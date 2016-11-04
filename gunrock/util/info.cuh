@@ -884,8 +884,13 @@ public:
             info["rmat_vmin"] = rmat_vmin;
             info["rmat_vmultipiler"] = rmat_vmultipiler;
             //can use to_string since c++11 is required, niiiice.
-            file_stem = "rmat_s"+std::to_string(rmat_scale)+"_e"+std::to_string(rmat_edgefactor);
-
+            file_stem = "rmat_" + 
+                (args.CheckCmdLineFlag("rmat_scale") ? 
+                    ("n" + std::to_string(rmat_scale)) : std::to_string(rmat_nodes)) 
+               + "_" + (args.CheckCmdLineFlag("rmat_edgefactor") ? 
+                    ("e" + std::to_string(rmat_edgefactor)) : std::to_string(rmat_edges));
+            info["dataset"] = file_stem;
+            
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
 
@@ -992,7 +997,14 @@ public:
             info["rgg_thfactor"]    = rgg_thfactor;
             info["rgg_threshold"]   = rgg_threshold;
             info["rgg_vmultipiler"] = rgg_vmultipiler;
-
+            //file_stem = "rgg_s"+std::to_string(rgg_scale)+"_e"+std::to_string(csr_ref.edges)+"_f"+std::to_string(rgg_thfactor);
+            file_stem = "rgg_" + 
+                (args.CheckCmdLineFlag("rgg_scale") ? 
+                    ("n" + std::to_string(rgg_scale)) : std::to_string(rgg_nodes)) 
+               + "_" + (args.CheckCmdLineFlag("rgg_thfactor") ? 
+                    ("t" + std::to_string(rgg_thfactor)) : std::to_string(rgg_threshold));
+            info["dataset"] = file_stem;
+ 
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
 
@@ -1009,7 +1021,6 @@ public:
             {
                 return 1;
             }
-            file_stem = "rgg_s"+std::to_string(rgg_scale)+"_e"+std::to_string(csr_ref.edges)+"_f"+std::to_string(rgg_thfactor);
 
             cpu_timer.Stop();
             float elapsed = cpu_timer.ElapsedMillis();
@@ -1051,7 +1062,12 @@ public:
             info["sw_k"          ] = (int64_t)sw_k          ;
             info["sw_vmultipiler"] = sw_vmultipiler;
             info["sw_vmin"       ] = sw_vmin       ;
-
+            file_stem = "smallworld_" + 
+                (args.CheckCmdLineFlag("sw_scale") ? 
+                    ("n" + std::to_string(sw_scale)) : std::to_string(sw_nodes))
+                + "k" + std::to_string(sw_k) + "_p" + std::to_string(sw_p); 
+            info["dataset"] = file_stem;
+ 
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
             if (graphio::small_world::BuildSWGraph<EDGE_VALUE>(
