@@ -49,7 +49,8 @@ ifneq ($(use_metis), 1)
 else
 	METIS_DEPS = -Xlinker -lmetis -Xcompiler -DMETIS_FOUND
 endif
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) -I.. -I../..
+GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=0.3.0
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) $(GUNROCK_DEF) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines

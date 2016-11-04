@@ -881,14 +881,14 @@ int main_VertexId(CommandLineArgs *args)
 // can be disabled to reduce compile time
 // atomicMin(long long) is only available for compute capability 3.5 or higher
     if (args -> CheckCmdLineFlag("64bit-VertexId"))
-#if __GR_CUDA_ARCH__ <= 300
-    {
-        printf("64bit-VertexId disabled, because atomicMin(long long) is only supported by compute capability 3.5 or higher\n");
-        return 1;
-    }
-#else
+//#if __GR_CUDA_ARCH__ <= 300
+//    {
+//        printf("64bit-VertexId disabled, because atomicMin(long long) is only supported by compute capability 3.5 or higher\n");
+//        return 1;
+//    }
+//#else
         return main_SizeT<long long>(args);
-#endif
+//#endif
     else
         return main_SizeT<int      >(args);
 }

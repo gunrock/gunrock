@@ -2298,7 +2298,10 @@ public:
     {
         if (this -> min_sm_version >= 300)
         {
-            if (traversal_mode == "LB")
+            if (this -> min_sm_version < 350 && sizeof(VertexId) == 8)
+                return util::GRError("64bit-VertexId disabled, because atomicMin(long long) is only supported by compute capability 3.5 or higher",
+                    __FILE__, __LINE__);
+            else if (traversal_mode == "LB")
                 return MODE_SWITCH<Problem::ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB>
                     ::Enact(*this, src);
             else if (traversal_mode == "TWC")
@@ -2340,7 +2343,10 @@ public:
     {
         if (this -> min_sm_version >= 300)
         {
-            if (traversal_mode == "LB")
+            if (this -> min_sm_version < 350 && sizeof(VertexId) == 8)
+                return util::GRError("64bit-VertexId disabled, because atomicMin(long long) is only supported by compute capability 3.5 or higher",
+                    __FILE__, __LINE__);
+            else if (traversal_mode == "LB")
                 return MODE_SWITCH<Problem::ENABLE_IDEMPOTENCE, gunrock::oprtr::advance::LB>
                     ::Init(*this, context, problem, max_grid_size);
             else if (traversal_mode == "TWC")
