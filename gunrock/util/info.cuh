@@ -875,6 +875,8 @@ public:
             info["rmat_edgefactor"] = (int64_t)rmat_edgefactor;
             info["rmat_vmin"] = rmat_vmin;
             info["rmat_vmultipiler"] = rmat_vmultipiler;
+            //can use to_string since c++11 is required, niiiice.
+            file_stem = "rmat_s"+std::to_string(rmat_scale)+"_e"+std::to_string(rmat_edgefactor);
 
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
@@ -999,6 +1001,7 @@ public:
             {
                 return 1;
             }
+            file_stem = "rgg_s"+std::to_string(rgg_scale)+"_e"+std::to_string(csr_ref.edges)+"_f"+std::to_string(rgg_thfactor);
 
             cpu_timer.Stop();
             float elapsed = cpu_timer.ElapsedMillis();
