@@ -155,7 +155,7 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
             SizeT new_frontier_elements[2] = {0,0};
             if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
-            // TODO: YC, is this part necessary?
+            // Reset mGPU counters and status
             for (int gpu = 0; gpu < this -> num_gpus; gpu++)
                 this -> wait_marker[gpu] = 0;
             for (int i=0; i<4; i++)
@@ -167,7 +167,6 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
                 this -> in_length[i][gpu] = 0;
             for (int peer=0; peer<this->num_gpus; peer++)
                 this -> out_length[peer] = 1;
-            // TODO: YC, is this part necessary?
 
             for (int peer=0;peer<(this->num_gpus > 1 ? this->num_gpus+1 : 1);peer++)
             for (int i=0; i < 2; i++)

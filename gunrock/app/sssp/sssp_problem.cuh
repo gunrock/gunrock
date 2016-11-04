@@ -35,7 +35,6 @@ template <
     typename    VertexId,
     typename    SizeT,
     typename    Value,
-    //bool        _MARK_PREDECESSORS>
     bool        _MARK_PATHS>
 struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
     true,//_MARK_PREDECESSORS, //MARK_PREDECESSORS

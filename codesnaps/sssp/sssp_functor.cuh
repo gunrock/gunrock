@@ -3,12 +3,12 @@
 // the Advance operator; and (2) two per-node functors, CondVertex and
 // ApplyVertex, which will be used in the Filter operator.
 
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename Problem>
 struct SSSPFunctor {
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
 
     // CondEdge assign the relaxed distance to destination node
-    __device__ bool CondEdge(VertexId s_id, VertexId d_id, VertexId e_id, DataSlice *p)
+    __device__ bool CondEdge(VertexId s_id, VertexId d_id, VertexId e_id, DataSlice *d_data_slice, ...)
     {
        Value label, weight;
        label = p->labels[s_id];
@@ -18,7 +18,7 @@ struct SSSPFunctor {
     }
 
     // ApplyEdge update the predecessor node ID 
-    __device__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *p)
+    __device__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *d_data_slice, ...)
     {
         if (ProblemData::MARK_PATHS)
             // We know the destination node is valid (from CondEdge),
@@ -27,14 +27,14 @@ struct SSSPFunctor {
             p->d_preds[d_id] = s_id;
     }
 
-    // In BFS, CondVertex checks if the vertex is valid in the next frontier.
-    __device__ void CondVertex(VertexId node, DataSlice *p)
+    // In SSSP, CondFilter checks if the vertex is valid in the next frontier.
+    __device__ void CondFilter(VertexId node, DataSlice *d_data_slice, ...)
     {
         return node != INVALID_NODE_ID;
     }
 
-    // In BFS, we don't apply any actions to vertices.
-    __device__ void ApplyVertex(VertexId node, DataSlice *p)
+    // In SSSP, we don't apply any actions to vertices.
+    __device__ void ApplyFilter(VertexId node, DataSlice *d_data_slice, ...)
     {
     }
 };

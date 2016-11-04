@@ -3,7 +3,7 @@
 BASEOPTION="--iteration-num=16 --in-sizing=1.1"
 BASEFLAG=""
 EXECUTION="./bin/test_cc_8.0_x86_64"
-DATADIR="/data/graphs/large"
+DATADIR="/data/gunrock_dataset/large"
 
 OPTION[0]="" && FLAG[0]=".default"
 OPTION[1]=" --undirected" && FLAG[1]=".undir"
@@ -34,9 +34,9 @@ NAME[12]="germany_osm"
 NAME[13]="road_usa"
 NAME[14]="road_central"
 
-for d in {1..1}
+for d in {1..4}
 do
-    SUFFIX="CentOS7.GTX1070x${d}"
+    SUFFIX="ubuntu14.04_K40cx${d}"
     mkdir -p eval/$SUFFIX
     DEVICE="0"
     for i in {1..8}
