@@ -518,8 +518,8 @@ public:
         if (info["destination_vertex"].get_int64() < 0 || info["destination_vertex"].get_int64()>=(int)csr_ref.nodes)
             info["destination_vertex"] = (int)csr_ref.nodes-1;   //if not set or something is wrong, set it to the largest vertex ID
         
-        info["num_vertices"] = csr_ref.nodes;
-        info["num_edges"   ] = csr_ref.edges;
+        info["num_vertices"] = (int64_t)csr_ref.nodes;
+        info["num_edges"   ] = (int64_t)csr_ref.edges;
     }
 
     /**
