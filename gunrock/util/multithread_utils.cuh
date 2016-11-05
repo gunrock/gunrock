@@ -318,7 +318,13 @@ extern "C" {
 
         for (_SizeT i=0;i<limit;i++)
         {
-            if (i!=0) sprintf(buffer,(i%10)==0?"%s, | " : "%s, ",buffer);
+            if (i!=0) 
+            {
+                if ((i%10) == 0)
+                    sprintf(buffer, "%s, |(%lld) ", buffer, (long long)i);
+                else
+                    sprintf(buffer, "%s, ", buffer);
+            }
             PrintValue(buffer,array[i],buffer);
         }
         PrintMessage(buffer,gpu,iteration, peer);

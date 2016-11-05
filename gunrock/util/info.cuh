@@ -570,9 +570,9 @@ public:
         csr_ptr = &csr_ref;  // set CSR pointer
         csc_ptr = &csc_ref;  // set CSC pointer
         InitBase(algorithm_name, args);
-        info["destination_vertex"] = (int)csr_ref.nodes-1;   //by default set it to the largest vertex ID
-        info["num_vertices"] = (int)csr_ref.nodes;
-        info["num_edges"   ] = (int)csr_ref.edges;
+        info["destination_vertex"] = (int64_t)csr_ref.nodes-1;   //by default set it to the largest vertex ID
+        info["num_vertices"] = (int64_t)csr_ref.nodes;
+        info["num_edges"   ] = (int64_t)csr_ref.edges;
     }
 
     /**

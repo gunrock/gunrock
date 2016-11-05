@@ -102,9 +102,11 @@ static __device__ __forceinline__ void ProcessNeighbor(
     }
 
     if (d_keys_out != NULL)
-    util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
-        u,
-        d_keys_out + output_pos);
+    {
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            u,
+            d_keys_out + output_pos);
+    }
 }
 
 template <typename VertexId, typename SizeT>

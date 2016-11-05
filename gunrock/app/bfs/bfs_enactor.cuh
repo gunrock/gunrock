@@ -1039,7 +1039,7 @@ struct BFSIteration : public IterationBase <
                 (SizeT*   )NULL,
                 (VertexId*)NULL,
                 graph_slice->nodes,
-                graph_slice->edges,
+                frontier_queue -> keys[frontier_attribute -> selector^1].GetSize(),
                 work_progress[0],
                 context[0],
                 stream,
@@ -1072,6 +1072,11 @@ struct BFSIteration : public IterationBase <
             //if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
             //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
             //    return;
+            //printf("%d\t %lld\t %lld\t Queue_Length = %lld, array_size = %lld\n",
+            //    thread_num, (long long)-1, (long long)enactor_stats -> iteration, 
+            //    (long long)frontier_attribute -> queue_length,
+            //    (long long)frontier_queue -> keys[frontier_attribute -> selector^1].GetSize());
+            //fflush(stdout);
             //util::cpu_mt::PrintGPUArray("AdvanceResult",
             //    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
             //    frontier_attribute -> queue_length,
@@ -1083,6 +1088,7 @@ struct BFSIteration : public IterationBase <
                 if (enactor -> debug)
                     util::cpu_mt::PrintMessage("Filter begin.",
                         thread_num, enactor_stats->iteration);
+                
                 gunrock::oprtr::filter::LaunchKernel
                     <FilterKernelPolicy, Problem, Functor> (
                     enactor_stats[0],
