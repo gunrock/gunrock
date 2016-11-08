@@ -432,6 +432,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     int      makeout_latency        = info->info["makeout_latency"   ].get_int ();
     std::string traversal_mode      = info->info["traversal_mode"    ].get_str ();
     if (traversal_mode == "TWC") traversal_mode = "LB";
+    if (max_queue_sizing < 0) max_queue_sizing = 1.2;
+    if (max_in_sizing < 0) max_in_sizing = 1.1; 
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
 
     CpuTimer cpu_timer;

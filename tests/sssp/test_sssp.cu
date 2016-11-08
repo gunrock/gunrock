@@ -326,11 +326,12 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     int      subqueue_latency       = info->info["subqueue_latency"  ].get_int (); 
     int      fullqueue_latency      = info->info["fullqueue_latency" ].get_int (); 
     int      makeout_latency        = info->info["makeout_latency"   ].get_int (); 
+    if (max_queue_sizing < 1.2) max_queue_sizing=1.2;
+    if (max_in_sizing < 0) max_in_sizing = 1.0;
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
 
     CpuTimer    cpu_timer;
     cudaError_t retval              = cudaSuccess;
-    if (max_queue_sizing < 1.2) max_queue_sizing=1.2;
 
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();

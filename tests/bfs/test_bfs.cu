@@ -322,7 +322,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     float    do_a                  = info->info["do_a"              ].get_real();
     float    do_b                  = info->info["do_b"              ].get_real();
     bool     undirected            = info->info["undirected"        ].get_bool();
-
+    if (max_queue_sizing < 0) max_queue_sizing = 6.5;
+    if (max_in_sizing < 0) max_in_sizing = 4;
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
 
     CpuTimer cpu_timer;

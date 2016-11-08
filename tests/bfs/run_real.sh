@@ -57,7 +57,7 @@ do
         fi
     done
 
-    for o1 in {0..1}; do for o2 in {2..3}; do for o3 in {4..5}; do for o4 in {6..7}; do for o5 in {8..10}; do for o6 in {11..14}; do
+    for o1 in {0..1}; do for o2 in {2..3}; do for o3 in {4..5}; do for o4 in {6..7}; do for o5 in {8..10}; do for o6 in {11..13}; do
 
     OPTIONS=${BASEOPTION}${OPTION[${o1}]}${OPTION[${o2}]}${OPTION[${o3}]}${OPTION[${o4}]}${OPTION[${o5}]}${OPTION[${o6}]}
     FLAGS=${BASEFLAG}${FLAG[${o1}]}${FLAG[${o2}]}${FLAG[${o3}]}${FLAG[${o4}]}${FLAG[${o5}]}${FLAG[${o6}]}

@@ -103,9 +103,9 @@ public:
         info["mark_predecessors"]  = false;  // mark predecessors (BFS, SSSP)
         info["max_grid_size"]      = 0;      // maximum grid size
         info["max_iteration"]      = 50;     // default maximum iteration
-        info["max_in_sizing"]      = 1.0f;   // maximum in queue sizing factor
-        info["max_queue_sizing"]   = 1.0f;   // maximum queue sizing factor
-        info["max_queue_sizing1"]  = -1.0f;   // maximum queue sizing factor
+        info["max_in_sizing"]      = -1.0f;  // maximum in queue sizing factor
+        info["max_queue_sizing"]   = -1.0f;  // maximum queue sizing factor
+        info["max_queue_sizing1"]  = -1.0f;  // maximum queue sizing factor
         info["m_teps"]             = 0.0f;   // traversed edges per second
         info["num_gpus"]           = 1;      // number of GPU(s) used
         info["nodes_visited"]      = 0;      // number of nodes visited
