@@ -697,11 +697,11 @@ void Iteration_Loop(
                     //    cudaStreamSynchronize(streams[peer_]),
                     //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
                     //    break;
-                    cudaError_t t_retval = cudaErrorNotReady;
-                    while (t_retval == cudaErrorNotReady)
+                    tretval = cudaErrorNotReady;
+                    while (tretval == cudaErrorNotReady)
                     {
-                        t_retval = cudaStreamQuery(streams[peer_]);
-                        if (t_retval == cudaErrorNotReady)
+                        tretval = cudaStreamQuery(streams[peer_]);
+                        if (tretval == cudaErrorNotReady)
                             sleep(0);
                     }
                     if (enactor_stats_ -> retval = util::GRError(tretval,
