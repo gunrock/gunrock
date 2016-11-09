@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>sssp_enactor.cuh</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>sssp_enactor.cuh</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      <p>The enactor defines how a graph primitive runs. It calls traversal
+(advance and filter operators) and computation (functors).</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="n">template</span><span class="o">&lt;</span>
+    <span class="kr">typename</span> <span class="n">KernelPolicy</span><span class="p">,</span>     <span class="c1">// `type of kernelpolicy, includes defination of VertexId, SizeT and Value</span>
+    <span class="kt">int</span> <span class="n">NUM_VERTEX_ASSOCIATES</span><span class="p">,</span> <span class="c1">// number of vertex associative of type VertexId transmitted with remote sub-frontiers </span>
+    <span class="kt">int</span> <span class="n">NUM_VALUE_ASSOCIATES</span><span class="o">&gt;</span>  <span class="c1">// number of vertex associative of type Value transmitted with remote sub-frontiers</span>
+<span class="n">__global__</span> <span class="kt">void</span> <span class="n">Expand_Incoming_Kernel</span><span class="p">(</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Kernel to combine received and local data</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>             <span class="kt">int</span>                     <span class="n">thread_num</span><span class="p">,</span>            <span class="c1">// thread number</span>
+    <span class="kr">typename</span> <span class="n">KernelPolicy</span><span class="o">::</span><span class="n">VertexId</span>  <span class="n">label</span><span class="p">,</span>                 <span class="c1">// label, equal to iteration number here</span>
+    <span class="kr">typename</span> <span class="n">KernelPolicy</span><span class="o">::</span><span class="n">SizeT</span>     <span class="n">num_elements</span><span class="p">,</span>          <span class="c1">// size of recevied sub-frontier</span>
+    <span class="kr">typename</span> <span class="n">KernelPolicy</span><span class="o">::</span><span class="n">VertexId</span> <span class="o">*</span><span class="n">d_keys_in</span><span class="p">,</span>             <span class="c1">// received sub-frontier</span>
+    <span class="kr">typename</span> <span class="n">KernelPolicy</span><span class="o">::</span><span class="n">VertexId</span> <span class="o">*</span><span class="n">d_vertex_associate_in</span><span class="p">,</span> <span class="c1">// received associatives of VertexId type</span>
+    <span class="kr">typename</span> <span class="n">KernelPolicy</span><span class="o">::</span><span class="n">Value</span>    <span class="o">*</span><span class="n">d_value__associate_in</span><span class="p">,</span> <span class="c1">// received associatives of Value type</span>
+    <span class="kr">typename</span> <span class="n">KernelPolicy</span><span class="o">::</span><span class="n">SizeT</span>    <span class="o">*</span><span class="n">d_out_length</span><span class="p">,</span>          <span class="c1">// output frontier size counter, may not start with 0</span>
+    <span class="kr">typename</span> <span class="n">KernelPolicy</span><span class="o">::</span><span class="n">VertexId</span> <span class="o">*</span><span class="n">d_keys_out</span><span class="p">,</span>            <span class="c1">// output frontier</span>
+    <span class="kr">typename</span> <span class="n">KernelPolicy</span><span class="o">::</span><span class="n">VertexId</span> <span class="o">*</span><span class="n">d_preds</span><span class="p">,</span>               <span class="c1">// the local per-vertex predecessor marker</span>
+    <span class="kr">typename</span> <span class="n">KernelPolicy</span><span class="o">::</span><span class="n">Value</span>    <span class="o">*</span><span class="n">d_distances</span><span class="p">,</span>           <span class="c1">// the local per-vertex distances marker</span>
+    <span class="kr">typename</span> <span class="n">KernelPolicy</span><span class="o">::</span><span class="n">VertexId</span> <span class="o">*</span><span class="n">d_labels</span><span class="p">)</span>              <span class="c1">// the local pre-vertex label marker</span>
+<span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>Below is algorithmicly equal to gunrock::app::sssp::Expan_Incoming_Kernel,
+but without optimizations.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">SizeT</span> <span class="n">x</span> <span class="o">=</span> <span class="p">(</span><span class="n">SizeT</span><span class="p">)</span><span class="n">blockIdx</span><span class="p">.</span><span class="n">x</span> <span class="o">*</span> <span class="n">blockDim</span><span class="p">.</span><span class="n">x</span> <span class="o">+</span> <span class="n">threadIdx</span><span class="p">.</span><span class="n">x</span><span class="p">;</span>
+    <span class="k">const</span> <span class="n">SizeT</span> <span class="n">STRIDE</span> <span class="o">=</span> <span class="p">(</span><span class="n">SizeT</span><span class="p">)</span><span class="n">blockDim</span><span class="p">.</span><span class="n">x</span> <span class="o">*</span> <span class="n">gridDim</span><span class="p">.</span><span class="n">x</span><span class="p">;</span>
+    <span class="k">while</span> <span class="p">(</span><span class="n">x</span> <span class="o">&lt;</span> <span class="n">num_elements</span><span class="p">)</span> <span class="c1">// for each element in the received sub-frontier</span>
+    <span class="p">{</span>
+        <span class="n">VertexId</span> <span class="n">key</span>          <span class="o">=</span> <span class="n">d_keys_in</span><span class="p">[</span><span class="n">x</span><span class="p">];</span>                           <span class="c1">// received vertex Id</span>
+        <span class="n">Value</span>    <span class="n">distance</span>     <span class="o">=</span> <span class="n">d_value__associate_in</span><span class="p">[</span><span class="n">x</span><span class="p">];</span>               <span class="c1">// received distance</span>
+        <span class="n">Value</span>    <span class="n">old_distance</span> <span class="o">=</span> <span class="n">atomicMin</span><span class="p">(</span><span class="n">d_distances</span> <span class="o">+</span> <span class="n">key</span><span class="p">,</span> <span class="n">distance</span><span class="p">);</span> <span class="c1">// compared with local distance</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">old_value</span> <span class="o">&gt;</span> <span class="n">value</span> <span class="o">&amp;&amp;</span> <span class="n">d_labels</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">!=</span> <span class="n">label</span><span class="p">)</span>
+        <span class="p">{</span> <span class="c1">// only when local distance got updated, and vertex not in local frontier</span>
+            <span class="n">d_labels</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">label</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">NUM_VERTEX_ASSOCIATES</span> <span class="o">==</span> <span class="mi">1</span> <span class="o">&amp;&amp;</span> <span class="n">d_distances</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">==</span> <span class="n">distance</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>if need to mark predecessors, and the curent distance is still not changed yet</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                <span class="n">d_preds</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">d_vertex_associate_in</span><span class="p">[</span><span class="n">x</span><span class="p">];</span>  <span class="c1">// assign the received predecessor</span>
+            <span class="n">d_keys_out</span><span class="p">[</span><span class="n">atomicAdd</span><span class="p">(</span><span class="n">d_out_length</span><span class="p">,</span> <span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="n">key</span><span class="p">;</span> <span class="c1">// put vertex in output frontier</span>
+        <span class="p">}</span>
+        
+        <span class="n">x</span> <span class="o">+=</span> <span class="n">STRIDE</span><span class="p">;</span> <span class="c1">// presistant thread loop</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">template</span><span class="o">&lt;</span>
+    <span class="kr">typename</span> <span class="n">AdvanceKernelPolicy</span><span class="p">,</span> <span class="c1">// Kernel policy for advance</span>
+    <span class="kr">typename</span> <span class="n">FilterKernelPolicy</span><span class="p">,</span>  <span class="c1">// Kernel policy for filter</span>
+    <span class="kr">typename</span> <span class="n">Enactor</span><span class="o">&gt;</span>             <span class="c1">// type of enactor</span>
+<span class="k">struct</span> <span class="nl">SSSPIteration</span> <span class="p">:</span> <span class="n">public</span> <span class="n">IterationBase</span> <span class="o">&lt;</span> <span class="c1">// Based on IterationBase</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>Main iteration loop for SSSP primitive</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">AdvanceKernelPolicy</span><span class="p">,</span> <span class="n">FilterKernelPolicy</span><span class="p">,</span> <span class="n">Enactor</span><span class="p">,</span>
+    <span class="nb">false</span><span class="p">,</span>  <span class="c1">//HAS_SUBQ = false, don&#39;t have SubQ_Core</span>
+    <span class="nb">true</span><span class="p">,</span>   <span class="c1">//HAS_FULLQ = true, has FullQ_Core</span>
+    <span class="nb">false</span><span class="p">,</span>  <span class="c1">//BACKWARD = false, communication is not backward</span>
+    <span class="nb">true</span><span class="p">,</span>   <span class="c1">//FORWARD = true, communication is forward</span>
+    <span class="n">Enactor</span><span class="o">::</span><span class="n">Problem</span><span class="o">::</span><span class="n">MARK_PATHS</span><span class="o">&gt;</span> <span class="c1">// MARK_PREDECESSORS, whether to mark predecessors</span>
+<span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>which Functor the iteration uses</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">typedef</span> <span class="n">SSSPFunctor</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">SizeT</span><span class="p">,</span> <span class="n">Value</span><span class="p">,</span> <span class="n">Problem</span><span class="o">&gt;</span>
+                                        <span class="n">Functor</span>   <span class="p">;</span>
+
+    <span class="n">template</span> <span class="o">&lt;</span>
+        <span class="kt">int</span> <span class="n">NUM_VERTEX_ASSOCIATES</span><span class="p">,</span> <span class="c1">// number of vertex associative of type VertexId transmitted with remote sub-frontiers </span>
+        <span class="kt">int</span> <span class="n">NUM_VALUE__ASSOCIATES</span><span class="o">&gt;</span>  <span class="c1">// number of vertex associative of type Value transmitted with remote sub-frontiers </span>
+    <span class="k">static</span> <span class="kt">void</span> <span class="n">Expand_Incoming</span><span class="p">(...)</span>
+    <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>Check whether allocated memory space for the output array is sufficient first
+set out_length[peer_] to be 0, when not using unified received</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">Expand_Incoming_Kernel</span>
+            <span class="o">&lt;</span><span class="n">AdvanceKernelPolicy</span><span class="p">,</span> <span class="n">NUM_VERTEX_ASSOCIATES</span><span class="p">,</span> <span class="n">NUM_VALUE__ASSOCIATES</span><span class="o">&gt;</span>
+            <span class="o">&lt;&lt;&lt;</span><span class="p">...</span><span class="o">&gt;&gt;&gt;</span>
+            <span class="p">(</span><span class="n">gpu_idx</span><span class="p">,</span>            <span class="c1">// thread_num</span>
+            <span class="n">iteration</span><span class="p">,</span>           <span class="c1">// iteration_num</span>
+            <span class="n">num_elements</span><span class="p">,</span>        <span class="c1">// received sub-frontier size</span>
+            <span class="n">keys_in</span><span class="p">,</span>             <span class="c1">// received sub-frontier</span>
+            <span class="n">vertex_associate_in</span><span class="p">,</span> <span class="c1">// received associatives of VertexId type</span>
+            <span class="n">value__associate_in</span><span class="p">,</span> <span class="c1">// received associatives of Value type</span>
+            <span class="n">out_length</span><span class="p">,</span>          <span class="c1">// output frontier size</span>
+            <span class="n">keys_out</span><span class="p">,</span>            <span class="c1">// output frontier</span>
+            <span class="n">preds</span><span class="p">,</span>               <span class="c1">// local predecessor marker array</span>
+            <span class="n">distances</span><span class="p">,</span>           <span class="c1">// local distance array</span>
+            <span class="n">labels</span><span class="p">);</span>             <span class="c1">// local label array</span>
+        <span class="n">out_length</span><span class="p">.</span><span class="n">Move</span><span class="p">(</span><span class="n">DEVICE</span><span class="p">,</span> <span class="n">HOST</span><span class="p">,</span> <span class="p">...);</span>
+    <span class="p">}</span>
+
+    <span class="k">static</span> <span class="n">cudaError_t</span> <span class="n">Compute_OutputLength</span><span class="p">(...)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>Compute the resulted frontier size, for memory (re)allocation purpose</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="p">{</span>
+        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">size_check</span> <span class="c1">// no need to check whether memory allocation is sufficient</span>
+            <span class="o">&amp;&amp;</span> <span class="o">!</span><span class="n">hasPreScan</span><span class="o">&lt;</span><span class="n">AdvanceKernelPolicy</span><span class="o">::</span><span class="n">ADVANCE_MODE</span><span class="o">&gt;</span><span class="p">())</span> <span class="c1">// advance does not require pre-scan</span>
+        <span class="p">{</span>
+            <span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">output_length</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="c1">// has no memory requirement</span>
+            <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>check whether partitioned_scanned_edges array is sufficient</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">Size_Check</span><span class="o">&lt;</span><span class="n">SizeT</span><span class="p">,</span> <span class="n">SizeT</span><span class="o">&gt;</span><span class="p">(</span>
+                <span class="n">size_check</span><span class="p">,</span> <span class="s">&quot;scanned_edges&quot;</span><span class="p">,</span>
+                <span class="n">frontir_atrribute</span> <span class="o">-&gt;</span> <span class="n">queue_length</span> <span class="o">+</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="n">partitioned_scanned_edges</span><span class="p">,</span> <span class="p">...))</span>
+                <span class="k">return</span> <span class="n">retval</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>perform a scan on the out-degrees of current frontier,
+use the result for memory size check and possible reallocation
+used for load balancing also</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">retval</span> <span class="o">=</span> <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">ComputeOutputLength</span>
+                <span class="o">&lt;</span><span class="p">...</span><span class="o">&gt;</span><span class="p">(</span><span class="n">frontier_attribute</span><span class="p">,</span> <span class="n">d_in_key_queue</span><span class="p">,</span> <span class="n">partitioned_scanned_edges</span><span class="p">,</span> <span class="p">...);</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <p>get the computed output size onto CPU</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">output_length</span><span class="p">.</span><span class="n">Move</span><span class="p">(</span><span class="n">DEVICE</span><span class="p">,</span> <span class="n">HOST</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">stream</span><span class="p">);</span>
+            <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="k">static</span> <span class="kt">void</span> <span class="n">Check_Queue_Size</span><span class="p">(...)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>Ensure output frontier allocation are sufficient</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">size_check</span> <span class="c1">// no need to check whether memory allocation is sufficient</span>
+           <span class="o">&amp;&amp;</span> <span class="o">!</span><span class="n">hasPreScan</span><span class="o">&lt;</span><span class="n">AdvanceKernelPolicy</span><span class="o">::</span><span class="n">ADVANCE_MODE</span><span class="o">&gt;</span><span class="p">())</span> <span class="c1">// advance does not require pre-scan</span>
+        <span class="p">{</span>
+            <span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">output_length</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+            <span class="k">return</span> <span class="n">retval</span><span class="p">;</span> <span class="c1">// no need to garentee sufficient memory</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">isFused</span><span class="o">&lt;</span><span class="n">AdvanceKernelPolicy</span><span class="o">::</span><span class="n">ADVANCE_MODE</span><span class="o">&gt;</span><span class="p">())</span> <span class="c1">// do not use kernel fusion</span>
+        <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <p>make sure sufficient allocation for frontier between advance and filter</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">CheckSize</span><span class="o">&lt;</span><span class="n">SizeT</span><span class="p">,</span> <span class="n">VertexId</span><span class="o">&gt;</span><span class="p">(</span>
+                <span class="p">...,</span><span class="n">request_length</span><span class="p">,</span> <span class="n">frontier_queue</span> <span class="o">-&gt;</span> <span class="n">keys</span><span class="p">[</span><span class="n">selector</span><span class="o">^</span><span class="mi">1</span><span class="p">],</span> <span class="p">...)</span> 
+                <span class="k">return</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <p>make sure sufficient allocation for frontier after filter</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">CheckSize</span><span class="o">&lt;</span><span class="n">SizeT</span><span class="p">,</span> <span class="n">VertexId</span><span class="o">&gt;</span><span class="p">(</span>
+                <span class="p">...,</span><span class="n">graph_slice</span> <span class="o">-&gt;</span> <span class="n">nodes</span> <span class="o">*</span> <span class="mf">1.2</span><span class="p">,</span> <span class="n">frontier_queue</span> <span class="o">-&gt;</span> <span class="n">keys</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="p">...)</span> 
+                <span class="k">return</span><span class="p">;</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span> <span class="c1">// when use kernel fusion</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <p>make sure sufficient allocation for frontier after filter</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">CheckSize</span><span class="o">&lt;</span><span class="n">SizeT</span><span class="p">,</span> <span class="n">VertexId</span><span class="o">&gt;</span><span class="p">(</span>
+                <span class="p">...,</span><span class="n">graph_slice</span> <span class="o">-&gt;</span> <span class="n">nodes</span> <span class="o">*</span> <span class="mf">1.2</span><span class="p">,</span> <span class="n">frontier_queue</span> <span class="o">-&gt;</span> <span class="n">keys</span><span class="p">[</span><span class="n">selector</span><span class="o">^</span><span class="mi">1</span><span class="p">],</span> <span class="p">...)</span> 
+                <span class="k">return</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="k">static</span> <span class="kt">void</span> <span class="n">FullQueue_Core</span><span class="p">(...)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      <p>The main per-iteration computation step </p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="p">{</span>
+        <span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">queue_reset</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span> <span class="c1">// use frotnier_attribute -&gt; queue_length as input frontier size</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      <p>Edge Map
+Traverse out going edges of vertices in the input frontier,
+and for every such edge, evaluate Functor::CondEdge(...),
+and if true, execute Functor::ApplyEdge(...)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">LaunchKernel</span>
+            <span class="o">&lt;</span><span class="p">...,</span> <span class="n">Functor</span><span class="p">,</span> <span class="p">...</span><span class="o">&gt;</span><span class="p">(</span>
+            <span class="n">frontier_attribute</span><span class="p">,</span> <span class="c1">// frontier attributes</span>
+            <span class="n">data_slice</span><span class="p">,</span>         <span class="c1">// problem associative data</span>
+            <span class="n">frontier_queue</span> <span class="o">-&gt;</span> <span class="n">keys</span><span class="p">[</span><span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">selector</span>  <span class="p">],</span> <span class="c1">// input frontier</span>
+            <span class="n">frontier_queue</span> <span class="o">-&gt;</span> <span class="n">keys</span><span class="p">[</span><span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">selector</span><span class="o">^</span><span class="mi">1</span><span class="p">],</span> <span class="c1">// output frontier</span>
+            <span class="n">graph_slice</span><span class="p">,</span> <span class="c1">// row_offsets, column_indices, etc.</span>
+            <span class="p">...);</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">advance</span><span class="o">::</span><span class="n">isFused</span><span class="o">&lt;</span><span class="n">AdvanceKernelPolicy</span><span class="o">::</span><span class="n">ADVANCE_MODE</span><span class="o">&gt;</span><span class="p">())</span> <span class="c1">// if kernel fusion is not in effect</span>
+        <span class="p">{</span>
+            <span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">queue_reset</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span> <span class="c1">// use outputed frontier length from advance, as input frontier length to filter</span>
+            <span class="n">frotnier_attribute</span> <span class="o">-&gt;</span> <span class="n">queue_index</span> <span class="o">++</span><span class="p">;</span>
+            <span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">selector</span> <span class="o">^=</span> <span class="mi">1</span><span class="p">;</span>       <span class="c1">// aternate ping-pong queue</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      <p>Vertex Map
+for every vertex in the output frontier from advance,
+evaluate Functor::CondFilter(...),
+and if true, execute Funtor::ApplyFilter(...) and put such vertex in output frontier</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">gunrock</span><span class="o">::</span><span class="n">oprtr</span><span class="o">::</span><span class="n">filter</span><span class="o">::</span><span class="n">LaunchKernel</span>
+                <span class="o">&lt;</span><span class="p">...,</span> <span class="n">Functor</span><span class="p">,</span> <span class="p">...</span><span class="o">&gt;</span><span class="p">(</span>
+                <span class="n">frontier_attribute</span><span class="p">,</span> <span class="c1">// frontier_attributes,</span>
+                <span class="n">data_slice</span><span class="p">,</span>         <span class="c1">// problem associative data,</span>
+                <span class="n">frontier_queue</span> <span class="o">-&gt;</span> <span class="n">keys</span><span class="p">[</span><span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">selector</span>  <span class="p">],</span> <span class="c1">// input frontier</span>
+                <span class="n">frontier_queue</span> <span class="o">-&gt;</span> <span class="n">keys</span><span class="p">[</span><span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">selector</span><span class="o">^</span><span class="mi">1</span><span class="p">],</span> <span class="c1">// output frontier</span>
+                <span class="n">graph_slice</span><span class="p">,</span> <span class="c1">// num_nodes, etc.</span>
+                <span class="p">...);</span> 
+        <span class="p">}</span>
+
+        <span class="n">frotnier_attribute</span> <span class="o">-&gt;</span> <span class="n">queue_index</span> <span class="o">++</span><span class="p">;</span>
+        <span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">selector</span> <span class="o">^=</span> <span class="mi">1</span><span class="p">;</span>       <span class="c1">// aternate ping-pong queue</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">work_progress</span> <span class="o">-&gt;</span> <span class="n">GetQueueLength</span><span class="p">(</span>
+            <span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">queue_index</span><span class="p">,</span>
+            <span class="n">frontier_attribute</span> <span class="o">-&gt;</span> <span class="n">queue_length</span><span class="p">,</span>
+            <span class="p">...))</span> <span class="k">return</span><span class="p">;</span> <span class="c1">// get the output queue length on CPU</span>
+    <span class="p">}</span>
+
+<span class="p">};</span>
+
+<span class="n">template</span><span class="o">&lt;</span>
+    <span class="kr">typename</span> <span class="n">AdvanceKernelPolicy</span><span class="p">,</span> <span class="c1">// Kernel policy for advance</span>
+    <span class="kr">typename</span> <span class="n">FilterKernelPolicy</span><span class="p">,</span>  <span class="c1">// Kernel policy for filter</span>
+    <span class="kr">typename</span> <span class="n">Enactor</span><span class="o">&gt;</span>             <span class="c1">// type of enactor</span>
+<span class="k">static</span> <span class="n">CUT_THREADPROC</span> <span class="n">SSSPThread</span><span class="p">(</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      <p>the per-GPU controlling thread on CPU</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="kt">void</span> <span class="o">*</span><span class="n">thread_data_</span><span class="p">)</span>           <span class="c1">// data package to bypass the thread boundary</span>
+<span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      <p>... thread perparation</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    
+    <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">SetDevice</span><span class="p">(</span><span class="n">gpu_idx</span><span class="p">))</span>
+    <span class="p">{</span> <span class="c1">// if set device failed, quit</span>
+        <span class="n">thread_data</span> <span class="o">-&gt;</span> <span class="n">status</span> <span class="o">=</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">Ended</span><span class="p">;</span>
+        <span class="n">CUT_THREADEND</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">thread_data</span> <span class="o">-&gt;</span> <span class="n">status</span> <span class="o">=</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">Idle</span><span class="p">;</span> <span class="c1">// ready, and waiting to enact</span>
+    <span class="k">while</span> <span class="p">(</span><span class="n">thread_data</span> <span class="o">-&gt;</span> <span class="n">status</span> <span class="o">!=</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">ToKill</span><span class="p">)</span> <span class="c1">// loop till instruct to kill</span>
+    <span class="p">{</span>
+        <span class="k">while</span> <span class="p">(</span><span class="n">thread_data</span> <span class="o">-&gt;</span> <span class="n">status</span> <span class="o">==</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">Wait</span> <span class="o">||</span>
+               <span class="n">thread_data</span> <span class="o">-&gt;</span> <span class="n">status</span> <span class="o">==</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">Idle</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">sleep</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span> <span class="c1">// wait until status changes</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">thread_data</span> <span class="o">-&gt;</span> <span class="n">status</span> <span class="o">==</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">ToKill</span><span class="p">)</span>
+            <span class="k">break</span><span class="p">;</span> <span class="c1">// end if instructed</span>
+
+        <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">peer_</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">peer_</span><span class="o">&lt;</span><span class="n">num_gpus</span><span class="p">;</span><span class="n">peer_</span><span class="o">++</span><span class="p">)</span>
+        <span class="p">{</span> <span class="c1">// setup frontiers</span>
+            <span class="n">frontier_attribute</span><span class="p">[</span><span class="n">peer_</span><span class="p">].</span><span class="n">queue_index</span>  <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="c1">// Work queue index</span>
+            <span class="n">frontier_attribute</span><span class="p">[</span><span class="n">peer_</span><span class="p">].</span><span class="n">queue_length</span> <span class="o">=</span> <span class="n">peer_</span><span class="o">==</span><span class="mi">0</span><span class="o">?</span><span class="n">thread_data</span><span class="o">-&gt;</span><span class="nl">init_size</span><span class="p">:</span><span class="mi">0</span><span class="p">;</span>
+            <span class="n">frontier_attribute</span><span class="p">[</span><span class="n">peer_</span><span class="p">].</span><span class="n">selector</span>     <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+            <span class="n">frontier_attribute</span><span class="p">[</span><span class="n">peer_</span><span class="p">].</span><span class="n">queue_reset</span>  <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
+            <span class="n">enactor_stats</span>     <span class="p">[</span><span class="n">peer_</span><span class="p">].</span><span class="n">iteration</span>    <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+        <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      <p>Perform one SSSP iteration loop</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">gunrock</span><span class="o">::</span><span class="n">app</span><span class="o">::</span><span class="n">Iteration_Loop</span>
+            <span class="o">&lt;</span><span class="n">Enactor</span><span class="p">,</span> <span class="n">Functor</span><span class="p">,</span> <span class="n">SSSPIteration</span><span class="o">&lt;</span><span class="p">...</span><span class="o">&gt;</span><span class="p">,</span> <span class="p">...</span><span class="o">&gt;</span>
+            <span class="p">(</span><span class="n">thread_data</span><span class="p">);</span>
+
+        <span class="n">thread_data</span> <span class="o">-&gt;</span> <span class="n">status</span> <span class="o">=</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">Idle</span><span class="p">;</span> <span class="c1">// signal work done</span>
+    <span class="p">}</span>
+    <span class="n">CUT_THREADEND</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">template</span> <span class="o">&lt;</span><span class="kr">typename</span> <span class="n">Problem</span><span class="o">&gt;</span> <span class="c1">// type of Problem</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">class</span> <span class="nl">SSSPEnactor</span> <span class="p">:</span> <span class="n">public</span> <span class="n">EnactorBase</span><span class="o">&lt;</span><span class="kr">typename</span> <span class="n">Problem</span><span class="o">::</span><span class="n">SizeT</span><span class="o">&gt;</span> 
+<span class="p">{</span>
+    <span class="n">ThreadSlice</span> <span class="o">*</span><span class="n">thread_slices</span><span class="p">;</span> <span class="c1">// thread data for CPU control threads</span>
+    <span class="n">CUTThread</span>   <span class="o">*</span><span class="n">thread_Ids</span><span class="p">;</span>    <span class="c1">// thread Id for CPU control threads</span>
+
+<span class="nl">public</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      <p>constructor of the Enactor</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">SSSPEnactor</span><span class="p">(...)</span>
+    <span class="p">...</span>
+    <span class="p">{}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      <p>destructor of the Eanctor</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">virtual</span> <span class="o">~</span><span class="n">SSSPEnactor</span><span class="p">()</span> 
+    <span class="p">{</span>
+        <span class="n">Release</span><span class="p">();</span> <span class="c1">// release allocated memory</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      <p>routine to release allocated memory</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="n">Release</span><span class="p">()</span>
+    <span class="p">{</span>
+        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">thread_slices</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">gpu</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">gpu</span> <span class="o">&lt;</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">;</span> <span class="n">gpu</span><span class="o">++</span><span class="p">)</span>
+                <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">status</span> <span class="o">=</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">ToKill</span><span class="p">;</span>
+            <span class="n">cutWaitForThreads</span><span class="p">(</span><span class="n">thread_Ids</span><span class="p">,</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">);</span> <span class="c1">// Kill all GPU controling threads</span>
+            <span class="n">delete</span><span class="p">[]</span> <span class="n">thread_Ids</span>   <span class="p">;</span> <span class="n">thread_Ids</span>    <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span> 
+            <span class="n">delete</span><span class="p">[]</span> <span class="n">thread_slices</span><span class="p">;</span> <span class="n">thread_slices</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span> <span class="c1">// deallocate thread data</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">BaseEnactor</span><span class="o">::</span><span class="n">Release</span><span class="p">())</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span> <span class="c1">// release memory allocated by parent class</span>
+        <span class="n">problem</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">template</span><span class="o">&lt;</span>
+        <span class="kr">typename</span> <span class="n">AdvanceKernelPolicy</span><span class="p">,</span> <span class="c1">// kernel policy for advance operator</span>
+        <span class="kr">typename</span> <span class="n">FilterKernelPolicy</span><span class="o">&gt;</span>  <span class="c1">// kernel policy for filter operator</span>
+    <span class="n">cudaError_t</span> <span class="n">InitSSSP</span><span class="p">(</span>             <span class="c1">// initialize SSSP Enactor</span>
+        <span class="n">ContextPtr</span>  <span class="o">*</span><span class="n">context</span><span class="p">,</span>         <span class="c1">// mGPU ContextPtr</span>
+        <span class="n">Problem</span>     <span class="o">*</span><span class="n">problem</span><span class="p">,</span>         <span class="c1">// problem data</span>
+        <span class="kt">int</span>         <span class="n">max_grid_size</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      <p>Initialize BaseEnactor</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">BaseEnactor</span><span class="o">::</span><span class="n">Init</span><span class="p">(</span>
+            <span class="n">max_grid_size</span><span class="p">,</span>
+            <span class="n">AdvanceKernelPolicy</span><span class="o">::</span><span class="n">CTA_OCCUPANCY</span><span class="p">,</span>
+            <span class="n">FilterKernelPolicy</span><span class="o">::</span><span class="n">CTA_OCCUPANCY</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+
+        <span class="n">this</span><span class="o">-&gt;</span><span class="n">problem</span> <span class="o">=</span> <span class="n">problem</span><span class="p">;</span>
+        <span class="n">thread_slices</span> <span class="o">=</span> <span class="n">new</span> <span class="n">ThreadSlice</span> <span class="p">[</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">];</span>
+        <span class="n">thread_Ids</span>    <span class="o">=</span> <span class="n">new</span> <span class="n">CUTThread</span>   <span class="p">[</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">];</span> <span class="c1">// GPU controlling thread data</span>
+
+        <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">gpu</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">gpu</span><span class="o">&lt;</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">;</span><span class="n">gpu</span><span class="o">++</span><span class="p">)</span>
+        <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      <p>assign thread data</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">thread_num</span>    <span class="o">=</span> <span class="n">gpu</span><span class="p">;</span>
+            <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">problem</span>       <span class="o">=</span> <span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">problem</span><span class="p">;</span>
+            <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">enactor</span>       <span class="o">=</span> <span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">this</span><span class="p">;</span>
+            <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">context</span>       <span class="o">=</span> <span class="o">&amp;</span><span class="p">(</span><span class="n">context</span><span class="p">[</span><span class="n">gpu</span><span class="o">*</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">]);</span>
+            <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">status</span>        <span class="o">=</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">Inited</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      <p>start the thread</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">thread_Id</span>     <span class="o">=</span> <span class="n">cutStartThread</span><span class="p">(</span>
+                    <span class="p">(</span><span class="n">CUT_THREADROUTINE</span><span class="p">)</span><span class="o">&amp;</span><span class="p">(</span><span class="n">SSSPThread</span><span class="o">&lt;</span>
+                        <span class="n">AdvanceKernelPolicy</span><span class="p">,</span> <span class="n">FilterKernelPolicy</span><span class="p">,</span>
+                        <span class="n">SSSPEnactor</span><span class="o">&lt;</span><span class="n">Problem</span><span class="o">&gt;</span> <span class="o">&gt;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="p">(</span><span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">]));</span>
+            <span class="n">thread_Ids</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span> <span class="o">=</span> <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">thread_Id</span><span class="p">;</span>
+        <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      <p>wait till all controlling threads ready</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">gpu</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span> <span class="n">gpu</span> <span class="o">&lt;</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">;</span> <span class="n">gpu</span><span class="o">++</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="k">while</span> <span class="p">(</span><span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">status</span> <span class="o">!=</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">Idle</span><span class="p">)</span>
+            <span class="p">{</span>
+                <span class="n">sleep</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      <p>Routine to reset the Enactor</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="n">Reset</span><span class="p">()</span>
+    <span class="p">{</span>
+        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      <p>Reset the BaseEnactor</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">BaseEnactor</span><span class="o">::</span><span class="n">Reset</span><span class="p">())</span>
+            <span class="k">return</span> <span class="n">retval</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      <p>Signal every controlling thread to wait</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">gpu</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span> <span class="n">gpu</span> <span class="o">&lt;</span> <span class="n">this</span> <span class="o">-&gt;</span> <span class="n">num_gpus</span><span class="p">;</span> <span class="n">gpu</span><span class="o">++</span><span class="p">)</span>
+            <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">status</span> <span class="o">=</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">Wait</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">template</span><span class="o">&lt;</span>
+        <span class="kr">typename</span> <span class="n">AdvanceKernelPolicy</span><span class="p">,</span>
+        <span class="kr">typename</span> <span class="n">FilterKernelPolicy</span><span class="o">&gt;</span>
+    <span class="n">cudaError_t</span> <span class="n">EnactSSSP</span><span class="p">(</span>
+        <span class="n">VertexId</span> <span class="n">src</span><span class="p">)</span>    <span class="c1">// the source vertex</span>
+    <span class="p">{</span>
+        <span class="n">cudaError_t</span>  <span class="n">retval</span>     <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-32'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-32'>#</a>
+      </div>
+      <p>prepare initial frontier size for each GPU</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">gpu</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span><span class="n">gpu</span><span class="o">&lt;</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">;</span><span class="n">gpu</span><span class="o">++</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="k">if</span> <span class="p">((</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span> <span class="o">==</span><span class="mi">1</span><span class="p">)</span> <span class="o">||</span> <span class="p">(</span><span class="n">gpu</span><span class="o">==</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">problem</span><span class="o">-&gt;</span><span class="n">partition_tables</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">src</span><span class="p">]))</span>
+                 <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">init_size</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span>
+            <span class="k">else</span> <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">init_size</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+            <span class="n">this</span><span class="o">-&gt;</span><span class="n">frontier_attribute</span><span class="p">[</span><span class="n">gpu</span><span class="o">*</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">].</span><span class="n">queue_length</span>
+                <span class="o">=</span> <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">init_size</span><span class="p">;</span>
+        <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-33'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-33'>#</a>
+      </div>
+      <p>singnal controlling threads to process</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">gpu</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span> <span class="n">gpu</span><span class="o">&lt;</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">;</span> <span class="n">gpu</span><span class="o">++</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">status</span> <span class="o">=</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">Running</span><span class="p">;</span>
+        <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-34'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-34'>#</a>
+      </div>
+      <p>wait until all controling threads finish</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">gpu</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span> <span class="n">gpu</span><span class="o">&lt;</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">;</span> <span class="n">gpu</span><span class="o">++</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="k">while</span> <span class="p">(</span><span class="n">thread_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">status</span> <span class="o">!=</span> <span class="n">ThreadSlice</span><span class="o">::</span><span class="n">Status</span><span class="o">::</span><span class="n">Idle</span><span class="p">)</span>
+            <span class="p">{</span>
+                <span class="n">sleep</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+            <span class="p">}</span>
+        <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-35'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-35'>#</a>
+      </div>
+      <p>check whether has error</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">gpu</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span> <span class="n">gpu</span><span class="o">&lt;</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span> <span class="o">*</span> <span class="n">this</span> <span class="o">-&gt;</span> <span class="n">num_gpus</span><span class="p">;</span><span class="n">gpu</span><span class="o">++</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">enactor_stats</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">retval</span><span class="o">!=</span><span class="n">cudaSuccess</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">retval</span><span class="o">=</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">enactor_stats</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">retval</span><span class="p">;</span>
+            <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">this</span> <span class="o">-&gt;</span> <span class="n">debug</span><span class="p">)</span> <span class="n">printf</span><span class="p">(</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">GPU SSSP Done.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+        <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-36'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-36'>#</a>
+      </div>
+      <p>Define filter and advance KernelPolicy</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-37'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-37'>#</a>
+      </div>
+      <p>Enact calling functions</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-38'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-38'>#</a>
+      </div>
+      <p>Enact interface</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="n">Enact</span><span class="p">(</span>
+        <span class="n">VertexId</span> <span class="n">src</span><span class="p">,</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">traversal_mode</span> <span class="o">=</span> <span class="s">&quot;LB&quot;</span><span class="p">)</span>
+    <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-39'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-39'>#</a>
+      </div>
+      <p>Select traversal mode, and SM version to call</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="n">EnactSSSP</span><span class="o">&lt;</span><span class="p">...</span><span class="o">&gt;</span><span class="p">(</span><span class="n">src</span><span class="p">);</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-40'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-40'>#</a>
+      </div>
+      <p>Init interface</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="n">Init</span><span class="p">(...)</span>
+    <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-41'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-41'>#</a>
+      </div>
+      <p>Select traversal mode, and SM version to call</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="n">InitSSSP</span><span class="o">&lt;</span><span class="p">...</span><span class="o">&gt;</span><span class="p">(...);</span>
+    <span class="p">}</span>
+    
+<span class="p">};</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

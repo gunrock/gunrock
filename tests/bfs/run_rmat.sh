@@ -1,14 +1,19 @@
 #!/bin/bash
 
-OPTION="--undirected --idempotence --src=largestdegree --traversal-mode=LB_CULL --direction-optimized --queue-sizing=6.5 --in-sizing=4 --iteration-num=10 --do_a=0.00001 --do_b=0.1"
-MARK=".skip_pred.undir.idempotence.LB_CULL.32bitSizeT.do"
-EXECUTION="./bin/test_bfs_7.5_x86_64"
+OPTION="--idempotence --src=largestdegree --traversal-mode=LB_CULL --direction-optimized --queue-sizing=6.5 --in-sizing=4 --iteration-num=10 --do_a=0.00001 --do_b=0.1"
+MARK=".skip_pred.idempotence.LB_CULL.32bitSizeT.do"
+EXECUTION="./bin/test_bfs_8.0_x86_64"
 DATADIR="/data/gunrock_dataset/large"
 
-for d in {1..4}
+for d in {1..2}
 do
-    SUFFIX="ubuntu14_04.k40cx${d}_rand"
+    SUFFIX="ubuntu14.04_k40cx${d}_rand"
     mkdir -p eval/$SUFFIX
+    #DEVICE="2"
+    #if [ "$d" -eq "2" ]; then
+    #    DEVICE=$DEVICE",3"
+    #fi
+
     DEVICE="0"
     for i in {1..8}
     do
