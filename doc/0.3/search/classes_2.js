@@ -20,13 +20,13 @@ var searchData=
   ['cooperativetilescan',['CooperativeTileScan',['../structgunrock_1_1util_1_1scan_1_1_cooperative_tile_scan.html',1,'gunrock::util::scan']]],
   ['cotfunctor',['COTFunctor',['../structgunrock_1_1app_1_1wtf_1_1_c_o_t_functor.html',1,'gunrock::app::wtf']]],
   ['csr',['Csr',['../structgunrock_1_1_csr.html',1,'gunrock']]],
-  ['cta',['Cta',['../structgunrock_1_1oprtr_1_1filter_1_1_cta.html',1,'gunrock::oprtr::filter']]],
   ['cta',['Cta',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta.html',1,'gunrock::oprtr::edge_map_backward']]],
   ['cta',['Cta',['../structgunrock_1_1oprtr_1_1edge__map__forward_1_1_cta.html',1,'gunrock::oprtr::edge_map_forward']]],
+  ['cta',['Cta',['../structgunrock_1_1oprtr_1_1cull__filter_1_1_cta.html',1,'gunrock::oprtr::cull_filter']]],
   ['ctaworkdistribution',['CtaWorkDistribution',['../structgunrock_1_1util_1_1_cta_work_distribution.html',1,'gunrock::util']]],
   ['ctaworklimits',['CtaWorkLimits',['../structgunrock_1_1util_1_1_cta_work_limits.html',1,'gunrock::util']]],
   ['ctaworkprogress',['CtaWorkProgress',['../classgunrock_1_1util_1_1_cta_work_progress.html',1,'gunrock::util']]],
+  ['ctaworkprogress_3c_20typename_20kernelpolicy_3a_3asizet_20_3e',['CtaWorkProgress&lt; typename KernelPolicy::SizeT &gt;',['../classgunrock_1_1util_1_1_cta_work_progress.html',1,'gunrock::util']]],
   ['ctaworkprogresslifetime',['CtaWorkProgressLifetime',['../classgunrock_1_1util_1_1_cta_work_progress_lifetime.html',1,'gunrock::util']]],
-  ['cudaproperties',['CudaProperties',['../classgunrock_1_1util_1_1_cuda_properties.html',1,'gunrock::util']]],
-  ['cyrmfunctor',['CyRmFunctor',['../structgunrock_1_1app_1_1mst_1_1_cy_rm_functor.html',1,'gunrock::app::mst']]]
+  ['cudaproperties',['CudaProperties',['../classgunrock_1_1util_1_1_cuda_properties.html',1,'gunrock::util']]]
 ];

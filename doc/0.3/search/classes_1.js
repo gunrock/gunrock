@@ -8,6 +8,5 @@ var searchData=
   ['bfs_5fparameter',['BFS_Parameter',['../struct_b_f_s___parameter.html',1,'']]],
   ['bfsenactor',['BFSEnactor',['../classgunrock_1_1app_1_1bfs_1_1_b_f_s_enactor.html',1,'gunrock::app::bfs']]],
   ['bfsfunctor',['BFSFunctor',['../structgunrock_1_1app_1_1bfs_1_1_b_f_s_functor.html',1,'gunrock::app::bfs']]],
-  ['bfsproblem',['BFSProblem',['../structgunrock_1_1app_1_1bfs_1_1_b_f_s_problem.html',1,'gunrock::app::bfs']]],
-  ['bitmasktex',['BitmaskTex',['../structgunrock_1_1oprtr_1_1filter_1_1_bitmask_tex.html',1,'gunrock::oprtr::filter']]]
+  ['bfsproblem',['BFSProblem',['../structgunrock_1_1app_1_1bfs_1_1_b_f_s_problem.html',1,'gunrock::app::bfs']]]
 ];

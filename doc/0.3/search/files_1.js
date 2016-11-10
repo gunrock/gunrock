@@ -9,5 +9,6 @@ var searchData=
   ['bfs_5fenactor_2ecuh',['bfs_enactor.cuh',['../bfs__enactor_8cuh.html',1,'']]],
   ['bfs_5ffunctor_2ecuh',['bfs_functor.cuh',['../bfs__functor_8cuh.html',1,'']]],
   ['bfs_5fproblem_2ecuh',['bfs_problem.cuh',['../bfs__problem_8cuh.html',1,'']]],
+  ['block_5fscan_2ecuh',['block_scan.cuh',['../block__scan_8cuh.html',1,'']]],
   ['brp_5fpartitioner_2ecuh',['brp_partitioner.cuh',['../brp__partitioner_8cuh.html',1,'']]]
 ];
