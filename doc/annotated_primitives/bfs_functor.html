@@ -27,7 +27,7 @@ ApplyVertex, which will be used in the Filter operator.</p>
 <span class="k">struct</span> <span class="n">BFSFunctor</span> <span class="p">{</span>
     <span class="k">typedef</span> <span class="kr">typename</span> <span class="n">ProblemData</span><span class="o">::</span><span class="n">DataSlice</span> <span class="n">DataSlice</span><span class="p">;</span>
 
-    <span class="k">static</span> <span class="n">__device__</span> <span class="n">__forceinline__</span> <span class="kt">bool</span> <span class="nf">CondEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+    <span class="n">__device__</span> <span class="kt">bool</span> <span class="nf">CondEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
     <span class="p">{</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">ProblemData</span><span class="o">::</span><span class="n">MARK_PREDECESSORS</span><span class="p">)</span></pre></div>
     </div>
@@ -73,7 +73,7 @@ one plus the source vertex's depth.</p>
       <p>ApplyEdge here increments the depth value.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>    <span class="k">static</span> <span class="n">__device__</span> <span class="n">__forceinline__</span> <span class="kt">void</span> <span class="nf">ApplyEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+      <div class="highlight"><pre>    <span class="n">__device__</span> <span class="kt">void</span> <span class="nf">ApplyEdge</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">s_id</span><span class="p">,</span> <span class="n">VertexId</span> <span class="n">d_id</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
     <span class="p">{</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">ProblemData</span><span class="o">::</span><span class="n">MARK_PREDECESSORS</span><span class="p">)</span></pre></div>
     </div>
@@ -102,7 +102,7 @@ vertex's depth.</p>
       <p>In BFS, CondVertex checks if the vertex is valid in the next frontier.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>    <span class="k">static</span> <span class="n">__device__</span> <span class="n">__forceinline__</span> <span class="kt">bool</span> <span class="nf">CondVertex</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">node</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+      <div class="highlight"><pre>    <span class="n">__device__</span> <span class="kt">void</span> <span class="nf">CondVertex</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">node</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
     <span class="p">{</span>
         <span class="k">return</span> <span class="n">node</span> <span class="o">!=</span> <span class="n">INVALID_NODE_ID</span><span class="p">;</span>
     <span class="p">}</span></pre></div>
@@ -117,7 +117,7 @@ vertex's depth.</p>
       <p>In BFS, we don't apply any actions to vertices.</p>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>    <span class="k">static</span> <span class="n">__device__</span> <span class="n">__forceinline__</span> <span class="kt">void</span> <span class="nf">ApplyVertex</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">node</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
+      <div class="highlight"><pre>    <span class="n">__device__</span> <span class="kt">void</span> <span class="nf">ApplyVertex</span><span class="p">(</span><span class="n">VertexId</span> <span class="n">node</span><span class="p">,</span> <span class="n">DataSlice</span> <span class="o">*</span><span class="n">p</span><span class="p">)</span>
     <span class="p">{</span>
     <span class="p">}</span>
 <span class="p">};</span>
