@@ -49,35 +49,6 @@ directly using [Github](https://github.com/gunrock/gunrock/issues).
 
 <!-- TODO: Algorithm Input Size Limitations -->
 
-<a name="OS_Support"></a>
-Operating System Support and Requirements
-=========================================
-
-This release (0.3) has only been tested on Linux Mint 15 (64-bit) and Ubuntu
-12.04 with CUDA 5.5, 6.0, 6.5, and 7.0 installed. We expect Gunrock to build
-and run correctly on other 64-bit and 32-bit Linux distributions, Mac OS,
-and Windows.
-
-Requirements
-------------
-
-CUDA version 5.5 (or greater) and compute capability 3.0 (or greater) is
-required.
-
-Several graph primitives' CPU validation code uses Boost Graph
-Library.  We are also using Boost Spirit, filesystem, predef, chrono,
-and timer in our utility code.  A boost version > 1.53.0 is required.
-
-CUDA
-====
-
-Gunrock is implemented in [CUDA C/C++](http://developer.nvidia.com/cuda).  It
-requires the CUDA Toolkit. Please see the NVIDIA
-[CUDA](http://developer.nvidia.com/cuda-downloads) homepage to download CUDA as
-well as the CUDA Programming Guide and CUDA SDK, which includes many CUDA code
-examples. Please refer to [NVIDIA CUDA Getting Started Guide for
-Linux](http://docs.nvidia.com/cuda/cuda-getting-started-guide-for-linux) for
-detailed information.
 
 <a name="Publications"></a>
 Publications
