@@ -18,3 +18,5 @@ do
     $EXEDIR/$EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $SETTING --device=$DEVICE --jsondir=./eval/ > ./eval/${NAME[$i]}.$EXECUTION.output.txt
     sleep 1
 done
+echo $EXECUTION rgg_24 $SETTING
+$EXEDIR/$EXECUTION rgg --rgg_scale=24 $SETTING --device=$DEVICE --jsondir=./eval/ > ./eval/rgg_24.$EXECUTION.output.txt
