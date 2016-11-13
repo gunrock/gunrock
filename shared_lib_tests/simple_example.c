@@ -46,16 +46,18 @@ int main(int argc, char* argv[])
     ///////////////////////////////////////////////////////////////////////////
     // run different primitive tests
     // graph traversal from given source return integer labels
-    bfs(bfs_label, nodes, edges, rows, cols, /*source=*/ 0);
+    bfs(bfs_label, 0, nodes, edges, rows, cols, 1,/*source=*/ 0, 0, false, false);
     // node betweenness centrality from given source
     // store computed results to bc_scores of floats
     bc(bc_scores, nodes, edges, rows, cols, /*source=*/ 0);
     // return number of component and per node component ID
     int num_components = cc(conn_comp, nodes, edges, rows, cols);
     // return shortest distance for each vertex from given source
-    sssp(sssp_dist, nodes, edges, rows, cols, vals, /*source=*/ 0);
+    sssp(sssp_dist, 0, nodes, edges, rows, cols, vals, 1,/*source=*/ 0,false);
+
+
     // return top-ranked nodes and their PageRank values of floats
-    pagerank(top_nodes, top_ranks, nodes, edges, rows, cols);
+    pagerank(top_nodes, top_ranks, nodes, edges, rows, cols, false);
 
     ///////////////////////////////////////////////////////////////////////////
     // demo prints allow at most ten nodes

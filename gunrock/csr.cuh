@@ -28,6 +28,7 @@
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/multithread_utils.cuh>
 #include <gunrock/util/sort_omp.cuh>
+#include <gunrock/coo.cuh>
 
 namespace gunrock {
 
@@ -40,7 +41,7 @@ namespace gunrock {
  * @tparam Value Associated value type.
  * @tparam SizeT Graph size type.
  */
-template<typename VertexId, typename Value, typename SizeT>
+template<typename VertexId, typename SizeT, typename Value>
 struct Csr
 {
     SizeT nodes;            // Number of nodes in the graph
@@ -79,6 +80,75 @@ struct Csr
         edge_values = NULL;
         node_values = NULL;
         this->pinned = pinned;
+    }
+
+    void FromCsr(Csr<VertexId, SizeT, Value> &source)
+    {
+        nodes = source.nodes;
+        edges = source.edges;
+        average_degree = source.average_degree;
+        average_edge_value = source.average_edge_value;
+        average_node_value = source.average_node_value;
+        out_nodes = source.out_nodes;
+        if (source.row_offsets == NULL)
+        {
+            row_offsets = NULL;
+        } else {
+            row_offsets = (SizeT*) malloc(sizeof(SizeT) * (source.nodes + 1));
+            memcpy(row_offsets, source.row_offsets, sizeof(SizeT) * (source.nodes + 1));
+        }
+        if (source.column_indices == NULL)
+        {
+            column_indices = NULL;
+        } else {
+            column_indices = (VertexId*) malloc(sizeof(VertexId) * source.edges); 
+            memcpy(column_indices, source.column_indices, sizeof(VertexId) * source.edges);
+        }
+        if (source.edge_values == NULL)
+        {
+            edge_values = NULL;
+        } else {
+            edge_values = (Value*) malloc(sizeof(Value) * source.edges);
+            memcpy(edge_values, source.edge_values, sizeof(Value) * source.edges);
+        }
+        if (source.node_values == NULL)
+        {
+            node_values = NULL;
+        } else {
+            node_values = (Value*) malloc(sizeof(Value) * source.nodes);
+            memcpy(node_values, source.node_values, sizeof(Value) * source.nodes);
+        } 
+    }
+
+    
+    template <typename Tuple>
+    void CsrToCsc(Csr<VertexId, SizeT, Value> &target, 
+            Csr<VertexId, SizeT, Value> &source)
+    {
+        target.nodes = source.nodes;
+        target.edges = source.edges;
+        target.average_degree = source.average_degree;
+        target.average_edge_value = source.average_edge_value;
+        target.average_node_value = source.average_node_value;
+        target.out_nodes = source.out_nodes;
+        {
+            Tuple *coo = (Tuple*)malloc(sizeof(Tuple) * source.edges);
+            int idx = 0;
+            for (int i = 0; i < source.nodes; ++i)
+            {
+                for (int j = source.row_offsets[i]; j < source.row_offsets[i+1]; ++j)
+                {
+                    coo[idx].row = source.column_indices[j];
+                    coo[idx].col = i;
+                    coo[idx++].val = (source.edge_values == NULL) ? 0 : source.edge_values[j];
+                }
+            }
+            if (source.edge_values == NULL)
+                target.template FromCoo<false>(NULL, coo, nodes, edges);
+            else
+                target.template FromCoo<true>(NULL, coo, nodes, edges);
+            free(coo);
+        }
     }
 
     /**
@@ -145,6 +215,18 @@ struct Csr
         }
     }
 
+    void WriteBinary_SM(
+	char *file_name,
+	SizeT v,
+	Value *labels)
+    {
+	std::ofstream fout(file_name);
+	if(fout.is_open())
+	{
+	    fout.write(reinterpret_cast<const char*>(labels), v*sizeof(Value));
+	    fout.close();
+	}
+    }
     /**
      *
      * @brief Store graph information into a file.
@@ -328,6 +410,73 @@ struct Csr
     }
 
     /**
+     * @brief (Specific for SM) Read from stored row_offsets, column_indices arrays.
+     *
+     * @tparam LOAD_NODE_VALUES Whether or not to load node values.
+     *
+     * @param[in] f_in Input graph file name.
+     * @param[in] f_label Input label file name.
+     * @param[in] quiet Don't print out anything.
+     */
+    template <bool LOAD_NODE_VALUES>
+    void FromCsr_SM(char *f_in, char *f_label, bool quiet = false)
+    {
+        if (!quiet)
+        {
+            printf("  Reading directly from stored binary CSR arrays ...\n");
+	    if(LOAD_NODE_VALUES)
+                printf("  Reading directly from stored binary label arrays ...\n");
+        }
+        time_t mark1 = time(NULL);
+
+        std::ifstream input(f_in);
+        std::ifstream input_label(f_label);
+
+        SizeT v, e;
+        input.read(reinterpret_cast<char*>(&v), sizeof(SizeT));
+        input.read(reinterpret_cast<char*>(&e), sizeof(SizeT));
+
+        FromScratch<false, LOAD_NODE_VALUES>(v, e);
+
+        input.read(reinterpret_cast<char*>(row_offsets), (v + 1)*sizeof(SizeT));
+        input.read(reinterpret_cast<char*>(column_indices), e * sizeof(VertexId));
+        if (LOAD_NODE_VALUES)
+        {
+            input_label.read(reinterpret_cast<char*>(node_values), v * sizeof(Value));
+        }
+	    for(int i=0; i<v; i++) printf("%lld ", (long long)node_values[i]); printf("\n");
+
+        time_t mark2 = time(NULL);
+        if (!quiet)
+        {
+            printf("Done reading (%ds).\n", (int) (mark2 - mark1));
+        }
+
+        // compute out_nodes
+        SizeT out_node = 0;
+        for (SizeT node = 0; node < nodes; node++)
+        {
+            if (row_offsets[node + 1] - row_offsets[node] > 0)
+            {
+                ++out_node;
+            }
+        }
+        out_nodes = out_node;
+    }
+
+    template<bool LOAD_NODE_VALUES>
+    void FromLabels(
+	char *output_file,
+	Value *labels,
+	SizeT nodes,
+	bool quiet = false)
+    {
+	    if(!quiet) printf("  Converting the labels of %lld vertices to binary format...\n", 
+				(long long)nodes);
+	    if(LOAD_NODE_VALUES) WriteBinary_SM(output_file, nodes, labels);
+    }
+
+    /**
      * @brief Build CSR graph from COO graph, sorted or unsorted
      *
      * @param[in] output_file Output file to dump the graph topology info
@@ -354,8 +503,9 @@ struct Csr
     {
         if (!quiet)
         {
-            printf("  Converting %d vertices, %d directed edges (%s tuples) "
-                   "to CSR format...\n", coo_nodes, coo_edges,
+            printf("  Converting %lld vertices, %lld directed edges (%s tuples) "
+                   "to CSR format...\n", 
+                    (long long)coo_nodes, (long long)coo_edges,
                    ordered_rows ? "ordered" : "unordered");
         }
 
@@ -537,12 +687,14 @@ struct Csr
         }
         printf("\nDegree Histogram (%lld vertices, %lld edges):\n",
                (long long) nodes, (long long) edges);
-        printf("    Degree   0: %d (%.2f%%)\n", log_counts[0],
+        printf("    Degree   0: %lld (%.2f%%)\n", 
+               (long long) log_counts[0],
                (float) log_counts[0] * 100.0 / nodes);
         for (int i = 0; i < max_log_length + 1; i++)
         {
-            printf("    Degree 2^%i: %d (%.2f%%)\n", i, log_counts[i + 1],
-                   (float) log_counts[i + 1] * 100.0 / nodes);
+            printf("    Degree 2^%i: %lld (%.2f%%)\n", 
+                i, (long long)log_counts[i + 1],
+                (float) log_counts[i + 1] * 100.0 / nodes);
         }
         printf("\n");
         fflush(stdout);
@@ -589,6 +741,7 @@ struct Csr
         SizeT displayed_node_num = (nodes > limit) ? limit : nodes;
         printf("%s : #nodes = ", name); util::PrintValue(nodes);
         printf(", #edges = "); util::PrintValue(edges);
+        printf("\n");
 
         for (SizeT i = 0; i < displayed_node_num; i++)
         {
@@ -705,6 +858,19 @@ struct Csr
     }
 
     /**
+     * @brief Get the degrees of all the nodes in graph
+     * 
+     * @param[in] node_degrees node degrees to fill in
+     */
+    void GetNodeDegree(SizeT *node_degrees)
+    {
+	for(SizeT node=0; node < nodes; ++node)
+	{
+		node_degrees[node] = row_offsets[node+1]-row_offsets[node];
+	}
+    }
+
+    /**
      * @brief Get the average node value in graph
      */
     Value GetAverageNodeValue()
@@ -741,7 +907,6 @@ struct Csr
                     mean += (edge_values[edge] - mean) / count;
                 }
             }
-            average_edge_value = static_cast<Value>(mean);
         }
         return average_edge_value;
     }

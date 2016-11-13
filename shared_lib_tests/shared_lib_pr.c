@@ -14,7 +14,7 @@ int main(int argc, char* argv[])
     data_t.SIZET_TYPE = SIZET_INT;         // graph size type
     data_t.VALUE_TYPE = VALUE_FLOAT;       // attributes type
 
-    struct GRSetup config = InitSetup();   // gunrock configurations
+    struct GRSetup *config = InitSetup(1, NULL);   // gunrock configurations
 
     int num_nodes = 7, num_edges = 26;
     int row_offsets[8]  = {0, 3, 6, 11, 15, 19, 23, 26};
@@ -35,7 +35,7 @@ int main(int argc, char* argv[])
     float *top_ranks = (float*)malloc(sizeof(float) * graphi->num_nodes);
     top_nodes = (  int*)grapho->node_value2;
     top_ranks = (float*)grapho->node_value1;
-    int node; for (node = 0; node < config.top_nodes; ++node)
+    int node; for (node = 0; node < config -> top_nodes; ++node)
         printf("Node_ID [%d] : Score: [%f]\n", top_nodes[node], top_ranks[node]);
 
     if (graphi) free(graphi);

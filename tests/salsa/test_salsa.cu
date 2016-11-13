@@ -127,7 +127,7 @@ void Usage()
  * @param[in] arank Pointer to authority rank score array
  * @param[in] nodes Number of nodes in the graph.
  */
-template<typename Value, typename SizeT>
+template <typename SizeT, typename Value>
 void DisplaySolution(Value *hrank, Value *arank, SizeT nodes)
 {
     //sort the top page ranks
@@ -136,7 +136,7 @@ void DisplaySolution(Value *hrank, Value *arank, SizeT nodes)
     RankPair<SizeT, Value> *ar_list =
         (RankPair<SizeT, Value>*)malloc(sizeof(RankPair<SizeT, Value>) * nodes);
 
-    for (int i = 0; i < nodes; ++i)
+    for (SizeT i = 0; i < nodes; ++i)
     {
         hr_list[i].vertex_id = i;
         hr_list[i].page_rank = hrank[i];
@@ -149,12 +149,14 @@ void DisplaySolution(Value *hrank, Value *arank, SizeT nodes)
         ar_list, ar_list + nodes, SALSACompare<RankPair<SizeT, Value> >);
 
     // Print out at most top 10 largest components
-    int top = (nodes < 10) ? nodes : 10;
-    printf("Top %d Page Ranks:\n", top);
-    for (int i = 0; i < top; ++i)
+    SizeT top = (nodes < 10) ? nodes : 10;
+    printf("Top %lld Page Ranks:\n", (long long)top);
+    for (SizeT i = 0; i < top; ++i)
     {
-        printf("Vertex ID: %d, Hub Rank: %5f\n", hr_list[i].vertex_id, hr_list[i].page_rank);
-        printf("Vertex ID: %d, Authority Rank: %5f\n", ar_list[i].vertex_id, ar_list[i].page_rank);
+        printf("Vertex ID: %lld, Hub Rank: %5f\n", 
+            (long long)hr_list[i].vertex_id, hr_list[i].page_rank);
+        printf("Vertex ID: %lld, Authority Rank: %5f\n", 
+            (long long)ar_list[i].vertex_id, ar_list[i].page_rank);
     }
 
     free(hr_list);
@@ -181,15 +183,15 @@ void DisplaySolution(Value *hrank, Value *arank, SizeT nodes)
  */
 template <
     typename VertexId,
-    typename Value,
-    typename SizeT >
-void SimpleReferenceSALSA(
-    const Csr<VertexId, Value, SizeT>       &graph,
-    const Csr<VertexId, Value, SizeT>       &inv_graph,
-    Value                                   *hrank,
-    Value                                   *arank,
-    SizeT                                   max_iter,
-    bool                                    quiet = false)
+    typename SizeT,
+    typename Value>
+void ReferenceSALSA(
+    const Csr<VertexId, SizeT, Value> &graph,
+    const Csr<VertexId, SizeT, Value> &inv_graph,
+    Value                             *hrank,
+    Value                             *arank,
+    SizeT                              max_iter,
+    bool                               quiet = false)
 {
     //
     //compute SALSA rank
@@ -219,36 +221,49 @@ void SimpleReferenceSALSA(
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
-void RunTests(Info<VertexId, Value, SizeT> *info)
+    typename Value>
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK >
+void RunTests(Info<VertexId, SizeT, Value> *info)
 {
-
     typedef SALSAProblem <
-    VertexId,
-    SizeT,
-    Value > Problem;
+        VertexId,
+        SizeT,
+        Value > Problem;
+    typedef SALSAEnactor <Problem>
+        Enactor;
 
-    Csr<VertexId, Value, SizeT>
-    *csr                    = (Csr<VertexId, Value, SizeT>*)info->csr_ptr;
-    Csr<VertexId, Value, SizeT>
-    *csc                    = (Csr<VertexId, Value, SizeT>*)info->csc_ptr;
-    int         max_grid_size    = info->info["max_grid_size"].get_int64();
-    int         num_gpus         = info->info["num_gpus"].get_int();
-    int         max_iter         = info->info["max_iteration"].get_int();
-    bool        quiet_mode       = info->info["quiet_mode"].get_bool();
-    bool        quick_mode       = info->info["quick_mode"].get_bool();
-    bool        undirected       = info->info["undirected"].get_bool();
-    bool        stream_from_host = info->info["stream_from_host"].get_bool();
+    Csr<VertexId, SizeT, Value>
+               *csr                 = info->csr_ptr;
+    Csr<VertexId, SizeT, Value>
+               *csc                 = info->csc_ptr;
+    int         max_grid_size       = info->info["max_grid_size"].get_int64();
+    int         num_gpus            = info->info["num_gpus"].get_int();
+    SizeT       max_iter            = info->info["max_iteration"].get_int();
+    bool        quiet_mode          = info->info["quiet_mode"].get_bool();
+    bool        quick_mode          = info->info["quick_mode"].get_bool();
+    bool        undirected          = info->info["undirected"].get_bool();
+    bool        stream_from_host    = info->info["stream_from_host"].get_bool();
+    double      max_queue_sizing    = info->info["max_queue_sizing" ].get_real ();
+    double      max_queue_sizing1   = info->info["max_queue_sizing1"].get_real ();
+    double      max_in_sizing       = info->info["max_in_sizing"    ].get_real ();
+    std::string partition_method    = info->info["partition_method" ].get_str  ();  
+    double      partition_factor    = info->info["partition_factor" ].get_real ();
+    int         partition_seed      = info->info["partition_seed"   ].get_int  ();  
+    bool        instrument          = info->info["instrument"       ].get_bool ();
+    bool        debug               = info->info["debug_mode"       ].get_bool ();
+    bool        size_check          = info->info["size_check"       ].get_bool ();
+    CpuTimer    cpu_timer;
 
+    cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
 
-    ContextPtr   *context           = (ContextPtr*)info -> context;
+    ContextPtr   *context = (ContextPtr*)   info -> context;
+    cudaStream_t *streams = (cudaStream_t*) info -> streams;
 
     // Allocate host-side array (for both reference and GPU-computed results)
     Value *reference_hrank   = (Value*)malloc(sizeof(Value) * csr->nodes);
@@ -258,25 +273,39 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     Value *reference_check_h = (quick_mode) ? NULL : reference_hrank;
     Value *reference_check_a = (quick_mode) ? NULL : reference_arank;
 
-    // Allocate enactor map
-    SALSAEnactor<Problem, INSTRUMENT, DEBUG, SIZE_CHECK> salsa_enactor(gpu_idx);
 
     // Allocate problem on GPU
     Problem *problem = new Problem;
     util::GRError(problem->Init(
-                      stream_from_host,
-                      *csr,
-                      *csc,
-                      num_gpus),
-                  "Problem SALSA Initialization Failed", __FILE__, __LINE__);
+        stream_from_host,
+        csr,
+        csc,
+        num_gpus,
+        gpu_idx,
+        partition_method,
+        streams,
+        max_queue_sizing,
+        max_in_sizing,
+        partition_factor,
+        partition_seed),
+        "Problem SALSA Initialization Failed", __FILE__, __LINE__);
+
+    // Allocate enactor map
+    Enactor *enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);
+    util::GRError(enactor->Init(
+        context, problem, max_grid_size),
+        "SALSA Enactor Init failed", __FILE__, __LINE__);
+    cpu_timer.Stop();
+    info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
     //
     // Compute reference CPU SALSA solution for source-distance
     //
-    if (reference_check_h != NULL)
+    if (!quick_mode)
     {
         if (!quiet_mode) { printf("compute ref value\n"); }
-        SimpleReferenceSALSA(
+        ReferenceSALSA(
             *csr,
             *csc,
             reference_check_h,
@@ -285,20 +314,23 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         if (!quiet_mode) printf("\n");
     }
 
+    max_queue_sizing = 200.0;
     // Perform SALSA
-    GpuTimer gpu_timer;
-
     util::GRError(
-        problem->Reset(salsa_enactor.GetFrontierType(), 200.0),
+        problem -> Reset(enactor -> GetFrontierType(),
+        max_queue_sizing, max_queue_sizing),
         "SALSA Problem Data Reset Failed", __FILE__, __LINE__);
-    gpu_timer.Start();
     util::GRError(
-        salsa_enactor.template Enact<Problem>(
-            *context, problem, max_iter, max_grid_size),
-        "SALSA Problem Enact Failed", __FILE__, __LINE__);
-    gpu_timer.Stop();
+        enactor -> Reset(),
+        "SALSA Enactor Reset failed.", __FILE__, __LINE__);
 
-    double elapsed = gpu_timer.ElapsedMillis();
+    cpu_timer.Start();
+    util::GRError( enactor -> Enact(max_iter),
+        "SALSA Problem Enact Failed", __FILE__, __LINE__);
+    cpu_timer.Stop();
+
+    double elapsed = cpu_timer.ElapsedMillis();
+    cpu_timer.Start();
 
     // Copy out results
     util::GRError(
@@ -306,7 +338,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         "SALSA Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // Verify the result
-    if (reference_check_a != NULL)
+    if (!quick_mode)
     {
         if (!quiet_mode) printf("Validity: ");
         CompareResults(h_hrank, reference_check_h, csr->nodes, true);
@@ -315,134 +347,105 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     if (!quiet_mode)
         DisplaySolution(h_hrank, h_arank, csr->nodes);
 
-    info->ComputeCommonStats(salsa_enactor.enactor_stats.GetPointer(), elapsed);
-
-    if (!quiet_mode)
-        info->DisplayStats();   // display collected statistics
-
-    info->CollectInfo();
+    info->ComputeCommonStats(
+        enactor -> enactor_stats.GetPointer(), elapsed, (VertexId*) NULL);
 
     // Cleanup
     if (problem) delete problem;
+    if (enactor) delete enactor;
     if (reference_check_h) free(reference_check_h);
     if (reference_check_a) free(reference_check_a);
 
     if (h_hrank) free(h_hrank);
     if (h_arank) free(h_arank);
-
-    cudaDeviceSynchronize();
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
-{
-
-    if (info->info["size_check"].get_bool())
-        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-                 true > (info);
-    else RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-             false> (info);
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-void RunTests_debug(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["debug_mode"].get_bool())
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,
-                            true > (info);
-    else RunTests_size_check
-        <VertexId, Value, SizeT, INSTRUMENT,
-        false> (info);
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT >
-void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["instrument"].get_bool())
-        RunTests_debug<VertexId, Value, SizeT,
-                       true > (info);
-    else RunTests_debug
-        <VertexId, Value, SizeT,
-        false> (info);
+    cpu_timer.Stop();
+    info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
 }
 
 /******************************************************************************
  * Main
  ******************************************************************************/
+template<
+    typename VertexId,
+    typename SizeT,
+    typename Value>
+int main_(CommandLineArgs *args)
+{
+    CpuTimer cpu_timer, cpu_timer2;
 
-int main( int argc, char** argv)
+    cpu_timer.Start();
+    Csr <VertexId, SizeT, Value> csr(false); // default for stream_from_host
+    Csr <VertexId, SizeT, Value> csc(false);
+    Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
+
+    info->info["undirected"] = false;
+    info->info["edge_value"] = false;
+
+    cpu_timer2.Start();
+    info->Init("SALSA", *args, csr, csc);
+    cpu_timer2.Stop();
+    info->info["load_time"] = cpu_timer2.ElapsedMillis();
+
+    // TODO: add a CPU Reference SALSA algorithm.
+    // before that, quick_mode always on.
+    info->info["quick_mode"] = true;
+    RunTests<VertexId, SizeT, Value>(info);
+    cpu_timer.Stop();
+    info->info["total_time"] = cpu_timer.ElapsedMillis();
+
+    if (!(info->info["quiet_mode"].get_bool()))
+    {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+    return 0;
+}
+
+template <
+    typename VertexId, // the vertex identifier type, usually int or long long
+    typename SizeT>
+int main_Value(CommandLineArgs *args)
+{
+// disabled to reduce compile time
+//    if (args -> CheckCmdLineFlag("64bit-Value"))
+//        return main_<VertexId, SizeT, double>(args);
+//    else
+        return main_<VertexId, SizeT, float >(args);
+}
+
+template <
+    typename VertexId>
+int main_SizeT(CommandLineArgs *args)
+{
+// disabled to reduce compile time
+//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+//        return main_Value<VertexId, long long>(args);
+//    else
+        return main_Value<VertexId, int      >(args);
+}
+
+int main_VertexId(CommandLineArgs *args)
+{
+    // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
+    //if (args -> CheckCmdLineFlag("64bit-VertexId"))
+    //    return main_SizeT<long long>(args);
+    //else
+        return main_SizeT<int      >(args);
+}
+
+int main(int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
-    if ((argc < 2) || (graph_args < 1) || (args.CheckCmdLineFlag("help")))
+    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
     {
         Usage();
         return 1;
     }
 
-    typedef int   VertexId;  // use as the node identifier
-    typedef float Value;     // use as the value type
-    typedef int   SizeT;     // use as the graph size type
-
-    Csr<VertexId, Value, SizeT> csr(false); // default for stream_from_host
-    Csr<VertexId, Value, SizeT> csc(false);
-    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
-
-    info->info["undirected"] = false;
-    info->info["edge_value"] = false;
-
-    info->Init("SALSA", args, csr, csc);
-
-    // TODO: add a CPU Reference SALSA algorithm.
-    // before that, quick_mode always on.
-    info->info["quick_mode"] = true;
-    RunTests_instrumented<VertexId, Value, SizeT>(info);
-
-    return 0;
+    return main_VertexId(&args);
 }
-
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++

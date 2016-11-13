@@ -14,12 +14,14 @@ int main(int argc, char* argv[])
     data_t.SIZET_TYPE = SIZET_INT;         // graph size type
     data_t.VALUE_TYPE = VALUE_INT;         // attributes type
 
-    struct GRSetup config = InitSetup();   // gunrock configurations
+    struct GRSetup *config = InitSetup(1, NULL);   // gunrock configurations
 
-    int num_nodes = 7, num_edges = 26;
-    int row_offsets[8]  = {0, 3, 6, 11, 15, 19, 23, 26};
-    int col_indices[26] = {1, 2, 3, 0, 2, 4, 0, 1, 3, 4, 5, 0, 2,
-                           5, 6, 1, 2, 5, 6, 2, 3, 4, 6, 3, 4, 5};
+    int num_nodes = 7, num_edges = 15;//26
+    int row_offsets[8]  = {0, 3, 6, 9, 11, 14, 15, 15};
+    int col_indices[15] = {1, 2, 3, 0, 2, 4, 3, 4, 5, 5, 6, 2, 5, 6, 6};
+    //int row_offsets[8]  = {0, 3, 6, 11, 15, 19, 23, 26};
+    //int col_indices[26] = {1, 2, 3, 0, 2, 4, 0, 1, 3, 4, 5, 0, 2,
+    //                       5, 6, 1, 2, 5, 6, 2, 3, 4, 6, 3, 4, 5};
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));

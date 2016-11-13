@@ -39,6 +39,7 @@ struct Coo {
     VertexId col;
     Value val;
 
+    Coo() {}
     Coo(VertexId row, VertexId col, Value val) : row(row), col(col), val(val) {}
 
     void Val(Value &value) {

@@ -58,88 +58,12 @@ struct EdgeProperties
 
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
+    typename Value>
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK >
 void runBC(GRGraph* output, BC_Parameter *parameter);
-
-/**
- * @brief Run test
- *
- * @tparam VertexId   Vertex identifier type
- * @tparam Value      Attribute type
- * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- * @tparam DEBUG      Keep debug statics
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-void RunTests_size_check(GRGraph* output, BC_Parameter *parameter)
-{
-    if (parameter->size_check)
-        runBC<VertexId, Value, SizeT, INSTRUMENT,
-              DEBUG,  true>(output, parameter);
-    else
-        runBC<VertexId, Value, SizeT, INSTRUMENT,
-              DEBUG, false>(output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId   Vertex identifier type
- * @tparam Value      Attribute type
- * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-void RunTests_debug(GRGraph* output, BC_Parameter *parameter)
-{
-    if (parameter->debug)
-        RunTests_size_check<VertexId, Value, SizeT,
-                            INSTRUMENT,  true>(output, parameter);
-    else
-        RunTests_size_check<VertexId, Value, SizeT,
-                            INSTRUMENT, false> (output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId Vertex identifier type
- * @tparam Value    Attribute type
- * @tparam SizeT    Graph size type
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT >
-void RunTests_instrumented(GRGraph* output, BC_Parameter *parameter)
-{
-    if (parameter->instrumented)
-        RunTests_debug<VertexId, Value, SizeT,  true>(output, parameter);
-    else
-        RunTests_debug<VertexId, Value, SizeT, false>(output, parameter);
-}
 
 /**
  * @brief Run test
@@ -156,28 +80,29 @@ void RunTests_instrumented(GRGraph* output, BC_Parameter *parameter)
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
+    typename Value>
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK >
 void runBC(GRGraph* output, BC_Parameter *parameter)
 {
     typedef BCProblem <VertexId,
             SizeT,
             Value,
-            true,               // MARK_PREDECESSORS
-            false > BcProblem;  // Does not use double buffer
+            true>               // MARK_PREDECESSORS
+            Problem;  // Does not use double buffer
 
-    typedef BCEnactor <BcProblem,
-            INSTRUMENT,
-            DEBUG,
-            SIZE_CHECK > BcEnactor;
+    typedef BCEnactor <Problem>
+            //INSTRUMENT,
+            //DEBUG,
+            //SIZE_CHECK >
+            Enactor;
 
-    Csr<VertexId, Value, SizeT> *graph =
-        (Csr<VertexId, Value, SizeT>*)parameter->graph;
+    Csr<VertexId, SizeT, Value> *graph =
+        (Csr<VertexId, SizeT, Value>*)parameter->graph;
     bool          quiet              = parameter -> g_quiet;
-    VertexId      src                = (VertexId)parameter -> src;
+    VertexId      src                = (VertexId)parameter -> src[0];
     int           max_grid_size      = parameter -> max_grid_size;
     int           num_gpus           = parameter -> num_gpus;
     double        max_queue_sizing   = parameter -> max_queue_sizing;
@@ -190,11 +115,13 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
     float         partition_factor   = parameter -> partition_factor;
     int           partition_seed     = parameter -> partition_seed;
     bool          g_stream_from_host = parameter -> g_stream_from_host;
+    bool          instrument         = parameter -> instrumented;
+    bool          debug              = parameter -> debug;
+    bool          size_check         = parameter -> size_check;
     size_t       *org_size           = new size_t  [num_gpus];
     // Allocate host-side arrays
     Value        *h_sigmas           = new Value   [graph->nodes];
     Value        *h_bc_values        = new Value   [graph->nodes];
-    Value        *h_ebc_values       = new Value   [graph->edges];
     VertexId     *h_labels           = new VertexId[graph->nodes];
 
     for (int gpu = 0; gpu < num_gpus; gpu++)
@@ -204,9 +131,7 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
-    BcEnactor* enactor = new BcEnactor(num_gpus, gpu_idx);  // BC enactor map
-    BcProblem* problem = new BcProblem;  // Allocate problem on GPU
-
+    Problem* problem = new Problem(false);  // Allocate problem on GPU
     util::GRError(
         problem->Init(
             g_stream_from_host,
@@ -221,6 +146,9 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
             partition_factor,
             partition_seed),
         "BC Problem Initialization Failed", __FILE__, __LINE__);
+    
+    Enactor* enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);  // BC enactor map
     util::GRError(
         enactor->Init(context, problem, max_grid_size),
         "BC Enactor init failed", __FILE__, __LINE__);
@@ -279,11 +207,10 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
 
     // Copy out results
     util::GRError(
-        problem->Extract(h_sigmas, h_bc_values, h_ebc_values, h_labels),
+        problem->Extract(h_sigmas, h_bc_values, h_labels),
         "BC Problem Data Extraction Failed", __FILE__, __LINE__);
 
     output->node_value1 = (Value*)&h_bc_values[0];
-    output->edge_value1 = (Value*)&h_ebc_values[0];
 
     if (!quiet)
     {
@@ -311,17 +238,18 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
 void dispatchBC(
     GRGraph*        grapho,
     const GRGraph*  graphi,
-    const GRSetup   config,
+    const GRSetup*  config,
     const GRTypes   data_t,
     ContextPtr*     context,
     cudaStream_t*   streams)
 {
     BC_Parameter* parameter = new BC_Parameter;
-    parameter->g_quiet  = config.quiet;
+    parameter->src = (long long*)malloc(sizeof(long long));
+    parameter->g_quiet  = config -> quiet;
     parameter->context  = context;
     parameter->streams  = streams;
-    parameter->num_gpus = config.num_devices;
-    parameter->gpu_idx  = config.device_list;
+    parameter->num_gpus = config -> num_devices;
+    parameter->gpu_idx  = config -> device_list;
 
     switch (data_t.VTXID_TYPE)
     {
@@ -356,35 +284,35 @@ void dispatchBC(
                 parameter->graph = &csr;
 
                 // determine source vertex to start
-                switch (config.source_mode)
+                switch (config -> source_mode)
                 {
                 case randomize:
                 {
-                    parameter->src = graphio::RandomNode(csr.nodes);
+                    parameter->src[0] = graphio::RandomNode(csr.nodes);
                     break;
                 }
                 case largest_degree:
                 {
                     int max_deg = 0;
-                    parameter->src = csr.GetNodeWithHighestDegree(max_deg);
+                    parameter->src[0] = csr.GetNodeWithHighestDegree(max_deg);
                     break;
                 }
                 case manually:
                 {
-                    parameter->src = config.source_vertex;
+                    parameter->src[0] = config -> source_vertex[0];
                     break;
                 }
                 default:
                 {
-                    parameter->src = 0;
+                    parameter->src[0] = 0;
                     break;
                 }
                 }
                 if (!parameter->g_quiet)
                 {
-                    printf(" source: %lld\n", (long long) parameter->src);
+                    printf(" source: %lld\n", (long long) parameter->src[0]);
                 }
-                RunTests_instrumented<int, float, int>(grapho, parameter);
+                runBC<int, int, float>(grapho, parameter);
 
                 csr.row_offsets    = NULL;
                 csr.column_indices = NULL;
@@ -397,6 +325,7 @@ void dispatchBC(
         break;
     }
     }
+    free(parameter->src);
 }
 
 /*
@@ -410,7 +339,7 @@ void dispatchBC(
 void gunrock_bc(
     GRGraph       *grapho,
     const GRGraph *graphi,
-    const GRSetup  config,
+    const GRSetup *config,
     const GRTypes  data_t)
 {
     // GPU-related configurations
@@ -419,20 +348,20 @@ void gunrock_bc(
     ContextPtr    *context = NULL;
     cudaStream_t  *streams = NULL;
 
-    num_gpus = config.num_devices;
+    num_gpus = config -> num_devices;
     gpu_idx  = new int [num_gpus];
     for (int i = 0; i < num_gpus; ++i)
     {
-        gpu_idx[i] = config.device_list[i];
+        gpu_idx[i] = config -> device_list[i];
     }
 
     // Create streams and MordernGPU context for each GPU
     streams = new cudaStream_t[num_gpus * num_gpus * 2];
     context = new ContextPtr[num_gpus * num_gpus];
-    if (!config.quiet) { printf(" using %d GPUs:", num_gpus); }
+    if (!config -> quiet) { printf(" using %d GPUs:", num_gpus); }
     for (int gpu = 0; gpu < num_gpus; ++gpu)
     {
-        if (!config.quiet) { printf(" %d ", gpu_idx[gpu]); }
+        if (!config -> quiet) { printf(" %d ", gpu_idx[gpu]); }
         util::SetDevice(gpu_idx[gpu]);
         for (int i = 0; i < num_gpus * 2; ++i)
         {
@@ -447,7 +376,7 @@ void gunrock_bc(
             }
         }
     }
-    if (!config.quiet) { printf("\n"); }
+    if (!config -> quiet) { printf("\n"); }
 
     dispatchBC(grapho, graphi, config, data_t, context, streams);
 }
@@ -475,8 +404,8 @@ void bc(
     data_t.SIZET_TYPE = SIZET_INT;    // integer graph size type
     data_t.VALUE_TYPE = VALUE_FLOAT;  // float attributes type
 
-    struct GRSetup config = InitSetup();  // primitive-specific configures
-    config.source_vertex = source;        // source vertex to start
+    struct GRSetup *config = InitSetup(1, NULL);  // primitive-specific configures
+    config -> source_vertex[0] = source;        // source vertex to start
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));

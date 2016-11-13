@@ -46,7 +46,7 @@ struct Sweep
         typename KernelPolicy::VertexId         *&d_column_indices,
         typename ProblemData::DataSlice         *&problem,
         typename KernelPolicy::SmemStorage      &smem_storage,
-        util::CtaWorkProgress                   &work_progress,
+        util::CtaWorkProgress    <typename KernelPolicy::SizeT> &work_progress,
         util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
         gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
         {
@@ -127,7 +127,7 @@ struct Dispatch
         SizeT                       *&d_row_offsets,
         VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
-        util::CtaWorkProgress       &work_progress,
+        util::CtaWorkProgress<SizeT> &work_progress,
         util::KernelRuntimeStats    &kernel_stats,
         gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
         {
@@ -161,7 +161,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         SizeT                       *&d_row_offsets,
         VertexId                    *&d_column_indices,
         DataSlice                   *&problem,
-        util::CtaWorkProgress       &work_progress,
+        util::CtaWorkProgress<SizeT> &work_progress,
         util::KernelRuntimeStats    &kernel_stats,
         gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
     {
@@ -169,18 +169,18 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
 
         // If instrument flag is set, track kernel stats
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
-            kernel_stats.MarkStart();
-        }
+        //if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+        //    kernel_stats.MarkStart();
+        //}
 
         // workprogress reset
-        if (queue_reset)
-        {
-            if (threadIdx.x < util::CtaWorkProgress::COUNTERS) {
+        //if (queue_reset)
+        //{
+        //    if (threadIdx.x < util::CtaWorkProgress::COUNTERS) {
                 //Reset all counters
-                work_progress.template Reset<SizeT>();
-            }
-        }
+        //        work_progress.template Reset<SizeT>();
+        //    }
+        //}
 
         // Determine work decomposition
         if (threadIdx.x == 0) {
@@ -227,10 +227,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                 smem_storage.state.work_decomposition,
                 ADVANCE_TYPE);
 
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
-            kernel_stats.MarkStop();
-            kernel_stats.Flush();
-        }
+        //if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
+        //    kernel_stats.MarkStop();
+        //    kernel_stats.Flush();
+        //}
     }
 
 };
@@ -269,7 +269,7 @@ void Kernel(
         typename KernelPolicy::SizeT            *d_row_offsets,
         typename KernelPolicy::VertexId         *d_column_indices,
         typename ProblemData::DataSlice         *problem,                    // Problem Object
-        util::CtaWorkProgress                   work_progress,              // Atomic workstealing and queueing counters
+        util::CtaWorkProgress<typename KernelPolicy::SizeT> work_progress,              // Atomic workstealing and queueing counters
         util::KernelRuntimeStats                kernel_stats,               // Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT)
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V)
 {

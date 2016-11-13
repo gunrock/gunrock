@@ -37,14 +37,16 @@ public:
     float    delta          ;  // Delta value for PageRank
     float    error          ;  // Error threshold PageRank
     int      max_iter       ;  // Maximum number of iteration
+    bool     normalized     ;
 
     PR_Parameter()
     {
         delta    = 0.85f;
         error    = 0.01f;
         max_iter =    50;
-        src      =    -1;
+        normalized = false;
     }
+
     ~PR_Parameter()
     {
     }
@@ -52,11 +54,12 @@ public:
 
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
+    typename Value,
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK,
+    bool NORMALIZED>
 void runPageRank(GRGraph *output, PR_Parameter *parameter);
 
 /**
@@ -73,66 +76,17 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter);
  */
 template <
     typename      VertexId,
-    typename      Value,
     typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-void sizeCheckPageRank(GRGraph *output, PR_Parameter *parameter)
+    typename      Value>
+    //bool          INSTRUMENT,
+    //bool          DEBUG,
+    //bool          SIZE_CHECK >
+void normalizedPageRank(GRGraph *output, PR_Parameter *parameter)
 {
-    if (parameter->size_check)
-        runPageRank<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-                    true > (output, parameter);
+    if (parameter -> normalized)
+        runPageRank<VertexId, SizeT, Value, true > (output, parameter);
     else
-        runPageRank<VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-                    false> (output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId   Vertex identifier type
- * @tparam Value      Attribute type
- * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-void debugPageRank(GRGraph *output, PR_Parameter *parameter)
-{
-    if (parameter->debug)
-        sizeCheckPageRank<VertexId, Value, SizeT, INSTRUMENT,
-                          true > (output, parameter);
-    else
-        sizeCheckPageRank<VertexId, Value, SizeT, INSTRUMENT,
-                          false> (output, parameter);
-}
-
-/**
- * @brief Run test
- *
- * @tparam VertexId Vertex identifier type
- * @tparam Value    Attribute type
- * @tparam SizeT    Graph size type
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- */
-template <
-    typename VertexId,
-    typename Value,
-    typename SizeT >
-void runPageRank(GRGraph *output, PR_Parameter* parameter)
-{
-    if (parameter->instrumented)
-        debugPageRank<VertexId, Value, SizeT,  true>(output, parameter);
-    else
-        debugPageRank<VertexId, Value, SizeT, false>(output, parameter);
+        runPageRank<VertexId, SizeT, Value, false> (output, parameter);
 }
 
 /**
@@ -150,24 +104,27 @@ void runPageRank(GRGraph *output, PR_Parameter* parameter)
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
+    typename Value,
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK,
+    bool NORMALIZED >
 void runPageRank(GRGraph *output, PR_Parameter *parameter)
 {
     typedef PRProblem < VertexId,
             SizeT,
-            Value > PrProblem;
+            Value,
+            NORMALIZED > Problem;
 
-    typedef PREnactor < PrProblem,
-            INSTRUMENT,
-            DEBUG,
-            SIZE_CHECK > PrEnactor;
+    typedef PREnactor < Problem>
+            //INSTRUMENT,
+            //DEBUG,
+            //SIZE_CHECK > 
+            Enactor;
 
-    Csr<VertexId, Value, SizeT>
-    *graph              = (Csr<VertexId, Value, SizeT>*)parameter->graph;
+    Csr<VertexId, SizeT, Value>
+    *graph              = (Csr<VertexId, SizeT, Value>*)parameter->graph;
     bool          quiet              = parameter -> g_quiet;
     int           max_grid_size      = parameter -> max_grid_size;
     int           num_gpus           = parameter -> num_gpus;
@@ -180,11 +137,14 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter)
     float         partition_factor   = parameter -> partition_factor;
     int           partition_seed     = parameter -> partition_seed;
     bool          g_stream_from_host = parameter -> g_stream_from_host;
-    VertexId      src                = parameter -> src;
+    VertexId      src                = parameter -> src[0];
     Value         delta              = parameter -> delta;
     Value         error              = parameter -> error;
     SizeT         max_iter           = parameter -> max_iter;
-    int           traversal_mode     = parameter -> traversal_mode;
+    std::string   traversal_mode     = parameter -> traversal_mode;
+    bool          instrument         = parameter -> instrumented;
+    bool          debug              = parameter -> debug;
+    bool          size_check         = parameter -> size_check;
     size_t       *org_size           = new size_t  [num_gpus];
     // Allocate host-side label arrays
     Value        *h_rank             = new Value   [graph->nodes];
@@ -197,9 +157,7 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter)
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
-    PrEnactor* enactor = new PrEnactor(num_gpus, gpu_idx);  // enactor map
-    PrProblem *problem = new PrProblem;  // Allocate problem on GPU
-
+    Problem *problem = new Problem(false);  // Allocate problem on GPU
     util::GRError(
         problem->Init(
             g_stream_from_host,
@@ -209,11 +167,15 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter)
             gpu_idx,
             partition_method,
             streams,
+            context,
             max_queue_sizing,
             max_in_sizing,
             partition_factor,
             partition_seed),
         "PR Initialization Failed", __FILE__, __LINE__);
+
+    Enactor* enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
     util::GRError(
         enactor->Init(context, problem, traversal_mode, max_grid_size),
         "PR Enactor Init failed", __FILE__, __LINE__);
@@ -241,12 +203,12 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter)
         problem->Extract(h_rank, h_node_id),
         "PR Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    float total_pr = 0;
-    for (int i = 0; i < graph->nodes; ++i)
+    double total_pr = 0;
+    for (SizeT i = 0; i < graph->nodes; ++i)
     {
         total_pr += h_rank[i];
     }
-    if (!quiet) { printf(" Total rank : %lf\n", total_pr); }
+    if (!quiet) { printf(" Total rank : %.8e\n", total_pr); }
 
     output->node_value1 = (Value*)&h_rank[0];
     output->node_value2 = (VertexId*)&h_node_id[0];
@@ -254,7 +216,7 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter)
     if (!quiet) { printf(" GPU PageRank finished in %lf msec.\n", elapsed); }
 
     // Clean up
-    if (org_size) { delete org_size; org_size = NULL; }
+    if (org_size) { delete[] org_size; org_size = NULL; }
     if (problem ) { delete problem ; problem  = NULL; }
     if (enactor ) { delete enactor ; enactor  = NULL; }
 }
@@ -272,20 +234,23 @@ void runPageRank(GRGraph *output, PR_Parameter *parameter)
 void dispatchPageRank(
     GRGraph       *grapho,
     const GRGraph *graphi,
-    const GRSetup  config,
+    const GRSetup *config,
     const GRTypes  data_t,
     ContextPtr*    context,
     cudaStream_t*  streams)
 {
     PR_Parameter *parameter = new PR_Parameter;
+    parameter->src = (long long*)malloc(sizeof(long long));
+    parameter->src[0] = -1;
     parameter->context      =  context;
     parameter->streams      =  streams;
-    parameter->g_quiet      = config.quiet;
-    parameter->num_gpus     = config.num_devices;
-    parameter->gpu_idx      = config.device_list;
-    parameter->delta        = config.pagerank_delta;
-    parameter->error        = config.pagerank_error;
-    parameter->max_iter     = config.max_iters;
+    parameter->g_quiet      = config -> quiet;
+    parameter->num_gpus     = config -> num_devices;
+    parameter->gpu_idx      = config -> device_list;
+    parameter->delta        = config -> pagerank_delta;
+    parameter->error        = config -> pagerank_error;
+    parameter->max_iter     = config -> max_iters;
+    parameter->normalized   = config -> pagerank_normalized;
     parameter->g_undirected = true;
 
     switch (data_t.VTXID_TYPE)
@@ -318,7 +283,7 @@ void dispatchPageRank(
                 csr.column_indices = (int*)graphi->col_indices;
                 parameter->graph = &csr;
 
-                runPageRank<int, float, int>(grapho, parameter);
+                normalizedPageRank<int, int, float>(grapho, parameter);
 
                 // reset for free memory
                 csr.row_offsets    = NULL;
@@ -332,6 +297,7 @@ void dispatchPageRank(
         break;
     }
     }
+    free(parameter->src);
 }
 
 /*
@@ -345,7 +311,7 @@ void dispatchPageRank(
 void gunrock_pagerank(
     GRGraph       *grapho,
     const GRGraph *graphi,
-    const GRSetup  config,
+    const GRSetup *config,
     const GRTypes  data_t)
 {
     // GPU-related configurations
@@ -354,20 +320,20 @@ void gunrock_pagerank(
     ContextPtr    *context = NULL;
     cudaStream_t  *streams = NULL;
 
-    num_gpus = config.num_devices;
+    num_gpus = config -> num_devices;
     gpu_idx  = new int [num_gpus];
     for (int i = 0; i < num_gpus; ++i)
     {
-        gpu_idx[i] = config.device_list[i];
+        gpu_idx[i] = config -> device_list[i];
     }
 
     // Create streams and MordernGPU context for each GPU
     streams = new cudaStream_t[num_gpus * num_gpus * 2];
     context = new ContextPtr[num_gpus * num_gpus];
-    if (!config.quiet) { printf(" using %d GPUs:", num_gpus); }
+    if (!config -> quiet) { printf(" using %d GPUs:", num_gpus); }
     for (int gpu = 0; gpu < num_gpus; ++gpu)
     {
-        if (!config.quiet) { printf(" %d ", gpu_idx[gpu]); }
+        if (!config -> quiet) { printf(" %d ", gpu_idx[gpu]); }
         util::SetDevice(gpu_idx[gpu]);
         for (int i = 0; i < num_gpus * 2; ++i)
         {
@@ -382,7 +348,7 @@ void gunrock_pagerank(
             }
         }
     }
-    if (!config.quiet) { printf("\n"); }
+    if (!config -> quiet) { printf("\n"); }
 
     dispatchPageRank(grapho, graphi, config, data_t, context, streams);
 }
@@ -404,15 +370,17 @@ void pagerank(
     const int           num_nodes,
     const int           num_edges,
     const int*          row_offsets,
-    const int*          col_indices)
+    const int*          col_indices,
+    bool                normalized)
 {
     struct GRTypes data_t;            // primitive-specific data types
     data_t.VTXID_TYPE = VTXID_INT;    // integer vertex identifier
     data_t.SIZET_TYPE = SIZET_INT;    // integer graph size type
     data_t.VALUE_TYPE = VALUE_FLOAT;  // float attributes type
 
-    struct GRSetup config = InitSetup();  // primitive-specific configures
-    config.top_nodes      = 10;           // number of top nodes
+    struct GRSetup *config = InitSetup(1, NULL);  // primitive-specific configures
+    config -> top_nodes      = 10;           // number of top nodes
+    config -> pagerank_normalized     = normalized;
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));

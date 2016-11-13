@@ -65,9 +65,9 @@ SizeT RandomNode (SizeT num_nodes)
     return node_id % num_nodes;
 }
 
-template <typename VertexId, typename Value, typename SizeT>
+template <typename VertexId, typename SizeT, typename Value>
 void RemoveStandaloneNodes(
-    Csr<VertexId, Value, SizeT>* graph, bool quiet = false)
+    Csr<VertexId, SizeT, Value>* graph, bool quiet = false)
 {
     SizeT nodes = graph->nodes;
     SizeT edges = graph->edges;
@@ -100,9 +100,10 @@ void RemoveStandaloneNodes(
         if (thread_num == 0) block_offsets = new SizeT[num_threads + 1];
         #pragma omp barrier
 
-        displacements[node_start] = 0;
+        if (node_end > node_start) displacements[node_start] = 0;
         for (VertexId node = node_start; node < node_end - 1; node++)
             displacements[node + 1] = displacements[node] + 1 - marker[node];
+        #pragma omp barrier
         if (node_end != 0)
             block_offsets[thread_num + 1] = displacements[node_end - 1] + 1 - marker[node_end - 1];
         else block_offsets[thread_num + 1] = 1 - marker[0];
@@ -119,10 +120,18 @@ void RemoveStandaloneNodes(
         {
             if (marker[node] == 0) continue;
             VertexId node_ = node - block_offsets[thread_num] - displacements[node];
+            //printf("thread_num = %d, node = %d, block_offsets[] = %d, displacements[] = %d, node_ = %d\n",
+            //    thread_num, node, block_offsets[thread_num], displacements[node], node_);
             new_nodes  [node ] = node_;
             new_offsets[node_] = row_offsets[node];
             if (values != NULL) new_values[node_] = values[node];
         }
+
+        //#pragma omp barrier
+        //for (SizeT edge = edge_start; edge < edge_end; edge++)
+        //{
+        //    column_indices[edge] = new_nodes[column_indices[edge]];
+        //}
     }
 
     for (SizeT edge = 0; edge < edges; edge++)

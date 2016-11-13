@@ -312,13 +312,19 @@ extern "C" {
     //void PrintCPUArray(const char* const name, const _Value* const array, const _SizeT limit, const int gpu=-1, const int iteration=-1, clock_t stime = -1)
     void PrintCPUArray(const char* const name, const _Value* const array, const _SizeT limit, const int gpu=-1, const int iteration=-1, int peer = -1)
     {
-        char *buffer = new char[1024 * 128];
+        char *buffer = new char[1024 * 1024];
 
         sprintf(buffer, "%s = ", name);
 
         for (_SizeT i=0;i<limit;i++)
         {
-            if (i!=0) sprintf(buffer,(i%10)==0?"%s, | " : "%s, ",buffer);
+            if (i!=0) 
+            {
+                if ((i%10) == 0)
+                    sprintf(buffer, "%s, |(%lld) ", buffer, (long long)i);
+                else
+                    sprintf(buffer, "%s, ", buffer);
+            }
             PrintValue(buffer,array[i],buffer);
         }
         PrintMessage(buffer,gpu,iteration, peer);
@@ -326,7 +332,7 @@ extern "C" {
     }
 
     template <typename _SizeT, typename _Value>
-    void PrintGPUArray(
+    cudaError_t PrintGPUArray(
         const char* const name,
               _Value* array,
         const _SizeT limit,
@@ -335,23 +341,29 @@ extern "C" {
               int peer = -1,
               cudaStream_t stream = 0)
     {
-        if (limit==0) return;
+        cudaError_t retval = cudaSuccess;
+        if (limit==0) return retval;
         if (stream == 0)
         {
             _Value* h_array = new _Value[limit];
-            util::GRError(cudaMemcpy(h_array,array,sizeof(_Value) * limit, cudaMemcpyDeviceToHost), "cuaMemcpy failed", __FILE__, __LINE__);
+            if (retval = util::GRError(
+                cudaMemcpy(h_array, array, sizeof(_Value) * limit, cudaMemcpyDeviceToHost), 
+                "cuaMemcpy failed", __FILE__, __LINE__)) 
+                return retval;
             PrintCPUArray<_SizeT,_Value>(name,h_array,limit,gpu,iteration, peer);
-            delete[] h_array;h_array=NULL;
+            delete[] h_array; h_array=NULL;
         } else {
             util::Array1D<_SizeT,_Value> arr;
             arr.SetName("array");
             arr.Init(limit, util::HOST);//, true, cudaHostAllocMapped | cudaHostAllocPortable);
             arr.SetPointer(array,-1, util::DEVICE);
-            arr.Move(util::DEVICE, util::HOST, -1, 0, stream);
-            cudaStreamSynchronize(stream);
+            if (retval = arr.Move(util::DEVICE, util::HOST, -1, 0, stream)) return retval;
+            if (retval = util::GRError(cudaStreamSynchronize(stream), 
+                "cudaStreamSynchronize failed", __FILE__, __LINE__)) return retval;
             PrintCPUArray<_SizeT,_Value>(name,arr.GetPointer(util::HOST), limit, gpu, iteration, peer);
             arr.Release();
         }
+        return retval;
     }
 } //namespace cpu_mt
 } //namespace util

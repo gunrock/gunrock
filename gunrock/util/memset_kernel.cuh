@@ -16,7 +16,7 @@
 /******************************************************************************
  * Simple Memset Kernel
  ******************************************************************************/
-
+#include <gunrock/coo.cuh>
 #pragma once
 
 namespace gunrock {
@@ -40,15 +40,27 @@ namespace util {
  * @param[in] value Value we want to set
  * @param[in] length Vector length
  */
-template <typename T>
-__global__ void MemsetKernel(T *d_out, T value, int length)
+template <typename T, typename SizeT>
+__global__ void MemsetKernel(T *d_out, T value, SizeT length)
 {
-    const int STRIDE = gridDim.x * blockDim.x;
-    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
          idx < length; idx += STRIDE)
     {
         d_out[idx] = value;
     }
+}
+
+template <typename VertexId, typename SizeT, typename Value>
+__global__ void MemsetAddEdgeValKernel(Coo<VertexId, Value> *d_out, VertexId value, SizeT length)
+{
+   const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
+         idx < length; idx += STRIDE)
+    {
+        d_out[idx].row += value;
+        d_out[idx].col += value;
+    } 
 }
 
 /**
@@ -60,11 +72,11 @@ __global__ void MemsetKernel(T *d_out, T value, int length)
  * @param[in] length Vector length
  * @param[in] scale The scale for indexing (1 by default)
  */
-template <typename T>
-__global__ void MemsetIdxKernel(T *d_out, int length, int scale=1)
+template <typename T, typename SizeT>
+__global__ void MemsetIdxKernel(T *d_out, SizeT length, T scale=1)
 {
-    const int STRIDE = gridDim.x * blockDim.x;
-    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
          idx < length; idx += STRIDE)
     {
         d_out[idx] = idx * scale;
@@ -80,11 +92,11 @@ __global__ void MemsetIdxKernel(T *d_out, int length, int scale=1)
  * @param[in] value Value we want to add to each element in the vector
  * @param[in] length Vector length
  */
-template <typename T>
-__global__ void MemsetAddKernel(T *d_out, T value, int length)
+template <typename T, typename SizeT>
+__global__ void MemsetAddKernel(T *d_out, T value, SizeT length)
 {
-    const int STRIDE = gridDim.x * blockDim.x;
-    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
          idx < length; idx += STRIDE)
     {
         d_out[idx] += value;
@@ -100,11 +112,11 @@ __global__ void MemsetAddKernel(T *d_out, T value, int length)
  * @param[in] value Scale factor
  * @param[in] length Vector length
  */
-template <typename T>
-__global__ void MemsetScaleKernel(T *d_out, T value, int length)
+template <typename T, typename SizeT>
+__global__ void MemsetScaleKernel(T *d_out, T value, SizeT length)
 {
-    const int STRIDE = gridDim.x * blockDim.x;
-    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
          idx < length; idx += STRIDE)
     {
         d_out[idx] *= value;
@@ -120,11 +132,11 @@ __global__ void MemsetScaleKernel(T *d_out, T value, int length)
  * @param[in] d_src Source device-side vector
  * @param[in] length Vector length
  */
-template <typename T>
-__global__ void MemsetAddVectorKernel(T *d_dst, T *d_src, int length)
+template <typename T, typename SizeT>
+__global__ void MemsetAddVectorKernel(T *d_dst, T *d_src, SizeT length)
 {
-    const int STRIDE = gridDim.x * blockDim.x;
-    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
          idx < length; idx += STRIDE)
     {
         d_dst[idx] += d_src[idx];
@@ -140,14 +152,35 @@ __global__ void MemsetAddVectorKernel(T *d_dst, T *d_src, int length)
  * @param[in] d_src Source device-side vector
  * @param[in] length Vector length
  */
-template <typename T>
-__global__ void MemsetMultiplyVectorKernel(T *d_dst, T *d_src, int length)
+template <typename T, typename SizeT>
+__global__ void MemsetMultiplyVectorKernel(T *d_dst, T *d_src, SizeT length)
 {
-    const int STRIDE = gridDim.x * blockDim.x;
-    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
          idx < length; idx += STRIDE)
     {
         d_dst[idx] *= d_src[idx];
+    }
+}
+
+/**
+ * @brief Divide the source vector to the destination vector with the same length
+ * TODO: divide by zero check
+ *
+ * @tparam T datatype of the vector.
+ *
+ * @param[in] d_dst Destination device-side vector
+ * @param[in] d_src Source device-side vector
+ * @param[in] length Vector length
+ */
+template <typename T, typename SizeT>
+__global__ void MemsetDivVectorKernel(T *d_dst, T *d_src, SizeT length)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
+         idx < length; idx += STRIDE)
+    {
+        d_dst[idx] /= d_src[idx];
     }
 }
 
@@ -160,11 +193,11 @@ __global__ void MemsetMultiplyVectorKernel(T *d_dst, T *d_src, int length)
  * @param[in] d_src Source device-side vector
  * @param[in] length Vector length
  */
-template <typename T>
-__global__ void MemsetCopyVectorKernel(T *d_dst, T *d_src, int length)
+template <typename T, typename SizeT>
+__global__ void MemsetCopyVectorKernel(T *d_dst, T *d_src, SizeT length)
 {
-    const int STRIDE = gridDim.x * blockDim.x;
-    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
          idx < length; idx += STRIDE)
     {
         d_dst[idx] = d_src[idx];
@@ -182,18 +215,39 @@ __global__ void MemsetCopyVectorKernel(T *d_dst, T *d_src, int length)
  * @param[in] scale Scale factor
  * @param[in] length Vector length
  */
-template <typename T>
+template <typename T, typename SizeT>
 __global__ void
-MemsetMadVectorKernel(T *d_dst, T *d_src1, T *d_src2, T scale, int length)
+MemsetMadVectorKernel(T *d_dst, T *d_src1, T *d_src2, T scale, SizeT length)
 {
-    const int STRIDE = gridDim.x * blockDim.x;
-    for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
          idx < length; idx += STRIDE)
     {
         d_dst[idx] = d_src1[idx] * scale + d_src2[idx];
     }
 }
 
+template <typename T, typename SizeT>
+__global__ void MemsetCASKernel(T *d_dst, T compare, T val, SizeT length)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; 
+        idx < length; idx += STRIDE) 
+    {
+        if (d_dst[idx] == compare) d_dst[idx] = val;
+    }
+}
+
+template <typename T, typename SizeT>
+__global__ void MemsetCASKernel(T *d_dst, T compare, T val, SizeT *length)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; 
+        idx < length[0]; idx += STRIDE) 
+    {
+        if (d_dst[idx] == compare) d_dst[idx] = val;
+    }
+}
 /** @} */
 
 } // namespace util

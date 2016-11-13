@@ -12,26 +12,14 @@
  * @brief Kernel configuration policy for Forward Edge Expansion Kernel
  */
 
-
-
 #pragma once
-
-#include <gunrock/util/basic_utils.h>
-#include <gunrock/util/cuda_properties.cuh>
-#include <gunrock/util/cta_work_distribution.cuh>
-#include <gunrock/util/soa_tuple.cuh>
-#include <gunrock/util/srts_grid.cuh>
-#include <gunrock/util/srts_soa_details.cuh>
-#include <gunrock/util/io/modified_load.cuh>
-#include <gunrock/util/io/modified_store.cuh>
-#include <gunrock/util/operators.cuh>
-
-#include <gunrock/app/problem_base.cuh>
 
 #include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_backward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_partitioned_backward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_partitioned/kernel_policy.cuh>
+#include <gunrock/oprtr/edge_map_partitioned_cull/kernel_policy.cuh>
+#include <gunrock/oprtr/all_edges_advance/kernel_policy.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -46,7 +34,36 @@ enum MODE {
     LB_BACKWARD,
     LB,
     LB_LIGHT,
+    LB_CULL,
+    LB_LIGHT_CULL,
+    ALL_EDGES,
 };
+
+template <MODE A_MODE>
+bool isFused()
+{
+    if (A_MODE == LB_CULL) return true;
+    else if (A_MODE == LB_LIGHT_CULL) return true;
+    else return false;
+}
+
+template <MODE A_MODE>
+bool hasPreScan()
+{
+    if (A_MODE == LB      ) return true;
+    else if (A_MODE == LB_LIGHT) return true;
+    else if (A_MODE == LB_CULL ) return true;
+    else if (A_MODE == LB_LIGHT_CULL) return true;
+    else return false;
+}
+
+template <MODE A_MODE>
+bool isBackward()
+{
+    if (A_MODE == TWC_BACKWARD) return true;
+    else if (A_MODE == LB_BACKWARD)  return true;
+    else return false;
+}
 
 /**
  * @brief Four types of advance operator
@@ -62,15 +79,15 @@ enum TYPE {
  * @brief opeartion to use for mgpu primitives
  */
 enum REDUCE_OP {
-    NONE,
-    PLUS,
-    MINUS,
-    MULTIPLIES,
-    MODULUS,
-    BIT_OR,
-    BIT_AND,
-    BIT_XOR,
-    MAXIMUM,
+    NONE       ,
+    PLUS       ,
+    MINUS      ,
+    MULTIPLIES ,
+    MODULUS    ,
+    BIT_OR     ,
+    BIT_AND    ,
+    BIT_XOR    ,
+    MAXIMUM    ,
     MINIMUM
 };
 
@@ -78,6 +95,89 @@ enum REDUCE_TYPE {
     EMPTY,
     VERTEX,
     EDGE
+};
+
+template <typename T, REDUCE_OP R_OP>
+struct Identity
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        extern __device__ __host__ void Error_UnsupportedOperation();
+        Error_UnsupportedOperation();
+        return 0;
+    }
+};
+
+template <typename T>
+struct Identity<T, NONE>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return 0;
+    }
+};
+
+template <typename T>
+struct Identity<T, PLUS>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return 0;
+    }
+};
+
+template <typename T>
+struct Identity<T, MULTIPLIES>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return 1;
+    }
+};
+
+template <typename T>
+struct Identity<T, BIT_OR>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return util::AllZeros<T>();
+    }
+};
+
+template <typename T>
+struct Identity<T, BIT_AND>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return util::AllOnes <T>();
+    }
+};
+
+template <typename T>
+struct Identity<T, BIT_XOR>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return util::AllZeros<T>();
+    }
+};
+
+template <typename T>
+struct Identity<T, MAXIMUM>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return util::MinValue<T>();
+    }
+};
+
+template <typename T>
+struct Identity<T, MINIMUM>
+{
+    __device__ __host__ __forceinline__ T operator()()
+    {
+        return util::MaxValue<T>();
+    }
 };
 
 /**
@@ -109,68 +209,124 @@ enum REDUCE_TYPE {
  * @tparam _ADVANCE_MODE                Enum type which shows the type of advance operator we use: TWC_FORWARD, TWC_BACKWARD, LB)
  */
 template <
-    typename _ProblemData,
+    typename _Problem,
     // Machine parameters
     int _CUDA_ARCH,
     // Behavioral control parameters
-    bool _INSTRUMENT,
+    //bool _INSTRUMENT,
     // Tunable parameters
-    int _MIN_CTA_OCCUPANCY,                                             
-    int _LOG_THREADS,                                                   
+    int _MAX_CTA_OCCUPANCY,
+    int _LOG_THREADS,
     int _LOG_BLOCKS,
     int _LIGHT_EDGE_THRESHOLD,
-    int _LOG_LOAD_VEC_SIZE,                                             
-    int _LOG_LOADS_PER_TILE,                                            
-    int _LOG_RAKING_THREADS,                                            
-    int _WARP_GATHER_THRESHOLD,                                          
-    int _CTA_GATHER_THRESHOLD,                                           
+    int _LOG_LOAD_VEC_SIZE,
+    int _LOG_LOADS_PER_TILE,
+    int _LOG_RAKING_THREADS,
+    int _WARP_GATHER_THRESHOLD,
+    int _CTA_GATHER_THRESHOLD,
     int _LOG_SCHEDULE_GRANULARITY,
     // Advance Mode and Type parameters
     MODE _ADVANCE_MODE>
 struct KernelPolicy {
 
-    typedef _ProblemData                    ProblemData;
-    typedef typename ProblemData::VertexId  VertexId;
-    typedef typename ProblemData::SizeT     SizeT;
-    typedef typename ProblemData::Value     Value;
+    typedef _Problem                    Problem;
+    typedef typename Problem::VertexId  VertexId;
+    typedef typename Problem::SizeT     SizeT;
+    typedef typename Problem::Value     Value;
 
     static const MODE   ADVANCE_MODE = _ADVANCE_MODE;
-    static const int    CTA_OCCUPANCY = _MIN_CTA_OCCUPANCY;
 
-typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
-    _ProblemData,
-    _CUDA_ARCH,
-    _INSTRUMENT,
-    _MIN_CTA_OCCUPANCY,
-    _LOG_THREADS,
-    _LOG_LOAD_VEC_SIZE,
-    _LOG_LOADS_PER_TILE,
-    _LOG_RAKING_THREADS,
-    _WARP_GATHER_THRESHOLD,
-    _CTA_GATHER_THRESHOLD,
-    _LOG_SCHEDULE_GRANULARITY> THREAD_WARP_CTA_FORWARD;
+    enum
+    {
+        CUDA_ARCH = _CUDA_ARCH,
+        LOG_THREADS = _LOG_THREADS,
+        THREADS = 1 << LOG_THREADS,
+    };
 
-typedef gunrock::oprtr::edge_map_backward::KernelPolicy<
-    _ProblemData,
-    _CUDA_ARCH,
-    _INSTRUMENT,
-    _MIN_CTA_OCCUPANCY,
-    _LOG_THREADS,
-    _LOG_LOAD_VEC_SIZE,
-    _LOG_LOADS_PER_TILE,
-    _LOG_RAKING_THREADS,
-    _WARP_GATHER_THRESHOLD,
-    _CTA_GATHER_THRESHOLD,
-    _LOG_SCHEDULE_GRANULARITY> THREAD_WARP_CTA_BACKWARD;
+    typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
+        _Problem,
+        _CUDA_ARCH,
+        //_INSTRUMENT,
+        _MAX_CTA_OCCUPANCY,
+        _LOG_THREADS,
+        _LOG_LOAD_VEC_SIZE,
+        _LOG_LOADS_PER_TILE,
+        _LOG_RAKING_THREADS,
+        _WARP_GATHER_THRESHOLD,
+        _CTA_GATHER_THRESHOLD,
+        _LOG_SCHEDULE_GRANULARITY>
+    THREAD_WARP_CTA_FORWARD;
 
-typedef gunrock::oprtr::edge_map_partitioned::KernelPolicy<
-    _ProblemData,
-    _CUDA_ARCH,
-    _INSTRUMENT,
-    1,
-    _LOG_THREADS,
-    _LOG_BLOCKS,
-    _LIGHT_EDGE_THRESHOLD> LOAD_BALANCED;
+    typedef gunrock::oprtr::edge_map_backward::KernelPolicy<
+        _Problem,
+        _CUDA_ARCH,
+        //_INSTRUMENT,
+        _MAX_CTA_OCCUPANCY,
+        _LOG_THREADS,
+        _LOG_LOAD_VEC_SIZE,
+        _LOG_LOADS_PER_TILE,
+        _LOG_RAKING_THREADS,
+        _WARP_GATHER_THRESHOLD,
+        _CTA_GATHER_THRESHOLD,
+        _LOG_SCHEDULE_GRANULARITY>
+    THREAD_WARP_CTA_BACKWARD;
+
+    typedef gunrock::oprtr::edge_map_partitioned::KernelPolicy<
+        _Problem,
+        _CUDA_ARCH,
+        //_INSTRUMENT,
+        _MAX_CTA_OCCUPANCY,
+        _LOG_THREADS,
+        _LOG_BLOCKS,
+        _LIGHT_EDGE_THRESHOLD>
+    LOAD_BALANCED;
+
+    typedef gunrock::oprtr::edge_map_partitioned_backward::KernelPolicy<
+        _Problem,
+        _CUDA_ARCH,
+        //_INSTRUMENT,
+        _MAX_CTA_OCCUPANCY,
+        _LOG_THREADS,
+        _LOG_BLOCKS,
+        _LIGHT_EDGE_THRESHOLD>
+    LOAD_BALANCED_BACKWARD;
+
+    typedef gunrock::oprtr::edge_map_partitioned_cull::KernelPolicy<
+        _Problem,
+        _CUDA_ARCH,
+        //_INSTRUMENT,
+        _MAX_CTA_OCCUPANCY,
+        _LOG_THREADS,
+        _LOG_BLOCKS,
+        _LIGHT_EDGE_THRESHOLD>
+    LOAD_BALANCED_CULL;
+
+    typedef gunrock::oprtr::all_edges_advance::KernelPolicy<
+        _Problem,
+        _CUDA_ARCH,
+        //_INSTRUMENT,
+        _MAX_CTA_OCCUPANCY,
+        _LOG_THREADS,
+        _LOG_BLOCKS>
+    EDGES;
+
+    static const int CTA_OCCUPANCY =
+         (ADVANCE_MODE == TWC_FORWARD ) ?
+            THREAD_WARP_CTA_FORWARD ::CTA_OCCUPANCY :
+        ((ADVANCE_MODE == TWC_BACKWARD) ?
+            THREAD_WARP_CTA_BACKWARD::CTA_OCCUPANCY :
+        ((ADVANCE_MODE == LB_BACKWARD ) ?
+            LOAD_BALANCED_BACKWARD  ::CTA_OCCUPANCY :
+        ((ADVANCE_MODE == LB          ) ?
+            LOAD_BALANCED           ::CTA_OCCUPANCY :
+        ((ADVANCE_MODE == LB_LIGHT    ) ?
+            LOAD_BALANCED           ::CTA_OCCUPANCY :
+        ((ADVANCE_MODE == LB_CULL     ) ?
+            LOAD_BALANCED_CULL      ::CTA_OCCUPANCY : 
+        ((ADVANCE_MODE == LB_LIGHT_CULL) ?
+            LOAD_BALANCED_CULL      ::CTA_OCCUPANCY : 
+        ((ADVANCE_MODE == ALL_EDGES    ) ?
+            EDGES                   ::CTA_OCCUPANCY : 0)))))));
 };
 
 } //advance

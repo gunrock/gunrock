@@ -45,13 +45,13 @@ using namespace gunrock::app::cc;
  * Defines, constants, globals
  ******************************************************************************/
 
-template <typename VertexId>
+template <typename VertexId, typename SizeT>
 struct CcList
 {
-    VertexId        root;
-    unsigned int    histogram;
+    VertexId root;
+    SizeT    histogram;
 
-    CcList(VertexId root, unsigned int histogram) :
+    CcList(VertexId root, SizeT histogram) :
         root(root), histogram(histogram) {}
 };
 
@@ -106,7 +106,7 @@ void Usage()
         "                          (graph-edges * <factor>). (Default: 1.0)\n"
         "[--v]                     Print verbose per iteration debug info.\n"
         "[--iteration-num=<num>]   Number of runs to perform the test.\n"
-        "[--partition_method=<random|biasrandom|clustered|metis>]\n"
+        "[--partition-method=<random|biasrandom|clustered|metis>]\n"
         "                          Choose partitioner (Default use random).\n"
         "[--quiet]                 No output (unless --json is specified).\n"
         "[--json]                  Output JSON-format statistics to STDOUT.\n"
@@ -132,11 +132,11 @@ template<typename VertexId, typename SizeT>
 void DisplaySolution(
     VertexId     *comp_ids,
     SizeT        nodes,
-    unsigned int num_components,
+    SizeT        num_components,
     VertexId     *roots,
-    unsigned int *histogram)
+    SizeT        *histogram)
 {
-    typedef CcList<VertexId> CcListType;
+    typedef CcList<VertexId, SizeT> CcListType;
     //printf("Number of components: %d\n", num_components);
 
     if (nodes <= 40)
@@ -157,7 +157,7 @@ void DisplaySolution(
         //sort the components by size
         CcListType *cclist =
             (CcListType*)malloc(sizeof(CcListType) * num_components);
-        for (int i = 0; i < num_components; ++i)
+        for (SizeT i = 0; i < num_components; ++i)
         {
             cclist[i].root = roots[i];
             cclist[i].histogram = histogram[i];
@@ -166,12 +166,12 @@ void DisplaySolution(
             cclist, cclist + num_components, CCCompare<CcListType>);
 
         // Print out at most top 10 largest components
-        int top = (num_components < 10) ? num_components : 10;
-        printf("Top %d largest components:\n", top);
-        for (int i = 0; i < top; ++i)
+        SizeT top = (num_components < 10) ? num_components : 10;
+        printf("Top %lld largest components:\n", (long long)top);
+        for (SizeT i = 0; i < top; ++i)
         {
-            printf("CC ID: %d, CC Root: %d, CC Size: %d\n",
-                   i, cclist[i].root, cclist[i].histogram);
+            printf("CC ID: %lld, CC Root: %lld, CC Size: %lld\n",
+                   (long long)i, (long long)cclist[i].root, (long long)cclist[i].histogram);
         }
 
         free(cclist);
@@ -196,11 +196,11 @@ void DisplaySolution(
  */
 template <
     typename VertexId,
-    typename Value,
-    typename SizeT >
+    typename SizeT,
+    typename Value >
 unsigned int ReferenceCC(
-    const Csr<VertexId, Value, SizeT> &graph,
-    int *labels,
+    const Csr<VertexId, SizeT, Value> &graph,
+    VertexId *labels,
     bool quiet = false)
 {
     using namespace boost;
@@ -219,7 +219,7 @@ unsigned int ReferenceCC(
     }
     CpuTimer cpu_timer;
     cpu_timer.Start();
-    int num_components = connected_components(G, &labels[0]);
+    SizeT num_components = connected_components(G, &labels[0]);
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
 
@@ -262,47 +262,59 @@ void ConvertIDs(
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- * @tparam SIZE_CHECK
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
-void RunTests(Info<VertexId, Value, SizeT> *info)
+    typename Value>
+cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 {
     typedef CCProblem < VertexId,
             SizeT,
-            Value,
-            false > CcProblem;  // use double buffer for advance and filter
+            Value> Problem;  // use double buffer for advance and filter
 
-    typedef CCEnactor < CcProblem,
-            INSTRUMENT,
-            DEBUG,
-            SIZE_CHECK > CcEnactor;
+    typedef CCEnactor < Problem>
+            //INSTRUMENT,
+            //DEBUG,
+            //SIZE_CHECK >
+            Enactor;
 
     // parse configurations from mObject info
-    Csr<VertexId, Value, SizeT> *graph = info->csr_ptr;
-    int max_grid_size            = info->info["max_grid_size"].get_int();
-    int num_gpus                 = info->info["num_gpus"].get_int();
-    double max_queue_sizing      = info->info["max_queue_sizing"].get_real();
-    double max_queue_sizing1     = info->info["max_queue_sizing1"].get_real();
-    double max_in_sizing         = info->info["max_in_sizing"].get_real();
-    std::string partition_method = info->info["partition_method"].get_str();
-    double partition_factor      = info->info["partition_factor"].get_real();
-    int partition_seed           = info->info["partition_seed"].get_int();
-    bool quiet_mode              = info->info["quiet_mode"].get_bool();
-    bool quick_mode              = info->info["quick_mode"].get_bool();
-    bool stream_from_host        = info->info["stream_from_host"].get_bool();
-    int traversal_mode           = info->info["traversal_mode"].get_int();
-    int iterations               = 1; //set to 1 for now. info->info["num_iteration"].get_int();
+    Csr<VertexId, SizeT, Value> *graph = info->csr_ptr;
+    int     max_grid_size          = info->info["max_grid_size"     ].get_int  ();
+    int     num_gpus               = info->info["num_gpus"          ].get_int  ();
+    double  max_queue_sizing       = info->info["max_queue_sizing"  ].get_real ();
+    double  max_queue_sizing1      = info->info["max_queue_sizing1" ].get_real ();
+    double  max_in_sizing          = info->info["max_in_sizing"     ].get_real ();
+    std::string partition_method   = info->info["partition_method"  ].get_str  ();
+    double  partition_factor       = info->info["partition_factor"  ].get_real ();
+    int     partition_seed         = info->info["partition_seed"    ].get_int  ();
+    bool    quiet_mode             = info->info["quiet_mode"        ].get_bool ();
+    bool    quick_mode             = info->info["quick_mode"        ].get_bool ();
+    bool    stream_from_host       = info->info["stream_from_host"  ].get_bool ();
+    std::string traversal_mode     = info->info["traversal_mode"    ].get_str  ();
+    bool    instrument             = info->info["instrument"        ].get_bool (); 
+    bool    debug                  = info->info["debug_mode"        ].get_bool (); 
+    bool    size_check             = info->info["size_check"        ].get_bool ();
+    int     iterations             = info->info["num_iteration"     ].get_int();
+    int     communicate_latency    = info->info["communicate_latency"].get_int (); 
+    float   communicate_multipy    = info->info["communicate_multipy"].get_real();
+    int     expand_latency         = info->info["expand_latency"    ].get_int (); 
+    int     subqueue_latency       = info->info["subqueue_latency"  ].get_int (); 
+    int     fullqueue_latency      = info->info["fullqueue_latency" ].get_int (); 
+    int     makeout_latency        = info->info["makeout_latency"   ].get_int (); 
+    if (max_queue_sizing < 0) max_queue_sizing = 1.0;
+    if (max_in_sizing < 0) max_in_sizing = 1.1;
+    if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
+    CpuTimer cpu_timer;
+    cudaError_t retval;
 
+    cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
@@ -315,7 +327,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     VertexId    *reference_component_ids = new VertexId[graph->nodes];
     VertexId    *h_component_ids        = new VertexId[graph->nodes];
     VertexId    *reference_check        = (quick_mode) ? NULL : reference_component_ids;
-    unsigned int ref_num_components     = 0;
+    SizeT        ref_num_components     = 0;
 
     //printf("0: node %d: %d -> %d, node %d: %d -> %d\n", 131070, graph->row_offsets[131070], graph->row_offsets[131071], 131071, graph->row_offsets[131071], graph->row_offsets[131072]);
     //for (int edge = 0; edge < graph->edges; edge ++)
@@ -330,31 +342,55 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     for (int gpu = 0; gpu < num_gpus; gpu++)
     {
         size_t dummy;
-        cudaSetDevice(gpu_idx[gpu]);
+        if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
-    CcEnactor* enactor = new CcEnactor(num_gpus, gpu_idx);  // enactor map
-    CcProblem* problem = new CcProblem;  // allocate problem on GPU
+    Problem* problem = new Problem;  // allocate problem on GPU
+    if (retval = util::GRError(problem->Init(
+        stream_from_host,
+        graph,
+        NULL,
+        num_gpus,
+        gpu_idx,
+        partition_method,
+        streams,
+        max_queue_sizing,
+        max_in_sizing,
+        partition_factor,
+        partition_seed),
+        "CC Problem Initialization Failed", __FILE__, __LINE__))
+        return retval;
 
-    util::GRError(problem->Init(
-                      stream_from_host,
-                      graph,
-                      NULL,
-                      num_gpus,
-                      gpu_idx,
-                      partition_method,
-                      streams,
-                      max_queue_sizing,
-                      max_in_sizing,
-                      partition_factor,
-                      partition_seed),
-                  "CC Problem Initialization Failed", __FILE__, __LINE__);
-    util::GRError(enactor->Init(context, problem, max_grid_size),
-                  "CC Enactor Init failed", __FILE__, __LINE__);
+    Enactor* enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
+    if (retval = util::GRError(enactor->Init(
+        context, problem, traversal_mode, max_grid_size),
+        "CC Enactor Init failed", __FILE__, __LINE__))
+        return retval;
+
+    enactor -> communicate_latency = communicate_latency;
+    enactor -> communicate_multipy = communicate_multipy;
+    enactor -> expand_latency      = expand_latency;
+    enactor -> subqueue_latency    = subqueue_latency;
+    enactor -> fullqueue_latency   = fullqueue_latency;
+    enactor -> makeout_latency     = makeout_latency;
+
+    if (retval = util::SetDevice(gpu_idx[0])) return retval;
+    if (retval = util::latency::Test(
+        streams[0], problem -> data_slices[0] -> latency_data,
+        communicate_latency,
+        communicate_multipy,
+        expand_latency,
+        subqueue_latency,
+        fullqueue_latency,
+        makeout_latency)) return retval;
+
+    cpu_timer.Stop();
+    info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
     // compute reference CPU CC
-    if (reference_check != NULL)
+    if (!quick_mode)
     {
         if (!quiet_mode) { printf("Computing reference value ...\n"); }
         ref_num_components = ReferenceCC(*graph, reference_check, quiet_mode);
@@ -362,45 +398,64 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     }
 
     // perform CC
-    CpuTimer cpu_timer;
-    float elapsed = 0.0f;
-
+    double total_elapsed = 0.0;
+    double single_elapsed = 0.0;
+    double max_elapsed    = 0.0;
+    double min_elapsed    = 1e10;
+    json_spirit::mArray process_times;
+    if (!quiet_mode) printf("Using traversal mode %s\n", traversal_mode.c_str());
     for (SizeT iter = 0; iter < iterations; ++iter)
     {
-        util::GRError(problem->Reset(
-                          enactor->GetFrontierType(), max_queue_sizing),
-                      "CC Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(enactor->Reset(),
-                      "CC Enactor Reset failed", __FILE__, __LINE__);
+        if (retval = util::GRError(problem->Reset(
+            enactor->GetFrontierType(), max_queue_sizing),
+            "CC Problem Data Reset Failed", __FILE__, __LINE__))
+            return retval;
+        if (retval = util::GRError(enactor->Reset(),
+            "CC Enactor Reset failed", __FILE__, __LINE__))
+            return retval;
 
         if (!quiet_mode)
         {
             printf("_________________________\n"); fflush(stdout);
         }
         cpu_timer.Start();
-        util::GRError(enactor->Enact(),
-                      "CC Problem Enact Failed", __FILE__, __LINE__);
+        if (retval = util::GRError(enactor->Enact(traversal_mode),
+            "CC Problem Enact Failed", __FILE__, __LINE__))
+            return retval;
         cpu_timer.Stop();
+        single_elapsed = cpu_timer.ElapsedMillis();
+        total_elapsed += single_elapsed;
+        process_times.push_back(single_elapsed);
+        if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
+        if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
         if (!quiet_mode)
         {
-            printf("-------------------------\n"); fflush(stdout);
+            printf("-------------------------\n"
+                "iteration %lld elapsed: %lf ms\n",
+                (long long)iter, single_elapsed); 
+            fflush(stdout);
         }
-        elapsed += cpu_timer.ElapsedMillis();
-    }
-    elapsed /= iterations;
 
+    }
+    total_elapsed /= iterations;
+    info -> info["process_times"] = process_times;
+    info -> info["min_process_time"] = min_elapsed;
+    info -> info["max_process_time"] = max_elapsed;
+
+    cpu_timer.Start();
     // copy out results
-    util::GRError(problem->Extract(h_component_ids),
-                  "CC Problem Data Extraction Failed", __FILE__, __LINE__);
+    if (retval = util::GRError(problem->Extract(h_component_ids),
+        "CC Problem Data Extraction Failed", __FILE__, __LINE__))
+        return retval;
 
     // validity
-    if (reference_check != NULL)
+    if (!quick_mode)
     {
         if (ref_num_components == problem->num_components)
         {
             if (!quiet_mode)
             {
-                printf("CORRECT. Component Count: %d\n", ref_num_components);
+                printf("CORRECT. Component Count: %lld\n", (long long)ref_num_components);
             }
         }
         else
@@ -408,9 +463,9 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             if (!quiet_mode)
             {
                 printf(
-                    "INCORRECT. Ref Component Count: %d, "
-                    "GPU Computed Component Count: %d\n",
-                    ref_num_components, problem->num_components);
+                    "INCORRECT. Ref Component Count: %lld, "
+                    "GPU Computed Component Count: %lld\n",
+                    (long long)ref_num_components, (long long)problem->num_components);
             }
         }
     }
@@ -421,7 +476,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             printf("Component Count: %lld\n", (long long) problem->num_components);
         }
     }
-    if (reference_check != NULL)
+    if (!quick_mode)
     {
         ConvertIDs<VertexId, SizeT>(reference_check, graph->nodes, ref_num_components);
         ConvertIDs<VertexId, SizeT>(h_component_ids, graph->nodes, problem->num_components);
@@ -429,11 +484,11 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         {
             printf("Label Validity: ");
         }
-        int error_num = CompareResults(
-                            h_component_ids, reference_check, graph->nodes, true, quiet_mode);
+        SizeT error_num = CompareResults(
+            h_component_ids, reference_check, graph->nodes, true, quiet_mode);
         if (error_num > 0)
         {
-            if (!quiet_mode) { printf("%d errors occurred.\n", error_num); }
+            if (!quiet_mode) { printf("%lld errors occurred.\n", (long long)error_num); }
         }
         else
         {
@@ -444,8 +499,8 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     //if (ref_num_components == csr_problem->num_components)
     {
         // Compute size and root of each component
-        VertexId     *h_roots      = new VertexId    [problem->num_components];
-        unsigned int *h_histograms = new unsigned int[problem->num_components];
+        VertexId *h_roots      = new VertexId[problem->num_components];
+        SizeT    *h_histograms = new SizeT   [problem->num_components];
 
         //printf("num_components = %d\n", problem->num_components);
         problem->ComputeCCHistogram(h_component_ids, h_roots, h_histograms);
@@ -455,7 +510,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
         {
             // Display Solution
             DisplaySolution(h_component_ids, graph->nodes,
-                            problem->num_components, h_roots, h_histograms);
+                problem->num_components, h_roots, h_histograms);
         }
 
         if (h_roots     ) {delete[] h_roots     ; h_roots      = NULL;}
@@ -463,14 +518,7 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     }
 
     info->ComputeCommonStats(  // compute running statistics
-        enactor->enactor_stats.GetPointer(), elapsed, h_component_ids, true);
-
-    if (!quiet_mode)
-    {
-        info->DisplayStats();  // display collected statistics
-    }
-
-    info->CollectInfo();  // collected all the info and put into JSON mObject
+        enactor->enactor_stats.GetPointer(), total_elapsed, h_component_ids, true);
 
     if (!quiet_mode)
     {
@@ -495,19 +543,19 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             for (int i = 0; i < num_gpus; i++)
             {
                 SizeT x = problem->data_slices[gpu]->frontier_queues[i].keys[0].GetSize();
-                printf("\t %d", x);
+                printf("\t %lld", (long long)x);
                 double factor = 1.0 * x / (num_gpus > 1 ? problem->graph_slices[gpu]->in_counter[i] : problem->graph_slices[gpu]->nodes);
                 if (factor > max_key_sizing) max_key_sizing = factor;
                 if (num_gpus > 1 && i != 0 )
                     for (int t = 0; t < 2; t++)
                     {
                         x = problem->data_slices[gpu][0].keys_in[t][i].GetSize();
-                        printf("\t %d", x);
+                        printf("\t %lld", (long long)x);
                         factor = 1.0 * x / problem->graph_slices[gpu]->in_counter[i];
                         if (factor > max_in_sizing_) max_in_sizing_ = factor;
                     }
             }
-            if (num_gpus > 1) printf("\t %d", problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
+            if (num_gpus > 1) printf("\t %lld", (long long)problem->data_slices[gpu]->frontier_queues[num_gpus].keys[0].GetSize());
             printf("\n");
         }
         printf("\t key_sizing =\t %lf", max_key_sizing);
@@ -521,93 +569,80 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     if (enactor                ) {delete   enactor                ; enactor                 = NULL;}
     if (reference_component_ids) {delete[] reference_component_ids; reference_component_ids = NULL;}
     if (h_component_ids        ) {delete[] h_component_ids        ; h_component_ids         = NULL;}
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["size_check"].get_bool())
-    {
-        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG,  true>(info);
-    }
-    else
-    {
-        RunTests<VertexId, Value, SizeT, INSTRUMENT, DEBUG, false>(info);
-    }
-}
-
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-void RunTests_debug(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["debug_mode"].get_bool())
-    {
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT,  true>(info);
-    }
-    else
-    {
-        RunTests_size_check<VertexId, Value, SizeT, INSTRUMENT, false>(info);
-    }
-}
-
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT >
-void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["instrument"].get_bool())
-    {
-        RunTests_debug<VertexId, Value, SizeT, true>(info);
-    }
-    else
-    {
-        RunTests_debug<VertexId, Value, SizeT, false>(info);
-    }
+    cpu_timer.Stop();
+    info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
+    return retval;
 }
 
 /******************************************************************************
  * Main
  ******************************************************************************/
+template <
+    typename VertexId,  // use int as the vertex identifier
+    typename SizeT   ,  // use int as the graph size type
+    typename Value   >  // use int as the value type
+int main_(CommandLineArgs *args)
+{
+    CpuTimer cpu_timer, cpu_timer2;
+    cpu_timer.Start();
+    Csr <VertexId, SizeT, Value> csr(false);  // graph we process on
+    Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
+
+    // graph construction or generation related parameters
+    info->info["undirected"] = true;   // require undirected input graph
+
+    cpu_timer2.Start();
+    info->Init("CC", *args, csr);  // initialize Info structure
+    graphio::RemoveStandaloneNodes<VertexId, SizeT, Value>(
+        &csr, args->CheckCmdLineFlag("quiet"));
+        cpu_timer2.Stop();
+    info->info["load_time"] = cpu_timer2.ElapsedMillis();
+
+    RunTests<VertexId, SizeT, Value>(info);  // run test
+
+    cpu_timer.Stop();
+    info->info["total_time"] = cpu_timer.ElapsedMillis();
+
+    if (!(info->info["quiet_mode"].get_bool()))
+    {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+    return 0;
+}
+
+template <
+    typename VertexId, // the vertex identifier type, usually int or long long
+    typename SizeT   > // the size tyep, usually int or long long
+int main_Value(CommandLineArgs *args)
+{
+//    if (args -> CheckCmdLineFlag("64bit-Value"))
+//        return main_<VertexId, SizeT, long long>(args);
+//    else
+//        return main_<VertexId, SizeT, int      >(args);
+      return main_<VertexId, SizeT, VertexId>(args); // Value = VertexId for CC
+}
+
+template <
+    typename VertexId>
+int main_SizeT(CommandLineArgs *args)
+{
+// disabled to reduce compile time
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
+        return main_Value<VertexId, int      >(args);
+}
+
+int main_VertexId(CommandLineArgs *args)
+{
+    // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
+    //if (args -> CheckCmdLineFlag("64bit-VertexId"))
+    //    return main_SizeT<long long>(args);
+    //else
+        return main_SizeT<int      >(args);
+}
 
 int main(int argc, char** argv)
 {
@@ -619,24 +654,8 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    typedef int VertexId;  // use int as the vertex identifier
-    typedef int Value;     // use int as the value type
-    typedef int SizeT;     // use int as the graph size type
-
-    Csr<VertexId, Value, SizeT> csr(false);  // graph we process on
-    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
-
-    // graph construction or generation related parameters
-    info->info["undirected"] = true;   // require undirected input graph
-
-    info->Init("CC", args, csr);  // initialize Info structure
-    graphio::RemoveStandaloneNodes<VertexId, Value, SizeT>(
-        &csr, args.CheckCmdLineFlag("quiet"));
-    RunTests_instrumented<VertexId, Value, SizeT>(info);  // run test
-
-    return 0;
+    return main_VertexId(&args);
 }
-
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++

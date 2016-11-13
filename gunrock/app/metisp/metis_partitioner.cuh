@@ -14,8 +14,12 @@
 
 #pragma once
 
-#include <metis.h>
+#ifdef METIS_FOUND
+  #include <metis.h>
+#endif
+
 #include <gunrock/app/partitioner_base.cuh>
+#include <gunrock/util/error_utils.cuh>
 
 namespace gunrock {
 namespace app {
@@ -24,26 +28,36 @@ namespace metisp {
 template <
     typename VertexId,
     typename SizeT,
-    typename Value,
+    typename Value/*,
     bool     ENABLE_BACKWARD = false,
     bool     KEEP_ORDER      = false,
-    bool     KEEP_NODE_NUM   = false>
-struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value, ENABLE_BACKWARD, KEEP_ORDER, KEEP_NODE_NUM>
+    bool     KEEP_NODE_NUM   = false*/>
+struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value/*, 
+    ENABLE_BACKWARD, KEEP_ORDER, KEEP_NODE_NUM*/>
 {
-    typedef Csr<VertexId,Value,SizeT> GraphT;
+    typedef PartitionerBase<VertexId, SizeT, Value> BasePartitioner;
+    typedef Csr<VertexId,SizeT,Value> GraphT;
 
     // Members
     float *weitage;
 
     // Methods
-    MetisPartitioner()
+    /*MetisPartitioner()
     {
         weitage=NULL;
-    }
+    }*/
 
-    MetisPartitioner(const GraphT &graph,
-                      int   num_gpus,
-                      float *weitage = NULL)
+    MetisPartitioner(
+        const  GraphT &graph,
+        int    num_gpus,
+        float *weitage = NULL,
+        bool   _enable_backward = false,
+        bool   _keep_order      = false,
+        bool   _keep_node_num   = false) :
+        BasePartitioner(
+            _enable_backward,
+            _keep_order,
+            _keep_node_num)
     {
         Init2(graph,num_gpus,weitage);
     }
@@ -60,7 +74,7 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value, ENABLE_BACKWARD,
         else {
             float sum=0;
             for (int gpu=0;gpu<num_gpus;gpu++) sum+=weitage[gpu];
-            for (int gpu=0;gpu<num_gpus;gpu++) this->weitage[gpu]=weitage[gpu]/sum; 
+            for (int gpu=0;gpu<num_gpus;gpu++) this->weitage[gpu]=weitage[gpu]/sum;
         }
         for (int gpu=0;gpu<num_gpus;gpu++) this->weitage[gpu+1]+=this->weitage[gpu];
     }
@@ -89,22 +103,25 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value, ENABLE_BACKWARD,
         int        seed   = -1)
     {
         cudaError_t retval = cudaSuccess;
-        //typedef idxtype idx_t;
-        idx_t       nodes  = this->graph->nodes;
-        idx_t       edges  = this->graph->edges;
-        idx_t       ngpus  = this->num_gpus;
-        idx_t       ncons  = 1;
-        idx_t       objval;
-        idx_t*      tpartition_table = new idx_t[nodes];//=this->partition_tables[0];
-        idx_t*      trow_offsets     = new idx_t[nodes+1];
-        idx_t*      tcolumn_indices  = new idx_t[edges];
+#ifdef METIS_FOUND
+        {
+            //typedef idxtype idx_t;
+            idx_t       nodes  = this->graph->nodes;
+            idx_t       edges  = this->graph->edges;
+            idx_t       ngpus  = this->num_gpus;
+            idx_t       ncons  = 1;
+            idx_t       objval;
+            idx_t*      tpartition_table = new idx_t[nodes];//=this->partition_tables[0];
+            idx_t*      trow_offsets     = new idx_t[nodes+1];
+            idx_t*      tcolumn_indices  = new idx_t[edges];
 
-        for (idx_t node = 0; node <= nodes; node++)
-            trow_offsets[node] = this->graph->row_offsets[node];
-        for (idx_t edge = 0; edge < edges; edge++)
-            tcolumn_indices[edge] = this->graph->column_indices[edge];
+            for (idx_t node = 0; node <= nodes; node++)
+                trow_offsets[node] = this->graph->row_offsets[node];
+            for (idx_t edge = 0; edge < edges; edge++)
+                tcolumn_indices[edge] = this->graph->column_indices[edge];
 
-        //int Status = 
+
+        //int Status =
                 METIS_PartGraphKway(
                     &nodes,                      // nvtxs  : the number of vertices in the graph
                     &ncons,                      // ncon   : the number of balancing constraints
@@ -119,7 +136,7 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value, ENABLE_BACKWARD,
                     NULL,                        // options: the options
                     &objval,                     // objval : the returned edge-cut or the total communication volume
                     tpartition_table);           // part   : the returned partition vector of the graph
-        
+
         for (SizeT i=0;i<nodes;i++) this->partition_tables[0][i]=tpartition_table[i];
         delete[] tpartition_table; tpartition_table = NULL;
         delete[] trow_offsets    ; trow_offsets     = NULL;
@@ -137,6 +154,14 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value, ENABLE_BACKWARD,
         backward_offsets     = this->backward_offsets;
         backward_partitions  = this->backward_partitions;
         backward_convertions = this->backward_convertions;
+
+      }
+#else
+      {
+        const char * str = "Metis was not found during installation, therefore metis partitioner cannot be used.";
+        retval = util::GRError(cudaErrorUnknown, str, __FILE__, __LINE__);
+      } // METIS_FOUND
+#endif
         return retval;
     }
 };

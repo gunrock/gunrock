@@ -96,7 +96,7 @@ namespace edge_map_backward {
 
             // Work progress
             VertexId                queue_index;                // Current frontier queue counter index
-            util::CtaWorkProgress   &work_progress;             // Atomic queueing counters
+            util::CtaWorkProgress<SizeT>   &work_progress;             // Atomic queueing counters
             //int                     num_gpus;                   // Number of GPUs
 
             // Operational details for raking grid
@@ -288,7 +288,7 @@ namespace edge_map_backward {
                                             // Mark the node as visited in  d_queue, so that we can cull it
                                             // during next vertex_map
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                -1,
+                                                (VertexId)-1,
                                                 cta->d_queue + cta->smem_storage.state.warp_comm[0][1]);
 
                                             //Set bitmap_out to true
@@ -325,7 +325,7 @@ namespace edge_map_backward {
                                             // Mark the node as visited in  d_queue, so that we can cull it
                                             // during next vertex_map
                                             util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                -1,
+                                                (VertexId)-1,
                                                 cta->d_queue + cta->smem_storage.state.warp_comm[0][1]);
 
                                             //Set bitmap_out to true
@@ -406,7 +406,7 @@ namespace edge_map_backward {
                                                 // Mark the node as visited in  d_queue, so that we can cull it
                                                 // during next vertex_map
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                        -1,
+                                                        (VertexId)-1,
                                                         cta->d_queue + cta->smem_storage.state.warp_comm[warp_id][1]);
 
                                                 //Set bitmap_out to true
@@ -443,7 +443,7 @@ namespace edge_map_backward {
                                                 // Mark the node as visited in  d_queue, so that we can cull it
                                                 // during next vertex_map
                                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                                                        -1,
+                                                        (VertexId)-1,
                                                         cta->d_queue + cta->smem_storage.state.warp_comm[warp_id][1]);
 
                                                 //Set bitmap_out to true
@@ -613,7 +613,7 @@ namespace edge_map_backward {
                 SizeT                       *d_row_offsets,
                 VertexId                    *d_column_indices,
                 DataSlice                   *problem,
-                util::CtaWorkProgress       &work_progress,
+                util::CtaWorkProgress<SizeT>       &work_progress,
                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE) :
 
                 queue_index(queue_index),
@@ -757,7 +757,7 @@ namespace edge_map_backward {
                         // Mark the node as visited in  d_queue, so that we can cull it
                         // during next vertex_map
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                            -1,
+                            (VertexId)-1,
                             d_queue + smem_storage.gather_offsets2[scratch_offset]);
                         //Set bitmap_out to true
                         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(

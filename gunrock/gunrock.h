@@ -16,6 +16,8 @@
 
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
 
 /**
  * @brief VertexId data type enumerators.
@@ -91,7 +93,8 @@ struct GRSetup
     bool               quiet;  // Whether to print out to STDOUT
     bool   mark_predecessors;  // Whether to mark predecessor or not
     bool  enable_idempotence;  // Whether or not to enable idempotent
-    int        source_vertex;  // Source node define where to start
+    int*       source_vertex;  // Source nodes define where to start
+    int            num_iters;  // Number of BFS runs (currently only support BFS)
     int         delta_factor;  // SSSP delta-factor parameter
     int*         device_list;  // Setting which device(s) to use
     unsigned int num_devices;  // Number of devices for computation
@@ -99,13 +102,18 @@ struct GRSetup
     unsigned int   top_nodes;  // K value for top k / PageRank problem
     float     pagerank_delta;  // PageRank specific value
     float     pagerank_error;  // PageRank specific value
+    bool pagerank_normalized;  // PageRank specific flag
     float   max_queue_sizing;  // Setting frontier queue size
-    int       traversal_mode;  // Traversal mode: 0 for LB, 1 TWC
+    char* traversal_mode;  // Traversal mode: 0 for LB, 1 TWC
     enum SrcMode source_mode;  // Source mode rand/largest_degree
 };
 
 /**
  * @brief Initialization function for GRSetup.
+ *
+ * @param[out] num_iters Rounds of graph primitive to run.
+ * @param[in]  source Pointer to source nodes array for each round.
+ *
  * \return Initialized configurations object.
  */
 // Proper way to check for C99
@@ -114,24 +122,37 @@ struct GRSetup
 // Link mentions is an issue with C99, not a clang specific issue
 static
 #endif
-inline struct GRSetup InitSetup()
+inline struct GRSetup* InitSetup(int num_iters, int* source)
 {
-    struct GRSetup configurations;
-    configurations.quiet = true;
-    configurations.mark_predecessors = true;
-    configurations.enable_idempotence = false;
-    configurations.source_vertex = 0;
-    configurations.delta_factor = 32;
-    configurations.num_devices = 1;
-    configurations.max_iters = 50;
-    configurations.top_nodes = 10;
-    configurations.pagerank_delta = 0.85f;
-    configurations.pagerank_error = 0.01f;
-    configurations.max_queue_sizing = 1.0;
-    configurations.traversal_mode = 0;
-    configurations.source_mode = manually;
+    struct GRSetup *configurations = (struct GRSetup*)malloc(sizeof(struct GRSetup));
+    configurations -> quiet = true;
+    configurations -> mark_predecessors = true;
+    configurations -> enable_idempotence = false;
+    int* sources = (int*)malloc(sizeof(int)*num_iters);
+    int i;
+    if (source == NULL)
+    {
+        for (i = 0; i < num_iters; ++i) sources[i] = 0;
+    } else
+    {
+        for (i = 0; i < num_iters; ++i) sources[i] = source[i];
+    }
+    configurations -> source_vertex = sources;
+    configurations -> delta_factor = 32;
+    configurations -> num_devices = 1;
+    configurations -> max_iters = 50;
+    configurations -> num_iters = num_iters;
+    configurations -> top_nodes = 10;
+    configurations -> pagerank_delta = 0.85f;
+    configurations -> pagerank_error = 0.01f;
+    configurations -> pagerank_normalized = false;
+    configurations -> max_queue_sizing = 1.0;
+    configurations -> traversal_mode = (char*)malloc(sizeof(char) * 3);
+    strcpy(configurations -> traversal_mode, "LB");
+    configurations -> traversal_mode[2] = '\0';
+    configurations -> source_mode = manually;
     int* gpu_idx = (int*)malloc(sizeof(int)); gpu_idx[0] = 0;
-    configurations.device_list = gpu_idx;
+    configurations -> device_list = gpu_idx;
     return configurations;
 }
 
@@ -146,30 +167,42 @@ extern "C" {
  * @param[in]  graphi Input data structure contains graph.
  * @param[in]  config Primitive-specific configurations.
  * @param[in]  data_t Primitive-specific data type setting.
+ *
+ * \return Elapsed run time in milliseconds
  */
-void gunrock_bfs(
+float gunrock_bfs(
     struct GRGraph*       grapho,   // Output graph / results
     const struct GRGraph* graphi,   // Input graph structure
-    const struct GRSetup  config,   // Flag configurations
+    const struct GRSetup* config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
-/**
- * @brief Breath-first search simple public interface.
+/*
+ * @brief Simple interface take in CSR arrays as input
  *
- * @param[out] bfs_label Return bfs labels (depth).
- * @param[in] num_nodes Input graph number of nodes.
- * @param[in] num_edges Input graph number of edges.
- * @param[in] row_offsets Input graph row_offsets.
- * @param[in] col_indices Input graph col_indices.
- * @param[in] source Source node to start.
+ * @param[out] bfs_label            Return BFS label (depth) per nodes
+ * @param[out] bfs_label            Return the predecessor per nodes
+ * @param[in]  num_nodes            Number of nodes of the input graph
+ * @param[in]  num_edges            Number of edges of the input graph
+ * @param[in]  row_offsets          CSR-formatted graph input row offsets
+ * @param[in]  col_indices          CSR-formatted graph input column indices
+ * @param[in]  num_iters            Number of BFS runs. Note if num_iters > 1, the bfs_lbel will only store the results from the last run
+ * @param[in]  source               Sources to begin traverse
+ * @param[in]  source_mode          Enumerator of source mode: manually, randomize, largest_degree
+ * @param[in]  mark_predecessors    If the flag is set, mark predecessors instead of bfs label
+ * @param[in]  enable_idempotence   If the flag is set, use optimizations that allow idempotence operation (will usually bring better performance)
  */
-void bfs(
-    int*       bfs_label,    // Return label (depth) per node
-    const int  num_nodes,    // Input graph number of nodes
-    const int  num_edges,    // Input graph number of edges
-    const int* row_offsets,  // Input graph row_offsets
-    const int* col_indices,  // Input graph col_indices
-    const int  source);      // Source vertex to start
+float bfs(
+    int*       bfs_label,
+    int*       bfs_pred,
+    const int  num_nodes,
+    const int  num_edges,
+    const int* row_offsets,
+    const int* col_indices,
+    const int  num_iters,
+    int* source,
+    enum SrcMode source_mode,
+    const bool mark_predecessors,
+    const bool enable_idempotence);
 
 /**
  * @brief Betweenness centrality public interface.
@@ -182,7 +215,7 @@ void bfs(
 void gunrock_bc(
     struct GRGraph*       grapho,   // Output graph / results
     const struct GRGraph* graphi,   // Input graph structure
-    const struct GRSetup  config,   // Flag configurations
+    const struct GRSetup* config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**
@@ -214,7 +247,7 @@ void bc(
 void gunrock_cc(
     struct GRGraph*       grapho,   // Output graph / results
     const struct GRGraph* graphi,   // Input graph structure
-    const struct GRSetup  config,   // Flag configurations
+    const struct GRSetup* config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**
@@ -242,32 +275,42 @@ int cc(
  * @param[in]  graphi Input data structure contains graph.
  * @param[in]  config Primitive-specific configurations.
  * @param[in]  data_t Primitive-specific data type setting.
+ *
+ * \return Elapsed run time in milliseconds
  */
-void gunrock_sssp(
+float gunrock_sssp(
     struct GRGraph*       grapho,   // Output graph / results
     const struct GRGraph* graphi,   // Input graph structure
-    const struct GRSetup  config,   // Flag configurations
+    const struct GRSetup* config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**
  * @brief Single-source shortest path simple public interface.
  *
  * @param[out] distances Return shortest distances.
+ * @param[out] preds Return predecessor of each node
  * @param[in] num_nodes Input graph number of nodes.
  * @param[in] num_edges Input graph number of edges.
  * @param[in] row_offsets Input graph row_offsets.
  * @param[in] col_indices Input graph col_indices.
  * @param[in] edge_values Input graph edge weight.
+ * @param[in] num_iters How many rounds of SSSP do we want to run.
  * @param[in] source Source node to start.
+ * @param[in] mark_preds Whether to mark the predecessors.
+ *
+ * \return Elapsed run time in milliseconds
  */
-void sssp(
+float sssp(
     unsigned int*       distances,    // Return shortest distances
+    int*                preds,
     const int           num_nodes,    // Input graph number of nodes
     const int           num_edges,    // Input graph number of edges
     const int*          row_offsets,  // Input graph row_offsets
     const int*          col_indices,  // Input graph col_indices
     const unsigned int* edge_values,  // Input graph edge weight
-    const int           source);      // Source node to start
+    const int           num_iters,
+    int*                source,
+    const bool          mark_preds);
 
 /**
  * @brief PageRank public interface.
@@ -280,7 +323,7 @@ void sssp(
 void gunrock_pagerank(
     struct GRGraph*       grapho,   // Output graph / results
     const struct GRGraph* graphi,   // Input graph structure
-    const struct GRSetup  config,   // Flag configurations
+    const struct GRSetup* config,   // Flag configurations
     const struct GRTypes  data_t);  // Data type Configurations
 
 /**
@@ -292,6 +335,7 @@ void gunrock_pagerank(
  * @param[in] num_edges Input graph number of edges.
  * @param[in] row_offsets Input graph row_offsets.
  * @param[in] col_indices Input graph col_indices.
+ * @param[in] normalized Whether to perform a normalized PageRank
  */
 void pagerank(
     int*       node_ids,      // Return top-ranked vertex IDs
@@ -299,7 +343,8 @@ void pagerank(
     const int  num_nodes,     // Input graph number of nodes
     const int  num_edges,     // Input graph number of edges
     const int* row_offsets,   // Input graph row_offsets
-    const int* col_indices);  // Input graph col_indices
+    const int* col_indices,   // Input graph col_indices
+    bool       normalized);   // normalized pagerank flag
 
 // TODO Add other primitives
 

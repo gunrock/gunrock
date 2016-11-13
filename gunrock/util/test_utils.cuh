@@ -341,18 +341,6 @@ inline bool EnoughDeviceMemory(unsigned int mem_needed)
     return (mem_needed <= free_mem);
 }
 
-template <typename T>
-__device__ __host__ __forceinline__ T MaxValue()
-{
-    return 0;
-}
-
-template <>
-__device__ __host__ __forceinline__ int MaxValue<int>()
-{
-    return INT_MAX;
-}
-
 /******************************************************************************
  * Helper routines for list construction and validation
  ******************************************************************************/
@@ -487,7 +475,7 @@ int CompareResults(
 
         if (!is_right)
         {
-            if (!quiet)
+            if (!quiet && flag < 10)
             {
                 printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
                 PrintValue<float>(computed[i]);

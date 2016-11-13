@@ -25,13 +25,15 @@ namespace salsa {
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam ProblemData         Problem data type which contains data slice for SALSA problem
+ * @tparam Problem             Problem data type which contains data slice for SALSA problem
+ * @tparam _LabelT             Vertex label type
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT = VertexId>
 struct HFORWARDFunctor
 {
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
@@ -39,13 +41,24 @@ struct HFORWARDFunctor
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
         return true;
     }
@@ -57,15 +70,26 @@ struct HFORWARDFunctor
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
-        util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            s_id, problem->hub_predecessors + e_id);
+        util::io::ModifiedStore<Problem::QUEUE_WRITE_MODIFIER>::St(
+            s_id, d_data_slice->hub_predecessors + edge_id);
     }
 
 };
@@ -76,12 +100,14 @@ struct HFORWARDFunctor
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
  * @tparam ProblemData         Problem data type which contains data slice for SALSA problem
+ * @tparam _LabelT             Vertex label type
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT=VertexId>
 struct HBACKWARDFunctor
 {
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
@@ -89,17 +115,28 @@ struct HBACKWARDFunctor
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
-        VertexId v_id = problem->hub_predecessors[e_id_in];
-        bool flag = (problem->out_degrees[v_id] != 0);
-        if (!flag) problem->hrank_next[v_id] = 0;
+        VertexId v_id = d_data_slice->hub_predecessors[input_pos];
+        bool flag = (d_data_slice->out_degrees[v_id] != 0);
+        if (!flag) d_data_slice->hrank_next[v_id] = 0;
         return flag;
     }
 
@@ -110,17 +147,27 @@ struct HBACKWARDFunctor
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
-        Value hrank_dst = (problem->in_degrees[s_id] == 0 || problem->out_degrees[d_id] == 0) ? 0 : problem->hrank_curr[d_id] / (problem->in_degrees[s_id] * problem->out_degrees[d_id]);
-        VertexId v_id = problem->hub_predecessors[e_id_in];
-        //printf("hub: eid_in:%d, v:%d, s:%d, d:%d in(s):%d, out(d):%d, H(d):%5f\n", e_id_in, v_id, s_id, d_id, problem->in_degrees[s_id], problem->out_degrees[d_id], problem->hrank_curr[d_id]);
-        atomicAdd(&problem->hrank_next[v_id], hrank_dst);
+        Value hrank_dst = (d_data_slice->in_degrees[s_id] == 0 || d_data_slice->out_degrees[d_id] == 0) ? 0 : d_data_slice->hrank_curr[d_id] / (d_data_slice->in_degrees[s_id] * d_data_slice->out_degrees[d_id]);
+        VertexId v_id = d_data_slice->hub_predecessors[input_pos];
+        atomicAdd(&d_data_slice->hrank_next[v_id], hrank_dst);
     }
 };
 
@@ -130,12 +177,14 @@ struct HBACKWARDFunctor
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
  * @tparam ProblemData         Problem data type which contains data slice for SALSA problem
+ * @tparam _LabelT             Vertex label type
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData, typename _LabelT=VertexId>
 struct AFORWARDFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
@@ -143,13 +192,24 @@ struct AFORWARDFunctor
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
         return true;
     }
@@ -161,15 +221,26 @@ struct AFORWARDFunctor
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            s_id, problem->auth_predecessors+e_id);
+            s_id, d_data_slice->auth_predecessors+edge_id);
     }
 
 };
@@ -180,12 +251,14 @@ struct AFORWARDFunctor
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
  * @tparam ProblemData         Problem data type which contains data slice for SALSA problem
+ * @tparam _LabelT             Vertex label type
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
+template<typename VertexId, typename SizeT, typename Value, typename ProblemData, typename _LabelT=VertexId>
 struct ABACKWARDFunctor
 {
     typedef typename ProblemData::DataSlice DataSlice;
+    typedef _LabelT LabelT;
 
     /**
      * @brief Forward Edge Mapping condition function. Check if the destination node
@@ -193,17 +266,28 @@ struct ABACKWARDFunctor
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
-    static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ bool CondEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
-        VertexId v_id = problem->auth_predecessors[e_id_in];
-        bool flag = (problem->in_degrees[v_id] != 0);
-        if (!flag) problem->arank_next[v_id] = 0;
+        VertexId v_id = d_data_slice->auth_predecessors[input_pos];
+        bool flag = (d_data_slice->in_degrees[v_id] != 0);
+        if (!flag) d_data_slice->arank_next[v_id] = 0;
         return flag;
     }
 
@@ -214,16 +298,27 @@ struct ABACKWARDFunctor
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      */
-    static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, VertexId e_id = 0, VertexId e_id_in = 0)
+    static __device__ __forceinline__ void ApplyEdge(
+        VertexId    s_id,
+        VertexId    d_id,
+        DataSlice   *d_data_slice,
+        SizeT       edge_id,
+        VertexId    input_item,
+        LabelT      label,
+        SizeT       input_pos,
+        SizeT       &output_pos)
     {
-        Value arank_dst = (problem->out_degrees[s_id] == 0 || problem->in_degrees[d_id] == 0) ? 0 : problem->arank_curr[d_id] / (problem->out_degrees[s_id] * problem->in_degrees[d_id]);
-        VertexId v_id = problem->auth_predecessors[e_id_in];
-        atomicAdd(&problem->arank_next[v_id], arank_dst);
+        Value arank_dst = (d_data_slice->out_degrees[s_id] == 0 || d_data_slice->in_degrees[d_id] == 0) ? 0 : d_data_slice->arank_curr[d_id] / (d_data_slice->out_degrees[s_id] * d_data_slice->in_degrees[d_id]);
+        VertexId v_id = d_data_slice->auth_predecessors[input_pos];
+        atomicAdd(&d_data_slice->arank_next[v_id], arank_dst);
     }
 };
 

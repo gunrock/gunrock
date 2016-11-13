@@ -98,8 +98,8 @@ void Usage()
  */
 template <
     typename VertexId,
-    typename Value,
-    typename SizeT >
+    typename SizeT,
+    typename Value>
 void DisplaySolution(
     VertexId *h_node_id,
     Value    *h_degrees_i,
@@ -109,10 +109,13 @@ void DisplaySolution(
     fflush(stdout);
     // at most display the first 100 results
     if (num_nodes > 100) num_nodes = 100;
-    printf("==> top %d centrality nodes:\n", num_nodes);
+    printf("==> top %lld centrality nodes:\n", 
+        (long long)num_nodes);
     for (SizeT iter = 0; iter < num_nodes; ++iter)
-        printf("%d %d %d\n",
-               h_node_id[iter], h_degrees_i[iter], h_degrees_o[iter]);
+        printf("%lld %lld %lld\n",
+            (long long)h_node_id  [iter], 
+            (long long)h_degrees_i[iter], 
+            (long long)h_degrees_o[iter]);
 }
 
 /******************************************************************************
@@ -138,13 +141,13 @@ struct compare_second_only
 
 template <
     typename VertexId,
-    typename Value,
-    typename SizeT >
-void SimpleReferenceTopK(
-    Csr<VertexId, Value, SizeT> &csr,
-    Csr<VertexId, Value, SizeT> &csc,
+    typename SizeT,
+    typename Value>
+void ReferenceTopK(
+    Csr<VertexId, SizeT, Value> &csr,
+    Csr<VertexId, SizeT, Value> &csc,
     VertexId *ref_node_id,
-    Value    *ref_degrees,
+    SizeT    *ref_degrees,
     SizeT    top_nodes)
 {
     printf("CPU reference test.\n");
@@ -157,7 +160,7 @@ void SimpleReferenceTopK(
         (Value*)malloc(sizeof(Value) * csc.nodes);
 
     // store reference output results
-    std::vector< std::pair<int, int> > results;
+    std::vector< std::pair<VertexId, Value> > results;
 
     // calculations
     for (SizeT node = 0; node < csr.nodes; ++node)
@@ -211,43 +214,47 @@ void SimpleReferenceTopK(
  */
 template <
     typename VertexId,
-    typename Value,
     typename SizeT,
-    bool INSTRUMENT,
-    bool DEBUG,
-    bool SIZE_CHECK >
-void RunTests(Info<VertexId, Value, SizeT> *info)
+    typename Value>
+    //bool INSTRUMENT,
+    //bool DEBUG,
+    //bool SIZE_CHECK >
+void RunTests(Info<VertexId, SizeT, Value> *info)
 {
-
     // define the problem data structure for graph primitive
     typedef TOPKProblem <
-    VertexId,
-    SizeT,
-    Value > Problem;
+        VertexId,
+        SizeT,
+        Value > Problem;
+    typedef TOPKEnactor <Problem>
+        Enactor;
 
-    Csr<VertexId, Value, SizeT>
-    *csr        = info->csr_ptr;
-    Csr<VertexId, Value, SizeT>
-    *csc        = info->csc_ptr;
-    int           max_grid_size         = info->info["max_grid_size"].get_int();
-    int           num_gpus              = info->info["num_gpus"].get_int();
-    bool          stream_from_host      = info->info["stream_from_host"].get_bool();
-    SizeT         top_nodes             = info->info["top_nodes"].get_int();
-    bool          quiet_mode            = info->info["quiet_mode"].get_bool();
+    Csr<VertexId, SizeT, Value> *csr = info->csr_ptr;
+    Csr<VertexId, SizeT, Value> *csc = info->csc_ptr;
+    int      max_grid_size         = info->info["max_grid_size"     ].get_int  (); 
+    int      num_gpus              = info->info["num_gpus"          ].get_int  (); 
+    double   max_queue_sizing      = info->info["max_queue_sizing"  ].get_real (); 
+    double   max_queue_sizing1     = info->info["max_queue_sizing1" ].get_real (); 
+    double   max_in_sizing         = info->info["max_in_sizing"     ].get_real (); 
+    std::string partition_method   = info->info["partition_method"  ].get_str  (); 
+    double   partition_factor      = info->info["partition_factor"  ].get_real (); 
+    int      partition_seed        = info->info["partition_seed"    ].get_int  (); 
+    bool     quiet_mode            = info->info["quiet_mode"        ].get_bool (); 
+    bool     quick_mode            = info->info["quick_mode"        ].get_bool (); 
+    bool     stream_from_host      = info->info["stream_from_host"  ].get_bool (); 
+    bool     instrument            = info->info["instrument"        ].get_bool (); 
+    bool     debug                 = info->info["debug_mode"        ].get_bool (); 
+    bool     size_check            = info->info["size_check"        ].get_bool (); 
+    SizeT    top_nodes             = info->info["top_nodes"         ].get_int  ();
+    CpuTimer cpu_timer;
 
-    ContextPtr    *context              = (ContextPtr*)info->context;
-
+    cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
     for (int i = 0; i < num_gpus; i++) gpu_idx[i] = device_list[i].get_int();
-
-    // INSTRUMENT specifies whether we want to keep such statistical data
-    // Allocate TOPK enactor map
-    TOPKEnactor<Problem, INSTRUMENT, DEBUG, SIZE_CHECK> topk_enactor(gpu_idx);
-
-    // allocate problem on GPU
-    // create a pointer of the TOPKProblem type
-    Problem *topk_problem = new Problem;
+    
+    ContextPtr    *context = (ContextPtr*  )info->context;
+    cudaStream_t  *streams = (cudaStream_t*)info->streams;
 
     // reset top_nodes if input k > total number of nodes
     if (top_nodes > csr->nodes) top_nodes = csr->nodes;
@@ -255,46 +262,66 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     // malloc host memory
     VertexId *h_node_id   = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
     VertexId *ref_node_id = (VertexId*)malloc(sizeof(VertexId) * top_nodes);
-    Value    *h_degrees_i = (Value*)malloc(sizeof(Value) * top_nodes);
-    Value    *h_degrees_o = (Value*)malloc(sizeof(Value) * top_nodes);
-    Value    *ref_degrees = (Value*)malloc(sizeof(Value) * top_nodes);
+    SizeT    *h_degrees_i = (SizeT*)malloc(sizeof(SizeT) * top_nodes);
+    SizeT    *h_degrees_o = (SizeT*)malloc(sizeof(SizeT) * top_nodes);
+    SizeT    *ref_degrees = (SizeT*)malloc(sizeof(SizeT) * top_nodes);
+
+    // allocate problem on GPU
+    // create a pointer of the TOPKProblem type
+    Problem *problem = new Problem;
 
     // copy data from CPU to GPU
     // initialize data members in DataSlice for graph
-    util::GRError(topk_problem->Init(
-                      stream_from_host,
-                      *csr,
-                      *csc,
-                      num_gpus),
-                  "Problem TOPK Initialization Failed", __FILE__, __LINE__);
+    util::GRError(problem->Init(
+        stream_from_host,
+        csr,
+        csc,
+        num_gpus,
+        gpu_idx,
+        partition_method,
+        streams,
+        max_queue_sizing,
+        max_in_sizing,
+        partition_factor,
+        partition_seed),
+        "Problem TOPK Initialization Failed", __FILE__, __LINE__);
+
+    // instrument specifies whether we want to keep such statistical data
+    // Allocate TOPK enactor map
+    Enactor *enactor = new Enactor(
+        num_gpus, gpu_idx, instrument, debug, size_check);
+    util::GRError(enactor->Init(
+        context, problem, max_grid_size),
+        "Enactor Init failed", __FILE__, __LINE__);
+    cpu_timer.Stop();
+    info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
     // perform topk degree centrality calculations
-    GpuTimer gpu_timer; // Record the kernel running time
 
     // reset values in DataSlice for graph
-    util::GRError(topk_problem->Reset(topk_enactor.GetFrontierType()),
-                  "TOPK Problem Data Reset Failed", __FILE__, __LINE__);
+    util::GRError(problem->Reset(enactor -> GetFrontierType(),
+        max_queue_sizing, max_queue_sizing1),
+        "TOPK Problem Data Reset Failed", __FILE__, __LINE__);
+    util::GRError(enactor -> Reset(),
+        "TOPK Enactor Reset failed", __FILE__, __LINE__);
 
-    gpu_timer.Start();
+    cpu_timer.Start();
     // launch topk enactor
-    util::GRError(topk_enactor.template Enact<Problem>(*context,
-                  topk_problem,
-                  top_nodes,
-                  max_grid_size),
-                  "TOPK Problem Enact Failed", __FILE__, __LINE__);
-    gpu_timer.Stop();
+    util::GRError(enactor -> Enact(top_nodes),
+        "TOPK Problem Enact Failed", __FILE__, __LINE__);
+    cpu_timer.Stop();
 
-    float elapsed_gpu = gpu_timer.ElapsedMillis();
+    double elapsed_gpu = cpu_timer.ElapsedMillis();
+    cpu_timer.Start();
     printf("==> GPU TopK Degree Centrality finished in %lf msec.\n", elapsed_gpu);
 
     // copy out results back to CPU from GPU using Extract
-    util::GRError(topk_problem->Extract(
-                      h_node_id,
-                      h_degrees_i,
-                      h_degrees_o,
-                      top_nodes),
-                  "TOPK Problem Data Extraction Failed",
-                  __FILE__, __LINE__);
+    util::GRError(problem->Extract(
+        h_node_id,
+        h_degrees_i,
+        h_degrees_o,
+        top_nodes),
+        "TOPK Problem Data Extraction Failed", __FILE__, __LINE__);
 
     // display solution
     if (!quiet_mode)
@@ -304,13 +331,10 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
             h_degrees_o,
             top_nodes);
 
-    info->ComputeCommonStats(topk_enactor.enactor_stats.GetPointer(), elapsed_gpu);
-
-    if (!quiet_mode)
-        info->DisplayStats();
+    info->ComputeCommonStats(enactor -> enactor_stats.GetPointer(), elapsed_gpu, (VertexId*)NULL);
 
     // validation
-    SimpleReferenceTopK(
+    ReferenceTopK(
         *csr,
         *csc,
         ref_node_id,
@@ -324,122 +348,97 @@ void RunTests(Info<VertexId, Value, SizeT> *info)
     }
     if (!quiet_mode) printf("\n");
 
-    info->CollectInfo();
-
     // cleanup if neccessary
-    if (topk_problem) { delete topk_problem; }
+    if (problem)      { delete problem; }
+    if (enactor)      { delete enactor; }
     if (h_node_id)    { free(h_node_id);   }
     if (h_degrees_i)  { free(h_degrees_i); }
     if (h_degrees_o)  { free(h_degrees_o); }
-
-    cudaDeviceSynchronize();
-}
-
-/**
- * @brief Test entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT,
-    bool          INSTRUMENT,
-    bool          DEBUG >
-void RunTests_size_check(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["size_check"].get_bool()) RunTests
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-        true > (info);
-    else RunTests
-        <VertexId, Value, SizeT, INSTRUMENT, DEBUG,
-        false> (info);
-}
-
-/**
- * @brief Test entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam INSTRUMENT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename    VertexId,
-    typename    Value,
-    typename    SizeT,
-    bool        INSTRUMENT >
-void RunTests_debug(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["debug_mode"].get_bool()) RunTests_size_check
-        <VertexId, Value, SizeT, INSTRUMENT,
-        true > (info);
-    else RunTests_size_check
-        <VertexId, Value, SizeT, INSTRUMENT,
-        false> (info);
-}
-
-/**
- * @brief Test entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- */
-template <
-    typename      VertexId,
-    typename      Value,
-    typename      SizeT >
-void RunTests_instrumented(Info<VertexId, Value, SizeT> *info)
-{
-    if (info->info["instrument"].get_bool()) RunTests_debug
-        <VertexId, Value, SizeT,
-        true > (info);
-    else RunTests_debug
-        <VertexId, Value, SizeT,
-        false> (info);
+    cpu_timer.Stop();
+    info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
+    //cudaDeviceSynchronize();
 }
 
 /******************************************************************************
  * Main
  ******************************************************************************/
+template <
+    typename VertexId,  // use int as the vertex identifier
+    typename SizeT   ,  // use int as the graph size type
+    typename Value   >  // use int as the value type
+int main_(CommandLineArgs *args)
+{
+    CpuTimer cpu_timer, cpu_timer2;
+    cpu_timer.Start();
+    Csr <VertexId, SizeT, Value> csr(false);
+    Csr <VertexId, SizeT, Value> csc(false);
+    Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
+
+    info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
+    cpu_timer2.Start();
+    info->Init("TOPK", *args, csr, csc);
+    cpu_timer2.Stop();
+    info->info["load_time"] = cpu_timer2.ElapsedMillis();
+
+    RunTests<VertexId, SizeT, Value>(info);
+    cpu_timer.Stop();
+    info->info["total_time"] = cpu_timer.ElapsedMillis();
+
+    if (!(info->info["quiet_mode"].get_bool()))
+    {
+        info->DisplayStats();  // display collected statistics
+    }
+
+    info->CollectInfo();  // collected all the info and put into JSON mObject
+
+    return 0;
+}
+
+template <
+    typename VertexId, // the vertex identifier type, usually int or long long
+    typename SizeT   > // the size tyep, usually int or long long
+int main_Value(CommandLineArgs *args)
+{
+    // Value = SizeT for TopK
+    return main_<VertexId, SizeT, SizeT>(args);
+    //if (args -> CheckCmdLineFlag("64bit-Value"))
+    //    return main_<VertexId, SizeT, long long>(args);
+    //else
+    //    return main_<VertexId, SizeT, int      >(args);
+}
+
+template <
+    typename VertexId>
+int main_SizeT(CommandLineArgs *args)
+{
+// disabled to reduce compile time
+//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+//        return main_Value<VertexId, long long>(args);
+//    else
+        return main_Value<VertexId, int      >(args);
+}
+
+int main_VertexId(CommandLineArgs *args)
+{
+    // disabled, because oprtr::filter::KernelPolicy::SmemStorage is too large for 64bit VertexId
+    //if (args -> CheckCmdLineFlag("64bit-VertexId"))
+    //    return main_SizeT<long long>(args);
+    //else 
+        return main_SizeT<int      >(args);
+}
+
 int main(int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
-
     int graph_args = argc - args.ParsedArgc() - 1;
-    if ((argc < 2) || (args.CheckCmdLineFlag("help")))
+    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
     {
         Usage();
         return 1;
     }
 
-    typedef int VertexId;
-    typedef int Value;
-    typedef int SizeT;
-
-    Csr<VertexId, Value, SizeT> csr(false);
-    Csr<VertexId, Value, SizeT> csc(false);
-    Info<VertexId, Value, SizeT> *info = new Info<VertexId, Value, SizeT>;
-
-    info->info["undirected"] = args.CheckCmdLineFlag("undirected");
-    info->Init("TOPK", args, csr, csc);
-
-    RunTests_instrumented<VertexId, Value, SizeT>(info);
-
-    return 0;
+    return main_VertexId(&args);
 }
-
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++

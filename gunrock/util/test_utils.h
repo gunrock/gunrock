@@ -153,6 +153,38 @@ public:
         market_filename =  (graph_args == 2) ? argv[2] : NULL; 
         return market_filename;
     }
+
+    char * GetCmdLineArgvQueryDataset()
+    {
+	char * market_fileName;
+        size_t graph_args = argc - pairs.size() - 1;
+	market_fileName = (graph_args>1) ? argv[2] : NULL;
+	return market_fileName;
+    }
+
+    char * GetCmdLineArgvDataDataset()
+    {
+	char * market_fileName;
+        size_t graph_args = argc - pairs.size() - 1;
+	market_fileName = (graph_args>2) ? ((graph_args==5) ? argv[graph_args-1] : argv[graph_args]) : NULL;
+	return market_fileName;
+    }
+
+    char * GetCmdLineArgvQueryLabel()
+    {
+	char * label_fileName;
+        size_t graph_args = argc - pairs.size() - 1;
+	label_fileName = (graph_args==5) ? argv[3] : NULL;
+	return label_fileName;
+    }
+
+    char * GetCmdLineArgvDataLabel()
+    {
+	char * label_fileName;
+        size_t graph_args = argc - pairs.size() - 1;
+	label_fileName = (graph_args==5) ? argv[graph_args] : NULL;
+	return label_fileName;
+    }
 };
 
 void DeviceInit(CommandLineArgs &args);

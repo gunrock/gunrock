@@ -20,14 +20,30 @@ FIND_LIBRARY(PARMETIS_LIBRARY parmetis
   /usr/lib
   )
 
-FIND_LIBRARY(METIS_LIBRARY metis
-  /usr/local/lib
-  /usr/lib
-  )
-
 IF(PARMETIS_INCLUDE_DIR)
   IF(PARMETIS_LIBRARY)
     SET( PARMETIS_LIBRARIES ${PARMETIS_LIBRARY} ${METIS_LIBRARY})
     SET( PARMETIS_FOUND "YES" )
   ENDIF(PARMETIS_LIBRARY)
 ENDIF(PARMETIS_INCLUDE_DIR)
+
+# ------------------------------------------------------------------------
+#  Gunrock: Find Metis and set pre-compiler flag
+# ------------------------------------------------------------------------
+FIND_LIBRARY(METIS_LIBRARY metis
+  /usr/local/lib
+  /usr/lib
+  )
+
+SET(gunrock_REQUIRED_METIS_VERSION 5.0)
+
+SET(METIS_FOUND FALSE)
+IF (METIS_LIBRARY)
+  SET(METIS_FOUND TRUE)
+  ADD_DEFINITIONS( -DMETIS_FOUND=true )
+  MESSAGE(STATUS "Found Metis")
+ELSE (METIS_LIBRARY)
+  ADD_DEFINITIONS( -DMETIS_FOUND=false )
+  MESSAGE(WARNING "Metis was requested but support was not found,
+  run `sudo apt-get install metis` or `/dep/install_metis.sh` for installation.")
+ENDIF (METIS_LIBRARY)

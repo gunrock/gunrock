@@ -61,26 +61,36 @@ namespace brp {
 template <
     typename VertexId,
     typename SizeT,
-    typename Value,
-    bool     ENABLE_BACKWARD = false,
-    bool     KEEP_ORDER      = false,
-    bool     KEEP_NODE_NUM   = false>
-struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKWARD, KEEP_ORDER, KEEP_NODE_NUM>
+    typename Value>
+    //bool     ENABLE_BACKWARD = false,
+    //bool     KEEP_ORDER      = false,
+    //bool     KEEP_NODE_NUM   = false>
+struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value/*,
+    ENABLE_BACKWARD, KEEP_ORDER, KEEP_NODE_NUM*/>
 {
-    typedef Csr<VertexId,Value,SizeT> GraphT;
+    typedef PartitionerBase<VertexId, SizeT, Value> BasePartitioner;
+    typedef Csr<VertexId,SizeT,Value> GraphT;
 
     // Members
     float *weitage;
 
     // Methods
-    BiasRandomPartitioner()
+    /*BiasRandomPartitioner()
     {
         weitage=NULL;
-    }
+    }*/
 
-    BiasRandomPartitioner(const GraphT &graph,
-                      int   num_gpus,
-                      float *weitage = NULL)
+    BiasRandomPartitioner(
+        const  GraphT &graph,
+        int    num_gpus,
+        float *weitage = NULL,
+        bool   _enable_backward = false,
+        bool   _keep_order      = false,
+        bool   _keep_node_num   = false) :
+        BasePartitioner(
+            _enable_backward,
+            _keep_order,
+            _keep_node_num)
     {
         Init2(graph,num_gpus,weitage);
     }
@@ -143,11 +153,11 @@ struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value,ENABLE_BACKW
         if (seed < 0) this->seed = time(NULL);
         else this->seed = seed;
         srand(this->seed);
-        printf("partition_seed = %d\n",this->seed);fflush(stdout);
+        printf("Partition begin. seed = %d\n",this->seed);fflush(stdout);
 
         if (factor < 0) this->factor = 0.5;
         else this->factor = factor;
-        printf("partition_factor = %f\n", this->factor);fflush(stdout);
+        //printf("partition_factor = %f\n", this->factor);fflush(stdout);
 
         target_level = n1;//(n1<n2? n2:n1);
         for (SizeT node=0;node<nodes;node++)

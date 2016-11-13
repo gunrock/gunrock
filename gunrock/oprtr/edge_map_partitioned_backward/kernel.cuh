@@ -48,90 +48,16 @@ template<
     bool        VALID = (__GR_CUDA_ARCH__ >= KernelPolicy::CUDA_ARCH)>
 struct Dispatch
 {
-    typedef typename KernelPolicy::VertexId VertexId;
-    typedef typename KernelPolicy::SizeT    SizeT;
-    typedef typename ProblemData::DataSlice DataSlice;
-
-    static __device__ __forceinline__ SizeT GetNeighborListLength(
-                            SizeT    *&d_row_offsets,
-                            VertexId    *&d_column_indices,
-                            VertexId    &d_vertex_id,
-                            SizeT       &max_vertex,
-                            SizeT       &max_edge,
-                            gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
-    {
-    }
-
-    static __device__ __forceinline__ void GetEdgeCounts(
-                                SizeT *&d_row_offsets,
-                                VertexId *&d_column_indices,
-                                VertexId *&d_queue,
-                                SizeT *&d_scanned_edges,
-                                SizeT &num_elements,
-                                SizeT &max_vertex,
-                                SizeT &max_edge,
-                                gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
-    {
-    }
-
-    static __device__ __forceinline__ void RelaxPartitionedEdges(
-                                bool &queue_reset,
-                                VertexId &queue_index,
-                                int &label,
-                                SizeT *&d_row_offsets,
-                                VertexId *&d_column_indices,
-                                VertexId *&d_inverse_column_indices,
-                                SizeT    *&d_scanned_edges,
-                                unsigned int *&partition_starts,
-                                unsigned int &num_partitions,
-                                //volatile int *&d_done,
-                                VertexId *&d_queue,
-                                bool     *&d_bitmap_in,
-                                bool     *&d_bitmap_out,
-                                DataSlice *&problem,
-                                SizeT &input_queue_len,
-                                SizeT *output_queue_len,
-                                SizeT &partition_size,
-                                SizeT &max_vertices,
-                                SizeT &max_edges,
-                                util::CtaWorkProgress &work_progress,
-                                util::KernelRuntimeStats &kernel_stats,
-                                gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
-                                bool &inverse_graph)
-    {
-    }
-
-    static __device__ __forceinline__ void RelaxLightEdges(
-                                bool &queue_reset,
-                                VertexId &queue_index,
-                                int &label,
-                                SizeT *&d_row_offsets,
-                                VertexId *&d_column_indices,
-                                VertexId *&d_inverse_column_indices,
-                                SizeT    *&d_scanned_edges,
-                                //volatile int *&d_done,
-                                VertexId *&d_queue,
-                                bool     *&d_bitmap_in,
-                                bool     *&d_bitmap_out,
-                                DataSlice *&problem,
-                                SizeT &input_queue_len,
-                                SizeT *output_queue_len,
-                                SizeT &max_vertices,
-                                SizeT &max_edges,
-                                util::CtaWorkProgress &work_progress,
-                                util::KernelRuntimeStats &kernel_stats,
-                                gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
-                                bool &inverse_graph)
-    {
-    }
-
 };
+
 template <typename KernelPolicy, typename ProblemData, typename Functor>
 struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 {
     typedef typename KernelPolicy::VertexId         VertexId;
     typedef typename KernelPolicy::SizeT            SizeT;
+    typedef typename KernelPolicy::Value            Value;
     typedef typename ProblemData::DataSlice         DataSlice;
+    typedef typename Functor::LabelT                LabelT;
 
     static __device__ __forceinline__ SizeT GetNeighborListLength(
                             SizeT    *&d_row_offsets,
@@ -192,23 +118,23 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 SizeT &partition_size,
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
-                                util::CtaWorkProgress &work_progress,
+                                util::CtaWorkProgress<SizeT> &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
                                 bool &inverse_graph)
     {
-        if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0 && blockIdx.x == 0)) {
-            kernel_stats.MarkStart();
-        }
+        //if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0 && blockIdx.x == 0)) {
+        //    kernel_stats.MarkStart();
+        //}
 
         // Reset work progress
-        if (queue_reset)
-        {
-            if (blockIdx.x == 0 && threadIdx.x < util::CtaWorkProgress::COUNTERS) {
+        //if (queue_reset)
+        //{
+        //    if (blockIdx.x == 0 && threadIdx.x < util::CtaWorkProgress::COUNTERS) {
                 //Reset all counters
-                work_progress.template Reset<SizeT>();
-            }
-        }
+        //        work_progress.template Reset<SizeT>();
+        //    }
+        //}
 
         // Determine work decomposition
         if (threadIdx.x == 0 && blockIdx.x == 0) {
@@ -216,12 +142,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             // obtain problem size
             if (queue_reset)
             {
-                work_progress.StoreQueueLength<SizeT>(input_queue_len, queue_index);
+                work_progress.StoreQueueLength(input_queue_len, queue_index);
             }
             else
             {
-                input_queue_len = work_progress.template LoadQueueLength<SizeT>(queue_index);
-                
+                input_queue_len = work_progress.LoadQueueLength(queue_index);
+
                 // Signal to host that we're done
                 //if (input_queue_len == 0) {
                 //    if (d_done) d_done[0] = input_queue_len;
@@ -231,8 +157,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             work_progress.Enqueue(output_queue_len[0], queue_index+1);
 
             // Reset our next outgoing queue counter to zero
-            work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
-            work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
+            work_progress.StoreQueueLength(0, queue_index + 2);
+            work_progress.PrepResetSteal(queue_index + 1);
         }
 
         // Barrier to protect work decomposition
@@ -245,7 +171,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         my_thread_start = bid * partition_size;
         my_thread_end = (bid+1)*partition_size < output_queue_len[0] ? (bid+1)*partition_size : output_queue_len[0];
-        //printf("tid:%d, bid:%d, m_thread_start:%d, m_thread_end:%d\n",tid, bid, my_thread_start, my_thread_end); 
+        //printf("tid:%d, bid:%d, m_thread_start:%d, m_thread_end:%d\n",tid, bid, my_thread_start, my_thread_end);
 
         if (my_thread_start >= output_queue_len[0])
             return;
@@ -294,7 +220,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             __syncthreads();
 
             SizeT e_last = min(s_edges[last] - e_offset, my_work_size - edges_processed);
-            SizeT v_index = gunrock::oprtr::edge_map_partitioned::BinarySearch<KernelPolicy::THREADS>(tid+e_offset, s_edges);
+            SizeT v_index = util::BinarySearch<KernelPolicy::THREADS>(tid+e_offset, s_edges);
             VertexId v = s_vertices[v_index];
             VertexId e_id = s_edge_ids[v_index];
             SizeT end_last = (v_index < my_end_partition ? s_edges[v_index] : max_edges);
@@ -305,7 +231,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             {
                 if (i >= end_last)
                 {
-                    v_index = gunrock::oprtr::edge_map_partitioned::BinarySearch<KernelPolicy::THREADS>(i, s_edges);
+                    v_index = util::BinarySearch<KernelPolicy::THREADS>(i, s_edges);
                     if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V || ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
                         v = d_queue[v_index];
                         e_id = 0;
@@ -331,7 +257,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                         u,
-                                        d_out + out_index); 
+                                        d_out + out_index);
                             } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
                                      ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -350,7 +276,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                             if (ADVANCE_TYPE == gunrock::oprtr::advance::V2V) {
                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
                                         u,
-                                        d_out + out_index); 
+                                        d_out + out_index);
                             } else if (ADVANCE_TYPE == gunrock::oprtr::advance::V2E
                                      ||ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
                                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
@@ -372,10 +298,10 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             e_offset = 0;
         }
 
-        if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
-            kernel_stats.MarkStop();
-            kernel_stats.Flush();
-        }
+        //if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
+        //    kernel_stats.MarkStop();
+        //    kernel_stats.Flush();
+        //}
     }
 
     static __device__ __forceinline__ void RelaxLightEdges(
@@ -395,23 +321,23 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                                 SizeT *output_queue_len,
                                 SizeT &max_vertices,
                                 SizeT &max_edges,
-                                util::CtaWorkProgress &work_progress,
+                                util::CtaWorkProgress<SizeT> &work_progress,
                                 util::KernelRuntimeStats &kernel_stats,
                                 gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
                                 bool inverse_graph)
     {
-        if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
-            kernel_stats.MarkStart();
-        }
+        //if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
+        //    kernel_stats.MarkStart();
+        //}
 
         // Reset work progress
-        if (queue_reset)
-        {
-            if (blockIdx.x == 0 && threadIdx.x < util::CtaWorkProgress::COUNTERS) {
+        //if (queue_reset)
+        //{
+        //    if (blockIdx.x == 0 && threadIdx.x < util::CtaWorkProgress::COUNTERS) {
                 //Reset all counters
-                work_progress.template Reset<SizeT>();
-            }
-        }
+        //        work_progress.template Reset<SizeT>();
+        //    }
+        //}
 
         // Determine work decomposition
         if (blockIdx.x == 0 && threadIdx.x == 0) {
@@ -419,12 +345,12 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             // obtain problem size
             if (queue_reset)
             {
-                work_progress.StoreQueueLength<SizeT>(input_queue_len, queue_index);
+                work_progress.StoreQueueLength(input_queue_len, queue_index);
             }
             else
             {
-                input_queue_len = work_progress.template LoadQueueLength<SizeT>(queue_index);
-                
+                input_queue_len = work_progress.LoadQueueLength(queue_index);
+
                 // Signal to host that we're done
                 //if (input_queue_len == 0) {
                 //    if (d_done) d_done[0] = input_queue_len;
@@ -434,8 +360,8 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
             work_progress.Enqueue(output_queue_len[0], queue_index+1);
 
             // Reset our next outgoing queue counter to zero
-            work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
-            work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
+            work_progress.StoreQueueLength(0, queue_index + 2);
+            work_progress.PrepResetSteal(queue_index + 1);
         }
 
         // Barrier to protect work decomposition
@@ -464,7 +390,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         }
         // do not support E2V and E2E for backward BFS now
         /*if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V || ADVANCE_TYPE == gunrock::oprtr::advance::E2E) {
-            if (inverse_graph) 
+            if (inverse_graph)
                 s_vertices[tid] = (my_id < range ? d_inverse_column_indices[d_queue[my_id]] : max_vertices);
             else
                 s_vertices[tid] = (my_id < range ? d_column_indices[d_queue[my_id]] : max_vertices);
@@ -476,7 +402,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
         VertexId v, e, v_id;
 
-        int v_index = gunrock::oprtr::edge_map_partitioned::BinarySearch<KernelPolicy::THREADS>(tid, s_edges);
+        int v_index = util::BinarySearch<KernelPolicy::THREADS>(tid, s_edges);
         v = s_vertices[v_index];
         v_id = s_edge_ids[v_index];
         int end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
@@ -486,7 +412,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         {
             if (i >= end_last)
             {
-                v_index = gunrock::oprtr::edge_map_partitioned::BinarySearch<KernelPolicy::THREADS>(i, s_edges);
+                v_index = util::BinarySearch<KernelPolicy::THREADS>(i, s_edges);
                 v = s_vertices[v_index];
                 v_id = s_edge_ids[v_index];
                 end_last = (v_index < KernelPolicy::THREADS ? s_edges[v_index] : max_vertices);
@@ -508,7 +434,7 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                     if (Functor::CondEdge(label, v, problem))
                         Functor::ApplyEdge(label, v, problem);
                 } else {
-                    if (Functor::CondEdge(u, v, problem)) 
+                    if (Functor::CondEdge(u, v, problem))
                         Functor::ApplyEdge(u, v, problem);
                 }
 
@@ -517,17 +443,17 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
                     d_bitmap_out + v);
 
                 util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-                    -1,
+                    (VertexId)-1,
                     d_queue + v_id);
 
                 found_parent = true;
             }
         }
 
-        if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
-            kernel_stats.MarkStop();
-            kernel_stats.Flush();
-        }
+        //if (KernelPolicy::INSTRUMENT && (blockIdx.x == 0 && threadIdx.x == 0)) {
+        //    kernel_stats.MarkStop();
+        //    kernel_stats.Flush();
+        //}
     }
 
 };
@@ -585,7 +511,7 @@ void RelaxPartitionedEdges(
         typename KernelPolicy::SizeT            partition_size,
         typename KernelPolicy::SizeT            max_vertices,
         typename KernelPolicy::SizeT            max_edges,
-        util::CtaWorkProgress                   work_progress,
+        util::CtaWorkProgress<typename KernelPolicy::SizeT>            work_progress,
         util::KernelRuntimeStats                kernel_stats,
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
         bool                                    inverse_graph = false)
@@ -664,7 +590,7 @@ void RelaxLightEdges(
         typename KernelPolicy::SizeT    *output_queue_len,
         typename KernelPolicy::SizeT    max_vertices,
         typename KernelPolicy::SizeT    max_edges,
-        util::CtaWorkProgress           work_progress,
+        util::CtaWorkProgress<typename KernelPolicy::SizeT>    work_progress,
         util::KernelRuntimeStats        kernel_stats,
         gunrock::oprtr::advance::TYPE ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
         bool                            inverse_graph = false)
