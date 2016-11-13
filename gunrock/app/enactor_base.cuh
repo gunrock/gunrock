@@ -705,6 +705,11 @@ public:
             info["rmat_nodes"] = rmat_nodes;
             info["rmat_edges"] = rmat_edges;
             info["rmat_edgefactor"] = rmat_edgefactor;
+            file_stem = "rmat_"+(args.CheckCmdLineFlag("rmat_scale")?
+            ("n"+std::to_string(rmat_scale)) : std::to_string(rmat_nodes))
+            + "_" + (args.CheckCmdLineFlag("rmat_edgefactor") ?
+            ("e"+std::to_string(rmat_edgefactor)):std::to_string(rmat_edges));
+            info["dataset"] = file_stem;
 
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
@@ -760,6 +765,12 @@ public:
             args.GetCmdLineArgument("rgg_threshold", rgg_threshold);
             args.GetCmdLineArgument("rgg_vmultipiler", rgg_vmultipiler);
             args.GetCmdLineArgument("rgg_seed", rgg_seed);
+            file_stem = "rgg_" +
+                (args.CheckCmdLineFlag("rgg_scale") ?
+                 ("n" + std::to_string(rgg_scale)) : std::to_string(rgg_nodes))
+                + "_" + (args.CheckCmdLineFlag("rgg_thfactor") ?
+                        ("t" + std::to_string(rgg_thfactor)) : std::to_string(rgg_threshold));
+            info["dataset"] = file_stem;
 
             // put everything into mObject info
             info["rgg_seed"]        = rgg_seed;

@@ -2,7 +2,7 @@ project(gunrock)
 
 set(gunrock_VERSION_MAJOR 0)
 set(gunrock_VERSION_MINOR 3)
-set(gunrock_VERSION_PATCH 0)
+set(gunrock_VERSION_PATCH 1)
 add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
 set(gunrock_REQUIRED_BOOST_VERSION 1.53)
@@ -138,6 +138,8 @@ option(GUNROCK_GENCODE_SM50
 option(CUDA_VERBOSE_PTXAS
   "On to enable verbose output from the PTXAS assembler."
   OFF)
+
+set(CUDA_NVCC_FLAGS -std=c++11)
 
 if (GUNROCK_GENCODE_SM10)
   set(GENCODE ${GENCODE} ${GENCODE_SM10})
