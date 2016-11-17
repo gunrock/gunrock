@@ -10,6 +10,6 @@ var searchData=
   ['array_5futils_2ecuh',['array_utils.cuh',['../array__utils_8cuh.html',1,'']]],
   ['atomicint',['AtomicInt',['../structgunrock_1_1util_1_1_atomic_int.html',1,'gunrock::util']]],
   ['auth_5fpredecessors',['auth_predecessors',['../structgunrock_1_1app_1_1salsa_1_1_s_a_l_s_a_problem_1_1_data_slice.html#a36a29ca5d8db3cd56b8073e308c09c38',1,'gunrock::app::salsa::SALSAProblem::DataSlice']]],
-  ['authfunctor',['AUTHFunctor',['../structgunrock_1_1app_1_1hits_1_1_a_u_t_h_functor.html',1,'gunrock::app::hits']]],
-  ['authfunctor',['AUTHFunctor',['../structgunrock_1_1app_1_1wtf_1_1_a_u_t_h_functor.html',1,'gunrock::app::wtf']]]
+  ['authfunctor',['AUTHFunctor',['../structgunrock_1_1app_1_1wtf_1_1_a_u_t_h_functor.html',1,'gunrock::app::wtf']]],
+  ['authfunctor',['AUTHFunctor',['../structgunrock_1_1app_1_1hits_1_1_a_u_t_h_functor.html',1,'gunrock::app::hits']]]
 ];

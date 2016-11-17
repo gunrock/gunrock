@@ -1,20 +1,11 @@
 var searchData=
 [
-  ['getaveragedegree',['GetAverageDegree',['../group___public_interface.html#gae83b838cbf38db397c97c3f1d10f169c',1,'gunrock::Csr']]],
-  ['getaverageedgevalue',['GetAverageEdgeValue',['../group___public_interface.html#gae7a0df653aee4d39c5b4eb6fcd855e3a',1,'gunrock::Csr']]],
-  ['getaveragenodevalue',['GetAverageNodeValue',['../group___public_interface.html#gacb199a135d3b5c5a4a954f6ec5725f38',1,'gunrock::Csr']]],
-  ['getdevicelist',['GetDeviceList',['../structgunrock_1_1util_1_1_info.html#a109f1696322e7519f13ba567704b171a',1,'gunrock::util::Info']]],
-  ['getnodedegree',['GetNodeDegree',['../group___public_interface.html#ga7414000e12eb064ca5e296e598fc1831',1,'gunrock::Csr']]],
-  ['getnodewithhighestdegree',['GetNodeWithHighestDegree',['../group___public_interface.html#ga8f66b325ab7928a25e38882d0e0ac19d',1,'gunrock::Csr']]],
-  ['getpointer',['getPointer',['../struct_shared_memory.html#adcd7a5ae493f1882c658d82332b7579b',1,'SharedMemory']]],
-  ['getsourcelist',['GetSourceList',['../structgunrock_1_1util_1_1_info.html#a325445b401eada523e239da64c66a233',1,'gunrock::util::Info']]],
-  ['globalbarrier',['GlobalBarrier',['../classgunrock_1_1util_1_1_global_barrier.html#a9519f4ec20041aa7aedc6173cc983614',1,'gunrock::util::GlobalBarrier']]],
-  ['gpuindex',['GpuIndex',['../structgunrock_1_1app_1_1_problem_base.html#ad9b9f58fb899b01cff16d3c3ee3f9934',1,'gunrock::app::ProblemBase']]],
-  ['graphslice',['GraphSlice',['../structgunrock_1_1app_1_1_graph_slice.html#acc4461d6443381640b17147de37df692',1,'gunrock::app::GraphSlice']]],
-  ['graphslicerow',['GraphSliceRow',['../structgunrock_1_1app_1_1_problem_base.html#a3ea79345124bdef1ae671e72454d1849',1,'gunrock::app::ProblemBase']]],
-  ['gunrock_5fbc',['gunrock_bc',['../gunrock_8h.html#a9850f053508d46c260918b9e73e52590',1,'gunrock.h']]],
-  ['gunrock_5fbfs',['gunrock_bfs',['../gunrock_8h.html#a23fcf2270806409df1e611097b37b968',1,'gunrock.h']]],
-  ['gunrock_5fcc',['gunrock_cc',['../gunrock_8h.html#ada3317dd84e8a81bd716192067f2c012',1,'gunrock.h']]],
-  ['gunrock_5fpagerank',['gunrock_pagerank',['../gunrock_8h.html#a7a8b1608f7d2fdd42337fe74d0b85487',1,'gunrock.h']]],
-  ['gunrock_5fsssp',['gunrock_sssp',['../gunrock_8h.html#afa81e9b965282817dd5bab1532e33c52',1,'gunrock.h']]]
+  ['fastmul',['FastMul',['../device__intrinsics_8cuh.html#a7938c5da8c1fe6c138ec934deb5f8d69',1,'gunrock::util::FastMul(unsigned int a, unsigned int b)'],['../device__intrinsics_8cuh.html#a74dae023fd48a65e524ed20ee5dfb743',1,'gunrock::util::FastMul(int a, int b)']]],
+  ['flip',['Flip',['../rmat_8cuh.html#ae5c7252218444b35e6a0cbbed20469dd',1,'gunrock::graphio::rmat']]],
+  ['flushkernel',['FlushKernel',['../cuda__properties_8cuh.html#ae13c70e61a31e98e6c95ed5615021410',1,'gunrock::util']]],
+  ['free',['Free',['../structgunrock_1_1_csr.html#adf896095f96b212ae004556b93992734',1,'gunrock::Csr']]],
+  ['fromcoo',['FromCoo',['../structgunrock_1_1_csr.html#a61e2c627dcfafe15ba3f4b5c18b7fa44',1,'gunrock::Csr']]],
+  ['fromcsr',['FromCsr',['../structgunrock_1_1_csr.html#a1003c46c28135382db06f10ff84075e0',1,'gunrock::Csr']]],
+  ['fromcsr_5fsm',['FromCsr_SM',['../structgunrock_1_1_csr.html#a5ae652923c879a697253ae1673e3b86d',1,'gunrock::Csr']]],
+  ['fromscratch',['FromScratch',['../structgunrock_1_1_csr.html#ad10d417883532cd084c44ab523341fb2',1,'gunrock::Csr']]]
 ];

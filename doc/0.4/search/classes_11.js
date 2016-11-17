@@ -1,9 +1,9 @@
 var searchData=
 [
   ['testparameter_5fbase',['TestParameter_Base',['../structgunrock_1_1app_1_1_test_parameter___base.html',1,'gunrock::app']]],
+  ['tile',['Tile',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta_1_1_tile.html',1,'gunrock::oprtr::edge_map_backward::Cta']]],
   ['tile',['Tile',['../structgunrock_1_1oprtr_1_1cull__filter_1_1_cta_1_1_tile.html',1,'gunrock::oprtr::cull_filter::Cta']]],
   ['tile',['Tile',['../structgunrock_1_1oprtr_1_1edge__map__forward_1_1_cta_1_1_tile.html',1,'gunrock::oprtr::edge_map_forward::Cta']]],
-  ['tile',['Tile',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta_1_1_tile.html',1,'gunrock::oprtr::edge_map_backward::Cta']]],
   ['topkenactor',['TOPKEnactor',['../classgunrock_1_1app_1_1topk_1_1_t_o_p_k_enactor.html',1,'gunrock::app::topk']]],
   ['topkfunctor',['TOPKFunctor',['../structgunrock_1_1app_1_1topk_1_1_t_o_p_k_functor.html',1,'gunrock::app::topk']]],
   ['topkproblem',['TOPKProblem',['../structgunrock_1_1app_1_1topk_1_1_t_o_p_k_problem.html',1,'gunrock::app::topk']]],

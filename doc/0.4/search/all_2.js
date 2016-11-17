@@ -24,11 +24,14 @@ var searchData=
   ['bfsfunctor',['BFSFunctor',['../structgunrock_1_1app_1_1bfs_1_1_b_f_s_functor.html',1,'gunrock::app::bfs']]],
   ['bfsproblem',['BFSProblem',['../structgunrock_1_1app_1_1bfs_1_1_b_f_s_problem.html',1,'gunrock::app::bfs']]],
   ['bfsproblem',['BFSProblem',['../structgunrock_1_1app_1_1bfs_1_1_b_f_s_problem.html#a60ec0b4488907ed06a1b09b510e155da',1,'gunrock::app::bfs::BFSProblem']]],
+  ['bisect',['Bisect',['../priority__queue_2kernel_8cuh.html#a1c4c41000cdf2ab813b87727a629461f',1,'gunrock::priority_queue']]],
   ['bitmaskcull',['BitmaskCull',['../structgunrock_1_1oprtr_1_1cull__filter_1_1_cta_1_1_tile_1_1_iterate.html#a5bcd35bd9157e84d7809eb1da64e04c3',1,'gunrock::oprtr::cull_filter::Cta::Tile::Iterate']]],
   ['block_5fscan_2ecuh',['block_scan.cuh',['../block__scan_8cuh.html',1,'']]],
   ['brp_5fpartitioner_2ecuh',['brp_partitioner.cuh',['../brp__partitioner_8cuh.html',1,'']]],
   ['building_20gunrock',['Building Gunrock',['../building_gunrock.html',1,'']]],
   ['buildmarketgraph',['BuildMarketGraph',['../group___public.html#ga94863ff97dcb7202a0879994d7e96e8a',1,'gunrock::graphio::BuildMarketGraph(char *mm_filename, char *output_file, Csr&lt; VertexId, SizeT, Value &gt; &amp;csr_graph, bool undirected, bool reversed, bool quiet=false)'],['../group___public.html#gab9ddc40d9208e1d299318c623b1192b4',1,'gunrock::graphio::BuildMarketGraph(char *file_in, Csr&lt; VertexId, SizeT, Value &gt; &amp;graph, bool undirected, bool reversed, bool quiet=false)']]],
   ['buildmarketgraph_5fsm',['BuildMarketGraph_SM',['../group___public.html#ga9e17f9fb9bb6b451bf1c0da1baed43f8',1,'gunrock::graphio::BuildMarketGraph_SM(char *mm_filename, char *label_filename, char *output_file, char *output_label, Csr&lt; VertexId, SizeT, Value &gt; &amp;csr_graph, bool undirected, bool reversed, bool quiet=false)'],['../group___public.html#ga2b0887c6ebeb6f47f961ef30170d3896',1,'gunrock::graphio::BuildMarketGraph_SM(char *file_in, char *file_label, Csr&lt; VertexId, SizeT, Value &gt; &amp;graph, bool undirected, bool reversed, bool quiet=false)']]],
+  ['buildmetarmatgraph',['BuildMetaRmatGraph',['../grmat_8cuh.html#adc74129ec5ac6f3cb712aa5bf68e2d0f',1,'gunrock::graphio::grmat']]],
+  ['buildrmatgraph',['BuildRmatGraph',['../grmat_8cuh.html#a222ae0b8934b50162f4253481790e700',1,'gunrock::graphio::grmat::BuildRmatGraph()'],['../rmat_8cuh.html#ac1b27fc93c718b3a9e3d74885bd4e6e7',1,'gunrock::graphio::rmat::BuildRmatGraph()']]],
   ['bfs_5fchart',['bfs_chart',['../md_stats_bfs_chart.html',1,'']]]
 ];

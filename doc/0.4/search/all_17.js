@@ -9,7 +9,7 @@ var searchData=
   ['warpreduce',['WarpReduce',['../structgunrock_1_1util_1_1reduction_1_1_warp_reduce.html',1,'gunrock::util::reduction']]],
   ['warpscan',['warpscan',['../structgunrock_1_1util_1_1_raking_details_3_01_raking_grid_00_01_null_type_01_4.html#a1d6dd77e7ba797f416b49530e6434f7d',1,'gunrock::util::RakingDetails&lt; RakingGrid, NullType &gt;']]],
   ['warpscan',['WarpScan',['../structgunrock_1_1util_1_1scan_1_1_warp_scan.html',1,'gunrock::util::scan']]],
-  ['warpscan_5fpartials',['warpscan_partials',['../structgunrock_1_1util_1_1_raking_soa_details_3_01___tile_tuple_00_01_raking_grid_tuple_00_012_00_01_null_type_01_4.html#a3c0bc285b236881db67b30018f2c138d',1,'gunrock::util::RakingSoaDetails&lt; _TileTuple, RakingGridTuple, 2, NullType &gt;']]],
+  ['warpscan_5fpartials',['warpscan_partials',['../structgunrock_1_1util_1_1_raking_soa_details_3_01_01_01_01_01_01_01_01_01_01_01_01_01_01_01_01_016837b1fe736968fdcb79be2c8f7dac5.html#a193c84e476c3cc0d34fc9bd6e80eeef3',1,'gunrock::util::RakingSoaDetails&lt;                  _TileTuple,           RakingGridTuple,           2,           NullType &gt;']]],
   ['warpsoareduce',['WarpSoaReduce',['../structgunrock_1_1util_1_1reduction_1_1soa_1_1_warp_soa_reduce.html',1,'gunrock::util::reduction::soa']]],
   ['warpsoascan',['WarpSoaScan',['../structgunrock_1_1util_1_1scan_1_1soa_1_1_warp_soa_scan.html',1,'gunrock::util::scan::soa']]],
   ['weights',['weights',['../structgunrock_1_1app_1_1sssp_1_1_s_s_s_p_problem_1_1_data_slice.html#ab95e5cbf57de14e870f158be0bd4b43a',1,'gunrock::app::sssp::SSSPProblem::DataSlice']]],

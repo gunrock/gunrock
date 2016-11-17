@@ -1,7 +1,15 @@
 var searchData=
 [
-  ['testparameter_5fbase',['TestParameter_Base',['../structgunrock_1_1app_1_1_test_parameter___base.html#aef32ecbef5a05adac670076cca453e55',1,'gunrock::app::TestParameter_Base']]],
-  ['threadexpand',['ThreadExpand',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_cta_1_1_tile_1_1_iterate.html#ad6576e3ce60e01f9a3d6c255c2170aff',1,'gunrock::oprtr::edge_map_backward::Cta::Tile::Iterate::ThreadExpand()'],['../structgunrock_1_1oprtr_1_1edge__map__forward_1_1_cta_1_1_tile_1_1_iterate.html#afe8d30e6629892f3bf27a37e300ad60e',1,'gunrock::oprtr::edge_map_forward::Cta::Tile::Iterate::ThreadExpand()']]],
-  ['topkenactor',['TOPKEnactor',['../classgunrock_1_1app_1_1topk_1_1_t_o_p_k_enactor.html#a8341f710823267970d21360b1542e6fc',1,'gunrock::app::topk::TOPKEnactor']]],
-  ['topkproblem',['TOPKProblem',['../structgunrock_1_1app_1_1topk_1_1_t_o_p_k_problem.html#aff4cff8bad454b3596c3d2b7dced51e4',1,'gunrock::app::topk::TOPKProblem']]]
+  ['salsaenactor',['SALSAEnactor',['../classgunrock_1_1app_1_1salsa_1_1_s_a_l_s_a_enactor.html#a2b2209b0bf510a592b10e4e80ecf6ad4',1,'gunrock::app::salsa::SALSAEnactor']]],
+  ['salsaproblem',['SALSAProblem',['../structgunrock_1_1app_1_1salsa_1_1_s_a_l_s_a_problem.html#a4fa1f846fcee02482a6ac092f873b140',1,'gunrock::app::salsa::SALSAProblem']]],
+  ['sampleenactor',['SampleEnactor',['../classgunrock_1_1app_1_1sample_1_1_sample_enactor.html#a718e2b3f976bd876c10186d6e55eb334',1,'gunrock::app::sample::SampleEnactor']]],
+  ['sampleproblem',['SampleProblem',['../structgunrock_1_1app_1_1sample_1_1_sample_problem.html#a2eaae869a5fd9533a3733b93c0ac9edd',1,'gunrock::app::sample::SampleProblem']]],
+  ['setup',['Setup',['../classgunrock_1_1app_1_1_enactor_base.html#a65f876efede9b22f7f6d0081e0d6580f',1,'gunrock::app::EnactorBase']]],
+  ['sprng',['Sprng',['../rmat_8cuh.html#a2d2449a696851386b2949ea13986f64f',1,'gunrock::graphio::rmat']]],
+  ['sssp',['sssp',['../sssp__app_8cu.html#a6132bcffd98c0328bddbf12ed4f4abbe',1,'sssp(unsigned int *distances, int *preds, const int num_nodes, const int num_edges, const int *row_offsets, const int *col_indices, const unsigned int *edge_values, const int num_iters, int *source, const bool mark_preds):&#160;sssp_app.cu'],['../gunrock_8h.html#a6132bcffd98c0328bddbf12ed4f4abbe',1,'sssp(unsigned int *distances, int *preds, const int num_nodes, const int num_edges, const int *row_offsets, const int *col_indices, const unsigned int *edge_values, const int num_iters, int *source, const bool mark_preds):&#160;sssp_app.cu']]],
+  ['ssspenactor',['SSSPEnactor',['../classgunrock_1_1app_1_1sssp_1_1_s_s_s_p_enactor.html#aa6b04424dfaa2670cd692d7319692b63',1,'gunrock::app::sssp::SSSPEnactor']]],
+  ['ssspproblem',['SSSPProblem',['../structgunrock_1_1app_1_1sssp_1_1_s_s_s_p_problem.html#a2697cdf3e4e176afd459e6f732712c7a',1,'gunrock::app::sssp::SSSPProblem']]],
+  ['suppressunusedconstantwarning',['SuppressUnusedConstantWarning',['../basic__utils_8h.html#ad17349de009f113369ea46727a6786a0',1,'gunrock::util']]],
+  ['swap',['Swap',['../basic__utils_8h.html#ac92cbf1a87a73174969a119fdfb30d1f',1,'gunrock::util']]],
+  ['sync',['Sync',['../classgunrock_1_1util_1_1_global_barrier.html#a75a0f1a2d834c0db9e10b5b5047453fd',1,'gunrock::util::GlobalBarrier']]]
 ];

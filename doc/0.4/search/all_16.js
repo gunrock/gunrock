@@ -2,6 +2,7 @@ var searchData=
 [
   ['vega_20graph_20examples',['Vega Graph Examples',['../md_stats_vegademo.html',1,'']]],
   ['valuetype',['ValueType',['../gunrock_8h.html#ad9971b6ef33e02ba2c75d19c1d2518a1',1,'gunrock.h']]],
+  ['varyparams',['VaryParams',['../rmat_8cuh.html#a80fdbfc6ab29e03d88c7701d0f0aab3d',1,'gunrock::graphio::rmat']]],
   ['vector_5ftypes_2ecuh',['vector_types.cuh',['../vector__types_8cuh.html',1,'']]],
   ['vectype_3c_20t_2c_201_20_3e',['VecType&lt; T, 1 &gt;',['../structgunrock_1_1util_1_1_vec_type_3_01_t_00_011_01_4.html',1,'gunrock::util']]],
   ['vectype_3c_20t_2c_202_20_3e',['VecType&lt; T, 2 &gt;',['../structgunrock_1_1util_1_1_vec_type_3_01_t_00_012_01_4.html',1,'gunrock::util']]],
