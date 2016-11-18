@@ -149,10 +149,18 @@ template <
     typename SizeT,
     typename Value>
 void Reference(
-    const Csr<VertexId, SizeT, Value> &graph,
+    const std::string &fname,
+    Csr<VertexId, SizeT, Value> &graph,
     bool                              quiet)
 {
     // Add CPU Implementation here.   
+    // Write graph to txt file and generate random edge weights [0,64)
+    graph.WriteToMtxFile(
+        fname.c_str(),
+        graph.nodes,
+        graph.edges,
+        graph.row_offsets,
+        graph.column_indices);
 }
 
 
@@ -357,6 +365,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     {
         if (!quiet_mode) { printf("Computing reference value ...\n"); }
         Reference<VertexId, SizeT, Value>(
+            info->info["dataset"].get_str(),
             *graph,
             quiet_mode);
         if (!quiet_mode) { printf("\n"); }
