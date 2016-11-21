@@ -35,7 +35,9 @@ CUDA_ADD_EXECUTABLE(${PROJECT_NAME}
 
 # begin /* Link Metis and Boost */
 target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} ${METIS_LIBRARY})
+if (METIS_FOUND)
+  target_link_libraries(${PROJECT_NAME} ${METIS_LIBRARY})
+endif()
 # end /* Link Metis and Boost */
 
 # begin /* Link OpenMP (libomp) for OSX */
