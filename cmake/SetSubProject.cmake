@@ -35,7 +35,7 @@ CUDA_ADD_EXECUTABLE(${PROJECT_NAME}
 
 # begin /* Link Metis and Boost */
 target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
-if (METIS_FOUND)
+if (METIS_LIBRARY)
   target_link_libraries(${PROJECT_NAME} ${METIS_LIBRARY})
 endif()
 # end /* Link Metis and Boost */

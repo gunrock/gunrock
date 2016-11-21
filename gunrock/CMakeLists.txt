@@ -39,8 +39,8 @@ cuda_add_library(gunrock ${LIB_TYPE}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
 
 target_link_libraries(gunrock ${Boost_LIBRARIES})
-if (METIS_FOUND)
-  target_link_libraries(gunrock ${METIS_LIBRARY})
+if (METIS_LIBRARY)
+	target_link_libraries(gunrock ${METIS_LIBRARY})
 endif ()
 
 # OpenMP on OS X/clang

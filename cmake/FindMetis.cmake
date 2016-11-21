@@ -37,13 +37,12 @@ FIND_LIBRARY(METIS_LIBRARY metis
 
 SET(gunrock_REQUIRED_METIS_VERSION 5.0)
 
-SET(METIS_FOUND FALSE)
 IF (METIS_LIBRARY)
-  SET(METIS_FOUND TRUE)
+  SET(METIS_FOUND true)
   ADD_DEFINITIONS( -DMETIS_FOUND=true )
   MESSAGE(STATUS "Found Metis")
 ELSE (METIS_LIBRARY)
-  ADD_DEFINITIONS( -DMETIS_FOUND=false )
-  MESSAGE(WARNING "Metis was requested but support was not found,
-  run `sudo apt-get install metis` or `/dep/install_metis.sh` for installation.")
+  #SET(METIS_FOUND false)
+  #ADD_DEFINITIONS( -DMETIS_FOUND=false )
+  MESSAGE(WARNING "Metis was requested but support was not found, run `sudo apt-get install metis` or `/dep/install_metis.sh` for installation.")
 ENDIF (METIS_LIBRARY)
