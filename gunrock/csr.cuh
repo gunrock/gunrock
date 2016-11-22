@@ -329,7 +329,7 @@ struct Csr
      * @param[in] quiet Don't print out anything.
      */
     void WriteToLigraFile(
-        char  *file_name,
+        const char  *file_name,
         SizeT v, SizeT e,
         SizeT *row,
         VertexId *col,
@@ -346,7 +346,7 @@ struct Csr
         std::ofstream fout3(adj_name);
         if (fout3.is_open())
         {
-            fout3 << v << " " << v << " " << e << std::endl;
+            fout3 << "AdjacencyGraph" << std::endl << v << std::endl << e << std::endl;
             for (int i = 0; i < v; ++i)
                 fout3 << row[i] << std::endl;
             for (int i = 0; i < e; ++i)

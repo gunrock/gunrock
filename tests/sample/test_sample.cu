@@ -155,7 +155,7 @@ void Reference(
 {
     // Add CPU Implementation here.   
     // Write graph to txt file and generate random edge weights [0,64)
-    graph.WriteToMtxFile(
+    graph.WriteToLigraFile(
         fname.c_str(),
         graph.nodes,
         graph.edges,
