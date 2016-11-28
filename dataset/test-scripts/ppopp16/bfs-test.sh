@@ -15,10 +15,10 @@ DEVICE="0"
 for i in {0..4}
 do
     echo $EXECUTION ${NAME[$i]} $SETTING
-    $EXEDIR/$EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $SETTING --device=$DEVICE --traversal-mode=${T_MODE[$i]} --do_a=${DO_A[$i]} --do_b=${DO_B[$i]} --jsondir=./eval/ > ./eval/${NAME[$i]}.$EXECUTION.output.txt
+    nvprof $EXEDIR/$EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $SETTING --device=$DEVICE --traversal-mode=${T_MODE[$i]} --do_a=${DO_A[$i]} --do_b=${DO_B[$i]} --jsondir=./eval/ > ./eval/nvprof.${NAME[$i]}.$EXECUTION.output.txt
     sleep 1
 done
 echo $EXECUTION rgg_24 $SETTING
-$EXEDIR/$EXECUTION rgg --rgg_scale=24 $SETTING --device=$DEVICE --traversal-mode=TWC --do_a=${DO_A[4]} --do_b=${DO_B[4]} --jsondir=./eval/ > ./eval/rgg_24.$EXECUTION.output.txt
+#$EXEDIR/$EXECUTION rgg --rgg_scale=24 $SETTING --device=$DEVICE --traversal-mode=TWC --do_a=${DO_A[4]} --do_b=${DO_B[4]} --jsondir=./eval/ > ./eval/rgg_24.$EXECUTION.output.txt
 
 

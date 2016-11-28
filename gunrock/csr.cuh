@@ -329,7 +329,7 @@ struct Csr
      * @param[in] quiet Don't print out anything.
      */
     void WriteToLigraFile(
-        char  *file_name,
+        const char  *file_name,
         SizeT v, SizeT e,
         SizeT *row,
         VertexId *col,
@@ -346,7 +346,7 @@ struct Csr
         std::ofstream fout3(adj_name);
         if (fout3.is_open())
         {
-            fout3 << v << " " << v << " " << e << std::endl;
+            fout3 << "AdjacencyGraph" << std::endl << v << std::endl << e << std::endl;
             for (int i = 0; i < v; ++i)
                 fout3 << row[i] << std::endl;
             for (int i = 0; i < e; ++i)
@@ -359,6 +359,45 @@ struct Csr
             fout3.close();
         }
     }
+
+    void WriteToMtxFile(
+        const char  *file_name,
+        SizeT v, SizeT e,
+        SizeT *row,
+        VertexId *col,
+        Value *edge_values = NULL,
+        bool quiet = false)
+    {
+        char adj_name[256];
+        sprintf(adj_name, "%s.mtx", file_name);
+        if (!quiet)
+        {
+            printf("writing to .mtx file.\n");
+        }
+
+        std::ofstream fout3(adj_name);
+        if (fout3.is_open())
+        {
+            fout3 << v << " " << v << " " << e << std::endl;
+            for (int i = 0; i < v; ++i) {
+                SizeT begin = row[i];
+                SizeT end = row[i+1];
+                for (int j = begin; j < end; ++j) {
+                    fout3 << col[j]+1 << " " << i+1;
+                    if (edge_values != NULL)
+                    {
+                        fout3 << " " << edge_values[j] << std::endl;
+                    }
+                    else
+                    {
+                        fout3 << " " << rand() % 64 << std::endl;
+                    }
+                }
+            }
+            fout3.close();
+        }
+    }
+
 
     /**
      * @brief Read from stored row_offsets, column_indices arrays.
