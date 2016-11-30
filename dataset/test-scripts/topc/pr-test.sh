@@ -3,7 +3,7 @@
 EXEDIR="../../../../gunrock_build/bin"
 EXECUTION="pr"
 DATADIR="/data/Compare/topc-datasets"
-SETTING=" --quick --iteration-num=10"
+SETTING=" --quick --iteration-num=10 --max-iter=1"
 NAME[0]="soc-LiveJournal1" && DO_A[0]="0.200" && DO_B[0]="0.1" && T_MODE[0]="LB_CULL"
 NAME[1]="soc-orkut" && DO_A[1]="0.012" && DO_B[1]="0.1" && T_MODE[1]="LB_CULL"
 NAME[2]="hollywood-2009" && DO_A[2]="0.006" && DO_B[2]="0.1" && T_MODE[2]="LB_CULL"
@@ -15,10 +15,10 @@ NAME[7]="road_usa" && DO_A[7]="1.0" && DO_B[7]="10" && T_MODE[7]="TWC"
 NAME[8]="rgg_n24_0.000548" && DO_A[8]="1.0" && DO_B[8]="10" && T_MODE[8]="TWC"
 
 mkdir -p eval
-DEVICE="0"
+DEVICE="3"
 for i in {0..8}
 do
-    echo $EXECUTION ${NAME[$i]} $SETTING
+    echo $EXECUTION market $DATADIR/${NAME[$i]}.mtx $SETTING
     $EXEDIR/$EXECUTION market $DATADIR/${NAME[$i]}.mtx $SETTING --device=$DEVICE --jsondir=./eval/ > ./eval/${NAME[$i]}.$EXECUTION.output.txt
     sleep 1
 done

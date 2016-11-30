@@ -14,6 +14,8 @@
 
 #pragma once
 
+#define RECORD_PER_ITERATION_STATS 0
+
 namespace gunrock {
 namespace util {
 
@@ -662,6 +664,38 @@ public:
     }
 
     /**
+     * @brief Utility function to parse per-iteration advance stats.
+     *
+     * @param[in] runtime_list std::vector stores per iteration runtime.
+     * @param[in] mteps_list std::vector stores per iteration mteps.
+     * @param[in] output_frontier_list std::vector stores per iteration output frontier number.
+     * @param[in] dir_list std::vector stores per iteration advance direction.
+     * @param[in] runtimes json_spirit::mArray to store per iteration runtimes.
+     * @param[in] mteps json_spirit::mArray to store per iteration mteps.
+     * @param[in] output_frontiers json_spirit::mArray to store per iteration output frontier numbers.
+     * @param[in] dirs json_spirit::mArray to store per iteration direction.
+     *
+     */
+    void GetPerIterationAdvanceStats(
+        std::vector<float> &runtime_list,
+        std::vector<float> &mteps_list,
+        std::vector<int> &output_frontier_list,
+        std::vector<bool> &dir_list,
+        json_spirit::mArray &runtimes,
+        json_spirit::mArray &mteps,
+        json_spirit::mArray &output_frontiers,
+        json_spirit::mArray &dirs)
+    {
+        for (int i = 0; i < runtime_list.size(); ++i) {
+            runtimes.push_back(runtime_list[i]);
+            mteps.push_back(mteps_list[i]);
+            output_frontiers.push_back(output_frontier_list[i]);
+            dirs.push_back(dir_list[i]?"push":"pull");
+        }
+        return;
+    }
+
+    /**
      * @brief Writes the JSON structure to STDOUT (command line --json).
      */
     void PrintJson()
@@ -1294,6 +1328,30 @@ public:
                 total_lifetimes += estats->total_lifetimes;
                 total_runtimes  += estats->total_runtimes;
             }
+        }
+
+        if (get_traversal_stats && RECORD_PER_ITERATION_STATS)
+        {
+            // TODO: collect info for multi-GPUs
+            EnactorStats *estats = enactor_stats;
+            json_spirit::mArray per_iteration_advance_runtime; 
+            json_spirit::mArray per_iteration_advance_mteps; 
+            json_spirit::mArray per_iteration_advance_output_frontier; 
+            json_spirit::mArray per_iteration_advance_dir;
+            GetPerIterationAdvanceStats(
+                    estats->per_iteration_advance_time,
+                    estats->per_iteration_advance_mteps,
+                    estats->per_iteration_advance_output_edges,
+                    estats->per_iteration_advance_direction,
+                    per_iteration_advance_runtime,
+                    per_iteration_advance_mteps,
+                    per_iteration_advance_output_frontier,
+                    per_iteration_advance_dir);
+
+            info["per_iteration_advance_runtime"] = per_iteration_advance_runtime;
+            info["per_iteration_advance_mteps"] = per_iteration_advance_runtime;
+            info["per_iteration_advance_output_frontier"] = per_iteration_advance_output_frontier;
+            info["per_iteration_advance_direction"] = per_iteration_advance_dir;
         }
 
         double avg_duty = (total_lifetimes > 0) ?

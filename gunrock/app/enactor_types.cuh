@@ -53,6 +53,10 @@ struct EnactorStats
     unsigned long long               total_runtimes      ;
     util::Array1D<int, SizeT>        edges_queued        ;
     util::Array1D<int, SizeT>        nodes_queued        ;
+    std::vector<float>         per_iteration_advance_time;
+    std::vector<float>         per_iteration_advance_mteps;
+    std::vector<int>         per_iteration_advance_output_edges;
+    std::vector<bool>         per_iteration_advance_direction;
     unsigned int                     advance_grid_size   ;
     unsigned int                     filter_grid_size    ;
     util::KernelRuntimeStatsLifetime advance_kernel_stats;
