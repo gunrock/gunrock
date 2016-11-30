@@ -28,7 +28,7 @@ GEN_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
 GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
-SM_TARGETS = $(GEN_SM35) #$(GEN_SM60) $(GEN_SM61) 
+SM_TARGETS = $(GEN_SM61) #$(GEN_SM35) $(GEN_SM60) $(GEN_SM61) 
 #-------------------------------------------------------------------------------
 # Libs
 #-------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ ifneq ($(use_metis), 1)
 else
 	METIS_DEPS = -Xlinker -lmetis -Xcompiler -DMETIS_FOUND
 endif
-GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=0.3.0
+GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=0.4.0
 INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) $(GUNROCK_DEF) -I.. -I../..
 
 #-------------------------------------------------------------------------------
