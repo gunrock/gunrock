@@ -14,7 +14,7 @@
 
 #pragma once
 
-#define RECORD_PER_ITERATION_STATS 0
+#define RECORD_PER_ITERATION_STATS 1
 
 namespace gunrock {
 namespace util {
@@ -1349,7 +1349,7 @@ public:
                     per_iteration_advance_dir);
 
             info["per_iteration_advance_runtime"] = per_iteration_advance_runtime;
-            info["per_iteration_advance_mteps"] = per_iteration_advance_runtime;
+            info["per_iteration_advance_mteps"] = per_iteration_advance_mteps;
             info["per_iteration_advance_output_frontier"] = per_iteration_advance_output_frontier;
             info["per_iteration_advance_direction"] = per_iteration_advance_dir;
         }
