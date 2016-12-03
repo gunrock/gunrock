@@ -1,7 +1,7 @@
 #!/bin/bash
 
 EXEDIR="../../../../gunrock_build/bin"
-EXECUTION="sssp"
+EXECUTION="pr"
 #DATADIR="../../large"
 DATADIR="/data/gunrock_dataset/large"
 SETTING=" --quick --iteration-num=10 --max-iter=1"

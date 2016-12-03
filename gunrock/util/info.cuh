@@ -14,7 +14,7 @@
 
 #pragma once
 
-#define RECORD_PER_ITERATION_STATS 1
+#define RECORD_PER_ITERATION_STATS 0
 
 namespace gunrock {
 namespace util {
