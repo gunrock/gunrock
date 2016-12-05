@@ -1060,6 +1060,7 @@ struct BFSIteration : public IterationBase <
                 float mteps = frontier_attribute->output_length[0] / (elapsed*1000);
                 enactor_stats->per_iteration_advance_time.push_back(elapsed);
                 enactor_stats->per_iteration_advance_mteps.push_back(mteps);
+                enactor_stats->per_iteration_advance_input_edges.push_back(frontier_attribute->queue_length);
                 enactor_stats->per_iteration_advance_output_edges.push_back(frontier_attribute->output_length[0]);
                 enactor_stats->per_iteration_advance_direction.push_back(true);
             }
@@ -1266,6 +1267,7 @@ struct BFSIteration : public IterationBase <
                 float elapsed = gpu_timer.ElapsedMillis();
                 enactor_stats->per_iteration_advance_time.push_back(elapsed);
                 enactor_stats->per_iteration_advance_mteps.push_back(-1.0f);
+                enactor_stats->per_iteration_advance_input_edges.push_back(-1.0f);
                 enactor_stats->per_iteration_advance_output_edges.push_back(-1.0f);
                 enactor_stats->per_iteration_advance_direction.push_back(false);
             }

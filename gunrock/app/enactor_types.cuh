@@ -55,6 +55,7 @@ struct EnactorStats
     util::Array1D<int, SizeT>        nodes_queued        ;
     std::vector<float>         per_iteration_advance_time;
     std::vector<float>         per_iteration_advance_mteps;
+    std::vector<int>         per_iteration_advance_input_edges;
     std::vector<int>         per_iteration_advance_output_edges;
     std::vector<bool>         per_iteration_advance_direction;
     unsigned int                     advance_grid_size   ;

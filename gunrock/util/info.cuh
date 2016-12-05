@@ -668,6 +668,7 @@ public:
      *
      * @param[in] runtime_list std::vector stores per iteration runtime.
      * @param[in] mteps_list std::vector stores per iteration mteps.
+     * @param[in] input_frontier_list std::vector stores per iteration input frontier number.
      * @param[in] output_frontier_list std::vector stores per iteration output frontier number.
      * @param[in] dir_list std::vector stores per iteration advance direction.
      * @param[in] runtimes json_spirit::mArray to store per iteration runtimes.
@@ -679,16 +680,19 @@ public:
     void GetPerIterationAdvanceStats(
         std::vector<float> &runtime_list,
         std::vector<float> &mteps_list,
+        std::vector<int> &input_frontier_list,
         std::vector<int> &output_frontier_list,
         std::vector<bool> &dir_list,
         json_spirit::mArray &runtimes,
         json_spirit::mArray &mteps,
+        json_spirit::mArray &input_frontiers,
         json_spirit::mArray &output_frontiers,
         json_spirit::mArray &dirs)
     {
         for (int i = 0; i < runtime_list.size(); ++i) {
             runtimes.push_back(runtime_list[i]);
             mteps.push_back(mteps_list[i]);
+            input_frontiers.push_back(input_frontier_list[i]);
             output_frontiers.push_back(output_frontier_list[i]);
             dirs.push_back(dir_list[i]?"push":"pull");
         }
@@ -1336,20 +1340,24 @@ public:
             EnactorStats *estats = enactor_stats;
             json_spirit::mArray per_iteration_advance_runtime; 
             json_spirit::mArray per_iteration_advance_mteps; 
+            json_spirit::mArray per_iteration_advance_input_frontier; 
             json_spirit::mArray per_iteration_advance_output_frontier; 
             json_spirit::mArray per_iteration_advance_dir;
             GetPerIterationAdvanceStats(
                     estats->per_iteration_advance_time,
                     estats->per_iteration_advance_mteps,
+                    estats->per_iteration_advance_input_edges,
                     estats->per_iteration_advance_output_edges,
                     estats->per_iteration_advance_direction,
                     per_iteration_advance_runtime,
                     per_iteration_advance_mteps,
+                    per_iteration_advance_input_frontier,
                     per_iteration_advance_output_frontier,
                     per_iteration_advance_dir);
 
             info["per_iteration_advance_runtime"] = per_iteration_advance_runtime;
             info["per_iteration_advance_mteps"] = per_iteration_advance_mteps;
+            info["per_iteration_advance_input_frontier"] = per_iteration_advance_input_frontier;
             info["per_iteration_advance_output_frontier"] = per_iteration_advance_output_frontier;
             info["per_iteration_advance_direction"] = per_iteration_advance_dir;
         }
