@@ -48,6 +48,7 @@ struct Csr
     SizeT edges;            // Number of edges in the graph
     SizeT out_nodes;        // Number of nodes which have outgoing edges
     SizeT average_degree;   // Average vertex degrees
+    float stddev_degree;    // Degree standard deviation
 
     VertexId *column_indices; // Column indices corresponding to all the
     // non-zero values in the sparse matrix
@@ -72,6 +73,7 @@ struct Csr
         nodes = 0;
         edges = 0;
         average_degree = 0;
+        stddev_degree = 0.0f;
         average_edge_value = 0;
         average_node_value = 0;
         out_nodes = -1;
@@ -894,6 +896,26 @@ struct Csr
             average_degree = static_cast<SizeT>(mean);
         }
         return average_degree;
+    }
+
+    /**
+     * @brief Get the average degree of all the nodes in graph
+     */
+    SizeT GetStddevDegree()
+    {
+        if (average_degree == 0)
+        {
+           GetAverageDegree();
+        }
+
+        float accum = 0.0f;
+        for (SizeT node=0; node < nodes; ++node)
+        {
+            float d = (row_offsets[node+1]-row_offsets[node]);
+            accum += (d - average_degree) * (d - average_degree);
+        }
+        stddev_degree = sqrt(accum / (nodes-1));
+        return stddev_degree;
     }
 
     /**
