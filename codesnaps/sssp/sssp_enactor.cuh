@@ -1,6 +1,27 @@
 // The enactor defines how a graph primitive runs. It calls traversal
 // (advance and filter operators) and computation (functors).
 
+// This SSSP example also illustrates what need to be supplied to the
+// multi-GPU framework, by the implementor of a graph primitive, so that
+// the primitive can be maily written in a single GPU manner, and the
+// framework can expant it to utilize multiple GPUs in a single node.
+//
+// Different parts that fits into the multi-GPU framework are as following:
+// 1) Core single-GPU primitive : 
+//      the FullQueue_Core(...) function, line 160 to 204
+// 2) Data to communicate : 
+//      defined in the sssp_problem.cuh file in the same directory of this 
+//      file, line 27, 31, and 100 to 106
+// 3) Combining remote and local data : 
+//      in Expand_Incoming_Kernel(...) GPU kernel, line 50 to 60
+// 4) Stop condition : 
+//      SSSP uses the default stop condition (all frontiers are empty, or 
+//      any GPU encounters error), which is defined by the 
+//      IterationBase::Stop_Condition(...) function (line 991 in 
+//      gunrock/app/enactor_loop.cuh). Primitive implementator can overload 
+//      this function, if non-default stop condition is required.
+
+
 template<
     typename KernelPolicy,     // `type of kernelpolicy, includes defination of VertexId, SizeT and Value
     int NUM_VERTEX_ASSOCIATES, // number of vertex associative of type VertexId transmitted with remote sub-frontiers 
