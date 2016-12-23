@@ -1,5 +1,6 @@
 var searchData=
 [
+  ['setting_20parameters_20for_20direction_2doptimized_20bfs',['Setting Parameters for Direction-Optimized BFS',['../md_stats_do_ab_random.html',1,'']]],
   ['salsa_5fenactor_2ecuh',['salsa_enactor.cuh',['../salsa__enactor_8cuh.html',1,'']]],
   ['salsa_5ffunctor_2ecuh',['salsa_functor.cuh',['../salsa__functor_8cuh.html',1,'']]],
   ['salsa_5fproblem_2ecuh',['salsa_problem.cuh',['../salsa__problem_8cuh.html',1,'']]],
@@ -49,7 +50,6 @@ var searchData=
   ['sort_5fomp_2ecuh',['sort_omp.cuh',['../sort__omp_8cuh.html',1,'']]],
   ['sort_5futils_2ecuh',['sort_utils.cuh',['../sort__utils_8cuh.html',1,'']]],
   ['sp_5fpartitioner_2ecuh',['sp_partitioner.cuh',['../sp__partitioner_8cuh.html',1,'']]],
-  ['sprng',['Sprng',['../rmat_8cuh.html#a2d2449a696851386b2949ea13986f64f',1,'gunrock::graphio::rmat']]],
   ['src_5fnode',['src_node',['../structgunrock_1_1app_1_1bc_1_1_b_c_problem_1_1_data_slice.html#a6a98b75fa7a527d7e4ad6cb934c19de0',1,'gunrock::app::bc::BCProblem::DataSlice']]],
   ['srcmode',['SrcMode',['../gunrock_8h.html#a548f76ec1e69ab6a72d23d18af6d5d05',1,'gunrock.h']]],
   ['srts_5fdetails_2ecuh',['srts_details.cuh',['../srts__details_8cuh.html',1,'']]],
@@ -69,8 +69,6 @@ var searchData=
   ['store_5ftile_2ecuh',['store_tile.cuh',['../store__tile_8cuh.html',1,'']]],
   ['storetile',['StoreTile',['../structgunrock_1_1util_1_1io_1_1_store_tile.html',1,'gunrock::util::io']]],
   ['sum',['Sum',['../structgunrock_1_1util_1_1_sum.html',1,'gunrock::util']]],
-  ['suppressunusedconstantwarning',['SuppressUnusedConstantWarning',['../basic__utils_8h.html#ad17349de009f113369ea46727a6786a0',1,'gunrock::util']]],
-  ['swap',['Swap',['../basic__utils_8h.html#ac92cbf1a87a73174969a119fdfb30d1f',1,'gunrock::util']]],
   ['sweep',['Sweep',['../structgunrock_1_1oprtr_1_1edge__map__forward_1_1_sweep.html',1,'gunrock::oprtr::edge_map_forward']]],
   ['sweep',['Sweep',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_sweep.html',1,'gunrock::oprtr::edge_map_backward']]],
   ['sweeppass',['SweepPass',['../structgunrock_1_1oprtr_1_1cull__filter_1_1_sweep_pass.html',1,'gunrock::oprtr::cull_filter']]],

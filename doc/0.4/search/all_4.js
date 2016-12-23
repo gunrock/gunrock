@@ -24,9 +24,9 @@ var searchData=
   ['device_5fintrinsics_2ecuh',['device_intrinsics.cuh',['../device__intrinsics_8cuh.html',1,'']]],
   ['dispatch',['Dispatch',['../structgunrock_1_1oprtr_1_1edge__map__backward_1_1_dispatch.html',1,'gunrock::oprtr::edge_map_backward']]],
   ['dispatch',['Dispatch',['../structgunrock_1_1oprtr_1_1edge__map__forward_1_1_dispatch.html',1,'gunrock::oprtr::edge_map_forward']]],
+  ['dispatch',['Dispatch',['../structgunrock_1_1oprtr_1_1edge__map__partitioned_1_1_dispatch.html',1,'gunrock::oprtr::edge_map_partitioned']]],
   ['dispatch',['Dispatch',['../structgunrock_1_1oprtr_1_1edge__map__partitioned__backward_1_1_dispatch.html',1,'gunrock::oprtr::edge_map_partitioned_backward']]],
   ['dispatch',['Dispatch',['../structgunrock_1_1oprtr_1_1edge__map__partitioned__cull_1_1_dispatch.html',1,'gunrock::oprtr::edge_map_partitioned_cull']]],
-  ['dispatch',['Dispatch',['../structgunrock_1_1oprtr_1_1edge__map__partitioned_1_1_dispatch.html',1,'gunrock::oprtr::edge_map_partitioned']]],
   ['dispatch',['Dispatch',['../structgunrock_1_1oprtr_1_1simplified2__filter_1_1_dispatch.html',1,'gunrock::oprtr::simplified2_filter']]],
   ['dispatch',['Dispatch',['../structgunrock_1_1priority__queue_1_1_dispatch.html',1,'gunrock::priority_queue']]],
   ['dispatch',['Dispatch',['../structgunrock_1_1oprtr_1_1all__edges__advance_1_1_dispatch.html',1,'gunrock::oprtr::all_edges_advance']]],
@@ -39,7 +39,6 @@ var searchData=
   ['dispatchbc',['dispatchBC',['../bc__app_8cu.html#ae82b8eb9fb5dc586191316421a919a32',1,'bc_app.cu']]],
   ['dispatchpagerank',['dispatchPageRank',['../pr__app_8cu.html#a906d2061a6a81e96cc8827f97cf59a18',1,'pr_app.cu']]],
   ['dispatchsssp',['dispatchSSSP',['../sssp__app_8cu.html#adfda61c9245cc1ce6dce1f2610e26f34',1,'sssp_app.cu']]],
-  ['displaydeviceresults',['DisplayDeviceResults',['../test__utils_8cuh.html#a50a8776a6d6901a6156a8dc1aca54cda',1,'gunrock::util::DisplayDeviceResults(T *d_data, size_t num_elements)'],['../test__utils_8cuh.html#af8215ef5820df34e64eb1c94a917eb6e',1,'gunrock::util::DisplayDeviceResults(DATATYPE *d_data, INDEXTYPE *d_indices, size_t num_elements, size_t num_indices)']]],
   ['displaygraph',['DisplayGraph',['../group___public_interface.html#ga1143a573784d4c34b6f4d7cf4c2d347d',1,'gunrock::Csr::DisplayGraph(bool with_edge_value=false)'],['../group___public_interface.html#gaa696590fc027f8884c9471174fc5e358',1,'gunrock::Csr::DisplayGraph(const char name[], SizeT limit=40)']]],
   ['displayneighborlist',['DisplayNeighborList',['../group___public_interface.html#gac9c3f0879354469a1bc5ac11b6f4b5ba',1,'gunrock::Csr']]],
   ['displaysolution',['DisplaySolution',['../test__bc_8cu.html#a18362914893220e4ee17ad85f17bfe5d',1,'DisplaySolution(Value *sigmas, Value *bc_values, SizeT nodes, bool quiet=false):&#160;test_bc.cu'],['../test__bfs_8cu.html#af3de3500ae01954ad3e80bfbb6b600fb',1,'DisplaySolution(VertexId *labels, VertexId *preds, SizeT num_nodes, bool quiet=false):&#160;test_bfs.cu'],['../test__cc_8cu.html#a42014ebaeec675d093f89d94453bc255',1,'DisplaySolution(VertexId *comp_ids, SizeT nodes, SizeT num_components, VertexId *roots, SizeT *histogram):&#160;test_cc.cu'],['../test__hits_8cu.html#a80796cb543e99e9ab3195232b5dc6709',1,'DisplaySolution(Value *hrank, Value *arank, SizeT nodes):&#160;test_hits.cu'],['../test__pr_8cu.html#a1377b38867a8f1a60b0ac686fca44c6e',1,'DisplaySolution(VertexId *node, Value *rank, SizeT nodes):&#160;test_pr.cu'],['../test__salsa_8cu.html#a80796cb543e99e9ab3195232b5dc6709',1,'DisplaySolution(Value *hrank, Value *arank, SizeT nodes):&#160;test_salsa.cu'],['../test__sample_8cu.html#a51cc64e360ec0771a49f6698e824cab6',1,'DisplaySolution(SizeT num_nodes):&#160;test_sample.cu'],['../test__sssp_8cu.html#a801882933359a22dbfbf736f8e13f0e4',1,'DisplaySolution(VertexId *source_path, SizeT num_nodes):&#160;test_sssp.cu'],['../test__topk_8cu.html#a76b33f31d1cfb8fadb4da28b643f9c80',1,'DisplaySolution(VertexId *h_node_id, Value *h_degrees_i, Value *h_degrees_o, SizeT num_nodes):&#160;test_topk.cu'],['../test__wtf_8cu.html#a6fb37527e3c7dfebf5191cdbed393b5c',1,'DisplaySolution(VertexId *node_id, Value *rank, SizeT nodes):&#160;test_wtf.cu']]],
@@ -47,5 +46,13 @@ var searchData=
   ['distances',['distances',['../structgunrock_1_1app_1_1sssp_1_1_s_s_s_p_problem_1_1_data_slice.html#ac80f21fe3fa8b4b06fb59a98f773d57a',1,'gunrock::app::sssp::SSSPProblem::DataSlice']]],
   ['doublebuffer',['DoubleBuffer',['../structgunrock_1_1util_1_1_double_buffer.html',1,'gunrock::util']]],
   ['doublebuffer_3c_20vertexid_2c_20sizet_2c_20value_20_3e',['DoubleBuffer&lt; VertexId, SizeT, Value &gt;',['../structgunrock_1_1util_1_1_double_buffer.html',1,'gunrock::util']]],
-  ['dup_5fpartitioner_2ecuh',['dup_partitioner.cuh',['../dup__partitioner_8cuh.html',1,'']]]
+  ['dup_5fpartitioner_2ecuh',['dup_partitioner.cuh',['../dup__partitioner_8cuh.html',1,'']]],
+  ['do_5fab_5frandom_5fhollywood_2d2009_5ftable_5fhtml',['do_ab_random_hollywood-2009_table_html',['../md_stats_do_ab_random_hollywood-2009_table_html.html',1,'']]],
+  ['do_5fab_5frandom_5findochina_2d2004_5ftable_5fhtml',['do_ab_random_indochina-2004_table_html',['../md_stats_do_ab_random_indochina-2004_table_html.html',1,'']]],
+  ['do_5fab_5frandom_5frmat_5fn22_5fe64_5ftable_5fhtml',['do_ab_random_rmat_n22_e64_table_html',['../md_stats_do_ab_random_rmat_n22_e64_table_html.html',1,'']]],
+  ['do_5fab_5frandom_5frmat_5fn23_5fe32_5ftable_5fhtml',['do_ab_random_rmat_n23_e32_table_html',['../md_stats_do_ab_random_rmat_n23_e32_table_html.html',1,'']]],
+  ['do_5fab_5frandom_5frmat_5fn24_5fe16_5ftable_5fhtml',['do_ab_random_rmat_n24_e16_table_html',['../md_stats_do_ab_random_rmat_n24_e16_table_html.html',1,'']]],
+  ['do_5fab_5frandom_5froad_5fusa_5ftable_5fhtml',['do_ab_random_road_usa_table_html',['../md_stats_do_ab_random_road_usa_table_html.html',1,'']]],
+  ['do_5fab_5frandom_5fsoc_2dlivejournal1_5ftable_5fhtml',['do_ab_random_soc-LiveJournal1_table_html',['../md_stats_do_ab_random_soc-_live_journal1_table_html.html',1,'']]],
+  ['do_5fab_5frandom_5fsoc_2dorkut_5ftable_5fhtml',['do_ab_random_soc-orkut_table_html',['../md_stats_do_ab_random_soc-orkut_table_html.html',1,'']]]
 ];
