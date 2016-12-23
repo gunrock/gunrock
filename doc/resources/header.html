@@ -55,6 +55,17 @@
                 });
             }
         </script>
+        <style media="screen">
+          /* Add space between vega-embed links */
+          /* http://vega.github.io/vega-tutorials/airports/ */
+          .vega-embed .vega-actions a {
+            margin-left: 1em;
+            visibility: hidden;
+          }
+          .vega-embed:hover .vega-actions a {
+            visibility: visible;
+          }
+        </style>
     </head>
     <body>
         <nav class="navbar navbar-inverse" role="navigation">
