@@ -6,7 +6,7 @@ Currently, Gunrock is a library that requires no preprocessing. By this we mean 
 
 Other graph libraries may benefit from preprocessing of input datasets. We would regard any manipulation of the input dataset (e.g., reordering the input or more sophisticated preprocessing such as graph coloring or  [CuSha](http://farkhor.github.io/CuSha/)'s G-Shards) to be preprocessing. We think preprocessing is an interesting future direction for Gunrock, but have not yet investigated it. We hope that any graph libraries that do preprocessing report results with both preprocessed and unmodified input datasets.
 
-(That being said, we do standardize input graphs in two ways: before running our experiments, if undirected flag is set, we convert the input graph to undirected and remove self-loops/duplicated edges. When we convert a graph to undirected, that implies one edge in each direction, and we report edges for that graph accordingly. What we do here appears to be standard practice.)
+(That being said, we do standardize input graphs in two ways: before running our experiments, we remove self-loops/duplicated edges. If the undirected flag is set, we convert the input graph to undirected. When we do so, that implies one edge in each direction, and we report edges for that graph accordingly. What we do here appears to be standard practice.)
 
 In general, we try to report results in two ways:
 
