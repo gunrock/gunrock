@@ -1,12 +1,12 @@
-How to setup and use gunrock/graph_io on a server/machine
+How to setup and use gunrock/io on a server/machine
 ================
 
-Gunrock/graph_io can be used to generate visual representation of graph engine performance, for exmaple, Gunrock. 
+gunrock/io can be used to generate visual representation of graph engine performance, for exmaple, Gunrock. 
 It takes output of a graph algorithm run and can produce visual output in svg, pdf, png, html and md format. 
 
-**Grunrock/graph_io Dependencies**
+**Grunrock/io Dependencies**
 
-To use graph_io to produce visual output of any graph algorithm, (as of Dec.2016), below are dependencies overview:
+To use gunrock/io to produce visual output of any graph algorithm, (as of Dec.2016), below are dependencies overview:
 
 * python 2.7.6
 * gcc 4.8.4
@@ -86,10 +86,10 @@ If no root access, use following command:
 	sudo apt-get update
 	sudo apt-get install inkscape
 
-How to use graph_io
+How to use gunrock/io
 ================
 
-With all the dependencies installed, to use graph_io, example @ [script](https://github.com/gunrock/io/blob/master/scripts/altair_test.py):
+With all the dependencies installed, to use gunrock/io, example @ [script](https://github.com/gunrock/io/blob/master/scripts/altair_test.py):
 
 1.  Parses the engine outputs (in txt format) and generates jsons containing important information regarding the output results using **text2json.py**. (Instructions @ [README](https://github.com/gunrock/io/blob/master/scripts/README.md))
 
@@ -166,7 +166,7 @@ With all the dependencies installed, to use graph_io, example @ [script](https:/
 To run this example @ [script](https://github.com/gunrock/io/blob/master/scripts/altair_test.py), clone graph_io:
 
 ```
-cd graph_io/io/scripts
+cd io/scripts
 mkdir example_output
 python altair_test.py 
 ```
