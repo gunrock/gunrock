@@ -1,3 +1,5 @@
+# Source data for engines_topc
+
 \htmlonly
 <table border="1" class="dataframe">
   <thead>
@@ -1470,6 +1472,18 @@
     <tr>
       <td>PageRank</td>
       <td>NaN</td>
+      <td>hollywood-2009</td>
+      <td>NVGraph</td>
+      <td>4396.636325</td>
+      <td>25.644928</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/PageRank-hollywood-2009-result.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>PageRank</td>
+      <td>NaN</td>
       <td>indochina-2004</td>
       <td>CuSha</td>
       <td>2328.080289</td>
@@ -1502,6 +1516,18 @@
       <td>NaN</td>
       <td>2016-11-29</td>
       <td><a href="https://github.com/gunrock/io/tree/master/Ligra-output/topc/PageRank-indochina-2004.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>PageRank</td>
+      <td>NaN</td>
+      <td>indochina-2004</td>
+      <td>NVGraph</td>
+      <td>5478.315220</td>
+      <td>55.120895</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/PageRank-indochina-2004-result.json">JSON output</a></td>
     </tr>
     <tr>
       <td>PageRank</td>
@@ -1542,6 +1568,18 @@
     <tr>
       <td>PageRank</td>
       <td>NaN</td>
+      <td>rgg_n24_0.000548</td>
+      <td>NVGraph</td>
+      <td>3085.941061</td>
+      <td>85.903198</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/PageRank-rgg_n24_0.000548-result.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>PageRank</td>
+      <td>NaN</td>
       <td>rmat_n22_e64</td>
       <td>CuSha</td>
       <td>2651.738119</td>
@@ -1574,6 +1612,18 @@
       <td>NaN</td>
       <td>2016-11-29</td>
       <td><a href="https://github.com/gunrock/io/tree/master/Ligra-output/topc/PageRank-rmat_n22_e64.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>PageRank</td>
+      <td>NaN</td>
+      <td>rmat_n22_e64</td>
+      <td>NVGraph</td>
+      <td>2617.061859</td>
+      <td>184.576477</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/PageRank-rmat_n22_e64-result.json">JSON output</a></td>
     </tr>
     <tr>
       <td>PageRank</td>
@@ -1614,6 +1664,18 @@
     <tr>
       <td>PageRank</td>
       <td>NaN</td>
+      <td>rmat_n23_e32</td>
+      <td>NVGraph</td>
+      <td>2118.564415</td>
+      <td>238.672455</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/PageRank-rmat_n23_e32-result.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>PageRank</td>
+      <td>NaN</td>
       <td>rmat_n24_e16</td>
       <td>CuSha</td>
       <td>4108.480898</td>
@@ -1650,6 +1712,18 @@
     <tr>
       <td>PageRank</td>
       <td>NaN</td>
+      <td>rmat_n24_e16</td>
+      <td>NVGraph</td>
+      <td>1751.496020</td>
+      <td>296.695007</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/PageRank-rmat_n24_e16-result.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>PageRank</td>
+      <td>NaN</td>
       <td>road_usa</td>
       <td>Gunrock</td>
       <td>2393.900391</td>
@@ -1670,6 +1744,18 @@
       <td>NaN</td>
       <td>2016-11-29</td>
       <td><a href="https://github.com/gunrock/io/tree/master/Ligra-output/topc/PageRank-road_usa.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>PageRank</td>
+      <td>NaN</td>
+      <td>road_usa</td>
+      <td>NVGraph</td>
+      <td>1940.481776</td>
+      <td>29.739328</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/PageRank-road_usa-result.json">JSON output</a></td>
     </tr>
     <tr>
       <td>PageRank</td>
@@ -1710,6 +1796,18 @@
     <tr>
       <td>PageRank</td>
       <td>NaN</td>
+      <td>soc-LiveJournal1</td>
+      <td>NVGraph</td>
+      <td>2488.376510</td>
+      <td>34.441120</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/PageRank-soc-LiveJournal1-result.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>PageRank</td>
+      <td>NaN</td>
       <td>soc-orkut</td>
       <td>CuSha</td>
       <td>4048.159948</td>
@@ -1742,6 +1840,18 @@
       <td>NaN</td>
       <td>2016-11-29</td>
       <td><a href="https://github.com/gunrock/io/tree/master/Ligra-output/topc/PageRank-soc-orkut.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>PageRank</td>
+      <td>NaN</td>
+      <td>soc-orkut</td>
+      <td>NVGraph</td>
+      <td>2170.290637</td>
+      <td>98.004578</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/PageRank-soc-orkut-result.json">JSON output</a></td>
     </tr>
     <tr>
       <td>SSSP</td>
@@ -1806,6 +1916,18 @@
     <tr>
       <td>SSSP</td>
       <td>NaN</td>
+      <td>hollywood-2009</td>
+      <td>NVGraph</td>
+      <td>0.244889</td>
+      <td>460417.687500</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/SSSP-hollywood-2009-result.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>SSSP</td>
+      <td>NaN</td>
       <td>indochina-2004</td>
       <td>CuSha</td>
       <td>2.203074</td>
@@ -1850,6 +1972,18 @@
       <td>NaN</td>
       <td>2016-11-29</td>
       <td><a href="https://github.com/gunrock/io/tree/master/Ligra-output/topc/SSSP-indochina-2004.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>SSSP</td>
+      <td>NaN</td>
+      <td>indochina-2004</td>
+      <td>NVGraph</td>
+      <td>7.231326</td>
+      <td>41758.542969</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/SSSP-indochina-2004-result.json">JSON output</a></td>
     </tr>
     <tr>
       <td>SSSP</td>
@@ -1902,6 +2036,18 @@
     <tr>
       <td>SSSP</td>
       <td>NaN</td>
+      <td>rgg_n24_0.000548</td>
+      <td>NVGraph</td>
+      <td>0.994839</td>
+      <td>266467.562500</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/SSSP-rgg_n24_0.000548-result.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>SSSP</td>
+      <td>NaN</td>
       <td>rmat_n22_e64</td>
       <td>CuSha</td>
       <td>213.636010</td>
@@ -1946,6 +2092,18 @@
       <td>NaN</td>
       <td>2016-11-29</td>
       <td><a href="https://github.com/gunrock/io/tree/master/Ligra-output/topc/SSSP-rmat_n22_e64.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>SSSP</td>
+      <td>NaN</td>
+      <td>rmat_n22_e64</td>
+      <td>NVGraph</td>
+      <td>384.427672</td>
+      <td>1256.538208</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/SSSP-rmat_n22_e64-result.json">JSON output</a></td>
     </tr>
     <tr>
       <td>SSSP</td>
@@ -1998,6 +2156,18 @@
     <tr>
       <td>SSSP</td>
       <td>NaN</td>
+      <td>rmat_n23_e32</td>
+      <td>NVGraph</td>
+      <td>270.170719</td>
+      <td>1871.568359</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/SSSP-rmat_n23_e32-result.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>SSSP</td>
+      <td>NaN</td>
       <td>rmat_n24_e16</td>
       <td>CuSha</td>
       <td>509.976973</td>
@@ -2046,6 +2216,18 @@
     <tr>
       <td>SSSP</td>
       <td>NaN</td>
+      <td>rmat_n24_e16</td>
+      <td>NVGraph</td>
+      <td>225.683934</td>
+      <td>2302.601318</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/SSSP-rmat_n24_e16-result.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>SSSP</td>
+      <td>NaN</td>
       <td>road_usa</td>
       <td>Galois</td>
       <td>0.134352</td>
@@ -2078,6 +2260,18 @@
       <td>NaN</td>
       <td>2016-11-29</td>
       <td><a href="https://github.com/gunrock/io/tree/master/Ligra-output/topc/SSSP-road_usa.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>SSSP</td>
+      <td>NaN</td>
+      <td>road_usa</td>
+      <td>NVGraph</td>
+      <td>15.867092</td>
+      <td>3637.000732</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/SSSP-road_usa-result.json">JSON output</a></td>
     </tr>
     <tr>
       <td>SSSP</td>
@@ -2130,6 +2324,18 @@
     <tr>
       <td>SSSP</td>
       <td>NaN</td>
+      <td>soc-LiveJournal1</td>
+      <td>NVGraph</td>
+      <td>129.393136</td>
+      <td>662.341736</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/SSSP-soc-LiveJournal1-result.json">JSON output</a></td>
+    </tr>
+    <tr>
+      <td>SSSP</td>
+      <td>NaN</td>
       <td>soc-orkut</td>
       <td>CuSha</td>
       <td>666.244072</td>
@@ -2175,5 +2381,18 @@
       <td>2016-11-29</td>
       <td><a href="https://github.com/gunrock/io/tree/master/Ligra-output/topc/SSSP-soc-orkut.json">JSON output</a></td>
     </tr>
+    <tr>
+      <td>SSSP</td>
+      <td>NaN</td>
+      <td>soc-orkut</td>
+      <td>NVGraph</td>
+      <td>150.375527</td>
+      <td>1414.448364</td>
+      <td>NaN</td>
+      <td>Tesla K40c</td>
+      <td>2016-12-23</td>
+      <td><a href="https://github.com/gunrock/io/tree/master/NVGraph-output/topc/SSSP-soc-orkut-result.json">JSON output</a></td>
+    </tr>
   </tbody>
-</table>\endhtmlonly
+</table>
+\endhtmlonly
