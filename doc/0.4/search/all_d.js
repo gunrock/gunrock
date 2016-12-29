@@ -9,6 +9,7 @@ var searchData=
   ['masks',['masks',['../structgunrock_1_1app_1_1cc_1_1_c_c_problem_1_1_data_slice.html#a7002cf225c2e24a55d953bdecc2307fc',1,'gunrock::app::cc::CCProblem::DataSlice']]],
   ['max_5fqueue_5flength',['max_queue_length',['../structgunrock_1_1priority__queue_1_1_priority_queue.html#a2e3cf9e828e85827471ed2837a9b16fb',1,'gunrock::priority_queue::PriorityQueue']]],
   ['maxgridsize',['MaxGridSize',['../classgunrock_1_1app_1_1_enactor_base.html#ac2439684ab09d7f650931efc16645712',1,'gunrock::app::EnactorBase']]],
+  ['methodology_20for_20graph_20analytics_20performance',['Methodology for Graph Analytics Performance',['../md_methodology.html',1,'']]],
   ['memset_5fkernel_2ecuh',['memset_kernel.cuh',['../memset__kernel_8cuh.html',1,'']]],
   ['memsetaddkernel',['MemsetAddKernel',['../group___public_interface.html#ga7d91c2cc69d42ba83ee9c0ebc0cbc0dd',1,'gunrock::util']]],
   ['memsetaddvectorkernel',['MemsetAddVectorKernel',['../group___public_interface.html#ga6ba64423ce416055f9e851bc111fa008',1,'gunrock::util']]],
