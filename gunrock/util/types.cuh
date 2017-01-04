@@ -14,7 +14,8 @@
 
 #pragma once
 
-
+#include <typeinfo>
+#include <typeindex>
 
 namespace gunrock {
 namespace util {
@@ -175,6 +176,15 @@ template <> struct VectorType<long long, 1> {typedef long long Type;};
 template <> struct VectorType<long long, 2> {typedef longlong2 Type;};
 template <> struct VectorType<long long, 3> {typedef longlong3 Type;};
 template <> struct VectorType<long long, 4> {typedef longlong4 Type;};
+
+std::string TypeName(const std::type_info* t_info)
+{
+    if (std::type_index(*t_info) == std::type_index(typeid(int        ))) return "int";
+    if (std::type_index(*t_info) == std::type_index(typeid(bool       ))) return "bool";
+    if (std::type_index(*t_info) == std::type_index(typeid(float      ))) return "float";
+    if (std::type_index(*t_info) == std::type_index(typeid(std::string))) return "std::string";
+    return std::string(t_info -> name());
+}
 
 } // namespace util
 } // namespace gunrock
