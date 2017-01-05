@@ -323,6 +323,11 @@ public:
 
                 auto it = p_map.find(names[i]);
                 Parameter_Item &p_item = it -> second;
+                if ((std::type_index(*(p_item.value_type_info)) == std::type_index(typeid(bool))) && argument == "")
+                {
+                    argument = "true";
+                }
+
                 if ((p_item.flag & SINGLE_VALUE) == SINGLE_VALUE)
                 {
                     if (argument.find(",") != std::string::npos)
@@ -355,6 +360,17 @@ public:
                             << argument << " is appended to pervious ones." << std::endl;
                         argument = p_item.value + "," + argument;
                     }
+                }
+
+                if (!isValidString(argument, p_item.value_type_info))
+                {
+                    std::cerr << "Error : Parameter " << p_item.name
+                        << "(" << p_item.file_name << ":"
+                        << p_item.line_num
+                        << ") only takes in " << TypeName(p_item.value_type_info)
+                        << ", argument " << argument
+                        << " is invalid." << std::endl;
+                    break;
                 }
 
                 retval = Set(names[i], argument);
