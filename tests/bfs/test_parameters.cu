@@ -85,15 +85,53 @@ int main(int argc, char* const argv[])
     parameters.Parse_CommandLine(argc, argv);
     parameters.Check_Required();
 
-    std::map<std::string, std::string> parameter_list = parameters.List();
+    /*std::map<std::string, std::string> parameter_list = parameters.List();
     std::cout << std::endl;
     for (auto it = parameter_list.begin(); it != parameter_list.end(); it++)
     {
         std::cout << it -> first << " = " << it -> second << std::endl;
     }
-    parameter_list.clear();
+    parameter_list.clear();*/
 
-    parameters.Set("rsio", 10);
-    std::cout << "parameters.Get<int>(\"rsio\") = " << parameters.Get<int>("rsio") << std::endl;
+    /*parameters.Set("rsio", 10);
+    std::cout << "parameters.Get<int>(\"rsio\") = " << parameters.Get<int>("rsio") << std::endl;*/
+
+    /*std::vector<int> test_vec;
+    test_vec.resize(10);
+    test_vec[0] = 1; test_vec[1] = 2;
+    test_vec[2] = 8; test_vec[3] = 10;
+    std::cout << test_vec << std::endl;
+
+    std::string test_vec_str = "9,8,7,6";
+    std::istringstream istr(test_vec_str);
+    istr >> test_vec;
+    std::cout << test_vec << std::endl;*/
+
+    std::cout << std::endl;
+    std::cout << "Get<bool>(\"osbo\") = " << (parameters.Get<bool>("osbo") ? "true" : "false") << std::endl;
+    std::cout << "Get<bool>(\"osbr\") = " << (parameters.Get<bool>("osbr") ? "true" : "false") << std::endl;
+    std::cout << "Get<bool>(\"ombo\") = " << (parameters.Get<bool>("ombo") ? "true" : "false") << std::endl;
+    std::cout << "Get<std::vector<bool> >(\"ombo\") = " << parameters.Get<std::vector<bool> >("ombo") << std::endl;
+    std::cout << "Get<bool>(\"ombr\") = " << (parameters.Get<bool>("ombr") ? "true" : "false") << std::endl;
+    std::cout << "Get<std::vector<bool> >(\"ombr\") = " << parameters.Get<std::vector<bool> >("ombr") << std::endl;
+    std::cout << "Get<bool>(\"rsbo\") = " << (parameters.Get<bool>("rsbo") ? "true" : "false") << std::endl;
+    std::cout << "Get<bool>(\"rsbr\") = " << (parameters.Get<bool>("rsbr") ? "true" : "false") << std::endl;
+    std::cout << "Get<bool>(\"rmbo\") = " << (parameters.Get<bool>("rmbo") ? "true" : "false") << std::endl;
+    std::cout << "Get<std::vector<bool> >(\"rmbo\") = " << parameters.Get<std::vector<bool> >("rmbo") << std::endl;
+    std::cout << "Get<bool>(\"rmbr\") = " << (parameters.Get<bool>("rmbr") ? "true" : "false") << std::endl;
+    std::cout << "Get<std::vector<bool> >(\"rmbr\") = " << parameters.Get<std::vector<bool> >("rmbr") << std::endl;
+
+    std::cout << "Get<int>(\"osio\") = " << parameters.Get<int>("osio") << std::endl;
+    std::cout << "Get<int>(\"osir\") = " << parameters.Get<int>("osir") << std::endl;
+    std::cout << "Get<int>(\"omio\") = " << parameters.Get<int>("omio") << std::endl;
+    std::cout << "Get<std::vector<int> >(\"omio\") = " << parameters.Get<std::vector<int> >("omio") << std::endl;
+    std::cout << "Get<int>(\"omir\") = " << parameters.Get<int>("omir") << std::endl;
+    std::cout << "Get<std::vector<int> >(\"omir\") = " << parameters.Get<std::vector<int> >("omir") << std::endl;
+    std::cout << "Get<int>(\"rsio\") = " << parameters.Get<int>("rsio") << std::endl;
+    std::cout << "Get<int>(\"rsir\") = " << parameters.Get<int>("rsir") << std::endl;
+    std::cout << "Get<int>(\"rmio\") = " << parameters.Get<int>("rmio") << std::endl;
+    std::cout << "Get<std::vector<int> >(\"rmio\") = " << parameters.Get<std::vector<int> >("rmio") << std::endl;
+    std::cout << "Get<int>(\"rmir\") = " << parameters.Get<int>("rmir") << std::endl;
+    std::cout << "Get<std::vector<int> >(\"rmbr\") = " << parameters.Get<std::vector<int> >("rmir") << std::endl;
     return 0;
 }

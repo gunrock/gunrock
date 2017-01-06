@@ -182,7 +182,8 @@ public:
         std::ostringstream ostr;
         ostr << default_value;
         return Use(name, flag,
-            ostr.str(), description, &typeid(T),
+            ostr.str(), description,
+            (((flag & MULTI_VALUE) == MULTI_VALUE) ? &typeid(std::vector<T>) : &typeid(T)),
             file_name, line_num);
     } // Use()
 
@@ -323,7 +324,8 @@ public:
 
                 auto it = p_map.find(names[i]);
                 Parameter_Item &p_item = it -> second;
-                if ((std::type_index(*(p_item.value_type_info)) == std::type_index(typeid(bool))) && argument == "")
+                if ((std::type_index(*(p_item.value_type_info)) == std::type_index(typeid(bool))
+                    || std::type_index(*(p_item.value_type_info)) == std::type_index(typeid(std::vector<bool>))) && argument == "")
                 {
                     argument = "true";
                 }
