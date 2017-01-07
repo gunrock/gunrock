@@ -9,7 +9,7 @@ that allows programmers to quickly develop new graph primitives with small
 code size and minimal GPU programming knowledge.
 
 For more details, please visit our [website](http://gunrock.github.io/), read
-[Why Gunrock](why-gunrock.html),
+[Why Gunrock](http://gunrock.github.io/gunrock/doc/latest/why-gunrock.html),
 our PPoPP 2016 paper,
 [Gunrock: A High-Performance Graph Processing Library on the GPU](http://escholarship.org/uc/item/6xz7z9k0),
 look at our [results](#Results),
