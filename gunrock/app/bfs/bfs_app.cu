@@ -63,21 +63,17 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter);
  * @tparam VertexId          Vertex identifier type
  * @tparam Value             Attribute type
  * @tparam SizeT             Graph size type
- * @tparam INSTRUMENT        Keep kernels statics
- * @tparam DEBUG             Keep debug statics
- * @tparam SIZE_CHECK        Enable size check
  * @tparam MARK_PREDECESSORS Enable mark predecessors
  *
  * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
+ *
+ * \return Elapsed run time in milliseconds
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value,
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS >
 float RunTests_enable_idempotence(GRGraph* output, BFS_Parameter *parameter)
 {
@@ -95,20 +91,16 @@ float RunTests_enable_idempotence(GRGraph* output, BFS_Parameter *parameter)
  * @tparam VertexId   Vertex identifier type
  * @tparam Value      Attribute type
  * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- * @tparam DEBUG      Keep debug statics
- * @tparam SIZE_CHECK Enable size check
  *
  * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
+ *
+ * \return Elapsed run time in milliseconds
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value>
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK >
 float RunTests_mark_predecessors(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->mark_predecessors)
@@ -125,22 +117,18 @@ float RunTests_mark_predecessors(GRGraph* output, BFS_Parameter *parameter)
  * @tparam VertexId           Vertex identifier type
  * @tparam Value              Attribute type
  * @tparam SizeT              Graph size type
- * @tparam INSTRUMENT         Keep kernels statics
- * @tparam DEBUG              Keep debug statics
- * @tparam SIZE_CHECK         Enable size check
  * @tparam MARK_PREDECESSORS  Enable mark predecessors
  * @tparam ENABLE_IDEMPOTENCE Enable idempotent operation
  *
  * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
+ *
+ * \return Elapsed run time in milliseconds
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value,
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE >
 float runBFS(GRGraph* output, BFS_Parameter *parameter)
@@ -272,6 +260,8 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter)
  * @param[in]  data_t  Data type configurations
  * @param[in]  context ModernGPU context
  * @param[in]  streams CUDA stream
+ *
+ * \return Elapsed run time in milliseconds
  */
 float dispatch_bfs(
     GRGraph*       grapho,

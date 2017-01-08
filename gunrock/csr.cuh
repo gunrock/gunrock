@@ -48,6 +48,7 @@ struct Csr
     SizeT edges;            // Number of edges in the graph
     SizeT out_nodes;        // Number of nodes which have outgoing edges
     SizeT average_degree;   // Average vertex degrees
+    float stddev_degree;    // Degree standard deviation
 
     VertexId *column_indices; // Column indices corresponding to all the
     // non-zero values in the sparse matrix
@@ -72,6 +73,7 @@ struct Csr
         nodes = 0;
         edges = 0;
         average_degree = 0;
+        stddev_degree = 0.0f;
         average_edge_value = 0;
         average_node_value = 0;
         out_nodes = -1;
@@ -329,7 +331,7 @@ struct Csr
      * @param[in] quiet Don't print out anything.
      */
     void WriteToLigraFile(
-        char  *file_name,
+        const char  *file_name,
         SizeT v, SizeT e,
         SizeT *row,
         VertexId *col,
@@ -346,7 +348,7 @@ struct Csr
         std::ofstream fout3(adj_name);
         if (fout3.is_open())
         {
-            fout3 << v << " " << v << " " << e << std::endl;
+            fout3 << "AdjacencyGraph" << std::endl << v << std::endl << e << std::endl;
             for (int i = 0; i < v; ++i)
                 fout3 << row[i] << std::endl;
             for (int i = 0; i < e; ++i)
@@ -359,6 +361,45 @@ struct Csr
             fout3.close();
         }
     }
+
+    void WriteToMtxFile(
+        const char  *file_name,
+        SizeT v, SizeT e,
+        SizeT *row,
+        VertexId *col,
+        Value *edge_values = NULL,
+        bool quiet = false)
+    {
+        char adj_name[256];
+        sprintf(adj_name, "%s.mtx", file_name);
+        if (!quiet)
+        {
+            printf("writing to .mtx file.\n");
+        }
+
+        std::ofstream fout3(adj_name);
+        if (fout3.is_open())
+        {
+            fout3 << v << " " << v << " " << e << std::endl;
+            for (int i = 0; i < v; ++i) {
+                SizeT begin = row[i];
+                SizeT end = row[i+1];
+                for (int j = begin; j < end; ++j) {
+                    fout3 << col[j]+1 << " " << i+1;
+                    if (edge_values != NULL)
+                    {
+                        fout3 << " " << edge_values[j] << std::endl;
+                    }
+                    else
+                    {
+                        fout3 << " " << rand() % 64 << std::endl;
+                    }
+                }
+            }
+            fout3.close();
+        }
+    }
+
 
     /**
      * @brief Read from stored row_offsets, column_indices arrays.
@@ -855,6 +896,26 @@ struct Csr
             average_degree = static_cast<SizeT>(mean);
         }
         return average_degree;
+    }
+
+    /**
+     * @brief Get the average degree of all the nodes in graph
+     */
+    SizeT GetStddevDegree()
+    {
+        if (average_degree == 0)
+        {
+           GetAverageDegree();
+        }
+
+        float accum = 0.0f;
+        for (SizeT node=0; node < nodes; ++node)
+        {
+            float d = (row_offsets[node+1]-row_offsets[node]);
+            accum += (d - average_degree) * (d - average_degree);
+        }
+        stddev_degree = sqrt(accum / (nodes-1));
+        return stddev_degree;
     }
 
     /**

@@ -3,7 +3,7 @@
 BASEOPTION="--src=randomize2 --queue-sizing=6.5 --in-sizing=4 --iteration-num=16"
 BASEFLAG=""
 EXECUTION="./bin/test_bfs_8.0_x86_64"
-DATADIR="/data/graphs/large"
+DATADIR="/data/gunrock_dataset/large"
 
 
 OPTION[0]="" && FLAG[0]=".default"
@@ -49,11 +49,9 @@ NAME[12]="germany_osm"      && DO_A[12]="1.5"   && DO_B[12]="10"
 NAME[13]="road_usa"         && DO_A[13]="1.0"   && DO_B[13]="10"
 NAME[14]="road_central"     && DO_A[14]="1.2" && DO_B[14]="10"
 
-# cd ~/Projects/gunrock_dev/gunrock/tests/bfs
-
-for d in {1..1}
+for d in {1..4}
 do
-    SUFFIX="CentOS7.GTX1070x${d}"
+    SUFFIX="ubuntu14.04_k40cx${d}"
     mkdir -p eval/$SUFFIX
     DEVICE="0"
     for i in {1..8}
@@ -63,12 +61,7 @@ do
         fi
     done
 
-    #queue_sizing=2.5
-    #if [ "$d" -lt "5" ]; then
-    #    queue_sizing=1.2
-    #fi
-
-    for o1 in {0..1}; do for o2 in {2..3}; do for o3 in {4..5}; do for o4 in {6..7}; do for o5 in {8..10}; do for o6 in {11..14}; do
+    for o1 in {0..1}; do for o2 in {2..3}; do for o3 in {4..5}; do for o4 in {6..7}; do for o5 in {8..10}; do for o6 in {11..13}; do
 
     OPTIONS=${BASEOPTION}${OPTION[${o1}]}${OPTION[${o2}]}${OPTION[${o3}]}${OPTION[${o4}]}${OPTION[${o5}]}${OPTION[${o6}]}
     FLAGS=${BASEFLAG}${FLAG[${o1}]}${FLAG[${o2}]}${FLAG[${o3}]}${FLAG[${o4}]}${FLAG[${o5}]}${FLAG[${o6}]}

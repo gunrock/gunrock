@@ -158,6 +158,7 @@ void Iteration_Loop(
             for (i=0; i<data_slice->num_stages; i++)
                 data_slice->events_set[enactor_stats[0].iteration%4][peer][i]=false;
         }
+        //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("labels", data_slice -> labels.GetPointer(util::DEVICE), graph_slice -> nodes, thread_num, iteration, -1, streams[0]);
 
         while (data_slice->wait_counter < num_gpus*2
            && (!Iteration::Stop_Condition(
@@ -433,7 +434,7 @@ void Iteration_Loop(
                     {
                         frontier_attribute_ -> queue_length = data_slice -> in_length_out[peer_];
                     }
-                    if (!enactor -> size_check /*&& Enactor::DEBUG*/)
+                    if (!enactor -> size_check && (enactor -> debug || num_gpus > 1))
                     {
                         if (Iteration::HAS_SUBQ)
                         {
@@ -532,8 +533,8 @@ void Iteration_Loop(
                 Total_Length = frontier_attribute[0].queue_length;
             if (enactor -> debug)
             {
-                printf("%d\t %lld\t \t Subqueue finished. Total_Length= %lld\n",
-                    thread_num, enactor_stats[0].iteration, (long long)Total_Length);
+                printf("%d\t %lld\t \t Subqueue finished. Total_Length= %lld, labels = %p\n",
+                    thread_num, enactor_stats[0].iteration, (long long)Total_Length, data_slice -> labels.GetPointer(util::DEVICE));
                 fflush(stdout);
             }
 
@@ -692,10 +693,21 @@ void Iteration_Loop(
                         context[peer_],
                         streams[peer_]);
                     if (enactor_stats_->retval) break;
-                    if (enactor_stats_ -> retval = util::GRError(
-                        cudaStreamSynchronize(streams[peer_]),
-                        "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                    //if (enactor_stats_ -> retval = util::GRError(
+                    //    cudaStreamSynchronize(streams[peer_]),
+                    //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                    //    break;
+                    tretval = cudaErrorNotReady;
+                    while (tretval == cudaErrorNotReady)
+                    {
+                        tretval = cudaStreamQuery(streams[peer_]);
+                        if (tretval == cudaErrorNotReady)
+                            sleep(0);
+                    }
+                    if (enactor_stats_ -> retval = util::GRError(tretval,
+                        "FullQueue_Core failed.", __FILE__, __LINE__))
                         break;
+
                     if (!enactor -> size_check)
                     {
                         if (enactor_stats_->retval =

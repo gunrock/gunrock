@@ -1120,22 +1120,15 @@ static CUT_THREADPROC PRThread(
  * @brief Problem enactor class.
  *
  * @tparam _Problem Problem type we process on
- * @tparam _INSTRUMENT Whether or not to collect per-CTA clock-count stats.
- * @tparam _DEBUG Whether or not to enable debug mode.
- * @tparam _SIZE_CHECK Whether or not to enable size check.
  */
 template <
     typename _Problem>
-    //bool _INSTRUMENT,
-    //bool _DEBUG,
-    //bool _SIZE_CHECK>
 class PREnactor :
     public EnactorBase<typename _Problem::SizeT>
 {
     // Members
     ThreadSlice *thread_slices;
     CUTThread   *thread_Ids   ;
-    //util::cpu_mt::CPUBarrier *cpu_barrier;
 
     // Methods
 public:
@@ -1147,9 +1140,6 @@ public:
     typedef EnactorBase<SizeT>         BaseEnactor;
     typedef PREnactor                  Enactor;
     typedef GraphSlice<VertexId, SizeT, Value> GraphSliceT;
-    //static const bool INSTRUMENT = _INSTRUMENT;
-    //static const bool DEBUG      = _DEBUG;
-    //static const bool SIZE_CHECK = _SIZE_CHECK;
 
    /**
      * \addtogroup PublicInterface
@@ -1252,7 +1242,7 @@ public:
         thread_slices = new ThreadSlice [this->num_gpus];
         thread_Ids    = new CUTThread   [this->num_gpus];
 
-        for (int gpu=0; gpu<this->num_gpus; gpu++)
+        /*for (int gpu=0; gpu<this->num_gpus; gpu++)
         {
             if (retval = util::SetDevice(this -> gpu_idx[gpu])) return retval;
             if (sizeof(SizeT) <= 4)
@@ -1267,7 +1257,7 @@ public:
                     "BFSEnactor cudaBindTexture row_offsets_ref failed",
                     __FILE__, __LINE__)) return retval;
             }
-        }
+        }*/
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {

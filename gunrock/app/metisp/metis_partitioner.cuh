@@ -103,23 +103,24 @@ struct MetisPartitioner : PartitionerBase<VertexId,SizeT,Value/*,
         int        seed   = -1)
     {
         cudaError_t retval = cudaSuccess;
-        //typedef idxtype idx_t;
-        idx_t       nodes  = this->graph->nodes;
-        idx_t       edges  = this->graph->edges;
-        idx_t       ngpus  = this->num_gpus;
-        idx_t       ncons  = 1;
-        idx_t       objval;
-        idx_t*      tpartition_table = new idx_t[nodes];//=this->partition_tables[0];
-        idx_t*      trow_offsets     = new idx_t[nodes+1];
-        idx_t*      tcolumn_indices  = new idx_t[edges];
-
-        for (idx_t node = 0; node <= nodes; node++)
-            trow_offsets[node] = this->graph->row_offsets[node];
-        for (idx_t edge = 0; edge < edges; edge++)
-            tcolumn_indices[edge] = this->graph->column_indices[edge];
-
 #ifdef METIS_FOUND
-      {
+        {
+            //typedef idxtype idx_t;
+            idx_t       nodes  = this->graph->nodes;
+            idx_t       edges  = this->graph->edges;
+            idx_t       ngpus  = this->num_gpus;
+            idx_t       ncons  = 1;
+            idx_t       objval;
+            idx_t*      tpartition_table = new idx_t[nodes];//=this->partition_tables[0];
+            idx_t*      trow_offsets     = new idx_t[nodes+1];
+            idx_t*      tcolumn_indices  = new idx_t[edges];
+
+            for (idx_t node = 0; node <= nodes; node++)
+                trow_offsets[node] = this->graph->row_offsets[node];
+            for (idx_t edge = 0; edge < edges; edge++)
+                tcolumn_indices[edge] = this->graph->column_indices[edge];
+
+
         //int Status =
                 METIS_PartGraphKway(
                     &nodes,                      // nvtxs  : the number of vertices in the graph

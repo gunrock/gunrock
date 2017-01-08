@@ -26,6 +26,9 @@
 #include <gunrock/app/sssp/sssp_problem.cuh>
 #include <gunrock/app/sssp/sssp_functor.cuh>
 
+
+#include <gunrock/app/sample/sample_enactor.cuh>
+
 // Operator includes
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
@@ -274,18 +277,17 @@ void ReferenceSssp(
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
  * @tparam MARK_PREDECESSORS
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename VertexId,
     typename SizeT,
     typename Value,
-    //bool INSTRUMENT,
-    //bool DEBUG,
-    //bool SIZE_CHECK,
     bool MARK_PREDECESSORS >
 cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 {
@@ -294,10 +296,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             Value,
             MARK_PREDECESSORS > Problem;
 
-    typedef SSSPEnactor < Problem/*,
-            INSTRUMENT,
-            DEBUG,
-            SIZE_CHECK*/ > Enactor;
+    typedef SSSPEnactor < Problem > Enactor;
 
     // parse configurations from mObject info
     Csr<VertexId, SizeT, Value> *graph = info->csr_ptr;
@@ -327,11 +326,12 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     int      subqueue_latency       = info->info["subqueue_latency"  ].get_int (); 
     int      fullqueue_latency      = info->info["fullqueue_latency" ].get_int (); 
     int      makeout_latency        = info->info["makeout_latency"   ].get_int (); 
+    if (max_queue_sizing < 1.2) max_queue_sizing=1.2;
+    if (max_in_sizing < 0) max_in_sizing = 1.0;
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
 
     CpuTimer    cpu_timer;
     cudaError_t retval              = cudaSuccess;
-    if (max_queue_sizing < 1.2) max_queue_sizing=1.2;
 
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
@@ -618,19 +618,16 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- * @tparam SIZE_CHECK
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value>
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK >
 cudaError_t RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
 {
     if (info->info["mark_predecessors"].get_bool())
@@ -663,6 +660,10 @@ int main_(CommandLineArgs *args)
 
     cpu_timer2.Start();
     info->Init("SSSP", *args, csr);  // initialize Info structure
+    
+    // force edge values to be 1, don't enable this unless you really want to
+    //for (SizeT e=0; e < csr.edges; e++)
+    //    csr.edge_values[e] = 1;
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 

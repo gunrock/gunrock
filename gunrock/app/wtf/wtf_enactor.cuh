@@ -58,65 +58,6 @@ public:
     Problem    *problem;
     ContextPtr *context;
 
-
-    // Members
-    protected:
-
-    // Methods
-    protected:
-
-    /**
-     * @brief Prepare the enactor for WTF kernel call. Must be called prior to each WTF search.
-     *
-     * @param[in] problem WTF Problem object which holds the graph data and WTF problem data to compute.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    /*template <typename ProblemData>
-    cudaError_t Setup(
-        ProblemData *problem)
-    {
-        typedef typename ProblemData::SizeT         SizeT;
-        typedef typename ProblemData::VertexId      VertexId;
-
-        cudaError_t retval = cudaSuccess;
-
-
-        do {
-            //initialize the host-mapped "done"
-            //if (!done) {
-            //    int flags = cudaHostAllocMapped;
-
-                // Allocate pinned memory for done
-            //    if (retval = util::GRError(cudaHostAlloc((void**)&done, sizeof(int) * 1, flags),
-            //        "WTFEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) break;
-
-                // Map done into GPU space
-            //    if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_done, (void*) done, 0),
-            //        "WTFEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) break;
-
-            //}
-
-            //done[0]             = -1;
-
-            //graph slice
-            //typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
-
-            // Bind row-offsets texture
-            //cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
-            //if (retval = util::GRError(cudaBindTexture(
-            //        0,
-            //        gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
-            //        graph_slice->d_row_offsets,
-            //        row_offsets_desc,
-            //        (graph_slice->nodes + 1) * sizeof(SizeT)),
-            //            "WTFEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
-
-        } while (0);
-
-        return retval;
-    }*/
-
     public:
 
     /**
@@ -200,30 +141,22 @@ public:
     /**
      * @brief Enacts a page rank computing on the specified graph.
      *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
+     * @tparam AdvanceKernelPolicy Kernel policy for forward edge mapping.
      * @tparam FilterPolicy Kernel policy for vertex mapping.
-     * @tparam WTFProblem WTF Problem type.
      *
-     * @param[in] context CudaContext for moderngpu library
      * @param[in] src Source node ID for WTF algorithm
      * @param[in] alpha Parameter to determine iteration number
-     * @param[in] problem WTFProblem object.
      * @param[in] max_iteration Max iteration number
-     * @param[in] max_grid_size Max grid size for WTF kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template<
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>
-        //typename WTFProblem>
     cudaError_t EnactWTF(
-        //ContextPtr   context,
         VertexId       src,
         Value          alpha,
-        //Problem     *problem,
         SizeT          max_iteration)
-        //int            max_grid_size = 0)
     {
         typedef PRFunctor<
             VertexId,
@@ -696,10 +629,7 @@ public:
      * @tparam WTFProblem WTF Problem type. @see PRProblem
      *
      * @param[in] context CudaContext for moderngpu library
-     * @param[in] src Source node for WTF.
-     * @param[in] alpha Parameters related to iteration number of WTF algorithm
      * @param[in] problem Pointer to WTFProblem object.
-     * @param[in] max_iteration Max iteration number of WTF algorithm
      * @param[in] max_grid_size Max grid size for WTF kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -735,22 +665,16 @@ public:
      *
      * @tparam WTFProblem WTF Problem type. @see PRProblem
      *
-     * @param[in] context CudaContext for moderngpu library
      * @param[in] src Source node for WTF.
      * @param[in] alpha Parameters related to iteration number of WTF algorithm
-     * @param[in] problem Pointer to WTFProblem object.
      * @param[in] max_iteration Max iteration number of WTF algorithm
-     * @param[in] max_grid_size Max grid size for WTF kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Enact(
-        //ContextPtr context,
         VertexId   src,
         Value      alpha,
-        //Problem   *problem,
         SizeT      max_iteration)
-        //int        max_grid_size = 0)
     {
         int min_sm_version = -1;
         for (int i=0;i<this->num_gpus;i++)

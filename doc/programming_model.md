@@ -49,5 +49,5 @@ three operators. Next, we need to write different functors for these operators.
 Some graph algorithms require only one functor (BFS), but some graph algorithms
 need more (CC needs seven). Finally, we write an enactor to load the proper
 operator with the proper functor. We provide a graph primitive template. The
-problem, functor, and enactor files are under gunrock/app/template, and the
-driver code is under tests/template.
+problem, functor, and enactor files are under gunrock/app/sample, and the
+driver code is under tests/sample.

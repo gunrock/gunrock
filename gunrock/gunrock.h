@@ -110,6 +110,10 @@ struct GRSetup
 
 /**
  * @brief Initialization function for GRSetup.
+ *
+ * @param[out] num_iters Rounds of graph primitive to run.
+ * @param[in]  source Pointer to source nodes array for each round.
+ *
  * \return Initialized configurations object.
  */
 // Proper way to check for C99
@@ -163,6 +167,8 @@ extern "C" {
  * @param[in]  graphi Input data structure contains graph.
  * @param[in]  config Primitive-specific configurations.
  * @param[in]  data_t Primitive-specific data type setting.
+ *
+ * \return Elapsed run time in milliseconds
  */
 float gunrock_bfs(
     struct GRGraph*       grapho,   // Output graph / results
@@ -269,6 +275,8 @@ int cc(
  * @param[in]  graphi Input data structure contains graph.
  * @param[in]  config Primitive-specific configurations.
  * @param[in]  data_t Primitive-specific data type setting.
+ *
+ * \return Elapsed run time in milliseconds
  */
 float gunrock_sssp(
     struct GRGraph*       grapho,   // Output graph / results
@@ -280,12 +288,17 @@ float gunrock_sssp(
  * @brief Single-source shortest path simple public interface.
  *
  * @param[out] distances Return shortest distances.
+ * @param[out] preds Return predecessor of each node
  * @param[in] num_nodes Input graph number of nodes.
  * @param[in] num_edges Input graph number of edges.
  * @param[in] row_offsets Input graph row_offsets.
  * @param[in] col_indices Input graph col_indices.
  * @param[in] edge_values Input graph edge weight.
+ * @param[in] num_iters How many rounds of SSSP do we want to run.
  * @param[in] source Source node to start.
+ * @param[in] mark_preds Whether to mark the predecessors.
+ *
+ * \return Elapsed run time in milliseconds
  */
 float sssp(
     unsigned int*       distances,    // Return shortest distances
@@ -322,6 +335,7 @@ void gunrock_pagerank(
  * @param[in] num_edges Input graph number of edges.
  * @param[in] row_offsets Input graph row_offsets.
  * @param[in] col_indices Input graph col_indices.
+ * @param[in] normalized Whether to perform a normalized PageRank
  */
 void pagerank(
     int*       node_ids,      // Return top-ranked vertex IDs
@@ -330,7 +344,7 @@ void pagerank(
     const int  num_edges,     // Input graph number of edges
     const int* row_offsets,   // Input graph row_offsets
     const int* col_indices,   // Input graph col_indices
-    bool       normalized);   // 
+    bool       normalized);   // normalized pagerank flag
 
 // TODO Add other primitives
 

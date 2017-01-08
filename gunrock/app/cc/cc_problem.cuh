@@ -75,7 +75,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, VertexId*> vertex_associate_ins;
         int turn;
         //DataSlice *d_pointer;
-        bool has_change;
+        bool has_change, previous_change;
         bool scanned_queue_computed;
         VertexId *temp_vertex_out;
         VertexId *temp_comp_out;
@@ -101,6 +101,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             //d_pointer     = NULL;
             //work_progress = NULL;
             has_change    = true;
+            previous_change = true;
             scanned_queue_computed = false;
             temp_vertex_out = NULL;
             temp_comp_out = NULL;
@@ -132,9 +133,9 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
          *
          * @param[in] num_gpus Number of the GPUs used.
          * @param[in] gpu_idx GPU index used for testing.
-         * @param[in] num_vertex_associate Number of vertices associated.
-         * @param[in] num_value__associate Number of value associated.
+         * @param[in] use_double_buffer Whether to use double buffer.
          * @param[in] graph Pointer to the graph we process on.
+         * @param[in] graph_slice Pointer to GraphSlice object.
          * @param[in] num_in_nodes
          * @param[in] num_out_nodes
          * @param[in] original_vertex
@@ -147,8 +148,6 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
             int   num_gpus,
             int   gpu_idx,
             bool  use_double_buffer,
-            //int   num_vertex_associate,
-            //int   num_value__associate,
             Csr<VertexId, SizeT, Value> *graph,
             GraphSlice<VertexId, SizeT, Value> *graph_slice,
             SizeT *num_in_nodes,
@@ -293,6 +292,7 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
                 this -> out_length[peer] = 1;
             turn = 0;
             has_change = true;
+            previous_change = true;
 
             // Set device
             if (retval = util::SetDevice(this->gpu_idx)) return retval;

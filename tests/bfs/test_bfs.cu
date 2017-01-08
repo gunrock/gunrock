@@ -260,21 +260,18 @@ void ReferenceBFS(
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- * @tparam SIZE_CHECK
  * @tparam MARK_PREDECESSORS
  * @tparam ENABLE_IDEMPOTENCE
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value,
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE >
 cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
@@ -325,7 +322,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     float    do_a                  = info->info["do_a"              ].get_real();
     float    do_b                  = info->info["do_b"              ].get_real();
     bool     undirected            = info->info["undirected"        ].get_bool();
-
+    if (max_queue_sizing < 0) max_queue_sizing = 6.5;
+    if (max_in_sizing < 0) max_in_sizing = 4;
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
 
     CpuTimer cpu_timer;
@@ -551,7 +549,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 VertexId pred = h_preds[v];
                 if (pred >= graph->nodes || pred < 0)
                 {
-                    //if (num_errors == 0)
+                    if (num_errors == 0)
                         printf("INCORRECT: pred[%lld] : %lld out of bound\n", 
                             (long long)v, (long long)pred);
                     #pragma omp atomic
@@ -560,7 +558,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 }
                 if (h_labels[v] != h_labels[pred] + 1)
                 {
-                    //if (num_errors == 0)
+                    if (num_errors == 0)
                         printf("INCORRECT: label[%lld] (%lld) != label[%lld] (%lld) + 1\n",
                             (long long)v, (long long)h_labels[v], (long long)pred, (long long)h_labels[pred]);
                     #pragma omp atomic
@@ -577,7 +575,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 }
                 if (!v_found)
                 {
-                    //if (num_errors == 0)
+                    if (num_errors == 0)
                         printf("INCORRECT: Vertex %lld not in Vertex %lld's neighbor list\n",
                             (long long)v, (long long)pred);
                     #pragma omp atomic
@@ -765,20 +763,17 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- * @tparam SIZE_CHECK
  * @tparam MARK_PREDECESSORS
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value,
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS >
 cudaError_t RunTests_enable_idempotence(Info<VertexId, SizeT, Value> *info)
 {
@@ -796,25 +791,22 @@ cudaError_t RunTests_enable_idempotence(Info<VertexId, SizeT, Value> *info)
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- * @tparam SIZE_CHECK
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value>
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK >
 cudaError_t RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
 {
-//    if (info->info["mark_predecessors"].get_bool())
-//        return RunTests_enable_idempotence<VertexId, SizeT, Value, /*INSTRUMENT,
-//                                    DEBUG, SIZE_CHECK,*/  true> (info);
-//    else
+    if (info->info["mark_predecessors"].get_bool())
+        return RunTests_enable_idempotence<VertexId, SizeT, Value, /*INSTRUMENT,
+                                    DEBUG, SIZE_CHECK,*/  true> (info);
+    else
         return RunTests_enable_idempotence<VertexId, SizeT, Value,/* INSTRUMENT,
                                     DEBUG, SIZE_CHECK,*/ false> (info);
 }
@@ -890,14 +882,14 @@ int main_VertexId(CommandLineArgs *args)
 // can be disabled to reduce compile time
 // atomicMin(long long) is only available for compute capability 3.5 or higher
     if (args -> CheckCmdLineFlag("64bit-VertexId"))
-#if __GR_CUDA_ARCH__ <= 300
-    {
-        printf("64bit-VertexId disabled, because atomicMin(long long) is only supported by compute capability 3.5 or higher\n");
-        return 1;
-    }
-#else
+//#if __GR_CUDA_ARCH__ <= 300
+//    {
+//        printf("64bit-VertexId disabled, because atomicMin(long long) is only supported by compute capability 3.5 or higher\n");
+//        return 1;
+//    }
+//#else
         return main_SizeT<long long>(args);
-#endif
+//#endif
     else
         return main_SizeT<int      >(args);
 }

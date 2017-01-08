@@ -192,9 +192,9 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
          *
          * @param[in] num_gpus Number of the GPUs used.
          * @param[in] gpu_idx GPU index used for testing.
-         * @param[in] num_vertex_associate Number of vertices associated.
-         * @param[in] num_value__associate Number of value associated.
+         * @param[in] use_double_buffer Whether to use double buffer.
          * @param[in] graph Pointer to the graph we process on.
+         * @param[in] graph_slice Pointer to GraphSlice object.
          * @param[in] num_in_nodes
          * @param[in] num_out_nodes
          * @param[in] queue_sizing Maximum queue sizing factor.
@@ -206,8 +206,6 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
             int   num_gpus,
             int   gpu_idx,
             bool  use_double_buffer,
-            //int   num_vertex_associate,
-            //int   num_value__associate,
             Csr<VertexId, SizeT, Value> *graph,
             GraphSlice<VertexId, SizeT, Value>
                    *graph_slice,
@@ -525,6 +523,7 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
      * @param[in] gpu_idx GPU index used for testing.
      * @param[in] partition_method Partition method to partition input graph.
      * @param[in] streams CUDA stream.
+     * @param[in] context
      * @param[in] queue_sizing Maximum queue sizing factor.
      * @param[in] in_sizing
      * @param[in] partition_factor Partition factor for partitioner.
@@ -704,12 +703,14 @@ struct PRProblem : ProblemBase<VertexId, SizeT, Value,
      * @brief Reset problem function. Must be called prior to each run.
      *
      * @param[in] src Source node to start.
-     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
      * @param[in] delta PageRank delta factor
      * @param[in] threshold Threshold for remove node from PR computation process.
      * @param[in] max_iter Maximum number of iterations.
      * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
      * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
+     * @param[in] queue_sizing1
+     * @param[in] skip_scanned_edges Whether to skip scanned edges
+     *
      *
      *  \return cudaError_t object Indicates the success of all CUDA calls.
      */

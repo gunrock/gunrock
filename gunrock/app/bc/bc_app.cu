@@ -122,7 +122,6 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
     // Allocate host-side arrays
     Value        *h_sigmas           = new Value   [graph->nodes];
     Value        *h_bc_values        = new Value   [graph->nodes];
-    Value        *h_ebc_values       = new Value   [graph->edges];
     VertexId     *h_labels           = new VertexId[graph->nodes];
 
     for (int gpu = 0; gpu < num_gpus; gpu++)
@@ -208,11 +207,10 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
 
     // Copy out results
     util::GRError(
-        problem->Extract(h_sigmas, h_bc_values, h_ebc_values, h_labels),
+        problem->Extract(h_sigmas, h_bc_values, h_labels),
         "BC Problem Data Extraction Failed", __FILE__, __LINE__);
 
     output->node_value1 = (Value*)&h_bc_values[0];
-    output->edge_value1 = (Value*)&h_ebc_values[0];
 
     if (!quiet)
     {

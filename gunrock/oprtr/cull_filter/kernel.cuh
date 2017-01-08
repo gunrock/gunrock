@@ -60,7 +60,6 @@ struct SweepPass
         SizeT            &max_out_frontier)
         //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&t_bitmask)
     {
-
         // Determine our threadblock's work range
         util::CtaWorkLimits<SizeT> work_limits;
         work_decomposition.template GetCtaWorkLimits<
@@ -157,7 +156,6 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
         util::KernelRuntimeStats    &kernel_stats)
         //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *&t_bitmask)
     {
-
         // Shared storage for the kernel
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
 

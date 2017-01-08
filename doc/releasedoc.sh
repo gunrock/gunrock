@@ -130,7 +130,7 @@ done
 echo -n "We are running in branch "
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 highlighted $current_branch
-[ "$current_branch" != "master" -a "$current_branch" != "dev" ] && error "Please run this script inside master or dev branch!"
+[ "$current_branch" != "master" -a "$current_branch" != "pre-release" ] && error "Please run this script inside master or dev branch!"
 
 
 # Extract the latest version number from CMakeLists.txt

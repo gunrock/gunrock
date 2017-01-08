@@ -25,7 +25,8 @@ namespace hits {
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam ProblemData         Problem data type which contains data slice for HITS problem
+ * @tparam Problem             Problem data type which contains data slice for HITS problem
+ * @tparam _LabelT             Vertex label type
  *
  */
 template<typename VertexId, typename SizeT, typename Value, typename Problem, typename _LabelT=VertexId>
@@ -40,9 +41,12 @@ struct HUBFunctor
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id output edge id
-     * @param[in] e_id_in input edge id
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
@@ -66,9 +70,12 @@ struct HUBFunctor
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id output edge id
-     * @param[in] e_id_in input edge id
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      */
     static __device__ __forceinline__ void ApplyEdge(
         VertexId    s_id,
@@ -92,7 +99,8 @@ struct HUBFunctor
  *
  * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
  * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam ProblemData         Problem data type which contains data slice for HITS problem
+ * @tparam Problem             Problem data type which contains data slice for HITS problem
+ * @tparam _LabelT             Vertex label type
  *
  */
 template<typename VertexId, typename SizeT, typename Value, typename ProblemData, typename _LabelT=VertexId>
@@ -107,9 +115,12 @@ struct AUTHFunctor
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id output edge id
-     * @param[in] e_id_in input edge id
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
@@ -133,9 +144,12 @@ struct AUTHFunctor
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id output edge id
-     * @param[in] e_id_in input edge id
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      */
     static __device__ __forceinline__ void ApplyEdge(

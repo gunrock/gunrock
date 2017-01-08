@@ -30,10 +30,10 @@ Prerequisites {#prerequisites}
   * Alternatively, you can clone gunrock recursively with `git clone --recursive https://github.com/gunrock/gunrock`
   * or if you already cloned gunrock, under `gunrock/` directory:
 
-```
+<pre>
 git submodule init
 git submodule update
-```
+</pre>
 
 **Optional Dependencies:**
 * [METIS](http://glaros.dtc.umn.edu/gkhome/metis/metis/overview) is used as one possible partitioner to partition graphs for multi-gpu primitives implementations.
@@ -46,19 +46,19 @@ Compilation {#compilation}
 
 **Simple Gunrock Compilation:**
 * Downloading gunrock:
-```
+<pre>
 # Using git (recursively) download gunrock
 git clone --recursive https://github.com/gunrock/gunrock
 # Using wget to download gunrock
 wget --no-check-certificate https://github.com/gunrock/gunrock/archive/master.zip
-```
+</pre>
 * Compiling gunrock:
-```
+<pre>
 cd gunrock
 mkdir build && cd build
 cmake ..
 make
-```
+</pre>
 * Binary test files are available in `build/bin` directory.
 * You can either run the test for all primitives by typing `make check` or `ctest` in the build directory, or do your own testings manually.
 * Detailed test log from `ctest` can be found in `/build/Testing/Temporary/LastTest.log`, alternatively you can run tests with verbose option enabled `ctest -v`.
@@ -83,15 +83,15 @@ You can also compile gunrock with more specific/advanced settings using `cmake -
   * **GUNROCK_APP_TOPK** (default: OFF)
 
 * **GUNROCK_MGPU_TESTS** (default: OFF) - If on, tests multiple GPU primitives with `ctest`.
-* **GUNROCK_GENCODE_SM<>** (default: GUNROCK_GENCODE_SM30=ON) change to generate code for different compute capability.
+* **GUNROCK_GENCODE_SM<>** (default: GUNROCK_GENCODE_SM30,35,61=ON) change to generate code for a different compute capability.
 * **CUDA_VERBOSE_PTXAS** (default: OFF) - ON to enable verbose output from the PTXAS assembler.
 
 Example for compiling gunrock with only *Breadth First Search (BFS)* primitive:
-```
+<pre>
 mkdir build && cd build
 cmake -DGUNROCK_BUILD_APPLICATIONS=OFF -DGUNROCK_APP_BFS=ON ..
 make
-```
+</pre>
 
 Generating Datasets {#generating_datasets}
 ===================

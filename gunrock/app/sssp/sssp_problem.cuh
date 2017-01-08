@@ -35,7 +35,6 @@ template <
     typename    VertexId,
     typename    SizeT,
     typename    Value,
-    //bool        _MARK_PREDECESSORS>
     bool        _MARK_PATHS>
 struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
     true,//_MARK_PREDECESSORS, //MARK_PREDECESSORS
@@ -118,15 +117,16 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
          *
          * @param[in] num_gpus Number of the GPUs used.
          * @param[in] gpu_idx GPU index used for testing.
-         * @param[in] num_vertex_associate Number of vertices associated.
-         * @param[in] num_value__associate Number of value associated.
+         * @param[in] use_double_buffer Whether to use double buffer.
          * @param[in] graph Pointer to the graph we process on.
+         * @param[in] graph_slice Pointer to the GraphSlice object.
          * @param[in] num_in_nodes
          * @param[in] num_out_nodes
-         * @param[in] original_vertex
          * @param[in] delta_factor Delta factor for delta-stepping.
          * @param[in] queue_sizing Maximum queue sizing factor.
          * @param[in] in_sizing
+         * @param[in] skip_makeout_selection
+         * @param[in] keep_node_num
          *
          * \return cudaError_t object Indicates the success of all CUDA calls.
          */
@@ -134,13 +134,10 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             int   num_gpus,
             int   gpu_idx,
             bool  use_double_buffer,
-            //int   num_vertex_associate,
-            //int   num_value__associate,
             Csr<VertexId, SizeT, Value> *graph,
             GraphSlice<VertexId, SizeT, Value> *graph_slice,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
-            //VertexId *original_vertex,
             int   delta_factor = 16,
             float queue_sizing = 2.0,
             float in_sizing    = 1.0,
@@ -162,8 +159,6 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                 num_gpus,
                 gpu_idx,
                 use_double_buffer,
-                //num_vertex_associate,
-                //num_value__associate,
                 graph,
                 num_in_nodes,
                 num_out_nodes,
@@ -173,31 +168,22 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = distances   .Allocate(graph->nodes, util::DEVICE)) return retval;
             if (retval = weights     .Allocate(graph->edges, util::DEVICE)) return retval;
             if (retval = this->labels.Allocate(graph->nodes, util::DEVICE)) return retval;
-            //if (retval = delta       .Allocate(1           ,util::DEVICE)) return retval;
-            //if (retval = visit_lookup.Allocate(graph->nodes,util::DEVICE)) return retval;
-            //if (retval = sssp_marker .Allocate(graph->nodes,util::DEVICE)) return retval;
 
             weights.SetPointer(graph->edge_values, graph->edges, util::HOST);
             if (retval = weights.Move(util::HOST, util::DEVICE)) return retval;
 
-            //float _delta = EstimatedDelta(graph)*delta_factor;
-            // printf("estimated delta:%5f\n", _delta);
-            //delta.SetPointer(&_delta, util::HOST);
-            //if (retval = delta.Move(util::HOST, util::DEVICE)) return retval;
 
-            if (MARK_PATHS)//(MARK_PREDECESSORS)
+            if (MARK_PATHS)
             {
                 if (retval = this->preds.Allocate(graph->nodes,util::DEVICE)) return retval;
-                //if (retval = this->temp_preds.Allocate(graph->nodes, util::DEVICE)) return retval;
             } else {
                 if (retval = this->preds.Release()) return retval;
-                //if (retval = this->temp_preds.Release()) return retval;
             }
 
             if (num_gpus >1)
             {
                 this->value__associate_orgs[0] = distances.GetPointer(util::DEVICE);
-                if (MARK_PATHS)//(MARK_PREDECESSORS)
+                if (MARK_PATHS)
                 {
                     this->vertex_associate_orgs[0] = this->preds.GetPointer(util::DEVICE);
                     if (!keep_node_num)
@@ -208,10 +194,8 @@ struct SSSPProblem : ProblemBase<VertexId, SizeT, Value,
                     if (retval = this->vertex_associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
                 }
                 if (retval = this->value__associate_orgs.Move(util::HOST, util::DEVICE)) return retval;
-                //if (retval = temp_marker.Allocate(graph->nodes, util::DEVICE)) return retval;
             }
 
-            //util::cpu_mt::PrintMessage("DataSlice Init() end.");
             return retval;
         } // Init
 

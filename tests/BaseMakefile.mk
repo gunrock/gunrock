@@ -10,6 +10,7 @@
 #-------------------------------------------------------------------------------
 
 force64 = 1
+use_metis = 0
 NVCC = "$(shell which nvcc)"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
@@ -24,11 +25,13 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 
 GEN_SM61 = -gencode=arch=compute_61,code=\"sm_61,compute_61\"
 GEN_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
+GEN_SM52 = -gencode=arch=compute_52,code=\"sm_52,compute_52\"
+GEN_SM50 = -gencode=arch=compute_50,code=\"sm_50,compute_50\"
 GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
-SM_TARGETS = $(GEN_SM35)
 
+SM_TARGETS = $(GEN_SM35) #$(GEN_SM35) $(GEN_SM60) $(GEN_SM61) 
 #-------------------------------------------------------------------------------
 # Libs
 #-------------------------------------------------------------------------------
@@ -41,12 +44,16 @@ SM_TARGETS = $(GEN_SM35)
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../externals/moderngpu/include"
 CUB_INC = "../../externals/cub"
-BOOST_LIB_PATH = "/shared/apps/rhel-6.2/libs/boost-1.57/lib"
-#BOOST_DEPS = -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
-BOOST_DEPS = -Xlinker $(BOOST_LIB_PATH)/libboost_system.a -Xlinker $(BOOST_LIB_PATH)/libboost_filesystem.a -Xlinker $(BOOST_LIB_PATH)/libboost_timer.a -Xlinker $(BOOST_LIB_PATH)/libboost_chrono.a #-lboost_timer -Xlinker -lboost_chrono
+BOOST_DEPS = -I../../.. -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
 OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
-METIS_DEPS = -Xlinker -lmetis -Xcompiler -DMETIS_FOUND
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) -I.. -I../..
+
+ifneq ($(use_metis), 1)
+	METIS_DEPS =
+else
+	METIS_DEPS = -Xlinker -lmetis -Xcompiler -DMETIS_FOUND
+endif
+GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=0.4.0
+INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) $(GUNROCK_DEF) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines

@@ -29,7 +29,8 @@ namespace bfs {
  * @tparam VertexId    Type of signed integer to use as vertex identifier.
  * @tparam SizeT       Type of unsigned integer to use for array indexing.
  * @tparam Value       Type of float or double to use for computed values.
- * @tparam ProblemData Problem data type which contains data slice for problem.
+ * @tparam Problem     Problem data type which contains data slice for problem.
+ * @tparam _LabelT     Vertex label type.
  *
  */
 template <
@@ -44,9 +45,12 @@ struct BFSFunctor {
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id output edge id
-     * @param[in] e_id_in input edge id
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
@@ -61,34 +65,16 @@ struct BFSFunctor {
         SizeT   &output_pos)
     {
         bool result = true;
-        if (Problem::ENABLE_IDEMPOTENCE)
+        if (!Problem::ENABLE_IDEMPOTENCE)
         {
-            //if (util::to_track(problem -> gpu_idx, d_id))
-            //    && !util::pred_to_track(problem -> gpu_idx, d_id))
-                //|| util::pred_to_track(problem -> gpu_idx, e_id_in))
-            //    printf("%d\t %d\t CondEdge (%d, %d)\t %d (%d) -> %d\n",
-            //        problem -> gpu_idx, s_id, blockIdx.x, threadIdx.x,
-            //        e_id_in, problem -> labels[e_id_in], d_id);
-            //if (label + 1 > d_data_slice -> labels[d_id]) result = false;
-        } else {
             // Check if the destination node has been claimed as someone's child
-            VertexId /*new_label,*/ old_label;
-            //if (Problem::MARK_PREDECESSORS) {
-            //    util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
-            //        new_label, d_data_slice -> labels + s_id);
-            //} else new_label = label;
-            //new_label = label + 1;
-            old_label = atomicMin(d_data_slice -> labels + d_id, /*new_*/label);
-            result = /*new_*/label < old_label;
+#if __GR_CUDA_ARCH__ >= 350
+            VertexId old_label= atomicMin(d_data_slice -> labels + d_id, /*new_*/label);
+            result = label < old_label;
+#else
+            result = false;
+#endif
         }
-        //if (result && TO_TRACK && util::to_track(d_data_slice -> gpu_idx, d_id))
-        //     printf("%d\t %d\t CondEdge\t labels[%d] (%d) -> %d = labels[%d] + 1\n",
-        //        d_data_slice -> gpu_idx, label-1, d_id, util::MaxValue<VertexId>(), label, s_id);
-
-        //atomicAdd(d_data_slice -> input_counter + input_pos, 1);
-        //atomicAdd(d_data_slice -> output_counter + output_pos, 1);
-        //atomicAdd(d_data_slice -> edge_marker + edge_id, 1);
-        //if (result) d_data_slice -> vertex_markers[label&0x1][d_id] = 1;
         return result;
     }
 
@@ -99,9 +85,12 @@ struct BFSFunctor {
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id output edge id
-     * @param[in] e_id_in input edge id
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
      */
     static __device__ __forceinline__ void ApplyEdge(
@@ -113,13 +102,9 @@ struct BFSFunctor {
         LabelT   label     ,
         SizeT    input_pos ,
         SizeT   &output_pos)
-        //VertexId s_id, VertexId d_id, DataSlice *problem,
-        //VertexId e_id = 0, VertexId e_id_in = 0)
     {
-        if (Problem::ENABLE_IDEMPOTENCE)
-        {
-            // do nothing here
-        } else {
+        if (!Problem::ENABLE_IDEMPOTENCE)
+       {
             //set preds[d_id] to be s_id
             if (Problem::MARK_PREDECESSORS)
             {
@@ -135,10 +120,13 @@ struct BFSFunctor {
     /**
      * @brief filter condition function. Check if the Vertex Id is valid (not equal to -1).
      *
-     * @param[in] node Vertex Id
-     * @param[in] problem Data slice object
-     * @param[in] v auxiliary value
-     * @param[in] nid Node ID
+     * @param[in] v auxiliary value.
+     * @param[in] node Vertex identifier.
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] nid Vertex index.
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[in] output_pos Index in the output frontier
      *
      * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
      */
@@ -151,22 +139,19 @@ struct BFSFunctor {
         SizeT      input_pos,
         SizeT      output_pos)
     {
-        //if (TO_TRACK && util::to_track(d_data_slice -> gpu_idx, node))
-        //if (node != -1)
-        //    printf("%d\t %d\t CondFilter (%d, %d)\t [%d] past, "
-        //        "input_pos = %d, output_pos = %d\n",
-        //        d_data_slice -> gpu_idx, label, blockIdx.x, threadIdx.x, node,
-        //        input_pos, output_pos);
         return node != -1;
     }
 
     /**
      * @brief filter apply function. Doing nothing for BFS problem.
      *
-     * @param[in] node Vertex identifier.
-     * @param[in] problem Data slice object.
      * @param[in] v auxiliary value.
+     * @param[in] node Vertex identifier.
+     * @param[out] d_data_slice Data slice object.
      * @param[in] nid Vertex index.
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[in] output_pos Index in the output frontier
      *
      */
     static __device__ __forceinline__ void ApplyFilter(
@@ -177,15 +162,8 @@ struct BFSFunctor {
         LabelT     label,
         SizeT      input_pos,
         SizeT      output_pos)
-        //VertexId node, DataSlice *d_data_slice, Value v = 0, SizeT nid = 0)
     {
         if (Problem::ENABLE_IDEMPOTENCE) {
-            //if (TO_TRACK && util::to_track(d_data_slice -> gpu_idx, node))
-            //    printf("(%4d, %4d) : ApplyFilter (%d, %d)\t labels[%d] -> %d\n",
-            //    blockIdx.x, threadIdx.x,
-            //    d_data_slice -> gpu_idx, label,  node, label);
-            //util::io::ModifiedStore<util::io::st::cg>::St(
-            //    label, d_data_slice->labels + node);
             if (Problem::MARK_PREDECESSORS)
             {
                 if (d_data_slice -> original_vertex.GetPointer(util::DEVICE) != NULL)

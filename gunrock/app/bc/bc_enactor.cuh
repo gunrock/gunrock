@@ -308,6 +308,7 @@ __global__ void Assign_Middle(
         }*/
         d_labels_out[x] = d_labels_in[key];
         d_sigmas_out[x] = d_sigmas_in[key];
+        
         x += STRIDE;
     }
 }
@@ -331,6 +332,7 @@ __global__ void Expand_Incoming_Middle(
         VertexId key = d_keys_in[x];
         d_labels_out[key] = d_labels_in[x];
         d_sigmas_out[key] = d_sigmas_in[x];
+       
         x += STRIDE;
     }
 }
@@ -1476,6 +1478,7 @@ static CUT_THREADPROC BCThread(
                  *frontier_attribute  = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
     EnactorStats<SizeT> *enactor_stats       = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
     EnactorStats<SizeT> *s_enactor_stats     = &(enactor     -> enactor_stats      [0                    ]);
+    bool          has_error           = false;
     //util::Array1D<int, unsigned char>* barrier_markers = data_slice -> barrier_markers;
 
     if (enactor_stats[0].retval = util::SetDevice(gpu_idx))
@@ -1483,6 +1486,10 @@ static CUT_THREADPROC BCThread(
         thread_data -> status = ThreadSlice::Status::Ended;
         CUT_THREADEND;
     }
+
+    if (enactor -> debug)
+        util::cpu_mt::PrintMessage("Thread started",
+            thread_num);
 
     thread_data->status = ThreadSlice::Status::Idle;
     while (thread_data -> status != ThreadSlice::Status::ToKill)
@@ -1496,6 +1503,10 @@ static CUT_THREADPROC BCThread(
         if (thread_data -> status == ThreadSlice::Status::ToKill)
             break;
         //thread_data->status = ThreadSlice::Status::Running;
+
+        if (enactor -> debug)
+            util::cpu_mt::PrintMessage("Enact begins",
+                thread_num);
 
         for (int peer_=0;peer_<num_gpus;peer_++)
         {
@@ -1524,17 +1535,17 @@ static CUT_THREADPROC BCThread(
 
         if (num_gpus>1)
         {
-            int middle_event_markers[8];
             data_slice -> middle_iteration = enactor_stats -> iteration;
+            int middle_event_markers[8];
             int middle_event_counter = 0;
-            for (int gpu = 0; gpu < num_gpus; gpu++)
+            /*for (int gpu = 0; gpu < num_gpus; gpu++)
                 middle_event_markers[gpu] = 0;
             while (middle_event_counter < num_gpus)
             {
                 for (int gpu = 0; gpu < num_gpus; gpu++)
                 {
                     if (middle_event_markers[gpu] == 1) continue;
-                    if (s_data_slice[gpu] -> middle_iteration != -1)
+                    if (s_data_slice[gpu] -> middle_iteration != 0)
                     {
                         middle_event_markers[gpu] = 1;
                         middle_event_counter ++;
@@ -1542,7 +1553,32 @@ static CUT_THREADPROC BCThread(
                 }
                 if (middle_event_counter < num_gpus)
                     sleep(0); 
+            }*/
+            has_error =false;
+            for (int gpu = 0; gpu < num_gpus; gpu++)
+            {
+                while (s_data_slice[gpu] -> middle_iteration < 0 && !has_error)
+                {
+                    sleep(0); 
+                    for (int i=0; i<num_gpus * num_gpus; i++)
+                    {
+                        if (s_enactor_stats[i].retval != cudaSuccess)
+                        {
+                            has_error = true;
+                            break;
+                        }
+                    }
+                }
+                if (has_error) break;
             }
+            if (has_error)
+            {
+                thread_data -> status = ThreadSlice::Status::Idle;
+                continue;
+            }
+            if (enactor -> debug)
+                util::cpu_mt::PrintMessage("Barrier1 past",
+                    thread_num, enactor_stats -> iteration); 
 
             int num_blocks = data_slice -> local_vertices.GetSize() / AdvanceKernelPolicy::THREADS / 2 +1;
             if (num_blocks > 480) num_blocks = 480;
@@ -1568,7 +1604,12 @@ static CUT_THREADPROC BCThread(
             if (enactor_stats -> retval = util::GRError(cudaEventRecord(
                 data_slice -> middle_events[0], data_slice -> streams[0]),
                 "cudaEventRecord failed", __FILE__, __LINE__))
-                break;
+                //break;
+            {
+                thread_data -> status = ThreadSlice::Status::Idle;
+                continue;
+            }
+
             //if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(data_slice -> streams[0]),
             //    "cudaStreamSynchronzie failed", __FILE__, __LINE__)) break;
             for (int peer = 0; peer < num_gpus; peer++)
@@ -1599,7 +1640,26 @@ static CUT_THREADPROC BCThread(
                     break;
                 data_slice -> middle_event_set[peer_] = true;
             }
+            if (enactor -> debug)
+                util::cpu_mt::PrintMessage("Pushed",
+                    thread_num, enactor_stats -> iteration); 
+
+            
             //printf("%d events set\n", thread_num);fflush(stdout);
+            has_error =false;
+            for (int i=0; i<num_gpus * num_gpus; i++)
+            {
+                if (s_enactor_stats[i].retval != cudaSuccess)
+                {
+                    has_error = true;
+                    break;
+                }
+            }
+            if (has_error)
+            {
+                thread_data -> status = ThreadSlice::Status::Idle;
+                continue;
+            }
 
             for (int peer_ = 1; peer_ < num_gpus; peer_ ++)
             {
@@ -1634,6 +1694,8 @@ static CUT_THREADPROC BCThread(
                     num_blocks = num_elements / AdvanceKernelPolicy::THREADS / 2 + 1;
                     VertexId peer_iteration = s_data_slice[peer] -> middle_iteration;
                     if (num_blocks > 480) num_blocks = 480;
+                    
+                    //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys_in", data_slice -> keys_in[peer_iteration%2][peer_].GetPointer(util::DEVICE), num_elements, thread_num, -1, peer_, data_slice -> streams[peer_]);
                     Expand_Incoming_Middle<VertexId, SizeT, Value>
                         <<<num_blocks, AdvanceKernelPolicy::THREADS, 
                         0, data_slice -> streams[peer_]>>>(
@@ -1647,9 +1709,26 @@ static CUT_THREADPROC BCThread(
                     middle_event_markers[peer] = 1;
                     middle_event_counter ++;
                 }
+                
+                has_error =false;
+                for (int i=0; i<num_gpus * num_gpus; i++)
+                {
+                    if (s_enactor_stats[i].retval != cudaSuccess)
+                    {
+                        has_error = true;
+                        break;
+                    }
+                }
+                if (has_error)
+                {
+                    thread_data -> status = ThreadSlice::Status::Idle;
+                    break;
+                }
+
                 if (middle_event_counter < num_gpus)
                     sleep(0);
             }
+            if (has_error) continue;
             //printf("%d events clear\n", thread_num);fflush(stdout);
 
             //data_slice->sigmas.Move(util::DEVICE, util::HOST);
@@ -1695,6 +1774,31 @@ static CUT_THREADPROC BCThread(
             //        s_data_slice[peer] -> labels[_node] = data_slice -> labels[node];
             //    }
             //}
+            for (int peer_ = 1; peer_ < num_gpus; peer_ ++)
+            {
+                if (enactor_stats -> retval = util::GRError(
+                    cudaStreamSynchronize(data_slice -> streams[peer_]),
+                    "cudaStreamSynchronize failed", __FILE__, __LINE__))
+                    break;
+            }
+
+            // CPU barrier
+            data_slice -> middle_finish = true;
+            has_error = false;
+            for (int peer = 0; peer < num_gpus; peer++)
+            {
+                while (!s_data_slice[peer] -> middle_finish && !has_error)
+                {
+                    sleep(0);
+                    for (int i=0; i<num_gpus * num_gpus; i++)
+                    if (s_enactor_stats[i].retval != cudaSuccess)
+                    {
+                        has_error = true; break;
+                    }
+                }
+                if (has_error) break;
+            }
+            if (has_error) continue;
 
             for (int gpu = 0; gpu < num_gpus * 2; gpu++)
                 data_slice -> wait_marker[gpu] = 0; 
@@ -1711,13 +1815,6 @@ static CUT_THREADPROC BCThread(
                 data_slice -> first_backward_incoming[peer] = true;
             }
 
-            for (int peer_ = 1; peer_ < num_gpus; peer_ ++)
-            {
-                if (enactor_stats -> retval = util::GRError(
-                    cudaStreamSynchronize(data_slice -> streams[peer_]),
-                    "cudaStreamSynchronize failed", __FILE__, __LINE__))
-                    break;
-            }
             //CPU_Barrier;
             //util::cpu_mt::IncrementnWaitBarrier(&cpu_barrier[1], thread_num);
             //barrier_markers[1][thread_num] = 1;
@@ -1743,7 +1840,25 @@ static CUT_THREADPROC BCThread(
             data_slice -> value__associate_orgs.Move(util::HOST, util::DEVICE);
         } else {
         }
+        
+        has_error =false;
+        for (int i=0; i<num_gpus * num_gpus; i++)
+        {
+            if (s_enactor_stats[i].retval != cudaSuccess)
+            {
+                has_error = true;
+                break;
+            }
+        }
+        if (has_error)
+        {
+            thread_data -> status = ThreadSlice::Status::Idle;
+            continue;
+        }
 
+        if (enactor -> debug)
+            util::cpu_mt::PrintMessage("Backward begin", 
+                thread_num, enactor_stats -> iteration);
         gunrock::app::Iteration_Loop
             <Enactor, BcBFunctor, 
             Backward_Iteration<AdvanceKernelPolicy, FilterKernelPolicy, Enactor>, 
@@ -1858,7 +1973,6 @@ public:
      * @param[in] context CudaContext pointer for ModernGPU API.
      * @param[in] problem Pointer to Problem object.
      * @param[in] max_grid_size Maximum grid size for kernel calls.
-     * @param[in] size_check Whether or not to enable size check.
      *
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
@@ -1869,15 +1983,10 @@ public:
         ContextPtr  *context,
         Problem     *problem,
         int         max_grid_size = 512)
-        //bool        size_check    = true)
     {
         cudaError_t retval = cudaSuccess;
-        //cpu_barrier = new util::cpu_mt::CPUBarrier[2];
-        //cpu_barrier[0]=util::cpu_mt::CreateBarrier(this->num_gpus);
-        //cpu_barrier[1]=util::cpu_mt::CreateBarrier(this->num_gpus);
         // Lazy initialization
         if (retval = BaseEnactor::Init(
-            //problem,
             max_grid_size,
             AdvanceKernelPolity::CTA_OCCUPANCY,
             FilterKernelPolicy::CTA_OCCUPANCY)) 
@@ -1889,7 +1998,7 @@ public:
         barrier_markers[0].Allocate(this -> num_gpus);
         barrier_markers[1].Allocate(this -> num_gpus);
 
-        for (int gpu=0;gpu<this->num_gpus;gpu++)
+        /*for (int gpu=0;gpu<this->num_gpus;gpu++)
         {    
             if (retval = util::SetDevice(this->gpu_idx[gpu])) break;
             if (sizeof(SizeT) == 4)
@@ -1905,7 +2014,7 @@ public:
                     __FILE__, __LINE__)) break;
             }
         }            
-        if (retval) return retval;
+        if (retval) return retval;*/
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)
         {
@@ -1923,6 +2032,15 @@ public:
                     (void*)&(thread_slices[gpu]));
             thread_Ids[gpu] = thread_slices[gpu].thread_Id;
         }
+
+        for (int gpu=0; gpu < this->num_gpus; gpu++)
+        {    
+            while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
+            {    
+                sleep(0);
+                //std::this_thread::yield();
+            }    
+        } 
         return retval;
     }
 
@@ -2157,6 +2275,7 @@ public:
      * @brief BC Enact kernel entry.
      *
      * @param[in] src Source node to start primitive.
+     * @param[in] traversal_mode Mode of workload strategy in advance
      *
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
@@ -2196,7 +2315,7 @@ public:
      * @param[in] context CudaContext pointer for ModernGPU API.
      * @param[in] problem Pointer to Problem object.
      * @param[in] max_grid_size Maximum grid size for kernel calls.
-     * @param[in] size_check Whether or not to enable size check.
+     * @param[in] traversal_mode Mode of workload strategy in advance
      *
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
@@ -2205,7 +2324,6 @@ public:
         Problem    *problem,
         int max_grid_size = 512,
         std::string traversal_mode = "LB")
-        //bool size_check = true)
     {
         if (this -> min_sm_version >= 300)
         {

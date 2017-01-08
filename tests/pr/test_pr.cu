@@ -155,10 +155,11 @@ void DisplaySolution(VertexId *node, Value *rank, SizeT nodes)
  * @tparam SizeT datatype of the array length.
  *
  * @param[in] computed Vector of values to be compared.
- * @param[in] reference Vector of reference values
- * @param[in] len Vector length
+ * @param[in] reference Vector of reference values.
+ * @param[in] len Vector length.
  * @param[in] verbose Whether to print values around the incorrect one.
- * @param[in] quiet     Don't print out anything to stdout
+ * @param[in] quiet     Don't print out anything to stdout.
+ * @param[in] threshold Results error checking threshold.
  *
  * \return Zero if two vectors are exactly the same, non-zero if there is any difference.
  */
@@ -356,6 +357,7 @@ inline bool operator< (const Sort_Pair<VertexId, Value>& lhs, const Sort_Pair<Ve
  * @param[in] max_iteration Maximum iteration to go
  * @param[in] directed Whether the graph is directed
  * @param[in] quiet Don't print out anything to stdout
+ * @param[in] scaled Normalized flag
  */
 template <
     typename VertexId,
@@ -372,12 +374,9 @@ void ReferencePageRank_Normalized(
     bool                              quiet = false,
     bool                              scaled = false)
 {
-    //typedef Sort_Pair<VertexId, Value> SPair;
     SizeT nodes = graph.nodes;
-    //SizeT edges = graph.edges;
     Value *rank_current = (Value*) malloc (sizeof(Value) * nodes);
     Value *rank_next    = (Value*) malloc (sizeof(Value) * nodes);
-    //SPair *sort_pairs   = (SPair*) malloc (sizeof(SPair) * nodes);
     bool  to_continue   = true;
     SizeT iteration     = 0;
     Value reset_value   = scaled ? 1.0 - delta : ((1.0 - delta) / (Value)nodes);
@@ -477,19 +476,16 @@ void ReferencePageRank_Normalized(
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- * @tparam SIZE_CHECK
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename VertexId,
     typename SizeT,
     typename Value,
-    //bool INSTRUMENT,
-    //bool DEBUG,
-    //bool SIZE_CHECK,
     bool NORMALIZED>
 cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 {
@@ -549,13 +545,6 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     // TODO: remove after merge mgpu-cq
     ContextPtr   *context = (ContextPtr*)  info->context;
     cudaStream_t *streams = (cudaStream_t*)info->streams;
-
-    // Allocate host-side array (for both reference and GPU-computed results)
-    Value        *ref_rank           = new Value   [graph->nodes];
-    Value        *h_rank             = new Value   [graph->nodes];
-    VertexId     *h_node_id          = new VertexId[graph->nodes];
-    VertexId     *ref_node_id        = new VertexId[graph->nodes];
-    //Value        *ref_check          = (quick_mode) ? NULL : ref_rank;
 
     size_t *org_size = new size_t[num_gpus];
     for (int gpu = 0; gpu < num_gpus; gpu++)
@@ -618,6 +607,13 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             graph -> nodes +=1;
         }   
     }
+
+    // Allocate host-side array (for both reference and GPU-computed results)
+    Value        *ref_rank           = new Value   [graph->nodes];
+    Value        *h_rank             = new Value   [graph->nodes];
+    VertexId     *h_node_id          = new VertexId[graph->nodes];
+    VertexId     *ref_node_id        = new VertexId[graph->nodes];
+    //Value        *ref_check          = (quick_mode) ? NULL : ref_rank;
  
     Problem *problem = new Problem(scaled);  // allocate problem on GPU
     if (retval = util::GRError(problem->Init(
@@ -801,6 +797,15 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         for (VertexId i=0; i<graph->nodes; i++)
         {
             VertexId v = ref_node_id[i];
+            if (v < 0 || v >= graph->nodes)
+            {
+                if (error_count == 0 && !quiet_mode)
+                    printf("INCORRECT : ref_node_id[%lld] = %lld, out of bound\n",
+                        (long long)i, (long long)v);
+                error_count ++;
+                continue;
+            }
+    
             ref_total_rank += ref_rank[i];
             Value diff = fabs(ref_rank[i] - unorder_rank[v]);
             if ((ref_rank[i] > 1e-12 && diff > error * ref_rank[i]) ||
@@ -831,6 +836,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         else if (!quiet_mode)
             printf("number of errors : %lld\n", (long long) error_count);
         printf("Reference total rank : %.10lf\n", ref_total_rank);
+        fflush(stdout);
         printf("Maximum difference : ");
         if (max_diff_pos < graph->nodes)
             printf("rank[%lld] %.8le vs. %.8le, ",
@@ -973,28 +979,6 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
 
-    if (h_rank     )
-    {
-        if (info->info["output_filename"].get_str() !="")
-        {
-            cpu_timer.Start();
-            std::ofstream fout;
-            size_t buf_size = 1024 * 1024 * 16;
-            char *fout_buf = new char[buf_size];
-            fout.rdbuf() -> pubsetbuf(fout_buf, buf_size);
-            fout.open(info->info["output_filename"].get_str().c_str());
-
-            for (VertexId v=0; v<graph->nodes; v++)
-            {
-                fout<< v+1 << "," << h_rank[v] << std::endl;
-            }
-            fout.close();
-            delete[] fout_buf; fout_buf = NULL;
-            cpu_timer.Stop();
-            info->info["write_time"] = cpu_timer.ElapsedMillis();
-        }
-        delete[] h_rank     ; h_rank      = NULL;
-    }
     return retval;
 }
 
@@ -1004,19 +988,16 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- * @tparam SIZE_CHECK
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename VertexId,
     typename SizeT,
     typename Value>
-    //bool INSTRUMENT,
-    //bool DEBUG,
-    //bool SIZE_CHECK >
 cudaError_t RunTests_normalized(Info<VertexId, SizeT, Value> *info)
 {
     if (info->info["normalized"].get_bool())
@@ -1039,9 +1020,6 @@ int main_(CommandLineArgs *args)
     CpuTimer cpu_timer, cpu_timer2;
 
     cpu_timer.Start();
-    //typedef int VertexId;  // use int as the vertex identifier
-    //typedef float Value;   // use float as the value type
-    //typedef int SizeT;     // use int as the graph size type
 
     Csr <VertexId, SizeT, Value> csr(false);  // graph we process on
     Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
@@ -1076,7 +1054,7 @@ template <
     typename SizeT>
 int main_Value(CommandLineArgs *args)
 {
-// disabled to reduce compile time
+// can be disabled to reduce compile time
 //    if (args -> CheckCmdLineFlag("64bit-Value"))
 //        return main_<VertexId, SizeT, double>(args);
 //    else

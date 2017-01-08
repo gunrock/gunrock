@@ -8,12 +8,16 @@ primitives and optimization strategies with a high-level programming model
 that allows programmers to quickly develop new graph primitives with small
 code size and minimal GPU programming knowledge.
 
-For more details, please visit our [website](http://gunrock.github.io/), read
-[Why Gunrock](http://gunrock.github.io/gunrock/doc/latest/why-gunrock.html),
-our PPoPP 2016 paper,
-[Gunrock: A High-Performance Graph Processing Library on the GPU](http://escholarship.org/uc/item/6xz7z9k0),
-and check out the
-[Publications](#Publications) section. See [Release Notes](http://gunrock.github.io/gunrock/doc/latest/release_notes.html) to keep up with the our latest changes.
+For more details, please visit our
+[website](http://gunrock.github.io/),
+read [Why Gunrock](http://gunrock.github.io/gunrock/doc/latest/why-gunrock.html),
+our PPoPP 2016 paper
+[Gunrock: A High-Performance Graph Processing Library on the GPU](http://escholarship.org/uc/item/6xz7z9k0)
+or (*new*) an extension of the PPoPP paper (submitted to ACM TOPC)
+[Gunrock: GPU Graph Analytics](http://arxiv.org/abs/1701.01170),
+look at our [results](#Results),
+and find more details in our [publications](#Publications).
+See [Release Notes](http://gunrock.github.io/gunrock/doc/latest/release_notes.html) to keep up with the our latest changes.
 
 Getting Started with Gunrock
 ----------------------------
@@ -29,9 +33,6 @@ application for most the functionality of Gunrock.
 - For the programming model we use in Gunrock, see
 [Programming Model](http://gunrock.github.io/gunrock/doc/latest/programming_model.html).
 
-- To use our stats logging and performance chart generation pipeline, please check
-out [Gunrock-to-JSON](http://gunrock.github.io/gunrock/doc/latest/gunrock_to_json.html).
-
 - We have also provided code samples for how to use
 [Gunrock's C interface](https://github.com/gunrock/gunrock/tree/master/shared_lib_tests)
 and how to
@@ -41,6 +42,21 @@ for two typical graph primitives.
 
 - For details on upcoming changes and features, see the [Road Map](http://gunrock.github.io/gunrock/doc/latest/road_map.html).
 
+<a name="Results"></a>
+Results and Analysis
+--------------------
+
+We are gradually adding summaries of our results to these web pages (please let us know if you would like other comparisons). These summaries also include a table of results along with links to the configuration and results of each individual run. We detail our [methodology for our measurements here](http://gunrock.github.io/gunrock/doc/latest/md_methodology.html).
+
+- [Gunrock performance compared with other engines for graph analytics](http://gunrock.github.io/gunrock/doc/latest/md_stats_engines_topc.html)
+- [Setting parameters for direction-optimized BFS](http://gunrock.github.io/gunrock/doc/latest/md_stats_do_ab_random.html)
+- [Gunrock results on different GPUs](http://gunrock.github.io/gunrock/doc/latest/md_stats_gunrock_gpus.html)
+- [Gunrock BFS throughput as a function of frontier size](http://gunrock.github.io/gunrock/doc/latest/md_stats_frontier.html)
+
+For reproducibility, we maintain Gunrock configurations and results in our github [gunrock/io](https://github.com/gunrock/io/tree/master/gunrock-output) repository.
+
+We are happy to run experiments with other engines, particularly if those engines output results in our JSON format / a format that can be easily parsed into JSON format.
+
 Reporting Problems
 ------------------
 
@@ -49,60 +65,33 @@ directly using [Github](https://github.com/gunrock/gunrock/issues).
 
 <!-- TODO: Algorithm Input Size Limitations -->
 
-<a name="OS_Support"></a>
-Operating System Support and Requirements
-=========================================
-
-This release (0.3) has only been tested on Linux Mint 15 (64-bit) and Ubuntu
-12.04 with CUDA 5.5, 6.0, 6.5, and 7.0 installed. We expect Gunrock to build
-and run correctly on other 64-bit and 32-bit Linux distributions, Mac OS,
-and Windows.
-
-Requirements
-------------
-
-CUDA version 5.5 (or greater) and compute capability 3.0 (or greater) is
-required.
-
-Several graph primitives' CPU validation code uses Boost Graph
-Library.  We are also using Boost Spirit, filesystem, predef, chrono,
-and timer in our utility code.  A boost version > 1.53.0 is required.
-
-CUDA
-====
-
-Gunrock is implemented in [CUDA C/C++](http://developer.nvidia.com/cuda).  It
-requires the CUDA Toolkit. Please see the NVIDIA
-[CUDA](http://developer.nvidia.com/cuda-downloads) homepage to download CUDA as
-well as the CUDA Programming Guide and CUDA SDK, which includes many CUDA code
-examples. Please refer to [NVIDIA CUDA Getting Started Guide for
-Linux](http://docs.nvidia.com/cuda/cuda-getting-started-guide-for-linux) for
-detailed information.
 
 <a name="Publications"></a>
 Publications
 ------------
 
-Leyuan Wang, Yangzihao Wang, Carl Yang, and John D. Owens. **A Comparative Study on Exact Triangle Counting Algorithms on the GPU**. In Proceedings of the 1st High Performance Graph Processing Workshop, HPGP '16, May 2016.
+Yangzihao Wang, Yuechao Pan, Andrew Davidson, Yuduo Wu, Carl Yang, Leyuan Wang, Muhammad Osama, Chenshan Yuan, Weitang Liu, Andy T. Riffel, and John D. Owens. **Gunrock: GPU Graph Analytics**. CoRR, abs/1701.01170(1701.01170v1), January 2017. [[arXiv](http://arxiv.org/abs/1701.01170)]
+
+Yuechao Pan, Yangzihao Wang, Yuduo Wu, Carl Yang, and John D. Owens.
+**Multi-GPU Graph Analytics**. CoRR, abs/1504.04804(1504.04804v3), October 2016.
+[[arXiv](http://arxiv.org/abs/1504.04804)]
+
+Leyuan Wang, Yangzihao Wang, Carl Yang, and John D. Owens. **A Comparative Study on Exact Triangle Counting Algorithms on the GPU**. In Proceedings of the 1st High Performance Graph Processing Workshop, HPGP '16, pages 1--8, May 2016.
 [[DOI](http://dx.doi.org/10.1145/2915516.2915521) |
 [http](http://www.escholarship.org/uc/item/9hf0m6w3)]
 
-Yuechao Pan, Yangzihao Wang, Yuduo Wu, Carl Yang, and John D. Owens.
-**Multi-GPU Graph Analytics**. CoRR, abs/1504.04804(1504.04804v2), April 2016.
-[[arXiv](http://arxiv.org/abs/1504.04804)]
-
 Yangzihao Wang, Andrew Davidson, Yuechao Pan, Yuduo Wu, Andy Riffel, and John D. Owens.
 **Gunrock: A High-Performance Graph Processing Library on the GPU**.
-In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming, PPoPP '16, pages 11:1--11:12, March 2016. Distinguished Paper. [[DOI](http://dx.doi.org/10.1145/2851141.2851145) | [http](http://escholarship.org/uc/item/6xz7z9k0)]
+In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming, [PPoPP '16](http://conf.researchr.org/home/ppopp-2016), pages 11:1--11:12, March 2016. Distinguished Paper. [[DOI](http://dx.doi.org/10.1145/2851141.2851145) | [http](http://escholarship.org/uc/item/6xz7z9k0)]
 
 Yuduo Wu, Yangzihao Wang, Yuechao Pan, Carl Yang, and John D. Owens.
 **Performance Characterization for High-Level Programming Models for GPU Graph
 Analytics**. In IEEE International Symposium on Workload Characterization,
-IISWC2015, October 2015. [[DOI](http://dx.doi.org/10.1109/IISWC.2015.13) | [http](http://web.ece.ucdavis.edu/~wyd855/iiswc-submission-2015.pdf)]
+IISWC-2015, pages 66--75, October 2015. Best Paper finalist. [[DOI](http://dx.doi.org/10.1109/IISWC.2015.13) | [http](http://escholarship.org/uc/item/2t69m5ht)]
 
 Carl Yang, Yangzihao Wang, and John D. Owens.
 **Fast Sparse Matrix and Sparse Vector Multiplication Algorithm on the GPU**.
-In Graph Algorithms Building Blocks, GABB 2015, May 2015.
+In Graph Algorithms Building Blocks, GABB 2015, pages 841--847, May 2015.
 [[DOI](http://dx.doi.org/10.1109/IPDPSW.2015.77) | [http](http://www.escholarship.org/uc/item/1rq9t3j3)]
 
 Afton Geil, Yangzihao Wang, and John D. Owens.
@@ -172,7 +161,8 @@ to Erich Elsen and Vishal Vaidyanathan from
 [Royal Caliber](http://www.royal-caliber.com/) and the [Onu](http://www.onu.io/) Team for their discussion on
 library development and the dataset auto-generating code. Thanks to
 Adam McLaughlin for his technical discussion. Thanks to Oded Green
-on his technical discussion and an optimization in CC primitive.
+for his technical discussion and an optimization in the CC primitive.
+Thanks to the [Altair](https://altair-viz.github.io/) and [Vega-lite](https://vega.github.io/vega-lite/) teams in the [Interactive Data Lab](http://idl.cs.washington.edu/) at the University of Washington for graphing help. We appreciate the technical assistance, advice, and machine access from many colleagues at NVIDIA: Chandra Cheij, Joe Eaton, Michael Garland, Mark Harris, Ujval Kapasi, David Luebke, Duane Merrill, Nikolai Sakharnykh, and Cliff Woolley.
 
 This work was funded by the DARPA XDATA program under AFRL Contract
 FA8750-13-C-0002, by NSF awards CCF-1017399, OCI-1032859, and
@@ -181,12 +171,13 @@ W911NF-16-C-0020. Our XDATA principal investigator is Eric Whyne of
 [Data Tactics Corporation](http://www.data-tactics.com/) and our DARPA
 program managers are Dr. Christopher White (2012--2014) and
 [Mr. Wade Shen](http://www.darpa.mil/staff/mr-wade-shen)
-(2015--present).
+(2015--present). Thanks to Chris, Wade, and DARPA business manager
+Gabriela Araujo for their support during the XDATA program.
 
 Copyright and Software License
 ----------------------------
 
 Gunrock is copyright The Regents of the University of
-California, 2013--2016. The library, examples, and all source code are
+California, 2013--2017. The library, examples, and all source code are
 released under
 [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0).

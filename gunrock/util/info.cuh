@@ -14,6 +14,8 @@
 
 #pragma once
 
+#define RECORD_PER_ITERATION_STATS 0
+
 namespace gunrock {
 namespace util {
 
@@ -103,9 +105,9 @@ public:
         info["mark_predecessors"]  = false;  // mark predecessors (BFS, SSSP)
         info["max_grid_size"]      = 0;      // maximum grid size
         info["max_iteration"]      = 50;     // default maximum iteration
-        info["max_in_sizing"]      = 1.0f;   // maximum in queue sizing factor
-        info["max_queue_sizing"]   = 1.0f;   // maximum queue sizing factor
-        info["max_queue_sizing1"]  = -1.0f;   // maximum queue sizing factor
+        info["max_in_sizing"]      = -1.0f;  // maximum in queue sizing factor
+        info["max_queue_sizing"]   = -1.0f;  // maximum queue sizing factor
+        info["max_queue_sizing1"]  = -1.0f;  // maximum queue sizing factor
         info["m_teps"]             = 0.0f;   // traversed edges per second
         info["num_gpus"]           = 1;      // number of GPU(s) used
         info["nodes_visited"]      = 0;      // number of nodes visited
@@ -150,6 +152,9 @@ public:
         info["do_a"               ]= 0.001;  // direction optimization parameter
         info["do_b"               ]= 0.200;  // direction optimization parameter
         info["duplicate_graph"    ]= false;  // whether to duplicate graph on every GPUs
+        info["64bit_VertexId"     ]= (sizeof(VertexId) == 8) ? true : false;
+        info["64bit_SizeT"        ]= (sizeof(SizeT   ) == 8) ? true : false;
+        info["64bit_Value"        ]= (sizeof(Value   ) == 8) ? true : false;
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -418,6 +423,12 @@ public:
             args.GetCmdLineArgument("do_b", do_b);
             info["do_b"] = do_b;
         }
+        if (args.CheckCmdLineFlag("tag"))
+        {
+            std::string tag = "";
+            args.GetCmdLineArgument("tag", tag);
+            info["tag"] = tag;
+        }
 
         // parse device count and device list
         info["device_list"] = GetDeviceList(args);
@@ -508,6 +519,9 @@ public:
         InitBase(algorithm_name, args);
         if (info["destination_vertex"].get_int64() < 0 || info["destination_vertex"].get_int64()>=(int)csr_ref.nodes)
             info["destination_vertex"] = (int)csr_ref.nodes-1;   //if not set or something is wrong, set it to the largest vertex ID
+        info["stddev_degrees"] = (float)csr_ref.GetStddevDegree();
+        info["num_vertices"] = (int64_t)csr_ref.nodes;
+        info["num_edges"   ] = (int64_t)csr_ref.edges;
     }
 
     /**
@@ -558,7 +572,10 @@ public:
         csr_ptr = &csr_ref;  // set CSR pointer
         csc_ptr = &csc_ref;  // set CSC pointer
         InitBase(algorithm_name, args);
-        info["destination_vertex"] = (int)csr_ref.nodes-1;   //by default set it to the largest vertex ID
+        info["destination_vertex"] = (int64_t)csr_ref.nodes-1;   //by default set it to the largest vertex ID
+        info["stddev_degrees"] = (float)csr_ref.GetStddevDegree();
+        info["num_vertices"] = (int64_t)csr_ref.nodes;
+        info["num_edges"   ] = (int64_t)csr_ref.edges;
     }
 
     /**
@@ -645,6 +662,42 @@ public:
             }
         }
         return source_list;
+    }
+
+    /**
+     * @brief Utility function to parse per-iteration advance stats.
+     *
+     * @param[in] runtime_list std::vector stores per iteration runtime.
+     * @param[in] mteps_list std::vector stores per iteration mteps.
+     * @param[in] input_frontier_list std::vector stores per iteration input frontier number.
+     * @param[in] output_frontier_list std::vector stores per iteration output frontier number.
+     * @param[in] dir_list std::vector stores per iteration advance direction.
+     * @param[in] runtimes json_spirit::mArray to store per iteration runtimes.
+     * @param[in] mteps json_spirit::mArray to store per iteration mteps.
+     * @param[in] output_frontiers json_spirit::mArray to store per iteration output frontier numbers.
+     * @param[in] dirs json_spirit::mArray to store per iteration direction.
+     *
+     */
+    void GetPerIterationAdvanceStats(
+        std::vector<float> &runtime_list,
+        std::vector<float> &mteps_list,
+        std::vector<int> &input_frontier_list,
+        std::vector<int> &output_frontier_list,
+        std::vector<bool> &dir_list,
+        json_spirit::mArray &runtimes,
+        json_spirit::mArray &mteps,
+        json_spirit::mArray &input_frontiers,
+        json_spirit::mArray &output_frontiers,
+        json_spirit::mArray &dirs)
+    {
+        for (int i = 0; i < runtime_list.size(); ++i) {
+            runtimes.push_back(runtime_list[i]);
+            mteps.push_back(mteps_list[i]);
+            input_frontiers.push_back(input_frontier_list[i]);
+            output_frontiers.push_back(output_frontier_list[i]);
+            dirs.push_back(dir_list[i]?"push":"pull");
+        }
+        return;
     }
 
     /**
@@ -875,7 +928,14 @@ public:
             info["rmat_edgefactor"] = (int64_t)rmat_edgefactor;
             info["rmat_vmin"] = rmat_vmin;
             info["rmat_vmultipiler"] = rmat_vmultipiler;
-
+            //can use to_string since c++11 is required, niiiice.
+            file_stem = "rmat_" + 
+                (args.CheckCmdLineFlag("rmat_scale") ? 
+                    ("n" + std::to_string(rmat_scale)) : std::to_string(rmat_nodes)) 
+               + "_" + (args.CheckCmdLineFlag("rmat_edgefactor") ? 
+                    ("e" + std::to_string(rmat_edgefactor)) : std::to_string(rmat_edges));
+            info["dataset"] = file_stem;
+            
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
 
@@ -982,7 +1042,14 @@ public:
             info["rgg_thfactor"]    = rgg_thfactor;
             info["rgg_threshold"]   = rgg_threshold;
             info["rgg_vmultipiler"] = rgg_vmultipiler;
-
+            //file_stem = "rgg_s"+std::to_string(rgg_scale)+"_e"+std::to_string(csr_ref.edges)+"_f"+std::to_string(rgg_thfactor);
+            file_stem = "rgg_" + 
+                (args.CheckCmdLineFlag("rgg_scale") ? 
+                    ("n" + std::to_string(rgg_scale)) : std::to_string(rgg_nodes)) 
+               + "_" + (args.CheckCmdLineFlag("rgg_thfactor") ? 
+                    ("t" + std::to_string(rgg_thfactor)) : std::to_string(rgg_threshold));
+            info["dataset"] = file_stem;
+ 
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
 
@@ -1040,7 +1107,12 @@ public:
             info["sw_k"          ] = (int64_t)sw_k          ;
             info["sw_vmultipiler"] = sw_vmultipiler;
             info["sw_vmin"       ] = sw_vmin       ;
-
+            file_stem = "smallworld_" + 
+                (args.CheckCmdLineFlag("sw_scale") ? 
+                    ("n" + std::to_string(sw_scale)) : std::to_string(sw_nodes))
+                + "k" + std::to_string(sw_k) + "_p" + std::to_string(sw_p); 
+            info["dataset"] = file_stem;
+ 
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
             if (graphio::small_world::BuildSWGraph<EDGE_VALUE>(
@@ -1093,6 +1165,7 @@ public:
      *
      * @param[in] args Command line arguments.
      * @param[in] csr_ref Reference to the CSR graph.
+     * @param[in] type normal type or qeury type
      *
      * \return int whether successfully loaded the graph (0 success, 1 error).
      */
@@ -1176,7 +1249,6 @@ public:
      /**
      * @brief SM Initialization process for Info.
      *
-     * @param[in] algorithm_name Algorithm name.
      * @param[in] args Command line arguments.
      * @param[in] csr_query_ref Reference to the CSR structure.
      * @param[in] csr_data_ref Reference to the CSR structure.
@@ -1261,6 +1333,34 @@ public:
                 total_lifetimes += estats->total_lifetimes;
                 total_runtimes  += estats->total_runtimes;
             }
+        }
+
+        if (get_traversal_stats && RECORD_PER_ITERATION_STATS)
+        {
+            // TODO: collect info for multi-GPUs
+            EnactorStats *estats = enactor_stats;
+            json_spirit::mArray per_iteration_advance_runtime; 
+            json_spirit::mArray per_iteration_advance_mteps; 
+            json_spirit::mArray per_iteration_advance_input_frontier; 
+            json_spirit::mArray per_iteration_advance_output_frontier; 
+            json_spirit::mArray per_iteration_advance_dir;
+            GetPerIterationAdvanceStats(
+                    estats->per_iteration_advance_time,
+                    estats->per_iteration_advance_mteps,
+                    estats->per_iteration_advance_input_edges,
+                    estats->per_iteration_advance_output_edges,
+                    estats->per_iteration_advance_direction,
+                    per_iteration_advance_runtime,
+                    per_iteration_advance_mteps,
+                    per_iteration_advance_input_frontier,
+                    per_iteration_advance_output_frontier,
+                    per_iteration_advance_dir);
+
+            info["per_iteration_advance_runtime"] = per_iteration_advance_runtime;
+            info["per_iteration_advance_mteps"] = per_iteration_advance_mteps;
+            info["per_iteration_advance_input_frontier"] = per_iteration_advance_input_frontier;
+            info["per_iteration_advance_output_frontier"] = per_iteration_advance_output_frontier;
+            info["per_iteration_advance_direction"] = per_iteration_advance_dir;
         }
 
         double avg_duty = (total_lifetimes > 0) ?
