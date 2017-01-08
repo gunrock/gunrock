@@ -15,6 +15,7 @@
 # Definitions of paths
 #----------------------------------------------------------------------------#
 CMAKELISTS="../CMakeLists.txt"
+DOXYGENEXE="doxygen"
 DOXYGENFILE="gunrock.doxygen"
 LOGFILE="doxygen.log"
 # JSONs for Vega plots should be put into the "graphs" directory
@@ -150,7 +151,7 @@ old_version=$(get_doxygen_variable "$DOXYGENFILE" "PROJECT_NUMBER") || error "Ca
 
 doxygen_output_path=$(get_doxygen_variable $DOXYGENFILE "HTML_OUTPUT")
 echo -n "Generating Doxygen pages in folder \"$doxygen_output_path\"..."
-doxygen "$DOXYGENFILE" > $LOGFILE 2>&1 || error "Doxygen failed. Please check $LOGFILE"
+"$DOXYGENEXE" "$DOXYGENFILE" > $LOGFILE 2>&1 || error "Doxygen failed. Please check $LOGFILE"
 
 # Warn you if there are doxygen warnings
 
