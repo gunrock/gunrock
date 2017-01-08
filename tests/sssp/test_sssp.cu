@@ -26,7 +26,6 @@
 #include <gunrock/app/sssp/sssp_problem.cuh>
 #include <gunrock/app/sssp/sssp_functor.cuh>
 
-
 #include <gunrock/app/sample/sample_enactor.cuh>
 
 // Operator includes

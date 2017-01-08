@@ -135,6 +135,10 @@ option(GUNROCK_APP_SALSA
   "If on, builds only SALSA application."
   OFF)
 
+option(GUNROCK_APP_MST
+  "If on, builds only MST application."
+  OFF)
+
 option(GUNROCK_APP_WTF
   "If on, builds only WTF application."
   OFF)
@@ -264,6 +268,7 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(tests/sssp)
   add_subdirectory(tests/hits)
   add_subdirectory(tests/salsa)
+  add_subdirectory(tests/mst)
   add_subdirectory(tests/wtf)
   add_subdirectory(tests/topk)
   #add_subdirectory(tests/template)
@@ -299,6 +304,10 @@ else(GUNROCK_BUILD_APPLICATIONS)
   if(GUNROCK_APP_SALSA)
     add_subdirectory(tests/salsa)
   endif(GUNROCK_APP_SALSA)
+
+  if(GUNROCK_APP_MST)
+    add_subdirectory(tests/mst)
+  endif(GUNROCK_APP_MST)
 
   if(GUNROCK_APP_WTF)
     add_subdirectory(tests/wtf)
@@ -342,6 +351,11 @@ set_tests_properties(TEST_PAGERANK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 add_test(NAME TEST_TOPK COMMAND topk market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
 set_tests_properties(TEST_TOPK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+# bips98_606.mtx is not fully-connected graph so use largest small graph instead
+add_test(NAME TEST_MST COMMAND mst market
+  ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx)
+set_tests_properties(TEST_MST PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
 ### shared library application interface tests
 add_test(NAME SHARED_LIB_TEST_BFS COMMAND shared_lib_bfs)
@@ -409,6 +423,10 @@ if(GUNROCK_MGPU_TESTS)
   #  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
   # set_tests_properties(TEST_TOPK PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
- endif(GUNROCK_MGPU_TESTS)
+  # add_test(NAME TEST_MGPU_MST COMMAND mst market
+  #  ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx ${DEVICES})
+  # set_tests_properties(TEST_MST PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+
+endif(GUNROCK_MGPU_TESTS)
 
 # end /* Enable Testing for `ctest` */
