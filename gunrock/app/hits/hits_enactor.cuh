@@ -14,18 +14,18 @@
 
 #pragma once
 
+#include <thread>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/test_utils.cuh>
-
+#include <gunrock/util/sort_utils.cuh>
+#include <gunrock/util/sharedmem.cuh>
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel_policy.cuh>
-
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/hits/hits_problem.cuh>
 #include <gunrock/app/hits/hits_functor.cuh>
-
 #include <moderngpu.cuh>
 
 using namespace mgpu;
@@ -39,8 +39,8 @@ namespace hits {
  *
  * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
  */
-template <typename _Problem /*, bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK*/>
-class HITSEnactor : public EnactorBase<typename _Problem::SizeT/*, _DEBUG, _SIZE_CHECK*/>
+template <typename _Problem>
+class HITSEnactor : public EnactorBase<typename _Problem::SizeT>
 {
 public:
     typedef _Problem                   Problem;
@@ -50,15 +50,10 @@ public:
     typedef EnactorBase<SizeT>         BaseEnactor;
     Problem    *problem;
     ContextPtr *context;
-    //static const bool INSTRUMENT = _INSTRUMENT;
-    //static const bool DEBUG      = _DEBUG;
-    //static const bool SIZE_CHECK = _SIZE_CHECK;
 
     // Members
     protected:
 
-    //volatile int        *done;
-    //int                 *d_done;
 
     /**
      * Current iteration, also used to get the final search depth of the HITS search
@@ -67,24 +62,6 @@ public:
 
     // Methods
     protected:
-
-    /**
-     * @brief Prepare the enactor for HITS kernel call. Must be called prior to each HITS search.
-     *
-     * @param[in] problem HITS Problem object which holds the graph data and HITS problem data to compute.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    /*cudaError_t Setup(
-        Problem *problem)
-    {
-        //typedef typename ProblemData::SizeT         SizeT;
-        //typedef typename ProblemData::VertexId      VertexId;
-
-        cudaError_t retval = cudaSuccess;
-
-        return retval;
-    }*/
 
     public:
 
@@ -121,11 +98,9 @@ public:
         if (hub_or_auth == 0) {
             rank_curr = problem->data_slices[0]->hrank_curr.GetPointer(util::DEVICE);
             rank_next = problem->data_slices[0]->hrank_next.GetPointer(util::DEVICE);
-            //printf("hub\n");
         } else {
             rank_curr = problem->data_slices[0]->arank_curr.GetPointer(util::DEVICE);
             rank_next = problem->data_slices[0]->arank_next.GetPointer(util::DEVICE);
-            //printf("auth\n");
         }
 
         //swap rank_curr and rank_next
@@ -170,14 +145,10 @@ public:
     /**
      * @brief Enacts a HITS computing on the specified graph.
      *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam VertexMapPolicy Kernel policy for vertex mapping.
-     * @tparam HITSProblem HITS Problem type.
+     * @tparam AdvanceKernelPolicy Kernel policy for advance.
+     * @tparam FilterKernelPolicy Kernel policy for filter.
      *
-     * @param[in] context CudaContext for moderngpu library
-     * @param[in] problem HITSProblem object.
      * @param[in] max_iteration Max number of iterations of HITS algorithm
-     * @param[in] max_grid_size Max grid size for HITS kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
@@ -185,10 +156,7 @@ public:
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>
     cudaError_t EnactHITS(
-        //ContextPtr       context,
-        //Problem         *problem,
         SizeT            max_iteration)
-        //int              max_grid_size = 0)
     {
         typedef HUBFunctor<
             VertexId,
@@ -206,7 +174,7 @@ public:
                      *graph_slice        = problem->graph_slices       [0];
         FrontierAttribute<SizeT>
                      *frontier_attribute = &this->frontier_attribute   [0];
-        EnactorStats *enactor_stats      = &this->enactor_stats        [0];
+        EnactorStats<SizeT> *enactor_stats      = &this->enactor_stats        [0];
         // Single-gpu graph slice
         typename Problem::DataSlice
                      *data_slice         =  problem->data_slices       [0];
@@ -214,7 +182,7 @@ public:
                      *d_data_slice       =  problem->d_data_slices     [0];
         util::DoubleBuffer<VertexId, SizeT, Value>
                      *frontier_queue     = &data_slice->frontier_queues[0];
-        util::CtaWorkProgressLifetime
+        util::CtaWorkProgressLifetime<SizeT>
                      *work_progress      = &this->work_progress        [0];
         cudaStream_t  stream             =  data_slice->streams        [0];
         ContextPtr    context            =  this -> context            [0];
@@ -249,9 +217,11 @@ public:
                 //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, AuthFunctor>(
+                    <AdvanceKernelPolicy, Problem, AuthFunctor, gunrock::oprtr::advance::V2V>(
                     enactor_stats[0],
                     frontier_attribute[0],
+                    typename AuthFunctor::LabelT(),
+                    data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
@@ -269,11 +239,7 @@ public:
                     graph_slice->edges,//graph_slice->frontier_elements[frontier_attribute.selector^1],                 // max_out_queue
                     work_progress[0],
                     context[0],
-                    stream,
-                    gunrock::oprtr::advance::V2V,
-                    false,
-                    false,
-                    true);
+                    stream);
 
                 if (this -> debug)
                 {
@@ -288,10 +254,11 @@ public:
                 //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, HubFunctor>(
-                    //d_done,
+                    <AdvanceKernelPolicy, Problem, HubFunctor, gunrock::oprtr::advance::V2V>(
                     enactor_stats[0],
                     frontier_attribute[0],
+                    typename HubFunctor::LabelT(),
+                    data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
@@ -309,11 +276,7 @@ public:
                     graph_slice->edges,//graph_slice->frontier_elements[frontier_attribute.selector^1],                 // max_out_queue
                     work_progress[0],
                     context[0],
-                    stream,
-                    gunrock::oprtr::advance::V2V,
-                    false,
-                    false,
-                    true);
+                    stream);
 
                 //util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
 
@@ -405,7 +368,6 @@ public:
      *
      * @param[in] context CudaContext for moderngpu library
      * @param[in] problem Pointer to HITSProblem object.
-     * @param[in] max_iteration Max iteration number for the algorithm
      * @param[in] max_grid_size Max grid size for HITS kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -438,18 +400,12 @@ public:
      *
      * @tparam HITSProblem HITS Problem type. @see HITSProblem
      *
-     * @param[in] context CudaContext for moderngpu library
-     * @param[in] problem Pointer to HITSProblem object.
      * @param[in] max_iteration Max iteration number for the algorithm
-     * @param[in] max_grid_size Max grid size for HITS kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Enact(
-        //ContextPtr  context,
-        //Problem    *problem,
         SizeT       max_iteration)
-        //int         max_grid_size = 0)
     {
         int min_sm_version = -1;
         for (int i=0;i<this->num_gpus;i++)

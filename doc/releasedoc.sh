@@ -15,10 +15,11 @@
 # Definitions of paths
 #----------------------------------------------------------------------------#
 CMAKELISTS="../CMakeLists.txt"
+DOXYGENEXE="doxygen"
 DOXYGENFILE="gunrock.doxygen"
 LOGFILE="doxygen.log"
 # JSONs for Vega plots should be put into the "graphs" directory
-GRAPHSDIR="graphs" 
+GRAPHSDIR="graphs"
 
 #----------------------------------------------------------------------------#
 # Colored terminal ouput
@@ -33,54 +34,54 @@ COLOR_C='\033[1;36m'
 COLOR_OFF='\033[m'
 
 highlighted () {
-	local message=$1	
-	echo -e -n $COLOR_B
-	echo -e "$message"
-	echo -e -n $COLOR_OFF
+        local message=$1
+        echo -e -n $COLOR_B
+        echo -e "$message"
+        echo -e -n $COLOR_OFF
 }
 
 warn () {
-	local message=$1	
-	echo -e -n $COLOR_M
-	echo -e "$message"
-	echo -e -n $COLOR_OFF
+        local message=$1
+        echo -e -n $COLOR_M
+        echo -e "$message"
+        echo -e -n $COLOR_OFF
 }
 
 error () {
-	local message=$1	
-	echo -e -n $COLOR_R
-	echo -e "$message"
-	echo -e -n $COLOR_OFF
-	exit
+        local message=$1
+        echo -e -n $COLOR_R
+        echo -e "$message"
+        echo -e -n $COLOR_OFF
+        exit
 }
 
 #----------------------------------------------------------------------------#
 # Utility functions for extracting verion information from CMakeLists.txt
 #----------------------------------------------------------------------------#
 extract_version () {
-	local cmakelists=$1
-	local version_major=""; local version_minor=""
-	version_major=$($GREP -Po 'gunrock_VERSION_MAJOR \K[0-9]+' $cmakelists) || return 1
-	version_minor=$($GREP -Po 'gunrock_VERSION_MINOR \K[0-9]+' $cmakelists) || return 1
-	echo $version_major.$version_minor
-	return 0
+        local cmakelists=$1
+        local version_major=""; local version_minor=""
+        version_major=$($GREP -Po 'gunrock_VERSION_MAJOR \K[0-9]+' $cmakelists) || return 1
+        version_minor=$($GREP -Po 'gunrock_VERSION_MINOR \K[0-9]+' $cmakelists) || return 1
+        echo $version_major.$version_minor
+        return 0
 }
 
 #----------------------------------------------------------------------------#
 # Utility functions for obtaining/updating doxygen configuration
 #----------------------------------------------------------------------------#
 update_doxygen_variable () {
-	local doxygenfile=$1
-	local doxygen_variable=$2
-	local value=$3
-	$SED -i'' 's/\('"$doxygen_variable"'[[:space:]]*=[[:space:]]*\).*/\1'$value'/g' $doxygenfile
+        local doxygenfile=$1
+        local doxygen_variable=$2
+        local value=$3
+        $SED -i'' 's/\('"$doxygen_variable"'[[:space:]]*=[[:space:]]*\).*/\1'$value'/g' $doxygenfile
 }
 
 get_doxygen_variable () {
-	local doxygenfile=$1
-	local doxygen_variable=$2
-	$GREP -Po "$doxygen_variable"'[[:space:]]*=[[:space:]]*\K.*' $doxygenfile || return 1
-	return 0
+        local doxygenfile=$1
+        local doxygen_variable=$2
+        $GREP -Po "$doxygen_variable"'[[:space:]]*=[[:space:]]*\K.*' $doxygenfile || return 1
+        return 0
 }
 
 #----------------------------------------------------------------------------#
@@ -88,11 +89,11 @@ get_doxygen_variable () {
 #----------------------------------------------------------------------------#
 
 version_compare_lte () {
-	[ "$1" == "$(echo -e "$1\n$2" | $SORT -V | head -n1)" ]
+        [ "$1" == "$(echo -e "$1\n$2" | $SORT -V | head -n1)" ]
 }
 
 version_compare_lt () {
-	[ "$1" == "$2" ] && return 1 || version_compare_lte $1 $2
+        [ "$1" == "$2" ] && return 1 || version_compare_lte $1 $2
 }
 
 #----------------------------------------------------------------------------#
@@ -100,14 +101,14 @@ version_compare_lt () {
 #----------------------------------------------------------------------------#
 
 check_tools () {
-	local var_name=$(echo $1 | tr '[:lower:]' '[:upper:]')
-	local tool_name=$(echo $1 | tr '[:upper:]' '[:lower:]')
-	echo -n "Checking for $tool_name..."
-	eval "$var_name=\"\""
-	hash "$tool_name" 2> /dev/null && eval "$var_name=$tool_name"
-	hash "g$tool_name" 2> /dev/null && eval "$var_name=g$tool_name"
-	highlighted "${!var_name}"
-	[ -z "${!var_name}" ] && error "Please install GNU $tool_name"
+        local var_name=$(echo $1 | tr '[:lower:]' '[:upper:]')
+        local tool_name=$(echo $1 | tr '[:upper:]' '[:lower:]')
+        echo -n "Checking for $tool_name..."
+        eval "$var_name=\"\""
+        hash "$tool_name" 2> /dev/null && eval "$var_name=$tool_name"
+        hash "g$tool_name" 2> /dev/null && eval "$var_name=g$tool_name"
+        highlighted "${!var_name}"
+        [ -z "${!var_name}" ] && error "Please install GNU $tool_name"
 }
 
 #----------------------------------------------------------------------------#
@@ -116,13 +117,13 @@ check_tools () {
 
 # OS and tools check
 
-REQIORED_TOOLS=("grep" "sort" "sed" "find")
+REQUIRED_TOOLS=("grep" "sort" "sed" "find")
 
 echo -n "We are running on "
 os=$(uname -s)
 highlighted $os
-for i in ${!REQIORED_TOOLS[@]}; do
-	check_tools "${REQIORED_TOOLS[i]}"
+for i in ${!REQUIRED_TOOLS[@]}; do
+        check_tools "${REQUIRED_TOOLS[i]}"
 done
 
 # Check if we are inside master or dev branch
@@ -130,10 +131,10 @@ done
 echo -n "We are running in branch "
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 highlighted $current_branch
-[ "$current_branch" != "master" -a "$current_branch" != "dev" ] && error "Please run this script inside master or dev branch!"
+[ "$current_branch" != "master" -a "$current_branch" != "pre-release" ] && error "Please run this script inside master or dev branch!"
 
 
-# Extract the lastest version number from CMakeLists.txt
+# Extract the latest version number from CMakeLists.txt
 
 echo -n "Checking gunrock version number..."
 gunrock_version=$(extract_version "$CMAKELISTS") || error "Can't find version numbers in $CMAKELISTS. Please run this script in 'doc' folder!"
@@ -150,7 +151,7 @@ old_version=$(get_doxygen_variable "$DOXYGENFILE" "PROJECT_NUMBER") || error "Ca
 
 doxygen_output_path=$(get_doxygen_variable $DOXYGENFILE "HTML_OUTPUT")
 echo -n "Generating Doxygen pages in folder \"$doxygen_output_path\"..."
-doxygen "$DOXYGENFILE" > $LOGFILE 2>&1 || error "Doxygen failed. Please check $LOGFILE"
+"$DOXYGENEXE" "$DOXYGENFILE" > $LOGFILE 2>&1 || error "Doxygen failed. Please check $LOGFILE"
 
 # Warn you if there are doxygen warnings
 
@@ -164,12 +165,12 @@ rm $LOGFILE
 echo -n "Copying Vega graphs..."
 if [ "$(ls -A $GRAPHSDIR 2>/dev/null)" ]
 then
-	cp -r "$GRAPHSDIR" "$doxygen_output_path"/
-	highlighted "done"
-	graphs_exist=true
+        cp -r "$GRAPHSDIR" "$doxygen_output_path"/
+        highlighted "done"
+        graphs_exist=true
 else
-	highlighted "skipped ($GRAPHSDIR folder is empty)"
-	graphs_exist=false
+        highlighted "skipped ($GRAPHSDIR folder is empty)"
+        graphs_exist=false
 fi
 
 # Switch to gh-pages branch, and check if documentation for that version exists or not
@@ -187,10 +188,10 @@ echo -n "Found old documentation for $prev_doc_revs- "
 [[ $prev_doc_revs == *"$gunrock_version"* ]] && read -p "I will remove the folder containing old documentation for $gunrock_version. Proceed? [Y/n] " -r users_anwser
 users_anwser=${users_anwser:-"Y"}
 if ! [[ $users_anwser =~ ^[Yy]$ ]]
-then	
-	git checkout "$current_branch" > /dev/null
-	git stash apply > /dev/null 2>&1
-	error "Exiting as requested by user's choice \"$users_anwser\""
+then
+        git checkout "$current_branch" > /dev/null
+        git stash apply > /dev/null 2>&1
+        error "Exiting as requested by user's choice \"$users_anwser\""
 fi
 
 # Update the 'latest' symbolink if we are generating docs for lastest version
@@ -200,11 +201,11 @@ mv "$doxygen_output_path" "$gunrock_version"
 $graphs_exist && rsync -ac "$gunrock_version"/"$GRAPHSDIR"/ "$GRAPHSDIR"
 if version_compare_lt $gunrock_version $prev_doc_latest
 then
-	echo "We are not updating the latest docs. No need to update symbolink."
+        echo "We are not updating the latest docs. No need to update symbolink."
 else
-	echo "We are updating the latest docs. Will update symbolink."
-	rm "latest"
-	ln -sv "$gunrock_version" "latest"
+        echo "We are updating the latest docs. Will update symbolink."
+        rm "latest"
+        ln -sv "$gunrock_version" "latest"
 fi
 echo -n "Latest documentation have been updated to folder "; highlighted $gunrock_version
 
@@ -220,12 +221,12 @@ git commit -e -am "updated docs for $gunrock_version"
 
 if [ $? -ne 0 ]
 then
-	read -p "Commit aborted. Reset gh-pages to last commit? [Y/n] " -r users_anwser
-	users_anwser=${users_anwser:-"Y"}
-	if [[ $users_anwser =~ ^[Yy]$ ]]
-	then
-		git reset HEAD --hard
-	fi
+        read -p "Commit aborted. Reset gh-pages to last commit? [Y/n] " -r users_anwser
+        users_anwser=${users_anwser:-"Y"}
+        if [[ $users_anwser =~ ^[Yy]$ ]]
+        then
+                git reset HEAD --hard
+        fi
 fi
 
 # switch back to original branch
@@ -234,4 +235,3 @@ git checkout "$current_branch" > /dev/null || error "Cannot switch back to $curr
 git stash apply > /dev/null 2>&1
 git stash drop > /dev/null 2>&1
 highlighted "Done! Please push after you verified everything looks good."
-

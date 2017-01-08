@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>sssp_problem.cuh</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>sssp_problem.cuh</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      <p>This data structure (the "Problem" struct) stores the graph
+topology in CSR format and the frontier. All Problem structs
+inherit from the ProblemBase struct. Algorithm-specific data is
+stored in a "DataSlice".</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="n">template</span><span class="o">&lt;</span>
+    <span class="kr">typename</span> <span class="n">VertexId</span><span class="p">,</span>
+    <span class="kr">typename</span> <span class="n">SizeT</span><span class="p">,</span>
+    <span class="kr">typename</span> <span class="n">Value</span><span class="p">,</span>
+    <span class="kt">bool</span> <span class="n">_MARK_PATHS</span><span class="o">&gt;</span> <span class="c1">// Whether to mark predecessor ID when advance</span>
+    <span class="k">struct</span> <span class="nl">SSSPProblem</span> <span class="p">:</span> <span class="n">public</span> <span class="n">ProblemBase</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">SizeT</span><span class="p">,</span> <span class="n">Value</span><span class="p">,</span>
+        <span class="nb">true</span><span class="p">,</span>  <span class="c1">// MARK_PREDECESSORS,</span>
+        <span class="nb">false</span><span class="o">&gt;</span> <span class="c1">// ENABLE_IDEMPOTENCE</span>
+<span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>MARK_PREDECESSORS sets the predecessor node ID during a
+traversal for each node in the new frontier.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">static</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">MARK_PREDECESSORS</span>     <span class="o">=</span> <span class="nb">true</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>ENABLE_IDEMPOTENCE is an optimization when the operation
+performed in parallel for all neighbor nodes/edges is
+idempotent, meaning data races are benign.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">static</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">ENABLE_IDEMPOTENCE</span>    <span class="o">=</span> <span class="nb">false</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>Maximum number of vertex associative values of VertexId type during communication,
+only used to transmit predecessors</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">static</span> <span class="k">const</span> <span class="kt">int</span> <span class="n">MAX_NUM_VERTEX_ASSOCIATES</span> <span class="o">=</span> <span class="n">MARK_PATHS</span> <span class="o">?</span> <span class="mi">1</span><span class="o">:</span><span class="mi">0</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>Maximum number of vertex associative values of Value type during communication,
+only used to transmit distance</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">static</span> <span class="k">const</span> <span class="kt">int</span> <span class="n">MAX_NUM_VALUE_ASSOCIATES</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>The DataSlice struct stores per-node or per-edge arrays and
+global variables (if any) that are specific to this particular
+algorithm. Here, we store the depth value and predecessor node
+ID for each node.
+Array1D is a data structure we build in Gunrock that used for
+efficient 1D array operation and GPU-CPU data movement.
+There are two additional device 1D arrays defined in BaseDataSlice,
+they are:</p>
+<p>preds: that contains predecessor node ID for traversal-based primitives.
+original_vertex: used for multi-GPU, where GPU i maps the original
+vertex IDs to [0..|Vi|-1] and stores the original vertex IDs in this array.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">struct</span> <span class="nl">DataSlice</span> <span class="p">:</span> <span class="n">BaseDataSlice</span>
+    <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>device storage arrays
+util::Array1D<SizeT, VertexId> labels     ; // node labels from source node, defined by BaseDataSlice</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">util</span><span class="o">::</span><span class="n">Array1D</span><span class="o">&lt;</span><span class="n">SizeT</span><span class="p">,</span> <span class="n">Value</span>   <span class="o">&gt;</span> <span class="n">distances</span>  <span class="p">;</span> <span class="c1">// Used for source distance</span>
+        <span class="n">util</span><span class="o">::</span><span class="n">Array1D</span><span class="o">&lt;</span><span class="n">SizeT</span><span class="p">,</span> <span class="n">Value</span>   <span class="o">&gt;</span> <span class="n">weights</span>    <span class="p">;</span> <span class="c1">// Used for storing edge weights</span>
+
+        <span class="n">DataSlice</span><span class="p">()</span> <span class="o">:</span> <span class="n">BaseDataSlice</span><span class="p">()</span>
+        <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>Name setup</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="p">}</span>
+
+        <span class="n">viatual</span> <span class="o">~</span><span class="n">DataSlice</span><span class="p">()</span>
+        <span class="p">{</span>
+            <span class="n">Release</span><span class="p">();</span> <span class="c1">// realse allocated memory</span>
+        <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>Routine to release allocated memory</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">cudaError_t</span> <span class="n">Release</span><span class="p">()</span>
+        <span class="p">{</span>
+            <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">SetDevice</span><span class="p">(</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">gpu_idx</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">BaseDataSlice</span><span class="o">::</span><span class="n">Release</span><span class="p">())</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">distances</span>     <span class="p">.</span><span class="n">Release</span><span class="p">())</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">weights</span>       <span class="p">.</span><span class="n">Release</span><span class="p">())</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+            <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+        <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>The Init function initializes a data slice struct with a CSR
+graph that's stored on the CPU. It also initializes the
+algorithm-specific data, here labels, and preds.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">cudaError_t</span> <span class="n">Init</span><span class="p">(</span>
+            <span class="kt">int</span>   <span class="n">num_gpus</span><span class="p">,</span>
+            <span class="kt">int</span>   <span class="n">gpu_idx</span><span class="p">,</span>
+            <span class="n">Csr</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">SizeT</span><span class="p">,</span> <span class="n">Value</span><span class="o">&gt;</span> <span class="o">*</span><span class="n">graph</span><span class="p">,</span>
+            <span class="p">...)</span>
+        <span class="p">{</span>
+            <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <p>Init BaseDataSlice</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">BaseDataSlice</span><span class="o">::</span><span class="n">Init</span><span class="p">(...))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>Allocate device memory</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">distances</span>   <span class="p">.</span><span class="n">Allocate</span><span class="p">(</span><span class="n">graph</span><span class="o">-&gt;</span><span class="n">nodes</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">weights</span>     <span class="p">.</span><span class="n">Allocate</span><span class="p">(</span><span class="n">graph</span><span class="o">-&gt;</span><span class="n">edges</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">labels</span><span class="p">.</span><span class="n">Allocate</span><span class="p">(</span><span class="n">graph</span><span class="o">-&gt;</span><span class="n">nodes</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <p>Allocate and move edge weights</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">weights</span><span class="p">.</span><span class="n">SetPointer</span><span class="p">(</span><span class="n">graph</span><span class="o">-&gt;</span><span class="n">edge_values</span><span class="p">,</span> <span class="n">graph</span><span class="o">-&gt;</span><span class="n">edges</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">HOST</span><span class="p">);</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">weights</span><span class="p">.</span><span class="n">Move</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">HOST</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">MARK_PATHS</span><span class="p">)</span> <span class="p">{</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">preds</span><span class="p">.</span><span class="n">Allocate</span><span class="p">(</span><span class="n">graph</span><span class="o">-&gt;</span><span class="n">nodes</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+            <span class="p">}</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">num_gpus</span> <span class="o">&gt;</span><span class="mi">1</span><span class="p">)</span>
+            <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <p>setup value__associate_orgs to point to distances, for communication</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                <span class="n">this</span><span class="o">-&gt;</span><span class="n">value__associate_orgs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">distances</span><span class="p">.</span><span class="n">GetPointer</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">);</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">value__associate_orgs</span><span class="p">.</span><span class="n">Move</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">HOST</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">MARK_PATHS</span><span class="p">)</span>
+                <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <p>setup vertex_associate_orgs to point to preds, for communication</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                    <span class="n">this</span><span class="o">-&gt;</span><span class="n">vertex_associate_orgs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">preds</span><span class="p">.</span><span class="n">GetPointer</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">);</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">vertex_associate_orgs</span><span class="p">.</span><span class="n">Move</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">HOST</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+
+            <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+        <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      <p>Reset data before each enact call</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">cudaError_t</span> <span class="n">Reset</span><span class="p">(</span>
+            <span class="n">FrontierType</span> <span class="n">frontier_type</span><span class="p">,</span>
+            <span class="n">GraphSLice</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">SizeT</span><span class="p">,</span> <span class="n">Value</span><span class="o">&gt;</span> <span class="o">*</span><span class="n">graph_slice</span><span class="p">,</span>
+            <span class="p">....)</span>
+        <span class="p">{</span>
+            <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      <p>Reset control status
+(Re)allocate memory space for frontier queues and scanned_edges</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      <p>If MARK_PATHS, set all predecessor node IDs to self ID</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="n">MARK_PATHS</span><span class="p">)</span>
+                <span class="n">util</span><span class="o">::</span><span class="n">MemsetIdxKernel</span><span class="o">&lt;&lt;&lt;</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span>
+                    <span class="n">this</span><span class="o">-&gt;</span><span class="n">preds</span><span class="p">.</span><span class="n">GetPointer</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">),</span> <span class="n">nodes</span><span class="p">);</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      <p>Set all distance values to maxvalue</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span>
+                <span class="n">this</span><span class="o">-&gt;</span><span class="n">distances</span>   <span class="p">.</span><span class="n">GetPointer</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">),</span>
+                <span class="n">util</span><span class="o">::</span><span class="n">MaxValue</span><span class="o">&lt;</span><span class="n">Value</span><span class="o">&gt;</span><span class="p">(),</span>
+                <span class="n">nodes</span><span class="p">);</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      <p>Set all labels values to maxvalue</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span>
+                <span class="n">this</span> <span class="o">-&gt;</span> <span class="n">labels</span> <span class="p">.</span><span class="n">GetPointer</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">),</span>
+                <span class="n">util</span><span class="o">::</span><span class="n">InvalidValue</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="o">&gt;</span><span class="p">(),</span>
+                <span class="n">nodes</span><span class="p">);</span>
+            
+            <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">};</span>
+
+    <span class="n">util</span><span class="o">::</span><span class="n">Array1D</span><span class="o">&lt;</span><span class="n">SizeT</span><span class="p">,</span> <span class="n">DataSlice</span><span class="o">&gt;</span> <span class="o">*</span><span class="n">data_slices</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      <p>Constructor
+*</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">SSSPProblem</span><span class="p">()</span> <span class="o">:</span> <span class="n">BaseProblem</span><span class="p">(</span>
+        <span class="nb">false</span><span class="p">,</span> <span class="c1">// use_double_buffer</span>
+        <span class="nb">false</span><span class="p">,</span> <span class="c1">// enable_backward</span>
+        <span class="nb">false</span><span class="p">,</span> <span class="c1">// keep_order</span>
+        <span class="nb">true</span><span class="p">,</span>  <span class="c1">// keep_node_num</span>
+        <span class="nb">false</span><span class="p">,</span> <span class="c1">// skip_makeout_selection</span>
+        <span class="nb">true</span><span class="p">)</span>  <span class="c1">// unified_receive</span>
+    <span class="p">{</span>
+        <span class="n">data_slices</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      <ul>
+<li>@brief SSSPProblem default destructor</li>
+</ul>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>     <span class="err">*/</span>
+    <span class="n">virtual</span> <span class="o">~</span><span class="n">SSSPProblem</span><span class="p">()</span>
+    <span class="p">{</span>
+        <span class="n">Release</span><span class="p">();</span> <span class="c1">// release allocated memory</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      <p>Routine to release allocated memory</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="n">Release</span><span class="p">()</span>
+    <span class="p">{</span>
+        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">data_slices</span><span class="o">==</span><span class="nb">NULL</span><span class="p">)</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      <p>Release allocated memory on each GPU</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">SetDevice</span><span class="p">(</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">gpu_idx</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">data_slices</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">Release</span><span class="p">())</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+        <span class="p">}</span>
+        <span class="n">delete</span><span class="p">[]</span> <span class="n">data_slices</span><span class="p">;</span><span class="n">data_slices</span><span class="o">=</span><span class="nb">NULL</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      <p>Release allocated by parent class</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">BaseProblem</span><span class="o">::</span><span class="n">Release</span><span class="p">())</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      <p>"Extract" copies distances and predecessors back to the CPU.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="n">Extract</span><span class="p">(</span><span class="n">VertexId</span> <span class="o">*</span><span class="n">h_distances</span><span class="p">,</span> <span class="n">VertexId</span> <span class="o">*</span><span class="n">h_preds</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> 
+        <span class="p">{</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">SetDevice</span><span class="p">(</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">gpu_idx</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      <p>move distances from GPU to CPU</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">distances</span><span class="p">.</span><span class="n">SetPointer</span><span class="p">(</span><span class="n">h_distances</span><span class="p">);</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">distances</span><span class="p">.</span><span class="n">Move</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">HOST</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">MARK_PATHS</span><span class="p">)</span>
+            <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      <p>move predecessors marker from GPU to CPU</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                <span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">preds</span><span class="p">.</span><span class="n">SetPointer</span><span class="p">(</span><span class="n">h_preds</span><span class="p">);</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">data_slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">preds</span><span class="p">.</span><span class="n">Move</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">HOST</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+            <span class="p">}</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      <p>tempary arrays to store pointers for each GPU's results</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">Value</span>    <span class="o">**</span><span class="n">temp_distances</span> <span class="o">=</span> <span class="n">new</span> <span class="n">Value</span>   <span class="o">*</span><span class="p">[</span><span class="n">this</span> <span class="o">-&gt;</span> <span class="n">num_gpus</span><span class="p">];</span>
+            <span class="n">VertexId</span> <span class="o">**</span><span class="n">temp_preds</span>     <span class="o">=</span> <span class="n">new</span> <span class="n">VertexId</span><span class="o">*</span><span class="p">[</span><span class="n">this</span> <span class="o">-&gt;</span> <span class="n">num_gpus</span><span class="p">];</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      <p>Move each GPU's results to CPU</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">gpu</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">gpu</span> <span class="o">&lt;</span> <span class="n">this</span> <span class="o">-&gt;</span> <span class="n">num_gpus</span><span class="p">;</span> <span class="n">gpu</span><span class="o">++</span><span class="p">)</span>
+            <span class="p">{</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">SetDevice</span><span class="p">(</span> <span class="n">this</span> <span class="o">-&gt;</span> <span class="n">gpu_idx</span><span class="p">[</span><span class="n">gpu</span><span class="p">]))</span> <span class="k">return</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      <p>move distances from GPU to CPU</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">data_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span> <span class="o">-&gt;</span> <span class="n">distances</span><span class="p">.</span><span class="n">Move</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">HOST</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+                <span class="n">temp_distances</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span> <span class="o">-&gt;</span> <span class="n">distances</span><span class="p">.</span><span class="n">GetPointer</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">HOST</span><span class="p">);</span>
+
+                <span class="k">if</span> <span class="p">(</span><span class="n">MARK_PATHS</span><span class="p">)</span>
+                <span class="p">{</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      <p>move predecessors marker from GPU to CPU</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                    <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">data_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">preds</span><span class="p">.</span><span class="n">Move</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">HOST</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+                    <span class="n">temp_preds</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_slice</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span> <span class="o">-&gt;</span> <span class="n">preds</span><span class="p">.</span><span class="n">GetPointer</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">HOST</span><span class="p">);</span>
+                <span class="p">}</span>
+            <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-32'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-32'>#</a>
+      </div>
+      <p>Combine data from multiple GPUs</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">for</span> <span class="p">(</span><span class="n">VertexId</span> <span class="n">v</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">v</span> <span class="o">&lt;</span> <span class="n">this</span> <span class="o">-&gt;</span> <span class="n">nodes</span><span class="p">;</span> <span class="n">v</span><span class="o">++</span><span class="p">)</span>
+            <span class="p">{</span>
+                <span class="kt">int</span>      <span class="n">gpu</span> <span class="o">=</span> <span class="n">this</span> <span class="o">-&gt;</span> <span class="n">partition_table</span> <span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">v</span><span class="p">];</span> <span class="c1">// get the host GPU</span>
+                <span class="n">VertexId</span> <span class="n">v_</span>  <span class="o">=</span> <span class="n">this</span> <span class="o">-&gt;</span> <span class="n">convertion_table</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">v</span><span class="p">];</span> <span class="c1">// get the converted vertex Id on host GPU</span>
+                <span class="n">h_distances</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp_distances</span><span class="p">[</span><span class="n">gpu</span><span class="p">][</span><span class="n">v_</span><span class="p">];</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">MARK_PATHS</span><span class="p">)</span>
+                    <span class="n">h_preds</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp_preds</span><span class="p">[</span><span class="n">gpu</span><span class="p">][</span><span class="n">v_</span><span class="p">];</span>
+            <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-33'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-33'>#</a>
+      </div>
+      <p>Cleanup</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">delete</span><span class="p">[]</span> <span class="n">temp_distances</span><span class="p">;</span> <span class="n">temp_distances</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+            <span class="n">delete</span><span class="p">[]</span> <span class="n">temp_preds</span>    <span class="p">;</span> <span class="n">temp_preds</span>     <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+    <span class="p">}</span> 
+
+    <span class="n">cudaError_t</span> <span class="n">Init</span><span class="p">(</span>
+            <span class="n">Csr</span><span class="o">&lt;</span><span class="n">VertexId</span><span class="p">,</span> <span class="n">SizeT</span><span class="p">,</span> <span class="n">Value</span><span class="o">&gt;</span> <span class="o">*</span><span class="n">graph</span><span class="p">,</span>
+            <span class="kt">int</span> <span class="n">num_gpus</span><span class="p">,</span>
+            <span class="p">...)</span> 
+    <span class="p">{</span>
+        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-34'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-34'>#</a>
+      </div>
+      <p>Init BaseProblem, this will partition the graph also</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">BaseProblem</span><span class="o">::</span><span class="n">Init</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">num_gpus</span><span class="p">,</span> <span class="p">...))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-35'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-35'>#</a>
+      </div>
+      <p>Create pre-GPU dataslice</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">data_slices</span> <span class="o">=</span> <span class="n">new</span> <span class="n">util</span><span class="o">::</span><span class="n">Array1D</span><span class="o">&lt;</span><span class="n">SizeT</span><span class="p">,</span> <span class="n">DataSlice</span><span class="o">&gt;</span><span class="p">[</span><span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">];</span>
+        <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">gpu</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">gpu</span> <span class="o">&lt;</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">;</span> <span class="o">++</span><span class="n">gpu</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">SetDevice</span><span class="p">(</span><span class="n">this</span> <span class="o">-&gt;</span> <span class="n">gpu_idx</span><span class="p">[</span><span class="n">gpu</span><span class="p">]))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-36'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-36'>#</a>
+      </div>
+      <p>allocate data_slices[gpu] on CPU and GPU</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">data_slices</span><span class="p">[</span><span class="n">gpu</span><span class="p">].</span><span class="n">Allocate</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span> <span class="o">|</span> <span class="n">util</span><span class="o">::</span><span class="n">HOST</span><span class="p">))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-37'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-37'>#</a>
+      </div>
+      <p>init data_slices[gpu] based on sub_graph[gpu]</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">data_slice</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">Init</span><span class="p">(</span><span class="n">sub_graph</span><span class="p">[</span><span class="n">gpu</span><span class="p">],</span> <span class="p">...))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span> 
+        <span class="p">}</span>
+    <span class="p">}</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-38'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-38'>#</a>
+      </div>
+      <p>The Reset function primes the graph data structure to an
+untraversed state.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">cudaError_t</span> <span class="n">Reset</span><span class="p">(</span>
+        <span class="n">VertexId</span> <span class="n">src</span><span class="p">,</span>
+        <span class="n">FrontierType</span> <span class="n">frontier_type</span><span class="p">,</span>
+        <span class="p">...)</span>
+    <span class="p">{</span>
+        <span class="n">cudaError_t</span> <span class="n">retval</span> <span class="o">=</span> <span class="n">cudaSuccess</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-39'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-39'>#</a>
+      </div>
+      <p>reset data_slice on each gpu</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span>  <span class="p">(</span><span class="kt">int</span> <span class="n">gpu</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">gpu</span> <span class="o">&lt;</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">num_gpus</span><span class="p">;</span> <span class="o">++</span><span class="n">gpu</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">SetDevice</span><span class="p">(</span><span class="n">this</span> <span class="o">-&gt;</span> <span class="n">gpu_idx</span><span class="p">[</span><span class="n">gpu</span><span class="p">]))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">data_slice</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">Reset</span><span class="p">(</span><span class="n">frontier_type</span><span class="p">,</span> <span class="p">...))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span> 
+        <span class="p">}</span>
+
+        <span class="kt">int</span>      <span class="n">gpu</span>  <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>   <span class="c1">// which GPU host src</span>
+        <span class="n">VertexId</span> <span class="n">tsrc</span> <span class="o">=</span> <span class="n">src</span><span class="p">;</span> <span class="c1">// what is the vertex Id of src on its host GPU</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">this</span> <span class="o">-&gt;</span> <span class="n">num_gpus</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">gpu</span> <span class="o">=</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">partition_tables</span> <span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">src</span><span class="p">];</span>
+            <span class="n">tsrc</span><span class="o">=</span> <span class="n">this</span><span class="o">-&gt;</span><span class="n">convertion_tables</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">src</span><span class="p">];</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">retval</span> <span class="o">=</span> <span class="n">util</span><span class="o">::</span><span class="n">SetDevice</span><span class="p">(</span><span class="n">this</span> <span class="o">-&gt;</span> <span class="n">gpu_idx</span><span class="p">[</span><span class="n">gpu</span><span class="p">]))</span> <span class="k">return</span> <span class="n">retval</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-40'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-40'>#</a>
+      </div>
+      <p>Init distance (and pred) for src on its host GPU</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slice</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span> <span class="o">-&gt;</span> <span class="n">distances</span><span class="p">.</span><span class="n">GetPointer</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">)</span> <span class="o">+</span> <span class="n">tsrc</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">MARK_PATHS</span><span class="p">)</span>
+            <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slice</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span> <span class="o">-&gt;</span> <span class="n">preds</span><span class="p">.</span><span class="n">GetPointer</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">)</span> <span class="o">+</span> <span class="n">tsrc</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-41'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-41'>#</a>
+      </div>
+      <p>Put src into initial frontier</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">util</span><span class="o">::</span><span class="n">MemsetKernel</span><span class="o">&lt;&lt;&lt;</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">data_slice</span><span class="p">[</span><span class="n">gpu</span><span class="p">]</span> <span class="o">-&gt;</span> <span class="n">frontir_queues</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">keys</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">GetPointer</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">DEVICE</span><span class="p">),</span> <span class="n">tsrc</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">};</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

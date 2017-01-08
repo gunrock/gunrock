@@ -153,7 +153,7 @@ struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value/*,
         if (seed < 0) this->seed = time(NULL);
         else this->seed = seed;
         srand(this->seed);
-        //printf("partition_seed = %d\n",this->seed);fflush(stdout);
+        printf("Partition begin. seed = %d\n",this->seed);fflush(stdout);
 
         if (factor < 0) this->factor = 0.5;
         else this->factor = factor;

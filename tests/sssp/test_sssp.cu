@@ -26,6 +26,9 @@
 #include <gunrock/app/sssp/sssp_problem.cuh>
 #include <gunrock/app/sssp/sssp_functor.cuh>
 
+
+#include <gunrock/app/sample/sample_enactor.cuh>
+
 // Operator includes
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
@@ -274,30 +277,26 @@ void ReferenceSssp(
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
  * @tparam MARK_PREDECESSORS
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename VertexId,
     typename SizeT,
     typename Value,
-    //bool INSTRUMENT,
-    //bool DEBUG,
-    //bool SIZE_CHECK,
     bool MARK_PREDECESSORS >
-void RunTests(Info<VertexId, SizeT, Value> *info)
+cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 {
     typedef SSSPProblem < VertexId,
             SizeT,
             Value,
             MARK_PREDECESSORS > Problem;
 
-    typedef SSSPEnactor < Problem/*,
-            INSTRUMENT,
-            DEBUG,
-            SIZE_CHECK*/ > Enactor;
+    typedef SSSPEnactor < Problem > Enactor;
 
     // parse configurations from mObject info
     Csr<VertexId, SizeT, Value> *graph = info->csr_ptr;
@@ -313,13 +312,26 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     bool        quiet_mode          = info->info["quiet_mode"       ].get_bool ();
     bool        quick_mode          = info->info["quick_mode"       ].get_bool ();
     bool        stream_from_host    = info->info["stream_from_host" ].get_bool ();
-    int         traversal_mode      = info->info["traversal_mode"   ].get_int  ();
+    std::string traversal_mode      = info->info["traversal_mode"   ].get_str  ();
     bool        instrument          = info->info["instrument"       ].get_bool ();
     bool        debug               = info->info["debug_mode"       ].get_bool ();
     bool        size_check          = info->info["size_check"       ].get_bool ();
-    int         iterations          = 1; //force to 1 info->info["num_iteration"].get_int();
+    int         iterations          = info->info["num_iteration"    ].get_int  ();
     int         delta_factor        = info->info["delta_factor"     ].get_int  ();
+    std::string src_type            = info->info["source_type"      ].get_str  (); 
+    int      src_seed               = info->info["source_seed"      ].get_int  ();
+    int      communicate_latency    = info->info["communicate_latency"].get_int (); 
+    float    communicate_multipy    = info->info["communicate_multipy"].get_real();
+    int      expand_latency         = info->info["expand_latency"    ].get_int (); 
+    int      subqueue_latency       = info->info["subqueue_latency"  ].get_int (); 
+    int      fullqueue_latency      = info->info["fullqueue_latency" ].get_int (); 
+    int      makeout_latency        = info->info["makeout_latency"   ].get_int (); 
+    if (max_queue_sizing < 1.2) max_queue_sizing=1.2;
+    if (max_in_sizing < 0) max_in_sizing = 1.0;
+    if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
+
     CpuTimer    cpu_timer;
+    cudaError_t retval              = cudaSuccess;
 
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
@@ -342,13 +354,14 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     for (int gpu = 0; gpu < num_gpus; gpu++)
     {
         size_t dummy;
-        cudaSetDevice(gpu_idx[gpu]);
-        cudaMemGetInfo(&(org_size[gpu]), &dummy);
+        if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
+        if (retval = util::GRError(cudaMemGetInfo(&(org_size[gpu]), &dummy),
+            "cudaMemGetInfo failed", __FILE__, __LINE__)) return retval;
     }
 
     // Allocate problem on GPU
     Problem *problem = new Problem;
-    util::GRError(problem->Init(
+    if (retval = util::GRError(problem->Init(
         stream_from_host,
         graph,
         NULL,
@@ -361,16 +374,110 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         max_in_sizing,
         partition_factor,
         partition_seed),
-        "SSSP Problem Init failed", __FILE__, __LINE__);
+        "SSSP Problem Init failed", __FILE__, __LINE__))
+        return retval;
 
     // Allocate SSSP enactor map
     Enactor* enactor = new Enactor(
         num_gpus, gpu_idx, instrument, debug, size_check);
-    util::GRError(enactor->Init(
+    if (retval = util::GRError(enactor->Init(
         context, problem, max_grid_size, traversal_mode),
-        "SSSP Enactor Init failed", __FILE__, __LINE__);
+        "SSSP Enactor Init failed", __FILE__, __LINE__))
+        return retval;
+
+    enactor -> communicate_latency = communicate_latency;
+    enactor -> communicate_multipy = communicate_multipy;
+    enactor -> expand_latency      = expand_latency;
+    enactor -> subqueue_latency    = subqueue_latency;
+    enactor -> fullqueue_latency   = fullqueue_latency;
+    enactor -> makeout_latency     = makeout_latency;
+
+    if (retval = util::SetDevice(gpu_idx[0])) return retval;
+    if (retval = util::latency::Test(
+        streams[0], problem -> data_slices[0] -> latency_data,
+        communicate_latency,
+        communicate_multipy,
+        expand_latency,
+        subqueue_latency,
+        fullqueue_latency,
+        makeout_latency)) return retval;
+
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
+
+    // perform SSSP
+    double total_elapsed  = 0.0;
+    double single_elapsed = 0.0;
+    double max_elapsed    = 0.0;
+    double min_elapsed    = 1e10;
+    json_spirit::mArray process_times;
+    if (src_type == "random2")
+    {
+        if (src_seed == -1) src_seed = time(NULL);
+        if (!quiet_mode)
+            printf("src_seed = %d\n", src_seed);
+        srand(src_seed);
+    }
+    if (!quiet_mode) printf("Using traversal mode %s\n", traversal_mode.c_str());
+    for (int iter = 0; iter < iterations; ++iter)
+    {
+        if (src_type == "random2")
+        {
+            bool src_valid = false;
+            while (!src_valid)
+            {
+                src = rand() % graph -> nodes;
+                if (graph -> row_offsets[src] != graph -> row_offsets[src+1])
+                    src_valid = true;
+            }
+        }
+
+        if (retval = util::GRError(problem->Reset(
+            src, enactor->GetFrontierType(),
+            max_queue_sizing, max_queue_sizing1),
+            "SSSP Problem Data Reset Failed", __FILE__, __LINE__))
+            return retval;
+
+        if (retval = util::GRError(enactor->Reset(),
+            "SSSP Enactor Reset failed", __FILE__, __LINE__))
+            return retval;
+
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            if (retval = util::SetDevice(gpu_idx[gpu]))
+                return retval;
+            if (retval = util::GRError(cudaDeviceSynchronize(),
+                "cudaDeviceSynchronize failed", __FILE__, __LINE__))
+                return retval;
+        }
+
+        if (!quiet_mode)
+        {
+            printf("__________________________\n"); fflush(stdout);
+        }
+        cpu_timer.Start();
+        if (retval = util::GRError(enactor->Enact(src, traversal_mode),
+            "SSSP Problem Enact Failed", __FILE__, __LINE__))
+            return retval;
+        cpu_timer.Stop();
+        single_elapsed = cpu_timer.ElapsedMillis();
+        total_elapsed += single_elapsed;
+        process_times.push_back(single_elapsed);
+        if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
+        if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
+        if (!quiet_mode)
+        {
+            printf("--------------------------\n"
+                "iteration %d elapsed: %lf ms, src = %lld, #iteration = %lld\n",
+                iter, single_elapsed, (long long)src,
+                (long long)enactor -> enactor_stats -> iteration);
+            fflush(stdout);
+        }
+    }
+    total_elapsed /= iterations;
+    info -> info["process_times"] = process_times;
+    info -> info["min_process_time"] = min_elapsed;
+    info -> info["max_process_time"] = max_elapsed;
 
     // compute reference CPU SSSP solution for source-distance
     if (!quick_mode)
@@ -385,38 +492,11 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         if (!quiet_mode) { printf("\n"); }
     }
 
-    // perform SSSP
-    double elapsed = 0.0f;
-
-    for (int iter = 0; iter < iterations; ++iter)
-    {
-        util::GRError(problem->Reset(
-            src, enactor->GetFrontierType(),
-            max_queue_sizing, max_queue_sizing1),
-            "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(enactor->Reset(),
-            "SSSP Enactor Reset failed", __FILE__, __LINE__);
-
-        if (!quiet_mode)
-        {
-            printf("__________________________\n"); fflush(stdout);
-        }
-        cpu_timer.Start();
-        util::GRError(enactor->Enact(src, traversal_mode),
-                      "SSSP Problem Enact Failed", __FILE__, __LINE__);
-        cpu_timer.Stop();
-        if (!quiet_mode)
-        {
-            printf("--------------------------\n"); fflush(stdout);
-        }
-        elapsed += cpu_timer.ElapsedMillis();
-    }
-    elapsed /= iterations;
-
     cpu_timer.Start();
     // Copy out results
-    util::GRError(problem->Extract(h_labels, h_preds),
-                  "SSSP Problem Data Extraction Failed", __FILE__, __LINE__);
+    if (retval = util::GRError(problem->Extract(h_labels, h_preds),
+        "SSSP Problem Data Extraction Failed", __FILE__, __LINE__))
+        return retval;
 
     if (!quick_mode) {
         for (SizeT i = 0; i < graph->nodes; i++)
@@ -453,7 +533,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     info->ComputeTraversalStats(  // compute running statistics
-        enactor->enactor_stats.GetPointer(), elapsed, h_labels);
+        enactor->enactor_stats.GetPointer(), total_elapsed, h_labels);
 
     if (!quiet_mode)
     {
@@ -509,14 +589,27 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
 
     // Clean up
     if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
-    if (enactor         ) {delete   enactor         ; enactor          = NULL;}
-    if (problem         ) {delete   problem         ; problem          = NULL;}
+    if (enactor         )
+    {
+        if (retval = util::GRError(enactor -> Release(),
+            "BFS Enactor Release failed", __FILE__, __LINE__))
+            return retval;
+        delete   enactor         ; enactor          = NULL;
+    }
+    if (problem         )
+    {
+        if (retval = util::GRError(problem -> Release(),
+            "BFS Problem Release failed", __FILE__, __LINE__))
+            return retval;
+        delete   problem         ; problem          = NULL;
+    }
     if (reference_labels) {delete[] reference_labels; reference_labels = NULL;}
     if (h_labels        ) {delete[] h_labels        ; h_labels         = NULL;}
     if (reference_preds ) {delete[] reference_preds ; reference_preds  = NULL;}
     if (h_preds         ) {delete[] h_preds         ; h_preds          = NULL;}
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
+    return retval;
 }
 
 /**
@@ -525,31 +618,24 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- * @tparam SIZE_CHECK
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value>
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK >
-void RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
+cudaError_t RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
 {
     if (info->info["mark_predecessors"].get_bool())
-    {
-        RunTests<VertexId, SizeT, Value, /*INSTRUMENT,
+        return RunTests<VertexId, SizeT, Value, /*INSTRUMENT,
                  DEBUG, SIZE_CHECK,*/ true>(info);
-    }
     else
-    {
-        RunTests<VertexId, SizeT, Value, /*INSTRUMENT,
+        return RunTests<VertexId, SizeT, Value, /*INSTRUMENT,
                  DEBUG, SIZE_CHECK,*/ false>(info);
-    }
 }
 
 /******************************************************************************
@@ -570,13 +656,18 @@ int main_(CommandLineArgs *args)
     // graph construction or generation related parameters
     info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
     info->info["edge_value"] = true;  // require per edge weight values
+    info->info["random_edge_value"] = args -> CheckCmdLineFlag("random-edge-value");
 
     cpu_timer2.Start();
     info->Init("SSSP", *args, csr);  // initialize Info structure
+    
+    // force edge values to be 1, don't enable this unless you really want to
+    //for (SizeT e=0; e < csr.edges; e++)
+    //    csr.edge_values[e] = 1;
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
-    RunTests_mark_predecessors<VertexId, SizeT, Value>(info);  // run test
+    cudaError_t retval = RunTests_mark_predecessors<VertexId, SizeT, Value>(info);  // run test
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
 
@@ -586,7 +677,7 @@ int main_(CommandLineArgs *args)
     }
 
     info->CollectInfo();  // collected all the info and put into JSON mObject
-    return 0;
+    return retval;
 }
 
 template <
@@ -606,9 +697,9 @@ template <
 int main_SizeT(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-//        return main_Value<VertexId, long long>(args);
-//    else
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
         return main_Value<VertexId, int      >(args);
 }
 

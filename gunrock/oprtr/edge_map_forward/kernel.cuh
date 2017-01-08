@@ -36,32 +36,42 @@ namespace edge_map_forward {
  * @tparam Functor Functor type for the specific problem type.
  * @tparam VALID
  */
-template <typename KernelPolicy, typename ProblemData, typename Functor>
+template <
+    typename KernelPolicy,
+    typename Problem,
+    typename Functor,
+    gunrock::oprtr::advance::TYPE        ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
+    gunrock::oprtr::advance::REDUCE_TYPE R_TYPE       = gunrock::oprtr::advance::EMPTY,
+    gunrock::oprtr::advance::REDUCE_OP   R_OP         = gunrock::oprtr::advance::NONE>
 struct Sweep
 {
     static __device__ __forceinline__ void Invoke(
+        bool                                    &queue_reset,
         typename KernelPolicy::VertexId         &queue_index,
         //int                                     &num_gpus,
-        int                                     &label,
-        typename KernelPolicy::VertexId         *&d_in_queue,
-        typename KernelPolicy::Value            *&d_value_out,
-        typename KernelPolicy::VertexId         *&d_out_queue,
-        typename KernelPolicy::SizeT            *&d_row_offsets,
-        typename KernelPolicy::VertexId         *&d_column_indices,
-        typename KernelPolicy::VertexId         *&d_inverse_column_indices,
-        typename ProblemData::DataSlice         *&problem,
-        typename KernelPolicy::SmemStorage      &smem_storage,
-        util::CtaWorkProgress                   &work_progress,
-        util::CtaWorkDistribution<typename KernelPolicy::SizeT> &work_decomposition,
+        typename Functor::LabelT                &label,
+        typename KernelPolicy::SizeT           *&d_row_offsets,
+        typename KernelPolicy::SizeT           *&d_inverse_row_offsets,
+        typename KernelPolicy::VertexId        *&d_column_indices,
+        typename KernelPolicy::VertexId        *&d_inverse_column_indices,
+        typename KernelPolicy::VertexId        *&d_keys_in,
+        typename KernelPolicy::VertexId        *&d_keys_out,
+        typename KernelPolicy::Value           *&d_values_out,
+        typename Problem::DataSlice            *&d_data_slice,
+        typename KernelPolicy::SizeT            &input_queue_length,
+        typename KernelPolicy::SizeT            &max_in_frontier,
         typename KernelPolicy::SizeT            &max_out_frontier,
-        gunrock::oprtr::advance::TYPE           &ADVANCE_TYPE,
-        bool                                    &inverse_graph,
-        gunrock::oprtr::advance::REDUCE_TYPE    &R_TYPE,
-        gunrock::oprtr::advance::REDUCE_OP      &R_OP,
+        util::CtaWorkProgress<typename KernelPolicy::SizeT>
+                                                &work_progress,
+        typename KernelPolicy::SmemStorage      &smem_storage,
+        util::CtaWorkDistribution<typename KernelPolicy::SizeT>
+                                                &work_decomposition,
+        bool                                    &input_inverse_graph,
         typename KernelPolicy::Value            *&d_value_to_reduce,
         typename KernelPolicy::Value            *&d_reduce_frontier)
         {
-            typedef Cta<KernelPolicy, ProblemData, Functor>     Cta;
+            typedef Cta<KernelPolicy, Problem, Functor,
+                ADVANCE_TYPE, R_TYPE, R_OP>     Cta;
             typedef typename KernelPolicy::SizeT                SizeT;
 
             // Determine threadblock's work range
@@ -77,24 +87,28 @@ struct Sweep
 
             // CTA processing abstraction
             Cta cta(
-                queue_index,
-                label,
-                smem_storage,
-                d_in_queue,
-                d_value_out,
-                d_out_queue,
-                d_row_offsets,
-                d_column_indices,
-                d_inverse_column_indices,
-                problem,
-                work_progress,
-                max_out_frontier,
-                ADVANCE_TYPE,
-                inverse_graph,
-                R_TYPE,
-                R_OP,
-                d_value_to_reduce,
-                d_reduce_frontier);
+              queue_reset,
+              queue_index,
+              label,
+              d_row_offsets,
+              d_inverse_row_offsets,
+              d_column_indices,
+              d_inverse_column_indices,
+              d_keys_in,
+              d_keys_out,
+              d_values_out,
+              d_data_slice,
+              input_queue_length,
+              max_in_frontier,
+              max_out_frontier,
+              work_progress,
+              smem_storage,
+              //ADVANCE_TYPE,
+              input_inverse_graph,
+              //R_TYPE,
+              //R_OP,
+              d_value_to_reduce,
+              d_reduce_frontier);
 
             // Process full tiles
             while (work_limits.offset < work_limits.guarded_offset) {
@@ -127,6 +141,9 @@ template<
     typename    KernelPolicy,
     typename    ProblemData,
     typename    Functor,
+    gunrock::oprtr::advance::TYPE        ADVANCE_TYPE,
+    gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+    gunrock::oprtr::advance::REDUCE_OP   R_OP,
     bool        VALID = (__GR_CUDA_ARCH__ >= KernelPolicy::CUDA_ARCH)>
 struct Dispatch
 {
@@ -134,29 +151,30 @@ struct Dispatch
     typedef typename KernelPolicy::SizeT    SizeT;
     typedef typename KernelPolicy::Value    Value;
     typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Functor::LabelT        LabelT;
 
     static __device__ __forceinline__ void Kernel(
-        bool                        &queue_reset,
-        VertexId                    &queue_index,
-        int                         &label,
-        SizeT                       &num_elements,
-        VertexId                    *&d_in_queue,
-        Value                       *&d_value_out,
-        VertexId                    *&d_out_queue,
-        SizeT                       *&d_row_offsets,
-        VertexId                    *&d_column_indices,
-        VertexId                    *&d_inverse_column_indices,
-        DataSlice                   *&problem,
-        util::CtaWorkProgress       &work_progress,
-        SizeT                       &max_in_frontier,
-        SizeT                       &max_out_frontier,
-        util::KernelRuntimeStats    &kernel_stats,
-        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
-        bool                        &inverse_graph,
-        gunrock::oprtr::advance::REDUCE_TYPE    &R_TYPE,
-        gunrock::oprtr::advance::REDUCE_OP      &R_OP,
-        typename KernelPolicy::Value            *&d_value_to_reduce,
-        typename KernelPolicy::Value            *&d_reduce_frontier)
+        bool              &queue_reset,
+        VertexId          &queue_index,
+        LabelT            &label,
+        SizeT            *&d_row_offsets,
+        SizeT            *&d_inverse_row_offsets,
+        VertexId         *&d_column_indices,
+        VertexId         *&d_inverse_column_indices,
+        VertexId         *&d_keys_in,
+        VertexId         *&d_keys_out,
+        Value            *&d_values_out,
+        SizeT             &input_queue_length,
+        DataSlice        *&d_data_slice,
+        SizeT             &max_in_frontier,
+        SizeT             &max_out_frontier,
+        util::CtaWorkProgress<SizeT>
+                          &work_progress,
+        util::KernelRuntimeStats
+                          &kernel_stats,
+        bool              &input_inverse_graph,
+        Value            *&d_value_to_reduce,
+        Value            *&d_reduce_frontier)
         {
             // empty
         }
@@ -170,37 +188,44 @@ struct Dispatch
  * @tparam ProblemData Problem data type for partitioned edge mapping.
  * @tparam Functor Functor type for the specific problem type.
  */
-template <typename KernelPolicy, typename ProblemData, typename Functor>
-struct Dispatch<KernelPolicy, ProblemData, Functor, true>
+template <
+    typename KernelPolicy,
+    typename Problem,
+    typename Functor,
+    gunrock::oprtr::advance::TYPE        ADVANCE_TYPE,
+    gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
+    gunrock::oprtr::advance::REDUCE_OP   R_OP>
+struct Dispatch<KernelPolicy, Problem, Functor,
+    ADVANCE_TYPE, R_TYPE, R_OP, true>
 {
     typedef typename KernelPolicy::VertexId VertexId;
     typedef typename KernelPolicy::SizeT    SizeT;
     typedef typename KernelPolicy::Value    Value;
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice     DataSlice;
+    typedef typename Functor::LabelT        LabelT;
 
     static __device__ __forceinline__ void Kernel(
-        bool                        &queue_reset,
-        VertexId                    &queue_index,
-        int                         &label,
-        SizeT                       &num_elements,
-        VertexId                    *&d_in_queue,
-        Value                       *&d_value_out,
-        VertexId                    *&d_out_queue,
-        SizeT                       *&d_row_offsets,
-        VertexId                    *&d_column_indices,
-        VertexId                    *&d_inverse_column_indices,
-        DataSlice                   *&problem,
-        util::CtaWorkProgress       &work_progress,
-        SizeT                       &max_in_frontier,
-        SizeT                       &max_out_frontier,
-        util::KernelRuntimeStats    &kernel_stats,
-        gunrock::oprtr::advance::TYPE &ADVANCE_TYPE,
-        bool                        &inverse_graph,
-        gunrock::oprtr::advance::REDUCE_TYPE    &R_TYPE,
-        gunrock::oprtr::advance::REDUCE_OP      &R_OP,
-        typename KernelPolicy::Value            *&d_value_to_reduce,
-        typename KernelPolicy::Value            *&d_reduce_frontier)
-
+        bool              &queue_reset,
+        VertexId          &queue_index,
+        LabelT            &label,
+        SizeT            *&d_row_offsets,
+        SizeT            *&d_inverse_row_offsets,
+        VertexId         *&d_column_indices,
+        VertexId         *&d_inverse_column_indices,
+        VertexId         *&d_keys_in,
+        VertexId         *&d_keys_out,
+        Value            *&d_values_out,
+        DataSlice        *&d_data_slice,
+        SizeT             &input_queue_length,
+        SizeT             &max_in_frontier,
+        SizeT             &max_out_frontier,
+        util::CtaWorkProgress<SizeT>
+                          &work_progress,
+        util::KernelRuntimeStats
+                          &kernel_stats,
+        bool              &input_inverse_graph,
+        Value            *&d_value_to_reduce,
+        Value            *&d_reduce_frontier)
     {
         // Shared storage for the kernel
         __shared__ typename KernelPolicy::SmemStorage smem_storage;
@@ -213,28 +238,28 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         // Reset work_progress
         //if (queue_reset)
         //{
-        //    if (threadIdx.x < util::CtaWorkProgress::COUNTERS) 
+        //    if (threadIdx.x < util::CtaWorkProgress::COUNTERS)
         //    {
                 //Reset all counters
                 //work_progress.template Reset<SizeT>();
-        //    }   
+        //    }
         //}
 
         // Determine work decomposition
-        if (threadIdx.x == 0) { 
-        
+        if (threadIdx.x == 0) {
+
             // Obtain problem size
             if (queue_reset)
             {
-                work_progress.StoreQueueLength<SizeT>(num_elements, queue_index);
+                work_progress.StoreQueueLength(input_queue_length, queue_index);
             }
             else
             {
-                num_elements = work_progress.template LoadQueueLength<SizeT>(queue_index);
+                input_queue_length = work_progress.LoadQueueLength(queue_index);
 
                 // Check if we previously overflowed
-                if (num_elements >= max_in_frontier) {
-                    num_elements = 0;
+                if (input_queue_length >= max_in_frontier) {
+                    input_queue_length = 0;
                 }
 
                 // Signal to host that we're done
@@ -245,37 +270,42 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
 
             // Initialize work decomposition in smem
             smem_storage.state.work_decomposition.template Init<KernelPolicy::LOG_SCHEDULE_GRANULARITY>(
-                    num_elements, gridDim.x);
+                    input_queue_length, gridDim.x);
 
             // Reset our next outgoing queue counter to zero
             work_progress.template StoreQueueLength<SizeT>(0, queue_index + 2);
 
-            work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
+            //work_progress.template PrepResetSteal<SizeT>(queue_index + 1);
         }
 
         // Barrier to protect work decomposition
-        __syncthreads(); 
+        __syncthreads();
 
-        Sweep<KernelPolicy, ProblemData, Functor>::Invoke(
-                queue_index,
-                label,
-                d_in_queue,
-                d_value_out,
-                d_out_queue,
-                d_row_offsets, 
-                d_column_indices,
-                d_inverse_column_indices,
-                problem,
-                smem_storage,
-                work_progress,
-                smem_storage.state.work_decomposition,
-                max_out_frontier,
-                ADVANCE_TYPE,
-                inverse_graph,
-                R_TYPE,
-                R_OP,
-                d_value_to_reduce,
-                d_reduce_frontier);
+        Sweep<KernelPolicy, Problem, Functor,
+            ADVANCE_TYPE, R_TYPE, R_OP>::Invoke(
+            queue_reset,
+            queue_index,
+            label,
+            d_row_offsets,
+            d_inverse_row_offsets,
+            d_column_indices,
+            d_inverse_column_indices,
+            d_keys_in,
+            d_keys_out,
+            d_values_out,
+            d_data_slice,
+            input_queue_length,
+            max_in_frontier,
+            max_out_frontier,
+            work_progress,
+            smem_storage,
+            smem_storage.state.work_decomposition,
+            //ADVANCE_TYPE,
+            input_inverse_graph,
+            //R_TYPE,
+            //R_OP,
+            d_value_to_reduce,
+            d_reduce_frontier);
 
         //if (KernelPolicy::INSTRUMENT && (threadIdx.x == 0)) {
         //    kernel_stats.MarkStop();
@@ -299,59 +329,68 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
  * @param[in] d_in_queue        Device pointer of VertexId to the incoming frontier queue
  * @param[in] d_pred_out         Device pointer of VertexId to the outgoing predecessor queue (only used when both mark_pred and enable_idempotence are set)
  * @param[in] d_out_queue       Device pointer of VertexId to the outgoing frontier queue
- * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue  
+ * @param[in] d_column_indices  Device pointer of VertexId to the column indices queue
  * @param[in] problem           Device pointer to the problem object
  * @param[in] work_progress     queueing counters to record work progress
  * @param[in] max_in_queue      Maximum number of elements we can place into the incoming frontier
  * @param[in] max_out_queue     Maximum number of elements we can place into the outgoing frontier
  * @param[in] kernel_stats      Per-CTA clock timing statistics (used when KernelPolicy::INSTRUMENT is set)
  */
-    template <typename KernelPolicy, typename ProblemData, typename Functor>
+template <
+    typename KernelPolicy,
+    typename ProblemData,
+    typename Functor,
+    gunrock::oprtr::advance::TYPE        ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
+    gunrock::oprtr::advance::REDUCE_TYPE R_TYPE       = gunrock::oprtr::advance::EMPTY,
+    gunrock::oprtr::advance::REDUCE_OP   R_OP         = gunrock::oprtr::advance::NONE>
 __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
     __global__
 void Kernel(
-        bool                                    queue_reset,
-        typename KernelPolicy::VertexId         queue_index,
-        int                                     label,
-        typename KernelPolicy::SizeT            num_elements,
-        typename KernelPolicy::VertexId         *d_in_queue,
-        typename KernelPolicy::Value            *d_value_out,
-        typename KernelPolicy::VertexId         *d_out_queue,
-        typename KernelPolicy::SizeT            *d_row_offsets,
-        typename KernelPolicy::VertexId         *d_column_indices,
-        typename KernelPolicy::VertexId         *d_inverse_column_indices,
-        typename ProblemData::DataSlice         *problem,
-        util::CtaWorkProgress                   work_progress,
-        typename KernelPolicy::SizeT            max_in_frontier,
-        typename KernelPolicy::SizeT            max_out_frontier,
-        util::KernelRuntimeStats                kernel_stats,
-        gunrock::oprtr::advance::TYPE           ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
-        bool                                    inverse_graph = false,
-        gunrock::oprtr::advance::REDUCE_TYPE    R_TYPE = gunrock::oprtr::advance::EMPTY,
-        gunrock::oprtr::advance::REDUCE_OP      R_OP = gunrock::oprtr::advance::NONE,
-        typename KernelPolicy::Value            *d_value_to_reduce = NULL,
-        typename KernelPolicy::Value            *d_reduce_frontier = NULL)
+    bool                                    queue_reset,
+    typename KernelPolicy::VertexId         queue_index,
+    typename Functor::LabelT                label,
+    typename KernelPolicy::SizeT            *d_row_offsets,
+    typename KernelPolicy::SizeT            *d_inverse_row_offsets,
+    typename KernelPolicy::VertexId         *d_column_indices,
+    typename KernelPolicy::VertexId         *d_inverse_column_indices,
+    typename KernelPolicy::VertexId         *d_keys_in,
+    typename KernelPolicy::VertexId         *d_keys_out,
+    typename KernelPolicy::Value            *d_values_out,
+    typename ProblemData::DataSlice         *d_data_slice,
+    typename KernelPolicy::SizeT            input_queue_length,
+    typename KernelPolicy::SizeT            max_in_frontier,
+    typename KernelPolicy::SizeT            max_out_frontier,
+    util::CtaWorkProgress<typename KernelPolicy::SizeT> work_progress,
+    util::KernelRuntimeStats                kernel_stats,
+    //gunrock::oprtr::advance::TYPE           ADVANCE_TYPE = gunrock::oprtr::advance::V2V,
+    bool                                    input_inverse_graph = false,
+    //gunrock::oprtr::advance::REDUCE_TYPE    R_TYPE = gunrock::oprtr::advance::EMPTY,
+    //gunrock::oprtr::advance::REDUCE_OP      R_OP = gunrock::oprtr::advance::NONE,
+    typename KernelPolicy::Value            *d_value_to_reduce = NULL,
+    typename KernelPolicy::Value            *d_reduce_frontier = NULL)
 {
-    Dispatch<KernelPolicy, ProblemData, Functor>::Kernel(
-            queue_reset,    
+    Dispatch<KernelPolicy, ProblemData, Functor,
+        ADVANCE_TYPE, R_TYPE, R_OP>::Kernel(
+            queue_reset,
             queue_index,
             label,
-            num_elements,
-            d_in_queue,
-            d_value_out,
-            d_out_queue,
             d_row_offsets,
+            d_inverse_row_offsets,
             d_column_indices,
             d_inverse_column_indices,
-            problem,
-            work_progress,
+            d_keys_in,
+            d_keys_out,
+            d_values_out,
+            d_data_slice,
+            input_queue_length,
             max_in_frontier,
             max_out_frontier,
+            work_progress,
             kernel_stats,
-            ADVANCE_TYPE,
-            inverse_graph,
-            R_TYPE,
-            R_OP,
+            //ADVANCE_TYPE,
+            input_inverse_graph,
+            //R_TYPE,
+            //R_OP,
             d_value_to_reduce,
             d_reduce_frontier);
 }

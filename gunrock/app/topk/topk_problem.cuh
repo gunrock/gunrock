@@ -48,6 +48,7 @@ struct TOPKProblem : ProblemBase<VertexId, SizeT, Value,
         MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem;
     typedef DataSliceBase <VertexId, SizeT, Value,
         MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
+    typedef unsigned char MaskT;
 
     //Helper structures
   
@@ -124,8 +125,9 @@ struct TOPKProblem : ProblemBase<VertexId, SizeT, Value,
          * @param[in] frontier_type      The frontier type (i.e., edge/vertex/mixed)
          * @param[in] graph_slice        Pointer to the corresponding graph slice
          * @param[in] queue_sizing       Sizing scaling factor for work queue allocation. 1.0 by default. Reserved for future use.
-         * @param[in] _USE_DOUBLE_BUFFER Whether to use double buffer
+         * @param[in] use_double_buffer Whether to use double buffer
          * @param[in] queue_sizing1      Scaling factor for frontier_queue1
+         * @param[in] skip_scanned_edges Whether to skip the scanned edges
          *
          * \return cudaError_t object which indicates the success of all CUDA function calls.
          */
@@ -242,24 +244,6 @@ struct TOPKProblem : ProblemBase<VertexId, SizeT, Value,
     }
 
     /**
-     * @brief TOPKProblem constructor
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph_original Reference to the CSR graph object we process on.
-     * @param[in] graph_reversed Reference to the inversed CSR graph object we process on.
-     * @param[in] num_gpus Number of the GPUs used.
-     */
-    //TOPKProblem(
-    //    bool stream_from_host,       // Only meaningful for single-GPU
-    //    const Csr<VertexId, SizeT, Value> &graph_original,
-    //    const Csr<VertexId, SizeT, Value> &graph_reversed,
-    //    int  num_gpus) :
-    //    num_gpus(num_gpus)
-    //{
-    //    Init(stream_from_host, graph_original, graph_reversed, num_gpus);
-    //}
-
-    /**
      * @brief TOPKProblem default destructor
      */
     ~TOPKProblem()
@@ -325,10 +309,15 @@ struct TOPKProblem : ProblemBase<VertexId, SizeT, Value,
    * @brief TOPKProblem initialization
    *
    * @param[in] stream_from_host Whether to stream data from host.
-   * @param[in] graph_original Reference to the CSR graph object we process on. @see Csr
-   * @param[in] graph_reversed Reference to the inversed CSR graph object we process on. @see Csr
-   * @param[in] _num_gpus Number of the GPUs used.
-   * @param[in] streams pointer to CUDA Streams.
+   * @param[in] org_graph Reference to the CSR graph object we process on. @see Csr
+   * @param[in] inv_graph Reference to the inversed CSR graph object we process on. @see Csr   * @param[in] num_gpus Number of the GPUs used.
+   * @param[in] gpu_idx
+   * @param[in] partition_method
+   * @param[in] streams CUDA Streams
+   * @param[in] queue_sizing
+   * @param[in] in_sizing
+   * @param[in] partition_factor
+   * @param[in] partition_seed
    *
    * \return cudaError_t object which indicates the success of all CUDA function calls.
    */
@@ -395,6 +384,8 @@ struct TOPKProblem : ProblemBase<VertexId, SizeT, Value,
      *
      *  @param[in] frontier_type Frontier type (i.e., edge / vertex / mixed).
      *  @param[in] queue_sizing Size scaling factor for work queue allocation.
+     *  @param[in] queue_sizing1
+     *
      *  \return cudaError_t object indicates the success of all CUDA functions.
      */
     cudaError_t Reset(

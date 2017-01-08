@@ -96,7 +96,7 @@ namespace edge_map_backward {
 
             // Work progress
             VertexId                queue_index;                // Current frontier queue counter index
-            util::CtaWorkProgress   &work_progress;             // Atomic queueing counters
+            util::CtaWorkProgress<SizeT>   &work_progress;             // Atomic queueing counters
             //int                     num_gpus;                   // Number of GPUs
 
             // Operational details for raking grid
@@ -613,7 +613,7 @@ namespace edge_map_backward {
                 SizeT                       *d_row_offsets,
                 VertexId                    *d_column_indices,
                 DataSlice                   *problem,
-                util::CtaWorkProgress       &work_progress,
+                util::CtaWorkProgress<SizeT>       &work_progress,
                 gunrock::oprtr::advance::TYPE ADVANCE_TYPE) :
 
                 queue_index(queue_index),

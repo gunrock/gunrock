@@ -262,20 +262,17 @@ void ConvertIDs(
  * @tparam VertexId
  * @tparam Value
  * @tparam SizeT
- * @tparam INSTRUMENT
- * @tparam DEBUG
- * @tparam SIZE_CHECK
  *
  * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
 template <
     typename VertexId,
     typename SizeT,
     typename Value>
-    //bool INSTRUMENT,
-    //bool DEBUG,
-    //bool SIZE_CHECK >
-void RunTests(Info<VertexId, SizeT, Value> *info)
+cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 {
     typedef CCProblem < VertexId,
             SizeT,
@@ -300,12 +297,22 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     bool    quiet_mode             = info->info["quiet_mode"        ].get_bool ();
     bool    quick_mode             = info->info["quick_mode"        ].get_bool ();
     bool    stream_from_host       = info->info["stream_from_host"  ].get_bool ();
-    int     traversal_mode         = info->info["traversal_mode"    ].get_int  ();
-    bool    instrument             = info->info["instrument"        ].get_bool ();
-    bool    debug                  = info->info["debug_mode"        ].get_bool ();
+    std::string traversal_mode     = info->info["traversal_mode"    ].get_str  ();
+    bool    instrument             = info->info["instrument"        ].get_bool (); 
+    bool    debug                  = info->info["debug_mode"        ].get_bool (); 
     bool    size_check             = info->info["size_check"        ].get_bool ();
-    int     iterations             = 1; //set to 1 for now. info->info["num_iteration"].get_int();
+    int     iterations             = info->info["num_iteration"     ].get_int();
+    int     communicate_latency    = info->info["communicate_latency"].get_int (); 
+    float   communicate_multipy    = info->info["communicate_multipy"].get_real();
+    int     expand_latency         = info->info["expand_latency"    ].get_int (); 
+    int     subqueue_latency       = info->info["subqueue_latency"  ].get_int (); 
+    int     fullqueue_latency      = info->info["fullqueue_latency" ].get_int (); 
+    int     makeout_latency        = info->info["makeout_latency"   ].get_int (); 
+    if (max_queue_sizing < 0) max_queue_sizing = 1.0;
+    if (max_in_sizing < 0) max_in_sizing = 1.1;
+    if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
     CpuTimer cpu_timer;
+    cudaError_t retval;
 
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
@@ -335,12 +342,12 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     for (int gpu = 0; gpu < num_gpus; gpu++)
     {
         size_t dummy;
-        cudaSetDevice(gpu_idx[gpu]);
+        if (retval = util::SetDevice(gpu_idx[gpu])) return retval;
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
 
-    Problem* problem = new Problem(false);  // allocate problem on GPU
-    util::GRError(problem->Init(
+    Problem* problem = new Problem;  // allocate problem on GPU
+    if (retval = util::GRError(problem->Init(
         stream_from_host,
         graph,
         NULL,
@@ -352,13 +359,33 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         max_in_sizing,
         partition_factor,
         partition_seed),
-        "CC Problem Initialization Failed", __FILE__, __LINE__);
+        "CC Problem Initialization Failed", __FILE__, __LINE__))
+        return retval;
 
     Enactor* enactor = new Enactor(
         num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
-    util::GRError(enactor->Init(
-        context, problem, max_grid_size),
-        "CC Enactor Init failed", __FILE__, __LINE__);
+    if (retval = util::GRError(enactor->Init(
+        context, problem, traversal_mode, max_grid_size),
+        "CC Enactor Init failed", __FILE__, __LINE__))
+        return retval;
+
+    enactor -> communicate_latency = communicate_latency;
+    enactor -> communicate_multipy = communicate_multipy;
+    enactor -> expand_latency      = expand_latency;
+    enactor -> subqueue_latency    = subqueue_latency;
+    enactor -> fullqueue_latency   = fullqueue_latency;
+    enactor -> makeout_latency     = makeout_latency;
+
+    if (retval = util::SetDevice(gpu_idx[0])) return retval;
+    if (retval = util::latency::Test(
+        streams[0], problem -> data_slices[0] -> latency_data,
+        communicate_latency,
+        communicate_multipy,
+        expand_latency,
+        subqueue_latency,
+        fullqueue_latency,
+        makeout_latency)) return retval;
+
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
@@ -371,36 +398,55 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     // perform CC
-    float elapsed = 0.0f;
-
+    double total_elapsed = 0.0;
+    double single_elapsed = 0.0;
+    double max_elapsed    = 0.0;
+    double min_elapsed    = 1e10;
+    json_spirit::mArray process_times;
+    if (!quiet_mode) printf("Using traversal mode %s\n", traversal_mode.c_str());
     for (SizeT iter = 0; iter < iterations; ++iter)
     {
-        util::GRError(problem->Reset(
+        if (retval = util::GRError(problem->Reset(
             enactor->GetFrontierType(), max_queue_sizing),
-            "CC Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(enactor->Reset(),
-            "CC Enactor Reset failed", __FILE__, __LINE__);
+            "CC Problem Data Reset Failed", __FILE__, __LINE__))
+            return retval;
+        if (retval = util::GRError(enactor->Reset(),
+            "CC Enactor Reset failed", __FILE__, __LINE__))
+            return retval;
 
         if (!quiet_mode)
         {
             printf("_________________________\n"); fflush(stdout);
         }
         cpu_timer.Start();
-        util::GRError(enactor->Enact(),
-            "CC Problem Enact Failed", __FILE__, __LINE__);
+        if (retval = util::GRError(enactor->Enact(traversal_mode),
+            "CC Problem Enact Failed", __FILE__, __LINE__))
+            return retval;
         cpu_timer.Stop();
+        single_elapsed = cpu_timer.ElapsedMillis();
+        total_elapsed += single_elapsed;
+        process_times.push_back(single_elapsed);
+        if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
+        if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
         if (!quiet_mode)
         {
-            printf("-------------------------\n"); fflush(stdout);
+            printf("-------------------------\n"
+                "iteration %lld elapsed: %lf ms\n",
+                (long long)iter, single_elapsed); 
+            fflush(stdout);
         }
-        elapsed += cpu_timer.ElapsedMillis();
+
     }
-    elapsed /= iterations;
+    total_elapsed /= iterations;
+    info -> info["process_times"] = process_times;
+    info -> info["min_process_time"] = min_elapsed;
+    info -> info["max_process_time"] = max_elapsed;
 
     cpu_timer.Start();
     // copy out results
-    util::GRError(problem->Extract(h_component_ids),
-                  "CC Problem Data Extraction Failed", __FILE__, __LINE__);
+    if (retval = util::GRError(problem->Extract(h_component_ids),
+        "CC Problem Data Extraction Failed", __FILE__, __LINE__))
+        return retval;
 
     // validity
     if (!quick_mode)
@@ -472,7 +518,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     info->ComputeCommonStats(  // compute running statistics
-        enactor->enactor_stats.GetPointer(), elapsed, h_component_ids, true);
+        enactor->enactor_stats.GetPointer(), total_elapsed, h_component_ids, true);
 
     if (!quiet_mode)
     {
@@ -525,6 +571,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     if (h_component_ids        ) {delete[] h_component_ids        ; h_component_ids         = NULL;}
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
+    return retval;
 }
 
 /******************************************************************************
@@ -582,9 +629,9 @@ template <
 int main_SizeT(CommandLineArgs *args)
 {
 // disabled to reduce compile time
-//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-//        return main_Value<VertexId, long long>(args);
-//    else
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
         return main_Value<VertexId, int      >(args);
 }
 

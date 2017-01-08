@@ -39,8 +39,8 @@ namespace salsa {
  *
  * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
  */
-template <typename _Problem/*, bool _INSTRUMENT, bool _DEBUG, bool _SIZE_CHECK*/>
-class SALSAEnactor : public EnactorBase <typename _Problem::SizeT/*, _DEBUG, _SIZE_CHECK*/>
+template <typename _Problem>
+class SALSAEnactor : public EnactorBase <typename _Problem::SizeT>
 {
 public:
     typedef _Problem                   Problem;
@@ -50,32 +50,6 @@ public:
     typedef EnactorBase<SizeT>         BaseEnactor;
     Problem    *problem;
     ContextPtr *context;
-    //static const bool INSTRUMENT = _INSTRUMENT;
-    //static const bool DEBUG      = _DEBUG;
-    //static const bool SIZE_CHECK = _SIZE_CHECK;
-
-    // Members
-    // Methods
-    protected:
-
-    /**
-     * @brief Prepare the enactor for SALSA kernel call. Must be called prior to each SALSA search.
-     *
-     * @param[in] problem SALSA Problem object which holds the graph data and SALSA problem data to compute.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    /*template <typename ProblemData>
-    cudaError_t Setup(
-        ProblemData *problem)
-    {
-        typedef typename ProblemData::SizeT         SizeT;
-        typedef typename ProblemData::VertexId      VertexId;
-
-        cudaError_t retval = cudaSuccess;
-
-        return retval;
-    }*/
 
     public:
 
@@ -164,24 +138,16 @@ public:
      *
      * @tparam AdvanceKernelPolicy Kernel policy for advance
      * @tparam FilterKernelPolicy Kernel policy for filter
-     * @tparam SALSAProblem SALSA Problem type.
      *
-     * @param[in] context CUDA context pointer.
-     * @param[in] problem SALSAProblem object.
      * @param[in] max_iteration Max number of iterations of SALSA algorithm
-     * @param[in] max_grid_size Max grid size for SALSA kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template<
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>
-        //typename SALSAProblem>
     cudaError_t EnactSALSA(
-        //ContextPtr  *context,
-        //Problem     *problem,
         SizeT        max_iteration)
-        //int          max_grid_size = 0)
     {
         typedef HFORWARDFunctor<
             VertexId,
@@ -211,7 +177,7 @@ public:
                      *graph_slice        = problem->graph_slices       [0];
         FrontierAttribute<SizeT>
                      *frontier_attribute = &this->frontier_attribute   [0];
-        EnactorStats *enactor_stats      = &this->enactor_stats        [0];
+        EnactorStats<SizeT> *enactor_stats      = &this->enactor_stats        [0];
         // Single-gpu graph slice
         typename Problem::DataSlice
                      *data_slice         =  problem->data_slices       [0];
@@ -219,7 +185,7 @@ public:
                      *d_data_slice       =  problem->d_data_slices     [0];
         util::DoubleBuffer<VertexId, SizeT, Value>
                      *frontier_queue     = &data_slice->frontier_queues[0];
-        util::CtaWorkProgressLifetime
+        util::CtaWorkProgressLifetime<SizeT>
                      *work_progress      = &this->work_progress        [0];
         cudaStream_t  stream             =  data_slice->streams        [0];
         ContextPtr    context            =  this -> context            [0];
@@ -268,9 +234,11 @@ public:
 
             // Edge Map
             gunrock::oprtr::advance::LaunchKernel
-                <AdvanceKernelPolicy, Problem, HForwardFunctor>(
+                <AdvanceKernelPolicy, Problem, HForwardFunctor, gunrock::oprtr::advance::V2E>(
                 enactor_stats[0],
                 frontier_attribute[0],
+                typename HForwardFunctor::LabelT(),
+                data_slice,
                 d_data_slice,
                 (VertexId*)NULL,
                 (bool*    )NULL,
@@ -288,8 +256,7 @@ public:
                 graph_slice->edges,
                 work_progress[0],
                 context[0],
-                stream,
-                gunrock::oprtr::advance::V2E);
+                stream);
 
             if (this -> debug)
             {
@@ -300,9 +267,11 @@ public:
 
             // Edge Map
             gunrock::oprtr::advance::LaunchKernel
-                <AdvanceKernelPolicy, Problem, AForwardFunctor>(
+                <AdvanceKernelPolicy, Problem, AForwardFunctor, gunrock::oprtr::advance::V2E>(
                 enactor_stats[0],
                 frontier_attribute[0],
+                typename AForwardFunctor::LabelT(),
+                data_slice,
                 d_data_slice,
                 (VertexId*)NULL,
                 (bool*    )NULL,
@@ -320,8 +289,7 @@ public:
                 graph_slice->edges,
                 work_progress[0],
                 context[0],
-                stream,
-                gunrock::oprtr::advance::V2E);
+                stream);
 
             if (this -> debug)
             {
@@ -331,11 +299,6 @@ public:
             }
         }
 
-        //util::DisplayDeviceResults(
-        //    problem->data_slices[0]->d_hub_predecessors, graph_slice->edges);
-        //util::DisplayDeviceResults(
-        //    problem->data_slices[0]->d_auth_predecessors, graph_slice->edges);
-
         while (true) 
         {
             util::MemsetIdxKernel<<<128, 128, 0, stream>>>(
@@ -343,15 +306,14 @@ public:
                 edges);
 
             frontier_attribute->queue_length     = graph_slice->edges;
-            //if (retval = work_progress->SetQueueLength(
-            //    frontier_attribute->queue_index, 
-            //    frontier_attribute->queue_length)) break;
 
             // Edge Map
             gunrock::oprtr::advance::LaunchKernel
-                <AdvanceKernelPolicy, Problem, HBackwardFunctor>(
+                <AdvanceKernelPolicy, Problem, HBackwardFunctor, gunrock::oprtr::advance::E2V>(
                 enactor_stats[0],
                 frontier_attribute[0],
+                typename HBackwardFunctor::LabelT(),
+                data_slice,
                 d_data_slice,
                 (VertexId*)NULL,
                 (bool*    )NULL,
@@ -365,12 +327,11 @@ public:
                 graph_slice->column_indices.GetPointer(util::DEVICE),
                 graph_slice->column_offsets.GetPointer(util::DEVICE),
                 graph_slice->row_indices.GetPointer(util::DEVICE),
-                graph_slice->edges, //graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
-                graph_slice->edges * 10000, //graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
+                graph_slice->edges,                    // max_in_queue
+                graph_slice->edges * 10000,                  // max_out_queue
                 work_progress[0],
                 context[0],
                 stream,
-                gunrock::oprtr::advance::E2V,
                 false,
                 true);
 
@@ -381,21 +342,15 @@ public:
                     return retval;
             }
 
-            //if (retval = work_progress.GetQueueLength(
-            //    frontier_attribute.queue_index, frontier_attribute.queue_length)) 
-            //    break;
-            //util::DisplayDeviceResults(
-            //    graph_slice->frontier_queues.d_keys[frontier_attribute.selector], 
-            //    frontier_attribute.queue_length);
-
             NormalizeRank(0, stream);
 
             // Edge Map
             gunrock::oprtr::advance::LaunchKernel
-                <AdvanceKernelPolicy, Problem, ABackwardFunctor>(
-                //d_done,
+                <AdvanceKernelPolicy, Problem, ABackwardFunctor, gunrock::oprtr::advance::E2V>(
                 enactor_stats[0],
                 frontier_attribute[0],
+                typename ABackwardFunctor::LabelT(),
+                data_slice,
                 d_data_slice,
                 (VertexId*)NULL,
                 (bool*    )NULL,
@@ -409,12 +364,11 @@ public:
                 graph_slice->row_indices.GetPointer(util::DEVICE),
                 graph_slice->row_offsets.GetPointer(util::DEVICE),
                 graph_slice->column_indices.GetPointer(util::DEVICE),
-                graph_slice->edges,//frontier_queue->keys[frontier_attribute->selector  ].GetSize(),//graph_slice->frontier_elements[frontier_attribute.selector],                   // max_in_queue
-                graph_slice->edges * 10000,//graph_slice->frontier_elements[frontier_attribute.selector^1]*10000,                 // max_out_queue
+                graph_slice->edges,                   // max_in_queue
+                graph_slice->edges * 10000,                 // max_out_queue
                 work_progress[0],
                 context[0],
                 stream,
-                gunrock::oprtr::advance::E2V,
                 false,
                 true);
 
@@ -431,14 +385,6 @@ public:
 
                 printf(", %lld", (long long)frontier_attribute->queue_length);
             }
-
-            //if (this -> instrument) 
-            //{
-            //    if (retval = enactor_stats->advance_kernel_stats.Accumulate(
-            //        enactor_stats->advance_grid_size,
-            //        enactor_stats->total_runtimes,
-            //        enactor_stats->total_lifetimes)) break;
-            //}
 
             NormalizeRank(1, stream);
 
@@ -459,7 +405,6 @@ public:
     typedef gunrock::oprtr::filter::KernelPolicy<
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
-        //INSTRUMENT,                         // INSTRUMENT
         0,                                  // SATURATION QUIT
         true,                               // DEQUEUE_SALSAOBLEM_SIZE
         8,                                  // MIN_CTA_OCCUPANCY
@@ -474,7 +419,6 @@ public:
     typedef gunrock::oprtr::advance::KernelPolicy<
         Problem,                            // Problem data type
         300,                                // CUDA_ARCH
-        //INSTRUMENT,                         // INSTRUMENT
         1,                                  // MIN_CTA_OCCUPANCY
         10,                                 // LOG_THREADS
         8,                                  // LOG_BLOCKS
@@ -505,7 +449,6 @@ public:
      *
      * @param[in] context CUDA Contet pointer.
      * @param[in] problem Pointer to SALSAProblem object.
-     * @param[in] max_iteration Max number of iterations.
      * @param[in] max_grid_size Max grid size for SALSA kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
@@ -538,18 +481,12 @@ public:
      *
      * @tparam SALSAProblem SALSA Problem type. @see SALSAProblem
      *
-     * @param[in] context CUDA Contet pointer.
-     * @param[in] problem Pointer to SALSAProblem object.
      * @param[in] max_iteration Max number of iterations.
-     * @param[in] max_grid_size Max grid size for SALSA kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     cudaError_t Enact(
-        //ContextPtr                           context,
-        //SALSAProblem                        *problem,
         SizeT         max_iteration)
-        //int                                  max_grid_size = 0)
     {
         int min_sm_version = -1;
         for (int i=0;i<this->num_gpus;i++)

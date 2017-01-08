@@ -1,43 +1,37 @@
 #!/bin/bash
 
-OPTION[0]="--src=largestdegree --device=0,1,2,3 --partition_method=biasrandom --grid-size=768"
-#OPTION[0]="" #directed and do not mark-pred"
-OPTION[1]=${OPTION[0]}" --mark-pred" #directed and mark-pred"
-OPTION[2]=${OPTION[0]}" --undirected" #undirected and do not mark-pred"
-OPTION[3]=${OPTION[1]}" --undirected" #undirected and mark-pred"
-OPTION[4]=${OPTION[0]}" --idempotence"
-OPTION[5]=${OPTION[1]}" --idempotence"
-OPTION[6]=${OPTION[2]}" --idempotence"
-OPTION[7]=${OPTION[3]}" --idempotence"
-
-MARK[0]=""
-MARK[1]=${MARK[0]}".mark_pred"
-MARK[2]=${MARK[0]}".undir"
-MARK[3]=${MARK[1]}".undir"
-MARK[4]=${MARK[0]}".idempotence"
-MARK[5]=${MARK[1]}".idempotence"
-MARK[6]=${MARK[2]}".idempotence"
-MARK[7]=${MARK[3]}".idempotence"
+OPTION[0]=""                    && MARK[0]=".skip_pred"
+OPTION[1]=" --mark-pred"        && MARK[1]=".mark_pred"
+OPTION[2]=""                    && MARK[2]=".dired"
+OPTION[3]=" --undirected"       && MARK[3]=".undir"
+OPTION[4]=""                    && MARK[4]=".non_idempot"
+OPTION[5]=" --idempotence"      && MARK[5]=".idempotence"
+OPTION[6]=" --traversal-mode=0" && MARK[6]=".t0"
+OPTION[7]=" --traversal-mode=1" && MARK[7]=".t1"
+OPTION[8]=""                    && MARK[8]=".32bSizeT"
+OPTION[9]=" --64bit-SizeT"      && MARK[9]=".64bSizeT"
 
 #get all execution files in ./bin
-files=(./bin/*)
+#files=(./bin/*)
 #split file names into arr
-arr=$(echo $files | tr " " "\n")
-max_ver_num="$"
-EXECUTION=${arr[0]}
+#arr=$(echo $files | tr " " "\n")
+#max_ver_num="$"
+#EXECUTION=${arr[0]}
 #iterate over all file names to get the largest version number
-for x in $arr
-do
-    output=$(grep -o "[0-9]\.[0-9]" <<<"$x")
-    if [ "$output" \> "$max_ver_num" ]; then
-        EXECUTION=$x
-    fi
-done
+#for x in $arr
+#do
+#    output=$(grep -o "[0-9]\.[0-9]" <<<"$x")
+#    if [ "$output" \> "$max_ver_num" ]; then
+#        EXECUTION=$x
+#    fi
+#done
 
 #put OS and Device type here
-SUFFIX="ubuntu12.04.k40cx4_brp0.5_dsize3"
-#EXCUTION="./bin/test_bfs_6.5_x86_64"
+SUFFIX="ubuntu14_04.k40cx4_rand"
+EXECUTION="./bin/test_bfs_7.5_x86_64"
 DATADIR="/data/gunrock_dataset/large"
+ORG_OPTION="--src=largestdegree --device=0,1,2,3 --partition_method=random --iteration-num=10 --queue-sizing=0 --in-sizing=0 --jsondir=./eval/$SUFFIX"
+ORG_MARK=""
 
 mkdir -p eval/$SUFFIX
 
@@ -91,17 +85,31 @@ NAME[41]="tweets"            && Q_SIZE_DIR[41]="5.00" && I_SIZE_DIR[41]="2.00" &
 NAME[42]="bitcoin"           && Q_SIZE_DIR[42]="5.00" && I_SIZE_DIR[42]="2.00" && Q_SIZE_UDIR[42]="10.0" && I_SIZE_UDIR[42]="2.00" 
 NAME[43]="caidaRouterLevel"  && Q_SIZE_DIR[43]="1.00" && I_SIZE_DIR[43]="0.30" && Q_SIZE_UDIR[43]="3.60" && I_SIZE_UDIR[43]="0.40" 
 
-for i in  24 25 28 41 42 #{0..43} 
+for i in  {0..43} 
 do
-    for j in 4 6 #0 1 2 3 4 6
-    do
-        if [ "$j" -eq "0" ] || [ "$j" -eq "1" ] || [ "$j" -eq "4" ] || [ "$j" -eq "5" ]; then
-            echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_DIR[$i]} --in-sizing=${I_SIZE_DIR[$i]} "> eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt"
-            $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_DIR[$i]} --in-sizing=${I_SIZE_DIR[$i]} > eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt
-        else
-            echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_UDIR[$i]} --in-sizing=${I_SIZE_UDIR[$i]} "> eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt"
-            $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_UDIR[$i]} --in-sizing=${I_SIZE_UDIR[$i]} > eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt
-        fi
+    for O1 in 0 1; do for O2 in 0 1; do for O3 in 0 1; do for O4 in 0 1; do for O5 in 0 1; do 
+        OPTIONS=$ORG_OPTION
+        OPTIONS=$OPTIONS${OPTION[$(( 0 + O1 ))]}
+        OPTIONS=$OPTIONS${OPTION[$(( 2 + O2 ))]}
+        OPTIONS=$OPTIONS${OPTION[$(( 4 + O3 ))]}
+        OPTIONS=$OPTIONS${OPTION[$(( 6 + O4 ))]}
+        OPTIONS=$OPTIONS${OPTION[$(( 8 + O5 ))]}
+
+        MARKS=$ORG_MARK
+        MARKS=$MARKS${MARK[$(( 0 + O1 ))]}
+        MARKS=$MARKS${MARK[$(( 2 + O2 ))]}
+        MARKS=$MARKS${MARK[$(( 4 + O3 ))]}
+        MARKS=$MARKS${MARK[$(( 6 + O4 ))]}
+        MARKS=$MARKS${MARK[$(( 8 + O5 ))]}
+        echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTIONS "> ./eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARKS}.txt"
+             $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx $OPTIONS > ./eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARKS}.txt
+        #if [ "$j" -eq "0" ] || [ "$j" -eq "1" ] || [ "$j" -eq "4" ] || [ "$j" -eq "5" ]; then
+        #    echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_DIR[$i]} --in-sizing=${I_SIZE_DIR[$i]} "> eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt"
+        #    $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_DIR[$i]} --in-sizing=${I_SIZE_DIR[$i]} > eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt
+        #else
+        #    echo $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_UDIR[$i]} --in-sizing=${I_SIZE_UDIR[$i]} "> eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt"
+        #    $EXECUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=${Q_SIZE_UDIR[$i]} --in-sizing=${I_SIZE_UDIR[$i]} > eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARK[$j]}.txt
+        #fi
         sleep 1
-    done
+    done; done; done; done; done
 done

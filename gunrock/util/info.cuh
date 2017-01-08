@@ -14,6 +14,8 @@
 
 #pragma once
 
+#define RECORD_PER_ITERATION_STATS 0
+
 namespace gunrock {
 namespace util {
 
@@ -33,12 +35,13 @@ private:
     int            num_iters;  // Number of times invoke primitive test
     int            max_iters;  // Maximum number of super-steps allowed
     int            grid_size;  // Maximum grid size (0: up to the enactor)
-    int            traversal;  // Load-balanced or Dynamic cooperative
+    std::string traversal_mode;  // Load-balanced or Dynamic cooperative
     int             num_gpus;  // Number of GPUs used
     double          q_sizing;  // Maximum size scaling factor for work queues
     double         q_sizing1;  // Value of max_queue_sizing1
     double          i_sizing;  // Maximum size scaling factor for communication
     long long         source;  // Source vertex ID to start
+    long long       destination_vertex; // Destination vertex ID
     std::string ref_filename;  // CPU reference input file name
     std::string    file_stem;  // Market filename path stem
     std::string       ofname;  // Used for jsonfile command
@@ -81,12 +84,15 @@ public:
         info["elapsed"]            = 0.0f;   // elapsed device running time
         info["preprocess_time"]    = 0.0f;   // elapsed preprocessing time
         info["postprocess_time"]   = 0.0f;   // postprocessing time
+        info["min_process_time"]   = 0.0f;   // min. elapsed time
+        info["max_process_time"]   = 0.0f;   // max. elapsed time
         info["total_time"]         = 0.0f;   // total run time of the program
         info["load_time"]          = 0.0f;   // data loading time
         info["write_time"]         = 0.0f;   // output writing time
         info["output_filename"]    = "";     // output filename
         info["engine"]             = "";     // engine name - Gunrock
         info["edge_value"]         = false;  // default don't load weights
+        info["random_edge_value"]  = false;  // whether to generate edge weights
         info["git_commit_sha1"]    = "";     // git commit sha1
         info["graph_type"]         = "";     // input graph type
         info["gunrock_version"]    = "";     // gunrock version number
@@ -99,9 +105,9 @@ public:
         info["mark_predecessors"]  = false;  // mark predecessors (BFS, SSSP)
         info["max_grid_size"]      = 0;      // maximum grid size
         info["max_iteration"]      = 50;     // default maximum iteration
-        info["max_in_sizing"]      = 1.0f;   // maximum in queue sizing factor
-        info["max_queue_sizing"]   = 1.0f;   // maximum queue sizing factor
-        info["max_queue_sizing1"]  = -1.0f;   // maximum queue sizing factor
+        info["max_in_sizing"]      = -1.0f;  // maximum in queue sizing factor
+        info["max_queue_sizing"]   = -1.0f;  // maximum queue sizing factor
+        info["max_queue_sizing1"]  = -1.0f;  // maximum queue sizing factor
         info["m_teps"]             = 0.0f;   // traversed edges per second
         info["num_gpus"]           = 1;      // number of GPU(s) used
         info["nodes_visited"]      = 0;      // number of nodes visited
@@ -116,9 +122,11 @@ public:
         info["search_depth"]       = 0;      // search depth (iterations)
         info["size_check"]         = true;   // enable or disable size check
         info["source_type"]        = "";     // source type
+        info["source_seed"]        = 0;      // source seed
         info["source_vertex"]      = 0;      // source (BFS, SSSP)
+        info["destination_vertex"] = -1;     // destination
         info["stream_from_host"]   = false;  // stream from host to device
-        info["traversal_mode"]     = -1;     // advance mode
+        info["traversal_mode"]     = "default";     // advance mode
         info["edges_queued"]       = 0;      // number of edges in queue
         info["nodes_queued"]       = 0;      // number of nodes in queue
         info["undirected"]         = true;   // default use undirected input
@@ -126,6 +134,7 @@ public:
         info["delta"]              = 0.85f;  // default delta for PageRank
         info["error"]              = 0.01f;  // default error for PageRank
         info["scaled"]             = false;  // default scaled for PageRank
+        info["compensate"]         = false;  // default compensate for PageRank
         info["alpha"]              = 6.0f;   // default alpha for DOBFS
         info["beta"]               = 6.0f;   // default beta for DOBFS
         info["top_nodes"]          = 0;      // default number of nodes for top-k primitive
@@ -133,6 +142,19 @@ public:
         info["multi_graphs"]       = false;  // default only one input graph
         info["node_value"]         = false;  // default don't load labels
         info["label"]              = "";     // label file name used in test
+        info["communicate_latency"]= 0;      // inter-GPU communication latency
+        info["communicate_multipy"]= -1.0f;  // inter-GPU communication multiplier
+        info["expand_latency"     ]= 0;      // expand_incoming latency
+        info["subqueue_latency"   ]= 0;      // subqueue latency
+        info["fullqueue_latency"  ]= 0;      // fullqueue latency
+        info["makeout_latency"    ]= 0;      // makeout latency
+        info["direction_optimized"]= false;  // whether to enable directional optimization
+        info["do_a"               ]= 0.001;  // direction optimization parameter
+        info["do_b"               ]= 0.200;  // direction optimization parameter
+        info["duplicate_graph"    ]= false;  // whether to duplicate graph on every GPUs
+        info["64bit_VertexId"     ]= (sizeof(VertexId) == 8) ? true : false;
+        info["64bit_SizeT"        ]= (sizeof(SizeT   ) == 8) ? true : false;
+        info["64bit_Value"        ]= (sizeof(Value   ) == 8) ? true : false;
         // info["gpuinfo"]
         // info["device_list"]
         // info["sysinfo"]
@@ -180,6 +202,8 @@ public:
         info["mark_predecessors"] =  args.CheckCmdLineFlag("mark-pred");  // BFS
         info["normalized"] =  args.CheckCmdLineFlag("normalized"); // PR
         info["scaled"    ] =  args.CheckCmdLineFlag("scaled"    ); // PR
+        info["compensate"] =  args.CheckCmdLineFlag("compensate"); // PR
+        info["direction_optimized"] = args.CheckCmdLineFlag("direction-optimized");
 
         info["json"] = args.CheckCmdLineFlag("json");
         if (args.CheckCmdLineFlag("jsonfile"))
@@ -222,24 +246,44 @@ public:
                            maximum_degree, source);
                 }
                 info["source_type"] = "largest-degree";
-            }
-            else
+            } else if (source_type.compare("randomize2") == 0)
+            {
+                source = 0;
+                if (!args.CheckCmdLineFlag("quiet"))
+                    printf("Using random source vertex for each run\n");
+                info["source_type"] = "random2";
+                int src_seed = -1;
+                if (args.CheckCmdLineFlag("src-seed"))
+                    args.GetCmdLineArgument("src-seed", src_seed);
+                info["source_seed"]   = src_seed;
+            } else if (source_type.compare("list") == 0)
+            { 
+                if (!args.CheckCmdLineFlag("quiet"))
+                    printf("Using user specified source vertex for each run\n");
+                info["source_type"] = "list";
+            } else
             {
                 args.GetCmdLineArgument("src", source);
                 info["source_type"] = "user-defined";
             }
+            info["source_list"] = GetSourceList(args); 
             info["source_vertex"] = (int64_t)source;
             if (!args.CheckCmdLineFlag("quiet"))
             {
                 printf("Source vertex: %lld\n", source);
             }
         }
+        if (args.CheckCmdLineFlag("dst-node"))
+        {
+            args.GetCmdLineArgument("dst-node", destination_vertex);
+            info["destination_vertex"] = (int)destination_vertex;
+        }
         if (args.CheckCmdLineFlag("grid-size"))
         {
             args.GetCmdLineArgument("grid-size", grid_size);
             info["max_grid_size"] = grid_size;
         }
-        if (args.CheckCmdLineFlag("iteration-num"))
+        if (args.CheckCmdLineFlag("iteration-num") && !args.CheckCmdLineFlag("source-list"))
         {
             args.GetCmdLineArgument("iteration-num", num_iters);
             info["num_iteration"] = num_iters;
@@ -279,15 +323,16 @@ public:
             args.GetCmdLineArgument("partition-seed", par_seed);
             info["partition_seed"] = par_seed;
         }
+        traversal_mode = "default";
         if (args.CheckCmdLineFlag("traversal-mode"))
         {
-            args.GetCmdLineArgument("traversal-mode", traversal);
-            info["traversal_mode"] = traversal;
+            args.GetCmdLineArgument("traversal-mode", traversal_mode);
+            info["traversal_mode"] = traversal_mode;
         }
-        if (traversal == -1)
+        if (traversal_mode == "default")
         {
-            traversal = csr_ptr->GetAverageDegree() > 5 ? 0 : 1;
-            info["traversal_mode"] = traversal;
+            traversal_mode = (csr_ptr->GetAverageDegree() > 5) ? "LB" : "TWC";
+            info["traversal_mode"] = traversal_mode;
         }
         if (args.CheckCmdLineFlag("ref_filename"))
         {
@@ -330,9 +375,70 @@ public:
             args.GetCmdLineArgument("output_filename", output_filename);
             info["output_filename"] = output_filename;
         }
+        if (args.CheckCmdLineFlag("communicate-latency"))
+        {
+            int communicate_latency = 0;
+            args.GetCmdLineArgument("communicate-latency", communicate_latency);
+            info["communicate_latency"] = communicate_latency;
+        }
+        if (args.CheckCmdLineFlag("communicate-multipy"))
+        {
+            float communicate_multipy = -1;
+            args.GetCmdLineArgument("communicate-multipy", communicate_multipy);
+            info["communicate_multipy"] = communicate_multipy;
+        }
+        if (args.CheckCmdLineFlag("expand-latency"))
+        {
+            int expand_latency = 0;
+            args.GetCmdLineArgument("expand-latency", expand_latency);
+            info["expand_latency"] = expand_latency;
+        }
+        if (args.CheckCmdLineFlag("subqueue-latency"))
+        {
+            int subqueue_latency = 0;
+            args.GetCmdLineArgument("subqueue-latency", subqueue_latency);
+            info["subqueue_latency"] = subqueue_latency;
+        }
+        if (args.CheckCmdLineFlag("fullqueue-latency"))
+        {
+            int fullqueue_latency = 0;
+            args.GetCmdLineArgument("fullqueue-latency", fullqueue_latency);
+            info["fullqueue_latency"] = fullqueue_latency;
+        }
+        if (args.CheckCmdLineFlag("makeout-latency"))
+        {
+            int makeout_latency = 0;
+            args.GetCmdLineArgument("makeout-latency", makeout_latency);
+            info["makeout_latency"] = makeout_latency;
+        }
+        if (args.CheckCmdLineFlag("do_a"))
+        {
+            float do_a = 0.001;
+            args.GetCmdLineArgument("do_a", do_a);
+            info["do_a"] = do_a;
+        }
+        if (args.CheckCmdLineFlag("do_b"))
+        {
+            float do_b = 0.200;
+            args.GetCmdLineArgument("do_b", do_b);
+            info["do_b"] = do_b;
+        }
+        if (args.CheckCmdLineFlag("tag"))
+        {
+            std::string tag = "";
+            args.GetCmdLineArgument("tag", tag);
+            info["tag"] = tag;
+        }
 
         // parse device count and device list
         info["device_list"] = GetDeviceList(args);
+
+        if (args.CheckCmdLineFlag("duplicate-graph"))
+        {
+            DuplicateGraph(args, *csr_ptr, info["edge_value"].get_bool());
+            info["duplicate_graph"] = true;
+        }
+
 
         ///////////////////////////////////////////////////////////////////////
         // initialize CUDA streams and context for MordernGPU API.
@@ -347,7 +453,10 @@ public:
         else  // use single device with index 0
         {
             num_gpus = 1;
-            temp_devices.push_back(0);
+            int gpu_idx;
+            util::GRError(cudaGetDevice(&gpu_idx),
+                "cudaGetDevice failed", __FILE__, __LINE__);
+            temp_devices.push_back(gpu_idx);
         }
 
         cudaStream_t*     streams_ = new cudaStream_t[num_gpus * num_gpus * 2];
@@ -388,16 +497,31 @@ public:
         Csr<VertexId, SizeT, Value> &csr_ref)
     {
         // load or generate input graph
-        if (info["edge_value"].get_bool())
+        if (info["edge_value"].get_bool() && !info["random_edge_value"].get_bool())
         {
             LoadGraph<true, false>(args, csr_ref);  // load graph with weighs
         }
         else
         {
             LoadGraph<false, false>(args, csr_ref);  // load without weights
+            if (info["random_edge_value"].get_bool())
+            {
+                if (csr_ref.edge_values != NULL) free(csr_ref.edge_values);
+                csr_ref.edge_values = (Value*)malloc(csr_ref.edges * sizeof(Value));
+                srand(time(NULL));
+                for (SizeT e= 0; e < csr_ref.edges; e++)
+                {
+                    csr_ref.edge_values[e] = rand() %64;
+                }
+            }
         }
         csr_ptr = &csr_ref;  // set graph pointer
         InitBase(algorithm_name, args);
+        if (info["destination_vertex"].get_int64() < 0 || info["destination_vertex"].get_int64()>=(int)csr_ref.nodes)
+            info["destination_vertex"] = (int)csr_ref.nodes-1;   //if not set or something is wrong, set it to the largest vertex ID
+        info["stddev_degrees"] = (float)csr_ref.GetStddevDegree();
+        info["num_vertices"] = (int64_t)csr_ref.nodes;
+        info["num_edges"   ] = (int64_t)csr_ref.edges;
     }
 
     /**
@@ -414,7 +538,8 @@ public:
         Csr<VertexId, SizeT, Value> &csr_ref,
         Csr<VertexId, SizeT, Value> &csc_ref)
     {
-        // Special initialization for SM problem
+        typedef Coo<VertexId, Value> EdgeTupleType;
+	    // Special initialization for SM problem
         if(algorithm_name == "SM") return Init_SM(args,csr_ref,csc_ref);
 
          // load or generate input graph
@@ -423,12 +548,12 @@ public:
             if (info["undirected"].get_bool())
             {
                 LoadGraph<true, false>(args, csr_ref);  // with weigh values
-                LoadGraph<true, false>(args, csc_ref);  // same as CSR
+                csc_ref.FromCsr(csr_ref);
             }
             else
             {
                 LoadGraph<true, false>(args, csr_ref);  // load CSR input
-                LoadGraph<true,  true>(args, csc_ref);  // load CSC input
+                csc_ref.template CsrToCsc<EdgeTupleType>(csc_ref, csr_ref);
             }
         }
         else  // does not need weight values
@@ -436,17 +561,21 @@ public:
             if (info["undirected"].get_bool())
             {
                 LoadGraph<false, false>(args, csr_ref);  // without weights
-                LoadGraph<false, false>(args, csc_ref);  // without weights
+                csc_ref.FromCsr(csr_ref);
             }
             else
             {
                 LoadGraph<false, false>(args, csr_ref);  // without weights
-                LoadGraph<false,  true>(args, csc_ref);  // without weights
+                csc_ref.template CsrToCsc<EdgeTupleType>(csc_ref, csr_ref);
             }
         }
         csr_ptr = &csr_ref;  // set CSR pointer
         csc_ptr = &csc_ref;  // set CSC pointer
         InitBase(algorithm_name, args);
+        info["destination_vertex"] = (int64_t)csr_ref.nodes-1;   //by default set it to the largest vertex ID
+        info["stddev_degrees"] = (float)csr_ref.GetStddevDegree();
+        info["num_vertices"] = (int64_t)csr_ref.nodes;
+        info["num_edges"   ] = (int64_t)csr_ref.edges;
     }
 
     /**
@@ -512,6 +641,66 @@ public:
     }
 
     /**
+     * @brief Utility function to parse source node list.
+     *
+     * @param[in] args Command line arguments.
+     *
+     * \return json_spirit::mArray object contain source nodes used.
+     */
+    json_spirit::mArray GetSourceList(util::CommandLineArgs &args)
+    {
+        json_spirit::mArray source_list;      // return mArray
+        std::vector<int> srcs;             // temp storage
+        if (args.CheckCmdLineFlag("source-list"))  // parse command
+        {
+            args.GetCmdLineArguments<int>("source-list", srcs);
+            int num_sources = srcs.size();
+            info["num_iteration"] = num_sources;  // update number of devices
+            for (int i = 0; i < num_sources; i++)
+            {
+                source_list.push_back(srcs[i]);
+            }
+        }
+        return source_list;
+    }
+
+    /**
+     * @brief Utility function to parse per-iteration advance stats.
+     *
+     * @param[in] runtime_list std::vector stores per iteration runtime.
+     * @param[in] mteps_list std::vector stores per iteration mteps.
+     * @param[in] input_frontier_list std::vector stores per iteration input frontier number.
+     * @param[in] output_frontier_list std::vector stores per iteration output frontier number.
+     * @param[in] dir_list std::vector stores per iteration advance direction.
+     * @param[in] runtimes json_spirit::mArray to store per iteration runtimes.
+     * @param[in] mteps json_spirit::mArray to store per iteration mteps.
+     * @param[in] output_frontiers json_spirit::mArray to store per iteration output frontier numbers.
+     * @param[in] dirs json_spirit::mArray to store per iteration direction.
+     *
+     */
+    void GetPerIterationAdvanceStats(
+        std::vector<float> &runtime_list,
+        std::vector<float> &mteps_list,
+        std::vector<int> &input_frontier_list,
+        std::vector<int> &output_frontier_list,
+        std::vector<bool> &dir_list,
+        json_spirit::mArray &runtimes,
+        json_spirit::mArray &mteps,
+        json_spirit::mArray &input_frontiers,
+        json_spirit::mArray &output_frontiers,
+        json_spirit::mArray &dirs)
+    {
+        for (int i = 0; i < runtime_list.size(); ++i) {
+            runtimes.push_back(runtime_list[i]);
+            mteps.push_back(mteps_list[i]);
+            input_frontiers.push_back(input_frontier_list[i]);
+            output_frontiers.push_back(output_frontier_list[i]);
+            dirs.push_back(dir_list[i]?"push":"pull");
+        }
+        return;
+    }
+
+    /**
      * @brief Writes the JSON structure to STDOUT (command line --json).
      */
     void PrintJson()
@@ -558,6 +747,77 @@ public:
         json_spirit::write_stream(
             json_spirit::mValue(info), of,
             json_spirit::pretty_print);
+    }
+
+    int DuplicateGraph(
+        util::CommandLineArgs &args,
+        Csr<VertexId, SizeT, Value> &graph,
+        bool edge_value = false)
+    {
+        VertexId org_src = info["source_vertex"].get_int64();
+        int num_gpus     = info["num_gpus"     ].get_int  ();
+        bool undirected  = info["undirected"   ].get_bool ();
+
+        if (num_gpus == 1) return 0;
+
+        SizeT org_nodes = graph. nodes;
+        SizeT org_edges = graph. edges;
+        SizeT new_nodes = graph. nodes * num_gpus + 1;
+        SizeT new_edges = graph. edges * num_gpus + ((undirected) ? 2 : 1) * num_gpus;
+        printf("Duplicatiing graph, #V = %lld -> %lld, #E = %lld -> %lld, src = %lld -> 0\n",
+            (long long)org_nodes, (long long)new_nodes,
+            (long long)org_edges, (long long)new_edges,
+            (long long)org_src);
+
+        SizeT    *new_row_offsets    = (SizeT*)malloc(sizeof(SizeT) * (new_nodes+1));
+        VertexId *new_column_indices = (VertexId*)malloc(sizeof(VertexId) * new_edges);
+        new_row_offsets[0] = 0;
+        for (int gpu = 0; gpu < num_gpus; gpu ++)
+            new_column_indices[gpu] = org_nodes * gpu + 1 + org_src;
+        new_row_offsets[new_nodes] = new_edges;
+        info["source_vertex"] = 0;
+        source = 0;
+
+        #pragma omp parallel for
+        for (VertexId org_v = 0; org_v < org_nodes; org_v ++)
+        {
+            SizeT org_row_offset = graph. row_offsets[org_v];
+            SizeT out_degree = graph. row_offsets[org_v + 1] - org_row_offset;
+            for (int gpu = 0; gpu < num_gpus; gpu ++)
+            {
+                VertexId new_v = org_nodes * gpu + 1 + org_v;
+                SizeT new_row_offset = num_gpus + org_edges * gpu + org_row_offset;
+                if (undirected) 
+                {
+                    new_row_offset += gpu;
+                    if (org_v > org_src) new_row_offset ++;
+                }
+                new_row_offsets[new_v] = new_row_offset;
+                SizeT start_pos = new_row_offset;
+
+                if (org_v == org_src && undirected)
+                {
+                    new_column_indices[start_pos] = 0;
+                    start_pos ++;
+                }
+
+                for (SizeT i = 0; i < out_degree; i++)
+                {
+                    VertexId org_u = graph. column_indices[org_row_offset + i];
+                    VertexId new_u = org_nodes * gpu + 1 + org_u;
+                    new_column_indices[start_pos + i] = new_u;
+                }
+            }
+        }
+
+        free(graph. row_offsets   ); graph. row_offsets    = new_row_offsets;
+        free(graph. column_indices); graph. column_indices = new_column_indices;
+        graph. nodes = new_nodes;
+        graph. edges = new_edges;
+        new_row_offsets = NULL;
+        new_column_indices = NULL;
+
+        return 0;
     }
 
     /**
@@ -607,7 +867,7 @@ public:
                 return 1;
             }
         }
-        else if (graph_type == "rmat")  // R-MAT graph
+        else if (graph_type == "rmat" || graph_type == "grmat" || graph_type == "metarmat")  // R-MAT graph
         {
             if (!args.CheckCmdLineFlag("quiet"))
             {
@@ -622,6 +882,8 @@ public:
             double rmat_b = 0.19;
             double rmat_c = 0.19;
             double rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
+            double rmat_vmin = 1;
+            double rmat_vmultipiler = 64;
             int rmat_seed = -1;
 
             args.GetCmdLineArgument("rmat_scale", rmat_scale);
@@ -636,6 +898,26 @@ public:
             rmat_d = 1 - (rmat_a + rmat_b + rmat_c);
             args.GetCmdLineArgument("rmat_d", rmat_d);
             args.GetCmdLineArgument("rmat_seed", rmat_seed);
+            args.GetCmdLineArgument("rmat_vmin", rmat_vmin);
+            args.GetCmdLineArgument("rmat_vmultipiler", rmat_vmultipiler);
+
+            std::vector<int> temp_devices;
+            if (args.CheckCmdLineFlag("device"))  // parse device list
+            {
+                args.GetCmdLineArguments<int>("device", temp_devices);
+                num_gpus = temp_devices.size();
+            }
+            else  // use single device with index 0
+            {
+                num_gpus = 1;
+                int gpu_idx;
+                util::GRError(cudaGetDevice(&gpu_idx),
+                    "cudaGetDevice failed", __FILE__, __LINE__);
+                temp_devices.push_back(gpu_idx);
+            }
+            int *gpu_idx = new int[temp_devices.size()];
+            for (int i=0; i<temp_devices.size(); i++)
+                gpu_idx[i] = temp_devices[i];
 
             // put everything into mObject info
             info["rmat_a"] = rmat_a;
@@ -647,30 +929,83 @@ public:
             info["rmat_nodes"] = (int64_t)rmat_nodes;
             info["rmat_edges"] = (int64_t)rmat_edges;
             info["rmat_edgefactor"] = (int64_t)rmat_edgefactor;
-
+            info["rmat_vmin"] = rmat_vmin;
+            info["rmat_vmultipiler"] = rmat_vmultipiler;
+            //can use to_string since c++11 is required, niiiice.
+            file_stem = "rmat_" + 
+                (args.CheckCmdLineFlag("rmat_scale") ? 
+                    ("n" + std::to_string(rmat_scale)) : std::to_string(rmat_nodes)) 
+               + "_" + (args.CheckCmdLineFlag("rmat_edgefactor") ? 
+                    ("e" + std::to_string(rmat_edgefactor)) : std::to_string(rmat_edges));
+            info["dataset"] = file_stem;
+            
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
 
             // generate R-MAT graph
-            if (graphio::rmat::BuildRmatGraph<EDGE_VALUE>(
-                        rmat_nodes,
-                        rmat_edges,
-                        csr_ref,
-                        info["undirected"].get_bool(),
-                        rmat_a,
-                        rmat_b,
-                        rmat_c,
-                        rmat_d,
-                        1,
-                        1,
-                        rmat_seed,
-                        args.CheckCmdLineFlag("quiet")) != 0)
+            if (graph_type == "rmat")
             {
-                return 1;
+                if (graphio::rmat::BuildRmatGraph<EDGE_VALUE>(
+                    rmat_nodes,
+                    rmat_edges,
+                    csr_ref,
+                    info["undirected"].get_bool(),
+                    rmat_a,
+                    rmat_b,
+                    rmat_c,
+                    rmat_d,
+                    rmat_vmultipiler,
+                    rmat_vmin,
+                    rmat_seed,
+                    args.CheckCmdLineFlag("quiet")) != 0)
+                {
+                    return 1;
+                }
+            } else if (graph_type == "grmat")
+            {
+                if (graphio::grmat::BuildRmatGraph<EDGE_VALUE>(
+                    rmat_nodes,
+                    rmat_edges,
+                    csr_ref,
+                    info["undirected"].get_bool(),
+                    rmat_a,
+                    rmat_b,
+                    rmat_c,
+                    rmat_d,
+                    rmat_vmultipiler,
+                    rmat_vmin,
+                    rmat_seed,
+                    args.CheckCmdLineFlag("quiet"),
+                    temp_devices.size(),
+                    gpu_idx) != 0)
+                {
+                    return 1;
+                }
+            } else // must be metarmat
+            {
+                if (graphio::grmat::BuildMetaRmatGraph<EDGE_VALUE>(
+                    rmat_nodes,
+                    rmat_edges,
+                    csr_ref,
+                    info["undirected"].get_bool(),
+                    rmat_a,
+                    rmat_b,
+                    rmat_c,
+                    rmat_d,
+                    rmat_vmultipiler,
+                    rmat_vmin,
+                    rmat_seed,
+                    args.CheckCmdLineFlag("quiet"),
+                    temp_devices.size(),
+                    gpu_idx) != 0)
+                {
+                    return 1;
+                }
             }
 
             cpu_timer.Stop();
             float elapsed = cpu_timer.ElapsedMillis();
+            delete[] gpu_idx; gpu_idx = NULL;
 
             if (!args.CheckCmdLineFlag("quiet"))
             {
@@ -710,7 +1045,14 @@ public:
             info["rgg_thfactor"]    = rgg_thfactor;
             info["rgg_threshold"]   = rgg_threshold;
             info["rgg_vmultipiler"] = rgg_vmultipiler;
-
+            //file_stem = "rgg_s"+std::to_string(rgg_scale)+"_e"+std::to_string(csr_ref.edges)+"_f"+std::to_string(rgg_thfactor);
+            file_stem = "rgg_" + 
+                (args.CheckCmdLineFlag("rgg_scale") ? 
+                    ("n" + std::to_string(rgg_scale)) : std::to_string(rgg_nodes)) 
+               + "_" + (args.CheckCmdLineFlag("rgg_thfactor") ? 
+                    ("t" + std::to_string(rgg_thfactor)) : std::to_string(rgg_threshold));
+            info["dataset"] = file_stem;
+ 
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
 
@@ -735,6 +1077,67 @@ public:
                 printf("RGG generated in %.3f ms, "
                        "threshold = %.3lf, vmultipiler = %.3lf\n",
                        elapsed, rgg_threshold, rgg_vmultipiler);
+            }
+        }
+        else if (graph_type == "smallworld")
+        {
+            if (!args.CheckCmdLineFlag("quiet"))
+            {
+                printf("Generating Small World Graph ...\n");
+            }
+
+            SizeT  sw_nodes = 1 << 10;
+            SizeT  sw_scale = 10;
+            double sw_p     = 0.0;
+            SizeT  sw_k     = 6;
+            int    sw_seed  = -1;
+            double sw_vmultipiler = 1.00;
+            double sw_vmin        = 1.00;
+
+            args.GetCmdLineArgument("sw_scale", sw_scale);
+            sw_nodes = 1 << sw_scale;
+            args.GetCmdLineArgument("sw_nodes", sw_nodes);
+            args.GetCmdLineArgument("sw_k"    , sw_k    );
+            args.GetCmdLineArgument("sw_p"    , sw_p    );
+            args.GetCmdLineArgument("sw_seed" , sw_seed );
+            args.GetCmdLineArgument("sw_vmultipiler", sw_vmultipiler);
+            args.GetCmdLineArgument("sw_vmin"       , sw_vmin);
+
+            info["sw_seed"       ] = sw_seed       ;
+            info["sw_scale"      ] = (int64_t)sw_scale      ;
+            info["sw_nodes"      ] = (int64_t)sw_nodes      ;
+            info["sw_p"          ] = sw_p          ;
+            info["sw_k"          ] = (int64_t)sw_k          ;
+            info["sw_vmultipiler"] = sw_vmultipiler;
+            info["sw_vmin"       ] = sw_vmin       ;
+            file_stem = "smallworld_" + 
+                (args.CheckCmdLineFlag("sw_scale") ? 
+                    ("n" + std::to_string(sw_scale)) : std::to_string(sw_nodes))
+                + "k" + std::to_string(sw_k) + "_p" + std::to_string(sw_p); 
+            info["dataset"] = file_stem;
+ 
+            util::CpuTimer cpu_timer;
+            cpu_timer.Start();
+            if (graphio::small_world::BuildSWGraph<EDGE_VALUE>(
+                sw_nodes,
+                csr_ref,
+                sw_k,
+                sw_p,
+                info["undirected"].get_bool(),
+                sw_vmultipiler,
+                sw_vmin,
+                sw_seed,
+                args.CheckCmdLineFlag("quiet")) != cudaSuccess)
+            {
+                return 1;
+            }
+            cpu_timer.Stop();
+            float elapsed = cpu_timer.ElapsedMillis();
+            if (!args.CheckCmdLineFlag("quiet"))
+            {
+                printf("Small World Graph generated in %.3lf ms, "
+                    "k = %lld, p = %.3lf\n",
+                    elapsed, (long long)sw_k, sw_p);
             }
         }
         else
@@ -765,6 +1168,7 @@ public:
      *
      * @param[in] args Command line arguments.
      * @param[in] csr_ref Reference to the CSR graph.
+     * @param[in] type normal type or qeury type
      *
      * \return int whether successfully loaded the graph (0 success, 1 error).
      */
@@ -848,7 +1252,6 @@ public:
      /**
      * @brief SM Initialization process for Info.
      *
-     * @param[in] algorithm_name Algorithm name.
      * @param[in] args Command line arguments.
      * @param[in] csr_query_ref Reference to the CSR structure.
      * @param[in] csr_data_ref Reference to the CSR structure.
@@ -935,6 +1338,34 @@ public:
             }
         }
 
+        if (get_traversal_stats && RECORD_PER_ITERATION_STATS)
+        {
+            // TODO: collect info for multi-GPUs
+            EnactorStats *estats = enactor_stats;
+            json_spirit::mArray per_iteration_advance_runtime; 
+            json_spirit::mArray per_iteration_advance_mteps; 
+            json_spirit::mArray per_iteration_advance_input_frontier; 
+            json_spirit::mArray per_iteration_advance_output_frontier; 
+            json_spirit::mArray per_iteration_advance_dir;
+            GetPerIterationAdvanceStats(
+                    estats->per_iteration_advance_time,
+                    estats->per_iteration_advance_mteps,
+                    estats->per_iteration_advance_input_edges,
+                    estats->per_iteration_advance_output_edges,
+                    estats->per_iteration_advance_direction,
+                    per_iteration_advance_runtime,
+                    per_iteration_advance_mteps,
+                    per_iteration_advance_input_frontier,
+                    per_iteration_advance_output_frontier,
+                    per_iteration_advance_dir);
+
+            info["per_iteration_advance_runtime"] = per_iteration_advance_runtime;
+            info["per_iteration_advance_mteps"] = per_iteration_advance_mteps;
+            info["per_iteration_advance_input_frontier"] = per_iteration_advance_input_frontier;
+            info["per_iteration_advance_output_frontier"] = per_iteration_advance_output_frontier;
+            info["per_iteration_advance_direction"] = per_iteration_advance_dir;
+        }
+
         double avg_duty = (total_lifetimes > 0) ?
             double(total_runtimes) / total_lifetimes * 100.0 : 0.0f;
 
@@ -968,6 +1399,7 @@ public:
             } else if (info["algorithm"].get_str().compare("PageRank") == 0)
             {
                 edges_visited = csr_ptr -> edges;
+                nodes_visited = csr_ptr -> nodes;
             }
 
             if (nodes_queued > nodes_visited)
@@ -1037,9 +1469,12 @@ public:
         double  postprocess_time = info["postprocess_time"].get_real();
         double  write_time       = info["write_time"      ].get_real();
         double  total_time       = info["total_time"      ].get_real();
+        double  min_process_time = info["min_process_time"].get_real();
+        double  max_process_time = info["max_process_time"].get_real();
 
-        printf("\n [%s] finished.", info["algorithm"].get_str().c_str());
-        printf("\n elapsed: %.4f ms\n iterations: %lld", elapsed, (long long)search_depth);
+        printf("\n [%s] finished.\n", info["algorithm"].get_str().c_str());
+        printf(" avg. elapsed: %.4f ms\n", elapsed);
+        printf(" iterations: %lld\n", (long long)search_depth);
 
         if (verbose)
         {
@@ -1049,41 +1484,46 @@ public:
             }
             else
             {
+                if (min_process_time > 0)
+                    printf(" min. elapsed: %.4f ms\n", min_process_time);
+                if (max_process_time > 0)
+                    printf(" max. elapsed: %.4f ms\n", max_process_time);
+
                 if (m_teps > 0.01)
                 {
-                    printf("\n rate: %.4f MiEdges/s", m_teps);
+                    printf(" rate: %.4f MiEdges/s\n", m_teps);
                 }
                 if (avg_duty > 0.01)
                 {
-                    printf("\n average CTA duty: %.2f%%", avg_duty);
+                    printf(" average CTA duty: %.2f%%\n", avg_duty);
                 }
                 if (nodes_visited != 0 && edges_visited != 0)
                 {
-                    printf("\n src: %lld\n nodes_visited: %lld\n edges_visited: %lld",
+                    printf(" src: %lld\n nodes_visited: %lld\n edges_visited: %lld\n",
                         source, (long long)nodes_visited, (long long)edges_visited);
                 }
                 if (nodes_queued > 0)
                 {
-                    printf("\n nodes queued: %lld", (long long)nodes_queued);
+                    printf(" nodes queued: %lld\n", (long long)nodes_queued);
                 }
                 if (edges_queued > 0)
                 {
-                    printf("\n edges queued: %lld", (long long)edges_queued);
+                    printf(" edges queued: %lld\n", (long long)edges_queued);
                 }
                 if (nodes_redundance > 0.01)
                 {
-                    printf("\n nodes redundance: %.2f%%", nodes_redundance);
+                    printf(" nodes redundance: %.2f%%\n", nodes_redundance);
                 }
                 if (edges_redundance > 0.01)
                 {
-                    printf("\n edges redundance: %.2f%%", edges_redundance);
+                    printf(" edges redundance: %.2f%%\n", edges_redundance);
                 }
-                printf("\n load time: %.4f ms", load_time);
-                printf("\n preprocess time: %.4f ms", preprocess_time);
-                printf("\n postprocess time: %.4f ms", postprocess_time);
+                printf(" load time: %.4f ms\n", load_time);
+                printf(" preprocess time: %.4f ms\n", preprocess_time);
+                printf(" postprocess time: %.4f ms\n", postprocess_time);
                 if (info["output_filename"].get_str() != "")
-                    printf("\n write time: %.4f ms", write_time);
-                printf("\n total time: %.4f ms", total_time);
+                    printf(" write time: %.4f ms\n", write_time);
+                printf(" total time: %.4f ms\n", total_time);
            }
         }
         printf("\n");

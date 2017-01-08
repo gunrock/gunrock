@@ -20,18 +20,17 @@ namespace gunrock {
 namespace util {
 
 #define TO_TRACK false
-#define NUM_TO_TRACK 5
+#define NUM_TO_TRACK 3
 #define MAX_GPU 0
 
 template <typename VertexId>
 static __device__ __host__ __inline__ bool to_track(VertexId node) {
     const VertexId node_to_track[] = {
-        81561706,
-        48459810, 
-        18876984,
-        1902};
+        2131537,
+        13839597,
+        15173021};
     if (!TO_TRACK) return false;
-    else { 
+    else {
         #pragma unroll
         for (int i = 0; i < NUM_TO_TRACK; i++)
             if (node == node_to_track[i]) return true;
@@ -47,7 +46,7 @@ static __device__ __host__ __inline__ bool to_track(
     /*for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --device=0,1 --queue-sizing=7.0 --queue-sizing1=8.0 --in-sizing=0.5 --partition-seed=1451953615 --v
     NUM_TO_TRACK = 38
     const VertexId node_to_track[NUM_TO_TRACK][3] = {
-        { 541845,  271043, 2569951}, 
+        { 541845,  271043, 2569951},
         { 569068,  284715, 2953294},
         {4016145, 2008346, 3872477},
         {  40641,   20374, 2555548},
@@ -93,7 +92,7 @@ static __device__ __host__ __inline__ bool to_track(
     };*/
 
     // for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --undirected --device=0,1,2,3 --queue-sizing=8.0 --in-sizing=0.5 --idempotence --v --partition-seed=1452208768
-    
+
     /*const VertexId node_to_track[][5] = {
         {  5487,    1370, 1239278, 1212000, 1238478},
         {  5503,    1377, 1531518, 1236984, 1238502},
@@ -168,7 +167,7 @@ static __device__ __host__ __inline__ bool to_track(
         { 209169,  104204, 3297101},
         {  56958, 2552293,   28432}
     };
-    
+
     const VertexId node_to_track[][5] = {
         {243640, 121881, 3344179},
         {330800, 2922799, 165211},
@@ -193,40 +192,59 @@ static __device__ __host__ __inline__ bool to_track(
         {769546 , 2863027, 384896}
     };*/
 
-    // for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --undirected --device=1 --queue-sizing=12.0 --idempotence 
-    const VertexId node_to_track[][MAX_GPU + 1] = {
-        {571021},
+    // for BFS, market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --undirected --device=1 --queue-sizing=12.0 --idempotence
+    //const VertexId node_to_track[][MAX_GPU + 1] = {
+        //{571021},
         //{1046961},
         //{2383788},
         //{3489561},
         //{3799683},
         //{94386},
-        {473430},
+        //{473430},
         //{616588},
         //{620833},
         //{620835},
-       
+
         //{327529},
         //{736107},
-        {821811},
+        //{821811},
         //{821813},
         //{821814},
         //{155168},
         //{156578},
         //{167158},
-        {168044},
+        //{168044},
         //{177768},
 
-        {91256},
+        //{91256},
         //{4847570},
 
-        {32456 },
-        {182080 },
-        {134578 },
-        {613300 },
-        {604857 }
-    };
+        //{32456 },
+        //{182080 },
+        //{134578 },
+        //{613300 },
+        //{604857 }
+    //};
 
+    // for BFS, ./bin/test_bfs_7.5_x86_64 market /data/gunrock_dataset/large/soc-LiveJournal1/soc-LiveJournal1.mtx --src=largestdegree --traversal-mode=1 --undirected --device=0 --queue-sizing=12.0 --idempotence
+    const VertexId node_to_track[][MAX_GPU + 1] = {
+        {357989},
+        {3291894},
+        {3291895},
+        {3291896},
+        {3291897},
+        {617822},
+        {3291898},
+        {1036861},
+        {1025745},
+        {3291899}
+
+        //{109644 },
+        //{101108 },
+        //{44056 },
+        //{106822 },
+        //{430576 }
+    };
     bool retval = false;
     if (TO_TRACK)
     {
@@ -234,7 +252,7 @@ static __device__ __host__ __inline__ bool to_track(
         #pragma unroll
         for (int i=0; i<NUM_TO_TRACK; i++)
             //if (gpu_num == gpu_to_track[i] &&
-            //    node == node_to_track[i]) 
+            //    node == node_to_track[i])
             if (node_to_track[i][gpu_num+1] == node)
                 retval = true;
     }
@@ -258,7 +276,7 @@ static __device__ __host__ __inline__ bool offset_to_track(
         //{35771053},
         //{35048667},
         //{35048669},
-       
+
         //{12544676},
         //{12544809},
         {12544939},
@@ -287,7 +305,7 @@ static __device__ __host__ __inline__ bool offset_to_track(
         #pragma unroll
         for (int i=0; i<OFFSET_TO_TRACK; i++)
             //if (gpu_num == gpu_to_track[i] &&
-            //    node == node_to_track[i]) 
+            //    node == node_to_track[i])
             if (offset_to_track[i][gpu_num+1] == offset)
                 retval = true;
     }
@@ -310,7 +328,7 @@ static __device__ __host__ __inline__ bool thread_to_track(
         //{613300 },
         //{604857 },
         //{604857 },
-       
+
         //{134578 },
         //{134578 },
         {134578 },
@@ -346,18 +364,18 @@ static __device__ __host__ __inline__ bool thread_to_track(
         //{77},
         {78},
         //{83},
-        
+
         {33}
     };
 
     bool retval = false;
-    if (TO_TRACK) 
+    if (TO_TRACK)
     {
         gpu_num = -1;
         #pragma unroll
         for (int i=0; i<THREAD_TO_TRACK; i++)
             //if (gpu_num == gpu_to_track[i] &&
-            //    node == node_to_track[i]) 
+            //    node == node_to_track[i])
             if (pred_to_track[i][gpu_num+1] == pred &&
                 thread_to_track[i][gpu_num+1] == threadIdx.x)
                 retval = true;
@@ -371,11 +389,16 @@ static __device__ __host__ __inline__ bool pred_to_track(
     int gpu_num, VertexId node)
 {
     const VertexId pred_to_track[][MAX_GPU + 1] = {
-         {32456 },
-        {182080 },
-        {134578 },
-        {613300 },
-        {604857 }
+        // {32456 },
+        //{182080 },
+        //{134578 },
+        //{613300 },
+        //{604857 }
+        {109644 },
+        {101108 },
+        {44056 },
+        {106822 },
+        {430576 }
     };
 
     bool retval = false;
@@ -385,7 +408,7 @@ static __device__ __host__ __inline__ bool pred_to_track(
         #pragma unroll
         for (int i=0; i<PRED_TO_TRACK; i++)
             //if (gpu_num == gpu_to_track[i] &&
-            //    node == node_to_track[i]) 
+            //    node == node_to_track[i])
             if (pred_to_track[i][gpu_num+1] == node)
                 retval = true;
     }
@@ -414,18 +437,18 @@ void Print_Vertex(
     int*   partition_table,
     VertexId** convertion_tables)
 {
-    printf("{%d ", v);
+    printf("{%lld ", (long long)v);
     if (num_gpus > 1)
     {
         for (int gpu=0; gpu<num_gpus; gpu++)
-            printf(", %d", convertion_tables[gpu][v]);
+            printf(", %lld", (long long)convertion_tables[gpu][v]);
     }
     printf("},\n\t\t");
     if (num_gpus > 1)
         printf("host = %d, ", partition_table[v]);
     if (fabs(results[v] - references[v]) >= error_threshold)
-        printf("reference = %d, ", references[v]);
-    printf("result = %d, ", results[v]);
+        printf("reference = %lld, ", (long long)references[v]);
+    printf("result = %lld, ", (long long)results[v]);
     printf("\n");
 }
 
@@ -454,7 +477,7 @@ void Track_Results (
         VertexId **preds = new VertexId*[NUM_TO_TRACK];
 
         for (VertexId dest=0; dest<nodes; dest++)
-        if (to_track(-1, dest)) 
+        if (to_track(-1, dest))
         {
             markers[dest] = counter;
             track_nodes[counter] = dest;
@@ -482,7 +505,7 @@ void Track_Results (
             preds[dest_][incoming_counter[dest_]] = src;
             incoming_counter[dest_] ++;
         }
-        
+
         for (SizeT i=0; i<NUM_TO_TRACK; i++)
         {
             VertexId dest = track_nodes[i];
@@ -490,7 +513,7 @@ void Track_Results (
             printf("Vertex ");
             Print_Vertex<VertexId, SizeT, T>(
                 dest, num_gpus, error_threshold,
-                results, references, 
+                results, references,
                 partition_table, convertion_tables);
             for (SizeT j = 0; j < incoming_counter[i]; j++)
             {
@@ -500,7 +523,7 @@ void Track_Results (
                 printf("\t");
                 Print_Vertex<VertexId, SizeT, T>(
                     src, num_gpus, error_threshold,
-                    results, references, 
+                    results, references,
                     partition_table, convertion_tables);
             }
             printf("\n");
@@ -512,7 +535,7 @@ void Track_Results (
             printf("Source ");
             Print_Vertex<VertexId, SizeT, T>(
                 src, num_gpus, error_threshold,
-                results, references, 
+                results, references,
                 partition_table, convertion_tables);
             for (SizeT j = graph->row_offsets[src]; j < graph->row_offsets[src+1]; j++)
             {
@@ -520,7 +543,7 @@ void Track_Results (
                 printf("\t");
                 Print_Vertex<VertexId, SizeT, T>(
                     dest, num_gpus, error_threshold,
-                    results, references, 
+                    results, references,
                     partition_table, convertion_tables);
             }
             printf("\n");
@@ -541,14 +564,14 @@ void Output_Errors (
     Value* results,
     Value* references,
     int*   partition_table,
-    VertexId** convertion_tables) 
+    VertexId** convertion_tables)
 {
     if (references == NULL) return;
 
     std::ofstream fout;
     printf("\nWriting errors into %s\n", file_name);
     fout.open(file_name);
-    
+
     for (VertexId v=0; v<num_nodes; v++)
     {
         if (fabs(results[v] - references[v]) <= error_threshold) continue;
@@ -693,11 +716,33 @@ __global__ void Verify_Value(
         {
             if (values[key] != value)
                 printf("%d\t %lld\t Verify_Value\t %d\t values[%d] (%d) != %lld\n",
-                    gpu_num, iteration, check_num, key, values[key], (long long)value); 
+                    gpu_num, iteration, check_num, key, values[key], (long long)value);
         }
         x += STRIDE;
     }
 }
+
+template <typename SizeT, typename Value>
+__global__ void Verify_Value(
+    const int gpu_num,
+    const int check_num,
+    const SizeT num_elements,
+    const long long iteration,
+    const Value* values,
+    const Value value)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+
+    while (x < num_elements)
+    {
+        if (values[x] != value)
+            printf("%d\t %lld\t Verify_Value\t %d\t values[%d] (%d) != %lld\n",
+                gpu_num, iteration, check_num, x, values[x], (long long)value);
+        x += STRIDE;
+    }
+}
+
 
 template <typename VertexId, typename SizeT, typename Value>
 __global__ void Verify_Value_(
@@ -719,7 +764,68 @@ __global__ void Verify_Value_(
         {
             if (values[key] != value)
                 printf("%d\t %lld\t Verify_Value\t %d\t values[%d] (%d) != %lld\n",
-                    gpu_num, iteration, check_num, key, values[key], (long long)value); 
+                    gpu_num, iteration, check_num, key, values[key], (long long)value);
+        }
+        x += STRIDE;
+    }
+}
+
+template <typename VertexId, typename SizeT>
+__global__ void Verify_Row_Length(
+    const int gpu_num,
+    const int check_num,
+    const SizeT num_elements,
+    const long long iteration,
+    const VertexId* keys,
+    const SizeT* row_offsets,
+    const SizeT* values)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+
+    while (x < num_elements)
+    {
+        VertexId key = keys[x];
+        if (key != -1)
+        {
+            if (values[x] != row_offsets[key+1] - row_offsets[key])
+                printf("%d\t %lld\t Verify_Row_Length\t %d\t keys[%d] (%d)\t values[%d] (%d) != %lld\n",
+                    gpu_num, iteration, check_num, x, key, x, values[x],
+                    (long long)(row_offsets[key+1] - row_offsets[key]));
+        }
+        x += STRIDE;
+    }
+}
+
+template <typename VertexId, typename SizeT, typename MarkerT>
+__global__ void Verify_Edges(
+    const int gpu_num,
+    const int check_num,
+    const SizeT num_elements,
+    const SizeT num_nodes,
+    const long long iteration,
+    const VertexId* keys,
+    const SizeT* row_offsets,
+    const MarkerT* markers,
+    const MarkerT  value)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+
+    while (x < num_elements)
+    {
+        VertexId key = keys[x];
+        if (key > 0 && key < num_nodes)
+        {
+            for (SizeT edge_id = row_offsets[key]; edge_id < row_offsets[key+1]; edge_id ++)
+                if (markers[edge_id] != value)
+                    printf("%d\t %lld\t Verify_Edges\t %d\t edge[%lld] (key_pos = %lld, key = %lld,"
+                        " neighbor_pos = %lld)\t marker (%lld) != %lld\n",
+                        gpu_num, iteration, check_num, (long long)edge_id, (long long)x,
+                        (long long)key,
+                        (long long)(edge_id - row_offsets[key]),
+                        (long long)markers[edge_id],
+                        (long long)value);
         }
         x += STRIDE;
     }
@@ -727,8 +833,8 @@ __global__ void Verify_Value_(
 
 template <typename VertexId, typename SizeT, typename ProblemData>
 static __device__ __forceinline__ void Store_d_out(
-    VertexId  new_value, 
-    VertexId *d_out, 
+    VertexId  new_value,
+    VertexId *d_out,
     int       checkpoint_num,
     SizeT     offset1,
     SizeT     offset2,
@@ -739,17 +845,17 @@ static __device__ __forceinline__ void Store_d_out(
     //VertexId old_value = d_out[offset];
     //if (!TO_TRACK)
         util::io::ModifiedStore<ProblemData::QUEUE_WRITE_MODIFIER>::St(
-            new_value, d_out + offset); 
+            new_value, d_out + offset);
     //else {
     //    VertexId old_value = atomicCAS(d_out + offset, -2, new_value);
     //    if (old_value != -2)// && util::to_track(data_slice -> gpu_idx, new_value))
-    //    {    
+    //    {
     //        printf("%d\t %d\t %d\t Storing conflict: [%d] -> %p + %lld, old_value = [%d], "
     //            "offset1 = %lld, offset2 = %lld, blockIdx.x = %d, threadIdx.x = %d\n",
     //            "org_cp = %d, org_q_idx = %d, org_d_out = %p, org_offset1 = %lld,"
     //            "org_offset2 = %lld, org_blockIdx.x = %d, org_threadIdx.x = %d\n",
-    //            data_slice -> gpu_idx, queue_index+1, checkpoint_num, new_value, d_out, 
-    //            (long long)offset, old_value, (long long)offset1, 
+    //            data_slice -> gpu_idx, queue_index+1, checkpoint_num, new_value, d_out,
+    //            (long long)offset, old_value, (long long)offset1,
     //            (long long)offset2, blockIdx.x, threadIdx.x);
     //            data_slice -> org_checkpoint[offset],
     //            data_slice -> org_queue_idx [offset],
@@ -766,16 +872,16 @@ static __device__ __forceinline__ void Store_d_out(
     //        data_slice -> org_queue_idx [offset] = queue_index+1 ;
     //        data_slice -> org_block_idx [offset] = blockIdx.x    ;
     //        data_slice -> org_thread_idx[offset] = threadIdx.x   ;
-    //    }    
+    //    }
     //    if (util::to_track(data_slice -> gpu_idx, new_value) &&
     //        !util::pred_to_track(data_slice -> gpu_idx, new_value))
-    //    {    
+    //    {
     //        printf("%d\t %d\t %d\t Storing [%d] -> + %lld\n",
-    //            data_slice -> gpu_idx, queue_index+1, checkpoint_num, new_value, 
+    //            data_slice -> gpu_idx, queue_index+1, checkpoint_num, new_value,
     //            (long long)offset);
     //    }
-    //}   
-} 
+    //}
+}
 
 } // namespace util
 } // namespace gunrock

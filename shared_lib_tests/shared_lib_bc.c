@@ -14,7 +14,7 @@ int main(int argc, char* argv[])
     data_t.SIZET_TYPE = SIZET_INT;         // graph size type
     data_t.VALUE_TYPE = VALUE_FLOAT;       // attributes type
 
-    struct GRSetup config = InitSetup(1, NULL);   // gunrock configurations
+    struct GRSetup *config = InitSetup(1, NULL);   // gunrock configurations
 
     int num_nodes = 7, num_edges = 26;
     int row_offsets[8]  = {0, 3, 6, 11, 15, 19, 23, 26};

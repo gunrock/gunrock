@@ -48,6 +48,7 @@ struct Csr
     SizeT edges;            // Number of edges in the graph
     SizeT out_nodes;        // Number of nodes which have outgoing edges
     SizeT average_degree;   // Average vertex degrees
+    float stddev_degree;    // Degree standard deviation
 
     VertexId *column_indices; // Column indices corresponding to all the
     // non-zero values in the sparse matrix
@@ -72,6 +73,7 @@ struct Csr
         nodes = 0;
         edges = 0;
         average_degree = 0;
+        stddev_degree = 0.0f;
         average_edge_value = 0;
         average_node_value = 0;
         out_nodes = -1;
@@ -80,6 +82,75 @@ struct Csr
         edge_values = NULL;
         node_values = NULL;
         this->pinned = pinned;
+    }
+
+    void FromCsr(Csr<VertexId, SizeT, Value> &source)
+    {
+        nodes = source.nodes;
+        edges = source.edges;
+        average_degree = source.average_degree;
+        average_edge_value = source.average_edge_value;
+        average_node_value = source.average_node_value;
+        out_nodes = source.out_nodes;
+        if (source.row_offsets == NULL)
+        {
+            row_offsets = NULL;
+        } else {
+            row_offsets = (SizeT*) malloc(sizeof(SizeT) * (source.nodes + 1));
+            memcpy(row_offsets, source.row_offsets, sizeof(SizeT) * (source.nodes + 1));
+        }
+        if (source.column_indices == NULL)
+        {
+            column_indices = NULL;
+        } else {
+            column_indices = (VertexId*) malloc(sizeof(VertexId) * source.edges); 
+            memcpy(column_indices, source.column_indices, sizeof(VertexId) * source.edges);
+        }
+        if (source.edge_values == NULL)
+        {
+            edge_values = NULL;
+        } else {
+            edge_values = (Value*) malloc(sizeof(Value) * source.edges);
+            memcpy(edge_values, source.edge_values, sizeof(Value) * source.edges);
+        }
+        if (source.node_values == NULL)
+        {
+            node_values = NULL;
+        } else {
+            node_values = (Value*) malloc(sizeof(Value) * source.nodes);
+            memcpy(node_values, source.node_values, sizeof(Value) * source.nodes);
+        } 
+    }
+
+    
+    template <typename Tuple>
+    void CsrToCsc(Csr<VertexId, SizeT, Value> &target, 
+            Csr<VertexId, SizeT, Value> &source)
+    {
+        target.nodes = source.nodes;
+        target.edges = source.edges;
+        target.average_degree = source.average_degree;
+        target.average_edge_value = source.average_edge_value;
+        target.average_node_value = source.average_node_value;
+        target.out_nodes = source.out_nodes;
+        {
+            Tuple *coo = (Tuple*)malloc(sizeof(Tuple) * source.edges);
+            int idx = 0;
+            for (int i = 0; i < source.nodes; ++i)
+            {
+                for (int j = source.row_offsets[i]; j < source.row_offsets[i+1]; ++j)
+                {
+                    coo[idx].row = source.column_indices[j];
+                    coo[idx].col = i;
+                    coo[idx++].val = (source.edge_values == NULL) ? 0 : source.edge_values[j];
+                }
+            }
+            if (source.edge_values == NULL)
+                target.template FromCoo<false>(NULL, coo, nodes, edges);
+            else
+                target.template FromCoo<true>(NULL, coo, nodes, edges);
+            free(coo);
+        }
     }
 
     /**
@@ -260,7 +331,7 @@ struct Csr
      * @param[in] quiet Don't print out anything.
      */
     void WriteToLigraFile(
-        char  *file_name,
+        const char  *file_name,
         SizeT v, SizeT e,
         SizeT *row,
         VertexId *col,
@@ -277,7 +348,7 @@ struct Csr
         std::ofstream fout3(adj_name);
         if (fout3.is_open())
         {
-            fout3 << v << " " << v << " " << e << std::endl;
+            fout3 << "AdjacencyGraph" << std::endl << v << std::endl << e << std::endl;
             for (int i = 0; i < v; ++i)
                 fout3 << row[i] << std::endl;
             for (int i = 0; i < e; ++i)
@@ -290,6 +361,45 @@ struct Csr
             fout3.close();
         }
     }
+
+    void WriteToMtxFile(
+        const char  *file_name,
+        SizeT v, SizeT e,
+        SizeT *row,
+        VertexId *col,
+        Value *edge_values = NULL,
+        bool quiet = false)
+    {
+        char adj_name[256];
+        sprintf(adj_name, "%s.mtx", file_name);
+        if (!quiet)
+        {
+            printf("writing to .mtx file.\n");
+        }
+
+        std::ofstream fout3(adj_name);
+        if (fout3.is_open())
+        {
+            fout3 << v << " " << v << " " << e << std::endl;
+            for (int i = 0; i < v; ++i) {
+                SizeT begin = row[i];
+                SizeT end = row[i+1];
+                for (int j = begin; j < end; ++j) {
+                    fout3 << col[j]+1 << " " << i+1;
+                    if (edge_values != NULL)
+                    {
+                        fout3 << " " << edge_values[j] << std::endl;
+                    }
+                    else
+                    {
+                        fout3 << " " << rand() % 64 << std::endl;
+                    }
+                }
+            }
+            fout3.close();
+        }
+    }
+
 
     /**
      * @brief Read from stored row_offsets, column_indices arrays.
@@ -402,10 +512,11 @@ struct Csr
 	SizeT nodes,
 	bool quiet = false)
     {
-	if(!quiet) printf("  Converting the labels of %lld vertices to binary format...\n", 
+	    if(!quiet) printf("  Converting the labels of %lld vertices to binary format...\n", 
 				(long long)nodes);
-	if(LOAD_NODE_VALUES) WriteBinary_SM(output_file, nodes, labels);
+	    if(LOAD_NODE_VALUES) WriteBinary_SM(output_file, nodes, labels);
     }
+
     /**
      * @brief Build CSR graph from COO graph, sorted or unsorted
      *
@@ -671,6 +782,7 @@ struct Csr
         SizeT displayed_node_num = (nodes > limit) ? limit : nodes;
         printf("%s : #nodes = ", name); util::PrintValue(nodes);
         printf(", #edges = "); util::PrintValue(edges);
+        printf("\n");
 
         for (SizeT i = 0; i < displayed_node_num; i++)
         {
@@ -787,6 +899,26 @@ struct Csr
     }
 
     /**
+     * @brief Get the average degree of all the nodes in graph
+     */
+    SizeT GetStddevDegree()
+    {
+        if (average_degree == 0)
+        {
+           GetAverageDegree();
+        }
+
+        float accum = 0.0f;
+        for (SizeT node=0; node < nodes; ++node)
+        {
+            float d = (row_offsets[node+1]-row_offsets[node]);
+            accum += (d - average_degree) * (d - average_degree);
+        }
+        stddev_degree = sqrt(accum / (nodes-1));
+        return stddev_degree;
+    }
+
+    /**
      * @brief Get the degrees of all the nodes in graph
      * 
      * @param[in] node_degrees node degrees to fill in
@@ -836,7 +968,6 @@ struct Csr
                     mean += (edge_values[edge] - mean) / count;
                 }
             }
-            average_edge_value = static_cast<Value>(mean);
         }
         return average_edge_value;
     }

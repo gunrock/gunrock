@@ -39,95 +39,20 @@ namespace topk {
 /**
  * @brief TOPK problem enactor class.
  *
- * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
+ * @tparam _Problem
  */
 template <
     typename _Problem> 
-    //bool _INSTRUMENT, 
-    //bool _DEBUG, 
-    //bool _SIZE_CHECK>
-class TOPKEnactor : public EnactorBase<typename _Problem::SizeT/*, _DEBUG, _SIZE_CHECK*/>
+class TOPKEnactor : public EnactorBase<typename _Problem::SizeT>
 {
 public:
     typedef _Problem                   Problem;
     typedef typename Problem::SizeT    SizeT   ;
     typedef typename Problem::VertexId VertexId;   
     typedef typename Problem::Value    Value   ;
-    //static const bool INSTRUMENT = _INSTRUMENT;
-    //static const bool DEBUG      = _DEBUG;
-    //static const bool SIZE_CHECK = _SIZE_CHECK;
     typedef EnactorBase<SizeT>         BaseEnactor;
     Problem    *problem;
     ContextPtr *context;
-
-    // Members
-protected:
-  
-    /**
-    * CTA duty kernel stats
-    */
-
-    //unsigned long long total_runtimes;  // Total working time by each CTA
-    //unsigned long long total_lifetimes; // Total life time of each CTA
-    //unsigned long long total_queued;
-
-    /**
-    * A pinned, mapped word that the traversal kernels will signal when done
-    */
-    //volatile int        *done;
-    //int                 *d_done;
-    //cudaEvent_t         throttle_event;
-
-    /**
-    * Current iteration, also used to get the final search depth of the TOPK search
-    */
-    //long long           iteration;
-  
-    // Methods
-protected:
-  
-    /**
-     * @brief Prepare the enactor for TOPK kernel call. Must be called prior to each TOPK iteration.
-     *
-     * @param[in] problem TOPK Problem object which holds the graph data and TOPK problem data to compute.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    /*cudaError_t Setup(Problem *problem)
-    {
-        //typedef typename ProblemData::SizeT     SizeT;
-        //typedef typename ProblemData::VertexId  VertexId;
-
-        cudaError_t retval = cudaSuccess;
-
-        //graph slice
-        //typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
-        //typename ProblemData::DataSlice  *data_slice  = problem->data_slices[0];
-
-        do {
-            // Bind row-offsets and bitmask texture
-            //cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
-            //if (retval = util::GRError(cudaBindTexture(0,
-            //    gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
-            //    graph_slice->d_row_offsets,
-            //    row_offsets_desc,
-            //    (graph_slice->nodes + 1) * sizeof(SizeT)),
-            //    "TOPKEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) 
-            //    break;
-          
-            //cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
-            //if (retval = util::GRError(cudaBindTexture(
-            //    0,
-            //    gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref,
-            //    graph_slice->d_column_indices,
-            //    column_indices_desc,
-            //    graph_slice->edges * sizeof(VertexId)),
-            //    "TOPKEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) 
-            //    break;
-        } while (0);
-
-        return retval;
-    }*/
 
 public:
   
@@ -145,8 +70,6 @@ public:
             instrument, debug, size_check),
         problem (NULL),
         context (NULL)
-        //iteration(0),
-        //total_queued(0)
     {
     }
   
@@ -157,34 +80,6 @@ public:
     {
     }
   
-    /**
-     * \addtogroup PublicInterface
-     * @{
-    */
-  
-    /**
-     * @brief Obtain statistics about the last TOPK search enacted.
-     *
-     * @param[out] total_queued Total queued elements in TOPK kernel running.
-     * @param[out] search_depth Search depth of TOPK algorithm.
-     * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
-     */
-    /*template <typename VertexId>
-    void GetStatistics(long long   &total_queued,
-		   VertexId    &search_depth,
-		   double      &avg_duty)
-    {
-        cudaThreadSynchronize();
-    
-        total_queued = this->total_queued;
-        search_depth = this->iteration;
-    
-        avg_duty = (total_lifetimes > 0) ?
-            double(total_runtimes) / total_lifetimes : 0.0;
-    }*/
-  
-    /** @} */
- 
     template <
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>
@@ -210,26 +105,18 @@ public:
     /**
      * @brief Enacts a degree centrality on the specified graph.
      *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
+     * @tparam AdvanceKernelPolicy Kernel policy for forward edge mapping.
      * @tparam FilterKernelPolicy Kernel policy for filtering.
-     * @tparam TOPKProblem TOPK Problem type.
      *
-     * @param[in] context CUDA context pointer.
-     * @param[in] problem TOPKProblem object.
      * @param[in] top_nodes Number of top nodes to process.
-     * @param[in] max_grid_size Max grid size for TOPK kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
     template <
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>
-        //typename TOPKProblem>
     cudaError_t EnactTOPK(
-        //ContextPtr context,
-        //TOPKProblem   *problem,
         SizeT         top_nodes)
-        //float         max_grid_size = 0)
   {
         typedef TOPKFunctor<VertexId, SizeT, Value, Problem> TopkFunctor;
         typedef typename Problem::DataSlice DataSlice;
@@ -238,7 +125,7 @@ public:
         GraphSlice<VertexId, SizeT, Value> 
                   *graph_slice   =  problem -> graph_slices[0];
         DataSlice *data_slice    =  problem -> data_slices [0].GetPointer(util::HOST);
-        util::CtaWorkProgressLifetime
+        util::CtaWorkProgressLifetime<SizeT>
                   *work_progress = &this->work_progress    [0];
         SizeT      nodes         = graph_slice -> nodes;
         cudaError_t retval       = cudaSuccess;
@@ -278,7 +165,7 @@ public:
 
         // check if any of the frontiers overflowed due to redundant expansion
         bool overflowed = false;
-        if (retval = work_progress -> CheckOverflow<SizeT>(overflowed)) return retval;
+        if (retval = work_progress -> CheckOverflow(overflowed)) return retval;
         if (overflowed)
         {
             retval = util::GRError(
@@ -376,18 +263,12 @@ public:
      *
      * @tparam TOPKProblem TOPK Problem type. @see TOPKProblem
      *
-     * @param[in] context CUDA context pointer.
-     * @param[in] problem Pointer to TOPKProblem object.
      * @param[in] top_nodes Top nodes to process.
-     * @param[in] max_grid_size Max grid size for TOPK kernel calls.
      *
      * \return cudaError_t object which indicates the success of all CUDA function calls.
     */
     cudaError_t Enact(
-        //ContextPtr context,
-        //Problem   *problem,
         SizeT         top_nodes)
-        //int	    max_grid_size = 0)
     {
         int min_sm_version = -1;
         for (int i=0; i< this->num_gpus; i++)

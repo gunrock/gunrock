@@ -1,3 +1,4 @@
+/*new*/
 @import url('https://fonts.googleapis.com/css?family=Lato:300,400,700,300italic,400italic,700italic');
 @import url('https://fonts.googleapis.com/css?family=Oswald');
 
@@ -37,9 +38,9 @@ p, div {
 }
 
 .navbar-nav li {
-    background: #3498DB; !important;
-    border-left:1px solid #54A3D7;
-    border-right:1px solid #54A3D7;
+    background: #F8F8F8; !important;
+    border-left:1px solid #E0E0E0;
+    border-right:1px solid #E0E0E0;
     /* border-radius:6px 6px 6px 6px; */
 }
 
@@ -55,7 +56,12 @@ p, div {
     border-right:0px solid #54A3D7;
     /* border-radius:6px 6px 6px 6px; */
 }
-
+table{
+    white-space:pre-wrap !important;
+}
+/*
+ ===========================
+*/
 
 
 /* Sticky footer styles
@@ -185,8 +191,8 @@ div.fragment {
 }
 
 div.line {
-    font-family: monospace, fixed;
-    font-size: 13px;
+    font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    font-size: 12px;
     min-height: 13px;
     line-height: 1.0;
     text-wrap: unrestricted;
@@ -194,7 +200,7 @@ div.line {
     white-space: -pre-wrap;     /* Opera 4-6 */
     white-space: -o-pre-wrap;   /* Opera 7 */
     white-space: pre-wrap;      /* CSS3  */
-    word-wrap: break-word;      /* IE 5.5+ */
+    word-wrap: normal;      /* IE 5.5+ */
     text-indent: -53px;
     padding-left: 53px;
     padding-bottom: 0px;
@@ -210,6 +216,9 @@ div.line {
     transition-property: background-color, box-shadow;
     transition-duration: 0.5s;
 }
+div.line:hover{
+    background-color: #FBFF00;
+}
 
 div.line.glow {
     background-color: cyan;
@@ -220,16 +229,21 @@ div.line.glow {
 span.lineno {
     padding-right: 4px;
     text-align: right;
-    border-right: 2px solid #0F0;
-    background-color: #E8E8E8;
+    color:rgba(0,0,0,0.3);
+    border-right: 1px solid #EEE;
+    border-left: 1px solid #EEE;
+    background-color: #FFF;
     white-space: pre;
+    font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace ;
 }
 span.lineno a {
-    background-color: #D8D8D8;
+    background-color: #FAFAFA;
+    cursor:pointer;
 }
 
 span.lineno a:hover {
-    background-color: #C8C8C8;
+    background-color: #EFE200;
+    color: #1e1e1e;
 }
 
 div.groupHeader {
@@ -296,3 +310,104 @@ blockquote {
     padding: 0 12px 0 16px;
 }
 
+/*---------------- Search Box */
+
+#search-box {
+    margin: 10px 0px;
+}
+#search-box .close {
+    display: none;
+    position: absolute;
+    right: 0px;
+    padding: 6px 12px;
+    z-index: 5;
+}
+
+/*---------------- Search results window */
+
+#search-results-window {
+    display: none;
+}
+
+iframe#MSearchResults {
+    width: 100%;
+    height: 15em;
+}
+
+.SRChildren {
+    padding-left: 3ex; padding-bottom: .5em
+}
+.SRPage .SRChildren {
+    display: none;
+}
+a.SRScope {
+    display: block;
+}
+a.SRSymbol:focus, a.SRSymbol:active,
+a.SRScope:focus, a.SRScope:active {
+    text-decoration: underline;
+}
+span.SRScope {
+    padding-left: 4px;
+}
+.SRResult {
+    display: none;
+}
+
+/* class and file list */
+.directory .icona,
+.directory .arrow {
+    height: auto;
+}
+.directory .icona .icon {
+    height: 16px;
+}
+.directory .icondoc {
+    background-position: 0px 0px;
+    height: 20px;
+}
+.directory .iconfopen {
+    background-position: 0px 0px;
+}
+.directory td.entry {
+    padding: 7px 8px 6px 8px;
+}
+
+.table > tbody > tr > td.memSeparator {
+    line-height: 0;
+    .table-hover;
+
+}
+
+.memItemLeft, .memTemplItemLeft {
+    white-space: normal;
+}
+
+/* enumerations */
+.panel-body thead > tr {
+    background-color: #e0e0e0;
+}
+
+/* todo lists */
+.todoname,
+.todoname a {
+    font-weight: bold;
+}
+
+/* Class title */
+.summary {
+    margin-top: 25px;
+}
+.page-header {
+    margin: 20px 0px !important;
+}
+.page-header .title {
+    display: inline-block;
+}
+.page-header .pull-right {
+    margin-top: 0.3em;
+    margin-left: 0.5em;
+}
+.page-header .label {
+    font-size: 50%;
+}

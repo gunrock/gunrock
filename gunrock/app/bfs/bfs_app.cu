@@ -36,12 +36,14 @@ struct BFS_Parameter : gunrock::app::TestParameter_Base
 public:
     bool   mark_predecessors ;  // mark src-distance vs. parent vertices
     bool   enable_idempotence;  // enable idempotence operation
+    bool   direction_optimized; // enable direction optimization
     double max_queue_sizing1 ;  // maximum queue sizing factor
 
     BFS_Parameter()
     {
         mark_predecessors  = false;
         enable_idempotence = false;
+        direction_optimized = false;
         max_queue_sizing1  = -1.0f;
     }
 
@@ -61,21 +63,17 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter);
  * @tparam VertexId          Vertex identifier type
  * @tparam Value             Attribute type
  * @tparam SizeT             Graph size type
- * @tparam INSTRUMENT        Keep kernels statics
- * @tparam DEBUG             Keep debug statics
- * @tparam SIZE_CHECK        Enable size check
  * @tparam MARK_PREDECESSORS Enable mark predecessors
  *
  * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
+ *
+ * \return Elapsed run time in milliseconds
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value,
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS >
 float RunTests_enable_idempotence(GRGraph* output, BFS_Parameter *parameter)
 {
@@ -93,20 +91,16 @@ float RunTests_enable_idempotence(GRGraph* output, BFS_Parameter *parameter)
  * @tparam VertexId   Vertex identifier type
  * @tparam Value      Attribute type
  * @tparam SizeT      Graph size type
- * @tparam INSTRUMENT Keep kernels statics
- * @tparam DEBUG      Keep debug statics
- * @tparam SIZE_CHECK Enable size check
  *
  * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
+ *
+ * \return Elapsed run time in milliseconds
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value>
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK >
 float RunTests_mark_predecessors(GRGraph* output, BFS_Parameter *parameter)
 {
     if (parameter->mark_predecessors)
@@ -123,22 +117,18 @@ float RunTests_mark_predecessors(GRGraph* output, BFS_Parameter *parameter)
  * @tparam VertexId           Vertex identifier type
  * @tparam Value              Attribute type
  * @tparam SizeT              Graph size type
- * @tparam INSTRUMENT         Keep kernels statics
- * @tparam DEBUG              Keep debug statics
- * @tparam SIZE_CHECK         Enable size check
  * @tparam MARK_PREDECESSORS  Enable mark predecessors
  * @tparam ENABLE_IDEMPOTENCE Enable idempotent operation
  *
  * @param[out] output    Pointer to output graph structure of the problem
  * @param[in]  parameter primitive-specific test parameters
+ *
+ * \return Elapsed run time in milliseconds
  */
 template <
     typename    VertexId,
     typename    SizeT,
     typename    Value,
-    //bool        INSTRUMENT,
-    //bool        DEBUG,
-    //bool        SIZE_CHECK,
     bool        MARK_PREDECESSORS,
     bool        ENABLE_IDEMPOTENCE >
 float runBFS(GRGraph* output, BFS_Parameter *parameter)
@@ -173,10 +163,12 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter)
     float         partition_factor     = parameter -> partition_factor;
     int           partition_seed       = parameter -> partition_seed;
     bool          g_stream_from_host   = parameter -> g_stream_from_host;
-    int           traversal_mode       = parameter -> traversal_mode;
+    std::string   traversal_mode       = parameter -> traversal_mode;
     bool          instrument           = parameter -> instrumented;
     bool          debug                = parameter -> debug;
     bool          size_check           = parameter -> size_check;
+    bool          undirected           = parameter -> g_undirected;
+    bool          direction_optimized  = parameter -> direction_optimized;
     size_t       *org_size             = new size_t  [num_gpus];
     // Allocate host-side label array
     VertexId     *h_labels             = new VertexId[graph->nodes];
@@ -193,7 +185,7 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter)
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
-    Problem *problem = new Problem;  // Allocate problem on GPU
+    Problem *problem = new Problem(direction_optimized, undirected);  // Allocate problem on GPU
 
     util::GRError( problem->Init(
         g_stream_from_host,
@@ -210,7 +202,7 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter)
         "Problem BFS Initialization Failed", __FILE__, __LINE__);
 
     Enactor *enactor = new Enactor(
-        num_gpus, gpu_idx, instrument, debug, size_check);  // BFS enactor map
+        num_gpus, gpu_idx, instrument, debug, size_check, direction_optimized);  // BFS enactor map
     util::GRError(
         enactor->Init(context, problem, max_grid_size, traversal_mode),
         "BFS Enactor init failed", __FILE__, __LINE__);
@@ -219,15 +211,13 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter)
     float elapsed = 0.0f;
     for (int i = 0; i < num_iters; ++i)
     {
-        printf("%d round of bfs.\n", i);
+        printf("Round %d of bfs.\n", i+1);
         util::GRError(
                 problem->Reset(parameter->src[i], enactor->GetFrontierType(),
                     max_queue_sizing, max_queue_sizing1),
                 "BFS Problem Data Reset Failed", __FILE__, __LINE__);
-        printf("before enactor reset.\n");
         util::GRError(
                 enactor->Reset(), "BFS Enactor Reset failed", __FILE__, __LINE__);
-        printf("after enactor reset.\n");
 
         cpu_timer.Start();
 
@@ -236,8 +226,6 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter)
                 "BFS Problem Enact Failed", __FILE__, __LINE__);
 
         cpu_timer.Stop();
-
-        printf("after enactor run.\n");
 
         elapsed += cpu_timer.ElapsedMillis();
     }
@@ -272,25 +260,27 @@ float runBFS(GRGraph* output, BFS_Parameter *parameter)
  * @param[in]  data_t  Data type configurations
  * @param[in]  context ModernGPU context
  * @param[in]  streams CUDA stream
+ *
+ * \return Elapsed run time in milliseconds
  */
 float dispatch_bfs(
     GRGraph*       grapho,
     const GRGraph* graphi,
-    const GRSetup  config,
+    const GRSetup* config,
     const GRTypes  data_t,
     ContextPtr*    context,
     cudaStream_t*  streams)
 {
     BFS_Parameter *parameter = new BFS_Parameter;
-    parameter->iterations = config.num_iters;
-    parameter->src = (long long*)malloc(sizeof(long long)*config.num_iters);
+    parameter->iterations = config -> num_iters;
+    parameter->src = (long long*)malloc(sizeof(long long)*config -> num_iters);
     parameter->context  = context;
     parameter->streams  = streams;
-    parameter->g_quiet  = config.quiet;
-    parameter->num_gpus = config.num_devices;
-    parameter->gpu_idx  = config.device_list;
-    parameter->mark_predecessors  = config.mark_predecessors;
-    parameter->enable_idempotence = config.enable_idempotence;
+    parameter->g_quiet  = config -> quiet;
+    parameter->num_gpus = config -> num_devices;
+    parameter->gpu_idx  = config -> device_list;
+    parameter->mark_predecessors  = config -> mark_predecessors;
+    parameter->enable_idempotence = config -> enable_idempotence;
 
     float elapsed_time;
 
@@ -315,7 +305,7 @@ float dispatch_bfs(
                 parameter->graph = &csr;
 
                 // determine source vertex to start
-                switch (config.source_mode)
+                switch (config -> source_mode)
                 {
                 case randomize:
                 {
@@ -329,7 +319,7 @@ float dispatch_bfs(
                 {
                     int max_deg = 0;
                     int node_id = csr.GetNodeWithHighestDegree(max_deg);
-                    for (int i = 0; i < config.num_iters; ++i)
+                    for (int i = 0; i < config -> num_iters; ++i)
                     {
                         parameter->src[i] = node_id;
                     }
@@ -339,7 +329,7 @@ float dispatch_bfs(
                 {
                     for (int i = 0; i < parameter->iterations; ++i)
                     {
-                        parameter->src[i] = config.source_vertex[i];
+                        parameter->src[i] = config -> source_vertex[i];
                     }
                     break;
                 }
@@ -355,7 +345,7 @@ float dispatch_bfs(
                 if (!parameter->g_quiet)
                 {
                     printf(" source: %lld", (long long) parameter->src[0]);
-                    for (int i = 1; i < config.num_iters; ++i)
+                    for (int i = 1; i < config -> num_iters; ++i)
                     {
                         printf(",%lld", (long long) parameter->src[i]);
                     }
@@ -403,7 +393,7 @@ float dispatch_bfs(
 float gunrock_bfs(
     GRGraph*       grapho,
     const GRGraph* graphi,
-    const GRSetup  config,
+    const GRSetup* config,
     const GRTypes  data_t)
 {
     // GPU-related configurations
@@ -412,20 +402,20 @@ float gunrock_bfs(
     ContextPtr    *context = NULL;
     cudaStream_t  *streams = NULL;
 
-    num_gpus = config.num_devices;
+    num_gpus = config -> num_devices;
     gpu_idx  = new int [num_gpus];
     for (int i = 0; i < num_gpus; ++i)
     {
-        gpu_idx[i] = config.device_list[i];
+        gpu_idx[i] = config -> device_list[i];
     }
 
     // Create streams and MordernGPU context for each GPU
     streams = new cudaStream_t[num_gpus * num_gpus * 2];
     context = new ContextPtr[num_gpus * num_gpus];
-    if (!config.quiet) { printf(" using %d GPUs:", num_gpus); }
+    if (!config -> quiet) { printf(" using %d GPUs:", num_gpus); }
     for (int gpu = 0; gpu < num_gpus; ++gpu)
     {
-        if (!config.quiet) { printf(" %d ", gpu_idx[gpu]); }
+        if (!config -> quiet) { printf(" %d ", gpu_idx[gpu]); }
         util::SetDevice(gpu_idx[gpu]);
         for (int i = 0; i < num_gpus * 2; ++i)
         {
@@ -440,7 +430,7 @@ float gunrock_bfs(
             }
         }
     }
-    if (!config.quiet) { printf("\n"); }
+    if (!config -> quiet) { printf("\n"); }
 
     return dispatch_bfs(grapho, graphi, config, data_t, context, streams);
 }
@@ -461,6 +451,7 @@ float gunrock_bfs(
  */
 float bfs(
     int*       bfs_label,
+    int*       bfs_preds,
     const int  num_nodes,
     const int  num_edges,
     const int* row_offsets,
@@ -476,10 +467,10 @@ float bfs(
     data_t.SIZET_TYPE = SIZET_INT;  // integer graph size type
     data_t.VALUE_TYPE = VALUE_INT;  // integer attributes type
 
-    struct GRSetup config = InitSetup(num_iters, source);  // primitive-specific configures
-    config.mark_predecessors  = mark_predecessors;    // do not mark predecessors
-    config.enable_idempotence = enable_idempotence;    // wether enable idempotence
-    config.source_mode = source_mode;
+    struct GRSetup* config = InitSetup(num_iters, source);  // primitive-specific configures
+    config -> mark_predecessors  = mark_predecessors;    // do not mark predecessors
+    config -> enable_idempotence = enable_idempotence;    // wether enable idempotence
+    config -> source_mode = source_mode;
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
@@ -489,11 +480,15 @@ float bfs(
     graphi->row_offsets = (void*)&row_offsets[0];  // setting row_offsets
     graphi->col_indices = (void*)&col_indices[0];  // setting col_indices
 
+
     float elapsed_time = gunrock_bfs(grapho, graphi, config, data_t);
     memcpy(bfs_label, (int*)grapho->node_value1, num_nodes * sizeof(int));
+    if (mark_predecessors) 
+        memcpy(bfs_preds, (int*)grapho->node_value2, num_nodes * sizeof(int));
 
     if (graphi) free(graphi);
     if (grapho) free(grapho);
+    if (config) free(config);
 
     return elapsed_time;
 }

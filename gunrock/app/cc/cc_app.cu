@@ -21,6 +21,8 @@
 #include <gunrock/app/cc/cc_problem.cuh>
 #include <gunrock/app/cc/cc_functor.cuh>
 
+#include <unistd.h>
+
 using namespace gunrock;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
@@ -94,6 +96,7 @@ void runCC(GRGraph* output, CC_Parameter *parameter)
     bool          instrument         = parameter -> instrumented;
     bool          debug              = parameter -> debug;
     bool          size_check         = parameter -> size_check;
+    std::string   traversal_mode     = parameter -> traversal_mode;
     size_t       *org_size           = new size_t  [num_gpus];
     // Allocate host-side label array
     VertexId    *h_component_ids     = new VertexId[graph->nodes];
@@ -104,8 +107,8 @@ void runCC(GRGraph* output, CC_Parameter *parameter)
         cudaSetDevice(gpu_idx[gpu]);
         cudaMemGetInfo(&(org_size[gpu]), &dummy);
     }
-
-    Problem* problem = new Problem(false);  // Allocate problem on GPU
+ 
+    Problem* problem = new Problem;  // Allocate problem on GPU
     util::GRError(
         problem->Init(
             g_stream_from_host,
@@ -123,8 +126,9 @@ void runCC(GRGraph* output, CC_Parameter *parameter)
 
     Enactor* enactor = new Enactor(
         num_gpus, gpu_idx, instrument, debug, size_check);  // CC enactor map
+ 
     util::GRError(
-        enactor->Init(context, problem, max_grid_size),
+        enactor->Init(context, problem, traversal_mode, max_grid_size),
         "CC Enactor Init failed", __FILE__, __LINE__);
 
     // Perform CC
@@ -136,9 +140,11 @@ void runCC(GRGraph* output, CC_Parameter *parameter)
     util::GRError(
         enactor->Reset(), "CC Enactor Reset failed", __FILE__, __LINE__);
 
+    //printf("frontier type:%d\n", enactor->GetFrontierType());
+    usleep(1000);
     cpu_timer.Start();
     util::GRError(
-        enactor->Enact(), "CC Problem Enact Failed", __FILE__, __LINE__);
+        enactor->Enact(traversal_mode), "CC Problem Enact Failed", __FILE__, __LINE__);
     cpu_timer.Stop();
 
     float elapsed = cpu_timer.ElapsedMillis();
@@ -176,7 +182,7 @@ void runCC(GRGraph* output, CC_Parameter *parameter)
 void dispatch_cc(
     GRGraph*       grapho,
     const GRGraph* graphi,
-    const GRSetup  config,
+    const GRSetup* config,
     const GRTypes  data_t,
     ContextPtr*    context,
     cudaStream_t*  streams)
@@ -184,9 +190,9 @@ void dispatch_cc(
     CC_Parameter *parameter = new CC_Parameter;
     parameter->context  = context;
     parameter->streams  = streams;
-    parameter->g_quiet  = config.quiet;
-    parameter->num_gpus = config.num_devices;
-    parameter->gpu_idx  = config.device_list;
+    parameter->g_quiet  = config -> quiet;
+    parameter->num_gpus = config -> num_devices;
+    parameter->gpu_idx  = config -> device_list;
 
     switch (data_t.VTXID_TYPE)
     {
@@ -245,7 +251,7 @@ void dispatch_cc(
 void gunrock_cc(
     GRGraph       *grapho,
     const GRGraph *graphi,
-    const GRSetup  config,
+    const GRSetup *config,
     const GRTypes  data_t)
 {
     // GPU-related configurations
@@ -254,20 +260,20 @@ void gunrock_cc(
     ContextPtr    *context = NULL;
     cudaStream_t  *streams = NULL;
 
-    num_gpus = config.num_devices;
+    num_gpus = config -> num_devices;
     gpu_idx  = new int [num_gpus];
     for (int i = 0; i < num_gpus; ++i)
     {
-        gpu_idx[i] = config.device_list[i];
+        gpu_idx[i] = config -> device_list[i];
     }
 
     // Create streams and MordernGPU context for each GPU
     streams = new cudaStream_t[num_gpus * num_gpus * 2];
     context = new ContextPtr[num_gpus * num_gpus];
-    if (!config.quiet) { printf(" using %d GPUs:", num_gpus); }
+    if (!config -> quiet) { printf(" using %d GPUs:", num_gpus); }
     for (int gpu = 0; gpu < num_gpus; ++gpu)
     {
-        if (!config.quiet) { printf(" %d ", gpu_idx[gpu]); }
+        if (!config -> quiet) { printf(" %d ", gpu_idx[gpu]); }
         util::SetDevice(gpu_idx[gpu]);
         for (int i = 0; i < num_gpus * 2; ++i)
         {
@@ -282,7 +288,7 @@ void gunrock_cc(
             }
         }
     }
-    if (!config.quiet) { printf("\n"); }
+    if (!config -> quiet) { printf("\n"); }
 
     dispatch_cc(grapho, graphi, config, data_t, context, streams);
 }
@@ -309,7 +315,7 @@ int cc(
     data_t.SIZET_TYPE = SIZET_INT;  // integer graph size type
     data_t.VALUE_TYPE = VALUE_INT;  // integer attributes type
 
-    struct GRSetup config = InitSetup(1, NULL);  // primitive-specific configures
+    struct GRSetup *config = InitSetup(1, NULL);  // primitive-specific configures
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));

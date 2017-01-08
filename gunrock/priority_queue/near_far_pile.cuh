@@ -52,11 +52,13 @@ struct PriorityQueue
     SizeT                   queue_length; /**< current queue length */
     unsigned int            max_queue_length; /**< upper limit of the queue length */
     int                     selector; /**< binary switch for choosing from ping-pong buffers */
+    SizeT                   level;
 
     PriorityQueue() :
         queue_length(0),
         max_queue_length(UINT_MAX),
-        selector(0)
+        selector(0),
+        level(0)
     {}
 
     virtual ~PriorityQueue()

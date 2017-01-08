@@ -6,7 +6,7 @@
 
 /**
  * @file
- * market.cuh
+ * rmat.cuh
  *
  * @brief R-MAT Graph Construction Routines
  */
@@ -35,7 +35,7 @@ typedef std::uniform_real_distribution<double> Distribution;
  */
 //inline double Sprng (struct drand48_data *rand_data)
 inline double Sprng (
-    Engine *engine, 
+    Engine *engine,
     Distribution *distribution)
 {
     return (*distribution)(*engine);
@@ -69,7 +69,7 @@ inline bool Flip (
 template <typename VertexId>
 inline void ChoosePartition (
     VertexId *u, VertexId *v, VertexId step,
-    double a, double b, double c, double d, 
+    double a, double b, double c, double d,
     Engine *engine, Distribution *distribution)
 {
     double p;
@@ -104,7 +104,7 @@ inline void ChoosePartition (
  * @param[in] rand_data
  */
 inline void VaryParams(
-    double *a, double *b, double *c, double *d, 
+    double *a, double *b, double *c, double *d,
     Engine *engine, Distribution *distribution)
 {
     double v, S;
@@ -191,16 +191,16 @@ int BuildRmatGraph(
 
     if ((nodes < 0) || (edges < 0))
     {
-        fprintf(stderr, "Invalid graph size: nodes=%lld, edges=%lld", 
+        fprintf(stderr, "Invalid graph size: nodes=%lld, edges=%lld",
             (long long)nodes, (long long)edges);
         return -1;
     }
 
     // construct COO format graph
 
-    VertexId directed_edges = (undirected) ? edges * 2 : edges;
+    SizeT directed_edges = (undirected) ? edges * 2 : edges;
     EdgeTupleType *coo = (EdgeTupleType*) malloc (
-        sizeof(EdgeTupleType) * directed_edges);
+        sizeof(EdgeTupleType) * SizeT(directed_edges));
 
     if (seed == -1) seed = time(NULL);
     if (!quiet)

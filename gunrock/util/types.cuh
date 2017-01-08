@@ -45,6 +45,12 @@ __device__ __host__ __forceinline__ int MaxValue<int>()
 }
 
 template <>
+__device__ __host__ __forceinline__ float MaxValue<float>()
+{
+    return FLT_MAX;
+}
+
+template <>
 __device__ __host__ __forceinline__ long long MaxValue<long long>()
 {
     return LLONG_MAX;
@@ -61,6 +67,12 @@ template <>
 __device__ __host__ __forceinline__ int MinValue<int>()
 {
     return INT_MIN;
+}
+
+template <>
+__device__ __host__ __forceinline__ float MinValue<float>()
+{
+    return FLT_MIN;
 }
 
 template <>
@@ -146,6 +158,12 @@ template <>
 __device__ __host__ __forceinline__ long long AllOnes<long long>()
 {
     return (long long)0xFFFFFFFFFFFFFFFFLL;
+}
+
+template <>
+__device__ __host__ __forceinline__ unsigned char AllOnes<unsigned char>()
+{
+    return (unsigned char)0xFF;
 }
 
 template <typename T>
