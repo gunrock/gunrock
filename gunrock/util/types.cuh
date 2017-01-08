@@ -378,8 +378,9 @@ template <> bool strtoT_simple <bool>(
         else break;
     }
 
-    if (i + 5 >= length)
+    if (i + 5 <= length)
     {
+        //std::cout << "Cond 1" << std::endl;
         if (tolower(str[i]) == 'f' && tolower(str[i+1]) == 'a'
             && tolower(str[i+2]) == 'l' && tolower(str[i+3]) == 's'
             && tolower(str[i+4]) == 'e')
@@ -389,8 +390,9 @@ template <> bool strtoT_simple <bool>(
         }
     }
 
-    if (i + 4 >= length)
+    if (i + 4 <= length)
     {
+        //std::cout << "Cond 2" << std::endl;
         if (tolower(str[i]) == 't' && tolower(str[i+1]) == 'r'
             && tolower(str[i+2]) == 'u' && tolower(str[i+3]) == 'e')
         {
@@ -399,8 +401,9 @@ template <> bool strtoT_simple <bool>(
         }
     }
 
-    if (i + 1 >= length)
+    if (i + 1 <= length)
     {
+        //std::cout << "Cond 3" << std::endl;
         if (str[i] == '0' || tolower(str[i]) == 'f')
         {
             *str_end = const_cast<char*>(str) + i + 1;
@@ -495,6 +498,84 @@ struct IS_VECTOR : std::false_type {};
 
 template <typename T, typename A>
 struct IS_VECTOR <std::vector<T,A>> : std::true_type {};
+
+bool isVector(const std::type_info* t_info)
+{
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<char>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<signed char>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<unsigned char>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<short>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<unsigned short>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<int>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<unsigned int>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<long>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<unsigned long>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<long long>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<unsigned long long>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<float>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<double>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<long double>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<bool>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<std::string>)))
+        return true;
+    if (std::type_index(*t_info) == std::type_index(typeid(std::vector<char*>)))
+        return true;
+    return false;
+}
+
+const std::type_info *toVector(const std::type_info* t_info)
+{
+    if (std::type_index(*t_info) == std::type_index(typeid(char)))
+        return & typeid(std::vector<char>);
+    if (std::type_index(*t_info) == std::type_index(typeid(signed char)))
+        return & typeid(std::vector<signed char>);
+    if (std::type_index(*t_info) == std::type_index(typeid(unsigned char)))
+        return & typeid(std::vector<unsigned char>);
+    if (std::type_index(*t_info) == std::type_index(typeid(short)))
+        return & typeid(std::vector<short>);
+    if (std::type_index(*t_info) == std::type_index(typeid(unsigned short)))
+        return & typeid(std::vector<unsigned short>);
+    if (std::type_index(*t_info) == std::type_index(typeid(int)))
+        return & typeid(std::vector<int>);
+    if (std::type_index(*t_info) == std::type_index(typeid(unsigned int)))
+        return & typeid(std::vector<unsigned int>);
+    if (std::type_index(*t_info) == std::type_index(typeid(long)))
+        return & typeid(std::vector<long>);
+    if (std::type_index(*t_info) == std::type_index(typeid(unsigned long)))
+        return & typeid(std::vector<unsigned long>);
+    if (std::type_index(*t_info) == std::type_index(typeid(long long)))
+        return & typeid(std::vector<long long>);
+    if (std::type_index(*t_info) == std::type_index(typeid(unsigned long long)))
+        return & typeid(std::vector<unsigned long long>);
+    if (std::type_index(*t_info) == std::type_index(typeid(float)))
+        return & typeid(std::vector<float>);
+    if (std::type_index(*t_info) == std::type_index(typeid(double)))
+        return & typeid(std::vector<double>);
+    if (std::type_index(*t_info) == std::type_index(typeid(long double)))
+        return & typeid(std::vector<long double>);
+    if (std::type_index(*t_info) == std::type_index(typeid(bool)))
+        return & typeid(std::vector<bool>);
+    if (std::type_index(*t_info) == std::type_index(typeid(std::string)))
+        return & typeid(std::vector<std::string>);
+    if (std::type_index(*t_info) == std::type_index(typeid(char*)))
+        return & typeid(std::vector<char*>);
+    return NULL;
+}
 
 template <typename T>
 T strtoT(const char *str, char **str_end, int base = 0)

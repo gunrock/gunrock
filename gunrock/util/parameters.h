@@ -16,6 +16,7 @@
 
 #include <string>
 #include <map>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <getopt.h>
@@ -32,9 +33,9 @@ namespace util {
 using Parameter_Flag = unsigned int;
 
 enum {
-    NO_ARGUMENT        = 0x01,
-    REQUIRED_ARGUMENT  = 0x02,
-    OPTIONAL_ARGUMENT  = 0x04,
+    NO_ARGUMENT        = 0x1,
+    REQUIRED_ARGUMENT  = 0x2,
+    OPTIONAL_ARGUMENT  = 0x4,
 
     //ZERO_VALUE         = 0x10,
     SINGLE_VALUE       = 0x20,
@@ -145,7 +146,11 @@ public:
             }
         }
 
-        Parameter_Item p_item(value_type_info);
+        Parameter_Item p_item(
+            ((flag & MULTI_VALUE) == MULTI_VALUE && !isVector(value_type_info)) ? 
+            toVector(value_type_info) : value_type_info);
+        if (isVector(value_type_info))
+            flag = (flag & (~SINGLE_VALUE)) | MULTI_VALUE;
         p_item.name           = name;
         p_item.flag           = flag;
         p_item.default_value  = default_value;
@@ -163,9 +168,14 @@ public:
         {
             return GRError(cudaErrorInvalidSymbol,
                 "Parameter " + name + " has been defined before, "
-                + it -> second.file_name + ":" + std::to_string(it -> second.line_num), file_name, line_num);
+                + it -> second.file_name + ":" 
+                + std::to_string(it -> second.line_num), 
+                file_name, line_num);
         }
 
+        //std::cout << name << " flag = " << flag << " "; 
+        //std::cout << std::ios::hex << flag << std::endl;
+        //std::cout << flag / 16 / 16 << (flag / 16) % 16 << flag % 16 << std::endl;
         p_map[name] = p_item;
         return cudaSuccess;
     }
@@ -183,7 +193,9 @@ public:
         ostr << default_value;
         return Use(name, flag,
             ostr.str(), description,
-            (((flag & MULTI_VALUE) == MULTI_VALUE) ? &typeid(std::vector<T>) : &typeid(T)),
+            (((flag & MULTI_VALUE) == MULTI_VALUE 
+               && !IS_VECTOR<T>::value ) ? 
+              &typeid(std::vector<T>) : &typeid(T)),
             file_name, line_num);
     } // Use()
 
@@ -197,6 +209,17 @@ public:
         {
             return GRError(cudaErrorInvalidValue,
                 "Parameter " + name + " has not been defined", __FILE__, __LINE__);
+        }
+
+        if (!isValidString(value, it -> second.value_type_info))
+        {
+            Parameter_Item &p_item = it->second;
+            return GRError(cudaErrorInvalidValue,
+                 "Parameter " + name + "(" + p_item.file_name + ":" 
+                 + std::to_string(p_item.line_num) + ") only takes in "
+                 + TypeName(p_item.value_type_info)
+                 + ", value " + value + " is invalid.",
+                __FILE__, __LINE__);            
         }
 
         if (PARAMETER_DEBUG)
@@ -236,22 +259,35 @@ public:
     template <typename T>
     cudaError_t Get(
         std::string name,
-        T          &value)
+        T          &value,
+        int         base = 0)
     {
         std::string str_value;
         cudaError_t retval = Get(name, str_value);
         if (retval) return retval;
 
-        std::istringstream istr(str_value);
-        istr >> value;
+        //std::istringstream istr(str_value);
+        //istr >> value;
+        char *str_end = NULL;
+        value = strtoT<T>(str_value.c_str(), &str_end, base);
+        if (str_end == NULL || (*str_end != '\0' && *str_end != ','))
+        {
+            //std::cout << int(*str_end) << "|" << str_end - str_value.c_str() << std::endl;
+            return GRError(cudaErrorInvalidValue,
+                "Value " + str_value + " is not a invalid "
+                + TypeName(&typeid(T)) + " for parameter " + name,
+                __FILE__, __LINE__);
+        }
+        //std::cout << "str_value = " << str_value << std::endl;
         return cudaSuccess;
     }
 
     template <typename T>
-    T Get(const char* name)
+    T Get(const char* name, int base = 0)
     {
         T val;
-        Get(std::string(name), val);
+        Get(std::string(name), val, base);
+        //std::cout << "val = " << val << std::endl;
         return val;
     }// Get()
 
@@ -264,12 +300,74 @@ public:
                 continue;
             if (p_item.value == "")
             {
-                std::cerr << "Error : Required parameter " << p_item.name
-                    << "(" << p_item.file_name << ":" << p_item.line_num << ")"
-                    << " is not present." << std::endl;
+                GRError(cudaErrorInvalidValue, 
+                    "Required parameter " + p_item.name
+                    + "(" + p_item.file_name 
+                    + ":" + std::to_string(p_item.line_num) + ")"
+                    + " is not present.", __FILE__, __LINE__);
             }
         }
         return cudaSuccess;
+    }
+
+    cudaError_t Read_In_Opt(
+        std::string option,
+        std::string argument)
+    {
+        auto it = p_map.find(option);
+        Parameter_Item &p_item = it -> second;
+        if ((std::type_index(*(p_item.value_type_info)) == std::type_index(typeid(bool))
+            || std::type_index(*(p_item.value_type_info)) == std::type_index(typeid(std::vector<bool>))) && argument == "")
+        {
+            argument = "true";
+        }
+
+        if ((p_item.flag & SINGLE_VALUE) == SINGLE_VALUE)
+        {
+            if (argument.find(",") != std::string::npos)
+            {
+                return GRError(cudaErrorInvalidValue, "Parameter " + p_item.name
+                    + "(" + p_item.file_name + ":"
+                    + std::to_string(p_item.line_num)
+                    + ") only takes single argument.",
+                    __FILE__, __LINE__);
+            }
+
+            if (!p_item.use_default)
+            {
+                std::cerr << "Warnning : Parameter " << p_item.name
+                    << "(" << p_item.file_name << ":"
+                    << p_item.line_num
+                    << ") specified more than once, only latter value "
+                    << argument << " is effective." << std::endl;
+            }
+        }
+
+        if ((p_item.flag & MULTI_VALUE) == MULTI_VALUE)
+        {
+            if (!p_item.use_default)
+            {
+                std::cerr << "Warnning : Parameter " << p_item.name
+                    << "(" << p_item.file_name << ":"
+                    << p_item.line_num
+                    << ") specified more than once, latter value "
+                    << argument << " is appended to pervious ones." << std::endl;
+                argument = p_item.value + "," + argument;
+            }
+        }
+
+        if (!isValidString(argument, p_item.value_type_info))
+        {
+            return GRError(cudaErrorInvalidValue, 
+                "Parameter " + p_item.name
+                + "(" + p_item.file_name +":"
+                + std::to_string(p_item.line_num)
+                + ") only takes in " + TypeName(p_item.value_type_info)
+                + ", argument " + argument
+                + " is invalid.", __FILE__, __LINE__);
+        }
+
+        return Set(option, argument);
     }
 
     cudaError_t Parse_CommandLine(
@@ -321,66 +419,51 @@ public:
                 }
 
                 std::string argument(optarg == NULL ? "" : optarg);
-
-                auto it = p_map.find(names[i]);
-                Parameter_Item &p_item = it -> second;
-                if ((std::type_index(*(p_item.value_type_info)) == std::type_index(typeid(bool))
-                    || std::type_index(*(p_item.value_type_info)) == std::type_index(typeid(std::vector<bool>))) && argument == "")
-                {
-                    argument = "true";
-                }
-
-                if ((p_item.flag & SINGLE_VALUE) == SINGLE_VALUE)
-                {
-                    if (argument.find(",") != std::string::npos)
-                    {
-                        std::cerr << "Error : Parameter " << p_item.name
-                            << "(" << p_item.file_name << ":"
-                            << p_item.line_num
-                            << ") only takes single argument." << std::endl;
-                        break;
-                    }
-
-                    if (!p_item.use_default)
-                    {
-                        std::cerr << "Warnning : Parameter " << p_item.name
-                            << "(" << p_item.file_name << ":"
-                            << p_item.line_num
-                            << ") specified more than once, only latter value "
-                            << argument << " is effective." << std::endl;
-                    }
-                }
-
-                if ((p_item.flag & MULTI_VALUE) == MULTI_VALUE)
-                {
-                    if (!p_item.use_default)
-                    {
-                        std::cerr << "Warnning : Parameter " << p_item.name
-                            << "(" << p_item.file_name << ":"
-                            << p_item.line_num
-                            << ") specified more than once, latter value "
-                            << argument << " is appended to pervious ones." << std::endl;
-                        argument = p_item.value + "," + argument;
-                    }
-                }
-
-                if (!isValidString(argument, p_item.value_type_info))
-                {
-                    std::cerr << "Error : Parameter " << p_item.name
-                        << "(" << p_item.file_name << ":"
-                        << p_item.line_num
-                        << ") only takes in " << TypeName(p_item.value_type_info)
-                        << ", argument " << argument
-                        << " is invalid." << std::endl;
-                    break;
-                }
-
-                retval = Set(names[i], argument);
+                Read_In_Opt(names[i], argument);
                 break;
             }
 
             if (retval) break;
         } while (i!=-1);
+
+        if (PARAMETER_DEBUG && optind < argc-1)
+            std::cout << "Left over arguments" << std::endl;
+        for (int i=optind; i<argc; i++)
+        {
+            bool valid_parameter = false;
+            if (PARAMETER_DEBUG)
+                std::cout << argv[i] << std::endl;
+            if (i == optind)
+            {
+                auto it = p_map.find("graph-type");
+                if (it != p_map.end())
+                {
+                    Read_In_Opt("graph-type", std::string(argv[i]));
+                    valid_parameter = true;
+                }
+            }
+
+            if (i == optind + 1)
+            {
+                auto it = p_map.find("graph-type");
+                if (it != p_map.end())
+                {
+                    it = p_map.find("market-file");
+                    if (it != p_map.end() && Get<std::string>("graph-type") == "market")
+                    {
+                        Read_In_Opt("market-file", std::string(argv[i]));
+                        valid_parameter = true;
+                    }     
+                }
+            }
+
+            if (!valid_parameter)
+            {
+                GRError(cudaErrorInvalidValue,
+                    "Unknown option " + std::string(argv[i]),
+                    __FILE__, __LINE__);
+            }
+        }
 
         delete[] long_options; long_options = NULL;
         delete[] names; names = NULL;

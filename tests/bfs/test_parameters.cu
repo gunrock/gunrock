@@ -20,14 +20,16 @@ using namespace gunrock::util;
 int main(int argc, char* const argv[])
 {
     Parameters parameters("Test program for util::Parameter class");
-    /*parameters.Use("help", OPTIONAL_ARGUMENT | SINGLE_VALUE | OPTIONAL_PARAMETER,
+    parameters.Use("help", OPTIONAL_ARGUMENT | SINGLE_VALUE | OPTIONAL_PARAMETER,
         false, "Print this usage guide.",
         __FILE__, __LINE__);
     parameters.Use("graph-type", REQUIRED_ARGUMENT | SINGLE_VALUE | REQUIRED_PARAMETER,
         "", "Type of graph to be processed, <market | rmat | rgg | smallworld>", &typeid(std::string), __FILE__, __LINE__);
+    parameters.Use("market-file", REQUIRED_ARGUMENT | SINGLE_VALUE | OPTIONAL_PARAMETER,
+        "", "path of the market graph file", &typeid(std::string), __FILE__, __LINE__);
     parameters.Use("device", REQUIRED_ARGUMENT | MULTI_VALUE | OPTIONAL_PARAMETER,
         0, "GPU device indices used for testing",
-        __FILE__, __LINE__);*/
+        __FILE__, __LINE__);
 
     //parameters.Use("ozbn", OPTIONAL_PARAMETER | ZERO_VALUE | NO_ARGUMENT,
     //    false, "Optional single bool value, no argument", __FILE__, __LINE__);
@@ -55,7 +57,7 @@ int main(int argc, char* const argv[])
     parameters.Use("osio", OPTIONAL_PARAMETER | SINGLE_VALUE | OPTIONAL_ARGUMENT,
         2, "Optional single int value, optional argument", __FILE__, __LINE__);
     parameters.Use("osir", OPTIONAL_PARAMETER | SINGLE_VALUE | REQUIRED_ARGUMENT,
-        3, "Optional single int value, optional argument", __FILE__, __LINE__);
+        3, "Optional single int value, required argument", __FILE__, __LINE__);
     parameters.Use("omio", OPTIONAL_PARAMETER | MULTI_VALUE | OPTIONAL_ARGUMENT,
         4, "Optional multiple int values, optional argument", __FILE__, __LINE__);
     parameters.Use("omir", OPTIONAL_PARAMETER | MULTI_VALUE | REQUIRED_ARGUMENT,
@@ -65,19 +67,19 @@ int main(int argc, char* const argv[])
     parameters.Use("rsio", REQUIRED_PARAMETER | SINGLE_VALUE | OPTIONAL_ARGUMENT,
         7, "Required single int value, optional argument", __FILE__, __LINE__);
     parameters.Use("rsir", REQUIRED_PARAMETER | SINGLE_VALUE | REQUIRED_ARGUMENT,
-        8, "Required single int value, optional argument", __FILE__, __LINE__);
+        8, "Required single int value, required argument", __FILE__, __LINE__);
     parameters.Use("rmio", REQUIRED_PARAMETER | MULTI_VALUE | OPTIONAL_ARGUMENT,
         9, "Required multiple int values, optional argument", __FILE__, __LINE__);
     parameters.Use("rmir", REQUIRED_PARAMETER | MULTI_VALUE | REQUIRED_ARGUMENT,
         10, "Required multiple int values, required argument", __FILE__, __LINE__);
 
-    parameters.Use("duplicated", OPTIONAL_ARGUMENT | SINGLE_VALUE | OPTIONAL_ARGUMENT,
+    parameters.Use("duplicated", OPTIONAL_PARAMETER | SINGLE_VALUE | OPTIONAL_ARGUMENT,
         "null", "Duplicated parameter defination", __FILE__, __LINE__);
-    parameters.Use("duplicated", OPTIONAL_ARGUMENT | SINGLE_VALUE | OPTIONAL_ARGUMENT,
+    parameters.Use("duplicated", OPTIONAL_PARAMETER | SINGLE_VALUE | OPTIONAL_ARGUMENT,
         "null", "Duplicated parameter defination", __FILE__, __LINE__);
 
-    parameters.Use<std::string>("required", REQUIRED_PARAMETER | SINGLE_VALUE | OPTIONAL_ARGUMENT,
-        "", "Required parameter", __FILE__, __LINE__);
+    parameters.Use("required", REQUIRED_PARAMETER | SINGLE_VALUE | OPTIONAL_ARGUMENT,
+        "", "Required bool parameter", &typeid(bool), __FILE__, __LINE__);
 
     parameters.Print_Help();
 
@@ -107,6 +109,9 @@ int main(int argc, char* const argv[])
     istr >> test_vec;
     std::cout << test_vec << std::endl;*/
 
+    parameters.Set("osio", "try");
+    parameters.Get<bool>("rmir");
+
     std::cout << std::endl;
     std::cout << "Get<bool>(\"osbo\") = " << (parameters.Get<bool>("osbo") ? "true" : "false") << std::endl;
     std::cout << "Get<bool>(\"osbr\") = " << (parameters.Get<bool>("osbr") ? "true" : "false") << std::endl;
@@ -132,6 +137,6 @@ int main(int argc, char* const argv[])
     std::cout << "Get<int>(\"rmio\") = " << parameters.Get<int>("rmio") << std::endl;
     std::cout << "Get<std::vector<int> >(\"rmio\") = " << parameters.Get<std::vector<int> >("rmio") << std::endl;
     std::cout << "Get<int>(\"rmir\") = " << parameters.Get<int>("rmir") << std::endl;
-    std::cout << "Get<std::vector<int> >(\"rmbr\") = " << parameters.Get<std::vector<int> >("rmir") << std::endl;
+    std::cout << "Get<std::vector<int> >(\"rmir\") = " << parameters.Get<std::vector<int> >("rmir") << std::endl;
     return 0;
 }
