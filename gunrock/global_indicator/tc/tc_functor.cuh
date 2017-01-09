@@ -8,20 +8,20 @@ namespace global_indicator {
 namespace tc {
 
 template<
-typename VertexId,
-typename SizeT,
-typename Value,
-typename ProblemData,
-typename _LabelT = VertexId>
+    typename VertexId,
+    typename SizeT,
+    typename Value,
+    typename Problem,
+    typename _LabelT = VertexId>
 struct TCFunctor
 {
-    typedef typename ProblemData::DataSlice DataSlice;
+    typedef typename Problem::DataSlice DataSlice;
     typedef _LabelT LabelT;
 
     static __device__ __forceinline__ bool CondEdge(
             VertexId s_id,
             VertexId d_id,
-            DataSlice *problem,
+            DataSlice *d_data_slice,
             SizeT edge_id,
             VertexId input_item,
             LabelT label,
@@ -31,14 +31,14 @@ struct TCFunctor
         //bool res =  (problem->d_degrees[s_id] > problem->d_degrees[d_id]
         //        || (problem->d_degrees[s_id] == problem->d_degrees[d_id] && s_id < d_id));
         bool res = s_id < d_id;
-        problem->d_src_node_ids[edge_id] = (res) ? 1:0;
+        d_data_slice->d_src_node_ids[edge_id] = (res) ? 1:0;
         return res;
     }
 
     static __device__ __forceinline__ void ApplyEdge(
             VertexId s_id,
             VertexId d_id,
-            DataSlice *problem,
+            DataSlice *d_data_slice,
             SizeT edge_id,
             VertexId input_item,
             LabelT label,
@@ -57,6 +57,8 @@ struct TCFunctor
         SizeT input_pos,
         SizeT output_pos)
     {
+        //if (blockIdx.x == 0 && threadIdx.x == 0)
+        //    printf("%d\n",node);
         return (node!=-1);
     }
 

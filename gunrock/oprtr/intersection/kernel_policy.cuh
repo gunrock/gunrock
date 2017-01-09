@@ -44,6 +44,10 @@ namespace intersection {
  *
  * @tparam _ProblemData                 Problem data type.
  * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code for.
+<<<<<<< HEAD
+=======
+ * @tparam _INSTRUMENT                  Whether or not we want instrumentation logic generated
+>>>>>>> dev-intersection-op
  * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have resident per SM (influences per-CTA smem cache sizes and register allocation/spills).
  * @tparam _LOG_THREADS                 Number of threads per CTA (log).
  * @tparam _LOG_BLOCKS                  Number of blocks per grid (log).

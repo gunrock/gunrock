@@ -10,7 +10,6 @@
 #-------------------------------------------------------------------------------
 
 include ../BaseMakefile.mk
-
 ALGO = bfs
 test: bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 

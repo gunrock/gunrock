@@ -28,7 +28,6 @@
 // MST includes
 #include <gunrock/global_indicator/tc/tc_enactor.cuh>
 #include <gunrock/global_indicator/tc/tc_problem.cuh>
-#include <gunrock/global_indicator/tc/tc_functor.cuh>
 
 // Operator includes
 #include <gunrock/oprtr/advance/kernel.cuh>
@@ -145,7 +144,6 @@ cudaError_t RunTest(Info<VertexId, Value, SizeT> *info)
     ContextPtr   *context = (ContextPtr*  )info->context;
     cudaStream_t *streams = (cudaStream_t*)info->streams;
 
-
     VertexId *h_srcs              = new VertexId[graph->edges/2];
     VertexId *h_dsts              = new VertexId[graph->edges/2];
     SizeT    *h_tc                = new SizeT[graph->edges/2];
@@ -243,7 +241,6 @@ cudaError_t RunTest(Info<VertexId, Value, SizeT> *info)
 
 int main(int argc, char** argv)
 {
-
     cudaError_t retval = cudaSuccess;
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
