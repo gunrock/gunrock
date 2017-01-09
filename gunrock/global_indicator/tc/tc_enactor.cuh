@@ -499,8 +499,8 @@ public:
         //);
 
         // Reuse d_scanned_edges
-        //SizeT *d_output_counts = d_scanned_edges;
-        //util::MemsetKernel<<<256, 1024>>>(d_output_triplets, (SizeT)0, graph_slice->edges);
+        SizeT *d_output_triplets = d_scanned_edges;
+        util::MemsetKernel<<<256, 1024>>>(d_output_triplets, (SizeT)0, graph_slice->edges);
 
         // Should make tc_count a member var to TCProblem
         long tc_count = gunrock::oprtr::intersection::LaunchKernel

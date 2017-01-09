@@ -1026,7 +1026,7 @@ public:
                     "BFSEnactor cudaBindTexture bitmask_tex_ref failed", __FILE__, __LINE__)) break;
             }*/
 
-            if (sizeof(SizeT) == 4)
+            /*if (sizeof(SizeT) == 4)
             {
                 cudaChannelFormatDesc row_offsets_dest = cudaCreateChannelDesc<SizeT>();
                 gunrock::oprtr::edge_map_partitioned::RowOffsetsTex<SizeT>::row_offsets.channelDesc = row_offsets_dest;
@@ -1037,7 +1037,7 @@ public:
                     ((size_t) (problem -> graph_slices[gpu]->nodes + 1)) * sizeof(SizeT)),
                     "BFSEnactor cudaBindTexture row_offsets_ref failed",
                     __FILE__, __LINE__)) break;
-            }
+            }*/
         }
 
         for (int gpu=0;gpu<this->num_gpus;gpu++)

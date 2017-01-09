@@ -62,7 +62,7 @@ struct TCProblem : ProblemBase <
      * @tparam Value    Type of float or double to use for attributes.
      */
      
-    struct Datalice : BaseDataSlice 
+    struct DataSlice : BaseDataSlice 
     {
         // device storage arrays
 	    util::Array1D<SizeT, VertexId> d_src_node_ids;  // Used for ...
