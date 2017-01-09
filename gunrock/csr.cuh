@@ -485,7 +485,7 @@ struct Csr
         {
             input_label.read(reinterpret_cast<char*>(node_values), v * sizeof(Value));
         }
-	    for(int i=0; i<v; i++) printf("%lld ", (long long)node_values[i]); printf("\n");
+//	    for(int i=0; i<v; i++) printf("%lld ", (long long)node_values[i]); printf("\n");
 
         time_t mark2 = time(NULL);
         if (!quiet)
@@ -923,7 +923,7 @@ struct Csr
      * 
      * @param[in] node_degrees node degrees to fill in
      */
-    void GetNodeDegree(SizeT *node_degrees)
+    void GetNodeDegree(unsigned long long *node_degrees)
     {
 	for(SizeT node=0; node < nodes; ++node)
 	{
