@@ -89,87 +89,36 @@ If no root access, use following command:
 How to use gunrock/io
 ================
 
-With all the dependencies installed, to use gunrock/io, example @ [script](https://github.com/gunrock/io/blob/master/scripts/altair_test.py):
+With all the dependencies installed, to use gunrock/io, below is a guide of how to reproduce the performance figures from JSON in gunrock/io:
+
 
 1.  Parses the engine outputs (in txt format) and generates jsons containing important information regarding the output results using **text2json.py**. (Instructions @ [README](https://github.com/gunrock/io/blob/master/scripts/README.md))
 
 2. Make a folder for output visual representation files. 
 
-3. Assuming we are plotting some bfs results from several datasets. In your python scripts, first specify:
-	```
-	      jsondir = '/json/output/from/run'
-	      outputdir = '/where/you/want/to/put/visual/output'
-	```
-4. Create a list of desired JSON output files, load them as a list of JSON objects and convert them to DataFrame.
-	```
-	#filter out JSON files needed for this plot
-	bfs_json_files = [f for f in os.listdir(jsondir) 
-	                      if (os.path.isfile(jsondir + f) and
-	                      (os.path.splitext(f)[1] == ".json") and
-	                      (os.path.basename(f).startswith("BFS") or
-	                       os.path.basename(f).startswith("DOBFS")) and
-	                      not os.path.basename(f).startswith("_"))]
+3. One can use exsiting scripts to generate different visualization output from JSON files. For example, altair_engines.py generates performance comparison visualization from different graph engines. Below is an example makefile to generate different engines performance comparison figures into .md file into gunrock/doc:
 
-	#load list of files as JSON objects
-	bfs_data_unfiltered = [json.load(open(jsondir + jf)) for jf in bfs_json_files]
 
-	bfs_df = pandas.DataFrame(bfs_data_unfiltered)
+    ENGINES_OUTPUTS = output/engines_topc.md \
+	output/engines_topc_table_html.md
+    
+    PLOTTING_FILES = fileops.py filters.py logic.py
+    
+    DEST = "../../gunrock/doc/stats"
+    
+    all: $(ALL)
+    
+    $(ENGINES_OUTPUTS): altair_engines.py $(PLOTTING_FILES)
+    		./altair_engines.py
+ 
+    install: $(ALL)
+    		cp $(ALL) $(DEST)
+    
+    clean:
+    		rm $(ALL)
+    
+After running these commands, output .md files will be copied into gunrock/doc/stats, in the output directory made in step 2, there will also be .html, .svg, .png, .pdf, .eps and .json output files generated. To start a new python scripts that will output other visualization output, please follow (script @ [altair_engines.py](https://github.com/gunrock/io/scripts/altair_engines.py)).
 
-	#One more filtering for this example,
-	#some runs in the repo have no dataset. .
-	bfs_df = bfs_df[bfs_df['dataset'] != ""]
-	```
-5. Set chart parameter and load it as a Chart object:
-	```
-	bfs_chart = Chart(bfs_df).mark_bar().encode(
-	    x=X('dataset',
-	        axis=Axis(title='Dataset')
-	        ),
-	    y=Y('m_teps',
-	        axis=Axis(title='MTEPS'),
-	        scale=Scale(type='log'),
-	        ),
-	)
-
-	```
-
-	Or to add colors to mark different kind of datasets, set color option,
-	```
-	def setParameters(row):
-	    return (row['algorithm'] + ', ' +
-	            ('un' if row['undirected'] else '') + 'directed, ' +
-	            ('' if row['mark_predecessors'] else 'no ') + 'mark predecessors')
-
-	bfs_df['parameters'] = bfs_df.apply(setParameters, axis=1)
-
-	bfs_chart = Chart(bfs_df).mark_point().encode(
-	    x=X('dataset',
-	        axis=Axis(title='Dataset')
-	        ),
-	    y=Y('m_teps',
-	        axis=Axis(title='MTEPS'),
-	        scale=Scale(type='log'),
-	        ),
-	    color='parameters',
-	)
-```
-
-6. Save chart to different visualization format:
-	```
-	savefile(bfs_param_t_chart, name='bfs_param_t_chart', fileformat='html',outputdir = outputdir)
-	savefile(bfs_param_t_chart, name='bfs_param_t_chart', fileformat='svg', outputdir = outputdir)
-	savefile(bfs_param_t_chart, name='bfs_param_t_chart', fileformat='png', outputdir = outputdir)
-	savefile(bfs_param_t_chart, name='bfs_param_t_chart', fileformat='pdf', outputdir = outputdir)
-
-	```
-
-To run this example @ [script](https://github.com/gunrock/io/blob/master/scripts/altair_test.py), clone graph_io:
-
-```
-cd io/scripts
-mkdir example_output
-python altair_test.py 
-```
 
 
 Reference:
