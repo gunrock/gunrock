@@ -34,25 +34,37 @@ template<
   typename VertexId,
   typename SizeT,
   typename Value,
-  typename Problem>
+  typename Problem,
+  typename _LabelT = VertexId>
 struct SMInitFunctor
 {
     typedef typename Problem::DataSlice DataSlice;
-    /**
-     * @brief Forward Advance Kernel condition function.
+    typedef _LabelT LabelT;
+ 
+    /** 
+     * @brief Forward Edge Mapping condition function. Check if the destination node
+     * has been claimed as someone else's child.
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
-     * \return Whether to load the apply function for the edge and include
-     * the destination node in the next frontier.
+     * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
     static __device__ __forceinline__ bool CondEdge(
-        VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
-        VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId s_id,
+        VertexId d_id,
+        DataSlice *d_data_slice,
+        SizeT    edge_id   ,   
+        VertexId input_item,
+        LabelT   label     ,   
+        SizeT    input_pos ,
+        SizeT   &output_pos)
     {
 	// d_query_col stores the query node labels; d_in stores the data node labels
         #pragma unroll
@@ -69,18 +81,30 @@ struct SMInitFunctor
 	return true;
     }
 
-    /**
-     * @brief Forward Advance Kernel apply function.
+    /** 
+     * @brief Forward Edge Mapping apply function. Now we know the source node
+     * has succeeded in claiming child, so it is safe to set distance to its child
+     * node (destination node).
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
+     *
      */
     static __device__ __forceinline__ void ApplyEdge(
-        VertexId s_id,  VertexId d_id, DataSlice *d_data_slice,
-        VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId s_id,
+        VertexId d_id,
+        DataSlice *d_data_slice,
+        SizeT    edge_id   ,
+        VertexId input_item,
+        LabelT   label     ,
+        SizeT    input_pos ,
+        SizeT   &output_pos)
     {
 	    return;
     }
@@ -99,25 +123,37 @@ template<
   typename VertexId,
   typename SizeT,
   typename Value,
-  typename Problem>
+  typename Problem,
+  typename _LabelT = VertexId>
 struct SMFunctor
 {
     typedef typename Problem::DataSlice DataSlice;
+    typedef _LabelT LabelT;
+
     /**
-     * @brief Forward Advance Kernel condition function.
+     * @brief Forward Edge Mapping condition function. Check if the destination node
+     * has been claimed as someone else's child.
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
      *
-     * \return Whether to load the apply function for the edge and include
-     * the destination node in the next frontier.
+     * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
      */
     static __device__ __forceinline__ bool CondEdge(
-        VertexId s_id, VertexId d_id, DataSlice *d_data_slice,
-        VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId s_id,
+        VertexId d_id,
+        DataSlice *d_data_slice,
+        SizeT    edge_id   ,
+        VertexId input_item,
+        LabelT   label     ,
+        SizeT    input_pos ,
+        SizeT   &output_pos)
     {
 
  	    bool res = false;
@@ -133,22 +169,34 @@ struct SMFunctor
 		if(res) break;
 	    }
 	    // use froms to store if the edge is kept or not
-	    d_data_slice -> d_in[e_id] = (res) ? (VertexId)1 : 0;
+	    d_data_slice -> d_in[edge_id] = (res) ? (VertexId)1 : 0;
 	    return res; 
     }
 
-    /**
-     * @brief Forward Advance Kernel apply function.
+    /** 
+     * @brief Forward Edge Mapping apply function. Now we know the source node
+     * has succeeded in claiming child, so it is safe to set distance to its child
+     * node (destination node).
      *
      * @param[in] s_id Vertex Id of the edge source node
      * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
+     * @param[out] d_data_slice Data slice object.
+     * @param[in] edge_id Edge index in the output frontier
+     * @param[in] input_item Input Vertex Id
+     * @param[in] label Vertex label value.
+     * @param[in] input_pos Index in the input frontier
+     * @param[out] output_pos Index in the output frontier
+     *
      */
     static __device__ __forceinline__ void ApplyEdge(
-        VertexId s_id,  VertexId d_id, DataSlice *d_data_slice,
-        VertexId e_id = 0, VertexId e_id_in = 0)
+        VertexId s_id,
+        VertexId d_id,
+        DataSlice *d_data_slice,
+        SizeT    edge_id   ,
+        VertexId input_item,
+        LabelT   label     ,
+        SizeT    input_pos ,
+        SizeT   &output_pos)
     {
 	    return;
     }

@@ -20,10 +20,10 @@
 #include <gunrock/util/segmented_reduce_utils.cuh>
 #include <gunrock/util/join.cuh>
 
+#include <gunrock/util/kernel_runtime_stats.cuh>
+
 #include <gunrock/oprtr/advance/kernel.cuh>
-#include <gunrock/oprtr/advance/kernel_policy.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
-#include <gunrock/oprtr/filter/kernel_policy.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/sm/sm_problem.cuh>
@@ -142,21 +142,21 @@ public:
     cudaError_t EnactSM()
     {
         // Define functors for primitive
-        typedef SMInitFunctor   <VertexId, SizeT, Value, Problem> SMInitFunctor;
+        typedef SMInitFunctor   <VertexId, SizeT, Value, Problem, long long> SMInitFunctor;
         typedef SMFunctor       <VertexId, SizeT, Value, Problem> SMFunctor;
         typedef util::DoubleBuffer  <VertexId, SizeT, Value> Frontier;
         typedef GraphSlice          <VertexId, SizeT, Value> GraphSliceT;
         typedef typename Problem::DataSlice                  DataSlice;
 
         Problem      *problem            = this -> problem;
-        EnactorStats *statistics         = &this->enactor_stats     [0];
+        EnactorStats<SizeT> *statistics  = &this->enactor_stats     [0];
         DataSlice    *data_slice         =  problem -> data_slices  [0].GetPointer(util::HOST);
         DataSlice    *d_data_slice       =  problem -> data_slices  [0].GetPointer(util::DEVICE);
         GraphSliceT  *graph_slice        =  problem -> graph_slices [0];
         Frontier     *queue              = &data_slice->frontier_queues[0];
         FrontierAttribute<SizeT>
                      *attributes         = &this->frontier_attribute[0];
-        util::CtaWorkProgressLifetime
+        util::CtaWorkProgressLifetime<SizeT>
                      *work_progress      = &this->work_progress     [0];
         cudaStream_t  stream             =  data_slice->streams     [0];
         ContextPtr    context            =  this -> context         [0];
@@ -190,9 +190,11 @@ public:
 //     for(int i=0; i<2; i++)  // filter candidate nodes and edges for a few iterations
 //     {
         gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, SMInitFunctor>(
+                    <AdvanceKernelPolicy, Problem, SMInitFunctor, gunrock::oprtr::advance::V2V>(
                     statistics[0],
                     attributes[0],
+                    statistics -> iteration + 1,
+                    data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
@@ -210,8 +212,7 @@ public:
                     graph_slice->edges,
                     work_progress[0],
                     context[0],
-                    stream,
-                    gunrock::oprtr::advance::V2V);
+                    stream);
 
         if (debug_info)
         {
@@ -226,9 +227,11 @@ public:
         attributes->queue_reset  = false;
 
         gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, SMFunctor>(
+                    <AdvanceKernelPolicy, Problem, SMFunctor, gunrock::oprtr::advance::V2V>(
                     statistics[0],
                     attributes[0],
+                    statistics -> iteration + 1,
+                    data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
@@ -246,8 +249,7 @@ public:
                     graph_slice->edges,
                     work_progress[0],
                     context[0],
-                    stream,
-                    gunrock::oprtr::advance::V2V);
+                    stream);
 
         if (debug_info)
         {
