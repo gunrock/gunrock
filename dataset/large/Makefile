@@ -4,7 +4,7 @@
 #Each graph lives in its own directory
 SUBDIRS = ak2010 belgium_osm delaunay_n13 delaunay_n21 delaunay_n24 coAuthorsDBLP kron_g500-logn21 soc-LiveJournal1 webbase-1M europe_osm road_usa cit-Patents soc-orkut indochina-2004 hollywood-2009 roadNet-CA
 
-SUBDIRS_IPDPS17 = soc-LiveJournal1 hollywood-2009 soc-orkut soc-sinaweibo soc-twitter-2010 indochina-2004 uk-2002 arabic-2005 uk-2005 webbase-2001 germany_osm asia_osm europe_osm road_central road_usa
+SUBDIRS_IPDPS17 = soc-LiveJournal1 hollywood-2009 soc-orkut soc-sinaweibo soc-twitter-2010 indochina-2004 uk-2002 arabic-2005 uk-2005 webbase-2001 germany_osm asia_osm europe_osm road_central road_usa kron_g500-logn21
 
 .PHONY: $(GRAPHS)
 
