@@ -14,7 +14,7 @@
 
 #pragma once
 
-#define RECORD_PER_ITERATION_STATS 0
+//#define RECORD_PER_ITERATION_STATS
 
 namespace gunrock {
 namespace util {
@@ -1335,7 +1335,8 @@ public:
             }
         }
 
-        if (get_traversal_stats && RECORD_PER_ITERATION_STATS)
+#ifdef RECORD_PER_ITERATION_STATS
+        if (get_traversal_stats)
         {
             // TODO: collect info for multi-GPUs
             EnactorStats *estats = enactor_stats;
@@ -1362,6 +1363,7 @@ public:
             info["per_iteration_advance_output_frontier"] = per_iteration_advance_output_frontier;
             info["per_iteration_advance_direction"] = per_iteration_advance_dir;
         }
+#endif
 
         double avg_duty = (total_lifetimes > 0) ?
             double(total_runtimes) / total_lifetimes * 100.0 : 0.0f;
