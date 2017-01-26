@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # get all execution files in ./bin
 files=(./bin/*)
@@ -16,13 +16,13 @@ do
 done
 
 # put OS and Device type here
-SUFFIX="ubuntu12.04.k40c"
+SUFFIX="ubuntu14.04.1.k40c"
 
 mkdir -p eval/$SUFFIX
 
-for i in delaunay_n13
+for i in delaunay_n10
 do
-    echo $exe_file market ../../dataset/large/$i/$i.mtx
+    echo $exe_file market ../../dataset/small/tri_sm.mtx ../../dataset/small/tri_sm.label /data/gunrock_dataset/large/$i/$i.mtx /data/leyuan/labels/$i.label
     $exe_file market ../../dataset/large/$i/$i.mtx > eval/$SUFFIX/$i.$SUFFIX.txt
     sleep 1
 done

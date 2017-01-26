@@ -43,12 +43,12 @@ struct GreaterThan
  * stored in \p d_num_selected_out.
  *
  */
-template <typename InputT, typename OutputT, typename SizeT, typename FlagT>
+template <typename InputT, typename OutputT, typename SizeT, typename Value, typename FlagT>
 cudaError_t CUBSelect_flagged(
     InputT 	*d_in,
     FlagT	*d_flags,
     OutputT	*d_out,
-    SizeT	*d_num_selected_out,
+    Value	*d_num_selected_out,
     SizeT 	num_elements)
 {
     cudaError_t retval = cudaSuccess;
@@ -86,11 +86,11 @@ cudaError_t CUBSelect_flagged(
             __FILE__, __LINE__)) return retval;
 
     // clean up
-    if (util::GRError(
+/*    if (util::GRError(
             (retval = cudaFree(d_temp_storage)),
             "CUBSelect free d_temp_storage failed",
             __FILE__, __LINE__)) return retval;
-
+*/
     return retval;
 }
 
@@ -142,12 +142,12 @@ cudaError_t CUBSelect_if(
             "CUBSelect cub::DeviceSelect::If failed",
             __FILE__, __LINE__)) return retval;
 
-    // clean up
-    if (util::GRError(
+// clean up
+/*    if (util::GRError(
             (retval = cudaFree(d_temp_storage)),
             "CUBSelect free d_temp_storage failed",
             __FILE__, __LINE__)) return retval;
-
+*/
     return retval;
 }
 

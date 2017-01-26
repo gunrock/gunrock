@@ -187,6 +187,7 @@ public:
         attributes->selector     = 0;
         attributes->queue_length = graph_slice->nodes;
         attributes->queue_reset  = true;
+
 //     for(int i=0; i<2; i++)  // filter candidate nodes and edges for a few iterations
 //     {
         gunrock::oprtr::advance::LaunchKernel
@@ -298,7 +299,7 @@ public:
             // froms stores the flags of candidate edges
 	    util::MemsetKernel<<<128,128, 0, stream>>>(
 	    	data_slice -> d_in.GetPointer(util::DEVICE),
-	    	(VertexId)0, data_slice -> edges_query * edges/2);
+	    	(Value)0, data_slice -> edges_query * edges/2);
 
 	    // Label candidate edges for each query edge
 	    util::Label<<<128,128,0,stream>>>(
@@ -315,7 +316,7 @@ public:
 
             util::MemsetKernel<<<128, 128, 0, stream>>>(
             	data_slice -> d_query_col.GetPointer(util::DEVICE), 
-            	(VertexId)0, data_slice -> edges_query);
+            	(Value)0, data_slice -> edges_query);
 
 
 	    util::MemsetIdxKernel<<<128, 128, 0, stream>>>(
@@ -332,17 +333,6 @@ public:
                 data_slice -> d_in 	    .GetPointer(util::DEVICE), //store middle results
                 data_slice -> d_query_col   .GetPointer(util::DEVICE), // d_query_col[0]
 		data_slice -> edges_data/2);
-
-	    if (debug_info)
-	        util::debug<<<128,128, 0, stream>>>(
-	    	    queue->values[attributes->selector].GetPointer(util::DEVICE), 
-                    data_slice -> d_col_indices .GetPointer(util::DEVICE), 
-                    data_slice -> froms_query   .GetPointer(util::DEVICE), 
-                    data_slice -> tos_query     .GetPointer(util::DEVICE), 
-                    data_slice -> d_in		.GetPointer(util::DEVICE), 
-                    data_slice -> d_query_col   .GetPointer(util::DEVICE), 
-                    data_slice -> edges_query, 
-                    data_slice -> edges_data);
 
 	    util::MemsetKernel<<<128,128,0,stream>>>(
 	        data_slice -> d_query_row.GetPointer(util::DEVICE), (SizeT)0, 
@@ -361,12 +351,12 @@ public:
 		    data_slice -> edges_data,
 		    data_slice -> edges_query,
 		    data_slice -> d_query_col  	       .GetPointer(util::DEVICE),
-		    data_slice -> d_query_row          .GetPointer(util::DEVICE),
+                    data_slice -> counts               .GetPointer(util::DEVICE),
                     data_slice -> flag                 .GetPointer(util::DEVICE),
 	    	    queue->values[attributes->selector].GetPointer(util::DEVICE), //can edge list 
                     data_slice -> d_col_indices        .GetPointer(util::DEVICE),
 		    data_slice -> d_in		       .GetPointer(util::DEVICE), // can edge ids
-                    data_slice -> d_c_set		       .GetPointer(util::DEVICE));// output
+                    data_slice -> d_c_set 	       .GetPointer(util::DEVICE));// output
 	
         return retval;
     }

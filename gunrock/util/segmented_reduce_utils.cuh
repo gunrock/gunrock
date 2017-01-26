@@ -69,11 +69,11 @@ cudaError_t CUBSegReduce_sum(
             __FILE__, __LINE__)) return retval;
 
     // clean up
-    if (util::GRError(
+/*    if (util::GRError(
             (retval = cudaFree(d_temp_storage)),
             "CUBSegReduce free d_temp_storage failed",
             __FILE__, __LINE__)) return retval;
-
+*/
     return retval;
 }
 
