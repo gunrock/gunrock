@@ -136,6 +136,8 @@ $(function() {
 <li><a href="http://gunrock.github.io/gunrock/doc/latest/md_stats_do_ab_random.html">Setting parameters for direction-optimized BFS</a></li>
 <li><a href="http://gunrock.github.io/gunrock/doc/latest/md_stats_gunrock_gpus.html">Gunrock results on different GPUs</a></li>
 <li><a href="http://gunrock.github.io/gunrock/doc/latest/md_stats_frontier.html">Gunrock BFS throughput as a function of frontier size</a></li>
+<li><a href="http://gunrock.github.io/gunrock/doc/latest/md_stats_mgpu_speedup.html">Multi-GPU Gunrock Scalability</a></li>
+<li><a href="http://gunrock.github.io/gunrock/doc/latest/md_stats_mgpu_partition.html">Multi-GPU Gunrock Partition Performance</a></li>
 </ul>
 <p>For reproducibility, we maintain Gunrock configurations and results in our github <a href="https://github.com/gunrock/io/tree/master/gunrock-output">gunrock/io</a> repository.</p>
 <p>We are happy to run experiments with other engines, particularly if those engines output results in our JSON format / a format that can be easily parsed into JSON format.</p>
@@ -168,7 +170,7 @@ $(function() {
 <li><a href="http://www.huan-zhang.com/">Huan Zhang</a>, University of California, Davis</li>
 <li><a href="http://www.ece.ucdavis.edu/~jowens/">John Owens</a>, University of California, Davis</li>
 </ul>
-<h2>Acknowledgements </h2>
+<h2>Acknowledgments </h2>
 <p>Thanks to the following developers who contributed code: The connected-component implementation was derived from code written by Jyothish Soman, Kothapalli Kishore, and P. J. Narayanan and described in their IPDPSW '10 paper <em>A Fast GPU Algorithm for Graph Connectivity</em> (<a href="http://dx.doi.org/10.1109/IPDPSW.2010.5470817">DOI</a>). The breadth-first search implementation and many of the utility functions in Gunrock are derived from the <a href="http://code.google.com/p/back40computing/">b40c</a> library of <a href="https://sites.google.com/site/duanemerrill/">Duane Merrill</a>. The algorithm is described in his PPoPP '12 paper <em>Scalable GPU Graph Traversal</em> (<a href="http://dx.doi.org/10.1145/2370036.2145832">DOI</a>). Thanks to Erich Elsen and Vishal Vaidyanathan from <a href="http://www.royal-caliber.com/">Royal Caliber</a> and the <a href="http://www.onu.io/">Onu</a> Team for their discussion on library development and the dataset auto-generating code. Thanks to Adam McLaughlin for his technical discussion. Thanks to Oded Green for his technical discussion and an optimization in the CC primitive. Thanks to the <a href="https://altair-viz.github.io/">Altair</a> and <a href="https://vega.github.io/vega-lite/">Vega-lite</a> teams in the <a href="http://idl.cs.washington.edu/">Interactive Data Lab</a> at the University of Washington for graphing help. We appreciate the technical assistance, advice, and machine access from many colleagues at NVIDIA: Chandra Cheij, Joe Eaton, Michael Garland, Mark Harris, Ujval Kapasi, David Luebke, Duane Merrill, Nikolai Sakharnykh, and Cliff Woolley.</p>
 <p>This work was funded by the DARPA XDATA program under AFRL Contract FA8750-13-C-0002, by NSF awards CCF-1017399, OCI-1032859, and CCF-1629657, by DARPA STTR award D14PC00023, and by DARPA SBIR award W911NF-16-C-0020. Our XDATA principal investigator is Eric Whyne of <a href="http://www.data-tactics.com/">Data Tactics Corporation</a> and our DARPA program managers are Dr. Christopher White (2012&ndash;2014) and <a href="http://www.darpa.mil/staff/mr-wade-shen">Mr. Wade Shen</a> (2015&ndash;present). Thanks to Chris, Wade, and DARPA business manager Gabriela Araujo for their support during the XDATA program.</p>
 <h2>Copyright and Software License </h2>
@@ -182,7 +184,7 @@ $(function() {
 </div>
 </div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Sun Jan 8 2017 12:04:11 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Mon Jan 30 2017 20:25:54 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.13
 </small></address>
