@@ -5,7 +5,7 @@ Scalability of DOBFS, BFS, and PR. {Strong, weak edge, weak vertex} scaling use 
 
 While providing both weak-vertex and -edge scaling, DOBFS doesn't have good strong scaling, because its computation and communication are both roughly on the order of O(|V<sub>i</sub>|). This effect is more obvious on P100, as computation is faster but inter-GPU bandwidth stays mostly the same. BFS and PR achieve almost linear weak and strong scaling from 1 to 8 GPUs.
 
-
+DOBFS
 \htmlonly
 
   <!-- Container for the visualization mgpu_scalability_DOBFS -->
@@ -602,7 +602,7 @@ While providing both weak-vertex and -edge scaling, DOBFS doesn't have good stro
 
 \endhtmlonly
 
-
+BFS
 \htmlonly
 
   <!-- Container for the visualization mgpu_scalability_BFS -->
@@ -1199,7 +1199,7 @@ While providing both weak-vertex and -edge scaling, DOBFS doesn't have good stro
 
 \endhtmlonly
 
-
+PageRank
 \htmlonly
 
   <!-- Container for the visualization mgpu_scalability_PageRank -->
@@ -1797,4 +1797,4 @@ While providing both weak-vertex and -edge scaling, DOBFS doesn't have good stro
 \endhtmlonly
 
 
-[[DOBFS source data](md_stats_mgpu_scalability_DOBFS_table_html.html)] [[BFS source data](md_stats_mgpu_scalability_BFS_table_html.html)] [[PageRank source data](md_stats_mgpu_scalability_PageRank_table_html.html)], with links to the output JSON for each run<br/>
+[[DOBFS source data](md_stats_mgpu_scalability__d_o_b_f_s_table_html.html)] [[BFS source data](md_stats_mgpu_scalability__b_f_s_table_html.html)] [[PageRank source data](md_stats_mgpu_scalability__page_rank_table_html.html)], with links to the output JSON for each run<br/>
