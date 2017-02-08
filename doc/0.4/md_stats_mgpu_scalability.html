@@ -118,7 +118,7 @@ $(function() {
 <div class="contents">
 <div class="textblock"><p>Scalability of DOBFS, BFS, and PR. {Strong, weak edge, weak vertex} scaling use rmat graphs with {2<sup>24</sup>, 2<sup>19</sup>, 2<sup>19</sup>&#160;&times;&#160;|GPUs|} vertices and edge factor {32, 256&#160;&times;&#160;|GPUs|, 256} respectively. DOBFS runs have idempotence disabled, though results with idempotence enabled have similar runtimes.</p>
 <p>While providing both weak-vertex and -edge scaling, DOBFS doesn't have good strong scaling, because its computation and communication are both roughly on the order of O(|V<sub>i</sub>|). This effect is more obvious on P100, as computation is faster but inter-GPU bandwidth stays mostly the same. BFS and PR achieve almost linear weak and strong scaling from 1 to 8 GPUs.</p>
-<p> 
+<p>DOBFS  
 
   <!-- Container for the visualization mgpu_scalability_DOBFS -->
   <div id="vis_mgpu_scalability_DOBFS"></div>
@@ -713,7 +713,7 @@ $(function() {
   </script>
 
 </p>
-<p> 
+<p>BFS  
 
   <!-- Container for the visualization mgpu_scalability_BFS -->
   <div id="vis_mgpu_scalability_BFS"></div>
@@ -1308,7 +1308,7 @@ $(function() {
   </script>
 
 </p>
-<p> 
+<p>PageRank  
 
   <!-- Container for the visualization mgpu_scalability_PageRank -->
   <div id="vis_mgpu_scalability_PageRank"></div>
@@ -1903,7 +1903,7 @@ $(function() {
   </script>
 
 </p>
-<p>[<a href="md_stats_mgpu_scalability_DOBFS_table_html.html">DOBFS source data</a>] [<a href="md_stats_mgpu_scalability_BFS_table_html.html">BFS source data</a>] [<a href="md_stats_mgpu_scalability_PageRank_table_html.html">PageRank source data</a>], with links to the output JSON for each run<br />
+<p>[<a href="md_stats_mgpu_scalability__d_o_b_f_s_table_html.html">DOBFS source data</a>] [<a href="md_stats_mgpu_scalability__b_f_s_table_html.html">BFS source data</a>] [<a href="md_stats_mgpu_scalability__page_rank_table_html.html">PageRank source data</a>], with links to the output JSON for each run<br />
  </p>
 </div></div><!-- contents -->
 <!-- HTML footer for doxygen 1.8.8-->
@@ -1914,7 +1914,7 @@ $(function() {
 </div>
 </div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Wed Feb 8 2017 12:37:18 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Feb 8 2017 13:02:44 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.13
 </small></address>
