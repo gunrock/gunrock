@@ -684,22 +684,6 @@
       <td>False</td>
       <td>4</td>
       <td>random</td>
-      <td>2.766781</td>
-      <td>Gunrock</td>
-      <td>215.756790</td>
-      <td>843.921840</td>
-      <td>0.4.0</td>
-      <td>Tesla K40c</td>
-      <td>Thu Jan 26 00:50:18 2017\n</td>
-      <td><a href="https://github.com/gunrock/io/tree/master/gunrock-output/ipdps17/eval_fig2/PageRank_kron_g500-logn21_Thu Jan 26 005018 2017.json">JSON output</a></td>
-    </tr>
-    <tr>
-      <td>PageRank</td>
-      <td>kron_g500-logn21</td>
-      <td>PageRank / kron_g500-logn21</td>
-      <td>False</td>
-      <td>4</td>
-      <td>random</td>
       <td>3.819972</td>
       <td>Gunrock</td>
       <td>297.885834</td>
