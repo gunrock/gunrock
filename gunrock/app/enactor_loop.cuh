@@ -17,6 +17,7 @@
 #include <gunrock/app/enactor_kernel.cuh>
 #include <gunrock/app/enactor_helper.cuh>
 #include <gunrock/util/latency_utils.cuh>
+//#include <gunrock/util/test_utils.h>
 #include <moderngpu.cuh>
 
 using namespace mgpu;
@@ -106,6 +107,42 @@ void Iteration_Loop(
     SizeT         subqueue_latency     =   enactor -> subqueue_latency;
     SizeT         fullqueue_latency    =   enactor -> fullqueue_latency;
     SizeT         makeout_latency      =   enactor -> makeout_latency;
+
+#ifdef ENABLE_PERFORMANCE_PROFILING
+    util::CpuTimer      cpu_timer;
+    std::vector<double> &iter_full_queue_time =
+        enactor -> iter_full_queue_time[thread_num].back();
+    std::vector<double> &iter_sub_queue_time =
+        enactor -> iter_sub_queue_time [thread_num].back();
+    std::vector<double> &iter_total_time =
+        enactor -> iter_total_time     [thread_num].back();
+    std::vector<SizeT>  &iter_full_queue_nodes_queued =
+        enactor -> iter_full_queue_nodes_queued[thread_num].back();
+    std::vector<SizeT>  &iter_full_queue_edges_queued =
+        enactor -> iter_full_queue_edges_queued[thread_num].back();
+
+    cpu_timer.Start();
+    double iter_start_time = cpu_timer.MillisSinceStart();
+    double iter_stop_time = 0;
+    double subqueue_finish_time = 0;
+
+    SizeT  h_edges_queued[16];
+    SizeT  h_nodes_queued[16];
+    SizeT  previous_edges_queued[16];
+    SizeT  previous_nodes_queued[16];
+    SizeT  h_full_queue_edges_queued = 0;
+    SizeT  h_full_queue_nodes_queued = 0;
+    SizeT  previous_full_queue_edges_queued = 0;
+    SizeT  previous_full_queue_nodes_queued = 0;
+
+    for (int peer_ = 0; peer_ < num_gpus; peer_++)
+    {
+        h_edges_queued       [peer_] = 0;
+        h_nodes_queued       [peer_] = 0;
+        previous_nodes_queued[peer_] = 0;
+        previous_edges_queued[peer_] = 0;
+    }
+#endif
 
     if (enactor -> debug)
     {
@@ -234,6 +271,10 @@ void Iteration_Loop(
 
                         frontier_attribute_->queue_length =
                             data_slice->in_length[iteration%2][peer_];
+#ifdef ENABLE_PERFORMANCE_PROFILING
+                        enactor_stats_ -> iter_in_length.back().push_back(
+                            data_slice -> in_length[iteration%2][peer_]);
+#endif
                         if (frontier_attribute_ -> queue_length != 0)
                         {
                             if (enactor_stats_ -> retval = util::GRError(
@@ -253,7 +294,7 @@ void Iteration_Loop(
 
                         if (expand_latency != 0)
                             util::latency::Insert_Latency(
-                            expand_latency, 
+                            expand_latency,
                             frontier_attribute_ -> queue_length,
                             streams[peer_],
                             data_slice -> latency_data.GetPointer(util::DEVICE));
@@ -297,7 +338,7 @@ void Iteration_Loop(
                     } else { //Push Neighbor
                         if (communicate_latency != 0)
                             util::latency::Insert_Latency(
-                            communicate_latency, 
+                            communicate_latency,
                             data_slice -> out_length[peer_],
                             streams[peer__],
                             data_slice -> latency_data.GetPointer(util::DEVICE));
@@ -409,6 +450,14 @@ void Iteration_Loop(
                         &(work_progress[peer_]),
                         context[peer_],
                         streams[peer_]);
+#ifdef ENABLE_PERFORMANCE_PROFILING
+                    h_nodes_queued[peer_] = enactor_stats_ -> nodes_queued[0];
+                    h_edges_queued[peer_] = enactor_stats_ -> edges_queued[0];
+                    enactor_stats_ -> nodes_queued.Move(
+                        util::DEVICE, util::HOST, 1, 0, streams[peer_]);
+                    enactor_stats_ -> edges_queued.Move(
+                        util::DEVICE, util::HOST, 1, 0, streams[peer_]);
+#endif
 
                     if (num_gpus>1)
                     {
@@ -525,12 +574,30 @@ void Iteration_Loop(
                 }
             }
 
-
             if (enactor -> problem -> unified_receive)
             {
                 Total_Length = data_slice -> in_length_out[0];
             } else if (num_gpus == 1)
                 Total_Length = frontier_attribute[0].queue_length;
+#ifdef ENABLE_PERFORMANCE_PROFILING
+            subqueue_finish_time = cpu_timer.MillisSinceStart();
+            iter_sub_queue_time.push_back(subqueue_finish_time - iter_start_time);
+            if (Iteration::HAS_SUBQ)
+            for (peer_ = 0; peer_ < num_gpus; peer_ ++)
+            {
+                enactor_stats[peer_].iter_nodes_queued.back().push_back(
+                    h_nodes_queued[peer_] + enactor_stats[peer_].nodes_queued[0]
+                    - previous_nodes_queued[peer_]);
+                previous_nodes_queued[peer_] = h_nodes_queued[peer_] + enactor_stats[peer_].nodes_queued[0];
+                enactor_stats[peer_].nodes_queued[0] = h_nodes_queued[peer_];
+
+                enactor_stats[peer_].iter_edges_queued.back().push_back(
+                    h_edges_queued[peer_] + enactor_stats[peer_].edges_queued[0]
+                    - previous_edges_queued[peer_]);
+                previous_edges_queued[peer_] = h_edges_queued[peer_] + enactor_stats[peer_].edges_queued[0];
+                enactor_stats[peer_].edges_queued[0] = h_edges_queued[peer_];
+            }
+#endif
             if (enactor -> debug)
             {
                 printf("%d\t %lld\t \t Subqueue finished. Total_Length= %lld, labels = %p\n",
@@ -658,7 +725,7 @@ void Iteration_Loop(
                     {
                         tretval = cudaStreamSynchronize(streams[peer_]);
                         if (tretval != cudaSuccess) {enactor_stats_->retval=tretval;break;}
-                        
+
                         Iteration::Check_Queue_Size(
                             enactor,
                             thread_num,
@@ -673,7 +740,7 @@ void Iteration_Loop(
 
                     if (fullqueue_latency != 0)
                         util::latency::Insert_Latency(
-                        fullqueue_latency, 
+                        fullqueue_latency,
                         frontier_attribute_ -> queue_length,
                         streams[peer_],
                         data_slice -> latency_data.GetPointer(util::DEVICE));
@@ -693,6 +760,12 @@ void Iteration_Loop(
                         context[peer_],
                         streams[peer_]);
                     if (enactor_stats_->retval) break;
+#ifdef ENABLE_PERFORMANCE_PROFILING
+                    h_full_queue_nodes_queued = enactor_stats_ -> nodes_queued[0];
+                    h_full_queue_edges_queued = enactor_stats_ -> edges_queued[0];
+                    enactor_stats_ -> edges_queued.Move(util::DEVICE, util::HOST, 1, 0, streams[peer_]);
+                    enactor_stats_ -> nodes_queued.Move(util::DEVICE, util::HOST, 1, 0, streams[peer_]);
+#endif
                     //if (enactor_stats_ -> retval = util::GRError(
                     //    cudaStreamSynchronize(streams[peer_]),
                     //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
@@ -708,6 +781,21 @@ void Iteration_Loop(
                         "FullQueue_Core failed.", __FILE__, __LINE__))
                         break;
 
+#ifdef ENABLE_PERFORMANCE_PROFILING
+                    iter_full_queue_nodes_queued.push_back(
+                        h_full_queue_nodes_queued + enactor_stats_ -> nodes_queued[0]
+                        - previous_full_queue_nodes_queued);
+                    previous_full_queue_nodes_queued = h_full_queue_nodes_queued
+                        + enactor_stats_ -> nodes_queued[0];
+                    enactor_stats_ -> nodes_queued[0] = h_full_queue_nodes_queued;
+
+                    iter_full_queue_edges_queued.push_back(
+                        h_full_queue_edges_queued + enactor_stats_ -> edges_queued[0]
+                        - previous_full_queue_edges_queued);
+                    previous_full_queue_edges_queued = h_full_queue_edges_queued
+                        + enactor_stats_ -> edges_queued[0];
+                    enactor_stats_ -> edges_queued[0] = h_full_queue_edges_queued;
+#endif
                     if (!enactor -> size_check)
                     {
                         if (enactor_stats_->retval =
@@ -723,7 +811,14 @@ void Iteration_Loop(
                     Total_Length = 0;
                     for (peer__=0;peer__<num_gpus;peer__++)
                         data_slice->out_length[peer__]=0;
+#ifdef ENABLE_PERFORMANCE_PROFILING
+                    iter_full_queue_nodes_queued.push_back(0);
+                    iter_full_queue_edges_queued.push_back(0);
+#endif
                 }
+#ifdef ENABLE_PERFORMANCE_PROFILING
+                iter_full_queue_time.push_back(cpu_timer.MillisSinceStart() - subqueue_finish_time);
+#endif
                 if (enactor -> debug)
                 {
                     printf("%d\t %lld\t \t Fullqueue finished. Total_Length= %lld\n",
@@ -797,8 +892,21 @@ void Iteration_Loop(
             }
 
             for (peer_=0;peer_<num_gpus;peer_++)
+            {
                 frontier_attribute[peer_].queue_length = data_slice->out_length[peer_];
+#ifdef ENABLE_PERFORMANCE_PROFILING
+                //if (peer_ == 0)
+                    enactor_stats[peer_].iter_out_length.back().push_back(
+                        data_slice -> out_length[peer_]);
+#endif
+            }
         }
+
+#ifdef ENABLE_PERFORMANCE_PROFILING
+        iter_stop_time = cpu_timer.MillisSinceStart();
+        iter_total_time.push_back(iter_stop_time - iter_start_time);
+        iter_start_time = iter_stop_time;
+#endif
         Iteration::Iteration_Change(enactor_stats->iteration);
     }
 }
@@ -1533,7 +1641,7 @@ public:
                 "keys_outs = %p (%d), vertex_associate_outs = %p (%d), value__associate_outs = %p (%d), "
                 "keep_node_num = %s, num_vertex_associates = %d, num_value_associates = %d\n",
                 num_blocks, AdvanceKernelPolicy::THREADS /2, stream,
-                num_elements, num_gpus, 
+                num_elements, num_gpus,
                 data_slice -> out_length.GetPointer(util::DEVICE), data_slice -> out_length.GetSize(),
                 frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
                 frontier_queue -> keys[frontier_attribute -> selector].GetSize(),
@@ -1553,8 +1661,8 @@ public:
                 data_slice  -> value__associate_outs.GetSize(),
                 enactor -> problem -> keep_node_num ? "true" : "false",
                 NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES);*/
-               
-            if (FORWARD) 
+
+            if (FORWARD)
                 Make_Output_Kernel < VertexId, SizeT, Value,
                     NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES,
                     AdvanceKernelPolicy::CUDA_ARCH,
@@ -1573,7 +1681,7 @@ public:
                     data_slice  -> value__associate_outs.GetPointer(util::DEVICE),
                     enactor -> problem -> keep_node_num);
 
-            if (BACKWARD) 
+            if (BACKWARD)
                 Make_Output_Backward_Kernel < VertexId, SizeT, Value,
                     NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES,
                     AdvanceKernelPolicy::CUDA_ARCH,
@@ -1615,8 +1723,8 @@ public:
             "Make_Output failed", __FILE__, __LINE__))
             return;
         if (!enactor -> problem -> skip_makeout_selection)
-        { 
-            for (int i=0; i< num_gpus; i++) 
+        {
+            for (int i=0; i< num_gpus; i++)
             {
                 data_slice -> out_length[i] --;
                 //printf("out_length[%d] = %d\n", i, data_slice -> out_length[i]);
