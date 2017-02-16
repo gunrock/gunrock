@@ -100,7 +100,7 @@ void V2Str(std::vector<T> &v, std::string &str)
 {
     str = "";
     for (auto it = v.begin(); it != v.end(); it++)
-        str = str + (it == v.begin() ? "" : ", ") + std::to_string(*it);
+        str = str + (it == v.begin() ? "" : " ") + std::to_string(*it);
 }
 
 template <typename Enactor>
@@ -114,13 +114,14 @@ void Display_Performance_Profiling(
     int num_gpus = enactor -> num_gpus;
     std::string str;
 
-    printf("\nPerformance profiling\n");
+    printf("\nPerformance profiling log begins\n");
+    printf("Iter\t GPU\t Item\t Per-iter readings\n");
     for (int i = 0; i< num_iterations; i++)
     {
-        printf("Iteration %d\n", i);
+        //printf("Iteration %d\n", i);
         for (int gpu = 0; gpu < num_gpus; gpu ++)
         {
-            printf("\tGPU %d\n", gpu);
+            //printf("\tGPU %d\n", gpu);
 
             for (int peer = 0; peer < num_gpus; peer++)
             {
@@ -129,7 +130,7 @@ void Display_Performance_Profiling(
                 if (iter_in_length.size() != 0)
                 {
                     V2Str(iter_in_length, str);
-                    printf("\t\tIn length %d: %s\n", peer, str.c_str());
+                    printf("%d\t %d\t In length %d\t %s\n", i, gpu, peer, str.c_str());
                 }
 
                 std::vector<SizeT> &iter_nodes_queued
@@ -137,7 +138,7 @@ void Display_Performance_Profiling(
                 if (iter_nodes_queued.size() != 0)
                 {
                     V2Str(iter_nodes_queued, str);
-                    printf("\t\tNodes queued %d: %s\n", peer, str.c_str());
+                    printf("%d\t %d\t Nodes queued %d\t %s\n", i, gpu, peer, str.c_str());
                 }
 
                 std::vector<SizeT> &iter_edges_queued
@@ -145,7 +146,7 @@ void Display_Performance_Profiling(
                 if (iter_edges_queued.size() != 0)
                 {
                     V2Str(iter_edges_queued, str);
-                    printf("\t\tEdges queued %d: %s\n", peer, str.c_str());
+                    printf("%d\t %d\t Edges queued %d\t %s\n", i, gpu, peer, str.c_str());
                 }
             }
 
@@ -154,7 +155,7 @@ void Display_Performance_Profiling(
             if (iter_sub_queue_time.size() != 0)
             {
                 V2Str(iter_sub_queue_time, str);
-                printf("\t\tSub queue time: %s\n", str.c_str());
+                printf("%d\t %d\t Sub queue time\t %s\n", i, gpu, str.c_str());
             }
 
             std::vector<SizeT> &iter_full_queue_nodes_queued
@@ -162,7 +163,7 @@ void Display_Performance_Profiling(
             if (iter_full_queue_nodes_queued.size() != 0)
             {
                 V2Str(iter_full_queue_nodes_queued, str);
-                printf("\t\tFull queue nodes: %s\n", str.c_str());
+                printf("%d\t %d\t Fu-queue nodes\t %s\n", i, gpu, str.c_str());
             }
 
             std::vector<SizeT> &iter_full_queue_edges_queued
@@ -170,7 +171,7 @@ void Display_Performance_Profiling(
             if (iter_full_queue_edges_queued.size() != 0)
             {
                 V2Str(iter_full_queue_edges_queued, str);
-                printf("\t\tFull queue edges: %s\n", str.c_str());
+                printf("%d\t %d\t Fu-queue edges\t %s\n", i, gpu, str.c_str());
             }
 
             std::vector<double> &iter_full_queue_time
@@ -178,7 +179,7 @@ void Display_Performance_Profiling(
             if (iter_full_queue_time.size() != 0)
             {
                 V2Str(iter_full_queue_time, str);
-                printf("\t\tFull queue time: %s\n", str.c_str());
+                printf("%d\t %d\t Fu-queue time\t %s\n", i, gpu, str.c_str());
             }
 
             std::vector<double> &iter_total_time
@@ -197,9 +198,9 @@ void Display_Performance_Profiling(
                         other_time.push_back(elapsed_time);
                 }
                 V2Str(other_time, str);
-                printf("\t\tOther time: %s\n", str.c_str());
+                printf("%d\t %d\t Other time\t %s\n", i, gpu, str.c_str());
                 V2Str(iter_total_time, str);
-                printf("\t\tIteration time: %s\n", str.c_str());
+                printf("%d\t %d\t Iteration time\t %s\n", i, gpu, str.c_str());
             }
 
             for (int peer = 0; peer < num_gpus; peer++)
@@ -209,11 +210,13 @@ void Display_Performance_Profiling(
                 if (iter_out_length.size() != 0)
                 {
                     V2Str(iter_out_length, str);
-                    printf("\t\tOut length %d: %s\n", peer, str.c_str());
+                    printf("%d\t %d\t Out length %d\t %s\n", i, gpu, peer, str.c_str());
                 }
             }
         }
+        printf("\n");
     }
+    printf("Performance profiling log ended\n");
 #endif
 }
 

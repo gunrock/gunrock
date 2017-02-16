@@ -41,6 +41,8 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/page_rank.hpp>
 
+#include <gunrock/tests/shared_utils.cuh>
+
 using namespace gunrock;
 using namespace gunrock::app;
 using namespace gunrock::util;
@@ -555,19 +557,19 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     if (compensate)
-    {   
+    {
         util::Array1D<SizeT, VertexId> zero_out_vertices;
-            
+
         zero_out_vertices.Allocate(graph -> nodes, util::HOST);
         SizeT counter = 0;
         for (VertexId v = 0; v< graph->nodes; v++)
         if (graph -> row_offsets[v+1] == graph -> row_offsets[v])
-        {   
+        {
             zero_out_vertices[counter] = v;
-            counter ++; 
-        }   
+            counter ++;
+        }
         if (counter != 0)
-        {   
+        {
             if (!quiet_mode) printf("Adding 1 vertex and %lld edges to compensate 0 degree vertices\n",
                 (long long)counter + (long long)graph -> nodes);
             util::Array1D<SizeT, VertexId> new_column_indices;
@@ -605,7 +607,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 sizeof(SizeT) * ((long long)graph -> nodes + 2));
             graph -> edges = edge_counter;
             graph -> nodes +=1;
-        }   
+        }
     }
 
     // Allocate host-side array (for both reference and GPU-computed results)
@@ -614,7 +616,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     VertexId     *h_node_id          = new VertexId[graph->nodes];
     VertexId     *ref_node_id        = new VertexId[graph->nodes];
     //Value        *ref_check          = (quick_mode) ? NULL : ref_rank;
- 
+
     Problem *problem = new Problem(scaled);  // allocate problem on GPU
     if (retval = util::GRError(problem->Init(
         stream_from_host,
@@ -805,7 +807,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 error_count ++;
                 continue;
             }
-    
+
             ref_total_rank += ref_rank[i];
             Value diff = fabs(ref_rank[i] - unorder_rank[v]);
             if ((ref_rank[i] > 1e-12 && diff > error * ref_rank[i]) ||
@@ -891,7 +893,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     info->ComputeCommonStats(  // compute running statistics
         enactor->enactor_stats.GetPointer(), total_elapsed, (VertexId*)NULL, true);
 
-    if (!quiet_mode)
+    /*if (!quiet_mode)
     {
         printf("\n\tMemory Usage(B)\t");
         for (int gpu = 0; gpu < num_gpus; gpu++)
@@ -930,6 +932,14 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
         if (num_gpus > 1) printf("\t in_sizing =\t %lf", max_in_sizing_);
         printf("\n");
+    }*/
+
+    if (!quiet_mode)
+    {
+        Display_Memory_Usage(num_gpus, gpu_idx, org_size, problem);
+#ifdef ENABLE_PERFORMANCE_PROFILING
+        Display_Performance_Profiling(enactor);
+#endif
     }
 
     // Clean up
@@ -950,6 +960,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     }
     if (ref_rank   ) { delete[] ref_rank   ; ref_rank    = NULL; }
     if (ref_node_id) { delete[] ref_node_id; ref_node_id = NULL; }
+    if (gpu_idx    ) { delete[] gpu_idx    ; gpu_idx     = NULL; }
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
 
@@ -1045,7 +1056,7 @@ int main_(CommandLineArgs *args)
     }
 
     info->CollectInfo();  // collected all the info and put into JSON mObject
-
+    if (info) {delete info; info=NULL;}
     return retval;
 }
 

@@ -318,14 +318,14 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     bool        size_check          = info->info["size_check"       ].get_bool ();
     int         iterations          = info->info["num_iteration"    ].get_int  ();
     int         delta_factor        = info->info["delta_factor"     ].get_int  ();
-    std::string src_type            = info->info["source_type"      ].get_str  (); 
+    std::string src_type            = info->info["source_type"      ].get_str  ();
     int      src_seed               = info->info["source_seed"      ].get_int  ();
-    int      communicate_latency    = info->info["communicate_latency"].get_int (); 
+    int      communicate_latency    = info->info["communicate_latency"].get_int ();
     float    communicate_multipy    = info->info["communicate_multipy"].get_real();
-    int      expand_latency         = info->info["expand_latency"    ].get_int (); 
-    int      subqueue_latency       = info->info["subqueue_latency"  ].get_int (); 
-    int      fullqueue_latency      = info->info["fullqueue_latency" ].get_int (); 
-    int      makeout_latency        = info->info["makeout_latency"   ].get_int (); 
+    int      expand_latency         = info->info["expand_latency"    ].get_int ();
+    int      subqueue_latency       = info->info["subqueue_latency"  ].get_int ();
+    int      fullqueue_latency      = info->info["fullqueue_latency" ].get_int ();
+    int      makeout_latency        = info->info["makeout_latency"   ].get_int ();
     if (max_queue_sizing < 1.2) max_queue_sizing=1.2;
     if (max_in_sizing < 0) max_in_sizing = 1.0;
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
@@ -548,7 +548,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             }
         }
 
-        printf("\n\tMemory Usage(B)\t");
+        /*printf("\n\tMemory Usage(B)\t");
         for (int gpu = 0; gpu < num_gpus; gpu++)
             if (num_gpus > 1) {if (gpu != 0) printf(" #keys%d,0\t #keys%d,1\t #ins%d,0\t #ins%d,1", gpu, gpu, gpu, gpu); else printf(" #keys%d,0\t #keys%d,1", gpu, gpu);}
             else printf(" #keys%d,0\t #keys%d,1", gpu, gpu);
@@ -585,6 +585,15 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         printf("\t queue_sizing =\t %lf \t %lf", max_queue_sizing_[0], max_queue_sizing_[1]);
         if (num_gpus > 1) printf("\t in_sizing =\t %lf", max_in_sizing_);
         printf("\n");
+        */
+    }
+
+    if (!quiet_mode)
+    {
+        Display_Memory_Usage(num_gpus, gpu_idx, org_size, problem);
+#ifdef ENABLE_PERFORMANCE_PROFILING
+        Display_Performance_Profiling(enactor);
+#endif
     }
 
     // Clean up
@@ -607,6 +616,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     if (h_labels        ) {delete[] h_labels        ; h_labels         = NULL;}
     if (reference_preds ) {delete[] reference_preds ; reference_preds  = NULL;}
     if (h_preds         ) {delete[] h_preds         ; h_preds          = NULL;}
+    if (gpu_idx         ) {delete[] gpu_idx         ; gpu_idx          = NULL;}
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
     return retval;
@@ -660,7 +670,7 @@ int main_(CommandLineArgs *args)
 
     cpu_timer2.Start();
     info->Init("SSSP", *args, csr);  // initialize Info structure
-    
+
     // force edge values to be 1, don't enable this unless you really want to
     //for (SizeT e=0; e < csr.edges; e++)
     //    csr.edge_values[e] = 1;
@@ -677,6 +687,7 @@ int main_(CommandLineArgs *args)
     }
 
     info->CollectInfo();  // collected all the info and put into JSON mObject
+    if (info) {delete info; info=NULL;}
     return retval;
 }
 
