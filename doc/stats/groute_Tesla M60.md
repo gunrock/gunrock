@@ -1,25 +1,8 @@
+# Tesla M60
+\htmlonly
 
-<!DOCTYPE html>
-<head>
-  <title>Vega-Lite Chart</title>
-  <meta charset="utf-8">
-
-  <script src="https://d3js.org/d3.v3.min.js"></script>
-  <script src="https://vega.github.io/vega/vega.js"></script>
-  <script src="https://vega.github.io/vega-lite/vega-lite.js"></script>
-  <script src="https://vega.github.io/vega-editor/vendor/vega-embed.js" charset="utf-8"></script>
-
-  <style media="screen">
-    /* Add space between vega-embed links  */
-    .vega-actions a {
-      margin-right: 5px;
-    }
-  </style>
-</head>
-<body>
-  <!-- Container for the visualization -->
-  <div id="vis"></div>
-
+  <!-- Container for the visualization  -->
+  <div id="vis_"></div>
   <script>
   var vlSpec = {
     "mark": "point", 
@@ -11145,17 +11128,17 @@
         }
     }
 }
-
   var embedSpec = {
     mode: "vega-lite",  // Instruct Vega-Embed to use the Vega-Lite compiler
     spec: vlSpec
   };
-
-  // Embed the visualization in the container with id `vis`
-  vg.embed("#vis", embedSpec, function(error, result) {
+  // Embed the visualization in the container with id `vis_`
+  vg.embed("#vis_", embedSpec, function(error, result) {
     // Callback receiving the View instance and parsed Vega spec
-    // result.view is the View, which resides under the '#vis' element
+    // result.view is the View, which resides under the
+    // '#vis_' element
   });
   </script>
-</body>
-</html>
+
+\endhtmlonly
+
