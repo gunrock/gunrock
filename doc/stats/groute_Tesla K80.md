@@ -1,37 +1,8 @@
-# Groute
-
-We noted with interest the PPoPP 2017 paper _Groute: An Asynchronous Multi-GPU Programming Model for Irregular Computations_ by Tal Ben-Nun, Michael Sutton, Sreepathi Pai, and Keshav Pingali ([DOI](http://dx.doi.org/10.1145/3018743.3018756)). This is really nice work, and we particularly admire their use of asynchronous execution. We expect (and show in the results below) that for high-diameter networks like road networks (e.g., `europe_osm`, `road_usa`), their approach is particularly beneficial. Gunrock's design is more targeted towards scale-free graphs (e.g., `kron_g500`, `soc-LiveJournal1`, `twitter-mpi`). In general, Groute generally performs better than Gunrock on high-diameter, road-network-ish graphs, and also has an excellent connected-components implementation.
-
-In their paper, the Groute authors compared against Gunrock 0.3.1, which was current at the time of paper submission (but had been updated to 0.4 by the time of camera-ready submission). We thus ran the Groute artifact ([link](https://github.com/groute/ppopp17-artifact)) locally to compare against current Gunrock results. The graphed results below are against Gunrock 0.4.
-
-In their paper, the Groute authors noted issues with Gunrock's accuracy on PageRank on multiple GPUs ("the evaluated version of Gunrock's multi-GPU PageRank produced incorrect results"). The Groute authors raised this issue on 17 September 2016 in a [github issue](https://github.com/gunrock/gunrock/issues/191), to which we responded on 3 October 2016. We noted in our response at that time that the issue is not an error but instead not using the proper command-line options for the desired comparison.
-
-We made the following notes when reproducing the results from the Groute paper using the same Gunrock version as in that paper (0.3.1), but on our server equipped with Tesla K40c GPUs (not Tesla M60s, as in the paper). The primary discrepancy is that the Groute comparisons in the paper do not incorporate Gunrock's optimizations, such as direction-optimal BFS traversal.
-
-- We could not verify the Table 3 results for BFS + soc-LiveJournal1 + Gunrock v0.3.1 (on our Nov 9, 2015 v0.3.1 release). The table reports a 99.11 ms runtime. With 2 GPUs (`--device=0,1`), we measured 40.31 ms; with `--device=0,1 --src=randomize2 --iteration-num=32 --idempotence`, we measured 29.48 ms. (We note Gunrock 0.4 has similar performance.) When we enable Gunrock's direction-optimized BFS (`--direction-optimized`), on v0.3.1, we measure ~15 ms. We don't believe that running on a M60 GPU vs. the K40c GPU would give such a large discrepancy.
-
-- We could not verify the Table 3 results for BFS + kron21.sym (the kron-g500-n21 dataset from the 10th DIMACS Implementation Challenge). On Gunrock 0.3.1 with `--dev=0,1,2`, we measured 72.80 ms on 3x K40c; Table 3 reports 156.68 ms.  With `--device=0,1,2 --idempotence --src=randomize2 --iteration-num=32`, we measure 17.94 ms. When we enable DOBFS, we measure 3.86 ms. Again we don't believe that running on a M60 GPU vs. the K40c GPU would give such a large discrepancy.
-
-- We believe that properly setting command-line parameters will allow several data sets to run to completion (for both Gunrock and for B40C) where the Groute paper instead reported errors or were un-runnable.
-    - For example, `-src=randomize` lets B40C run the kron21 dataset properly; without a randomized source, B40C (unsuccessfully) tries to find a source that reaches more than 5 edges. Here, `-src=randomize` results in a timing of 5.49 ms, and `--src=randomize --num-gpus=4 --undirected -i=32` gives 17.49 ms for the average runtime.
-    - For Gunrock + twitter, `-queue-sizing=0.1 -device=0,1,2,3` allows a successful run (735.13 ms); `market /data/gunrock_dataset/huge/twitter-mpi/twitter-mpi.mtx --device=0,1,2,3 --queue-sizing=0.1 --idempotence --src=randomize2 -iteration-num=32` measures 342.21 ms.
-    - For Gunrock + connected components, we found Gunrock ran properly on kron21 even on a single GPU with no command-line parameters, and should be able to run on more GPUs as well (we successfully tested up to 4xK40c).
-
-We note that Groute's circular work list overflowed on Tesla K40c for some PageRank runs with the twitter and kron datasets (`circular worklist has overflowed, please allocate more memory`). We haven't yet worked out the right command-line switch to allocate more memory for this case, although we're sure this is a simple fix.
-
-The following plot has multiple GPUs on one plot. We have broken them out by GPU on individual pages here:
-[ [Tesla P100](md_stats_groute__tesla__p100-_p_c_i_e-16_g_b.html)
-| [Tesla K40c](md_stats_groute__tesla__k40c.html)
-| [Tesla K40m](md_stats_groute__tesla__k40m.html)
-| [Tesla K80](md_stats_groute__tesla__k80.html)
-| [Tesla M60](md_stats_groute__tesla__m60.html)
-]
-
-
+# Tesla K80
 \htmlonly
 
-  <!-- Container for the visualization groute -->
-  <div id="vis_groute"></div>
+  <!-- Container for the visualization  -->
+  <div id="vis_"></div>
   <script>
   var vlSpec = {
     "mark": "point", 
@@ -11105,12 +11076,15 @@ The following plot has multiple GPUs on one plot. We have broken them out by GPU
             }
         ]
     }, 
+    "transform": {
+        "filter": "datum['gpuinfo.name'] == \"Tesla K80\""
+    }, 
     "encoding": {
         "color": {
-            "field": "[gpuinfo.name]", 
+            "field": "engine", 
             "type": "nominal", 
             "legend": {
-                "title": "GPU"
+                "title": "Engine"
             }
         }, 
         "column": {
@@ -11158,15 +11132,13 @@ The following plot has multiple GPUs on one plot. We have broken them out by GPU
     mode: "vega-lite",  // Instruct Vega-Embed to use the Vega-Lite compiler
     spec: vlSpec
   };
-  // Embed the visualization in the container with id `vis_groute`
-  vg.embed("#vis_groute", embedSpec, function(error, result) {
+  // Embed the visualization in the container with id `vis_`
+  vg.embed("#vis_", embedSpec, function(error, result) {
     // Callback receiving the View instance and parsed Vega spec
     // result.view is the View, which resides under the
-    // '#vis_groute' element
+    // '#vis_' element
   });
   </script>
 
 \endhtmlonly
 
-
-[Source data](md_stats_groute_table_html.html), with links to the output JSON for each run<br/>
