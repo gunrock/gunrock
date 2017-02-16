@@ -150,7 +150,7 @@ public:
     {
         char * market_filename;
         size_t graph_args = argc - pairs.size() - 1;
-        market_filename =  (graph_args == 2) ? argv[2] : NULL; 
+        market_filename =  (graph_args == 2) ? argv[2] : NULL;
         return market_filename;
     }
 
@@ -295,12 +295,24 @@ struct CpuTimer
         QueryPerformanceCounter(&ll_stop);
     }
 
-    float ElapsedMillis()
+    double TimeDifference(LARGE_INTEGER &a, LARGE_INTEGER &b)
     {
-        double start = double(ll_start.QuadPart) / double(ll_freq.QuadPart);
-        double stop  = double(ll_stop.QuadPart) / double(ll_freq.QuadPart);
+        double start = double(a.QuadPart) / double(ll_freq.QuadPart);
+        double stop  = double(b.QuadPart) / double(ll_freq.QuadPart);
 
         return (stop - start) * 1000;
+    }
+
+    double ElapsedMillis()
+    {
+        return TimeDifference(ll_start, ll_stop);
+    }
+
+    double MillisSinceStart()
+    {
+        LARGE_INTEGER ll_current;
+        QueryPerformanceCounter(&ll_current);
+        return TimeDifference(ll_start, ll_current);
     }
 
 #elif defined(CLOCK_PROCESS_CPUTIME_ID)
@@ -308,25 +320,38 @@ struct CpuTimer
     double start;
     double stop;
 
-    void Start()
+    double GetCurrentTime()
     {
         static struct timeval tv;
         static struct timezone tz;
         gettimeofday(&tv, &tz);
-        start = tv.tv_sec + 1.e-6 * tv.tv_usec;
+        return tv.tv_sec + 1.e-6 * tv.tv_usec;
     }
 
-    void Stop() 
+    void Start()
     {
-        static struct timeval tv;
-        static struct timezone tz;
-        gettimeofday(&tv, &tz);
-        stop = tv.tv_sec + 1.e-6 * tv.tv_usec;
+        start = GetCurrentTime();
+    }
+
+    void Stop()
+    {
+        stop = GetCurrentTime();
+    }
+
+    double TimeDifference(double &a, double &b)
+    {
+        return 1000 * (b - a);
     }
 
     double ElapsedMillis()
     {
-        return 1000 * (stop - start);
+        return TimeDifference(start, stop);
+    }
+
+    double MillisSinceStart()
+    {
+        double current = GetCurrentTime();
+        return TimeDifference(start, current);
     }
 
 #else
@@ -343,7 +368,12 @@ struct CpuTimer
         cpu_t.stop();
     }
 
-    float ElapsedMillis()
+    double ElapsedMillis()
+    {
+        return cpu_t.elapsed().wall / 1000000.0;
+    }
+
+    double MillisSinceStart()
     {
         return cpu_t.elapsed().wall / 1000000.0;
     }
