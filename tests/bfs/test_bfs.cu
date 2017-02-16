@@ -708,7 +708,6 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     }
 
     // Clean up
-    if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
     if (enactor         )
     {
         if (retval = util::GRError(enactor -> Release(),
@@ -726,6 +725,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     if (reference_labels) {delete[] reference_labels; reference_labels = NULL;}
     if (reference_preds ) {delete[] reference_preds ; reference_preds  = NULL;}
     if (h_labels        ) {delete[] h_labels        ; h_labels         = NULL;}
+    if (gpu_idx         ) {delete[] gpu_idx         ; gpu_idx          = NULL;}
+    if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
 
@@ -850,6 +851,7 @@ int main_(CommandLineArgs *args)
     }
 
     info->CollectInfo();  // collected all the info and put into JSON mObject
+    if (info) {delete info; info=NULL;}
     return retval;
 }
 
