@@ -20,10 +20,10 @@ We made the following notes when reproducing the results from the Groute paper u
 We note that Groute's circular work list overflowed on Tesla K40c for some PageRank runs with the twitter and kron datasets (`circular worklist has overflowed, please allocate more memory`). We haven't yet worked out the right command-line switch to allocate more memory for this case, although we're sure this is a simple fix.
 
 The following plot has multiple GPUs on one plot. We have broken them out by GPU on individual pages here:
-[ [Tesla P100](md_stats_groute_Tesla%20P100-PCIE-16GB.html)
-| [Tesla K40c](md_stats_groute_Tesla%20K40c.html)
-| [Tesla K40m](md_stats_groute_Tesla%20K40m.html)
-| [Tesla M60](md_stats_groute_Tesla%20M60.html)
+[ [Tesla P100](groute__tesla__p100-_p_c_i_e-16_g_b.html)
+| [Tesla K40c](md_stats_groute__tesla__k40c.html)
+| [Tesla K40m](md_stats_groute__tesla__k40m.html)
+| [Tesla M60](md_stats_groute__tesla__m60.html)
 ]
 
 
