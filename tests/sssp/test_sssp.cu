@@ -43,6 +43,8 @@
 #include <boost/graph/dijkstra_shortest_paths.hpp>
 #include <boost/property_map/property_map.hpp>
 
+#include <gunrock/tests/shared_utils.cuh>
+
 using namespace gunrock;
 using namespace gunrock::app;
 using namespace gunrock::util;
