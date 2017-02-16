@@ -1,7 +1,7 @@
 
 # Speedup for different partition methods
 
-We test three primitives (BFS, DOBFS, PageRank) on three different datasets with three different partitioners. Random partitioning captures no locality but has excellent load balance. Biased-random is like random but biases its choice toward a GPU that contains more of its neighbors. [Metis](http://glaros.dtc.umn.edu/gkhome/metis/metis/overview) is the classic offline partitioner
+We test three primitives (BFS, DOBFS, PageRank) on three different datasets with three different partitioners. Random partitioning captures no locality but has excellent load balance. Biased-random is like random but biases its choice toward a GPU that contains more of its neighbors. [Metis](http://glaros.dtc.umn.edu/gkhome/metis/metis/overview) is the classic offline partitioner.
 
 Unfortunately, scale-free graphs are very difficult to partition under any circumstances. As well, Metis and many other offline partitioners optimize for cutting the fewest edges across partitions. The ideal Gunrock partitioner, on the other hand, should instead optimize for minimizing the number of vertices on the border of a partition. We believe this is an interesting research problem for the partitioning community.
 
