@@ -11,6 +11,7 @@ var searchData=
   ['source_20data_20for_20do_5fab_5frandom_5fsoc_2dorkut',['Source data for do_ab_random_soc-orkut',['../md_stats_do_ab_random_soc-orkut_table_html.html',1,'']]],
   ['source_20data_20for_20engines_5ftopc',['Source data for engines_topc',['../md_stats_engines_topc_table_html.html',1,'']]],
   ['source_20data_20for_20frontier',['Source data for frontier',['../md_stats_frontier_table_html.html',1,'']]],
+  ['source_20data_20for_20groute',['Source data for groute',['../md_stats_groute_table_html.html',1,'']]],
   ['source_20data_20for_20gunrock_5fgpus',['Source data for gunrock_gpus',['../md_stats_gunrock_gpus_table_html.html',1,'']]],
   ['speedup_20for_20different_20partition_20methods',['Speedup for different partition methods',['../md_stats_mgpu_partition.html',1,'']]],
   ['source_20data_20for_20mgpu_5fpartition',['Source data for mgpu_partition',['../md_stats_mgpu_partition_table_html.html',1,'']]],

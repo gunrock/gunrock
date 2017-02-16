@@ -34,6 +34,7 @@ var searchData=
   ['gunrock_5fsssp',['gunrock_sssp',['../gunrock_8h.html#afa81e9b965282817dd5bab1532e33c52',1,'gunrock.h']]],
   ['gunrock',['Gunrock',['../index.html',1,'']]],
   ['ld',['ld',['../namespacegunrock_1_1util_1_1io_1_1ld.html',1,'gunrock::util::io']]],
+  ['groute',['Groute',['../md_stats_groute.html',1,'']]],
   ['gunrock_20v0_2e4_20release_20notes',['Gunrock v0.4 Release Notes',['../release_notes.html',1,'']]],
   ['st',['st',['../namespacegunrock_1_1util_1_1io_1_1st.html',1,'gunrock::util::io']]]
 ];

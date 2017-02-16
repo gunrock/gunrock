@@ -13,6 +13,7 @@ var searchData=
   ['serial_5fscan_2ecuh',['serial_scan.cuh',['../serial__scan_8cuh.html',1,'']]],
   ['serial_5fsoa_5freduce_2ecuh',['serial_soa_reduce.cuh',['../serial__soa__reduce_8cuh.html',1,'']]],
   ['serial_5fsoa_5fscan_2ecuh',['serial_soa_scan.cuh',['../serial__soa__scan_8cuh.html',1,'']]],
+  ['shared_5futils_2ecuh',['shared_utils.cuh',['../shared__utils_8cuh.html',1,'']]],
   ['sharedmem_2ecuh',['sharedmem.cuh',['../sharedmem_8cuh.html',1,'']]],
   ['small_5fworld_2ecuh',['small_world.cuh',['../small__world_8cuh.html',1,'']]],
   ['soa_5ftuple_2ecuh',['soa_tuple.cuh',['../soa__tuple_8cuh.html',1,'']]],
