@@ -22,7 +22,7 @@ mkdir -p eval/$SUFFIX
 
 for i in delaunay_n10
 do
-    echo $exe_file market ../../dataset/small/tri_sm.mtx ../../dataset/small/tri_sm.label /data/gunrock_dataset/large/$i/$i.mtx /data/leyuan/labels/$i.label
-    $exe_file market ../../dataset/large/$i/$i.mtx > eval/$SUFFIX/$i.$SUFFIX.txt
+    echo $exe_file market ../../dataset/small/tri_sm.mtx ../../dataset/small/tri_sm.label /data/gunrock_dataset/large/$i/$i.mtx /data/leyuan/labels/$i.label "> ./eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARKS}.txt"
+         $exe_file market ../../dataset/small/tri_sm.mtx ../../dataset/small/tri_sm.label /data/gunrock_dataset/large/$i/$i.mtx /data/leyuan/labels/$i.label > ./eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARKS}.txt
     sleep 1
 done

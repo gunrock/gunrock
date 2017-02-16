@@ -17,10 +17,10 @@ namespace util {
 
 
 
-template<typename SizeT, typename T>
+template<typename Value, typename SizeT>
 __global__ void Update(
-    	  T*              indices,
-	  SizeT*          pos,
+    	  Value*          indices,
+	  Value*          pos,
     const SizeT           edges_data)
 {
     const SizeT STRIDE = gridDim.x * blockDim.x;
@@ -116,22 +116,19 @@ __global__ void debug(
  * @param[out]tos_out   output edge list destination node id
  */
 template <
-    typename VertexId, typename SizeT, typename Value, typename T>
+    typename VertexId, typename SizeT, typename Value>
 __global__ void Join(
     const SizeT                 edges_data,
     const SizeT                 edges_query,
-    const SizeT*    const       pos,// store the start positions for each query edge's candidates
-          SizeT*        	counts,// store the number of matches
+    const Value*    const       pos,// store the start positions for each query edge's candidates
+          unsigned long long*  	counts,// store the number of matches
     const VertexId* const	intersect,
     const Value*    const       froms,
     const VertexId* const       tos,
-    const T*        const       edges,
+    const Value*    const       edges,
     	  VertexId*             output)  // store candidate edges in query edge order
 {
     unsigned long long size = pos[0];
-
-//printf("pos[0]:%d, pos[1]-pos[0]:%d, pos[2]-pos[1]:%d\n", pos[0], pos[1]-pos[0], pos[2]-pos[1]);
-
     for(int i=0; i<edges_query-1; i++)
         size *= (pos[i+1] - pos[i]);
     const SizeT STRIDE = gridDim.x * blockDim.x;
@@ -140,7 +137,6 @@ __global__ void Join(
     SizeT offset;
     SizeT edge;
     unsigned long long x = blockIdx.x * blockDim.x + threadIdx.x;
-if(x==0) printf("===size=%lld===\n",size);
     while (x < size)
     {
 	unsigned long long id = x;
@@ -151,18 +147,17 @@ if(x==0) printf("===size=%lld===\n",size);
 	    edge_id[iter] = edges[edge_id[iter]];
 	}
 	edge_id[iter] = edges[id];
-//printf("edge_id[0]:%lld, edge_id[1]:%lld, edge_id[2]:%lld\n", edge_id[0], edge_id[1], edge_id[2]);
+	#pragma unroll
 	for(iter=0; iter < edges_query-1; iter++)
 	{
 	   offset = iter*(iter+1)/2;
-	   
+	   #pragma unroll 
 	   for(edge = 0; edge < iter+1; edge++)
 	   {
 	    if(edge_id[iter+1]==edge_id[edge]) break; //two edges in one combination have the same id
 
 	    VertexId c = intersect[(offset+edge)*2];
 	    VertexId d = intersect[(offset+edge)*2+1];
-//printf("iter:%d, edge:%d, iter+1:%d, c:%d, d:%d, edge_id[%d]:%d, edge_id[%d]:%d\n", iter,edge,iter+1, c, d, edge, edge_id[edge], iter+1, edge_id[iter+1]);
   	    if(c!=0)  
  	    {
 	        if(c%2==1){
@@ -305,7 +300,7 @@ __global__ void Label(
     const VertexId* const      froms_query,
     const VertexId* const      tos_query,
     const VertexId* const      d_c_set,
-          VertexId*            label,
+          Value* 	       label,
     const VertexId* const      d_query_row,
     const SizeT                edges_data,
     const SizeT                edges_query)
