@@ -22,6 +22,8 @@ using namespace mgpu;
 #define STR(x) #x
 #define XSTR(x) STR(x)
 
+//#define ENABLE_PERFORMANCE_PROFILING
+
 namespace gunrock {
 namespace app {
 
@@ -53,11 +55,6 @@ struct EnactorStats
     unsigned long long               total_runtimes      ;
     util::Array1D<int, SizeT>        edges_queued        ;
     util::Array1D<int, SizeT>        nodes_queued        ;
-    std::vector<float>         per_iteration_advance_time;
-    std::vector<float>         per_iteration_advance_mteps;
-    std::vector<int>         per_iteration_advance_input_edges;
-    std::vector<int>         per_iteration_advance_output_edges;
-    std::vector<bool>         per_iteration_advance_direction;
     unsigned int                     advance_grid_size   ;
     unsigned int                     filter_grid_size    ;
     util::KernelRuntimeStatsLifetime advance_kernel_stats;
@@ -66,6 +63,13 @@ struct EnactorStats
     util::Array1D<int, SizeT>        node_locks_out      ;
     cudaError_t                      retval              ;
     clock_t                          start_time          ;
+
+#ifdef ENABLE_PERFORMANCE_PROFILING
+    std::vector<std::vector<SizeT> >  iter_edges_queued   ;
+    std::vector<std::vector<SizeT> >  iter_nodes_queued   ;
+    std::vector<std::vector<SizeT> >  iter_in_length      ;
+    std::vector<std::vector<SizeT> >  iter_out_length     ;
+#endif
 
     /*
      * @brief Default EnactorStats constructor
@@ -113,9 +117,6 @@ struct EnactorStats
     }
 
     cudaError_t Init(
-        //int max_grid_size,
-        //int advance_occupancy,
-        //int filter_occupancy,
         int node_lock_size = 1024)
    {
         cudaError_t retval = cudaSuccess;
@@ -131,6 +132,13 @@ struct EnactorStats
               .Allocate(1, util::DEVICE | util::HOST)) return retval;
         if (retval = edges_queued
               .Allocate(1, util::DEVICE | util::HOST)) return retval;
+
+#ifdef ENABLE_PERFORMANCE_PROFILING
+        iter_edges_queued.clear();
+        iter_nodes_queued.clear();
+        iter_in_length   .clear();
+        iter_out_length  .clear();
+#endif
         return retval;
     }
 
@@ -146,6 +154,12 @@ struct EnactorStats
         nodes_queued.Move(util::HOST, util::DEVICE);
         edges_queued.Move(util::HOST, util::DEVICE);
 
+#ifdef ENABLE_PERFORMANCE_PROFILING
+        iter_edges_queued.push_back(std::vector<SizeT>());
+        iter_nodes_queued.push_back(std::vector<SizeT>());
+        iter_in_length   .push_back(std::vector<SizeT>());
+        iter_out_length  .push_back(std::vector<SizeT>());
+#endif
         return retval;
     }
 
@@ -156,6 +170,25 @@ struct EnactorStats
         if (retval = node_locks_out.Release()) return retval;
         if (retval = edges_queued  .Release()) return retval;
         if (retval = nodes_queued  .Release()) return retval;
+
+#ifdef ENABLE_PERFORMANCE_PROFILING
+        for (auto it = iter_edges_queued.begin();
+            it != iter_edges_queued.end(); it++)
+            it -> clear();
+        for (auto it = iter_nodes_queued.begin();
+            it != iter_nodes_queued.end(); it++)
+            it -> clear();
+        for (auto it = iter_in_length.begin();
+            it  != iter_in_length.end(); it++)
+            it -> clear();
+        for (auto it = iter_out_length.begin();
+            it != iter_out_length.end(); it++)
+            it -> clear();
+        iter_edges_queued.clear();
+        iter_nodes_queued.clear();
+        iter_in_length   .clear();
+        iter_out_length  .clear();
+#endif
         return retval;
     }
 };

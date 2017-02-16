@@ -42,6 +42,8 @@
 #include <boost/graph/bc_clustering.hpp>
 #include <boost/graph/iteration_macros.hpp>
 
+#include <gunrock/tests/shared_utils.cuh>
+
 using namespace gunrock;
 using namespace gunrock::app;
 using namespace gunrock::util;
@@ -122,11 +124,11 @@ void Usage()
  * @param[in] quiet
  */
 template <
-    typename SizeT, 
+    typename SizeT,
     typename Value>
 void DisplaySolution(
-    Value *sigmas, 
-    Value *bc_values, 
+    Value *sigmas,
+    Value *bc_values,
     SizeT nodes,
     bool  quiet = false)
 {
@@ -417,9 +419,9 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     int      partition_seed         = info->info["partition_seed"    ].get_int();
     bool     quick_mode             = info->info["quick_mode"        ].get_bool();
     bool     stream_from_host       = info->info["stream_from_host"  ].get_bool();
-    bool     instrument             = info->info["instrument"        ].get_bool (); 
-    bool     debug                  = info->info["debug_mode"        ].get_bool (); 
-    bool     size_check             = info->info["size_check"        ].get_bool (); 
+    bool     instrument             = info->info["instrument"        ].get_bool ();
+    bool     debug                  = info->info["debug_mode"        ].get_bool ();
+    bool     size_check             = info->info["size_check"        ].get_bool ();
     int      iterations             = info->info["num_iteration"     ].get_int();
     std::string src_type            = info->info["source_type"       ].get_str  ();
     int      src_seed               = info->info["source_seed"       ].get_int  ();
@@ -433,12 +435,12 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     std::string traversal_mode      = info->info["traversal_mode"    ].get_str ();
     if (traversal_mode == "TWC") traversal_mode = "LB";
     if (max_queue_sizing < 0) max_queue_sizing = 1.2;
-    if (max_in_sizing < 0) max_in_sizing = 1.1; 
+    if (max_in_sizing < 0) max_in_sizing = 1.1;
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
 
     CpuTimer cpu_timer;
     cudaError_t retval = cudaSuccess;
-    
+
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
@@ -506,7 +508,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         subqueue_latency,
         fullqueue_latency,
         makeout_latency)) return retval;
-    
+
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
@@ -553,7 +555,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         {
             start_src = src;
             end_src = src + 1;
-        } 
+        }
 
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
@@ -581,7 +583,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 "BC Problem Data Reset Failed", __FILE__, __LINE__))
                 return retval;
             if (retval = util::GRError(enactor ->Reset(),
-                "BC Enactor Reset failed", __FILE__, __LINE__)) 
+                "BC Enactor Reset failed", __FILE__, __LINE__))
                 return retval;
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
@@ -614,7 +616,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         {
             printf("--------------------------\n"
                 "iteration %d elapsed: %lf ms, src = %lld\n",
-                iter, single_elapsed, (long long)src); 
+                iter, single_elapsed, (long long)src);
             fflush(stdout);
         }
     }
@@ -712,7 +714,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     info->ComputeTraversalStats(  // compute running statistics
         enactor->enactor_stats.GetPointer(), total_elapsed, h_labels);
 
-    if (!quiet_mode)
+    /*if (!quiet_mode)
     {
         printf("\n\tMemory Usage(B)\t");
         for (int gpu = 0; gpu < num_gpus; gpu++)
@@ -752,6 +754,15 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         if (num_gpus > 1) printf("\t in_sizing =\t %lf", max_in_sizing_);
         printf("\n");
     }
+    */
+
+    if (!quiet_mode)
+    {
+        Display_Memory_Usage(num_gpus, gpu_idx, org_size, problem);
+#ifdef ENABLE_PERFORMANCE_PROFILING
+        Display_Performance_Profiling(enactor);
+#endif
+    }
 
     // Cleanup
     if (org_size            ) {delete[] org_size            ; org_size             = NULL;}
@@ -763,6 +774,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     if (h_sigmas            ) {delete[] h_sigmas            ; h_sigmas             = NULL;}
     if (h_bc_values         ) {delete[] h_bc_values         ; h_bc_values          = NULL;}
     if (h_labels            ) {delete[] h_labels            ; h_labels             = NULL;}
+    if (gpu_idx             ) {delete[] gpu_idx             ; gpu_idx              = NULL;}
     cpu_timer.Stop();
     info -> info["postprocess_time"] = cpu_timer.ElapsedMillis();
     return retval;
@@ -792,7 +804,7 @@ int main_(CommandLineArgs* args)
     info -> info["load_time"] = cpu_timer2.ElapsedMillis();
 
     RunTests<VertexId, SizeT, Value>(info);  // run test
-    
+
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
 
@@ -802,6 +814,7 @@ int main_(CommandLineArgs* args)
     }
 
     info->CollectInfo();  // collected all the info and put into JSON mObject
+    if (info) {delete info; info=NULL;}
     return 0;
 }
 
@@ -813,7 +826,7 @@ int main_Value(CommandLineArgs *args)
 // disabled to reduce compile time
 //    if (args -> CheckCmdLineFlag("64bit-Value"))
 //        return main_<VertexId, SizeT, double>(args);
-//    else 
+//    else
         return main_<VertexId, SizeT, float >(args);
 }
 
@@ -833,7 +846,7 @@ int main_VertexId(CommandLineArgs *args)
 // disabled, because of filter smem size issue
     //if (args -> CheckCmdLineFlag("64bit-VertexId"))
     //    return main_SizeT<long long>(args);
-    //else 
+    //else
         return main_SizeT<int      >(args);
 }
 

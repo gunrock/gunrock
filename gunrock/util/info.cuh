@@ -162,6 +162,18 @@ public:
         // info["userinfo"]
     }  // end Info()
 
+    ~Info()
+    {
+        Release();
+    }
+
+    cudaError_t Release()
+    {
+        if (streams) {delete[] streams; streams=NULL;}
+        if (context) {delete[] (mgpu::ContextPtr*)context; context = NULL;}
+        return cudaSuccess;
+    }
+
     /**
      * @brief Initialization process for Info.
      *
