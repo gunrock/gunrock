@@ -33,7 +33,7 @@
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
 
-#include <gunrock/tests/shared_utils.cuh>
+#include <gunrock/util/shared_utils.cuh>
 
 #include <moderngpu.cuh>
 

@@ -42,7 +42,7 @@
 #include <boost/graph/bc_clustering.hpp>
 #include <boost/graph/iteration_macros.hpp>
 
-#include <gunrock/tests/shared_utils.cuh>
+#include <gunrock/util/shared_utils.cuh>
 
 using namespace gunrock;
 using namespace gunrock::app;

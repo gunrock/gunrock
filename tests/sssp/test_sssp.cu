@@ -34,6 +34,8 @@
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/priority_queue/kernel.cuh>
 
+#include <gunrock/util/shared_utils.cuh>
+
 #include <moderngpu.cuh>
 
 // Boost includes for CPU Dijkstra SSSP reference algorithms
@@ -42,8 +44,6 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/dijkstra_shortest_paths.hpp>
 #include <boost/property_map/property_map.hpp>
-
-#include <gunrock/tests/shared_utils.cuh>
 
 using namespace gunrock;
 using namespace gunrock::app;

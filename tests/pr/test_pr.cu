@@ -41,7 +41,7 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/page_rank.hpp>
 
-#include <gunrock/tests/shared_utils.cuh>
+#include <gunrock/util/shared_utils.cuh>
 
 using namespace gunrock;
 using namespace gunrock::app;
