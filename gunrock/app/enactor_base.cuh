@@ -87,6 +87,14 @@ public:
 
     FrontierType GetFrontierType() {return frontier_type;}
 
+#ifdef ENABLE_PERFORMANCE_PROFILING
+    std::vector<std::vector<double> > *iter_full_queue_time;
+    std::vector<std::vector<double> > *iter_sub_queue_time;
+    std::vector<std::vector<double> > *iter_total_time;
+    std::vector<std::vector<SizeT > > *iter_full_queue_nodes_queued;
+    std::vector<std::vector<SizeT > > *iter_full_queue_edges_queued;
+#endif
+
 protected:
 
     /**
@@ -123,10 +131,10 @@ protected:
         work_progress     .SetName("work_progress"     );
         enactor_stats     .SetName("enactor_stats"     );
         frontier_attribute.SetName("frontier_attribute");
-        
+
         if (cuda_props        .Init(
-            num_gpus         , util::HOST, true, 
-            cudaHostAllocMapped | cudaHostAllocPortable)) 
+            num_gpus         , util::HOST, true,
+            cudaHostAllocMapped | cudaHostAllocPortable))
             return;
         min_sm_version = -1;
         for (int gpu=0;gpu<num_gpus;gpu++)
@@ -138,7 +146,15 @@ protected:
             if (min_sm_version == -1 ||
                 cuda_props[gpu].device_sm_version < min_sm_version)
                 min_sm_version = cuda_props[gpu].device_sm_version;
-        }      
+        }
+
+#ifdef ENABLE_PERFORMANCE_PROFILING
+        iter_full_queue_time = new std::vector<std::vector<double> >[num_gpus];
+        iter_sub_queue_time  = new std::vector<std::vector<double> >[num_gpus];
+        iter_total_time      = new std::vector<std::vector<double> >[num_gpus];
+        iter_full_queue_nodes_queued = new std::vector<std::vector<SizeT> >[num_gpus];
+        iter_full_queue_edges_queued = new std::vector<std::vector<SizeT> >[num_gpus];
+#endif
     }
 
     /**
@@ -160,7 +176,7 @@ protected:
             {
                 if (retval = enactor_stats [gpu*num_gpus+peer].Release())
                     return retval;
-                if (retval = work_progress [gpu*num_gpus+peer].Release()) 
+                if (retval = work_progress [gpu*num_gpus+peer].Release())
                     return retval;
                 if (retval = frontier_attribute[gpu*num_gpus + peer].Release())
                     return retval;
@@ -170,6 +186,40 @@ protected:
         if (retval = cuda_props        .Release()) return retval;
         if (retval = enactor_stats     .Release()) return retval;
         if (retval = frontier_attribute.Release()) return retval;
+
+#ifdef ENABLE_PERFORMANCE_PROFILING
+        if (iter_full_queue_time)
+        {
+            for (int gpu = 0; gpu < num_gpus; gpu++)
+            {
+                for (auto it = iter_full_queue_time[gpu].begin();
+                    it != iter_full_queue_time[gpu].end(); it++)
+                    it -> clear();
+                for (auto it = iter_sub_queue_time[gpu].begin();
+                    it != iter_sub_queue_time[gpu].end(); it++)
+                    it -> clear();
+                for (auto it = iter_total_time[gpu].begin();
+                    it != iter_total_time[gpu].end(); it++)
+                    it -> clear();
+                for (auto it = iter_full_queue_nodes_queued[gpu].begin();
+                    it != iter_full_queue_nodes_queued[gpu].end(); it++)
+                    it -> clear();
+                for (auto it = iter_full_queue_edges_queued[gpu].begin();
+                    it != iter_full_queue_edges_queued[gpu].end(); it++)
+                    it -> clear();
+                iter_full_queue_time[gpu].clear();
+                iter_sub_queue_time [gpu].clear();
+                iter_total_time     [gpu].clear();
+                iter_full_queue_nodes_queued[gpu].clear();
+                iter_full_queue_edges_queued[gpu].clear();
+            }
+            delete[] iter_full_queue_time; iter_full_queue_time = NULL;
+            delete[] iter_sub_queue_time ; iter_sub_queue_time  = NULL;
+            delete[] iter_total_time;      iter_total_time      = NULL;
+            delete[] iter_full_queue_nodes_queued; iter_full_queue_nodes_queued = NULL;
+            delete[] iter_full_queue_edges_queued; iter_full_queue_edges_queued = NULL;
+        }
+#endif
         return retval;
     }
 
@@ -194,16 +244,16 @@ protected:
     {
         cudaError_t retval = cudaSuccess;
         if (retval = work_progress     .Init(
-            num_gpus*num_gpus, util::HOST, true, 
+            num_gpus*num_gpus, util::HOST, true,
             cudaHostAllocMapped | cudaHostAllocPortable))
             return retval;
         if (retval = enactor_stats     .Init(
-            num_gpus*num_gpus, util::HOST, true, 
+            num_gpus*num_gpus, util::HOST, true,
             cudaHostAllocMapped | cudaHostAllocPortable))
             return retval;
 
         if (retval = frontier_attribute.Init(
-            num_gpus*num_gpus, util::HOST, true, 
+            num_gpus*num_gpus, util::HOST, true,
             cudaHostAllocMapped | cudaHostAllocPortable))
             return retval;
 
@@ -243,6 +293,14 @@ protected:
                     }
                 }
             }
+
+#ifdef ENABLE_PERFORMANCE_PROFILING
+            iter_sub_queue_time [gpu].clear();
+            iter_full_queue_time[gpu].clear();
+            iter_total_time     [gpu].clear();
+            iter_full_queue_nodes_queued[gpu].clear();
+            iter_full_queue_edges_queued[gpu].clear();
+#endif
         }
         return retval;
     }
@@ -269,6 +327,14 @@ protected:
                     .Reset())
                     return retval;
             }
+
+#ifdef ENABLE_PERFORMANCE_PROFILING
+            iter_sub_queue_time [gpu].push_back(std::vector<double>());
+            iter_full_queue_time[gpu].push_back(std::vector<double>());
+            iter_total_time     [gpu].push_back(std::vector<double>());
+            iter_full_queue_nodes_queued[gpu].push_back(std::vector<SizeT>());
+            iter_full_queue_edges_queued[gpu].push_back(std::vector<SizeT>());
+#endif
         }
         return retval;
     }
@@ -294,7 +360,7 @@ protected:
     {
         cudaError_t retval = cudaSuccess;
 
-        if (retval = Init(/*problem,*/ max_grid_size, 
+        if (retval = Init(/*problem,*/ max_grid_size,
             advance_occupancy, filter_occupancy, node_lock_size)) return retval;
         if (retval = Reset()) return retval;
         return retval;

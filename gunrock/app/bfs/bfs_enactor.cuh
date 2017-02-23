@@ -1007,8 +1007,10 @@ struct BFSIteration : public IterationBase <
         //    frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
         //    frontier_attribute -> queue_length,
         //    thread_num, enactor_stats -> iteration, -1, stream);
-        
+
+#ifdef RECORD_PER_ITERATION_STATS        
         GpuTimer gpu_timer;
+#endif
         if (data_slice -> current_direction == FORWARD)
         {
             frontier_attribute->queue_reset = true;
@@ -1025,7 +1027,9 @@ struct BFSIteration : public IterationBase <
             }
 
             // Edge Map
-            if (RECORD_PER_ITERATION_STATS) gpu_timer.Start();
+#ifdef RECORD_PER_ITERATION_STATS 
+            gpu_timer.Start();
+#endif
             gunrock::oprtr::advance::LaunchKernel
                 <AdvanceKernelPolicy, Problem, Functor, gunrock::oprtr::advance::V2V>(
                 enactor_stats[0],
@@ -1054,7 +1058,8 @@ struct BFSIteration : public IterationBase <
                 false,
                 false,
                 false);
-            if (RECORD_PER_ITERATION_STATS) {
+
+#ifdef RECORD_PER_ITERATION_STATS
                 gpu_timer.Stop(); 
                 float elapsed = gpu_timer.ElapsedMillis();
                 float mteps = frontier_attribute->output_length[0] / (elapsed*1000);
@@ -1063,7 +1068,8 @@ struct BFSIteration : public IterationBase <
                 enactor_stats->per_iteration_advance_input_edges.push_back(frontier_attribute->queue_length);
                 enactor_stats->per_iteration_advance_output_edges.push_back(frontier_attribute->output_length[0]);
                 enactor_stats->per_iteration_advance_direction.push_back(true);
-            }
+#endif
+
             if (enactor -> debug)
                 util::cpu_mt::PrintMessage("Forward Advance end",
                     thread_num, enactor_stats->iteration, peer_);
@@ -1243,7 +1249,9 @@ struct BFSIteration : public IterationBase <
             num_blocks = data_slice -> num_unvisited_vertices / AdvanceKernelPolicy::THREADS + 1;
             if (num_blocks > 480) num_blocks = 480;
 
-            if (RECORD_PER_ITERATION_STATS) gpu_timer.Start();
+#ifdef RECORD_PER_ITERATION_STATS 
+            gpu_timer.Start();
+#endif
             Inverse_Expand<Problem, AdvanceKernelPolicy>
                 <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
                 (data_slice   -> num_unvisited_vertices,
@@ -1262,7 +1270,7 @@ struct BFSIteration : public IterationBase <
                 data_slice -> labels.GetPointer(util::DEVICE),
                 data_slice -> preds.GetPointer(util::DEVICE));
 
-            if (RECORD_PER_ITERATION_STATS) {
+#ifdef RECORD_PER_ITERATION_STATS
                 gpu_timer.Stop(); 
                 float elapsed = gpu_timer.ElapsedMillis();
                 enactor_stats->per_iteration_advance_time.push_back(elapsed);
@@ -1270,7 +1278,8 @@ struct BFSIteration : public IterationBase <
                 enactor_stats->per_iteration_advance_input_edges.push_back(-1.0f);
                 enactor_stats->per_iteration_advance_output_edges.push_back(-1.0f);
                 enactor_stats->per_iteration_advance_direction.push_back(false);
-            }
+#endif
+
             data_slice -> split_lengths.Move(util::DEVICE, util::HOST, 2, 0, stream);
             if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
                 "cudaStreamSynchronize failed", __FILE__, __LINE__))
