@@ -18,3 +18,4 @@ fetch: $(GRAPH_FILE)
 $(GRAPH_FILE):
 	$(WGET) -N $(GRAPH_URL)
 
+IPDPS17: setup

@@ -361,7 +361,7 @@ void PushNeighbor(
             if (enactor_stats -> retval = util::SetDevice(data_slice_l -> gpu_idx))
                 return;
     }
-    
+
     if (data_slice_l -> keys_out[peer_].GetPointer(util::DEVICE) != NULL)
     {
         //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("keys_out",
@@ -398,6 +398,10 @@ void PushNeighbor(
         cudaMemcpyDefault, stream),
         "cudamemcpyPeer keys failed", __FILE__, __LINE__))
         return;
+
+#ifdef ENABLE_PERFORMANCE_PROFILING
+    //enactor_stats -> iter_out_length.back().push_back(queue_length);
+#endif
 }
 
 /*

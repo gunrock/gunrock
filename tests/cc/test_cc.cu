@@ -35,6 +35,8 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
 
+#include <gunrock/util/shared_utils.cuh>
+
 using namespace gunrock;
 using namespace gunrock::app;
 using namespace gunrock::util;
@@ -298,16 +300,16 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     bool    quick_mode             = info->info["quick_mode"        ].get_bool ();
     bool    stream_from_host       = info->info["stream_from_host"  ].get_bool ();
     std::string traversal_mode     = info->info["traversal_mode"    ].get_str  ();
-    bool    instrument             = info->info["instrument"        ].get_bool (); 
-    bool    debug                  = info->info["debug_mode"        ].get_bool (); 
+    bool    instrument             = info->info["instrument"        ].get_bool ();
+    bool    debug                  = info->info["debug_mode"        ].get_bool ();
     bool    size_check             = info->info["size_check"        ].get_bool ();
     int     iterations             = info->info["num_iteration"     ].get_int();
-    int     communicate_latency    = info->info["communicate_latency"].get_int (); 
+    int     communicate_latency    = info->info["communicate_latency"].get_int ();
     float   communicate_multipy    = info->info["communicate_multipy"].get_real();
-    int     expand_latency         = info->info["expand_latency"    ].get_int (); 
-    int     subqueue_latency       = info->info["subqueue_latency"  ].get_int (); 
-    int     fullqueue_latency      = info->info["fullqueue_latency" ].get_int (); 
-    int     makeout_latency        = info->info["makeout_latency"   ].get_int (); 
+    int     expand_latency         = info->info["expand_latency"    ].get_int ();
+    int     subqueue_latency       = info->info["subqueue_latency"  ].get_int ();
+    int     fullqueue_latency      = info->info["fullqueue_latency" ].get_int ();
+    int     makeout_latency        = info->info["makeout_latency"   ].get_int ();
     if (max_queue_sizing < 0) max_queue_sizing = 1.0;
     if (max_in_sizing < 0) max_in_sizing = 1.1;
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
@@ -432,7 +434,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         {
             printf("-------------------------\n"
                 "iteration %lld elapsed: %lf ms\n",
-                (long long)iter, single_elapsed); 
+                (long long)iter, single_elapsed);
             fflush(stdout);
         }
 
@@ -522,6 +524,14 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     if (!quiet_mode)
     {
+        Display_Memory_Usage(num_gpus, gpu_idx, org_size, problem);
+#ifdef ENABLE_PERFORMANCE_PROFILING
+        Display_Performance_Profiling(enactor);
+#endif
+    }
+
+    /*if (!quiet_mode)
+    {
         printf("\n\tMemory Usage(B)\t");
         for (int gpu = 0; gpu < num_gpus; gpu++)
             if (num_gpus > 1)
@@ -561,7 +571,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         printf("\t key_sizing =\t %lf", max_key_sizing);
         if (num_gpus > 1) printf("\t in_sizing =\t %lf", max_in_sizing_);
         printf("\n");
-    }
+    }*/
 
     // Cleanup
     if (org_size               ) {delete[] org_size               ; org_size                = NULL;}
@@ -569,6 +579,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     if (enactor                ) {delete   enactor                ; enactor                 = NULL;}
     if (reference_component_ids) {delete[] reference_component_ids; reference_component_ids = NULL;}
     if (h_component_ids        ) {delete[] h_component_ids        ; h_component_ids         = NULL;}
+    if (gpu_idx                ) {delete[] gpu_idx                ; gpu_idx                 = NULL;}
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
     return retval;
@@ -609,6 +620,7 @@ int main_(CommandLineArgs *args)
     }
 
     info->CollectInfo();  // collected all the info and put into JSON mObject
+    if (info) {delete info; info=NULL;}
     return 0;
 }
 
