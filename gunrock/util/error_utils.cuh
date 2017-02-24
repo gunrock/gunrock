@@ -26,6 +26,9 @@ enum gunrockError {
 
 typedef enum gunrockError gunrockError_t;
 
+void PrintMsg(const char* msg);
+void PrintMsg(std::string msg);
+
 /**
  * Displays error message in accordance with debug mode
  */
@@ -86,4 +89,3 @@ gunrockError_t GRError(
 
 } // namespace util
 } // namespace gunrock
-

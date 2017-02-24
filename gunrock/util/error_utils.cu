@@ -13,12 +13,26 @@
  */
 
 #include <stdio.h>
-#include <gunrock/util/error_utils.cuh> 
+#include <gunrock/util/error_utils.cuh>
+
+namespace gunrock {
+namespace util {
+
+void PrintMsg(const char* msg)
+{
+    printf("%s\n", msg);
+    fflush(stdout);
+}
+
+void PrintMsg(std::string msg)
+{
+    PrintMsg(msg.c_str());
+}
 
 /**
  * Displays error message in accordance with debug mode
  */
-cudaError_t gunrock::util::GRError(
+cudaError_t GRError(
     cudaError_t error,
     const char *message,
     const char *filename,
@@ -34,7 +48,7 @@ cudaError_t gunrock::util::GRError(
     return error;
 }
 
-cudaError_t gunrock::util::GRError(
+cudaError_t GRError(
     cudaError_t error,
     std::string message,
     const char *filename,
@@ -46,14 +60,14 @@ cudaError_t gunrock::util::GRError(
         cudaGetDevice(&gpu);
         fprintf(stderr, "[%s, %d @ gpu %d] %s (CUDA error %d: %s)\n", filename, line, gpu, message.c_str(), error, cudaGetErrorString(error));
         fflush(stderr);
-    }   
+    }
     return error;
 }
 
 /**
  * Checks and resets last CUDA error.  If set, displays last error message in accordance with debug mode.
  */
-cudaError_t gunrock::util::GRError(
+cudaError_t GRError(
     const char *message,
     const char *filename,
     int line,
@@ -69,7 +83,7 @@ cudaError_t gunrock::util::GRError(
     return error;
 }
 
-cudaError_t gunrock::util::GRError(
+cudaError_t GRError(
     std::string message,
     const char *filename,
     int line,
@@ -88,7 +102,7 @@ cudaError_t gunrock::util::GRError(
 /**
  * Displays error message in accordance with debug mode
  */
-cudaError_t gunrock::util::GRError(
+cudaError_t GRError(
     cudaError_t error,
     bool print)
 {
@@ -104,7 +118,7 @@ cudaError_t gunrock::util::GRError(
 /**
  * Checks and resets last CUDA error.  If set, displays last error message in accordance with debug mode.
  */
-cudaError_t gunrock::util::GRError(
+cudaError_t GRError(
     bool print)
 {
     cudaError_t error = cudaGetLastError();
@@ -117,7 +131,7 @@ cudaError_t gunrock::util::GRError(
     return error;
 }
 
-std::string gunrock::util::GetErrorString(gunrock::util::gunrockError_t error)
+std::string GetErrorString(gunrock::util::gunrockError_t error)
 {
     switch (error) {
     case gunrock::util::GR_UNSUPPORTED_INPUT_DATA:
@@ -126,7 +140,7 @@ std::string gunrock::util::GetErrorString(gunrock::util::gunrockError_t error)
         return "unknown error";
     }
 }
-gunrock::util::gunrockError_t gunrock::util::GRError(
+gunrockError_t GRError(
     gunrock::util::gunrockError_t error,
     std::string message,
     const char *filename,
@@ -141,3 +155,12 @@ gunrock::util::gunrockError_t gunrock::util::GRError(
     }
     return error;
 }
+
+} // namespace util
+} // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

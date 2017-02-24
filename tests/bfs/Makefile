@@ -10,7 +10,7 @@
 #-------------------------------------------------------------------------------
 
 include ../BaseMakefile.mk
-ALGO = bfs
+ALGO = refactor
 test: bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
 bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_$(ALGO).cu $(DEPS)

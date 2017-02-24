@@ -7,45 +7,45 @@
 
 /**
  * @file
- * types.cu
+ * str_to_T.cu
  *
- * @brief data types and limits implementations
+ * @brief string to T implementations
  */
 
 //#pragma once
 
-#include <gunrock/util/types.cuh>
+#include <gunrock/util/str_to_T.cuh>
 
 namespace gunrock {
 namespace util {
 
 template <> long strtoT_simple <long>(
     const char *str, char **str_end, int base)
-{   
+{
     return strtol(str, str_end, base);
 }
 
 template <> unsigned long strtoT_simple <unsigned long>(
     const char *str, char **str_end, int base)
-{   
+{
     return strtoul(str, str_end, base);
 }
 
 template <> long long strtoT_simple <long long>(
     const char *str, char **str_end, int base)
-{   
+{
     return strtoll(str, str_end, base);
 }
 
 template <> unsigned long long strtoT_simple <unsigned long long>(
     const char *str, char **str_end, int base)
-{   
+{
     return strtoull(str, str_end, base);
 }
 
 template <> char strtoT_simple <char>(
     const char *str, char **str_end, int base)
-{   
+{
     long val = strtoT_simple<long>(str, str_end, base);
     if (val < CHAR_MIN) val = CHAR_MIN;
     if (val > CHAR_MAX) val = CHAR_MAX;
@@ -54,7 +54,7 @@ template <> char strtoT_simple <char>(
 
 template <> signed char strtoT_simple <signed char>(
     const char *str, char **str_end, int base)
-{   
+{
     signed long val = strtoT_simple<signed long>(str, str_end, base);
     if (val < SCHAR_MIN) val = SCHAR_MIN;
     if (val > SCHAR_MAX) val = SCHAR_MAX;
@@ -63,7 +63,7 @@ template <> signed char strtoT_simple <signed char>(
 
 template <> unsigned char strtoT_simple <unsigned char>(
     const char *str, char **str_end, int base)
-{   
+{
     unsigned long val = strtoT_simple<unsigned long>(str, str_end, base);
     if (val > UCHAR_MAX) val = UCHAR_MAX;
     return (unsigned char) val;
@@ -71,7 +71,7 @@ template <> unsigned char strtoT_simple <unsigned char>(
 
 template <> short strtoT_simple <short>(
     const char *str, char **str_end, int base)
-{   
+{
     long val = strtoT_simple<long>(str, str_end, base);
     if (val < SHRT_MIN) val = SHRT_MIN;
     if (val > SHRT_MAX) val = SHRT_MAX;
@@ -80,7 +80,7 @@ template <> short strtoT_simple <short>(
 
 template <> unsigned short strtoT_simple <unsigned short>(
     const char *str, char **str_end, int base)
-{   
+{
     unsigned long val = strtoT_simple<unsigned long>(str, str_end, base);
     if (val > USHRT_MAX) val = USHRT_MAX;
     return (unsigned short)val;
@@ -88,7 +88,7 @@ template <> unsigned short strtoT_simple <unsigned short>(
 
 template <> int strtoT_simple <int>(
     const char *str, char **str_end, int base)
-{   
+{
     long val = strtoT_simple<long>(str, str_end, base);
     if (val < INT_MIN) val = INT_MIN;
     if (val > INT_MAX) val = INT_MAX;
@@ -97,7 +97,7 @@ template <> int strtoT_simple <int>(
 
 template <> unsigned int strtoT_simple <unsigned int>(
     const char *str, char **str_end, int base)
-{   
+{
     unsigned long val = strtoT_simple<unsigned long>(str, str_end, base);
     if (val > UINT_MAX) val = UINT_MAX;
     return (unsigned int)val;
@@ -105,71 +105,71 @@ template <> unsigned int strtoT_simple <unsigned int>(
 
 template <> float strtoT_simple <float>(
     const char *str, char **str_end, int base)
-{   
+{
     return strtof(str, str_end);
 }
 
 template <> double strtoT_simple <double>(
     const char *str, char **str_end, int base)
-{   
+{
     return strtod(str, str_end);
 }
 
 template <> long double strtoT_simple <long double>(
     const char *str, char **str_end, int base)
-{   
+{
     return strtold(str, str_end);
 }
 
 template <> bool strtoT_simple <bool>(
     const char *str, char **str_end, int base)
-{   
-    unsigned int i = 0; 
+{
+    unsigned int i = 0;
     unsigned int length = strlen(str);
     while (i < length)
-    {   
+    {
         if (isspace(str[i])) i++;
         else break;
     }
-    
+
     if (i + 5 <= length)
-    {   
+    {
         //std::cout << "Cond 1" << std::endl;
         if (tolower(str[i]) == 'f' && tolower(str[i+1]) == 'a'
             && tolower(str[i+2]) == 'l' && tolower(str[i+3]) == 's'
             && tolower(str[i+4]) == 'e')
-        {   
+        {
             *str_end = const_cast<char*>(str) + i + 5;
             return false;
         }
     }
-    
+
     if (i + 4 <= length)
-    {   
+    {
         //std::cout << "Cond 2" << std::endl;
         if (tolower(str[i]) == 't' && tolower(str[i+1]) == 'r'
             && tolower(str[i+2]) == 'u' && tolower(str[i+3]) == 'e')
-        {   
+        {
             *str_end = const_cast<char*>(str) + i + 4;
             return true;
         }
     }
-    
+
     if (i + 1 <= length)
-    {   
+    {
         //std::cout << "Cond 3" << std::endl;
         if (str[i] == '0' || tolower(str[i]) == 'f')
-        {   
+        {
             *str_end = const_cast<char*>(str) + i + 1;
             return false;
         }
         if (str[i] == '1' || tolower(str[i]) == 't')
-        {   
+        {
             *str_end = const_cast<char*>(str) + i + 1;
             return true;
         }
     }
-    
+
     *str_end = const_cast<char*>(str) + i;
     return true;
 }
@@ -340,7 +340,7 @@ const std::type_info *toVector(const std::type_info* t_info)
 }
 
 bool isValidString(const char *str, const std::type_info* t_info, int base)
-{   
+{
     if (std::type_index(*t_info) == std::type_index(typeid(char)))
         return isValidString<char>(str, base);
     if (std::type_index(*t_info) == std::type_index(typeid(signed char)))

@@ -14,53 +14,37 @@
 
 #pragma once
 
-#include <time.h>
-#include <stdio.h>
-#include <string>
-#include <vector>
-#include <fstream>
-#include <iostream>
-#include <algorithm>
-#include <iterator>
-#include <omp.h>
-
-#include <gunrock/util/test_utils.cuh>
-#include <gunrock/util/error_utils.cuh>
-#include <gunrock/util/multithread_utils.cuh>
-#include <gunrock/util/sort_omp.cuh>
-#include <gunrock/coo.cuh>
+#include <gunrock/util/array_utils.cuh>
+#include <gunrock/graph/graph_base.cuh>
 
 namespace gunrock {
+namespace graph {
 
 /**
  * @brief CSR data structure which uses Compressed Sparse Row
  * format to store a graph. It is a compressed way to present
  * the graph as a sparse matrix.
  *
- * @tparam VertexId Vertex identifier.
- * @tparam Value Associated value type.
+ * @tparam VertexT Vertex identifier type.
  * @tparam SizeT Graph size type.
+ * @tparam ValueT Associated value type.
  */
-template<typename VertexId, typename SizeT, typename Value>
-struct Csr
+template<typename VertexT, typename SizeT, typename ValueT, GraphFlag FLAG>
+struct Csr : GraphBase<VertexT, SizeT, ValueT, FLAG>
 {
-    SizeT nodes;            // Number of nodes in the graph
-    SizeT edges;            // Number of edges in the graph
-    SizeT out_nodes;        // Number of nodes which have outgoing edges
-    SizeT average_degree;   // Average vertex degrees
-    float stddev_degree;    // Degree standard deviation
-
-    VertexId *column_indices; // Column indices corresponding to all the
+    // Column indices corresponding to all the
     // non-zero values in the sparse matrix
-    SizeT    *row_offsets;    // List of indices where each row of the
+    util::Array1D<SizeT, VertexT> column_indices;
+
+    // List of indices where each row of the
     // sparse matrix starts
-    Value    *edge_values;    // List of values attached to edges in the graph
-    Value    *node_values;    // List of values attached to nodes in the graph
+    util::Array1D<SizeT, SizeT  > row_offsets;
 
-    Value average_edge_value;
-    Value average_node_value;
+    // List of values attached to edges in the graph
+    util::Array1D<SizeT, ValueT > edge_values;
 
-    bool  pinned;  // Whether to use pinned memory
+    // List of values attached to nodes in the graph
+    util::Array1D<SizeT, ValueT > node_values;
 
     /**
      * @brief CSR Constructor
@@ -72,11 +56,6 @@ struct Csr
     {
         nodes = 0;
         edges = 0;
-        average_degree = 0;
-        stddev_degree = 0.0f;
-        average_edge_value = 0;
-        average_node_value = 0;
-        out_nodes = -1;
         row_offsets = NULL;
         column_indices = NULL;
         edge_values = NULL;
@@ -103,7 +82,7 @@ struct Csr
         {
             column_indices = NULL;
         } else {
-            column_indices = (VertexId*) malloc(sizeof(VertexId) * source.edges); 
+            column_indices = (VertexId*) malloc(sizeof(VertexId) * source.edges);
             memcpy(column_indices, source.column_indices, sizeof(VertexId) * source.edges);
         }
         if (source.edge_values == NULL)
@@ -119,12 +98,11 @@ struct Csr
         } else {
             node_values = (Value*) malloc(sizeof(Value) * source.nodes);
             memcpy(node_values, source.node_values, sizeof(Value) * source.nodes);
-        } 
+        }
     }
 
-    
     template <typename Tuple>
-    void CsrToCsc(Csr<VertexId, SizeT, Value> &target, 
+    void CsrToCsc(Csr<VertexId, SizeT, Value> &target,
             Csr<VertexId, SizeT, Value> &source)
     {
         target.nodes = source.nodes;
@@ -512,7 +490,7 @@ struct Csr
 	SizeT nodes,
 	bool quiet = false)
     {
-	    if(!quiet) printf("  Converting the labels of %lld vertices to binary format...\n", 
+	    if(!quiet) printf("  Converting the labels of %lld vertices to binary format...\n",
 				(long long)nodes);
 	    if(LOAD_NODE_VALUES) WriteBinary_SM(output_file, nodes, labels);
     }
@@ -545,7 +523,7 @@ struct Csr
         if (!quiet)
         {
             printf("  Converting %lld vertices, %lld directed edges (%s tuples) "
-                   "to CSR format...\n", 
+                   "to CSR format...\n",
                     (long long)coo_nodes, (long long)coo_edges,
                    ordered_rows ? "ordered" : "unordered");
         }
@@ -728,12 +706,12 @@ struct Csr
         }
         printf("\nDegree Histogram (%lld vertices, %lld edges):\n",
                (long long) nodes, (long long) edges);
-        printf("    Degree   0: %lld (%.2f%%)\n", 
+        printf("    Degree   0: %lld (%.2f%%)\n",
                (long long) log_counts[0],
                (float) log_counts[0] * 100.0 / nodes);
         for (int i = 0; i < max_log_length + 1; i++)
         {
-            printf("    Degree 2^%i: %lld (%.2f%%)\n", 
+            printf("    Degree 2^%i: %lld (%.2f%%)\n",
                 i, (long long)log_counts[i + 1],
                 (float) log_counts[i + 1] * 100.0 / nodes);
         }
@@ -920,7 +898,7 @@ struct Csr
 
     /**
      * @brief Get the degrees of all the nodes in graph
-     * 
+     *
      * @param[in] node_degrees node degrees to fill in
      */
     void GetNodeDegree(unsigned long long *node_degrees)
@@ -1031,6 +1009,7 @@ struct Csr
     }
 };
 
+} // namespace graph
 } // namespace gunrock
 
 // Leave this at the end of the file

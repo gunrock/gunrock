@@ -13,6 +13,7 @@
  */
 
 #pragma once
+#include <string>
 
 namespace gunrock {
 namespace util {
@@ -51,7 +52,7 @@ __host__ __device__ __forceinline__ void SuppressUnusedConstantWarning(const T) 
 /**
  * Perform a swap
  */
-template <typename T> 
+template <typename T>
 void __host__ __device__ __forceinline__ Swap(T &a, T &b) {
     T temp = a;
     a = b;
@@ -62,20 +63,20 @@ void __host__ __device__ __forceinline__ Swap(T &a, T &b) {
 template <typename K, int magnitude, bool shift_left> struct MagnitudeShiftOp;
 
 /**
- * MagnitudeShift().  Allows you to shift left for positive magnitude values, 
- * right for negative.   
- * 
- * N.B. This code is a little strange; we are using this meta-programming 
- * pattern of partial template specialization for structures in order to 
- * decide whether to shift left or right.  Normally we would just use a 
- * conditional to decide if something was negative or not and then shift 
- * accordingly, knowing that the compiler will elide the untaken branch, 
- * i.e., the out-of-bounds shift during dead code elimination. However, 
- * the pass for bounds-checking shifts seems to happen before the DCE 
- * phase, which results in a an unsightly number of compiler warnings, so 
+ * MagnitudeShift().  Allows you to shift left for positive magnitude values,
+ * right for negative.
+ *
+ * N.B. This code is a little strange; we are using this meta-programming
+ * pattern of partial template specialization for structures in order to
+ * decide whether to shift left or right.  Normally we would just use a
+ * conditional to decide if something was negative or not and then shift
+ * accordingly, knowing that the compiler will elide the untaken branch,
+ * i.e., the out-of-bounds shift during dead code elimination. However,
+ * the pass for bounds-checking shifts seems to happen before the DCE
+ * phase, which results in a an unsightly number of compiler warnings, so
  * we force the issue earlier using structural template specialization.
  */
-template <typename K, int magnitude> 
+template <typename K, int magnitude>
 __device__ __forceinline__ K MagnitudeShift(K key)
 {
     return MagnitudeShiftOp<K, (magnitude > 0) ? magnitude : magnitude * -1, (magnitude > 0)>::Shift(key);
@@ -161,7 +162,7 @@ struct If<false, ThenType, ElseType>
 
 
 /**
- * Equals 
+ * Equals
  */
 template <typename A, typename B>
 struct Equals
@@ -214,8 +215,13 @@ struct RemovePointersHelper<Tp, Up*>
 template <typename Tp>
 struct RemovePointers : RemovePointersHelper<Tp, Tp> {};
 
-
+template <typename T>
+std::string to_string(T* ptr)
+{
+    char temp_str[128];
+    sprintf(temp_str, "%p", ptr);
+    return std::string(temp_str);
+}
 
 } // namespace util
 } // namespace gunrock
-
