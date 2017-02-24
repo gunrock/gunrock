@@ -30,14 +30,14 @@
 #include <gunrock/app/sm/sm_functor.cuh>
 
 
+//using namespace gunrock::app;
+using namespace mgpu;
+using namespace cub;
+
 namespace gunrock {
 namespace app {
 namespace sm {
 
-
-using namespace gunrock::app;
-using namespace mgpu;
-using namespace cub;
 
 /**
  * @brief SM enactor class.
@@ -47,22 +47,14 @@ using namespace cub;
  * @tparam _DEBUG
  * @tparam _SIZE_CHECK
  */
-template <
-    typename _Problem>
-    //bool _INSTRUMENT,
-    //bool _DEBUG,
-    //bool _SIZE_CHECK >
-class SMEnactor :
-  public EnactorBase<typename _Problem::SizeT/*, _DEBUG, _SIZE_CHECK*/> 
+template <typename _Problem>
+class SMEnactor :  public EnactorBase<typename _Problem::SizeT> 
 {
 public:
     typedef _Problem                   Problem;
     typedef typename Problem::SizeT    SizeT;
     typedef typename Problem::VertexId VertexId;
     typedef typename Problem::Value    Value;
-    //static const bool INSTRUMENT   =   _INSTRUMENT;
-    //static const bool DEBUG        =        _DEBUG;
-    //static const bool SIZE_CHECK   =   _SIZE_CHECK;
     typedef EnactorBase<SizeT>         BaseEnactor;
     Problem    *problem;
     ContextPtr *context;
@@ -142,10 +134,14 @@ public:
     cudaError_t EnactSM()
     {
         // Define functors for primitive
-        typedef SMInitFunctor   <VertexId, SizeT, Value, Problem, long long> SMInitFunctor;
+        // Fill d_c_set for each data node
+        typedef SMInitFunctor   <VertexId, SizeT, Value, Problem> SMInitFunctor;
+        // Select candidate edges
         typedef SMFunctor       <VertexId, SizeT, Value, Problem> SMFunctor;
+        
         typedef util::DoubleBuffer  <VertexId, SizeT, Value> Frontier;
         typedef GraphSlice          <VertexId, SizeT, Value> GraphSliceT;
+    
         typedef typename Problem::DataSlice                  DataSlice;
 
         Problem      *problem            = this -> problem;
@@ -165,9 +161,13 @@ public:
         SizeT         nodes              = graph_slice -> nodes;
         SizeT         edges              = graph_slice -> edges;
         bool          debug_info         = 0;   // used for debug purpose
-	SizeT         iterations = 1;
 
-        if (retval = data_slice -> scanned_edges[0].EnsureSize(edges))
+        if (data_slice -> scanned_edges[0].GetSize() == 0)
+        {
+            if (retval = data_slice -> scanned_edges[0].Allocate(edges, util::DEVICE))
+                return retval;
+        }
+        else if (retval = data_slice -> scanned_edges[0].EnsureSize(edges))
             return retval;
         d_scanned_edges = data_slice -> scanned_edges[0].GetPointer(util::DEVICE);
 
@@ -185,16 +185,18 @@ public:
         
         attributes->queue_index  = 0;
         attributes->selector     = 0;
-        attributes->queue_length = graph_slice->nodes;
+        attributes->queue_length = nodes;
         attributes->queue_reset  = true;
 
 //     for(int i=0; i<2; i++)  // filter candidate nodes and edges for a few iterations
 //     {
+
         gunrock::oprtr::advance::LaunchKernel
                     <AdvanceKernelPolicy, Problem, SMInitFunctor, gunrock::oprtr::advance::V2V>(
                     statistics[0],
                     attributes[0],
-                    statistics -> iteration + 1,
+                    //statistics -> iteration + 1,
+                    typename SMInitFunctor::LabelT(),
                     data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
@@ -213,7 +215,10 @@ public:
                     graph_slice->edges,
                     work_progress[0],
                     context[0],
-                    stream);
+                    stream,
+                    false,
+                    false,
+                    true);
 
         if (debug_info)
         {
@@ -221,6 +226,7 @@ public:
                         "SMInit Advance::LaunchKernel failed", __FILE__, __LINE__)) 
                 return retval;
         }
+
 
         attributes->queue_index  = 0;
         attributes->selector     = 0;
@@ -258,8 +264,6 @@ public:
                         "SMFunctor Advance::LaunchKernel failed", __FILE__, __LINE__)) 
                 return retval;
         }
-
-
         util::GreaterThan select_op(0);
 
 	util::CUBSelect_if(
@@ -284,6 +288,8 @@ public:
         (int*)0,
 	graph_slice->row_offsets.GetPointer(util::DEVICE), // Output new row_offsets
         context[0]);
+
+        //util::debugScan<<<128,128, 0, stream>>>(graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1);
       //}	
 	   
 	// Convert graph_slice -> row_offsets to edges_list source node list
@@ -300,7 +306,7 @@ public:
 	    util::MemsetKernel<<<128,128, 0, stream>>>(
 	    	data_slice -> d_in.GetPointer(util::DEVICE),
 	    	(Value)0, data_slice -> edges_query * edges/2);
-
+ //           util::debugLabel<<<128,128,0,stream>>>(data_slice -> d_in.GetPointer(util::DEVICE), data_slice -> edges_query * edges/2);
 	    // Label candidate edges for each query edge
 	    util::Label<<<128,128,0,stream>>>(
 	        queue->values[attributes->selector].GetPointer(util::DEVICE), //src node list
@@ -312,7 +318,8 @@ public:
 		data_slice -> d_query_row   .GetPointer(util::DEVICE), 
 	    	data_slice -> edges_data,
 	    	data_slice -> edges_query);
-
+            
+//           util::debugLabel<<<128,128,0,stream>>>(data_slice -> d_in.GetPointer(util::DEVICE), data_slice -> edges_query * edges/2);
 
             util::MemsetKernel<<<128, 128, 0, stream>>>(
             	data_slice -> d_query_col.GetPointer(util::DEVICE), 
@@ -343,10 +350,10 @@ public:
                 (VertexId)0, 
 	        data_slice -> edges_data * data_slice -> edges_query /2);
 
-/*            util::DisplayDeviceResults(
-                data_slice->d_in.GetPointer(util::DEVICE),
-		data_slice -> edges_query * data_slice -> edges_data/2);
-*/
+         //   util::DisplayDeviceResults(
+         //       data_slice->d_in.GetPointer(util::DEVICE),
+	//	data_slice -> edges_query * data_slice -> edges_data/2);
+
   	    util::Join<<<128, 128, 0, stream>>>(
 		    data_slice -> edges_data,
 		    data_slice -> edges_query,
@@ -357,7 +364,9 @@ public:
                     data_slice -> d_col_indices        .GetPointer(util::DEVICE),
 		    data_slice -> d_in		       .GetPointer(util::DEVICE), // can edge ids
                     data_slice -> d_c_set 	       .GetPointer(util::DEVICE));// output
-	
+
+            util::debug<<<128,128,0,stream>>>(data_slice->counts.GetPointer(util::DEVICE));
+
         return retval;
     }
 
@@ -382,7 +391,7 @@ public:
         //INSTRUMENT,         // INSTRUMENT
         8,                  // MIN_CTA_OCCUPANCY
         10,                 // LOG_THREADS
-        8,                  // LOG_BLOCKS
+        9,                  // LOG_BLOCKS
         32 * 128,           // LIGHT_EDGE_THRESHOLD
         1,                  // LOG_LOAD_VEC_SIZE
         0,                  // LOG_LOADS_PER_TILE

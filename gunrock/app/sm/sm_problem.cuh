@@ -13,7 +13,6 @@
 
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/util/memset_kernel.cuh>
-#include <gunrock/util/array_utils.cuh>
 
 
 
@@ -134,7 +133,6 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             float in_sizing = 1.0)
         {
             cudaError_t retval = cudaSuccess;
-
             if (retval = BaseDataSlice::Init(
                 num_gpus,
                 gpu_idx,
@@ -143,27 +141,27 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                 num_in_nodes,
                 num_out_nodes,
                 in_sizing)) return retval;
-	    if(retval = counts         .Allocate(1, util::HOST | util::DEVICE))
+
+//            if (retval = this->labels.Allocate(graph_data->nodes, util::DEVICE)) return retval;
+	    if(retval = counts      .Allocate(1, util::HOST | util::DEVICE))
                 return retval;
-            if(retval = d_query_row    .Allocate(graph_query -> nodes+1, util::DEVICE)) 
+            if(retval = d_query_row .Allocate(graph_query -> nodes+1, util::DEVICE)) 
                 return retval;
-            if(retval = d_query_col    .Allocate(graph_query -> edges/2, util::DEVICE)) 
+            if(retval = d_query_col .Allocate(graph_query -> edges/2, util::DEVICE)) 
                 return retval;
             //if(retval = data_slices[gpu]->d_edge_weights.Allocate(edges_query, util::DEVICE)) 
             //	return retval;
-            if(retval = d_c_set        .Allocate(graph_data->edges * graph_query->edges/4,
+            if(retval = d_c_set     .Allocate(graph_data->edges * graph_query->edges/4,
 						util::DEVICE))
                 return retval;
-            if(retval = froms_query    .Allocate(graph_query -> edges/2, util::HOST | util::DEVICE)) 
+            if(retval = froms_query .Allocate(graph_query -> edges/2, util::HOST | util::DEVICE)) 
                 return retval;
-            if(retval = tos_query      .Allocate(graph_query -> edges/2, util::HOST | util::DEVICE)) 
+            if(retval = tos_query   .Allocate(graph_query -> edges/2, util::HOST | util::DEVICE)) 
                 return retval;
-            if(retval = flag           .Allocate(graph_query -> edges/2 * 
+            if(retval = flag        .Allocate(graph_query -> edges/2 * 
 						(graph_query -> edges/2 -1), 
 						util::HOST | util::DEVICE)) 
                 return retval;
-
-//bool enough = util::EnoughDeviceMemory(sizeof(VertexId)*graph_data->nodes * graph_data -> nodes * graph_data ->edges/2 );
             if(retval = d_in           .Allocate(graph_data->edges * graph_query->edges/4,
 						util::DEVICE)) 
                 return retval;
@@ -173,7 +171,6 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
 	    for(int i=0; i<graph_query->nodes; i++)
                 query_labels[i] = graph_query->node_values[i];
             d_query_col.SetPointer(query_labels);
-            //d_query_col.SetPointer((VertexId*)graph_query -> node_values);
             if (retval = d_query_col.Move(util::HOST, util::DEVICE))
                 return retval;
 //util::DisplayDeviceResults(d_query_col.GetPointer(util::DEVICE), graph_query -> nodes);
@@ -278,6 +275,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             bool    skip_scanned_edges = false)
         {
             cudaError_t retval = cudaSuccess;
+            printf("graph slice edges: %d, queue_sizing:%f\n", graph_slice->edges, queue_sizing);
             if (retval = BaseDataSlice::Reset(
                 frontier_type,
                 graph_slice,
@@ -289,9 +287,16 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             SizeT nodes = graph_slice -> nodes;
             SizeT edges = graph_slice -> edges;
 
+            if (this->labels.GetPointer(util::DEVICE) == NULL)
+                if (retval = this->labels.Allocate(nodes, util::DEVICE)) return retval;
+
+//            util::MemsetKernel<<<128, 128>>>(
+//                this -> labels .GetPointer(util::DEVICE),
+//                util::InvalidValue<VertexId>(),
+//                nodes);
+
             if (d_c_set.GetPointer(util::DEVICE) == NULL) 
-                if (retval = d_c_set.Allocate(edges * edges_query/2,
-					util::DEVICE))
+                if (retval = d_c_set.Allocate(edges * edges_query/2, util::DEVICE))
                     return retval;
             
             if (froms_query.GetPointer(util::DEVICE) == NULL) 
@@ -329,16 +334,15 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
 	    util::MemsetKernel<<<128, 128>>>(
 		d_c_set.GetPointer(util::DEVICE),
 		(VertexId)0, 
-		edges * edges_query/2
-		);
+		edges * edges_query/2);
 
             // Initialize vertex frontier queue used for mappings
-            //util::MemsetIdxKernel<<<128, 128>>>(
-            //    this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
+            util::MemsetIdxKernel<<<128, 128>>>(
+                this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
             
             // Initialized edge frontier queue used for mappings
-            //util::MemsetIdxKernel<<<128, 128>>>(
-            //    this -> frontier_queues[0].values[0].GetPointer(util::DEVICE), edges);
+            util::MemsetIdxKernel<<<128, 128>>>(
+                this -> frontier_queues[0].values[0].GetPointer(util::DEVICE), edges);
 
             return retval;
         } 
@@ -412,15 +416,14 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = util::SetDevice( this -> gpu_idx[gpu]))
                 return retval;
 
-	    //unsigned long long *num_matches = new unsigned long long[1];
-
+//	    unsigned long long *num_matches = new unsigned long long[1];
 //            data_slices[gpu] -> d_in.SetPointer(h_froms);
 //            if(retval = data_slices[gpu] -> d_in.Move(util::DEVICE, util::HOST))
 //        	    return retval;
 
-            //data_slices[gpu] -> counts.SetPointer(num_matches);
-            //if(retval = data_slices[gpu] -> counts.Move(util::DEVICE, util::HOST))
-            //    return retval;
+ //           data_slices[gpu] -> counts.SetPointer(num_matches);
+//            if(retval = data_slices[gpu] -> counts.Move(util::DEVICE, util::HOST))
+//                return retval;
 
             // TODO: code to extract other results here
 	   // data_slices[gpu] -> num_matches = num_matches[0];
@@ -451,13 +454,13 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
         int*        gpu_idx          = NULL,
         std::string partition_method ="random",
         cudaStream_t* streams        = NULL,
-        float       queue_sizing     = 2.0f,
+        float       queue_sizing     = 1.0f,
         float       in_sizing        = 1.0f,
         float       partition_factor = -1.0f,
         int         partition_seed   = -1)
     {
-
-        BaseProblem::Init(
+        cudaError_t retval = cudaSuccess;
+        if (retval = BaseProblem::Init(
             stream_from_host,
             graph_data,
             NULL,
@@ -466,13 +469,11 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             partition_method,
             queue_sizing,
             partition_factor,
-            partition_seed);
-
-
+            partition_seed))
+            return retval;
 	
         // No data in DataSlice needs to be copied form host
 
-        cudaError_t retval = cudaSuccess;
         data_slices = new util::Array1D<SizeT,DataSlice>[this->num_gpus];
 
         for (int gpu = 0; gpu < this -> num_gpus; gpu++)
@@ -531,6 +532,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                 queue_sizing,
                 queue_sizing1))
                 return retval;
+
             if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) 
                 return retval;
         }

@@ -75,7 +75,6 @@ struct SMInitFunctor
 			(d_data_slice -> d_query_row[     i+1] - d_data_slice -> d_query_row[     i])))
 		{
 			d_data_slice -> d_c_set[s_id] |= 1 << i;
-			
 		}
 	    }
 	return true;
@@ -164,7 +163,7 @@ struct SMFunctor
 		unsigned int to   = d_data_slice -> tos_query[i];
 		res = ((d_data_slice -> d_c_set[s_id] >> from) % 2 == 1) && 
 		      ((d_data_slice -> d_c_set[d_id] >> to  ) % 2 == 1) && 
-		      (s_id < d_id); // only for triangle counting
+		      (s_id < d_id); 
 
 		if(res) break;
 	    }

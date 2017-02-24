@@ -109,7 +109,6 @@ cudaError_t CUBSelect_if(
     SelectOp	select_op)
 {
     cudaError_t retval = cudaSuccess;
-
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
 
@@ -141,13 +140,12 @@ cudaError_t CUBSelect_if(
 		select_op)),
             "CUBSelect cub::DeviceSelect::If failed",
             __FILE__, __LINE__)) return retval;
-
 // clean up
-/*    if (util::GRError(
+    if (util::GRError(
             (retval = cudaFree(d_temp_storage)),
             "CUBSelect free d_temp_storage failed",
             __FILE__, __LINE__)) return retval;
-*/
+
     return retval;
 }
 

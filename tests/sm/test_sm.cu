@@ -128,7 +128,7 @@ void DisplaySolution(
 template<typename VertexId, typename SizeT, typename Value>
 SizeT ReferenceSM(
 	const Csr<VertexId, SizeT, Value> &graph_query,
-    const Csr<VertexId, SizeT, Value> &graph_data,
+        const Csr<VertexId, SizeT, Value> &graph_data,
 	bool quiet_mode = false)
 {
     if (!quiet_mode) { printf("\nSM CPU REFERENCE TEST\n"); }
@@ -177,11 +177,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     // define the problem data structure for graph primitive
     typedef SMProblem<VertexId,
             SizeT,
-            Value>
-            //true,    // MARK_PREDECESSORS
-            //false>   // ENABLE_IDEMPOTENCE
-            //true >   // USE_DOUBLE_BUFFER
-            Problem;
+            Value> Problem;
     typedef SMEnactor <Problem>
             Enactor;
     Csr<VertexId, SizeT, Value> *graph_query = info->csr_query_ptr;
@@ -200,7 +196,9 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     bool     instrument            = info->info["instrument"        ].get_bool (); 
     bool     debug                 = info->info["debug_mode"        ].get_bool (); 
     bool     size_check            = info->info["size_check"        ].get_bool (); 
-    int      iterations            = 1; //disable since doesn't support mgpu stop condition. info->info["num_iteration"].get_int();
+//    int      iterations            = 1; //disable since doesn't support mgpu stop condition. info->info["num_iteration"].get_int();
+    if(max_queue_sizing < 0) max_queue_sizing = 1.0;
+    if(max_in_sizing < 0) max_in_sizing = 1.0;
     CpuTimer cpu_timer;
 
     cpu_timer.Start();
@@ -213,12 +211,11 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     ContextPtr   *context = (ContextPtr*  )info->context;
     cudaStream_t *streams = (cudaStream_t*)info->streams;
 
-    // host results spaces
+    // TODO: still need? host results spaces
     VertexId *h_edges = new VertexId [graph_data -> edges * graph_query -> edges/4];
 
-    // allocate problem on GPU create a pointer of the SMProblem type
+    // allocate problem on GPU create a pointer of the SMProblem type with double buffer
     Problem * problem = new Problem(true);
-
     // copy data from CPU to GPU initialize data members in DataSlice
     util::GRError(problem->Init(
         stream_from_host,
@@ -248,25 +245,21 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     // perform calculations
     double elapsed_gpu = 0.0f;  // device elapsed running time
 
-    for (int iter = 0; iter < iterations; ++iter)
-    {
         // reset values in DataSlice
-        util::GRError(problem->Reset(
-            enactor -> GetFrontierType(), 
-            max_queue_sizing, max_queue_sizing1),
-            "SM Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(enactor -> Reset(),
-            "Enactor Reset failed", __FILE__, __LINE__);
+    util::GRError(problem->Reset(
+        enactor -> GetFrontierType(), 
+        max_queue_sizing, max_queue_sizing1),
+        "SM Problem Data Reset Failed", __FILE__, __LINE__);
+    util::GRError(enactor -> Reset(),
+        "Enactor Reset failed", __FILE__, __LINE__);
 
-        cpu_timer.Start();
-        // launch SM enactor
-        util::GRError(enactor -> Enact(),
-            "SM Problem Enact Failed", __FILE__, __LINE__);
-        cpu_timer.Stop();
-        elapsed_gpu += cpu_timer.ElapsedMillis();
-    }
+    cpu_timer.Start();
+    // launch SM enactor
+    util::GRError(enactor -> Enact(),
+        "SM Problem Enact Failed", __FILE__, __LINE__);
+    cpu_timer.Stop();
+    elapsed_gpu += cpu_timer.ElapsedMillis();
 
-    elapsed_gpu /= iterations;
     cpu_timer.Start();
 
     if (!quiet_mode)
@@ -332,7 +325,7 @@ int main_(CommandLineArgs *args, int graph_args)
 
     // graph construction or generation related parameters
     info->info["undirected"] = true;  // always convert to undirected
-    info->info["debug_mode"] = false;  // debug mode
+    info->info["debug_mode"] = true;  // debug mode
     if (graph_args == 5)  info->info["node_value"] = true;  // require per node label values
 
     cpu_timer2.Start();
