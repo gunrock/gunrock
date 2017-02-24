@@ -339,7 +339,7 @@ public:
         return retval;
     } // Release(...)
 
-    __host__ __device__
+    __host__ __device__ __forceinline__
     SizeT GetSize() const
     {
         return this -> size;

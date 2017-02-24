@@ -74,7 +74,7 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 #-ccbin=g++-4.8
+NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 --expt-extended-lambda #-ccbin=g++-4.8
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500

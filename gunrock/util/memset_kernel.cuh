@@ -251,3 +251,9 @@ __global__ void MemsetCASKernel(T *d_dst, T compare, T val, SizeT *length)
 
 } // namespace util
 } // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:
