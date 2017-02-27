@@ -18,7 +18,8 @@
 #include <fstream>
 #include <gunrock/util/basic_utils.h>
 #include <gunrock/util/error_utils.cuh>
-#include <gunrock/util/memset_kernel.cuh>
+#include <gunrock/util/type_limits.cuh>
+//#include <gunrock/util/memset_kernel.cuh>
 
 namespace gunrock {
 namespace util {
@@ -40,6 +41,7 @@ enum : Location
     GPU           = 0x02,
     DISK          = 0x04,
     LOCATION_ALL  = 0x0F,
+    LOCATION_DEFAULT = 0x10,
 };
 
 std::string Location_to_string(Location target)
@@ -69,6 +71,20 @@ enum : ArrayFlag
     MAPPED     = 0x04,
 };
 
+template <typename SizeT, typename ValueT>
+__global__ void Memcpy_Kernel(
+    ValueT *d_dest, ValueT *d_src,
+    SizeT length)
+{
+    const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;
+    SizeT i = (SizeT)blockDim.x * blockIdx.x + threadIdx.x;
+    while (i < length)
+    {
+        d_dest[i] = d_src[i];
+        i += STRIDE;
+    }
+}
+
 template <
     typename _SizeT,
     typename _ValueT,
@@ -78,6 +94,8 @@ struct Array1D
 {
     typedef _SizeT SizeT;
     typedef _ValueT ValueT;
+    typedef Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+        Array1DT;
 
 private:
     std::string  name;
@@ -148,6 +166,102 @@ public:
         //Release();
 #endif
     } // ~Array1D()
+
+    template <typename ApplyLambda>
+    cudaError_t ForAll(
+        ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
+
+    template <typename ArrayT_in, typename ApplyLambda>
+    cudaError_t ForAll(
+        ArrayT_in array_in,
+        ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
+
+    template <typename ArrayT_in1, typename ArrayT_in2,
+        typename ApplyLambda>
+    cudaError_t ForAll(
+        ArrayT_in1 array_in1, ArrayT_in2 array_in2,
+        ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
+
+    template <typename CondLambda, typename ApplyLambda>
+    cudaError_t ForAllCond(
+        CondLambda cond, ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
+
+    template <typename ArrayT_in,
+        typename CondLambda, typename ApplyLambda>
+    cudaError_t ForAllCond(
+        ArrayT_in array_in, CondLambda cond, ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
+
+    template <typename ArrayT_in1, typename ArrayT_in2,
+        typename CondLambda, typename ApplyLambda>
+    cudaError_t ForAllCond(
+        ArrayT_in1 array_in1, ArrayT_in2 array_in2,
+        CondLambda cond, ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
+
+    template <typename ApplyLambda>
+    cudaError_t ForEach(
+        ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
+
+    template <typename ArrayT_in, typename ApplyLambda>
+    cudaError_t ForEach(
+        ArrayT_in array_in, ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
+
+    template <typename ArrayT_in1, typename ArrayT_in2,
+        typename ApplyLambda>
+    cudaError_t ForEach(
+        ArrayT_in1 array_in1, ArrayT_in2 array_in2,
+        ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
+
+    template <typename CondLambda, typename ApplyLambda>
+    cudaError_t ForEachCond(
+        CondLambda cond, ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
+
+    template <typename ArrayT_in,
+        typename CondLambda, typename ApplyLambda>
+    cudaError_t ForEachCond(
+        ArrayT_in array_in,
+        CondLambda cond, ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
+
+    template <typename ArrayT_in1, typename ArrayT_in2,
+        typename CondLambda, typename ApplyLambda>
+    cudaError_t ForEachCond(
+        ArrayT_in1 array_in1, ArrayT_in2 array_in2,
+        CondLambda cond, ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
 
     cudaError_t Init(
         SizeT        size,
@@ -370,7 +484,7 @@ public:
             memcpy(temp_array.GetPointer(HOST),
                 h_pointer, sizeof(ValueT) * this->size);
         if ((allocated & DEVICE) == DEVICE)
-            MemsetCopyVectorKernel<<<256, 256, 0, stream>>>(
+            Memcpy_Kernel<<<256, 256, 0, stream>>>(
                 temp_array.GetPointer(DEVICE), d_pointer, this->size);
         if (retval = Release(HOST  )) return retval;
         if (retval = Release(DEVICE)) return retval;
@@ -410,7 +524,7 @@ public:
             memcpy(temp_array.GetPointer(HOST),
                 h_pointer, sizeof(ValueT) * this -> size);
         if ((allocated & DEVICE) == DEVICE)
-            MemsetCopyVectorKernel<<<256, 256, 0, stream>>>(
+            Memcpy_Kernel<<<256, 256, 0, stream>>>(
                 temp_array.GetPointer(DEVICE), d_pointer, this -> size);
         if (retval = Release(HOST  )) return retval;
         if (retval = Release(DEVICE)) return retval;
@@ -768,6 +882,30 @@ public:
         return h_pointer + offset;
 #endif
     }
+
+    template <typename T> Array1DT& operator=  (T val);
+    template <typename T> Array1DT& operator+= (T val);
+    template <typename T> Array1DT& operator-= (T val);
+    template <typename T> Array1DT& operator*= (T val);
+    template <typename T> Array1DT& operator/= (T val);
+    template <typename T>
+    cudaError_t Set(T value,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+    template <typename SizeT_in, typename ValueT_in,
+        ArrayFlag FLAG_in, unsigned int cudaHostRegisterFlag_in>
+    cudaError_t Set(Array1D<SizeT_in, ValueT_in,
+        FLAG_in, cudaHostRegisterFlag_in> &array_in,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+    template <typename T>
+        cudaError_t SetIdx(T scasle = 1,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+    template <typename CompareT, typename AssignT>
+        cudaError_t CAS(CompareT compare, AssignT val,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
 }; // struct Array1D
 
 } // namespace util

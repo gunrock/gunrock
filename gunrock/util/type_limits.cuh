@@ -13,11 +13,10 @@
  */
 
 #pragma once
+#include <limits>
 
 namespace gunrock {
 namespace util {
-
-#include <limits>
 
 // Ensure no un-specialized types will be compiled
 extern __device__ __host__
@@ -137,7 +136,7 @@ struct PreDefinedValues<unsigned long long>
 };
 
 template <typename T>
-__Device__ __host__ __forceinline__
+__device__ __host__ __forceinline__
 bool isValid(T val)
 {
     return (val != PreDefinedValues<T>::InvalidValue);
