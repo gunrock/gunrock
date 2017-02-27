@@ -270,6 +270,134 @@ cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     });
 }
 
+template <
+    typename SizeT,
+    typename ValueT,
+    ArrayFlag FLAG,
+    unsigned int cudaHostRegisterFlag>
+template <
+    typename SizeT_in,
+    typename ValueT_in,
+    ArrayFlag FLAG_in,
+    unsigned int cudaHostRegisterFlag_in>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+    ::Add(
+    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in>
+        &array_in,
+    SizeT length,
+    Location target,
+    cudaStream_t stream)
+{
+    return ForEach(array_in, []__host__ __device__ (
+        ValueT &element, ValueT_in element_in){
+        element += element_in;
+    });
+}
+
+template <
+    typename SizeT,
+    typename ValueT,
+    ArrayFlag FLAG,
+    unsigned int cudaHostRegisterFlag>
+template <
+    typename SizeT_in,
+    typename ValueT_in,
+    ArrayFlag FLAG_in,
+    unsigned int cudaHostRegisterFlag_in>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+    ::Minus(
+    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in>
+        &array_in,
+    SizeT length,
+    Location target,
+    cudaStream_t stream)
+{
+    return ForEach(array_in, []__host__ __device__ (
+        ValueT &element, ValueT_in element_in){
+        element -= element_in;
+    });
+}
+
+template <
+    typename SizeT,
+    typename ValueT,
+    ArrayFlag FLAG,
+    unsigned int cudaHostRegisterFlag>
+template <
+    typename SizeT_in,
+    typename ValueT_in,
+    ArrayFlag FLAG_in,
+    unsigned int cudaHostRegisterFlag_in>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+    ::Mul(
+    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in>
+        &array_in,
+    SizeT length,
+    Location target,
+    cudaStream_t stream)
+{
+    return ForEach(array_in, []__host__ __device__ (
+        ValueT &element, ValueT_in element_in){
+        element *= element_in;
+    });
+}
+
+template <
+    typename SizeT,
+    typename ValueT,
+    ArrayFlag FLAG,
+    unsigned int cudaHostRegisterFlag>
+template <
+    typename SizeT_in,
+    typename ValueT_in,
+    ArrayFlag FLAG_in,
+    unsigned int cudaHostRegisterFlag_in>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+    ::Div(
+    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in>
+        &array_in,
+    SizeT length,
+    Location target,
+    cudaStream_t stream)
+{
+    return ForEach(array_in, []__host__ __device__ (
+        ValueT &element, ValueT_in element_in){
+        element /= element_in;
+    });
+}
+
+template <
+    typename SizeT,
+    typename ValueT,
+    ArrayFlag FLAG,
+    unsigned int cudaHostRegisterFlag>
+template <
+    typename SizeT_in1,
+    typename ValueT_in1,
+    ArrayFlag FLAG_in1,
+    unsigned int cudaHostRegisterFlag_in1,
+    typename SizeT_in2,
+    typename ValueT_in2,
+    ArrayFlag FLAG_in2,
+    unsigned int cudaHostRegisterFlag_in2,
+    typename T>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+    ::Mad(
+    Array1D<SizeT_in1, ValueT_in1, FLAG_in1, cudaHostRegisterFlag_in1>
+        &array_in1,
+    Array1D<SizeT_in2, ValueT_in2, FLAG_in2, cudaHostRegisterFlag_in2>
+        &array_in2,
+    T     scale,
+    SizeT length,
+    Location target,
+    cudaStream_t stream)
+{
+    return ForEach(array_in1, array_in2, [scale]__host__ __device__ (
+        ValueT &element, ValueT_in1 element_in1, ValueT_in2 element_in2){
+        element = element_in1 * scale + element_in2;
+    });
+}
+
 } // namespace util
 } // namespace gunrock
 

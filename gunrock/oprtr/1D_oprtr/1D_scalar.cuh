@@ -305,9 +305,7 @@ Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::operator= (T val)
 {
-    ForEach([val] __device__ __host__ (ValueT &element){
-        element = val;
-    });
+    GRError(Set(val), name + " Set() failed.", __FILE__, __LINE__);
     return (*this);
 }
 
@@ -321,9 +319,7 @@ Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::operator+= (T val)
 {
-    ForEach([val] __device__ __host__ (ValueT &element){
-        element += val;
-    });
+    GRError(Add(val), name + " Add() failed.", __FILE__, __LINE__);
     return (*this);
 }
 
@@ -337,9 +333,7 @@ Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::operator-= (T val)
 {
-    ForEach([val] __device__ __host__ (ValueT &element){
-        element -= val;
-    });
+    GRError(Minus(val), name + " Minus() failed.", __FILE__, __LINE__);
     return (*this);
 }
 
@@ -353,9 +347,7 @@ Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::operator*= (T val)
 {
-    ForEach([val] __device__ __host__ (ValueT &element){
-        element *= val;
-    });
+    GRError(Minus(val), name + " Mul() failed.", __FILE__, __LINE__);
     return (*this);
 }
 
@@ -369,9 +361,7 @@ Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::operator/= (T val)
 {
-    ForEach([val] __device__ __host__ (ValueT &element){
-        element /= val;
-    });
+    GRError(Minus(val), name + " Div() failed.", __FILE__, __LINE__);
     return (*this);
 }
 
@@ -381,15 +371,13 @@ template <
     ArrayFlag FLAG,
     unsigned int cudaHostRegisterFlag>
 template <typename T>
-cudaError_t
-Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::Set(
     T          value,
     SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
     Location   target,// = LOCATION_DEFAULT,
     cudaStream_t stream)// = 0)
 {
-    //typedef typename ArrayT::ValueT ValueT;
     return ForEach([value] __host__ __device__ (ValueT &element){
             element = value;
         }, length, target, stream);
@@ -401,15 +389,13 @@ template <
     ArrayFlag FLAG,
     unsigned int cudaHostRegisterFlag>
 template <typename T>
-cudaError_t
-Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::SetIdx(
     T          scale,// = 1,
     SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
     Location   target,// = LOCATION_DEFAULT,
     cudaStream_t stream)// = 0)
 {
-    //typedef typename ArrayT::ValueT ValueT;
     return ForAll([scale] __host__ __device__ (ValueT* elements, SizeT pos){
             elements[pos] = pos * scale;
         }, length, target, stream);
@@ -420,9 +406,80 @@ template <
     typename ValueT,
     ArrayFlag FLAG,
     unsigned int cudaHostRegisterFlag>
+template <typename T>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+    ::Add(
+    T          value,
+    SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
+    Location   target,// = LOCATION_DEFAULT,
+    cudaStream_t stream)// = 0)
+{
+    return ForEach([value] __host__ __device__ (ValueT &element){
+            element += value;
+        }, length, target, stream);
+}
+
+template <
+    typename SizeT,
+    typename ValueT,
+    ArrayFlag FLAG,
+    unsigned int cudaHostRegisterFlag>
+template <typename T>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+    ::Minus(
+    T          value,
+    SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
+    Location   target,// = LOCATION_DEFAULT,
+    cudaStream_t stream)// = 0)
+{
+    return ForEach([value] __host__ __device__ (ValueT &element){
+            element -= value;
+        }, length, target, stream);
+}
+
+template <
+    typename SizeT,
+    typename ValueT,
+    ArrayFlag FLAG,
+    unsigned int cudaHostRegisterFlag>
+template <typename T>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+    ::Mul(
+    T          value,
+    SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
+    Location   target,// = LOCATION_DEFAULT,
+    cudaStream_t stream)// = 0)
+{
+    return ForEach([value] __host__ __device__ (ValueT &element){
+            element *= value;
+        }, length, target, stream);
+}
+
+template <
+    typename SizeT,
+    typename ValueT,
+    ArrayFlag FLAG,
+    unsigned int cudaHostRegisterFlag>
+template <typename T>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+    ::Div(
+    T          value,
+    SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
+    Location   target,// = LOCATION_DEFAULT,
+    cudaStream_t stream)// = 0)
+{
+    return ForEach([value] __host__ __device__ (ValueT &element){
+            element /= value;
+        }, length, target, stream);
+}
+
+template <
+    typename SizeT,
+    typename ValueT,
+    ArrayFlag FLAG,
+    unsigned int cudaHostRegisterFlag>
 template <typename CompareT, typename AssignT>
-cudaError_t
-Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::CAS(
     CompareT   compare,
     AssignT    assign,

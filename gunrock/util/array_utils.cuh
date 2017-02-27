@@ -176,7 +176,7 @@ public:
 
     template <typename ArrayT_in, typename ApplyLambda>
     cudaError_t ForAll(
-        ArrayT_in array_in,
+        ArrayT_in &array_in,
         ApplyLambda apply,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT,
@@ -185,7 +185,7 @@ public:
     template <typename ArrayT_in1, typename ArrayT_in2,
         typename ApplyLambda>
     cudaError_t ForAll(
-        ArrayT_in1 array_in1, ArrayT_in2 array_in2,
+        ArrayT_in1 &array_in1, ArrayT_in2 &array_in2,
         ApplyLambda apply,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT,
@@ -201,7 +201,7 @@ public:
     template <typename ArrayT_in,
         typename CondLambda, typename ApplyLambda>
     cudaError_t ForAllCond(
-        ArrayT_in array_in, CondLambda cond, ApplyLambda apply,
+        ArrayT_in &array_in, CondLambda cond, ApplyLambda apply,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT,
         cudaStream_t stream = 0);
@@ -209,7 +209,7 @@ public:
     template <typename ArrayT_in1, typename ArrayT_in2,
         typename CondLambda, typename ApplyLambda>
     cudaError_t ForAllCond(
-        ArrayT_in1 array_in1, ArrayT_in2 array_in2,
+        ArrayT_in1 &array_in1, ArrayT_in2 &array_in2,
         CondLambda cond, ApplyLambda apply,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT,
@@ -224,7 +224,7 @@ public:
 
     template <typename ArrayT_in, typename ApplyLambda>
     cudaError_t ForEach(
-        ArrayT_in array_in, ApplyLambda apply,
+        ArrayT_in &array_in, ApplyLambda apply,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT,
         cudaStream_t stream = 0);
@@ -232,7 +232,7 @@ public:
     template <typename ArrayT_in1, typename ArrayT_in2,
         typename ApplyLambda>
     cudaError_t ForEach(
-        ArrayT_in1 array_in1, ArrayT_in2 array_in2,
+        ArrayT_in1 &array_in1, ArrayT_in2 &array_in2,
         ApplyLambda apply,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT,
@@ -248,7 +248,7 @@ public:
     template <typename ArrayT_in,
         typename CondLambda, typename ApplyLambda>
     cudaError_t ForEachCond(
-        ArrayT_in array_in,
+        ArrayT_in &array_in,
         CondLambda cond, ApplyLambda apply,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT,
@@ -257,7 +257,7 @@ public:
     template <typename ArrayT_in1, typename ArrayT_in2,
         typename CondLambda, typename ApplyLambda>
     cudaError_t ForEachCond(
-        ArrayT_in1 array_in1, ArrayT_in2 array_in2,
+        ArrayT_in1 &array_in1, ArrayT_in2 &array_in2,
         CondLambda cond, ApplyLambda apply,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT,
@@ -888,24 +888,92 @@ public:
     template <typename T> Array1DT& operator-= (T val);
     template <typename T> Array1DT& operator*= (T val);
     template <typename T> Array1DT& operator/= (T val);
+
+    // operation with scalar
     template <typename T>
     cudaError_t Set(T value,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
-    template <typename SizeT_in, typename ValueT_in,
-        ArrayFlag FLAG_in, unsigned int cudaHostRegisterFlag_in>
-    cudaError_t Set(Array1D<SizeT_in, ValueT_in,
-        FLAG_in, cudaHostRegisterFlag_in> &array_in,
+
+    template <typename T = ValueT>
+        cudaError_t SetIdx(T scale = 1,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+
     template <typename T>
-        cudaError_t SetIdx(T scasle = 1,
+    cudaError_t Add(T value,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+
+    template <typename T>
+    cudaError_t Minus(T value,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+
+    template <typename T>
+    cudaError_t Mul(T value,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+
+    template <typename T>
+    cudaError_t Div(T value,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+
     template <typename CompareT, typename AssignT>
         cudaError_t CAS(CompareT compare, AssignT val,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+
+    // operations with other arrays
+    template <typename SizeT_in, typename ValueT_in,
+        ArrayFlag FLAG_in, unsigned int cudaHostRegisterFlag_in>
+    cudaError_t Set(Array1D<SizeT_in, ValueT_in,
+            FLAG_in, cudaHostRegisterFlag_in> &array_in,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+
+    template <typename SizeT_in, typename ValueT_in,
+        ArrayFlag FLAG_in, unsigned int cudaHostRegisterFlag_in>
+    cudaError_t Add(Array1D<SizeT_in, ValueT_in,
+            FLAG_in, cudaHostRegisterFlag_in> &array_in,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+
+    template <typename SizeT_in, typename ValueT_in,
+        ArrayFlag FLAG_in, unsigned int cudaHostRegisterFlag_in>
+    cudaError_t Minus(Array1D<SizeT_in, ValueT_in,
+            FLAG_in, cudaHostRegisterFlag_in> &array_in,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+
+    template <typename SizeT_in, typename ValueT_in,
+        ArrayFlag FLAG_in, unsigned int cudaHostRegisterFlag_in>
+    cudaError_t Mul(Array1D<SizeT_in, ValueT_in,
+            FLAG_in, cudaHostRegisterFlag_in> &array_in,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+
+    template <typename SizeT_in, typename ValueT_in,
+        ArrayFlag FLAG_in, unsigned int cudaHostRegisterFlag_in>
+    cudaError_t Div(Array1D<SizeT_in, ValueT_in,
+            FLAG_in, cudaHostRegisterFlag_in> &array_in,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+
+    template <typename SizeT_in1, typename ValueT_in1,
+        ArrayFlag FLAG_in1, unsigned int cudaHostRegisterFlag_in1,
+        typename SizeT_in2, typename ValueT_in2,
+        ArrayFlag FLAG_in2, unsigned int cudaHostRegisterFlag_in2,
+        typename T>
+    cudaError_t Mad(Array1D<SizeT_in1, ValueT_in1,
+            FLAG_in1, cudaHostRegisterFlag_in1> &array_in1,
+        Array1D<SizeT_in2, ValueT_in2,
+            FLAG_in2, cudaHostRegisterFlag_in2> &array_in2,
+        T scale,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
+
 }; // struct Array1D
 
 } // namespace util

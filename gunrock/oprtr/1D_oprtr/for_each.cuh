@@ -503,7 +503,7 @@ template <
     typename ApplyLambda>
 cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::ForEach(
-    ArrayT_in    array_in,
+    ArrayT_in    &array_in,
     //ArrayT_out   array_out,
     ApplyLambda  apply,
     SizeT        length,// = PreDefinedValues<SizeT>::InvalidValue,
@@ -545,8 +545,8 @@ template <
     typename ApplyLambda>
 cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::ForEach(
-    ArrayT_in1   array_in1,
-    ArrayT_in2   array_in2,
+    ArrayT_in1   &array_in1,
+    ArrayT_in2   &array_in2,
     //ArrayT_out   array_out,
     ApplyLambda  apply,
     SizeT        length,// = PreDefinedValues<SizeT>::InvalidValue,
@@ -629,7 +629,7 @@ template <
     typename ApplyLambda>
 cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::ForEachCond(
-    ArrayT_in    array_in,
+    ArrayT_in    &array_in,
     //ArrayT_out   array_out,
     CondLambda   cond,
     ApplyLambda  apply,
@@ -673,8 +673,8 @@ template <
     typename ApplyLambda>
 cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::ForEachCond(
-    ArrayT_in1   array_in1,
-    ArrayT_in2   array_in2,
+    ArrayT_in1   &array_in1,
+    ArrayT_in2   &array_in2,
     //ArrayT_out   array_out,
     CondLambda   cond,
     ApplyLambda  apply,

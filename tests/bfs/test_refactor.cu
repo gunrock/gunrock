@@ -71,8 +71,9 @@ int main(int argc, char* argv[])
     Location target = HOST | DEVICE;
     array3.Allocate(length, target);
     array4.Allocate(length, target);
+    array4.SetIdx();
     array3 = 10;
-    array3 += 14.5;
+    array3 += array4;
     array3 -= 19.5;
     //ForEach(array3.GetPointer(DEVICE),
     //    [] __host__ __device__ (ValueT &element){
