@@ -160,6 +160,19 @@ struct If<false, ThenType, ElseType>
     typedef ElseType Type;
 };
 
+template <bool IF, unsigned int ThenVal, unsigned int ElseVal>
+struct If_Val
+{
+    // true
+    static const unsigned int Value = ThenVal;
+};
+
+template <unsigned int ThenVal, unsigned int ElseVal>
+struct If_Val<false, ThenVal, ElseVal>
+{
+    // false
+    static const unsigned int Value = ElseVal;
+};
 
 /**
  * Equals

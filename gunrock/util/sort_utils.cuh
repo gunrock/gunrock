@@ -271,4 +271,3 @@ cudaError_t CUBRadixSort(
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-

@@ -5,16 +5,19 @@
 #include <gunrock/oprtr/1D_oprtr/for_each.cuh>
 #include <gunrock/oprtr/1D_oprtr/1D_scalar.cuh>
 #include <gunrock/oprtr/1D_oprtr/1D_1D.cuh>
+#include <gunrock/graph/csr.cuh>
+#include <gunrock/graph/coo.cuh>
 
 using namespace gunrock;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
+using namespace gunrock::graph;
 
 int main(int argc, char* argv[])
 {
     typedef int SizeT;
     typedef int ValueT;
-    static const SizeT DefaultSize = PreDefinedValues<SizeT>::InvalidValue;
+    //const SizeT DefaultSize = PreDefinedValues<SizeT>::InvalidValue;
 
     // test array
     /*Array1D<int, int, PINNED> test_array;
@@ -25,7 +28,7 @@ int main(int argc, char* argv[])
     test_array.Release();*/
 
     // test ForAll
-    Array1D<int, int, PINNED> array1, array2;
+    /*Array1D<int, int, PINNED> array1, array2;
     array1.SetName("array1"); array2.SetName("array2");
     array1.Allocate(1024 * 1024, HOST | DEVICE);
     array2.Allocate(1024 * 1024, HOST | DEVICE);
@@ -62,10 +65,10 @@ int main(int argc, char* argv[])
 #endif
                     pos, pos, elements_in[pos]);
         });//, DefaultSize, HOST | DEVICE);
-    cudaDeviceSynchronize();
+    cudaDeviceSynchronize();*/
 
     // test ForEach
-    Array1D<SizeT, ValueT, PINNED> array3, array4;
+    /*Array1D<SizeT, ValueT, PINNED> array3, array4;
     array3.SetName("array3");array4.SetName("array4");
     SizeT length = 1024 * 1024;
     Location target = HOST | DEVICE;
@@ -81,6 +84,18 @@ int main(int argc, char* argv[])
     //    }, length, DEVICE);
     array4.ForEach([] __host__ __device__ (ValueT &element){
             element = 20;
-        });
+        });*/
+
+    // Test_Csr
+    typedef int VertexT;
+    Csr<VertexT, SizeT, ValueT> csr;
+    csr.Allocate(10, 10);
+    Coo<VertexT, SizeT, ValueT> coo;
+    csr.FromCoo(coo);
+
+    Csr<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> csr2;
+    csr2.Allocate(10, 10);
+    Coo<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> coo2;
+    csr2.FromCoo(coo2);
     return 0;
 }

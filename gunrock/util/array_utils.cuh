@@ -85,6 +85,71 @@ __global__ void Memcpy_Kernel(
     }
 }
 
+static const Location ARRAY_DEFAULT_TARGET = DEVICE;
+
+// Dummy array with no storage
+template <
+    typename _SizeT,
+    typename _ValueT,
+    ArrayFlag FLAG = ARRAY_NONE,
+    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
+struct NullArray
+{
+    typedef _SizeT SizeT;
+    typedef _ValueT ValueT;
+
+    void SetName(std::string name) {}
+    cudaError_t Allocate(SizeT size, Location target = ARRAY_DEFAULT_TARGET)
+    {
+        return cudaSuccess;
+    }
+
+    cudaError_t Release()
+    {
+        return cudaSuccess;
+    }
+
+    template <typename ArrayT>
+    cudaError_t Set(ArrayT &array_in,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT, cudaStream_t stream = 0)
+    {
+        return cudaSuccess;
+    }
+
+    cudaError_t Move(
+        Location source,
+        Location target,
+        SizeT size  =-1,
+        SizeT offset=0,
+        cudaStream_t stream=0)
+    {
+        return cudaSuccess;
+    }
+    
+    template <typename ArrayT_in, typename ApplyLambda>
+    cudaError_t ForEach(
+        ArrayT_in &array_in, ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0)
+    {
+        return cudaSuccess;
+    }
+
+    __host__ __device__ __forceinline__
+    ValueT* GetPointer(Location target = ARRAY_DEFAULT_TARGET)
+    {
+        return (ValueT*)NULL;
+    }
+
+    __host__ __device__ __forceinline__
+    ValueT* operator+(const _SizeT& offset)
+    {
+        return (ValueT*)NULL;
+    }
+};
+
 template <
     typename _SizeT,
     typename _ValueT,
@@ -125,7 +190,7 @@ public:
         //setted    = LOCATION_NONE;
         //allocated = LOCATION_NONE;
         //use_cuda_alloc = false;
-        Init(0,LOCATION_NONE);
+        Init(0, LOCATION_NONE);
     } // Array1D()
 
     Array1D(const char* const name) :
@@ -145,7 +210,7 @@ public:
         //allocated = LOCATION_NONE;
         //flag      = cudaHostAllocDefault;
         //use_cuda_alloc = false;
-        Init(0,LOCATION_NONE);
+        Init(0, LOCATION_NONE);
     } // Array1D(const char* const)
 
     /*Array1D(SizeT size, std::string name = "", unsigned int target = HOST)
@@ -265,7 +330,7 @@ public:
 
     cudaError_t Init(
         SizeT        size,
-        Location     target = HOST)
+        Location     target = ARRAY_DEFAULT_TARGET)
         //bool use_cuda_alloc = false,
         //unsigned int flag   = cudaHostAllocDefault)
     {
@@ -298,7 +363,7 @@ public:
         this -> name = name;
     }
 
-    cudaError_t Allocate(SizeT size, Location target = HOST)
+    cudaError_t Allocate(SizeT size, Location target = ARRAY_DEFAULT_TARGET)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -459,6 +524,18 @@ public:
         return this -> size;
     }
 
+    __host__ __device__ __forceinline__
+    Location GetSetted()
+    {
+        return this -> setted;
+    }
+
+    __host__ __device__ __forceinline__
+    Location GetAllocated()
+    {
+        return this -> allocated;
+    }
+
     cudaError_t EnsureSize(SizeT size, bool keep = false, cudaStream_t stream = 0)
     {
 #ifdef ENABLE_ARRAY_DEBUG
@@ -541,7 +618,7 @@ public:
     } // ShrinkSize(...)
 
     __host__ __device__ __forceinline__
-    ValueT* GetPointer(Location target = HOST)
+    ValueT* GetPointer(Location target = ARRAY_DEFAULT_TARGET)
     {
         if (target == HOST  )
         {
@@ -563,7 +640,7 @@ public:
         return NULL;
     } // GetPointer(...)
 
-    cudaError_t SetPointer(ValueT* pointer, SizeT size = -1, Location target = HOST)
+    cudaError_t SetPointer(ValueT* pointer, SizeT size = -1, Location target = ARRAY_DEFAULT_TARGET)
     {
         cudaError_t retval = cudaSuccess;
         if (size == -1) size = this->size;
@@ -617,7 +694,7 @@ public:
         return retval;
     } // SetPointer(...)
 
-    cudaError_t ForceSetPointer(ValueT* pointer, Location target = HOST)
+    cudaError_t ForceSetPointer(ValueT* pointer, Location target = ARRAY_DEFAULT_TARGET)
     {
         if (target == HOST)
             h_pointer = pointer;
@@ -626,7 +703,7 @@ public:
         return cudaSuccess;
     }
 
-    cudaError_t ForceUnSetPointer(Location target = HOST)
+    cudaError_t ForceUnSetPointer(Location target = ARRAY_DEFAULT_TARGET)
     {
         cudaError_t retval = cudaSuccess;
         if ((setted & target) == target)
@@ -658,7 +735,7 @@ public:
         return retval;
     } // UnSetPointer(...)
 
-    void UnSetPointer(Location target = HOST)
+    void UnSetPointer(Location target = ARRAY_DEFAULT_TARGET)
     {
         if ((setted & target) == target)
         {
@@ -666,7 +743,7 @@ public:
         }
     } // UnSetPointer(...)
 
-    void SetMarker(int t, Location target = HOST, bool s = true)
+    void SetMarker(int t, Location target = ARRAY_DEFAULT_TARGET, bool s = true)
     {
         if (t==0)
         {
@@ -974,6 +1051,30 @@ public:
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT, cudaStream_t stream = 0);
 
+    // Sorting
+    template <typename CompareLambda>
+    cudaError_t Sort(
+        CompareLambda compare = [] __host__ __device__
+        (const ValueT &a, const ValueT &b){
+            return a < b;
+        },
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        SizeT offset = 0,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
+
+    template <typename ArrayT,
+        typename CompareLambda>
+    cudaError_t Sort_by_Key(
+        ArrayT &array_in,
+        CompareLambda compare = [] __host__ __device__
+        (const ValueT &a, const ValueT &b){
+            return a < b;
+        },
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        SizeT offset = 0,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0);
 }; // struct Array1D
 
 } // namespace util
