@@ -44,8 +44,17 @@ SM_TARGETS = $(GEN_SM35) #$(GEN_SM35) $(GEN_SM60) $(GEN_SM61)
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../externals/moderngpu/include"
 CUB_INC = "../../externals/cub"
-BOOST_DEPS = -I../../.. -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
-OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
+BOOST_DEPS = #-I../../.. -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
+
+ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
+    OMP_DEPS = -I"/usr/local/include/libiomp" -Xlinker /usr/local/lib/libiomp5.dylib
+else
+    OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
+endif
+
+ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
+    use_metis = 0
+endif
 
 ifneq ($(use_metis), 1)
 	METIS_DEPS =

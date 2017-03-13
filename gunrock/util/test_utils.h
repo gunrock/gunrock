@@ -37,7 +37,8 @@
 #include <fstream>
 #include <algorithm>
 #include <utility>
-#include <boost/timer/timer.hpp>
+//#include <boost/timer/timer.hpp>
+#include <chrono>
 #include <gunrock/util/random_bits.h>
 #include <gunrock/util/basic_utils.h>
 
@@ -354,7 +355,7 @@ struct CpuTimer
         return TimeDifference(start, current);
     }
 
-#else
+/*#elif defined(boost)
 
     boost::timer::cpu_timer::cpu_timer cpu_t;
 
@@ -377,7 +378,37 @@ struct CpuTimer
     {
         return cpu_t.elapsed().wall / 1000000.0;
     }
+*/
+#else // C++11 timer
+    typedef std::chrono::time_point<std::chrono::system_clock> TimeT;
+    TimeT start, end;
 
+    void Start()
+    {
+        start = std::chrono::system_clock::now();
+    }
+
+    void Stop()
+    {
+        end = std::chrono::system_clock::now();
+    }
+
+    double TimeDifference(TimeT &start, TimeT &end)
+    {
+        std::chrono::duration<double> diff = end - start;
+        return std::chrono::milliseconds(diff).count();
+    }
+
+    double MillisSinceStart()
+    {
+        auto time_now = std::chrono::system_clock::now();
+        return TimeDifference(start, time_now);
+    }
+
+    double ElapsedMillis()
+    {
+        return TimeDifference(start, end);
+    }
 #endif
 };
 
