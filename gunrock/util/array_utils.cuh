@@ -19,6 +19,7 @@
 #include <gunrock/util/basic_utils.h>
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/type_limits.cuh>
+#include <gunrock/util/type_enum.cuh>
 //#include <gunrock/util/memset_kernel.cuh>
 
 namespace gunrock {
@@ -126,7 +127,7 @@ struct NullArray
     {
         return cudaSuccess;
     }
-    
+
     template <typename ArrayT_in, typename ApplyLambda>
     cudaError_t ForEach(
         ArrayT_in &array_in, ApplyLambda apply,
@@ -1075,6 +1076,232 @@ public:
         SizeT offset = 0,
         Location target = LOCATION_DEFAULT,
         cudaStream_t stream = 0);
+
+    template <typename T>
+    cudaError_t tRead(std::string filename)
+    {
+        Array1D<SizeT, T> tArray;
+        cudaError_t retval = cudaSuccess;
+        int64_t tLength, tType;
+        std::ifstream fin;
+        fin.open(filename.c_str());
+        if (!fin.is_open())
+            return GRError("Unable to read file " + filename,
+                __FILE__, __LINE__);
+
+        fin >> tLength >> tType;
+        if (retval = tArray.Allocate(tLength, HOST))
+            return retval;
+
+        for (SizeT i=0; i<tLength; i++)
+            fin >> tArray.h_pointer[i];
+
+        if (retval = EnsureSize(tLength))
+            return retval;
+        if (retval = ForEach(tArray,
+            [](ValueT &element, const T &tElement){
+                element = tElement;
+            }, tLength, HOST))
+            return retval;
+        if (retval = tArray.Release())
+            return retval;
+        return retval;
+    }
+
+    cudaError_t Read(
+        std::string filename)
+    {
+        cudaError_t retval = cudaSuccess;
+        int64_t tLength, tType;
+        std::ifstream fin;
+        fin.open(filename.c_str());
+        if (!fin.is_open())
+            return GRError("Unable to read file " + filename,
+                __FILE__, __LINE__);
+
+        fin >> tLength >> tType;
+        tType = tType & 0xFF;
+        if (tType == Type2Enum<ValueT>::Id)
+        {
+            if (retval = EnsureSize(tLength))
+                return retval;
+            for (SizeT i=0; i<size; i++)
+                fin >> h_pointer[i];
+            fin.close();
+        } else {
+            fin.close();
+            switch(tType)
+            {
+            case Type2Enum<char>::Id :
+                retval = tRead<char>(filename); break;
+            case Type2Enum<unsigned char>::Id :
+                retval = tRead<unsigned char>(filename); break;
+            case Type2Enum<short>::Id :
+                retval = tRead<short>(filename); break;
+            case Type2Enum<unsigned short>::Id :
+                retval = tRead<unsigned short>(filename); break;
+            case Type2Enum<int>::Id :
+                retval = tRead<int>(filename); break;
+            case Type2Enum<unsigned int>::Id :
+                retval = tRead<unsigned int>(filename); break;
+            case Type2Enum<long>::Id :
+                retval = tRead<long>(filename); break;
+            case Type2Enum<unsigned long>::Id :
+                retval = tRead<unsigned long>(filename); break;
+            case Type2Enum<long long>::Id :
+                retval = tRead<long long>(filename); break;
+            case Type2Enum<unsigned long long>::Id :
+                retval = tRead<unsigned long long>(filename); break;
+            case Type2Enum<float>::Id :
+                retval = tRead<float>(filename); break;
+            case Type2Enum<double>::Id :
+                retval = tRead<double>(filename); break;
+            case Type2Enum<std::string>::Id :
+                retval = tRead<std::string>(filename); break;
+            case util::Type2Enum<char*>::Id :
+                retval = tRead<char*>(filename); break;
+            default:
+                retval = GRError("Unsupported type (Id = " +
+                    std::to_string(tType) + ")",
+                    __FILE__, __LINE__);
+            }
+            //if (tType == util::Type2Enum<char>::Id)
+            //    retval = tRead<char>(fin);
+        }
+        return retval;
+    }
+
+    cudaError_t Write(
+        std::string filename)
+    {
+        cudaError_t retval = cudaSuccess;
+        std::ofstream fout;
+        fout.open(filename.c_str());
+        if (!fout.is_open())
+            return GRError("Unable to write file " + filename,
+                __FILE__, __LINE__);
+
+        fout << size << " "
+             << Type2Enum<ValueT>::Id << std::endl;
+        for (SizeT i=0; i < size; i++)
+            fout << h_pointer[i] << std::endl;
+        fout.close();
+        return retval;
+    }
+
+    template <typename T>
+    cudaError_t tRead_Binary(std::string filename)
+    {
+        Array1D<SizeT, T> tArray;
+        cudaError_t retval = cudaSuccess;
+        int64_t tLength, tType;
+        std::ifstream fin;
+        fin.open(filename.c_str(), std::ios::in | std::ios::binary);
+        if (!fin.is_open())
+            return GRError("Unable to read file " + filename,
+                __FILE__, __LINE__);
+
+        fin.read((char*)(&tLength), 8);
+        fin.read((char*)(&tType), 8);
+        if (retval = tArray.Allocate(tLength, HOST))
+            return retval;
+
+        fin.read(tArray.h_pointer, tLength * sizeof(T));
+        fin.close();
+
+        if (retval = EnsureSize(tLength))
+            return retval;
+        if (retval = ForEach(tArray,
+            [](ValueT &element, const T &tElement){
+                element = tElement;
+            }, tLength, HOST))
+            return retval;
+        if (retval = tArray.Release())
+            return retval;
+        return retval;
+    }
+
+    cudaError_t Read_Binary(
+        std::string filename)
+    {
+        cudaError_t retval = cudaSuccess;
+        int64_t tLength, tType;
+        std::ifstream fin;
+        fin.open(filename.c_str(), std::ios::in | std::ios::binary);
+        if (!fin.is_open())
+            return GRError("Unable to read file " + filename,
+                __FILE__, __LINE__);
+
+        fin.read((char*)(&tLength), 8);
+        fin.read((char*)(&tType), 8);
+        tType = tType & 0xFF;
+        if (tType == util::Type2Enum<ValueT>::Id)
+        {
+            if (retval = EnsureSize(tLength))
+                return retval;
+            fin.read(h_pointer, sizeof(ValueT) * tLength);
+            fin.close();
+        } else {
+            fin.close();
+            switch(tType)
+            {
+            case Type2Enum<char>::Id :
+                retval = tRead_Binary<char>(filename); break;
+            case Type2Enum<unsigned char>::Id :
+                retval = tRead_Binary<unsigned char>(filename); break;
+            case Type2Enum<short>::Id :
+                retval = tRead_Binary<short>(filename); break;
+            case Type2Enum<unsigned short>::Id :
+                retval = tRead_Binary<unsigned short>(filename); break;
+            case Type2Enum<int>::Id :
+                retval = tRead_Binary<int>(filename); break;
+            case Type2Enum<unsigned int>::Id :
+                retval = tRead_Binary<unsigned int>(filename); break;
+            case Type2Enum<long>::Id :
+                retval = tRead_Binary<long>(filename); break;
+            case Type2Enum<unsigned long>::Id :
+                retval = tRead_Binary<unsigned long>(filename); break;
+            case Type2Enum<long long>::Id :
+                retval = tRead_Binary<long long>(filename); break;
+            case Type2Enum<unsigned long long>::Id :
+                retval = tRead_Binary<unsigned long long>(filename); break;
+            case Type2Enum<float>::Id :
+                retval = tRead_Binary<float>(filename); break;
+            case Type2Enum<double>::Id :
+                retval = tRead_Binary<double>(filename); break;
+            //case Type2Enum<std::string>::Id :
+            //    retval = tRead_Binary<std::string>(filename); break;
+            //case util::Type2Enum<char*>::Id :
+            //    retval = tRead_Binary<char*>(filename); break;
+            default:
+                retval = GRError("Unsupported type (Id = " +
+                    std::to_string(tType) + ")",
+                    __FILE__, __LINE__);
+            }
+            //if (tType == util::Type2Enum<char>::Id)
+            //    retval = tRead<char>(fin);
+        }
+        return retval;
+    }
+
+    cudaError_t Write_Binary(
+        std::string filename)
+    {
+        cudaError_t retval = cudaSuccess;
+        std::ofstream fout;
+        fout.open(filename.c_str(), std::ios::out | std::ios::binary);
+        if (!fout.is_open())
+            return GRError("Unable to write file " + filename,
+                __FILE__, __LINE__);
+
+        int64_t tLength = size;
+        int64_t tType = util::Type2Enum<ValueT>::Id;
+        fout.write((char*)(&tLength), 8);
+        fout.write((char*)(&tType), 8);
+        fout.write(h_pointer, sizeof(ValueT) * size);
+        fout.close();
+        return retval;
+    }
 }; // struct Array1D
 
 } // namespace util

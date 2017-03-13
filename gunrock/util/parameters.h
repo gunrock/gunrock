@@ -28,7 +28,7 @@
 namespace gunrock {
 namespace util {
 
-#define PARAMETER_DEBUG true
+//#define ENABLE_PARAMETER_DEBUG
 
 using Parameter_Flag = unsigned int;
 
@@ -147,7 +147,7 @@ public:
         }
 
         Parameter_Item p_item(
-            ((flag & MULTI_VALUE) == MULTI_VALUE && !isVector(value_type_info)) ? 
+            ((flag & MULTI_VALUE) == MULTI_VALUE && !isVector(value_type_info)) ?
             toVector(value_type_info) : value_type_info);
         if (isVector(value_type_info))
             flag = (flag & (~SINGLE_VALUE)) | MULTI_VALUE;
@@ -168,12 +168,12 @@ public:
         {
             return GRError(cudaErrorInvalidSymbol,
                 "Parameter " + name + " has been defined before, "
-                + it -> second.file_name + ":" 
-                + std::to_string(it -> second.line_num), 
+                + it -> second.file_name + ":"
+                + std::to_string(it -> second.line_num),
                 file_name, line_num);
         }
 
-        //std::cout << name << " flag = " << flag << " "; 
+        //std::cout << name << " flag = " << flag << " ";
         //std::cout << std::ios::hex << flag << std::endl;
         //std::cout << flag / 16 / 16 << (flag / 16) % 16 << flag % 16 << std::endl;
         p_map[name] = p_item;
@@ -193,8 +193,8 @@ public:
         ostr << default_value;
         return Use(name, flag,
             ostr.str(), description,
-            (((flag & MULTI_VALUE) == MULTI_VALUE 
-               && !IS_VECTOR<T>::value ) ? 
+            (((flag & MULTI_VALUE) == MULTI_VALUE
+               && !IS_VECTOR<T>::value ) ?
               &typeid(std::vector<T>) : &typeid(T)),
             file_name, line_num);
     } // Use()
@@ -215,16 +215,17 @@ public:
         {
             Parameter_Item &p_item = it->second;
             return GRError(cudaErrorInvalidValue,
-                 "Parameter " + name + "(" + p_item.file_name + ":" 
+                 "Parameter " + name + "(" + p_item.file_name + ":"
                  + std::to_string(p_item.line_num) + ") only takes in "
                  + TypeName(p_item.value_type_info)
                  + ", value " + value + " is invalid.",
-                __FILE__, __LINE__);            
+                __FILE__, __LINE__);
         }
 
-        if (PARAMETER_DEBUG)
-            std::cout << "Parameter " << name << " <- "
-                << value << std::endl;
+#ifdef ENABLE_PARAMETER_DEBUG
+        std::cout << "Parameter " << name << " <- "
+            << value << std::endl;
+#endif
 
         it -> second.value = value;
         it -> second.use_default = false;
@@ -283,6 +284,14 @@ public:
     }
 
     template <typename T>
+    T Get(std::string name, int base = 0)
+    {
+        T val;
+        Get(name, val, base);
+        return val;
+    }
+
+    template <typename T>
     T Get(const char* name, int base = 0)
     {
         T val;
@@ -300,9 +309,9 @@ public:
                 continue;
             if (p_item.value == "")
             {
-                GRError(cudaErrorInvalidValue, 
+                GRError(cudaErrorInvalidValue,
                     "Required parameter " + p_item.name
-                    + "(" + p_item.file_name 
+                    + "(" + p_item.file_name
                     + ":" + std::to_string(p_item.line_num) + ")"
                     + " is not present.", __FILE__, __LINE__);
             }
@@ -358,7 +367,7 @@ public:
 
         if (!isValidString(argument, p_item.value_type_info))
         {
-            return GRError(cudaErrorInvalidValue, 
+            return GRError(cudaErrorInvalidValue,
                 "Parameter " + p_item.name
                 + "(" + p_item.file_name +":"
                 + std::to_string(p_item.line_num)
@@ -426,13 +435,16 @@ public:
             if (retval) break;
         } while (i!=-1);
 
-        if (PARAMETER_DEBUG && optind < argc-1)
+#ifdef ENABLE_PARAMETER_DEBUG
+        if (optind < argc-1)
             std::cout << "Left over arguments" << std::endl;
+#endif
         for (int i=optind; i<argc; i++)
         {
             bool valid_parameter = false;
-            if (PARAMETER_DEBUG)
+#ifdef ENABLE_PARAMETER_DEBUG
                 std::cout << argv[i] << std::endl;
+#endif
             if (i == optind)
             {
                 auto it = p_map.find("graph-type");
@@ -453,7 +465,7 @@ public:
                     {
                         Read_In_Opt("market-file", std::string(argv[i]));
                         valid_parameter = true;
-                    }     
+                    }
                 }
             }
 
