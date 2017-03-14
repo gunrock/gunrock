@@ -23,7 +23,8 @@
 #include <typeinfo>
 #include <typeindex>
 #include <gunrock/util/error_utils.cuh>
-#include <gunrock/util/types.cuh>
+//#include <gunrock/util/types.cuh>
+#include <gunrock/util/str_to_T.cuh>
 
 namespace gunrock {
 namespace util {
@@ -110,6 +111,23 @@ public:
     :   summary(summary)
     {
         p_map.clear();
+        Use("quiet",
+            OPTIONAL_ARGUMENT | SINGLE_VALUE | OPTIONAL_PARAMETER,
+            false,
+            "No output (unless --json is specified).",
+            __FILE__, __LINE__);
+
+        Use("v",
+            OPTIONAL_ARGUMENT | SINGLE_VALUE | OPTIONAL_PARAMETER,
+            false,
+            "Print verbose per iteration debug info.",
+            __FILE__, __LINE__);
+
+        Use("help",
+            OPTIONAL_ARGUMENT | SINGLE_VALUE | OPTIONAL_PARAMETER,
+            false,
+            "Print this usage.",
+            __FILE__, __LINE__);
     }
 
     ~Parameters()
@@ -241,6 +259,18 @@ public:
         ostr << value;
         return Set(name, ostr.str());
     } // Set()
+
+    bool UseDefault(std::string name)
+    {
+        auto it = p_map.find(name);
+        if (it == p_map.end())
+        {
+            GRError(cudaErrorInvalidValue,
+                "Parameter " + name + " has not been defined", __FILE__, __LINE__);
+            return false;
+        }
+        return it -> second.use_default;
+    }
 
     cudaError_t Get(
         std::string name,
@@ -460,10 +490,10 @@ public:
                 auto it = p_map.find("graph-type");
                 if (it != p_map.end())
                 {
-                    it = p_map.find("market-file");
+                    it = p_map.find("graph-file");
                     if (it != p_map.end() && Get<std::string>("graph-type") == "market")
                     {
-                        Read_In_Opt("market-file", std::string(argv[i]));
+                        Read_In_Opt("graph-file", std::string(argv[i]));
                         valid_parameter = true;
                     }
                 }

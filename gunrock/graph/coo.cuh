@@ -130,6 +130,23 @@ struct Coo :
         return retval;
     }
 
+    cudaError_t Display(
+        std::string graph_prefix = "",
+        SizeT edges_to_show = 40,
+        bool  with_edge_values = true)
+    {
+        cudaError_t retval = cudaSuccess;
+        util::PrintMsg(graph_prefix + " Graph containing " +
+            std::to_string(this -> nodes) + " vertices, " +
+            std::to_string(this -> edges) + " edges, in COO format :");
+        for (SizeT e=0; e <this->edges && e<edges_to_show; e++)
+            util::PrintMsg("e " + std::to_string(e) +
+                " : " + std::to_string(edge_pairs[e].x) +
+                " -> " + std::to_string(edge_pairs[e].y) +
+                (((FLAG & HAS_EDGE_VALUES) && (with_edge_values))? (" (" + std::to_string(edge_values[e]) + ")") : ""));
+        return retval;
+    }
+
     template <
         typename VertexT_in, typename SizeT_in,
         typename ValueT_in, GraphFlag FLAG_in,

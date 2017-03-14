@@ -31,6 +31,8 @@ namespace util {
 
 std::string TypeName(const std::type_info* t_info);
 
+extern void Error_UnsupportedType();
+
 template <typename T>
 T strtoT_simple(
     const char *str, char **str_end, int base = 0)

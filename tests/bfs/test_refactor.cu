@@ -7,14 +7,31 @@
 #include <gunrock/oprtr/1D_oprtr/1D_1D.cuh>
 #include <gunrock/graph/csr.cuh>
 #include <gunrock/graph/coo.cuh>
+#include <gunrock/graphio/graphio.cuh>
 
 using namespace gunrock;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::graph;
 
+template <
+    typename VertexT = int,
+    typename SizeT   = VertexT,
+    typename ValueT  = VertexT,
+    GraphFlag _FLAG   = GRAPH_NONE,
+    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
+struct TestGraph :
+    public Csr<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO, cudaHostRegisterFlag>,
+    public Coo<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO, cudaHostRegisterFlag>
+{
+    static const GraphFlag FLAG = _FLAG | HAS_CSR | HAS_COO;
+    typedef Csr<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CsrT;
+    typedef Coo<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CooT;
+};
+
 int main(int argc, char* argv[])
 {
+    typedef int VertexT;
     typedef int SizeT;
     typedef int ValueT;
     //const SizeT DefaultSize = PreDefinedValues<SizeT>::InvalidValue;
@@ -87,7 +104,7 @@ int main(int argc, char* argv[])
         });*/
 
     // Test_Csr
-    typedef int VertexT;
+    /*typedef int VertexT;
     Csr<VertexT, SizeT, ValueT> csr;
     csr.Allocate(10, 10);
     Coo<VertexT, SizeT, ValueT> coo;
@@ -96,6 +113,29 @@ int main(int argc, char* argv[])
     Csr<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> csr2;
     csr2.Allocate(10, 10);
     Coo<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> coo2;
-    csr2.FromCoo(coo2);
+    csr2.FromCoo(coo2);*/
+
+    // Test graphio
+    cudaError_t retval = cudaSuccess;
+    util::Parameters parameters("test refactor");
+    typedef TestGraph<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> GraphT;
+    GraphT graph;
+
+    retval = graphio::UseParameters(parameters);
+    if (retval) return retval;
+    retval = parameters.Parse_CommandLine(argc, argv);
+    if (retval) return retval;
+    if (parameters.Get<bool>("help"))
+    {
+        parameters.Print_Help();
+        return 0;
+    }
+
+    retval = parameters.Check_Required();
+    if (retval) return retval;
+    retval = graphio::LoadGraph(parameters, graph);
+    if (retval) return retval;
+    retval = graph.CooT::Display();
+    if (retval) return retval;
     return 0;
 }

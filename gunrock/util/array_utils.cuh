@@ -149,6 +149,12 @@ struct NullArray
     {
         return (ValueT*)NULL;
     }
+
+    __host__ __device__ __forceinline__
+    ValueT& operator[](std::size_t idx)
+    {
+        return *((ValueT*)NULL);
+    }
 };
 
 template <

@@ -22,8 +22,8 @@ namespace graph {
 /**
  * @brief Predefined flags for graph types
  */
-enum GraphFlag: unsigned int
-{
+using GraphFlag = unsigned int;
+enum {
     GRAPH_NONE      = 0x00,
     HAS_EDGE_VALUES = 0x01,
     HAS_NODE_VALUES = 0x02,
@@ -93,6 +93,8 @@ struct GraphBase
     cudaError_t Allocate(SizeT nodes, SizeT edges,
         util::Location target = GRAPH_DEFAULT_TARGET)
     {
+        this -> nodes = nodes;
+        this -> edges = edges;
         return cudaSuccess;
     }
 
