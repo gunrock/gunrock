@@ -64,8 +64,8 @@ struct GraphBase
     typedef _VertexT VertexT;
     typedef _SizeT   SizeT;
     typedef _ValueT  ValueT;
-    const GraphFlag FLAG = _FLAG;
-    const unsigned int cudaHostRegisterFlag = _cudaHostRegisterFlag;
+    static const GraphFlag FLAG = _FLAG;
+    static const unsigned int cudaHostRegisterFlag = _cudaHostRegisterFlag;
 
     SizeT nodes;   // Number of nodes in the graph
     SizeT edges;   // Number of edges in the graph
@@ -98,13 +98,9 @@ struct GraphBase
         return cudaSuccess;
     }
 
-    template <
-        typename VertexT_in, typename SizeT_in,
-        typename ValueT_in, GraphFlag FLAG_in,
-        unsigned int cudaHostRegisterFlag_in>
+    template <typename GraphT_in>
     cudaError_t Set(
-        GraphBase<VertexT_in, SizeT_in, ValueT_in, FLAG_in,
-            cudaHostRegisterFlag_in> &source,
+        GraphT_in &source,
         util::Location target = util::LOCATION_DEFAULT,
         cudaStream_t stream = 0)
     {

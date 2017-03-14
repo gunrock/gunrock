@@ -344,8 +344,9 @@ public:
         cudaError_t retval = cudaSuccess;
 
 #ifdef ENABLE_ARRAY_DEBUG
-        PrintMsg(name + " Init size = " + std::to_string(size) +
-            ", target = " + Location_to_string(target));
+        if (size != 0 || target != LOCATION_NONE)
+            PrintMsg(name + " Init size = " + std::to_string(size) +
+                ", target = " + Location_to_string(target));
 #endif
         if (retval = Release()) return retval;
         setted     = LOCATION_NONE;

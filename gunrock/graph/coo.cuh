@@ -42,6 +42,7 @@ struct Coo :
     public GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag>
 {
     typedef GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> BaseGraph;
+    typedef Coo<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CooT;
 
     typedef typename util::VectorType<VertexT, 2>::Type
         EdgePairT;
@@ -136,10 +137,13 @@ struct Coo :
         bool  with_edge_values = true)
     {
         cudaError_t retval = cudaSuccess;
-        util::PrintMsg(graph_prefix + " Graph containing " +
+        if (edges_to_show > this -> edges)
+            edges_to_show = this -> edges;
+        util::PrintMsg(graph_prefix + "Graph containing " +
             std::to_string(this -> nodes) + " vertices, " +
-            std::to_string(this -> edges) + " edges, in COO format :");
-        for (SizeT e=0; e <this->edges && e<edges_to_show; e++)
+            std::to_string(this -> edges) + " edges, in COO format. First " + std::to_string(edges_to_show) +
+            " edges :");
+        for (SizeT e=0; e < edges_to_show; e++)
             util::PrintMsg("e " + std::to_string(e) +
                 " : " + std::to_string(edge_pairs[e].x) +
                 " -> " + std::to_string(edge_pairs[e].y) +
@@ -159,7 +163,7 @@ struct Coo :
     {
         cudaError_t retval = cudaSuccess;
         if (target == util::LOCATION_DEFAULT)
-            target = source.edge_pairs.setted | source.edge_pairs.allocated;
+            target = source.edge_pairs.GetSetted() | source.edge_pairs.GetAllocated();
 
         this -> edge_order = source.edge_order;
         if (retval = BaseGraph::Set(source))

@@ -191,30 +191,35 @@ struct Csr :
         if (!quiet)
         {
             util::PrintMsg("  Converting " +
-                std::to_string(source.nodes) +
-                " vertices, " + std::to_string(source.edges) +
-                (source.directed ? " directed" : " undirected") +
-                " edges (" + (source.edge_order == BY_ROW_ASCENDING ? " ordered" : "unordered") +
+                std::to_string(source.CooT::nodes) +
+                " vertices, " + std::to_string(source.CooT::edges) +
+                (source.CooT::directed ? " directed" : " undirected") +
+                " edges (" + (source.CooT::edge_order == BY_ROW_ASCENDING ? " ordered" : "unordered") +
                 " tuples) to CSR format...");
         }
 
         time_t mark1 = time(NULL);
         cudaError_t retval = cudaSuccess;
         if (target == util::LOCATION_DEFAULT)
-            target = source.edge_pairs.GetSetted() | source.edge_pairs.GetAllocated();
+            target = source.CooT::edge_pairs.GetSetted() | source.CooT::edge_pairs.GetAllocated();
 
-        if (retval = BaseGraph::Set(source))
+        /*if (retval = BaseGraph:: template Set<typename CooT::CooT>((typename CooT::CooT)source))
             return retval;
+        */
+        this -> nodes = source.CooT::nodes;
+        this -> edges = source.CooT::edges;
+        this -> directed = source.CooT::directed;
 
-        if (retval = Allocate(source.nodes, source.edges, target))
+        if (retval = Allocate(source.CooT::nodes, source.CooT::edges, target))
             return retval;
 
         // Sort COO by row
-        if (retval = source.Order(BY_ROW_ASCENDING, target, stream))
+        if (retval = source.CooT::Order(BY_ROW_ASCENDING, target, stream))
             return retval;
+        source.CooT::Display();
 
         // assign column_indices
-        if (retval = column_indices.ForEach(source.edge_pairs,
+        if (retval = column_indices.ForEach(source.CooT::edge_pairs,
                 []__host__ __device__ (VertexT &column_index,
                 const typename CooT::EdgePairT &edge_pair){
                 column_index = edge_pair.y;},
@@ -223,7 +228,7 @@ struct Csr :
 
         // assign edge_values
         if (FLAG & HAS_EDGE_VALUES)
-            if (retval = edge_values.ForEach(source.edge_values,
+            if (retval = edge_values.ForEach(source.CooT::edge_values,
                 []__host__ __device__ (ValueT &edge_value,
                 const typename CooT::ValueT &edge_value_in){
                 edge_value = edge_value_in;},
@@ -232,19 +237,22 @@ struct Csr :
 
         // assign row_offsets
         SizeT edges = this -> edges;
+        SizeT nodes = this -> nodes;
         auto row_edge_compare = [] __host__ __device__ (
             const typename CooT::EdgePairT &edge_pair,
             const VertexT &row){
-            return row < edge_pair.x;
+            return edge_pair.x < row;
         };
-        if (retval = row_offsets.ForAll(source.edge_pairs,
-            [edges, row_edge_compare] __host__ __device__ (
+        if (retval = row_offsets.ForAll(source.CooT::edge_pairs,
+            [nodes, edges, row_edge_compare] __host__ __device__ (
                 SizeT *row_offsets,
                 const typename CooT::EdgePairT *edge_pairs,
                 const VertexT &row){
-                    row_offsets[row] = util::BinarySearch(row,
-                        edge_pairs, 0, edges,
-                        row_edge_compare);
+                    if (row < nodes)
+                        row_offsets[row] = util::BinarySearch(row,
+                            edge_pairs, 0, edges,
+                            row_edge_compare);
+                    else row_offsets[row] = edges;
                 }, this -> nodes + 1, target, stream))
             return retval;
 
@@ -373,6 +381,49 @@ struct Csr :
             }
         }
         out_nodes = out_node;*/
+    }
+
+    /**
+     * @brief Display CSR graph to console
+     *
+     * @param[in] with_edge_value Whether display graph with edge values.
+     */
+    cudaError_t Display(
+        std::string graph_prefix = "",
+        SizeT nodes_to_show = 40,
+        bool  with_edge_values = true)
+    {
+        cudaError_t retval = cudaSuccess;
+        if (nodes_to_show > this -> nodes)
+            nodes_to_show = this -> nodes;
+        util::PrintMsg(graph_prefix + "Graph containing " +
+            std::to_string(this -> nodes) + " vertices, " +
+            std::to_string(this -> edges) + " edges, in CSR format. Neighbor list of first " + std::to_string(nodes_to_show) +
+            " nodes :");
+        for (SizeT node = 0; node < nodes_to_show; node++)
+        {
+            std::string str = "v " + std::to_string(node) +
+             " " + std::to_string(row_offsets[node]) + " : ";
+            for (SizeT edge = row_offsets[node];
+                    edge < row_offsets[node + 1];
+                    edge++)
+            {
+                if (edge - row_offsets[node] > 40) break;
+                str = str + "[" + std::to_string(column_indices[edge]);
+                if (with_edge_values && (FLAG & HAS_EDGE_VALUES))
+                {
+                    str = str + "," + std::to_string(edge_values[edge]);
+                }
+                if (edge - row_offsets[node] != 40 &&
+                    edge != row_offsets[node+1] -1)
+                    str = str + "], ";
+                else str = str + "]";
+            }
+            if (row_offsets[node + 1] - row_offsets[node] > 40)
+                str = str + "...";
+            util::PrintMsg(str);
+        }
+        return retval;
     }
 
     /*template <typename Tuple>
@@ -733,39 +784,6 @@ struct Csr :
         }
         printf("\n");
         fflush(stdout);
-    }*/
-
-
-    /**
-     * @brief Display CSR graph to console
-     *
-     * @param[in] with_edge_value Whether display graph with edge values.
-     */
-    /*void DisplayGraph(bool with_edge_value = false)
-    {
-        SizeT displayed_node_num = (nodes > 40) ? 40 : nodes;
-        printf("First %d nodes's neighbor list of the input graph:\n",
-               displayed_node_num);
-        for (SizeT node = 0; node < displayed_node_num; node++)
-        {
-            util::PrintValue(node);
-            printf(":");
-            for (SizeT edge = row_offsets[node];
-                    edge < row_offsets[node + 1];
-                    edge++)
-            {
-                if (edge - row_offsets[node] > 40) break;
-                printf("[");
-                util::PrintValue(column_indices[edge]);
-                if (with_edge_value && edge_values != NULL)
-                {
-                    printf(",");
-                    util::PrintValue(edge_values[edge]);
-                }
-                printf("], ");
-            }
-            printf("\n");
-        }
     }*/
 
     /**

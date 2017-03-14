@@ -473,7 +473,7 @@ public:
         {
             bool valid_parameter = false;
 #ifdef ENABLE_PARAMETER_DEBUG
-                std::cout << argv[i] << std::endl;
+            std::cout << argv[i] << std::endl;
 #endif
             if (i == optind)
             {

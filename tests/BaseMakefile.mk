@@ -114,6 +114,7 @@ DEPS = 	./Makefile \
     $(wildcard ../../gunrock/util/**/*.cuh) \
     $(wildcard ../../gunrock/util/*.c) \
     $(wildcard ../../gunrock/*.cuh) \
+    $(wildcard ../../gunrock/graph/*.cuh) \
     $(wildcard ../../gunrock/graphio/*.cuh) \
     $(wildcard ../../gunrock/oprtr/*.cuh) \
     $(wildcard ../../gunrock/oprtr/**/*.cuh) \

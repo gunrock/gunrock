@@ -21,6 +21,7 @@
 #include <iostream>
 
 #include <gunrock/util/parameters.h>
+#include <gunrock/graph/coo.cuh>
 //#include <gunrock/graphio/utils.cuh>
 
 namespace gunrock {
@@ -85,7 +86,7 @@ cudaError_t ReadMarketStream(
     if (parameters.UseDefault(graph_prefix + "edge-value-seed"))
         edge_value_seed = time(NULL);
 
-    auto &edge_pairs = graph.Coo::edge_pairs;
+    auto &edge_pairs = graph.CooT::edge_pairs;
     SizeT edges_read = -1;
     SizeT nodes = 0;
     SizeT edges = 0;
@@ -107,8 +108,8 @@ cudaError_t ReadMarketStream(
 
     char line[1024];
 
-    bool ordered_rows = true;
-    if (retval = graph.Coo::Release())
+    //bool ordered_rows = true;
+    if (retval = graph.CooT::Release())
         return retval;
 
     while (true)
@@ -171,7 +172,7 @@ cudaError_t ReadMarketStream(
             }
 
             // Allocate coo graph
-            if (retval = graph.Coo::Allocate(nodes, edges, util::HOST))
+            if (retval = graph.CooT::Allocate(nodes + ((vertex_start_from_zero) ? 0 : 1), edges, util::HOST))
                 return retval;
 
             /*unsigned long long allo_size = sizeof(EdgeTupleType);
@@ -199,7 +200,7 @@ cudaError_t ReadMarketStream(
             }
             if (edges_read >= edges)
             {
-                if (retval = graph.Coo::Release())
+                if (retval = graph.CooT::Release())
                     return retval;
                 return util::GRError(
                     "Error parsing MARKET graph: "
@@ -232,7 +233,7 @@ cudaError_t ReadMarketStream(
 
                 else if (array || num_input < 2)
                 {
-                    if (retval = graph.Coo::Release())
+                    if (retval = graph.CooT::Release())
                         return retval;
                     return util::GRError(
                         "Error parsing MARKET graph: "
@@ -244,7 +245,7 @@ cudaError_t ReadMarketStream(
                 {
                     ll_value = rand() % edge_value_range + edge_value_min;
                 }
-                //graph.Coo::edge_values[edges_read] = ll_value;
+                //graph.CooT::edge_values[edges_read] = ll_value;
             }
             else
             {
@@ -259,7 +260,7 @@ cudaError_t ReadMarketStream(
 
                 else if (array || (num_input != 2))
                 {
-                    if (retval = graph.Coo::Release())
+                    if (retval = graph.CooT::Release())
                         return retval;
                     return util::GRError(
                         "Error parsing MARKET graph: "
@@ -278,11 +279,11 @@ cudaError_t ReadMarketStream(
             //{
                 edge_pairs[edges_read].x = ll_row;   // zero-based array
                 edge_pairs[edges_read].y = ll_col;   // zero-based array
-                ordered_rows = false;
+                //ordered_rows = false;
 
                 if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
                 {
-                    graph.Coo::edge_values[edges_read] = ll_value * (skew ? -1 : 1);
+                    graph.CooT::edge_values[edges_read] = ll_value * (skew ? -1 : 1);
                 }
             //}
 
@@ -296,10 +297,10 @@ cudaError_t ReadMarketStream(
 
                 if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
                 {
-                    graph.Coo::edge_values[edges_read] = ll_value * (skew ? -1 : 1);
+                    graph.CooT::edge_values[edges_read] = ll_value * (skew ? -1 : 1);
                 }
 
-                ordered_rows = false;
+                //ordered_rows = false;
                 edges_read++;
             }
         }
@@ -312,7 +313,7 @@ cudaError_t ReadMarketStream(
 
     if (edges_read != edges)
     {
-        if (retval = graph.Coo::Release())
+        if (retval = graph.CooT::Release())
             return retval;
         return util::GRError("Error parsing MARKET graph: "
             "only " + std::to_string(edges_read) +
@@ -457,12 +458,34 @@ cudaError_t Read(
 }
 
 template <typename GraphT>
-cudaError_t LoadGraph(
+cudaError_t Load(
     util::Parameters &parameters,
     GraphT &graph,
     std::string graph_prefix = "")
 {
-    return Read(parameters, graph, graph_prefix);
+    typedef graph::Coo<typename GraphT::VertexT,
+        typename GraphT::SizeT,
+        typename GraphT::ValueT,
+        GraphT::FLAG | graph::HAS_COO, GraphT::cudaHostRegisterFlag> CooT;
+    cudaError_t retval = cudaSuccess;
+
+    if (GraphT::FLAG & graph::HAS_COO)
+    {
+        retval = Read(parameters, graph, graph_prefix);
+        if (retval) return retval;
+        retval = graph.FromCoo(graph, true);
+        if (retval) return retval;
+    } else {
+        CooT coo;
+        retval = Read(parameters, coo, graph_prefix);
+        if (retval) return retval;
+        retval = graph.FromCoo(coo);
+        if (retval) return retval;
+        retval = coo.Release();
+        return retval;
+    }
+
+    return retval;
 }
 
 template <typename GraphT>
@@ -472,7 +495,7 @@ cudaError_t Write(
     std::string graph_prefix = "")
 {
     typedef typename GraphT::SizeT SizeT;
-    typedef typename GraphT::Coo::EdgePairT EdgePairT;
+    typedef typename GraphT::CooT::EdgePairT EdgePairT;
     cudaError_t retval = cudaSuccess;
 
     bool quiet = parameters.Get<bool>("quiet");
@@ -494,12 +517,12 @@ cudaError_t Write(
         fout << graph.nodes << " " << graph.nodes << " " << graph.edges << std::endl;
         for (SizeT e=0; e<graph.edges; e++)
         {
-            EdgePairT &edge_pair = graph.Coo::edge_pairs[e];
+            EdgePairT &edge_pair = graph.CooT::edge_pairs[e];
             if (graph.undirected && edge_pair.x > edge_pair.y)
                 continue;
             fout << edge_pair.x << " " << edge_pair.y;
             if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
-                fout << " " << graph.Coo::edge_values[e];
+                fout << " " << graph.CooT::edge_values[e];
             fout << std::endl;
         }
         fout.close();

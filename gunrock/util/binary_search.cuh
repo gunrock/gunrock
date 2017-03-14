@@ -39,8 +39,17 @@ SizeT BinarySearch(
         } else {
             center_index = ((long long)left_index + (long long) right_index) >> 1;
             if (comp(elements[center_index], element_to_find))
+            {
                 left_index = center_index + 1;
-            else right_index = center_index - 1;
+            } else {
+                right_index = center_index - 1;
+            }
+#ifndef __CUDA_ARCH__
+            /*PrintMsg("Find " + std::to_string(element_to_find) +
+                " Pos " + std::to_string(center_index) +
+                " -> [" + std::to_string(left_index) +
+                ", " + std::to_string(right_index) + "]");*/
+#endif
         }
     } while (true);
     //return 0;

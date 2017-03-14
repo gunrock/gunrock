@@ -19,14 +19,26 @@ template <
     typename SizeT   = VertexT,
     typename ValueT  = VertexT,
     GraphFlag _FLAG   = GRAPH_NONE,
-    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
+    unsigned int _cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct TestGraph :
-    public Csr<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO, cudaHostRegisterFlag>,
-    public Coo<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO, cudaHostRegisterFlag>
+    public Csr<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO, _cudaHostRegisterFlag>,
+    public Coo<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO, _cudaHostRegisterFlag>
 {
     static const GraphFlag FLAG = _FLAG | HAS_CSR | HAS_COO;
+    static const unsigned int cudaHostRegisterFlag = _cudaHostRegisterFlag;
     typedef Csr<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CsrT;
     typedef Coo<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CooT;
+
+    template <typename CooT_in>
+    cudaError_t FromCoo(CooT_in &coo, bool self_coo = false)
+    {
+        cudaError_t retval = cudaSuccess;
+        retval = this -> CsrT::FromCoo(coo);
+        if (retval) return retval;
+        if (!self_coo)
+            retval = this -> CooT::FromCoo(coo);
+        return retval;
+    }
 };
 
 int main(int argc, char* argv[])
@@ -136,6 +148,8 @@ int main(int argc, char* argv[])
     retval = graphio::LoadGraph(parameters, graph);
     if (retval) return retval;
     retval = graph.CooT::Display();
+    if (retval) return retval;
+    retval = graph.CsrT::Display();
     if (retval) return retval;
     return 0;
 }
