@@ -141,7 +141,8 @@ struct Coo :
             edges_to_show = this -> edges;
         util::PrintMsg(graph_prefix + "Graph containing " +
             std::to_string(this -> nodes) + " vertices, " +
-            std::to_string(this -> edges) + " edges, in COO format. First " + std::to_string(edges_to_show) +
+            std::to_string(this -> edges) + " edges, in COO format, ordered " + EdgeOrder_to_string(edge_order)
+            + ". First " + std::to_string(edges_to_show) +
             " edges :");
         for (SizeT e=0; e < edges_to_show; e++)
             util::PrintMsg("e " + std::to_string(e) +
@@ -184,6 +185,98 @@ struct Coo :
             this -> nodes, target, stream))
             return retval;
 
+        return retval;
+    }
+
+    template <typename CsrT>
+    cudaError_t FromCsr(
+        CsrT &source,
+        util::Location target = util::LOCATION_DEFAULT,
+        cudaStream_t stream = 0)
+    {
+        cudaError_t retval = cudaSuccess;
+        if (target == util::LOCATION_DEFAULT)
+            target = source.edge_pairs.GetSetted() | source.edge_pairs.GetAllocated();
+
+        //if (retval = BaseGraph::Set(source))
+        //    return retval;
+        this -> nodes = source.CsrT::nodes;
+        this -> nodes = source.CsrT::edges;
+        this -> directed = source.CsrT::directed;
+        this -> edge_order = UNORDERED;
+
+        if (retval = Allocate(source.CsrT::nodes, source.CsrT::edges, target))
+            return retval;
+
+        if (retval = source.row_offsets.ForAll(
+            edge_pairs, source.column_indices,
+            [] __host__ __device__ (
+                typename CsrT::SizeT *row_offsets,
+                EdgePairT *edge_pairs,
+                typename CsrT::VertexT *column_indices,
+                const VertexT &row){
+                    SizeT e_end = row_offsets[row+1];
+                    for (SizeT e = row_offsets[row]; e < e_end; e++)
+                    {
+                        edge_pairs[e].x = row;
+                        edge_pairs[e].y = column_indices[e];
+                    }
+                }, this -> nodes, target, stream))
+            return retval;
+
+        if (retval = edge_values   .Set(source.CsrT::edge_values,
+            this -> edges, target, stream))
+            return retval;
+
+        if (retval = node_values   .Set(source.CsrT::node_values,
+            this -> nodes, target, stream))
+            return retval;
+        return retval;
+    }
+
+    template <typename CscT>
+    cudaError_t FromCsc(
+        CscT &source,
+        util::Location target = util::LOCATION_DEFAULT,
+        cudaStream_t stream = 0)
+    {
+        cudaError_t retval = cudaSuccess;
+        if (target == util::LOCATION_DEFAULT)
+            target = source.edge_pairs.GetSetted() | source.edge_pairs.GetAllocated();
+
+        //if (retval = BaseGraph::template Set<typename CscT::CscT>((typename CscT::CscT)source))
+        //    return retval;
+        this -> nodes = source.CscT::nodes;
+        this -> edges = source.CscT::edges;
+        this -> directed = source.CscT::directed;
+        this -> edge_order = UNORDERED;
+
+        if (retval = Allocate(source.CscT::nodes, source.CscT::edges, target))
+            return retval;
+
+        if (retval = source.column_offsets.ForAll(
+            edge_pairs, source.row_indices,
+            [] __host__ __device__ (
+                typename CscT::SizeT *column_offsets,
+                EdgePairT *edge_pairs,
+                typename CscT::VertexT *row_indices,
+                const VertexT &column){
+                    SizeT e_end = column_offsets[column+1];
+                    for (SizeT e = column_offsets[column]; e < e_end; e++)
+                    {
+                        edge_pairs[e].x = row_indices[e];
+                        edge_pairs[e].y = column;
+                    }
+                }, this -> nodes, target, stream))
+            return retval;
+
+        if (retval = edge_values   .Set(source.CscT::edge_values,
+            this -> edges, target, stream))
+            return retval;
+
+        if (retval = node_values   .Set(source.CscT::node_values,
+            this -> nodes, target, stream))
+            return retval;
         return retval;
     }
 
@@ -231,149 +324,75 @@ struct Coo :
             return true;
         };
 
+        //util::PrintMsg("Before Sorting");
+        //Display();
         // Sort
         if (FLAG & HAS_EDGE_VALUES)
         {
-            if (new_order == BY_ROW_ASCENDING)
+            switch (new_order)
+            {
+            case BY_ROW_ASCENDING:
                 retval = edge_pairs.Sort_by_Key(
                     edge_values, row_ascen_order,
                     this -> edges, 0, target, stream);
-            else if (new_order == BY_ROW_DECENDING)
+                break;
+            case BY_ROW_DECENDING:
                 retval = edge_pairs.Sort_by_Key(
                     edge_values, row_decen_order,
                     this -> edges, 0, target, stream);
-            else if (new_order == BY_COLUMN_ASCENDING)
+                break;
+            case BY_COLUMN_ASCENDING:
                 retval = edge_pairs.Sort_by_Key(
                     edge_values, column_ascen_order,
                     this -> edges, 0, target, stream);
-            else if (new_order == BY_ROW_DECENDING)
+                break;
+            case BY_COLUMN_DECENDING:
                 retval = edge_pairs.Sort_by_Key(
                     edge_values, column_decen_order,
                     this -> edges, 0, target, stream);
+                break;
+            case UNORDERED:
+                break;
+            }
             if (retval) return retval;
         } else { // no edge values
-            if (new_order == BY_ROW_ASCENDING)
+            switch (new_order)
+            {
+            case BY_ROW_ASCENDING:
+                retval = edge_pairs.Sort(
+                    row_ascen_order,
+                    this -> edges, 0, target, stream);
+                break;
+            case BY_ROW_DECENDING:
                 retval = edge_pairs.Sort(
                     row_decen_order,
                     this -> edges, 0, target, stream);
-            else if (new_order == BY_ROW_DECENDING)
-                retval = edge_pairs.Sort(
-                    row_decen_order,
-                    this -> edges, 0, target, stream);
-            else if (new_order == BY_COLUMN_ASCENDING)
+                break;
+            case BY_COLUMN_ASCENDING:
                 retval = edge_pairs.Sort(
                     column_ascen_order,
                     this -> edges, 0, target, stream);
-            else if (new_order == BY_ROW_DECENDING)
+                break;
+            case BY_COLUMN_DECENDING:
                 retval = edge_pairs.Sort(
                     column_decen_order,
                     this -> edges, 0, target, stream);
+                break;
+            case UNORDERED:
+                break;
+            }
             if (retval) return retval;
         }
 
+        edge_order = new_order;
+        //util::PrintMsg("After sorting");
+        //Display();
         return retval;
     }
 
 }; // Coo
 
 } // namespace graph
-
-/**
- * @brief COO sparse format edge. (A COO graph is just a
- * list/array/vector of these.)
- *
- * @tparam VertexId Vertex identifiler type.
- * @tparam Value Attribute value type.
- *
- */
-/*template<typename VertexId, typename Value>
-struct Coo {
-    VertexId row;
-    VertexId col;
-    Value val;
-
-    Coo() {}
-    Coo(VertexId row, VertexId col, Value val) : row(row), col(col), val(val) {}
-
-    void Val(Value &value) {
-        value = val;
-    }
-};*/
-
-
-/*
- * @brief Coo data structure.
- *
- * @tparam VertexId Vertex identifier type.
- */
-/*template<typename VertexId>
-struct Coo<VertexId, util::NullType> {
-    VertexId row;
-    VertexId col;
-
-    template <typename Value>
-    Coo(VertexId row, VertexId col, Value val) : row(row), col(col) {}
-
-    template <typename Value>
-    void Val(Value &value) {}
-};*/
-
-
-/**
- * @brief Comparator for sorting COO sparse format edges first by row
- *
- * @tparam Coo COO Datatype
- *
- * @param[in] elem1 First element to compare
- * @param[in] elem2 Second element to compare
- * @returns true if first element comes before second element in (r,c)
- * order, otherwise false
- *
- * @see ColumnFirstTupleCompare
- */
-/*template<typename Coo>
-bool RowFirstTupleCompare (
-    Coo elem1,
-    Coo elem2) {
-    if (elem1.row < elem2.row) {
-        // Sort edges by source node
-        return true;
-    } else if ((elem1.row == elem2.row) && (elem1.col < elem2.col)) {
-        // Sort edgelists as well for coherence
-        return true;
-    }
-
-    return false;
-}*/
-
-/**
- * @brief Comparator for sorting COO sparse format edges first by column
- *
- * @tparam Coo COO Datatype
- *
- * @param[in] elem1 First element to compare
- * @param[in] elem2 Second element to compare
- * @returns true if first element comes before second element in (c,r)
- * order, otherwise false
- *
- * @see RowFirstTupleCompare
- */
-/*template<typename Coo>
-bool ColumnFirstTupleCompare (
-    Coo elem1,
-    Coo elem2) {
-    if (elem1.col < elem2.col) {
-        // Sort edges by source node
-        return true;
-    } else if ((elem1.col == elem2.col) && (elem1.row < elem2.row)) {
-        // Sort edgelists as well for coherence
-        return true;
-    }
-
-    return false;
-}*/
-
-
 } // namespace gunrock
 
 // Leave this at the end of the file

@@ -48,6 +48,19 @@ enum EdgeOrder
     UNORDERED,
 };
 
+std::string EdgeOrder_to_string(EdgeOrder order)
+{
+    switch (order)
+    {
+    case BY_ROW_ASCENDING: return "by row ascending";
+    case BY_ROW_DECENDING: return "by row decending";
+    case BY_COLUMN_ASCENDING: return "by column ascending";
+    case BY_COLUMN_DECENDING: return "by column decending";
+    case UNORDERED: return "unordered";
+    }
+    return "unspecified";
+}
+
 /**
  * @brief GraphBase data structure to store basic info about a graph.
  *

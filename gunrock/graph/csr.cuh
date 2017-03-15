@@ -16,6 +16,7 @@
 
 #include <gunrock/util/array_utils.cuh>
 #include <gunrock/graph/graph_base.cuh>
+#include <gunrock/graph/coo.cuh>
 #include <gunrock/util/binary_search.cuh>
 
 namespace gunrock {
@@ -135,7 +136,7 @@ struct Csr :
     {
         cudaError_t retval = cudaSuccess;
         if (target == util::LOCATION_DEFAULT)
-            target = source.row_offsets.setted | source.row_offsets.allocated;
+            target = source.row_offsets.GetSetted() | source.row_offsets.GetAllocated();
 
         if (retval = BaseGraph::Set(source))
             return retval;
@@ -216,7 +217,7 @@ struct Csr :
         // Sort COO by row
         if (retval = source.CooT::Order(BY_ROW_ASCENDING, target, stream))
             return retval;
-        source.CooT::Display();
+        //source.CooT::Display();
 
         // assign column_indices
         if (retval = column_indices.ForEach(source.CooT::edge_pairs,
@@ -263,124 +264,26 @@ struct Csr :
                 std::to_string(mark2 - mark1) + "s).");
         }
         return retval;
-        /*SizeT edge_offsets[129];
-        SizeT edge_counts [129];
-        #pragma omp parallel
-        {
-            int num_threads  = omp_get_num_threads();
-            int thread_num   = omp_get_thread_num();
-            SizeT edge_start = (long long)(coo_edges) * thread_num / num_threads;
-            SizeT edge_end   = (long long)(coo_edges) * (thread_num + 1) / num_threads;
-            SizeT node_start = (long long)(coo_nodes) * thread_num / num_threads;
-            SizeT node_end   = (long long)(coo_nodes) * (thread_num + 1) / num_threads;
-            Tuple *new_coo   = (Tuple*) malloc (sizeof(Tuple) * (edge_end - edge_start));
-            SizeT edge       = edge_start;
-            SizeT new_edge   = 0;
-            for (edge = edge_start; edge < edge_end; edge++)
-            {
-                VertexId col = coo[edge].col;
-                VertexId row = coo[edge].row;
-                if ((col != row) && (edge == 0 || col != coo[edge - 1].col || row != coo[edge - 1].row))
-                {
-                    new_coo[new_edge].col = col;
-                    new_coo[new_edge].row = row;
-                    new_coo[new_edge].val = coo[edge].val;
-                    new_edge++;
-                }
-            }
-            edge_counts[thread_num] = new_edge;
-            for (VertexId node = node_start; node < node_end; node++)
-                row_offsets[node] = -1;
+    }
 
-            #pragma omp barrier
-            #pragma omp single
-            {
-                edge_offsets[0] = 0;
-                for (int i = 0; i < num_threads; i++)
-                    edge_offsets[i + 1] = edge_offsets[i] + edge_counts[i];
-                //util::cpu_mt::PrintCPUArray("edge_offsets", edge_offsets, num_threads+1);
-                row_offsets[0] = 0;
-            }
+    template <typename CscT>
+    cudaError_t FromCsc(
+        CscT &source,
+        util::Location target = util::LOCATION_DEFAULT,
+        cudaStream_t stream = 0)
+    {
+        cudaError_t retval = cudaSuccess;
+        typedef Coo<VertexT, SizeT, ValueT, FLAG | HAS_COO, cudaHostRegisterFlag> CooT;
 
-            SizeT edge_offset = edge_offsets[thread_num];
-            VertexId first_row = new_edge > 0 ? new_coo[0].row : -1;
-            //VertexId last_row = new_edge > 0? new_coo[new_edge-1].row : -1;
-            SizeT pointer = -1;
-            for (edge = 0; edge < new_edge; edge++)
-            {
-                SizeT edge_  = edge + edge_offset;
-                VertexId row = new_coo[edge].row;
-                row_offsets[row + 1] = edge_ + 1;
-                if (row == first_row) pointer = edge_ + 1;
-                // Fill in rows up to and including the current row
-                //for (VertexId row = prev_row + 1; row <= current_row; row++) {
-                //    row_offsets[row] = edge;
-                //}
-                //prev_row = current_row;
-
-                column_indices[edge + edge_offset] = new_coo[edge].col;
-                if (LOAD_EDGE_VALUES)
-                {
-                    //new_coo[edge].Val(edge_values[edge]);
-                    edge_values[edge + edge_offset] = new_coo[edge].val;
-                }
-            }
-            #pragma omp barrier
-            //if (first_row != last_row)
-            if (edge_start > 0 && coo[edge_start].row == coo[edge_start - 1].row) // same row as previous thread
-                if (edge_end == coo_edges || coo[edge_end].row != coo[edge_start].row) // first row ends at this thread
-                {
-                    row_offsets[first_row + 1] = pointer;
-                }
-            #pragma omp barrier
-            // Fill out any trailing edgeless nodes (and the end-of-list element)
-            //for (VertexId row = prev_row + 1; row <= nodes; row++) {
-            //    row_offsets[row] = real_edge;
-            //}
-            if (row_offsets[node_start] == -1)
-            {
-                VertexId i = node_start;
-                while (row_offsets[i] == -1) i--;
-                row_offsets[node_start] = row_offsets[i];
-            }
-            for (VertexId node = node_start + 1; node < node_end; node++)
-                if (row_offsets[node] == -1)
-                {
-                    row_offsets[node] = row_offsets[node - 1];
-                }
-            if (thread_num == 0) edges = edge_offsets[num_threads];
-
-            free(new_coo); new_coo = NULL;
-        }
-
-        row_offsets[nodes] = edges;
-
-        // Write offsets, indices, node, edges etc. into file
-        if (LOAD_EDGE_VALUES)
-        {
-            WriteBinary(output_file, nodes, edges,
-                        row_offsets, column_indices, edge_values);
-            //WriteCSR(output_file, nodes, edges,
-            //         row_offsets, column_indices, edge_values);
-            //WriteToLigraFile(output_file, nodes, edges,
-            //                 row_offsets, column_indices, edge_values);
-        }
-        else
-        {
-            WriteBinary(output_file, nodes, edges,
-                        row_offsets, column_indices);
-        }
-
-        // Compute out_nodes
-        SizeT out_node = 0;
-        for (SizeT node = 0; node < nodes; node++)
-        {
-            if (row_offsets[node + 1] - row_offsets[node] > 0)
-            {
-                ++out_node;
-            }
-        }
-        out_nodes = out_node;*/
+        CooT coo;
+        retval = coo.FromCsc(source, target, stream);
+        if (retval) return retval;
+        retval = FromCoo(coo, target, stream);
+        if (retval) return retval;
+        //coo.Display();
+        retval = coo.Release();
+        if (retval) return retval;
+        return retval;
     }
 
     /**
@@ -398,7 +301,8 @@ struct Csr :
             nodes_to_show = this -> nodes;
         util::PrintMsg(graph_prefix + "Graph containing " +
             std::to_string(this -> nodes) + " vertices, " +
-            std::to_string(this -> edges) + " edges, in CSR format. Neighbor list of first " + std::to_string(nodes_to_show) +
+            std::to_string(this -> edges) + " edges, in CSR format."
+            + " Neighbor list of first " + std::to_string(nodes_to_show) +
             " nodes :");
         for (SizeT node = 0; node < nodes_to_show; node++)
         {
@@ -787,43 +691,6 @@ struct Csr :
     }*/
 
     /**
-     * @brief Display CSR graph to console
-     */
-    /*void DisplayGraph(const char name[], SizeT limit = 40)
-    {
-        SizeT displayed_node_num = (nodes > limit) ? limit : nodes;
-        printf("%s : #nodes = ", name); util::PrintValue(nodes);
-        printf(", #edges = "); util::PrintValue(edges);
-        printf("\n");
-
-        for (SizeT i = 0; i < displayed_node_num; i++)
-        {
-            util::PrintValue(i);
-            printf(",");
-            util::PrintValue(row_offsets[i]);
-            if (node_values != NULL)
-            {
-                printf(",");
-                util::PrintValue(node_values[i]);
-            }
-            printf(" (");
-            for (SizeT j = row_offsets[i]; j < row_offsets[i + 1]; j++)
-            {
-                if (j != row_offsets[i]) printf(" , ");
-                util::PrintValue(column_indices[j]);
-                if (edge_values != NULL)
-                {
-                    printf(",");
-                    util::PrintValue(edge_values[j]);
-                }
-            }
-            printf(")\n");
-        }
-
-        printf("\n");
-    }*/
-
-    /**
      * @brief Check values.
      */
     /*bool CheckValue()
@@ -985,7 +852,7 @@ struct Csr :
     }*/
 
     /**@}*/
-};
+}; // CSR
 
 } // namespace graph
 } // namespace gunrock

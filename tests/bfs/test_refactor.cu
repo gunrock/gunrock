@@ -7,6 +7,7 @@
 #include <gunrock/oprtr/1D_oprtr/1D_1D.cuh>
 #include <gunrock/graph/csr.cuh>
 #include <gunrock/graph/coo.cuh>
+#include <gunrock/graph/csc.cuh>
 #include <gunrock/graphio/graphio.cuh>
 
 using namespace gunrock;
@@ -21,19 +22,22 @@ template <
     GraphFlag _FLAG   = GRAPH_NONE,
     unsigned int _cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct TestGraph :
-    public Csr<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO, _cudaHostRegisterFlag>,
-    public Coo<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO, _cudaHostRegisterFlag>
+    public Csr<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC, _cudaHostRegisterFlag>,
+    public Coo<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC, _cudaHostRegisterFlag>,
+    public Csc<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC, _cudaHostRegisterFlag>
 {
-    static const GraphFlag FLAG = _FLAG | HAS_CSR | HAS_COO;
+    static const GraphFlag FLAG = _FLAG | HAS_CSR | HAS_COO | HAS_CSC;
     static const unsigned int cudaHostRegisterFlag = _cudaHostRegisterFlag;
     typedef Csr<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CsrT;
     typedef Coo<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CooT;
+    typedef Csc<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CscT;
 
     template <typename CooT_in>
     cudaError_t FromCoo(CooT_in &coo, bool self_coo = false)
     {
         cudaError_t retval = cudaSuccess;
         retval = this -> CsrT::FromCoo(coo);
+        retval = this -> CscT::FromCoo(coo);
         if (retval) return retval;
         if (!self_coo)
             retval = this -> CooT::FromCoo(coo);
@@ -151,5 +155,127 @@ int main(int argc, char* argv[])
     if (retval) return retval;
     retval = graph.CsrT::Display();
     if (retval) return retval;
+    retval = graph.CscT::Display();
+    if (retval) return retval;
+
+    typedef Csr<VertexT, SizeT, ValueT> CsrT;
+    CsrT csr;
+    retval = csr.FromCoo(graph);
+    if (retval) return retval;
+    PrintMsg("CSR from COO:");
+    csr.Display();
+    //graph.CooT::Display();
+
+    retval = csr.FromCsc(graph);
+    if (retval) return retval;
+    PrintMsg("CSR from CSC:");
+    csr.Display();
+    //graph.CooT::Display();
+
+    retval = csr.FromCsr(graph);
+    if (retval) return retval;
+    PrintMsg("CSR from CSR:");
+    csr.Display();
+    //graph.CooT::Display();
+
+    typedef Csr<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> CsreT;
+    CsreT csre;
+    retval = csre.FromCoo(graph);
+    if (retval) return retval;
+    PrintMsg("CSRE from COO:");
+    csre.Display();
+    //graph.CooT::Display();
+
+    retval = csre.FromCsc(graph);
+    if (retval) return retval;
+    PrintMsg("CSRE from CSC:");
+    csre.Display();
+    //graph.CooT::Display();
+
+    retval = csre.FromCsr(graph);
+    if (retval) return retval;
+    PrintMsg("CSRE from CSR:");
+    csre.Display();
+    //graph.CooT::Display();
+
+    typedef Csc<VertexT, SizeT, ValueT> CscT;
+    CscT csc;
+    retval = csc.FromCoo(graph);
+    if (retval) return retval;
+    PrintMsg("CSC from COO:");
+    csc.Display();
+    //graph.CooT::Display();
+
+    retval = csc.FromCsc(graph);
+    if (retval) return retval;
+    PrintMsg("CSC from CSC:");
+    csc.Display();
+    //graph.CooT::Display();
+
+    retval = csc.FromCsr(graph);
+    if (retval) return retval;
+    PrintMsg("CSC from CSR:");
+    csc.Display();
+    //graph.CooT::Display();
+
+    typedef Csc<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> CsceT;
+    CsceT csce;
+    retval = csce.FromCoo(graph);
+    if (retval) return retval;
+    PrintMsg("CSCE from COO:");
+    csce.Display();
+    //graph.CooT::Display();
+
+    retval = csce.FromCsc(graph);
+    if (retval) return retval;
+    PrintMsg("CSCE from CSC:");
+    csce.Display();
+    //graph.CooT::Display();
+
+    retval = csce.FromCsr(graph);
+    if (retval) return retval;
+    PrintMsg("CSCE from CSR:");
+    csce.Display();
+    //graph.CooT::Display();
+
+    typedef Coo<VertexT, SizeT, ValueT> CooT;
+    CooT coo;
+    retval = coo.FromCoo(graph);
+    if (retval) return retval;
+    PrintMsg("COO from COO:");
+    coo.Display();
+    //graph.CooT::Display();
+
+    retval = coo.FromCsc(graph);
+    if (retval) return retval;
+    PrintMsg("COO from CSC:");
+    coo.Display();
+    //graph.CooT::Display();
+
+    retval = coo.FromCsr(graph);
+    if (retval) return retval;
+    PrintMsg("COO from CSR:");
+    coo.Display();
+    //graph.CooT::Display();
+
+    typedef Coo<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> CooeT;
+    CooeT cooe;
+    retval = cooe.FromCoo(graph);
+    if (retval) return retval;
+    PrintMsg("COOE from COO:");
+    cooe.Display();
+    //graph.CooT::Display();
+
+    retval = cooe.FromCsc(graph);
+    if (retval) return retval;
+    PrintMsg("COOE from CSC:");
+    cooe.Display();
+    //graph.CooT::Display();
+
+    retval = cooe.FromCsr(graph);
+    if (retval) return retval;
+    PrintMsg("COOE from CSR:");
+    cooe.Display();
+    //graph.CooT::Display();
     return 0;
 }
