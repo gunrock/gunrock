@@ -19,6 +19,8 @@ look at our [results](#Results),
 and find more details in our [publications](#Publications).
 See [Release Notes](http://gunrock.github.io/gunrock/doc/latest/release_notes.html) to keep up with the our latest changes.
 
+Gunrock is featured on NVIDIA's list of [GPU Accelerated Libraries](https://developer.nvidia.com/gpu-accelerated-libraries) as the only external library for GPU graph analytics.
+
 Links for Gunrock source code
 -----------------------------
 [ [Related Pages](http://gunrock.github.io/gunrock/doc/latest/pages.html) |
@@ -85,8 +87,10 @@ Publications
 Yangzihao Wang, Yuechao Pan, Andrew Davidson, Yuduo Wu, Carl Yang, Leyuan Wang, Muhammad Osama, Chenshan Yuan, Weitang Liu, Andy T. Riffel, and John D. Owens. **Gunrock: GPU Graph Analytics**. CoRR, abs/1701.01170(1701.01170v1), January 2017. [[arXiv](http://arxiv.org/abs/1701.01170)]
 
 Yuechao Pan, Yangzihao Wang, Yuduo Wu, Carl Yang, and John D. Owens.
-**Multi-GPU Graph Analytics**. CoRR, abs/1504.04804(1504.04804v3), October 2016.
-[[arXiv](http://arxiv.org/abs/1504.04804)]
+**Multi-GPU Graph Analytics**.  In Proceedings of the 31st IEEE International Parallel and Distributed Processing Symposium, IPDPS 2017, May/June 2017.
+[[http](http://escholarship.org/uc/item/39r145g1)]
+
+Yangzihao Wang, Sean Baxter, and John D. Owens. **Mini-Gunrock: A Lightweight Graph Analytics Framework on the GPU**. In Graph Algorithms Building Blocks, GABB 2017, May 2017. [[http](https://escholarship.org/uc/item/5wm061tr)]
 
 Leyuan Wang, Yangzihao Wang, Carl Yang, and John D. Owens. **A Comparative Study on Exact Triangle Counting Algorithms on the GPU**. In Proceedings of the 1st High Performance Graph Processing Workshop, HPGP '16, pages 1--8, May 2016.
 [[DOI](http://dx.doi.org/10.1145/2915516.2915521) |
