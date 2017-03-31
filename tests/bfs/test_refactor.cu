@@ -37,10 +37,24 @@ struct TestGraph :
     {
         cudaError_t retval = cudaSuccess;
         retval = this -> CsrT::FromCoo(coo);
+        if (retval) return retval;
         retval = this -> CscT::FromCoo(coo);
         if (retval) return retval;
         if (!self_coo)
             retval = this -> CooT::FromCoo(coo);
+        return retval;
+    }
+
+    template <typename CsrT_in>
+    cudaError_t FromCsr(CsrT_in &csr, bool self_csr = false)
+    {
+        cudaError_t retval = cudaSuccess;
+        retval = this -> CooT::FromCsr(csr);
+        if (retval) return retval;
+        retval = this -> CscT::FromCsr(csr);
+        if (retval) return retval;
+        if (!self_csr)
+            retval = this -> CsrT::FromCsr(csr);
         return retval;
     }
 };

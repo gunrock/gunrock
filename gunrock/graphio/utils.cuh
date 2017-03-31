@@ -41,13 +41,11 @@ struct drand48_data
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/random_bits.h>
 
-#include <gunrock/coo.cuh>
-#include <gunrock/csr.cuh>
+//#include <gunrock/coo.cuh>
+//#include <gunrock/csr.cuh>
 
-namespace gunrock
-{
-namespace graphio
-{
+namespace gunrock {
+namespace graphio {
 
 /**
  * @brief Generates a random node-ID in the range of [0, num_nodes)
@@ -65,7 +63,7 @@ SizeT RandomNode (SizeT num_nodes)
     return node_id % num_nodes;
 }
 
-template <typename VertexId, typename SizeT, typename Value>
+/*template <typename VertexId, typename SizeT, typename Value>
 void RemoveStandaloneNodes(
     Csr<VertexId, SizeT, Value>* graph, bool quiet = false)
 {
@@ -156,7 +154,7 @@ void RemoveStandaloneNodes(
     delete[] marker       ; marker        = NULL;
     delete[] displacements; displacements = NULL;
     delete[] block_offsets; block_offsets = NULL;
-}
+}*/
 
 } // namespace graphio
 } // namespace gunrock

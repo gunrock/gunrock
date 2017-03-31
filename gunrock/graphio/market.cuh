@@ -457,8 +457,26 @@ cudaError_t Read(
     return retval;
 }
 
+template <typename GraphT, bool COO_SWITCH>
+struct CooSwitch
+{
+static cudaError_t Load(
+    util::Parameters &parameters,
+    GraphT &graph,
+    std::string graph_prefix = "")
+{
+    cudaError_t retval = cudaSuccess;
+    retval = Read(parameters, graph, graph_prefix);
+    if (retval) return retval;
+    retval = graph.FromCoo(graph, true);
+    return retval;
+}
+};
+
 template <typename GraphT>
-cudaError_t Load(
+struct CooSwitch<GraphT, false>
+{
+static cudaError_t Load(
     util::Parameters &parameters,
     GraphT &graph,
     std::string graph_prefix = "")
@@ -468,24 +486,24 @@ cudaError_t Load(
         typename GraphT::ValueT,
         GraphT::FLAG | graph::HAS_COO, GraphT::cudaHostRegisterFlag> CooT;
     cudaError_t retval = cudaSuccess;
-
-    if (GraphT::FLAG & graph::HAS_COO)
-    {
-        retval = Read(parameters, graph, graph_prefix);
-        if (retval) return retval;
-        retval = graph.FromCoo(graph, true);
-        if (retval) return retval;
-    } else {
-        CooT coo;
-        retval = Read(parameters, coo, graph_prefix);
-        if (retval) return retval;
-        retval = graph.FromCoo(coo);
-        if (retval) return retval;
-        retval = coo.Release();
-        return retval;
-    }
-
+    CooT coo;
+    retval = Read(parameters, coo, graph_prefix);
+    if (retval) return retval;
+    retval = graph.FromCoo(coo);
+    if (retval) return retval;
+    retval = coo.Release();
     return retval;
+}
+};
+
+template <typename GraphT>
+cudaError_t Load(
+    util::Parameters &parameters,
+    GraphT &graph,
+    std::string graph_prefix = "")
+{
+    return CooSwitch<GraphT, (GraphT::FLAG & graph::HAS_COO) != 0>
+        ::Load(parameters, graph, graph_prefix);
 }
 
 template <typename GraphT>

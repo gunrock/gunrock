@@ -196,7 +196,7 @@ struct Coo :
     {
         cudaError_t retval = cudaSuccess;
         if (target == util::LOCATION_DEFAULT)
-            target = source.edge_pairs.GetSetted() | source.edge_pairs.GetAllocated();
+            target = source.CsrT::row_offsets.GetSetted() | source.CsrT::row_offsets.GetAllocated();
 
         //if (retval = BaseGraph::Set(source))
         //    return retval;

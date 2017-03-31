@@ -41,6 +41,8 @@ struct Csr :
     public GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag>
 {
     typedef GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> BaseGraph;
+    typedef Csr<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CsrT;
+    
     // Column indices corresponding to all the
     // non-zero values in the sparse matrix
     util::Array1D<SizeT, VertexT,

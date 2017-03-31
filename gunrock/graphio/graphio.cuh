@@ -16,6 +16,7 @@
 
 #include <gunrock/util/parameters.h>
 #include <gunrock/graphio/market.cuh>
+#include <gunrock/graphio/rgg.cuh>
 
 namespace gunrock {
 namespace graphio {
@@ -85,7 +86,8 @@ cudaError_t UseParameters(
 
     retval = market::UseParameters(parameters, graph_prefix);
     if (retval) return retval;
-
+    retval = rgg::UseParameters(parameters, graph_prefix);
+    if (retval) return retval;
     return retval;
 }
 
@@ -263,68 +265,7 @@ cudaError_t LoadGraph(
     }*/
     else if (graph_type == "rgg")
     {
-        if (!args.CheckCmdLineFlag("quiet"))
-        {
-            printf("Generating RGG (Random Geometry Graph) ...\n");
-        }
-
-        SizeT rgg_nodes = 1 << 10;
-        SizeT rgg_scale = 10;
-        double rgg_thfactor  = 0.55;
-        double rgg_threshold =
-            rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
-        double rgg_vmultipiler = 1;
-        int rgg_seed = -1;
-
-        args.GetCmdLineArgument("rgg_scale", rgg_scale);
-        rgg_nodes = 1 << rgg_scale;
-        args.GetCmdLineArgument("rgg_nodes", rgg_nodes);
-        args.GetCmdLineArgument("rgg_thfactor", rgg_thfactor);
-        rgg_threshold = rgg_thfactor * sqrt(log(rgg_nodes) / rgg_nodes);
-        args.GetCmdLineArgument("rgg_threshold", rgg_threshold);
-        args.GetCmdLineArgument("rgg_vmultipiler", rgg_vmultipiler);
-        args.GetCmdLineArgument("rgg_seed", rgg_seed);
-
-        // put everything into mObject info
-        info["rgg_seed"]        = rgg_seed;
-        info["rgg_scale"]       = (int64_t)rgg_scale;
-        info["rgg_nodes"]       = (int64_t)rgg_nodes;
-        info["rgg_thfactor"]    = rgg_thfactor;
-        info["rgg_threshold"]   = rgg_threshold;
-        info["rgg_vmultipiler"] = rgg_vmultipiler;
-        //file_stem = "rgg_s"+std::to_string(rgg_scale)+"_e"+std::to_string(csr_ref.edges)+"_f"+std::to_string(rgg_thfactor);
-        file_stem = "rgg_" +
-            (args.CheckCmdLineFlag("rgg_scale") ?
-                ("n" + std::to_string(rgg_scale)) : std::to_string(rgg_nodes))
-           + "_" + (args.CheckCmdLineFlag("rgg_thfactor") ?
-                ("t" + std::to_string(rgg_thfactor)) : std::to_string(rgg_threshold));
-        info["dataset"] = file_stem;
-
-        util::CpuTimer cpu_timer;
-        cpu_timer.Start();
-
-        // generate random geometry graph
-        if (graphio::rgg::BuildRggGraph<EDGE_VALUE>(
-                    rgg_nodes,
-                    csr_ref,
-                    rgg_threshold,
-                    info["undirected"].get_bool(),
-                    rgg_vmultipiler,
-                    1,
-                    rgg_seed,
-                    args.CheckCmdLineFlag("quiet")) != 0)
-        {
-            return 1;
-        }
-
-        cpu_timer.Stop();
-        float elapsed = cpu_timer.ElapsedMillis();
-        if (!args.CheckCmdLineFlag("quiet"))
-        {
-            printf("RGG generated in %.3f ms, "
-                   "threshold = %.3lf, vmultipiler = %.3lf\n",
-                   elapsed, rgg_threshold, rgg_vmultipiler);
-        }
+        retval = rgg::Load(parameters, graph, graph_prefix);
     }
     /*else if (graph_type == "smallworld")
     {
