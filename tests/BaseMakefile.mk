@@ -11,6 +11,7 @@
 
 force64 = 1
 use_metis = 1
+use_boost = 1
 NVCC = "$(shell which nvcc)"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
@@ -44,12 +45,20 @@ SM_TARGETS = $(GEN_SM35) #$(GEN_SM35) $(GEN_SM60) $(GEN_SM61)
 CUDA_INC = "$(shell dirname $(NVCC))/../include"
 MGPU_INC = "../../externals/moderngpu/include"
 CUB_INC = "../../externals/cub"
-BOOST_DEPS = #-I../../.. -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
+
+BOOST_INC =
+BOOST_LINK =
+ifeq ($(use_boost), 1)
+    BOOST_INC = "/usr/local/include"
+    BOOST_LINK = -Xcompiler -DBOOST_FOUND -L"/usr/local/lib" -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
+endif
 
 ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
-    OMP_DEPS = -I"/usr/local/include/libiomp" -Xlinker /usr/local/lib/libiomp5.dylib
+    OMP_INC  = "/usr/local/include/libiomp"
+    OMP_LINK = -Xlinker /usr/local/lib/libiomp5.dylib
 else
-    OMP_DEPS = -Xcompiler -fopenmp -Xlinker -lgomp
+    OMP_INC = 
+    OMP_LINK = -Xcompiler -fopenmp -Xlinker -lgomp
 endif
 
 ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
@@ -57,12 +66,13 @@ ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
 endif
 
 ifneq ($(use_metis), 1)
-	METIS_DEPS =
+	METIS_LINK =
 else
-	METIS_DEPS = -Xlinker -lmetis -Xcompiler -DMETIS_FOUND
+	METIS_LINK = -Xlinker -lmetis -Xcompiler -DMETIS_FOUND
 endif
 GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=0.4.0
-INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) $(GUNROCK_DEF) -I.. -I../..
+LINK = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
+INC = -I$(CUDA_INC) -I$(OMP_INC) -I$(MGPU_INC) -I$(CUB_INC) -I$(BOOST_INC) -I.. -I../.. $(LINK)
 
 #-------------------------------------------------------------------------------
 # Defines

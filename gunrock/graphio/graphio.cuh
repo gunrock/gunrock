@@ -17,6 +17,7 @@
 #include <gunrock/util/parameters.h>
 #include <gunrock/graphio/market.cuh>
 #include <gunrock/graphio/rgg.cuh>
+#include <gunrock/graphio/small_world.cuh>
 
 namespace gunrock {
 namespace graphio {
@@ -87,6 +88,8 @@ cudaError_t UseParameters(
     retval = market::UseParameters(parameters, graph_prefix);
     if (retval) return retval;
     retval = rgg::UseParameters(parameters, graph_prefix);
+    if (retval) return retval;
+    retval = small_world::UseParameters(parameters, graph_prefix);
     if (retval) return retval;
     return retval;
 }
@@ -267,67 +270,12 @@ cudaError_t LoadGraph(
     {
         retval = rgg::Load(parameters, graph, graph_prefix);
     }
-    /*else if (graph_type == "smallworld")
+
+    else if (graph_type == "smallworld")
     {
-        if (!args.CheckCmdLineFlag("quiet"))
-        {
-            printf("Generating Small World Graph ...\n");
-        }
+        retval = small_world::Load(parameters, graph, graph_prefix);
+    }
 
-        SizeT  sw_nodes = 1 << 10;
-        SizeT  sw_scale = 10;
-        double sw_p     = 0.0;
-        SizeT  sw_k     = 6;
-        int    sw_seed  = -1;
-        double sw_vmultipiler = 1.00;
-        double sw_vmin        = 1.00;
-
-        args.GetCmdLineArgument("sw_scale", sw_scale);
-        sw_nodes = 1 << sw_scale;
-        args.GetCmdLineArgument("sw_nodes", sw_nodes);
-        args.GetCmdLineArgument("sw_k"    , sw_k    );
-        args.GetCmdLineArgument("sw_p"    , sw_p    );
-        args.GetCmdLineArgument("sw_seed" , sw_seed );
-        args.GetCmdLineArgument("sw_vmultipiler", sw_vmultipiler);
-        args.GetCmdLineArgument("sw_vmin"       , sw_vmin);
-
-        info["sw_seed"       ] = sw_seed       ;
-        info["sw_scale"      ] = (int64_t)sw_scale      ;
-        info["sw_nodes"      ] = (int64_t)sw_nodes      ;
-        info["sw_p"          ] = sw_p          ;
-        info["sw_k"          ] = (int64_t)sw_k          ;
-        info["sw_vmultipiler"] = sw_vmultipiler;
-        info["sw_vmin"       ] = sw_vmin       ;
-        file_stem = "smallworld_" +
-            (args.CheckCmdLineFlag("sw_scale") ?
-                ("n" + std::to_string(sw_scale)) : std::to_string(sw_nodes))
-            + "k" + std::to_string(sw_k) + "_p" + std::to_string(sw_p);
-        info["dataset"] = file_stem;
-
-        util::CpuTimer cpu_timer;
-        cpu_timer.Start();
-        if (graphio::small_world::BuildSWGraph<EDGE_VALUE>(
-            sw_nodes,
-            csr_ref,
-            sw_k,
-            sw_p,
-            info["undirected"].get_bool(),
-            sw_vmultipiler,
-            sw_vmin,
-            sw_seed,
-            args.CheckCmdLineFlag("quiet")) != cudaSuccess)
-        {
-            return 1;
-        }
-        cpu_timer.Stop();
-        float elapsed = cpu_timer.ElapsedMillis();
-        if (!args.CheckCmdLineFlag("quiet"))
-        {
-            printf("Small World Graph generated in %.3lf ms, "
-                "k = %lld, p = %.3lf\n",
-                elapsed, (long long)sw_k, sw_p);
-        }
-    }*/
     else
     {
         retval = util::GRError("Unspecified graph type " + graph_type,
