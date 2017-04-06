@@ -258,7 +258,7 @@ struct Csc :
                 const VertexT &column){
                     if (column < nodes)
                         column_offsets[column] = util::BinarySearch(column,
-                            edge_pairs, 0, edges,
+                            edge_pairs, 0, edges-1,
                             column_edge_compare);
                     else column_offsets[column] = edges;
                 }, this -> nodes + 1, target, stream))

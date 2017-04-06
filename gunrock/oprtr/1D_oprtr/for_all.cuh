@@ -540,14 +540,18 @@ cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
 
     if ((target & HOST) == HOST)
     {
+        //util::PrintMsg("Launching on HOST, length = " + std::to_string(length));
         #pragma omp parallel for
         for (SizeT i=0; i<length; i++)
+        {
+            //util::PrintMsg(std::to_string(i) + " " + std::to_string((*this)[i]));
             apply((*this) + 0, array_in1 + 0, array_in2 + 0, i);
+        }
     }
 
     if ((target & DEVICE) == DEVICE)
     {
-        //printf("Launch kernel, length = %d\n", length);
+        //util::PrintMsg("Launching on DEVICE, length = " + std::to_string(length));
         oprtr::ForAll_Kernel
             <<<256, 256, 0, stream>>>(
             (*this), array_in1, array_in2, apply, length);

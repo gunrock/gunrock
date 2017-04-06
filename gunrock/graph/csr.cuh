@@ -256,7 +256,7 @@ struct Csr :
                 const VertexT &row){
                     if (row < nodes)
                         row_offsets[row] = util::BinarySearch(row,
-                            edge_pairs, 0, edges,
+                            edge_pairs, 0, edges-1,
                             row_edge_compare);
                     else row_offsets[row] = edges;
                 }, this -> nodes + 1, target, stream))

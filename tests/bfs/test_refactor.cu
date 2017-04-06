@@ -178,13 +178,13 @@ int main(int argc, char* argv[])
     if (retval) return retval;
     PrintMsg("CSR from COO:");
     csr.Display();
-    graph.CooT::Display();
+    //graph.CooT::Display();
 
     retval = csr.FromCsc(graph);
     if (retval) return retval;
     PrintMsg("CSR from CSC:");
     csr.Display();
-    graph.CooT::Display();
+    //graph.CooT::Display();
 
     retval = csr.FromCsr(graph);
     if (retval) return retval;
