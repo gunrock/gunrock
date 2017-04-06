@@ -36,11 +36,12 @@ template<
     typename VertexT = int,
     typename SizeT   = VertexT,
     typename ValueT  = VertexT,
-    GraphFlag FLAG   = GRAPH_NONE,
+    GraphFlag _FLAG   = GRAPH_NONE,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct Coo :
-    public GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+    public GraphBase<VertexT, SizeT, ValueT, _FLAG | HAS_COO, cudaHostRegisterFlag>
 {
+    static const GraphFlag FLAG = _FLAG | HAS_COO;
     typedef GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> BaseGraph;
     typedef Coo<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CooT;
 
@@ -188,12 +189,13 @@ struct Coo :
         return retval;
     }
 
-    template <typename CsrT>
+    template <typename GraphT>
     cudaError_t FromCsr(
-        CsrT &source,
+        GraphT &source,
         util::Location target = util::LOCATION_DEFAULT,
         cudaStream_t stream = 0)
     {
+        typedef typename GraphT::CsrT CsrT;
         cudaError_t retval = cudaSuccess;
         if (target == util::LOCATION_DEFAULT)
             target = source.CsrT::row_offsets.GetSetted() | source.CsrT::row_offsets.GetAllocated();
@@ -234,12 +236,14 @@ struct Coo :
         return retval;
     }
 
-    template <typename CscT>
+    template <typename GraphT>
     cudaError_t FromCsc(
-        CscT &source,
+        GraphT &source,
         util::Location target = util::LOCATION_DEFAULT,
         cudaStream_t stream = 0)
     {
+        typedef typename GraphT::CscT CscT;
+
         cudaError_t retval = cudaSuccess;
         if (target == util::LOCATION_DEFAULT)
             target = source.edge_pairs.GetSetted() | source.edge_pairs.GetAllocated();

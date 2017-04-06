@@ -87,6 +87,7 @@ cudaError_t Build(
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::ValueT  ValueT;
+    typedef typename GraphT::CooT    CooT;
 
 #ifndef BOOST_FOUND
     retval = util::GRError("Small world graph generator requires boost, but it's not found", __FILE__, __LINE__);

@@ -35,11 +35,12 @@ template<
     typename VertexT = int,
     typename SizeT   = VertexT,
     typename ValueT  = VertexT,
-    GraphFlag FLAG   = GRAPH_NONE,
+    GraphFlag _FLAG   = GRAPH_NONE,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct Csc :
-    public GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag>
+    public GraphBase<VertexT, SizeT, ValueT, _FLAG | HAS_CSC, cudaHostRegisterFlag>
 {
+    static const GraphFlag FLAG = _FLAG | HAS_CSC;
     typedef GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> BaseGraph;
     typedef Csc<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CscT;
 
@@ -142,9 +143,9 @@ struct Csc :
 
         //if (retval = BaseGraph::Set(source))
         //    return retval;
-        this -> nodes = source.CscT::nodes;
-        this -> edges = source.CscT::edges;
-        this -> directed = source.CscT::directed;
+        this -> nodes = source.nodes;
+        this -> edges = source.edges;
+        this -> directed = source.directed;
 
         if (retval = Allocate(source.nodes, source.edges, target))
             return retval;
@@ -182,9 +183,9 @@ struct Csc :
      *
      * Default: Assume rows are not sorted.
      */
-    template <typename CooT>
+    template <typename GraphT>
     cudaError_t FromCoo(
-        CooT &source,
+        GraphT &source,
         util::Location target = util::LOCATION_DEFAULT,
         cudaStream_t stream = 0,
         //bool  ordered_rows = false,
@@ -192,6 +193,7 @@ struct Csc :
         //bool  reversed = false,
         bool  quiet = false)
     {
+        typedef typename GraphT::CooT CooT;
         //typedef Coo<VertexT_in, SizeT_in, ValueT_in, FLAG_in,
         //    cudaHostRegisterFlag_in> CooT;
         if (!quiet)
@@ -271,14 +273,15 @@ struct Csc :
         return retval;
     }
 
-    template <typename CsrT>
+    template <typename GraphT>
     cudaError_t FromCsr(
-        CsrT &source,
+        GraphT &source,
         util::Location target = util::LOCATION_DEFAULT,
         cudaStream_t stream = 0)
     {
-        cudaError_t retval = cudaSuccess;
+        typedef typename GraphT::CsrT CsrT;
         typedef Coo<VertexT, SizeT, ValueT, FLAG | HAS_COO, cudaHostRegisterFlag> CooT;
+        cudaError_t retval = cudaSuccess;
 
         CooT coo;
         retval = coo.FromCsr(source, target, stream);

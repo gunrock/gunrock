@@ -174,19 +174,19 @@ int main(int argc, char* argv[])
 
     typedef Csr<VertexT, SizeT, ValueT> CsrT;
     CsrT csr;
-    //retval = csr.FromCoo(graph);
-    //if (retval) return retval;
-    //PrintMsg("CSR from COO:");
-    //csr.Display();
-    //graph.CooT::Display();
+    retval = csr.FromCoo(graph);
+    if (retval) return retval;
+    PrintMsg("CSR from COO:");
+    csr.Display();
+    graph.CooT::Display();
 
-    //retval = csr.FromCsc(graph);
-    //if (retval) return retval;
-    //PrintMsg("CSR from CSC:");
-    //csr.Display();
-    //graph.CooT::Display();
+    retval = csr.FromCsc(graph);
+    if (retval) return retval;
+    PrintMsg("CSR from CSC:");
+    csr.Display();
+    graph.CooT::Display();
 
-    /*retval = csr.FromCsr(graph);
+    retval = csr.FromCsr(graph);
     if (retval) return retval;
     PrintMsg("CSR from CSR:");
     csr.Display();
@@ -250,14 +250,14 @@ int main(int argc, char* argv[])
     if (retval) return retval;
     PrintMsg("CSCE from CSR:");
     csce.Display();
-    //graph.CooT::Display();*/
+    //graph.CooT::Display();
 
     typedef Coo<VertexT, SizeT, ValueT> CooT;
     CooT coo;
-    //retval = coo.FromCoo(graph);
-    //if (retval) return retval;
-    //PrintMsg("COO from COO:");
-    //coo.Display();
+    retval = coo.FromCoo(graph);
+    if (retval) return retval;
+    PrintMsg("COO from COO:");
+    coo.Display();
     //graph.CooT::Display();
 
     retval = coo.FromCsc(graph);
@@ -266,7 +266,7 @@ int main(int argc, char* argv[])
     coo.Display();
     //graph.CooT::Display();
 
-    /*retval = coo.FromCsr(graph);
+    retval = coo.FromCsr(graph);
     if (retval) return retval;
     PrintMsg("COO from CSR:");
     coo.Display();
@@ -290,6 +290,6 @@ int main(int argc, char* argv[])
     if (retval) return retval;
     PrintMsg("COOE from CSR:");
     cooe.Display();
-    //graph.CooT::Display();*/
+    //graph.CooT::Display();
     return 0;
 }

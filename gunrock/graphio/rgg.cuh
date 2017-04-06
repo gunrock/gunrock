@@ -154,6 +154,7 @@ cudaError_t Build(
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::ValueT  ValueT;
+    typedef typename GraphT::CsrT    CsrT;
 
     bool quiet = parameters.Get<bool>("quiet");
     //bool undirected = !parameters.Get<bool>(graph_prefix + "directed");

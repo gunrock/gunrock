@@ -70,6 +70,7 @@ cudaError_t ReadMarketStream(
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::EdgePairT EdgePairT;
+    typedef typename GraphT::CooT      CooT;
 
     cudaError_t retval = cudaSuccess;
     bool quiet = parameters.Get<bool>("quiet");
@@ -513,6 +514,7 @@ cudaError_t Write(
     std::string graph_prefix = "")
 {
     typedef typename GraphT::SizeT SizeT;
+    typedef typename GraphT::CooT  CooT;
     typedef typename GraphT::CooT::EdgePairT EdgePairT;
     cudaError_t retval = cudaSuccess;
 

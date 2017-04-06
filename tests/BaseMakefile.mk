@@ -32,7 +32,7 @@ GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 
-SM_TARGETS = $(GEN_SM35) #$(GEN_SM35) $(GEN_SM60) $(GEN_SM61) 
+SM_TARGETS = $(GEN_SM35) #$(GEN_SM35) $(GEN_SM60) $(GEN_SM61)
 #-------------------------------------------------------------------------------
 # Libs
 #-------------------------------------------------------------------------------
@@ -42,22 +42,22 @@ SM_TARGETS = $(GEN_SM35) #$(GEN_SM35) $(GEN_SM60) $(GEN_SM61)
 # Includes
 #-------------------------------------------------------------------------------
 
-CUDA_INC = "$(shell dirname $(NVCC))/../include"
-MGPU_INC = "../../externals/moderngpu/include"
-CUB_INC = "../../externals/cub"
+CUDA_INC = -I"$(shell dirname $(NVCC))/../include"
+MGPU_INC = -I"../../externals/moderngpu/include"
+CUB_INC = -I"../../externals/cub"
 
 BOOST_INC =
 BOOST_LINK =
 ifeq ($(use_boost), 1)
-    BOOST_INC = "/usr/local/include"
+    BOOST_INC = -I"/usr/local/include"
     BOOST_LINK = -Xcompiler -DBOOST_FOUND -L"/usr/local/lib" -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
 endif
 
 ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
-    OMP_INC  = "/usr/local/include/libiomp"
+    OMP_INC  = -I"/usr/local/include/libiomp"
     OMP_LINK = -Xlinker /usr/local/lib/libiomp5.dylib
 else
-    OMP_INC = 
+    OMP_INC =
     OMP_LINK = -Xcompiler -fopenmp -Xlinker -lgomp
 endif
 
@@ -72,7 +72,7 @@ else
 endif
 GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=0.4.0
 LINK = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
-INC = -I$(CUDA_INC) -I$(OMP_INC) -I$(MGPU_INC) -I$(CUB_INC) -I$(BOOST_INC) -I.. -I../.. $(LINK)
+INC = $(CUDA_INC) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(BOOST_INC) -I.. -I../.. $(LINK)
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -115,8 +115,13 @@ endif
 #-------------------------------------------------------------------------------
 # Dependency Lists
 #-------------------------------------------------------------------------------
-EXTRA_SOURCE = ../../gunrock/util/str_to_T.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp ../../gunrock/util/gitsha1.c
-      
+EXTRA_SOURCE = ../../gunrock/util/str_to_T.cu \
+	../../gunrock/util/test_utils.cu \
+	../../gunrock/util/error_utils.cu \
+	../../externals/moderngpu/src/mgpucontext.cu \
+	../../externals/moderngpu/src/mgpuutil.cpp \
+	../../gunrock/util/gitsha1.c
+
 DEPS = 	./Makefile \
     ../BaseMakefile.mk \
     $(EXTRA_SOURCE) \
