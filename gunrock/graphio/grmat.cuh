@@ -57,7 +57,7 @@ __device__ __forceinline__ void ChoosePartition (
 }
 
 __device__ __forceinline__ void VaryParams(
-    double a, double b, double c, double d,
+    double &a, double &b, double &c, double &d,
     curandState &rand_state)
 {
     double v, S;
@@ -383,7 +383,7 @@ cudaError_t BuildMetaRmatGraph(
         if (undirected) edge_count *=2;
         unsigned int seed_ = seed + 616 * gpu;
         if (retval = edges[gpu].Allocate(edge_count, util::DEVICE))
-            return retval; 
+            return retval;
 
         int block_size = 1024;
         int grid_size = edge_count / block_size + 1;

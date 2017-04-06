@@ -16,6 +16,7 @@
 
 #include <gunrock/util/parameters.h>
 #include <gunrock/graphio/market.cuh>
+#include <gunrock/graphio/rmat.cuh>
 #include <gunrock/graphio/rgg.cuh>
 #include <gunrock/graphio/small_world.cuh>
 
@@ -91,6 +92,8 @@ cudaError_t UseParameters(
     if (retval) return retval;
     retval = small_world::UseParameters(parameters, graph_prefix);
     if (retval) return retval;
+    retval = rmat::UseParameters(parameters, graph_prefix);
+    if (retval) return retval;
     return retval;
 }
 
@@ -119,6 +122,12 @@ cudaError_t LoadGraph(
     {
         retval = market::Load(parameters, graph, graph_prefix);
     }
+
+    else if (graph_type == "rmat")
+    {
+        retval = rmat::Load(parameters, graph, graph_prefix);
+    }
+
     /*else if (graph_type == "rmat" || graph_type == "grmat" || graph_type == "metarmat")  // R-MAT graph
     {
         if (!args.CheckCmdLineFlag("quiet"))

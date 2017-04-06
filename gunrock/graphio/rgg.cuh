@@ -158,12 +158,12 @@ cudaError_t Build(
     bool quiet = parameters.Get<bool>("quiet");
     //bool undirected = !parameters.Get<bool>(graph_prefix + "directed");
     SizeT scale = parameters.Get<SizeT>(graph_prefix + "rgg-scale");
-    SizeT nodes = 1 << scale;
+    SizeT num_nodes = 1 << scale;
     if (!parameters.UseDefault(graph_prefix + "rgg-nodes"))
-        nodes = parameters.Get<SizeT>(graph_prefix + "rgg-nodes");
+        num_nodes = parameters.Get<SizeT>(graph_prefix + "rgg-nodes");
 
     double thfactor = parameters.Get<double>(graph_prefix + "rgg-thfactor");
-    double threshold = thfactor * sqrt(log(nodes) / nodes);
+    double threshold = thfactor * sqrt(log(num_nodes) / num_nodes);
     if (!parameters.UseDefault(graph_prefix + "rgg-threshold"))
         threshold = parameters.Get<double>(graph_prefix + "rgg-threshold");
 
@@ -183,11 +183,11 @@ cudaError_t Build(
 
     int             reserved_size = 50;
     util::Location  target        = util::HOST;
-    SizeT           edges         = 0;
+    SizeT           num_edges     = 0;
     long long       row_length    = 1.0 / threshold + 1;
     long long       reserved_factor2 = 8;
     long long       initial_length   =
-        reserved_factor2 * nodes / row_length / row_length;
+        reserved_factor2 * num_nodes / row_length / row_length;
 
     util::Array1D<SizeT, RggPoint> points;
     util::Array1D<SizeT, SizeT   > row_offsets;
@@ -207,14 +207,14 @@ cudaError_t Build(
     block_size .SetName("graphio::rgg::block_size");
     block_length.SetName("graphio::rgg::block_length");
 
-    if (retval = points.Allocate(nodes + 1, target))
+    if (retval = points.Allocate(num_nodes + 1, target))
         return retval;
-    if (retval = row_offsets.Allocate(nodes + 1, target))
+    if (retval = row_offsets.Allocate(num_nodes + 1, target))
         return retval;
-    if (retval = col_index_.Allocate(reserved_size * nodes, target))
+    if (retval = col_index_.Allocate(reserved_size * num_nodes, target))
         return retval;
     if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
-        if (retval = values_.Allocate(reserved_size * nodes, target))
+        if (retval = values_.Allocate(reserved_size * num_nodes, target))
             return retval;
     SizeT tLength = row_length * row_length + 1;
     if (retval = blocks.Allocate(tLength, target))
@@ -240,8 +240,8 @@ cudaError_t Build(
     do {
         int       thread_num  = omp_get_thread_num();
         int       num_threads = omp_get_num_threads();
-        SizeT     node_start  = (long long)(nodes) * thread_num / num_threads;
-        SizeT     node_end    = (long long)(nodes) * (thread_num + 1) / num_threads;
+        SizeT     node_start  = (long long)(num_nodes) * thread_num / num_threads;
+        SizeT     node_end    = (long long)(num_nodes) * (thread_num + 1) / num_threads;
         SizeT     counter     = 0;
         VertexT  *col_index   = col_index_ + reserved_size * node_start;
         ValueT   *values      = (GraphT::FLAG & graph::HAS_EDGE_VALUES) ? values_ + reserved_size * node_start : NULL;
@@ -265,7 +265,7 @@ cudaError_t Build(
         #pragma omp barrier
         #pragma omp single
         {
-            std::stable_sort(points + 0, points + nodes, XFirstPointCompare<RggPoint>);
+            std::stable_sort(points + 0, points + num_nodes, XFirstPointCompare<RggPoint>);
         }
 
         for (VertexT node = node_start; node < node_end; node++)
@@ -350,8 +350,8 @@ cudaError_t Build(
             offsets[0] = 0;
             for (int i=0; i<num_threads; i++)
                 offsets[i+1] += offsets[i];
-            edges = offsets[num_threads];
-            retval = graph.CsrT::Allocate(nodes, edges, target);
+            num_edges = offsets[num_threads];
+            retval = graph.CsrT::Allocate(num_nodes, num_edges, target);
             //coo = (EdgeTupleType*) malloc (sizeof(EdgeTupleType) * edges);
         }
         if (retval) break;

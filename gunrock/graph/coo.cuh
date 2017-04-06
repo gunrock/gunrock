@@ -254,6 +254,7 @@ struct Coo :
         if (retval = Allocate(source.CscT::nodes, source.CscT::edges, target))
             return retval;
 
+        util::PrintMsg("1");
         if (retval = source.column_offsets.ForAll(
             edge_pairs, source.row_indices,
             [] __host__ __device__ (
@@ -270,13 +271,16 @@ struct Coo :
                 }, this -> nodes, target, stream))
             return retval;
 
+        util::PrintMsg("2");
         if (retval = edge_values   .Set(source.CscT::edge_values,
             this -> edges, target, stream))
             return retval;
 
+        util::PrintMsg("3");
         if (retval = node_values   .Set(source.CscT::node_values,
             this -> nodes, target, stream))
             return retval;
+        util::PrintMsg("4");
         return retval;
     }
 
