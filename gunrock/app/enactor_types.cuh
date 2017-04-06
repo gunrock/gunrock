@@ -200,12 +200,10 @@ template <typename SizeT>
 struct FrontierAttribute
 {
     SizeT        queue_length ;
-    util::Array1D<SizeT,SizeT>
-                 output_length;
-    unsigned int queue_index  ;
+
     SizeT        queue_offset ;
     int          selector     ;
-    bool         queue_reset  ;
+
     int          current_label;
     bool         has_incoming ;
     gunrock::oprtr::advance::TYPE

@@ -80,12 +80,11 @@ public:
     //Device properties
     util::Array1D<SizeT, util::CudaProperties>          cuda_props        ;
 
-    // Queue size counters and accompanying functionality
-    util::Array1D<SizeT, util::CtaWorkProgressLifetime<SizeT> > work_progress     ;
-    util::Array1D<SizeT, EnactorStats<SizeT> >                  enactor_stats     ;
-    util::Array1D<SizeT, FrontierAttribute<SizeT> >             frontier_attribute;
 
-    FrontierType GetFrontierType() {return frontier_type;}
+    util::Array1D<SizeT, EnactorStats<SizeT> >                  enactor_stats     ;
+    //util::Array1D<SizeT, FrontierAttribute<SizeT> >             frontier_attribute;
+
+    //FrontierType GetFrontierType() {return frontier_type;}
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
     std::vector<std::vector<double> > *iter_full_queue_time;

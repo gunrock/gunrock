@@ -18,14 +18,9 @@
 #include <string>
 
 // Graph construction utilities
-#include <gunrock/graphio/market.cuh>
-#include <gunrock/graphio/rmat.cuh>
-#include <gunrock/graphio/grmat.cuh>
-#include <gunrock/graphio/rgg.cuh>
-#include <gunrock/graphio/small_world.cuh>
+#include <gunrock/graphio/graphio.cuh>
 
 // Information stats utilities
-#include <boost/filesystem.hpp>
 #include <gunrock/util/sysinfo.h>
 #include <gunrock/util/gitsha1.h>
 #include <gunrock/util/json_spirit_writer_template.h>
@@ -60,16 +55,6 @@
 
 namespace gunrock {
 namespace app {
-
-/**
- * @brief Enumeration of global frontier queue configurations
- */
-enum FrontierType
-{
-    VERTEX_FRONTIERS,       // O(n) ping-pong global vertex frontiers
-    EDGE_FRONTIERS,         // O(m) ping-pong global edge frontiers
-    MIXED_FRONTIERS         // O(n) global vertex frontier, O(m) global edge frontier
-};
 
 /**
  * @brief Graph slice structure which contains common graph structural data.
@@ -406,10 +391,6 @@ struct DataSliceBase
     util::Array1D<SizeT, VertexId    >   temp_preds              ; // temporary storages for predecessors
     util::Array1D<SizeT, VertexId    >   labels                  ; // Used for source distance
 
-    //Frontier queues. Used to track working frontier.
-    util::DoubleBuffer<VertexId, SizeT, Value>  *frontier_queues ; // frontier queues
-    util::Array1D<SizeT, SizeT       >  *scanned_edges           ; // length / offsets for offsets of the frontier queues
-    util::Array1D<SizeT, unsigned char> *cub_scan_space;
     util::Array1D<SizeT, MaskT        > visited_mask;
     util::Array1D<SizeT, int          > latency_data;
 
@@ -1703,7 +1684,7 @@ struct ProblemBase
                     inv_edge_counters[gpu] = 0;
 
                 for (VertexId v = 0; v < graph -> nodes; v++)
-                    inv_edge_counters[partition_tables[0][v]] += 
+                    inv_edge_counters[partition_tables[0][v]] +=
                         inverse_graph -> row_offsets[v+1] - inverse_graph -> row_offsets[v];
 
                 for (int gpu = 0; gpu < num_gpus; gpu++)
