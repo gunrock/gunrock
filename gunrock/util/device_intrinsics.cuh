@@ -18,7 +18,7 @@
 #define DEVICE_INTRINSICS_CUH
 
 #include <gunrock/util/cuda_properties.cuh>
-#include <gunrock/util/types.cuh>
+//#include <gunrock/util/types.cuh>
 
 #if __CUDACC_VER_MAJOR__ < 8
 // atomic addition from Jon Cohen at NVIDIA
@@ -86,7 +86,7 @@ __device__ __forceinline__ T _ldg(T* addr)
 {
 #if __GR_CUDA_ARCH__ >= 350
     return __ldg(addr);
-#else 
+#else
     return *addr;
 #endif
 }

@@ -10,10 +10,17 @@
 #include <gunrock/graph/csc.cuh>
 #include <gunrock/graphio/graphio.cuh>
 
+#include <gunrock/app/frontier.cuh>
+
 using namespace gunrock;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::graph;
+using namespace gunrock::app;
+
+typedef int VertexT;
+typedef int SizeT;
+typedef int ValueT;
 
 template <
     typename VertexT = int,
@@ -59,23 +66,21 @@ struct TestGraph :
     }
 };
 
-int main(int argc, char* argv[])
+void Test_Array()
 {
-    typedef int VertexT;
-    typedef int SizeT;
-    typedef int ValueT;
-    //const SizeT DefaultSize = PreDefinedValues<SizeT>::InvalidValue;
-
     // test array
-    /*Array1D<int, int, PINNED> test_array;
+    Array1D<int, int, PINNED> test_array;
     test_array.SetName("test_array");
     test_array.Allocate(1024, HOST | DEVICE);
     test_array.EnsureSize(2048);
     test_array.Move(HOST, DEVICE);
-    test_array.Release();*/
+    test_array.Release();
+}
 
+void Test_ForAll()
+{
     // test ForAll
-    /*Array1D<int, int, PINNED> array1, array2;
+    Array1D<int, int, PINNED> array1, array2;
     array1.SetName("array1"); array2.SetName("array2");
     array1.Allocate(1024 * 1024, HOST | DEVICE);
     array2.Allocate(1024 * 1024, HOST | DEVICE);
@@ -112,10 +117,13 @@ int main(int argc, char* argv[])
 #endif
                     pos, pos, elements_in[pos]);
         });//, DefaultSize, HOST | DEVICE);
-    cudaDeviceSynchronize();*/
+    cudaDeviceSynchronize();
+}
 
+void Test_ForEach()
+{
     // test ForEach
-    /*Array1D<SizeT, ValueT, PINNED> array3, array4;
+    Array1D<SizeT, ValueT, PINNED> array3, array4;
     array3.SetName("array3");array4.SetName("array4");
     SizeT length = 1024 * 1024;
     Location target = HOST | DEVICE;
@@ -131,20 +139,26 @@ int main(int argc, char* argv[])
     //    }, length, DEVICE);
     array4.ForEach([] __host__ __device__ (ValueT &element){
             element = 20;
-        });*/
+        });
+}
 
+void Test_Csr()
+{
     // Test_Csr
-    /*typedef int VertexT;
-    Csr<VertexT, SizeT, ValueT> csr;
+    typedef int VertexT;
+    Csr<VertexT, SizeT, ValueT, HAS_CSR> csr;
     csr.Allocate(10, 10);
-    Coo<VertexT, SizeT, ValueT> coo;
+    Coo<VertexT, SizeT, ValueT, HAS_COO> coo;
     csr.FromCoo(coo);
 
-    Csr<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> csr2;
+    Csr<VertexT, SizeT, ValueT, HAS_CSR | HAS_EDGE_VALUES> csr2;
     csr2.Allocate(10, 10);
-    Coo<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> coo2;
-    csr2.FromCoo(coo2);*/
+    Coo<VertexT, SizeT, ValueT, HAS_COO | HAS_EDGE_VALUES> coo2;
+    csr2.FromCoo(coo2);
+}
 
+cudaError_t Test_GraphIo(int argc, char* argv[])
+{
     // Test graphio
     cudaError_t retval = cudaSuccess;
     util::Parameters parameters("test refactor");
@@ -158,7 +172,7 @@ int main(int argc, char* argv[])
     if (parameters.Get<bool>("help"))
     {
         parameters.Print_Help();
-        return 0;
+        return cudaSuccess;
     }
 
     retval = parameters.Check_Required();
@@ -291,5 +305,26 @@ int main(int argc, char* argv[])
     PrintMsg("COOE from CSR:");
     cooe.Display();
     //graph.CooT::Display();
+
+    return retval;
+}
+
+void Test_Frontier()
+{
+    Frontier<VertexT, SizeT> frontier;
+    frontier.SetName("test_frontier");
+    frontier.Init();
+    frontier.Release();
+}
+
+int main(int argc, char* argv[])
+{
+    //const SizeT DefaultSize = PreDefinedValues<SizeT>::InvalidValue;
+    // Test_Array();
+    // Test_ForAll();
+    // Test_ForEach();
+    // Test_Csr();
+    // Test_GraphIo(argc, argv);
+    Test_Frontier();
     return 0;
 }

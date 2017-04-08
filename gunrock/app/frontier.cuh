@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <gunrock/util/cta_work_progress.cuh>
 #include <gunrock/util/array_utils.cuh>
 
 namespace gunrock {
@@ -35,7 +36,7 @@ template <
     typename VertexT,
     typename SizeT = VertexT,
     util::ArrayFlag FLAG = util::ARRAY_NONE,
-    unsigned int cudaHostRegisterFlag = cudaHostRegisterFlag>
+    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct Frontier
 {
     std::string  frontier_name;
@@ -79,7 +80,7 @@ struct Frontier
 
         frontier_name = name;
         if (name != "") name = name + "::";
-        work_progress .SetName(name + "work_progress");
+        //work_progress .SetName(name + "work_progress");
         queue_types   .SetName(name + "queue_types");
         queue_map     .SetName(name + "queue_map");
         output_length .SetName(name + "output_length");
@@ -110,7 +111,7 @@ struct Frontier
         for (unsigned int q = 0; q < num_queues; q++)
         {
             FrontierType queue_type = VERTEX_FRONTIER;
-            if (types != NULL || types[q] == EDGE_FRONTIER)
+            if (types != NULL && types[q] == EDGE_FRONTIER)
                 queue_type = EDGE_FRONTIER;
 
             queue_types[q] = queue_type;
@@ -120,7 +121,7 @@ struct Frontier
                 num_vertex_queues ++;
             } else if (queue_type == EDGE_FRONTIER)
             {
-                queue_map[q] = num_edge_queue;
+                queue_map[q] = num_edge_queues;
                 num_edge_queues ++;
             }
         }
@@ -152,7 +153,7 @@ struct Frontier
 
         retval = output_length.Allocate(1, target | util::HOST);
         if (retval) return retval;
-        retval = queue_offsets.Allcoate(num_queues, target | util::HOST);
+        retval = queue_offsets.Allocate(num_queues, target | util::HOST);
         if (retval) return retval;
         return retval;
     }

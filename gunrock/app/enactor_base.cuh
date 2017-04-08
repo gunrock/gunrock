@@ -18,7 +18,7 @@
 #include <boost/predef.h>
 
 #include <gunrock/util/cuda_properties.cuh>
-#include <gunrock/util/cta_work_progress.cuh>
+
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/array_utils.cuh>
