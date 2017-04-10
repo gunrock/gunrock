@@ -117,7 +117,7 @@ $(function() {
 <div class="title">Throughput vs. Frontier Size </div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p>While running BFS on several datasets, we extracted the MTEPS (throughput) that we achieve on each iteration. What is our performance as a function of the size of the nput and output frontier?</p>
+<div class="textblock"><p>While running BFS on several datasets, we extracted the MTEPS (throughput) that we achieve on each iteration. What is our performance as a function of the size of the input and output frontier?</p>
 <p>Ideally, throughput is independent of the size of the input or output frontier, but in practice, the GPU requires a significant amount of work to become fully utilized. So for relatively small frontiers, as the size of the frontier increases, so does the performance. Eventually we reach maximum throughput. This is a significant reason why road-network-ish graphs demonstrate a much smaller throughput (MTEPS) than scale-free graphs; road networks just don't generate frontiers that are large enough to fully utilize the GPU.</p>
 <p>It appears from the results that the output frontier size is a better predictor of performance than the input frontier size.</p>
 <p> 
@@ -11910,7 +11910,7 @@ $(function() {
 </div>
 </div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Mon Apr 10 2017 11:44:33 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Mon Apr 10 2017 11:46:58 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.13
 </small></address>
