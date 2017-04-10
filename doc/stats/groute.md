@@ -1,52 +1,54 @@
 # Groute performance vs. Gunrock
 
-We noted with interest the PPoPP 2017 paper _Groute: An Asynchronous Multi-GPU Programming Model for Irregular Computations_ by Tal Ben-Nun, Michael Sutton, Sreepathi Pai, and Keshav Pingali ([DOI](http://dx.doi.org/10.1145/3018743.3018756)). This is really nice work, and we particularly admire their use of asynchronous execution. We expect (and show in the results below) that for high-diameter networks like road networks (e.g., `europe_osm`, `road_usa`), their approach is particularly beneficial. Gunrock's design is more targeted towards scale-free graphs (e.g., `kron_g500`, `soc-LiveJournal1`, `twitter-mpi`). In general, Groute generally performs better than Gunrock on high-diameter, road-network-ish graphs, and also has an excellent connected-components implementation.
+We noted with interest the PPoPP 2017 paper _Groute: An Asynchronous Multi-GPU Programming Model for Irregular Computations_ by Tal Ben-Nun, Michael Sutton, Sreepathi Pai, and Keshav Pingali ([DOI](http://dx.doi.org/10.1145/3018743.3018756)). This is really nice work, and we particularly admire their use of asynchronous execution. We expect (and show in the results below) that for high-diameter networks like road networks (e.g., `europe_osm`, `road_usa`), their approach is particularly beneficial. Gunrock's design is more targeted towards scale-free graphs (e.g., `kron_g500`, `soc-LiveJournal1`, `twitter-mpi`). Groute generally performs better than Gunrock on high-diameter, road-network-ish graphs, and also has an excellent connected-components implementation.
 
-In their paper, the Groute authors compared against Gunrock 0.3.1 (released 9 November 2015), which was the most recent release at the time of paper submission (but had been updated to 0.4 by the time of camera-ready submission). Between the Gunrock 0.3.1 release and the time of Groute paper submission, the Gunrock team had made significant performance improvements to Gunrock. We ran the [Groute PPoPP artifact](https://github.com/groute/ppopp17-artifact) locally to compare against two versions of Gunrock ([methodology discussion](https://github.com/gunrock/io/issues/31)). The first is the Gunrock github version of 11 July 2016 (several weeks before Groute's paper submission). The second is the Gunrock 0.4 release of 10 November 2016 (two months before Groute's camera-ready submission).
+In their paper, the Groute authors compared against Gunrock 0.3.1 (released 9 November 2015), which was the most recent release at the time of paper submission (but had been updated to 0.4 by the time of camera-ready submission). Between the Gunrock 0.3.1 release and the time of Groute paper submission, the Gunrock team had made significant performance improvements to Gunrock. We ran the [Groute PPoPP artifact](https://github.com/groute/ppopp17-artifact) locally to compare against two versions of Gunrock ([methodology discussion](https://github.com/gunrock/io/issues/31)). The first is the Gunrock github version of 11 July 2016 (several weeks before Groute's paper submission, https://github.com/gunrock/gunrock/commit/6eb6db5d09620701bf127c5acb13143f4d8de394). The second is the Gunrock 0.4 release of 10 November 2016 (two months before Groute's camera-ready submission, https://github.com/gunrock/gunrock/releases/tag/v0.4).
 
 The graphs at the bottom of the page use Gunrock 0.4 and [Groute's PPoPP artifact](https://github.com/groute/ppopp17-artifact) and _only_ reflect Gunrock's (non-direction-optimized) BFS performance. In general, Gunrock's direction-optimized (DOBFS) BFS results on scale-free graphs are significantly better than its non-direction-optimized BFS results. We believe this comparison against Gunrock 0.4's BFS is the most appropriate comparison at the time of Groute's camera-ready submission (January 2017).
 
+We choose two results from the Groute paper for discussion below: Gunrock's BFS on the soc-LiveJournal1 and kron21 datasets. The plots at the bottom of the page provide a fuller comparison of Gunrock 0.4 vs. Groute on 5 primitives across 5 datasets on 5 different GPUs.
+
 ## Gunrock BFS on soc-LiveJournal1
 
-The Groute paper reported Gunrock's best BFS time on soc-LiveJournal1 of 99.11 ms (Groute's Table 3) on M60 GPUs. Gunrock 0.4's BFS achieves [23.95 ms](https://github.com/gunrock/io/blob/master/gunrock-output/Groute_Comparison/BFS_soc-LiveJournal1_Thu%20Feb%20%209%20185702%202017.json) on this dataset on M60 GPUs.
+The Groute paper reported Gunrock's best BFS time on soc-LiveJournal1 as 99.11 ms (Groute's Table 3) on M60 GPUs. Gunrock 0.4's BFS achieves [23.95 ms](https://github.com/gunrock/io/blob/master/gunrock-output/Groute_Comparison/BFS_soc-LiveJournal1_Thu%20Feb%20%209%20185702%202017.json) on this dataset on M60 GPUs.
 
-For the 11 July 2016 version of Gunrock, we measure the following results on K40 and K80 GPUs (which achieve similar runtimes as M60s in our experiments):
+For the 11 July 2016 version of Gunrock, we measure the following results on K40 and K80 GPUs (which achieve similar runtimes to M60s in our experiments):
 
 ### Non-idempotent, not direction-optimized
 
-- K40+METIS: [avg: 40.49 ms, min: 40.00 ms, max: 51.54 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k40mx2_metis_soc-LiveJournal1.txt)
-- K40+random: [avg: 37.45ms, min: 37.02ms, max: 47.80ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k40mx2_rand_soc-LiveJournal1.txt)
-- K80+METIS: [avg: 38.01 ms, min: 33.80ms, max: 61.02 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k80x2_metis_soc-LiveJournal1.txt)
-- K80+random: [avg: 35.43 ms, min: 31.67 ms, max: 57.12 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k80x2_rand_soc-LiveJournal1.txt)
+- K40+METIS: [avg: 40.49 ms, min: 40.00 ms, max: 51.54 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k40mx2_metis_soc-LiveJournal1.txt) [JSON](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k40mx2_metis_soc-LiveJournal1.json)
+- K40+random: [avg: 37.45ms, min: 37.02ms, max: 47.80ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k40mx2_rand_soc-LiveJournal1.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k40mx2_rand_soc-LiveJournal1.json)
+- K80+METIS: [avg: 38.01 ms, min: 33.80ms, max: 61.02 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k80x2_metis_soc-LiveJournal1.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k80x2_metis_soc-LiveJournal1.json)
+- K80+random: [avg: 35.43 ms, min: 31.67 ms, max: 57.12 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k80x2_rand_soc-LiveJournal1.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k80x2_rand_soc-LiveJournal1.json)
 
 ### Idempotent, not direction optimized:
 
-- K40+METIS+idempotent: [avg: 29.53 ms, min: 27.63 ms, max: 38.99 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k40mx2_metis_soc-LiveJournal1.txt)
-- K40+random+idempotent: [avg: 29.26 ms, min: 28.12 ms, max: 38.59 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k40mx2_rand_soc-LiveJournal1.txt)
-- K80+METIS+idempotent+Market: [avg: 32.96 ms, min: 30.78 ms, max: 49.34 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k80x2_metis_soc-LiveJournal1.txt)
-- K80+random+idempotent: [avg: 31.35 ms, min: 25.89 ms, max: 52.96 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k80x2_rand_soc-LiveJournal1.txt)
+- K40+METIS+idempotent: [avg: 29.53 ms, min: 27.63 ms, max: 38.99 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k40mx2_metis_soc-LiveJournal1.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k40mx2_metis_soc-LiveJournal1.json)
+- K40+random+idempotent: [avg: 29.26 ms, min: 28.12 ms, max: 38.59 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k40mx2_rand_soc-LiveJournal1.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k40mx2_rand_soc-LiveJournal1.json)
+- K80+METIS+idempotent+Market: [avg: 32.96 ms, min: 30.78 ms, max: 49.34 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k80x2_metis_soc-LiveJournal1.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k80x2_metis_soc-LiveJournal1.json)
+- K80+random+idempotent: [avg: 31.35 ms, min: 25.89 ms, max: 52.96 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k80x2_rand_soc-LiveJournal1.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k80x2_rand_soc-LiveJournal1.json)
 
 Yuechao notes that he fixed a correctness bug in idempotence mode on 4 October 2016 (https://github.com/gunrock/gunrock/commit/23490d30fb330c984ba9cb3239838d5dbe2d155d). For our testing in idempotence mode only, we measured Gunrock versions both immediately before and immediately after this bug was fixed ("the performance differences were very small"). We believe running on any July-October Gunrock build would give similar performance results.
 
 ### DOBFS
 
-Multi-GPU DOBFS was enabled in Gunrock's BFS, and single-GPU direction-optimizing BFS was removed, as of 26 April 2016 (https://github.com/gunrock/gunrock/commit/1fbbc85ab07fcbb0d418202fcd5a77290b6df508). Gunrock's DOBFS has different behavior to Groute's (or anyone else's) BFS, which makes performance differences more challenging to explain.
+Multi-GPU DOBFS was enabled in Gunrock's BFS, and single-GPU direction-optimizing BFS was removed, as of 26 April 2016 (https://github.com/gunrock/gunrock/commit/1fbbc85ab07fcbb0d418202fcd5a77290b6df508). Gunrock's DOBFS has different behavior to Groute's (or anyone else's) BFS, which makes performance differences more challenging to explain. The following four results indicate Gunrock's single-GPU DOBFS performance:
 
-- K40+DOBFS: [avg: 27.29 ms, min: 26.18ms, max: 27.84 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs_k40mx1_soc-LiveJournal1.txt)
-- K80+DOBFS: [avg: 31.20 ms, min: 26.45 ms, max: 39.19 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs_k80x1_soc-LiveJournal1.txt)
-- K40+DOBFS+idempotence: [avg: 23.40 ms, min: 19.95 ms, max: 24.65 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs-idem_k40mx1_soc-LiveJournal1.txt)
-- K80+DOBFS+idempotence: [avg: 23.13 ms, min: 21.77 ms, max: 24.94 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs-idem_k80x1_soc-LiveJournal1.txt)
+- K40+DOBFS: [avg: 27.29 ms, min: 26.18ms, max: 27.84 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs_k40mx1_soc-LiveJournal1.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs_k40mx1_soc-LiveJournal1.json)
+- K80+DOBFS: [avg: 31.20 ms, min: 26.45 ms, max: 39.19 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs_k80x1_soc-LiveJournal1.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs_k80x1_soc-LiveJournal1.json)
+- K40+DOBFS+idempotence: [avg: 23.40 ms, min: 19.95 ms, max: 24.65 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs-idem_k40mx1_soc-LiveJournal1.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs-idem_k40mx1_soc-LiveJournal1.json)
+- K80+DOBFS+idempotence: [avg: 23.13 ms, min: 21.77 ms, max: 24.94 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs-idem_k80x1_soc-LiveJournal1.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs-idem_k80x1_soc-LiveJournal1.json)
 
 ## Gunrock BFS on kron21
 
-The Groute paper reported Gunrock's best BFS time on kron21 of 156.68 ms (Groute's Table 3) on M60 GPUs. Gunrock 0.4 achieves [19.315 ms](https://github.com/gunrock/io/blob/master/gunrock-output/Groute_Comparison/BFS_kron_g500-logn21_Thu%20Feb%20%209%20184323%202017.json) on this dataset running BFS (not DOBFS) on M60 GPUs. If we switch to DOBFS, Gunrock 0.4 achieves [4.53 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs-idem_k80x1_kron_g500-logn21.txt) on one K80 GPU.
+The Groute paper reported Gunrock's best BFS time on kron21 as 156.68 ms (Groute's Table 3) on M60 GPUs. Gunrock 0.4 achieves [19.315 ms](https://github.com/gunrock/io/blob/master/gunrock-output/Groute_Comparison/BFS_kron_g500-logn21_Thu%20Feb%20%209%20184323%202017.json) on this dataset running BFS (not DOBFS) on M60 GPUs. If we switch to DOBFS, Gunrock 0.4 achieves [4.53 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/dobfs-idem_k80x1_kron_g500-logn21.txt) on one K80 GPU.
 
 For the 11 July 2016 version of Gunrock, we measure the following results on K40 and K80 GPUs (which achieve similar runtimes as M60s in our experiments):
 
-- 3xK80+METIS: [avg: 120.67ms, min: 114.33ms, max: 216.01ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k80x3_metis_kron_g500-logn21.txt)
-- 3xK80+random: [avg: 67.70 ms, min: 55.24 ms, max: 143.39 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k80x3_rand_kron_g500-logn21.txt)
-- 3xK80+idempotence+METIS+market: [avg: 35.34 ms, min: 26.75 ms, max: 78.21 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k80x3_metis_kron_g500-logn21.txt)
-- 3xK80+idempotence+random+market: [avg: 22.70ms, min: 16.68ms, max: 56.84ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k80x3_rand_kron_g500-logn21.txt)
+- 3xK80+METIS: [avg: 120.67ms, min: 114.33ms, max: 216.01ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k80x3_metis_kron_g500-logn21.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k80x3_metis_kron_g500-logn21.json)
+- 3xK80+random: [avg: 67.70 ms, min: 55.24 ms, max: 143.39 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k80x3_rand_kron_g500-logn21.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs_k80x3_rand_kron_g500-logn21.json)
+- 3xK80+idempotence+METIS+market: [avg: 35.34 ms, min: 26.75 ms, max: 78.21 ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k80x3_metis_kron_g500-logn21.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k80x3_metis_kron_g500-logn21.json)
+- 3xK80+idempotence+random+market: [avg: 22.70ms, min: 16.68ms, max: 56.84ms](https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k80x3_rand_kron_g500-logn21.txt) [JSON]((https://github.com/gunrock/io/blob/master/gunrock-output/20170303/bfs-idem_k80x3_rand_kron_g500-logn21.json)
 
 ## Other notes
 
@@ -61,7 +63,7 @@ We note that Groute's circular work list overflowed on Tesla K40c for some PageR
 
 ## Full performance comparison
 
-The following plot compares Gunrock 0.4 with Groute's PPoPP artifact. It has multiple GPUs on one plot. We have broken them out by GPU on individual pages here:
+The following plot compares [Gunrock 0.4](https://github.com/gunrock/gunrock/releases/tag/v0.4) with [Groute's PPoPP artifact](https://github.com/groute/ppopp17-artifact). It has multiple GPUs on one plot. We have broken them out by GPU on individual pages here:
 [ [Tesla P100](md_stats_groute__tesla__p100-_p_c_i_e-16_g_b.html)
 | [Tesla K40c](md_stats_groute__tesla__k40c.html)
 | [Tesla K40m](md_stats_groute__tesla__k40m.html)
