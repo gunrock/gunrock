@@ -63,10 +63,12 @@ cudaError_t Partition(
     PartitionFlag flag = PARTITION_NONE,
     util::Location target = util::HOST)
 {
+    typedef typename GraphT::GpT GpT;
+
     cudaError_t retval = cudaSuccess;
     std::string partition_method = parameters.Get<std::string>("partition-method");
 
-    retval = org_graph.Gp::Allocate(
+    retval = org_graph.GpT::Allocate(
         org_graph.nodes, org_graph.edges,
         num_subgraphs, flag & Org_Graph_Mark, target);
     if (retval) return retval;

@@ -355,12 +355,13 @@ cudaError_t Test_Partitioner(int argc, char* argv[])
     if (retval) return retval;
 
     retval = partitioner::Partition(
-        graph, sub_graphs, parameters, 4, util::HOST);
+        graph, sub_graphs, parameters, 4,
+        partitioner::Keep_Node_Num, util::HOST);
     if (retval) return retval;
 
     PrintMsg("OrgGraph");
     graph.CsrT::Display();
-    
+
     for (int i=0; i<4; i++)
     {
         PrintMsg("SubGraph " + std::to_string(i));

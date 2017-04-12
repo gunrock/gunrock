@@ -68,6 +68,8 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::ValueT  ValueT;
+    typedef typename GraphT::CsrT    CsrT;
+    typedef typename GraphT::GpT     GpT;
 
     ThreadSlice<GraphT> *thread_data      = (ThreadSlice<GraphT>*) thread_data_;
     GraphT*         org_graph             = thread_data->org_graph;
@@ -79,20 +81,20 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     PartitionFlag   flag                  = thread_data->partition_flag;
     cudaError_t    &retval                = thread_data->retval;
 
-    auto           &org_partition_table   = org_graph -> Gp::partition_table;
-    auto           &org_convertion_table  = org_graph -> Gp::convertion_table;
-    auto           &partition_table       = sub_graph -> Gp::partition_table;
+    auto           &org_partition_table   = org_graph -> GpT::partition_table;
+    auto           &org_convertion_table  = org_graph -> GpT::convertion_table;
+    auto           &partition_table       = sub_graph -> GpT::partition_table;
     //VertexId**      convertion_tables     = thread_data->convertion_tables;
     //int**           partition_tables      = thread_data->partition_tables;
-    auto           &convertion_table      = sub_graph -> Gp::convertion_table;
-    auto           &original_vertex       = sub_graph -> Gp::original_vertex;
+    auto           &convertion_table      = sub_graph -> GpT::convertion_table;
+    auto           &original_vertex       = sub_graph -> GpT::original_vertex;
 
-    auto           &backward_partition    = sub_graph -> Gp::backward_partition;
-    auto           &backward_convertion   = sub_graph -> Gp::backward_convertion;
-    auto           &backward_offset       = sub_graph -> Gp::backward_offset;
-    auto           &out_offset            = sub_graph -> Gp::out_offset;
-    auto           &in_counter            = sub_graph -> Gp::in_counter;
-    auto           &out_counter           = sub_graph -> Gp::out_counter;
+    auto           &backward_partition    = sub_graph -> GpT::backward_partition;
+    auto           &backward_convertion   = sub_graph -> GpT::backward_convertion;
+    auto           &backward_offset       = sub_graph -> GpT::backward_offset;
+    auto           &out_offset            = sub_graph -> GpT::out_offset;
+    auto           &in_counter            = sub_graph -> GpT::in_counter;
+    auto           &out_counter           = sub_graph -> GpT::out_counter;
     //bool            enable_backward       = thread_data->enable_backward;
     bool            keep_node_num         = ((flag & Keep_Node_Num) != 0);
     //bool            keep_order            = thread_data->keep_order;
@@ -132,8 +134,8 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     {
         if (!keep_node_num)
         {
-            org_convertion_table[v] = num_nodes;
-            tconvertion_table[v]    = num_nodes;
+            org_convertion_table[v] = out_counter[thread_num];
+            tconvertion_table[v]    = out_counter[thread_num];
         }
         marker[v] =1;
         SizeT edge_start = org_graph -> CsrT::row_offsets[v];
@@ -144,8 +146,8 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
             int peer  = org_partition_table[neibor];
             if ((peer != thread_num) && (marker[neibor] == 0))
             {
-                if (keep_node_num)
-                    tconvertion_table[neibor] = num_nodes;
+                if (!keep_node_num)
+                    tconvertion_table[neibor] = out_counter[peer];
                 out_counter[peer] ++;
                 marker[neibor] = 1;
                 num_nodes ++;
@@ -163,7 +165,7 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     node_counter = out_counter[thread_num];
     for (int peer = 0; peer < num_subgraphs; peer++)
     {
-        if (peer == num_subgraphs) continue;
+        if (peer == thread_num) continue;
         int peer_ = (peer < thread_num ? peer+1 : peer);
         out_offset[peer_] = node_counter;
         node_counter += out_counter[peer];
@@ -180,8 +182,8 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
         if (peer == thread_num) continue;
         int peer_       = (peer       < thread_num ? peer+1 : peer);
         int thread_num_ = (thread_num < peer ? thread_num+1 : thread_num);
-        in_counter [peer_] = sub_graphs[peer].Gp::out_offset[thread_num_+1]
-            - sub_graphs[peer].Gp::out_offset[thread_num_];
+        in_counter [peer_] = sub_graphs[peer].GpT::out_offset[thread_num_+1]
+            - sub_graphs[peer].GpT::out_offset[thread_num_];
         node_counter += in_counter[peer_];
     }
     in_counter[num_subgraphs] = node_counter;
@@ -190,7 +192,7 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     if (keep_node_num) num_nodes = org_graph->nodes;
     retval = sub_graph -> CsrT::Allocate(num_nodes, num_edges, target);
     if (retval) CUT_THREADEND;
-    retval = sub_graph -> Gp::Allocate(
+    retval = sub_graph -> GpT::Allocate(
         num_nodes, num_edges, num_subgraphs, flag | Sub_Graph_Mark, target);
     if (retval) CUT_THREADEND;
 
@@ -222,7 +224,7 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     for (VertexT v = 0; v < org_graph->nodes; v++)
     if (org_partition_table[v] == thread_num)
     {
-        VertexT v_ = tconvertion_table[v];
+        VertexT v_ = keep_node_num ? v : tconvertion_table[v];
         sub_graph -> CsrT::row_offsets[v_] = edge_counter;
         if (GraphT::FLAG & graph::HAS_NODE_VALUES)
             sub_graph -> CsrT::node_values[v_]
@@ -299,8 +301,8 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
                     for (SizeT edge = edge_start; edge < edge_end; edge++)
                     {
                         VertexT _v = sub_graph -> CsrT::column_indices[edge];
-                        if (sub_graphs[peer].Gp::convertion_table[_v] == v_ &&
-                            sub_graphs[peer].Gp::partition_table [_v] == thread_num_)
+                        if (sub_graphs[peer].GpT::convertion_table[_v] == v_ &&
+                            sub_graphs[peer].GpT::partition_table [_v] == thread_num_)
                         {
                             backward_convertion[in_counter_]= _v;
                             break;
@@ -344,8 +346,8 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
         }
         out_counter[peer_] = out_offset[peer_+1] - out_offset[peer_];
         out_counter[num_subgraphs] += out_counter[peer_];
-        in_counter [peer_] = sub_graphs[peer].Gp::out_offset[thread_num_+1]
-            - sub_graphs[peer].Gp::out_offset[thread_num_];
+        in_counter [peer_] = sub_graphs[peer].GpT::out_offset[thread_num_+1]
+            - sub_graphs[peer].GpT::out_offset[thread_num_];
         in_counter [num_subgraphs] += in_counter[peer_];
     }
     //util::cpu_mt::PrintCPUArray<SizeT, SizeT>("out_counter",out_counter,num_gpus+1,gpu);

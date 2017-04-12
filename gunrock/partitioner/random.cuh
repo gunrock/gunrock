@@ -74,9 +74,10 @@ cudaError_t Partition(
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::ValueT  ValueT;
+    typedef typename GraphT::GpT     GpT;
 
     cudaError_t retval = cudaSuccess;
-    auto &partition_table = org_graph.Gp::partition_table;
+    auto &partition_table = org_graph.GpT::partition_table;
     SizeT       nodes  = org_graph.nodes;
     util::Array1D<SizeT, sort_node<SizeT> > sort_list;
     sort_list.SetName("partitioner::random::sort_list");
