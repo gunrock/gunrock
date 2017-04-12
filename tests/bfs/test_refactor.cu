@@ -8,9 +8,12 @@
 #include <gunrock/graph/csr.cuh>
 #include <gunrock/graph/coo.cuh>
 #include <gunrock/graph/csc.cuh>
+#include <gunrock/graph/gp.cuh>
 #include <gunrock/graphio/graphio.cuh>
 
 #include <gunrock/app/frontier.cuh>
+
+#include <gunrock/partitioner/partitioner.cuh>
 
 using namespace gunrock;
 using namespace gunrock::util;
@@ -29,20 +32,26 @@ template <
     GraphFlag _FLAG   = GRAPH_NONE,
     unsigned int _cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct TestGraph :
-    public Csr<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC, _cudaHostRegisterFlag>,
-    public Coo<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC, _cudaHostRegisterFlag>,
-    public Csc<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC, _cudaHostRegisterFlag>
+    public Csr<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP, _cudaHostRegisterFlag>,
+    public Coo<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP, _cudaHostRegisterFlag>,
+    public Csc<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP, _cudaHostRegisterFlag>,
+    public Gp <VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP, _cudaHostRegisterFlag>
 {
-    static const GraphFlag FLAG = _FLAG | HAS_CSR | HAS_COO | HAS_CSC;
+    static const GraphFlag FLAG = _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP;
     static const unsigned int cudaHostRegisterFlag = _cudaHostRegisterFlag;
     typedef Csr<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CsrT;
     typedef Coo<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CooT;
     typedef Csc<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CscT;
+    typedef Gp <VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> GpT;
+
+    SizeT nodes, edges;
 
     template <typename CooT_in>
     cudaError_t FromCoo(CooT_in &coo, bool self_coo = false)
     {
         cudaError_t retval = cudaSuccess;
+        nodes = coo.CooT::nodes;
+        edges = coo.CooT::edges;
         retval = this -> CsrT::FromCoo(coo);
         if (retval) return retval;
         retval = this -> CscT::FromCoo(coo);
@@ -56,6 +65,8 @@ struct TestGraph :
     cudaError_t FromCsr(CsrT_in &csr, bool self_csr = false)
     {
         cudaError_t retval = cudaSuccess;
+        nodes = csr.CsrT::nodes;
+        edges = csr.CsrT::edges;
         retval = this -> CooT::FromCsr(csr);
         if (retval) return retval;
         retval = this -> CscT::FromCsr(csr);
@@ -317,6 +328,47 @@ void Test_Frontier()
     frontier.Release();
 }
 
+cudaError_t Test_Partitioner(int argc, char* argv[])
+{
+    cudaError_t retval = cudaSuccess;
+    util::Parameters parameters("test refactor");
+    typedef TestGraph<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> GraphT;
+    GraphT graph;
+    GraphT *sub_graphs = NULL;
+
+    retval = graphio::UseParameters(parameters);
+    if (retval) return retval;
+    retval = partitioner::UseParameters(parameters);
+    if (retval) return retval;
+
+    retval = parameters.Parse_CommandLine(argc, argv);
+    if (retval) return retval;
+    if (parameters.Get<bool>("help"))
+    {
+        parameters.Print_Help();
+        return cudaSuccess;
+    }
+
+    retval = parameters.Check_Required();
+    if (retval) return retval;
+    retval = graphio::LoadGraph(parameters, graph);
+    if (retval) return retval;
+
+    retval = partitioner::Partition(
+        graph, sub_graphs, parameters, 4, util::HOST);
+    if (retval) return retval;
+
+    PrintMsg("OrgGraph");
+    graph.CsrT::Display();
+    
+    for (int i=0; i<4; i++)
+    {
+        PrintMsg("SubGraph " + std::to_string(i));
+        sub_graphs[i].CsrT::Display();
+    }
+    return retval;
+}
+
 int main(int argc, char* argv[])
 {
     //const SizeT DefaultSize = PreDefinedValues<SizeT>::InvalidValue;
@@ -325,6 +377,7 @@ int main(int argc, char* argv[])
     // Test_ForEach();
     // Test_Csr();
     // Test_GraphIo(argc, argv);
-    Test_Frontier();
+    // Test_Frontier();
+    Test_Partitioner(argc, argv);
     return 0;
 }

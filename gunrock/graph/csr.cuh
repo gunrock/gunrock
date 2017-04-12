@@ -41,32 +41,34 @@ struct Csr :
     public GraphBase<VertexT, SizeT, ValueT, _FLAG | HAS_CSR, cudaHostRegisterFlag>
 {
     static const GraphFlag FLAG = _FLAG | HAS_CSR;
+    static const util::ArrayFlag ARRAY_FLAG =
+        util::If_Val<(FLAG & GRAPH_PINNED) != 0, (FLAG & ARRAY_RESERVE) | util::PINNED,
+            FLAG & ARRAY_RESERVE>::Value;
     typedef GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> BaseGraph;
-    typedef Csr<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CsrT;
+    typedef Csr<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag> CsrT;
 
     // Column indices corresponding to all the
     // non-zero values in the sparse matrix
-    util::Array1D<SizeT, VertexT,
-        util::If_Val<FLAG & GRAPH_PINNED, util::PINNED, util::ARRAY_NONE>::Value,
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG,
         cudaHostRegisterFlag> column_indices;
 
     // List of indices where each row of the
     // sparse matrix starts
-    util::Array1D<SizeT, SizeT,
-        util::If_Val<FLAG & GRAPH_PINNED, util::PINNED, util::ARRAY_NONE>::Value,
+    util::Array1D<SizeT, SizeT, ARRAY_FLAG,
         cudaHostRegisterFlag> row_offsets;
 
-    typedef util::Array1D<SizeT, ValueT,
-        util::If_Val<FLAG & GRAPH_PINNED, util::PINNED, util::ARRAY_NONE>::Value,
+    typedef util::Array1D<SizeT, ValueT, ARRAY_FLAG,
         cudaHostRegisterFlag> Array_ValueT;
+    typedef util::NullArray<SizeT, ValueT, ARRAY_FLAG,
+        cudaHostRegisterFlag> Array_NValueT;
 
     // List of values attached to edges in the graph
-    typename util::If<FLAG & HAS_EDGE_VALUES,
-        Array_ValueT, util::NullArray<SizeT, ValueT, FLAG, cudaHostRegisterFlag> >::Type edge_values;
+    typename util::If<(FLAG & HAS_EDGE_VALUES) != 0,
+        Array_ValueT,  Array_NValueT>::Type edge_values;
 
     // List of values attached to nodes in the graph
-    typename util::If<FLAG & HAS_NODE_VALUES,
-        Array_ValueT, util::NullArray<SizeT, ValueT, FLAG, cudaHostRegisterFlag> >::Type node_values;
+    typename util::If<(FLAG & HAS_NODE_VALUES) != 0,
+        Array_ValueT, Array_NValueT>::Type node_values;
 
     /**
      * @brief CSR Constructor
@@ -93,14 +95,14 @@ struct Csr :
     /**
      * @brief Deallocates CSR graph
      */
-    cudaError_t Release()
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
-        if (retval = row_offsets   .Release()) return retval;
-        if (retval = column_indices.Release()) return retval;
-        if (retval = node_values   .Release()) return retval;
-        if (retval = edge_values   .Release()) return retval;
-        if (retval = BaseGraph    ::Release()) return retval;
+        if (retval = row_offsets   .Release(target)) return retval;
+        if (retval = column_indices.Release(target)) return retval;
+        if (retval = node_values   .Release(target)) return retval;
+        if (retval = edge_values   .Release(target)) return retval;
+        if (retval = BaseGraph    ::Release(target)) return retval;
         return retval;
     }
 

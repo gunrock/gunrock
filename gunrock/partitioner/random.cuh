@@ -20,13 +20,11 @@
 #include <vector>
 #include <random>
 
-#include <gunrock/app/partitioner_base.cuh>
-#include <gunrock/util/memset_kernel.cuh>
-#include <gunrock/util/multithread_utils.cuh>
+#include <gunrock/partitioner/partitioner_base.cuh>
 
 namespace gunrock {
-namespace app {
-namespace rp {
+namespace partitioner {
+namespace random {
 
 typedef std::mt19937 Engine;
 typedef std::uniform_int_distribution<int> Distribution;
@@ -62,157 +60,94 @@ bool compare_sort_node(sort_node<SizeT> A, sort_node<SizeT> B)
     return (A.value < B.value);
 }
 
-
-template <
-    typename VertexId,
-    typename SizeT,
-    typename Value/*,
-    bool     ENABLE_BACKWARD = false,
-    bool     KEEP_ORDER      = false,
-    bool     KEEP_NODE_NUM   = false*/ >
-struct RandomPartitioner :
-    PartitionerBase<VertexId, SizeT, Value/*,
-    ENABLE_BACKWARD, KEEP_ORDER, KEEP_NODE_NUM*/>
+template <typename GraphT>
+cudaError_t Partition(
+    GraphT     &org_graph,
+    GraphT*    &sub_graphs,
+    util::Parameters &parameters,
+    int         num_subgraphs = 1,
+    PartitionFlag flag = PARTITION_NONE,
+    util::Location target = util::HOST,
+    float      *weitage = NULL)
 {
-    typedef PartitionerBase<VertexId, SizeT, Value> BasePartitioner;
-    typedef Csr<VertexId, SizeT, Value> GraphT;
+    //typedef _GraphT  GraphT;
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::ValueT  ValueT;
 
-    // Members
-    float *weitage;
+    cudaError_t retval = cudaSuccess;
+    auto &partition_table = org_graph.Gp::partition_table;
+    SizeT       nodes  = org_graph.nodes;
+    util::Array1D<SizeT, sort_node<SizeT> > sort_list;
+    sort_list.SetName("partitioner::random::sort_list");
 
-    // Methods
-    /*RandomPartitioner()
+    int partition_seed = parameters.Get<int>("partition-seed");
+    if (parameters.UseDefault("partition-seed"))
+        partition_seed = time(NULL);
+
+    bool quiet = parameters.Get<bool>("quiet");
+    if (!quiet)
+        util::PrintMsg("Random partition begin. seed = "
+            + std::to_string(partition_seed));
+
+    retval = sort_list.Allocate(nodes, target);
+    if (retval) return retval;
+
+    #pragma omp parallel
     {
-        weitage = NULL;
-    }*/
-
-    RandomPartitioner(
-        const  GraphT &graph,
-        int    num_gpus,
-        float *weitage          = NULL,
-        bool   _enable_backward = false,
-        bool   _keep_order      = false,
-        bool   _keep_node_num   = false) :
-        BasePartitioner(
-            _enable_backward,
-            _keep_order,
-            _keep_node_num)
-    {
-        Init2(graph, num_gpus, weitage);
-    }
-
-    void Init2(
-        const GraphT &graph,
-        int num_gpus,
-        float *weitage)
-    {
-        this->Init(graph, num_gpus);
-        this->weitage = new float[num_gpus + 1];
-        if (weitage == NULL)
+        int thread_num  = omp_get_thread_num();
+        int num_threads = omp_get_num_threads();
+        SizeT node_start   = (long long)(nodes) * thread_num / num_threads;
+        SizeT node_end     = (long long)(nodes) * (thread_num + 1) / num_threads;
+        unsigned int thread_seed = partition_seed + 754 * thread_num;
+        Engine engine(thread_seed);
+        Distribution distribution(0, util::PreDefinedValues<int>::MaxValue);
+        for (SizeT v = node_start; v < node_end; v++)
         {
-            for (int gpu = 0; gpu < num_gpus; gpu++)
-            {
-                this->weitage[gpu] = 1.0f / num_gpus;
-            }
-        }
-        else
-        {
-            float sum = 0;
-            for (int gpu = 0; gpu < num_gpus; gpu++)
-            {
-                sum += weitage[gpu];
-            }
-            for (int gpu = 0; gpu < num_gpus; gpu++)
-            {
-                this->weitage[gpu] = weitage[gpu] / sum;
-            }
-        }
-        for (int gpu = 0; gpu < num_gpus; gpu++)
-        {
-            this->weitage[gpu + 1] += this->weitage[gpu];
+            long int x;
+            x = distribution(engine);
+            sort_list[v].value = x;
+            sort_list[v].posit = v;
         }
     }
 
-    ~RandomPartitioner()
+    util::omp_sort(sort_list + 0, nodes, compare_sort_node<SizeT>);
+
+    bool weitage_allocated = false;
+    if (weitage == NULL)
     {
-        if (weitage != NULL)
-        {
-            delete[] weitage; weitage = NULL;
-        }
+        weitage_allocated = true;
+        weitage = new float[num_subgraphs + 1];
+        for (int i = 0; i < num_subgraphs; i++)
+            weitage[i] = 1.0f / num_subgraphs;
+    } else {
+        float sum = 0;
+        for (int i = 0; i < num_subgraphs; i++)
+            sum += weitage[i];
+        for (int i = 0; i < num_subgraphs; i++)
+            weitage[i] = weitage[i] / sum;
+    }
+    for (int i = 0; i < num_subgraphs; i++)
+        weitage[i + 1] += weitage[i];
+
+    for (int i = 0; i < num_subgraphs; i++)
+    {
+        SizeT begin_pos = (i == 0 ? 0 : weitage[i-1] * nodes);
+        SizeT end_pos = weitage[i] * nodes;
+        for (SizeT pos = begin_pos; pos < end_pos; pos++)
+            partition_table[sort_list[pos].posit] = i;
     }
 
-    cudaError_t Partition(
-        GraphT*    &sub_graphs,
-        int**      &partition_tables,
-        VertexId** &convertion_tables,
-        VertexId** &original_vertexes,
-        //SizeT**    &in_offsets,
-        SizeT**    &in_counter,
-        SizeT**    &out_offsets,
-        SizeT**    &out_counter,
-        SizeT**    &backward_offsets,
-        int**      &backward_partitions,
-        VertexId** &backward_convertions,
-        float      factor = -1,
-        int        seed   = -1)
+    if (retval = sort_list.Release()) return retval;
+    if (weitage_allocated)
     {
-        cudaError_t retval = cudaSuccess;
-        int*        tpartition_table = this->partition_tables[0];
-        SizeT       nodes  = this->graph->nodes;
-        sort_node<SizeT> *sort_list = new sort_node<SizeT>[nodes];
-
-        if (seed < 0) this->seed = time(NULL);
-        else this->seed = seed;
-        printf("Partition begin. seed=%d\n", this->seed); fflush(stdout);
-
-        #pragma omp parallel
-        {
-            int thread_num  = omp_get_thread_num();
-            int num_threads = omp_get_num_threads();
-            SizeT i_start   = (long long)(nodes) * thread_num / num_threads;
-            SizeT i_end     = (long long)(nodes) * (thread_num + 1) / num_threads;
-            unsigned int seed_ = this -> seed + 754 * thread_num;
-            Engine engine(seed_);
-            Distribution distribution(0, util::MaxValue<int>());
-            for (SizeT i = i_start; i < i_end; i++)
-            {
-                long int x;
-                x = distribution(engine);
-                sort_list[i].value = x;
-                sort_list[i].posit = i;
-            }
-        }
-
-        util::omp_sort(sort_list, nodes, compare_sort_node<SizeT>);
-        for (int gpu = 0; gpu < this->num_gpus; gpu++) 
-        {
-            SizeT begin_pos = gpu == 0? 0 : weitage[gpu-1] * nodes;
-            SizeT end_pos = weitage[gpu] * nodes; 
-            for (SizeT pos = begin_pos; pos < end_pos; pos++)
-            {
-                tpartition_table[sort_list[pos].posit] = gpu;
-            }
-        }
-        
-        delete[] sort_list; sort_list = NULL;
-        retval = this->MakeSubGraph();
-        sub_graphs          = this->sub_graphs;
-        partition_tables    = this->partition_tables;
-        convertion_tables   = this->convertion_tables;
-        original_vertexes   = this->original_vertexes;
-        //in_offsets          = this->in_offsets;
-        in_counter          = this->in_counter;
-        out_offsets         = this->out_offsets;
-        out_counter         = this->out_counter;
-        backward_offsets    = this->backward_offsets;
-        backward_partitions = this->backward_partitions;
-        backward_convertions = this->backward_convertions;
-        return retval;
+        delete[] weitage;weitage = NULL;
     }
-};
+    return retval;
+} // end of Partition
 
-} //namespace rp
-} //namespace app
+} //namespace random
+} //namespace partitioner
 } //namespace gunrock
 
 // Leave this at the end of the file

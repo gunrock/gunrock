@@ -115,12 +115,19 @@ endif
 #-------------------------------------------------------------------------------
 # Dependency Lists
 #-------------------------------------------------------------------------------
-EXTRA_SOURCE = ../../gunrock/util/str_to_T.cu \
+EXTRA_SOURCE_ = ../../gunrock/util/str_to_T.cu \
 	../../gunrock/util/test_utils.cu \
 	../../gunrock/util/error_utils.cu \
 	../../externals/moderngpu/src/mgpucontext.cu \
 	../../externals/moderngpu/src/mgpuutil.cpp \
 	../../gunrock/util/gitsha1.c
+
+ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
+    EXTRA_SOURCE = $(EXTRA_SOURCE_) \
+	    ../../gunrock/util/misc_utils.cu
+else
+    EXTRA_SOURCE = $(EXTRA_SOURCE_)
+endif
 
 DEPS = 	./Makefile \
     ../BaseMakefile.mk \
@@ -134,7 +141,8 @@ DEPS = 	./Makefile \
     $(wildcard ../../gunrock/oprtr/*.cuh) \
     $(wildcard ../../gunrock/oprtr/**/*.cuh) \
     $(wildcard ../../gunrock/app/*.cuh) \
-    $(wildcard ../../gunrock/app/**/*.cuh)
+    $(wildcard ../../gunrock/app/**/*.cuh) \
+    $(wildcard ../../gunrock/partitioner/*.cuh)
 
 #-------------------------------------------------------------------------------
 # (make test) Test driver for

@@ -24,14 +24,17 @@ namespace graph {
  */
 using GraphFlag = unsigned int;
 enum {
-    GRAPH_NONE      = 0x00,
-    HAS_EDGE_VALUES = 0x01,
-    HAS_NODE_VALUES = 0x02,
-    HAS_CSR         = 0x10,
-    HAS_CSC         = 0x20,
-    HAS_COO         = 0x30,
+    ARRAY_RESERVE   = 0x000F,
 
-    GRAPH_PINNED    = 0x100,
+    GRAPH_NONE      = 0x0000,
+    HAS_EDGE_VALUES = 0x0010,
+    HAS_NODE_VALUES = 0x0020,
+    HAS_CSR         = 0x0100,
+    HAS_CSC         = 0x0200,
+    HAS_COO         = 0x0400,
+    HAS_GP          = 0x0800,
+
+    GRAPH_PINNED    = 0x1000,
 };
 
 static const util::Location GRAPH_DEFAULT_TARGET = util::DEVICE;
@@ -95,7 +98,7 @@ struct GraphBase
         //Release();
     }
 
-    cudaError_t Release()
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         nodes = 0;
         edges = 0;

@@ -35,38 +35,40 @@ template<
     typename VertexT = int,
     typename SizeT   = VertexT,
     typename ValueT  = VertexT,
-    GraphFlag _FLAG   = GRAPH_NONE,
+    GraphFlag _FLAG   = GRAPH_NONE | HAS_CSC,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct Csc :
     public GraphBase<VertexT, SizeT, ValueT, _FLAG | HAS_CSC, cudaHostRegisterFlag>
 {
     static const GraphFlag FLAG = _FLAG | HAS_CSC;
+    static const util::ArrayFlag ARRAY_FLAG =
+        util::If_Val<(FLAG & GRAPH_PINNED) != 0, (FLAG & ARRAY_RESERVE) | util::PINNED,
+            FLAG & ARRAY_RESERVE>::Value;
     typedef GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> BaseGraph;
-    typedef Csc<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CscT;
+    typedef Csc<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag> CscT;
 
     // Column indices corresponding to all the
     // non-zero values in the sparse matrix
-    util::Array1D<SizeT, VertexT,
-        util::If_Val<FLAG & GRAPH_PINNED, util::PINNED, util::ARRAY_NONE>::Value,
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG,
         cudaHostRegisterFlag> row_indices;
 
     // List of indices where each row of the
     // sparse matrix starts
-    util::Array1D<SizeT, SizeT,
-        util::If_Val<FLAG & GRAPH_PINNED, util::PINNED, util::ARRAY_NONE>::Value,
+    util::Array1D<SizeT, SizeT, ARRAY_FLAG,
         cudaHostRegisterFlag> column_offsets;
 
-    typedef util::Array1D<SizeT, ValueT,
-        util::If_Val<FLAG & GRAPH_PINNED, util::PINNED, util::ARRAY_NONE>::Value,
+    typedef util::Array1D<SizeT, ValueT, ARRAY_FLAG,
         cudaHostRegisterFlag> Array_ValueT;
+    typedef util::NullArray<SizeT, ValueT, ARRAY_FLAG,
+        cudaHostRegisterFlag> Array_NValueT;
 
     // List of values attached to edges in the graph
-    typename util::If<FLAG & HAS_EDGE_VALUES,
-        Array_ValueT, util::NullArray<SizeT, ValueT, FLAG, cudaHostRegisterFlag> >::Type edge_values;
+    typename util::If<(FLAG & HAS_EDGE_VALUES) != 0,
+        Array_ValueT, Array_NValueT >::Type edge_values;
 
     // List of values attached to nodes in the graph
-    typename util::If<FLAG & HAS_NODE_VALUES,
-        Array_ValueT, util::NullArray<SizeT, ValueT, FLAG, cudaHostRegisterFlag> >::Type node_values;
+    typename util::If<(FLAG & HAS_NODE_VALUES) != 0,
+        Array_ValueT, Array_NValueT >::Type node_values;
 
     /**
      * @brief CSC Constructor
@@ -93,14 +95,14 @@ struct Csc :
     /**
      * @brief Deallocates CSC graph
      */
-    cudaError_t Release()
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
-        if (retval = column_offsets.Release()) return retval;
-        if (retval = row_indices   .Release()) return retval;
-        if (retval = node_values   .Release()) return retval;
-        if (retval = edge_values   .Release()) return retval;
-        if (retval = BaseGraph    ::Release()) return retval;
+        if (retval = column_offsets.Release(target)) return retval;
+        if (retval = row_indices   .Release(target)) return retval;
+        if (retval = node_values   .Release(target)) return retval;
+        if (retval = edge_values   .Release(target)) return retval;
+        if (retval = BaseGraph    ::Release(target)) return retval;
         return retval;
     }
 

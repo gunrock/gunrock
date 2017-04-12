@@ -105,7 +105,7 @@ struct NullArray
         return cudaSuccess;
     }
 
-    cudaError_t Release()
+    cudaError_t Release(Location target = LOCATION_ALL)
     {
         return cudaSuccess;
     }

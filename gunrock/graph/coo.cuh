@@ -36,14 +36,17 @@ template<
     typename VertexT = int,
     typename SizeT   = VertexT,
     typename ValueT  = VertexT,
-    GraphFlag _FLAG   = GRAPH_NONE,
+    GraphFlag _FLAG   = GRAPH_NONE | HAS_COO,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct Coo :
     public GraphBase<VertexT, SizeT, ValueT, _FLAG | HAS_COO, cudaHostRegisterFlag>
 {
     static const GraphFlag FLAG = _FLAG | HAS_COO;
+    static const util::ArrayFlag ARRAY_FLAG =
+        util::If_Val<(FLAG & GRAPH_PINNED) != 0, (FLAG & ARRAY_RESERVE) | util::PINNED,
+            FLAG & ARRAY_RESERVE>::Value;
     typedef GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> BaseGraph;
-    typedef Coo<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CooT;
+    typedef Coo<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag> CooT;
 
     typedef typename util::VectorType<VertexT, 2>::Type
         EdgePairT;
@@ -52,35 +55,24 @@ struct Coo :
     EdgeOrder edge_order;
 
     // Source (.x) and Destination (.y) of edges
-    util::Array1D<SizeT, EdgePairT,
-        util::If_Val<FLAG & GRAPH_PINNED,
-            util::PINNED, util::ARRAY_NONE>::Value,
+    util::Array1D<SizeT, EdgePairT, ARRAY_FLAG,
         cudaHostRegisterFlag> edge_pairs;
 
-    typedef util::Array1D<SizeT, ValueT,
-        util::If_Val<FLAG & GRAPH_PINNED,
-            util::PINNED, util::ARRAY_NONE>::Value,
+    typedef util::Array1D<SizeT, ValueT, ARRAY_FLAG,
         cudaHostRegisterFlag> Array_ValueT;
+    typedef util::NullArray<SizeT, ValueT, ARRAY_FLAG,
+        cudaHostRegisterFlag> Array_NValueT;
 
     // List of values attached to edges in the graph
-    typename util::If<FLAG & HAS_EDGE_VALUES,
-        Array_ValueT, util::NullArray<SizeT, ValueT,
-            util::If_Val<FLAG & GRAPH_PINNED,
-                util::PINNED, util::ARRAY_NONE>::Value,
-            cudaHostRegisterFlag> >::Type edge_values;
+    typename util::If<(FLAG & HAS_EDGE_VALUES) != 0,
+        Array_ValueT, Array_NValueT>::Type edge_values;
 
     // List of values attached to nodes in the graph
-    typename util::If<FLAG & HAS_NODE_VALUES,
-        Array_ValueT, util::NullArray<SizeT, ValueT,
-            util::If_Val<FLAG & GRAPH_PINNED,
-                util::PINNED, util::ARRAY_NONE>::Value,
-            cudaHostRegisterFlag> >::Type node_values;
+    typename util::If<(FLAG & HAS_NODE_VALUES) != 0,
+        Array_ValueT, Array_NValueT>::Type node_values;
 
     /**
      * @brief COO Constructor
-     *
-     * @param[in] pinned Use pinned memory for CSR data structure
-     * (default: do not use pinned memory)
      */
     Coo() : BaseGraph()
     {
@@ -101,13 +93,13 @@ struct Coo :
     /**
      * @brief Deallocates CSR graph
      */
-    cudaError_t Release()
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
-        if (retval = edge_pairs    .Release()) return retval;
-        if (retval = node_values   .Release()) return retval;
-        if (retval = edge_values   .Release()) return retval;
-        if (retval = BaseGraph    ::Release()) return retval;
+        if (retval = edge_pairs    .Release(target)) return retval;
+        if (retval = node_values   .Release(target)) return retval;
+        if (retval = edge_values   .Release(target)) return retval;
+        if (retval = BaseGraph    ::Release(target)) return retval;
         return retval;
     }
 
