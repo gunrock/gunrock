@@ -19,6 +19,7 @@
 #include <gunrock/util/parameters.h>
 #include <gunrock/partitioner/random.cuh>
 #include <gunrock/partitioner/static.cuh>
+#include <gunrock/partitioner/metis.cuh>
 
 namespace gunrock {
 namespace partitioner {
@@ -100,7 +101,12 @@ cudaError_t Partition(
         retval = static_p::Partition(
             org_graph, sub_graphs, parameters,
             num_subgraphs, flag, target, weitage);
+    else if (partition_method == "metis")
+        retval = metis::Partition(
+            org_graph, sub_graphs, parameters,
+            num_subgraphs, flag, target, weitage);
     else retval = util::GRError(
+        cudaErrorUnknown,
         "Unknown partitioning method " + partition_method,
         __FILE__, __LINE__);
     if (retval) return retval;
