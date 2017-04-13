@@ -18,6 +18,7 @@
 
 #include <gunrock/util/parameters.h>
 #include <gunrock/partitioner/random.cuh>
+#include <gunrock/partitioner/static.cuh>
 
 namespace gunrock {
 namespace partitioner {
@@ -61,7 +62,8 @@ cudaError_t Partition(
     util::Parameters &parameters,
     int         num_subgraphs = 1,
     PartitionFlag flag = PARTITION_NONE,
-    util::Location target = util::HOST)
+    util::Location target = util::HOST,
+    float      *weitage = NULL)
 {
     typedef typename GraphT::GpT GpT;
 
@@ -73,14 +75,42 @@ cudaError_t Partition(
         num_subgraphs, flag & Org_Graph_Mark, target);
     if (retval) return retval;
 
+    bool weitage_allocated = false;
+    if (weitage == NULL)
+    {
+        weitage_allocated = true;
+        weitage = new float[num_subgraphs + 1];
+        for (int i = 0; i < num_subgraphs; i++)
+            weitage[i] = 1.0f / num_subgraphs;
+    } else {
+        float sum = 0;
+        for (int i = 0; i < num_subgraphs; i++)
+            sum += weitage[i];
+        for (int i = 0; i < num_subgraphs; i++)
+            weitage[i] = weitage[i] / sum;
+    }
+    for (int i = 0; i < num_subgraphs; i++)
+        weitage[i + 1] += weitage[i];
+
     if (partition_method == "random")
         retval = random::Partition(
-            org_graph, sub_graphs, parameters, num_subgraphs, target);
-    else retval = util::GRError("Unknown partitioning method " + partition_method,
+            org_graph, sub_graphs, parameters,
+            num_subgraphs, flag, target, weitage);
+    else if (partition_method == "static")
+        retval = static_p::Partition(
+            org_graph, sub_graphs, parameters,
+            num_subgraphs, flag, target, weitage);
+    else retval = util::GRError(
+        "Unknown partitioning method " + partition_method,
         __FILE__, __LINE__);
     if (retval) return retval;
 
-    retval = MakeSubGraph(org_graph, sub_graphs, parameters, num_subgraphs, flag, target);
+    if (weitage_allocated)
+    {
+        delete[] weitage;weitage = NULL;
+    }
+    retval = MakeSubGraph(org_graph, sub_graphs, parameters,
+        num_subgraphs, flag, target);
     if (retval) return retval;
     return retval;
 }

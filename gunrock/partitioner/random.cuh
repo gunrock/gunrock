@@ -114,23 +114,6 @@ cudaError_t Partition(
 
     util::omp_sort(sort_list + 0, nodes, compare_sort_node<SizeT>);
 
-    bool weitage_allocated = false;
-    if (weitage == NULL)
-    {
-        weitage_allocated = true;
-        weitage = new float[num_subgraphs + 1];
-        for (int i = 0; i < num_subgraphs; i++)
-            weitage[i] = 1.0f / num_subgraphs;
-    } else {
-        float sum = 0;
-        for (int i = 0; i < num_subgraphs; i++)
-            sum += weitage[i];
-        for (int i = 0; i < num_subgraphs; i++)
-            weitage[i] = weitage[i] / sum;
-    }
-    for (int i = 0; i < num_subgraphs; i++)
-        weitage[i + 1] += weitage[i];
-
     for (int i = 0; i < num_subgraphs; i++)
     {
         SizeT begin_pos = (i == 0 ? 0 : weitage[i-1] * nodes);
@@ -140,10 +123,7 @@ cudaError_t Partition(
     }
 
     if (retval = sort_list.Release()) return retval;
-    if (weitage_allocated)
-    {
-        delete[] weitage;weitage = NULL;
-    }
+    
     return retval;
 } // end of Partition
 
