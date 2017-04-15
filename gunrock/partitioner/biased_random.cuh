@@ -19,261 +19,209 @@
 #include <algorithm>
 #include <vector>
 
-#include <gunrock/app/partitioner_base.cuh>
-#include <gunrock/util/memset_kernel.cuh>
-#include <gunrock/util/multithread_utils.cuh>
+#include <gunrock/partitioner/partitioner_base.cuh>
 
 namespace gunrock {
-namespace app {
-namespace brp {
+namespace partitioner {
+namespace biased_random {
 
-    template <typename SizeT>
-    struct sort_node
-    {
-    public:
-        SizeT posit;
-        int   value;
-
-        bool operator==(const sort_node& node) const
-        {
-            return (node.value == value);
-        }
-
-        bool operator<(const sort_node& node) const
-        {
-            return (node.value < value);
-        }
-
-        sort_node & operator=(const sort_node &rhs)
-        {
-            this->posit=rhs.posit;
-            this->value=rhs.value;
-            return *this;
-        }
-    };
-
-    template <typename SizeT>
-    bool compare_sort_node(sort_node<SizeT> A, sort_node<SizeT> B)
-    {
-        return (A.value<B.value);
-    }
-
-template <
-    typename VertexId,
-    typename SizeT,
-    typename Value>
-    //bool     ENABLE_BACKWARD = false,
-    //bool     KEEP_ORDER      = false,
-    //bool     KEEP_NODE_NUM   = false>
-struct BiasRandomPartitioner : PartitionerBase<VertexId,SizeT,Value/*,
-    ENABLE_BACKWARD, KEEP_ORDER, KEEP_NODE_NUM*/>
+template <typename GraphT>
+cudaError_t Partition(
+    GraphT     &org_graph,
+    GraphT*    &sub_graphs,
+    util::Parameters &parameters,
+    int         num_subgraphs = 1,
+    PartitionFlag flag = PARTITION_NONE,
+    util::Location target = util::HOST,
+    float      *weitage = NULL)
 {
-    typedef PartitionerBase<VertexId, SizeT, Value> BasePartitioner;
-    typedef Csr<VertexId,SizeT,Value> GraphT;
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::ValueT  ValueT;
+    typedef typename GraphT::CsrT    CsrT;
+    typedef typename GraphT::GpT     GpT;
 
-    // Members
-    float *weitage;
+    cudaError_t retval       = cudaSuccess;
+    SizeT       total_count  = 0;
+    SizeT       current      = 0;
+    SizeT       tail         = 0;
+    SizeT       level        = 0;
+    SizeT       n1           = 1;//, n2 = 1;
+    SizeT       target_level = n1;
+    SizeT       start_edge, end_edge;
+    double      partition_factor = 0.5;
+    long        partition_seed = 0;
 
-    // Methods
-    /*BiasRandomPartitioner()
+    auto        &partition_table = org_graph.GpT::partition_table;
+    SizeT        nodes           = org_graph.nodes;
+    auto        &row_offsets     = org_graph.CsrT::row_offsets;
+    auto        &column_indices  = org_graph.CsrT::column_indices;
+    util::Array1D<SizeT, SortNode<SizeT, SizeT> > sort_list;
+    util::Array1D<SizeT, VertexT> t_queue;
+    util::Array1D<SizeT, VertexT> marker;
+    util::Array1D<SizeT, SizeT  > counter;
+    util::Array1D<SizeT, SizeT  > level_tail;
+    util::Array1D<SizeT, SizeT  > current_count;
+    util::Array1D<SizeT, float  > subgraph_percentage;
+
+    if (!parameters.UseDefault("partition-factor"))
+        partition_factor = parameters.Get<double>("partition-factor");
+
+    if (parameters.UseDefault("partition-seed"))
+        partition_seed = time(NULL);
+    else partition_seed = parameters.Get<long>("partition-seed");
+
+    bool quiet = parameters.Get<bool>("quiet");
+    if (!quiet)
+        util::PrintMsg("Biased random partition begin. factor = "
+            + std::to_string(partition_factor)
+            + ", seed = " + std::to_string(partition_seed));
+
+    sort_list.SetName("partitioner::biased_random::sort_list");
+    retval = sort_list.Allocate(nodes, target);
+    if (retval) return retval;
+
+    t_queue.SetName("partitioner::biased_random::t_queue");
+    retval = t_queue.Allocate(nodes, target);
+    if (retval) return retval;
+
+    marker.SetName("partitioner::biased_random::marker");
+    retval = marker.Allocate(nodes, target);
+    if (retval) return retval;
+
+    counter.SetName("partitioner::biased_random::counter");
+    retval = counter.Allocate(num_subgraphs + 1, target);
+    if (retval) return retval;
+
+    level_tail.SetName("partitioner::biased_random::level_tail");
+    retval = level_tail.Allocate(target_level + 1, target);
+    if (retval) return retval;
+
+    current_count.SetName("partitioner::biased_random::current_count");
+    retval = current_count.Allocate(num_subgraphs, target);
+    if (retval) return retval;
+
+    subgraph_percentage.SetName("partitioner::biased_random::subgraph_percentage");
+    retval = subgraph_percentage.Allocate(num_subgraphs + 1, target);
+    if (retval) return retval;
+
+    target_level = n1;//(n1<n2? n2:n1);
+    retval = sort_list.ForAll(row_offsets, []__host__ __device__
+        (SortNode<SizeT, SizeT> *sort_list_, SizeT *row_offsets_, SizeT node){
+            sort_list_[node].value = row_offsets_[node + 1] - row_offsets_[node];
+            sort_list_[node].posit = node;
+        }, nodes, target);
+    if (retval) return retval;
+
+    retval = partition_table.ForEach([num_subgraphs]__host__ __device__(int &partition){
+            partition = num_subgraphs;
+        }, nodes, target);
+    if (retval) return retval;
+
+    for (int i = 0; i < num_subgraphs; i++)
+        current_count[i] = 0;
+    memset(marker + 0, 0, sizeof(VertexT) * nodes);
+    std::vector<SortNode<SizeT, SizeT> > sort_vector(
+        sort_list + 0, sort_list + nodes);
+    std::sort(sort_vector.begin(), sort_vector.end());
+
+    for (SizeT pos = 0; pos < nodes; pos++)
     {
-        weitage=NULL;
-    }*/
-
-    BiasRandomPartitioner(
-        const  GraphT &graph,
-        int    num_gpus,
-        float *weitage = NULL,
-        bool   _enable_backward = false,
-        bool   _keep_order      = false,
-        bool   _keep_node_num   = false) :
-        BasePartitioner(
-            _enable_backward,
-            _keep_order,
-            _keep_node_num)
-    {
-        Init2(graph,num_gpus,weitage);
-    }
-
-    void Init2(
-        const GraphT &graph,
-        int num_gpus,
-        float *weitage)
-    {
-        this->Init(graph,num_gpus);
-        this->weitage=new float[num_gpus+1];
-        if (weitage==NULL)
-            for (int gpu=0;gpu<num_gpus;gpu++) this->weitage[gpu]=1.0f/num_gpus;
-        else {
-            float sum=0;
-            for (int gpu=0;gpu<num_gpus;gpu++) sum+=weitage[gpu];
-            for (int gpu=0;gpu<num_gpus;gpu++) this->weitage[gpu]=weitage[gpu]/sum;
-        }
-    }
-
-    ~BiasRandomPartitioner()
-    {
-        if (weitage!=NULL)
+        VertexT node = sort_vector[pos].posit;
+        if (partition_table[node] != num_subgraphs) continue;
+        current = 0; tail = 0; level = 0; total_count = 0;
+        t_queue[current] = node;
+        marker[node] = node;
+        for (int i = 0; i <= num_subgraphs; i++)
+            counter[i] = 0;
+        for (level = 0; level < target_level; level++)
         {
-            delete[] weitage;weitage=NULL;
-        }
-    }
-
-    cudaError_t Partition(
-        GraphT*    &sub_graphs,
-        int**      &partition_tables,
-        VertexId** &convertion_tables,
-        VertexId** &original_vertexes,
-        SizeT**    &in_counter,
-        SizeT**    &out_offsets,
-        SizeT**    &out_counter,
-        SizeT**    &backward_offsets,
-        int**      &backward_partitions,
-        VertexId** &backward_convertions,
-        float      factor = -1,
-        int        seed = -1)
-    {
-        cudaError_t retval = cudaSuccess;
-        int*        tpartition_table=this->partition_tables[0];
-        SizeT       nodes  = this->graph->nodes;
-        sort_node<SizeT> *sort_list = new sort_node<SizeT>[nodes];
-        VertexId    *t_queue = new VertexId[this->graph->nodes];
-        VertexId    *marker = new VertexId[this->graph->nodes];
-        SizeT       total_count = 0, current=0, tail = 0, level = 0;
-        SizeT       *counter = new SizeT[this->num_gpus+1];
-        SizeT       n1 = 1;//, n2 = 1;
-        SizeT       target_level = n1;
-        SizeT       *level_tail = new SizeT[target_level+1];
-        float       *gpu_percentage=new float[this->num_gpus+1];
-        SizeT       *current_count = new SizeT[this->num_gpus];
-        VertexId    StartId, EndId;
-        SizeT       *row_offsets=this->graph->row_offsets;
-        VertexId    *column_indices=this->graph->column_indices;
-
-        if (seed < 0) this->seed = time(NULL);
-        else this->seed = seed;
-        srand(this->seed);
-        printf("Partition begin. seed = %d\n",this->seed);fflush(stdout);
-
-        if (factor < 0) this->factor = 0.5;
-        else this->factor = factor;
-        //printf("partition_factor = %f\n", this->factor);fflush(stdout);
-
-        target_level = n1;//(n1<n2? n2:n1);
-        for (SizeT node=0;node<nodes;node++)
-        {
-            sort_list[node].value=this->graph->row_offsets[node+1]-this->graph->row_offsets[node];
-            sort_list[node].posit=node;
-            tpartition_table[node]=this->num_gpus;
-        }
-        for (int i=0;i<this->num_gpus;i++) current_count[i]=0;
-        memset(marker,0,sizeof(VertexId)*nodes);
-        std::vector<sort_node<SizeT> > sort_vector(sort_list, sort_list+nodes);
-        std::sort(sort_vector.begin(),sort_vector.end());
-
-        for (SizeT pos=0;pos<nodes;pos++)
-        {
-            VertexId node = sort_vector[pos].posit;
-            if (tpartition_table[node]!=this->num_gpus) continue;
-            current = 0; tail = 0; level = 0; total_count = 0;
-            t_queue[current] = node;
-            marker[node]=node;
-            for (SizeT i=0;i<=this->num_gpus;i++) counter[i]=0;
-            for (level=0;level<target_level;level++)
+            level_tail[level] = tail;
+            for (;current <= level_tail[level]; current++)
             {
-                level_tail[level] = tail;
-                for (;current<=level_tail[level];current++)
+                VertexT t_node = t_queue[current];
+                start_edge = row_offsets[t_node];
+                end_edge   = row_offsets[t_node+1];
+                for (SizeT e = start_edge; e < end_edge; e++)
                 {
-                    VertexId t_node=t_queue[current];
-                    StartId = row_offsets[t_node];
-                    EndId   = row_offsets[t_node+1];
-                    for (VertexId i=StartId;i<EndId;i++)
+                    VertexT neibor = column_indices[e];
+                    if (marker[neibor] == node) continue;
+                    if (partition_table[neibor] < num_subgraphs)
                     {
-                        VertexId neibor=column_indices[i];
-                        if (marker[neibor]==node) continue;
-                        if (tpartition_table[neibor]<this->num_gpus)
+                        if (level < n1)
                         {
-                            if (level < n1)
-                            {
-                                counter[tpartition_table[neibor]]++;
-                            }
+                            counter[partition_table[neibor]]++;
                         }
-                        marker[neibor]=node;
-                        tail++;t_queue[tail]=neibor;
                     }
+                    marker[neibor] = node;
+                    tail++;
+                    t_queue[tail] = neibor;
                 }
-            }
-            level_tail[level]=tail;
-
-            total_count=0;
-            for (int i=0;i<this->num_gpus;i++)
-            {
-                total_count+=counter[i];
-            }
-            for (int i=0;i<this->num_gpus;i++)
-            {
-                gpu_percentage[i]=(total_count==0?0:(this->factor*counter[i]/total_count));
-            }
-            total_count=0;
-            for (int i=0;i<this->num_gpus;i++)
-            {
-                SizeT e=nodes*weitage[i]-current_count[i];
-                total_count+=(e>=0?e:0);
-            }
-            for (int i=0;i<this->num_gpus;i++)
-            {
-                SizeT e=nodes*weitage[i]-current_count[i];
-                gpu_percentage[i]+=(e>0?((1-this->factor)*e/total_count):0);
-            }
-            float total_percentage=0;
-            for (int i=0;i<this->num_gpus;i++)
-                total_percentage+=gpu_percentage[i];
-            for (int i=0;i<this->num_gpus;i++)
-            {
-                gpu_percentage[i]=gpu_percentage[i]/total_percentage;
-            }
-            gpu_percentage[this->num_gpus]=1;
-            for (int i=this->num_gpus-1;i>=0;i--)
-                gpu_percentage[i]=gpu_percentage[i+1]-gpu_percentage[i];
-            float x=1.0f*rand()/RAND_MAX;
-            for (int i=0;i<this->num_gpus;i++)
-                if (x>=gpu_percentage[i] && x<gpu_percentage[i+1])
-                {
-                    current_count[i]++;
-                    tpartition_table[node]=i;
-                    break;
-                }
-            if (tpartition_table[node]>= this->num_gpus)
-            {
-                tpartition_table[node]=(rand()%(this->num_gpus));
-                current_count[tpartition_table[node]]++;
             }
         }
+        level_tail[level] = tail;
 
-        delete[] sort_list; sort_list = NULL;
-        delete[] t_queue  ; t_queue   = NULL;
-        delete[] counter  ; counter   = NULL;
-        delete[] marker   ; marker    = NULL;
-        delete[] level_tail; level_tail = NULL;
-        delete[] current_count; current_count = NULL;
-        delete[] gpu_percentage; gpu_percentage = NULL;
-        retval = this->MakeSubGraph();
-        sub_graphs          = this->sub_graphs;
-        partition_tables    = this->partition_tables;
-        convertion_tables   = this->convertion_tables;
-        original_vertexes   = this->original_vertexes;
-        in_counter          = this->in_counter;
-        out_offsets         = this->out_offsets;
-        out_counter         = this->out_counter;
-        backward_offsets    = this->backward_offsets;
-        backward_partitions = this->backward_partitions;
-        backward_convertions= this->backward_convertions;
-        return retval;
+        total_count = 0;
+        for (int i = 0; i < num_subgraphs; i++)
+        {
+            total_count+=counter[i];
+        }
+        for (int i = 0; i < num_subgraphs; i++)
+        {
+            subgraph_percentage[i] =
+                (total_count == 0 ? 0 :
+                    (partition_factor * counter[i] / total_count));
+        }
+        total_count=0;
+        for (int i = 0; i < num_subgraphs; i++)
+        {
+            SizeT e = nodes * weitage[i] - current_count[i];
+            total_count += (e >= 0 ? e : 0);
+        }
+        for (int i = 0; i < num_subgraphs; i++)
+        {
+            SizeT e = nodes * weitage[i] - current_count[i];
+            subgraph_percentage[i] += ( e > 0 ?
+                ((1 - partition_factor) * e / total_count) : 0);
+        }
+        float total_percentage = 0;
+        for (int i = 0; i < num_subgraphs; i++)
+            total_percentage += subgraph_percentage[i];
+        for (int i = 0; i < num_subgraphs; i++)
+        {
+            subgraph_percentage[i] = subgraph_percentage[i] / total_percentage;
+        }
+        subgraph_percentage[num_subgraphs]=1;
+        for (int i = num_subgraphs-1; i >= 0; i--)
+            subgraph_percentage[i] = subgraph_percentage[i+1] - subgraph_percentage[i];
+        float x = 1.0f*rand()/RAND_MAX;
+        for (int i = 0; i < num_subgraphs; i++)
+            if (x >= subgraph_percentage[i] && x < subgraph_percentage[i+1])
+            {
+                current_count[i] ++;
+                partition_table[node] = i;
+                break;
+            }
+        if (partition_table[node] >= num_subgraphs)
+        {
+            partition_table[node] = (rand()%(num_subgraphs));
+            current_count[partition_table[node]]++;
+        }
     }
-};
 
-} //namespace cp
-} //namespace app
+    if (retval = sort_list    .Release()) return retval;
+    if (retval = t_queue      .Release()) return retval;
+    if (retval = counter      .Release()) return retval;
+    if (retval = marker       .Release()) return retval;
+    if (retval = level_tail   .Release()) return retval;
+    if (retval = current_count.Release()) return retval;
+    if (retval = subgraph_percentage.Release()) return retval;
+
+    return retval;
+}
+
+} //namespace biased_random
+} //namespace partitioner
 } //namespace gunrock
 
 // Leave this at the end of the file

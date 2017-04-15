@@ -34,6 +34,37 @@ enum : PartitionStatus
     Partitioned        = 0x400,
 };
 
+template <typename SizeT, typename ValueT>
+struct SortNode
+{
+public:
+    SizeT posit;
+    ValueT value;
+
+    bool operator==(const SortNode& node) const
+    {
+        return (node.value == value);
+    }
+
+    bool operator<(const SortNode& node) const
+    {
+        return (node.value < value);
+    }
+
+    SortNode & operator=(const SortNode &rhs)
+    {
+        this->posit = rhs.posit;
+        this->value = rhs.value;
+        return *this;
+    }
+}; // end of SortNode
+
+template <typename SizeT, typename ValueT>
+bool Compare_SortNode(SortNode<SizeT, ValueT> A, SortNode<SizeT, ValueT> B)
+{
+    return (A.value < B.value);
+}
+
 /*
  * @brief ThreadSlice data structure.
  *

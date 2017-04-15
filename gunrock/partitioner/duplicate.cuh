@@ -14,19 +14,11 @@
 
 #pragma once
 
-#include <stdlib.h>
-#include <time.h>
-#include <algorithm>
-#include <vector>
-#include <random>
-
 #include <gunrock/app/partitioner_base.cuh>
-#include <gunrock/util/memset_kernel.cuh>
-#include <gunrock/util/multithread_utils.cuh>
 
 namespace gunrock {
-namespace app {
-namespace dup {
+namespace partitioner {
+namespace duplicate {
 
 template <
     typename VertexId,
@@ -107,8 +99,8 @@ struct DuplicatePartitioner :
     }
 };
 
-} //namespace dup
-} //namespace app
+} //namespace duplicate
+} //namespace partitioner
 } //namespace gunrock
 
 // Leave this at the end of the file

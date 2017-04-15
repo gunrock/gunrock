@@ -29,37 +29,6 @@ namespace random {
 typedef std::mt19937 Engine;
 typedef std::uniform_int_distribution<int> Distribution;
 
-template <typename SizeT>
-struct sort_node
-{
-public:
-    SizeT posit;
-    int   value;
-
-    bool operator==(const sort_node& node) const
-    {
-        return (node.value == value);
-    }
-
-    bool operator<(const sort_node& node) const
-    {
-        return (node.value < value);
-    }
-
-    sort_node & operator=(const sort_node &rhs)
-    {
-        this->posit = rhs.posit;
-        this->value = rhs.value;
-        return *this;
-    }
-};
-
-template <typename SizeT>
-bool compare_sort_node(sort_node<SizeT> A, sort_node<SizeT> B)
-{
-    return (A.value < B.value);
-}
-
 template <typename GraphT>
 cudaError_t Partition(
     GraphT     &org_graph,
@@ -79,7 +48,7 @@ cudaError_t Partition(
     cudaError_t retval = cudaSuccess;
     auto &partition_table = org_graph.GpT::partition_table;
     SizeT       nodes  = org_graph.nodes;
-    util::Array1D<SizeT, sort_node<SizeT> > sort_list;
+    util::Array1D<SizeT, SortNode<SizeT, long int> > sort_list;
     sort_list.SetName("partitioner::random::sort_list");
 
     int partition_seed = parameters.Get<int>("partition-seed");
@@ -112,7 +81,7 @@ cudaError_t Partition(
         }
     }
 
-    util::omp_sort(sort_list + 0, nodes, compare_sort_node<SizeT>);
+    util::omp_sort(sort_list + 0, nodes, Compare_SortNode<SizeT, long int>);
 
     for (int i = 0; i < num_subgraphs; i++)
     {
@@ -123,7 +92,7 @@ cudaError_t Partition(
     }
 
     if (retval = sort_list.Release()) return retval;
-    
+
     return retval;
 } // end of Partition
 

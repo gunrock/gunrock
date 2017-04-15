@@ -26,37 +26,6 @@ namespace gunrock {
 namespace partitioner {
 namespace cluster {
 
-template <typename SizeT>
-struct SortNode
-{
-public:
-    SizeT posit;
-    int   value;
-
-    bool operator==(const SortNode& node) const
-    {
-        return (node.value == value);
-    }
-
-    bool operator<(const SortNode& node) const
-    {
-        return (node.value < value);
-    }
-
-    SortNode & operator=(const SortNode &rhs)
-    {
-        this->posit=rhs.posit;
-        this->value=rhs.value;
-        return *this;
-    }
-};
-
-template <typename SizeT>
-bool compare_sort_node(SortNode<SizeT> A, SortNode<SizeT> B)
-{
-    return (A.value<B.value);
-}
-
 template <typename GraphT>
 cudaError_t Partition(
     GraphT     &org_graph,
@@ -89,7 +58,7 @@ cudaError_t Partition(
     SizeT        nodes           = org_graph.nodes;
     auto        &row_offsets     = org_graph.CsrT::row_offsets;
     auto        &column_indices  = org_graph.CsrT::column_indices;
-    util::Array1D<SizeT, SortNode<SizeT> > sort_list;
+    util::Array1D<SizeT, SortNode<SizeT, SizeT> > sort_list;
     util::Array1D<SizeT, VertexT> t_queue;
     util::Array1D<SizeT, VertexT> marker;
     util::Array1D<SizeT, SizeT  > counter;
@@ -131,7 +100,7 @@ cudaError_t Partition(
 
     target_level = (n1 < n2 ? n2 : n1);
     retval = sort_list.ForAll(row_offsets, []__host__ __device__
-        (SortNode<SizeT> *sort_list_, SizeT *row_offsets_, SizeT node) {
+        (SortNode<SizeT, SizeT> *sort_list_, SizeT *row_offsets_, SizeT node) {
             sort_list_[node].value = row_offsets_[node + 1] - row_offsets_[node];
             sort_list_[node].posit = node;
         }, nodes, target);
@@ -144,7 +113,7 @@ cudaError_t Partition(
 
     for (int i = 0; i < num_subgraphs; i++)
         current_count[i] = 0;
-    std::vector<SortNode<SizeT> > sort_vector(sort_list + 0, sort_list + nodes);
+    std::vector<SortNode<SizeT, SizeT> > sort_vector(sort_list + 0, sort_list + nodes);
     std::sort(sort_vector.begin(),sort_vector.end());
 
     //printf("1");fflush(stdout);
