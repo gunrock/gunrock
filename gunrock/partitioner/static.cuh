@@ -31,8 +31,6 @@ cudaError_t Partition(
     float      *weitage = NULL)
 {
     typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::SizeT   SizeT;
-    typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::GpT     GpT;
 
     cudaError_t retval = cudaSuccess;

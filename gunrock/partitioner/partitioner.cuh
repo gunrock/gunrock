@@ -22,6 +22,7 @@
 #include <gunrock/partitioner/metis.cuh>
 #include <gunrock/partitioner/cluster.cuh>
 #include <gunrock/partitioner/biased_random.cuh>
+#include <gunrock/partitioner/duplicate.cuh>
 
 namespace gunrock {
 namespace partitioner {
@@ -35,7 +36,7 @@ cudaError_t UseParameters(
         "partition-method",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         "random",
-        "partitioning method, can be one of {random, biasrandom, cluster, metis, static}",
+        "partitioning method, can be one of {random, biasrandom, cluster, metis, static, duplicate}",
         __FILE__, __LINE__);
     if (retval) return retval;
 
@@ -113,6 +114,10 @@ cudaError_t Partition(
             num_subgraphs, flag, target, weitage);
     else if (partition_method == "biasrandom")
         retval = biased_random::Partition(
+            org_graph, sub_graphs, parameters,
+            num_subgraphs, flag, target, weitage);
+    else if (partition_method == "duplicate")
+        retval = duplicate::Partition(
             org_graph, sub_graphs, parameters,
             num_subgraphs, flag, target, weitage);
     else retval = util::GRError(
