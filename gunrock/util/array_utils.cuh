@@ -680,7 +680,7 @@ public:
 #ifdef ENABLE_ARRAY_DEBUG
             PrintMsg(name + "\t setted on " + Location_to_string(HOST) +
                 ", size =\t " + std::to_string(this -> size) +
-                ", pointer =\t " + std::to_string(h_pointer) +
+                ", pointer =\t " + to_string(h_pointer) +
                 ", setted =\t " + Location_to_string(setted));
 #endif
         }
@@ -695,7 +695,7 @@ public:
 #ifdef ENABLE_ARRAY_DEBUG
             PrintMsg(name + "\t setted on " + Location_to_string(DEVICE) +
                 ", size =\t " + std::to_string(this -> size) +
-                ", pointer =\t " + std::to_string(d_pointer) +
+                ", pointer =\t " + to_string(d_pointer) +
                 ", setted =\t " + Location_to_string(setted));
 #endif
         }

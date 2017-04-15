@@ -15,6 +15,8 @@
 
 #include <gunrock/partitioner/partitioner.cuh>
 
+#include <gunrock/app/problem_base.cuh>
+
 using namespace gunrock;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
@@ -75,9 +77,24 @@ struct TestGraph :
             retval = this -> CsrT::FromCsr(csr);
         return retval;
     }
+
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        retval = this -> CooT::Release(target);
+        if (retval) return retval;
+        retval = this -> CsrT::Release(target);
+        if (retval) return retval;
+        retval = this -> CscT::Release(target);
+        if (retval) return retval;
+        retval = this -> GpT::Release(target);
+        if (retval) return retval;
+        return retval;
+    }
 };
 
-void Test_Array()
+/*void Test_Array()
 {
     // test array
     Array1D<int, int, PINNED> test_array;
@@ -326,33 +343,24 @@ void Test_Frontier()
     frontier.SetName("test_frontier");
     frontier.Init();
     frontier.Release();
-}
+}*/
 
-cudaError_t Test_Partitioner(int argc, char* argv[])
+template <typename GraphT>
+cudaError_t LoadGraph(util::Parameters &parameters, GraphT &graph)
 {
     cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test refactor");
-    typedef TestGraph<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> GraphT;
-    GraphT graph;
-    GraphT *sub_graphs = NULL;
 
-    retval = graphio::UseParameters(parameters);
-    if (retval) return retval;
-    retval = partitioner::UseParameters(parameters);
-    if (retval) return retval;
-
-    retval = parameters.Parse_CommandLine(argc, argv);
-    if (retval) return retval;
-    if (parameters.Get<bool>("help"))
-    {
-        parameters.Print_Help();
-        return cudaSuccess;
-    }
-
-    retval = parameters.Check_Required();
-    if (retval) return retval;
     retval = graphio::LoadGraph(parameters, graph);
     if (retval) return retval;
+
+    return retval;
+}
+
+/*template <typename GraphT>
+cudaError_t Test_Partitioner(Parameters &parameters, GraphT &graph)
+{
+    cudaError_t retval = cudaSuccess;
+    GraphT *sub_graphs = NULL;
 
     retval = partitioner::Partition(
         graph, sub_graphs, parameters, 4,
@@ -368,6 +376,20 @@ cudaError_t Test_Partitioner(int argc, char* argv[])
         sub_graphs[i].CsrT::Display();
     }
     return retval;
+}*/
+
+template <typename GraphT>
+cudaError_t Test_ProblemBase(Parameters &parameters, GraphT &graph)
+{
+    cudaError_t retval = cudaSuccess;
+
+    typedef ProblemBase<GraphT> ProblemT;
+    ProblemT problem;
+
+    retval = problem.Init(parameters, graph);
+    if (retval) return retval;
+
+    return retval;
 }
 
 int main(int argc, char* argv[])
@@ -379,6 +401,37 @@ int main(int argc, char* argv[])
     // Test_Csr();
     // Test_GraphIo(argc, argv);
     // Test_Frontier();
-    Test_Partitioner(argc, argv);
+
+    cudaError_t retval = cudaSuccess;
+    util::Parameters parameters("test refactor");
+    typedef TestGraph<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> GraphT;
+    GraphT graph;
+
+
+    retval = graphio::UseParameters(parameters);
+    if (retval) return 1;
+    retval = partitioner::UseParameters(parameters);
+    if (retval) return 2;
+    retval = app::UseParameters(parameters);
+    if (retval) return 3;
+
+    retval = parameters.Parse_CommandLine(argc, argv);
+    if (retval) return 4;
+    if (parameters.Get<bool>("help"))
+    {
+        parameters.Print_Help();
+        return cudaSuccess;
+    }
+
+    retval = parameters.Check_Required();
+    if (retval) return 5;
+
+    retval = LoadGraph(parameters, graph);
+    if (retval) return 11;
+    //retval = Test_Partitioner(parameters, graph);
+    //if (retval) return 12;
+    retval = Test_ProblemBase(parameters, graph);
+    if (retval) return 13;
+
     return 0;
 }
