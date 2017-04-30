@@ -13,9 +13,9 @@
 
 #include <gunrock/app/frontier.cuh>
 
-#include <gunrock/partitioner/partitioner.cuh>
+//#include <gunrock/partitioner/partitioner.cuh>
 
-#include <gunrock/app/problem_base.cuh>
+#include <gunrock/app/sssp/sssp_problem.cuh>
 
 using namespace gunrock;
 using namespace gunrock::util;
@@ -392,6 +392,25 @@ cudaError_t Test_ProblemBase(Parameters &parameters, GraphT &graph)
     return retval;
 }
 
+template <typename GraphT>
+cudaError_t Test_SSSPProblem(Parameters &parameters, GraphT &graph, util::Location target = util::HOST)
+{
+    cudaError_t retval = cudaSuccess;
+
+    typedef gunrock::app::sssp::Problem<GraphT> ProblemT;
+    ProblemT problem;
+
+    retval = problem.Init(parameters, graph, partitioner::PARTITION_NONE, target);
+    if (retval) return retval;
+
+    retval = problem.Reset(0, target);
+    if (retval) return retval;
+
+    retval = problem.Release(target);
+    if (retval) return retval;
+    return retval;
+}
+
 int main(int argc, char* argv[])
 {
     //const SizeT DefaultSize = PreDefinedValues<SizeT>::InvalidValue;
@@ -410,8 +429,8 @@ int main(int argc, char* argv[])
 
     retval = graphio::UseParameters(parameters);
     if (retval) return 1;
-    retval = partitioner::UseParameters(parameters);
-    if (retval) return 2;
+    //retval = partitioner::UseParameters(parameters);
+    //if (retval) return 2;
     retval = app::UseParameters(parameters);
     if (retval) return 3;
 
@@ -430,8 +449,16 @@ int main(int argc, char* argv[])
     if (retval) return 11;
     //retval = Test_Partitioner(parameters, graph);
     //if (retval) return 12;
-    retval = Test_ProblemBase(parameters, graph);
+    retval = Test_SSSPProblem(parameters, graph, util::HOST);
     if (retval) return 13;
+    util::PrintMsg("====Test on HOST finished");
 
+    retval = Test_SSSPProblem(parameters, graph, util::DEVICE);
+    if (retval) return 14;
+    util::PrintMsg("====Test on DEVICE finished");
+
+    retval = Test_SSSPProblem(parameters, graph, util::HOST | util::DEVICE);
+    if (retval) return 15;
+    util::PrintMsg("====Test on HOST | DEVICE finished");
     return 0;
 }

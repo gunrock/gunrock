@@ -41,6 +41,9 @@ cudaError_t UseParameters(
 {
     cudaError_t retval = cudaSuccess;
 
+    retval = partitioner::UseParameters(parameters);
+    if (retval) return retval;
+
     retval = parameters.Use<int>(
         "device",
         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
@@ -51,6 +54,67 @@ cudaError_t UseParameters(
 
     return retval;
 }
+
+template <
+    typename _GraphT,
+    ProblemFlag _FLAG = Problem_None>
+struct DataSliceBase
+{
+    typedef _GraphT GraphT;
+    static const ProblemFlag FLAG = _FLAG;
+
+    int gpu_idx; // index of GPU the data slice is allocated
+    cudaStream_t stream;
+    GraphT *sub_graph;
+    ProblemFlag flag;
+
+    DataSliceBase() :
+        gpu_idx  (0),
+        stream   (0),
+        sub_graph(NULL),
+        flag     (Problem_None)
+    {
+    }
+
+    cudaError_t Init(
+        _GraphT &sub_graph,
+        int      gpu_idx = 0,
+        util::Location target = util::DEVICE,
+        ProblemFlag flag = Problem_None)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        this -> gpu_idx = gpu_idx;
+        this -> sub_graph = &sub_graph;
+        this -> flag = flag;
+        if (target & util::DEVICE)
+        {
+            retval = util::SetDevice(gpu_idx);
+            if (retval) return retval;
+            retval = util::GRError(cudaStreamCreateWithFlags(
+                &stream, cudaStreamNonBlocking),
+                "cudaStreamCreateWithFlags failed.", __FILE__, __LINE__);
+            if (retval) return retval;
+        }
+
+        return retval;
+    }
+
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        if (target & util::DEVICE)
+        {
+            if (stream != 0)
+                retval = util::GRError(cudaStreamDestroy(stream),
+                    "cudaStreamDestroy failed", __FILE__, __LINE__);
+            if (retval) return retval;
+        }
+        return retval;
+    }
+// empty for now
+};
 
 /**
  * @brief Base problem structure.
@@ -159,7 +223,7 @@ struct ProblemBase
         util::Parameters &parameters,
         GraphT &graph,
         partitioner::PartitionFlag partition_flag = partitioner::PARTITION_NONE,
-        util::Location target = util::HOST)
+        util::Location target = util::DEVICE)
     {
         cudaError_t retval      = cudaSuccess;
         this->org_graph         = &graph;

@@ -544,6 +544,32 @@ public:
         return this -> allocated;
     }
 
+    cudaError_t EnsureSize_(SizeT size, Location target = ARRAY_DEFAULT_TARGET)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        if (GetSize() < size)
+        {
+            retval = Allocate(size, target & allocated);
+            return retval;
+        } else size = GetSize();
+
+        if ((target & DEVICE) != 0 &&
+            (GetPointer(DEVICE) == NULL))
+        {
+            retval = Allocate(size, DEVICE);
+            if (retval) return retval;
+        }
+
+        if ((target & HOST) != 0 &&
+            (GetPointer(HOST) == NULL))
+        {
+            retval = Allocate(size, HOST);
+            if (retval) return retval;
+        }
+        return retval;
+    }
+
     cudaError_t EnsureSize(SizeT size, bool keep = false, cudaStream_t stream = 0)
     {
 #ifdef ENABLE_ARRAY_DEBUG
@@ -776,6 +802,7 @@ public:
         cudaStream_t stream=0)
     {
         cudaError_t retval = cudaSuccess;
+        if (source == target) return retval;
         if ((source == HOST || source == DEVICE) &&
             ((source & setted) != source) && ((source & allocated) != source))
             return GRError(name + " movment source is not valid", __FILE__, __LINE__);
