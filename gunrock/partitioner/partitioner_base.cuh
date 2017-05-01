@@ -158,7 +158,7 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     memset(marker + 0, 0, sizeof(int) * org_graph -> nodes);
     memset(out_counter + 0, 0, sizeof(SizeT) * (num_subgraphs + 1));
 
-    util::PrintMsg("Thread " + std::to_string(thread_num) + ", 2");
+    //util::PrintMsg("Thread " + std::to_string(thread_num) + ", 2");
     num_nodes = 0;
     for (VertexT v = 0; v < org_graph->nodes; v++)
     if (org_partition_table[v] == thread_num)
@@ -190,7 +190,7 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     }
     retval = marker.Release();
     if (retval) CUT_THREADEND;
-    util::PrintMsg("Thread " + std::to_string(thread_num) + ", 3");
+    //util::PrintMsg("Thread " + std::to_string(thread_num) + ", 3");
 
     out_offset[0] = 0;
     node_counter = out_counter[thread_num];
@@ -205,7 +205,7 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     // util::cpu_mt::PrintCPUArray<SizeT, SizeT>(
     //    "out_offsets", out_offsets[thread_num], num_subgraphs+1, thread_num);
     util::cpu_mt::IncrementnWaitBarrier(cpu_barrier, thread_num);
-    util::PrintMsg("Thread " + std::to_string(thread_num) + ", 4");
+    //util::PrintMsg("Thread " + std::to_string(thread_num) + ", 4");
 
     node_counter = 0;
     for (int peer = 0; peer < num_subgraphs; peer++)
@@ -218,7 +218,7 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
         node_counter += in_counter[peer_];
     }
     in_counter[num_subgraphs] = node_counter;
-    util::PrintMsg("Thread " + std::to_string(thread_num) + ", 5");
+    //util::PrintMsg("Thread " + std::to_string(thread_num) + ", 5");
 
     if (keep_node_num) num_nodes = org_graph->nodes;
     retval = sub_graph -> CsrT::Allocate(num_nodes, num_edges, target);
@@ -249,7 +249,7 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
             }
         }
     }
-    util::PrintMsg("Thread " + std::to_string(thread_num) + ", 6");
+    //util::PrintMsg("Thread " + std::to_string(thread_num) + ", 6");
 
     edge_counter = 0;
     for (VertexT v = 0; v < org_graph->nodes; v++)
@@ -304,7 +304,7 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
         partition_table [v] = peer_;
     }
     sub_graph -> CsrT::row_offsets[num_nodes] = num_edges;
-    util::PrintMsg("Thread " + std::to_string(thread_num) + ", 7");
+    //util::PrintMsg("Thread " + std::to_string(thread_num) + ", 7");
 
     if (flag & Enable_Backward)
     {
@@ -363,7 +363,7 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
         retval = marker.Release();
         if (retval) CUT_THREADEND;
     }
-    util::PrintMsg("Thread " + std::to_string(thread_num) + ", 8");
+    //util::PrintMsg("Thread " + std::to_string(thread_num) + ", 8");
 
     out_counter [num_subgraphs] = 0;
     in_counter  [num_subgraphs] = 0;
@@ -385,8 +385,11 @@ static CUT_THREADPROC MakeSubGraph_Thread(void *thread_data_)
     //util::cpu_mt::PrintCPUArray<SizeT, SizeT>("in_counter ", in_counter,num_gpus+1,gpu);
     retval = tconvertion_table.Release();
     if (retval) CUT_THREADEND;
-    util::PrintMsg("Thread " + std::to_string(thread_num) + ", 9");
+    //util::PrintMsg("Thread " + std::to_string(thread_num) + ", 9");
 
+    retval = sub_graph -> FromCsr(*sub_graph, true);
+    if (retval) CUT_THREADEND;
+    
     CUT_THREADEND;
 }
 

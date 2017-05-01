@@ -82,6 +82,8 @@ struct TestGraph :
     {
         cudaError_t retval = cudaSuccess;
 
+        util::PrintMsg("GraphT::Realeasing on " +
+            util::Location_to_string(target));
         retval = this -> CooT::Release(target);
         if (retval) return retval;
         retval = this -> CsrT::Release(target);
@@ -400,7 +402,7 @@ cudaError_t Test_SSSPProblem(Parameters &parameters, GraphT &graph, util::Locati
     typedef gunrock::app::sssp::Problem<GraphT> ProblemT;
     ProblemT problem;
 
-    retval = problem.Init(parameters, graph, partitioner::PARTITION_NONE, target);
+    retval = problem.Init(parameters, graph, target);
     if (retval) return retval;
 
     retval = problem.Reset(0, target);

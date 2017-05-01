@@ -222,7 +222,7 @@ struct ProblemBase
     cudaError_t Init(
         util::Parameters &parameters,
         GraphT &graph,
-        partitioner::PartitionFlag partition_flag = partitioner::PARTITION_NONE,
+        //partitioner::PartitionFlag partition_flag = partitioner::PARTITION_NONE,
         util::Location target = util::DEVICE)
     {
         cudaError_t retval      = cudaSuccess;
@@ -234,12 +234,12 @@ struct ProblemBase
         if (num_gpus == 1)
             sub_graphs.SetPointer(&graph, 1, util::HOST);
         else {
-            retval = sub_graphs.Allocate(num_gpus, target);
+            retval = sub_graphs.Allocate(num_gpus, target | util::HOST);
             if (retval) return retval;
             GraphT *t_subgraphs = sub_graphs + 0;
             retval = gunrock::partitioner::Partition(
-                graph, t_subgraphs, parameters,
-                num_gpus, partition_flag, target);
+                graph, t_subgraphs, parameters, num_gpus,
+                flag, target);
             if (retval) return retval;
         }
 

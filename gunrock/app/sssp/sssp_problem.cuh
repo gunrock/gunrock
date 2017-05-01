@@ -49,6 +49,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::ValueT  ValueT;
+    typedef typename GraphT::CsrT    CsrT;
+    typedef typename GraphT::GpT     GpT;
 
     typedef ProblemBase   <GraphT, FLAG> BaseProblem;
     typedef DataSliceBase <GraphT, FLAG> BaseDataSlice;
@@ -416,12 +418,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     cudaError_t Init(
             util::Parameters &parameters,
             GraphT &graph,
-            partitioner::PartitionFlag partition_flag = partitioner::PARTITION_NONE,
+            //partitioner::PartitionFlag partition_flag = partitioner::PARTITION_NONE,
             util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
 
-        retval = BaseProblem::Init(parameters, graph, partition_flag, target);
+        retval = BaseProblem::Init(parameters, graph, target);
         if (retval) return retval;
 
         // No data in DataSlice needs to be copied from host
@@ -483,7 +485,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             gpu = 0; src_=src;
         } else {
             gpu = this -> org_graph -> partition_table[src];
-            //tsrc= this->convertion_tables[0][src];
+            if (this -> flag & partitioner::Keep_Node_Num)
+                src_ = src;
+            else
+                src_ = this -> org_graph -> GpT::convertion_table[src];
         }
         if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
 

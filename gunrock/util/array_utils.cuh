@@ -806,7 +806,7 @@ public:
         if ((source == HOST || source == DEVICE) &&
             ((source & setted) != source) && ((source & allocated) != source))
             return GRError(name + " movment source is not valid", __FILE__, __LINE__);
-        if ((target == HOST || target == DEVICE) &&
+        if (((target & HOST) == HOST || (target & DEVICE) == DEVICE) &&
             ((target & setted) != target) && ((target & allocated) != target))
             if (retval = Allocate(this->size, target)) return retval;
         if ((target == DISK || source == DISK) && ((setted & DISK) != DISK))

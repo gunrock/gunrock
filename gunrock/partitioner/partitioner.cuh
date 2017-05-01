@@ -96,30 +96,31 @@ cudaError_t Partition(
     for (int i = 0; i < num_subgraphs; i++)
         weitage[i + 1] += weitage[i];
 
+    util::Location target_ = util::HOST;
     if (partition_method == "random")
         retval = random::Partition(
             org_graph, sub_graphs, parameters,
-            num_subgraphs, flag, target, weitage);
+            num_subgraphs, flag, target_, weitage);
     else if (partition_method == "static")
         retval = static_p::Partition(
             org_graph, sub_graphs, parameters,
-            num_subgraphs, flag, target, weitage);
+            num_subgraphs, flag, target_, weitage);
     else if (partition_method == "metis")
         retval = metis::Partition(
             org_graph, sub_graphs, parameters,
-            num_subgraphs, flag, target, weitage);
+            num_subgraphs, flag, target_, weitage);
     else if (partition_method == "cluster")
         retval = cluster::Partition(
             org_graph, sub_graphs, parameters,
-            num_subgraphs, flag, target, weitage);
+            num_subgraphs, flag, target_, weitage);
     else if (partition_method == "biasrandom")
         retval = biased_random::Partition(
             org_graph, sub_graphs, parameters,
-            num_subgraphs, flag, target, weitage);
+            num_subgraphs, flag, target_, weitage);
     else if (partition_method == "duplicate")
         retval = duplicate::Partition(
             org_graph, sub_graphs, parameters,
-            num_subgraphs, flag, target, weitage);
+            num_subgraphs, flag, target_, weitage);
     else retval = util::GRError(
         cudaErrorUnknown,
         "Unknown partitioning method " + partition_method,
