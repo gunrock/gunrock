@@ -19,6 +19,9 @@
 #include <gunrock/util/vector_types.cuh>
 #include <gunrock/util/array_utils.cuh>
 #include <gunrock/oprtr/1D_oprtr/sort.cuh>
+#include <gunrock/oprtr/1D_oprtr/1D_scalar.cuh>
+#include <gunrock/oprtr/1D_oprtr/1D_1D.cuh>
+#include <gunrock/graph/graph_base.cuh>
 
 namespace gunrock {
 namespace graph {

@@ -330,6 +330,14 @@ public:
         return val;
     }// Get()
 
+    bool Have(std::string name)
+    {
+        auto it = p_map.find(name);
+        if (it == p_map.end())
+            return false;
+        return true;
+    }
+
     cudaError_t Check_Required()
     {
         for (auto it = p_map.begin(); it != p_map.end(); it++)

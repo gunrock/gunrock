@@ -63,7 +63,7 @@ protected :
     // Seven pointer-sized counters in global device memory (we may not use
     // all of them, or may only use 32-bit versions of them)
     SizeT *d_counters;
-    util::Array1D<int, SizeT> *p_counters;
+    util::Array1D<int, SizeT, PINNED, cudaHostAllocMapped | cudaHostAllocPortable> *p_counters;
 
     // Host-controlled selector for indexing into d_counters.
     int progress_selector;
@@ -80,7 +80,7 @@ public:
     CtaWorkProgress() :
         d_counters(NULL),
         progress_selector(0),
-        p_counters  (NULL) 
+        p_counters  (NULL)
     {
     }
 
@@ -201,8 +201,7 @@ public:
     cudaError_t Init()
     {
         cudaError_t retval = cudaSuccess;
-        if (retval = p_counters -> Init(COUNTERS, util::HOST | util::DEVICE,
-            true, cudaHostAllocMapped | cudaHostAllocPortable))
+        if (retval = p_counters -> Allocate(COUNTERS, util::HOST | util::DEVICE))
             return retval;
         d_counters = p_counters -> GetPointer(util::DEVICE);
         progress_selector = 0;
@@ -231,7 +230,7 @@ protected:
 
     // GPU d_counters was allocated on
     int gpu;
-    util::Array1D<int, SizeT> counters;
+    util::Array1D<int, SizeT, PINNED, cudaHostAllocMapped | cudaHostAllocPortable> counters;
 
 public:
 
@@ -240,7 +239,7 @@ public:
      */
     CtaWorkProgressLifetime() :
         CtaWorkProgress<SizeT>(),
-        gpu(GR_INVALID_DEVICE) 
+        gpu(GR_INVALID_DEVICE)
     {
         counters.SetName("counters");
         this -> p_counters = &counters;
@@ -259,7 +258,7 @@ public:
     {
         cudaError_t retval = cudaSuccess;
 
-        if (gpu != GR_INVALID_DEVICE) 
+        if (gpu != GR_INVALID_DEVICE)
         {
 
             // Save current gpu
@@ -298,7 +297,7 @@ public:
         cudaError_t retval = cudaSuccess;
 
         // Make sure that our progress counters are allocated
-        if (this -> counters.GetPointer(util::DEVICE) == NULL) 
+        if (this -> counters.GetPointer(util::DEVICE) == NULL)
         {
 
             // Allocate and initialize
@@ -327,7 +326,7 @@ public:
         cudaError_t retval = cudaSuccess;
 
         //SizeT counter;
-        if (retval = counters.Move(util::DEVICE, util::HOST, 
+        if (retval = counters.Move(util::DEVICE, util::HOST,
             1, this -> QUEUE_COUNTERS + this -> STEAL_COUNTERS, stream))
             return retval;
 
@@ -359,31 +358,31 @@ public:
         if (stream == 0)
         {
             if (!DEBUG)
-                cudaMemcpy(&queue_length, this->d_counters + queue_length_idx, 
+                cudaMemcpy(&queue_length, this->d_counters + queue_length_idx,
                     sizeof(SizeT), cudaMemcpyDeviceToHost);
             else if (retval = util::GRError(cudaMemcpy(
                 &queue_length, this -> d_counters + queue_length_idx,
                 sizeof(SizeT), cudaMemcpyDeviceToHost),
-                "CtaWorkProgress cudaMemcpy d_counters failed", __FILE__, __LINE__)) 
+                "CtaWorkProgress cudaMemcpy d_counters failed", __FILE__, __LINE__))
                 return retval;
         } else {
             //printf("GetQueueLength using MemcpyAsync\n");
             if (!DEBUG)
-                cudaMemcpyAsync(&queue_length, this -> d_counters + queue_length_idx, 
+                cudaMemcpyAsync(&queue_length, this -> d_counters + queue_length_idx,
                     sizeof(SizeT), cudaMemcpyDeviceToHost, stream);
             else if (retval = util::GRError(cudaMemcpyAsync(
-                &queue_length, this -> d_counters + queue_length_idx, 
-                sizeof(SizeT), cudaMemcpyDeviceToHost, stream), 
-                "CtaWorkProgress cudaMemcpyAsync d_counter failed.", __FILE__, __LINE__)) 
+                &queue_length, this -> d_counters + queue_length_idx,
+                sizeof(SizeT), cudaMemcpyDeviceToHost, stream),
+                "CtaWorkProgress cudaMemcpyAsync d_counter failed.", __FILE__, __LINE__))
                 return retval;
-            if (!skip_sync) 
+            if (!skip_sync)
             {
                 if (retval = util::GRError(cudaStreamSynchronize(stream),
                     "CtaWorkProgress GetQueueLength failed", __FILE__, __LINE__))
                 return retval;
             }
         }
-        /*if (retval = counters.Move(util::DEVICE, util::HOST, 
+        /*if (retval = counters.Move(util::DEVICE, util::HOST,
             1, queue_length_idx, stream))
             return retval;
         if (!skip_sync)
@@ -402,7 +401,7 @@ public:
         IndexT queue_length_idx = index & 0x3;
         return counters.GetPointer(util::DEVICE) + queue_length_idx;
     }
-        
+
     // Set work queue length
     template <typename IterationT/*, typename SizeT*/>
     cudaError_t SetQueueLength(
@@ -428,14 +427,14 @@ public:
            // printf("gpu = %d, queue_idx = %d, d_counters = %p, stream = %d, queue_length = %d\n",gpu, queue_length_idx, d_counters, stream, queue_length);fflush(stdout);
             //util::MemsetKernel<<<1,1,0,stream>>>(((SizeT*) d_counters) + queue_length_idx, queue_length, 1);
             cudaMemcpyAsync(((SizeT*) d_counters) + queue_length_idx, &queue_length, sizeof(SizeT), cudaMemcpyHostToDevice,stream);
-            if (DEBUG) 
+            if (DEBUG)
             {
                 cudaStreamSynchronize(stream);
                 retval = util::GRError("CtaWorkProgress MemsetKernel d_counters failed", __FILE__, __LINE__);
             }
         }*/
         this -> counters[queue_length_idx] = queue_length;
-        if (retval = this -> counters.Move(util::HOST, util::DEVICE, 
+        if (retval = this -> counters.Move(util::HOST, util::DEVICE,
             1, queue_length_idx, stream))
             return retval;
         if (DEBUG)
@@ -452,4 +451,3 @@ public:
 
 } // namespace util
 } // namespace gunrock
-

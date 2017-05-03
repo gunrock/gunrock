@@ -155,44 +155,54 @@ struct Frontier
         if (retval) return retval;
         retval = queue_offsets.Allocate(num_queues, target | util::HOST);
         if (retval) return retval;
+
+        // TODO: work_progress.Init on HOST
+        retval = work_progress.Init();
+        if (retval) return retval;
         return retval;
     }
 
-    cudaError_t Release()
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
 
         for (unsigned int q = 0; q < num_queues; q++)
         {
-            retval = segment_offsets[q].Release();
+            retval = segment_offsets[q].Release(target);
             if (retval) return retval;
 
             if (queue_types[q] == VERTEX_FRONTIER)
             {
                 auto queue = vertex_queues[queue_map[q]];
-                retval = queue.Release();
+                retval = queue.Release(target);
                 if (retval) return retval;
             } else if (queue_types[q] == EDGE_FRONTIER)
             {
                 auto queue = edge_queues[queue_map[q]];
-                retval = queue.Release();
+                retval = queue.Release(target);
                 if (retval) return retval;
             }
         }
 
-        if (retval = queue_types  .Release()) return retval;
-        if (retval = queue_map    .Release()) return retval;
-        if (retval = output_length.Release()) return retval;
-        if (retval = num_segments .Release()) return retval;
-        if (retval = queue_offsets.Release()) return retval;
-        if (retval = scanned_edges.Release()) return retval;
-        if (retval = cub_scan_space.Release()) return retval;
+        if (retval = queue_types   .Release(target)) return retval;
+        if (retval = queue_map     .Release(target)) return retval;
+        if (retval = output_length .Release(target)) return retval;
+        if (retval = num_segments  .Release(target)) return retval;
+        if (retval = queue_offsets .Release(target)) return retval;
+        if (retval = scanned_edges .Release(target)) return retval;
+        if (retval = cub_scan_space.Release(target)) return retval;
         delete[] segment_offsets; segment_offsets = NULL;
         delete[] vertex_queues  ; vertex_queues   = NULL;
         delete[] edge_queues    ; edge_queues     = NULL;
         return retval;
     }
 
+    cudaError_t Reset(util::Location target = util::LOCATION_ALL)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        return retval;
+    }
 }; // struct Frontier
 
 } // namespace app

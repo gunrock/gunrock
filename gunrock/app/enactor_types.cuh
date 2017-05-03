@@ -14,7 +14,12 @@
 
 #pragma once
 
+#include <time.h>
 #include <moderngpu.cuh>
+#include <gunrock/util/multithreading.cuh>
+#include <gunrock/util/kernel_runtime_stats.cuh>
+#include <gunrock/util/parameters.h>
+#include <gunrock/app/frontier.cuh>
 
 using namespace mgpu;
 
@@ -41,7 +46,7 @@ __global__ void Accumulate_Num (
     SizeT1 *num,
     SizeT2 *sum)
 {
-    sum[0]+=num[0];
+    sum[0] += num[0];
 }
 
 /**
@@ -117,21 +122,25 @@ struct EnactorStats
     }
 
     cudaError_t Init(
-        int node_lock_size = 1024)
+        int node_lock_size = 1024,
+        util::Location target = util::DEVICE)
    {
         cudaError_t retval = cudaSuccess;
-        if (retval = advance_kernel_stats
+        if (target & util::DEVICE)
+        {
+            if (retval = advance_kernel_stats
               .Setup(advance_grid_size)) return retval;
-        if (retval = filter_kernel_stats
+            if (retval = filter_kernel_stats
               .Setup(filter_grid_size )) return retval;
+        }
         if (retval = node_locks
-              .Allocate(node_lock_size + 1, util::DEVICE)) return retval;
+              .Allocate(node_lock_size + 1, target)) return retval;
         if (retval = node_locks_out
-              .Allocate(node_lock_size + 1, util::DEVICE)) return retval;
+              .Allocate(node_lock_size + 1, target)) return retval;
         if (retval = nodes_queued
-              .Allocate(1, util::DEVICE | util::HOST)) return retval;
+              .Allocate(1, target | util::HOST)) return retval;
         if (retval = edges_queued
-              .Allocate(1, util::DEVICE | util::HOST)) return retval;
+              .Allocate(1, target | util::HOST)) return retval;
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
         iter_edges_queued.clear();
@@ -142,7 +151,7 @@ struct EnactorStats
         return retval;
     }
 
-    cudaError_t Reset()
+    cudaError_t Reset(util::Location target = util::LOCATION_ALL)
     {
         iteration       = 0;
         total_lifetimes = 0;
@@ -151,8 +160,8 @@ struct EnactorStats
 
         nodes_queued[0] = 0;
         edges_queued[0] = 0;
-        nodes_queued.Move(util::HOST, util::DEVICE);
-        edges_queued.Move(util::HOST, util::DEVICE);
+        nodes_queued.Move(util::HOST, target);
+        edges_queued.Move(util::HOST, target);
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
         iter_edges_queued.push_back(std::vector<SizeT>());
@@ -163,13 +172,13 @@ struct EnactorStats
         return retval;
     }
 
-    cudaError_t Release()
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
-        if (retval = node_locks    .Release()) return retval;
-        if (retval = node_locks_out.Release()) return retval;
-        if (retval = edges_queued  .Release()) return retval;
-        if (retval = nodes_queued  .Release()) return retval;
+        if (retval = node_locks    .Release(target)) return retval;
+        if (retval = node_locks_out.Release(target)) return retval;
+        if (retval = edges_queued  .Release(target)) return retval;
+        if (retval = nodes_queued  .Release(target)) return retval;
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
         for (auto it = iter_edges_queued.begin();
@@ -189,73 +198,6 @@ struct EnactorStats
         iter_in_length   .clear();
         iter_out_length  .clear();
 #endif
-        return retval;
-    }
-};
-
-/**
- * @brief Structure for auxiliary variables used in frontier operations.
- */
-template <typename SizeT>
-struct FrontierAttribute
-{
-    SizeT        queue_length ;
-
-    SizeT        queue_offset ;
-    int          selector     ;
-
-    int          current_label;
-    bool         has_incoming ;
-    gunrock::oprtr::advance::TYPE
-                 advance_type ;
-
-    /*
-     * @brief Default FrontierAttribute constructor
-     */
-    FrontierAttribute() :
-        queue_length (0),
-        queue_index  (0),
-        queue_offset (0),
-        selector     (0),
-        queue_reset  (false),
-        has_incoming (false)
-    {
-        output_length.SetName("output_length");
-    }
-
-    virtual ~FrontierAttribute()
-    {
-        Release();
-    }
-
-    cudaError_t Release()
-    {
-        cudaError_t retval = cudaSuccess;
-        if (retval = output_length.Release())
-            return retval;
-        return retval;
-    }
-
-    cudaError_t Init()
-    {
-        cudaError_t retval = cudaSuccess;
-        if (retval = output_length.Init(1, util::HOST | util::DEVICE, true))
-            return retval;
-        return retval;
-    }
-
-    cudaError_t Reset()
-    {
-        cudaError_t retval = cudaSuccess;
-        queue_length  = 0;
-        queue_index   = 0;
-        queue_offset  = 0;
-        selector      = 0;
-        queue_reset   = false;
-        has_incoming  = false;
-        output_length[0] = 0;
-        if (retval = output_length.Move(util::HOST, util::DEVICE))
-            return retval;
         return retval;
     }
 };
@@ -283,9 +225,6 @@ public:
     Status        status     ;
     void         *problem    ;
     void         *enactor    ;
-    ContextPtr   *context    ;
-    //util::cpu_mt::CPUBarrier
-    //             *cpu_barrier;
 
     /*
      * @brief Default ThreadSlice constructor
@@ -293,11 +232,9 @@ public:
     ThreadSlice() :
         problem     (NULL),
         enactor     (NULL),
-        context     (NULL),
         thread_num  (0   ),
         init_size   (0   ),
         status      (Status::New)
-        //cpu_barrier (NULL)
     {
     }
 
@@ -308,14 +245,100 @@ public:
     {
         problem     = NULL;
         enactor     = NULL;
-        context     = NULL;
-        //cpu_barrier = NULL;
     }
 
     cudaError_t Reset()
     {
         cudaError_t retval = cudaSuccess;
         init_size = 0;
+        return retval;
+    }
+};
+
+template <
+    typename GraphT,
+    util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
+    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
+class EnactorSlice
+{
+public:
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+
+    cudaStream_t        stream;
+    ContextPtr          context;
+    EnactorStats<SizeT> enactor_stats;
+    Frontier<VertexT, SizeT, ARRAY_FLAG, cudaHostRegisterFlag> frontier;
+
+    EnactorSlice()
+    {
+    }
+
+    ~EnactorSlice()
+    {
+        Release();
+    }
+
+    cudaError_t Init(
+        unsigned int num_queues = 2,
+        FrontierType *types = NULL,
+        std::string frontier_name = "",
+        int node_lock_size = 1024,
+        util::Location target = util::DEVICE)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        if (target & util::DEVICE)
+        {
+            retval = util::GRError(cudaStreamCreateWithFlags(
+                &stream, cudaStreamNonBlocking),
+                "cudaStreamCreateWithFlags failed", __FILE__, __LINE__);
+            if (retval) return retval;
+
+            int gpu_idx;
+            retval = util::GRError(cudaGetDevice(&gpu_idx));
+            if (retval) return retval;
+            context = mgpu::CreateCudaDeviceAttachStream(gpu_idx, stream);
+        }
+
+        retval = enactor_stats.Init(node_lock_size, target);
+        if (retval) return retval;
+
+        retval = frontier.Init(num_queues, types, frontier_name, target);
+        if (retval) return retval;
+
+        return retval;
+    }
+
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        retval = frontier.Release(target);
+        if (retval) return retval;
+
+        retval = enactor_stats.Release(target);
+        if (retval) return retval;
+
+        if (target & util::DEVICE)
+        {
+            retval = util::GRError(cudaStreamDestroy(stream),
+                "cudaStreamDestroy failed", __FILE__, __LINE__);
+            if (retval) return retval;
+        }
+        return retval;
+    }
+
+    cudaError_t Reset(util::Location target = util::LOCATION_ALL)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        retval = enactor_stats.Reset(target);
+        if (retval) return retval;
+
+        retval = frontier.Reset(target);
+        if (retval) return retval;
+
         return retval;
     }
 };

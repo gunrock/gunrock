@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <gunrock/util/memset_kernel.cuh>
+//#include <gunrock/util/memset_kernel.cuh>
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/cuda_properties.cuh>
 
@@ -38,7 +38,6 @@ protected :
 
     // Counters in global device memory
     unsigned long long      *d_stat;
-
 
     clock_t                 start;              // Start time
     clock_t                 clocks;             // Accumulated time
@@ -188,8 +187,12 @@ public:
                     "KernelRuntimeStatsLifetime cudaMalloc d_stat failed", __FILE__, __LINE__)) break;
 
                 // Initialize to zero
-                util::MemsetKernel<unsigned long long><<<(grid_size + 128 - 1) / 128, 128>>>(
-                    d_stat, 0, grid_size);
+                //util::MemsetKernel<unsigned long long><<<(grid_size + 128 - 1) / 128, 128>>>(
+                //    d_stat, 0, grid_size);
+                oprtr::ForEach(d_stat, []__host__ __device__(unsigned long long &stat){
+                    stat = 0;
+                    }, grid_size, util::DEVICE);
+
                 if (retval = util::GRError(cudaThreadSynchronize(),
                     "KernelRuntimeStatsLifetime MemsetKernel d_stat failed", __FILE__, __LINE__)) break;
             }
