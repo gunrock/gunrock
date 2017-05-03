@@ -128,10 +128,11 @@ struct EnactorStats
         cudaError_t retval = cudaSuccess;
         if (target & util::DEVICE)
         {
-            if (retval = advance_kernel_stats
-              .Setup(advance_grid_size)) return retval;
-            if (retval = filter_kernel_stats
-              .Setup(filter_grid_size )) return retval;
+            //TODO: move to somewhere
+            //if (retval = advance_kernel_stats
+            //  .Setup(advance_grid_size)) return retval;
+            //if (retval = filter_kernel_stats
+            //  .Setup(filter_grid_size )) return retval;
         }
         if (retval = node_locks
               .Allocate(node_lock_size + 1, target)) return retval;
@@ -272,6 +273,7 @@ public:
 
     EnactorSlice()
     {
+        stream = 0;
     }
 
     ~EnactorSlice()
@@ -322,9 +324,11 @@ public:
 
         if (target & util::DEVICE)
         {
+            if (stream != 0)
             retval = util::GRError(cudaStreamDestroy(stream),
                 "cudaStreamDestroy failed", __FILE__, __LINE__);
             if (retval) return retval;
+            stream = 0;
         }
         return retval;
     }

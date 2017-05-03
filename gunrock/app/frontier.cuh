@@ -173,12 +173,12 @@ struct Frontier
 
             if (queue_types[q] == VERTEX_FRONTIER)
             {
-                auto queue = vertex_queues[queue_map[q]];
+                auto &queue = vertex_queues[queue_map[q]];
                 retval = queue.Release(target);
                 if (retval) return retval;
             } else if (queue_types[q] == EDGE_FRONTIER)
             {
-                auto queue = edge_queues[queue_map[q]];
+                auto &queue = edge_queues[queue_map[q]];
                 retval = queue.Release(target);
                 if (retval) return retval;
             }
@@ -194,6 +194,7 @@ struct Frontier
         delete[] segment_offsets; segment_offsets = NULL;
         delete[] vertex_queues  ; vertex_queues   = NULL;
         delete[] edge_queues    ; edge_queues     = NULL;
+        num_queues = 0;
         return retval;
     }
 

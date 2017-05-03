@@ -336,6 +336,7 @@ public:
                     std::to_string(peer) + "]", node_lock_size, target);
                 if (retval) return retval;
 
+                // TODO: move to somewhere
                 //initialize runtime stats
                 //enactor_slice.enactor_stats -> advance_grid_size = MaxGridSize(
                 //    gpu, advance_occupancy, max_grid_size);
