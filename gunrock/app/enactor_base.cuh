@@ -22,18 +22,8 @@
 #include <gunrock/util/cuda_properties.cuh>
 
 #include <gunrock/util/error_utils.cuh>
-//#include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/array_utils.cuh>
-//#include <gunrock/util/sharedmem.cuh>
-//#include <gunrock/util/info.cuh>
-//#include <gunrock/app/problem_base.cuh>
 
-//#include <gunrock/oprtr/advance/kernel.cuh>
-//#include <gunrock/oprtr/advance/kernel_policy.cuh>
-//#include <gunrock/oprtr/filter/kernel.cuh>
-//#include <gunrock/oprtr/filter/kernel_policy.cuh>
-
-//#include <gunrock/app/enactor_kernel.cuh>
 #include <gunrock/app/enactor_types.cuh>
 //#include <gunrock/app/enactor_helper.cuh>
 //#include <gunrock/app/enactor_loop.cuh>
@@ -52,6 +42,7 @@ using Enactor_Flag = unsigned int;
 
 enum : Enactor_Flag
 {
+    Enactor_None = 0x00,
     Instrument = 0x01,
     Debug      = 0x02,
     Size_Check = 0x04,
@@ -120,6 +111,19 @@ cudaError_t UseParameters2(
         "additional make-out latency",
         __FILE__, __LINE__);
     if (retval) return retval;
+
+    retval = parameters.Use<std::string>(
+        "traversal-mode",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        "",
+        "Traversal strategy, LB for Load-Balanced, "
+        "TWC for Dynamic-Cooperative, add -LIGHT for "
+        "small frontiers, add -CULL for fuzed kernels; "
+        "not all modes are available for specific problem; "
+        "default is determined based on input graph",
+        __FILE__, __LINE__);
+    if (retval) return retval;
+
     return retval;
 }
 
@@ -143,6 +147,8 @@ public:
     int           num_gpus;
     std::vector<int> gpu_idx;
     std::string   algo_name;
+    util::Parameters *parameters;
+    Enactor_Flag  flag;
 
     int           communicate_latency;
     float         communicate_multipy;
@@ -165,6 +171,10 @@ public:
     //Frontiers
     //util::Array1D<int, FrontierT, ARRAY_FLAG, cudaHostRegisterFlag>
     //    frontiers;
+
+    // Per-CPU-thread data
+    util::Array1D<int, ThreadSlice> thread_slices;
+    util::Array1D<int, CUTThread  > thread_Ids  ;
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
     util::Array1D<int, std::vector<std::vector<double> > > iter_full_queue_time;
@@ -189,8 +199,10 @@ public:
     EnactorBase(std::string algo_name = "test")
     {
         this -> algo_name = algo_name;
-        cuda_props          .SetName("cuda_props"          );
-        enactor_slices      .SetName("enactor_slices"      );
+        cuda_props      .SetName("cuda_props"    );
+        enactor_slices  .SetName("enactor_slices");
+        thread_slices   .SetName("thread_slices" );
+        thread_Ids      .SetName("thread_Ids"    );
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
         iter_full_queue_time.SetName("iter_full_queue_time");
@@ -212,7 +224,13 @@ public:
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval;
-        if (enactor_slices + 0 != NULL)
+        util::PrintMsg("EnactorBase::Release() entered");
+
+        if (thread_slices.GetPointer(util::HOST)!= NULL)
+            retval = Kill_Threads();
+        if (retval) return retval;
+
+        if (enactor_slices.GetPointer(util::HOST) != NULL)
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
             retval = util::SetDevice(gpu_idx[gpu]);
@@ -226,9 +244,11 @@ public:
         }
         if (retval = cuda_props    .Release(target)) return retval;
         if (retval = enactor_slices.Release(target)) return retval;
+        if (retval = thread_Ids    .Release(target)) return retval;
+        if (retval = thread_slices .Release(target)) return retval;
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
-        if (iter_full_queue_time + 0!= NULL && (target & util::HOST) != 0)
+        if (iter_full_queue_time.GetPointer(util::HOST)!= NULL && (target & util::HOST) != 0)
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
@@ -260,6 +280,7 @@ public:
             if (retval = iter_full_queue_edges_queued.Release(target)) return retval;
         }
 #endif
+        util::PrintMsg("EnactorBase::Release() returning");
         return retval;
     }
 
@@ -281,6 +302,7 @@ public:
         //int max_grid_size,
         //int advance_occupancy,
         //int filter_occupancy,
+        Enactor_Flag flag = Enactor_None,
         unsigned int num_queues = 2,
         FrontierType *frontier_types = NULL,
         int node_lock_size = 1024,
@@ -297,11 +319,19 @@ public:
         fullqueue_latency   = parameters.Get<int  >("fullqueue-latency");
         makeout_latency     = parameters.Get<int  >("makeout-latency");
         min_sm_version      = -1;
+        this -> parameters  = &parameters;
+        this -> flag        = flag;
 
-        retval = cuda_props   .Allocate(num_gpus, util::HOST);
+        retval = cuda_props    .Allocate(num_gpus, util::HOST);
         if (retval) return retval;
 
         retval = enactor_slices.Allocate(num_gpus * num_gpus, util::HOST);
+        if (retval) return retval;
+
+        retval = thread_slices .Allocate(num_gpus, util::HOST);
+        if (retval) return retval;
+
+        retval = thread_Ids    .Allocate(num_gpus, util::HOST);
         if (retval) return retval;
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
@@ -404,6 +434,73 @@ public:
             iter_full_queue_nodes_queued[gpu].push_back(std::vector<SizeT>());
             iter_full_queue_edges_queued[gpu].push_back(std::vector<SizeT>());
 #endif
+
+            thread_slices[gpu].status = ThreadSlice::Status::Wait;
+        }
+        return retval;
+    }
+
+    template <typename EnactorT>
+    cudaError_t Init_Threads(EnactorT *enactor,
+        CUT_THREADROUTINE Thread_Func)
+    {
+        for (int gpu=0; gpu<this->num_gpus; gpu++)
+        {
+            thread_slices[gpu].thread_num    = gpu;
+            thread_slices[gpu].problem       = (void*)enactor -> problem;
+            thread_slices[gpu].enactor       = (void*)enactor;
+            //thread_slices[gpu].context       = &(context[gpu*this->num_gpus]);
+            thread_slices[gpu].status        = ThreadSlice::Status::Inited;
+            thread_slices[gpu].thread_Id     = cutStartThread(
+                    Thread_Func,
+                    (void*)&(thread_slices[gpu]));
+            thread_Ids[gpu] = thread_slices[gpu].thread_Id;
+        }
+
+        for (int gpu=0; gpu < this->num_gpus; gpu++)
+        {
+            while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
+            {
+                sleep(0);
+                //std::this_thread::yield();
+            }
+        }
+    }
+
+    cudaError_t Run_Threads()
+    {
+        cudaError_t retval = cudaSuccess;
+
+        for (int gpu=0; gpu< num_gpus; gpu++)
+        {
+            thread_slices[gpu].status = ThreadSlice::Status::Running;
+        }
+        for (int gpu=0; gpu< num_gpus; gpu++)
+        {
+            while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
+            {
+                sleep(0);
+                //std::this_thread::yield();
+            }
+        }
+
+        for (int gpu=0; gpu< num_gpus * num_gpus; gpu++)
+        {
+            retval = enactor_slices[gpu].enactor_stats.retval;
+            if (retval) return retval;
+        }
+        return retval;
+    }
+
+    cudaError_t Kill_Threads()
+    {
+        cudaError_t retval = cudaSuccess;
+
+        if (thread_slices.GetPointer(util::HOST) != NULL)
+        {
+            for (int gpu = 0; gpu < this->num_gpus; gpu++)
+                thread_slices[gpu].status = ThreadSlice::Status::ToKill;
+            cutWaitForThreads(thread_Ids + 0, this->num_gpus);
         }
         return retval;
     }

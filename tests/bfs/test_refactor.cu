@@ -17,7 +17,9 @@
 
 //#include <gunrock/app/sssp/sssp_problem.cuh>
 
-#include <gunrock/app/enactor_base.cuh>
+//#include <gunrock/app/enactor_base.cuh>
+
+#include <gunrock/app/sssp/sssp_enactor.cuh>
 
 using namespace gunrock;
 using namespace gunrock::util;
@@ -396,26 +398,37 @@ cudaError_t Test_ProblemBase(Parameters &parameters, GraphT &graph)
     return retval;
 }*/
 
-/*template <typename GraphT>
-cudaError_t Test_SSSPProblem(Parameters &parameters, GraphT &graph, util::Location target = util::HOST)
+template <typename GraphT>
+cudaError_t Test_SSSP(Parameters &parameters, GraphT &graph, util::Location target = util::HOST)
 {
     cudaError_t retval = cudaSuccess;
 
     typedef gunrock::app::sssp::Problem<GraphT> ProblemT;
+    typedef gunrock::app::sssp::Enactor<ProblemT> EnactorT;
     ProblemT problem;
+    EnactorT enactor;
 
     retval = problem.Init(parameters, graph, target);
+    if (retval) return retval;
+    retval = enactor.InitSSSP(parameters, &problem, target);
     if (retval) return retval;
 
     retval = problem.Reset(0, target);
     if (retval) return retval;
+    retval = enactor.Reset(0, target);
+    if (retval) return retval;
+
+    retval = enactor.EnactSSSP(0);
+    if (retval) return retval;
 
     retval = problem.Release(target);
     if (retval) return retval;
+    retval = enactor.Release(target);
+    if (retval) return retval;
     return retval;
-}*/
+}
 
-template <typename GraphT>
+/*template <typename GraphT>
 cudaError_t Test_EnactorBase(Parameters &parameters, GraphT &graph, util::Location target = util::HOST)
 {
     cudaError_t retval = cudaSuccess;
@@ -423,7 +436,7 @@ cudaError_t Test_EnactorBase(Parameters &parameters, GraphT &graph, util::Locati
     typedef gunrock::app::EnactorBase<GraphT> EnactorT;
     EnactorT enactor("refactor");
 
-    retval = enactor.Init(parameters, /*0, 8, 8,*/ 2, NULL, 1024, target);
+    retval = enactor.Init(parameters,  2, NULL, 1024, target);
     if (retval) return retval;
 
     retval = enactor.Reset(target);
@@ -433,7 +446,7 @@ cudaError_t Test_EnactorBase(Parameters &parameters, GraphT &graph, util::Locati
     if (retval) return retval;
 
     return retval;
-}
+}*/
 
 int main(int argc, char* argv[])
 {
@@ -455,10 +468,10 @@ int main(int argc, char* argv[])
     if (retval) return 1;
     //retval = partitioner::UseParameters(parameters);
     //if (retval) return 2;
-    //retval = app::UseParameters(parameters);
+    retval = app::sssp::UseParameters(parameters);
     if (retval) return 3;
 
-    retval = app::UseParameters2(parameters);
+    retval = app::sssp::UseParameters2(parameters);
     if (retval) return 3;
 
     retval = parameters.Parse_CommandLine(argc, argv);
@@ -488,7 +501,7 @@ int main(int argc, char* argv[])
     if (retval) return 15;
     util::PrintMsg("====Test on HOST | DEVICE finished");*/
 
-    retval = Test_EnactorBase(parameters, graph, util::HOST);
+    /*retval = Test_EnactorBase(parameters, graph, util::HOST);
     if (retval) return 16;
     util::PrintMsg("====Test on HOST finished");
 
@@ -497,6 +510,18 @@ int main(int argc, char* argv[])
     util::PrintMsg("====Test on DEVICE finished");
 
     retval = Test_EnactorBase(parameters, graph, util::HOST | util::DEVICE);
+    if (retval) return 18;
+    util::PrintMsg("====Test on HOST | DEVICE finished");*/
+
+    retval = Test_SSSP(parameters, graph, util::HOST);
+    if (retval) return 16;
+    util::PrintMsg("====Test on HOST finished");
+
+    retval = Test_SSSP(parameters, graph, util::DEVICE);
+    if (retval) return 17;
+    util::PrintMsg("====Test on DEVICE finished");
+
+    retval = Test_SSSP(parameters, graph, util::HOST | util::DEVICE);
     if (retval) return 18;
     util::PrintMsg("====Test on HOST | DEVICE finished");
     return 0;
