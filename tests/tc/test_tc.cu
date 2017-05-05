@@ -134,6 +134,9 @@ cudaError_t RunTest(Info<VertexId, Value, SizeT> *info)
     CpuTimer cpu_timer; 
     cudaError_t retval             = cudaSuccess;
 
+
+    if(max_queue_sizing < 0) max_queue_sizing = 1.0;
+    if(max_in_sizing    < 0) max_in_sizing    = 1.0;  
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
     int* gpu_idx = new int[num_gpus];
@@ -155,7 +158,6 @@ cudaError_t RunTest(Info<VertexId, Value, SizeT> *info)
 
     // host results spaces
     if (!quiet_mode) { printf("\nTC TEST\n"); }
-
     // copy data from CPU to GPU initialize data members in DataSlice
     util::GRError(problem.Init(stream_from_host,
                                 graph,
@@ -184,6 +186,7 @@ cudaError_t RunTest(Info<VertexId, Value, SizeT> *info)
 
     for (int iter = 0; iter < iterations; ++iter)
     {
+//printf("in TC test: max_queue_sizing: %f, max_in_sizing:%f\n", max_queue_sizing, max_in_sizing);
         // reset values in DataSlice
         util::GRError(problem.Reset(
                           enactor.GetFrontierType(),

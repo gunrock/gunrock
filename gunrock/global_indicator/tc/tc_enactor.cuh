@@ -105,15 +105,16 @@ public:
      */
     virtual ~TCEnactor()
     {
-        Release();
+    //    Release();
     }
 
-    cudaError_t Release()
+/*    cudaError_t Release()
     {
         cudaError_t retval = cudaSuccess;
         if (retval = BaseEnactor::Release()) return retval;
         return retval;
     }
+*/
 
 
     template <
@@ -179,8 +180,8 @@ public:
         FrontierAttribute<SizeT> *attributes    = &this -> frontier_attribute[0];
         EnactorStats<SizeT>      *statistics    = &this -> enactor_stats[0];
         GraphSliceT              *graph_slice   = problem -> graph_slices[0];
-        DataSlice                *d_data_slice  = problem -> d_data_slices[0];
-        DataSlice                *data_slice    = problem -> data_slices[0];
+        DataSlice                *d_data_slice  = problem -> data_slices[0].GetPointer(util::DEVICE);
+        DataSlice                *data_slice    = problem -> data_slices[0].GetPointer(util::HOST);
         Frontier                 *queue         = &data_slice->frontier_queues[0];
         util::CtaWorkProgressLifetime<SizeT>
                                  *work_progress = &this -> work_progress[0];
@@ -188,7 +189,8 @@ public:
         ContextPtr                context       =  this -> context[0];
         cudaError_t               retval        = cudaSuccess;
         SizeT                    *d_scanned_edges = NULL;  // Used for LB
-
+        SizeT                     nodes         = graph_slice->nodes;
+        SizeT                     edges         = graph_slice->edges;
         // initialization
         //if (retval = EnactorBase<typename _Problem::SizeT, _DEBUG, _SIZE_CHECK>::Setup(
         //    problem,
@@ -196,16 +198,18 @@ public:
         //    AdvanceKernelPolicy::CTA_OCCUPANCY,
         //    FilterKernelPolicy::CTA_OCCUPANCY)) return retval;
 
-        if (retval = util::GRError(cudaMalloc(
-            (void**)&d_scanned_edges, graph_slice->edges * sizeof(SizeT)),
-            "Problem cudaMalloc d_scanned_edges failed", __FILE__, __LINE__))
+/*      if (data_slice -> scanned_edges[0].GetSize() == 0)
         {
-            return retval;
+            if (retval = data_slice -> scanned_edges[0].Allocate(edges, util::DEVICE))
+                return retval;
         }
+        else if (retval = data_slice -> scanned_edges[0].EnsureSize(edges))
+            return retval;*/
+        d_scanned_edges = data_slice -> scanned_edges[0].GetPointer(util::DEVICE);
 
         attributes->queue_index  = 0;
         attributes->selector     = 0;
-        attributes->queue_length = graph_slice->nodes;
+        attributes->queue_length = nodes;
         attributes->queue_reset  = true; 
 
         // TODO: Add TC algorithm here.
@@ -241,6 +245,9 @@ public:
 
         GreaterThan select_op(0);
 
+/*	if (retval = queue->keys[1].EnsureSize(
+	    graph_slice->edges, util::DEVICE));
+*/
         void *d_temp_storage = NULL;
         size_t temp_storage_bytes = 0;
         cub::DeviceSelect::If(d_temp_storage, temp_storage_bytes,
@@ -528,7 +535,7 @@ public:
 
         // end of the TC
 
-        if (d_scanned_edges) cudaFree(d_scanned_edges);
+//        if (d_scanned_edges) cudaFree(d_scanned_edges);
         return retval;
     }
 
