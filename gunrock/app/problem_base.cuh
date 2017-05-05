@@ -188,7 +188,7 @@ struct ProblemBase
     {
         cudaError_t retval = cudaSuccess;
         // Cleanup graph slices on the heap
-        if (sub_graphs + 0 != NULL && num_gpus != 1)
+        if (sub_graphs.GetPointer(util::HOST) != NULL && num_gpus != 1)
         {
             for (int i = 0; i < num_gpus; ++i)
             {

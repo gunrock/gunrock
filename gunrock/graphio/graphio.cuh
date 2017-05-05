@@ -15,6 +15,10 @@
 #pragma once
 
 #include <gunrock/util/parameters.h>
+#include <gunrock/graph/csr.cuh>
+#include <gunrock/graph/coo.cuh>
+#include <gunrock/graph/csc.cuh>
+#include <gunrock/graph/gp.cuh>
 #include <gunrock/graphio/market.cuh>
 #include <gunrock/graphio/rmat.cuh>
 #include <gunrock/graphio/rgg.cuh>
@@ -83,6 +87,46 @@ cudaError_t UseParameters(
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "rand seed to generate edge values, default is time(NULL)",
+        __FILE__, __LINE__);
+    if (retval) return retval;
+
+    retval = parameters.Use<long long>(
+        graph_prefix + "graph-nodes",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        1 << 10,
+        "Number of nodes",
+        __FILE__, __LINE__);
+    if (retval) return retval;
+
+    retval = parameters.Use<long long>(
+        graph_prefix + "graph-edges",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        (1 << 10) * 48,
+        "Number of edges",
+        __FILE__, __LINE__);
+    if (retval) return retval;
+
+    retval = parameters.Use<long long>(
+        graph_prefix + "graph-scale",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        10,
+        "Vertex scale",
+        __FILE__, __LINE__);
+    if (retval) return retval;
+
+    retval = parameters.Use<double>(
+        graph_prefix + "graph-edgefactor",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        48,
+        "edge factor",
+        __FILE__, __LINE__);
+    if (retval) return retval;
+
+    retval = parameters.Use<int>(
+        graph_prefix + "graph-seed",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        0,
+        "rand seed to generate the graph, default is time(NULL)",
         __FILE__, __LINE__);
     if (retval) return retval;
 

@@ -34,22 +34,6 @@ cudaError_t UseParameters(
 {
     cudaError_t retval = cudaSuccess;
 
-    retval = parameters.Use<long long>(
-        graph_prefix + "sw-nodes",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        1 << 10,
-        "Number of nodes",
-        __FILE__, __LINE__);
-    if (retval) return retval;
-
-    retval = parameters.Use<long long>(
-        graph_prefix + "sw-scale",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        10,
-        "Vertex scale",
-        __FILE__, __LINE__);
-    if (retval) return retval;
-
     retval = parameters.Use<double>(
         graph_prefix + "sw-p",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
@@ -63,14 +47,6 @@ cudaError_t UseParameters(
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         6,
         "k",
-        __FILE__, __LINE__);
-    if (retval) return retval;
-
-    retval = parameters.Use<int>(
-        graph_prefix + "sw-seed",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        0,
-        "rand seed to generate the small world graph, default is time(NULL)",
         __FILE__, __LINE__);
     if (retval) return retval;
 
@@ -97,10 +73,10 @@ cudaError_t Build(
     //using namespace boost;
     bool quiet = parameters.Get<bool>("quiet");
     //bool undirected = !parameters.Get<bool>(graph_prefix + "directed");
-    SizeT scale = parameters.Get<SizeT>(graph_prefix + "rgg-scale");
+    SizeT scale = parameters.Get<SizeT>(graph_prefix + "graph-scale");
     SizeT num_nodes = 1 << scale;
-    if (!parameters.UseDefault(graph_prefix + "sw-nodes"))
-        num_nodes = parameters.Get<SizeT>(graph_prefix + "sw-nodes");
+    if (!parameters.UseDefault(graph_prefix + "graph-nodes"))
+        num_nodes = parameters.Get<SizeT>(graph_prefix + "graph-nodes");
 
     double p = parameters.Get<double>(graph_prefix + "sw-p");
     SizeT k = parameters.Get<SizeT>(graph_prefix + "sw-k");
@@ -109,8 +85,8 @@ cudaError_t Build(
     double edge_value_min   = parameters.Get<double>(graph_prefix + "edge-value-min");
 
     int seed = time(NULL);
-    if (parameters.UseDefault(graph_prefix + "sw-seed"))
-        seed = parameters.Get<int>(graph_prefix + "sw-seed");
+    if (parameters.UseDefault(graph_prefix + "graph-seed"))
+        seed = parameters.Get<int>(graph_prefix + "graph-seed");
     unsigned int seed_ = seed + 2244;
     Engine engine(seed_);
     Distribution distribution(0.0, 1.0);

@@ -185,38 +185,6 @@ cudaError_t UseParameters(
 {
     cudaError_t retval = cudaSuccess;
 
-    retval = parameters.Use<long long>(
-        graph_prefix + "rmat-nodes",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        1 << 10,
-        "Number of nodes",
-        __FILE__, __LINE__);
-    if (retval) return retval;
-
-    retval = parameters.Use<long long>(
-        graph_prefix + "rmat-edges",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        (1 << 10) * 48,
-        "Number of edges",
-        __FILE__, __LINE__);
-    if (retval) return retval;
-
-    retval = parameters.Use<long long>(
-        graph_prefix + "rmat-scale",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        10,
-        "Vertex scale",
-        __FILE__, __LINE__);
-    if (retval) return retval;
-
-    retval = parameters.Use<double>(
-        graph_prefix + "rmat-edgefactor",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        48,
-        "edge factor for rmat generator",
-        __FILE__, __LINE__);
-    if (retval) return retval;
-
     retval = parameters.Use<double>(
         graph_prefix + "rmat-a",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
@@ -245,15 +213,7 @@ cudaError_t UseParameters(
         graph_prefix + "rmat-d",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0.05,
-        "d for rmat generator, default is 1 - a - b -c",
-        __FILE__, __LINE__);
-    if (retval) return retval;
-
-    retval = parameters.Use<int>(
-        graph_prefix + "rmat-seed",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        0,
-        "rand seed to generate the rmat graph, default is time(NULL)",
+        "d for rmat generator, default is 1 - a - b - c",
         __FILE__, __LINE__);
     if (retval) return retval;
 
@@ -294,15 +254,15 @@ cudaError_t Build(
 
     bool quiet = parameters.Get<bool>("quiet");
     //bool undirected = !parameters.Get<bool>(graph_prefix + "directed");
-    SizeT scale = parameters.Get<SizeT>(graph_prefix + "rmat-scale");
+    SizeT scale = parameters.Get<SizeT>(graph_prefix + "graph-scale");
     SizeT num_nodes = 1 << scale;
-    if (!parameters.UseDefault(graph_prefix + "rmat-nodes"))
-        num_nodes = parameters.Get<SizeT>(graph_prefix + "rmat-nodes");
+    if (!parameters.UseDefault(graph_prefix + "graph-nodes"))
+        num_nodes = parameters.Get<SizeT>(graph_prefix + "graph-nodes");
 
-    double edge_factor = parameters.Get<double>(graph_prefix + "rmat-edgefactor");
+    double edge_factor = parameters.Get<double>(graph_prefix + "graph-edgefactor");
     SizeT num_edges = num_nodes * edge_factor;
-    if (!parameters.UseDefault(graph_prefix + "rmat-edges"))
-        num_edges = parameters.Get<SizeT>(graph_prefix + "rmat-edges");
+    if (!parameters.UseDefault(graph_prefix + "graph-edges"))
+        num_edges = parameters.Get<SizeT>(graph_prefix + "graph-edges");
 
     double a0 = parameters.Get<double>(graph_prefix + "rmat-a");
     double b0 = parameters.Get<double>(graph_prefix + "rmat-b");
@@ -312,8 +272,8 @@ cudaError_t Build(
         d0 = parameters.Get<double>(graph_prefix + "rmat-d");
 
     int seed = time(NULL);
-    if (!parameters.UseDefault(graph_prefix + "rmat-seed"))
-        seed = parameters.Get<int>(graph_prefix + "rmat-seed");
+    if (!parameters.UseDefault(graph_prefix + "graph-seed"))
+        seed = parameters.Get<int>(graph_prefix + "graph-seed");
 
     double edge_value_range = parameters.Get<double>(graph_prefix + "edge-value-range");
     double edge_value_min   = parameters.Get<double>(graph_prefix + "edge-value-min");
