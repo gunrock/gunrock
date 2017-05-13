@@ -112,7 +112,7 @@ __global__ void Expand_Incoming_BFS (
 }
 
 template <
-    typename VertexId, 
+    typename VertexId,
     typename SizeT>
 struct LoadLabel {};
 
@@ -122,7 +122,7 @@ struct LoadLabel<int, SizeT>
     static __device__ __forceinline__ int Load
         (int *&d_labels, SizeT &pos)
     {
-        //return tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<int>::labels, pos); 
+        //return tex1Dfetch(gunrock::oprtr::cull_filter::LabelsTex<int>::labels, pos);
         return _ldg(d_labels + pos);
     }
 };
@@ -386,14 +386,14 @@ __global__ void From_Unvisited_Queue_Local(
     __shared__ typename BlockScanT::Temp_Space scan_space;
     __shared__ SizeT block_offset;
     SizeT x = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
-    const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;  
+    const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;
 
     while ((x - threadIdx.x) < num_local_vertices)
     {
         bool to_process = true;
         VertexId key = 0;
         SizeT output_pos = 0;
-        
+
         if (x < num_local_vertices)
         {
             key = d_local_vertices[x];
@@ -567,11 +567,11 @@ __global__ void Inverse_Expand(
                     discoverable = true;
                     parent = neighbor;
                     //printf("Found %lld from %lld, label = %lld\n",
-                    //(long long)key, (long long)neighbor, (long long)label);    
+                    //(long long)key, (long long)neighbor, (long long)label);
                     break;
                 }
             }
-                   
+
         }
 
         if (discoverable)
@@ -686,7 +686,7 @@ __global__ void Combind_Masks(
     const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
     int l_vertex_counter = 0;
     VertexId l_vertices[sizeof(MaskT) * 8];
-    
+
     if (threadIdx.x < num_gpus) s_mask_ins[threadIdx.x] = d_mask_ins[threadIdx.x];
     __syncthreads();
 
@@ -748,8 +748,8 @@ __global__ void Combind_Masks(
                 d_out_keys[output_pos + i] = l_vertices[i];
             }
         }
-        x += STRIDE; 
-    }   
+        x += STRIDE;
+    }
 }
 
 /*
@@ -783,7 +783,7 @@ struct BFSIteration : public IterationBase <
         false, true, false, true, Enactor::Problem::MARK_PREDECESSORS>
         BaseIteration;
 
-    /*   
+    /*
      * @brief FullQueue_Gather function.
      *
      * @param[in] thread_num Number of threads.
@@ -814,12 +814,12 @@ struct BFSIteration : public IterationBase <
         ContextPtr                     context,
         cudaStream_t                   stream)
     {
-        if (false)//(Problem::ENABLE_IDEMPOTENCE && (!Problem::MARK_PREDECESSORS) && 
+        if (false)//(Problem::ENABLE_IDEMPOTENCE && (!Problem::MARK_PREDECESSORS) &&
            // (data_slice -> num_gpus > 1) && (enactor_stats -> iteration > 0))
         {
             for (int gpu = 1; gpu < data_slice -> num_gpus; gpu++)
             {
-                data_slice -> in_masks[gpu] = 
+                data_slice -> in_masks[gpu] =
                     (MaskT*)(data_slice -> keys_in[enactor_stats -> iteration % 2][gpu].GetPointer(util::DEVICE));
                 //printf("%d\t \t %d, in_mask = %p\n",
                 //    thread_num, gpu, data_slice -> in_masks[gpu]);
@@ -843,12 +843,12 @@ struct BFSIteration : public IterationBase <
                 data_slice -> labels.GetPointer(util::DEVICE),
                 graph_slice -> partition_table.GetPointer(util::DEVICE));
             data_slice -> in_length_out.Move(util::DEVICE, util::HOST, 1, 0, stream);
-            if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream), 
+            if (enactor_stats -> retval = util::GRError(cudaStreamSynchronize(stream),
                 "cudaStreamSynchronize failed", __FILE__, __LINE__))
                 return;
             frontier_attribute -> queue_length = data_slice -> in_length_out[0];
         }
- 
+
          //if (data_slice -> previous_direction == FORWARD)
             data_slice -> num_visited_vertices += frontier_attribute -> queue_length;
         data_slice -> num_unvisited_vertices = graph_slice -> nodes - data_slice -> num_visited_vertices;
@@ -917,15 +917,15 @@ struct BFSIteration : public IterationBase <
         else {
             data_slice -> current_direction = data_slice -> direction_votes[iteration_];
         }
-        if (false) //(thread_num == 0 && enactor -> direction_optimized) 
+        if (false) //(thread_num == 0 && enactor -> direction_optimized)
             printf("%d\t %lld\t \t queue = %lld,\t pre_output = %lld,\t visited = %lld,\t "
                 "unvisited = %lld,\t predicted_forward = %.0f,\t predicted_backward = %.0f,\t "
                 "direction = %s, ratio = %.8f\n",
                 //" ratio2 = %.4f, ratio3 = %.4f, %.4f, ratio4 = %.4f, ratio5 = %.4f\n",
-                thread_num, enactor_stats -> iteration, 
+                thread_num, enactor_stats -> iteration,
                 (long long)frontier_attribute -> queue_length,
                 (long long)frontier_attribute -> output_length[0],
-                (long long)data_slice -> num_visited_vertices, 
+                (long long)data_slice -> num_visited_vertices,
                 (long long)data_slice -> num_unvisited_vertices,
                 predicted_forward_visits,
                 predicted_backward_visits,
@@ -935,9 +935,9 @@ struct BFSIteration : public IterationBase <
                 //data_slice -> num_visited_vertices * 1.0 / data_slice -> num_unvisited_vertices,
                 //data_slice -> num_unvisited_vertices * 1.0 / data_slice -> num_visited_vertices,
                 //frontier_attribute -> queue_length * 1.0 / data_slice -> num_unvisited_vertices,
-                //frontier_attribute -> queue_length * 1.0 * data_slice -> edges / data_slice -> nodes / 
+                //frontier_attribute -> queue_length * 1.0 * data_slice -> edges / data_slice -> nodes /
                 //(data_slice -> num_unvisited_vertices * 1.0 * data_slice -> nodes / data_slice -> num_visited_vertices));
-    }  
+    }
 
     /*
      * @brief SubQueue_Core function.
@@ -992,7 +992,7 @@ struct BFSIteration : public IterationBase <
             //    (Value)(enactor_stats -> iteration));
         }
 
-               
+
         //util::MemsetKernel<<<256, 256, 0, stream>>>(
         //    data_slice -> output_counter.GetPointer(util::DEVICE),
         //    0, frontier_attribute -> output_length[0]);
@@ -1008,7 +1008,7 @@ struct BFSIteration : public IterationBase <
         //    frontier_attribute -> queue_length,
         //    thread_num, enactor_stats -> iteration, -1, stream);
 
-#ifdef RECORD_PER_ITERATION_STATS        
+#ifdef RECORD_PER_ITERATION_STATS
         GpuTimer gpu_timer;
 #endif
         if (data_slice -> current_direction == FORWARD)
@@ -1027,7 +1027,7 @@ struct BFSIteration : public IterationBase <
             }
 
             // Edge Map
-#ifdef RECORD_PER_ITERATION_STATS 
+#ifdef RECORD_PER_ITERATION_STATS
             gpu_timer.Start();
 #endif
             gunrock::oprtr::advance::LaunchKernel
@@ -1060,7 +1060,7 @@ struct BFSIteration : public IterationBase <
                 false);
 
 #ifdef RECORD_PER_ITERATION_STATS
-                gpu_timer.Stop(); 
+                gpu_timer.Stop();
                 float elapsed = gpu_timer.ElapsedMillis();
                 float mteps = frontier_attribute->output_length[0] / (elapsed*1000);
                 enactor_stats->per_iteration_advance_time.push_back(elapsed);
@@ -1096,7 +1096,7 @@ struct BFSIteration : public IterationBase <
             //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
             //    return;
             //printf("%d\t %lld\t %lld\t Queue_Length = %lld, array_size = %lld\n",
-            //    thread_num, (long long)-1, (long long)enactor_stats -> iteration, 
+            //    thread_num, (long long)-1, (long long)enactor_stats -> iteration,
             //    (long long)frontier_attribute -> queue_length,
             //    (long long)frontier_queue -> keys[frontier_attribute -> selector^1].GetSize());
             //fflush(stdout);
@@ -1111,7 +1111,7 @@ struct BFSIteration : public IterationBase <
                 if (enactor -> debug)
                     util::cpu_mt::PrintMessage("Filter begin.",
                         thread_num, enactor_stats->iteration);
-                
+
                 gunrock::oprtr::filter::LaunchKernel
                     <FilterKernelPolicy, Problem, Functor> (
                     enactor_stats[0],
@@ -1235,8 +1235,8 @@ struct BFSIteration : public IterationBase <
             } else {
                 data_slice -> num_unvisited_vertices = data_slice -> split_lengths[0];
             }
-            //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("unvisited0", 
-            //    data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE), 
+            //util::cpu_mt::PrintGPUArray<SizeT, VertexId>("unvisited0",
+            //    data_slice -> unvisited_vertices[frontier_attribute -> selector].GetPointer(util::DEVICE),
             //    num_unvisited_vertices, data_slice -> gpu_idx, enactor_stats -> iteration, -1, stream);
 
             data_slice -> split_lengths[0] = 0;
@@ -1249,7 +1249,7 @@ struct BFSIteration : public IterationBase <
             num_blocks = data_slice -> num_unvisited_vertices / AdvanceKernelPolicy::THREADS + 1;
             if (num_blocks > 480) num_blocks = 480;
 
-#ifdef RECORD_PER_ITERATION_STATS 
+#ifdef RECORD_PER_ITERATION_STATS
             gpu_timer.Start();
 #endif
             Inverse_Expand<Problem, AdvanceKernelPolicy>
@@ -1271,7 +1271,7 @@ struct BFSIteration : public IterationBase <
                 data_slice -> preds.GetPointer(util::DEVICE));
 
 #ifdef RECORD_PER_ITERATION_STATS
-                gpu_timer.Stop(); 
+                gpu_timer.Stop();
                 float elapsed = gpu_timer.ElapsedMillis();
                 enactor_stats->per_iteration_advance_time.push_back(elapsed);
                 enactor_stats->per_iteration_advance_mteps.push_back(-1.0f);
@@ -1375,7 +1375,7 @@ struct BFSIteration : public IterationBase <
         DataSlice      *h_data_slice,
         EnactorStats<SizeT> *enactor_stats)
     {
-        if (false) //(Problem::ENABLE_IDEMPOTENCE && !Problem::MARK_PREDECESSORS && h_data_slice -> num_gpus > 1) 
+        if (false) //(Problem::ENABLE_IDEMPOTENCE && !Problem::MARK_PREDECESSORS && h_data_slice -> num_gpus > 1)
         {
             out_length[peer_] = num_elements;
             //printf("%d\t %lld\t %d\t incoming length = %d\n",
@@ -1553,8 +1553,8 @@ struct BFSIteration : public IterationBase <
 
         if (!enactor -> size_check &&
             (!gunrock::oprtr::advance::hasPreScan<AdvanceKernelPolicy::ADVANCE_MODE>()))
-        {    
-            frontier_attribute -> output_length[0] = 0; 
+        {
+            frontier_attribute -> output_length[0] = 0;
             return;
         } else if (!gunrock::oprtr::advance::isFused<AdvanceKernelPolicy::ADVANCE_MODE>())
             //(AdvanceKernelPolicy::ADVANCE_MODE != gunrock::oprtr::advance::LB_CULL)
@@ -1599,7 +1599,7 @@ struct BFSIteration : public IterationBase <
         }
     }
 
-    /*   
+    /*
      * @brief Make_Output function.
      *
      * @tparam NUM_VERTEX_ASSOCIATES
@@ -1642,7 +1642,7 @@ struct BFSIteration : public IterationBase <
         {
             int num_blocks = (graph_slice -> nodes / 32 /  sizeof(MaskT)) / AdvanceKernelPolicy::THREADS + 1;
             if (num_blocks > 480) num_blocks = 480;
-            Update_Mask_Kernel<Problem> 
+            Update_Mask_Kernel<Problem>
                 <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>(
                 graph_slice -> nodes,
                 data_slice -> old_mask.GetPointer(util::DEVICE),
@@ -2235,12 +2235,12 @@ public:
                 LBAdvanceKernelPolicy     , FilterKernelPolicy,
                 LBAdvanceKernelPolicy_IDEM, FilterKernelPolicy,
                 ENABLE_IDEMPOTENCE> I_SWITCH;
- 
+
         static cudaError_t Enact(Enactor &enactor, VertexId src)
         {
             return I_SWITCH::Enact(enactor, src);
         }
-        
+
         static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
         {
             return I_SWITCH::Init(enactor, context, problem, max_grid_size);
@@ -2254,12 +2254,12 @@ public:
                 TWCAdvanceKernelPolicy     , FilterKernelPolicy,
                 TWCAdvanceKernelPolicy_IDEM, FilterKernelPolicy,
                 ENABLE_IDEMPOTENCE> I_SWITCH;
- 
+
         static cudaError_t Enact(Enactor &enactor, VertexId src)
         {
             return I_SWITCH::Enact(enactor, src);
         }
-        
+
         static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
         {
             return I_SWITCH::Init(enactor, context, problem, max_grid_size);
@@ -2273,12 +2273,12 @@ public:
                 LB_LIGHT_AdvanceKernelPolicy     , FilterKernelPolicy,
                 LB_LIGHT_AdvanceKernelPolicy_IDEM, FilterKernelPolicy,
                 ENABLE_IDEMPOTENCE> I_SWITCH;
- 
+
         static cudaError_t Enact(Enactor &enactor, VertexId src)
         {
             return I_SWITCH::Enact(enactor, src);
         }
-        
+
         static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
         {
             return I_SWITCH::Init(enactor, context, problem, max_grid_size);
@@ -2292,12 +2292,12 @@ public:
                 LB_CULL_AdvanceKernelPolicy     , FilterKernelPolicy,
                 LB_CULL_AdvanceKernelPolicy_IDEM, FilterKernelPolicy,
                 ENABLE_IDEMPOTENCE> I_SWITCH;
- 
+
         static cudaError_t Enact(Enactor &enactor, VertexId src)
         {
             return I_SWITCH::Enact(enactor, src);
         }
-        
+
         static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
         {
             return I_SWITCH::Init(enactor, context, problem, max_grid_size);
@@ -2311,12 +2311,12 @@ public:
                 LB_LIGHT_CULL_AdvanceKernelPolicy     , FilterKernelPolicy,
                 LB_LIGHT_CULL_AdvanceKernelPolicy_IDEM, FilterKernelPolicy,
                 ENABLE_IDEMPOTENCE> I_SWITCH;
- 
+
         static cudaError_t Enact(Enactor &enactor, VertexId src)
         {
             return I_SWITCH::Enact(enactor, src);
         }
-        
+
         static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
         {
             return I_SWITCH::Init(enactor, context, problem, max_grid_size);

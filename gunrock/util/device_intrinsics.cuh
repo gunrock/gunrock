@@ -22,7 +22,7 @@
 
 #if __CUDACC_VER_MAJOR__ < 8
 // atomic addition from Jon Cohen at NVIDIA
-__device__ static double atomicAdd(double *addr, double val)
+__device__ static __forceinline__ double atomicAdd(double *addr, double val)
 {
     double old=*addr, assumed;
     do {
@@ -36,7 +36,7 @@ __device__ static double atomicAdd(double *addr, double val)
 }
 #endif
 
-__device__ static long long atomicCAS(long long *addr, long long comp, long long val)
+__device__ static __forceinline__ long long atomicCAS(long long *addr, long long comp, long long val)
 {
     return (long long)atomicCAS(
         (unsigned long long*)addr,
@@ -45,31 +45,38 @@ __device__ static long long atomicCAS(long long *addr, long long comp, long long
 }
 
 // TODO: verify overflow condition
-__device__ static long long atomicAdd(long long *addr, long long val)
+__device__ static __forceinline__ long long atomicAdd(long long *addr, long long val)
 {
     return (long long)atomicAdd(
         (unsigned long long*)addr,
         (unsigned long long )val);
 }
 
-#if __GR_CUDA_ARCH__ <= 300
 // TODO: only works if both *addr and val are non-negetive
-/*__device__ static signed long long int atomicMin(signed long long int* addr, signed long long int val)
+__device__ static __forceinline__ long long atomicMin_(long long* addr, long long val)
 {
-    unsigned long long int pre_value = (unsigned long long int)val;
-    unsigned long long int old_value = (unsigned long long int)val;
+#if __CUDA_ARCH__ <= 300
+    long long pre_value = val;
+    long long old_value = val;
     while (true)
     {
-        old_value = atomicCAS((unsigned long long int*)addr, pre_value, (unsigned long long int)val);
-        if (old_value <= (unsigned long long int)val) break;
+        old_value = atomicCAS(addr, pre_value, val);
+        if (old_value <= val) break;
         if (old_value == pre_value) break;
         pre_value = old_value;
     }
     return old_value;
-}*/
+#else
+    return atomicMin(addr, val);
 #endif
+}
 
-__device__ static float atomicMin(float* addr, float val)
+__device__ static __forceinline__ int atomicMin_(int* addr, int val)
+{
+    return atomicMin(addr, val);
+}
+
+__device__ static __forceinline__ float atomicMin(float* addr, float val)
 {
     int* addr_as_int = (int*)addr;
     int old = *addr_as_int;
@@ -86,7 +93,7 @@ __device__ __forceinline__ T _ldg(T* addr)
 {
 #if __GR_CUDA_ARCH__ >= 350
     return __ldg(addr);
-#else 
+#else
     return *addr;
 #endif
 }

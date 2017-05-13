@@ -68,12 +68,12 @@ struct BFSFunctor {
         if (!Problem::ENABLE_IDEMPOTENCE)
         {
             // Check if the destination node has been claimed as someone's child
-#if __GR_CUDA_ARCH__ >= 350
-            VertexId old_label= atomicMin(d_data_slice -> labels + d_id, /*new_*/label);
+//#if __GR_CUDA_ARCH__ >= 350
+            VertexId old_label= atomicMin_(d_data_slice -> labels + d_id, /*new_*/label);
             result = label < old_label;
-#else
-            result = false;
-#endif
+//#else
+//            result = false;
+//#endif
         }
         return result;
     }
