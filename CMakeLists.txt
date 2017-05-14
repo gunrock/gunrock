@@ -340,7 +340,7 @@ add_test(NAME TEST_SSSP COMMAND sssp market
 set_tests_properties(TEST_SSSP PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 
 add_test(NAME TEST_PAGERANK COMMAND pr market
-  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --normalized --compensate --undirected)
 set_tests_properties(TEST_PAGERANK PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 
 add_test(NAME TEST_TOPK COMMAND topk market
