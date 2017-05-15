@@ -24,6 +24,9 @@ int main(int argc, char* argv[])
     //                       5, 6, 1, 2, 5, 6, 2, 3, 4, 6, 3, 4, 5};
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
+    
+    // CC() implementation assumes that the input graph is undirected (via. edge
+    // doubling). 
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     graphi->num_nodes   = num_nodes;
     graphi->num_edges   = num_edges;
