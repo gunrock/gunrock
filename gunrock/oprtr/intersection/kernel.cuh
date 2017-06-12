@@ -514,14 +514,20 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     typedef typename KernelPolicy::VertexId     VertexId;
     typedef typename KernelPolicy::Value        Value;
 
-    /*void *d_temp_storage = NULL;
+    void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
-    SizeT *d_total_count = NULL;
-    SizeT total_counts[1] = {0};
+    long long *d_total = NULL;
+    long long *d_tc_count = NULL;
+    long long total[1] = {0};
+    long long tc_count[1] = {0};
     util::GRError(cudaMalloc(
-                    &d_total_count,
-                    sizeof(SizeT)),
-                    "Total count cudaMalloc failed.", __FILE__, __LINE__);*/
+                    (void**)&d_total,
+                    sizeof(long long)),
+                    "Total count cudaMalloc failed.", __FILE__, __LINE__);
+    util::GRError(cudaMalloc(
+                    (void**)&d_tc_count,
+                    sizeof(long long)),
+                    "TC count cudaMalloc failed.", __FILE__, __LINE__);
 
     size_t stride = (input_length + KernelPolicy::BLOCKS * KernelPolicy::THREADS - 1)
                         >> (KernelPolicy::LOG_THREADS + KernelPolicy::LOG_BLOCKS);
@@ -546,30 +552,46 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     util::DisplayDeviceResults(&d_output_counts[input_length/4],10);
     util::DisplayDeviceResults(&d_output_counts[input_length/8*3],10);*/
 
-    /*cub::DeviceReduce::Sum(d_temp_storage,
+    cub::DeviceReduce::Sum(d_temp_storage,
                                   temp_storage_bytes,
                                   d_output_counts,
-                                  &d_total_count[0],
-                                  10);
+                                  d_tc_count,
+                                  input_length);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
     
     cub::DeviceReduce::Sum(d_temp_storage,
                                   temp_storage_bytes,
                                   d_output_counts,
-                                  &d_total_count[0],
-                                  10);*/
+                                  d_tc_count,
+                                  input_length);
 
-    /*util::GRError(cudaMemcpy( total_counts,
-    &d_total_count[0], sizeof(SizeT),
+    util::GRError(cudaMemcpy( tc_count,
+    d_tc_count, sizeof(long long),
+    cudaMemcpyDeviceToHost),"TC count cudaMemcpy failed.", __FILE__,
+    __LINE__);
+
+    cub::DeviceReduce::Sum(d_temp_storage,
+                                  temp_storage_bytes,
+                                  d_output_total,
+                                  d_total,
+                                  input_length);
+    cudaMalloc(&d_temp_storage, temp_storage_bytes);
+    
+    cub::DeviceReduce::Sum(d_temp_storage,
+                                  temp_storage_bytes,
+                                  d_output_total,
+                                  d_total,
+                                  input_length);
+
+    util::GRError(cudaMemcpy( total,
+    d_total, sizeof(long long),
     cudaMemcpyDeviceToHost),"Total count cudaMemcpy failed.", __FILE__,
-    __LINE__);*/
+    __LINE__);
 
-
-    long total = mgpu::Reduce(d_output_total, input_length, context);
-    long tc_count = mgpu::Reduce(d_output_counts, input_length, context);
-    printf("tc_total:%ld\n, tc_count:%ld\n", total, tc_count);
-    return (float)tc_count / (float)total;
-    //return total_counts[0];
+//    long total = mgpu::Reduce(d_output_total, input_length, context);
+//    long tc_count = mgpu::Reduce(d_output_counts, input_length, context);
+    printf("tc_total:%lld\n, tc_count:%lld\n", total[0], tc_count[0]);
+    return (float) 3.0 * tc_count[0]/(float) (total[0] * 1.0);
 }
 
 }  // intersection

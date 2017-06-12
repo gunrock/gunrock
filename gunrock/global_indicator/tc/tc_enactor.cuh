@@ -510,7 +510,7 @@ public:
         util::MemsetKernel<<<256, 1024>>>(d_output_triplets, (SizeT)0, graph_slice->edges);
 
         // Should make tc_count a member var to TCProblem
-        long tc_count = gunrock::oprtr::intersection::LaunchKernel
+        float cc = gunrock::oprtr::intersection::LaunchKernel
             <IntersectionKernelPolicy, Problem, TCFunctor>(
             statistics[0],
             attributes[0],
@@ -531,7 +531,7 @@ public:
 
         //tc_count /= 3;
 
-        printf("tc count:%ld\n", tc_count);
+        printf("clustering coefficient:%f\n", cc);
 
         // end of the TC
 
