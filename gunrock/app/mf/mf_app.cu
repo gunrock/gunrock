@@ -34,14 +34,10 @@ using namespace gunrock::app::mf;
 struct MF_Parameter : gunrock::app::TestParameter_Base
 {
 public:
-    bool   mark_predecessors;
-    int    delta_factor;
     double max_queue_sizing1;
 
     MF_Parameter()
     {
-        delta_factor      =    32;
-        mark_predecessors = false;
         max_queue_sizing1 =  -1.0;
     }
 
@@ -65,33 +61,8 @@ public:
 template <
     typename VertexId,
     typename SizeT,
-    typename Value,
-    bool MARK_PREDECESSORS >
+    typename Value>
 float runMF(GRGraph* output, MF_Parameter *parameter);
-
-/**
- * @brief Run test
- *
- * @tparam VertexId   Vertex identifier type
- * @tparam Value      Attribute type
- * @tparam SizeT      Graph size type
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- *
- * \return Elapsed run time in milliseconds
- */
-template <
-    typename    VertexId,
-    typename    SizeT,
-    typename    Value>
-float markPredecessorsMF(GRGraph* output, MF_Parameter *parameter)
-{
-    if (parameter->mark_predecessors)
-        return runMF<VertexId, SizeT, Value, true>(output, parameter);
-    else
-        return runMF<VertexId, SizeT, Value, false>(output, parameter);
-}
 
 /**
  * @brief Run test
@@ -109,20 +80,12 @@ float markPredecessorsMF(GRGraph* output, MF_Parameter *parameter)
 template <
     typename VertexId,
     typename SizeT,
-    typename Value,
-    bool MARK_PREDECESSORS >
+    typename Value>
 float runMF(GRGraph* output, MF_Parameter *parameter)
 {
-    typedef MFProblem < VertexId,
-            SizeT,
-            Value,
-            MARK_PREDECESSORS > Problem;
+    typedef MFProblem <VertexId, SizeT, Value> Problem;
 
-    typedef MFEnactor < Problem>
-            //INSTRUMENT,
-            //DEBUG,
-            //SIZE_CHECK >
-            Enactor;
+    typedef MFEnactor <Problem> Enactor;
 
     Csr<VertexId, SizeT, Value>
         *graph = (Csr<VertexId, SizeT, Value>*)parameter->graph;
@@ -140,15 +103,15 @@ float runMF(GRGraph* output, MF_Parameter *parameter)
     float         partition_factor   = parameter -> partition_factor;
     int           partition_seed     = parameter -> partition_seed;
     bool          g_stream_from_host = parameter -> g_stream_from_host;
-    int           delta_factor       = parameter -> delta_factor;
     std::string   traversal_mode     = parameter -> traversal_mode;
     bool          instrument         = parameter -> instrumented;
     bool          debug              = parameter -> debug;
     bool          size_check         = parameter -> size_check;
     size_t       *org_size           = new size_t[num_gpus];
-    // Allocate host-side distance arrays
-    Value    *h_distances = new Value[graph->nodes];
-    VertexId *h_preds  = MARK_PREDECESSORS ? new VertexId[graph->nodes] : NULL;
+
+    // Allocate host-side excess arrays
+    Value   *h_excess   = new Value[graph->nodes];
+
     if (max_queue_sizing < 1.2) max_queue_sizing=1.2;
 
     for (int gpu = 0; gpu < num_gpus; gpu++)
@@ -168,17 +131,16 @@ float runMF(GRGraph* output, MF_Parameter *parameter)
             gpu_idx,
             partition_method,
             streams,
-            delta_factor,
             max_queue_sizing,
             max_in_sizing,
             partition_factor,
             partition_seed),
         "Problem MF Initialization Failed", __FILE__, __LINE__);
 
-    Enactor* enactor = new Enactor(
-        num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
+    Enactor* enactor = new Enactor(num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
+
     util::GRError(
-        enactor->Init (context, problem, max_grid_size, traversal_mode),
+        enactor->Init(context, problem, max_grid_size, traversal_mode),
         "MF Enactor init failed", __FILE__, __LINE__);
 
     // Perform MF
@@ -205,11 +167,10 @@ float runMF(GRGraph* output, MF_Parameter *parameter)
 
     // Copy out results
     util::GRError(
-        problem->Extract(h_distances, h_preds),
+        problem->Extract(h_excess),
         "MF Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    output->node_value1 = (Value*)&h_distances[0];
-    if (MARK_PREDECESSORS) output->node_value2 = (VertexId*)&h_preds[0];
+    output->node_value1 = (Value*)&h_excess[0];
 
     if (!quiet)
     {
@@ -252,9 +213,7 @@ float dispatchMF(
     parameter->g_quiet  = config -> quiet;
     parameter->num_gpus = config -> num_devices;
     parameter->gpu_idx  = config -> device_list;
-    parameter->delta_factor = config -> delta_factor;
     parameter->traversal_mode = std::string(config -> traversal_mode);
-    parameter->mark_predecessors  = config -> mark_predecessors;
 
     float elapsed_time;
 
@@ -308,7 +267,7 @@ float dispatchMF(
                     printf(" source: %lld\n", (long long) parameter->src[0]);
                 }
 
-                elapsed_time = markPredecessorsMF<int, int, int>(grapho, parameter);
+                elapsed_time = runMF<int, int, int>(grapho, parameter);
 
                 // reset for free memory
                 csr.row_offsets    = NULL;
@@ -396,24 +355,22 @@ float gunrock_mf(
 /*
  * @brief Simple interface take in CSR arrays as input
  *
- * @param[out] distances   Return shortest distance to source per nodes
- * @param[in]  num_nodes   Number of nodes of the input graph
- * @param[in]  num_edges   Number of edges of the input graph
- * @param[in]  row_offsets CSR-formatted graph input row offsets
- * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  source      Source to begin traverse
+ * @param[out] excess       Return excess stored in each graph node
+ * @param[in]  num_nodes    Number of nodes of the input graph
+ * @param[in]  num_edges    Number of edges of the input graph
+ * @param[in]  row_offsets  CSR-formatted graph input row offsets
+ * @param[in]  col_indices  CSR-formatted graph input column indices
+ * @param[in]  source       Source to begin traverse
  */
 float mf(
-    unsigned int*       distances,
-    int*                preds,
+    unsigned int*       excess,
     const int           num_nodes,
     const int           num_edges,
     const int*          row_offsets,
     const int*          col_indices,
     const unsigned int* edge_values,
     const int           num_iters,
-    int*                source,
-    const bool          mark_preds)
+    int*                source)
 {
     struct GRTypes data_t;          // primitive-specific data types
     data_t.VTXID_TYPE = VTXID_INT;  // integer vertex identifier
@@ -421,7 +378,6 @@ float mf(
     data_t.VALUE_TYPE = VALUE_INT;  // integer attributes type
 
     struct GRSetup *config = InitSetup(num_iters, source);  // primitive-specific configures
-    config -> mark_predecessors = mark_preds;     // do not mark predecessors
 
     struct GRGraph *grapho = (struct GRGraph*)malloc(sizeof(struct GRGraph));
     struct GRGraph *graphi = (struct GRGraph*)malloc(sizeof(struct GRGraph));
@@ -433,9 +389,7 @@ float mf(
     graphi->edge_values = (void*)&edge_values[0];  // setting edge_values
 
     float elapsed_time = gunrock_mf(grapho, graphi, config, data_t);
-    memcpy(distances, (int*)grapho->node_value1, num_nodes * sizeof(int));
-    if (mark_preds)
-        memcpy(preds, (int*)grapho->node_value2, num_nodes * sizeof(int));
+    memcpy(excess, (int*)grapho->node_value1, num_nodes * sizeof(int));
 
     if (graphi) free(graphi);
     if (grapho) free(grapho);

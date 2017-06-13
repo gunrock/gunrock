@@ -99,7 +99,6 @@ void Usage()
         "                          determine based on average degree).\n"
         "[--partition-method=<random|biasrandom|clustered|metis>]\n"
         "                          Choose partitioner (Default use random).\n"
-        "[--delta_factor=<factor>] Delta factor for delta-stepping MF.\n"
         "[--quiet]                 No output (unless --json is specified).\n"
         "[--json]                  Output JSON-format statistics to STDOUT.\n"
         "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"
@@ -116,9 +115,12 @@ void Usage()
  *
  * @param[in] num_nodes Number of nodes in the graph.
  */
-template<typename VertexId, typename SizeT>
-void DisplaySolution (SizeT num_nodes)
+template<typename Value, typename VertexId>
+void DisplaySolution (Value* excess, VertexId sinkId)
 {
+    printf("An amount of flow pushed from the source towards the sink: [");
+    PrintValue(excess[sinkId]);
+    printf("]\n");
 }
 
 /******************************************************************************
@@ -142,8 +144,7 @@ void DisplaySolution (SizeT num_nodes)
 template <
     typename VertexId,
     typename SizeT,
-    typename Value,
-    bool     MARK_PREDECESSORS >
+    typename Value>
 void ReferenceMF(
     const Csr<VertexId, SizeT, Value> &graph,
     Value                             *node_values,
@@ -170,14 +171,10 @@ void ReferenceMF(
 template <
     typename VertexId,
     typename SizeT,
-    typename Value,
-    bool MARK_PREDECESSORS >
+    typename Value>
 cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 {
-    typedef MFProblem < VertexId,
-            SizeT,
-            Value,
-            MARK_PREDECESSORS > Problem;
+    typedef MFProblem < VertexId, SizeT, Value> Problem;
 
     typedef MFEnactor < Problem > Enactor;
 
@@ -200,7 +197,6 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     bool        debug               = info->info["debug_mode"       ].get_bool ();
     bool        size_check          = info->info["size_check"       ].get_bool ();
     int         iterations          = info->info["num_iteration"    ].get_int  ();
-    int         delta_factor        = info->info["delta_factor"     ].get_int  ();
     std::string src_type            = info->info["source_type"      ].get_str  (); 
     int      src_seed               = info->info["source_seed"      ].get_int  ();
     int      communicate_latency    = info->info["communicate_latency"].get_int (); 
@@ -213,7 +209,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
 
     CpuTimer    cpu_timer;
-    cudaError_t retval              = cudaSuccess;
+    cudaError_t retval = cudaSuccess;
     if (max_queue_sizing < 1.2) max_queue_sizing=1.2;
 
     cpu_timer.Start();
@@ -226,12 +222,10 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     cudaStream_t *streams = (cudaStream_t*)info->streams;
 
     // Allocate host-side array (for both reference and GPU-computed results)
-    Value    *reference_labels      = new Value[graph->nodes];
-    Value    *h_labels              = new Value[graph->nodes];
-    Value    *reference_check_label = (quick_mode) ? NULL : reference_labels;
-    VertexId *reference_preds       = MARK_PREDECESSORS ? new VertexId[graph->nodes] : NULL;
-    VertexId *h_preds               = MARK_PREDECESSORS ? new VertexId[graph->nodes] : NULL;
-    VertexId *reference_check_pred  = (quick_mode || !MARK_PREDECESSORS) ? NULL : reference_preds;
+    Value *h_excess      = new Value[graph->nodes];
+    Value *reference_labels = new Value[graph->nodes];
+    Value *reference_check_label = (quick_mode) ? NULL : reference_labels;
+    Value *reference_check_pred = NULL;
 
     size_t *org_size = new size_t[num_gpus];
     for (int gpu = 0; gpu < num_gpus; gpu++)
@@ -252,7 +246,6 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         gpu_idx,
         partition_method,
         streams,
-        delta_factor,
         max_queue_sizing,
         max_in_sizing,
         partition_factor,
@@ -261,8 +254,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         return retval;
 
     // Allocate MF enactor map
-    Enactor* enactor = new Enactor(
-        num_gpus, gpu_idx, instrument, debug, size_check);
+    Enactor* enactor = new Enactor(num_gpus, gpu_idx, instrument, debug, size_check);
     if (retval = util::GRError(enactor->Init(
         context, problem, max_grid_size, traversal_mode),
         "MF Enactor Init failed", __FILE__, __LINE__))
@@ -366,7 +358,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     if (!quick_mode)
     {
         if (!quiet_mode) { printf("Computing reference value ...\n"); }
-        ReferenceMF<VertexId, SizeT, Value, MARK_PREDECESSORS>(
+        ReferenceMF<VertexId, SizeT, Value>(
             *graph,
             reference_check_label,
             reference_check_pred,
@@ -377,62 +369,42 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     cpu_timer.Start();
     // Copy out results
-    if (retval = util::GRError(problem->Extract(h_labels, h_preds),
-        "MF Problem Data Extraction Failed", __FILE__, __LINE__))
+    if (retval = util::GRError(problem->Extract(h_excess),
+        "MF Problem Data Extraction of excess array Failed", __FILE__, __LINE__))
         return retval;
 
     if (!quiet_mode)
     {
+        //BAD temporary value of sinkID !!!
+        VertexId sinkId = 0;
         // Display Solution
-        DisplaySolution<VertexId, SizeT>(graph->nodes);
+        DisplaySolution(h_excess, sinkId);
     }
 
+    // Vertify the result
+    // NONE here!!!!???
+
     // Clean up
-    if (org_size        ) {delete[] org_size        ; org_size         = NULL;}
-    if (enactor         )
-    {
-        if (retval = util::GRError(enactor -> Release(),
-            "BFS Enactor Release failed", __FILE__, __LINE__))
-            return retval;
-        delete   enactor         ; enactor          = NULL;
+    if (org_size){
+        delete[] org_size; org_size = NULL;
     }
-    if (problem         )
-    {
-        if (retval = util::GRError(problem -> Release(),
-            "BFS Problem Release failed", __FILE__, __LINE__))
-            return retval;
-        delete   problem         ; problem          = NULL;
+    if (enactor){
+        if (retval = util::GRError(enactor->Release(), "BFS Enactor Release failed", __FILE__, __LINE__)) return retval;
+        delete enactor; enactor = NULL;
     }
+    if (problem){
+        if (retval = util::GRError(problem -> Release(), "BFS Problem Release failed", __FILE__, __LINE__)) return retval;
+        delete problem; problem = NULL;
+    }
+    if (h_excess)
+        delete[] h_excess; h_excess = NULL;
+    if (reference_labels)
+        delete[] reference_labels; reference_labels = NULL;
     cpu_timer.Stop();
     info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
     return retval;
 }
 
-/**
- * @brief RunTests entry
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- *
- * @param[in] info Pointer to info contains parameters and statistics.
- *
- * \return cudaError_t object which indicates the success of
- * all CUDA function calls.
- */
-template <
-    typename    VertexId,
-    typename    SizeT,
-    typename    Value>
-cudaError_t RunTests_mark_predecessors(Info<VertexId, SizeT, Value> *info)
-{
-    if (info->info["mark_predecessors"].get_bool())
-        return RunTests<VertexId, SizeT, Value, /*INSTRUMENT,
-                 DEBUG, SIZE_CHECK,*/ true>(info);
-    else
-        return RunTests<VertexId, SizeT, Value, /*INSTRUMENT,
-                 DEBUG, SIZE_CHECK,*/ false>(info);
-}
 
 /******************************************************************************
 * Main
@@ -463,7 +435,7 @@ int main_(CommandLineArgs *args)
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
-    cudaError_t retval = RunTests_mark_predecessors<VertexId, SizeT, Value>(info);  // run test
+    cudaError_t retval = RunTests<VertexId, SizeT, Value>(info);  // run test
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
 

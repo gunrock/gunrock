@@ -35,6 +35,17 @@ namespace gunrock {
 namespace app {
 namespace mf {
 
+/**
+ * @brief Expand incoming function.
+ *
+ * @tparam KernelPolicy
+ * @tparam NUM_VERTEX_ASSOCIATES
+ * @tparam NUM_VALUE__ASSOCIATES
+ *
+ * @param[in] label
+ * @param[in]
+ **/
+
 template <
     typename KernelPolicy,
     int      NUM_VERTEX_ASSOCIATES,
@@ -48,9 +59,11 @@ __global__ void Expand_Incoming_Kernel(
     typename KernelPolicy::Value    *d_value__associate_in,
     typename KernelPolicy::SizeT    *d_out_length,
     typename KernelPolicy::VertexId *d_keys_out,
-    typename KernelPolicy::VertexId *d_preds,
-    typename KernelPolicy::Value    *d_distances,
-    typename KernelPolicy::VertexId *d_labels)
+    typename KernelPolicy::Value    *d_flow,
+    typename KernelPolicy::Value    *d_height,
+    typename KernelPolicy::Value    *d_capacity,
+    typename KernelPolicy::Value    *d_excess
+    )
 {
     typedef typename KernelPolicy::VertexId VertexId;
     typedef typename KernelPolicy::SizeT    SizeT;
@@ -85,8 +98,9 @@ __global__ void Expand_Incoming_Kernel(
         {
             output_pos += block_offset;
             d_keys_out[output_pos] = key;
-            if (NUM_VERTEX_ASSOCIATES == 1 && d_distances[key] == value)
-                d_preds[key] = d_vertex_associate_in[x];
+            /*todo something with that 
+               if (NUM_VERTEX_ASSOCIATES == 1 && d_distances[key] == value)
+                d_preds[key] = d_vertex_associate_in[x];*/
         }
         x += STRIDE;
     }
@@ -110,8 +124,8 @@ struct MFIteration : public IterationBase <
     false,//true , // HAS_SUBQ, whether to use SubQ_Core
     true,//false, // HAS_FULLQ, whether to use FullQ_Core
     false, // BACKWARD, whether communication goes backward
-    true , // FORWARD , whether communicaiton goes forward
-    Enactor::Problem::MARK_PATHS>//MARK_PREDECESSORS, whether to mark predecessors
+    true, // FORWARD , whether communicaiton goes forward
+    false> //MARK_PREDECESSORS
 {
     typedef typename Enactor::SizeT     SizeT     ;
     typedef typename Enactor::Value     Value     ;
@@ -127,7 +141,7 @@ struct MFIteration : public IterationBase <
     typedef typename Functor::LabelT    LabelT    ;
     typedef IterationBase <
         AdvanceKernelPolicy, FilterKernelPolicy, Enactor,
-        false, true, false, true, Enactor::Problem::MARK_PATHS>//MARK_PREDECESSORS>
+        false, true, false, true, false>//MARK_PREDECESSORS>
                                         BaseIteration;
 
     /*
@@ -219,63 +233,67 @@ struct MFIteration : public IterationBase <
      *
      */
     template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
-    static void Expand_Incoming(
-        Enactor        *enactor,
-        cudaStream_t    stream,
-        VertexId        iteration,
-        int             peer_,
-        SizeT           received_length,
-        SizeT           num_elements,
-        util::Array1D<SizeT, SizeT    > &out_length,
-        util::Array1D<SizeT, VertexId > &keys_in,
-        util::Array1D<SizeT, VertexId > &vertex_associate_in,
-        util::Array1D<SizeT, Value    > &value__associate_in,
-        util::Array1D<SizeT, VertexId > &keys_out,
-        util::Array1D<SizeT, VertexId*> &vertex_associate_orgs,
-        util::Array1D<SizeT, Value   *> &value__associate_orgs,
-        DataSlice      *h_data_slice,
-        EnactorStats<SizeT> *enactor_stats)
-    {
-        bool over_sized = false;
-        if (enactor -> problem -> unified_receive)
+        static void Expand_Incoming(
+                Enactor*                            enactor,
+                cudaStream_t                        stream,
+                VertexId                            iteration,
+                int                                 peer_,
+                SizeT                               received_length,
+                SizeT                               num_elements,
+                util::Array1D<SizeT, SizeT    >&    out_length,
+                util::Array1D<SizeT, VertexId >&    keys_in,
+                util::Array1D<SizeT, VertexId >&    vertex_associate_in,
+                util::Array1D<SizeT, Value    >&    value__associate_in,
+                util::Array1D<SizeT, VertexId >&    keys_out,
+                util::Array1D<SizeT, VertexId*>&    vertex_associate_orgs,
+                util::Array1D<SizeT, Value   *>&    value__associate_orgs,
+                DataSlice*                          h_data_slice,
+                EnactorStats<SizeT>*                enactor_stats
+                )
         {
-            if (enactor_stats -> retval = Check_Size<SizeT, VertexId>(
-                enactor -> size_check, "incoming_queue",
-                num_elements + received_length,
-                &keys_out, over_sized, h_data_slice -> gpu_idx, iteration, peer_, true))
-                return;
-            received_length += num_elements;
-        } else {
-            if (enactor_stats -> retval = Check_Size<SizeT, VertexId>(
-                enactor -> size_check, "incomping_queue",
-                num_elements,
-                &keys_out, over_sized, h_data_slice -> gpu_idx, iteration, peer_))
-                return;
-            out_length[peer_] =0;
-            out_length.Move(util::HOST, util::DEVICE, 1, peer_, stream);
-        }
+            bool over_sized = false;
+            if (enactor -> problem -> unified_receive)
+            {
+                if (enactor_stats -> retval = Check_Size<SizeT, VertexId>(
+                            enactor -> size_check, "incoming_queue",
+                            num_elements + received_length,
+                            &keys_out, over_sized, h_data_slice -> gpu_idx, iteration, peer_, true))
+                    return;
+                received_length += num_elements;
+            } else {
+                if (enactor_stats -> retval = Check_Size<SizeT, VertexId>(
+                            enactor -> size_check, "incomping_queue",
+                            num_elements,
+                            &keys_out, over_sized, h_data_slice -> gpu_idx, iteration, peer_))
+                    return;
+                out_length[peer_] =0;
+                out_length.Move(util::HOST, util::DEVICE, 1, peer_, stream);
+            }
 
-        int num_blocks = num_elements / AdvanceKernelPolicy::THREADS / 2+ 1;
-        if (num_blocks > 240) num_blocks = 240;
-        Expand_Incoming_Kernel
-            <AdvanceKernelPolicy, NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
-            <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
-            (h_data_slice -> gpu_idx,
-            iteration,
-            num_elements,
-            keys_in.GetPointer(util::DEVICE),
-            vertex_associate_in.GetPointer(util::DEVICE),
-            value__associate_in.GetPointer(util::DEVICE),
-            out_length.GetPointer(util::DEVICE) + ((enactor -> problem -> unified_receive) ? 0: peer_),
-            keys_out.GetPointer(util::DEVICE),
-            h_data_slice -> preds.GetPointer(util::DEVICE),
-            h_data_slice -> distances.GetPointer(util::DEVICE),
-            h_data_slice -> labels.GetPointer(util::DEVICE));
+            int num_blocks = num_elements / AdvanceKernelPolicy::THREADS / 2+ 1;
+            if (num_blocks > 240) num_blocks = 240;
+            Expand_Incoming_Kernel
+                <AdvanceKernelPolicy, NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
+                <<<num_blocks, AdvanceKernelPolicy::THREADS, 0, stream>>>
+                (h_data_slice -> gpu_idx,
+                 iteration,
+                 num_elements,
+                 keys_in.GetPointer(util::DEVICE),
+                 vertex_associate_in.GetPointer(util::DEVICE),
+                 value__associate_in.GetPointer(util::DEVICE),
+                 out_length.GetPointer(util::DEVICE) + ((enactor -> problem -> unified_receive) ? 0: peer_),
+                 keys_out.GetPointer(util::DEVICE),
+                 h_data_slice -> flow.GetPointer(util::DEVICE),
+                 h_data_slice -> height.GetPointer(util::DEVICE),
+                 h_data_slice -> capacity.GetPointer(util::DEVICE),
+                 h_data_slice -> excess.GetPointer(util::DEVICE)
+            );
 
-        if (!enactor -> problem -> unified_receive)
+        if (!enactor->problem->unified_receive)
             out_length.Move(util::DEVICE, util::HOST, 1, peer_, stream);
         else out_length.Move(util::DEVICE, util::HOST, 1, 0, stream);
     }
+
     /*
      * @brief Compute output length of the resulted frontiers
      *
@@ -443,30 +461,27 @@ template <
     typename AdvanceKernelPolicy,
     typename FilterKernelPolicy,
     typename Enactor>
-static CUT_THREADPROC MFThread(
-    void * thread_data_)
+static CUT_THREADPROC MFThread(void * thread_data_)
 {
-    typedef typename Enactor::Problem    Problem   ;
-    typedef typename Enactor::SizeT      SizeT     ;
-    typedef typename Enactor::VertexId   VertexId  ;
-    typedef typename Enactor::Value      Value     ;
-    typedef typename Problem::DataSlice  DataSlice ;
-    typedef GraphSlice <VertexId, SizeT, Value>          GraphSliceT;
-    typedef MFFunctor<VertexId, SizeT, Value, Problem> Functor;
+    typedef typename Enactor::Problem                   Problem;
+    typedef typename Enactor::SizeT                     SizeT;
+    typedef typename Enactor::VertexId                  VertexId;
+    typedef typename Enactor::Value                     Value;
+    typedef typename Problem::DataSlice                 DataSlice;
+    typedef GraphSlice<VertexId, SizeT, Value>          GraphSliceT;
+    typedef MFFunctor<VertexId, SizeT, Value, Problem>  Functor;
 
-    ThreadSlice  *thread_data        =  (ThreadSlice*) thread_data_;
-    Problem      *problem            =  (Problem*)     thread_data -> problem;
-    Enactor      *enactor            =  (Enactor*)     thread_data -> enactor;
-    int           num_gpus           =   problem     -> num_gpus;
-    int           thread_num         =   thread_data -> thread_num;
-    int           gpu_idx            =   problem     -> gpu_idx            [thread_num] ;
-    DataSlice    *data_slice         =   problem     -> data_slices        [thread_num].GetPointer(util::HOST);
-    FrontierAttribute<SizeT>
-                 *frontier_attribute = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
-    EnactorStats<SizeT> *enactor_stats      = &(enactor     -> enactor_stats      [thread_num * num_gpus]);
+    ThreadSlice*                thread_data        = (ThreadSlice*) thread_data_;
+    Problem*                    problem            = (Problem*)     thread_data -> problem;
+    Enactor*                    enactor            = (Enactor*)     thread_data -> enactor;
+    int                         num_gpus           = problem     -> num_gpus;
+    int                         thread_num         = thread_data -> thread_num;
+    int                         gpu_idx            = problem     -> gpu_idx            [thread_num] ;
+    DataSlice*                  data_slice         = problem     -> data_slices        [thread_num].GetPointer(util::HOST);
+    FrontierAttribute<SizeT>*   frontier_attribute = &(enactor   -> frontier_attribute [thread_num * num_gpus]);
+    EnactorStats<SizeT>*        enactor_stats      = &(enactor   -> enactor_stats      [thread_num * num_gpus]);
 
-    if (enactor_stats[0].retval = util::SetDevice(gpu_idx))
-    {
+    if (enactor_stats[0].retval = util::SetDevice(gpu_idx)){
         thread_data -> status = ThreadSlice::Status::Ended;
         CUT_THREADEND;
     }
@@ -493,12 +508,10 @@ static CUT_THREADPROC MFThread(
         }
 
         gunrock::app::Iteration_Loop
-            <Enactor, Functor,
-            MFIteration<AdvanceKernelPolicy, FilterKernelPolicy, Enactor>,
-            Problem::MARK_PATHS ? 1:0, 1>
+            <Enactor, Functor, MFIteration<AdvanceKernelPolicy, FilterKernelPolicy, Enactor>, 0, 1>
             (thread_data);
         //printf("MF_Thread finished\n");fflush(stdout);
-        thread_data -> status = ThreadSlice::Status::Idle;
+        thread_data->status = ThreadSlice::Status::Idle;
     }
 
     thread_data -> status = ThreadSlice::Status::Ended;
