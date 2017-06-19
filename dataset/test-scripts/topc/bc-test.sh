@@ -1,9 +1,8 @@
 #!/bin/bash
 
-EXEDIR="../../../../gunrock_build/bin"
+EXEDIR=${1:-"../../../../gunrock_build/bin"}
+DATADIR=${2:-"/data/gunrock_dataset/large"}
 EXECUTION="bc"
-#DATADIR="../../large"
-DATADIR="/data/gunrock_dataset/large"
 SETTING=" --src=0 --iteration-num=10"
 NAME[0]="soc-LiveJournal1" && DO_A[0]="0.200"   && DO_B[0]="0.1" && T_MODE[0]="LB_CULL"
 NAME[1]="soc-orkut"        && DO_A[1]="0.012"   && DO_B[1]="0.1" && T_MODE[1]="LB_CULL"
