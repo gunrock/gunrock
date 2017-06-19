@@ -15,6 +15,8 @@
 
 #pragma once
 
+#include <gunrock/util/device_intrinsics.cuh>
+
 namespace gunrock {
 namespace util {
 
@@ -48,40 +50,40 @@ struct Block_Scan
         //UpSweep<int, LOG_WARP_THREADS>::Sweep(lane_local, lane_recv, lane_id);
         //UpSweep LOG_WIDTH = 5
         //if ((lane_id & 1) == 0)
-            lane_recv = __shfl_xor(lane_local, 1);
+            lane_recv = _shfl_xor(lane_local, 1);
         if ((lane_id & 1) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 4
-            lane_recv = __shfl_xor(lane_local, 2);
+            lane_recv = _shfl_xor(lane_local, 2);
         }
 
         if ((lane_id & 3) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 3
-            lane_recv = __shfl_xor(lane_local, 4);
+            lane_recv = _shfl_xor(lane_local, 4);
         }
 
         if ((lane_id & 7) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 2
-            lane_recv = __shfl_xor(lane_local, 8);
+            lane_recv = _shfl_xor(lane_local, 8);
         }
 
         if ((lane_id & 0xF) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 1
-            lane_recv = __shfl_xor(lane_local, 0x10);
+            lane_recv = _shfl_xor(lane_local, 0x10);
         }
 
         if (lane_id == 0)
         {
             lane_local += lane_recv;
         }
-        sum = __shfl(lane_local, 0);
+        sum = _shfl(lane_local, 0);
         if (lane_id == 0)
         {
             lane_recv =0;
@@ -90,22 +92,22 @@ struct Block_Scan
 
         //DownSweep<int, LOG_WARP_THREADS-2>::Sweep(lane_local, lane_recv, lane_id);
         //DownSweep LOG_WIDTH = 3
-        lane_recv = __shfl_up(lane_local, 8);
+        lane_recv = _shfl_up(lane_local, 8);
         if ((lane_id & 15) == 8)
             lane_local += lane_recv;
 
         //DownSweep LOG_WIDTH = 2
-        lane_recv = __shfl_up(lane_local, 4);
+        lane_recv = _shfl_up(lane_local, 4);
         if ((lane_id & 7) == 4)
             lane_local += lane_recv;
 
         //DownSweep LOG_WIDTH = 1
-        lane_recv = __shfl_up(lane_local, 2);
+        lane_recv = _shfl_up(lane_local, 2);
         if ((lane_id & 3) == 2)
             lane_local += lane_recv;
 
         //DownSweep LOG_WIDTH = 0
-        lane_recv = __shfl_up(lane_local, 1);
+        lane_recv = _shfl_up(lane_local, 1);
         if ((lane_id & 1) == 1)
             lane_local += lane_recv;
     }
@@ -120,33 +122,33 @@ struct Block_Scan
         //UpSweep<int, LOG_WARP_THREADS>::Sweep(lane_local, lane_recv, lane_id);
         //UpSweep LOG_WIDTH = 5
         //if ((lane_id & 1) == 0)
-            lane_recv = __shfl_xor(lane_local, 1);
+            lane_recv = _shfl_xor(lane_local, 1);
         if ((lane_id & 1) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 4
-            lane_recv = __shfl_xor(lane_local, 2);
+            lane_recv = _shfl_xor(lane_local, 2);
         }
 
         if ((lane_id & 3) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 3
-            lane_recv = __shfl_xor(lane_local, 4);
+            lane_recv = _shfl_xor(lane_local, 4);
         }
 
         if ((lane_id & 7) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 2
-            lane_recv = __shfl_xor(lane_local, 8);
+            lane_recv = _shfl_xor(lane_local, 8);
         }
 
         if ((lane_id & 0xF) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 1
-            lane_recv = __shfl_xor(lane_local, 0x10);
+            lane_recv = _shfl_xor(lane_local, 0x10);
         }
 
         if (lane_id == 0)
@@ -159,29 +161,29 @@ struct Block_Scan
 
         //DownSweep<int, LOG_WARP_THREADS-2>::Sweep(lane_local, lane_recv, lane_id);
         //DownSweep LOG_WIDTH = 3
-        lane_recv = __shfl_up(lane_local, 8);
+        lane_recv = _shfl_up(lane_local, 8);
         if ((lane_id & 15) == 8)
             lane_local += lane_recv;
 
         //DownSweep LOG_WIDTH = 2
-        lane_recv = __shfl_up(lane_local, 4);
+        lane_recv = _shfl_up(lane_local, 4);
         if ((lane_id & 7) == 4)
             lane_local += lane_recv;
 
         //DownSweep LOG_WIDTH = 1
-        lane_recv = __shfl_up(lane_local, 2);
+        lane_recv = _shfl_up(lane_local, 2);
         if ((lane_id & 3) == 2)
             lane_local += lane_recv;
 
         //DownSweep LOG_WIDTH = 0
-        lane_recv = __shfl_up(lane_local, 1);
+        lane_recv = _shfl_up(lane_local, 1);
         if ((lane_id & 1) == 1)
             lane_local += lane_recv;
     }
 
     static __device__ __forceinline__ void Warp_LogicScan(int thread_in, T &thread_out)
     {
-        unsigned int warp_flag = __ballot(thread_in);
+        unsigned int warp_flag = _ballot(thread_in);
         int lane_id = threadIdx.x & WARP_THREADS_MASK;
         unsigned int lane_mask = (1 << lane_id)-1;
         thread_out = __popc(warp_flag & lane_mask);
@@ -189,7 +191,7 @@ struct Block_Scan
 
     static __device__ __forceinline__ void Warp_LogicScan(int thread_in, T &thread_out, T &sum)
     {
-        unsigned int warp_flag = __ballot(thread_in);
+        unsigned int warp_flag = _ballot(thread_in);
         int lane_id = threadIdx.x & WARP_THREADS_MASK;
         unsigned int lane_mask = (1 << lane_id)-1;
         thread_out = __popc(warp_flag & lane_mask);

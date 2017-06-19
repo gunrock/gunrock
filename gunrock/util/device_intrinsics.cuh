@@ -20,6 +20,88 @@
 #include <gunrock/util/cuda_properties.cuh>
 //#include <gunrock/util/types.cuh>
 
+#define MEMBERMASK 0xffffffff
+#define WARPSIZE 32
+
+// CUDA 9 warp shuffles (device intrinsics)
+template <typename T>
+__device__ static __forceinline__
+T _shfl_up(T &lane_local, int delta, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
+{
+  int first_lane = (WARPSIZE-width) << 8;
+#if __CUDACC_VER_MAJOR__ < 9
+  return __shfl_up(lane_local, delta, first_lane);
+#else
+  return __shfl_up_sync(mask, lane_local, delta, first_lane);
+#endif
+}
+
+template <typename T>
+__device__ static __forceinline__
+T _shfl_down(T &lane_local, int delta, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
+{
+  int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
+#if __CUDACC_VER_MAJOR__ < 9
+  return __shfl_down(lane_local, delta, last_lane);
+#else
+  return __shfl_down_sync(mask, lane_local, delta, last_lane);
+#endif
+}
+
+template <typename T>
+__device__ static __forceinline__
+T _shfl_xor(T &lane_local, int lane_mask, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
+{
+  int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
+#if __CUDACC_VER_MAJOR__ < 9
+  return __shfl_xor(lane_local, lane_mask, last_lane);
+#else
+  return __shfl_xor_sync(mask, lane_local, lane_mask, last_lane);
+#endif
+}
+
+template <typename T>
+__device__ static __forceinline__
+T _shfl(T &lane_local, int source_lane, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
+{
+  int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
+#if __CUDACC_VER_MAJOR__ < 9
+  return __shfl(lane_local, source_lane, last_lane);
+#else
+  return __shfl_sync(mask, lane_local, source_lane, last_lane);
+#endif
+}
+
+__device__ static __forceinline__
+unsigned int _ballot(int predicate, unsigned int mask=MEMBERMASK)
+{
+#if __CUDACC_VER_MAJOR__ < 9
+  return __ballot(predicate);
+#else
+  return __ballot_sync(mask, predicate);
+#endif
+}
+
+__device__ static __forceinline__
+int _any(int predicate, unsigned int mask=MEMBERMASK)
+{
+#if __CUDACC_VER_MAJOR__ < 9
+  return ::__any(predicate);
+#else
+  return __any_sync(mask, predicate);
+#endif
+}
+
+__device__ static __forceinline__
+int _all(int predicate, unsigned int mask=MEMBERMASK)
+{
+#if __CUDACC_VER_MAJOR__ < 9
+  return ::__all(predicate);
+#else
+  return __all_sync(mask, predicate);
+#endif
+}
+
 #if __CUDACC_VER_MAJOR__ < 8
 // atomic addition from Jon Cohen at NVIDIA
 __device__ static double atomicAdd(double *addr, double val)

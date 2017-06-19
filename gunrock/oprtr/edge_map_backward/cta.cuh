@@ -355,7 +355,7 @@ namespace edge_map_backward {
                                     int warp_id = threadIdx.x >> GR_LOG_WARP_THREADS(KernelPolicy::CUDA_ARCH);
                                     int lane_id = util::LaneId();
 
-                                    while (::__any(tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD)) {
+                                    while (::_any(tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD)) {
                                         if (tile->row_length[LOAD][VEC] >= KernelPolicy::WARP_GATHER_THRESHOLD) {
                                             // All threads inside one warp vie for control of the warp
                                             cta->smem_storage.state.warp_comm[warp_id][0] = lane_id;
