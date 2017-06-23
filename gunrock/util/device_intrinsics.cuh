@@ -26,54 +26,54 @@
 // CUDA 9 warp shuffles (device intrinsics)
 template <typename T>
 __device__ static __forceinline__
-T _shfl_up(T &lane_local, int delta, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
+T _shfl_up(T var, unsigned int delta, int width=WARPSIZE, unsigned mask=MEMBERMASK)
 {
-  int first_lane = (WARPSIZE-width) << 8;
+  //int first_lane = (WARPSIZE-width) << 8;
 #if __CUDACC_VER_MAJOR__ < 9
-  return __shfl_up(lane_local, delta, first_lane);
+  return __shfl_up(var, delta, width);
 #else
-  return __shfl_up_sync(mask, lane_local, delta, first_lane);
+  return __shfl_up_sync(mask, var, delta, width);
 #endif
 }
 
 template <typename T>
 __device__ static __forceinline__
-T _shfl_down(T &lane_local, int delta, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
+T _shfl_down(T var, unsigned int delta, int width=WARPSIZE, unsigned mask=MEMBERMASK)
 {
-  int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
+  //int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
 #if __CUDACC_VER_MAJOR__ < 9
-  return __shfl_down(lane_local, delta, last_lane);
+  return __shfl_down(var, delta, width);
 #else
-  return __shfl_down_sync(mask, lane_local, delta, last_lane);
+  return __shfl_down_sync(mask, var, delta, width);
 #endif
 }
 
 template <typename T>
 __device__ static __forceinline__
-T _shfl_xor(T &lane_local, int lane_mask, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
+T _shfl_xor(T var, int lane_mask, int width=WARPSIZE, unsigned mask = MEMBERMASK)
 {
-  int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
+  //int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
 #if __CUDACC_VER_MAJOR__ < 9
-  return __shfl_xor(lane_local, lane_mask, last_lane);
+  return __shfl_xor(var, lane_mask, width);
 #else
-  return __shfl_xor_sync(mask, lane_local, lane_mask, last_lane);
+  return __shfl_xor_sync(mask, var, lane_mask, width);
 #endif
 }
 
 template <typename T>
 __device__ static __forceinline__
-T _shfl(T &lane_local, int source_lane, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
+T _shfl(T var, int source_lane, int width=WARPSIZE, unsigned mask=MEMBERMASK)
 {
-  int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
+  //int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
 #if __CUDACC_VER_MAJOR__ < 9
-  return __shfl(lane_local, source_lane, last_lane);
+  return __shfl(var, source_lane, width);
 #else
-  return __shfl_sync(mask, lane_local, source_lane, last_lane);
+  return __shfl_sync(mask, var, source_lane, width);
 #endif
 }
 
 __device__ static __forceinline__
-unsigned int _ballot(int predicate, unsigned int mask=MEMBERMASK)
+unsigned _ballot(int predicate, unsigned mask=MEMBERMASK)
 {
 #if __CUDACC_VER_MAJOR__ < 9
   return __ballot(predicate);
@@ -83,20 +83,20 @@ unsigned int _ballot(int predicate, unsigned int mask=MEMBERMASK)
 }
 
 __device__ static __forceinline__
-int _any(int predicate, unsigned int mask=MEMBERMASK)
+int _any(int predicate, unsigned mask=MEMBERMASK)
 {
 #if __CUDACC_VER_MAJOR__ < 9
-  return ::__any(predicate);
+  return __any(predicate);
 #else
   return __any_sync(mask, predicate);
 #endif
 }
 
 __device__ static __forceinline__
-int _all(int predicate, unsigned int mask=MEMBERMASK)
+int _all(int predicate, unsigned mask=MEMBERMASK)
 {
 #if __CUDACC_VER_MAJOR__ < 9
-  return ::__all(predicate);
+  return __all(predicate);
 #else
   return __all_sync(mask, predicate);
 #endif
