@@ -16,5 +16,8 @@ target_link_libraries(shared_lib_pr gunrock)
 add_executable(shared_lib_sssp shared_lib_sssp.c)
 target_link_libraries(shared_lib_sssp gunrock)
 
+add_executable(shared_lib_mf shared_lib_mf.c)
+target_link_libraries(shared_lib_mf gunrock)
+
 add_executable(shared_lib_example simple_example.c)
 target_link_libraries(shared_lib_example gunrock)
