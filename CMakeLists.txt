@@ -357,9 +357,9 @@ add_test(NAME TEST_SSSP COMMAND sssp market
   ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx --undirected --src=0)
 set_tests_properties(TEST_SSSP PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
-add_test(NAME TEST_MF COMMAND mf market
-  ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx --undirected --src=0)
-set_tests_properties(TEST_MF PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
+#add_test(NAME TEST_MF COMMAND mf market
+#  ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx --undirected --src=0)
+#set_tests_properties(TEST_MF PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
 add_test(NAME TEST_PAGERANK COMMAND pr market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
@@ -391,9 +391,9 @@ add_test(NAME SHARED_LIB_TEST_SSSP COMMAND shared_lib_sssp)
 set_tests_properties(SHARED_LIB_TEST_SSSP
   PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Label.*39.*")
 
-add_test(NAME SHARED_LIB_TEST_MF COMMAND shared_lib_mf)
-set_tests_properties(SHARED_LIB_TEST_MF
-  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Label.*39.*")
+#add_test(NAME SHARED_LIB_TEST_MF COMMAND shared_lib_mf)
+#set_tests_properties(SHARED_LIB_TEST_MF
+#  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Label.*39.*")
 
 add_test(NAME SHARED_LIB_TEST_PAGERANK COMMAND shared_lib_pr)
 set_tests_properties(SHARED_LIB_TEST_PAGERANK
