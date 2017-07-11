@@ -29,6 +29,8 @@
 #include <gunrock/app/sm/sm_problem.cuh>
 #include <gunrock/app/sm/sm_functor.cuh>
 
+#include <moderngpu.cuh>
+#include <cub/cub.cuh>
 
 //using namespace gunrock::app;
 using namespace mgpu;
@@ -38,6 +40,22 @@ namespace gunrock {
 namespace app {
 namespace sm {
 
+/// Selection functor type
+struct GreaterThan
+{
+    int compare;
+
+    __host__ __device__ __forceinline__
+        GreaterThan(int compare) : compare(compare) {}
+
+    __host__ __device__ __forceinline__
+        bool operator()(const int &a) const {
+            return (a > compare);
+        }
+};
+
+using namespace mgpu;
+using namespace cub;
 
 /**
  * @brief SM enactor class.
@@ -68,7 +86,7 @@ public:
         int   num_gpus   = 1,  
         int  *gpu_idx    = NULL,
         bool  instrument = false,
-        bool  debug      = false,
+        bool  debug      = true,
         bool  size_check = true) :
         BaseEnactor(
             EDGE_FRONTIERS, num_gpus, gpu_idx,
@@ -134,11 +152,11 @@ public:
     cudaError_t EnactSM()
     {
         // Define functors for primitive
-        // Fill d_c_set for each data node
         typedef SMInitFunctor   <VertexId, SizeT, Value, Problem> SMInitFunctor;
-        // Select candidate edges
-        typedef SMFunctor       <VertexId, SizeT, Value, Problem> SMFunctor;
-        
+        typedef SMFilterFunctor <VertexId, SizeT, Value, Problem> SMFilterFunctor;
+        typedef SMDistributeFunctor  <VertexId, SizeT, Value, Problem> SMDistributeFunctor;
+//        typedef SMiBFSFunctor   <VertexId, SizeT, Value, Problem> SMiBFSFunctor;
+        typedef typename SMInitFunctor::LabelT      LabelT;
         typedef util::DoubleBuffer  <VertexId, SizeT, Value> Frontier;
         typedef GraphSlice          <VertexId, SizeT, Value> GraphSliceT;
     
@@ -164,10 +182,10 @@ public:
 
         if (data_slice -> scanned_edges[0].GetSize() == 0)
         {
-            if (retval = data_slice -> scanned_edges[0].Allocate(edges, util::DEVICE))
+            if (retval = data_slice -> scanned_edges[0].Allocate(edges*data_slice->nodes_query, util::DEVICE))
                 return retval;
         }
-        else if (retval = data_slice -> scanned_edges[0].EnsureSize(edges))
+        else if (retval = data_slice -> scanned_edges[0].EnsureSize(edges*data_slice->nodes_query))
             return retval;
         d_scanned_edges = data_slice -> scanned_edges[0].GetPointer(util::DEVICE);
 
@@ -181,28 +199,76 @@ public:
             util::DisplayDeviceResults(
                 graph_slice->row_offsets.GetPointer(util::DEVICE),
                 graph_slice->nodes + 1);
+            util::DisplayDeviceResults(
+                graph_slice->column_indices.GetPointer(util::DEVICE),
+                graph_slice->edges);
         }
         
         attributes->queue_index  = 0;
         attributes->selector     = 0;
         attributes->queue_length = nodes;
         attributes->queue_reset  = true;
+        printf("edges:%d\n", edges);
 
 //     for(int i=0; i<2; i++)  // filter candidate nodes and edges for a few iterations
 //     {
-
+        // hard to update csr graph 
+        gunrock::oprtr::filter::LaunchKernel
+                    <FilterKernelPolicy, Problem, SMInitFunctor>(
+                    statistics[0],
+                    attributes[0],
+                    (VertexId) statistics -> iteration,
+                    data_slice,
+                    d_data_slice,
+                    (SizeT*)NULL, //vertex markers
+                    (unsigned char*)NULL, // visited_mask
+                    //(VertexId*)NULL, //keys_in
+                    //(VertexId*)NULL,
+                    queue->keys[attributes->selector  ].GetPointer(util::DEVICE),
+                    queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+                    (Value*   )NULL,
+                    (Value*   )NULL,
+                    graph_slice->edges,
+                    graph_slice->nodes,
+                    work_progress[0],
+                    context[0],
+                    stream,
+                    //graph_slice->nodes,
+                    //util::MaxValue<SizeT>(),
+                    queue->keys[attributes->selector  ].GetSize(),
+                    queue->keys[attributes->selector^1].GetSize(),
+                    statistics -> filter_kernel_stats,
+                    false, //By-Pass
+                    false //skip_marking
+                    );
+                    
+        if (debug_info)
+        {
+             if (retval = util::GRError(cudaStreamSynchronize(stream),
+                            "SMInit Filter::LaunchKernel failed", __FILE__, __LINE__)) 
+                    return retval;
+           /*  util::DisplayDeviceResults(
+                    queue->keys[attributes->selector].GetPointer(util::DEVICE),
+                    queue->keys[attributes->selector].GetSize());
+             util::DisplayDeviceResults(
+                    queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+                    queue->keys[attributes->selector^1].GetSize());*/
+        }
+        attributes->selector = attributes->selector^1;
+        attributes->queue_index++;
         gunrock::oprtr::advance::LaunchKernel
                     <AdvanceKernelPolicy, Problem, SMInitFunctor, gunrock::oprtr::advance::V2V>(
                     statistics[0],
                     attributes[0],
                     //statistics -> iteration + 1,
-                    typename SMInitFunctor::LabelT(),
+                    util::InvalidValue<LabelT>(),
+                    //typename SMInitFunctor::LabelT(),
                     data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
                     (bool*    )NULL,
-                    d_scanned_edges,  
+                    d_scanned_edges,
                     queue->keys[attributes->selector  ].GetPointer(util::DEVICE),
                     queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
                     (Value*   )NULL,
@@ -222,28 +288,128 @@ public:
 
         if (debug_info)
         {
-           if (retval = util::GRError(cudaStreamSynchronize(stream),
-                        "SMInit Advance::LaunchKernel failed", __FILE__, __LINE__)) 
-                return retval;
+             if (retval = util::GRError(cudaStreamSynchronize(stream),
+                            "SMInit Advance::LaunchKernel failed", __FILE__, __LINE__)) 
+                    return retval;
+/*             util::DisplayDeviceResults(
+                    queue->keys[attributes->selector].GetPointer(util::DEVICE),
+                    queue->keys[attributes->selector].GetSize());
+             util::DisplayDeviceResults(
+                    queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+                    queue->keys[attributes->selector^1].GetSize());*/
         }
 
-
-        attributes->queue_index  = 0;
-        attributes->selector     = 0;
-        attributes->queue_length = graph_slice->nodes;
-        attributes->queue_reset  = false;
-
-        gunrock::oprtr::advance::LaunchKernel
-                    <AdvanceKernelPolicy, Problem, SMFunctor, gunrock::oprtr::advance::V2V>(
+//        attributes->selector = attributes->selector^1;
+        gunrock::oprtr::filter::LaunchKernel
+                    <FilterKernelPolicy, Problem, SMFilterFunctor>(
                     statistics[0],
                     attributes[0],
-                    statistics -> iteration + 1,
+                    (VertexId) statistics -> iteration,
+                    //typename SMInitFunctor::LabelT(),
+                    data_slice,
+                    d_data_slice,
+                    (SizeT*)NULL, //vertex markers
+                    (unsigned char*)NULL, // visited_mask
+                    //(VertexId*)NULL, //keys_in
+                    //(VertexId*)NULL,
+                    queue->keys[attributes->selector  ].GetPointer(util::DEVICE),
+                    queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+                    (Value*   )NULL,
+                    (Value*   )NULL,
+                    //graph_slice->edges,
+                    attributes->queue_length,
+                    graph_slice->nodes,
+                    work_progress[0],
+                    context[0],
+                    stream,
+                    //graph_slice->edges,
+                    //util::MaxValue<SizeT>(),
+                    queue->keys[attributes->selector  ].GetSize(),
+                    queue->keys[attributes->selector^1].GetSize(),
+                    statistics -> filter_kernel_stats,
+                    false, //By-Pass
+                    false //skip_marking
+                    );
+
+        if (debug_info)
+        {
+           if (retval = util::GRError(cudaStreamSynchronize(stream),
+                        "SMFilterFunctor Filter::LaunchKernel failed", __FILE__, __LINE__)) 
+                return retval;
+/*         util::DisplayDeviceResults(
+                queue->keys[attributes->selector].GetPointer(util::DEVICE),
+                queue->keys[attributes->selector].GetSize());
+         util::DisplayDeviceResults(
+                queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+                queue->keys[attributes->selector^1].GetSize());*/
+        }
+        attributes->selector = attributes->selector^1;
+        attributes->queue_index++;
+        gunrock::oprtr::filter::LaunchKernel
+                    <FilterKernelPolicy, Problem, SMDistributeFunctor>(
+                    statistics[0],
+                    attributes[0],
+                    (VertexId) statistics -> iteration,
+                    data_slice,
+                    d_data_slice,
+                    (SizeT*)NULL, //vertex markers
+                    (unsigned char*)NULL, // visited_mask
+                    //(VertexId*)NULL, //keys_in
+                    //(VertexId*)NULL,
+                    queue->keys[attributes->selector  ].GetPointer(util::DEVICE),
+                    queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+                    (Value*   )NULL,
+                    (Value*   )NULL,
+                    //graph_slice->edges,
+                    attributes->queue_length,
+                    graph_slice->nodes,
+                    work_progress[0],
+                    context[0],
+                    stream,
+                    //graph_slice->edges,
+                    //util::MaxValue<SizeT>(),
+                    queue->keys[attributes->selector  ].GetSize(),
+                    queue->keys[attributes->selector^1].GetSize(),
+                    statistics -> filter_kernel_stats,
+                    false, //By-Pass
+                    false //skip_marking
+                    );
+
+        if (debug_info)
+        {
+             if (retval = util::GRError(cudaStreamSynchronize(stream),
+                        "SMDistributeFunctor Filter::LaunchKernel failed", __FILE__, __LINE__)) 
+                return retval;
+     /*        util::DisplayDeviceResults(
+                    queue->keys[attributes->selector].GetPointer(util::DEVICE),
+                    queue->keys[attributes->selector].GetSize());
+             util::DisplayDeviceResults(
+                    queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+                    queue->keys[attributes->selector^1].GetSize());*/
+        }
+        attributes->selector = attributes->selector^1;
+for(SizeT i=0; i<data_slice->nodes_query-1; i++) {
+/*        printf("Before distribute queue length:%d\n", attributes->queue_length);
+            util::DisplayDeviceResults(
+                queue->keys[attributes->selector].GetPointer(util::DEVICE),
+                queue->keys[attributes->selector].GetSize());*/
+        util::MemsetKernel<<<128,128, 0, stream>>>(data_slice->d_src_node_id.GetPointer(util::DEVICE),
+                                                    0, graph_slice->edges);
+        attributes->queue_index++;
+       // if(i==0)
+        gunrock::oprtr::advance::LaunchKernel
+                    <AdvanceKernelPolicy, Problem, SMDistributeFunctor, gunrock::oprtr::advance::V2V>(
+                    statistics[0],
+                    attributes[0],
+                    //statistics -> iteration + 1,
+                    util::InvalidValue<LabelT>(),
+                    //typename SMInitFunctor::LabelT(),
                     data_slice,
                     d_data_slice,
                     (VertexId*)NULL,
                     (bool*    )NULL,
                     (bool*    )NULL,
-                    d_scanned_edges,  
+                    d_scanned_edges,
                     queue->keys[attributes->selector  ].GetPointer(util::DEVICE),
                     queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
                     (Value*   )NULL,
@@ -256,117 +422,236 @@ public:
                     graph_slice->edges,
                     work_progress[0],
                     context[0],
-                    stream);
+                    stream,
+                    false,
+                    false,
+                    true);
 
-        if (debug_info)
-        {
-           if (retval = util::GRError(cudaStreamSynchronize(stream),
-                        "SMFunctor Advance::LaunchKernel failed", __FILE__, __LINE__)) 
+        if(debug_info) {
+            if (retval = util::GRError(cudaStreamSynchronize(stream),
+                        "SMDistributeFunctor Adavance::LaunchKernel failed", __FILE__, __LINE__)) 
                 return retval;
         }
-        util::GreaterThan select_op(0);
+        GreaterThan select_op(0);
+        void *d_temp_storage = NULL;
+        size_t temp_storage_bytes = 0;
+        if(i==0){
+/*            printf("d_src_node_id before seg reduce:\n");
+            util::DisplayDeviceResults(
+                data_slice->d_src_node_id.GetPointer(util::DEVICE),
+                data_slice->d_src_node_id.GetSize());*/
+            util::MemsetKernel<<<128,128, 0, stream>>>(data_slice -> scanned_edges[0].GetPointer(util::DEVICE), 
+                                                        0, 
+                                                        data_slice->scanned_edges[0].GetSize());
+            // Calculate new src node ids to queue key selector^1
+            cub::DeviceSegmentedReduce::Sum(d_temp_storage, temp_storage_bytes,
+                data_slice->d_src_node_id.GetPointer(util::DEVICE),
+                data_slice -> scanned_edges[0].GetPointer(util::DEVICE), 
+                graph_slice->nodes,
+                graph_slice->row_offsets.GetPointer(util::DEVICE),
+                graph_slice->row_offsets.GetPointer(util::DEVICE)+1);
+            cudaMalloc(&d_temp_storage, temp_storage_bytes);
+            cub::DeviceSegmentedReduce::Sum(d_temp_storage, temp_storage_bytes,
+                data_slice->d_src_node_id.GetPointer(util::DEVICE),
+                data_slice -> scanned_edges[0].GetPointer(util::DEVICE), 
+                graph_slice->nodes,
+                graph_slice->row_offsets.GetPointer(util::DEVICE),
+                graph_slice->row_offsets.GetPointer(util::DEVICE)+1);
 
-	util::CUBSelect_if(
-       	      queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
-              graph_slice->column_indices.GetPointer(util::DEVICE), 
-	      data_slice ->d_query_row.GetPointer(util::DEVICE), // stores the number of selected edges
-              graph_slice->edges,
-              select_op);
+ /*           printf("seg reduce results:\n");
+            util::DisplayDeviceResults(
+                data_slice -> scanned_edges[0].GetPointer(util::DEVICE), 
+                data_slice->d_src_node_id.GetSize());*/
+                //queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+                //queue->keys[attributes->selector^1].GetSize());
 
-	util::CUBSegReduce_sum(
-        	data_slice->d_in                   .GetPointer(util::DEVICE),
-        	queue->values[attributes->selector].GetPointer(util::DEVICE), // output
-        	graph_slice->row_offsets	   .GetPointer(util::DEVICE),
-        	graph_slice->nodes);
+            util::MemsetKernel<<<128,128, 0, stream>>>(data_slice->d_src_node_id.GetPointer(util::DEVICE),
+                                                        -1, 
+                                                        data_slice->d_src_node_id.GetSize());
+            Scan<mgpu::MgpuScanTypeExc>(
+                data_slice -> scanned_edges[0].GetPointer(util::DEVICE), 
+                graph_slice->nodes+1,
+                (int)0,
+                mgpu::plus<int>(),
+                (int*)0,
+                (int*)0,
+                data_slice->d_src_node_id.GetPointer(util::DEVICE),
+                context[0]);
 
-        Scan<mgpu::MgpuScanTypeExc>(
-        queue->values[attributes->selector].GetPointer(util::DEVICE),
-        graph_slice->nodes+1,
-        (int)0,
-        mgpu::plus<int>(),
-        (int*)0,
-        (int*)0,
-	graph_slice->row_offsets.GetPointer(util::DEVICE), // Output new row_offsets
-        context[0]);
+/*            util::DisplayDeviceResults(
+                data_slice -> d_src_node_id.GetPointer(util::DEVICE), 
+                data_slice->d_src_node_id.GetSize());*/
+            util::MemsetKernel<<<128,128, 0, stream>>>(data_slice->scanned_edges[0].GetPointer(util::DEVICE),
+                                            -1, 
+                                            data_slice->scanned_edges[0].GetSize());
+            IntervalExpand(
+                graph_slice->edges/2,
+                data_slice->d_src_node_id.GetPointer(util::DEVICE), // Expand counts
+                queue->keys[attributes->selector].GetPointer(util::DEVICE), //Expand values
+                graph_slice->nodes,
+                data_slice -> scanned_edges[0].GetPointer(util::DEVICE), //outputs
+                context[0]);
+/*            printf("new src node ids:\n");
+            util::DisplayDeviceResults(
+                data_slice -> scanned_edges[0].GetPointer(util::DEVICE), //outputs
+                data_slice->d_src_node_id.GetSize());*/
+            //-----------------------------------------------------------------------------------------------------------
+            // Compact dest node ids to queue key selector
+            d_temp_storage = NULL;
+            temp_storage_bytes = 0;
+            util::MemsetKernel<<<128,128, 0, stream>>>(
+                                            queue->keys[attributes->selector].GetPointer(util::DEVICE),
+                                            -1, 
+                                            queue->keys[attributes->selector].GetSize());
+            cub::DeviceSelect::If(d_temp_storage, temp_storage_bytes,
+                queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+                queue->keys[attributes->selector].GetPointer(util::DEVICE),
+                data_slice -> num_subs.GetPointer(util::DEVICE),
+                queue->keys[attributes->selector^1].GetSize(),
+                select_op);
+            cudaMalloc(&d_temp_storage, temp_storage_bytes);
+            cub::DeviceSelect::If(d_temp_storage, temp_storage_bytes,
+                queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
+                queue->keys[attributes->selector].GetPointer(util::DEVICE),
+                data_slice -> num_subs.GetPointer(util::DEVICE),
+                queue->keys[attributes->selector^1].GetSize(),
+                select_op);
 
-        //util::debugScan<<<128,128, 0, stream>>>(graph_slice->row_offsets.GetPointer(util::DEVICE), graph_slice->nodes+1);
-      //}	
-	   
-	// Convert graph_slice -> row_offsets to edges_list source node list
-	// graph_slice -> column_indices is the dest node list itself
-        IntervalExpand(
-            edges/2, // number of outputs
-	    graph_slice->row_offsets.GetPointer(util::DEVICE), // expand counts
-            queue->keys[attributes->selector].GetPointer(util::DEVICE), // expand values
-            nodes,	// number of inputs
-	    queue->values[attributes->selector].GetPointer(util::DEVICE), // output src node list 
-            context[0]); 
+            if(debug_info)
+                if (retval = util::GRError(
+                        cudaStreamSynchronize(stream),
+                       "cub select iter 1 cudaStreamSynchronize failed", __FILE__, __LINE__)) return retval;
+/*            printf("prev dest node ids:\n");
+            util::DisplayDeviceResults(
+                queue->keys[attributes->selector^1].GetPointer(util::DEVICE), 
+                queue->keys[attributes->seelctor^1].GetSize());*/
+        }else{
+            // Compact dest node ids to queue key selector
+            if(graph_slice->edges > queue->keys[attributes->selector].GetSize()) printf("=========Error: cub out of bound============\n ");
+            d_temp_storage = NULL;
+            temp_storage_bytes = 0;
+            util::MemsetKernel<<<128,128, 0, stream>>>(
+                                            queue->keys[attributes->selector].GetPointer(util::DEVICE),
+                                            -1, 
+                                            queue->keys[attributes->selector].GetSize());
+            cub::DeviceSelect::If(d_temp_storage, temp_storage_bytes,
+                data_slice->d_src_node_id.GetPointer(util::DEVICE), 
+                queue->keys[attributes->selector].GetPointer(util::DEVICE),
+                data_slice -> num_subs.GetPointer(util::DEVICE),
+                graph_slice->edges, 
+                select_op);
+            cudaMalloc(&d_temp_storage, temp_storage_bytes);
+            cub::DeviceSelect::If(d_temp_storage, temp_storage_bytes,
+                data_slice->d_src_node_id.GetPointer(util::DEVICE), 
+                queue->keys[attributes->selector].GetPointer(util::DEVICE),
+                data_slice -> num_subs.GetPointer(util::DEVICE),
+                graph_slice->edges, 
+                select_op);
 
-            // froms stores the flags of candidate edges
-	    util::MemsetKernel<<<128,128, 0, stream>>>(
-	    	data_slice -> d_in.GetPointer(util::DEVICE),
-	    	(Value)0, data_slice -> edges_query * edges/2);
- //           util::debugLabel<<<128,128,0,stream>>>(data_slice -> d_in.GetPointer(util::DEVICE), data_slice -> edges_query * edges/2);
-	    // Label candidate edges for each query edge
-	    util::Label<<<128,128,0,stream>>>(
-	        queue->values[attributes->selector].GetPointer(util::DEVICE), //src node list
-	    	data_slice -> d_col_indices .GetPointer(util::DEVICE), // dest node list
-	    	data_slice -> froms_query   .GetPointer(util::DEVICE),
-	    	data_slice -> tos_query     .GetPointer(util::DEVICE),
-	    	data_slice -> d_c_set       .GetPointer(util::DEVICE),
-	    	data_slice -> d_in          .GetPointer(util::DEVICE),//label results
-		data_slice -> d_query_row   .GetPointer(util::DEVICE), 
-	    	data_slice -> edges_data,
-	    	data_slice -> edges_query);
-            
-//           util::debugLabel<<<128,128,0,stream>>>(data_slice -> d_in.GetPointer(util::DEVICE), data_slice -> edges_query * edges/2);
+            if(debug_info)
+                if (retval = util::GRError(
+                        cudaStreamSynchronize(stream),
+                       "cub select iter2 cudaStreamSynchronize failed", __FILE__, __LINE__)) return retval;
+/*            printf("prev dest node ids:\n");
+            util::DisplayDeviceResults(
+                data_slice->d_src_node_id.GetPointer(util::DEVICE), 
+                data_slice->d_src_node_id.GetSize());*/
+        }
+      /*  printf("new dest node ids:\n");
+        util::DisplayDeviceResults(
+            queue->keys[attributes->selector].GetPointer(util::DEVICE),
+            queue->keys[attributes->selector].GetSize());*/
 
-            util::MemsetKernel<<<128, 128, 0, stream>>>(
-            	data_slice -> d_query_col.GetPointer(util::DEVICE), 
-            	(Value)0, data_slice -> edges_query);
+        printf("#of partial results:\n");
+        util::DisplayDeviceResults(
+                data_slice->num_subs.GetPointer(util::DEVICE),
+                data_slice->num_subs.GetSize());
+
+        util::WriteToPartial<<<128, 128, 0, stream>>>(
+             data_slice -> scanned_edges[0].GetPointer(util::DEVICE),
+             queue->keys[attributes->selector].GetPointer(util::DEVICE),
+             data_slice -> d_src_node_id.GetPointer(util::DEVICE), 
+             data_slice -> num_subs.GetPointer(util::DEVICE),
+             i,
+             data_slice -> d_src_node_id.GetSize(), 
+             data_slice -> nodes_query,
+             data_slice -> d_partial.GetPointer(util::DEVICE));
+        
+        if(debug_info)
+            if (retval = util::GRError(
+                        cudaStreamSynchronize(stream),
+                       "Write to partial cudaStreamSynchronize failed", __FILE__, __LINE__)) return retval;
+
+        if(i>0){ 
+            //--------------------------------------------------------------------------------------
+            //Compact partial results (filter out those with uncomplete partial results)
+            util::MaskOut<<<128,128, 0, stream>>>(i+2,
+                                       data_slice->d_partial.GetSize(),
+                                       data_slice->d_partial.GetPointer(util::DEVICE));
+            if(debug_info)
+                if (retval = util::GRError(
+                        cudaStreamSynchronize(stream),
+                       "Mask out cudaStreamSynchronize failed", __FILE__, __LINE__)) return retval;
+    
+            util::MemsetKernel<<<128,128, 0, stream>>>(
+                data_slice -> scanned_edges[0].GetPointer(util::DEVICE),
+                (SizeT)(-1), data_slice -> scanned_edges[0].GetSize());
+
+            GreaterThan select_op1(-1);
+            d_temp_storage = NULL;
+            temp_storage_bytes = 0;
+            cub::DeviceSelect::If(d_temp_storage, temp_storage_bytes,
+                data_slice -> d_partial.GetPointer(util::DEVICE),
+                data_slice -> scanned_edges[0].GetPointer(util::DEVICE),
+                data_slice -> num_subs.GetPointer(util::DEVICE),
+                data_slice -> d_partial.GetSize(),
+                select_op1);
+            cudaMalloc(&d_temp_storage, temp_storage_bytes);
+            cub::DeviceSelect::If(d_temp_storage, temp_storage_bytes,
+                data_slice -> d_partial.GetPointer(util::DEVICE),
+                data_slice -> scanned_edges[0].GetPointer(util::DEVICE),
+                data_slice -> num_subs.GetPointer(util::DEVICE),
+                data_slice -> d_partial.GetSize(),
+                select_op1);
+
+            util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
+                data_slice->d_partial.GetPointer(util::DEVICE),
+                data_slice -> scanned_edges[0].GetPointer(util::DEVICE),
+                data_slice->d_partial.GetSize());
+
+/*            util::DisplayDeviceResults(
+                    data_slice -> scanned_edges[0].GetPointer(util::DEVICE),
+                    data_slice -> scanned_edges[0].GetSize());*/
+        }
+/*        printf("partial resutls:\n");
+            util::DisplayDeviceResults(
+                    data_slice->d_partial.GetPointer(util::DEVICE),
+                    data_slice->d_partial.GetSize());
+*/
+        util::MemsetKernel<<<1,1, 0, stream>>>(
+            data_slice -> counter.GetPointer(util::DEVICE),
+            i+2, 1);
+        // need to sync before printf the queue length, need to ++queue_index for current queue
+/*        if (retval = work_progress -> GetQueueLength(
+            attributes->queue_index,
+            attributes->queue_length,
+            false,
+            stream,
+            true)) return retval;
+        if (retval = util::GRError(
+                cudaStreamSynchronize(stream),
+               "cudaStreamSynchronize failed", __FILE__, __LINE__)) return retval;*/
+ //       printf("After distribute queue length:%d\n", attributes->queue_length);
+  //      attributes->queue_length *= 3; //TODO: should multiply average degree
+//        util::DisplayDeviceResults(
+//                data_slice->d_partial.GetPointer(util::DEVICE),
+//                data_slice->d_partial.GetSize());
+}
 
 
-	    util::MemsetIdxKernel<<<128, 128, 0, stream>>>(
-		data_slice -> d_c_set.GetPointer(util::DEVICE), data_slice-> edges_query * edges/2);
-
-	    util::CUBSelect_flagged(
-		data_slice -> d_c_set       .GetPointer(util::DEVICE),
-                data_slice -> d_in          .GetPointer(util::DEVICE),
-                data_slice -> d_in	    .GetPointer(util::DEVICE), //store middle results
-                data_slice -> d_query_col   .GetPointer(util::DEVICE), // d_query_col[0]
-		data_slice -> edges_query * data_slice -> edges_data/2);
-
-	    util::Update<<<128, 128, 0, stream>>>(
-                data_slice -> d_in 	    .GetPointer(util::DEVICE), //store middle results
-                data_slice -> d_query_col   .GetPointer(util::DEVICE), // d_query_col[0]
-		data_slice -> edges_data/2);
-
-	    util::MemsetKernel<<<128,128,0,stream>>>(
-	        data_slice -> d_query_row.GetPointer(util::DEVICE), (SizeT)0, 
-		data_slice -> nodes_query + 1);
-
-            util::MemsetKernel<<<128,128,0,stream>>>(
-                data_slice -> d_c_set.GetPointer(util::DEVICE), 
-                (VertexId)0, 
-	        data_slice -> edges_data * data_slice -> edges_query /2);
-
-         //   util::DisplayDeviceResults(
-         //       data_slice->d_in.GetPointer(util::DEVICE),
-	//	data_slice -> edges_query * data_slice -> edges_data/2);
-
-  	    util::Join<<<128, 128, 0, stream>>>(
-		    data_slice -> edges_data,
-		    data_slice -> edges_query,
-		    data_slice -> d_query_col  	       .GetPointer(util::DEVICE),
-                    data_slice -> counts               .GetPointer(util::DEVICE),
-                    data_slice -> flag                 .GetPointer(util::DEVICE),
-	    	    queue->values[attributes->selector].GetPointer(util::DEVICE), //can edge list 
-                    data_slice -> d_col_indices        .GetPointer(util::DEVICE),
-		    data_slice -> d_in		       .GetPointer(util::DEVICE), // can edge ids
-                    data_slice -> d_c_set 	       .GetPointer(util::DEVICE));// output
-
-            util::debug<<<128,128,0,stream>>>(data_slice->counts.GetPointer(util::DEVICE));
-
+        util::DisplayDeviceResults(
+                data_slice -> num_subs.GetPointer(util::DEVICE),
+                1);
         return retval;
     }
 

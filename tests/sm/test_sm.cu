@@ -44,7 +44,7 @@ using namespace gunrock::app;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
 using namespace gunrock::app::sm;
-
+using namespace std;
 ///////////////////////////////////////////////////////////////////////////////
 // Housekeeping and utility routines
 ///////////////////////////////////////////////////////////////////////////////
@@ -195,7 +195,8 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     bool     stream_from_host      = info->info["stream_from_host"  ].get_bool (); 
     bool     instrument            = info->info["instrument"        ].get_bool (); 
     bool     debug                 = info->info["debug_mode"        ].get_bool (); 
-    bool     size_check            = info->info["size_check"        ].get_bool (); 
+    bool     size_check            = info->info["size_check"        ].get_bool ();
+    bool     node_label            = info->info["node_value"        ].get_bool ();
 //    int      iterations            = 1; //disable since doesn't support mgpu stop condition. info->info["num_iteration"].get_int();
     if(max_queue_sizing < 0) max_queue_sizing = 1.0;
     if(max_in_sizing < 0) max_in_sizing = 1.0;
@@ -211,8 +212,8 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     ContextPtr   *context = (ContextPtr*  )info->context;
     cudaStream_t *streams = (cudaStream_t*)info->streams;
 
-    // TODO: still need? host results spaces
-    VertexId *h_edges = new VertexId [graph_data -> edges * graph_query -> edges/4];
+    // host results spaces, same size as d_partial
+    VertexId *h_edges = new VertexId [graph_query -> nodes * graph_query->edges * graph_data->edges];
 
     // allocate problem on GPU create a pointer of the SMProblem type with double buffer
     Problem * problem = new Problem(true);
@@ -221,6 +222,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         stream_from_host,
         graph_query,
         graph_data,
+        node_label,
         num_gpus,
         gpu_idx,
         partition_method,
@@ -248,6 +250,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         // reset values in DataSlice
     util::GRError(problem->Reset(
         enactor -> GetFrontierType(), 
+        node_label,
         max_queue_sizing, max_queue_sizing1),
         "SM Problem Data Reset Failed", __FILE__, __LINE__);
     util::GRError(enactor -> Reset(),
@@ -270,7 +273,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     // copy results back to CPU from GPU using Extract
     util::GRError(problem->Extract(h_edges),
           "SM Problem Data Extraction Failed", __FILE__, __LINE__);
-    SizeT num_matches_gpu = problem->data_slices[0]->num_matches;
+    SizeT num_matches_gpu = problem->num_subgraphs;
 
     if (!quick_mode)  // run CPU reference test
     {
@@ -327,7 +330,6 @@ int main_(CommandLineArgs *args, int graph_args)
     info->info["undirected"] = true;  // always convert to undirected
     info->info["debug_mode"] = true;  // debug mode
     if (graph_args == 5)  info->info["node_value"] = true;  // require per node label values
-
     cpu_timer2.Start();
     info->Init("SM", *args, csr_query, csr_data);
     cpu_timer2.Stop();
@@ -357,7 +359,7 @@ int main_Value(CommandLineArgs *args, int graph_args)
 {
 // can be disabled to reduce compile time
     if (args -> CheckCmdLineFlag("64bit-Value"))
-        return main_<VertexId, SizeT, long long      >(args, graph_args);
+        return main_<VertexId, SizeT, unsigned long long      >(args, graph_args);
     else
         return main_<VertexId, SizeT,  int      >(args, graph_args);
 }
@@ -386,7 +388,7 @@ int main(int argc, char** argv)
 {
     CommandLineArgs args(argc, argv);
     int graph_args = argc - args.ParsedArgc() - 1;
-    if (argc < 2 || graph_args < 1 || args.CheckCmdLineFlag("help"))
+    if (argc < 3 || graph_args < 2 || args.CheckCmdLineFlag("help"))
     {
         Usage();
         return 1;

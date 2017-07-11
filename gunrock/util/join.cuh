@@ -46,6 +46,59 @@ __global__ void debug(
     if(x==0) printf("======Num of subgraph matches: %d=======\n", counts[0]);
 }
 
+template<typename VertexId, typename SizeT>
+__global__ void MaskOut(
+    const SizeT  nodes_query,
+    const SizeT  size,
+    VertexId* d_partial)
+{
+    const SizeT STRIDE = gridDim.x * blockDim.x;
+    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+    while(x<size){
+        if(d_partial[x]<0){
+            int mode = x%nodes_query;
+            #pragma unroll
+            for(int idx = 0; idx < nodes_query; idx++){
+                if(x+idx-mode>=size) printf("====Error:mask out mem access=====\n");
+                d_partial[x+idx-mode] = -1;
+            }
+        }
+        x += STRIDE;
+    }
+}
+
+template<typename VertexId, typename SizeT>
+__global__ void WriteToPartial(
+    const SizeT* const src_node,
+    const SizeT* const dest_node,
+    const SizeT* const flag, // only valid when level is greater than 2
+    const SizeT* const count,
+    const SizeT  const iter,
+    const SizeT  const flag_size, // only valid when level is greater than 2
+    const SizeT  const nodes_query,
+    VertexId*          d_partial)
+{
+    const SizeT STRIDE = gridDim.x * blockDim.x;
+    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+    SizeT bound = count[0];
+    if(iter==0){
+    if(x==0)    printf("iteration:%d, bound:%d\n", iter, bound);
+        while(x<bound){
+    //        printf("%d: src:%d, dest:%d\n", x, src_node[x], dest_node[x]);
+            d_partial[x*nodes_query] = src_node[x];
+            d_partial[x*nodes_query+iter+1] = dest_node[x]; 
+            x += STRIDE;
+        }
+    }
+    else{
+    if(x==0) printf("iteration:%d, bound:%d\n", iter, flag_size);
+        while(x<flag_size){
+            if(flag[x]>0)
+                d_partial[x*nodes_query+iter+1] = flag[x]; 
+            x += STRIDE;
+        }
+    }
+}
 /*
  * @brief Join Kernel function.
  *
@@ -60,28 +113,31 @@ __global__ void debug(
  * @param[out]froms_out output edge list source node id
  * @param[out]tos_out   output edge list destination node id
  */
-template <
+/*template <
     typename VertexId, typename SizeT, typename Value>
 __global__ void Join(
-    const SizeT                 edges_data,
-    const SizeT                 edges_query,
-    const Value*    const       pos,// store the start positions for each query edge's candidates
-          unsigned long long*  	counts,// store the number of matches
-    const VertexId* const	intersect,
-    const Value*    const       froms,
-    const VertexId* const       tos,
-    const Value*    const       edges,
-    	  VertexId*             output)  // store candidate edges in query edge order
+    const SizeT*                 row_offset,
+    const SizeT*                 column_indices,
+    const VertexId* const        query_ng,// query node sequence
+    const bool*     const        isValid_data, // mark valid data nodes
+    const SizeT     const        query_nodes,
+    const SizeT     const        data_nodes,
+          VertexId*              partial_results, 
+          unsigned long long*  	 counts,// store the number of matches
+    	  VertexId*              results,// store candidate edges in query edge order
+          SizeT                  depth) // current recursive level
 {
     unsigned long long size = pos[0];
+    // #intermediate results = products of all #candidate of edges of query edges
     for(int i=0; i<edges_query-1; i++)
         size *= (pos[i+1] - pos[i]);
     const SizeT STRIDE = gridDim.x * blockDim.x;
-    unsigned long long edge_id[3];
+    unsigned long long edge_id[3]; //specific for triangles 
     SizeT iter;
     SizeT offset;
     SizeT edge;
     unsigned long long x = blockIdx.x * blockDim.x + threadIdx.x;
+    if(x==0) printf("====Number of intermediate results:%llu, STRIDE size:%llu========\n", size, STRIDE);
     while (x < size)
     {
 	unsigned long long id = x;
@@ -150,7 +206,7 @@ __global__ void Join(
 
     }
 } // Join Kernel
-
+*/
 
 template<typename VertexId, typename SizeT, typename Value>
 __global__ void Label(
