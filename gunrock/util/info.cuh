@@ -55,6 +55,7 @@ private:
     double             alpha;  // Used in direction optimal BFS
     double              beta;  // Used in direction optimal BFS
     int            top_nodes;  // Used in Top-K
+    int            walk_length;// Used in random walk
 
 public:
     json_spirit::mObject info;  // test parameters and running statistics
@@ -138,6 +139,7 @@ public:
         info["alpha"]              = 6.0f;   // default alpha for DOBFS
         info["beta"]               = 6.0f;   // default beta for DOBFS
         info["top_nodes"]          = 0;      // default number of nodes for top-k primitive
+        info["walk_length"]        = 1;      // default number of walk for random walk
         info["normalized"]         = false;  // default normalized for PageRank
         info["multi_graphs"]       = false;  // default only one input graph
         info["node_value"]         = false;  // default don't load labels
@@ -269,7 +271,7 @@ public:
                     args.GetCmdLineArgument("src-seed", src_seed);
                 info["source_seed"]   = src_seed;
             } else if (source_type.compare("list") == 0)
-            { 
+            {
                 if (!args.CheckCmdLineFlag("quiet"))
                     printf("Using user specified source vertex for each run\n");
                 info["source_type"] = "list";
@@ -278,7 +280,7 @@ public:
                 args.GetCmdLineArgument("src", source);
                 info["source_type"] = "user-defined";
             }
-            info["source_list"] = GetSourceList(args); 
+            info["source_list"] = GetSourceList(args);
             info["source_vertex"] = (int64_t)source;
             if (!args.CheckCmdLineFlag("quiet"))
             {
@@ -380,6 +382,11 @@ public:
         {
             args.GetCmdLineArgument("top_nodes", top_nodes);
             info["top_nodes"] = top_nodes;
+        }
+        if (args.CheckCmdLineFlag("walk_length"))
+        {
+            args.GetCmdLineArgument("walk_length", walk_length);
+            info["walk_length"] = walk_length;
         }
         if (args.CheckCmdLineFlag("output_filename"))
         {
@@ -755,7 +762,7 @@ public:
         std::string ofname = filename.data();
         std::ofstream of(ofname);
         // now store the filename back into the JSON structure
-        info["jsonfile"] = ofname;        
+        info["jsonfile"] = ofname;
         json_spirit::write_stream(
             json_spirit::mValue(info), of,
             json_spirit::pretty_print);
@@ -799,7 +806,7 @@ public:
             {
                 VertexId new_v = org_nodes * gpu + 1 + org_v;
                 SizeT new_row_offset = num_gpus + org_edges * gpu + org_row_offset;
-                if (undirected) 
+                if (undirected)
                 {
                     new_row_offset += gpu;
                     if (org_v > org_src) new_row_offset ++;
@@ -944,13 +951,13 @@ public:
             info["rmat_vmin"] = rmat_vmin;
             info["rmat_vmultipiler"] = rmat_vmultipiler;
             //can use to_string since c++11 is required, niiiice.
-            file_stem = "rmat_" + 
-                (args.CheckCmdLineFlag("rmat_scale") ? 
-                    ("n" + std::to_string(rmat_scale)) : std::to_string(rmat_nodes)) 
-               + "_" + (args.CheckCmdLineFlag("rmat_edgefactor") ? 
+            file_stem = "rmat_" +
+                (args.CheckCmdLineFlag("rmat_scale") ?
+                    ("n" + std::to_string(rmat_scale)) : std::to_string(rmat_nodes))
+               + "_" + (args.CheckCmdLineFlag("rmat_edgefactor") ?
                     ("e" + std::to_string(rmat_edgefactor)) : std::to_string(rmat_edges));
             info["dataset"] = file_stem;
-            
+
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
 
@@ -1058,13 +1065,13 @@ public:
             info["rgg_threshold"]   = rgg_threshold;
             info["rgg_vmultipiler"] = rgg_vmultipiler;
             //file_stem = "rgg_s"+std::to_string(rgg_scale)+"_e"+std::to_string(csr_ref.edges)+"_f"+std::to_string(rgg_thfactor);
-            file_stem = "rgg_" + 
-                (args.CheckCmdLineFlag("rgg_scale") ? 
-                    ("n" + std::to_string(rgg_scale)) : std::to_string(rgg_nodes)) 
-               + "_" + (args.CheckCmdLineFlag("rgg_thfactor") ? 
+            file_stem = "rgg_" +
+                (args.CheckCmdLineFlag("rgg_scale") ?
+                    ("n" + std::to_string(rgg_scale)) : std::to_string(rgg_nodes))
+               + "_" + (args.CheckCmdLineFlag("rgg_thfactor") ?
                     ("t" + std::to_string(rgg_thfactor)) : std::to_string(rgg_threshold));
             info["dataset"] = file_stem;
- 
+
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
 
@@ -1122,12 +1129,12 @@ public:
             info["sw_k"          ] = (int64_t)sw_k          ;
             info["sw_vmultipiler"] = sw_vmultipiler;
             info["sw_vmin"       ] = sw_vmin       ;
-            file_stem = "smallworld_" + 
-                (args.CheckCmdLineFlag("sw_scale") ? 
+            file_stem = "smallworld_" +
+                (args.CheckCmdLineFlag("sw_scale") ?
                     ("n" + std::to_string(sw_scale)) : std::to_string(sw_nodes))
-                + "k" + std::to_string(sw_k) + "_p" + std::to_string(sw_p); 
+                + "k" + std::to_string(sw_k) + "_p" + std::to_string(sw_p);
             info["dataset"] = file_stem;
- 
+
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
             if (graphio::small_world::BuildSWGraph<EDGE_VALUE>(
@@ -1361,10 +1368,10 @@ public:
         {
             // TODO: collect info for multi-GPUs
             EnactorStats *estats = enactor_stats;
-            json_spirit::mArray per_iteration_advance_runtime; 
-            json_spirit::mArray per_iteration_advance_mteps; 
-            json_spirit::mArray per_iteration_advance_input_frontier; 
-            json_spirit::mArray per_iteration_advance_output_frontier; 
+            json_spirit::mArray per_iteration_advance_runtime;
+            json_spirit::mArray per_iteration_advance_mteps;
+            json_spirit::mArray per_iteration_advance_input_frontier;
+            json_spirit::mArray per_iteration_advance_output_frontier;
             json_spirit::mArray per_iteration_advance_dir;
             GetPerIterationAdvanceStats(
                     estats->per_iteration_advance_time,

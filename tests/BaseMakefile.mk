@@ -31,7 +31,7 @@ GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 
-SM_TARGETS = $(GEN_SM35) #$(GEN_SM35) $(GEN_SM60) $(GEN_SM61) 
+SM_TARGETS = $(GEN_SM35) #$(GEN_SM35) $(GEN_SM60) $(GEN_SM61)
 #-------------------------------------------------------------------------------
 # Libs
 #-------------------------------------------------------------------------------
@@ -75,6 +75,8 @@ else
 endif
 
 NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 #-ccbin=g++-4.8
+#used to link to curand library
+NVCCFLAGS += -lcurand
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
@@ -97,7 +99,7 @@ endif
 # Dependency Lists
 #-------------------------------------------------------------------------------
 EXTRA_SOURCE = ../../gunrock/util/types.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp ../../gunrock/util/gitsha1.c
-      
+
 DEPS = 	./Makefile \
     ../BaseMakefile.mk \
     $(EXTRA_SOURCE) \

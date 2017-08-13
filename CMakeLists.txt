@@ -127,10 +127,6 @@ option(GUNROCK_APP_SSSP
   "If on, builds only SSSP application."
   OFF)
 
-option(GUNROCK_APP_MF
-  "If on, builds only MF application."
-  OFF)
-
 option(GUNROCK_APP_HITS
   "If on, builds only HITS application."
   OFF)
@@ -149,6 +145,10 @@ option(GUNROCK_APP_WTF
 
 option(GUNROCK_APP_TOPK
   "If on, builds only TOPK application."
+  OFF)
+
+option(GUNROCK_APP_RW
+  "If on, builds only SAMPLE application."
   OFF)
 
 #option(GUNROCK_APP_SAMPLE
@@ -274,12 +274,12 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(tests/cc)
   add_subdirectory(tests/pr)
   add_subdirectory(tests/sssp)
-  add_subdirectory(tests/mf)
   add_subdirectory(tests/hits)
   add_subdirectory(tests/salsa)
   add_subdirectory(tests/mst)
   add_subdirectory(tests/wtf)
   add_subdirectory(tests/topk)
+  add_subdirectory(tests/rw)
   #add_subdirectory(tests/template)
   #add_subdirectory(tests/vis)
   #add_subdirectory(tests/mis)
@@ -306,10 +306,6 @@ else(GUNROCK_BUILD_APPLICATIONS)
     add_subdirectory(tests/sssp)
   endif(GUNROCK_APP_SSSP)
 
-  if(GUNROCK_APP_MF)
-    add_subdirectory(tests/mf)
-  endif(GUNROCK_APP_MF)
-
   if(GUNROCK_APP_HITS)
     add_subdirectory(tests/hits)
   endif(GUNROCK_APP_HITS)
@@ -329,6 +325,10 @@ else(GUNROCK_BUILD_APPLICATIONS)
   if(GUNROCK_APP_TOPK)
     add_subdirectory(tests/topk)
   endif(GUNROCK_APP_TOPK)
+
+  if(GUNROCK_APP_RW)
+    add_subdirectory(tests/rw)
+  endif(GUNROCK_APP_RW)
 
   # if(GUNROCK_APP_SAMPLE)
   #   add_subdirectory(tests/sample)
@@ -356,10 +356,6 @@ set_tests_properties(TEST_CC PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 add_test(NAME TEST_SSSP COMMAND sssp market
   ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx --undirected --src=0)
 set_tests_properties(TEST_SSSP PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
-
-#add_test(NAME TEST_MF COMMAND mf market
-#  ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx --undirected --src=0)
-#set_tests_properties(TEST_MF PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
 add_test(NAME TEST_PAGERANK COMMAND pr market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
@@ -390,10 +386,6 @@ set_tests_properties(SHARED_LIB_TEST_CC
 add_test(NAME SHARED_LIB_TEST_SSSP COMMAND shared_lib_sssp)
 set_tests_properties(SHARED_LIB_TEST_SSSP
   PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Label.*39.*")
-
-#add_test(NAME SHARED_LIB_TEST_MF COMMAND shared_lib_mf)
-#set_tests_properties(SHARED_LIB_TEST_MF
-#  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Label.*39.*")
 
 add_test(NAME SHARED_LIB_TEST_PAGERANK COMMAND shared_lib_pr)
 set_tests_properties(SHARED_LIB_TEST_PAGERANK
@@ -435,10 +427,6 @@ if(GUNROCK_MGPU_TESTS)
   add_test(NAME TEST_MGPU_SSSP COMMAND sssp market
     ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx ${DEVICES} --undirected --src=0)
   set_tests_properties(TEST_SSSP PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
-
-  add_test(NAME TEST_MGPU_MF COMMAND mf market
-    ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx ${DEVICES} --undirected --src=0)
-  set_tests_properties(TEST_MF PROPERTIES PASS_REGULAR_EXPRESSION "CORRECT")
 
   add_test(NAME TEST_MGPU_PR COMMAND pr market
     ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
