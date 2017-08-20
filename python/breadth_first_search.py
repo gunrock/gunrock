@@ -3,7 +3,7 @@
 from ctypes import *
 
 ### load gunrock shared library - libgunrock
-gunrock = cdll.LoadLibrary('../../build/lib/libgunrock.so')
+gunrock = cdll.LoadLibrary('../lib/libgunrock.so')
 
 ### read in input CSR arrays from files
 row_list = [int(x.strip()) for x in open('toy_graph/row.txt')]
@@ -17,9 +17,13 @@ edges = len(col_list)
 
 ### output array
 labels = pointer((c_int * nodes)())
+preds  = pointer((c_int * nodes)())
+
+### sources
+sources= pointer((c_int * 1)(1))
 
 ### call gunrock function on device
-gunrock.bfs(labels, nodes, edges, row, col, 0)
+gunrock.bfs(labels, preds, nodes, edges, row, col, 1, sources, 0, 0, 1)
 
 ### sample results
 print ' bfs labels (depth):',
