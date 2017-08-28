@@ -96,8 +96,11 @@ gunrockError_t GRError(
     if (retval) return retval; \
 } \
 
+
 #define GUARD_CU2(cuda_call, message) \
 { \
     retval = gunrock::util::GRError(cuda_call, message, __FILE__, __LINE__); \
     if (retval) return retval; \
 } \
+
+

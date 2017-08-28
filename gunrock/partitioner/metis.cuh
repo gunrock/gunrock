@@ -48,7 +48,7 @@ cudaError_t Partition(
     auto &partition_table = org_graph.GpT::partition_table;
     //typedef idxtype idx_t;
     idx_t       nodes  = org_graph.nodes;
-    idx_t       edges  = org_graph.edges;
+    //idx_t       edges  = org_graph.edges;
     idx_t       nsubgraphs  = num_subgraphs;
     idx_t       ncons  = 1;
     idx_t       objval;

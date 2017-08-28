@@ -46,6 +46,7 @@ static CUT_THREADPROC SSSPThread(
     typedef typename EnactorT::ValueT     ValueT    ;
     typedef typename Problem ::GraphT     GraphT    ;
     typedef typename GraphT  ::CsrT       CsrT      ;
+    typedef typename GraphT  ::GpT        GpT       ;
     //typedef typename Problem::DataSlice  DataSlice ;
     //typedef GraphSlice <VertexId, SizeT, Value>          GraphSliceT;
     //typedef SSSPFunctor<VertexId, SizeT, Value, Problem> Functor;
@@ -241,6 +242,7 @@ public:
      */
     cudaError_t Reset(VertexT src, util::Location target = util::DEVICE)
     {
+        typedef typename GraphT::GpT GpT; 
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
