@@ -15,6 +15,7 @@
 #pragma once
 
 #include <string>
+#include <cstring>
 #include <fstream>
 #include <gunrock/util/basic_utils.h>
 #include <gunrock/util/error_utils.cuh>
@@ -99,7 +100,7 @@ struct NullArray
     typedef _SizeT SizeT;
     typedef _ValueT ValueT;
 
-    void SetName(std::string name) {}
+    void SetName(const char* const name) {}
     cudaError_t Allocate(SizeT size, Location target = ARRAY_DEFAULT_TARGET)
     {
         return cudaSuccess;
@@ -170,7 +171,8 @@ struct Array1D
         Array1DT;
 
 private:
-    std::string  name;
+
+    char        *name;
     //std::string  file_name;
     SizeT        size;
     //unsigned int flag;
@@ -180,8 +182,9 @@ private:
     ValueT      *d_pointer;
 
 public:
+
     Array1D() :
-        name     (""),
+        //name     (""),
         h_pointer(NULL),
         d_pointer(NULL),
         setted   (LOCATION_NONE),
@@ -201,12 +204,17 @@ public:
     } // Array1D()
 
     Array1D(const char* const name) :
-        name     (std::string(name)),
+        //name     (std::string(name)),
         h_pointer(NULL),
         d_pointer(NULL),
         setted   (LOCATION_NONE),
         allocated(LOCATION_NONE)
     {
+        if (name != NULL)
+        {
+            malloc(this -> name, sizeof(char) * (strlen(name) + 1));
+            strcpy(this -> name, name);
+        }
         //this->name.reserve(40);
         //file_name.reserve(512);
         //this->name= std::string(name);
@@ -231,6 +239,7 @@ public:
         Init(size,target,use_cuda_alloc,flag);
     } // Array1D(...)*/
 
+    __host__ __device__
     virtual ~Array1D()
     {
 #ifdef __CUDA_ARCH__
@@ -345,7 +354,7 @@ public:
 
 #ifdef ENABLE_ARRAY_DEBUG
         if (size != 0 || target != LOCATION_NONE)
-            PrintMsg(name + " Init size = " + std::to_string(size) +
+            PrintMsg(std::string(name) + " Init size = " + std::to_string(size) +
                 ", target = " + Location_to_string(target));
 #endif
         if (retval = Release()) return retval;
@@ -366,9 +375,12 @@ public:
         setted = setted | DISK;
     }*/
 
-    void SetName(std::string name)
+    cudaError_t SetName(std::string name)
     {
-        this -> name = name;
+        free(this -> name);
+        this -> name = (char*)malloc(sizeof(char) * (name.length() + 1));
+        strcpy(this -> name, name.c_str());
+        return cudaSuccess;
     }
 
     cudaError_t Allocate(SizeT size, Location target = ARRAY_DEFAULT_TARGET)
@@ -387,16 +399,16 @@ public:
 
             if (retval = GRError(cudaHostAlloc((void **)&h_pointer,
                     sizeof(ValueT) * size, flag),
-                    name + "cudaHostAlloc failed", __FILE__, __LINE__))
+                    std::string(name) + "cudaHostAlloc failed", __FILE__, __LINE__))
                 return retval;
             //if (retval = GRError(cudaHostGetDevicePointer((void **)&d_pointer,
             //        (void *)h_pointer,0),
-            //        name + "cudaHostGetDevicePointer failed", __FILE__, __LINE__))
+            //        std::string(name) + "cudaHostGetDevicePointer failed", __FILE__, __LINE__))
             //    return retval;
             allocated = allocated | HOST  ;
             //allocated = allocated | DEVICE;
 #ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + "\t allocated on " + Location_to_string(HOST) +
+            PrintMsg(std::string(name) + "\t allocated on " + Location_to_string(HOST) +
                 ", size = " + std::to_string(size) +
                 ", flag = " + std::to_string(flag));
 #endif
@@ -412,7 +424,7 @@ public:
             {
                 h_pointer = new ValueT[size];
                 if (h_pointer == NULL)
-                    return GRError(name + " allocation on " +
+                    return GRError(std::string(name) + " allocation on " +
                         Location_to_string(HOST) + " failed",
                         __FILE__, __LINE__);
 
@@ -420,13 +432,13 @@ public:
                 {
                     if (retval = util::GRError(cudaHostRegister((void*)h_pointer,
                         sizeof(ValueT)*size, cudaHostRegisterFlag),
-                        name + " cudaHostRegister failed.", __FILE__, __LINE__))
+                        std::string(name) + " cudaHostRegister failed.", __FILE__, __LINE__))
                         return retval;
                 }
             }
             allocated = allocated | HOST;
 #ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + "\t allocated on " + Location_to_string(HOST) +
+            PrintMsg(std::string(name) + "\t allocated on " + Location_to_string(HOST) +
                 ", length =\t " + std::to_string(size) +
                 ", size =\t " + std::to_string((long long)size * sizeof(ValueT)) +
                 " bytes, pointer =\t " + to_string(h_pointer));
@@ -443,7 +455,7 @@ public:
                 this -> size = size;
 
 /*#ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + "\t allocating on " + Location_to_string(DEVICE) +
+            PrintMsg(std::string(name) + "\t allocating on " + Location_to_string(DEVICE) +
                 ", length =\t " + std::to_string(size) +
                 ", size =\t " + std::to_string((long long)size * sizeof(ValueT)) +
                 " bytes, pointer =\t " + std::to_string(d_pointer));
@@ -451,12 +463,12 @@ public:
             if (size!=0) {
                 retval = GRError(
                     cudaMalloc((void**)&(d_pointer), sizeof(ValueT) * size),
-                    name + " cudaMalloc failed", __FILE__, __LINE__);
+                    std::string(name) + " cudaMalloc failed", __FILE__, __LINE__);
                 if (retval) return retval;
             }
             allocated = allocated | DEVICE;
 #ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + "\t allocated on " + Location_to_string(DEVICE) +
+            PrintMsg(std::string(name) + "\t allocated on " + Location_to_string(DEVICE) +
                 ", length =\t " + std::to_string(size) +
                 ", size =\t " + std::to_string((long long)size * sizeof(ValueT)) +
                 " bytes, pointer =\t " + to_string(d_pointer));
@@ -474,14 +486,14 @@ public:
         /*if (((allocated & HOST) == HOST) && ((target & DEVICE) == HOST) &&
         {
             if (retval = GRError(cudaFreeHost(h_pointer),
-                name + " cudaFreeHost failed", __FILE__, __LINE__))
+                std::string(name) + " cudaFreeHost failed", __FILE__, __LINE__))
                 return retval;
             h_pointer = NULL;
             //d_pointer = NULL;
             allocated = allocated & (~HOST);
             //allocated = allocated & (~DEVICE);
 #ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + " released on " + Location_to_string(HOST | DEVICE));
+            PrintMsg(std::string(name) + " released on " + Location_to_string(HOST | DEVICE));
 #endif
         } else {*/
         if (((target & HOST) == HOST) && ((allocated & HOST) == HOST))
@@ -489,11 +501,11 @@ public:
             if ((FLAG & PINNED) == PINNED)
             {
                 if (retval = GRError(cudaHostUnregister((void*)h_pointer),
-                    name + " cudaHostUnregister failed", __FILE__, __LINE__))
+                    std::string(name) + " cudaHostUnregister failed", __FILE__, __LINE__))
                     return retval;
             }
 #ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + "\t released on " + Location_to_string(HOST) +
+            PrintMsg(std::string(name) + "\t released on " + Location_to_string(HOST) +
                 ", length =\t " + std::to_string(size) +
                 ", pointer =\t " + to_string(h_pointer));
 #endif
@@ -507,12 +519,12 @@ public:
         if (((target & DEVICE) == DEVICE)&&((allocated & DEVICE) ==DEVICE))
         {
 #ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + "\t releasing on " + Location_to_string(DEVICE) +
+            PrintMsg(std::string(name) + "\t releasing on " + Location_to_string(DEVICE) +
                 ", length =\t " + std::to_string(size) +
                 ", pointer = " + to_string(d_pointer));
 #endif
             retval = GRError(cudaFree((void*)d_pointer),
-                name + " cudaFree failed", __FILE__, __LINE__);
+                std::string(name) + " cudaFree failed", __FILE__, __LINE__);
             if (retval) return retval;
             d_pointer = NULL;
             allocated = allocated & (~DEVICE);
@@ -573,7 +585,7 @@ public:
     cudaError_t EnsureSize(SizeT size, bool keep = false, cudaStream_t stream = 0)
     {
 #ifdef ENABLE_ARRAY_DEBUG
-        PrintMsg(name + " EnsureSize : " + std::to_string(this -> size) +
+        PrintMsg(std::string(name) + " EnsureSize : " + std::to_string(this -> size) +
             " -> " + std::to_string(size));
 #endif
         if (this->size >= size) return cudaSuccess;
@@ -614,13 +626,13 @@ public:
     cudaError_t ShrinkSize(SizeT size, bool keep = false, cudaStream_t stream = 0)
     {
 #ifdef ENABLE_ARRAY_DEBUG
-        PrintMsg(name + " ShrinkSize : " + std::to_string(this -> size) +
+        PrintMsg(std::string(name) + " ShrinkSize : " + std::to_string(this -> size) +
             " -> " + std::to_string(size));
 #endif
         if (this->size <= size) return cudaSuccess;
 
 /*#ifdef ENABLE_ARRAY_DEBUG
-        PrintMsg(name + " Shrinking : "+ std::to_string(this -> size) +
+        PrintMsg(std::string(name) + " Shrinking : "+ std::to_string(this -> size) +
             " -> " + std::to_string(size));
 #endif*/
         if (!keep) return Allocate(size, allocated);
@@ -652,25 +664,26 @@ public:
     } // ShrinkSize(...)
 
     __host__ __device__ __forceinline__
-    ValueT* GetPointer(Location target = ARRAY_DEFAULT_TARGET)
+    ValueT* GetPointer(Location target = ARRAY_DEFAULT_TARGET) const
     {
+        if (target == DEVICE)
+        {
+/*#ifdef ENABLE_ARRAY_DEBUG
+            PrintMsg(std::string(name) + " \tpointer on " + Location_to_string(DEVICE) +
+                "   get = " + std::to_string(d_pointer));
+#endif*/
+            return d_pointer;
+        }
+
         if (target == HOST  )
         {
 /*#ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + " \tpointer on " + Location_to_string(HOST) +
+            PrintMsg(std::string(name) + " \tpointer on " + Location_to_string(HOST) +
                 "   get = " + std::to_string(h_pointer));
 #endif*/
             return h_pointer;
         }
 
-        if (target == DEVICE)
-        {
-/*#ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + " \tpointer on " + Location_to_string(DEVICE) +
-                "   get = " + std::to_string(d_pointer));
-#endif*/
-            return d_pointer;
-        }
         return NULL;
     } // GetPointer(...)
 
@@ -681,11 +694,11 @@ public:
         if (size < this->size)
         {
 #ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + "\t setting pointer, size too small, size = " +
+            PrintMsg(std::string(name) + "\t setting pointer, size too small, size = " +
                 std::to_string(size) + ", this->size = " +
                 std::to_string(this -> size));
 #endif
-            return GRError(name + " SetPointer size is too small",
+            return GRError(std::string(name) + " SetPointer size is too small",
                 __FILE__, __LINE__);
         }
 
@@ -696,7 +709,7 @@ public:
             {
                 retval = util::GRError(
                     cudaHostRegister(pointer, sizeof(ValueT)*size, cudaHostRegisterFlag),
-                    name + " cudaHostRegister failed.", __FILE__, __LINE__);
+                    std::string(name) + " cudaHostRegister failed.", __FILE__, __LINE__);
                 if (retval) return retval;
             }
             h_pointer = pointer;
@@ -704,7 +717,7 @@ public:
                 this -> size = size;
             setted    = setted | HOST;
 #ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + "\t setted on " + Location_to_string(HOST) +
+            PrintMsg(std::string(name) + "\t setted on " + Location_to_string(HOST) +
                 ", size =\t " + std::to_string(this -> size) +
                 ", pointer =\t " + to_string(h_pointer) +
                 ", setted =\t " + Location_to_string(setted));
@@ -719,7 +732,7 @@ public:
                 this -> size = size;
             setted    = setted | DEVICE;
 #ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + "\t setted on " + Location_to_string(DEVICE) +
+            PrintMsg(std::string(name) + "\t setted on " + Location_to_string(DEVICE) +
                 ", size =\t " + std::to_string(this -> size) +
                 ", pointer =\t " + to_string(d_pointer) +
                 ", setted =\t " + Location_to_string(setted));
@@ -749,11 +762,11 @@ public:
         {
             if ((FLAG & PINNED) == PINNED)
                 if (retval = GRError(cudaHostUnregister((void*)h_pointer),
-                    name + " cudaHostUnregister failed.", __FILE__, __LINE__))
+                    std::string(name) + " cudaHostUnregister failed.", __FILE__, __LINE__))
                     return retval;
             h_pointer = NULL;
 #ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + "\t unsetted on " + Location_to_string(HOST));
+            PrintMsg(std::string(name) + "\t unsetted on " + Location_to_string(HOST));
 #endif
         }
 
@@ -761,7 +774,7 @@ public:
         {
             d_pointer = NULL;
 #ifdef ENABLE_ARRAY_DEBUG
-            PrintMsg(name + "\t unsetted on " + Location_to_string(DEVICE));
+            PrintMsg(std::string(name) + "\t unsetted on " + Location_to_string(DEVICE));
 #endif
         }
         //if (target == DISK  )
@@ -797,7 +810,7 @@ public:
     cudaError_t Move(
         Location source,
         Location target,
-        SizeT size  =-1,
+        SizeT size  = util::PreDefinedValues<SizeT>::InvalidValue,
         SizeT offset=0,
         cudaStream_t stream=0)
     {
@@ -805,20 +818,20 @@ public:
         if (source == target) return retval;
         if ((source == HOST || source == DEVICE) &&
             ((source & setted) != source) && ((source & allocated) != source))
-            return GRError(name + " movment source is not valid", __FILE__, __LINE__);
+            return GRError(std::string(name) + " movment source is not valid", __FILE__, __LINE__);
         if (((target & HOST) == HOST || (target & DEVICE) == DEVICE) &&
             ((target & setted) != target) && ((target & allocated) != target))
             if (retval = Allocate(this->size, target)) return retval;
         if ((target == DISK || source == DISK) && ((setted & DISK) != DISK))
-            return GRError(name + " filename not set", __FILE__, __LINE__);
-        if (size == -1) size=this->size;
+            return GRError(std::string(name) + " filename not set", __FILE__, __LINE__);
+        if (!isValid(size)) size = this->size;
         if (size > this->size)
-            return GRError(name + " size is invalid", __FILE__, __LINE__);
+            return GRError(std::string(name) + " size is invalid", __FILE__, __LINE__);
         if (size+offset > this->size)
-            return GRError(name + " size+offset is invalid", __FILE__, __LINE__);
+            return GRError(std::string(name) + " size+offset is invalid", __FILE__, __LINE__);
         if (size == 0) return retval;
 #ifdef ENABLE_ARRAY_DEBUG
-        PrintMsg(name + " Moving from " + Location_to_string(source) +
+        PrintMsg(std::string(name) + " Moving from " + Location_to_string(source) +
             " to " + Location_to_string(target) +
             ", size = " + std::to_string(size) +
             ", offset = " + std::to_string(offset) +
@@ -834,13 +847,13 @@ public:
                 retval = GRError(
                     cudaMemcpyAsync( d_pointer + offset, h_pointer + offset,
                         sizeof(ValueT) * size, cudaMemcpyHostToDevice, stream),
-                        name + " cudaMemcpyAsync H2D failed", __FILE__, __LINE__);
+                        std::string(name) + " cudaMemcpyAsync H2D failed", __FILE__, __LINE__);
                 if (retval) return retval;
             } else {
                 retval = GRError(
                     cudaMemcpy( d_pointer + offset, h_pointer + offset,
                         sizeof(ValueT) * size, cudaMemcpyHostToDevice),
-                        name + " cudaMemcpy H2D failed", __FILE__, __LINE__);
+                        std::string(name) + " cudaMemcpy H2D failed", __FILE__, __LINE__);
                 if (retval) return retval;
             }
         }
@@ -853,13 +866,13 @@ public:
                 retval = GRError(
                     cudaMemcpyAsync( h_pointer + offset, d_pointer + offset,
                         sizeof(ValueT) * size, cudaMemcpyDeviceToHost, stream),
-                        name + " cudaMemcpyAsync D2H failed", __FILE__, __LINE__);
+                        std::string(name) + " cudaMemcpyAsync D2H failed", __FILE__, __LINE__);
                 if (retval) return retval;
             } else {
                 retval = GRError(
                     cudaMemcpy( h_pointer + offset, d_pointer + offset,
                         sizeof(ValueT) * size, cudaMemcpyDeviceToHost),
-                        name + " cudaMemcpy D2H failed", __FILE__, __LINE__);
+                        std::string(name) + " cudaMemcpy D2H failed", __FILE__, __LINE__);
                 if (retval) return retval;
             }
         }
@@ -913,7 +926,7 @@ public:
     Array1D& operator=(const Array1D& other)
     {
 #ifdef ENABLE_ARRAY_DEBUG
-        PrintMsg(other.name + " Assigment");
+        PrintMsg(std::string(other.name) + " Assigment");
 #endif
        //name      = other.name     ;
        //file_name = other.file_name;
@@ -935,10 +948,10 @@ public:
 #else
     #ifdef ENABLE_ARRAY_DEBUG
         if (h_pointer == NULL)
-            GRError(name + " not defined on " + Location_to_string(HOST),
+            GRError(std::string(name) + " not defined on " + Location_to_string(HOST),
                 __FILE__, __LINE__);
         if (idx >= size)
-            GRError(name + " access out of bound", __FILE__, __LINE__);
+            GRError(std::string(name) + " access out of bound", __FILE__, __LINE__);
         //printf("%s @ %p [%ld]ed1\n", name.c_str(), h_pointer,idx);fflush(stdout);
     #endif
         return h_pointer[idx];
@@ -953,10 +966,10 @@ public:
 #else
     #ifdef ENABLE_ARRAY_DEBUG
         if (h_pointer == NULL)
-            GRError(name + " not defined on " + Location_to_string(HOST),
+            GRError(std::string(name) + " not defined on " + Location_to_string(HOST),
                 __FILE__, __LINE__);
         if (idx >= size)
-            GRError(name + " access out of bound", __FILE__, __LINE__);
+            GRError(std::string(name) + " access out of bound", __FILE__, __LINE__);
         //PrintMsg(name + " [" + std::string(idx) + "]ed2");
     #endif
         return const_cast<ValueT&>(h_pointer[idx]);
@@ -971,23 +984,24 @@ public:
 #else
     #ifdef ENABLE_ARRAY_DEBUG
         if (h_pointer == NULL)
-            GRError(name + " not deined on " + Location_to_string(HOST),
+            GRError(std::string(name) + " not deined on " + Location_to_string(HOST),
                 __FILE__, __LINE__);
-        //PrintMsg(name + " -> ed");
+        //PrintMsg(std::string(name) + " -> ed");
     #endif
         return h_pointer;
 #endif
     }
 
+    template <typename T>
     __host__ __device__ __forceinline__
-    ValueT* operator+(const _SizeT& offset)
+    ValueT* operator+(const T& offset) const
     {
 #ifdef __CUDA_ARCH__
         return d_pointer + offset;
 #else
     #ifdef ENABLE_ARRAY_DEBUG
         if (h_pointer == NULL)
-            GRError(name + " not deined on " + Location_to_string(HOST),
+            GRError(std::string(name) + " not deined on " + Location_to_string(HOST),
                 __FILE__, __LINE__);
         //PrintMsg(name + " -> ed");
     #endif

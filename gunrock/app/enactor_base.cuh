@@ -54,65 +54,56 @@ cudaError_t UseParameters2(
     cudaError_t retval = cudaSuccess;
 
     if (!parameters.Have("device"))
-    {
-        retval = parameters.Use<int>(
+        GUARD_CU(parameters.Use<int>(
             "device",
             util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
             0,
             "Set GPU(s) for testing",
-            __FILE__, __LINE__);
-        if (retval) return retval;
-    }
+            __FILE__, __LINE__));
 
-    retval = parameters.Use<int>(
+    GUARD_CU(parameters.Use<int>(
         "communicate-latency",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "additional communication latency",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<float>(
+    GUARD_CU(parameters.Use<float>(
         "communicate-multipy",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         1.0f,
         "communication sizing factor",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<int>(
+    GUARD_CU(parameters.Use<int>(
         "expand-latency",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "additional expand incoming latency",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<int>(
+    GUARD_CU(parameters.Use<int>(
         "subqueue-latency",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "additional subqueue latency",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<int>(
+    GUARD_CU(parameters.Use<int>(
         "fullqueue-latency",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "additional fullqueue latency",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<int>(
+    GUARD_CU(parameters.Use<int>(
         "makeout-latency",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "additional make-out latency",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<std::string>(
+    GUARD_CU(parameters.Use<std::string>(
         "traversal-mode",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         "",
@@ -121,8 +112,7 @@ cudaError_t UseParameters2(
         "small frontiers, add -CULL for fuzed kernels; "
         "not all modes are available for specific problem; "
         "default is determined based on input graph",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
     return retval;
 }
@@ -132,7 +122,9 @@ cudaError_t UseParameters2(
  *
  * @tparam SizeT
  */
-template <typename GraphT,
+template <
+    typename GraphT,
+    typename LabelT,
     util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 class EnactorBase
@@ -140,15 +132,16 @@ class EnactorBase
 public:
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
-    typedef EnactorSlice<GraphT, ARRAY_FLAG, cudaHostRegisterFlag>
+    typedef EnactorSlice<GraphT, LabelT, ARRAY_FLAG, cudaHostRegisterFlag>
                                      EnactorSliceT;
     //typedef Frontier<VertexT, SizeT, ARRAY_FLAG, cudaHostRegisterFlag>
     //                                 FrontierT;
-    int           num_gpus;
-    std::vector<int> gpu_idx;
-    std::string   algo_name;
+
+    int               num_gpus;
+    std::vector<int>  gpu_idx;
+    std::string       algo_name;
     util::Parameters *parameters;
-    Enactor_Flag  flag;
+    Enactor_Flag      flag;
 
     int           communicate_latency;
     float         communicate_multipy;
@@ -305,7 +298,7 @@ public:
         Enactor_Flag flag = Enactor_None,
         unsigned int num_queues = 2,
         FrontierType *frontier_types = NULL,
-        int node_lock_size = 1024,
+        //int node_lock_size = 1024,
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -363,7 +356,7 @@ public:
 
                 retval = enactor_slice.Init(num_queues, frontier_types,
                     algo_name + "::frontier[" + std::to_string(gpu) + "," +
-                    std::to_string(peer) + "]", node_lock_size, target);
+                    std::to_string(peer) + "]", /*node_lock_size,*/ target);
                 if (retval) return retval;
 
                 // TODO: move to somewhere
@@ -465,6 +458,7 @@ public:
                 //std::this_thread::yield();
             }
         }
+        return cudaSuccess;
     }
 
     cudaError_t Run_Threads()

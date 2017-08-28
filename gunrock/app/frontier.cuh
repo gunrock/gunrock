@@ -39,6 +39,9 @@ template <
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct Frontier
 {
+    typedef util::Array1D<SizeT, SizeT  , FLAG, cudaHostRegisterFlag> EdgeQT;
+    typedef util::Array1D<SizeT, VertexT, FLAG, cudaHostRegisterFlag> VertexQT;
+
     std::string  frontier_name;
     util::CtaWorkProgressLifetime<SizeT> work_progress; // Queue size counters
     SizeT        queue_length; // the length of the current queue
@@ -48,7 +51,7 @@ struct Frontier
     unsigned int num_queues  ; // how many queues to support
     unsigned int num_vertex_queues; // num of vertex queues
     unsigned int num_edge_queues; // num of edge queues
-    util::Array1D<SizeT, FrontierType, FLAG, cudaHostRegisterFlag>  queue_types; // types of each queue
+    util::Array1D<SizeT, FrontierType, FLAG, cudaHostRegisterFlag >  queue_types; // types of each queue
     util::Array1D<SizeT, unsigned int, FLAG, cudaHostRegisterFlag >  queue_map; // mapping queue index to vertex_queue / edge_queue indices
 
     util::Array1D<SizeT, SizeT, FLAG | util::PINNED,
@@ -59,12 +62,14 @@ struct Frontier
 
     util::Array1D<SizeT, SizeT        , FLAG, cudaHostRegisterFlag>  queue_offsets; //
 
-    util::Array1D<SizeT, SizeT        , FLAG, cudaHostRegisterFlag>  scanned_edges           ; // length / offsets for offsets of the frontier queues
+    util::Array1D<SizeT, SizeT        , FLAG, cudaHostRegisterFlag>  output_offsets; // length / offsets for offsets of the frontier queues
+    util::Array1D<SizeT, SizeT        , FLAG, cudaHostRegisterFlag>  block_input_starts;
+    util::Array1D<SizeT, SizeT        , FLAG, cudaHostRegisterFlag>  block_output_starts;
     util::Array1D<SizeT, unsigned char, FLAG, cudaHostRegisterFlag>  cub_scan_space;
 
     //Frontier queues. Used to track working frontier.
-    util::Array1D<SizeT, VertexT, FLAG, cudaHostRegisterFlag> *vertex_queues; // vertex queues
-    util::Array1D<SizeT, SizeT  , FLAG, cudaHostRegisterFlag> *edge_queues; // edge queues
+    VertexQT *vertex_queues; // vertex queues
+    EdgeQT   *edge_queues; // edge queues
 
     Frontier()
     {
@@ -81,13 +86,13 @@ struct Frontier
         frontier_name = name;
         if (name != "") name = name + "::";
         //work_progress .SetName(name + "work_progress");
-        queue_types   .SetName(name + "queue_types");
-        queue_map     .SetName(name + "queue_map");
-        output_length .SetName(name + "output_length");
-        num_segments  .SetName(name + "num_segments");
-        queue_offsets .SetName(name + "queue_offsets");
-        scanned_edges .SetName(name + "scanned_edges");
-        cub_scan_space.SetName(name + "cub_scan_space");
+        GUARD_CU(queue_types   .SetName(name + "queue_types"   ));
+        GUARD_CU(queue_map     .SetName(name + "queue_map"     ));
+        GUARD_CU(output_length .SetName(name + "output_length" ));
+        GUARD_CU(num_segments  .SetName(name + "num_segments"  ));
+        GUARD_CU(queue_offsets .SetName(name + "queue_offsets" ));
+        GUARD_CU(output_offsets.SetName(name + "output_offsets"));
+        GUARD_CU(cub_scan_space.SetName(name + "cub_scan_space"));
         return retval;
     }
 
@@ -98,14 +103,11 @@ struct Frontier
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
-        retval = SetName(frontier_name);
-        if (retval) return retval;
-
+        GUARD_CU(SetName(frontier_name));
         this -> num_queues = num_queues;
-        retval = queue_types.Allocate(num_queues, util::HOST);
-        if (retval) return retval;
-        retval = queue_map  .Allocate(num_queues, util::HOST);
-        if (retval) return retval;
+        GUARD_CU(queue_types.Allocate(num_queues, util::HOST));
+        GUARD_CU(queue_map  .Allocate(num_queues, util::HOST));
+
         num_vertex_queues = 0;
         num_edge_queues = 0;
         for (unsigned int q = 0; q < num_queues; q++)
@@ -128,11 +130,10 @@ struct Frontier
 
         if (frontier_name != "")
             frontier_name = frontier_name + "::";
-        retval = num_segments.Allocate(num_queues, util::HOST | target);
-        if (retval) return retval;
-        segment_offsets = new util::Array1D<SizeT, SizeT, FLAG, cudaHostRegisterFlag>[num_queues];
-        vertex_queues = new util::Array1D<SizeT, VertexT, FLAG, cudaHostRegisterFlag>[num_vertex_queues];
-        edge_queues = new util::Array1D<SizeT, SizeT, FLAG, cudaHostRegisterFlag>[num_edge_queues];
+        GUARD_CU(num_segments.Allocate(num_queues, util::HOST | target));
+        segment_offsets = new util::Array1D<SizeT, SizeT  , FLAG, cudaHostRegisterFlag>[num_queues       ];
+        vertex_queues   = new VertexQT[num_vertex_queues];
+        edge_queues     = new EdgeQT  [num_edge_queues  ];
         for (unsigned int q = 0; q < num_queues; q++)
         {
             segment_offsets[q].SetName(frontier_name
@@ -151,14 +152,11 @@ struct Frontier
             }
         }
 
-        retval = output_length.Allocate(1, target | util::HOST);
-        if (retval) return retval;
-        retval = queue_offsets.Allocate(num_queues, target | util::HOST);
-        if (retval) return retval;
+        GUARD_CU(output_length.Allocate(1, target | util::HOST));
+        GUARD_CU(queue_offsets.Allocate(num_queues, target | util::HOST));
 
         // TODO: work_progress.Init on HOST
-        retval = work_progress.Init();
-        if (retval) return retval;
+        GUARD_CU(work_progress.Init());
         return retval;
     }
 
@@ -168,34 +166,41 @@ struct Frontier
 
         for (unsigned int q = 0; q < num_queues; q++)
         {
-            retval = segment_offsets[q].Release(target);
-            if (retval) return retval;
+            GUARD_CU(segment_offsets[q].Release(target));
 
             if (queue_types[q] == VERTEX_FRONTIER)
             {
                 auto &queue = vertex_queues[queue_map[q]];
-                retval = queue.Release(target);
-                if (retval) return retval;
+                GUARD_CU(queue.Release(target));
             } else if (queue_types[q] == EDGE_FRONTIER)
             {
                 auto &queue = edge_queues[queue_map[q]];
-                retval = queue.Release(target);
-                if (retval) return retval;
+                GUARD_CU(queue.Release(target));
             }
         }
 
-        if (retval = queue_types   .Release(target)) return retval;
-        if (retval = queue_map     .Release(target)) return retval;
-        if (retval = output_length .Release(target)) return retval;
-        if (retval = num_segments  .Release(target)) return retval;
-        if (retval = queue_offsets .Release(target)) return retval;
-        if (retval = scanned_edges .Release(target)) return retval;
-        if (retval = cub_scan_space.Release(target)) return retval;
+        GUARD_CU(queue_types   .Release(target));
+        GUARD_CU(queue_map     .Release(target));
+        GUARD_CU(output_length .Release(target));
+        GUARD_CU(num_segments  .Release(target));
+        GUARD_CU(queue_offsets .Release(target));
+        GUARD_CU(output_offsets.Release(target));
+        GUARD_CU(cub_scan_space.Release(target));
         delete[] segment_offsets; segment_offsets = NULL;
         delete[] vertex_queues  ; vertex_queues   = NULL;
         delete[] edge_queues    ; edge_queues     = NULL;
         num_queues = 0;
         return retval;
+    }
+
+    VertexQT *V_Q(SizeT index)
+    {
+        return vertex_queues + queue_map[index];
+    }
+
+    EdgeQT *E_Q(SizeT index)
+    {
+        return edge_queues + queue_map[index];
     }
 
     cudaError_t Reset(util::Location target = util::LOCATION_ALL)

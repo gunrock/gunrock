@@ -78,10 +78,6 @@ struct Csr :
      */
     Csr() : BaseGraph()
     {
-        row_offsets   .SetName("row_offsets");
-        column_indices.SetName("column_indices");
-        edge_values   .SetName("edge_values");
-        node_values   .SetName("node_values");
     }
 
     /**
@@ -116,6 +112,10 @@ struct Csr :
         util::Location target = GRAPH_DEFAULT_TARGET)
     {
         cudaError_t retval = cudaSuccess;
+        row_offsets   .SetName("row_offsets");
+        column_indices.SetName("column_indices");
+        edge_values   .SetName("edge_values");
+        node_values   .SetName("node_values");
         if (retval = BaseGraph    ::Allocate(nodes, edges, target))
             return retval;
         if (retval = row_offsets   .Allocate(nodes + 1  , target))
@@ -258,7 +258,7 @@ struct Csr :
                 const VertexT &row){
                     if (row < nodes)
                         row_offsets[row] = util::BinarySearch(row,
-                            edge_pairs, 0, edges-1,
+                            edge_pairs, (SizeT)0, edges-1,
                             row_edge_compare);
                     else row_offsets[row] = edges;
                 }, this -> nodes + 1, target, stream))
@@ -336,6 +336,27 @@ struct Csr :
             util::PrintMsg(str);
         }
         return retval;
+    }
+
+    __device__ __host__ __forceinline__
+    SizeT GetNeighborListLength(const VertexT &v) const
+    {
+        if (v < 0 || v >= this -> nodes)
+            return 0;
+        return _ldg(row_offsets + (v+1)) - _ldg(row_offsets + v);
+    }
+
+    __device__ __host__ __forceinline__
+    SizeT GetNeighborListOffset(const VertexT &v) const
+    {
+        return _ldg(row_offsets + v);
+    }
+
+    __device__ __host__ __forceinline__
+    VertexT GetEdgeDest(const SizeT &e) const
+    {
+        //return _ldg(column_indices + e);
+        return column_indices[e];
     }
 
     /*template <typename Tuple>

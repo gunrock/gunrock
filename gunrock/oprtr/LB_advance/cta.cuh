@@ -19,10 +19,10 @@
 
 namespace gunrock {
 namespace oprtr {
-namespace edge_map_partitioned {
+namespace LB {
 
 
-} //namespace edge_map_partitioned
+} //namespace LB
 } //namespace oprtr
 } //namespace gunrock
 

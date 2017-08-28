@@ -260,7 +260,7 @@ struct Csc :
                 const VertexT &column){
                     if (column < nodes)
                         column_offsets[column] = util::BinarySearch(column,
-                            edge_pairs, 0, edges-1,
+                            edge_pairs, (SizeT)0, edges-1,
                             column_edge_compare);
                     else column_offsets[column] = edges;
                 }, this -> nodes + 1, target, stream))
@@ -338,6 +338,27 @@ struct Csc :
             util::PrintMsg(str);
         }
         return retval;
+    }
+
+    __device__ __host__ __forceinline__
+    SizeT GetNeighborListLength(const VertexT &v)
+    {
+        if (v < 0 || v >= this -> nodes)
+            return 0;
+        return _ldg(column_offsets + (v+1)) - _ldg(column_offsets + v);
+    }
+
+    __device__ __host__ __forceinline__
+    SizeT GetNeighborListOffset(const VertexT &v)
+    {
+        return _ldg(column_offsets + v);
+    }
+
+    __device__ __host__ __forceinline__
+    VertexT GetEdgeDest(const SizeT &e)
+    {
+        //return _ldg(row_indices + e);
+        return row_indices[e];
     }
 }; // CSC
 

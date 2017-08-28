@@ -42,7 +42,7 @@ struct LoadTile
         ELEMENTS_PER_THREAD         = 1 << LOG_ELEMENTS_PER_THREAD,
         TILE_SIZE                   = ACTIVE_THREADS * ELEMENTS_PER_THREAD,
     };
-    
+
     //---------------------------------------------------------------------
     // Iteration Structures
     //---------------------------------------------------------------------
@@ -250,7 +250,7 @@ struct LoadTile
                 data, oob_default, d_in, guarded_elements);
         }
     };
-    
+
     /**
      * Terminate
      */
@@ -423,4 +423,3 @@ struct LoadTile
 } // namespace io
 } // namespace util
 } // namespace gunrock
-

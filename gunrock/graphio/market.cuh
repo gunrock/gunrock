@@ -88,7 +88,7 @@ cudaError_t ReadMarketStream(
         edge_value_seed = time(NULL);
 
     auto &edge_pairs = graph.CooT::edge_pairs;
-    SizeT edges_read = -1;
+    SizeT edges_read = util::PreDefinedValues<SizeT>::InvalidValue; //-1;
     SizeT nodes = 0;
     SizeT edges = 0;
     //util::Array1D<SizeT, EdgePairT> temp_edge_pairs;
@@ -131,7 +131,7 @@ cudaError_t ReadMarketStream(
             }
         }
 
-        else if (edges_read == -1)
+        else if (!util::isValid(edges_read))//(edges_read == -1)
         { // Problem description
             long long ll_nodes_x, ll_nodes_y, ll_edges;
             int items_scanned = sscanf(line, "%lld %lld %lld",
@@ -188,7 +188,8 @@ cudaError_t ReadMarketStream(
                 return -1;
             }*/
 
-            edges_read++;
+            //edges_read++;
+            edges_read = 0;
         }
 
         else { // Edge description (v -> w)
@@ -244,7 +245,8 @@ cudaError_t ReadMarketStream(
 
                 else if (num_input == 2)
                 {
-                    ll_value = rand() % edge_value_range + edge_value_min;
+                    ll_value = std::remainder(rand(), edge_value_range)
+                        + edge_value_min;
                 }
                 //graph.CooT::edge_values[edges_read] = ll_value;
             }

@@ -13,110 +13,19 @@
  */
 #pragma once
 
-#include <gunrock/app/enactor_types.cuh>
-#include <gunrock/oprtr/filter/kernel_policy.cuh>
+//#include <gunrock/app/enactor_types.cuh>
+//#include <gunrock/oprtr/filter/kernel_policy.cuh>
 #include <gunrock/oprtr/cull_filter/kernel.cuh>
-#include <gunrock/oprtr/compacted_cull_filter/kernel.cuh>
-#include <gunrock/oprtr/simplified_filter/kernel.cuh>
-#include <gunrock/oprtr/simplified2_filter/kernel.cuh>
-#include <gunrock/oprtr/bypass_filter/kernel.cuh>
+//#include <gunrock/oprtr/compacted_cull_filter/kernel.cuh>
+//#include <gunrock/oprtr/simplified_filter/kernel.cuh>
+//#include <gunrock/oprtr/simplified2_filter/kernel.cuh>
+//#include <gunrock/oprtr/bypass_filter/kernel.cuh>
 
 namespace gunrock {
 namespace oprtr {
 namespace filter {
 
-template <
-    typename _KernelPolicy,
-    typename _Problem,
-    typename _Functor>
-struct KernelParameter
-{
-    typedef _KernelPolicy KernelPolicy;
-    typedef _Problem      Problem;
-    typedef _Functor      Functor;
-    typedef typename Problem::VertexId VertexId;
-    typedef typename Problem::SizeT    SizeT;
-    typedef typename Problem::Value    Value;
-    typedef typename Functor::LabelT   LabelT;
-    typedef typename Problem::DataSlice DataSlice;
-
-    gunrock::app::EnactorStats<SizeT>
-                     &enactor_stats;
-    gunrock::app::FrontierAttribute<SizeT>
-                     &frontier_attribute;
-    LabelT           &label;
-    DataSlice       *&h_data_slice;
-    DataSlice       *&d_data_slice;
-    SizeT           *&d_vertex_markers;
-    unsigned char   *&d_visited_mask;
-    VertexId        *&d_in_key_queue;
-    VertexId        *&d_out_key_queue;
-    Value           *&d_in_value_queue;
-    Value           *&d_out_value_queue;
-    SizeT            &num_elements;
-    SizeT            &num_nodes;
-    util::CtaWorkProgressLifetime<SizeT>
-                     &work_progress;
-    CudaContext      &context;
-    cudaStream_t     &stream;
-    SizeT            &max_in_queue;
-    SizeT            &max_out_queue;
-    util::KernelRuntimeStatsLifetime
-                     &kernel_stats;
-    bool             &filtering_flag;
-    bool             &skip_marking;
-
-    KernelParameter(
-        gunrock::app::EnactorStats<SizeT>
-                         &enactor_stats,
-        gunrock::app::FrontierAttribute<SizeT>
-                         &frontier_attribute,
-        LabelT           &label,
-        DataSlice       *&h_data_slice,
-        DataSlice       *&d_data_slice,
-        SizeT           *&d_vertex_markers,
-        unsigned char   *&d_visited_mask,
-        VertexId        *&d_in_key_queue,
-        VertexId        *&d_out_key_queue,
-        Value           *&d_in_value_queue,
-        Value           *&d_out_value_queue,
-        SizeT            &num_elements,
-        SizeT            &num_nodes,
-        util::CtaWorkProgressLifetime<SizeT>
-                         &work_progress,
-        CudaContext      &context,
-        cudaStream_t     &stream,
-        SizeT            &max_in_queue,
-        SizeT            &max_out_queue,
-        util::KernelRuntimeStatsLifetime
-                         &kernel_stats,
-        bool             &filtering_flag,
-        bool             &skip_marking) :
-        enactor_stats       (enactor_stats      ),
-        frontier_attribute  (frontier_attribute ),
-        label               (label              ),
-        h_data_slice        (h_data_slice       ),
-        d_data_slice        (d_data_slice       ),
-        d_vertex_markers    (d_vertex_markers   ),
-        d_visited_mask      (d_visited_mask     ),
-        d_in_key_queue      (d_in_key_queue     ),
-        d_out_key_queue     (d_out_key_queue    ),
-        d_in_value_queue    (d_in_value_queue   ),
-        d_out_value_queue   (d_out_value_queue  ),
-        num_elements        (num_elements       ),
-        num_nodes           (num_nodes          ),
-        work_progress       (work_progress      ),
-        context             (context            ),
-        stream              (stream             ),
-        max_in_queue        (max_in_queue       ),
-        max_out_queue       (max_out_queue      ),
-        kernel_stats        (kernel_stats       ),
-        filtering_flag      (filtering_flag     ),
-        skip_marking        (skip_marking       )
-    {}
-};
-
-template <
+/*template <
     typename Parameter,
     MODE FILTER_MODE>
 struct Dispatch{
@@ -504,6 +413,57 @@ cudaError_t LaunchKernel(
     }
 
     return retval;
+}*/
+
+template <
+    OprtrFlag FLAG,
+    typename GraphT,
+    typename FrontierInT,
+    typename FrontierOutT,
+    typename ParametersT,
+    typename AdvanceOpT,
+    typename FilterOpT>
+cudaError_t Launch(
+    const GraphT         &graph,
+    const FrontierInT   * frontier_in,
+          FrontierOutT  * frontier_out,
+          ParametersT    &parameters,
+          AdvanceOpT      advance_op,
+          FilterOpT       filter_op)
+{
+    if (parameters.filter_mode == "CULL")
+        return CULL::Launch<FLAG>(graph, frontier_in, frontier_out,
+            parameters, advance_op, filter_op);
+    return util::GRError(cudaErrorInvalidValue,
+        "FilterMode " + parameters.filter_mode + " undefined.", __FILE__, __LINE__);
+}
+
+template <
+    OprtrFlag FLAG,
+    typename GraphT,
+    typename FrontierInT,
+    typename FrontierOutT,
+    typename ParametersT,
+    typename OpT>
+cudaError_t Launch(
+    const GraphT         &graph,
+    const FrontierInT   * frontier_in,
+          FrontierOutT  * frontier_out,
+          ParametersT    &parameters,
+          OpT             op)
+{
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    typedef typename FrontierInT::ValueT InKeyT;
+
+    auto dummy_advance = []__host__ __device__ (
+        const VertexT &src   , VertexT &dest, const SizeT &edge_id,
+        const InKeyT  &key_in, const SizeT &input_pos, SizeT &output_pos) -> bool{
+            return true;
+        };
+
+    return Launch<FLAG>(graph, frontier_in, frontier_out,
+        parameters, dummy_advance, op);
 }
 
 } // namespace filter

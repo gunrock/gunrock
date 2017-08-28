@@ -73,6 +73,11 @@ template <> struct VectorType<double         , 2> {typedef double2     Type;};
 template <> struct VectorType<double         , 3> {typedef double3     Type;};
 template <> struct VectorType<double         , 4> {typedef double4     Type;};
 
+template <typename T, int SIZE>
+struct VecType
+{
+    typedef typename VectorType<T, SIZE>::Type Type;
+};
 // DO NOT USE following definations
 // cuda buildin vector types are defined in <CUDA_DIR>/include/vector_types.h
 

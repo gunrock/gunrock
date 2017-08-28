@@ -14,27 +14,27 @@
 
 #pragma once
 
-#include <gunrock/util/basic_utils.h>
-#include <gunrock/util/cuda_properties.cuh>
-#include <gunrock/util/cta_work_distribution.cuh>
 #include <gunrock/util/srts_grid.cuh>
 #include <gunrock/util/srts_details.cuh>
-#include <gunrock/util/io/modified_load.cuh>
-#include <gunrock/util/io/modified_store.cuh>
 
 namespace gunrock {
 namespace oprtr {
-namespace cull_filter {
+namespace CULL {
 
 template <
-    typename _Problem,
-
-    // Machine parameters
-    int _CUDA_ARCH,
+    OprtrFlag _FLAG,
+    //typename _VertexT,      // Data types
+    typename _InKeyT,
+    typename _OutKeyT,
+    typename _SizeT,
+    typename _ValueT,
+    typename _LabelT,
+    typename _FilterOpT,
+    //int _CUDA_ARCH, // Machine parameters
     //bool _INSTRUMENT,
-    // Behavioral control parameters
-    int _SATURATION_QUIT,
-    bool _DEQUEUE_PROBLEM_SIZE,
+
+    //int  _SATURATION_QUIT,      // Behavioral control parameters
+    //bool _DEQUEUE_PROBLEM_SIZE,
 
     // Tunable parameters
     int _MAX_CTA_OCCUPANCY,
@@ -43,24 +43,28 @@ template <
     int _LOG_LOADS_PER_TILE,
     int _LOG_RAKING_THREADS,
     int _END_BITMASK_CULL,
-    int _LOG_SCHEDULE_GRANULARITY,
-    int _MODE>
+    int _LOG_SCHEDULE_GRANULARITY>
+    //int _MODE>
 struct KernelPolicy
 {
     //---------------------------------------------------------------------
     // Constants and typedefs
     //---------------------------------------------------------------------
 
-    typedef _Problem                    Problem;
-    typedef typename Problem::VertexId  VertexId;
-    typedef typename Problem::SizeT     SizeT;
-    typedef typename Problem::Value     Value;
+    static const OprtrFlag FLAG = _FLAG;
+    //typedef _VertexT  VertexT;
+    typedef _InKeyT   InKeyT;
+    typedef _OutKeyT  OutKeyT;
+    typedef _SizeT    SizeT;
+    typedef _ValueT   ValueT;
+    typedef _LabelT   LabelT;
+    typedef _FilterOpT FilterOpT;
 
     enum {
-        MODE                            = _MODE,
-        CUDA_ARCH                       = _CUDA_ARCH,
-        SATURATION_QUIT                 = _SATURATION_QUIT,
-        DEQUEUE_PROBLEM_SIZE            = _DEQUEUE_PROBLEM_SIZE,
+        //MODE                            = _MODE,
+        //CUDA_ARCH                       = _CUDA_ARCH,
+        //SATURATION_QUIT                 = _SATURATION_QUIT,
+        //DEQUEUE_PROBLEM_SIZE            = _DEQUEUE_PROBLEM_SIZE,
 
         //INSTRUMENT                      = _INSTRUMENT,
 
@@ -99,10 +103,10 @@ struct KernelPolicy
         LOG_LOADS_PER_TILE,             // Lanes (the number of loads)
         LOG_RAKING_THREADS,             // Raking threads
         true>                           // There are prefix dependences between lanes
-            RakingGrid;
+            RakingGridT;
 
     // Operational details type for raking grid type
-    typedef util::RakingDetails<RakingGrid> RakingDetails;
+    typedef util::RakingDetails<RakingGridT> RakingDetails;
 
     /**
      * @brief Shared memory storage type for the CTA
@@ -111,7 +115,8 @@ struct KernelPolicy
     {
 
         enum {
-            WARP_HASH_ELEMENTS          = 128,          // Collision hash table size (per warp)
+            // Collision hash table size (per warp)
+            WARP_HASH_ELEMENTS          = 128,
             WARP_HASH_MASK              = WARP_HASH_ELEMENTS -1,
         };
 
@@ -122,12 +127,12 @@ struct KernelPolicy
             util::CtaWorkDistribution<SizeT>    work_decomposition;
 
             // Storage for scanning local ranks
-            SizeT                               warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
+            SizeT warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
 
             // General pool for prefix sum
             union {
-                SizeT                               raking_elements[RakingGrid::TOTAL_RAKING_ELEMENTS];
-                /*volatile*/ VertexId                   vid_hashtable[WARPS][WARP_HASH_ELEMENTS];
+                SizeT raking_elements[RakingGridT::TOTAL_RAKING_ELEMENTS];
+                /*volatile*/ InKeyT vid_hashtable[WARPS][WARP_HASH_ELEMENTS];
             };
 
         } state;
@@ -135,27 +140,29 @@ struct KernelPolicy
 
         enum {
             // Amount of storage we can use for hashing scratch space under target occupancy
-            FULL_OCCUPANCY_BYTES                = (GR_SMEM_BYTES(CUDA_ARCH) / _MAX_CTA_OCCUPANCY)
-                                                    - sizeof(State)
-                                                    - 128,                                              // Fudge-factor to guarantee occupancy
-            HISTORY_HASH_ELEMENTS               = FULL_OCCUPANCY_BYTES / sizeof(VertexId), // 256,
-            //HISTORY_HASH_MASK                   = HISTORY_HASH_ELEMENTS -1,
+            FULL_OCCUPANCY_BYTES  = (GR_SMEM_BYTES(CUDA_ARCH) / _MAX_CTA_OCCUPANCY)
+                                    - sizeof(State)
+                                    - 128, // Fudge-factor to guarantee occupancy
+            HISTORY_HASH_ELEMENTS = FULL_OCCUPANCY_BYTES / sizeof(InKeyT), // 256,
+            //HISTORY_HASH_MASK   = HISTORY_HASH_ELEMENTS -1,
 
         };
 
         // Fill the remainder of smem with a history-based hash-cache of seen vertex-ids
-        /*volatile*/ VertexId                      history[HISTORY_HASH_ELEMENTS];
+        /*volatile*/ InKeyT history[HISTORY_HASH_ELEMENTS];
 
     };
 
     enum {
         THREAD_OCCUPANCY    = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
         SMEM_OCCUPANCY      = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
-        CTA_OCCUPANCY       = GR_MIN(_MAX_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
+        CTA_OCCUPANCY       = GR_MIN(_MAX_CTA_OCCUPANCY,
+            GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
         VALID               = (CTA_OCCUPANCY > 0),
-	    ELEMENT_ID_MASK	    = ~(1ULL<<(sizeof(VertexId)*8-2)),								// Bitmask for masking off the upper control bits in element identifier
-    };
+        // Bitmask for masking off the upper control bits in element identifier
+	    ELEMENT_ID_MASK	    = ~(1ULL<<(sizeof(InKeyT)*8-2)),
 
+    };
 }; // end of kernelPolicy
 
 } // namespace cull_filter

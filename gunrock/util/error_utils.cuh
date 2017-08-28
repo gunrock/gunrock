@@ -89,3 +89,15 @@ gunrockError_t GRError(
 
 } // namespace util
 } // namespace gunrock
+
+#define GUARD_CU(cuda_call) \
+{ \
+    retval = cuda_call; \
+    if (retval) return retval; \
+} \
+
+#define GUARD_CU2(cuda_call, message) \
+{ \
+    retval = gunrock::util::GRError(cuda_call, message, __FILE__, __LINE__); \
+    if (retval) return retval; \
+} \

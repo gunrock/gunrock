@@ -22,11 +22,9 @@
 #include <gunrock/util/test_utils.cuh>
 
 // SSSP includes
-#include <gunrock/app/sssp/sssp_enactor.cuh>
 #include <gunrock/app/sssp/sssp_problem.cuh>
+#include <gunrock/app/sssp/sssp_enactor.cuh>
 #include <gunrock/app/sssp/sssp_functor.cuh>
-
-#include <gunrock/app/sample/sample_enactor.cuh>
 
 // Operator includes
 #include <gunrock/oprtr/advance/kernel.cuh>

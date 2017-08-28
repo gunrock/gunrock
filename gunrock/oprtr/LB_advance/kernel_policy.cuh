@@ -12,13 +12,11 @@
  * @brief Kernel configuration policy for Load balanced Edge Expansion Kernel
  */
 
-
-
 #pragma once
 
 namespace gunrock {
 namespace oprtr {
-namespace edge_map_partitioned {
+namespace LB {
 
 /**
  * @brief Kernel configuration policy for partitioned edge mapping kernels.
@@ -38,31 +36,30 @@ namespace edge_map_partitioned {
  * @tparam _LOG_THREADS                 Number of threads per CTA (log).
  */
 template <
-    typename _ProblemData,
-    // Machine parameters
-    int _CUDA_ARCH,
-    // Behavioral control parameters
-    //bool _INSTRUMENT,
-    // Tunable parameters
-    int _MIN_CTA_OCCUPANCY,
+    //typename _ProblemData,
+    typename _VertexT,      // Data types
+    typename _InKeyT,
+    typename _SizeT,
+    typename _ValueT,
+    //int _CUDA_ARCH,         // Machine parameters
+    int _MIN_CTA_OCCUPANCY, // Tunable parameters
     int _LOG_THREADS,
     int _LOG_BLOCKS,
     int _LIGHT_EDGE_THRESHOLD>
-
 struct KernelPolicy
 {
     //---------------------------------------------------------------------
     // Constants and typedefs
     //---------------------------------------------------------------------
 
-    typedef _ProblemData                    ProblemData;
-    typedef typename ProblemData::VertexId  VertexId;
-    typedef typename ProblemData::SizeT     SizeT;
-    typedef typename ProblemData::Value     Value;
+    typedef _VertexT  VertexT;
+    typedef _InKeyT   InKeyT;
+    typedef _SizeT    SizeT;
+    typedef _ValueT   ValueT;
 
     enum {
 
-        CUDA_ARCH                       = _CUDA_ARCH,
+        //CUDA_ARCH                       = _CUDA_ARCH,
         //INSTRUMENT                      = _INSTRUMENT,
 
         LOG_THREADS                     = _LOG_THREADS,
@@ -92,8 +89,8 @@ struct KernelPolicy
         struct {
             SizeT                       output_offset[SCRATCH_ELEMENTS];
             SizeT                       row_offset   [SCRATCH_ELEMENTS];
-            VertexId                    vertices     [SCRATCH_ELEMENTS];
-            VertexId                    input_queue  [SCRATCH_ELEMENTS];
+            VertexT                     vertices     [SCRATCH_ELEMENTS];
+            InKeyT                      input_queue  [SCRATCH_ELEMENTS];
         };
     };
 
@@ -106,8 +103,7 @@ struct KernelPolicy
     };
 };
 
-
-} // namespace edge_map_partitioned
+} // namespace LB
 } // namespace oprtr
 } // namespace gunrock
 

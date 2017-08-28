@@ -27,10 +27,12 @@
 #include <gunrock/util/reduction/tree_reduce.cuh>
 
 #include <gunrock/util/scan/cooperative_scan.cuh>
+#include <gunrock/util/vector_types.cuh>
+#include <gunrock/util/type_limits.cuh>
 
 namespace gunrock {
 namespace oprtr {
-namespace cull_filter {
+namespace CULL {
 
 /**
 * Templated texture reference for visited mask
@@ -59,50 +61,51 @@ texture<LabelT, cudaTextureType1D, cudaReadModeElementType> LabelsTex<LabelT>::l
  * @tparam Functor Functor type for the specific problem type.
  *
  */
-template <typename KernelPolicy, typename Problem, typename Functor>
+template <typename KernelPolicyT, typename FilterOpT>
 struct Cta
 {
     //---------------------------------------------------------------------
     // Typedefs and Constants
     //---------------------------------------------------------------------
 
-    typedef typename KernelPolicy::VertexId         VertexId;
-    typedef typename KernelPolicy::SizeT            SizeT;
+    static const OprtrFlag FLAG = KernelPolicyT::FLAG;
+    //typedef typename KernelPolicyT::VertexId         VertexId;
+    typedef typename KernelPolicyT::InKeyT           InKeyT;
+    typedef typename KernelPolicyT::OutKeyT          OutKeyT;
+    typedef typename KernelPolicyT::SizeT            SizeT;
+    typedef typename KernelPolicyT::ValueT           ValueT;
+    typedef typename KernelPolicyT::LabelT           LabelT;
 
-    typedef typename KernelPolicy::RakingDetails    RakingDetails;
-    typedef typename KernelPolicy::SmemStorage      SmemStorage;
-
-    typedef typename Problem::DataSlice             DataSlice;
-    typedef typename Problem::Value                 Value;
-    typedef typename Functor::LabelT                LabelT;
+    typedef typename KernelPolicyT::RakingDetails    RakingDetails;
+    typedef typename KernelPolicyT::SmemStorage      SmemStorage;
 
     /**
      * Members
      */
 
     // Input and output device pointers
-    VertexId                *d_in;                      // Incoming frontier
-    Value                   *d_value_in;                //
-    VertexId                *d_out;                     // Outgoing frontier
-    DataSlice               *d_data_slice;              // Problem data
-    unsigned char           *d_visited_mask;            // Mask for detecting visited status
+    const InKeyT        *keys_in;      // Incoming frontier
+    const ValueT        *values_in;    // Incoming values
+          OutKeyT       *keys_out;     // Outgoing frontier
+          LabelT        *labels;       // Key labels
+    const LabelT         label;        // Current label
+    //DataSlice     *d_data_slice;  // Problem data
+    unsigned char *visited_masks; // Mask for detecting visited status
 
     // Work progress
-    //VertexId                iteration;                  // Current graph traversal iteration
-    typename Functor::LabelT label;
-    VertexId                queue_index;                // Current frontier queue counter index
-    util::CtaWorkProgress<SizeT> &work_progress;             // Atomic workstealing and queueing counters
-    SizeT                   max_out_frontier;           // Maximum size (in elements) of outgoing frontier
-    //int                     num_gpus;                   // Number of GPUs
+    const SizeT          queue_index;  // Current frontier queue counter index
+    util::CtaWorkProgress<SizeT> &work_progress; // Atomic workstealing and queueing counters
+    //const SizeT          max_out_frontier; // Maximum size (in elements) of outgoing frontier
+    FilterOpT      filter_op;
 
     // Operational details for raking_scan_grid
-    RakingDetails           raking_details;
+    RakingDetails  raking_details;
 
     // Shared memory for the CTA
-    SmemStorage             &smem_storage;
+    SmemStorage   &smem_storage;
 
     // Whether or not to perform bitmask culling (incurs extra latency on small frontiers)
-    bool                    bitmask_cull;
+    bool           bitmask_cull;
     //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *t_bitmask;
 
     //---------------------------------------------------------------------
@@ -135,14 +138,14 @@ struct Cta
         //---------------------------------------------------------------------
 
         // Dequeued element ids
-        VertexId    element_id[LOADS_PER_TILE][LOAD_VEC_SIZE];
-        VertexId    pred_id[LOADS_PER_TILE][LOAD_VEC_SIZE];
+        InKeyT    element_id  [LOADS_PER_TILE][LOAD_VEC_SIZE];
+        InKeyT    pred_id     [LOADS_PER_TILE][LOAD_VEC_SIZE];
 
         // Whether or not the corresponding element_id is valid for exploring
-        unsigned char   flags[LOADS_PER_TILE][LOAD_VEC_SIZE];
+        unsigned char flags   [LOADS_PER_TILE][LOAD_VEC_SIZE];
 
         // Global scatter offsets
-        SizeT       ranks[LOADS_PER_TILE][LOAD_VEC_SIZE];
+        SizeT       ranks     [LOADS_PER_TILE][LOAD_VEC_SIZE];
 
 
         //---------------------------------------------------------------------
@@ -163,7 +166,8 @@ struct Cta
             static __device__ __forceinline__ void InitFlags(Tile *tile)
             {
                 // Initially valid if vertex-id is valid
-                tile->flags[LOAD][VEC] = (tile->element_id[LOAD][VEC] == util::InvalidValue<VertexId>()) ? 0 : 1;
+                tile->flags[LOAD][VEC] =
+                    (tile->element_id[LOAD][VEC] == util::PreDefinedValues<InKeyT>::InvalidValue) ? 0 : 1;
                 tile->ranks[LOAD][VEC] = tile->flags[LOAD][VEC];
 
                 // Next
@@ -181,41 +185,27 @@ struct Cta
                 if (tile->element_id[LOAD][VEC] >= 0)
                 {
                     // Location of mask byte to read
-                    SizeT mask_byte_offset = (tile->element_id[LOAD][VEC] & KernelPolicy::ELEMENT_ID_MASK) >> 3;
+                    SizeT mask_byte_offset =
+                        (tile->element_id[LOAD][VEC] & KernelPolicyT::ELEMENT_ID_MASK) >> 3;
 
                     // Bit in mask byte corresponding to current vertex id
                     unsigned char mask_bit = 1 << (tile->element_id[LOAD][VEC] & 7);
 
                     // Read byte from visited mask in tex
-                    //unsigned char tex_mask_byte = tex1Dfetch(
-                    //    BitmaskTex<unsigned char>::ref,//cta->t_bitmask[0],
-                    //    mask_byte_offset);
                     //unsigned char tex_mask_byte = cta->d_visited_mask[mask_byte_offset];
-                    unsigned char tex_mask_byte = _ldg(cta -> d_visited_mask + mask_byte_offset);
+                    unsigned char tex_mask_byte
+                        = _ldg(cta -> visited_mask + mask_byte_offset);
 
                     if (mask_bit & tex_mask_byte)
                     {
                         // Seen it
-                        tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
+                        tile->element_id[LOAD][VEC]
+                            = util::PreDefinedValues<InKeyT>::InvalidValue;
                     } else {
-                        //unsigned char mask_byte = tex_mask_byte;
-                        //util::io::ModifiedLoad<util::io::ld::cg>::Ld(
-                        //    mask_byte, cta->d_visited_mask + mask_byte_offset);
-                        //mask_byte = cta->d_visited_mask[mask_byte_offset];
-
-                        //mask_byte |= tex_mask_byte;
-
-                        //if (mask_bit & mask_byte) {
-                            // Seen it
-                        //    tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
-                        //} else {
-                            // Update with best effort
-                            //mask_byte |= mask_bit;
-                            tex_mask_byte |= mask_bit;
-                            util::io::ModifiedStore<util::io::st::cg>::St(
-                                tex_mask_byte, //mask_byte,
-                                cta->d_visited_mask + mask_byte_offset);
-                        //}
+                        tex_mask_byte |= mask_bit;
+                        util::io::ModifiedStore<util::io::st::cg>::St(
+                            tex_mask_byte, //mask_byte,
+                            cta->visited_mask + mask_byte_offset);
                     }
                 }
 
@@ -237,60 +227,39 @@ struct Cta
                 static __device__ __forceinline__ void Cull(
                     Cta* cta, Tile *tile)
                 {
-                    if (tile -> element_id[LOAD][VEC] >= 0)//util::isValid(row_id))//tile->element_id[LOAD][VEC]))
+                    //if (tile -> element_id[LOAD][VEC] >= 0)
+                    if (util::isValid(tile -> element_id[LOAD][VEC]))
                     {
-                        VertexId row_id = (tile->element_id[LOAD][VEC] & KernelPolicy::ELEMENT_ID_MASK);///cta->num_gpus;
-                        //row_id = row_id & KernelPolicy::ELEMENT_ID_MASK;
+                        InKeyT key_in = (tile->element_id[LOAD][VEC]
+                            & KernelPolicyT::ELEMENT_ID_MASK);
+                        //row_id = row_id & KernelPolicyT::ELEMENT_ID_MASK;
 
                         //LabelT label;
                         //util::io::ModifiedLoad<Problem::COLUMN_READ_MODIFIER>::Ld(
                         //    label,
                         //    cta->d_data_slice ->labels + row_id);
                         //if (label != util::MaxValue<LabelT>())
-                        if (cta -> d_data_slice -> labels[row_id] != util::MaxValue<LabelT>())
+                        if (cta -> labels[key_in] !=
+                            util::PreDefinedValues<LabelT>::MaxValue)
                         {
                             // Seen it
-                            tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
+                            tile->element_id[LOAD][VEC]
+                                = util::PreDefinedValues<InKeyT>::InvalidValue;
                             //row_id = util::InvalidValue<VertexId>();
                         } else {
-                            cta -> d_data_slice -> labels[row_id] = cta -> label;
-                            if (Problem::MARK_PREDECESSORS) {
-                                if (Functor::CondFilter(
-                                    tile->pred_id[LOAD][VEC],
-                                    row_id, cta->d_data_slice,
-                                    util::InvalidValue<SizeT>(),
-                                    cta->label,
-                                    util::InvalidValue<SizeT>(),
-                                    util::InvalidValue<SizeT>()))
-                                {
-                                    Functor::ApplyFilter(
-                                        tile->pred_id[LOAD][VEC],
-                                        row_id, cta->d_data_slice,
-                                        util::InvalidValue<SizeT>(),
-                                        cta->label,
-                                        util::InvalidValue<SizeT>(),
-                                        util::InvalidValue<SizeT>());
-                                } //else tile -> element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
-                            } else {
-                                if (Functor::CondFilter(
-                                    util::InvalidValue<VertexId>(),
-                                    row_id,
-                                    cta->d_data_slice,
-                                    util::InvalidValue<SizeT>(),
-                                    cta->label,
-                                    util::InvalidValue<SizeT>(),
-                                    util::InvalidValue<SizeT>()))
-                                {
-                                    Functor::ApplyFilter(
-                                        util::InvalidValue<VertexId>(),
-                                        row_id,
-                                        cta->d_data_slice,
-                                        util::InvalidValue<SizeT>(),
-                                        cta->label,
-                                        util::InvalidValue<SizeT>(),
-                                        util::InvalidValue<SizeT>());
-                                } //else tile -> element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
-                            }
+                            cta -> labels[key_in] = cta -> label;
+                            InKeyT src = (FLAG & OprtrOption_Mark_Predecessors) ?
+                                (tile -> pred_id[LOAD][VEC]) :
+                                util::PreDefinedValues<InKeyT>::InvalidValue;
+                            if (!cta -> filter_op(
+                                src,
+                                key_in,
+                                util::PreDefinedValues<SizeT>::InvalidValue,
+                                key_in,
+                                util::PreDefinedValues<SizeT>::InvalidValue,
+                                util::PreDefinedValues<SizeT>::InvalidValue))
+                                tile -> element_id[LOAD][VEC]
+                                    = util::PreDefinedValues<InKeyT>::InvalidValue;
                         }
                     }
                 }
@@ -304,29 +273,21 @@ struct Cta
                 {
                     if (util::isValid(tile->element_id[LOAD][VEC]))
                     {
-                        // Row index on our GPU (for multi-gpu, element ids are striped across GPUs)
-                        //VertexId row_id = (tile->element_id[LOAD][VEC]);// / cta->num_gpus;
-                        SizeT node_id = threadIdx.x * LOADS_PER_TILE*LOAD_VEC_SIZE + LOAD*LOAD_VEC_SIZE+VEC;
-                        if (Functor::CondFilter(
-                            util::InvalidValue<VertexId>(),
-                            tile->element_id[LOAD][VEC],//row_id,
-                            cta->d_data_slice,
+                        SizeT node_id = threadIdx.x * LOADS_PER_TILE * LOAD_VEC_SIZE
+                            + LOAD*LOAD_VEC_SIZE+VEC;
+                        InKeyT src = (FLAG & OprtrOption_Mark_Predecessors) ?
+                            (tile -> pred_id[LOAD][VEC]) :
+                            util::PreDefinedValues<InKeyT>::InvalidValue;
+                        SizeT output_pos = util::PreDefinedValues<SizeT>::InvalidValue;
+                        if (!cta -> filter_op(
+                            src,
+                            tile->element_id[LOAD][VEC],
+                            output_pos, //util::PreDefinedValues<SizeT>::InvalidValue,
+                            tile->element_id[LOAD][VEC],
                             node_id,
-                            cta->label,
-                            util::InvalidValue<SizeT>(),
-                            util::InvalidValue<SizeT>()))
-                        {
-                            // ApplyFilter(row_id)
-                            Functor::ApplyFilter(
-                            util::InvalidValue<VertexId>(),
-                            tile->element_id[LOAD][VEC],//row_id,
-                            cta->d_data_slice,
-                            node_id,
-                            cta->label,
-                            util::InvalidValue<SizeT>(),
-                            util::InvalidValue<SizeT>());
-                        }
-                        else tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
+                            output_pos))
+                            tile -> element_id[LOAD][VEC]
+                                = util::PreDefinedValues<InKeyT>::InvalidValue;
                     }
                 }
             };
@@ -341,7 +302,7 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                VertexC<SizeT, Problem::ENABLE_IDEMPOTENCE>::Cull(cta, tile);
+                VertexC<SizeT, (FLAG & OprtrOption_Idempotence) != 0>::Cull(cta, tile);
 
                 // Next
                 Iterate<LOAD, VEC + 1>::VertexCull(cta, tile);
@@ -357,14 +318,15 @@ struct Cta
             {
                 if (util::isValid(tile->element_id[LOAD][VEC]))
                 {
-                    int hash = (tile->element_id[LOAD][VEC]) % SmemStorage::HISTORY_HASH_ELEMENTS;
+                    int hash = (tile->element_id[LOAD][VEC])
+                        % SmemStorage::HISTORY_HASH_ELEMENTS;
                         //(tile -> element_id[LOAD][VEC]) & SmemStorage::HISTORY_HASH_MASK;
-                    VertexId retrieved = cta->smem_storage.history[hash];
+                    InKeyT retrieved = cta->smem_storage.history[hash];
 
                     if (retrieved == tile->element_id[LOAD][VEC])
                     {
                         // Seen it
-                        tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
+                        tile->element_id[LOAD][VEC] = util::PreDefinedValues<InKeyT>::InvalidValue;
                     } else {
                         // Update it
                         cta->smem_storage.history[hash] = tile->element_id[LOAD][VEC];
@@ -383,14 +345,17 @@ struct Cta
                 Cta *cta,
                 Tile *tile)
             {
-                if (util::isValid(tile->element_id[LOAD][VEC])) {
+                if (util::isValid(tile->element_id[LOAD][VEC]))
+                {
                     int warp_id = threadIdx.x >> 5;
-                    int hash    = tile->element_id[LOAD][VEC] & SmemStorage::WARP_HASH_MASK;//(SmemStorage::WARP_HASH_ELEMENTS - 1);
+                    int hash    = tile->element_id[LOAD][VEC]
+                        & SmemStorage::WARP_HASH_MASK;
+                        //(SmemStorage::WARP_HASH_ELEMENTS - 1);
 
-                    /*if (warp_id < 0 || warp_id >= KernelPolicy::WARPS)
+                    /*if (warp_id < 0 || warp_id >= KernelPolicyT::WARPS)
                     {
                         printf("Invalid warp_id (%d), threadIdx.x == %d, WARPS = %d\n",
-                        warp_id, threadIdx.x, KernelPolicy::WARPS);
+                        warp_id, threadIdx.x, KernelPolicyT::WARPS);
                         return;
                     }
 
@@ -403,14 +368,14 @@ struct Cta
                     }*/
 
                     cta->smem_storage.state.vid_hashtable[warp_id][hash] = tile->element_id[LOAD][VEC];
-                    VertexId retrieved = cta->smem_storage.state.vid_hashtable[warp_id][hash];
+                    InKeyT retrieved = cta->smem_storage.state.vid_hashtable[warp_id][hash];
 
                     if (retrieved == tile->element_id[LOAD][VEC])
                     {
                         cta->smem_storage.state.vid_hashtable[warp_id][hash] = threadIdx.x;
-                        VertexId tid = cta->smem_storage.state.vid_hashtable[warp_id][hash];
+                        InKeyT tid = cta->smem_storage.state.vid_hashtable[warp_id][hash];
                         if (tid != threadIdx.x) {
-                            tile->element_id[LOAD][VEC] = util::InvalidValue<VertexId>();
+                            tile->element_id[LOAD][VEC] = util::PreDefinedValues<InKeyT>::InvalidValue;
                         }
                     }
                 }
@@ -540,11 +505,11 @@ struct Cta
     {
         static __device__ __forceinline__ bool Eval(LabelT label)
         {
-            if (KernelPolicy::END_BITMASK_CULL < 0)
+            if (KernelPolicyT::END_BITMASK_CULL < 0)
                 return true;
-            else if (KernelPolicy::END_BITMASK_CULL == 0)
+            else if (KernelPolicyT::END_BITMASK_CULL == 0)
                 return false;
-            else return (label < KernelPolicy::END_BITMASK_CULL);
+            else return (label < KernelPolicyT::END_BITMASK_CULL);
         }
     };
 
@@ -561,49 +526,43 @@ struct Cta
      * @brief CTA type default constructor
      */
     __device__ __forceinline__ Cta(
-        typename Functor::LabelT  label,
-        VertexId                queue_index,
-        //int                     num_gpus,
-        SmemStorage             &smem_storage,
-        VertexId                *d_in,
-        Value                   *d_value_in,
-        VertexId                *d_out,
-        DataSlice               *d_data_slice,
-        unsigned char           *d_visited_mask,
+        const SizeT              queue_index,
+        const InKeyT            *keys_in,
+        const ValueT            *values_in,
+        const LabelT             label,
+              LabelT            *labels,
+              unsigned char     *visited_masks,
+              OutKeyT           *keys_out,
+              SmemStorage       &smem_storage,
         util::CtaWorkProgress<SizeT> &work_progress,
-        SizeT                   max_out_frontier):
-        //texture<unsigned char, cudaTextureType1D, cudaReadModeElementType> *t_bitmask):
-            //iteration(iteration),
-            label(label),
-            queue_index(queue_index),
-            //num_gpus(num_gpus),
-            raking_details(
-                smem_storage.state.raking_elements,
-                smem_storage.state.warpscan,
-                0),
-            smem_storage(smem_storage),
-            d_in(d_in),
-            d_value_in(d_value_in),
-            d_out(d_out),
-            d_data_slice(d_data_slice),
-            d_visited_mask(d_visited_mask),
-            work_progress(work_progress),
-            max_out_frontier(max_out_frontier)
-	    //t_bitmask(t_bitmask),
-            //bitmask_cull(
-            //    (KernelPolicy::END_BITMASK_CULL < 0) ?
-            //        true :
-            //        ((KernelPolicy::END_BITMASK_CULL == 0) ?
-            //            false :
-            //            (/*iteration*/ (Problem::ENABLE_IDEMPOTENCE) ?
-            //                (label < KernelPolicy::END_BITMASK_CULL) :
-            //                false)))
+        //const SizeT              max_out_frontier,
+        const FilterOpT         &filter_op):
+        queue_index             (queue_index),
+        keys_in                 (keys_in),
+        values_in               (values_in),
+        label                   (label),
+        labels                  (labels),
+        visited_masks           (visited_masks),
+        keys_out                (keys_out),
+        raking_details(
+            smem_storage.state.raking_elements,
+            smem_storage.state.warpscan,
+            0),
+        smem_storage            (smem_storage),
+        work_progress           (work_progress),
+        //max_out_frontier        (max_out_frontier),
+        filter_op               (filter_op)
     {
-        bitmask_cull = BitMask_Cull<typename Functor::LabelT, Problem::ENABLE_IDEMPOTENCE>::Eval(label);
+        bitmask_cull = BitMask_Cull<LabelT,
+            (FLAG & OprtrOption_Idempotence) != 0>
+            ::Eval(label);
 
         // Initialize history duplicate-filter
-        for (int offset = threadIdx.x; offset < SmemStorage::HISTORY_HASH_ELEMENTS; offset += KernelPolicy::THREADS) {
-            smem_storage.history[offset] = util::InvalidValue<VertexId>();
+        for (int offset = threadIdx.x;
+            offset < SmemStorage::HISTORY_HASH_ELEMENTS;
+            offset += KernelPolicyT::THREADS) {
+            smem_storage.history[offset]
+                = util::PreDefinedValues<InKeyT>::InvalidValue;
         }
     }
 
@@ -615,7 +574,7 @@ struct Cta
             T &tile,
             Cta *cta,
             SizeT cta_offset,
-            const SizeT &guarded_elements = KernelPolicy::TILE_ELEMENTS)
+            const SizeT &guarded_elements = KernelPolicyT::TILE_ELEMENTS)
         {}
     };
 
@@ -626,29 +585,31 @@ struct Cta
             TileT &tile,
             Cta *cta,
             SizeT &cta_offset,
-            const SizeT &guarded_elements = KernelPolicy::TILE_ELEMENTS)
+            const SizeT &guarded_elements = KernelPolicyT::TILE_ELEMENTS)
         {
-            if (Problem::MARK_PREDECESSORS && cta -> d_value_in != NULL)
+            if ((FLAG & OprtrOption_Mark_Predecessors)!= 0 &&
+                cta -> values_in != NULL)
             {
                 util::io::LoadTile<
-                KernelPolicy::LOG_LOADS_PER_TILE,
-                KernelPolicy::LOG_LOAD_VEC_SIZE,
-                KernelPolicy::THREADS,
-                Problem::QUEUE_READ_MODIFIER,
+                KernelPolicyT::LOG_LOADS_PER_TILE,
+                KernelPolicyT::LOG_LOAD_VEC_SIZE,
+                KernelPolicyT::THREADS,
+                QUEUE_READ_MODIFIER,
                 false>::LoadValid(
                     tile.pred_id,
-                    cta -> d_value_in,
+                    cta -> values_in,
                     cta_offset,
                     guarded_elements);
             }
 
-            if (cta -> bitmask_cull && cta -> d_visited_mask != NULL)
+            if (cta -> bitmask_cull && cta -> visited_masks != NULL)
             {
                 tile.BitmaskCull(cta);
             }
             tile.HistoryCull(cta);
             //tile.WarpCull(cta);
-            tile.VertexCull(cta);          // using vertex visitation status (update discovered vertices)
+            // using vertex visitation status (update discovered vertices)
+            tile.VertexCull(cta);
         }
     };
 
@@ -659,9 +620,10 @@ struct Cta
             TileT &tile,
             Cta *cta,
             SizeT &cta_offset,
-            const SizeT &guarded_elements = KernelPolicy::TILE_ELEMENTS)
+            const SizeT &guarded_elements = KernelPolicyT::TILE_ELEMENTS)
         {
-            tile.VertexCull(cta);          // using vertex visitation status (update discovered vertices)
+            // using vertex visitation status (update discovered vertices)
+            tile.VertexCull(cta);
         }
     };
 
@@ -673,25 +635,26 @@ struct Cta
      */
     __device__ __forceinline__ void ProcessTile(
         SizeT cta_offset,
-        const SizeT &guarded_elements = KernelPolicy::TILE_ELEMENTS)
+        const SizeT &guarded_elements = KernelPolicyT::TILE_ELEMENTS)
     {
-        typedef Tile<KernelPolicy::LOG_LOADS_PER_TILE, KernelPolicy::LOG_LOAD_VEC_SIZE> TileT;
+        typedef Tile<KernelPolicyT::LOG_LOADS_PER_TILE,
+            KernelPolicyT::LOG_LOAD_VEC_SIZE> TileT;
         TileT tile;
 
         // Load tile
         util::io::LoadTile<
-            KernelPolicy::LOG_LOADS_PER_TILE,
-            KernelPolicy::LOG_LOAD_VEC_SIZE,
-            KernelPolicy::THREADS,
-            Problem::QUEUE_READ_MODIFIER,
+            KernelPolicyT::LOG_LOADS_PER_TILE,
+            KernelPolicyT::LOG_LOAD_VEC_SIZE,
+            KernelPolicyT::THREADS,
+            QUEUE_READ_MODIFIER,
             false>::LoadValid(
                 tile.element_id,
-                d_in,
+                const_cast<InKeyT*>(keys_in),
                 cta_offset,
                 guarded_elements,
-                util::InvalidValue<VertexId>());
+                util::PreDefinedValues<InKeyT>::InvalidValue);
 
-        PTile<TileT, Cta, Problem::ENABLE_IDEMPOTENCE>::Process(
+        PTile<TileT, Cta, (FLAG & OprtrOption_Idempotence) != 0>::Process(
             tile, this, cta_offset, guarded_elements);
 
         // Init valid flags and ranks
@@ -704,11 +667,13 @@ struct Cta
         // space in the contracted queue, seeding ranks
         // Cooperative Scan (done)
         util::Sum<SizeT> scan_op;
-        SizeT new_queue_offset = util::scan::CooperativeTileScan<KernelPolicy::LOAD_VEC_SIZE>::ScanTileWithEnqueue(
-            raking_details,
-            tile.ranks,
-            work_progress.GetQueueCounter(queue_index + 1),
-            scan_op);
+        SizeT new_queue_offset
+            = util::scan::CooperativeTileScan<KernelPolicyT::LOAD_VEC_SIZE>
+                ::ScanTileWithEnqueue(
+                    raking_details,
+                    tile.ranks,
+                    work_progress.GetQueueCounter(queue_index + 1),
+                    scan_op);
 
         // Check updated queue offset for overflow due to redundant expansion
         //if (new_queue_offset >= max_out_frontier) {
@@ -719,13 +684,13 @@ struct Cta
 
         // Scatter directly (without first contracting in smem scratch), predicated
         // on flags
-        if (d_out != NULL) {
+        if (keys_out != NULL) {
             util::io::ScatterTile<
-                KernelPolicy::LOG_LOADS_PER_TILE,
-                KernelPolicy::LOG_LOAD_VEC_SIZE,
-                KernelPolicy::THREADS,
-                Problem::QUEUE_WRITE_MODIFIER>::Scatter(
-                    d_out,
+                KernelPolicyT::LOG_LOADS_PER_TILE,
+                KernelPolicyT::LOG_LOAD_VEC_SIZE,
+                KernelPolicyT::THREADS,
+                QUEUE_WRITE_MODIFIER>::Scatter(
+                    keys_out,
                     tile.element_id,
                     tile.flags,
                     tile.ranks);
@@ -734,7 +699,7 @@ struct Cta
 };
 
 
-} // namespace filter
+} // namespace CULL
 } // namespace oprtr
 } // namespace gunrock
 

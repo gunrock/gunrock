@@ -135,6 +135,13 @@ struct PreDefinedValues<unsigned long long>
     static const unsigned long long InvalidValue = AllOnes;
 };
 
+template <>
+struct PreDefinedValues<float>
+{
+    constexpr static const float MinValue = FLT_MIN;
+    constexpr static const float MaxValue = FLT_MAX;
+};
+
 template <typename T>
 __device__ __host__ __forceinline__
 bool isValid(T val)

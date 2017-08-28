@@ -305,7 +305,7 @@ Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::operator= (T val)
 {
-    GRError(Set(val), name + " Set() failed.", __FILE__, __LINE__);
+    GRError(Set(val), std::string(name) + " Set() failed.", __FILE__, __LINE__);
     return (*this);
 }
 
@@ -319,7 +319,7 @@ Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::operator+= (T val)
 {
-    GRError(Add(val), name + " Add() failed.", __FILE__, __LINE__);
+    GRError(Add(val), std::string(name) + " Add() failed.", __FILE__, __LINE__);
     return (*this);
 }
 
@@ -333,7 +333,7 @@ Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::operator-= (T val)
 {
-    GRError(Minus(val), name + " Minus() failed.", __FILE__, __LINE__);
+    GRError(Minus(val), std::string(name) + " Minus() failed.", __FILE__, __LINE__);
     return (*this);
 }
 
@@ -347,7 +347,7 @@ Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::operator*= (T val)
 {
-    GRError(Minus(val), name + " Mul() failed.", __FILE__, __LINE__);
+    GRError(Minus(val), std::string(name) + " Mul() failed.", __FILE__, __LINE__);
     return (*this);
 }
 
@@ -361,7 +361,7 @@ Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ::operator/= (T val)
 {
-    GRError(Minus(val), name + " Div() failed.", __FILE__, __LINE__);
+    GRError(Minus(val), std::string(name) + " Div() failed.", __FILE__, __LINE__);
     return (*this);
 }
 

@@ -5,10 +5,10 @@
 //#include <gunrock/oprtr/1D_oprtr/for_each.cuh>
 //#include <gunrock/oprtr/1D_oprtr/1D_scalar.cuh>
 //#include <gunrock/oprtr/1D_oprtr/1D_1D.cuh>
-#include <gunrock/graph/csr.cuh>
-#include <gunrock/graph/coo.cuh>
-#include <gunrock/graph/csc.cuh>
-#include <gunrock/graph/gp.cuh>
+//#include <gunrock/graph/csr.cuh>
+//#include <gunrock/graph/coo.cuh>
+//#include <gunrock/graph/csc.cuh>
+//#include <gunrock/graph/gp.cuh>
 #include <gunrock/graphio/graphio.cuh>
 
 //#include <gunrock/app/frontier.cuh>
@@ -27,9 +27,9 @@ using namespace gunrock::oprtr;
 using namespace gunrock::graph;
 using namespace gunrock::app;
 
-typedef int VertexT;
-typedef int SizeT;
-typedef int ValueT;
+typedef uint32_t VertexT;
+typedef uint64_t SizeT;
+typedef float ValueT;
 
 template <
     typename VertexT = int,
@@ -403,14 +403,14 @@ cudaError_t Test_SSSP(Parameters &parameters, GraphT &graph, util::Location targ
 {
     cudaError_t retval = cudaSuccess;
 
-    typedef gunrock::app::sssp::Problem<GraphT> ProblemT;
+    typedef gunrock::app::sssp::Problem<GraphT, unsigned char> ProblemT;
     typedef gunrock::app::sssp::Enactor<ProblemT> EnactorT;
     ProblemT problem;
     EnactorT enactor;
 
     retval = problem.Init(parameters, graph, target);
     if (retval) return retval;
-    retval = enactor.InitSSSP(parameters, &problem, target);
+    retval = enactor.Init(parameters, &problem, target);
     if (retval) return retval;
 
     retval = problem.Reset(0, target);
@@ -418,7 +418,7 @@ cudaError_t Test_SSSP(Parameters &parameters, GraphT &graph, util::Location targ
     retval = enactor.Reset(0, target);
     if (retval) return retval;
 
-    retval = enactor.EnactSSSP(0);
+    retval = enactor.Enact(0);
     if (retval) return retval;
 
     retval = problem.Release(target);
