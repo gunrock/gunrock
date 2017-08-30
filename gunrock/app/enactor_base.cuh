@@ -104,14 +104,21 @@ cudaError_t UseParameters2(
         __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<std::string>(
-        "traversal-mode",
+        "advance-mode",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         "",
-        "Traversal strategy, LB for Load-Balanced, "
+        "Advance strategy, LB for Load-Balanced, "
         "TWC for Dynamic-Cooperative, add -LIGHT for "
         "small frontiers, add -CULL for fuzed kernels; "
         "not all modes are available for specific problem; "
         "default is determined based on input graph",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<std::string>(
+        "filter-mode",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        "",
+        "Filter strategy",
         __FILE__, __LINE__));
 
     return retval;
@@ -198,9 +205,9 @@ public:
         thread_Ids      .SetName("thread_Ids"    );
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
-        iter_full_queue_time.SetName("iter_full_queue_time");
-        iter_sub_queue_time .SetName("iter_sub_queue_time" );
-        iter_total_time     .SetName("iter_total_time"     );
+        iter_full_queue_time        .SetName("iter_full_queue_time");
+        iter_sub_queue_time         .SetName("iter_sub_queue_time" );
+        iter_total_time             .SetName("iter_total_time"     );
         iter_full_queue_edges_queued.SetName("iter_full_queue_edges_queued");
         iter_full_queue_nodes_queued.SetName("iter_full_queue_nodes_queued");
 #endif
@@ -220,25 +227,22 @@ public:
         util::PrintMsg("EnactorBase::Release() entered");
 
         if (thread_slices.GetPointer(util::HOST)!= NULL)
-            retval = Kill_Threads();
-        if (retval) return retval;
+            GUARD_CU(Kill_Threads());
 
         if (enactor_slices.GetPointer(util::HOST) != NULL)
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
-            retval = util::SetDevice(gpu_idx[gpu]);
-            if (retval) return retval;
+            GUARD_CU(util::SetDevice(gpu_idx[gpu]));
             for (int peer = 0; peer < num_gpus; peer++)
             {
                 int idx = gpu * num_gpus + peer;
-                retval = enactor_slices[idx].Release(target);
-                if (retval) return retval;
+                GUARD_CU(enactor_slices[idx].Release(target));
             }
         }
-        if (retval = cuda_props    .Release(target)) return retval;
-        if (retval = enactor_slices.Release(target)) return retval;
-        if (retval = thread_Ids    .Release(target)) return retval;
-        if (retval = thread_slices .Release(target)) return retval;
+        GUARD_CU(cuda_props    .Release(target));
+        GUARD_CU(enactor_slices.Release(target));
+        GUARD_CU(thread_Ids    .Release(target));
+        GUARD_CU(thread_slices .Release(target));
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
         if (iter_full_queue_time.GetPointer(util::HOST)!= NULL && (target & util::HOST) != 0)
@@ -260,17 +264,17 @@ public:
                 for (auto it = iter_full_queue_edges_queued[gpu].begin();
                     it != iter_full_queue_edges_queued[gpu].end(); it++)
                     it -> clear();
-                iter_full_queue_time[gpu].clear();
-                iter_sub_queue_time [gpu].clear();
-                iter_total_time     [gpu].clear();
+                iter_full_queue_time        [gpu].clear();
+                iter_sub_queue_time         [gpu].clear();
+                iter_total_time             [gpu].clear();
                 iter_full_queue_nodes_queued[gpu].clear();
                 iter_full_queue_edges_queued[gpu].clear();
             }
-            if (retval = iter_full_queue_time.Release(target)) return retval;
-            if (retval = iter_sub_queue_time .Release(target)) return retval;
-            if (retval = iter_total_time     .Release(target)) return retval;
-            if (retval = iter_full_queue_nodes_queued.Release(target)) return retval;
-            if (retval = iter_full_queue_edges_queued.Release(target)) return retval;
+            GUARD_CU(iter_full_queue_time        .Release(target));
+            GUARD_CU(iter_sub_queue_time         .Release(target));
+            GUARD_CU(iter_total_time             .Release(target));
+            GUARD_CU(iter_full_queue_nodes_queued.Release(target));
+            GUARD_CU(iter_full_queue_edges_queued.Release(target));
         }
 #endif
         util::PrintMsg("EnactorBase::Release() returning");
@@ -315,32 +319,24 @@ public:
         this -> parameters  = &parameters;
         this -> flag        = flag;
 
-        retval = cuda_props    .Allocate(num_gpus, util::HOST);
-        if (retval) return retval;
-
-        retval = enactor_slices.Allocate(num_gpus * num_gpus, util::HOST);
-        if (retval) return retval;
-
-        retval = thread_slices .Allocate(num_gpus, util::HOST);
-        if (retval) return retval;
-
-        retval = thread_Ids    .Allocate(num_gpus, util::HOST);
-        if (retval) return retval;
+        GUARD_CU(cuda_props    .Allocate(num_gpus, util::HOST));
+        GUARD_CU(enactor_slices.Allocate(num_gpus * num_gpus, util::HOST));
+        GUARD_CU(thread_slices .Allocate(num_gpus, util::HOST));
+        GUARD_CU(thread_Ids    .Allocate(num_gpus, util::HOST));
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
-        if (retval = iter_full_queue_time.Allocate(num_gpus, util::HOST)) return retval;
-        if (retval = iter_sub_queue_time .Allocate(num_gpus, util::HOST)) return retval;
-        if (retval = iter_total_time     .Allocate(num_gpus, util::HOST)) return retval;
-        if (retval = iter_full_queue_nodes_queued.Allocate(num_gpus, util::HOST)) return retval;
-        if (retval = iter_full_queue_edges_queued.Allocate(num_gpus, util::HOST)) return retval;
+        GUARD_CU(iter_full_queue_time        .Allocate(num_gpus, util::HOST));
+        GUARD_CU(iter_sub_queue_time         .Allocate(num_gpus, util::HOST));
+        GUARD_CU(iter_total_time             .Allocate(num_gpus, util::HOST));
+        GUARD_CU(iter_full_queue_nodes_queued.Allocate(num_gpus, util::HOST));
+        GUARD_CU(iter_full_queue_edges_queued.Allocate(num_gpus, util::HOST));
 #endif
 
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
             if (target & util::DEVICE)
             {
-                retval = util::SetDevice(gpu_idx[gpu]);
-                if (retval) return retval;
+                GUARD_CU(util::SetDevice(gpu_idx[gpu]));
 
                 // Setup work progress (only needs doing once since we maintain
                 // it in our kernel code)
@@ -354,10 +350,12 @@ public:
             {
                 auto &enactor_slice = enactor_slices[gpu*num_gpus + peer];
 
-                retval = enactor_slice.Init(num_queues, frontier_types,
+                GUARD_CU(enactor_slice.Init(num_queues, frontier_types,
                     algo_name + "::frontier[" + std::to_string(gpu) + "," +
-                    std::to_string(peer) + "]", /*node_lock_size,*/ target);
-                if (retval) return retval;
+                    std::to_string(peer) + "]", /*node_lock_size,*/ target,
+                    cuda_props + gpu,
+                    parameters.Get<std::string>("advance-mode"),
+                    parameters.Get<std::string>("filter-mode")));
 
                 // TODO: move to somewhere
                 //initialize runtime stats
@@ -369,23 +367,21 @@ public:
                 if (gpu != peer && (target & util::DEVICE) != 0)
                 {
                     int peer_access_avail;
-                    if (retval = util::GRError(cudaDeviceCanAccessPeer(
+                    GUARD_CU2(cudaDeviceCanAccessPeer(
                         &peer_access_avail, gpu_idx[gpu], gpu_idx[peer]),
-                        "cudaDeviceCanAccess failed", __FILE__, __LINE__))
-                        return retval;
+                        "cudaDeviceCanAccess failed");
                     if (peer_access_avail)
                     {
-                        if (retval = util::GRError(cudaDeviceEnablePeerAccess(gpu_idx[peer],0),
-                            "cudaDeviceEnablePeerAccess failed", __FILE__, __LINE__))
-                            return retval;
+                        GUARD_CU2(cudaDeviceEnablePeerAccess(gpu_idx[peer],0),
+                            "cudaDeviceEnablePeerAccess failed");
                     }
                 }
             }
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
-            iter_sub_queue_time [gpu].clear();
-            iter_full_queue_time[gpu].clear();
-            iter_total_time     [gpu].clear();
+            iter_sub_queue_time         [gpu].clear();
+            iter_full_queue_time        [gpu].clear();
+            iter_total_time             [gpu].clear();
             iter_full_queue_nodes_queued[gpu].clear();
             iter_full_queue_edges_queued[gpu].clear();
 #endif
@@ -404,20 +400,16 @@ public:
         {
             if (target & util::DEVICE)
             {
-                retval = util::SetDevice(gpu_idx[gpu]);
-                if (retval) return retval;
+                GUARD_CU(util::SetDevice(gpu_idx[gpu]));
             }
             for (int peer = 0; peer < num_gpus; peer++)
             {
-                if (retval = enactor_slices[gpu * num_gpus + peer]
-                    .Reset(target))
-                    return retval;
-                //if (retval = work_progress     [gpu * num_gpus + peer]
-                //    .Reset_())
-                //    return retval;
-                //if (retval = frontier_attribute[gpu * num_gpus + peer]
-                //    .Reset())
-                //    return retval;
+                GUARD_CU(enactor_slices[gpu * num_gpus + peer]
+                    .Reset(target));
+                //GUARD_CU(work_progress     [gpu * num_gpus + peer]
+                //    .Reset_());
+                //GUARD_CU(frontier_attribute[gpu * num_gpus + peer]
+                //    .Reset());
             }
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
@@ -480,8 +472,7 @@ public:
 
         for (int gpu=0; gpu< num_gpus * num_gpus; gpu++)
         {
-            retval = enactor_slices[gpu].enactor_stats.retval;
-            if (retval) return retval;
+            GUARD_CU(enactor_slices[gpu].enactor_stats.retval);
         }
         return retval;
     }

@@ -25,7 +25,7 @@ namespace util {
  * CUDA architecture of the current compilation path
  */
 #ifndef __CUDA_ARCH__
-    #define __GR_CUDA_ARCH__ 0                      // Host path
+    //#define __GR_CUDA_ARCH__ 0                      // Host path
 #else
     #define __GR_CUDA_ARCH__ __CUDA_ARCH__          // Device path
 #endif
@@ -39,8 +39,8 @@ namespace util {
 // Invalid CUDA device ordinal
 #define GR_INVALID_DEVICE               (-1)
 
-// Threads per warp. 
-#define GR_LOG_WARP_THREADS(arch)       (5)         // 32 threads in a warp 
+// Threads per warp.
+#define GR_LOG_WARP_THREADS(arch)       (5)         // 32 threads in a warp
 #define GR_WARP_THREADS(arch)           (1 << GR_LOG_WARP_THREADS(arch))
 
 // SM memory bank stride (in bytes)
@@ -51,13 +51,13 @@ namespace util {
 #define GR_SM20_LOG_MEM_BANKS()     (5)         // 32 banks on SM2.0+
 #define GR_SM10_LOG_MEM_BANKS()     (4)         // 16 banks on SM1.0-SM1.3
 #define GR_LOG_MEM_BANKS(arch)      ((arch >= 200) ? GR_SM20_LOG_MEM_BANKS() :  \
-                                                         GR_SM10_LOG_MEM_BANKS())       
+                                                         GR_SM10_LOG_MEM_BANKS())
 
 // Physical shared memory per SM (bytes)
 #define GR_SM20_SMEM_BYTES()            (49152)     // 48KB on SM2.0+
 #define GR_SM10_SMEM_BYTES()            (16384)     // 32KB on SM1.0-SM1.3
 #define GR_SMEM_BYTES(arch)         ((arch >= 200) ? GR_SM20_SMEM_BYTES() :     \
-                                                         GR_SM10_SMEM_BYTES())      
+                                                         GR_SM10_SMEM_BYTES())
 
 // Physical threads per SM
 #define GR_SM30_SM_THREADS()            (2048)      // 2048 threads on SM3.0+
@@ -126,17 +126,17 @@ __global__ void FlushKernel(void) { }
 /**
  * Class encapsulating device properties for dynamic host-side inspection
  */
-class CudaProperties 
+class CudaProperties
 {
 public:
-    
+
     // Information about our target device
     cudaDeviceProp      device_props;
     int                 device_sm_version;
-    
+
     // Information about our kernel assembly
     int                 kernel_ptx_version;
-    
+
 public:
 
     CudaProperties()        {           }
@@ -166,4 +166,3 @@ public:
 
 } // namespace util
 } // namespace gunrock
-

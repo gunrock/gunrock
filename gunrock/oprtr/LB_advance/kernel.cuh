@@ -620,7 +620,7 @@ cudaError_t Launch(
         oprtr::SetIdx_Kernel<<<1, 256, 0, parameters.stream>>>(
             parameters.frontier -> block_output_starts.GetPointer(util::DEVICE),
             num_blocks, outputs_per_block);
-        SortedSearch<MgpuBoundsLower>(
+        mgpu::SortedSearch<mgpu::MgpuBoundsLower>(
             parameters.frontier -> block_output_starts.GetPointer(util::DEVICE),
             num_blocks,
             parameters.frontier -> output_offsets.GetPointer(util::DEVICE),
@@ -682,6 +682,11 @@ cudaError_t Launch(
               break;
       }
     }*/
+
+    if (frontier_out != NULL)
+    {
+        parameters.frontier -> queue_index ++;
+    }
     return retval;
 }
 
@@ -741,6 +746,10 @@ cudaError_t Launch_Light(
             : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
         advance_op);
 
+    if (frontier_out != NULL)
+    {
+        parameters.frontier -> queue_index ++;
+    }
     return retval;
 }
 

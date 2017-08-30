@@ -38,7 +38,7 @@ struct OprtrParameters
     util::Array1D<SizeT, SizeT >  *vertex_markers;
     util::Array1D<SizeT, unsigned char> *visited_masks;
     util::Array1D<SizeT, LabelT>  *labels;
-    cudaDeviceProp                *device_props;
+    util::CudaProperties          *cuda_props;
 
     //VertexT *d_backward_index_queue;
     //bool    *d_backward_frontier_map_in;
@@ -73,11 +73,17 @@ struct OprtrParameters
         //output_offsets     = NULL;
         reduce_values_in   = NULL;
         reduce_values_out  = NULL;
+        vertex_markers     = NULL;
+        visited_masks      = NULL;
+        labels             = NULL;
+        cuda_props         = NULL;
         //max_in             = 0;
         //max_out            = 0;
-        context            = 0;
+        context            = NULL;
         stream             = 0;
         get_output_length  = true;
+        advance_mode       = "";
+        filter_mode        = "";
         return cudaSuccess;
     }
 };

@@ -287,7 +287,7 @@ cudaError_t Launch(
 
     SizeT grid_size = (parameters.frontier -> queue_reset) ?
         (parameters.frontier -> queue_length / KernelPolicyT::THREADS + 1) :
-        (parameters.device_props -> multiProcessorCount * KernelPolicyT::CTA_OCCUPANCY);
+        (parameters.cuda_props -> device_props.multiProcessorCount * KernelPolicyT::CTA_OCCUPANCY);
     Kernel<FLAG, InKeyT, OutKeyT, SizeT, ValueT, LabelT, FilterOpT>
         <<<grid_size, KernelPolicyT::THREADS, 0, parameters.stream>>>(
         parameters.frontier -> queue_reset,
@@ -305,6 +305,10 @@ cudaError_t Launch(
         parameters.frontier -> work_progress,
         filter_op);
 
+    if (frontier_out != NULL)
+    {
+        parameters.frontier -> queue_index ++;
+    }
     return cudaSuccess;
 }
 

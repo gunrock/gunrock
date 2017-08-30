@@ -22,7 +22,7 @@
 #include <gunrock/app/frontier.cuh>
 #include <gunrock/oprtr/oprtr_parameters.cuh>
 
-using namespace mgpu;
+//using namespace mgpu;
 
 /* this is the "stringize macro macro" hack */
 #define STR(x) #x
@@ -61,8 +61,8 @@ struct EnactorStats
     unsigned long long               total_runtimes      ;
     util::Array1D<int, SizeT>        edges_queued        ;
     util::Array1D<int, SizeT>        nodes_queued        ;
-    unsigned int                     advance_grid_size   ;
-    unsigned int                     filter_grid_size    ;
+    //unsigned int                     advance_grid_size   ;
+    //unsigned int                     filter_grid_size    ;
     util::KernelRuntimeStatsLifetime advance_kernel_stats;
     util::KernelRuntimeStatsLifetime filter_kernel_stats ;
     //util::Array1D<int, SizeT>        node_locks          ;
@@ -130,19 +130,13 @@ struct EnactorStats
         if (target & util::DEVICE)
         {
             //TODO: move to somewhere
-            //if (retval = advance_kernel_stats
-            //  .Setup(advance_grid_size)) return retval;
-            //if (retval = filter_kernel_stats
-            //  .Setup(filter_grid_size )) return retval;
+            //GUARD_CU(advance_kernel_stats.Setup(advance_grid_size));
+            //GUARD_CU(filter_kernel_stats .Setup(filter_grid_size ));
         }
-        //if (retval = node_locks
-        //      .Allocate(node_lock_size + 1, target)) return retval;
-        //if (retval = node_locks_out
-        //      .Allocate(node_lock_size + 1, target)) return retval;
-        if (retval = nodes_queued
-              .Allocate(1, target | util::HOST)) return retval;
-        if (retval = edges_queued
-              .Allocate(1, target | util::HOST)) return retval;
+        //GUARD_CU(node_locks    .Allocate(node_lock_size + 1, target));
+        //GUARD_CU(node_locks_out.Allocate(node_lock_size + 1, target));
+        GUARD_CU(nodes_queued  .Allocate(1, target | util::HOST));
+        GUARD_CU(edges_queued  .Allocate(1, target | util::HOST));
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
         iter_edges_queued.clear();
@@ -162,8 +156,8 @@ struct EnactorStats
 
         nodes_queued[0] = 0;
         edges_queued[0] = 0;
-        nodes_queued.Move(util::HOST, target);
-        edges_queued.Move(util::HOST, target);
+        GUARD_CU(nodes_queued.Move(util::HOST, target));
+        GUARD_CU(edges_queued.Move(util::HOST, target));
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
         iter_edges_queued.push_back(std::vector<SizeT>());
@@ -177,10 +171,10 @@ struct EnactorStats
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
-        //if (retval = node_locks    .Release(target)) return retval;
-        //if (retval = node_locks_out.Release(target)) return retval;
-        if (retval = edges_queued  .Release(target)) return retval;
-        if (retval = nodes_queued  .Release(target)) return retval;
+        //GUARD_CU(node_locks    .Release(target));
+        //GUARD_CU(node_locks_out.Release(target));
+        GUARD_CU(edges_queued  .Release(target));
+        GUARD_CU(nodes_queued  .Release(target));
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
         for (auto it = iter_edges_queued.begin();
@@ -271,7 +265,7 @@ public:
     typedef oprtr::OprtrParameters<GraphT, FrontierT, LabelT> OprtrParametersT;
 
     cudaStream_t        stream;
-    ContextPtr          context;
+    mgpu::CudaContext  *context;
     EnactorStats<SizeT> enactor_stats;
     FrontierT           frontier;
     OprtrParametersT    oprtr_parameters;
@@ -291,29 +285,34 @@ public:
         FrontierType *types = NULL,
         std::string frontier_name = "",
         //int node_lock_size = 1024,
-        util::Location target = util::DEVICE)
+        util::Location target = util::DEVICE,
+        util::CudaProperties *cuda_properties = NULL,
+        std::string advance_mode = "",
+        std::string filter_mode = "")
     {
         cudaError_t retval = cudaSuccess;
 
         if (target & util::DEVICE)
         {
-            retval = util::GRError(cudaStreamCreateWithFlags(
+            GUARD_CU2(cudaStreamCreateWithFlags(
                 &stream, cudaStreamNonBlocking),
-                "cudaStreamCreateWithFlags failed", __FILE__, __LINE__);
-            if (retval) return retval;
+                "cudaStreamCreateWithFlags failed");
 
             int gpu_idx;
-            retval = util::GRError(cudaGetDevice(&gpu_idx));
-            if (retval) return retval;
+            GUARD_CU2(cudaGetDevice(&gpu_idx), "cudaGetDevice failed.");
             context = mgpu::CreateCudaDeviceAttachStream(gpu_idx, stream);
         }
 
-        retval = enactor_stats.Init(/*node_lock_size,*/ target);
-        if (retval) return retval;
+        GUARD_CU(enactor_stats.Init(/*node_lock_size,*/ target));
+        GUARD_CU(frontier.Init(num_queues, types, frontier_name, target));
+        GUARD_CU(oprtr_parameters.Init());
 
-        retval = frontier.Init(num_queues, types, frontier_name, target);
-        if (retval) return retval;
-
+        oprtr_parameters.stream   = stream;
+        oprtr_parameters.context  = context;
+        oprtr_parameters.frontier = &frontier;
+        oprtr_parameters.cuda_props = cuda_properties;
+        oprtr_parameters.advance_mode = advance_mode;
+        oprtr_parameters.filter_mode = filter_mode;
         return retval;
     }
 
@@ -321,18 +320,14 @@ public:
     {
         cudaError_t retval = cudaSuccess;
 
-        retval = frontier.Release(target);
-        if (retval) return retval;
-
-        retval = enactor_stats.Release(target);
-        if (retval) return retval;
+        GUARD_CU(frontier     .Release(target));
+        GUARD_CU(enactor_stats.Release(target));
 
         if (target & util::DEVICE)
         {
             if (stream != 0)
-            retval = util::GRError(cudaStreamDestroy(stream),
-                "cudaStreamDestroy failed", __FILE__, __LINE__);
-            if (retval) return retval;
+            GUARD_CU2(cudaStreamDestroy(stream),
+                "cudaStreamDestroy failed");
             stream = 0;
         }
         return retval;
@@ -341,13 +336,8 @@ public:
     cudaError_t Reset(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
-
-        retval = enactor_stats.Reset(target);
-        if (retval) return retval;
-
-        retval = frontier.Reset(target);
-        if (retval) return retval;
-
+        GUARD_CU(enactor_stats.Reset(target));
+        GUARD_CU(frontier.Reset(target));
         return retval;
     }
 };

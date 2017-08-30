@@ -25,9 +25,7 @@ namespace sssp {
 cudaError_t UseParameters2(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
-
-    retval = app::UseParameters2(parameters);
-    if (retval) return retval;
+    GUARD_CU(app::UseParameters2(parameters));
     return retval;
 }
 
@@ -73,6 +71,7 @@ static CUT_THREADPROC SSSPThread(
     auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
     auto         &retval             =   enactor_stats.retval;
     SizeT         iteration          =   0;
+    auto         &stream             =   enactor_slice.stream;
 
     if (retval = util::SetDevice(gpu_idx))
     {
@@ -108,48 +107,54 @@ static CUT_THREADPROC SSSPThread(
         //    (thread_data);
         //printf("SSSP_Thread finished\n");fflush(stdout);
 
-        oprtr::Advance<oprtr::OprtrType_V2V>(
-            (CsrT)graph, frontier.V_Q(frontier.queue_index),
-            frontier.V_Q(frontier.queue_index + 1), oprtr_parameters,
-            [distances, weights, original_vertex, preds]__host__ __device__ (
-                const VertexT &src, VertexT &dest, const SizeT &edge_id,
-                const VertexT &input_item, const SizeT &input_pos,
-                SizeT &output_pos) -> bool {
-                ValueT src_distance, edge_weight;
+        while (frontier.queue_length != 0)
+        {
+            oprtr::Advance<oprtr::OprtrType_V2V>(
+                (CsrT)graph, frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+                [distances, weights, original_vertex, preds]__host__ __device__ (
+                    const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                    const VertexT &input_item, const SizeT &input_pos,
+                    SizeT &output_pos) -> bool {
+                    ValueT src_distance, edge_weight;
 
-                util::io::ModifiedLoad<oprtr::COLUMN_READ_MODIFIER>::Ld(
-                    src_distance, distances + src);
-                util::io::ModifiedLoad<oprtr::COLUMN_READ_MODIFIER>::Ld(
-                    edge_weight, weights + edge_id);
-                ValueT new_distance = src_distance + edge_weight;
+                    util::io::ModifiedLoad<oprtr::COLUMN_READ_MODIFIER>::Ld(
+                        src_distance, distances + src);
+                    util::io::ModifiedLoad<oprtr::COLUMN_READ_MODIFIER>::Ld(
+                        edge_weight, weights + edge_id);
+                    ValueT new_distance = src_distance + edge_weight;
 
-                // Check if the destination node has been claimed as someone's child
-                ValueT old_distance = atomicMin(distances + dest, new_distance);
-                if (new_distance < old_distance)
-                {
-                    VertexT pred = src;
-                    if (original_vertex + 0 != NULL)
-                        pred = original_vertex[src];
-                    util::io::ModifiedStore<oprtr::QUEUE_WRITE_MODIFIER>::St(
-                        pred, preds + dest);
+                    // Check if the destination node has been claimed as someone's child
+                    ValueT old_distance = atomicMin(distances + dest, new_distance);
+                    if (new_distance < old_distance)
+                    {
+                        VertexT pred = src;
+                        if (original_vertex + 0 != NULL)
+                            pred = original_vertex[src];
+                        util::io::ModifiedStore<oprtr::QUEUE_WRITE_MODIFIER>::St(
+                            pred, preds + dest);
+                        return true;
+                    }
+                    return false;
+                });
+
+            oprtr::Filter<oprtr::OprtrType_V2V>(
+                graph, frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+                [labels, iteration] __host__ __device__(
+                    const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                    const VertexT &input_item, const SizeT &input_pos,
+                    SizeT &output_pos) -> bool {
+
+                    if (!util::isValid(dest)) return false;
+                    if (labels[dest] == iteration) return false;
+                    (labels + dest)[0] = iteration;
                     return true;
-                }
-                return false;
-            });
+                });
 
-        oprtr::Filter<oprtr::OprtrType_V2V>(
-            graph, frontier.V_Q(frontier.queue_index),
-            frontier.V_Q(frontier.queue_index + 1), oprtr_parameters,
-            [labels, iteration] __host__ __device__(
-                const VertexT &src, VertexT &dest, const SizeT &edge_id,
-                const VertexT &input_item, const SizeT &input_pos,
-                SizeT &output_pos) -> bool {
-
-                if (!util::isValid(dest)) return false;
-                if (labels[dest] == iteration) return false;
-                (labels + dest)[0] = iteration;
-                return true;
-            });
+            frontier.GetQueueLength(stream);
+            retval = util::GRError(cudaStreamSynchronize(stream),
+                "cudaStreamSynchronize failed.", __FILE__, __LINE__);
+            iteration ++;
+        }
         thread_status = ThreadSlice::Status::Idle;
     }
 
@@ -242,7 +247,7 @@ public:
      */
     cudaError_t Reset(VertexT src, util::Location target = util::DEVICE)
     {
-        typedef typename GraphT::GpT GpT; 
+        typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
         for (int gpu = 0; gpu < this->num_gpus; gpu++)

@@ -197,7 +197,7 @@ cudaError_t ComputeOutputLength(
         parameters.frontier -> output_offsets.GetPointer(util::DEVICE), FLAG);
         //util::DisplayDeviceResults(partitioned_scanned_edges, frontier_attribute->queue_length);
 
-    Scan<mgpu::MgpuScanTypeInc>(
+    mgpu::Scan<mgpu::MgpuScanTypeInc>(
         parameters.frontier -> output_offsets.GetPointer(util::DEVICE),
         parameters.frontier -> queue_length, // TODO: +1?
         (SizeT)0,

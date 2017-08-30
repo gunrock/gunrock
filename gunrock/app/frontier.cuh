@@ -193,20 +193,49 @@ struct Frontier
         return retval;
     }
 
-    VertexQT *V_Q(SizeT index)
+    VertexQT *V_Q(SizeT index = util::PreDefinedValues<SizeT>::InvalidValue)
     {
+        if (index == util::PreDefinedValues<SizeT>::InvalidValue)
+            index = queue_index;
         return vertex_queues + queue_map[index];
     }
 
-    EdgeQT *E_Q(SizeT index)
+    VertexQT *Next_V_Q(SizeT index = util::PreDefinedValues<SizeT>::InvalidValue)
     {
+        if (index == util::PreDefinedValues<SizeT>::InvalidValue)
+            index = queue_index;
+        index ++;
+        return V_Q(index);
+    }
+
+    EdgeQT *E_Q(SizeT index  = util::PreDefinedValues<SizeT>::InvalidValue)
+    {
+        if (index == util::PreDefinedValues<SizeT>::InvalidValue)
+            index = queue_index;
         return edge_queues + queue_map[index];
+    }
+
+    EdgeQT *Next_E_Q(SizeT index  = util::PreDefinedValues<SizeT>::InvalidValue)
+    {
+        if (index == util::PreDefinedValues<SizeT>::InvalidValue)
+            index = queue_index;
+        index ++;
+        return E_Q(index);
     }
 
     cudaError_t Reset(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
+        queue_reset = true;
+        queue_index = 0;
+        return retval;
+    }
 
+    cudaError_t GetQueueLength(cudaStream_t stream = 0)
+    {
+        cudaError_t retval = cudaSuccess;
+        GUARD_CU(work_progress.GetQueueLength(
+            queue_index, queue_length, false, stream, true));
         return retval;
     }
 }; // struct Frontier
