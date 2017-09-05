@@ -22,6 +22,8 @@
 #include <fstream>
 #include <map>
 #include <iostream>
+#include <random>
+#include <map>
 
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
@@ -162,19 +164,62 @@ template <
     typename VertexId,
     typename SizeT,
     typename Value>
-void Reference(
-    const std::string &fname,
+void ReferenceRW(
     Csr<VertexId, SizeT, Value> &graph,
-    bool                              quiet)
+    int                         walk_length,
+    bool                        quiet = false)
 {
-    // Add CPU Implementation here.   
-    // Write graph to txt file and generate random edge weights [0,64)
-    graph.WriteToLigraFile(
-        fname.c_str(),
-        graph.nodes,
-        graph.edges,
-        graph.row_offsets,
-        graph.column_indices);
+    //assume the input data are sorted 
+    int length = walk_length;
+    typedef std::map<int, std::vector<int>> StdAdjGraph;
+    StdAdjGraph my_graph;
+
+    for (int i = 0; i < graph.nodes; ++i)
+    {
+        std::vector<int> list;
+        for (int j = graph.row_offsets[i]; j < graph.row_offsets[i + 1]; ++j)
+        {
+            
+            list.push_back(graph.column_indices[j]);
+        }
+        my_graph.insert(std::pair<int, std::vector<int>>(i, list));
+    }
+
+    std::vector<int> curr;
+    std::random_device rand;
+    std::mt19937 engine{rand()};
+    int output[graph.nodes][length];
+
+    CpuTimer cpu_timer;
+    cpu_timer.Start();
+    for(int i = 0; i < graph.nodes; ++i){
+        curr = my_graph[i];
+        output[i][0] = i;
+        for(int j = 1; j < length; ++j){
+            std::uniform_int_distribution<int> dist(0, curr.size()-1);
+            int next = curr[dist(engine)];
+            output[i][j] = next;
+            curr = my_graph[next];
+        }
+    }
+
+    cpu_timer.Stop();
+    float elapsed = cpu_timer.ElapsedMillis();
+
+    if(!quiet){
+        printf("CPU RW finished in %lf msec. Walklength: %d\n",
+                   elapsed, length);
+    }
+    /*debug purpose
+    printf("example out(walk length limit to 5): \n");
+    for(int i = 0; i < graph.nodes; i++){
+        for(int k = 0; k < length; k++){
+            printf("%d ", output[i][k]);
+        }
+        printf("\n");
+    }
+    */
+  
 }
 
 
@@ -262,6 +307,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     SizeT nodes = graph->nodes;
     VertexId *h_paths = (VertexId*)malloc(sizeof(VertexId) * nodes * walk_length);
     SizeT *h_neighbor = (SizeT*)malloc(sizeof(SizeT)*nodes);
+
+    ReferenceRW(*graph, walk_length, quiet_mode);
 
 
     // Allocate problem on GPU
