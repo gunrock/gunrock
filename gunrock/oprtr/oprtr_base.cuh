@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <gunrock/util/io/cub_io.cuh>
+
 namespace gunrock {
 namespace oprtr {
 
@@ -45,7 +47,10 @@ static const util::io::ld::CacheModifier ROW_OFFSET_UNALIGNED_READ_MODIFIER
 static const util::io::st::CacheModifier QUEUE_WRITE_MODIFIER
     = util::io::st::cg;
 
-static const int CUDA_ARCH = 300; // CUDA_ARCH compiled for
+#ifndef CUDA_ARCH
+    static const int CUDA_ARCH = 300; // CUDA_ARCH compiled for
+#endif
+
 /**
  * @brief Operator Modes
  */

@@ -95,25 +95,28 @@ static CUT_THREADPROC SSSPThread(
         util::PrintMsg("Run started");
         while (frontier.queue_length != 0 && !(retval))
         {
-            util::PrintMsg("Iteration " + std::to_string(iteration) 
+            util::PrintMsg("Iteration " + std::to_string(iteration)
                 + " begin, queue_length = " + std::to_string(frontier.queue_length)
                 + " distances = " + util::to_string(distances.GetPointer(util::DEVICE))
                 + " sizeof(ValueT) = " + std::to_string(sizeof(ValueT)));
 
             retval = oprtr::Advance<oprtr::OprtrType_V2V>(
-                (static_cast<CsrT*>(&graph))[0], frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
-                [distances, weights, original_vertex, preds]__host__ __device__ (
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+                [distances, weights, original_vertex, preds]
+                __host__ __device__ (
                     const VertexT &src, VertexT &dest, const SizeT &edge_id,
                     const VertexT &input_item, const SizeT &input_pos,
                     SizeT &output_pos) -> bool {
-                    ValueT src_distance, edge_weight;
+                    //ValueT edge_weight;
 
-                    util::io::ModifiedLoad<oprtr::COLUMN_READ_MODIFIER>::Ld(
-                        src_distance, distances + src);
+                    //util::io::ModifiedLoad<oprtr::COLUMN_READ_MODIFIER>::Ld(
+                    //    src_distance, distances + src);
+                    ValueT src_distance = Load<cub::LOAD_CG>(distances + src);
                     //printf("%llu : %p\n", src, distances + src);
                     //src_distance = distances[src];
-                    util::io::ModifiedLoad<oprtr::COLUMN_READ_MODIFIER>::Ld(
-                        edge_weight, weights + edge_id);
+                    //util::io::ModifiedLoad<oprtr::COLUMN_READ_MODIFIER>::Ld(
+                    //    edge_weight, weights + edge_id);
+                    ValueT edge_weight = Load<cub::LOAD_CS>(weights + edge_id);
                     ValueT new_distance = src_distance + edge_weight;
 
                     // Check if the destination node has been claimed as someone's child
@@ -121,17 +124,18 @@ static CUT_THREADPROC SSSPThread(
                     if (new_distance < old_distance)
                     {
                         //printf("%llu (%.3f + %.3f) -> %llu (%.3f -> %.3f), %llu\n",
-                        //    (unsigned long long)src, src_distance, edge_weight, 
+                        //    (unsigned long long)src, src_distance, edge_weight,
                         //    (unsigned long long)dest, old_distance,
-                        //    new_distance, (unsigned long long) edge_id);  
-     
-                        if (preds + 0 != NULL)
+                        //    new_distance, (unsigned long long) edge_id);
+
+                        if (!preds.isEmpty())
                         {
                             VertexT pred = src;
-                            if (original_vertex + 0 != NULL)
+                            if (!original_vertex.isEmpty())
                                 pred = original_vertex[src];
-                            util::io::ModifiedStore<oprtr::QUEUE_WRITE_MODIFIER>::St(
-                                pred, preds + dest);
+                            //util::io::ModifiedStore<oprtr::QUEUE_WRITE_MODIFIER>::St(
+                            //    pred, preds + dest);
+                            Store(preds + dest, pred);
                         }
                         return true;
                     }
@@ -149,7 +153,8 @@ static CUT_THREADPROC SSSPThread(
             oprtr_parameters.label = iteration + 1;
             oprtr_parameters.frontier -> queue_reset = false;
             retval = oprtr::Filter<oprtr::OprtrType_V2V>(
-                graph, frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                oprtr_parameters,
                 [labels, iteration] __host__ __device__(
                     const VertexT &src, VertexT &dest, const SizeT &edge_id,
                     const VertexT &input_item, const SizeT &input_pos,
@@ -157,7 +162,8 @@ static CUT_THREADPROC SSSPThread(
 
                     if (!util::isValid(dest)) return false;
                     if (labels[dest] == iteration) return false;
-                    (labels + dest)[0] = iteration;
+                    //(labels + dest)[0] = iteration;
+                    labels[dest] = iteration;
                     return true;
                 });
             if (retval) break;
@@ -299,7 +305,7 @@ public:
                     }
                 }
             }
-            
+
             else {
                 this -> thread_slices[gpu].init_size = 0;
                 for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)

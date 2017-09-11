@@ -98,6 +98,11 @@ struct TestGraph :
         if (retval) return retval;
         return retval;
     }
+
+    CsrT &csr()
+    {
+        return (static_cast<CsrT*>(this))[0];
+    }
 };
 
 /*void Test_Array()

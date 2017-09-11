@@ -960,11 +960,11 @@ public:
 #endif
     }
 
-    __host__ __device__ const __forceinline__
+    __host__ __device__ __forceinline__
     ValueT& operator[](std::size_t idx) const
     {
 #ifdef __CUDA_ARCH__
-        return const_cast<ValueT&>(d_pointer[idx]);
+        return d_pointer[idx];
 #else
     #ifdef ENABLE_ARRAY_DEBUG
         if (h_pointer == NULL)
@@ -974,7 +974,7 @@ public:
             GRError(std::string(name) + " access out of bound", __FILE__, __LINE__);
         //PrintMsg(name + " [" + std::string(idx) + "]ed2");
     #endif
-        return const_cast<ValueT&>(h_pointer[idx]);
+        return h_pointer[idx];
 #endif
     }
 
@@ -1008,6 +1008,16 @@ public:
         //PrintMsg(name + " -> ed");
     #endif
         return h_pointer + offset;
+#endif
+    }
+
+    __host__ __device__ __forceinline__
+    bool isEmpty() const
+    {
+#ifdef __CUDA_ARCH__
+        return (d_pointer == NULL) ? true : false;
+#else
+        return (h_pointer == NULL) ? true : false;
 #endif
     }
 
