@@ -293,15 +293,17 @@ cudaError_t Launch(
         parameters.frontier -> queue_reset,
         (SizeT)(parameters.frontier -> queue_index),
         (frontier_in == NULL) ? ((InKeyT*)NULL)
-            : frontier_in -> GetPointer(util::DEVICE),
+            : (frontier_in -> GetPointer(util::DEVICE)),
         (parameters.values_in == NULL) ? ((ValueT*)NULL)
-            : parameters.values_in -> GetPointer(util::DEVICE),
+            : (parameters.values_in -> GetPointer(util::DEVICE)),
         parameters.frontier -> queue_length,
         parameters.label,
-        parameters.labels -> GetPointer(util::DEVICE),
-        parameters.visited_masks -> GetPointer(util::DEVICE),
+        (parameters.labels == NULL) ? ((LabelT*)NULL)
+            : (parameters.labels -> GetPointer(util::DEVICE)),
+        (parameters.visited_masks == NULL) ? ((unsigned char*)NULL)
+            : (parameters.visited_masks -> GetPointer(util::DEVICE)),
         (frontier_out == NULL) ? ((OutKeyT*)NULL)
-            : frontier_out -> GetPointer(util::DEVICE),
+            : (frontier_out -> GetPointer(util::DEVICE)),
         parameters.frontier -> work_progress,
         filter_op);
 

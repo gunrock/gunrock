@@ -78,6 +78,10 @@ struct Csr :
      */
     Csr() : BaseGraph()
     {
+        column_indices.SetName("column_indices");
+        row_offsets   .SetName("row_offsets");
+        edge_values   .SetName("edge_values");
+        node_values   .SetName("node_values");
     }
 
     /**

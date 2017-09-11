@@ -463,19 +463,11 @@ int main(int argc, char* argv[])
     typedef TestGraph<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> GraphT;
     GraphT graph;
 
-
-    retval = graphio::UseParameters(parameters);
-    if (retval) return 1;
-    //retval = partitioner::UseParameters(parameters);
-    //if (retval) return 2;
-    retval = app::sssp::UseParameters(parameters);
-    if (retval) return 3;
-
-    retval = app::sssp::UseParameters2(parameters);
-    if (retval) return 3;
-
-    retval = parameters.Parse_CommandLine(argc, argv);
-    if (retval) return 4;
+    GUARD_CU(graphio::UseParameters(parameters));
+    //GUARD_CU(partitioner::UseParameters(parameters));
+    GUARD_CU(app::sssp::UseParameters(parameters));
+    GUARD_CU(app::sssp::UseParameters2(parameters));
+    GUARD_CU(parameters.Parse_CommandLine(argc, argv));
     if (parameters.Get<bool>("help"))
     {
         parameters.Print_Help();
@@ -513,16 +505,16 @@ int main(int argc, char* argv[])
     if (retval) return 18;
     util::PrintMsg("====Test on HOST | DEVICE finished");*/
 
-    retval = Test_SSSP(parameters, graph, util::HOST);
-    if (retval) return 16;
-    util::PrintMsg("====Test on HOST finished");
+    //retval = Test_SSSP(parameters, graph, util::HOST);
+    //if (retval) return 16;
+    //util::PrintMsg("====Test on HOST finished");
 
     retval = Test_SSSP(parameters, graph, util::DEVICE);
     if (retval) return 17;
     util::PrintMsg("====Test on DEVICE finished");
 
-    retval = Test_SSSP(parameters, graph, util::HOST | util::DEVICE);
-    if (retval) return 18;
-    util::PrintMsg("====Test on HOST | DEVICE finished");
+    //retval = Test_SSSP(parameters, graph, util::HOST | util::DEVICE);
+    //if (retval) return 18;
+    //util::PrintMsg("====Test on HOST | DEVICE finished");
     return 0;
 }

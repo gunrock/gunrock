@@ -29,7 +29,7 @@ template <
     typename ParametersT,
     typename OpT>
 cudaError_t Advance(
-    const GraphT    graph,
+    const GraphT   &graph,
     FrontierInT   * frontier_in,
     FrontierOutT  * frontier_out,
     ParametersT    &parameters,
@@ -48,7 +48,7 @@ template <
     typename AdvanceOpT,
     typename FilterOpT>
 cudaError_t Advance(
-    const GraphT    graph,
+    const GraphT   &graph,
     FrontierInT   * frontier_in,
     FrontierOutT  * frontier_out,
     ParametersT    &parameters,

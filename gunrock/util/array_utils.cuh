@@ -26,7 +26,7 @@
 namespace gunrock {
 namespace util {
 
-#define ENABLE_ARRAY_DEBUG
+//#define ENABLE_ARRAY_DEBUG
 
 /**
  * @brief location flags
@@ -184,7 +184,7 @@ private:
 public:
 
     Array1D() :
-        //name     (""),
+        name     (NULL),
         h_pointer(NULL),
         d_pointer(NULL),
         setted   (LOCATION_NONE),
@@ -200,6 +200,8 @@ public:
         //setted    = LOCATION_NONE;
         //allocated = LOCATION_NONE;
         //use_cuda_alloc = false;
+        this -> name = (char*)malloc(sizeof(char) * 1);
+        this -> name[0] = '\0';
         Init(0, LOCATION_NONE);
     } // Array1D()
 
@@ -212,7 +214,7 @@ public:
     {
         if (name != NULL)
         {
-            malloc(this -> name, sizeof(char) * (strlen(name) + 1));
+            this -> name = (char*)malloc(sizeof(char) * (strlen(name) + 1));
             strcpy(this -> name, name);
         }
         //this->name.reserve(40);

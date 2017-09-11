@@ -98,6 +98,11 @@ void ProcessNeighbor(
 
     if (keys_out != NULL)
     {
+        //if (util::isValid(out_key))
+        //printf("(%3d, %3d) src = %llu, dest = %llu, edge = %llu, out_key = %llu, output_pos = %llu\n",
+        //    blockIdx.x, threadIdx.x, (unsigned long long)src, 
+        //    (unsigned long long)dest, (unsigned long long)edge_id, 
+        //    (unsigned long long)out_key, (unsigned long long)output_pos);
         util::io::ModifiedStore<QUEUE_WRITE_MODIFIER>::St(
             out_key,
             keys_out + output_pos);
@@ -130,6 +135,10 @@ __device__ __forceinline__ void PrepareQueue(
         // Reset our next outgoing queue counter to zero
         work_progress.StoreQueueLength(0, queue_index + 2);
         //work_progress.PrepResetSteal(queue_index + 1);
+    } else if (threadIdx.x == 0)
+    {
+        if (!queue_reset)
+            input_queue_length = work_progress.LoadQueueLength(queue_index);
     }
 
     // Barrier to protect work decomposition
@@ -157,6 +166,9 @@ __global__ void GetEdgeCounts(
         else
             v = graph.GetEdgeDest((keys_in == NULL) ? i : keys_in[i]);
         edge_counts[i] = graph.GetNeighborListLength(v);
+        //printf("(%3d, %3d) v = %lld, edge_counts[%lld] = %lld\n",
+        //    blockIdx.x, threadIdx.x, (unsigned long long)v, 
+        //    (unsigned long long)i, (unsigned long long)(edge_counts[i]));
     }
 }
 

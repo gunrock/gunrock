@@ -127,6 +127,11 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
                         output_offsets[iter_input_start -1] : 0)
                 : 0;
 
+        //if (num_inputs > 1 && threadIdx.x == 0)
+        //    printf("(%3d, %3d) block_input = [%llu, %llu), block_output = [%llu, %llu)\n",
+        //        blockIdx.x, threadIdx.x, 
+        //        (unsigned long long)iter_input_start, (unsigned long long)block_input_end,
+        //        (unsigned long long)block_output_start, (unsigned long long)block_output_end);
         while (block_output_processed < block_output_size &&
             iter_input_start < block_input_end)
         {
@@ -558,7 +563,7 @@ template <
     typename  AdvanceOpT,
     typename  FilterOpT>
 cudaError_t Launch(
-    const GraphT           graph,
+    const GraphT          &graph,
     const FrontierInT    * frontier_in,
           FrontierOutT   * frontier_out,
           ParametersT     &parameters,
@@ -576,20 +581,27 @@ cudaError_t Launch(
     // load edge-expand-partitioned kernel
     if (parameters.get_output_length)
     {
+        util::PrintMsg("getting output length");
         GUARD_CU (ComputeOutputLength<FLAG>(graph, frontier_in, parameters));
+        GUARD_CU (parameters.frontier -> output_length.Move(util::DEVICE, util::HOST, 1, 0, parameters.stream));
         GUARD_CU2(cudaStreamSynchronize(parameters.stream),
             "cudaStreamSynchronize failed");
+        //GUARD_CU2(cudaDeviceSynchronize(),
+        //    "cudaDeviceSynchronize failed");
     }
 
     if (parameters.frontier -> output_length[0]
         < KernelPolicyT::LIGHT_EDGE_THRESHOLD)
     {
-        SizeT num_block = parameters.frontier -> queue_length
+        SizeT num_blocks = parameters.frontier -> queue_length
             / KernelPolicyT::SCRATCH_ELEMENTS + 1;
         //printf("using RelaxLightEdges\n");
+        util::PrintMsg("output_length = " + std::to_string(parameters.frontier -> output_length[0])
+            + ", threads = " + std::to_string(KernelPolicyT::THREADS)
+            + ", blocks = " + std::to_string(num_blocks));
         RelaxLightEdges
             <FLAG, GraphT, InKeyT, OutKeyT>
-            <<< num_block, KernelPolicyT::THREADS, 0, parameters.stream>>>(
+            <<< num_blocks, KernelPolicyT::THREADS, 0, parameters.stream>>>(
             parameters.frontier -> queue_reset,
             parameters.frontier -> queue_index,
             graph,
@@ -614,12 +626,17 @@ cudaError_t Launch(
             / 2 / KernelPolicyT::THREADS + 1; // LBPOLICY::BLOCKS
         if (num_blocks > KernelPolicyT::BLOCKS)
             num_blocks = KernelPolicyT::BLOCKS;
+        util::PrintMsg("output_length = " + std::to_string(parameters.frontier -> output_length[0])
+            + ", threads = " + std::to_string(KernelPolicyT::THREADS)
+            + ", blocks = " + std::to_string(num_blocks)
+            + ", block_output_starts = " + util::to_string(parameters.frontier -> block_output_starts.GetPointer(util::DEVICE))
+            + ", length = " + std::to_string(parameters.frontier -> block_output_starts.GetSize()));
         SizeT outputs_per_block = (parameters.frontier -> output_length[0] +
             num_blocks - 1) / num_blocks;
 
         oprtr::SetIdx_Kernel<<<1, 256, 0, parameters.stream>>>(
             parameters.frontier -> block_output_starts.GetPointer(util::DEVICE),
-            num_blocks, outputs_per_block);
+            outputs_per_block, num_blocks);
         mgpu::SortedSearch<mgpu::MgpuBoundsLower>(
             parameters.frontier -> block_output_starts.GetPointer(util::DEVICE),
             num_blocks,
@@ -699,7 +716,7 @@ template <
     typename  AdvanceOpT,
     typename  FilterOpT>
 cudaError_t Launch_Light(
-    const GraphT           graph,
+    const GraphT          &graph,
     const FrontierInT    * frontier_in,
           FrontierOutT   * frontier_out,
           ParametersT     &parameters,

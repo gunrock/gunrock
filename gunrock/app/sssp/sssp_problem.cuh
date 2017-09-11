@@ -435,6 +435,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 src_ = this -> org_graph -> GpT::convertion_table[src];
         }
         GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+        GUARD_CU2(cudaDeviceSynchronize(),
+            "cudaDeviceSynchronize failed");
 
         ValueT src_distance = 0;
         if (target & util::HOST)
@@ -446,6 +448,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         if (target & util::DEVICE)
         {
+            util::PrintMsg("distances [" + std::to_string(src) + 
+                " (" + std::to_string(src_) + ")] <- "
+                + std::to_string(src_distance));
+            util::PrintMsg("distances = " + util::to_string(data_slices[gpu] -> distances.GetPointer(util::DEVICE))
+                + " sizeof(ValueT) = " + std::to_string(sizeof(ValueT)));
+
             GUARD_CU2(cudaMemcpy(
                 data_slices[gpu]->distances.GetPointer(util::DEVICE)+ src_,
                 &src_distance, sizeof(ValueT),
@@ -462,6 +470,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     "SSSPProblem cudaMemcpy preds failed");
             }
         }
+        GUARD_CU2(cudaDeviceSynchronize(),
+            "cudaDeviceSynchronize failed");
         return retval;
     }
 

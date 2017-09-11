@@ -106,7 +106,7 @@ cudaError_t UseParameters2(
     GUARD_CU(parameters.Use<std::string>(
         "advance-mode",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        "",
+        "LB",
         "Advance strategy, LB for Load-Balanced, "
         "TWC for Dynamic-Cooperative, add -LIGHT for "
         "small frontiers, add -CULL for fuzed kernels; "
@@ -117,8 +117,22 @@ cudaError_t UseParameters2(
     GUARD_CU(parameters.Use<std::string>(
         "filter-mode",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        "",
+        "CULL",
         "Filter strategy",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<double>(
+        "queue-factor",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        6.0,
+        "Reserved frontier sizing factor, multiples of numbers of vertices or edges",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<double>(
+        "trans-factor",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        1.0,
+        "Reserved sizing factor for data communication, multiples of number of vertices",
         __FILE__, __LINE__));
 
     return retval;
@@ -157,6 +171,8 @@ public:
     int           fullqueue_latency;
     int           makeout_latency;
     int           min_sm_version;
+    std::vector<double> queue_factors;
+    double        trans_factor;
 
     //Device properties
     util::Array1D<SizeT, util::CudaProperties, ARRAY_FLAG,
@@ -283,9 +299,6 @@ public:
 
    /**
      * @brief Init function for enactor base class.
-     *
-     * @tparam Problem
-     *
      * @param[in] max_grid_size Maximum CUDA block numbers in on grid
      * @param[in] advance_occupancy CTA Occupancy for Advance operator
      * @param[in] filter_occupancy CTA Occupancy for Filter operator
@@ -293,28 +306,25 @@ public:
      *
      * \return cudaError_t object indicates the success of all CUDA calls.
      */
-    //template <typename Problem>
     cudaError_t Init(
         util::Parameters &parameters,
-        //int max_grid_size,
-        //int advance_occupancy,
-        //int filter_occupancy,
         Enactor_Flag flag = Enactor_None,
         unsigned int num_queues = 2,
         FrontierType *frontier_types = NULL,
-        //int node_lock_size = 1024,
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
 
         gpu_idx             = parameters.Get<std::vector<int>>("device");
         num_gpus            = gpu_idx.size();
-        communicate_latency = parameters.Get<int  >("communicate-latency");
-        communicate_multipy = parameters.Get<float>("communicate-multipy");
-        expand_latency      = parameters.Get<int  >("expand-latency");
-        subqueue_latency    = parameters.Get<int  >("subqueue-latency");
-        fullqueue_latency   = parameters.Get<int  >("fullqueue-latency");
-        makeout_latency     = parameters.Get<int  >("makeout-latency");
+        communicate_latency = parameters.Get<int   >("communicate-latency");
+        communicate_multipy = parameters.Get<float >("communicate-multipy");
+        expand_latency      = parameters.Get<int   >("expand-latency");
+        subqueue_latency    = parameters.Get<int   >("subqueue-latency");
+        fullqueue_latency   = parameters.Get<int   >("fullqueue-latency");
+        makeout_latency     = parameters.Get<int   >("makeout-latency");
+        queue_factors       = parameters.Get<std::vector<double>>("queue-factor");
+        trans_factor        = parameters.Get<double>("trans-factor");
         min_sm_version      = -1;
         this -> parameters  = &parameters;
         this -> flag        = flag;
@@ -356,13 +366,6 @@ public:
                     cuda_props + gpu,
                     parameters.Get<std::string>("advance-mode"),
                     parameters.Get<std::string>("filter-mode")));
-
-                // TODO: move to somewhere
-                //initialize runtime stats
-                //enactor_slice.enactor_stats -> advance_grid_size = MaxGridSize(
-                //    gpu, advance_occupancy, max_grid_size);
-                //enactor_slice.enactor_stats -> filter_grid_size  = MaxGridSize(
-                //    gpu, filter_occupancy , max_grid_size);
 
                 if (gpu != peer && (target & util::DEVICE) != 0)
                 {

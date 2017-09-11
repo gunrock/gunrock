@@ -51,6 +51,7 @@ struct Frontier
     unsigned int num_queues  ; // how many queues to support
     unsigned int num_vertex_queues; // num of vertex queues
     unsigned int num_edge_queues; // num of edge queues
+    util::Location target; // where the queues allocated
     util::Array1D<SizeT, FrontierType, FLAG, cudaHostRegisterFlag >  queue_types; // types of each queue
     util::Array1D<SizeT, unsigned int, FLAG, cudaHostRegisterFlag >  queue_map; // mapping queue index to vertex_queue / edge_queue indices
 
@@ -105,6 +106,7 @@ struct Frontier
         cudaError_t retval = cudaSuccess;
         GUARD_CU(SetName(frontier_name));
         this -> num_queues = num_queues;
+        this -> target     = target;
         GUARD_CU(queue_types.Allocate(num_queues, util::HOST));
         GUARD_CU(queue_map  .Allocate(num_queues, util::HOST));
 
@@ -160,6 +162,31 @@ struct Frontier
         return retval;
     }
 
+    cudaError_t Allocate(SizeT num_nodes, SizeT num_edges, std::vector<double> &queue_factors)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        SizeT max_queue_size = 0;
+        for (unsigned int q = 0; q < num_queues; q++)
+        {
+            double factor = queue_factors[q % queue_factors.size()];
+            if (queue_types[q] == VERTEX_FRONTIER)
+            {
+                auto &queue = vertex_queues[queue_map[q]];
+                GUARD_CU(queue.Allocate(num_nodes * factor, target));
+                if (max_queue_size < num_nodes * factor)
+                    max_queue_size = num_nodes * factor;
+            } else {
+                auto &queue = edge_queues[queue_map[q]];
+                GUARD_CU(queue.Allocate(num_edges * factor, target));
+            }
+        }
+        GUARD_CU(output_offsets.Allocate(max_queue_size, target));
+        GUARD_CU(block_input_starts.Allocate(2048, target));
+        GUARD_CU(block_output_starts.Allocate(2048, target));
+        return retval;
+    }
+
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
@@ -197,7 +224,7 @@ struct Frontier
     {
         if (index == util::PreDefinedValues<SizeT>::InvalidValue)
             index = queue_index;
-        return vertex_queues + queue_map[index];
+        return vertex_queues + queue_map[index % num_queues];
     }
 
     VertexQT *Next_V_Q(SizeT index = util::PreDefinedValues<SizeT>::InvalidValue)
@@ -212,7 +239,7 @@ struct Frontier
     {
         if (index == util::PreDefinedValues<SizeT>::InvalidValue)
             index = queue_index;
-        return edge_queues + queue_map[index];
+        return edge_queues + queue_map[index % num_queues];
     }
 
     EdgeQT *Next_E_Q(SizeT index  = util::PreDefinedValues<SizeT>::InvalidValue)
@@ -228,6 +255,8 @@ struct Frontier
         cudaError_t retval = cudaSuccess;
         queue_reset = true;
         queue_index = 0;
+        queue_length = 0;
+        GUARD_CU(work_progress.Reset_());
         return retval;
     }
 

@@ -84,9 +84,9 @@ enum : OprtrType
 {
     OprtrType_Mask = 0x0F,
     OprtrType_V2V  = 0x01,
-    OprtrType_V2E  = 0x03,
-    OprtrType_E2V  = 0x02,
-    OprtrType_E2E  = 0x04,
+    OprtrType_V2E  = 0x02,
+    OprtrType_E2V  = 0x04,
+    OprtrType_E2E  = 0x08,
 };
 
 /**

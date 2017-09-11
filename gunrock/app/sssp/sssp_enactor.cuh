@@ -79,6 +79,7 @@ static CUT_THREADPROC SSSPThread(
         CUT_THREADEND;
     }
 
+    util::PrintMsg("Thread entered.");
     thread_status = ThreadSlice::Status::Idle;
     while (thread_status != ThreadSlice::Status::ToKill)
     {
@@ -91,26 +92,16 @@ static CUT_THREADPROC SSSPThread(
         if (thread_status == ThreadSlice::Status::ToKill)
             break;
 
-        for (int peer_=0;peer_<num_gpus;peer_++)
+        util::PrintMsg("Run started");
+        while (frontier.queue_length != 0 && !(retval))
         {
-            //frontier_attribute[peer_].queue_index  = 0;        // Work queue index
-            //frontier_attribute[peer_].queue_length = peer_==0?thread_data->init_size:0;
-            //frontier_attribute[peer_].selector     = 0;//frontier_attrbute[peer_].queue_length == 0 ? 0 : 1;
-            //frontier_attribute[peer_].queue_reset  = true;
-            //enactor_stats     [peer_].iteration    = 0;
-        }
+            util::PrintMsg("Iteration " + std::to_string(iteration) 
+                + " begin, queue_length = " + std::to_string(frontier.queue_length)
+                + " distances = " + util::to_string(distances.GetPointer(util::DEVICE))
+                + " sizeof(ValueT) = " + std::to_string(sizeof(ValueT)));
 
-        //gunrock::app::Iteration_Loop
-        //    <Enactor, Functor,
-        //    SSSPIteration<AdvanceKernelPolicy, FilterKernelPolicy, Enactor>,
-        //    Problem::MARK_PATHS ? 1:0, 1>
-        //    (thread_data);
-        //printf("SSSP_Thread finished\n");fflush(stdout);
-
-        while (frontier.queue_length != 0)
-        {
-            oprtr::Advance<oprtr::OprtrType_V2V>(
-                (CsrT)graph, frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+            retval = oprtr::Advance<oprtr::OprtrType_V2V>(
+                (static_cast<CsrT*>(&graph))[0], frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
                 [distances, weights, original_vertex, preds]__host__ __device__ (
                     const VertexT &src, VertexT &dest, const SizeT &edge_id,
                     const VertexT &input_item, const SizeT &input_pos,
@@ -119,6 +110,8 @@ static CUT_THREADPROC SSSPThread(
 
                     util::io::ModifiedLoad<oprtr::COLUMN_READ_MODIFIER>::Ld(
                         src_distance, distances + src);
+                    //printf("%llu : %p\n", src, distances + src);
+                    //src_distance = distances[src];
                     util::io::ModifiedLoad<oprtr::COLUMN_READ_MODIFIER>::Ld(
                         edge_weight, weights + edge_id);
                     ValueT new_distance = src_distance + edge_weight;
@@ -127,17 +120,35 @@ static CUT_THREADPROC SSSPThread(
                     ValueT old_distance = atomicMin(distances + dest, new_distance);
                     if (new_distance < old_distance)
                     {
-                        VertexT pred = src;
-                        if (original_vertex + 0 != NULL)
-                            pred = original_vertex[src];
-                        util::io::ModifiedStore<oprtr::QUEUE_WRITE_MODIFIER>::St(
-                            pred, preds + dest);
+                        //printf("%llu (%.3f + %.3f) -> %llu (%.3f -> %.3f), %llu\n",
+                        //    (unsigned long long)src, src_distance, edge_weight, 
+                        //    (unsigned long long)dest, old_distance,
+                        //    new_distance, (unsigned long long) edge_id);  
+     
+                        if (preds + 0 != NULL)
+                        {
+                            VertexT pred = src;
+                            if (original_vertex + 0 != NULL)
+                                pred = original_vertex[src];
+                            util::io::ModifiedStore<oprtr::QUEUE_WRITE_MODIFIER>::St(
+                                pred, preds + dest);
+                        }
                         return true;
                     }
                     return false;
                 });
+            if (retval) break;
 
-            oprtr::Filter<oprtr::OprtrType_V2V>(
+            //frontier.GetQueueLength(stream);
+            //retval = util::GRError(cudaStreamSynchronize(oprtr_parameters.stream),
+            //    "Advance failed", __FILE__, __LINE__);
+            //util::cpu_mt::PrintGPUArray<SizeT, VertexT>("after advance",
+            //    frontier.V_Q() -> GetPointer(util::DEVICE),
+            //    frontier.queue_length, -1, iteration, -1, oprtr_parameters.stream);
+
+            oprtr_parameters.label = iteration + 1;
+            oprtr_parameters.frontier -> queue_reset = false;
+            retval = oprtr::Filter<oprtr::OprtrType_V2V>(
                 graph, frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
                 [labels, iteration] __host__ __device__(
                     const VertexT &src, VertexT &dest, const SizeT &edge_id,
@@ -149,11 +160,17 @@ static CUT_THREADPROC SSSPThread(
                     (labels + dest)[0] = iteration;
                     return true;
                 });
+            if (retval) break;
 
             frontier.GetQueueLength(stream);
             retval = util::GRError(cudaStreamSynchronize(stream),
                 "cudaStreamSynchronize failed.", __FILE__, __LINE__);
+            //util::cpu_mt::PrintGPUArray<SizeT, VertexT>("after filter",
+            //    frontier.V_Q() -> GetPointer(util::DEVICE),
+            //    frontier.queue_length, -1, iteration, -1, oprtr_parameters.stream);
+
             iteration ++;
+            if (retval) break;
         }
         thread_status = ThreadSlice::Status::Idle;
     }
@@ -234,7 +251,21 @@ public:
         this->problem = problem;
 
         // Lazy initialization
-        GUARD_CU(BaseEnactor::Init(parameters, Enactor_None, 2, NULL, /*1024,*/ target));
+        GUARD_CU(BaseEnactor::Init(parameters, Enactor_None, 2, NULL, target));
+        for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
+        {
+            GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
+            auto &enactor_slice = this -> enactor_slices[gpu * this -> num_gpus + 0];
+            auto &graph = problem -> sub_graphs[gpu];
+            GUARD_CU(enactor_slice.frontier.Allocate(
+                graph.nodes, graph.edges, this -> queue_factors));
+
+            for (int peer = 0; peer < this -> num_gpus; peer ++)
+            {
+                this -> enactor_slices[gpu * this -> num_gpus + peer].oprtr_parameters.labels
+                    = &(problem -> data_slices[gpu] -> labels);
+            }
+        }
         GUARD_CU(this -> Init_Threads(this, (CUT_THREADROUTINE)&(SSSPThread<EnactorT>)));
         return retval;
     }
@@ -254,11 +285,29 @@ public:
         {
             if ((this->num_gpus == 1) ||
                 (gpu == this->problem->org_graph->GpT::partition_table[src]))
-                 this -> thread_slices[gpu].init_size = 1;
-            else this -> thread_slices[gpu].init_size = 0;
-            // TODO: move to somewhere else
-            //this->frontier_attribute[gpu*this->num_gpus].queue_length
-            //    = thread_slices[gpu].init_size;
+            {
+                this -> thread_slices[gpu].init_size = 1;
+                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
+                {
+                    auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
+                    frontier.queue_length = (peer_ == 0) ? 1 : 0;
+                    if (peer_ == 0)
+                    {
+                        GUARD_CU(frontier.V_Q() -> ForEach([src]__host__ __device__ (VertexT &v){
+                            v = src;
+                        }, 1, target, 0));
+                    }
+                }
+            }
+            
+            else {
+                this -> thread_slices[gpu].init_size = 0;
+                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
+                {
+                    this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier.queue_length
+                        = 0;
+                }
+            }
         }
         return retval;
     }

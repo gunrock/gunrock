@@ -265,7 +265,7 @@ public:
     typedef oprtr::OprtrParameters<GraphT, FrontierT, LabelT> OprtrParametersT;
 
     cudaStream_t        stream;
-    mgpu::CudaContext  *context;
+    mgpu::ContextPtr    context;
     EnactorStats<SizeT> enactor_stats;
     FrontierT           frontier;
     OprtrParametersT    oprtr_parameters;
@@ -273,6 +273,7 @@ public:
     EnactorSlice()
     {
         stream = 0;
+        //context = NULL;
     }
 
     ~EnactorSlice()
@@ -292,6 +293,7 @@ public:
     {
         cudaError_t retval = cudaSuccess;
 
+        util::PrintMsg("target = " + std::to_string(target));
         if (target & util::DEVICE)
         {
             GUARD_CU2(cudaStreamCreateWithFlags(
@@ -301,9 +303,10 @@ public:
             int gpu_idx;
             GUARD_CU2(cudaGetDevice(&gpu_idx), "cudaGetDevice failed.");
             context = mgpu::CreateCudaDeviceAttachStream(gpu_idx, stream);
+            util::PrintMsg("Stream and context allocated on GPU " + std::to_string(gpu_idx));
         }
 
-        GUARD_CU(enactor_stats.Init(/*node_lock_size,*/ target));
+        GUARD_CU(enactor_stats.Init(target));
         GUARD_CU(frontier.Init(num_queues, types, frontier_name, target));
         GUARD_CU(oprtr_parameters.Init());
 

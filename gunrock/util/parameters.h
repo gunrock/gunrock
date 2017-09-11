@@ -347,7 +347,7 @@ public:
                 continue;
             if (p_item.value == "")
             {
-                GRError(cudaErrorInvalidValue,
+                return GRError(cudaErrorInvalidValue,
                     "Required parameter " + p_item.name
                     + "(" + p_item.file_name
                     + ":" + std::to_string(p_item.line_num) + ")"

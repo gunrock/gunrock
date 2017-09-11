@@ -45,7 +45,7 @@ struct OprtrParameters
     //bool    *d_backward_frontier_map_out;
     //SizeT         max_in;
     //SizeT         max_out;
-    mgpu::CudaContext  *context;
+    mgpu::ContextPtr context;
     cudaStream_t  stream;
     bool          get_output_length;
     std::string   advance_mode;
@@ -79,7 +79,7 @@ struct OprtrParameters
         cuda_props         = NULL;
         //max_in             = 0;
         //max_out            = 0;
-        context            = NULL;
+        //context            = NULL;
         stream             = 0;
         get_output_length  = true;
         advance_mode       = "";
