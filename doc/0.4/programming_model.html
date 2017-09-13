@@ -118,22 +118,25 @@ $(function() {
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p>This page describes the programming model we use in Gunrock.</p>
+<p>Gunrock targets graph computations that are generally expressed as "iterative convergent processes". By "iterative," we mean operations that may require running a series of steps repeatedly; by "convergent," we mean that these iterations allow us to approach the correct answer and terminate when that answer is reached. Many graph-computation programming models target a similar goal.</p>
+<p>Many of these programming models focus on sequencing steps of <em>computation</em>. Gunrock differs from these programming models in its focus on <em>manipulating a data structure</em>. We call this data structure a <em>frontier</em> of vertices or edges. The frontier represents the subset of vertices or edges that is actively participating in the computation. Gunrock operators input one or more frontiers and output one or more frontiers.</p>
+<p>Generically, graph operations can often be expressed via a <em>push</em> abstraction (graph elements "push" local private updates into a shared state) or a <em>pull</em> abstraction (graph elements "pull" updates into their local private state) (<a href="https://htor.inf.ethz.ch/publications/index.php?pub=281">Besta et al. publication on push-vs.-pull, HPDC '17</a>). Gunrock's programming model supports both of these abstractions. (For instance, Gunrock's direction-optimized breadth-first-search supports both push and pull BFS phases. <a href="https://github.com/gunrock/mini">Mini-Gunrock</a> supports pull-based BFS and PR.) Push-based approaches may or may not require synchronization (such as atomics) for correct operation; this depends on the primitive. Gunrock's idempotence optimization (within its BFS implementation) is an example of a push-based primitive that does not require atomics.</p>
 <h1><a class="anchor" id="operators"></a>
 Operators                       </h1>
-<p>Gunrock supports two operators that form the basis of graph computation:</p>
+<p>In the current Gunrock release, we support four operators.</p>
 <ul>
-<li>Advance: This operator represents the most common operation in graphs: advancing from one frontier to another through edges. It takes either a vertex frontier or an edge frontier as the input, visits the edges connected to the elements in the frontier, and returns a new frontier that contains either the edges or the vertices it reaches.</li>
-<li>Filter: This operator inputs a frontier of elements, culls some elements by testing whether it meets the criteria defined by users, and outputs the rest into a new frontier. It can also do computations while visiting the elements in the queue and doing the validation test.</li>
+<li>Advance: An <em>advance</em> operator generates a new frontier from the current frontier by visiting the neighbors of the current frontier. A frontier can consist of either vertices or edges, and an advance step can input and output either kind of frontier. Advance is an irregularly-parallel operation for two reasons: 1)~different vertices in a graph have different numbers of neighbors and 2)~vertices share neighbors. Thus a vertex in an input frontier map to multiple output items. An efficient advance is the most significant challenge of a GPU implementation.</li>
+<li>Filter: A <em>filter</em> operator generates a new frontier from the current frontier by choosing a subset of the current frontier based on programmer-specified criteria. Each input item maps to zero or one output items.</li>
+<li>Compute: A <em>compute</em> operator defines an operation on all elements (vertices or edges) in its input frontier. A programmer-specified compute operator can be used together with all three traversal operators. Gunrock performs that operation in parallel across all elements without regard to order.</li>
+<li>Segmented intersection: A <em>segmented intersection</em> operator takes two input node frontiers with the same length, or an input edge frontier, and generates both the number of total intersections and the intersected node IDs as the new frontier.</li>
 </ul>
-<h1><a class="anchor" id="functors"></a>
-Functors                        </h1>
-<p>The operators traverse edges and vertices in a graph. To do the actual computation, we need functors. Functors are divided into two categories:</p>
+<p>We note that compute operators can often be fused with a neighboring operator into a single kernel. This increases producer-consumer locality and improves performance. Thus within Gunrock, we express compute operators as "functors", which are automatically merged into their neighboring operators. Within Gunrock, we express functors in one of two flavors:</p>
 <ul>
 <li>Cond Functor: Cond functors input either a vertex id (as in <code>VertexCond</code>) or the source id and the dest id of an edge (as in <code>EdgeCond</code>). They also input data specific to the problem being solved to decide whether the vertex or the edge is valid in the outgoing frontier.</li>
 <li>Apply Functor: Apply functors take the same set of arguments as Cond functors, but perform user-specified computation on the problem-specific data.</li>
 </ul>
 <h1><a class="anchor" id="new_primitive"></a>
-Create New Graph Primitive         </h1>
+Creating a New Graph Primitive         </h1>
 <p>To create a new graph primitive, we first put all the problem-specific data into a data structure. For BFS, we need a per-node label value and a per-node predecessor value; for CC, we need a per-edge mark value, a per-node component id value, etc. Then we map the algorithm into the combination of the above three operators. Next, we need to write different functors for these operators. Some graph algorithms require only one functor (BFS), but some graph algorithms need more (CC needs seven). Finally, we write an enactor to load the proper operator with the proper functor. We provide a graph primitive template. The problem, functor, and enactor files are under gunrock/app/sample, and the driver code is under tests/sample. </p>
 </div></div><!-- contents -->
 <!-- HTML footer for doxygen 1.8.8-->
@@ -144,7 +147,7 @@ Create New Graph Primitive         </h1>
 </div>
 </div>
 <hr class="footer"/><address class="footer"><small>
-Generated on Mon Apr 10 2017 13:50:07 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Sep 13 2017 10:50:59 for Gunrock by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.13
 </small></address>
