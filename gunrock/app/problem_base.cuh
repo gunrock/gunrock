@@ -27,7 +27,7 @@
 namespace gunrock {
 namespace app {
 
-using ProblemFlag = unsigned int;
+using ProblemFlag = uint32_t;
 
 enum : ProblemFlag
 {
@@ -140,7 +140,7 @@ struct ProblemBase
     typedef typename GraphT::ValueT  ValueT;
 
     static const ProblemFlag FLAG = _FLAG;
-    ProblemFlag flag;    
+    ProblemFlag flag;
 
     // Members
     int      num_gpus; // Number of GPUs to be sliced over

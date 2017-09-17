@@ -22,7 +22,7 @@ namespace gunrock {
 
 namespace partitioner {
 
-using PartitionFlag = unsigned int;
+using PartitionFlag = uint32_t;
 
 enum : PartitionFlag
 {

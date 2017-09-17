@@ -264,7 +264,7 @@ public:
     typedef Frontier<VertexT, SizeT, ARRAY_FLAG, cudaHostRegisterFlag> FrontierT;
     typedef oprtr::OprtrParameters<GraphT, FrontierT, LabelT> OprtrParametersT;
 
-    cudaStream_t        stream;
+    cudaStream_t        stream, stream2;
     mgpu::ContextPtr    context;
     EnactorStats<SizeT> enactor_stats;
     FrontierT           frontier;
@@ -273,6 +273,7 @@ public:
     EnactorSlice()
     {
         stream = 0;
+        stream2 = 0;
         //context = NULL;
     }
 
@@ -298,6 +299,9 @@ public:
         {
             GUARD_CU2(cudaStreamCreateWithFlags(
                 &stream, cudaStreamNonBlocking),
+                "cudaStreamCreateWithFlags failed");
+            GUARD_CU2(cudaStreamCreateWithFlags(
+                &stream2, cudaStreamNonBlocking),
                 "cudaStreamCreateWithFlags failed");
 
             int gpu_idx;
@@ -329,9 +333,17 @@ public:
         if (target & util::DEVICE)
         {
             if (stream != 0)
-            GUARD_CU2(cudaStreamDestroy(stream),
-                "cudaStreamDestroy failed");
-            stream = 0;
+            {
+                GUARD_CU2(cudaStreamDestroy(stream),
+                    "cudaStreamDestroy failed");
+                stream = 0;
+            }
+            if (stream2 != 0)
+            {
+                GUARD_CU2(cudaStreamDestroy(stream2),
+                    "cudaStreamDestroy failed");
+                stream2 = 0;
+            }
         }
         return retval;
     }

@@ -15,6 +15,8 @@
 #pragma once
 
 #include <gunrock/app/enactor_base.cuh>
+#include <gunrock/app/enactor_iteration.cuh>
+#include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/app/sssp/sssp_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
@@ -29,49 +31,121 @@ cudaError_t UseParameters2(util::Parameters &parameters)
     return retval;
 }
 
+template <typename EnactorT>
+struct SSSPIteration : public IterationBase
+    <EnactorT, Use_FullQ | Push |
+    (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
+    Update_Predecessors : 0x0)>
+{
+    typedef typename EnactorT::VertexT VertexT;
+    typedef typename EnactorT::SizeT   SizeT;
+    typedef typename EnactorT::ValueT  ValueT;
+
+    typedef IterationBase
+        <EnactorT, Use_FullQ | Push |
+        (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
+         Update_Predecessors : 0x0)> BaseIteration;
+
+    SSSPIteration(
+        EnactorT *enactor,
+        int      gpu_num) :
+        BaseIteration(enactor, gpu_num)
+    {}
+
+    cudaError_t Core(int peer_ = 0)
+    {
+        auto         &data_slice         =   this -> enactor -> problem -> data_slices[this -> gpu_num][0];
+        auto         &enactor_slice      =   this -> enactor -> enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
+        auto         &enactor_stats      =   enactor_slice.enactor_stats;
+        auto         &graph              =   data_slice.sub_graph[0];
+        auto         &distances          =   data_slice.distances;
+        auto         &labels             =   data_slice.labels;
+        auto         &preds              =   data_slice.preds;
+        auto         &weights            =   graph.CsrT::edge_values;
+        auto         &original_vertex    =   graph.GpT::original_vertex;
+        auto         &frontier           =   enactor_slice.frontier;
+        auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
+        auto         &retval             =   enactor_stats.retval;
+        //auto         &stream             =   enactor_slice.stream;
+        auto         &iteration          =   enactor_stats.iteration;
+
+        auto advance_op = [distances, weights, original_vertex, preds]
+        __host__ __device__ (
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            ValueT src_distance = Load<cub::LOAD_CG>(distances + src);
+            ValueT edge_weight  = Load<cub::LOAD_CS>(weights + edge_id);
+            ValueT new_distance = src_distance + edge_weight;
+
+            // Check if the destination node has been claimed as someone's child
+            ValueT old_distance = atomicMin(distances + dest, new_distance);
+            if (new_distance < old_distance)
+            {
+                if (!preds.isEmpty())
+                {
+                    VertexT pred = src;
+                    if (!original_vertex.isEmpty())
+                        pred = original_vertex[src];
+                    Store(preds + dest, pred);
+                }
+                return true;
+            }
+            return false;
+        };
+        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+            oprtr_parameters, advance_op));
+
+        oprtr_parameters.label = iteration + 1;
+        oprtr_parameters.frontier -> queue_reset = false;
+
+        auto filter_op = [labels, iteration] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            if (!util::isValid(dest)) return false;
+            if (labels[dest] == iteration) return false;
+            labels[dest] = iteration;
+            return true;
+        };
+        GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+            oprtr_parameters, filter_op));
+
+        return retval;
+    }
+
+}; // end of struct SSSPIteration
+
 /**
  * @brief Thread controls.
  * @tparam Enactor Enactor type we process on.
  * @param[in] thread_data_ Thread data.
  */
-template <typename EnactorT>
+template <typename Enactor>
 static CUT_THREADPROC SSSPThread(
     void * thread_data_)
 {
-    typedef typename EnactorT::Problem    Problem   ;
-    typedef typename EnactorT::SizeT      SizeT     ;
-    typedef typename EnactorT::VertexT    VertexT   ;
-    typedef typename EnactorT::ValueT     ValueT    ;
-    typedef typename Problem ::GraphT     GraphT    ;
-    typedef typename GraphT  ::CsrT       CsrT      ;
-    typedef typename GraphT  ::GpT        GpT       ;
-    //typedef typename Problem::DataSlice  DataSlice ;
-    //typedef GraphSlice <VertexId, SizeT, Value>          GraphSliceT;
-    //typedef SSSPFunctor<VertexId, SizeT, Value, Problem> Functor;
+    typedef SSSPIteration<Enactor>       IterationT;
+    typedef typename Enactor::Problem    Problem   ;
+    typedef typename Enactor::SizeT      SizeT     ;
+    typedef typename Enactor::VertexT    VertexT   ;
+    typedef typename Enactor::ValueT     ValueT    ;
+    typedef typename Problem::GraphT     GraphT    ;
+    typedef typename GraphT ::CsrT       CsrT      ;
+    typedef typename GraphT ::GpT        GpT       ;
 
     ThreadSlice  *thread_data        =  (ThreadSlice*) thread_data_;
-    Problem      *problem            =  (Problem*)     thread_data -> problem;
-    EnactorT     *enactor            =  (EnactorT*)    thread_data -> enactor;
-    int           num_gpus           =   problem     -> num_gpus;
+    //Problem      *problem            =  (Problem*)     thread_data -> problem;
+    Enactor      *enactor            =  (Enactor*)     thread_data -> enactor;
+    //int           num_gpus           =   problem     -> num_gpus;
     int           thread_num         =   thread_data -> thread_num;
-    int           gpu_idx            =   problem     -> gpu_idx[thread_num] ;
+    int           gpu_idx            =   enactor -> gpu_idx[thread_num] ;
     auto         &thread_status      =   thread_data -> status;
-    auto         &data_slice         =   problem     -> data_slices[thread_num];
-    //FrontierAttribute<SizeT>
-    //             *frontier_attribute = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
-    auto         &enactor_slice      =   enactor     -> enactor_slices[thread_num * num_gpus];
-    auto         &enactor_stats      =   enactor_slice.enactor_stats;
-    auto         &graph              =   data_slice  -> sub_graph[0];
-    auto         &distances          =   data_slice  -> distances;
-    auto         &labels             =   data_slice  -> labels;
-    auto         &preds              =   data_slice  -> preds;
-    auto         &weights            =   graph.CsrT::edge_values;
-    auto         &original_vertex    =   graph.GpT::original_vertex;
-    auto         &frontier           =   enactor_slice.frontier;
-    auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
-    auto         &retval             =   enactor_stats.retval;
-    SizeT         iteration          =   0;
-    auto         &stream             =   enactor_slice.stream;
+    auto         &retval             =   enactor -> enactor_slices[thread_num * enactor -> num_gpus].enactor_stats.retval;
 
     if (retval = util::SetDevice(gpu_idx))
     {
@@ -79,6 +153,7 @@ static CUT_THREADPROC SSSPThread(
         CUT_THREADEND;
     }
 
+    IterationT iteration(enactor, thread_num);
     util::PrintMsg("Thread entered.");
     thread_status = ThreadSlice::Status::Idle;
     while (thread_status != ThreadSlice::Status::ToKill)
@@ -93,91 +168,17 @@ static CUT_THREADPROC SSSPThread(
             break;
 
         util::PrintMsg("Run started");
-        while (frontier.queue_length != 0 && !(retval))
+        gunrock::app::Iteration_Loop<
+            ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0, 1, IterationT>(thread_data[0], iteration);
+        /*while (frontier.queue_length != 0 && !(retval))
         {
-            util::PrintMsg("Iteration " + std::to_string(iteration)
-                + " begin, queue_length = " + std::to_string(frontier.queue_length)
-                + " distances = " + util::to_string(distances.GetPointer(util::DEVICE))
-                + " sizeof(ValueT) = " + std::to_string(sizeof(ValueT)));
-
-            retval = oprtr::Advance<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
-                [distances, weights, original_vertex, preds]
-                __host__ __device__ (
-                    const VertexT &src, VertexT &dest, const SizeT &edge_id,
-                    const VertexT &input_item, const SizeT &input_pos,
-                    SizeT &output_pos) -> bool {
-                    //ValueT edge_weight;
-
-                    //util::io::ModifiedLoad<oprtr::COLUMN_READ_MODIFIER>::Ld(
-                    //    src_distance, distances + src);
-                    ValueT src_distance = Load<cub::LOAD_CG>(distances + src);
-                    //printf("%llu : %p\n", src, distances + src);
-                    //src_distance = distances[src];
-                    //util::io::ModifiedLoad<oprtr::COLUMN_READ_MODIFIER>::Ld(
-                    //    edge_weight, weights + edge_id);
-                    ValueT edge_weight = Load<cub::LOAD_CS>(weights + edge_id);
-                    ValueT new_distance = src_distance + edge_weight;
-
-                    // Check if the destination node has been claimed as someone's child
-                    ValueT old_distance = atomicMin(distances + dest, new_distance);
-                    if (new_distance < old_distance)
-                    {
-                        //printf("%llu (%.3f + %.3f) -> %llu (%.3f -> %.3f), %llu\n",
-                        //    (unsigned long long)src, src_distance, edge_weight,
-                        //    (unsigned long long)dest, old_distance,
-                        //    new_distance, (unsigned long long) edge_id);
-
-                        if (!preds.isEmpty())
-                        {
-                            VertexT pred = src;
-                            if (!original_vertex.isEmpty())
-                                pred = original_vertex[src];
-                            //util::io::ModifiedStore<oprtr::QUEUE_WRITE_MODIFIER>::St(
-                            //    pred, preds + dest);
-                            Store(preds + dest, pred);
-                        }
-                        return true;
-                    }
-                    return false;
-                });
-            if (retval) break;
-
-            //frontier.GetQueueLength(stream);
-            //retval = util::GRError(cudaStreamSynchronize(oprtr_parameters.stream),
-            //    "Advance failed", __FILE__, __LINE__);
-            //util::cpu_mt::PrintGPUArray<SizeT, VertexT>("after advance",
-            //    frontier.V_Q() -> GetPointer(util::DEVICE),
-            //    frontier.queue_length, -1, iteration, -1, oprtr_parameters.stream);
-
-            oprtr_parameters.label = iteration + 1;
-            oprtr_parameters.frontier -> queue_reset = false;
-            retval = oprtr::Filter<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-                oprtr_parameters,
-                [labels, iteration] __host__ __device__(
-                    const VertexT &src, VertexT &dest, const SizeT &edge_id,
-                    const VertexT &input_item, const SizeT &input_pos,
-                    SizeT &output_pos) -> bool {
-
-                    if (!util::isValid(dest)) return false;
-                    if (labels[dest] == iteration) return false;
-                    //(labels + dest)[0] = iteration;
-                    labels[dest] = iteration;
-                    return true;
-                });
-            if (retval) break;
-
+            // Iteration core here
             frontier.GetQueueLength(stream);
             retval = util::GRError(cudaStreamSynchronize(stream),
                 "cudaStreamSynchronize failed.", __FILE__, __LINE__);
-            //util::cpu_mt::PrintGPUArray<SizeT, VertexT>("after filter",
-            //    frontier.V_Q() -> GetPointer(util::DEVICE),
-            //    frontier.queue_length, -1, iteration, -1, oprtr_parameters.stream);
-
             iteration ++;
             if (retval) break;
-        }
+        }*/
         thread_status = ThreadSlice::Status::Idle;
     }
 

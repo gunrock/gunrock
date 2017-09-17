@@ -689,10 +689,14 @@ public:
         return NULL;
     } // GetPointer(...)
 
-    cudaError_t SetPointer(ValueT* pointer, SizeT size = -1, Location target = ARRAY_DEFAULT_TARGET)
+    cudaError_t SetPointer(
+        ValueT* pointer,
+        SizeT size = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = ARRAY_DEFAULT_TARGET)
     {
         cudaError_t retval = cudaSuccess;
-        if (size == -1) size = this->size;
+        if (size == PreDefinedValues<SizeT>::InvalidValue)
+            size = this->size;
         if (size < this->size)
         {
 #ifdef ENABLE_ARRAY_DEBUG

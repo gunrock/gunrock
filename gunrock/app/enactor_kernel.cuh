@@ -34,22 +34,21 @@ namespace app {
  * @param[in] in_preds Pointer to the input predecessor array.
  * @param[out] out_preds Pointer to the output predecessor array.
  */
-template <typename VertexId, typename SizeT>
-__global__ void Copy_Preds (
-    const SizeT     num_elements,
-    const VertexId* keys,
-    const VertexId* in_preds,
-          VertexId* out_preds)
+template <typename VertexT, typename SizeT>
+__global__ void CopyPreds_Kernel (
+    const SizeT    num_elements,
+    const VertexT *keys,
+    const VertexT *in_preds,
+          VertexT *out_preds)
 {
     const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    VertexId x = (SizeT)blockIdx.x*blockDim.x+threadIdx.x;
-    VertexId t;
+    SizeT x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
 
-    while (x<num_elements)
+    while (x < num_elements)
     {
-        t = keys[x];
+        VertexT t = keys[x];
         out_preds[t] = in_preds[t];
-        x+= STRIDE;
+        x += STRIDE;
     }
 }
 
@@ -67,7 +66,7 @@ __global__ void Copy_Preds (
  * @param[out] out_preds Pointer to the output predecessor array.
  */
 template <typename VertexId, typename SizeT>
-__global__ void Update_Preds (
+__global__ void UpdatePreds_Kernel (
     const SizeT     num_elements,
     const SizeT     nodes,
     const VertexId* keys,
@@ -100,7 +99,7 @@ __global__ void Update_Preds (
  * @param[in] partition_table Pointer to the partition table.
  * @param[out] marker
  */
-template <typename VertexId, class SizeT>
+/*template <typename VertexId, class SizeT>
 __global__ void Assign_Marker(
     const SizeT            num_elements,
     const int              num_gpus,
@@ -116,7 +115,7 @@ __global__ void Assign_Marker(
     const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
     SizeT x= (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
     if (threadIdx.x < num_gpus)
-        s_marker[threadIdx.x]=marker[threadIdx.x];
+        s_marker[threadIdx.x] = marker[threadIdx.x];
     __syncthreads();
 
     while (x < num_elements)
@@ -125,9 +124,9 @@ __global__ void Assign_Marker(
         gpu = partition_table[key];
         for (int i=0;i<num_gpus;i++)
             s_marker[i][x]=(i==gpu)?1:0;
-        x+=STRIDE;
+        x += STRIDE;
     }
-}
+}*/
 
 /*
  * @brief Assign marker backward function.
@@ -142,7 +141,7 @@ __global__ void Assign_Marker(
  * @param[in] partition_table Pointer to the partition table.
  * @param[out] marker
  */
-template <typename VertexId, class SizeT>
+/*template <typename VertexId, class SizeT>
 __global__ void Assign_Marker_Backward(
     const SizeT            num_elements,
     const int              num_gpus,
@@ -170,7 +169,7 @@ __global__ void Assign_Marker_Backward(
             s_marker[partition_table[i]][x]=1;
         x+=STRIDE;
     }
-}
+}*/
 
 /*
  * @brief Make output function.
@@ -337,24 +336,23 @@ __global__ void Make_Out_Backward(
     }
 }
 
-template <typename VertexId, typename SizeT, typename Value,
-          SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES,
-          int CUDA_ARCH, int LOG_THREADS>
-__global__ void Make_Output_Kernel(
-    SizeT      num_elements,
-    int        num_gpus,
-    SizeT     *d_out_length,
-    VertexId  *d_keys_in,
-    int       *d_partition_table,
-    VertexId  *d_convertion_table,
-    VertexId **d_vertex_associate_orgs,
-    Value    **d_value__associate_orgs,
-    VertexId **d_keys_outs,
-    VertexId **d_vertex_associate_outs,
-    Value    **d_value__associate_outs,
-    bool       skip_convertion = false)
+template <typename VertexT, typename SizeT, typename ValueT,
+          SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES>
+__global__ void MakeOutput_Kernel(
+    SizeT     num_elements,
+    int       num_gpus,
+    SizeT    *d_out_length,
+    VertexT  *d_keys_in,
+    int      *d_partition_table,
+    VertexT  *d_convertion_table,
+    VertexT **d_vertex_associate_orgs,
+    ValueT  **d_value__associate_orgs,
+    VertexT **d_keys_outs,
+    VertexT **d_vertex_associate_outs,
+    ValueT  **d_value__associate_outs,
+    bool      skip_convertion = false)
 {
-    typedef util::Block_Scan<SizeT, CUDA_ARCH, LOG_THREADS> BlockScanT;
+    typedef util::Block_Scan<SizeT, 9> BlockScanT;
     __shared__ typename BlockScanT::Temp_Space scan_space;
     __shared__ SizeT sum_offset[8];
     //__shared__ SizeT offset[8];
@@ -365,8 +363,8 @@ __global__ void Make_Output_Kernel(
 
     while (in_pos - threadIdx.x < num_elements)
     {
-        VertexId key    = util::InvalidValue<VertexId>();
-        int      target = util::InvalidValue<int>();
+        VertexT key    = util::PreDefinedValues<VertexT>::InvalidValue;
+        int     target = util::PreDefinedValues<int    >::InvalidValue;
         if (in_pos < num_elements)
         {
             key = d_keys_in[in_pos];
@@ -379,7 +377,7 @@ __global__ void Make_Output_Kernel(
             //__syncthreads();
             BlockScanT::LogicScan((target == gpu)? 1 : 0, out_offset, scan_space);
             if (target == gpu) out_pos = out_offset;
-            if (threadIdx.x == blockDim.x-1) 
+            if (threadIdx.x == blockDim.x-1)
             {
                 //sum[gpu] = block_sum;
                 sum_offset[gpu] = out_offset + ((target == gpu) ? 1: 0);
@@ -400,7 +398,11 @@ __global__ void Make_Output_Kernel(
         if (in_pos >= num_elements) break;
         //printf("(%4d, %4d) : in_pos = %d, key = %d, target = %d, out_pos = %d + %d\n",
         //    blockIdx.x, threadIdx.x, in_pos, key, target, out_pos, offset[target]-1);
-        if (key < 0) {in_pos += STRIDE; continue; }
+        if (!util::isValid(key))
+        {
+            in_pos += STRIDE;
+            continue;
+        }
         out_pos += sum_offset[target]-1;
         if (skip_convertion)
         {
@@ -432,25 +434,24 @@ __global__ void Make_Output_Kernel(
     }
 }
 
-template <typename VertexId, typename SizeT, typename Value,
-          SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES,
-          int CUDA_ARCH, int LOG_THREADS>
-__global__ void Make_Output_Backward_Kernel(
-    SizeT      num_elements,
-    int        num_gpus,
-    SizeT     *d_out_length,
-    VertexId  *d_keys_in,
-    SizeT     *d_offsets,
-    int       *d_partition_table,
-    VertexId  *d_convertion_table,
-    VertexId **d_vertex_associate_orgs,
-    Value    **d_value__associate_orgs,
-    VertexId **d_keys_outs,
-    VertexId **d_vertex_associate_outs,
-    Value    **d_value__associate_outs,
-    bool       skip_convertion = false)
+template <typename VertexT, typename SizeT, typename ValueT,
+          SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES>
+__global__ void MakeOutput_Backward_Kernel(
+    SizeT    num_elements,
+    int      num_gpus,
+    SizeT    *d_out_length,
+    VertexT  *d_keys_in,
+    SizeT    *d_offsets,
+    int      *d_partition_table,
+    VertexT  *d_convertion_table,
+    VertexT **d_vertex_associate_orgs,
+    ValueT  **d_value__associate_orgs,
+    VertexT **d_keys_outs,
+    VertexT **d_vertex_associate_outs,
+    ValueT  **d_value__associate_outs,
+    bool      skip_convertion = false)
 {
-    typedef util::Block_Scan<SizeT, CUDA_ARCH, LOG_THREADS> BlockScanT;
+    typedef util::Block_Scan<SizeT, 9> BlockScanT;
     __shared__ typename BlockScanT::Temp_Space scan_space;
     __shared__ SizeT sum_offset[8];
     SizeT out_pos[8];
@@ -463,7 +464,7 @@ __global__ void Make_Output_Backward_Kernel(
 
     while (in_pos - threadIdx.x < num_elements)
     {
-        VertexId key    = util::InvalidValue<VertexId>();
+        VertexT key    = util::PreDefinedValues<VertexT>::InvalidValue;
         for (int gpu = 0; gpu < num_gpus; gpu++)
             gpu_select[gpu] = 0;
         if (in_pos < num_elements)
@@ -476,7 +477,7 @@ __global__ void Make_Output_Backward_Kernel(
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
             BlockScanT::LogicScan(gpu_select[gpu], out_pos[gpu], scan_space);
-            if (threadIdx.x == blockDim.x-1) 
+            if (threadIdx.x == blockDim.x-1)
             {
                 sum_offset[gpu] = out_pos[gpu] + gpu_select[gpu];
             }
@@ -490,7 +491,10 @@ __global__ void Make_Output_Backward_Kernel(
         __syncthreads();
 
         if (in_pos >= num_elements) break;
-        if (key < 0) {in_pos += STRIDE; continue; }
+        if (!util::isValid(key))
+        {
+            in_pos += STRIDE; continue;
+        }
 
         for (int i = d_offsets[key]; i < d_offsets[key+1]; i++)
         {
@@ -530,25 +534,24 @@ __global__ void Make_Output_Backward_Kernel(
 }
 
 
-template <typename VertexId, typename SizeT, typename Value,
-          SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES,
-          int CUDA_ARCH, int LOG_THREADS>
-__global__ void Make_Output_Kernel_SkipSelection(
-    SizeT      num_elements,
+template <typename VertexT, typename SizeT, typename ValueT,
+          SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES>
+__global__ void MakeOutput_SkipSelection_Kernel(
+    SizeT     num_elements,
     //int        num_gpus,
-    VertexId  *d_keys_in,
-    VertexId **d_vertex_associate_orgs,
-    Value    **d_value__associate_orgs,
-    VertexId  *d_keys_out,
-    VertexId  *d_vertex_associate_out,
-    Value     *d_value__associate_out)
+    VertexT  *d_keys_in,
+    VertexT **d_vertex_associate_orgs,
+    ValueT  **d_value__associate_orgs,
+    VertexT  *d_keys_out,
+    VertexT  *d_vertex_associate_out,
+    ValueT   *d_value__associate_out)
 {
     SizeT in_pos = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
     const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;
 
     while (in_pos < num_elements)
     {
-        VertexId key     = d_keys_in[in_pos];
+        VertexT key     = d_keys_in[in_pos];
         SizeT    out_pos = in_pos;
 
         //keys_out[0][out_pos] = key;

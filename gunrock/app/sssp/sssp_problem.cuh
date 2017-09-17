@@ -72,6 +72,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         //util::Array1D<SizeT, int    >    sssp_marker;
         util::Array1D<SizeT, LabelT>     labels; // labels to mark latest iteration the vertex been visited
         util::Array1D<SizeT, VertexT>    preds ; // predecessors of vertices
+        util::Array1D<SizeT, VertexT>    temp_preds ; // predecessors of vertices
 
         /*
          * @brief Default constructor
@@ -84,6 +85,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             //sssp_marker     .SetName("sssp_marker"     );
             labels          .SetName("labels"          );
             preds           .SetName("preds"           );
+            temp_preds      .SetName("temp_preds"      );
         }
 
         /*
@@ -106,6 +108,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             //GUARD_CU(sssp_marker   .Release(target));
             GUARD_CU(labels         .Release(target));
             GUARD_CU(preds          .Release(target));
+            GUARD_CU(temp_preds     .Release(target));
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
         }
@@ -140,7 +143,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(distances .Allocate(sub_graph.nodes, target));
             GUARD_CU(labels    .Allocate(sub_graph.nodes, target));
             if (flag & Mark_Predecessors)
+            {
                 GUARD_CU(preds .Allocate(sub_graph.nodes, target));
+                GUARD_CU(temp_preds .Allocate(sub_graph.nodes, target));
+            }
 
             if (target & util::DEVICE)
             {
@@ -192,7 +198,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(distances.EnsureSize_(nodes, target));
             GUARD_CU(labels   .EnsureSize_(nodes, target));
             if (this -> flag & Mark_Predecessors)
+            {
                 GUARD_CU(preds.EnsureSize_(nodes, target));
+                GUARD_CU(temp_preds.EnsureSize_(nodes, target));
+            }
             //GUARD_CU(visit_lookup.EnsureSize_(this -> sub_graph -> nodes, target));
 
             // Reset data
@@ -205,9 +214,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 }, nodes, target, this -> stream));
 
             if (this -> flag & Mark_Predecessors)
+            {
                 GUARD_CU(preds.ForAll([]__host__ __device__ (VertexT *preds_, const SizeT &pos){
                     preds_[pos] = pos;
                 }, nodes, target, this -> stream));
+                GUARD_CU(temp_preds.ForAll([]__host__ __device__ (VertexT *preds_, const SizeT &pos){
+                    preds_[pos] = pos;
+                }, nodes, target, this -> stream));
+            }
 
             //GUARD_CU(visit_lookup.ForEach([]__host__ __device__ (VertexT &lookup){
             //        lookup = util::PreDefinedValues<VertexT>::InvalidValue;
@@ -448,7 +462,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         if (target & util::DEVICE)
         {
-            util::PrintMsg("distances [" + std::to_string(src) + 
+            util::PrintMsg("distances [" + std::to_string(src) +
                 " (" + std::to_string(src_) + ")] <- "
                 + std::to_string(src_distance));
             util::PrintMsg("distances = " + util::to_string(data_slices[gpu] -> distances.GetPointer(util::DEVICE))

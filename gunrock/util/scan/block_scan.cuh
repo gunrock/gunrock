@@ -18,11 +18,11 @@
 namespace gunrock {
 namespace util {
 
-template <typename T, int _CUDA_ARCH, int _LOG_THREADS>
+template <typename T, /*int _CUDA_ARCH,*/ int _LOG_THREADS>
 struct Block_Scan
 {
     enum {
-        CUDA_ARCH         = _CUDA_ARCH,
+        //CUDA_ARCH         = _CUDA_ARCH,
         LOG_THREADS       = _LOG_THREADS,
         THREADS           = 1 << LOG_THREADS,
         LOG_WARP_THREADS  = 5, //GR_LOG_WARP_THREADS(CUDA_ARCH),

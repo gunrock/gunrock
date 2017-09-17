@@ -25,6 +25,7 @@
 #include <gunrock/util/array_utils.cuh>
 
 #include <gunrock/app/enactor_types.cuh>
+#include <gunrock/app/mgpu_slice.cuh>
 //#include <gunrock/app/enactor_helper.cuh>
 //#include <gunrock/app/enactor_loop.cuh>
 
@@ -152,11 +153,14 @@ class EnactorBase
 {
 public:
     typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::SizeT   SizeT;
     typedef EnactorSlice<GraphT, LabelT, ARRAY_FLAG, cudaHostRegisterFlag>
                                      EnactorSliceT;
     //typedef Frontier<VertexT, SizeT, ARRAY_FLAG, cudaHostRegisterFlag>
     //                                 FrontierT;
+    typedef MgpuSlice<VertexT, SizeT, ValueT>
+                                     MgpuSliceT;
 
     int               num_gpus;
     std::vector<int>  gpu_idx;
@@ -183,6 +187,10 @@ public:
     util::Array1D<int, EnactorSliceT, ARRAY_FLAG,
         cudaHostRegisterFlag>// | cudaHostAllocMapped | cudaHostAllocPortable>
         enactor_slices;
+
+    util::Array1D<int, MgpuSliceT, ARRAY_FLAG,
+        cudaHostRegisterFlag>// | cudaHostAllocMapped | cudaHostAllocPortable>
+        mgpu_slices;
 
     //Frontiers
     //util::Array1D<int, FrontierT, ARRAY_FLAG, cudaHostRegisterFlag>
