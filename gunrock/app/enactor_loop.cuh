@@ -83,15 +83,15 @@ void Iteration_Loop(
 #ifdef ENABLE_PERFORMANCE_PROFILING
     util::CpuTimer      cpu_timer;
     std::vector<double> &iter_full_queue_time =
-        enactor -> iter_full_queue_time[thread_num].back();
+        enactor.iter_full_queue_time[gpu_num].back();
     std::vector<double> &iter_sub_queue_time =
-        enactor -> iter_sub_queue_time [thread_num].back();
+        enactor.iter_sub_queue_time [gpu_num].back();
     std::vector<double> &iter_total_time =
-        enactor -> iter_total_time     [thread_num].back();
+        enactor.iter_total_time     [gpu_num].back();
     std::vector<SizeT>  &iter_full_queue_nodes_queued =
-        enactor -> iter_full_queue_nodes_queued[thread_num].back();
+        enactor.iter_full_queue_nodes_queued[gpu_num].back();
     std::vector<SizeT>  &iter_full_queue_edges_queued =
-        enactor -> iter_full_queue_edges_queued[thread_num].back();
+        enactor.iter_full_queue_edges_queued[gpu_num].back();
 
     cpu_timer.Start();
     double iter_start_time = cpu_timer.MillisSinceStart();
@@ -233,8 +233,8 @@ void Iteration_Loop(
                         frontier.queue_length =
                             mgpu_slice.in_length[iteration_num%2][peer_];
 #ifdef ENABLE_PERFORMANCE_PROFILING
-                        enactor_stats_ -> iter_in_length.back().push_back(
-                            mgpu_slice -> in_length[iteration_num%2][peer_]);
+                        enactor_stats.iter_in_length.back().push_back(
+                            mgpu_slice.in_length[iteration_num%2][peer_]);
 #endif
                         if (frontier.queue_length != 0)
                         {
@@ -370,12 +370,12 @@ void Iteration_Loop(
                     iteration.Core(peer_);
                     if (retval) break;
 #ifdef ENABLE_PERFORMANCE_PROFILING
-                    h_nodes_queued[peer_] = enactor_stats_ -> nodes_queued[0];
-                    h_edges_queued[peer_] = enactor_stats_ -> edges_queued[0];
-                    enactor_stats_ -> nodes_queued.Move(
-                        util::DEVICE, util::HOST, 1, 0, streams[peer_]);
-                    enactor_stats_ -> edges_queued.Move(
-                        util::DEVICE, util::HOST, 1, 0, streams[peer_]);
+                    h_nodes_queued[peer_] = enactor_stats.nodes_queued[0];
+                    h_edges_queued[peer_] = enactor_stats.edges_queued[0];
+                    enactor_stats.nodes_queued.Move(
+                        util::DEVICE, util::HOST, 1, 0, stream);
+                    enactor_stats.edges_queued.Move(
+                        util::DEVICE, util::HOST, 1, 0, stream);
 #endif
 
                     if (num_gpus>1)
@@ -526,20 +526,21 @@ void Iteration_Loop(
 #ifdef ENABLE_PERFORMANCE_PROFILING
             subqueue_finish_time = cpu_timer.MillisSinceStart();
             iter_sub_queue_time.push_back(subqueue_finish_time - iter_start_time);
-            if (Iteration::HAS_SUBQ)
+            if (IterationT::FLAG & Use_SubQ)
             for (int peer_ = 0; peer_ < num_gpus; peer_ ++)
             {
-                enactor_stats[peer_].iter_nodes_queued.back().push_back(
-                    h_nodes_queued[peer_] + enactor_stats[peer_].nodes_queued[0]
+                auto &enactor_stats = enactor_slices[peer_].enactor_stats;
+                enactor_stats.iter_nodes_queued.back().push_back(
+                    h_nodes_queued[peer_] + enactor_stats.nodes_queued[0]
                     - previous_nodes_queued[peer_]);
-                previous_nodes_queued[peer_] = h_nodes_queued[peer_] + enactor_stats[peer_].nodes_queued[0];
-                enactor_stats[peer_].nodes_queued[0] = h_nodes_queued[peer_];
+                previous_nodes_queued[peer_] = h_nodes_queued[peer_] + enactor_stats.nodes_queued[0];
+                enactor_stats.nodes_queued[0] = h_nodes_queued[peer_];
 
-                enactor_stats[peer_].iter_edges_queued.back().push_back(
-                    h_edges_queued[peer_] + enactor_stats[peer_].edges_queued[0]
+                enactor_stats.iter_edges_queued.back().push_back(
+                    h_edges_queued[peer_] + enactor_stats.edges_queued[0]
                     - previous_edges_queued[peer_]);
-                previous_edges_queued[peer_] = h_edges_queued[peer_] + enactor_stats[peer_].edges_queued[0];
-                enactor_stats[peer_].edges_queued[0] = h_edges_queued[peer_];
+                previous_edges_queued[peer_] = h_edges_queued[peer_] + enactor_stats.edges_queued[0];
+                enactor_stats.edges_queued[0] = h_edges_queued[peer_];
             }
 #endif
             if (enactor.flag & Debug)
@@ -667,10 +668,10 @@ void Iteration_Loop(
                     iteration.Core(peer_);
                     if (retval) break;
 #ifdef ENABLE_PERFORMANCE_PROFILING
-                    h_full_queue_nodes_queued = enactor_stats_ -> nodes_queued[0];
-                    h_full_queue_edges_queued = enactor_stats_ -> edges_queued[0];
-                    enactor_stats_ -> edges_queued.Move(util::DEVICE, util::HOST, 1, 0, stream);
-                    enactor_stats_ -> nodes_queued.Move(util::DEVICE, util::HOST, 1, 0, stream);
+                    h_full_queue_nodes_queued = enactor_stats.nodes_queued[0];
+                    h_full_queue_edges_queued = enactor_stats.edges_queued[0];
+                    enactor_stats.edges_queued.Move(util::DEVICE, util::HOST, 1, 0, stream);
+                    enactor_stats.nodes_queued.Move(util::DEVICE, util::HOST, 1, 0, stream);
 #endif
                     //if (enactor_stats_ -> retval = util::GRError(
                     //    cudaStreamSynchronize(streams[peer_]),
@@ -689,18 +690,18 @@ void Iteration_Loop(
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
                     iter_full_queue_nodes_queued.push_back(
-                        h_full_queue_nodes_queued + enactor_stats_ -> nodes_queued[0]
+                        h_full_queue_nodes_queued + enactor_stats.nodes_queued[0]
                         - previous_full_queue_nodes_queued);
                     previous_full_queue_nodes_queued = h_full_queue_nodes_queued
-                        + enactor_stats_ -> nodes_queued[0];
-                    enactor_stats_ -> nodes_queued[0] = h_full_queue_nodes_queued;
+                        + enactor_stats.nodes_queued[0];
+                    enactor_stats.nodes_queued[0] = h_full_queue_nodes_queued;
 
                     iter_full_queue_edges_queued.push_back(
-                        h_full_queue_edges_queued + enactor_stats_ -> edges_queued[0]
+                        h_full_queue_edges_queued + enactor_stats.edges_queued[0]
                         - previous_full_queue_edges_queued);
                     previous_full_queue_edges_queued = h_full_queue_edges_queued
-                        + enactor_stats_ -> edges_queued[0];
-                    enactor_stats_ -> edges_queued[0] = h_full_queue_edges_queued;
+                        + enactor_stats.edges_queued[0];
+                    enactor_stats.edges_queued[0] = h_full_queue_edges_queued;
 #endif
                     if ((enactor.flag & Size_Check) == 0)
                     {
@@ -784,8 +785,8 @@ void Iteration_Loop(
                     = mgpu_slice.out_length[peer_];
 #ifdef ENABLE_PERFORMANCE_PROFILING
                 //if (peer_ == 0)
-                    enactor_stats[peer_].iter_out_length.back().push_back(
-                        mgpu_slice -> out_length[peer_]);
+                    enactor_slices[peer_].enactor_stats.iter_out_length
+                        .back().push_back(mgpu_slice.out_length[peer_]);
 #endif
             }
         }

@@ -28,7 +28,7 @@
 #define STR(x) #x
 #define XSTR(x) STR(x)
 
-//#define ENABLE_PERFORMANCE_PROFILING
+#define ENABLE_PERFORMANCE_PROFILING
 
 namespace gunrock {
 namespace app {
