@@ -28,7 +28,7 @@ using namespace gunrock::graph;
 using namespace gunrock::app;
 
 typedef uint32_t VertexT;
-typedef uint64_t SizeT;
+typedef unsigned long long SizeT;
 typedef float ValueT;
 
 template <

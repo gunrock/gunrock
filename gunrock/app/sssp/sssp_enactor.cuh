@@ -40,6 +40,8 @@ struct SSSPIteration : public IterationBase
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
     typedef typename EnactorT::ValueT  ValueT;
+    typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
+    typedef typename EnactorT::Problem::GraphT::GpT  GpT;
     typedef IterationBase
         <EnactorT, Use_FullQ | Push |
         (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
