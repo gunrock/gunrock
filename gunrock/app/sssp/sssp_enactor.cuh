@@ -40,17 +40,12 @@ struct SSSPIteration : public IterationBase
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
     typedef typename EnactorT::ValueT  ValueT;
-
     typedef IterationBase
         <EnactorT, Use_FullQ | Push |
         (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
          Update_Predecessors : 0x0)> BaseIteration;
 
-    SSSPIteration(
-        EnactorT *enactor,
-        int      gpu_num) :
-        BaseIteration(enactor, gpu_num)
-    {}
+    SSSPIteration() : BaseIteration() {}
 
     cudaError_t Core(int peer_ = 0)
     {
@@ -118,73 +113,42 @@ struct SSSPIteration : public IterationBase
         return retval;
     }
 
+    template <
+        int NUM_VERTEX_ASSOCIATES,
+        int NUM_VALUE__ASSOCIATES>
+    cudaError_t ExpandIncoming(SizeT &received_length, int peer_)
+    {
+        auto         &data_slice         =   this -> enactor -> problem -> data_slices[this -> gpu_num][0];
+        auto         &enactor_slice      =   this -> enactor -> enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
+        auto iteration = enactor_slice.enactor_stats.iteration;
+        auto         &distances          =   data_slice.distances;
+        auto         &labels             =   data_slice.labels;
+        auto         &preds              =   data_slice.preds;
+        auto          label              =   this -> enactor -> mgpu_slices[this -> gpu_num].in_iteration[iteration % 2][peer_];
+
+        auto expand_op = [distances, labels, label, preds]
+        __host__ __device__(
+            VertexT &key, const SizeT &in_pos,
+            VertexT *vertex_associate_ins,
+            ValueT  *value__associate_ins) -> bool{
+            ValueT in_val  = value__associate_ins[in_pos];
+            ValueT old_val = atomicMin(distances + key, in_val);
+            if (old_val <= in_val)
+                return false;
+            if (labels[key] == label)
+                return false;
+            labels[key] = label;
+            if (!preds.isEmpty())
+                preds[key] = vertex_associate_ins[in_pos];
+            return true;
+        };
+
+        cudaError_t retval = BaseIteration:: template ExpandIncomingBase
+            <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
+            (received_length, peer_, expand_op);
+        return retval;
+    }
 }; // end of struct SSSPIteration
-
-/**
- * @brief Thread controls.
- * @tparam Enactor Enactor type we process on.
- * @param[in] thread_data_ Thread data.
- */
-template <typename Enactor>
-static CUT_THREADPROC SSSPThread(
-    void * thread_data_)
-{
-    typedef SSSPIteration<Enactor>       IterationT;
-    typedef typename Enactor::Problem    Problem   ;
-    typedef typename Enactor::SizeT      SizeT     ;
-    typedef typename Enactor::VertexT    VertexT   ;
-    typedef typename Enactor::ValueT     ValueT    ;
-    typedef typename Problem::GraphT     GraphT    ;
-    typedef typename GraphT ::CsrT       CsrT      ;
-    typedef typename GraphT ::GpT        GpT       ;
-
-    ThreadSlice  *thread_data        =  (ThreadSlice*) thread_data_;
-    //Problem      *problem            =  (Problem*)     thread_data -> problem;
-    Enactor      *enactor            =  (Enactor*)     thread_data -> enactor;
-    //int           num_gpus           =   problem     -> num_gpus;
-    int           thread_num         =   thread_data -> thread_num;
-    int           gpu_idx            =   enactor -> gpu_idx[thread_num] ;
-    auto         &thread_status      =   thread_data -> status;
-    auto         &retval             =   enactor -> enactor_slices[thread_num * enactor -> num_gpus].enactor_stats.retval;
-
-    if (retval = util::SetDevice(gpu_idx))
-    {
-        thread_status = ThreadSlice::Status::Ended;
-        CUT_THREADEND;
-    }
-
-    IterationT iteration(enactor, thread_num);
-    util::PrintMsg("Thread entered.");
-    thread_status = ThreadSlice::Status::Idle;
-    while (thread_status != ThreadSlice::Status::ToKill)
-    {
-        while (thread_status == ThreadSlice::Status::Wait ||
-               thread_status == ThreadSlice::Status::Idle)
-        {
-            sleep(0);
-            //std::this_thread::yield();
-        }
-        if (thread_status == ThreadSlice::Status::ToKill)
-            break;
-
-        util::PrintMsg("Run started");
-        gunrock::app::Iteration_Loop<
-            ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0, 1, IterationT>(thread_data[0], iteration);
-        /*while (frontier.queue_length != 0 && !(retval))
-        {
-            // Iteration core here
-            frontier.GetQueueLength(stream);
-            retval = util::GRError(cudaStreamSynchronize(stream),
-                "cudaStreamSynchronize failed.", __FILE__, __LINE__);
-            iteration ++;
-            if (retval) break;
-        }*/
-        thread_status = ThreadSlice::Status::Idle;
-    }
-
-    thread_status = ThreadSlice::Status::Ended;
-    CUT_THREADEND;
-}
 
 /**
  * @brief Problem enactor class.
@@ -211,7 +175,8 @@ public:
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
 
-    Problem     *problem      ;
+    Problem     *problem   ;
+    void        *iterations;
 
     /**
      * @brief BFSEnactor constructor
@@ -231,9 +196,11 @@ public:
 
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
+        typedef SSSPIteration<EnactorT> IterationT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Release(target));
-        problem = NULL;
+        delete []((IterationT*)iterations);
+        problem = NULL; iterations = NULL;
         return retval;
     }
 
@@ -254,6 +221,7 @@ public:
         Problem          *problem,
         util::Location    target = util::DEVICE)
     {
+        typedef SSSPIteration<EnactorT> IterationT;
         cudaError_t retval = cudaSuccess;
         this->problem = problem;
 
@@ -273,8 +241,26 @@ public:
                     = &(problem -> data_slices[gpu] -> labels);
             }
         }
-        GUARD_CU(this -> Init_Threads(this, (CUT_THREADROUTINE)&(SSSPThread<EnactorT>)));
+
+        iterations = new IterationT[this -> num_gpus];
+        for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
+        {
+            GUARD_CU(((IterationT*)iterations)[gpu].Init(this, gpu));
+        }
+
+        GUARD_CU(this -> Init_Threads(this, (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
         return retval;
+    }
+
+    // one run of sssp, to be called within GunrockThread
+    cudaError_t Run(ThreadSlice &thread_data)
+    {
+        typedef SSSPIteration<EnactorT> IterationT;
+
+        gunrock::app::Iteration_Loop<
+            ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0, 1, IterationT>(thread_data,
+                ((IterationT*)iterations)[thread_data.thread_num]);
+        return cudaSuccess;
     }
 
     /**

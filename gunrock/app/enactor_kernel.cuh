@@ -576,6 +576,60 @@ __global__ void MakeOutput_SkipSelection_Kernel(
     }
 }
 
+template <
+    typename VertexT,
+    typename SizeT,
+    typename ValueT,
+    int      NUM_VERTEX_ASSOCIATES,
+    int      NUM_VALUE__ASSOCIATES,
+    typename ExpandOpT>
+__global__ void ExpandIncoming_Kernel(
+    int      gpu_num,
+    SizeT    num_elements,
+    VertexT *keys_in,
+    VertexT *vertex_associate_in,
+    ValueT  *value__associate_in,
+    SizeT   *out_length,
+    VertexT *keys_out,
+    ExpandOpT expand_op)
+{
+    typedef util::Block_Scan<SizeT, 9> BlockScanT;
+
+    __shared__ typename BlockScanT::Temp_Space scan_space;
+    __shared__ SizeT block_offset;
+    SizeT in_pos = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+    const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
+
+    while (in_pos - threadIdx.x < num_elements)
+    {
+        bool to_process = true;
+        SizeT out_pos = util::PreDefinedValues<SizeT>::InvalidValue;
+        VertexT key = util::PreDefinedValues<VertexT>::InvalidValue;
+
+        if (in_pos < num_elements)
+        {
+            key = keys_in[in_pos];
+            to_process = expand_op(key, in_pos,
+                vertex_associate_in, value__associate_in);
+        } else to_process = false;
+
+        BlockScanT::LogicScan(to_process, out_pos, scan_space);
+        if (threadIdx.x == blockDim.x -1)
+        {
+            block_offset = atomicAdd(
+                out_length, out_pos + ((to_process) ? 1 : 0));
+        }
+        __syncthreads();
+
+        if (to_process && keys_out != NULL)
+        {
+            out_pos += block_offset;
+            keys_out[out_pos] = key;
+        }
+        in_pos += STRIDE;
+    }
+}
+
 } // namespace app
 } // namespace gunrock
 

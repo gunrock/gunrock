@@ -15,6 +15,7 @@
 #pragma once
 
 #include <gunrock/graph/gp.cuh>
+#include <gunrock/oprtr/advance/advance_base.cuh>
 #include <gunrock/app/enactor_helper.cuh>
 #include <gunrock/app/enactor_kernel.cuh>
 
@@ -33,6 +34,7 @@ enum : IterationFlag
     Unified_Receive     = 0x200,
     Use_Double_Buffer   = 0x400,
     Skip_Makeout_Selection = 0x800,
+    Skip_PreScan = 0x1000,
 
     Iteration_Default = Use_FullQ | Push,
 };
@@ -58,13 +60,20 @@ public:
 
     Enactor *enactor;
     int      gpu_num;
+    IterationFlag flag;
 
-    IterationBase(
+    IterationBase() :
+        enactor (NULL),
+        gpu_num (0)
+    {}
+
+    cudaError_t Init(
         Enactor   *enactor,
-        int        gpu_num) :
-        enactor   (enactor),
-        gpu_num   (gpu_num)
+        int        gpu_num)
     {
+        this -> enactor = enactor;
+        this -> gpu_num = gpu_num;
+        return cudaSuccess;
     }
 
     cudaError_t Core(int peer_)
@@ -432,19 +441,98 @@ public:
         return retval;
     }
 
-    template <
+    /*template <
         int NUM_VERTEX_ASSOCIATES,
         int NUM_VALUE__ASSOCIATES>
     cudaError_t Expand_Incoming(int peer_)
     {
-        // TODO: Fill in here
         return cudaSuccess;
+    }*/
+
+    template <
+        int NUM_VERTEX_ASSOCIATES,
+        int NUM_VALUE__ASSOCIATES,
+        typename ExpandOpT>
+    cudaError_t ExpandIncomingBase(SizeT &received_length, int peer_, ExpandOpT exapnd_op)
+    {
+        bool over_sized = false;
+        auto &mgpu_slice = enactor -> mgpu_slices[gpu_num];
+        auto &enactor_slice = enactor -> enactor_slices[gpu_num * enactor -> num_gpus + ((FLAG & Unified_Receive) ? 0 : peer_)];
+        auto &iteration = enactor_slice.enactor_stats.iteration;
+        auto &out_length = mgpu_slice.in_length_out;
+        auto &num_elements = mgpu_slice.in_length[iteration%2][peer_];
+        auto &keys_in    = mgpu_slice.keys_in[iteration%2][peer_];
+        auto &vertex_associate_in = mgpu_slice.vertex_associate_in[iteration%2][peer_];
+        auto &value__associate_in = mgpu_slice.value__associate_in[iteration%2][peer_];
+        auto &retval = enactor_slice.enactor_stats.retval;
+        auto &frontier = enactor_slice.frontier;
+        auto &stream = enactor_slice.stream;
+
+        if (FLAG & Unified_Receive)
+        {
+            retval = CheckSize<SizeT, VertexT>(
+                enactor -> flag & Size_Check, "incoming_queue",
+                num_elements + received_length,
+                frontier.V_Q(), over_sized, gpu_num, iteration, peer_, true);
+            if (retval) return retval;
+            received_length += num_elements;
+        } else {
+            retval = CheckSize<SizeT, VertexT>(
+                enactor -> flag & Size_Check, "incomping_queue",
+                num_elements,
+                frontier.V_Q(), over_sized, gpu_num, iteration, peer_, false);
+            if (retval) return retval;
+            out_length[peer_] =0;
+            GUARD_CU(out_length.Move(util::HOST, util::DEVICE, 1, peer_, stream));
+        }
+
+        int block_size = 512;
+        int grid_size = num_elements / block_size + 1;
+        if (grid_size > 240) grid_size = 240;
+        ExpandIncoming_Kernel
+            <VertexT, SizeT, ValueT, NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
+            <<<grid_size, block_size, 0, stream>>>
+            (gpu_num, num_elements,
+            keys_in.GetPointer(util::DEVICE),
+            vertex_associate_in.GetPointer(util::DEVICE),
+            value__associate_in.GetPointer(util::DEVICE),
+            out_length.GetPointer(util::DEVICE) + ((FLAG & Unified_Receive) ? 0: peer_),
+            frontier.V_Q() -> GetPointer(util::DEVICE),
+            exapnd_op);
+
+        GUARD_CU(out_length.Move(util::DEVICE, util::HOST, 1,
+            (FLAG & Unified_Receive) ? 0 : peer_, stream));
+        return retval;
     }
 
     cudaError_t Compute_OutputLength(int peer_)
     {
-        // TODO: Fill in here
-        return cudaSuccess;
+        cudaError_t retval = cudaSuccess;
+        bool over_sized = false;
+        auto &enactor_slice = enactor -> enactor_slices[gpu_num * enactor -> num_gpus + peer_];
+        auto &frontier = enactor_slice.frontier;
+        auto &stream = enactor_slice.stream;
+        auto &graph = enactor -> problem -> sub_graphs[gpu_num];
+
+        if ((enactor -> flag & Size_Check) == 0 &&
+            (flag & Skip_PreScan))
+        {
+            frontier.output_length[0] = 0;
+            return retval;
+        }
+
+        retval = CheckSize<SizeT, SizeT> (
+            enactor -> flag & Size_Check, "scanned_edges",
+            frontier.queue_length + 2,
+            &frontier.output_offsets, over_sized, -1, -1, -1, false);
+        if (retval) return retval;
+
+        GUARD_CU(oprtr::ComputeOutputLength<oprtr::OprtrType_V2V>(
+            graph.csr(), frontier.V_Q(), enactor_slice.oprtr_parameters));
+
+        GUARD_CU(frontier.output_length.Move(
+            util::DEVICE, util::HOST, 1, 0, stream));
+        return retval;
     }
 };
 

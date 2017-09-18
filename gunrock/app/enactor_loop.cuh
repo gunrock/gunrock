@@ -261,8 +261,8 @@ void Iteration_Loop(
                             expand_latency, frontier.queue_length, stream,
                             mgpu_slice.latency_data.GetPointer(util::DEVICE));
 
-                        iteration.template Expand_Incoming
-                            <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>(peer_);
+                        iteration.template ExpandIncoming
+                            <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>(received_length, peer_);
                         //printf("%d, Expand, selector = %d, keys = %p\n",
                         //    thread_num, selector^1,
                         //    frontier.keys[selector^1] .GetPointer(util::DEVICE));
@@ -798,6 +798,60 @@ void Iteration_Loop(
 #endif
         iteration.Change();
     }
+}
+
+/**
+ * @brief Thread controls.
+ * @tparam Enactor Enactor type we process on.
+ * @param[in] thread_data_ Thread data.
+ */
+template <typename Enactor>
+static CUT_THREADPROC GunrockThread(
+    void * thread_data_)
+{
+    //typedef typename Enactor::Problem    Problem   ;
+    //typedef typename Enactor::SizeT      SizeT     ;
+    //typedef typename Enactor::VertexT    VertexT   ;
+    //typedef typename Enactor::ValueT     ValueT    ;
+    //typedef typename Problem::GraphT     GraphT    ;
+    //typedef typename GraphT ::CsrT       CsrT      ;
+    //typedef typename GraphT ::GpT        GpT       ;
+
+    ThreadSlice  &thread_data        =  ((ThreadSlice*)thread_data_)[0];
+    //Problem      *problem            =  (Problem*)     thread_data -> problem;
+    Enactor      &enactor            =  ((Enactor*)thread_data.enactor)[0];
+    //int           num_gpus           =   problem     -> num_gpus;
+    int           thread_num         =   thread_data.thread_num;
+    int           gpu_idx            =   enactor.gpu_idx[thread_num] ;
+    auto         &thread_status      =   thread_data.status;
+    auto         &retval             =   enactor.enactor_slices[thread_num * enactor.num_gpus].enactor_stats.retval;
+
+    if (retval = util::SetDevice(gpu_idx))
+    {
+        thread_status = ThreadSlice::Status::Ended;
+        CUT_THREADEND;
+    }
+
+    util::PrintMsg("Thread entered.");
+    thread_status = ThreadSlice::Status::Idle;
+    while (thread_status != ThreadSlice::Status::ToKill)
+    {
+        while (thread_status == ThreadSlice::Status::Wait ||
+               thread_status == ThreadSlice::Status::Idle)
+        {
+            sleep(0);
+            //std::this_thread::yield();
+        }
+        if (thread_status == ThreadSlice::Status::ToKill)
+            break;
+
+        util::PrintMsg("Run started");
+        enactor.Run(thread_data);
+        thread_status = ThreadSlice::Status::Idle;
+    }
+
+    thread_status = ThreadSlice::Status::Ended;
+    CUT_THREADEND;
 }
 
 } // namespace app
