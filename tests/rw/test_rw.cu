@@ -160,6 +160,7 @@ void DisplaySolution (VertexId *h_paths, SizeT nodes, SizeT walk_length)
  * @param[in] graph Reference to the CSR graph we process on
  * @param[in] quiet Don't print out anything to stdout
  */
+
 template <
     typename VertexId,
     typename SizeT,
@@ -168,47 +169,52 @@ void ReferenceRW(
     Csr<VertexId, SizeT, Value> &graph,
     int                         walk_length,
     bool                        quiet = false)
-{
+{ 
     //assume the input data are sorted 
-    int length = walk_length;
-    typedef std::map<int, std::vector<int>> StdAdjGraph;
-    StdAdjGraph my_graph;
-
-    for (int i = 0; i < graph.nodes; ++i)
+    int len = walk_length; 
+    std::map<SizeT, std::vector<SizeT>> arr;
+    for (SizeT i = 0; i < graph.nodes; ++i)
     {
-        std::vector<int> list;
-        for (int j = graph.row_offsets[i]; j < graph.row_offsets[i + 1]; ++j)
-        {
-            
-            list.push_back(graph.column_indices[j]);
-        }
-        my_graph.insert(std::pair<int, std::vector<int>>(i, list));
+     
+        if(graph.row_offsets[i] != graph.row_offsets[i+1]){
+		std::vector<SizeT> l;
+		for (SizeT j = graph.row_offsets[i]; j < graph.row_offsets[i + 1]; ++j)
+        	{ 
+			l.push_back(graph.column_indices[j]);
+        	}
+
+		arr[i] = l;
+	}
     }
-
-    std::vector<int> curr;
+  
+    std::vector<SizeT> curr;
     std::random_device rand;
-    std::mt19937 engine{rand()};
-    int output[graph.nodes][length];
-
+    std::mt19937 engine{rand()}; 
+    std::map<SizeT, std::vector<SizeT>> output;    
+   
     CpuTimer cpu_timer;
     cpu_timer.Start();
-    for(int i = 0; i < graph.nodes; ++i){
-        curr = my_graph[i];
-        output[i][0] = i;
-        for(int j = 1; j < length; ++j){
-            std::uniform_int_distribution<int> dist(0, curr.size()-1);
-            int next = curr[dist(engine)];
-            output[i][j] = next;
-            curr = my_graph[next];
-        }
+    for(VertexId i = 0; i < graph.nodes; ++i){
+	if(arr.count(i) == 1){
+        	curr = arr[i];
+        	std::vector<SizeT> out;
+        	out.push_back(i);
+        	for(VertexId j = 1; j < len; ++j){
+            		std::uniform_int_distribution<int> dist(0, curr.size()-1);
+            		VertexId next = curr[dist(engine)];
+            		out.push_back(next);
+            		curr = arr[next];
+        	}	
+        	output[i] = out;
+	}
     }
-
+    
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
-
+    
     if(!quiet){
         printf("CPU RW finished in %lf msec. Walklength: %d\n",
-                   elapsed, length);
+                   elapsed, len);
     }
     /*debug purpose
     printf("example out(walk length limit to 5): \n");
@@ -337,24 +343,29 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
+
+    double elapsed_gpu = 0.0f;
     if (retval = util::GRError(problem->Reset(enactor->GetFrontierType(),
                                         max_queue_sizing, max_queue_sizing1),
                                         "RW Problem Data Reset Failed", __FILE__, __LINE__))
-    return retval;
+        return retval;
     
     if (retval = util::GRError(enactor->Reset(),
             "RW Enactor Reset failed", __FILE__, __LINE__))
         return retval;
 
-    printf("enactor begin\n");
 
     cpu_timer.Start();
     if (retval = util::GRError(enactor->Enact(walk_length),
             "RW Problem Enact Failed", __FILE__, __LINE__))
         return retval;
     cpu_timer.Stop();
-    info -> info["process_times"] = cpu_timer.ElapsedMillis();
+    elapsed_gpu += cpu_timer.ElapsedMillis();
 
+    if (!quiet_mode)
+    {
+        printf("GPU - Computation Complete in %lf msec.\n", elapsed_gpu);
+    }
 
     // compute reference CPU primitive solution for source-distance
     /*
@@ -435,7 +446,7 @@ int main_(CommandLineArgs *args)
     // graph construction or generation related parameters
     info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
     info->info["edge_value"] = false;  // require per edge weight values
-
+    printf("debug\n");
     cpu_timer2.Start();
     info->Init("RW", *args, csr);  // initialize Info structure
     cpu_timer2.Stop();
