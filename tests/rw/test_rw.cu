@@ -399,7 +399,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     // Clean up
     cpu_timer.Start();
-    /* enactor doesn't have a release function implemented
+     //enactor doesn't have a release function implemented
     if (enactor         )
     {
         if (retval = util::GRError(enactor -> Release(),
@@ -407,9 +407,9 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
             return retval;
         delete   enactor         ; enactor          = NULL;
     }
-    */
+    
 
-    if (enactor)      { delete enactor; }
+    //if (enactor)      { delete enactor; }
 
     if (problem         )
     {
