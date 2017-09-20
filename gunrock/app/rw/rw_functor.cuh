@@ -106,19 +106,26 @@ __global__ void RandomNext(T *paths, T *num_neighbor, D *d_rand, T *d_row_offset
     for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
          idx < length; idx += STRIDE)
     {
-        //printf("d_rand[%d]: %.6f -> %d\n", idx, d_rand[idx], temp);
+	
+	//printf("d_rand[%d]: %.6f\n", idx, d_rand[idx]);
 
         //this node : itr * length + idx,                   path[itr*length+idx]       -> node_id[idx]
         //result (next node) : (itr+1) * length +idx,       path[(itr+1)*length + idx] -> path[idx]
 
 
         //calculate offset in neighbor list
+	
         SizeT node_id = paths[itr*length+idx];
-        SizeT offset = __float2int_ru(num_neighbor[node_id] * d_rand[idx]) - 1;
+        if(node_id != -1 && num_neighbor[node_id] > 0){
+	SizeT offset = __float2int_ru(num_neighbor[node_id] * d_rand[idx]) - 1;
         SizeT new_node = d_row_offsets[node_id] + offset;
         paths[(itr+1)*length + idx] = d_col_indices[new_node];
-
-
+	}else{
+	paths[(itr+1)*length + idx] = -1;
+	}
+	/*if(node_id <= 10 && node_id!=-1){
+		printf("node:%d, d_rand[%d]: %.6f, next:%d\n", node_id, idx, d_rand[idx], paths[(itr+1)*length + idx]);
+	}*/
 
     }
 };

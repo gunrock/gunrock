@@ -129,17 +129,18 @@ template<typename VertexId,
          typename SizeT>
 void DisplaySolution (VertexId *h_paths, SizeT nodes, SizeT walk_length)
 {
-    if (nodes > 40) nodes = 40;
+    
+    SizeT limit = nodes > 40 ? 40 : nodes;
 
     printf("==> random walk output paths:\n");
 
     printf("[");
-    for (SizeT i = 0; i < nodes; ++i)
+    for (SizeT i = 0; i < limit; ++i)
     {   
         //printf("%lld (%lld): ", (long long)h_paths[i], (long long)h_neighbor[i]);
-        printf("%lld : ", (long long)h_paths[i]);
+        printf("%d : ", h_paths[i]);
         for(SizeT j = 1; j < walk_length; ++j){
-            printf("%lld ", (long long)h_paths[j*nodes+i]);
+            printf("%d ", h_paths[j*nodes+i]);
         }
         printf("\n");
     }
@@ -213,8 +214,8 @@ void ReferenceRW(
     float elapsed = cpu_timer.ElapsedMillis();
     
     if(!quiet){
-        printf("CPU RW finished in %lf msec. Walklength: %d\n",
-                   elapsed, len);
+        printf("Walklength: %d.\nCPU RW finished in %lf msec.\n",
+                   len, elapsed);
     }
     /*debug purpose
     printf("example out(walk length limit to 5): \n");
@@ -312,7 +313,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     */
     SizeT nodes = graph->nodes;
     VertexId *h_paths = (VertexId*)malloc(sizeof(VertexId) * nodes * walk_length);
-    SizeT *h_neighbor = (SizeT*)malloc(sizeof(SizeT)*nodes);
+ 
 
     ReferenceRW(*graph, walk_length, quiet_mode);
 
@@ -382,7 +383,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     // Copy out GPU results
     cpu_timer.Start();
-    if (retval = util::GRError(problem->Extract(h_paths, h_neighbor ,nodes),
+    if (retval = util::GRError(problem->Extract(h_paths ,nodes),
         "RW Problem Data Extraction Failed", __FILE__, __LINE__))
         return retval;
 

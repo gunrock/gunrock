@@ -158,7 +158,7 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
             if (retval = this->d_col_indices.Allocate(graph->nodes, util::DEVICE)) return retval;
 
             if (retval = this->paths.Allocate(graph->nodes*this->walk_length, util::DEVICE)) return retval;
-
+ 
             if (retval = this->num_neighbor.Allocate(graph->nodes, util::HOST | util::DEVICE)) return retval;
 
             // calculate number of neighbor node from row_offsets of csr graph
@@ -312,11 +312,22 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
      */
     cudaError_t Extract(
       SizeT    *h_paths,
-      SizeT    *h_neighbor,
       SizeT    num_nodes)
     {
       cudaError_t retval = cudaSuccess;
-      if (this -> num_gpus == 1)
+       if (this->num_gpus == 1)
+        {
+            // Set device
+            if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
+
+            data_slices[0]->paths.SetPointer(h_paths);
+            if (retval = data_slices[0]->paths.Move(util::DEVICE,util::HOST)) return retval;
+
+        
+         
+          
+        
+/*      if (this -> num_gpus == 1)
       {
           // Set device
           int gpu = 0;
@@ -327,12 +338,7 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
           data_slice -> paths.SetPointer(h_paths);
           if (retval = data_slice -> paths.Move(util::DEVICE, util::HOST, num_nodes*this->walk_length))
               return retval;
-
-          data_slice -> num_neighbor.SetPointer(h_neighbor);
-          if (retval = data_slice -> num_neighbor.Move(util::DEVICE, util::HOST, num_nodes))
-              return retval;
-
-            
+  */    
       } else
       {
           // TODO: multi-GPU extract result

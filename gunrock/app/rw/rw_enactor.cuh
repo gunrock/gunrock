@@ -39,10 +39,6 @@ namespace app {
 namespace rw {
 
 
-
-
-
-
 /**
  * @brief RW Problem enactor class.
  *
@@ -169,12 +165,17 @@ public:
         //make curandGen as a field of Enactor, destroy generator in enactor destructor
         curandGenerator_t gen;
         curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT); /* Set seed */
-        //curandSetPseudoRandomGeneratorSeed(gen, 1234ULL); /* Generate n floats on device */
-        curandGenerateUniform(gen, data_slice->d_rand.GetPointer(util::DEVICE), nodes);
+        curandSetPseudoRandomGeneratorSeed(gen, time(NULL)); /* Generate n floats on device */
+ 
 
-        for(SizeT i = 0; i < walk_length ; i++){
-            curandGenerateUniform(gen, data_slice->d_rand.GetPointer(util::DEVICE), nodes);
-
+        for(SizeT i = 0; i < walk_length-1; i++){ //should be walk_length-1
+            //curandSetPseudoRandomGeneratorSeed(gen, 1234ULL+i);
+	    curandGenerateUniform(gen, data_slice->d_rand.GetPointer(util::DEVICE), nodes);
+	    /*if(i == 0){
+		for(SizeT i=0; i < nodes; i++){
+   			printf("d_rand[%d]: %.6f -> %d\n", i, d_rand[i]);
+	    	}
+	    } */  
             rw::RandomNext<<<128,128>>>(data_slice ->paths.GetPointer(util::DEVICE),
                                         data_slice ->num_neighbor.GetPointer(util::DEVICE),
                                         data_slice ->d_rand.GetPointer(util::DEVICE),
