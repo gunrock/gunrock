@@ -131,16 +131,16 @@ void DisplaySolution (VertexId *h_paths, SizeT nodes, SizeT walk_length)
 {
     
     SizeT limit = nodes > 40 ? 40 : nodes;
-
+    SizeT walkLimit = walk_length > 11 ? 10 : walk_length; 
     printf("==> random walk output paths:\n");
 
     printf("[");
     for (SizeT i = 0; i < limit; ++i)
     {   
         //printf("%lld (%lld): ", (long long)h_paths[i], (long long)h_neighbor[i]);
-        printf("%d : ", h_paths[i]);
-        for(SizeT j = 1; j < walk_length; ++j){
-            printf("%d ", h_paths[j*nodes+i]);
+        printf("%lld : ", (long long)h_paths[i]);
+        for(SizeT j = 1; j < walkLimit; ++j){
+            printf("%lld ", (long long)h_paths[j*nodes+i]);
         }
         printf("\n");
     }
@@ -314,9 +314,9 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     SizeT nodes = graph->nodes;
     VertexId *h_paths = (VertexId*)malloc(sizeof(VertexId) * nodes * walk_length);
  
-
-    ReferenceRW(*graph, walk_length, quiet_mode);
-
+    if (!quick_mode){
+    	ReferenceRW(*graph, walk_length, quiet_mode);
+    }
 
     // Allocate problem on GPU
     Problem *problem = new Problem(walk_length);
@@ -399,7 +399,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     // Clean up
     cpu_timer.Start();
-     //enactor doesn't have a release function implemented
+
     if (enactor         )
     {
         if (retval = util::GRError(enactor -> Release(),
@@ -408,9 +408,6 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         delete   enactor         ; enactor          = NULL;
     }
     
-
-    //if (enactor)      { delete enactor; }
-
     if (problem         )
     {
         if (retval = util::GRError(problem -> Release(),
