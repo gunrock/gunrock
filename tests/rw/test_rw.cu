@@ -214,7 +214,7 @@ void ReferenceRW(
     float elapsed = cpu_timer.ElapsedMillis();
     
     if(!quiet){
-        printf("Walklength: %d.\nCPU RW finished in %lf msec.\n",
+        printf("Walklength: %d.\n CPU RW computation complete in %lf msec.\n",
                    len, elapsed);
     }
     /*debug purpose
@@ -365,10 +365,10 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     if (!quiet_mode)
     {
-        printf("GPU - Computation Complete in %lf msec.\n", elapsed_gpu);
+        printf("GPU RW computation complete in %lf msec.\n", elapsed_gpu);
     }
 
-    // compute reference CPU primitive solution for source-distance
+
     /*
     if (!quick_mode)
     {
@@ -444,7 +444,6 @@ int main_(CommandLineArgs *args)
     // graph construction or generation related parameters
     info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
     info->info["edge_value"] = false;  // require per edge weight values
-    printf("debug\n");
     cpu_timer2.Start();
     info->Init("RW", *args, csr);  // initialize Info structure
     cpu_timer2.Stop();
