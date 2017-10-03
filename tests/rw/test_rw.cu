@@ -269,7 +269,9 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     bool        quick_mode          = info->info["quick_mode"       ].get_bool ();
     bool        stream_from_host    = info->info["stream_from_host" ].get_bool ();
     std::string traversal_mode      = info->info["traversal_mode"   ].get_str  ();
+    //use this flag for sorted enactor
     bool        instrument          = info->info["instrument"       ].get_bool ();
+    bool        sorted              = info->info["mark-pred"        ].get_bool ();
     bool        debug               = info->info["debug_mode"       ].get_bool ();
     bool        size_check          = info->info["size_check"       ].get_bool ();
     int         iterations          = info->info["num_iteration"    ].get_int  ();
@@ -284,6 +286,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     int      walk_length            = info->info["walk_length"       ].get_int ();
     
     //if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
+
 
     CpuTimer    cpu_timer;
     cudaError_t retval              = cudaSuccess;
@@ -357,7 +360,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
 
     cpu_timer.Start();
-    if (retval = util::GRError(enactor->Enact(walk_length),
+    if (retval = util::GRError(enactor->Enact(walk_length, sorted),
             "RW Problem Enact Failed", __FILE__, __LINE__))
         return retval;
     cpu_timer.Stop();
@@ -442,7 +445,9 @@ int main_(CommandLineArgs *args)
     Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
 
     // graph construction or generation related parameters
+  
     info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
+    info->info["mark-pred"] = args -> CheckCmdLineFlag("mark-pred");
     info->info["edge_value"] = false;  // require per edge weight values
     cpu_timer2.Start();
     info->Init("RW", *args, csr);  // initialize Info structure
@@ -450,6 +455,7 @@ int main_(CommandLineArgs *args)
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
     cudaError_t retval = RunTests<VertexId, SizeT, Value>(info);  // run test
+
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
 

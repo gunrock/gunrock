@@ -8,13 +8,14 @@ FORMAT="market"
 DATA="hollywood-2009"
 WALK="5 10 20 40 80 160"
 
+mkdir -p ./evaluation/$MARK
+DIR="./evaluation/$MARK"
 
-mkdir -p ./eval/$MARK
 #cd ~/Projects/gunrock_dev/gunrock/tests/bfs
 for w in $WALK
 do
-    echo $EXECUTION $FORMAT $DATADIR/$DATA/$DATA.mtx $OPTION --walk_length=$w --jsondir=./eval/$MARK "> ./eval/$MARK/"$w"_$DATA.txt"
-	$EXECUTION $FORMAT $DATADIR/$DATA/$DATA.mtx $OPTION --walk_length=$w --jsondir=./eval/$MARK > ./eval/$MARK/"$w"_$DATA.txt
+    echo $EXECUTION $FORMAT $DATADIR/$DATA/$DATA.mtx $OPTION --walk_length=$w --jsondir=$DIR "> $DIR/"$w"_$DATA.txt"
+	$EXECUTION $FORMAT $DATADIR/$DATA/$DATA.mtx $OPTION --walk_length=$w --jsondir=$DIR > $DIR/"$w"_$DATA.txt
 done    
    
 
