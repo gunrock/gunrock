@@ -21,6 +21,17 @@
 #include <gunrock/util/test_utils.h>
 #include <gunrock/util/error_utils.cuh>
 
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  (byte & 0x80 ? '1' : '0'), \
+  (byte & 0x40 ? '1' : '0'), \
+  (byte & 0x20 ? '1' : '0'), \
+  (byte & 0x10 ? '1' : '0'), \
+  (byte & 0x08 ? '1' : '0'), \
+  (byte & 0x04 ? '1' : '0'), \
+  (byte & 0x02 ? '1' : '0'), \
+  (byte & 0x01 ? '1' : '0')
+
 namespace gunrock
 {
 namespace util
@@ -248,6 +259,34 @@ void DisplayDeviceResults(
         printf(", ");
     }
     printf("\n\n");
+
+    // Cleanup
+    if (h_data) free(h_data);
+}
+
+/**
+ * Display device results in binary format
+ *
+ */
+template <typename T>
+void DisplayDeviceBinaryResults(
+    T *d_data,
+    size_t num_elements)
+{
+    // Allocate array on host
+    T *h_data = (T*) malloc(num_elements * sizeof(T));
+
+    // Reduction data back
+    cudaMemcpy(h_data, d_data, sizeof(T) * num_elements, cudaMemcpyDeviceToHost);
+
+    // Display data
+    printf("\n\nData:\n");
+    printf("Binary Format:\n");
+    for (int i = 0; i < num_elements; i++)
+    {
+        printf(""BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN"\n",
+  BYTE_TO_BINARY(h_data[i]>>8), BYTE_TO_BINARY(h_data[i])); 
+    }
 
     // Cleanup
     if (h_data) free(h_data);
