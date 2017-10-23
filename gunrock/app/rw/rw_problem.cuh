@@ -22,6 +22,16 @@
 #include <gunrock/util/memset_kernel.cuh>
 #include <gunrock/util/array_utils.cuh>
 
+#define ELEMS_PER_THREAD 4
+#define THREAD_BLOCK 128
+
+
+enum MODE{
+    RAW    = 0,
+    DEVICE = 1,
+    BLOCK  = 2,
+};
+
 namespace gunrock {
 namespace app {
 namespace rw {
@@ -62,13 +72,22 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
         // device storage arrays
         // util::Array1D<SizeT, Value>    user_specific_array;     /**< users can add arbitrary device arrays here. */
 
-        //util::Array1D<SizeT, VertexId>    node_id;    /**< Used for the mapping between original vertex IDs and local vertex IDs on multi-GPUs */
+        util::Array1D<SizeT, SizeT>       node_id;    /**< Used for the mapping between original vertex IDs and local vertex IDs on multi-GPUs */
         util::Array1D<SizeT, Value>       d_row_offsets;
         util::Array1D<SizeT, Value>       d_col_indices;
-        util::Array1D<SizeT, Value>       num_neighbor;       /**< Used for randomly choosing next neighbor node */
+        util::Array1D<SizeT, Value>       num_neighbor;  
+             /**< Used for randomly choosing next neighbor node */
         util::Array1D<SizeT, Value>       paths;              /**< Used for store output paths */
-        util::Array1D<SizeT, float>       d_rand; 
-        SizeT                             walk_length;
+        util::Array1D<SizeT, float>       d_rand;
+        util::Array1D<SizeT, Value>       trailing_slice; //used in sorted random walk to deal with 
+        SizeT                             size; //frontier size
+        SizeT                             trailing;
+        SizeT                             grid_size;
+        //bool                              block; // 0, raw, 1, device sort, 2, block sort, 3: pre-process
+        //bool                              device;
+
+
+
 
 
         //util::Array1D<SizeT, Value>       path_length;
@@ -78,13 +97,16 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
          */
         DataSlice() : BaseDataSlice()
         {
-            //node_id       .SetName("nodes" );
+            node_id       .SetName("node_id" );
             num_neighbor  .SetName("num_neighbor" );
             d_row_offsets .SetName("d_row_offsets");
             d_col_indices .SetName("d_col_indices"); 
             d_rand        .SetName("d_rand");
             paths         .SetName("paths" );
-            walk_length = 1;
+            trailing_slice.SetName("padding_slice" );
+            size          = 1;
+            trailing      = 0;
+            grid_size     = 1;
             //path_length.SetName("path_length");
         }
 
@@ -94,14 +116,13 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
         ~DataSlice()
         {
             if (util::SetDevice(this->gpu_idx)) return ;
-            //node_id       .Release();
+            node_id       .Release();
             d_row_offsets .Release();
             d_col_indices .Release();
             d_rand        .Release();
             num_neighbor  .Release();
             paths         .Release();
-
-
+            trailing_slice .Release();
 
         }
 
@@ -110,6 +131,9 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
          * Define and allocate mem for all the needed data/data array for this problem
          * Define specific data needed for this problem/primitive here
          *
+         * @param[in] walk_length Number of the rw walks.
+         * @param[in] block Block sort rw or not.
+         * @param[in] device Device sort rw or not.
          * @param[in] num_gpus Number of the GPUs used.
          * @param[in] gpu_idx GPU index used for testing.
          * @param[in] use_double_buffer Whether to use double buffer.
@@ -125,10 +149,11 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
          * \return cudaError_t object Indicates the success of all CUDA calls.
          */
         cudaError_t Init(
+            int   walk_length,
+            int   mode,
             int   num_gpus,
             int   gpu_idx,
             bool  use_double_buffer,
-            SizeT length,
             Csr<VertexId, SizeT, Value> *graph,
             SizeT *num_in_nodes,
             SizeT *num_out_nodes,
@@ -146,18 +171,52 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
                 num_out_nodes,
                 in_sizing)) return retval;
 
+
+        
+        //enum { GRID = DSIZE / ELEMS_PER_THREAD };
+
+        //int frontierSize=grid*ITEM_PER_THERAD*tb;
+
+
+        //ITEM_PER_THERAD = 4
+    //block size-> 128
+    //if  data size  = 70
+    // 70/4 = 17, -> 17 threads/block
+    // 70/128 = 0-> 1 block(gridsize) 
+   // only sorting 68 element
+
+
+            //this-> walk_length = walk_length;
+            if(mode == BLOCK){
+                this->grid_size = graph->nodes/(THREAD_BLOCK*ELEMS_PER_THREAD);
+                this->size = ELEMS_PER_THREAD*THREAD_BLOCK*grid_size;
+                this->trailing = graph->nodes - this->size;
+                if (retval = this->node_id.Allocate(this->size, util::DEVICE)) return retval;
+                if (retval = this->paths.Allocate(this->size*walk_length, util::DEVICE)) return retval;
+                if (retval = this->trailing_slice.Allocate(this->trailing*walk_length, util::DEVICE)) return retval;
+
+            }else if(mode == DEVICE){
+              this->size = graph->nodes;
+                if (retval = this->node_id.Allocate(graph->nodes, util::DEVICE)) return retval;
+                if (retval = this->paths.Allocate(graph->nodes*walk_length, util::DEVICE)) return retval;
+
+
+            }else{
+                this->size = graph->nodes;
+                if (retval = this->paths.Allocate(graph->nodes*walk_length, util::DEVICE)) return retval;
+            }
+
             // labels is a required array that defined in BaseProblem class.
             //if (retval = this->node_id.Allocate(graph->nodes, util::DEVICE)) return retval;
 
-            this->walk_length = length;
+            //problem.walk_leg
 
-            if (retval = this->d_row_offsets.Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = this->d_row_offsets.Allocate(graph->nodes+1, util::DEVICE)) return retval;
 
             if (retval = this->d_rand.Allocate(graph->nodes, util::DEVICE)) return retval;
 
-            if (retval = this->d_col_indices.Allocate(graph->nodes, util::DEVICE)) return retval;
+            if (retval = this->d_col_indices.Allocate(graph->edges, util::DEVICE)) return retval;
 
-            if (retval = this->paths.Allocate(graph->nodes*this->walk_length, util::DEVICE)) return retval;
  
             if (retval = this->num_neighbor.Allocate(graph->nodes, util::HOST | util::DEVICE)) return retval;
 
@@ -187,12 +246,14 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
          * \return cudaError_t object Indicates the success of all CUDA calls.
          */
         cudaError_t Reset(
-            FrontierType frontier_type,
+            int                                 walk_length,
+            int                                 mode,      
+            FrontierType                        frontier_type,
             GraphSlice<VertexId, SizeT, Value>  *graph_slice,
-            double queue_sizing = 2.0,
-            bool    use_double_buffer  = false,
-            double queue_sizing1 = -1.0,
-            bool    skip_scanned_edges = false)
+            double                              queue_sizing = 2.0,
+            bool                                use_double_buffer  = false,
+            double                              queue_sizing1 = -1.0,
+            bool                                skip_scanned_edges = false)
         {
             cudaError_t retval = cudaSuccess;
 
@@ -208,21 +269,22 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
                 skip_scanned_edges))
                 return retval;            
 
-            SizeT node = graph_slice -> nodes;
+            SizeT node = graph_slice ->nodes;
             SizeT edge = graph_slice ->edges;
 
 
             if (d_row_offsets.GetPointer(util::DEVICE) == NULL){
                 printf("d_row_offsets pointer is null.\n");
-                if (retval = d_row_offsets.Allocate(node, util::DEVICE))
+                if (retval = d_row_offsets.Allocate(node+1, util::DEVICE))
                     return retval;
             }
 
             if (d_col_indices.GetPointer(util::DEVICE) == NULL){
                 printf("d_col_indices pointer is null.\n");
-                if (retval = d_row_offsets.Allocate(node, util::DEVICE))
+                if (retval = d_row_offsets.Allocate(edge, util::DEVICE))
                     return retval;
             }
+
 
             if (d_rand.GetPointer(util::DEVICE) == NULL){
                 printf("d_rand pointer is null.\n");
@@ -230,9 +292,6 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
                     return retval;
             }
 
-            if (paths.GetPointer(util::DEVICE) == NULL)
-                if (retval = paths.Allocate(node*this->walk_length, util::DEVICE))
-                    return retval;
 
             if (num_neighbor.GetPointer(util::DEVICE) == NULL)
                 if (retval = num_neighbor.Allocate(node, util::DEVICE))
@@ -245,9 +304,71 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
             d_col_indices.SetPointer((VertexId*)graph_slice -> column_indices.GetPointer(util::DEVICE), 
                                     edge, util::DEVICE);
 
+            /*
+            util::MemsetIdxKernel<<<128, 128>>>(
+                node_id.GetPointer(util::DEVICE), this->size);
 
             util::MemsetIdxKernel<<<128, 128>>>(
-                paths.GetPointer(util::DEVICE), node);
+                paths.GetPointer(util::DEVICE), this->size);*/
+
+            if(mode == BLOCK){
+
+                if (node_id.GetPointer(util::DEVICE) == NULL)
+                  if (retval = node_id.Allocate(this->size*walk_length, util::DEVICE))
+                      return retval;
+
+                if (paths.GetPointer(util::DEVICE) == NULL)
+                  if (retval = paths.Allocate(this->size*walk_length, util::DEVICE))
+                      return retval;
+                
+                if (trailing_slice.GetPointer(util::DEVICE) == NULL)
+                  if (retval = trailing_slice.Allocate(this->trailing*walk_length, util::DEVICE))
+                      return retval;
+
+                util::MemsetIdxKernel<<<128, 128>>>(
+                  node_id.GetPointer(util::DEVICE), this->size);
+
+                util::MemsetIdxKernel<<<128, 128>>>(
+                    paths.GetPointer(util::DEVICE), this->size);
+
+                util::MemsetIdxKernel<<<128, 128>>>(
+                    trailing_slice.GetPointer(util::DEVICE), this->trailing);
+
+                //offset node_id in the trailing slice by "size" number
+                util::MemsetAddKernel<<<128, 128>>>(
+                    trailing_slice.GetPointer(util::DEVICE), this->size,this->trailing);
+
+                
+            }else if(mode == DEVICE){
+              if (node_id.GetPointer(util::DEVICE) == NULL)
+                  if (retval = node_id.Allocate(node, util::DEVICE))
+                      return retval;
+
+              if (paths.GetPointer(util::DEVICE) == NULL)
+                  if (retval = paths.Allocate(node*walk_length, util::DEVICE))
+                      return retval;
+
+              util::MemsetIdxKernel<<<128, 128>>>(
+                  node_id.GetPointer(util::DEVICE), node);
+
+              util::MemsetIdxKernel<<<128, 128>>>(
+                  paths.GetPointer(util::DEVICE), node);
+
+            }else{
+              if (paths.GetPointer(util::DEVICE) == NULL)
+                  if (retval = paths.Allocate(node*walk_length, util::DEVICE))
+                      return retval;
+                
+                util::MemsetIdxKernel<<<128, 128>>>(
+                  paths.GetPointer(util::DEVICE), node);
+            }
+
+
+	    
+
+
+
+	    
             /*
             util::MemsetIdxKernel<<<128, 128>>>(
                 num_neighbor.GetPointer(util::DEVICE), node);*/
@@ -262,21 +383,27 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice>          *data_slices;
     SizeT                                    walk_length;
+    SizeT                                    mode;
     // Methods
 
     /**
      * @brief RWProblem default constructor
      */
 
-    RWProblem(SizeT length) : BaseProblem(
+    RWProblem(SizeT _walk_length, SizeT _mode) : BaseProblem(
         false, // use_double_buffer
         false, // enable_backward
         false, // keep_order
         false  // keep_node_num
         ),  // unified_receive
-        data_slices(NULL)
+        data_slices(NULL),
+        walk_length(_walk_length),
+        mode       (_mode)
     {
-        this->walk_length = length;
+        //this->walk_length = length;
+        //this->block = block;
+        printf("In problem reset, mode %d\n", mode);
+        printf("In problem reset, walk_length %d\n", walk_length);
     }
 
     /**
@@ -311,8 +438,10 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
      *\return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Extract(
-      SizeT    *h_paths,
-      SizeT    num_nodes)
+      SizeT    *h_paths /*，
+
+      bool      block=false,
+      SizeT    *h_trailing=NULL*/)
     {
       cudaError_t retval = cudaSuccess;
        if (this->num_gpus == 1)
@@ -322,6 +451,11 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
 
             data_slices[0]->paths.SetPointer(h_paths);
             if (retval = data_slices[0]->paths.Move(util::DEVICE,util::HOST)) return retval;
+            
+
+            if(mode == BLOCK){
+              if (retval = data_slices[0]->trailing_slice.Move(util::DEVICE,util::HOST)) return retval;
+            }
 
         
          
@@ -345,6 +479,10 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
       }
       return retval;
     }
+
+
+    /**
+
 
     /**
      * @brief initialization function of Problem Struct.
@@ -408,10 +546,11 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
             data_slice -> streams.SetPointer(streams + gpu * num_gpus * 2, num_gpus * 2);
 
             if (retval = data_slice->Init(
+                walk_length,
+                mode,
                 this -> num_gpus,
                 this -> gpu_idx[gpu],
                 this -> use_double_buffer,
-                this -> walk_length,
               &(this -> sub_graphs[gpu]),
                 this -> num_gpus > 1? graph_slice -> in_counter     .GetPointer(util::HOST) : NULL,
                 this -> num_gpus > 1? graph_slice -> out_counter    .GetPointer(util::HOST) : NULL,
@@ -449,10 +588,12 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
 
 
         //single gpu
-        if (retval = data_slices[0] -> Reset(frontier_type, 
-                                            this->graph_slices[0],
-                                            queue_sizing, 
-                                            queue_sizing1)) return retval;
+        if (retval = data_slices[0] -> Reset(walk_length,
+                                             mode,
+                                             frontier_type, 
+                                             this->graph_slices[0],
+                                             queue_sizing, 
+                                             queue_sizing1)) return retval;
 
         if (retval = data_slices[0].Move(util::HOST, util::DEVICE)) return retval;
 

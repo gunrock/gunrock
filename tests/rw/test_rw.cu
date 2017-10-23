@@ -111,7 +111,9 @@ void Usage()
         "[--json]                  Output JSON-format statistics to STDOUT.\n"
         "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"
         "[--jsondir=<dir>]         Output JSON-format statistics to <dir>/name,\n"
+        "[--mode=<num>]            Mode of GPU random walk, 0:raw, 1:device, 2:block\n"
         "                          where name is auto-generated.\n"
+
     );
 }
 
@@ -128,6 +130,38 @@ void Usage()
 template<typename VertexId, 
          typename SizeT>
 void DisplaySolution (VertexId *h_paths, SizeT nodes, SizeT walk_length)
+{
+    
+    SizeT limit = nodes > 40 ? 40 : nodes;
+    SizeT walkLimit = walk_length > 11 ? 10 : walk_length; 
+    printf("==> random walk output paths:\n");
+
+    printf("[");
+    for (SizeT i = 0; i < limit; ++i)
+    {   
+        //printf("%lld (%lld): ", (long long)h_paths[i], (long long)h_neighbor[i]);
+        printf("%lld : ", (long long)h_paths[i]);
+        for(SizeT j = 1; j < walkLimit; ++j){
+            printf("%lld ", (long long)h_paths[j*nodes+i]);
+        }
+        printf("\n");
+    }
+    printf("]\n");
+}
+
+/**
+ * @brief Displays the result (i.e., distance from source)
+ *
+ * @tparam VertexId
+ * @tparam SizeT
+ *
+ * @param[in] num_nodes Number of nodes in the graph.
+ */
+
+
+template<typename VertexId, 
+         typename SizeT>
+void StoreSolution (VertexId *h_paths, SizeT nodes, SizeT walk_length, int mode)
 {
     
     SizeT limit = nodes > 40 ? 40 : nodes;
@@ -246,7 +280,7 @@ template <
     typename VertexId,
     typename SizeT,
     typename Value>
-cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
+cudaError_t RunTests(Info<VertexId, SizeT, Value> *info, int mode)
 {
     typedef RWProblem < VertexId,
             SizeT,
@@ -271,7 +305,6 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     std::string traversal_mode      = info->info["traversal_mode"   ].get_str  ();
     //use this flag for sorted enactor
     bool        instrument          = info->info["instrument"       ].get_bool ();
-    bool        sorted              = info->info["mark-pred"        ].get_bool ();
     bool        debug               = info->info["debug_mode"       ].get_bool ();
     bool        size_check          = info->info["size_check"       ].get_bool ();
     int         iterations          = info->info["num_iteration"    ].get_int  ();
@@ -284,6 +317,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     int      fullqueue_latency      = info->info["fullqueue_latency" ].get_int (); 
     int      makeout_latency        = info->info["makeout_latency"   ].get_int (); 
     int      walk_length            = info->info["walk_length"       ].get_int ();
+    std::string output_filename     = info->info["output_filename"   ].get_str (); 
+
     
     //if (communicate_multipy > 1) max_in_sizing *= communicate_multipy;
 
@@ -315,14 +350,29 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     }
     */
     SizeT nodes = graph->nodes;
-    VertexId *h_paths = (VertexId*)malloc(sizeof(VertexId) * nodes * walk_length);
+    VertexId *h_paths;
+    VertexId *h_trailing_paths;
+
+    if(mode == BLOCK){
+        int grid = nodes/(THREAD_BLOCK*ELEMS_PER_THREAD);
+        int block_data = ELEMS_PER_THREAD*THREAD_BLOCK*grid;
+        int trailing = nodes - block_data;
+
+        h_paths = (VertexId*)malloc(sizeof(VertexId) * block_data * walk_length);
+        h_trailing_paths = (VertexId*)malloc(sizeof(VertexId) * trailing * walk_length);
+    }else{
+        h_paths = (VertexId*)malloc(sizeof(VertexId) * nodes * walk_length);
+
+    }
+
+    
  
     if (!quick_mode){
     	ReferenceRW(*graph, walk_length, quiet_mode);
     }
 
     // Allocate problem on GPU
-    Problem *problem = new Problem(walk_length);
+    Problem *problem = new Problem(walk_length, mode);
     if (retval = util::GRError(problem->Init(
         stream_from_host,
         graph,
@@ -360,7 +410,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
 
     cpu_timer.Start();
-    if (retval = util::GRError(enactor->Enact(walk_length, sorted),
+    if (retval = util::GRError(enactor->Enact(mode),
             "RW Problem Enact Failed", __FILE__, __LINE__))
         return retval;
     cpu_timer.Stop();
@@ -386,7 +436,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     // Copy out GPU results
     cpu_timer.Start();
-    if (retval = util::GRError(problem->Extract(h_paths ,nodes),
+    if (retval = util::GRError(problem->Extract(h_paths),
         "RW Problem Data Extraction Failed", __FILE__, __LINE__))
         return retval;
 
@@ -394,10 +444,16 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     if (!quiet_mode)
     {
         // Display Solution
-        DisplaySolution(
-                        h_paths,
+        DisplaySolution(h_paths,
                         nodes,
                         walk_length);
+    }
+
+    if(!output_filename.empty()){
+        StoreSolution(h_paths,
+                  nodes,
+                  walk_length,
+                  mode);
     }
 
     // Clean up
@@ -447,14 +503,27 @@ int main_(CommandLineArgs *args)
     // graph construction or generation related parameters
   
     info->info["undirected"] = args -> CheckCmdLineFlag("undirected");
-    info->info["mark-pred"] = args -> CheckCmdLineFlag("mark-pred");
+
+    /** additional arg parameter for rw testing**/
+    //bool block_sort = args -> CheckCmdLineFlag("block_sort");
+    //bool device_sort = args -> CheckCmdLineFlag("device_sort");
+    int mode;
+
+    if (args->CheckCmdLineFlag("mode"))
+        {
+            args->GetCmdLineArgument("mode", mode);
+        }
+    //printf("mode %d\n", mode);
+
+
+
     info->info["edge_value"] = false;  // require per edge weight values
     cpu_timer2.Start();
     info->Init("RW", *args, csr);  // initialize Info structure
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
-    cudaError_t retval = RunTests<VertexId, SizeT, Value>(info);  // run test
+    cudaError_t retval = RunTests<VertexId, SizeT, Value>(info, mode);  // run test
 
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();

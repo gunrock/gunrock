@@ -33,6 +33,9 @@
 #include <gunrock/app/rw/rw_functor.cuh>
 #include <gunrock/app/rw/rw_problem.cuh>
 
+#define ELEMS_PER_THREAD 4
+#define THREAD_BLOCK 128
+
 
 namespace gunrock {
 namespace app {
@@ -82,7 +85,15 @@ public:
      */
     virtual ~RWEnactor()
     {
-        //Release();
+        Release();
+    }
+
+    cudaError_t Release()
+    {
+	cudaError_t retval = cudaSuccess;
+        if (retval = BaseEnactor::Release()) return retval;
+        problem = NULL;
+        return retval;
     }
 
     /** @} */
@@ -148,7 +159,7 @@ public:
     template<
         typename AdvanceKernelPolicy,
         typename FilterKernelPolicy>
-    cudaError_t EnactRW(SizeT walk_length)
+    cudaError_t EnactRW()
     {
         typedef RWFunctor<VertexId, SizeT, Value, Problem> RWFunctor;
         typedef typename Problem::DataSlice DataSlice;
@@ -161,11 +172,14 @@ public:
                   *work_progress = &this->work_progress    [0];
         SizeT      nodes         = graph_slice -> nodes;
         cudaError_t retval       = cudaSuccess;
+        SizeT walk_length        = problem->walk_length;
 
         //make curandGen as a field of Enactor, destroy generator in enactor destructor
         curandGenerator_t gen;
         curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT); /* Set seed */
         curandSetPseudoRandomGeneratorSeed(gen, time(NULL)); /* Generate n floats on device */
+
+
  
 
         for(SizeT i = 0; i < walk_length-1; i++){ //should be walk_length-1
@@ -175,8 +189,9 @@ public:
 		for(SizeT i=0; i < nodes; i++){
    			printf("d_rand[%d]: %.6f -> %d\n", i, d_rand[i]);
 	    	}
-	    } */  
-            rw::RandomNext<<<128,128>>>(data_slice ->paths.GetPointer(util::DEVICE),
+	    } */
+
+           rw::RandomNext<<<128,128>>>(data_slice ->paths.GetPointer(util::DEVICE),
                                         data_slice ->num_neighbor.GetPointer(util::DEVICE),
                                         data_slice ->d_rand.GetPointer(util::DEVICE),
                                         data_slice -> d_row_offsets.GetPointer(util::DEVICE),
@@ -203,6 +218,195 @@ public:
         if (this -> debug) printf("\nGPU RW Done.\n");
         return retval;
     }
+
+    template<
+        typename AdvanceKernelPolicy,
+        typename FilterKernelPolicy>
+    cudaError_t EnactSortedRW()
+    {
+        typedef RWFunctor<VertexId, SizeT, Value, Problem> RWFunctor;
+        typedef typename Problem::DataSlice DataSlice;
+
+        // single gpu graph slice
+        GraphSlice<VertexId, SizeT, Value>
+                  *graph_slice   =  problem -> graph_slices[0];
+        DataSlice *data_slice    =  problem -> data_slices [0].GetPointer(util::HOST);
+        util::CtaWorkProgressLifetime<SizeT>
+                  *work_progress = &this->work_progress    [0];
+        SizeT      nodes         = graph_slice -> nodes;
+        cudaError_t retval       = cudaSuccess;
+        SizeT walk_length        = problem->walk_length;
+
+
+        //make curandGen as a field of Enactor, destroy generator in enactor destructor
+        curandGenerator_t gen;
+        curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT); /* Set seed */
+        curandSetPseudoRandomGeneratorSeed(gen, time(NULL)); /* Generate n floats on device */
+
+
+        for(SizeT i = 0; i < walk_length-1; i++){ 
+            	//curandSetPseudoRandomGeneratorSeed(gen, 1234ULL+i);
+                curandGenerateUniform(gen, data_slice->d_rand.GetPointer(util::DEVICE), nodes);
+
+		if(i!= 0){
+            	//sort the node index
+            	util::CUBRadixSort<SizeT, VertexId>(
+                    	true, nodes,
+                    	data_slice -> paths.GetPointer(util::DEVICE)+i*nodes,
+                    	data_slice -> node_id.GetPointer(util::DEVICE));
+            
+	    	
+            	util::CUBRadixSort<SizeT, VertexId>(
+                   	true, nodes,
+                    	data_slice -> paths.GetPointer(util::DEVICE)+i*nodes);
+            	}
+           	rw::SortedRandomNext<<<128,128>>>(data_slice ->paths.GetPointer(util::DEVICE),
+                                        data_slice ->node_id.GetPointer(util::DEVICE),
+                                        data_slice ->num_neighbor.GetPointer(util::DEVICE),
+                                        data_slice ->d_rand.GetPointer(util::DEVICE),
+                                        data_slice -> d_row_offsets.GetPointer(util::DEVICE),
+                                        data_slice -> d_col_indices.GetPointer(util::DEVICE),
+                                        nodes,
+                                        i);
+           if(i!=0){
+		
+           util::CUBRadixSort<SizeT, VertexId>(
+                    true, nodes,
+                    data_slice -> node_id.GetPointer(util::DEVICE),
+                    data_slice -> paths.GetPointer(util::DEVICE)+i*nodes);
+            }
+            util::MemsetIdxKernel<<<128, 128>>>(
+                data_slice->node_id.GetPointer(util::DEVICE), nodes);
+
+        }
+        //curandDestroyGenerator(gen);
+
+
+        // check if any of the frontiers overflowed due to redundant expansion
+        bool overflowed = false;
+        if (retval = work_progress -> CheckOverflow(overflowed)) return retval;
+        if (overflowed)
+        {
+            retval = util::GRError(
+                cudaErrorInvalidConfiguration,
+                "Frontier queue overflow. Please increase queus size factor.",
+                __FILE__, __LINE__);
+            return retval;
+        }
+
+
+        if (this -> debug) printf("\nGPU RW Done.\n");
+        return retval;
+    }
+
+
+    template<
+        typename AdvanceKernelPolicy,
+        typename FilterKernelPolicy>
+    cudaError_t EnactBlockSortedRW()
+    {
+        typedef RWFunctor<VertexId, SizeT, Value, Problem> RWFunctor;
+        typedef typename Problem::DataSlice DataSlice;
+
+        // single gpu graph slice
+        GraphSlice<VertexId, SizeT, Value>
+                  *graph_slice   =  problem -> graph_slices[0];
+        DataSlice *data_slice    =  problem -> data_slices [0].GetPointer(util::HOST);
+        util::CtaWorkProgressLifetime<SizeT>
+                  *work_progress = &this->work_progress    [0];
+        //SizeT      nodes         = graph_slice -> nodes;
+        cudaError_t retval       = cudaSuccess;
+        SizeT walk_length        = problem->walk_length;
+
+
+        //const int tb = (nodes / ELEMS_PER_THREAD) > THREAD_BLOCK ?  THREAD_BLOCK : (nodes / ELEMS_PER_THREAD);
+        //int grid = nodes/(THREAD_BLOCK*ELEMS_PER_THREAD);
+        // { GRID = DSIZE / ELEMS_PER_THREAD };
+
+        //int frontierSize=grid*THREAD_BLOCK*ELEMS_PER_THREAD;
+        //int const& const_tb = tb;
+
+        //need to work out how much padding needed to be done after block-wise sort
+        //in problem
+        //int block_left = nodes - THREAD_BLOCK*ELEMS_PER_THREAD*;
+
+
+        //ITEM_PER_THERAD = 4
+        //block size-> 128
+        //if  data size  = 70
+        // 70/4 = 17, -> 17 threads/block
+        // 70/128 = 0-> 1 block(gridsize) 
+        // only sorting 68 element
+
+        int block_nodes = data_slice->size;
+        int trailing_nodes = data_slice->trailing;
+        //make curandGen as a field of Enactor, destroy generator in enactor destructor
+        curandGenerator_t gen;
+        curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT); /* Set seed */
+        curandSetPseudoRandomGeneratorSeed(gen, time(NULL)); /* Generate n floats on device */
+
+        for(SizeT i = 0; i < walk_length-1; i++){
+                //curandSetPseudoRandomGeneratorSeed(gen, 1234ULL+i);
+                curandGenerateUniform(gen, data_slice->d_rand.GetPointer(util::DEVICE), block_nodes);
+
+                rw::BlockSortKernel<THREAD_BLOCK, ELEMS_PER_THREAD><<<data_slice->grid_size, THREAD_BLOCK>>>(
+                                                            data_slice ->paths.GetPointer(util::DEVICE)+i*block_nodes, 
+                                                            data_slice ->node_id.GetPointer(util::DEVICE)); 
+
+                rw::BlockRandomNext<<<128,128>>>(data_slice ->paths.GetPointer(util::DEVICE)+i*block_nodes,
+                                        data_slice ->node_id.GetPointer(util::DEVICE),
+                                        data_slice ->num_neighbor.GetPointer(util::DEVICE),
+                                        data_slice ->d_rand.GetPointer(util::DEVICE),
+                                        data_slice -> d_row_offsets.GetPointer(util::DEVICE),
+                                        data_slice -> d_col_indices.GetPointer(util::DEVICE),
+                                        block_nodes);
+
+                rw::BlockSortKernel<THREAD_BLOCK, ELEMS_PER_THREAD><<<data_slice->grid_size, THREAD_BLOCK>>>(
+                                                            data_slice ->node_id.GetPointer(util::DEVICE),
+                                                            data_slice ->paths.GetPointer(util::DEVICE)+i*block_nodes);
+
+        }
+        
+
+
+        //need to raw rw walk the trailing slice from the graph
+
+        
+        for(SizeT i = 0; i < walk_length-1; i++){ //should be walk_length-1
+            //curandSetPseudoRandomGeneratorSeed(gen, 1234ULL+i);
+            curandGenerateUniform(gen, data_slice->d_rand.GetPointer(util::DEVICE), trailing_nodes);
+        
+
+           rw::RandomNext<<<128,128>>>( data_slice ->trailing_slice.GetPointer(util::DEVICE),
+                                        data_slice ->num_neighbor.GetPointer(util::DEVICE),
+                                        data_slice ->d_rand.GetPointer(util::DEVICE),
+                                        data_slice -> d_row_offsets.GetPointer(util::DEVICE),
+                                        data_slice -> d_col_indices.GetPointer(util::DEVICE),
+                                        trailing_nodes,
+                                        i);
+        }
+        
+        curandDestroyGenerator(gen);
+
+
+
+        // check if any of the frontiers overflowed due to redundant expansion
+        bool overflowed = false;
+        if (retval = work_progress -> CheckOverflow(overflowed)) return retval;
+        if (overflowed)
+        {
+            retval = util::GRError(
+                cudaErrorInvalidConfiguration,
+                "Frontier queue overflow. Please increase queus size factor.",
+                __FILE__, __LINE__);
+            return retval;
+        }
+
+
+        if (this -> debug) printf("\nGPU RW Done.\n");
+        return retval;
+    }
+
 
     typedef gunrock::oprtr::filter::KernelPolicy<
         Problem,                            // Problem data type
@@ -252,7 +456,7 @@ public:
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     //template <typename SampleProblem>
-    cudaError_t Enact(SizeT walk_length)
+    cudaError_t Enact(int mode)
     {
         int min_sm_version = -1;
         for (int i = 0; i < this->num_gpus; i++)
@@ -266,7 +470,16 @@ public:
 
         if (min_sm_version >= 300)
         {
-            return EnactRW<AdvanceKernelPolicy, FilterKernelPolicy> (walk_length);
+            if(mode == DEVICE){
+                return EnactSortedRW<AdvanceKernelPolicy, FilterKernelPolicy> ();
+            }else if(mode == BLOCK){
+               	//return EnactSortedRW<AdvanceKernelPolicy, FilterKernelPolicy> (walk_length);
+                return EnactBlockSortedRW<AdvanceKernelPolicy, FilterKernelPolicy> ();
+
+            }else{
+                return EnactRW<AdvanceKernelPolicy, FilterKernelPolicy> ();
+
+            }
         }
 
         // to reduce compile time, get rid of other architecture for now
