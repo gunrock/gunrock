@@ -1,8 +1,20 @@
 # Gunrock's Testing CMake File
+# include_directories
+# Google test add subdirectory
+# include(${CMAKE_SOURCE_DIR}/cmake/DownloadProject.cmake)
+
+# download_project(
+#    PROJ googletest
+#    GIT_REPOSITORY https://github.com/google/googletest.git
+#    GIT_TAG master
+#    UPDATE_DISCONNECTED 1
+# )
+
+include_directories(${PROJECT_SOURCE_DIR}/externals/googletest)
 
 # begin /* Add premitives' subdirectories */
 if(GUNROCK_BUILD_APPLICATIONS)
-  add_subdirectory(shared_lib_tests)
+  add_subdirectory(shared_libs)
   #add_subdirectory(simple_example)
   add_subdirectory(bc)
   add_subdirectory(bfs)
