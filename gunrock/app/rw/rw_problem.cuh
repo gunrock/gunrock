@@ -402,8 +402,6 @@ struct RWProblem : ProblemBase<VertexId, SizeT, Value,
     {
         //this->walk_length = length;
         //this->block = block;
-        printf("In problem reset, mode %d\n", mode);
-        printf("In problem reset, walk_length %d\n", walk_length);
     }
 
     /**
