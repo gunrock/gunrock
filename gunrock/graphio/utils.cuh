@@ -65,8 +65,7 @@ SizeT RandomNode (SizeT num_nodes)
     return node_id % num_nodes;
 }
 
-template <typename VertexId, typename SizeT, typename Value>
-void RemoveStandaloneNodes(
+template <typename VertexId, typename SizeT, typename Value>void RemoveStandaloneNodes(
     Csr<VertexId, SizeT, Value>* graph, bool quiet = false)
 {
     SizeT nodes = graph->nodes;
@@ -92,7 +91,8 @@ void RemoveStandaloneNodes(
         SizeT node_start = (long long)(nodes) * thread_num / num_threads;
         SizeT node_end   = (long long)(nodes) * (thread_num + 1) / num_threads;
 
-        for (SizeT    edge = edge_start; edge < edge_end; edge++)
+	
+	for (SizeT    edge = edge_start; edge < edge_end; edge++)
             marker[column_indices[edge]] = 1;
         for (VertexId node = node_start; node < node_end; node++)
             if (row_offsets[node] != row_offsets[node + 1])
@@ -140,6 +140,13 @@ void RemoveStandaloneNodes(
     }
 
     nodes = nodes - block_offsets[num_threads];
+
+    if (nodes < 0)
+    {
+	printf("Invalid graph error. The number of nodes is negative.\n");
+	exit(1);
+    }	
+
     memcpy(row_offsets, new_offsets, sizeof(SizeT) * (nodes + 1));
     if (values != NULL) memcpy(values, new_values, sizeof(Value) * nodes);
     if (!quiet)
