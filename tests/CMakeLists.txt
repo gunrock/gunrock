@@ -1,16 +1,4 @@
 # Gunrock's Testing CMake File
-# include_directories
-# Google test add subdirectory
-# include(${CMAKE_SOURCE_DIR}/cmake/DownloadProject.cmake)
-
-# download_project(
-#    PROJ googletest
-#    GIT_REPOSITORY https://github.com/google/googletest.git
-#    GIT_TAG master
-#    UPDATE_DISCONNECTED 1
-# )
-
-include_directories(${PROJECT_SOURCE_DIR}/externals/googletest)
 
 # begin /* Add premitives' subdirectories */
 if(GUNROCK_BUILD_APPLICATIONS)
@@ -76,6 +64,12 @@ endif(GUNROCK_BUILD_APPLICATIONS)
 
 # begin /* Enable Testing for `ctest` */
 enable_testing()
+
+### tests using googletest and googlemock
+if (GUNROCK_GOOGLE_TESTS)
+  add_subdirectory(unit_tests)
+  add_test(NAME UNIT_TEST COMMAND unit_test)
+endif (GUNROCK_GOOGLE_TESTS)
 
 ### primitive tests with bips98_606 graph
 add_test(NAME TEST_BFS COMMAND bfs market

@@ -65,6 +65,21 @@ include(${CMAKE_SOURCE_DIR}/cmake/FindModernGPU.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindCUB.cmake)
 # end /* Include moderngpu & cub */
 
+# begin /* Include googletest & googlemock */
+option(GUNROCK_GOOGLE_TESTS "Use Googletest as testing framework (default: ON)." ON)
+
+if (GUNROCK_GOOGLE_TESTS)
+include(${CMAKE_SOURCE_DIR}/cmake/DownloadProject/DownloadProject.cmake)
+download_project(
+    PROJ googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG master
+    UPDATE_DISCONNECTED 1
+)
+add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
+endif (GUNROCK_GOOGLE_TESTS)
+# end /* Include googletest & googlemock */
+
 ## Set the directory where the binaries will be stored
 set(EXECUTABLE_OUTPUT_PATH
   ${PROJECT_BINARY_DIR}/bin
