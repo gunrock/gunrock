@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <gunrock/gunrock.h>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 namespace gunrock {
@@ -34,8 +35,17 @@ TEST(sharedlibrary, breadthfirstsearch)
 
     int *labels = (int*)malloc(sizeof(int) * graphi->num_nodes);
     labels = (int*)grapho->node_value1;
-    int node; for (node = 0; node < graphi->num_nodes; ++node)
-        printf("Node_ID [%d] : Label [%d]\n", node, labels[node]);
+    // int node; for (node = 0; node < graphi->num_nodes; ++node)
+    //    printf("Node_ID [%d] : Label [%d]\n", node, labels[node]);
+
+    int result[7] = {2147483647, 2147483647, 0, 1, 1, 1, 2};
+
+    // ASSERT_THAT(labels, ElementsAre(2147483647, 2147483647, 0, 1, 1, 1, 2)) << "BFS using Gunrock as a shared library was unsuccessful";
+    // ASSERT_EQ(labels.size(), result.size()) << "Vectors x and y are of unequal length";
+
+    for (int i = 0; i < graphi->num_nodes; ++i) {
+      EXPECT_EQ(labels[i], result[i]) << "Vectors x and y differ at index " << i;
+    }
 
     if (graphi) free(graphi);
     if (grapho) free(grapho);
