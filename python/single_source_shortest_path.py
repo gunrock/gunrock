@@ -3,7 +3,7 @@
 from ctypes import *
 
 ### load gunrock shared library - libgunrock
-gunrock = cdll.LoadLibrary('../../build/lib/libgunrock.so')
+gunrock = cdll.LoadLibrary('../build/lib/libgunrock.so')
 
 ### read in input CSR arrays from files
 row_list = [int(x.strip()) for x in open('toy_graph/row.txt')]
@@ -19,9 +19,13 @@ edges = len(col_list)
 
 ### output array
 labels = pointer((c_uint * nodes)())
+preds  = pointer((c_uint * nodes)())
+
+### source nodes
+sources= pointer((c_uint * 1)(1))
 
 ### call gunrock function on device
-gunrock.sssp(labels, nodes, edges, row, col, val, 0)
+gunrock.sssp(labels, preds, nodes, edges, row, col, val, 1, sources, 0)
 
 ### sample results
 print ' sssp labels (distance):',
