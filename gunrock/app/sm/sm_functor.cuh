@@ -234,7 +234,7 @@ struct SMFilterFunctor
                 // Current candidate doesn't match any query node's footprint
                 if(i==d_data_slice->nodes_query) {
 //                    d_data_slice->filter[0] = true;
-/*                    d_data_slice->d_isValid[node] = false;
+                    d_data_slice->d_isValid[node] = false;
                     if(d_data_slice->d_data_labels.GetSize()!=0)
                         d_data_slice->d_data_ne[node] = 0;
                     // Update neighbor nodes' NE
@@ -248,7 +248,7 @@ struct SMFilterFunctor
                             if(d_data_slice->d_data_labels.GetSize()!=0)
                                 atomicSub(d_data_slice->d_data_ne+neighbor, d_data_slice->d_data_labels[node]);
                         }
-                    }*/
+                    }
                 }else res = true;
             }
         return res;
