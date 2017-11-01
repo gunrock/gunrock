@@ -16,13 +16,13 @@ do
 done
 
 # put OS and Device type here
-SUFFIX="ubuntu14.04.1.k40c"
+SUFFIX="ubuntu16.04.3.k40c"
 
 mkdir -p eval/$SUFFIX
 
 for i in delaunay_n10
 do
-    echo $exe_file market ../../dataset/small/tri_sm.mtx ../../dataset/small/tri_sm.label /data/gunrock_dataset/large/$i/$i.mtx /data/leyuan/labels/$i.label "> ./eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARKS}.txt"
-         $exe_file market ../../dataset/small/tri_sm.mtx ../../dataset/small/tri_sm.label /data/gunrock_dataset/large/$i/$i.mtx /data/leyuan/labels/$i.label > ./eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARKS}.txt
+    echo $exe_file market ../../dataset/small/tri_sm.mtx /data/gunrock_dataset/large/$i/$i.mtx"> ./eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARKS}.txt"
+         $exe_file market ../../dataset/small/tri_sm.mtx /data-2/gunrock_dataset/large/$i/$i.mtx > ./eval/$SUFFIX/${NAME[$i]}.$SUFFIX${MARKS}.txt
     sleep 1
 done

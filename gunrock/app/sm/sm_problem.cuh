@@ -64,8 +64,6 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
     struct DataSlice : BaseDataSlice
     {
         // device storage arrays
-//	util::Array1D<SizeT, unsigned long long> counts;
-//TODO; VertexId is long long??
         util::Array1D<SizeT, Value   > d_query_labels;/** < Used for query graph node labels */
         util::Array1D<SizeT, Value   > d_data_labels; /** < Used for data graph node offsets */
         util::Array1D<SizeT, SizeT   > d_query_ro;    /** < Used for query row offsets       */
@@ -76,19 +74,17 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, bool    > d_isValid;     /** < Used for data node validation    */
         util::Array1D<SizeT, SizeT   > d_data_ne;     /** < Used for data graph node ne info */
         util::Array1D<SizeT, SizeT   > d_query_ne;    /** < Used for query graph node ne info*/
-        util::Array1D<SizeT, bool    > filter;        /** < Used for flag of filtering       */
         util::Array1D<SizeT, SizeT   > counter;       /** < Used for counting iBFS sources   */
-        util::Array1D<SizeT, SizeT   > num_subs; /** < Used for counting iBFS sources   */
-//        util::Array1D<SizeT, Value   > bitmap;        /** < Used for storing visiting status */
+        util::Array1D<SizeT, SizeT   > num_subs;      /** < Used for counting iBFS sources   */
         util::Array1D<SizeT, VertexId> d_NG;          /** < Used for query node explore seq  */
         util::Array1D<SizeT, SizeT   > d_NG_ro;       /** < Used for query node sequence non-tree edge info */
         util::Array1D<SizeT, VertexId> d_NG_ci;       /** < Used for query node sequence non-tree edge info */
         util::Array1D<SizeT, VertexId> d_partial;     /** < Used for storing partial results */
         util::Array1D<SizeT, VertexId> d_src_node_id; /** < Used for storing compacted src nodes */
+        util::Array1D<SizeT, VertexId> d_index;        /** < Used for storing intermediate flag val */
         SizeT    nodes_data;       /** < Used for number of data nodes  */
         SizeT	 nodes_query;      /** < Used for number of query nodes */
         SizeT 	 edges_data;	   /** < Used for number of data edges   */
-        SizeT 	 edges_query;      /** < Used for number of query edges  */
         SizeT    num_matches;      /** < Used for number of matches in the result */
 
 	    /*
@@ -106,7 +102,6 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             d_isValid       .SetName("d_isValid");
             d_data_ne       .SetName("d_data_ne");
             d_query_ne      .SetName("d_query_ne");
-            filter          .SetName("filter");
             counter         .SetName("counter");
             num_subs         .SetName("num_subs");
             d_NG            .SetName("d_NG");
@@ -114,10 +109,10 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             d_NG_ci         .SetName("d_NG_ro");
             d_partial       .SetName("d_partial");
             d_src_node_id   .SetName("d_src_node_id");
+            d_index         .SetName("d_index");
             nodes_data		= 0;
             nodes_query		= 0;	   
             edges_data 		= 0;
-            edges_query 	= 0;
             num_matches	  	= 0; 
         }
 
@@ -133,7 +128,6 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             d_query_degree    .Release();
             d_isValid         .Release();
             d_query_ne        .Release();
-            filter            .Release();
             counter           .Release();
             num_subs          .Release();
             d_NG              .Release();
@@ -141,6 +135,7 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             d_NG_ci           .Release();
             d_partial         .Release();
             d_src_node_id     .Release();
+            d_index           .Release();
         }
 
         cudaError_t Init(
@@ -164,14 +159,12 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                 num_in_nodes,
                 num_out_nodes,
                 in_sizing)) return retval;
-
-//            if (retval = this->labels.Allocate(graph_data->nodes, util::DEVICE)) return retval;
-//	    if(retval = counts      .Allocate(1, util::HOST | util::DEVICE))
-//                return retval;
             if(node_label) {
                 if(retval = d_query_labels .Allocate(graph_query -> nodes, util::DEVICE)) 
                     return retval;
                 if(retval = d_data_labels  .Allocate(graph_data -> nodes, util::DEVICE)) 
+                    return retval;
+                if(retval = d_data_ne      .Allocate(graph_data -> nodes, util::DEVICE)) 
                     return retval;
             }
             if(retval = d_query_ro     .Allocate(graph_query -> nodes+1, util::DEVICE)) 
@@ -183,24 +176,13 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                 return retval;
             if(retval = d_isValid      .Allocate(graph_data -> nodes, util::DEVICE)) 
                 return retval;
-            if(retval = d_data_ne      .Allocate(graph_data -> nodes, util::DEVICE)) 
-                return retval;
             // Need to be computed on CPU
             if(retval = d_query_ne     .Allocate(graph_query -> nodes, util::HOST | util::DEVICE)) 
-                return retval;
-            if(retval = filter         .Allocate(1, util::DEVICE)) 
                 return retval;
             if(retval = counter        .Allocate(1, util::HOST | util::DEVICE)) 
                 return retval;
             if(retval = num_subs       .Allocate(1, util::HOST | util::DEVICE)) 
                 return retval;
-            // bitmap stores all n nodes' visit info  in bits, the structure is there are n nodes,
-            // each node has n bits representing n BFS sources, 
-            // and there are k iBFS stages, each stage contains the same amount of bits
-            // <------n*n-------><---------n*n--------><---------n*n--------->
-            // <-------------------------n*n*k-------------------------------->
-//            if(retval = bitmap         .Allocate(graph_data->nodes*graph_data->nodes*graph_query->nodes/(sizeof(Value)*8), util::DEVICE))
-//                return retval;
             //query node exploring sequence
             if(retval = d_NG           .Allocate(graph_query->nodes, util::HOST | util::DEVICE))
                 return retval;
@@ -212,9 +194,11 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                     return retval;
             }
             // partial results storage: as much as possible
-            if(retval = d_partial           .Allocate(graph_query->nodes* graph_data->edges/2,  util::DEVICE))
+            if(retval = d_partial           .Allocate(graph_query->nodes* graph_data->edges*2/3,  util::DEVICE))
                 return retval;
-            if(retval = d_src_node_id       .Allocate(graph_data->edges,  util::DEVICE))
+            if(retval = d_src_node_id       .Allocate(graph_data->edges*3/4,  util::DEVICE))
+                return retval;
+            if(retval = d_index             .Allocate(graph_data->edges*3/4,  util::DEVICE))
                 return retval;
             // Initialize query graph node degree by row offsets
             // neighbor node encoding = sum of neighbor node labels
@@ -226,10 +210,10 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                         d_query_ne[i] += graph_query->node_values[graph_query->column_indices[j]]; 
                     else d_query_ne[i] += 1;
                 }
-                printf("node %d's ne: %d\n", i, d_query_ne[i]);
+//                printf("node %d's ne: %d\n", i, d_query_ne[i]);
             }
 
-            // Generate query graph node exploration sequence based on maximum likelihood estimation
+            // Generate query graph node exploration sequence based on maximum likelihood estimation (MLE)
             // node mapping degree, TODO:probablity estimation based on label and degree, degree
             int *d_m = new int[graph_query->nodes];
             memset(d_m, 0, sizeof(int)*graph_query->nodes);
@@ -281,10 +265,10 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             if(retval = d_NG.Move(util::HOST, util::DEVICE)) return retval;
             if(retval = d_NG_ro.Move(util::HOST, util::DEVICE)) return retval;
             if(retval = d_NG_ci.Move(util::HOST, util::DEVICE)) return retval;
-    printf("query node exploration sequence:\n");
+/*    printf("query node exploration sequence:\n");
     util::DisplayDeviceResults(d_NG.GetPointer(util::DEVICE), graph_query -> nodes);
     util::DisplayDeviceResults(d_NG_ro.GetPointer(util::DEVICE), graph_query -> nodes-1);
-    util::DisplayDeviceResults(d_NG_ci.GetPointer(util::DEVICE), graph_query -> edges/2-graph_query->nodes+1);
+    util::DisplayDeviceResults(d_NG_ci.GetPointer(util::DEVICE), graph_query -> edges/2-graph_query->nodes+1);*/
 
             if(node_label) {
                 d_query_labels.SetPointer(graph_query->node_values);
@@ -293,6 +277,8 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                 d_data_labels.SetPointer(graph_data->node_values);
                 if(retval = d_data_labels.Move(util::HOST, util::DEVICE))
                     return retval;
+                util::MemsetKernel<<<128,128>>>(d_data_ne.GetPointer(util::DEVICE),
+                    0, graph_data->nodes);
             }
             // Initialize query row offsets with graph_query.row_offsets
             d_query_ro.SetPointer(graph_query -> row_offsets);
@@ -304,10 +290,6 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                 false, graph_data->nodes);
 	    util::MemsetKernel<<<128,128>>>(d_data_degree.GetPointer(util::DEVICE),
                 0, graph_data->nodes);
-	    util::MemsetKernel<<<128,128>>>(d_data_ne.GetPointer(util::DEVICE),
-                0, graph_data->nodes);
-            util::MemsetKernel<<<1,1>>>(filter.GetPointer(util::DEVICE),
-                true, 1);
             util::MemsetKernel<<<1,1>>>(counter.GetPointer(util::DEVICE),
                 0, 1);
             util::MemsetKernel<<<1,1>>>(num_subs.GetPointer(util::DEVICE),
@@ -316,7 +298,6 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             nodes_data   = graph_data  -> nodes;
             nodes_query  = graph_query -> nodes;
             edges_data   = graph_data  -> edges;
-            edges_query  = graph_query -> edges/2;
 
             
             return retval;
@@ -352,6 +333,11 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                 if(d_data_labels.GetPointer(util::DEVICE) == NULL)
                     if(retval = d_data_labels.Allocate(nodes, util::DEVICE))
                         return retval;
+                if(d_data_ne.GetPointer(util::DEVICE) == NULL)
+                    if(retval = d_data_ne.Allocate(nodes, util::DEVICE))
+                        return retval;
+                util::MemsetKernel<<<128,128>>>(d_data_ne.GetPointer(util::DEVICE),
+                    0, nodes);
             }
             if(d_isValid.GetPointer(util::DEVICE) == NULL)
                 if(retval = d_isValid.Allocate(nodes, util::DEVICE))
@@ -362,14 +348,8 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             if(d_query_degree.GetPointer(util::DEVICE) == NULL)
                 if(retval = d_query_degree.Allocate(nodes_query, util::DEVICE))
                     return retval;
-            if(d_data_ne.GetPointer(util::DEVICE) == NULL)
-                if(retval = d_data_ne.Allocate(nodes, util::DEVICE))
-                    return retval;
             if(d_query_ne.GetPointer(util::DEVICE) == NULL)
                 if(retval = d_query_ne.Allocate(nodes_query, util::DEVICE))
-                    return retval;
-            if(filter.GetPointer(util::DEVICE) == NULL)
-                if(retval = filter.Allocate(1, util::DEVICE)) 
                     return retval;
             if(counter.GetPointer(util::DEVICE) == NULL)
                 if(retval = counter.Allocate(1, util::DEVICE)) 
@@ -377,44 +357,47 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             if(num_subs.GetPointer(util::DEVICE) == NULL)
                 if(retval = num_subs.Allocate(1, util::DEVICE)) 
                     return retval;
-//            if(bitmap.GetPointer(util::DEVICE) == NULL)
-//                if(retval = counter.Allocate(nodes*nodes*nodes_query/(sizeof(Value)*8), util::DEVICE)) 
-//                    return retval;
-           
             if(d_NG.GetPointer(util::DEVICE) == NULL)
                 if(retval = d_NG.Allocate(nodes_query, util::DEVICE))
                     return retval;
             if(d_partial.GetPointer(util::DEVICE) == NULL)
-                if(retval = d_partial.Allocate(nodes_query*edges/2, util::DEVICE))
+                if(retval = d_partial.Allocate(nodes_query*edges*2/3, util::DEVICE))
                     return retval;
             if(d_src_node_id.GetPointer(util::DEVICE) == NULL)
-                if(retval = d_src_node_id.Allocate(edges, util::DEVICE))
+                if(retval = d_src_node_id.Allocate(edges*3/4, util::DEVICE))
                     return retval;
-
+            if(d_index.GetPointer(util::DEVICE) == NULL)
+                if(retval = d_index.Allocate(edges*3/4, util::DEVICE))
+                    return retval;
             d_data_ro.SetPointer((SizeT*)graph_slice -> row_offsets.GetPointer(util::DEVICE), nodes+1, util::DEVICE);
 
             d_data_ci.SetPointer((SizeT*)graph_slice -> column_indices.GetPointer(util::DEVICE), edges, util::DEVICE);
 
 	    util::MemsetKernel<<<128,128>>>(d_isValid.GetPointer(util::DEVICE),
                 false, nodes);
-	    util::MemsetKernel<<<128,128>>>(d_data_ne.GetPointer(util::DEVICE),
-                0, nodes);
 	    util::MemsetKernel<<<128,128>>>(d_data_degree.GetPointer(util::DEVICE),
                 0, nodes);
-	    util::MemsetKernel<<<1,1>>>(filter.GetPointer(util::DEVICE),
-                true, 1);
             util::MemsetKernel<<<128,128>>>(d_partial.GetPointer(util::DEVICE),
-                -1, nodes_query*edges/2);
-            util::MemsetKernel<<<128,128>>>(
+                -1, nodes_query*edges*2/3);
+/*            util::MemsetKernel<<<128,128>>>(
                 this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE),
                 -1, 
-                this -> frontier_queues[0].keys[0].GetSize());
+                this -> frontier_queues[0].keys[0].GetSize());*/
+/*            if(retval = this -> frontier_queues[0].keys[0].EnsureSize(this->edges/2, util::DEVICE))
+                return retval;
+            if(retval = this -> frontier_queues[0].keys[1].EnsureSize(this->edges, util::DEVICE))
+                return retval;*/
+            printf("input frontier queue size:%d, output size:%d\n", this -> frontier_queues[0].keys[0].GetSize(), this -> frontier_queues[0].keys[1].GetSize());
             util::MemsetIdxKernel<<<128, 128>>>(
-                this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
+                this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE),
+                nodes);
+/*                this -> frontier_queues[0].keys[0].GetSize());
             
+            util::DisplayDeviceResults(this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE),
+                                       this -> frontier_queues[0].keys[0].GetSize());*/
             // Initialized edge frontier queue used for mappings
-            util::MemsetIdxKernel<<<128, 128>>>(
-                this -> frontier_queues[0].values[0].GetPointer(util::DEVICE), edges);
+/*            util::MemsetIdxKernel<<<128, 128>>>(
+                this -> frontier_queues[0].values[0].GetPointer(util::DEVICE), edges);*/
             
 
             return retval;
@@ -483,7 +466,6 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
     cudaError_t Extract(VertexId *h_results)
     {
         cudaError_t retval = cudaSuccess;
-
         if(this->num_gpus == 1)
         {
             int gpu = 0;
