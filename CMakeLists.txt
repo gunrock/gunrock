@@ -80,6 +80,12 @@ add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
 endif (GUNROCK_GOOGLE_TESTS)
 # end /* Include googletest & googlemock */
 
+# begin /* Include CodeCoverage */
+include(CodeCoverage)
+setup_target_for_coverage(${PROJECT_NAME}_coverage tests coverage)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
+# end /* Include CodeCoverage */
+
 ## Set the directory where the binaries will be stored
 set(EXECUTABLE_OUTPUT_PATH
   ${PROJECT_BINARY_DIR}/bin
