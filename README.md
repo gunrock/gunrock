@@ -11,13 +11,13 @@ code size and minimal GPU programming knowledge.
 For more details, please visit our
 [website](http://gunrock.github.io/),
 read [Why Gunrock](http://gunrock.github.io/gunrock/doc/latest/why-gunrock.html),
-our PPoPP 2016 paper
-[Gunrock: A High-Performance Graph Processing Library on the GPU](http://escholarship.org/uc/item/6xz7z9k0)
-or (*new*) an extension of the PPoPP paper (submitted to ACM TOPC)
-[Gunrock: GPU Graph Analytics](http://arxiv.org/abs/1701.01170),
+our TOPC 2017 paper
+[Gunrock: GPU Graph Analytics](http://escholarship.org/uc/item/9gj6r1dj),
 look at our [results](#Results),
 and find more details in our [publications](#Publications).
 See [Release Notes](http://gunrock.github.io/gunrock/doc/latest/release_notes.html) to keep up with the our latest changes.
+
+Gunrock is featured on NVIDIA's list of [GPU Accelerated Libraries](https://developer.nvidia.com/gpu-accelerated-libraries) as the only external library for GPU graph analytics.
 
 Links for Gunrock source code
 -----------------------------
@@ -82,36 +82,40 @@ directly using [Github](https://github.com/gunrock/gunrock/issues).
 Publications
 ------------
 
-Yangzihao Wang, Yuechao Pan, Andrew Davidson, Yuduo Wu, Carl Yang, Leyuan Wang, Muhammad Osama, Chenshan Yuan, Weitang Liu, Andy T. Riffel, and John D. Owens. **Gunrock: GPU Graph Analytics**. CoRR, abs/1701.01170(1701.01170v1), January 2017. [[arXiv](http://arxiv.org/abs/1701.01170)]
+Yangzihao Wang, Yuechao Pan, Andrew Davidson, Yuduo Wu, Carl Yang, Leyuan Wang, Muhammad Osama, Chenshan Yuan, Weitang Liu, Andy T. Riffel, and John D. Owens. **Gunrock: GPU Graph Analytics**. ACM Transactions on Parallel Computing, 4(1):3:1&ndash;3:49, August 2017. [[DOI](http://dx.doi.org/10.1145/3108140) | [http](http://escholarship.org/uc/item/9gj6r1dj)]
 
 Yuechao Pan, Yangzihao Wang, Yuduo Wu, Carl Yang, and John D. Owens.
-**Multi-GPU Graph Analytics**. CoRR, abs/1504.04804(1504.04804v3), October 2016.
-[[arXiv](http://arxiv.org/abs/1504.04804)]
+**Multi-GPU Graph Analytics**.  In Proceedings of the 31st IEEE International Parallel and Distributed Processing Symposium, IPDPS 2017, pages 479&ndash;490, May/June 2017.
+[[DOI](http://dx.doi.org/10.1109/IPDPS.2017.117) |
+[http](http://escholarship.org/uc/item/39r145g1)]
 
-Leyuan Wang, Yangzihao Wang, Carl Yang, and John D. Owens. **A Comparative Study on Exact Triangle Counting Algorithms on the GPU**. In Proceedings of the 1st High Performance Graph Processing Workshop, HPGP '16, pages 1--8, May 2016.
+Yangzihao Wang, Sean Baxter, and John D. Owens. **Mini-Gunrock: A Lightweight Graph Analytics Framework on the GPU**. In Graph Algorithms Building Blocks, GABB 2017, pages 616&ndash;626, May 2017. [[DOI](http://dx.doi.org/10.1109/IPDPSW.2017.116) | [http](https://escholarship.org/uc/item/5wm061tr)]
+
+Leyuan Wang, Yangzihao Wang, Carl Yang, and John D. Owens. **A Comparative Study on Exact Triangle Counting Algorithms on the GPU**. In Proceedings of the 1st High Performance Graph Processing Workshop, HPGP '16, pages 1&ndash;8, May 2016.
 [[DOI](http://dx.doi.org/10.1145/2915516.2915521) |
 [http](http://www.escholarship.org/uc/item/9hf0m6w3)]
 
 Yangzihao Wang, Andrew Davidson, Yuechao Pan, Yuduo Wu, Andy Riffel, and John D. Owens.
 **Gunrock: A High-Performance Graph Processing Library on the GPU**.
-In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming, [PPoPP '16](http://conf.researchr.org/home/ppopp-2016), pages 11:1--11:12, March 2016. Distinguished Paper. [[DOI](http://dx.doi.org/10.1145/2851141.2851145) | [http](http://escholarship.org/uc/item/6xz7z9k0)]
+In Proceedings of the 21st ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming, [PPoPP '16](http://conf.researchr.org/home/ppopp-2016), pages 11:1&ndash;11:12, March 2016. Distinguished Paper. [[DOI](http://dx.doi.org/10.1145/2851141.2851145) | [http](http://escholarship.org/uc/item/6xz7z9k0)]
 
 Yuduo Wu, Yangzihao Wang, Yuechao Pan, Carl Yang, and John D. Owens.
 **Performance Characterization for High-Level Programming Models for GPU Graph
 Analytics**. In IEEE International Symposium on Workload Characterization,
-IISWC-2015, pages 66--75, October 2015. Best Paper finalist. [[DOI](http://dx.doi.org/10.1109/IISWC.2015.13) | [http](http://escholarship.org/uc/item/2t69m5ht)]
+IISWC-2015, pages 66&ndash;75, October 2015. Best Paper finalist. [[DOI](http://dx.doi.org/10.1109/IISWC.2015.13) | [http](http://escholarship.org/uc/item/2t69m5ht)]
 
 Carl Yang, Yangzihao Wang, and John D. Owens.
 **Fast Sparse Matrix and Sparse Vector Multiplication Algorithm on the GPU**.
-In Graph Algorithms Building Blocks, GABB 2015, pages 841--847, May 2015.
+In Graph Algorithms Building Blocks, GABB 2015, pages 841&ndash;847, May 2015.
 [[DOI](http://dx.doi.org/10.1109/IPDPSW.2015.77) | [http](http://www.escholarship.org/uc/item/1rq9t3j3)]
 
 Afton Geil, Yangzihao Wang, and John D. Owens.
 **WTF, GPU! Computing Twitter's Who-To-Follow on the GPU**.
 In Proceedings of the Second ACM Conference on Online Social Networks,
-COSN '14, pages 63--68, October 2014.
+COSN '14, pages 63&ndash;68, October 2014.
 [[DOI](http://dx.doi.org/10.1145/2660460.2660481) | [http](http://escholarship.org/uc/item/5xq3q8k0)]
 
+<a name="Presentations"></a>
 Presentations
 -------------
 
