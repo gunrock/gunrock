@@ -27,9 +27,9 @@ using namespace gunrock::oprtr;
 using namespace gunrock::graph;
 using namespace gunrock::app;
 
-typedef uint32_t VertexT;
-typedef unsigned long long SizeT;
-typedef float ValueT;
+typedef int VertexT;
+typedef int SizeT;
+typedef int ValueT;
 
 template <
     typename VertexT = int,
@@ -97,11 +97,6 @@ struct TestGraph :
         retval = this -> GpT::Release(target);
         if (retval) return retval;
         return retval;
-    }
-
-    CsrT &csr()
-    {
-        return (static_cast<CsrT*>(this))[0];
     }
 };
 
@@ -408,14 +403,14 @@ cudaError_t Test_SSSP(Parameters &parameters, GraphT &graph, util::Location targ
 {
     cudaError_t retval = cudaSuccess;
 
-    typedef gunrock::app::sssp::Problem<GraphT, unsigned char> ProblemT;
+    typedef gunrock::app::sssp::Problem<GraphT> ProblemT;
     typedef gunrock::app::sssp::Enactor<ProblemT> EnactorT;
     ProblemT problem;
     EnactorT enactor;
 
     retval = problem.Init(parameters, graph, target);
     if (retval) return retval;
-    retval = enactor.Init(parameters, &problem, target);
+    retval = enactor.InitSSSP(parameters, &problem, target);
     if (retval) return retval;
 
     retval = problem.Reset(0, target);
@@ -423,7 +418,7 @@ cudaError_t Test_SSSP(Parameters &parameters, GraphT &graph, util::Location targ
     retval = enactor.Reset(0, target);
     if (retval) return retval;
 
-    retval = enactor.Enact(0);
+    retval = enactor.EnactSSSP(0);
     if (retval) return retval;
 
     retval = problem.Release(target);
@@ -468,11 +463,19 @@ int main(int argc, char* argv[])
     typedef TestGraph<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> GraphT;
     GraphT graph;
 
-    GUARD_CU(graphio::UseParameters(parameters));
-    //GUARD_CU(partitioner::UseParameters(parameters));
-    GUARD_CU(app::sssp::UseParameters(parameters));
-    GUARD_CU(app::sssp::UseParameters2(parameters));
-    GUARD_CU(parameters.Parse_CommandLine(argc, argv));
+
+    retval = graphio::UseParameters(parameters);
+    if (retval) return 1;
+    //retval = partitioner::UseParameters(parameters);
+    //if (retval) return 2;
+    retval = app::sssp::UseParameters(parameters);
+    if (retval) return 3;
+
+    retval = app::sssp::UseParameters2(parameters);
+    if (retval) return 3;
+
+    retval = parameters.Parse_CommandLine(argc, argv);
+    if (retval) return 4;
     if (parameters.Get<bool>("help"))
     {
         parameters.Print_Help();
@@ -510,16 +513,16 @@ int main(int argc, char* argv[])
     if (retval) return 18;
     util::PrintMsg("====Test on HOST | DEVICE finished");*/
 
-    //retval = Test_SSSP(parameters, graph, util::HOST);
-    //if (retval) return 16;
-    //util::PrintMsg("====Test on HOST finished");
+    retval = Test_SSSP(parameters, graph, util::HOST);
+    if (retval) return 16;
+    util::PrintMsg("====Test on HOST finished");
 
     retval = Test_SSSP(parameters, graph, util::DEVICE);
     if (retval) return 17;
     util::PrintMsg("====Test on DEVICE finished");
 
-    //retval = Test_SSSP(parameters, graph, util::HOST | util::DEVICE);
-    //if (retval) return 18;
-    //util::PrintMsg("====Test on HOST | DEVICE finished");
+    retval = Test_SSSP(parameters, graph, util::HOST | util::DEVICE);
+    if (retval) return 18;
+    util::PrintMsg("====Test on HOST | DEVICE finished");
     return 0;
 }

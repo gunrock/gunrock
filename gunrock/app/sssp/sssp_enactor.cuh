@@ -15,10 +15,7 @@
 #pragma once
 
 #include <gunrock/app/enactor_base.cuh>
-#include <gunrock/app/enactor_iteration.cuh>
-#include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/app/sssp/sssp_problem.cuh>
-#include <gunrock/oprtr/oprtr.cuh>
 
 namespace gunrock {
 namespace app {
@@ -27,143 +24,100 @@ namespace sssp {
 cudaError_t UseParameters2(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
-    GUARD_CU(app::UseParameters2(parameters));
+
+    retval = app::UseParameters2(parameters);
+    if (retval) return retval;
     return retval;
 }
 
-template <typename EnactorT>
-struct SSSPIteration : public IterationBase
-    <EnactorT, Use_FullQ | Push |
-    (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-    Update_Predecessors : 0x0)>
+/**
+ * @brief Thread controls.
+ *
+ * @tparam AdvanceKernelPolicy Kernel policy for advance operator.
+ * @tparam FilterKernelPolicy Kernel policy for filter operator.
+ * @tparam Enactor Enactor type we process on.
+ *
+ * @thread_data_ Thread data.
+ */
+template <
+    //typename AdvanceKernelPolicy,
+    //typename FilterKernelPolicy,
+    typename Enactor>
+static CUT_THREADPROC SSSPThread(
+    void * thread_data_)
 {
-    typedef typename EnactorT::VertexT VertexT;
-    typedef typename EnactorT::SizeT   SizeT;
-    typedef typename EnactorT::ValueT  ValueT;
-    typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
-    typedef typename EnactorT::Problem::GraphT::GpT  GpT;
-    typedef IterationBase
-        <EnactorT, Use_FullQ | Push |
-        (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-         Update_Predecessors : 0x0)> BaseIteration;
+    typedef typename Enactor::Problem    Problem   ;
+    typedef typename Enactor::SizeT      SizeT     ;
+    typedef typename Enactor::VertexT    VertexT   ;
+    typedef typename Enactor::ValueT     ValueT    ;
+    //typedef typename Problem::DataSlice  DataSlice ;
+    //typedef GraphSlice <VertexId, SizeT, Value>          GraphSliceT;
+    //typedef SSSPFunctor<VertexId, SizeT, Value, Problem> Functor;
 
-    SSSPIteration() : BaseIteration() {}
+    ThreadSlice  *thread_data        =  (ThreadSlice*) thread_data_;
+    Problem      *problem            =  (Problem*)     thread_data -> problem;
+    Enactor      *enactor            =  (Enactor*)     thread_data -> enactor;
+    int           num_gpus           =   problem     -> num_gpus;
+    int           thread_num         =   thread_data -> thread_num;
+    int           gpu_idx            =   problem     -> gpu_idx[thread_num] ;
+    auto         &thread_status      =   thread_data -> status;
+    //DataSlice    *data_slice         =   problem     -> data_slices        [thread_num].GetPointer(util::HOST);
+    //FrontierAttribute<SizeT>
+    //             *frontier_attribute = &(enactor     -> frontier_attribute [thread_num * num_gpus]);
+    auto         &enactor_slice      =   enactor     -> enactor_slices[thread_num * num_gpus];
+    auto         &enactor_stats      =   enactor_slice.enactor_stats;
+    auto         &thread_retval      =   enactor_stats.retval;
 
-    cudaError_t Core(int peer_ = 0)
+    if (thread_retval = util::SetDevice(gpu_idx))
     {
-        auto         &data_slice         =   this -> enactor -> problem -> data_slices[this -> gpu_num][0];
-        auto         &enactor_slice      =   this -> enactor -> enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
-        auto         &enactor_stats      =   enactor_slice.enactor_stats;
-        auto         &graph              =   data_slice.sub_graph[0];
-        auto         &distances          =   data_slice.distances;
-        auto         &labels             =   data_slice.labels;
-        auto         &preds              =   data_slice.preds;
-        auto         &weights            =   graph.CsrT::edge_values;
-        auto         &original_vertex    =   graph.GpT::original_vertex;
-        auto         &frontier           =   enactor_slice.frontier;
-        auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
-        auto         &retval             =   enactor_stats.retval;
-        //auto         &stream             =   enactor_slice.stream;
-        auto         &iteration          =   enactor_stats.iteration;
-
-        auto advance_op = [distances, weights, original_vertex, preds]
-        __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            ValueT src_distance = Load<cub::LOAD_CG>(distances + src);
-            ValueT edge_weight  = Load<cub::LOAD_CS>(weights + edge_id);
-            ValueT new_distance = src_distance + edge_weight;
-
-            // Check if the destination node has been claimed as someone's child
-            ValueT old_distance = atomicMin(distances + dest, new_distance);
-            if (new_distance < old_distance)
-            {
-                if (!preds.isEmpty())
-                {
-                    VertexT pred = src;
-                    if (!original_vertex.isEmpty())
-                        pred = original_vertex[src];
-                    Store(preds + dest, pred);
-                }
-                return true;
-            }
-            return false;
-        };
-        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, advance_op));
-
-        oprtr_parameters.label = iteration + 1;
-        oprtr_parameters.frontier -> queue_reset = false;
-
-        auto filter_op = [labels, iteration] __host__ __device__(
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            if (!util::isValid(dest)) return false;
-            if (labels[dest] == iteration) return false;
-            labels[dest] = iteration;
-            return true;
-        };
-        GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, filter_op));
-
-        return retval;
+        thread_status = ThreadSlice::Status::Ended;
+        CUT_THREADEND;
     }
 
-    template <
-        int NUM_VERTEX_ASSOCIATES,
-        int NUM_VALUE__ASSOCIATES>
-    cudaError_t ExpandIncoming(SizeT &received_length, int peer_)
+    thread_status = ThreadSlice::Status::Idle;
+    while (thread_status != ThreadSlice::Status::ToKill)
     {
-        auto         &data_slice         =   this -> enactor -> problem -> data_slices[this -> gpu_num][0];
-        auto         &enactor_slice      =   this -> enactor -> enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
-        auto iteration = enactor_slice.enactor_stats.iteration;
-        auto         &distances          =   data_slice.distances;
-        auto         &labels             =   data_slice.labels;
-        auto         &preds              =   data_slice.preds;
-        auto          label              =   this -> enactor -> mgpu_slices[this -> gpu_num].in_iteration[iteration % 2][peer_];
+        while (thread_status == ThreadSlice::Status::Wait ||
+               thread_status == ThreadSlice::Status::Idle)
+        {
+            sleep(0);
+            //std::this_thread::yield();
+        }
+        if (thread_status == ThreadSlice::Status::ToKill)
+            break;
 
-        auto expand_op = [distances, labels, label, preds]
-        __host__ __device__(
-            VertexT &key, const SizeT &in_pos,
-            VertexT *vertex_associate_ins,
-            ValueT  *value__associate_ins) -> bool{
-            ValueT in_val  = value__associate_ins[in_pos];
-            ValueT old_val = atomicMin(distances + key, in_val);
-            if (old_val <= in_val)
-                return false;
-            if (labels[key] == label)
-                return false;
-            labels[key] = label;
-            if (!preds.isEmpty())
-                preds[key] = vertex_associate_ins[in_pos];
-            return true;
-        };
+        for (int peer_=0;peer_<num_gpus;peer_++)
+        {
+            //frontier_attribute[peer_].queue_index  = 0;        // Work queue index
+            //frontier_attribute[peer_].queue_length = peer_==0?thread_data->init_size:0;
+            //frontier_attribute[peer_].selector     = 0;//frontier_attrbute[peer_].queue_length == 0 ? 0 : 1;
+            //frontier_attribute[peer_].queue_reset  = true;
+            //enactor_stats     [peer_].iteration    = 0;
+        }
 
-        cudaError_t retval = BaseIteration:: template ExpandIncomingBase
-            <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
-            (received_length, peer_, expand_op);
-        return retval;
+        //gunrock::app::Iteration_Loop
+        //    <Enactor, Functor,
+        //    SSSPIteration<AdvanceKernelPolicy, FilterKernelPolicy, Enactor>,
+        //    Problem::MARK_PATHS ? 1:0, 1>
+        //    (thread_data);
+        //printf("SSSP_Thread finished\n");fflush(stdout);
+        thread_status = ThreadSlice::Status::Idle;
     }
-}; // end of struct SSSPIteration
+
+    thread_status = ThreadSlice::Status::Ended;
+    CUT_THREADEND;
+}
 
 /**
  * @brief Problem enactor class.
+ *
  * @tparam _Problem Problem type we process on
  */
-template <
-    typename _Problem,
+template <typename _Problem,
     util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 class Enactor :
-    public EnactorBase<
-        typename _Problem::GraphT, typename _Problem::LabelT,
-        ARRAY_FLAG, cudaHostRegisterFlag>
+    public EnactorBase<typename _Problem::GraphT, ARRAY_FLAG, cudaHostRegisterFlag>
 {
 public:
     typedef _Problem                   Problem ;
@@ -171,14 +125,12 @@ public:
     typedef typename Problem::VertexT  VertexT ;
     typedef typename Problem::ValueT   ValueT  ;
     typedef typename Problem::GraphT   GraphT  ;
-    typedef typename Problem::LabelT   LabelT  ;
-    typedef EnactorBase<GraphT , LabelT, ARRAY_FLAG, cudaHostRegisterFlag>
+    typedef EnactorBase<GraphT , ARRAY_FLAG, cudaHostRegisterFlag>
         BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
 
-    Problem     *problem   ;
-    void        *iterations;
+    Problem     *problem      ;
 
     /**
      * @brief BFSEnactor constructor
@@ -198,11 +150,9 @@ public:
 
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
-        typedef SSSPIteration<EnactorT> IterationT;
         cudaError_t retval = cudaSuccess;
-        GUARD_CU(BaseEnactor::Release(target));
-        delete []((IterationT*)iterations);
-        problem = NULL; iterations = NULL;
+        if (retval = BaseEnactor::Release(target)) return retval;
+        problem = NULL;
         return retval;
     }
 
@@ -211,114 +161,343 @@ public:
      * @{
      */
 
+    /** @} */
+
     /**
      * @brief Initialize the problem.
-     * @param[in] parameters Running parameters.
+     *
+     * @tparam AdvanceKernelPolicy Kernel policy for advance operator.
+     * @tparam FilterKernelPolicy Kernel policy for filter operator.
+     *
+     * @param[in] context CudaContext pointer for ModernGPU API.
      * @param[in] problem Pointer to Problem object.
-     * @param[in] target Target location of data
+     * @param[in] max_grid_size Maximum grid size for kernel calls.
+     *
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
-    cudaError_t Init(
+    //template<
+    //    typename AdvanceKernelPolicy,
+    //    typename FilterKernelPolicy>
+    cudaError_t InitSSSP(
         util::Parameters &parameters,
         Problem          *problem,
+        //Enactor_Flag      flag   = Enactor_None,
         util::Location    target = util::DEVICE)
     {
-        typedef SSSPIteration<EnactorT> IterationT;
         cudaError_t retval = cudaSuccess;
-        this->problem = problem;
 
         // Lazy initialization
-        GUARD_CU(BaseEnactor::Init(parameters, Enactor_None, 2, NULL, target));
-        for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
-        {
-            GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
-            auto &enactor_slice = this -> enactor_slices[gpu * this -> num_gpus + 0];
-            auto &graph = problem -> sub_graphs[gpu];
-            GUARD_CU(enactor_slice.frontier.Allocate(
-                graph.nodes, graph.edges, this -> queue_factors));
+        if (retval = BaseEnactor::Init(parameters, Enactor_None, 2, NULL, 1024, target))
+            return retval;
 
-            for (int peer = 0; peer < this -> num_gpus; peer ++)
-            {
-                this -> enactor_slices[gpu * this -> num_gpus + peer].oprtr_parameters.labels
-                    = &(problem -> data_slices[gpu] -> labels);
-            }
-        }
+        this->problem = problem;
 
-        iterations = new IterationT[this -> num_gpus];
-        for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
-        {
-            GUARD_CU(((IterationT*)iterations)[gpu].Init(this, gpu));
-        }
-
-        GUARD_CU(this -> Init_Threads(this, (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
+        retval = this -> Init_Threads(this, (CUT_THREADROUTINE)&(SSSPThread<EnactorT>));
+        if (retval) return retval;
         return retval;
-    }
-
-    // one run of sssp, to be called within GunrockThread
-    cudaError_t Run(ThreadSlice &thread_data)
-    {
-        typedef SSSPIteration<EnactorT> IterationT;
-
-        gunrock::app::Iteration_Loop<
-            ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0, 1, IterationT>(thread_data,
-                ((IterationT*)iterations)[thread_data.thread_num]);
-        return cudaSuccess;
     }
 
     /**
      * @brief Reset enactor
-     * @param[in] src Source node to start primitive.
-     * @param[in] target Target location of data
+     *
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
     cudaError_t Reset(VertexT src, util::Location target = util::DEVICE)
     {
-        typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
-        GUARD_CU(BaseEnactor::Reset(target));
+        if (retval = BaseEnactor::Reset(target))
+            return retval;
+        return retval;
+    }
+
+    /** @} */
+
+    /**
+     * @brief Enacts a SSSP computing on the specified graph.
+     *
+     * @tparam AdvanceKernelPolicy Kernel policy for advance operator.
+     * @tparam FilterKernelPolicy Kernel policy for filter operator.
+     *
+     * @param[in] src Source node to start primitive.
+     *
+     * \return cudaError_t object Indicates the success of all CUDA calls.
+     */
+    //template<
+    //    typename AdvanceKernelPolicy,
+    //    typename FilterKernelPolicy>
+    cudaError_t EnactSSSP(
+        VertexT src)
+    {
+        cudaError_t  retval     = cudaSuccess;
+
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
             if ((this->num_gpus == 1) ||
                 (gpu == this->problem->org_graph->GpT::partition_table[src]))
-            {
-                this -> thread_slices[gpu].init_size = 1;
-                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
-                {
-                    auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                    frontier.queue_length = (peer_ == 0) ? 1 : 0;
-                    if (peer_ == 0)
-                    {
-                        GUARD_CU(frontier.V_Q() -> ForEach([src]__host__ __device__ (VertexT &v){
-                            v = src;
-                        }, 1, target, 0));
-                    }
-                }
-            }
-
-            else {
-                this -> thread_slices[gpu].init_size = 0;
-                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
-                {
-                    this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier.queue_length
-                        = 0;
-                }
-            }
+                 this -> thread_slices[gpu].init_size = 1;
+            else this -> thread_slices[gpu].init_size = 0;
+            // TODO: move to somewhere else
+            //this->frontier_attribute[gpu*this->num_gpus].queue_length
+            //    = thread_slices[gpu].init_size;
         }
+
+        retval = this -> Run_Threads();
+        if (retval) return retval;
+
+        if (this -> flag & Debug) util::PrintMsg("\nGPU SSSP Done.\n");
         return retval;
     }
 
+    /*typedef gunrock::oprtr::filter::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        0,                                  // SATURATION QUIT
+        true,                               // DEQUEUE_PROBLEM_SIZE
+        8,                                  // MIN_CTA_OCCUPANCY
+        8,                                  // LOG_THREADS
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        5,                                  // END_BITMASK_CULL
+        8>                                  // LOG_SCHEDULE_GRANULARITY
+    FilterKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        8,                                  // MIN_CTA_OCCUPANCY
+        7,                                  // LOG_THREADS
+        10,                                 // LOG_BLOCKS
+        32*128,                             // LIGHT_EDGE_THRESHOLD
+        1,                                  // LOG_LOAD_VEC_SIZE
+        1,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::TWC_FORWARD>
+    TWC_AdvanceKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        1,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        9,                                  // LOG_BLOCKS
+        32*1024,                            // LIGHT_EDGE_THRESHOLD
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB>
+    LB_AdvanceKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        1,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        9,                                  // LOG_BLOCKS
+        32*1024,                            // LIGHT_EDGE_THRESHOLD
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB_CULL>
+    LB_CULL_AdvanceKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        1,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        9,                                  // LOG_BLOCKS
+        32*1024,                            // LIGHT_EDGE_THRESHOLD
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB_LIGHT>
+    LB_LIGHT_AdvanceKernelPolicy;
+
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        1,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        9,                                  // LOG_BLOCKS
+        32*1024,                            // LIGHT_EDGE_THRESHOLD
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB_LIGHT_CULL>
+    LB_LIGHT_CULL_AdvanceKernelPolicy;
+
+    template <typename Dummy, gunrock::oprtr::advance::MODE A_MODE>
+    struct MODE_SWITCH{};
+
+    template <typename Dummy>
+    struct MODE_SWITCH<Dummy, gunrock::oprtr::advance::LB>
+    {
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return enactor.EnactSSSP<LB_AdvanceKernelPolicy, FilterKernelPolicy>(src);
+        }
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
+        {
+            return enactor.InitSSSP <LB_AdvanceKernelPolicy, FilterKernelPolicy>(
+                context, problem, max_grid_size);
+        }
+    };
+
+    template <typename Dummy>
+    struct MODE_SWITCH<Dummy, gunrock::oprtr::advance::TWC_FORWARD>
+    {
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return enactor.EnactSSSP<TWC_AdvanceKernelPolicy, FilterKernelPolicy>(src);
+        }
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
+        {
+            return enactor.InitSSSP <TWC_AdvanceKernelPolicy, FilterKernelPolicy>(
+                context, problem, max_grid_size);
+        }
+    };
+
+    template <typename Dummy>
+    struct MODE_SWITCH<Dummy, gunrock::oprtr::advance::LB_LIGHT>
+    {
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return enactor.EnactSSSP<LB_LIGHT_AdvanceKernelPolicy, FilterKernelPolicy>(src);
+        }
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
+        {
+            return enactor.InitSSSP <LB_LIGHT_AdvanceKernelPolicy, FilterKernelPolicy>(
+                context, problem, max_grid_size);
+        }
+    };
+
+    template <typename Dummy>
+    struct MODE_SWITCH<Dummy, gunrock::oprtr::advance::LB_CULL>
+    {
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return enactor.EnactSSSP<LB_CULL_AdvanceKernelPolicy, FilterKernelPolicy>(src);
+        }
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
+        {
+            return enactor.InitSSSP <LB_CULL_AdvanceKernelPolicy, FilterKernelPolicy>(
+                context, problem, max_grid_size);
+        }
+    };
+
+    template <typename Dummy>
+    struct MODE_SWITCH<Dummy, gunrock::oprtr::advance::LB_LIGHT_CULL>
+    {
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return enactor.EnactSSSP<LB_LIGHT_CULL_AdvanceKernelPolicy, FilterKernelPolicy>(src);
+        }
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
+        {
+            return enactor.InitSSSP <LB_LIGHT_CULL_AdvanceKernelPolicy, FilterKernelPolicy>(
+                context, problem, max_grid_size);
+        }
+    };*/
+
     /**
-     * @brief Enacts a SSSP computing on the specified graph.
+     * \addtogroup PublicInterface
+     * @{
+     */
+
+    /**
+     * @brief SSSP Enact kernel entry.
+     *
      * @param[in] src Source node to start primitive.
+     * @param[in] traversal_mode Load-balanced or Dynamic cooperative.
+     *
      * \return cudaError_t object Indicates the success of all CUDA calls.
      */
-    cudaError_t Enact(VertexT src)
+    //template <typename SSSPProblem>
+    cudaError_t Enact(
+        VertexT     src,
+        std::string traversal_mode = "LB")
     {
-        cudaError_t  retval     = cudaSuccess;
-        GUARD_CU(this -> Run_Threads());
-        if (this -> flag & Debug)
-            util::PrintMsg("\nGPU SSSP Done.\n");
-        return retval;
+        /*if (this -> min_sm_version >= 300)
+        {
+            if (traversal_mode == "LB")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB>
+                    ::Enact(*this, src);
+            else if (traversal_mode == "TWC")
+                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::TWC_FORWARD>
+                    ::Enact(*this, src);
+            else if (traversal_mode == "LB_CULL")
+                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_CULL>
+                    ::Enact(*this, src);
+            else if (traversal_mode == "LB_LIGHT")
+                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT>
+                    ::Enact(*this, src);
+            else if (traversal_mode == "LB_LIGHT_CULL")
+                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT_CULL>
+                    ::Enact(*this, src);
+        }*/
+
+        //to reduce compile time, get rid of other architecture for now
+        //TODO: add all the kernelpolicy settings for all archs
+        printf("Not yet tuned for this architecture\n");
+        return cudaErrorInvalidDeviceFunction;
+    }
+
+    /**
+     * @brief SSSP Enact kernel entry.
+     *
+     * @param[in] context CudaContext pointer for ModernGPU API.
+     * @param[in] problem Pointer to Problem object.
+     * @param[in] max_grid_size Maximum grid size for kernel calls.
+     * @param[in] traversal_mode Load-balanced or Dynamic cooperative.
+     *
+     * \return cudaError_t object Indicates the success of all CUDA calls.
+     */
+    cudaError_t Init(
+        ContextPtr   *context,
+        Problem      *problem,
+        int          max_grid_size = 0,
+        std::string  traversal_mode = "LB")
+    {
+        /*if (this -> min_sm_version >= 300)
+        {
+            if (traversal_mode == "LB")
+                return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB>
+                    ::Init(*this, context, problem, max_grid_size);
+            else if (traversal_mode == "TWC")
+                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::TWC_FORWARD>
+                    ::Init(*this, context, problem, max_grid_size);
+            else if (traversal_mode == "LB_CULL")
+                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_CULL>
+                    ::Init(*this, context, problem, max_grid_size);
+            else if (traversal_mode == "LB_LIGHT")
+                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT>
+                    ::Init(*this, context, problem, max_grid_size);
+            else if (traversal_mode == "LB_LIGHT_CULL")
+                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT_CULL>
+                    ::Init(*this, context, problem, max_grid_size);
+            else printf("Traversal_mode %s is undefined for SSSP\n", traversal_mode.c_str());
+        }*/
+
+        //to reduce compile time, get rid of other architecture for now
+        //TODO: add all the kernel policy settings for all archs
+        printf("Not yet tuned for this architecture\n");
+        return cudaErrorInvalidDeviceFunction;
     }
 
     /** @} */

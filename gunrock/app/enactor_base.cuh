@@ -25,7 +25,6 @@
 #include <gunrock/util/array_utils.cuh>
 
 #include <gunrock/app/enactor_types.cuh>
-#include <gunrock/app/mgpu_slice.cuh>
 //#include <gunrock/app/enactor_helper.cuh>
 //#include <gunrock/app/enactor_loop.cuh>
 
@@ -55,86 +54,75 @@ cudaError_t UseParameters2(
     cudaError_t retval = cudaSuccess;
 
     if (!parameters.Have("device"))
-        GUARD_CU(parameters.Use<int>(
+    {
+        retval = parameters.Use<int>(
             "device",
             util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
             0,
             "Set GPU(s) for testing",
-            __FILE__, __LINE__));
+            __FILE__, __LINE__);
+        if (retval) return retval;
+    }
 
-    GUARD_CU(parameters.Use<int>(
+    retval = parameters.Use<int>(
         "communicate-latency",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "additional communication latency",
-        __FILE__, __LINE__));
+        __FILE__, __LINE__);
+    if (retval) return retval;
 
-    GUARD_CU(parameters.Use<float>(
+    retval = parameters.Use<float>(
         "communicate-multipy",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         1.0f,
         "communication sizing factor",
-        __FILE__, __LINE__));
+        __FILE__, __LINE__);
+    if (retval) return retval;
 
-    GUARD_CU(parameters.Use<int>(
+    retval = parameters.Use<int>(
         "expand-latency",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "additional expand incoming latency",
-        __FILE__, __LINE__));
+        __FILE__, __LINE__);
+    if (retval) return retval;
 
-    GUARD_CU(parameters.Use<int>(
+    retval = parameters.Use<int>(
         "subqueue-latency",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "additional subqueue latency",
-        __FILE__, __LINE__));
+        __FILE__, __LINE__);
+    if (retval) return retval;
 
-    GUARD_CU(parameters.Use<int>(
+    retval = parameters.Use<int>(
         "fullqueue-latency",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "additional fullqueue latency",
-        __FILE__, __LINE__));
+        __FILE__, __LINE__);
+    if (retval) return retval;
 
-    GUARD_CU(parameters.Use<int>(
+    retval = parameters.Use<int>(
         "makeout-latency",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "additional make-out latency",
-        __FILE__, __LINE__));
+        __FILE__, __LINE__);
+    if (retval) return retval;
 
-    GUARD_CU(parameters.Use<std::string>(
-        "advance-mode",
+    retval = parameters.Use<std::string>(
+        "traversal-mode",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        "LB",
-        "Advance strategy, LB for Load-Balanced, "
+        "",
+        "Traversal strategy, LB for Load-Balanced, "
         "TWC for Dynamic-Cooperative, add -LIGHT for "
         "small frontiers, add -CULL for fuzed kernels; "
         "not all modes are available for specific problem; "
         "default is determined based on input graph",
-        __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<std::string>(
-        "filter-mode",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        "CULL",
-        "Filter strategy",
-        __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<double>(
-        "queue-factor",
-        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-        6.0,
-        "Reserved frontier sizing factor, multiples of numbers of vertices or edges",
-        __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<double>(
-        "trans-factor",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        1.0,
-        "Reserved sizing factor for data communication, multiples of number of vertices",
-        __FILE__, __LINE__));
+        __FILE__, __LINE__);
+    if (retval) return retval;
 
     return retval;
 }
@@ -144,29 +132,23 @@ cudaError_t UseParameters2(
  *
  * @tparam SizeT
  */
-template <
-    typename GraphT,
-    typename LabelT,
+template <typename GraphT,
     util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 class EnactorBase
 {
 public:
     typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::SizeT   SizeT;
-    typedef EnactorSlice<GraphT, LabelT, ARRAY_FLAG, cudaHostRegisterFlag>
+    typedef EnactorSlice<GraphT, ARRAY_FLAG, cudaHostRegisterFlag>
                                      EnactorSliceT;
     //typedef Frontier<VertexT, SizeT, ARRAY_FLAG, cudaHostRegisterFlag>
     //                                 FrontierT;
-    typedef MgpuSlice<VertexT, SizeT, ValueT>
-                                     MgpuSliceT;
-
-    int               num_gpus;
-    std::vector<int>  gpu_idx;
-    std::string       algo_name;
+    int           num_gpus;
+    std::vector<int> gpu_idx;
+    std::string   algo_name;
     util::Parameters *parameters;
-    Enactor_Flag      flag;
+    Enactor_Flag  flag;
 
     int           communicate_latency;
     float         communicate_multipy;
@@ -175,8 +157,6 @@ public:
     int           fullqueue_latency;
     int           makeout_latency;
     int           min_sm_version;
-    std::vector<double> queue_factors;
-    double        trans_factor;
 
     //Device properties
     util::Array1D<SizeT, util::CudaProperties, ARRAY_FLAG,
@@ -187,10 +167,6 @@ public:
     util::Array1D<int, EnactorSliceT, ARRAY_FLAG,
         cudaHostRegisterFlag>// | cudaHostAllocMapped | cudaHostAllocPortable>
         enactor_slices;
-
-    util::Array1D<int, MgpuSliceT, ARRAY_FLAG,
-        cudaHostRegisterFlag>// | cudaHostAllocMapped | cudaHostAllocPortable>
-        mgpu_slices;
 
     //Frontiers
     //util::Array1D<int, FrontierT, ARRAY_FLAG, cudaHostRegisterFlag>
@@ -229,9 +205,9 @@ public:
         thread_Ids      .SetName("thread_Ids"    );
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
-        iter_full_queue_time        .SetName("iter_full_queue_time");
-        iter_sub_queue_time         .SetName("iter_sub_queue_time" );
-        iter_total_time             .SetName("iter_total_time"     );
+        iter_full_queue_time.SetName("iter_full_queue_time");
+        iter_sub_queue_time .SetName("iter_sub_queue_time" );
+        iter_total_time     .SetName("iter_total_time"     );
         iter_full_queue_edges_queued.SetName("iter_full_queue_edges_queued");
         iter_full_queue_nodes_queued.SetName("iter_full_queue_nodes_queued");
 #endif
@@ -251,22 +227,25 @@ public:
         util::PrintMsg("EnactorBase::Release() entered");
 
         if (thread_slices.GetPointer(util::HOST)!= NULL)
-            GUARD_CU(Kill_Threads());
+            retval = Kill_Threads();
+        if (retval) return retval;
 
         if (enactor_slices.GetPointer(util::HOST) != NULL)
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
-            GUARD_CU(util::SetDevice(gpu_idx[gpu]));
+            retval = util::SetDevice(gpu_idx[gpu]);
+            if (retval) return retval;
             for (int peer = 0; peer < num_gpus; peer++)
             {
                 int idx = gpu * num_gpus + peer;
-                GUARD_CU(enactor_slices[idx].Release(target));
+                retval = enactor_slices[idx].Release(target);
+                if (retval) return retval;
             }
         }
-        GUARD_CU(cuda_props    .Release(target));
-        GUARD_CU(enactor_slices.Release(target));
-        GUARD_CU(thread_Ids    .Release(target));
-        GUARD_CU(thread_slices .Release(target));
+        if (retval = cuda_props    .Release(target)) return retval;
+        if (retval = enactor_slices.Release(target)) return retval;
+        if (retval = thread_Ids    .Release(target)) return retval;
+        if (retval = thread_slices .Release(target)) return retval;
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
         if (iter_full_queue_time.GetPointer(util::HOST)!= NULL && (target & util::HOST) != 0)
@@ -288,17 +267,17 @@ public:
                 for (auto it = iter_full_queue_edges_queued[gpu].begin();
                     it != iter_full_queue_edges_queued[gpu].end(); it++)
                     it -> clear();
-                iter_full_queue_time        [gpu].clear();
-                iter_sub_queue_time         [gpu].clear();
-                iter_total_time             [gpu].clear();
+                iter_full_queue_time[gpu].clear();
+                iter_sub_queue_time [gpu].clear();
+                iter_total_time     [gpu].clear();
                 iter_full_queue_nodes_queued[gpu].clear();
                 iter_full_queue_edges_queued[gpu].clear();
             }
-            GUARD_CU(iter_full_queue_time        .Release(target));
-            GUARD_CU(iter_sub_queue_time         .Release(target));
-            GUARD_CU(iter_total_time             .Release(target));
-            GUARD_CU(iter_full_queue_nodes_queued.Release(target));
-            GUARD_CU(iter_full_queue_edges_queued.Release(target));
+            if (retval = iter_full_queue_time.Release(target)) return retval;
+            if (retval = iter_sub_queue_time .Release(target)) return retval;
+            if (retval = iter_total_time     .Release(target)) return retval;
+            if (retval = iter_full_queue_nodes_queued.Release(target)) return retval;
+            if (retval = iter_full_queue_edges_queued.Release(target)) return retval;
         }
 #endif
         util::PrintMsg("EnactorBase::Release() returning");
@@ -307,6 +286,9 @@ public:
 
    /**
      * @brief Init function for enactor base class.
+     *
+     * @tparam Problem
+     *
      * @param[in] max_grid_size Maximum CUDA block numbers in on grid
      * @param[in] advance_occupancy CTA Occupancy for Advance operator
      * @param[in] filter_occupancy CTA Occupancy for Filter operator
@@ -314,47 +296,58 @@ public:
      *
      * \return cudaError_t object indicates the success of all CUDA calls.
      */
+    //template <typename Problem>
     cudaError_t Init(
         util::Parameters &parameters,
+        //int max_grid_size,
+        //int advance_occupancy,
+        //int filter_occupancy,
         Enactor_Flag flag = Enactor_None,
         unsigned int num_queues = 2,
         FrontierType *frontier_types = NULL,
+        int node_lock_size = 1024,
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
 
         gpu_idx             = parameters.Get<std::vector<int>>("device");
         num_gpus            = gpu_idx.size();
-        communicate_latency = parameters.Get<int   >("communicate-latency");
-        communicate_multipy = parameters.Get<float >("communicate-multipy");
-        expand_latency      = parameters.Get<int   >("expand-latency");
-        subqueue_latency    = parameters.Get<int   >("subqueue-latency");
-        fullqueue_latency   = parameters.Get<int   >("fullqueue-latency");
-        makeout_latency     = parameters.Get<int   >("makeout-latency");
-        queue_factors       = parameters.Get<std::vector<double>>("queue-factor");
-        trans_factor        = parameters.Get<double>("trans-factor");
+        communicate_latency = parameters.Get<int  >("communicate-latency");
+        communicate_multipy = parameters.Get<float>("communicate-multipy");
+        expand_latency      = parameters.Get<int  >("expand-latency");
+        subqueue_latency    = parameters.Get<int  >("subqueue-latency");
+        fullqueue_latency   = parameters.Get<int  >("fullqueue-latency");
+        makeout_latency     = parameters.Get<int  >("makeout-latency");
         min_sm_version      = -1;
         this -> parameters  = &parameters;
         this -> flag        = flag;
 
-        GUARD_CU(cuda_props    .Allocate(num_gpus, util::HOST));
-        GUARD_CU(enactor_slices.Allocate(num_gpus * num_gpus, util::HOST));
-        GUARD_CU(thread_slices .Allocate(num_gpus, util::HOST));
-        GUARD_CU(thread_Ids    .Allocate(num_gpus, util::HOST));
+        retval = cuda_props    .Allocate(num_gpus, util::HOST);
+        if (retval) return retval;
+
+        retval = enactor_slices.Allocate(num_gpus * num_gpus, util::HOST);
+        if (retval) return retval;
+
+        retval = thread_slices .Allocate(num_gpus, util::HOST);
+        if (retval) return retval;
+
+        retval = thread_Ids    .Allocate(num_gpus, util::HOST);
+        if (retval) return retval;
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
-        GUARD_CU(iter_full_queue_time        .Allocate(num_gpus, util::HOST));
-        GUARD_CU(iter_sub_queue_time         .Allocate(num_gpus, util::HOST));
-        GUARD_CU(iter_total_time             .Allocate(num_gpus, util::HOST));
-        GUARD_CU(iter_full_queue_nodes_queued.Allocate(num_gpus, util::HOST));
-        GUARD_CU(iter_full_queue_edges_queued.Allocate(num_gpus, util::HOST));
+        if (retval = iter_full_queue_time.Allocate(num_gpus, util::HOST)) return retval;
+        if (retval = iter_sub_queue_time .Allocate(num_gpus, util::HOST)) return retval;
+        if (retval = iter_total_time     .Allocate(num_gpus, util::HOST)) return retval;
+        if (retval = iter_full_queue_nodes_queued.Allocate(num_gpus, util::HOST)) return retval;
+        if (retval = iter_full_queue_edges_queued.Allocate(num_gpus, util::HOST)) return retval;
 #endif
 
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
             if (target & util::DEVICE)
             {
-                GUARD_CU(util::SetDevice(gpu_idx[gpu]));
+                retval = util::SetDevice(gpu_idx[gpu]);
+                if (retval) return retval;
 
                 // Setup work progress (only needs doing once since we maintain
                 // it in our kernel code)
@@ -368,31 +361,38 @@ public:
             {
                 auto &enactor_slice = enactor_slices[gpu*num_gpus + peer];
 
-                GUARD_CU(enactor_slice.Init(num_queues, frontier_types,
+                retval = enactor_slice.Init(num_queues, frontier_types,
                     algo_name + "::frontier[" + std::to_string(gpu) + "," +
-                    std::to_string(peer) + "]", /*node_lock_size,*/ target,
-                    cuda_props + gpu,
-                    parameters.Get<std::string>("advance-mode"),
-                    parameters.Get<std::string>("filter-mode")));
+                    std::to_string(peer) + "]", node_lock_size, target);
+                if (retval) return retval;
+
+                // TODO: move to somewhere
+                //initialize runtime stats
+                //enactor_slice.enactor_stats -> advance_grid_size = MaxGridSize(
+                //    gpu, advance_occupancy, max_grid_size);
+                //enactor_slice.enactor_stats -> filter_grid_size  = MaxGridSize(
+                //    gpu, filter_occupancy , max_grid_size);
 
                 if (gpu != peer && (target & util::DEVICE) != 0)
                 {
                     int peer_access_avail;
-                    GUARD_CU2(cudaDeviceCanAccessPeer(
+                    if (retval = util::GRError(cudaDeviceCanAccessPeer(
                         &peer_access_avail, gpu_idx[gpu], gpu_idx[peer]),
-                        "cudaDeviceCanAccess failed");
+                        "cudaDeviceCanAccess failed", __FILE__, __LINE__))
+                        return retval;
                     if (peer_access_avail)
                     {
-                        GUARD_CU2(cudaDeviceEnablePeerAccess(gpu_idx[peer],0),
-                            "cudaDeviceEnablePeerAccess failed");
+                        if (retval = util::GRError(cudaDeviceEnablePeerAccess(gpu_idx[peer],0),
+                            "cudaDeviceEnablePeerAccess failed", __FILE__, __LINE__))
+                            return retval;
                     }
                 }
             }
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
-            iter_sub_queue_time         [gpu].clear();
-            iter_full_queue_time        [gpu].clear();
-            iter_total_time             [gpu].clear();
+            iter_sub_queue_time [gpu].clear();
+            iter_full_queue_time[gpu].clear();
+            iter_total_time     [gpu].clear();
             iter_full_queue_nodes_queued[gpu].clear();
             iter_full_queue_edges_queued[gpu].clear();
 #endif
@@ -411,16 +411,20 @@ public:
         {
             if (target & util::DEVICE)
             {
-                GUARD_CU(util::SetDevice(gpu_idx[gpu]));
+                retval = util::SetDevice(gpu_idx[gpu]);
+                if (retval) return retval;
             }
             for (int peer = 0; peer < num_gpus; peer++)
             {
-                GUARD_CU(enactor_slices[gpu * num_gpus + peer]
-                    .Reset(target));
-                //GUARD_CU(work_progress     [gpu * num_gpus + peer]
-                //    .Reset_());
-                //GUARD_CU(frontier_attribute[gpu * num_gpus + peer]
-                //    .Reset());
+                if (retval = enactor_slices[gpu * num_gpus + peer]
+                    .Reset(target))
+                    return retval;
+                //if (retval = work_progress     [gpu * num_gpus + peer]
+                //    .Reset_())
+                //    return retval;
+                //if (retval = frontier_attribute[gpu * num_gpus + peer]
+                //    .Reset())
+                //    return retval;
             }
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
@@ -461,7 +465,6 @@ public:
                 //std::this_thread::yield();
             }
         }
-        return cudaSuccess;
     }
 
     cudaError_t Run_Threads()
@@ -483,7 +486,8 @@ public:
 
         for (int gpu=0; gpu< num_gpus * num_gpus; gpu++)
         {
-            GUARD_CU(enactor_slices[gpu].enactor_stats.retval);
+            retval = enactor_slices[gpu].enactor_stats.retval;
+            if (retval) return retval;
         }
         return retval;
     }
