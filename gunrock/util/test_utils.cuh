@@ -284,7 +284,7 @@ void DisplayDeviceBinaryResults(
     printf("Binary Format:\n");
     for (int i = 0; i < num_elements; i++)
     {
-        printf(""BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN"\n",
+        printf("" BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n",
   BYTE_TO_BINARY(h_data[i]>>8), BYTE_TO_BINARY(h_data[i])); 
     }
 
