@@ -494,7 +494,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                             smem_storage.block_first_v_skip_count);*/
                 } else {
                     smem_storage.output_offset[threadIdx.x] = util::MaxValue<SizeT>(); //max_edges;
-                    smem_storage.vertices     [threadIdx.x] = util::MaxValue<VertexId>();//max_vertices;
+                    //smem_storage.vertices     [threadIdx.x] = util::MaxValue<VertexId>();//max_vertices;
                     smem_storage.input_queue  [threadIdx.x] = util::MaxValue<VertexId>();//max_vertices;
                     smem_storage.row_offset   [threadIdx.x] = util::MaxValue<SizeT>();
                 }
