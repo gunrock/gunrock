@@ -13,6 +13,7 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(salsa)
   add_subdirectory(wtf)
   add_subdirectory(topk)
+  add_subdirectory(mf)
   #add_subdirectory(template)
   #add_subdirectory(vis)
   #add_subdirectory(mis)
@@ -110,6 +111,10 @@ set_tests_properties(SHARED_LIB_TEST_SSSP
 add_test(NAME SHARED_LIB_TEST_PAGERANK COMMAND shared_lib_pr)
 set_tests_properties(SHARED_LIB_TEST_PAGERANK
   PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*2.*: Score.*1.2*")
+
+# add_test(NAME SHARED_LIB_TEST_MF COMMAND shared_lib_mf)
+# set_tests_properties(SHARED_LIB_TEST_MF
+#  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Label.*39.*")
 
 # note: Some premitives are not added as test because they don't have
 #	cpu reference code.
