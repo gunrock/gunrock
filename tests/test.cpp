@@ -17,7 +17,7 @@
 #include <gmock/gmock.h>
 
 // Add google tests
-#include "test_lib_bfs.h"
+#include "bfs/test_lib_bfs.h"
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
