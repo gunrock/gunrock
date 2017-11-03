@@ -289,5 +289,6 @@ endif(GUNROCK_BUILD_LIB)
 
 # Subdirectories for examples, testing and documentation
 if(GUNROCK_BUILD_TESTS)
+    add_subdirectory(examples)
     add_subdirectory(tests)
 endif(GUNROCK_BUILD_TESTS)
