@@ -194,11 +194,11 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                     return retval;
             }
             // partial results storage: as much as possible
-            if(retval = d_partial           .Allocate(graph_query->nodes* graph_data->edges*2/3,  util::DEVICE))
+            if(retval = d_partial           .Allocate(graph_query->nodes* graph_data->edges,  util::DEVICE))
                 return retval;
-            if(retval = d_src_node_id       .Allocate(graph_data->edges*3/4,  util::DEVICE))
+            if(retval = d_src_node_id       .Allocate(graph_data->edges,  util::DEVICE))
                 return retval;
-            if(retval = d_index             .Allocate(graph_data->edges*3/4,  util::DEVICE))
+            if(retval = d_index             .Allocate(graph_data->edges,  util::DEVICE))
                 return retval;
             // Initialize query graph node degree by row offsets
             // neighbor node encoding = sum of neighbor node labels
@@ -265,10 +265,6 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
             if(retval = d_NG.Move(util::HOST, util::DEVICE)) return retval;
             if(retval = d_NG_ro.Move(util::HOST, util::DEVICE)) return retval;
             if(retval = d_NG_ci.Move(util::HOST, util::DEVICE)) return retval;
-/*    printf("query node exploration sequence:\n");
-    util::DisplayDeviceResults(d_NG.GetPointer(util::DEVICE), graph_query -> nodes);
-    util::DisplayDeviceResults(d_NG_ro.GetPointer(util::DEVICE), graph_query -> nodes-1);
-    util::DisplayDeviceResults(d_NG_ci.GetPointer(util::DEVICE), graph_query -> edges/2-graph_query->nodes+1);*/
 
             if(node_label) {
                 d_query_labels.SetPointer(graph_query->node_values);
@@ -361,13 +357,13 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
                 if(retval = d_NG.Allocate(nodes_query, util::DEVICE))
                     return retval;
             if(d_partial.GetPointer(util::DEVICE) == NULL)
-                if(retval = d_partial.Allocate(nodes_query*edges*2/3, util::DEVICE))
+                if(retval = d_partial.Allocate(nodes_query*edges, util::DEVICE))
                     return retval;
             if(d_src_node_id.GetPointer(util::DEVICE) == NULL)
-                if(retval = d_src_node_id.Allocate(edges*3/4, util::DEVICE))
+                if(retval = d_src_node_id.Allocate(edges, util::DEVICE))
                     return retval;
             if(d_index.GetPointer(util::DEVICE) == NULL)
-                if(retval = d_index.Allocate(edges*3/4, util::DEVICE))
+                if(retval = d_index.Allocate(edges, util::DEVICE))
                     return retval;
             d_data_ro.SetPointer((SizeT*)graph_slice -> row_offsets.GetPointer(util::DEVICE), nodes+1, util::DEVICE);
 
@@ -378,27 +374,10 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
 	    util::MemsetKernel<<<128,128>>>(d_data_degree.GetPointer(util::DEVICE),
                 0, nodes);
             util::MemsetKernel<<<128,128>>>(d_partial.GetPointer(util::DEVICE),
-                -1, nodes_query*edges*2/3);
-/*            util::MemsetKernel<<<128,128>>>(
-                this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE),
-                -1, 
-                this -> frontier_queues[0].keys[0].GetSize());*/
-/*            if(retval = this -> frontier_queues[0].keys[0].EnsureSize(this->edges/2, util::DEVICE))
-                return retval;
-            if(retval = this -> frontier_queues[0].keys[1].EnsureSize(this->edges, util::DEVICE))
-                return retval;*/
-            printf("input frontier queue size:%d, output size:%d\n", this -> frontier_queues[0].keys[0].GetSize(), this -> frontier_queues[0].keys[1].GetSize());
+                -1, nodes_query*edges);
             util::MemsetIdxKernel<<<128, 128>>>(
                 this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE),
                 nodes);
-/*                this -> frontier_queues[0].keys[0].GetSize());
-            
-            util::DisplayDeviceResults(this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE),
-                                       this -> frontier_queues[0].keys[0].GetSize());*/
-            // Initialized edge frontier queue used for mappings
-/*            util::MemsetIdxKernel<<<128, 128>>>(
-                this -> frontier_queues[0].values[0].GetPointer(util::DEVICE), edges);*/
-            
 
             return retval;
         } 

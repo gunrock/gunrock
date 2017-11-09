@@ -221,11 +221,12 @@ struct SMFilterFunctor
                 {
                     if ((d_data_slice->d_data_labels.GetSize()==0 && 
                           d_data_slice->d_data_degree[node] >= d_data_slice->d_query_degree[i])
-                        || (d_data_slice -> d_data_labels[node] == d_data_slice->d_query_labels[i]
-                          && ((d_data_slice->d_data_degree[node]==d_data_slice->d_query_degree[i] 
+                        || (d_data_slice->d_data_labels.GetSize()!=0
+                           && d_data_slice -> d_data_labels[node] == d_data_slice->d_query_labels[i]
+                             && ((d_data_slice->d_data_degree[node]==d_data_slice->d_query_degree[i]
                                && d_data_slice->d_data_ne[node]==d_data_slice->d_query_ne[i]) 
-                             || (d_data_slice->d_data_degree[node]>d_data_slice->d_query_degree[i]
-                               && d_data_slice->d_data_ne[node]>d_data_slice->d_query_ne[i]))))
+                                || (d_data_slice->d_data_degree[node]>d_data_slice->d_query_degree[i]
+                                && d_data_slice->d_data_ne[node]>d_data_slice->d_query_ne[i]))))
                     {
                         break;
                     }
@@ -331,8 +332,9 @@ struct SMDistributeFunctor
         VertexId idx = d_data_slice->d_NG[d_data_slice->counter[0]];
         if ((d_data_slice->d_data_labels.GetSize()==0 && 
               d_data_slice->d_data_degree[node] >= d_data_slice->d_query_degree[idx])
-            || (d_data_slice -> d_data_labels[node] == d_data_slice->d_query_labels[idx]
-              && ((d_data_slice->d_data_degree[node]==d_data_slice->d_query_degree[idx] 
+            || (d_data_slice->d_data_labels.GetSize()!=0
+              && d_data_slice -> d_data_labels[node] == d_data_slice->d_query_labels[idx]
+                 && ((d_data_slice->d_data_degree[node]==d_data_slice->d_query_degree[idx]
                    && d_data_slice->d_data_ne[node]==d_data_slice->d_query_ne[idx]) 
                  || (d_data_slice->d_data_degree[node]>d_data_slice->d_query_degree[idx]
                    && d_data_slice->d_data_ne[node]>d_data_slice->d_query_ne[idx]))))
@@ -425,8 +427,9 @@ struct SMDistributeFunctor
         VertexId idx = d_data_slice->d_NG[id];
         if ((d_data_slice->d_data_labels.GetSize()==0 && 
               d_data_slice->d_data_degree[d_id] >= d_data_slice->d_query_degree[idx])
-            || (d_data_slice -> d_data_labels[d_id] == d_data_slice->d_query_labels[idx]
-              && ((d_data_slice->d_data_degree[d_id]==d_data_slice->d_query_degree[idx] 
+            || (d_data_slice->d_data_labels.GetSize()!=0
+              && d_data_slice -> d_data_labels[d_id] == d_data_slice->d_query_labels[idx]
+                 && ((d_data_slice->d_data_degree[d_id]==d_data_slice->d_query_degree[idx]
                    && d_data_slice->d_data_ne[d_id]==d_data_slice->d_query_ne[idx]) 
                  || (d_data_slice->d_data_degree[d_id]>d_data_slice->d_query_degree[idx]
                    && d_data_slice->d_data_ne[d_id]>d_data_slice->d_query_ne[idx]))))
@@ -479,205 +482,18 @@ struct SMDistributeFunctor
         SizeT    input_pos ,
         SizeT   &output_pos)
     {
-       int idx = blockIdx.x * blockDim.x + threadIdx.x;
        if(d_data_slice->counter[0]==1)
             d_data_slice->d_src_node_id[edge_id] = 1;
        else {
             int index = atomicAdd(d_data_slice->num_subs+0, 1);
-            if(index >= d_data_slice->edges_data*3/4)
-                printf("=====d_index and src node exit bound===\n");
+/*            if(index >= d_data_slice->edges_data*4.5)
+                printf("=====d_index and src node exit bound: index:%d, edges:%d===\n", index, d_data_slice->edges_data);*/
             d_data_slice->d_src_node_id[index] = d_id;
             d_data_slice->d_index[index] = input_pos;
-//            if(idx>d_data_slice->edges_data) 
-//         printf("HERE: s_id:%d, d_id:%d, threadid:%d, index:%d, idx:%d, edges:%d, input_pos+edge_id:%d, input_pos:%d, edge_id:%d \n",s_id, d_id,threadIdx.x, index, idx, d_data_slice->edges_data, input_pos+edge_id, input_pos, edge_id);
         }
     }
 }; // SMDistributeFunctor
 
-
-/**
- * @brief Structure contains device functions in listing subgraphs including
- * matching on query edge weights. 
- *
- * @tparam VertexId    Type used for vertex id (e.g., uint32)
- * @tparam SizeT       Type used for array indexing. (e.g., uint32)
- * @tparam Value       Type used for calculation values (e.g., float)
- * @tparam ProblemData Problem data type which contains data slice for SM problem
- *
- */
-template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename Problem,
-  typename _LabelT = VertexId>
-struct SMiBFSFunctor
-{
-    typedef typename Problem::DataSlice DataSlice;
-    typedef _LabelT LabelT;
-    /**
-     * @brief Forward Advance Kernel condition function.
-     *
-     * @param[in] s_id Vertex Id of the edge source node
-     * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
-     *
-     * \return Whether to load the apply function for the edge and include
-     * the destination node in the next frontier.
-     */
-    static __device__ __forceinline__ bool CondEdge(
-        VertexId s_id,
-        VertexId d_id,
-        DataSlice *d_data_slice,
-        SizeT    edge_id   ,   
-        VertexId input_item,
-        LabelT   label     ,   
-        SizeT    input_pos ,
-        SizeT   &output_pos)
-    {
-        bool res = true;
-        if(d_data_slice->counter[0]==d_data_slice->nodes_query) {
-            printf("iteration exceed number of BFS levels\n");
-            res = false; return res;}
-        if(threadIdx.x==0)
-            printf("counter:%d\n", d_data_slice->counter[0]);
-        int n = d_data_slice->nodes_data;
-        int block = n*n;
-        int k = d_data_slice->counter[0];
-        int i=0;
-        size_t idx = threadIdx.x + blockIdx.x*blockDim.x;
-        if(!d_data_slice->d_isValid[d_id] || s_id>d_id) return false;
-        if(d_data_slice->counter[0]>0){
-            if(d_data_slice->counter[0]>1)
-                // test if each s_id's bitmap has changed, if not, s_id is not in the frontier
-                for(i=0; i<d_data_slice->nodes_data; i++){
-                    if((d_data_slice->bitmap[(block*(k-1)+s_id*n+i)/(sizeof(Value)*8)] << 
-                       (block*(k-1)+s_id*n+i)%(sizeof(Value)*8)) ^ 
-                       (d_data_slice->bitmap[(block*(k-2)+s_id*n+i)/(sizeof(Value)*8)] << 
-                       (block*(k-2)+s_id*n+i)%(sizeof(Value)*8)))
-                       break;
-                }
-                if(i==d_data_slice->nodes_data) res = false;
-            // copy k-1 level's bitmaps to k level k=counter[0]
-            if(idx<block)
-                d_data_slice->bitmap[(k*block+idx)/(sizeof(Value)*8)] = 
-                d_data_slice->bitmap[((k-1)*block+idx)/(sizeof(Value)*8)];
-        }
-        return res;
-    }
-
-    /**
-     * @brief Forward Advance Kernel apply function.
-     *
-     * @param[in] s_id Vertex Id of the edge source node
-     * @param[in] d_id Vertex Id of the edge destination node
-     * @param[in] problem Data slice object
-     * @param[in] e_id Output edge index
-     * @param[in] e_id_in Input edge index
-     */
-    static __device__ __forceinline__ void ApplyEdge(
-        VertexId s_id,
-        VertexId d_id,
-        DataSlice *d_data_slice,
-        SizeT    edge_id   ,
-        VertexId input_item,
-        LabelT   label     ,
-        SizeT    input_pos ,
-        SizeT   &output_pos)
-    {
-        printf("iBFS input edge: %d, %d\n", s_id, d_id);
-        int k = d_data_slice->counter[0];
-        int n = d_data_slice->nodes_data;
-        int block = n*n;
-        if(k==0)
-            // setting the bits of iBFS source nodes to be 1
-            d_data_slice->bitmap[(s_id*n+s_id)/(sizeof(Value)*8)] |= 1 << (s_id*n+s_id)%(sizeof(Value)*8);
-        else
-        // atomicOr d_id's bitmap with s_id's bitmap and store the results in d_id's bitmap
-            atomicOr(d_data_slice->bitmap+(k*block+d_id*n)/(sizeof(Value)*8), 
-                     d_data_slice->bitmap[((k-1)*block+s_id*n)/(sizeof(Value)*8)] << ((k-1)*block+s_id*n)%(sizeof(Value)*8)); 
-        if(blockIdx.x==0 && threadIdx.x==0)
-            d_data_slice->counter[0] ++;
-    }
-}; // SMiBFSFunctor
-
-/**
- * @brief Structure contains device functions in listing subgraphs including
- * matching on query edge weights. 
- *
- * @tparam VertexId    Type used for vertex id (e.g., uint32)
- * @tparam SizeT       Type used for array indexing. (e.g., uint32)
- * @tparam Value       Type used for calculation values (e.g., float)
- * @tparam ProblemData Problem data type which contains data slice for SM problem
- *
- */
-template<
-  typename VertexId,
-  typename SizeT,
-  typename Value,
-  typename Problem,
-  typename _LabelT = VertexId>
-struct SMiDFSFunctor
-{
-    typedef typename Problem::DataSlice DataSlice;
-    typedef _LabelT LabelT;
-    /**
-     * @brief Vertex mapping condition function. Check if vertex id matches footprint
-     * of the first query vertex.
-     *
-     * @param[in] v auxiliary value.
-     * @param[in] node Vertex identifier.
-     * @param[out] d_data_slice Data slice object.
-     * @param[in] nid Vertex index.
-     * @param[in] label Vertex label value.
-     * @param[in] input_pos Index in the input frontier
-     * @param[in] output_pos Index in the output frontier
-     *
-     * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
-     */
-    static __device__ __forceinline__ bool CondFilter(
-        VertexId   v,
-        VertexId   node,
-        DataSlice *d_data_slice,
-        SizeT      nid  ,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT      output_pos)
-    {
-        bool res = false;
-        if(threadIdx.x==0)
-            printf("counter:%d\n", d_data_slice->counter[0]);
-        if(d_data_slice->counter[0]==0) res = d_data_slice->d_isValid[node];
-        
-        return res;
-    }
-
-    /**
-     * @brief Vertex mapping apply function. Do nothing.
-     * 
-     *
-     * @param[in] v auxiliary value.
-     * @param[in] node Vertex identifier.
-     * @param[out] d_data_slice Data slice object.
-     * @param[in] nid Vertex index.
-     * @param[in] label Vertex label value.
-     * @param[in] input_pos Index in the input frontier
-     * @param[in] output_pos Index in the output frontier
-     */
-    static __device__ __forceinline__ void ApplyFilter(
-        VertexId   v,
-        VertexId   node,
-        DataSlice *d_data_slice,
-        SizeT      nid  ,
-        LabelT     label,
-        SizeT      input_pos,
-        SizeT      output_pos)
-    {
-//        printf("query node 1's candidate node id: %d \n", node);
-    }
-}; // SMDFSFunctor
 
 }  // namespace sm
 }  // namespace app
