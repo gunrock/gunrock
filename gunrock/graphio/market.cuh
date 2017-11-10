@@ -363,7 +363,8 @@ int ReadMarketStream(
 
 		if (ll_row < 1 || ll_col < 1)
                 {
-                    fprintf(stderr, "\nError Invalid graph: Bad MTX format, indices cannot start with 0.\n");
+                    fprintf(stderr, "\nError Invalid graph: Bad MTX format, 
+			    indices cannot start with 0.\n");
                     if (coo) free(coo);
                     exit(1);
                 }
