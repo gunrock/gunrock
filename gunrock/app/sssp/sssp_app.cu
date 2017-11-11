@@ -324,10 +324,52 @@ float dispatchSSSP(
             }
             case VALUE_FLOAT:
             {
-                // template type = <int, float, int>
-                // not support yet
-                printf("Not Yet Support This DataType Combination.\n");
-                break;
+              Csr<int, int, float> csr(false);
+              csr.nodes = graphi->num_nodes;
+              csr.edges = graphi->num_edges;
+              csr.row_offsets    = (int*)graphi->row_offsets;
+              csr.column_indices = (int*)graphi->col_indices;
+              csr.edge_values    = (float*)graphi->edge_values;
+              parameter->graph = &csr;
+
+              // determine source vertex to start
+              switch (config -> source_mode)
+              {
+              case randomize:
+              {
+                  parameter->src[0] = graphio::RandomNode(csr.nodes);
+                  break;
+              }
+              case largest_degree:
+              {
+                  int max_deg = 0;
+                  parameter->src[0] = csr.GetNodeWithHighestDegree(max_deg);
+                  break;
+              }
+              case manually:
+              {
+                  parameter->src[0] = config -> source_vertex[0];
+                  break;
+              }
+              default:
+              {
+                  parameter->src[0] = 0;
+                  break;
+              }
+              }
+              if (!parameter->g_quiet)
+              {
+                  printf(" source: %lld\n", (long long) parameter->src[0]);
+              }
+
+              elapsed_time = markPredecessorsSSSP<int, int, float>(grapho, parameter);
+
+              // reset for free memory
+              csr.row_offsets    = NULL;
+              csr.column_indices = NULL;
+              csr.edge_values    = NULL;
+
+              break;
             }
             }
             break;
@@ -440,7 +482,7 @@ float sssp(
     if (graphi) free(graphi);
     if (grapho) free(grapho);
     if (config) free(config);
-    
+
     return elapsed_time;
 }
 
