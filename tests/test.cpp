@@ -13,11 +13,14 @@
  * @source https://github.com/google/googletest/blob/master/googletest/docs/Primer.md
  */
 
-#include <gtest/gtest.h>
+#include <stdio.h>
+#include <gunrock/gunrock.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 // Add google tests
 #include "bfs/test_lib_bfs.h"
+#include "cc/test_lib_cc.h"
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

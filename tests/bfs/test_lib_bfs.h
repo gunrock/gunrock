@@ -3,14 +3,9 @@
  * @file test_lib_bfs.h
  */
 
-#include <stdio.h>
-#include <gunrock/gunrock.h>
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
 namespace gunrock {
 
-TEST(sharedlibrary, breadthfirstsearch) 
+TEST(sharedlibrary, breadthfirstsearch)
 {
     struct GRTypes data_t;                 // data type structure
     data_t.VTXID_TYPE = VTXID_INT;         // vertex identifier
