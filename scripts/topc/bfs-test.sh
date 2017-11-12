@@ -1,10 +1,9 @@
 #!/bin/bash
 
-EXEDIR="../../../../gunrock_build/bin"
-EXECUTION="sssp"
-#DATADIR="../../large"
-DATADIR="/data/gunrock_dataset/large"
-SETTING=" --src=0 --undirected --iteration-num=10"
+EXEDIR=${1:-"../../build/bin"}
+DATADIR=${2:-"/data/gunrock_dataset/large"}
+EXECUTION="bfs"
+SETTING=" --src=0 --undirected --idempotence --queue-sizing=6.5 --in-sizing=4 --iteration-num=10 --direction-optimized"
 NAME[0]="soc-LiveJournal1" && DO_A[0]="0.200"   && DO_B[0]="0.1" && T_MODE[0]="LB_CULL"
 NAME[1]="soc-orkut"        && DO_A[1]="0.012"   && DO_B[1]="0.1" && T_MODE[1]="LB_CULL"
 NAME[2]="hollywood-2009"   && DO_A[2]="0.006"   && DO_B[2]="0.1" && T_MODE[2]="LB_CULL"
@@ -23,13 +22,15 @@ GRAPH[4]="grmat --rmat_scale=22 --rmat_edgefactor=64"
 GRAPH[5]="grmat --rmat_scale=23 --rmat_edgefactor=32"
 GRAPH[6]="grmat --rmat_scale=24 --rmat_edgefactor=16"
 GRAPH[7]="market $DATADIR/${NAME[7]}/${NAME[7]}.mtx"
-GRAPH[8]="rgg --rgg_scale=24 --rgg_theshold=0.000548"
+GRAPH[8]="rgg --rgg_scale=24 --rgg_threshold=0.000548"
 
 mkdir -p eval
 DEVICE="0"
 for i in {0..8}
 do
-    echo $EXEDIR/$EXECUTION ${GRAPH[$i]} $SETTING --device=$DEVICE --traversal-mode=${T_MODE[$i]} --jsondir=./eval/ "> ./eval/${NAME[$i]}.$EXECUTION.output.txt"
-         $EXEDIR/$EXECUTION ${GRAPH[$i]} $SETTING --device=$DEVICE --traversal-mode=${T_MODE[$i]} --jsondir=./eval/  > ./eval/${NAME[$i]}.$EXECUTION.output.txt
+    echo $EXEDIR/$EXECUTION ${GRAPH[$i]} $SETTING --device=$DEVICE --traversal-mode=${T_MODE[$i]} --do_a=${DO_A[$i]} --do_b=${DO_B[$i]} --jsondir=./eval/ "> ./eval/${NAME[$i]}.$EXECUTION.output.txt"
+         $EXEDIR/$EXECUTION ${GRAPH[$i]} $SETTING --device=$DEVICE --traversal-mode=${T_MODE[$i]} --do_a=${DO_A[$i]} --do_b=${DO_B[$i]} --jsondir=./eval/  > ./eval/${NAME[$i]}.$EXECUTION.output.txt
     sleep 1
 done
+
+
