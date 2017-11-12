@@ -26,49 +26,49 @@
 // CUDA 9 warp shuffles (device intrinsics)
 template <typename T>
 __device__ static __forceinline__
-T _shfl_up(T &lane_local, int delta, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
+T _shfl_up(T var, unsigned int delta, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
 {
-  int first_lane = (WARPSIZE-width) << 8;
+  //int first_lane = (WARPSIZE-width) << 8;
 #if __CUDACC_VER_MAJOR__ < 9
-  return __shfl_up(lane_local, delta, first_lane);
+  return __shfl_up(var, delta, width);
 #else
-  return __shfl_up_sync(mask, lane_local, delta, first_lane);
+  return __shfl_up_sync(mask, var, delta, width);
 #endif
 }
 
 template <typename T>
 __device__ static __forceinline__
-T _shfl_down(T &lane_local, int delta, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
+T _shfl_down(T var, unsigned int delta, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
 {
-  int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
+  //int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
 #if __CUDACC_VER_MAJOR__ < 9
-  return __shfl_down(lane_local, delta, last_lane);
+  return __shfl_down(var, delta, width);
 #else
-  return __shfl_down_sync(mask, lane_local, delta, last_lane);
+  return __shfl_down_sync(mask, var, delta, width);
 #endif
 }
 
 template <typename T>
 __device__ static __forceinline__
-T _shfl_xor(T &lane_local, int lane_mask, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
+T _shfl_xor(T var, int lane_mask, int width=WARPSIZE, unsigned int mask = MEMBERMASK)
 {
-  int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
+  //int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
 #if __CUDACC_VER_MAJOR__ < 9
-  return __shfl_xor(lane_local, lane_mask, last_lane);
+  return __shfl_xor(var, lane_mask, width);
 #else
-  return __shfl_xor_sync(mask, lane_local, lane_mask, last_lane);
+  return __shfl_xor_sync(mask, var, lane_mask, width);
 #endif
 }
 
 template <typename T>
 __device__ static __forceinline__
-T _shfl(T &lane_local, int source_lane, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
+T _shfl(T var, int source_lane, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
 {
-  int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
+  //int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
 #if __CUDACC_VER_MAJOR__ < 9
-  return __shfl(lane_local, source_lane, last_lane);
+  return __shfl(var, source_lane, width);
 #else
-  return __shfl_sync(mask, lane_local, source_lane, last_lane);
+  return __shfl_sync(mask, var, source_lane, width);
 #endif
 }
 
@@ -104,7 +104,7 @@ int _all(int predicate, unsigned int mask=MEMBERMASK)
 
 #if __CUDACC_VER_MAJOR__ < 8
 // atomic addition from Jon Cohen at NVIDIA
-__device__ static double atomicAdd(double *addr, double val)
+__device__ static __forceinline__ double atomicAdd(double *addr, double val)
 {
     double old=*addr, assumed;
     do {
@@ -118,7 +118,7 @@ __device__ static double atomicAdd(double *addr, double val)
 }
 #endif
 
-__device__ static long long atomicCAS(long long *addr, long long comp, long long val)
+__device__ static __forceinline__ long long atomicCAS(long long *addr, long long comp, long long val)
 {
     return (long long)atomicCAS(
         (unsigned long long*)addr,
@@ -127,31 +127,38 @@ __device__ static long long atomicCAS(long long *addr, long long comp, long long
 }
 
 // TODO: verify overflow condition
-__device__ static long long atomicAdd(long long *addr, long long val)
+__device__ static __forceinline__ long long atomicAdd(long long *addr, long long val)
 {
     return (long long)atomicAdd(
         (unsigned long long*)addr,
         (unsigned long long )val);
 }
 
-#if __GR_CUDA_ARCH__ <= 300
 // TODO: only works if both *addr and val are non-negetive
-/*__device__ static signed long long int atomicMin(signed long long int* addr, signed long long int val)
+__device__ static __forceinline__ long long atomicMin_(long long* addr, long long val)
 {
-    unsigned long long int pre_value = (unsigned long long int)val;
-    unsigned long long int old_value = (unsigned long long int)val;
+#if __CUDA_ARCH__ <= 300
+    long long pre_value = val;
+    long long old_value = val;
     while (true)
     {
-        old_value = atomicCAS((unsigned long long int*)addr, pre_value, (unsigned long long int)val);
-        if (old_value <= (unsigned long long int)val) break;
+        old_value = atomicCAS(addr, pre_value, val);
+        if (old_value <= val) break;
         if (old_value == pre_value) break;
         pre_value = old_value;
     }
     return old_value;
-}*/
+#else
+    return atomicMin(addr, val);
 #endif
+}
 
-__device__ static float atomicMin(float* addr, float val)
+__device__ static __forceinline__ int atomicMin_(int* addr, int val)
+{
+    return atomicMin(addr, val);
+}
+
+__device__ static __forceinline__ float atomicMin(float* addr, float val)
 {
     int* addr_as_int = (int*)addr;
     int old = *addr_as_int;
@@ -168,7 +175,7 @@ __device__ __forceinline__ T _ldg(T* addr)
 {
 #if __GR_CUDA_ARCH__ >= 350
     return __ldg(addr);
-#else 
+#else
     return *addr;
 #endif
 }

@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------
 #  Gunrock: Finds Boost package and includes/links directories
 # ------------------------------------------------------------------------
-SET(gunrock_REQUIRED_BOOST_VERSION 1.56)
+SET(gunrock_REQUIRED_BOOST_VERSION 1.58)
 
 FIND_PACKAGE(Boost ${gunrock_REQUIRED_BOOST_VERSION}
   REQUIRED system filesystem timer chrono)

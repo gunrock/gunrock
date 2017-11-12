@@ -1,4 +1,4 @@
-Gunrock
+Gunrock [![Build Status](http://mario.ece.ucdavis.edu:8080/buildStatus/icon?job=project-gunrock)](http://mario.ece.ucdavis.edu:8080/job/project-gunrock/)
 =====================
 Gunrock is a CUDA library for graph-processing designed specifically for the
 GPU. It uses a high-level, bulk-synchronous, data-centric abstraction focused

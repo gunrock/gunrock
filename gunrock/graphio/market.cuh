@@ -71,14 +71,6 @@ int ReadLabelStream(
                 return -1;
             }
 
-            if (ll_nodes_x != ll_nodes_y)
-            {
-                fprintf(stderr,
-                        "Error parsing node labels: not square (%lld, %lld)\n",
-                        ll_nodes_x, ll_nodes_y);
-                return -1;
-            }
-
             nodes = ll_nodes_x;
 
             if (!quiet)
@@ -332,6 +324,15 @@ int ReadMarketStream(
             {
                 num_input = sscanf(line, "%lld %lld %lf",
                     &ll_row, &ll_col, &lf_value);
+
+		if (ll_row <  1 || ll_col <  1)
+		{
+		    fprintf(stderr, 
+			    "\nInvalid graph: Bad MTX format, indices cannot start with 0.\n");
+		    free(coo);
+		    exit(1); 
+		}		
+
                 if (typeid(Value) == typeid(float) || typeid(Value) == typeid(double))
                     ll_value = (Value)lf_value;
                 else ll_value = (Value)(lf_value + 1e-10);
@@ -346,8 +347,7 @@ int ReadMarketStream(
 
                 else if (array || num_input < 2)
                 {
-                    fprintf(stderr,
-                            "Error parsing MARKET graph: badly formed edge\n");
+                    fprintf(stderr,                            "Error parsing MARKET graph: badly formed edge\n");
                     if (coo) free(coo);
                     return -1;
                 }
@@ -360,6 +360,14 @@ int ReadMarketStream(
             else
             {
                 num_input = sscanf(line, "%lld %lld", &ll_row, &ll_col);
+
+		if (ll_row < 1 || ll_col < 1)
+                {
+                    fprintf(stderr,
+			    "\nInvalid graph: Bad MTX format, indices cannot start with 0.\n");
+                    free(coo);
+                    exit(1);
+                }
 
                 if (array && (num_input == 1))
                 {

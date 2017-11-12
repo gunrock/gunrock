@@ -3,7 +3,7 @@
 
 While running BFS on several datasets, we extracted the MTEPS (throughput)
 that we achieve on each iteration. What is our performance as a function
-of the size of the nput and output frontier?
+of the size of the input and output frontier?
 
 Ideally, throughput is independent of the size of the input or output
 frontier, but in practice, the GPU requires a significant amount of work

@@ -561,12 +561,19 @@ struct Csr
             util::omp_sort(coo, coo_edges, RowFirstTupleCompare<Tuple>);
         }
 
-        SizeT edge_offsets[129];
-        SizeT edge_counts [129];
+        SizeT *edge_offsets = NULL;
+        SizeT *edge_counts  = NULL;
         #pragma omp parallel
         {
             int num_threads  = omp_get_num_threads();
             int thread_num   = omp_get_thread_num();
+            if (thread_num == 0)
+            {
+                edge_offsets = new SizeT[num_threads+1];
+                edge_counts  = new SizeT[num_threads+1];
+            }
+            #pragma omp barrier
+
             SizeT edge_start = (long long)(coo_edges) * thread_num / num_threads;
             SizeT edge_end   = (long long)(coo_edges) * (thread_num + 1) / num_threads;
             SizeT node_start = (long long)(coo_nodes) * thread_num / num_threads;
@@ -652,6 +659,8 @@ struct Csr
         }
 
         row_offsets[nodes] = edges;
+        delete[] edge_offsets; edge_offsets = NULL;
+        delete[] edge_counts ; edge_counts  = NULL;
 
         time_t mark2 = time(NULL);
         if (!quiet)
