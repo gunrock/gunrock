@@ -1,6 +1,6 @@
 #!/bin/bash
 
-EXEDIR=${1:-"../../../../gunrock_build/bin"}
+EXEDIR=${1:-"../../build/bin"}
 DATADIR=${2:-"/data/gunrock_dataset/large"}
 EXECUTION="bfs"
 SETTING=" --src=0 --undirected --idempotence --queue-sizing=6.5 --in-sizing=4 --iteration-num=10 --direction-optimized"
