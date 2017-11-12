@@ -26,7 +26,7 @@
 // CUDA 9 warp shuffles (device intrinsics)
 template <typename T>
 __device__ static __forceinline__
-T _shfl_up(T var, unsigned int delta, int width=WARPSIZE, unsigned mask=MEMBERMASK)
+T _shfl_up(T var, unsigned int delta, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
 {
   //int first_lane = (WARPSIZE-width) << 8;
 #if __CUDACC_VER_MAJOR__ < 9
@@ -38,7 +38,7 @@ T _shfl_up(T var, unsigned int delta, int width=WARPSIZE, unsigned mask=MEMBERMA
 
 template <typename T>
 __device__ static __forceinline__
-T _shfl_down(T var, unsigned int delta, int width=WARPSIZE, unsigned mask=MEMBERMASK)
+T _shfl_down(T var, unsigned int delta, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
 {
   //int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
 #if __CUDACC_VER_MAJOR__ < 9
@@ -50,7 +50,7 @@ T _shfl_down(T var, unsigned int delta, int width=WARPSIZE, unsigned mask=MEMBER
 
 template <typename T>
 __device__ static __forceinline__
-T _shfl_xor(T var, int lane_mask, int width=WARPSIZE, unsigned mask = MEMBERMASK)
+T _shfl_xor(T var, int lane_mask, int width=WARPSIZE, unsigned int mask = MEMBERMASK)
 {
   //int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
 #if __CUDACC_VER_MAJOR__ < 9
@@ -62,7 +62,7 @@ T _shfl_xor(T var, int lane_mask, int width=WARPSIZE, unsigned mask = MEMBERMASK
 
 template <typename T>
 __device__ static __forceinline__
-T _shfl(T var, int source_lane, int width=WARPSIZE, unsigned mask=MEMBERMASK)
+T _shfl(T var, int source_lane, int width=WARPSIZE, unsigned int mask=MEMBERMASK)
 {
   //int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
 #if __CUDACC_VER_MAJOR__ < 9
@@ -73,7 +73,7 @@ T _shfl(T var, int source_lane, int width=WARPSIZE, unsigned mask=MEMBERMASK)
 }
 
 __device__ static __forceinline__
-unsigned _ballot(int predicate, unsigned mask=MEMBERMASK)
+unsigned int _ballot(int predicate, unsigned int mask=MEMBERMASK)
 {
 #if __CUDACC_VER_MAJOR__ < 9
   return __ballot(predicate);
@@ -83,20 +83,20 @@ unsigned _ballot(int predicate, unsigned mask=MEMBERMASK)
 }
 
 __device__ static __forceinline__
-int _any(int predicate, unsigned mask=MEMBERMASK)
+int _any(int predicate, unsigned int mask=MEMBERMASK)
 {
 #if __CUDACC_VER_MAJOR__ < 9
-  return __any(predicate);
+  return ::__any(predicate);
 #else
   return __any_sync(mask, predicate);
 #endif
 }
 
 __device__ static __forceinline__
-int _all(int predicate, unsigned mask=MEMBERMASK)
+int _all(int predicate, unsigned int mask=MEMBERMASK)
 {
 #if __CUDACC_VER_MAJOR__ < 9
-  return __all(predicate);
+  return ::__all(predicate);
 #else
   return __all_sync(mask, predicate);
 #endif

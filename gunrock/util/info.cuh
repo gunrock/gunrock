@@ -752,7 +752,10 @@ public:
                 std::remove(filename.begin(), filename.end(), bad_chars[i]),
                 filename.end());
         }
-        std::ofstream of(filename.data());
+        std::string ofname = filename.data();
+        std::ofstream of(ofname);
+        // now store the filename back into the JSON structure
+        info["jsonfile"] = ofname;        
         json_spirit::write_stream(
             json_spirit::mValue(info), of,
             json_spirit::pretty_print);
@@ -1230,7 +1233,7 @@ public:
                         market_filename,
                         label_filename,
                         csr_ref,
-			 info["undirected"].get_bool(),
+                         info["undirected"].get_bool(),
                         false,
                         args.CheckCmdLineFlag("quiet")) != 0)
             {
@@ -1280,8 +1283,14 @@ public:
         }
         csr_query_ptr = &csr_query_ref;
         csr_data_ptr = &csr_data_ref;
+	csr_ptr = &csr_data_ref;
 
         InitBase("SM", args);
+        if (info["destination_vertex"].get_int64() < 0 || info["destination_vertex"].get_int64()>=(int)csr_data_ref.nodes)
+            info["destination_vertex"] = (int)csr_data_ref.nodes-1;   //if not set or something is wrong, set it to the largest vertex ID
+        info["stddev_degrees"] = (float)csr_data_ref.GetStddevDegree();
+        info["num_vertices"] = (int64_t)csr_data_ref.nodes;
+        info["num_edges"   ] = (int64_t)csr_data_ref.edges;
     }
 
 

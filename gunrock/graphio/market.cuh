@@ -641,24 +641,25 @@ int BuildMarketGraph_SM(
                 perror("Unable to open graph file");
                 return -1;
             }
-	    
-	    // Read from label
-            FILE *label_in = fopen(label_filename, "r");
-	    if(label_in)
-	    {
-		if(!quiet) printf("Reading form %s:\n", label_filename);
- 		if(ReadLabelStream<LOAD_VALUES>(label_in, output_label, csr_graph, quiet) != 0)
-		{
-		    fclose(label_in);
-		    return -1;
-		}
-		fclose(label_in);
-	    }
-	    else
-	    {
-		perror("Unable to open label file");
-		return -1;
-	    }
+            if(LOAD_VALUES) {
+                // Read from label
+                FILE *label_in = fopen(label_filename, "r");
+                if(label_in)
+                {
+                    if(!quiet) printf("Reading form %s:\n", label_filename);
+                    if(ReadLabelStream<LOAD_VALUES>(label_in, output_label, csr_graph, quiet) != 0)
+                    {
+                        fclose(label_in);
+                        return -1;
+                    }
+                    fclose(label_in);
+                }
+                else
+                {
+                    perror("Unable to open label file");
+                    return -1;
+                }
+            }
 	    
         }
     }
