@@ -24,46 +24,77 @@ def cmake_build() {
   }
 }
 
+// notify slack of build status and progress
+def notifySlack(String buildStatus = 'STARTED') {
+    // Build status of null means success.
+    buildStatus = buildStatus ?: 'SUCCESS'
+
+    def color
+
+    if (buildStatus == 'STARTED') {
+        color = '#D4DADF'
+    } else if (buildStatus == 'SUCCESS') {
+        color = '#BDFFC3'
+    } else if (buildStatus == 'UNSTABLE') {
+        color = '#FFFE89'
+    } else {
+        color = '#FF9FA1'
+    }
+
+    def msg = "${buildStatus}: `${env.JOB_NAME}` #${env.BUILD_NUMBER}:\n${env.BUILD_URL}"
+
+    slackSend(color: color, message: msg)
+}
+
+
 pipeline {
   agent any
-  stages {
-    stage('Init') {
-      steps {
-        init_git()
+  try {
+    notifySlack()
+    stages {
+      stage('Init') {
+        steps {
+          init_git()
+        }
+      }
+      stage('Build') {
+        steps {
+          cmake_build()
+        }
+      }
+      stage('Unit Tests') {
+        steps {
+          sh '''cd build
+                ./bin/unit_test'''
+        }
+      }
+      stage('Regression Tests') {
+        steps {
+          sh '''cd build
+                cd examples
+                ctest -VV'''
+        }
+      }
+      stage('Code Coverage') {
+        steps {
+          sh '''#!/bin/bash
+                cd build
+                CODECOV_TOKEN="d0690e81-c2ed-42d0-8a63-da351c3ae619"
+                bash <(curl -s https://codecov.io/bash) -t ${CODECOV_TOKEN} || echo "Error: Codecov did not collect coverage reports"'''
+        }
+      }
+      stage('Deploy') {
+        steps {
+          echo 'Branch: Dev.'
+          echo 'Pipleline finished.'
+        }
       }
     }
-    stage('Build') {
-      steps {
-        cmake_build()
-      }
-    }
-    stage('Unit Tests') {
-      steps {
-        sh '''cd build
-              ./bin/unit_test'''
-      }
-    }
-    stage('Regression Tests') {
-      steps {
-        sh '''cd build
-              cd examples
-              ctest -VV'''
-      }
-    }
-    stage('Code Coverage') {
-      steps {
-        sh '''#!/bin/bash
-              cd build
-              CODECOV_TOKEN="d0690e81-c2ed-42d0-8a63-da351c3ae619"
-              bash <(curl -s https://codecov.io/bash) -t ${CODECOV_TOKEN} || echo "Error: Codecov did not collect coverage reports"'''
-      }
-    }
-    stage('Deploy') {
-      steps {
-        echo 'Branch: Dev.'
-        echo 'Pipleline finished.'
-      }
-    }
+  } catch (e) {
+      currentBuild.result = 'FAILURE'
+      throw e
+  } finally {
+      notifySlack(currentBuild.result)
   }
   post {
     always {
