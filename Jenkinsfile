@@ -30,6 +30,7 @@ pipeline {
     stage('Init') {
       steps {
         init_git()
+        slackSend(token: 'Nq0oASH7cBXxDKOiO3oW5NpA', teamDomain: 'https://gunrock.slack.com', baseUrl: 'https://gunrock.slack.com/services/hooks/jenkins-ci/', channel: '#builds', message: 'Pipeline started build and tests (gunrock:master).')
       }
     }
 
@@ -45,9 +46,18 @@ pipeline {
       }
     }
     stage('Deploy') {
-      steps {
-        echo 'Branch: Master.'
-        echo 'Pipleline finished.'
+      parallel {
+        stage('Deploy') {
+          steps {
+            echo 'Branch: Master.'
+            echo 'Pipleline finished.'
+          }
+        }
+        stage('Slack') {
+          steps {
+            slackSend(token: 'Nq0oASH7cBXxDKOiO3oW5NpA', teamDomain: 'https://gunrock.slack.com', baseUrl: 'https://gunrock.slack.com/services/hooks/jenkins-ci/', channel: '#builds', message: 'Pipeline finished build and tests (gunrock:master).')
+          }
+        }
       }
     }
   }
