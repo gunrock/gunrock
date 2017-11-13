@@ -24,13 +24,35 @@ def cmake_build() {
   }
 }
 
+// notify slack of build status and progress
+def notifySlack(String buildStatus = 'STARTED') {
+    // Build status of null means success.
+    buildStatus = buildStatus ?: 'SUCCESS'
+
+    def color
+
+    if (buildStatus == 'STARTED') {
+        color = '#D4DADF'
+    } else if (buildStatus == 'SUCCESS') {
+        color = '#BDFFC3'
+    } else if (buildStatus == 'UNSTABLE') {
+        color = '#FFFE89'
+    } else {
+        color = '#FF9FA1'
+    }
+
+    def msg = "${buildStatus}: `${env.JOB_NAME}` #${env.BUILD_NUMBER}:\n${env.BUILD_URL}"
+
+    slackSend(color: color, message: msg)
+}
+
 pipeline {
   agent any
   stages {
     stage('Init') {
       steps {
+        notifySlack('STARTED')
         init_git()
-        slackSend(token: 'Nq0oASH7cBXxDKOiO3oW5NpA', teamDomain: 'https://gunrock.slack.com', baseUrl: 'https://gunrock.slack.com/services/hooks/jenkins-ci/', channel: '#builds', message: 'Pipeline started build and tests (gunrock:master).')
       }
     }
 
@@ -46,24 +68,21 @@ pipeline {
       }
     }
     stage('Deploy') {
-      parallel {
-        stage('Deploy') {
-          steps {
-            echo 'Branch: Master.'
-            echo 'Pipleline finished.'
-          }
-        }
-        stage('Slack') {
-          steps {
-            slackSend(token: 'Nq0oASH7cBXxDKOiO3oW5NpA', teamDomain: 'https://gunrock.slack.com', baseUrl: 'https://gunrock.slack.com/services/hooks/jenkins-ci/', channel: '#builds', message: 'Pipeline finished build and tests (gunrock:master).')
-          }
-        }
+      steps {
+        echo 'Branch: Master.'
+        echo 'Pipleline finished.'
       }
     }
   }
   post { 
       always { 
-          cleanWs()
+        cleanWs()
+      }
+      success {
+        notifySlack('SUCCESS')
+      }
+      failure {
+        notifySlack('FAILURE')
       }
    }
 }
