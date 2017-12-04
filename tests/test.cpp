@@ -21,6 +21,7 @@
 // Add google tests
 #include "bfs/test_lib_bfs.h"
 #include "cc/test_lib_cc.h"
+#include "bc/test_lib_bc.h"
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
