@@ -41,7 +41,6 @@ cudaError_t UseParameters(
  */
 template <
     typename _GraphT,
-    typename _LabelT = typename _GraphT::ValueT,
     ProblemFlag _FLAG = Problem_None>
 struct Problem : ProblemBase<_GraphT, _FLAG>
 {
@@ -52,7 +51,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::CsrT    CsrT;
     typedef typename GraphT::GpT     GpT;
-    typedef                  _LabelT LabelT;
 
     typedef ProblemBase   <GraphT, FLAG> BaseProblem;
     typedef DataSliceBase <GraphT, FLAG> BaseDataSlice;
@@ -67,12 +65,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     {
         // device storage arrays
         util::Array1D<SizeT, ValueT >    distances  ;     /**< Used for source distance */
-        //util::Array1D<SizeT, VertexT>    visit_lookup;    /**< Used for check duplicate */
-        //util::Array1D<SizeT, float  >    delta;
-        //util::Array1D<SizeT, int    >    sssp_marker;
-        util::Array1D<SizeT, LabelT>     labels; // labels to mark latest iteration the vertex been visited
+        //util::Array1D<SizeT, VertexT    >    visit_lookup;    /**< Used for check duplicate */
+        //util::Array1D<SizeT, float       >    delta;
+        //util::Array1D<SizeT, int         >    sssp_marker;
+        util::Array1D<SizeT, VertexT>    labels; // labels to mark latest iteration the vertex been visited
         util::Array1D<SizeT, VertexT>    preds ; // predecessors of vertices
-        util::Array1D<SizeT, VertexT>    temp_preds ; // predecessors of vertices
 
         /*
          * @brief Default constructor
@@ -85,7 +82,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             //sssp_marker     .SetName("sssp_marker"     );
             labels          .SetName("labels"          );
             preds           .SetName("preds"           );
-            temp_preds      .SetName("temp_preds"      );
         }
 
         /*
@@ -100,18 +96,24 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         {
             cudaError_t retval = cudaSuccess;
             if (target & util::DEVICE)
-                GUARD_CU(util::SetDevice(this->gpu_idx));
+                if (retval = util::SetDevice(this->gpu_idx)) return retval;
 
-            GUARD_CU(distances      .Release(target));
-            //GUARD_CU(visit_lookup  .Release(target));
-            //GUARD_CU(delta         .Release(target));
-            //GUARD_CU(sssp_marker   .Release(target));
-            GUARD_CU(labels         .Release(target));
-            GUARD_CU(preds          .Release(target));
-            GUARD_CU(temp_preds     .Release(target));
-            GUARD_CU(BaseDataSlice ::Release(target));
+            if (retval = distances      .Release(target)) return retval;
+            //if (retval = visit_lookup  .Release(target)) return retval;
+            //if (retval = delta         .Release(target)) return retval;
+            //if (retval = sssp_marker   .Release(target)) return retval;
+            if (retval = labels         .Release(target)) return retval;
+            if (retval = preds          .Release(target)) return retval;
+            if (retval = BaseDataSlice ::Release(target)) return retval;
             return retval;
         }
+
+        /*bool HasNegativeValue(Value* vals, size_t len)
+        {
+            for (int i = 0; i < len; ++i)
+                if (vals[i] < 0.0) return true;
+            return false;
+        }*/
 
         /**
          * @brief initialization function.
@@ -132,36 +134,41 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          * \return cudaError_t object Indicates the success of all CUDA calls.
          */
         cudaError_t Init(
-            GraphT        &sub_graph,
-            int            gpu_idx = 0,
-            util::Location target  = util::DEVICE,
-            ProblemFlag    flag    = Problem_None)
+            GraphT &sub_graph,
+            int     gpu_idx = 0,
+            util::Location target = util::DEVICE,
+            ProblemFlag flag = Problem_None)
         {
             cudaError_t retval  = cudaSuccess;
 
-            GUARD_CU(BaseDataSlice::Init(sub_graph, gpu_idx, target, flag));
-            GUARD_CU(distances .Allocate(sub_graph.nodes, target));
-            GUARD_CU(labels    .Allocate(sub_graph.nodes, target));
+            retval = BaseDataSlice::Init(sub_graph, gpu_idx, target, flag);
+            if (retval) return retval;
+
+            retval = distances .Allocate(sub_graph.nodes, target);
+            if (retval) return retval;
+
+            retval = labels    .Allocate(sub_graph.nodes, target);
+            if (retval) return retval;
+
             if (flag & Mark_Predecessors)
             {
-                GUARD_CU(preds .Allocate(sub_graph.nodes, target));
-                GUARD_CU(temp_preds .Allocate(sub_graph.nodes, target));
+                retval = preds.Allocate(sub_graph.nodes, target);
+                if (retval) return retval;
             }
 
             if (target & util::DEVICE)
             {
-                GUARD_CU(sub_graph.CsrT::row_offsets   .Move(
-                    util::HOST, target,
-                    util::PreDefinedValues<SizeT>::InvalidValue,
-                    0, this -> stream));
-                GUARD_CU(sub_graph.CsrT::column_indices.Move(
-                    util::HOST, target,
-                    util::PreDefinedValues<SizeT>::InvalidValue,
-                    0, this -> stream));
-                GUARD_CU(sub_graph.CsrT::edge_values   .Move(
-                    util::HOST, target,
-                    util::PreDefinedValues<SizeT>::InvalidValue,
-                    0, this -> stream));
+                retval = sub_graph.CsrT::row_offsets   .Move(
+                    util::HOST, target, -1, 0, this -> stream);
+                if (retval) return retval;
+
+                retval = sub_graph.CsrT::column_indices.Move(
+                    util::HOST, target, -1, 0, this -> stream);
+                if (retval) return retval;
+
+                retval = sub_graph.CsrT::edge_values   .Move(
+                    util::HOST, target, -1, 0, this -> stream);
+                if (retval) return retval;
             }
             return retval;
         } // Init
@@ -195,41 +202,45 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT nodes = this -> sub_graph -> nodes;
 
             // Ensure data are allocated
-            GUARD_CU(distances.EnsureSize_(nodes, target));
-            GUARD_CU(labels   .EnsureSize_(nodes, target));
+            retval = distances.EnsureSize_(nodes, target);
+            if (retval) return retval;
+
+            retval = labels   .EnsureSize_(nodes, target);
+            if (retval) return retval;
+
             if (this -> flag & Mark_Predecessors)
-            {
-                GUARD_CU(preds.EnsureSize_(nodes, target));
-                GUARD_CU(temp_preds.EnsureSize_(nodes, target));
-            }
-            //GUARD_CU(visit_lookup.EnsureSize_(this -> sub_graph -> nodes, target));
+                retval = preds.EnsureSize_(nodes, target);
+            if (retval) return retval;
+
+            //retval = visit_lookup.EnsureSize_(this -> sub_graph -> nodes, target);
+            //if (retval) return retval;
 
             // Reset data
-            GUARD_CU(distances.ForEach([]__host__ __device__ (ValueT &distance){
+            retval = distances.ForEach([]__host__ __device__ (ValueT &distance){
                     distance = util::PreDefinedValues<ValueT>::MaxValue;
-                }, nodes, target, this -> stream));
+                }, nodes, target, this -> stream);
+            if (retval) return retval;
 
-            GUARD_CU(labels   .ForEach([]__host__ __device__ (LabelT &label){
-                    label = util::PreDefinedValues<LabelT>::InvalidValue;
-                }, nodes, target, this -> stream));
+            retval = labels   .ForEach([]__host__ __device__ (VertexT &label){
+                    label = util::PreDefinedValues<VertexT>::InvalidValue;
+                }, nodes, target, this -> stream);
+            if (retval) return retval;
 
             if (this -> flag & Mark_Predecessors)
-            {
-                GUARD_CU(preds.ForAll([]__host__ __device__ (VertexT *preds_, const SizeT &pos){
+                retval = preds.ForAll([]__host__ __device__ (VertexT *preds_, const SizeT &pos){
                     preds_[pos] = pos;
-                }, nodes, target, this -> stream));
-                GUARD_CU(temp_preds.ForAll([]__host__ __device__ (VertexT *preds_, const SizeT &pos){
-                    preds_[pos] = pos;
-                }, nodes, target, this -> stream));
-            }
+                }, nodes, target, this -> stream);
+            if (retval) return retval;
 
-            //GUARD_CU(visit_lookup.ForEach([]__host__ __device__ (VertexT &lookup){
+            //retval = visit_lookup.ForEach([]__host__ __device__ (VertexT &lookup){
             //        lookup = util::PreDefinedValues<VertexT>::InvalidValue;
-            //    }, nodes, target, this -> stream));
+            //    }, nodes, target, this -> stream);
+            //if (retval) return retval;
 
-            //GUARD_CU(sssp_marker.ForEach([]__host__ __device__ (int &marker){
+            //retval = sssp_marker.ForEach([]__host__ __device__ (int &marker){
             //        marker = 0;
-            //    }, nodes, target, this -> stream));
+            //    }, nodes, target, this -> stream);
+            //if (retval) return retval;
 
             return retval;
         }
@@ -264,14 +275,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         cudaError_t retval = cudaSuccess;
         if (data_slices == NULL) return retval;
         for (int i = 0; i < this->num_gpus; i++)
-            GUARD_CU(data_slices[i].Release(target));
-
-        if ((target & util::HOST) != 0 &&
-            data_slices[0].GetPointer(util::DEVICE) == NULL)
+        {
+            if (retval = data_slices[i].Release(target)) return retval;
+        }
+        if ((target & util::HOST) != 0 && data_slices[0].GetPointer(util::DEVICE) == NULL)
         {
             delete[] data_slices; data_slices=NULL;
         }
-        GUARD_CU(BaseProblem::Release(target));
+        if (retval = BaseProblem::Release(target)) return retval;
         return retval;
     }
 
@@ -303,47 +314,66 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // Set device
             if (target == util::DEVICE)
             {
-                GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+                retval = util::SetDevice(this->gpu_idx[0]);
+                if (retval) return retval;
 
-                GUARD_CU(data_slice.distances.SetPointer(
-                    h_distances, nodes, util::HOST));
-                GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
+                retval = data_slice.distances.SetPointer(h_distances, nodes, util::HOST);
+                if (retval) return retval;
+                retval = data_slice.distances.Move(util::DEVICE, util::HOST);
+                if (retval) return retval;
 
-                if ((this -> flag & Mark_Predecessors) == 0) return retval;
-                GUARD_CU(data_slice.preds.SetPointer(h_preds, nodes, util::HOST));
-                GUARD_CU(data_slice.preds.Move(util::DEVICE, util::HOST));
+                if ((this -> flag & Mark_Predecessors) == 0)
+                    return retval;
+
+                retval = data_slice.preds.SetPointer(h_preds, nodes, util::HOST);
+                if (retval) return retval;
+                retval = data_slice.preds.Move(util::DEVICE, util::HOST);
+                if (retval) return retval;
 
             } else if (target == util::HOST) {
-                GUARD_CU(data_slice.distances.ForEach(h_distances,
+                retval = data_slice.distances.ForEach(h_distances,
                     []__host__ __device__(const ValueT &distance, ValueT &h_distance){
                         h_distance = distance;
-                    }, nodes, util::HOST));
+                    }, nodes, util::HOST);
+                if (retval) return retval;
 
                 if (this -> flag & Mark_Predecessors)
-                    GUARD_CU(data_slice.preds.ForEach(h_preds,
+                    retval = data_slice.preds.ForEach(h_preds,
                     []__host__ __device__(const VertexT &pred, VertexT &h_pred){
                         h_pred = pred;
-                    }, nodes, util::HOST));
+                    }, nodes, util::HOST);
+                if (retval) return retval;
             }
-        }
-        else { // num_gpus != 1
+
+        } else { // num_gpus != 1
+
             util::Array1D<SizeT, ValueT > th_distances;
             util::Array1D<SizeT, VertexT> th_preds;
+
             th_distances.SetName("bfs::Problem::Extract::th_distances");
             th_preds    .SetName("bfs::Problem::Extract::th_preds");
-            GUARD_CU(th_distances.Allocate(this->num_gpus, util::HOST));
-            GUARD_CU(th_preds    .Allocate(this->num_gpus, util::HOST));
+            retval = th_distances.Allocate(this->num_gpus, util::HOST);
+            if (retval) return retval;
+            retval = th_preds    .Allocate(this->num_gpus, util::HOST);
+            if (retval) return retval;
 
             for (int gpu = 0; gpu < this->num_gpus; gpu++)
             {
                 auto &data_slice = data_slices[gpu][0];
                 if (target == util::DEVICE)
                 {
-                    GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-                    GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
+                    retval = util::SetDevice(this->gpu_idx[gpu]);
+                    if (retval) return retval;
+                    retval = data_slice.distances.Move(util::DEVICE, util::HOST);
+                    if (retval) return retval;
+
                     if (this -> flag & Mark_Predecessors)
-                        GUARD_CU(data_slice.preds.Move(util::DEVICE, util::HOST));
+                    {
+                        retval = data_slice.preds.Move(util::DEVICE, util::HOST);
+                        if (retval) return retval;
+                    }
                 }
+
                 th_distances[gpu] = data_slice.distances.GetPointer(util::HOST);
                 th_preds    [gpu] = data_slice.preds    .GetPointer(util::HOST);
             } //end for(gpu)
@@ -360,8 +390,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     h_preds[v] = th_preds    [gpu][v_];
             }
 
-            GUARD_CU(th_distances.Release());
-            GUARD_CU(th_preds    .Release());
+            retval = th_distances.Release();
+            retval = th_preds    .Release();
         } //end if
 
         return retval;
@@ -387,24 +417,33 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     cudaError_t Init(
             util::Parameters &parameters,
-            GraphT           &graph,
-            util::Location    target = util::DEVICE)
+            GraphT &graph,
+            //partitioner::PartitionFlag partition_flag = partitioner::PARTITION_NONE,
+            util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
-        GUARD_CU(BaseProblem::Init(parameters, graph, target));
+
+        retval = BaseProblem::Init(parameters, graph, target);
+        if (retval) return retval;
+
+        // No data in DataSlice needs to be copied from host
+
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
             data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
             if (target & util::DEVICE)
-                GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+                retval = util::SetDevice(this->gpu_idx[gpu]);
+            if (retval) return retval;
 
-            GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
+            retval = data_slices[gpu].Allocate(1, target | util::HOST);
+            if (retval) return retval;
 
             auto &data_slice = data_slices[gpu][0];
-            GUARD_CU(data_slice.Init(this -> sub_graphs[gpu],
-                this -> gpu_idx[gpu], target, this -> flag));
+            //_data_slice->streams.SetPointer(&streams[gpu*num_gpus*2], num_gpus*2);
+            retval = data_slice.Init(this -> sub_graphs[gpu], this -> gpu_idx[gpu], target, this -> flag);
+            if (retval) return retval;
         } // end for (gpu)
 
         return retval;
@@ -424,15 +463,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             VertexT    src,
             util::Location target = util::DEVICE)
     {
+
         cudaError_t retval = cudaSuccess;
 
-        for (int gpu = 0; gpu < this->num_gpus; ++gpu)
-        {
+        for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             // Set device
             if (target & util::DEVICE)
-                GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-            GUARD_CU(data_slices[gpu] -> Reset(target));
-            GUARD_CU(data_slices[gpu].Move(util::HOST, target));
+                retval = util::SetDevice(this->gpu_idx[gpu]);
+            if (retval) return retval;
+            retval = data_slices[gpu] -> Reset(target);
+            if (retval) return retval;
+            retval = data_slices[gpu].Move(util::HOST, target);
+            if (retval) return retval;
         }
 
         // Fillin the initial input_queue for SSSP problem
@@ -448,48 +490,43 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             else
                 src_ = this -> org_graph -> GpT::convertion_table[src];
         }
-        GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-        GUARD_CU2(cudaDeviceSynchronize(),
-            "cudaDeviceSynchronize failed");
+        if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
 
         ValueT src_distance = 0;
         if (target & util::HOST)
         {
             data_slices[gpu] -> distances[src_] = src_distance;
             if (this -> flag & Mark_Predecessors)
-                data_slices[gpu] -> preds[src_] = util::PreDefinedValues<VertexT>::InvalidValue;
+                data_slices[gpu] -> preds[src_] = -1;
         }
 
         if (target & util::DEVICE)
         {
-            util::PrintMsg("distances [" + std::to_string(src) +
-                " (" + std::to_string(src_) + ")] <- "
-                + std::to_string(src_distance));
-            util::PrintMsg("distances = " + util::to_string(data_slices[gpu] -> distances.GetPointer(util::DEVICE))
-                + " sizeof(ValueT) = " + std::to_string(sizeof(ValueT)));
-
-            GUARD_CU2(cudaMemcpy(
+            retval = util::GRError(cudaMemcpy(
                 data_slices[gpu]->distances.GetPointer(util::DEVICE)+ src_,
                 &src_distance, sizeof(ValueT),
                 cudaMemcpyHostToDevice),
-                "SSSPProblem cudaMemcpy distances failed");
+                "SSSPProblem cudaMemcpy distances failed",
+                __FILE__, __LINE__);
+            if (retval) return retval;
 
             if (this -> flag & Mark_Predecessors)
             {
-                VertexT src_pred = util::PreDefinedValues<VertexT>::InvalidValue;
-                GUARD_CU2(cudaMemcpy(
+                VertexT src_pred = -1;
+                retval = util::GRError(cudaMemcpy(
                     data_slices[gpu]->preds.GetPointer(util::DEVICE)+ src_,
                     &src_pred, sizeof(VertexT),
                     cudaMemcpyHostToDevice),
-                    "SSSPProblem cudaMemcpy preds failed");
+                    "SSSPProblem cudaMemcpy preds failed",
+                    __FILE__, __LINE__);
+                if (retval) return retval;
             }
         }
-        GUARD_CU2(cudaDeviceSynchronize(),
-            "cudaDeviceSynchronize failed");
         return retval;
     }
 
     /** @} */
+
 };
 
 } //namespace sssp
