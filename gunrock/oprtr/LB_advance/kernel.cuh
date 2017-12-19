@@ -83,7 +83,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
         1,                                  // MIN_CTA_OCCUPANCY
         10,                                 // LOG_THREADS
         9,                                  // LOG_BLOCKS
-        128 * 1024                         // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
+        128 * 1024                          // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
         > KernelPolicyT;
 
     template <typename AdvanceOpT>
@@ -129,7 +129,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
 
         //if (num_inputs > 1 && threadIdx.x == 0)
         //    printf("(%3d, %3d) block_input = [%llu, %llu), block_output = [%llu, %llu)\n",
-        //        blockIdx.x, threadIdx.x, 
+        //        blockIdx.x, threadIdx.x,
         //        (unsigned long long)iter_input_start, (unsigned long long)block_input_end,
         //        (unsigned long long)block_output_start, (unsigned long long)block_output_end);
         while (block_output_processed < block_output_size &&
@@ -257,7 +257,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
         const InKeyT   *&keys_in,
         const SizeT      num_inputs,
         const SizeT    *&output_offsets,
-              VertexT  *&keys_out,
+              OutKeyT  *&keys_out,
               ValueT   *&values_out,
         const SizeT     &num_outputs,
         const ValueT   *&reduce_values_in,

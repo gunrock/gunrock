@@ -16,6 +16,7 @@
 
 #include <gunrock/oprtr/advance/advance_base.cuh>
 #include <gunrock/oprtr/LB_advance/kernel.cuh>
+#include <gunrock/oprtr/TWC_advance/kernel.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -656,9 +657,9 @@ cudaError_t Launch(
     //if (parameters -> advance_mode == "LB_LIGHT_CULL")
     //    return LB_CULL::Launch_Light(graph, frontier_in, frontier_out,
     //        parameters, advance_op, filter_op);
-    //if (parameters -> advance_mode == "TWC")
-    //    return TWC::Launch          (graph, frontier_in, frontier_out,
-    //        parameters, advance_op, filter_op);
+    if (parameters.advance_mode == "TWC")
+        return TWC::Launch     <FLAG>(graph, frontier_in, frontier_out,
+            parameters, advance_op, filter_op);
     //if (parameters -> advance_mode == "ALL_EDGES")
     //    return ALL_EDGES::Launch    (graph, frontier_in, frontier_out,
     //        parameters, advance_op, filter_op);
