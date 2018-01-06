@@ -16,6 +16,7 @@
 
 #include <gunrock/oprtr/advance/advance_base.cuh>
 #include <gunrock/oprtr/LB_advance/kernel.cuh>
+#include <gunrock/oprtr/LB_CULL_advance/kernel.cuh>
 #include <gunrock/oprtr/TWC_advance/kernel.cuh>
 
 namespace gunrock {
@@ -651,12 +652,12 @@ cudaError_t Launch(
     if (parameters.advance_mode == "LB_LIGHT")
         return LB::Launch_Light<FLAG>(graph, frontier_in, frontier_out,
             parameters, advance_op, filter_op);
-    //if (parameters -> advance_mode == "LB_CULL")
-    //    return LB_CULL::Launch      (graph, frontier_in, frontier_out,
-    //        parameters, advance_op, filter_op);
-    //if (parameters -> advance_mode == "LB_LIGHT_CULL")
-    //    return LB_CULL::Launch_Light(graph, frontier_in, frontier_out,
-    //        parameters, advance_op, filter_op);
+    if (parameters.advance_mode == "LB_CULL")
+        return LB_CULL::Launch <FLAG>(graph, frontier_in, frontier_out,
+            parameters, advance_op, filter_op);
+    if (parameters.advance_mode == "LB_LIGHT_CULL")
+        return LB_CULL::Launch_Light<FLAG>(graph, frontier_in, frontier_out,
+            parameters, advance_op, filter_op);
     if (parameters.advance_mode == "TWC")
         return TWC::Launch     <FLAG>(graph, frontier_in, frontier_out,
             parameters, advance_op, filter_op);
@@ -686,7 +687,8 @@ cudaError_t Launch(
 
     auto dummy_filter = []__host__ __device__ (
         const VertexT &src, VertexT &dest, const SizeT &edge_id,
-        const SizeT &input_pos, SizeT &output_pos) -> bool{
+        const VertexT &input_item, const SizeT &input_pos,
+        SizeT &output_pos) -> bool{
             return true;
         };
     return oprtr::advance::Launch<FLAG>(graph, frontier_in, frontier_out,

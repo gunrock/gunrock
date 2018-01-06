@@ -38,15 +38,15 @@ template <
     typename ValueT,
     typename OpT>
 __device__ __host__ __forceinline__
-void ProcessNeighbor(
+OutKeyT ProcessNeighbor(
           VertexT   &src,
           VertexT   &dest,
     const SizeT     &edge_id,
     const SizeT      input_pos,
     const InKeyT    &input_item,
           SizeT      output_pos,
-          OutKeyT  *&keys_out,
-          ValueT   *&values_out,
+          OutKeyT  * keys_out,
+          ValueT   * values_out,
     const ValueT   *&reduce_values_in,
           ValueT   *&reduce_values_out,
           OpT        op)
@@ -100,13 +100,15 @@ void ProcessNeighbor(
     {
         //if (util::isValid(out_key))
         //printf("(%3d, %3d) src = %llu, dest = %llu, edge = %llu, out_key = %llu, output_pos = %llu\n",
-        //    blockIdx.x, threadIdx.x, (unsigned long long)src, 
-        //    (unsigned long long)dest, (unsigned long long)edge_id, 
+        //    blockIdx.x, threadIdx.x, (unsigned long long)src,
+        //    (unsigned long long)dest, (unsigned long long)edge_id,
         //    (unsigned long long)out_key, (unsigned long long)output_pos);
         util::io::ModifiedStore<QUEUE_WRITE_MODIFIER>::St(
             out_key,
             keys_out + output_pos);
     }
+
+    return out_key;
 }
 
 template <typename VertexT, typename SizeT>
@@ -115,7 +117,8 @@ __device__ __forceinline__ void PrepareQueue(
     VertexT  queue_index,
     SizeT   &input_queue_length,
     SizeT   *output_queue_length,
-    util::CtaWorkProgress<SizeT> &work_progress)
+    util::CtaWorkProgress<SizeT> &work_progress,
+    bool     skip_output_length = false)
 {
     // Determine work decomposition
     if (threadIdx.x == 0 && blockIdx.x == 0)
@@ -130,7 +133,8 @@ __device__ __forceinline__ void PrepareQueue(
             input_queue_length = work_progress.LoadQueueLength(queue_index);
         }
 
-        work_progress.Enqueue(output_queue_length[0], queue_index + 1);
+        if (!skip_output_length)
+            work_progress.Enqueue(output_queue_length[0], queue_index + 1);
 
         // Reset our next outgoing queue counter to zero
         work_progress.StoreQueueLength(0, queue_index + 2);
@@ -167,7 +171,7 @@ __global__ void GetEdgeCounts(
             v = graph.GetEdgeDest((keys_in == NULL) ? i : keys_in[i]);
         edge_counts[i] = graph.GetNeighborListLength(v);
         //printf("(%3d, %3d) v = %lld, edge_counts[%lld] = %lld\n",
-        //    blockIdx.x, threadIdx.x, (unsigned long long)v, 
+        //    blockIdx.x, threadIdx.x, (unsigned long long)v,
         //    (unsigned long long)i, (unsigned long long)(edge_counts[i]));
     }
 }

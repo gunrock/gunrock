@@ -12,16 +12,14 @@
  * @brief Kernel configuration policy for Load balanced Edge Expansion Kernel
  */
 
-
-
 #pragma once
 
-#include <cub/cub.cuh>
+//#include <cub/cub.cuh>
 #include <gunrock/util/scan/block_scan.cuh>
 
 namespace gunrock {
 namespace oprtr {
-namespace edge_map_partitioned_cull {
+namespace LB_CULL {
 
 /**
  * @brief Kernel configuration policy for partitioned edge mapping kernels.
@@ -41,12 +39,16 @@ namespace edge_map_partitioned_cull {
  * @tparam _LOG_THREADS                 Number of threads per CTA (log).
  */
 template <
-    typename _Problem,
-    // Machine parameters
-    int _CUDA_ARCH,
-    // Behavioral control parameters
-    //bool _INSTRUMENT,
-    // Tunable parameters
+    //typename _ProblemData,
+    OprtrFlag _FLAG,
+    typename _VertexT,      // Data types
+    typename _InKeyT,
+    typename _OutKeyT,
+    typename _SizeT,
+    typename _ValueT,
+    typename _LabelT,
+    //int _CUDA_ARCH,         // Machine parameters
+    //int _MIN_CTA_OCCUPANCY, // Tunable parameters
     int _MAX_CTA_OCCUPANCY,
     int _LOG_THREADS,
     int _LOG_BLOCKS,
@@ -60,16 +62,16 @@ public:
     // Constants and typedefs
     //---------------------------------------------------------------------
 
-    typedef _Problem                    Problem;
-
-    typedef typename Problem::VertexId  VertexId;
-    typedef typename Problem::SizeT     SizeT;
-    typedef typename Problem::Value     Value;
-    typedef typename Problem::MaskT     MaskT;
+    typedef _VertexT  VertexT;
+    typedef _InKeyT   InKeyT;
+    typedef _OutKeyT  OutKeyT;
+    typedef _SizeT    SizeT;
+    typedef _ValueT   ValueT;
+    typedef _LabelT   LabelT;
 
     enum {
-
-        CUDA_ARCH                       = _CUDA_ARCH,
+        FLAG                            = _FLAG,
+        //CUDA_ARCH                       = _CUDA_ARCH,
         //INSTRUMENT                      = _INSTRUMENT,
 
         LOG_THREADS                     = _LOG_THREADS,
@@ -97,25 +99,25 @@ public:
     };
 
     //typedef cub::BlockScan<SizeT, THREADS, cub::BLOCK_SCAN_RAKING> BlockScanT;
-    typedef util::Block_Scan<SizeT, CUDA_ARCH, LOG_THREADS> BlockScanT;
+    typedef util::Block_Scan<SizeT, LOG_THREADS> BlockScanT;
     /**
      * @brief Shared memory storage type for the CTA
      */
     struct SmemStorage
     {
-
-
         // Scratch elements
         //struct {
             SizeT                       output_offset[SCRATCH_ELEMENTS];
             SizeT                       row_offset   [SCRATCH_ELEMENTS];
-            VertexId                    vertices     [1];//SCRATCH_ELEMENTS];
-            VertexId                    input_queue  [SCRATCH_ELEMENTS];
+            VertexT                     vertices     [
+                ((FLAG & OprtrType_V2V) != 0 || (FLAG & OprtrType_V2E) != 0)
+                ? 1 : SCRATCH_ELEMENTS];//SCRATCH_ELEMENTS];
+            InKeyT                      input_queue  [SCRATCH_ELEMENTS];
             SizeT                       block_offset;
-            SizeT                      *d_output_counter;
-            VertexId                   *d_labels;
-            MaskT                      *d_visited_mask;
-            VertexId                   *d_column_indices;
+            SizeT                      *output_counter;
+            LabelT                     *labels;
+            unsigned char              *visited_masks;
+            //VertexT                    *column_indices;
             SizeT                       block_output_start;
             SizeT                       block_output_end;
             SizeT                       block_output_size;
@@ -127,7 +129,7 @@ public:
             SizeT                       iter_output_end;
             SizeT                       iter_output_size;
             SizeT                       iter_output_end_offset;
-            VertexId                    thread_output_vertices[THREADS * OUTPUT_PER_THREAD];
+            OutKeyT                     thread_output_vertices[THREADS * OUTPUT_PER_THREAD];
             //MaskT                       tex_mask_bytes[THREADS * OUTPUT_PER_THREAD];
             //bool                        warps_cond[WARPS];
             //bool                        block_cond;
@@ -140,15 +142,56 @@ public:
         //};
 
         __device__ __forceinline__ void Init(
-            typename _Problem::VertexId   &queue_index,
-            typename _Problem::DataSlice *&d_data_slice,
-            typename _Problem::SizeT     *&d_scanned_edges,
-            typename _Problem::SizeT     *&partition_starts,
-            typename _Problem::SizeT      &partition_size,
-            typename _Problem::SizeT      &input_queue_len,
-            typename _Problem::SizeT     *&output_queue_len,
-            util::CtaWorkProgress<typename _Problem::SizeT>
-                                          &work_progress);
+            const VertexT  &queue_index,
+            const SizeT    &num_inputs,
+            const SizeT   *&block_input_starts,
+            unsigned char *&_visited_masks,
+            LabelT        *&_labels,
+            const SizeT   *&output_offsets,
+            const SizeT    &num_outputs,
+            util::CtaWorkProgress<SizeT> &work_progress)
+        {
+            output_counter = work_progress.template GetQueueCounter<VertexT>(queue_index + 1);
+            //int lane_id = threadIdx.x & KernelPolicy::WARP_SIZE_MASK;
+            //int warp_id = threadIdx.x >> KernelPolicy::LOG_WARP_SIZE;
+            labels = _labels;
+            visited_masks = ((FLAG & OprtrOption_Idempotence) != 0) ?
+                _visited_masks : ((unsigned char*)NULL);
+
+            if (block_input_starts != NULL)
+            {
+                SizeT outputs_per_block =
+                    (num_outputs + gridDim.x - 1) / gridDim.x;
+                block_output_start = (SizeT)blockIdx.x * outputs_per_block;
+                if (block_output_start >= num_outputs) return;
+                block_output_end   = min(
+                    block_output_start + outputs_per_block, num_outputs);
+                block_output_size  = block_output_end - block_output_start;
+                block_input_end    = (blockIdx.x + 1 == gridDim.x) ?
+                    num_inputs : min(
+                    block_input_starts[blockIdx.x + 1] , num_inputs);
+                if (block_input_end < num_inputs &&
+                    block_output_end >
+                        (block_input_end > 0 ?
+                            output_offsets[block_input_end-1] : 0))
+                    block_input_end ++;
+
+                block_input_start = block_input_starts[blockIdx.x];
+                block_first_v_skip_count =
+                    (block_output_start != output_offsets[block_input_start]) ?
+                        block_output_start -
+                            (block_input_start > 0 ?
+                                    output_offsets[block_input_start -1] : 0)
+                        : 0;
+                iter_input_start = block_input_start;
+            }
+
+            /*printf("(%4d, %4d) : block_input = %d ~ %d, %d "
+                "block_output = %d ~ %d, %d\n",
+                blockIdx.x, threadIdx.x,
+                block_input_start, block_input_end, block_input_end - block_input_start + 1,
+                block_output_start, block_output_end, block_output_size);*/
+        }
     };
 
     enum {
@@ -157,7 +200,7 @@ public:
         CTA_OCCUPANCY                   = GR_MIN(_MAX_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
 
         VALID                           = (CTA_OCCUPANCY > 0),
-        ELEMENT_ID_MASK	                = ~(1ULL<<(sizeof(VertexId)*8-2)),
+        ELEMENT_ID_MASK	                = ~(1ULL<<(sizeof(VertexT)*8-2)),
     };
 };
 

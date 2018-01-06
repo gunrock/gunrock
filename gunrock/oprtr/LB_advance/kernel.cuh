@@ -80,7 +80,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
         //#else
         //    0,
         //#endif
-        1,                                  // MIN_CTA_OCCUPANCY
+        1,                                  // MAX_CTA_OCCUPANCY
         10,                                 // LOG_THREADS
         9,                                  // LOG_BLOCKS
         128 * 1024                          // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
@@ -285,9 +285,9 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
                 {
                     input_item = (keys_in == NULL) ?
                         thread_input : keys_in[thread_input];
+                    smem_storage.input_queue  [threadIdx.x] = input_item;
                     smem_storage.output_offset[threadIdx.x]
                         = output_offsets[thread_input] - block_output_start;
-                    smem_storage.input_queue  [threadIdx.x] = input_item;
                     if ((FLAG & OprtrType_V2V) != 0 ||
                         (FLAG & OprtrType_V2E) != 0)
                     {

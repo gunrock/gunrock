@@ -17,11 +17,9 @@
 
 namespace gunrock {
 namespace oprtr {
-namespace edge_map_partitioned_cull {
+namespace LB_CULL {
 
-
-
-} //namespace edge_map_partitioned
+} //namespace LB_CULL
 } //namespace oprtr
 } //namespace gunrock
 
