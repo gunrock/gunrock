@@ -154,7 +154,14 @@ void Iteration_Loop(
                     "cudaStreamSynchronize failed", __FILE__, __LINE__))
                 break;
             }
-        } else mgpu_slice.in_length_out[0] = received_length;
+        } 
+        else 
+        {
+            //auto &frontier = enactor_slices[0].frontier;
+            //frontier.queue_reset  = true;
+            //frontier.queue_offset = 0;
+            mgpu_slice.in_length_out[0] = received_length;
+        }
 
         for (int peer = 0; peer < num_gpus; peer++)
         {
@@ -403,7 +410,7 @@ void Iteration_Loop(
                         frontier.queue_length = mgpu_slice.in_length_out[peer_];
                     }
                     if ((enactor.flag & Size_Check) == 0 &&
-                        ((enactor.flag & Debug)!=0 || num_gpus > 1))
+                        (/*(enactor.flag & Debug) !=0 ||*/ num_gpus > 1))
                     {
                         bool over_sized = false;
                         if (IterationT::FLAG & Use_SubQ)

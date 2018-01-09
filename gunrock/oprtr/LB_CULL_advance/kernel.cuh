@@ -198,15 +198,23 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
         KernelPolicyT::BlockScanT::Scan(
             thread_output_count, output_pos, smem_storage.scan_space);
 
+        //if (thread_output_count != 0)
+        //    printf("(%4d, %4d) writting %d outputs, offset = %d\n",
+        //        blockIdx.x, threadIdx.x, thread_output_count, output_pos);    
 
         //KernelPolicy::BlockScanT(smem_storage.cub_storage.scan_space)
         //    .ExclusiveSum(thread_output_count, output_pos);
         if (threadIdx.x + 1 == KernelPolicyT::THREADS)
         {
             if (output_pos + thread_output_count != 0)
+            {
                 smem_storage.block_offset
                     = atomicAdd(smem_storage.output_counter,
                         output_pos + thread_output_count);
+                //printf("(%4d, %4d) writing %d outputs, offset = %d\n",
+                //    blockIdx.x, threadIdx.x, output_pos + thread_output_count,
+                //    smem_storage.block_offset); 
+            }
         }
         __syncthreads();
 
@@ -525,7 +533,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
                         output_pos = util::PreDefinedValues<SizeT>::InvalidValue;
                         if (!filter_op(
                             v, out_key, edge_id,
-                            out_key, util::PreDefinedValues<SizeT>::InvalidValue,
+                            out_key, output_pos, //util::PreDefinedValues<SizeT>::InvalidValue,
                             output_pos))
                             to_process = false;
                         if (!util::isValid(out_key))
@@ -821,7 +829,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
                         output_pos = util::PreDefinedValues<SizeT>::InvalidValue;
                         if (!filter_op(
                             v, out_key, edge_id,
-                            out_key, util::PreDefinedValues<SizeT>::InvalidValue,
+                            out_key, output_pos, //util::PreDefinedValues<SizeT>::InvalidValue,
                             output_pos))
                             to_process = false;
                         if (!util::isValid(out_key))
@@ -839,8 +847,10 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
                 }
 
                 if (__syncthreads_or(thread_output_count == KernelPolicyT::OUTPUT_PER_THREAD))
+                {
                     Write_Global_Output(smem_storage, output_pos,
                         thread_output_count, keys_out);
+                }
             } // end of for thread_output
 
             //block_input_start += KernelPolicy::SCRATCH_ELEMENTS;
@@ -917,7 +927,7 @@ void RelaxPartitionedEdges2(
 {
     PrepareQueue(
         queue_reset, queue_index, num_inputs,
-        num_outputs, work_progress, false);
+        num_outputs, work_progress, true);
 
     Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT>
         ::RelaxPartitionedEdges2(
@@ -984,7 +994,7 @@ void RelaxLightEdges(
 {
     PrepareQueue(
         queue_reset, queue_index, num_inputs,
-        num_outputs, work_progress, false);
+        num_outputs, work_progress, true);
 
     Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT>
         ::RelaxLightEdges(
@@ -1271,7 +1281,8 @@ cudaError_t Launch_Light(
         parameters.frontier -> output_offsets.GetPointer(util::DEVICE),
         (frontier_out == NULL) ? ((OutKeyT*)NULL)
             : frontier_out        -> GetPointer(util::DEVICE),
-        parameters.values_out     -> GetPointer(util::DEVICE),
+        (parameters.values_out == NULL) ? ((ValueT*)NULL)
+            : parameters.values_out     -> GetPointer(util::DEVICE),
         parameters.frontier -> output_length.GetPointer(util::DEVICE),
         parameters.frontier -> work_progress,
         (parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)

@@ -229,7 +229,7 @@ void Kernel(
                    AdvanceOpT       advance_op)
 {
     PrepareQueue(
-        queue_reset, queue_index, num_inputs, num_outputs, work_progress);
+        queue_reset, queue_index, num_inputs, num_outputs, work_progress, true);
 
     Dispatch<FLAG, GraphT, InKeyT, OutKeyT>
         ::Kernel(

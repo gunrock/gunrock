@@ -32,9 +32,9 @@ typedef unsigned long long SizeT;
 typedef float ValueT;
 
 template <
-    typename VertexT = int,
-    typename SizeT   = VertexT,
-    typename ValueT  = VertexT,
+    typename _VertexT = int,
+    typename _SizeT   = VertexT,
+    typename _ValueT  = VertexT,
     GraphFlag _FLAG   = GRAPH_NONE,
     unsigned int _cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct TestGraph :
@@ -43,6 +43,9 @@ struct TestGraph :
     public Csc<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP, _cudaHostRegisterFlag>,
     public Gp <VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP, _cudaHostRegisterFlag>
 {
+    typedef _VertexT VertexT;
+    typedef _SizeT   SizeT;
+    typedef _ValueT  ValueT;
     static const GraphFlag FLAG = _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP;
     static const unsigned int cudaHostRegisterFlag = _cudaHostRegisterFlag;
     typedef Csr<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CsrT;
@@ -363,7 +366,11 @@ cudaError_t LoadGraph(util::Parameters &parameters, GraphT &graph)
 
     retval = graphio::LoadGraph(parameters, graph);
     if (retval) return retval;
-
+    //util::cpu_mt::PrintCPUArray<typename GraphT::SizeT, typename GraphT::SizeT>(
+    //    "row_offsets", graph.GraphT::CsrT::row_offsets + 0, graph.nodes+1);
+ 
+    //util::cpu_mt::PrintCPUArray<typename GraphT::SizeT, typename GraphT::ValueT>(
+    //    "edge_values", graph.GraphT::CsrT::edge_values + 0, graph.edges);
     return retval;
 }
 

@@ -43,6 +43,9 @@ bool All_Done(EnactorT &enactor, int gpu_num = 0)
         return true;
     }
 
+    //if (enactor_slices[0].enactor_stats.iteration > 2)
+    //    return true;
+
     for (int gpu = 0; gpu < num_gpus * num_gpus; gpu++)
     {
         auto &frontier = enactor_slices[gpu].frontier;

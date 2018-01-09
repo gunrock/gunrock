@@ -754,7 +754,8 @@ cudaError_t Launch_Light(
         parameters.frontier -> output_offsets.GetPointer(util::DEVICE),
         (frontier_out == NULL) ? ((OutKeyT*)NULL)
             : frontier_out        -> GetPointer(util::DEVICE),
-        parameters.values_out     -> GetPointer(util::DEVICE),
+        (parameters.values_out == NULL) ? ((ValueT*)NULL) :
+            parameters.values_out     -> GetPointer(util::DEVICE),
         parameters.frontier -> output_length.GetPointer(util::DEVICE),
         parameters.frontier -> work_progress,
         (parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)

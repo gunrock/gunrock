@@ -136,6 +136,12 @@ cudaError_t UseParameters2(
         "Reserved sizing factor for data communication, multiples of number of vertices",
         __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<bool  >(
+        "size-check",
+        util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        true,
+        "Whether to enable frontier auto resizing",
+        __FILE__, __LINE__));
     return retval;
 }
 
@@ -168,6 +174,8 @@ public:
     util::Parameters *parameters;
     Enactor_Flag      flag;
 
+    int           max_num_vertex_associates;
+    int           max_num_value__associates;
     int           communicate_latency;
     float         communicate_multipy;
     int           expand_latency;
@@ -242,7 +250,7 @@ public:
      */
     virtual ~EnactorBase()
     {
-        Release();
+        //Release();
     }
 
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
@@ -262,9 +270,11 @@ public:
                 int idx = gpu * num_gpus + peer;
                 GUARD_CU(enactor_slices[idx].Release(target));
             }
+            GUARD_CU(mgpu_slices[gpu].Release(target));
         }
         GUARD_CU(cuda_props    .Release(target));
         GUARD_CU(enactor_slices.Release(target));
+        GUARD_CU(mgpu_slices   .Release(target));
         GUARD_CU(thread_Ids    .Release(target));
         GUARD_CU(thread_slices .Release(target));
 
@@ -316,11 +326,14 @@ public:
      */
     cudaError_t Init(
         util::Parameters &parameters,
-        Enactor_Flag flag = Enactor_None,
-        unsigned int num_queues = 2,
-        FrontierType *frontier_types = NULL,
-        util::Location target = util::DEVICE)
+        GraphT           *sub_graphs,
+        Enactor_Flag      flag           = Enactor_None,
+        unsigned int      num_queues     = 2,
+        FrontierType     *frontier_types = NULL,
+        util::Location    target         = util::DEVICE,
+        bool              skip_makeout_selection = false)
     {
+        typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
 
         gpu_idx             = parameters.Get<std::vector<int>>("device");
@@ -335,10 +348,16 @@ public:
         trans_factor        = parameters.Get<double>("trans-factor");
         min_sm_version      = -1;
         this -> parameters  = &parameters;
+        if (parameters.Get<bool>("v"))
+            flag = flag | Debug;
+        if (parameters.Get<bool>("size-check"))
+            flag = flag | Size_Check;
         this -> flag        = flag;
+        
 
         GUARD_CU(cuda_props    .Allocate(num_gpus, util::HOST));
         GUARD_CU(enactor_slices.Allocate(num_gpus * num_gpus, util::HOST));
+        GUARD_CU(mgpu_slices   .Allocate(num_gpus, util::HOST));
         GUARD_CU(thread_slices .Allocate(num_gpus, util::HOST));
         GUARD_CU(thread_Ids    .Allocate(num_gpus, util::HOST));
 
@@ -389,6 +408,17 @@ public:
                 }
             }
 
+            auto &mgpu_slice = mgpu_slices[gpu];
+            auto &sub_graph  = sub_graphs [gpu];
+            mgpu_slice.max_num_vertex_associates = max_num_vertex_associates;
+            mgpu_slice.max_num_value__associates = max_num_value__associates;
+            GUARD_CU(mgpu_slice.Init(
+                num_gpus, gpu_idx[gpu], sub_graph.nodes,
+                sub_graph.nodes * queue_factors[0],
+                sub_graph.GpT::in_counter + 0,
+                sub_graph.GpT::out_counter + 0,
+                trans_factor, skip_makeout_selection)); 
+
 #ifdef ENABLE_PERFORMANCE_PROFILING
             iter_sub_queue_time         [gpu].clear();
             iter_full_queue_time        [gpu].clear();
@@ -423,6 +453,7 @@ public:
                 //    .Reset());
             }
 
+            GUARD_CU(mgpu_slices[gpu].Reset(target));
 #ifdef ENABLE_PERFORMANCE_PROFILING
             iter_sub_queue_time [gpu].push_back(std::vector<double>());
             iter_full_queue_time[gpu].push_back(std::vector<double>());

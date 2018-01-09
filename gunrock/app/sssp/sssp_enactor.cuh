@@ -58,6 +58,7 @@ struct SSSPIteration : public IterationBase
         auto         &distances          =   data_slice.distances;
         auto         &labels             =   data_slice.labels;
         auto         &preds              =   data_slice.preds;
+        auto         &row_offsets        =   graph.CsrT::row_offsets;
         auto         &weights            =   graph.CsrT::edge_values;
         auto         &original_vertex    =   graph.GpT::original_vertex;
         auto         &frontier           =   enactor_slice.frontier;
@@ -66,7 +67,16 @@ struct SSSPIteration : public IterationBase
         //auto         &stream             =   enactor_slice.stream;
         auto         &iteration          =   enactor_stats.iteration;
 
-        auto advance_op = [distances, weights, original_vertex, preds]
+        //if (iteration == 0)
+        //    util::cpu_mt::PrintGPUArray<SizeT, SizeT>("row_offsets",
+        //        row_offsets.GetPointer(util::DEVICE),
+        //        graph.nodes + 1);
+
+        //util::cpu_mt::PrintGPUArray<SizeT, VertexT>("input_queue",
+        //    frontier.V_Q() -> GetPointer(util::DEVICE),
+        //    frontier.queue_length);
+
+        auto advance_op = [distances, weights, original_vertex, preds, row_offsets]
         __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
@@ -78,6 +88,10 @@ struct SSSPIteration : public IterationBase
 
             // Check if the destination node has been claimed as someone's child
             ValueT old_distance = atomicMin(distances + dest, new_distance);
+            //printf("%d : %f -> %f (%d) + %f (%d) : %f, [%d, %d)\n",
+            //    dest, old_distance, src_distance, src, edge_weight, edge_id, 
+            //    min(new_distance, old_distance), row_offsets[src], row_offsets[src+1]);
+
             if (new_distance < old_distance)
             {
                 if (!preds.isEmpty())
@@ -91,12 +105,6 @@ struct SSSPIteration : public IterationBase
             }
             return false;
         };
-        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, advance_op));
-
-        oprtr_parameters.label = iteration + 1;
-        oprtr_parameters.frontier -> queue_reset = false;
 
         auto filter_op = [labels, iteration] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
@@ -106,11 +114,27 @@ struct SSSPIteration : public IterationBase
             if (!util::isValid(dest)) return false;
             if (labels[dest] == iteration) return false;
             labels[dest] = iteration;
+            //printf("%d -> output\n", dest);
             return true;
         };
-        GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+        
+        oprtr_parameters.label = iteration + 1;
+        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, filter_op));
+            oprtr_parameters, advance_op, filter_op));
+
+        if (oprtr_parameters.advance_mode != "LB_CULL" &&
+            oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
+        {
+            frontier.queue_reset = false;
+            GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                oprtr_parameters, filter_op));
+        }
+
+        GUARD_CU(frontier.work_progress.GetQueueLength(
+            frontier.queue_index, frontier.queue_length,
+            false, oprtr_parameters.stream, true));
 
         return retval;
     }
@@ -186,7 +210,11 @@ public:
     Enactor() :
         BaseEnactor("sssp"),
         problem    (NULL  )
-    {}
+    {
+        this -> max_num_vertex_associates 
+            = (Problem::FLAG & Mark_Predecessors) != 0 ? 1 : 0;
+        this -> max_num_value__associates = 1;
+    }
 
     /**
      * @brief BFSEnactor destructor
@@ -228,7 +256,8 @@ public:
         this->problem = problem;
 
         // Lazy initialization
-        GUARD_CU(BaseEnactor::Init(parameters, Enactor_None, 2, NULL, target));
+        GUARD_CU(BaseEnactor::Init(
+            parameters, problem -> sub_graphs + 0, Enactor_None, 2, NULL, target, false));
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
         {
             GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));

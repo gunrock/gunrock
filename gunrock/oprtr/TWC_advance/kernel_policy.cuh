@@ -209,9 +209,9 @@ struct KernelPolicy
                 ? (sizeof(SizeT) + sizeof(VertexT) * 2)
                 : (sizeof(SizeT) + sizeof(VertexT)), // Both gather offset and predecessor
             GATHER_ELEMENTS                 = MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE,
-            PARENT_ELEMENTS                 =
-                ((FLAG & OprtrOption_Mark_Predecessors) != 0)
-                ? GATHER_ELEMENTS : 0,
+            PARENT_ELEMENTS                 = GATHER_ELEMENTS,
+                //((FLAG & OprtrOption_Mark_Predecessors) != 0)
+                //? GATHER_ELEMENTS : 0,
         };
 
         union {

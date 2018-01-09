@@ -461,7 +461,7 @@ struct Tile
                 cta -> smem_storage.gather_edges  [scratch_offset]
                     = tile -> keys_in   [LOAD][VEC];
                 //if (Problem::MARK_PREDECESSORS)
-                if ((FLAG & OprtrOption_Mark_Predecessors) != 0)
+                //if ((FLAG & OprtrOption_Mark_Predecessors) != 0)
                 {
                     //if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V ||
                     //    ADVANCE_TYPE == gunrock::oprtr::advance::E2E)
@@ -827,6 +827,10 @@ struct Cta
             SizeT enqueue_amt       = coarse_count + tile.fine_count;
             SizeT enqueue_offset    = work_progress.Enqueue(enqueue_amt, queue_index + 1);
 
+            //printf("(%4d, %4d) outputs = %lld + %lld = %lld, offset = %lld\n",
+            //    blockIdx.x, threadIdx.x, 
+            //    coarse_count, tile.fine_count,
+            //    enqueue_amt, enqueue_offset);
             smem_storage.state.coarse_enqueue_offset = enqueue_offset;
             smem_storage.state.fine_enqueue_offset = enqueue_offset + coarse_count;
 
@@ -885,10 +889,10 @@ struct Cta
 
                 VertexT predecessor_id;
                 //if (Problem::MARK_PREDECESSORS)
-                if ((KernelPolicyT::FLAG & OprtrOption_Mark_Predecessors) != 0)
+                //if ((KernelPolicyT::FLAG & OprtrOption_Mark_Predecessors) != 0)
                     predecessor_id = smem_storage.gather_predecessors[scratch_offset];
-                else
-                    predecessor_id = util::PreDefinedValues<VertexT>::InvalidValue;//label;
+                //else
+                //    predecessor_id = util::PreDefinedValues<VertexT>::InvalidValue;//label;
 
                 // if Cond(neighbor_id) returns true
                 // if Cond(neighbor_id) returns false or Apply returns false
@@ -911,6 +915,10 @@ struct Cta
                 //    d_value_to_reduce,
                 //    d_reduce_frontier);
                 SizeT output_pos = smem_storage.state.fine_enqueue_offset + tile.progress + scratch_offset;
+                //printf("(%4d, %4d) output_pos = %lld + %lld + %lld = %lld\n",
+                //    blockIdx.x, threadIdx.x,
+                //    smem_storage.state.fine_enqueue_offset,
+                //    tile.progress, scratch_offset, output_pos);
                 ProcessNeighbor
                     <KernelPolicyT::FLAG, VertexT, InKeyT, OutKeyT, SizeT, ValueT>(
                     predecessor_id, neighbor_id, edge_id,
