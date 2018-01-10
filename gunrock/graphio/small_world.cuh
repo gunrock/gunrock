@@ -159,12 +159,12 @@ static cudaError_t Load(
 template <typename GraphT>
 struct CooSwitch<GraphT, false>
 {
-cudaError_t Load(
+static cudaError_t Load(
     util::Parameters &parameters,
     GraphT &graph,
     std::string graph_prefix = "")
 {
-    typedef graph::Csr<typename GraphT::VertexT,
+    typedef graph::Coo<typename GraphT::VertexT,
         typename GraphT::SizeT,
         typename GraphT::ValueT,
         GraphT::FLAG | graph::HAS_COO, GraphT::cudaHostRegisterFlag> CooT;

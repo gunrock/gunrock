@@ -33,8 +33,8 @@ typedef float ValueT;
 
 template <
     typename _VertexT = int,
-    typename _SizeT   = VertexT,
-    typename _ValueT  = VertexT,
+    typename _SizeT   = _VertexT,
+    typename _ValueT  = _VertexT,
     GraphFlag _FLAG   = GRAPH_NONE,
     unsigned int _cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct TestGraph :
@@ -368,7 +368,7 @@ cudaError_t LoadGraph(util::Parameters &parameters, GraphT &graph)
     if (retval) return retval;
     //util::cpu_mt::PrintCPUArray<typename GraphT::SizeT, typename GraphT::SizeT>(
     //    "row_offsets", graph.GraphT::CsrT::row_offsets + 0, graph.nodes+1);
- 
+
     //util::cpu_mt::PrintCPUArray<typename GraphT::SizeT, typename GraphT::ValueT>(
     //    "edge_values", graph.GraphT::CsrT::edge_values + 0, graph.edges);
     return retval;

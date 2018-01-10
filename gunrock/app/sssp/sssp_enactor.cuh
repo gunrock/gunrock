@@ -51,8 +51,10 @@ struct SSSPIteration : public IterationBase
 
     cudaError_t Core(int peer_ = 0)
     {
-        auto         &data_slice         =   this -> enactor -> problem -> data_slices[this -> gpu_num][0];
-        auto         &enactor_slice      =   this -> enactor -> enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
+        auto         &data_slice         =   this -> enactor ->
+            problem -> data_slices[this -> gpu_num][0];
+        auto         &enactor_slice      =   this -> enactor ->
+            enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
         auto         &enactor_stats      =   enactor_slice.enactor_stats;
         auto         &graph              =   data_slice.sub_graph[0];
         auto         &distances          =   data_slice.distances;
@@ -76,7 +78,7 @@ struct SSSPIteration : public IterationBase
         //    frontier.V_Q() -> GetPointer(util::DEVICE),
         //    frontier.queue_length);
 
-        auto advance_op = [distances, weights, original_vertex, preds, row_offsets]
+        auto advance_op = [distances, weights, original_vertex, preds]
         __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
@@ -88,9 +90,9 @@ struct SSSPIteration : public IterationBase
 
             // Check if the destination node has been claimed as someone's child
             ValueT old_distance = atomicMin(distances + dest, new_distance);
-            //printf("%d : %f -> %f (%d) + %f (%d) : %f, [%d, %d)\n",
-            //    dest, old_distance, src_distance, src, edge_weight, edge_id, 
-            //    min(new_distance, old_distance), row_offsets[src], row_offsets[src+1]);
+            //printf("%d : %f -> %f (%d) + %f (%d) : %f\n",
+            //    dest, old_distance, src_distance, src, edge_weight, edge_id,
+            //    min(new_distance, old_distance));
 
             if (new_distance < old_distance)
             {
@@ -100,6 +102,7 @@ struct SSSPIteration : public IterationBase
                     if (!original_vertex.isEmpty())
                         pred = original_vertex[src];
                     Store(preds + dest, pred);
+                    //printf("Pred[%d] -> %d\n", dest, pred);
                 }
                 return true;
             }
@@ -117,7 +120,7 @@ struct SSSPIteration : public IterationBase
             //printf("%d -> output\n", dest);
             return true;
         };
-        
+
         oprtr_parameters.label = iteration + 1;
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
@@ -144,13 +147,16 @@ struct SSSPIteration : public IterationBase
         int NUM_VALUE__ASSOCIATES>
     cudaError_t ExpandIncoming(SizeT &received_length, int peer_)
     {
-        auto         &data_slice         =   this -> enactor -> problem -> data_slices[this -> gpu_num][0];
-        auto         &enactor_slice      =   this -> enactor -> enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
+        auto         &data_slice         =   this -> enactor ->
+            problem -> data_slices[this -> gpu_num][0];
+        auto         &enactor_slice      =   this -> enactor ->
+            enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
         auto iteration = enactor_slice.enactor_stats.iteration;
         auto         &distances          =   data_slice.distances;
         auto         &labels             =   data_slice.labels;
         auto         &preds              =   data_slice.preds;
-        auto          label              =   this -> enactor -> mgpu_slices[this -> gpu_num].in_iteration[iteration % 2][peer_];
+        auto          label              =   this -> enactor ->
+            mgpu_slices[this -> gpu_num].in_iteration[iteration % 2][peer_];
 
         auto expand_op = [distances, labels, label, preds]
         __host__ __device__(
@@ -211,7 +217,7 @@ public:
         BaseEnactor("sssp"),
         problem    (NULL  )
     {
-        this -> max_num_vertex_associates 
+        this -> max_num_vertex_associates
             = (Problem::FLAG & Mark_Predecessors) != 0 ? 1 : 0;
         this -> max_num_value__associates = 1;
     }
@@ -248,28 +254,31 @@ public:
      */
     cudaError_t Init(
         util::Parameters &parameters,
-        Problem          *problem,
+        Problem          &problem,
         util::Location    target = util::DEVICE)
     {
         typedef SSSPIteration<EnactorT> IterationT;
         cudaError_t retval = cudaSuccess;
-        this->problem = problem;
+        this->problem = &problem;
 
         // Lazy initialization
         GUARD_CU(BaseEnactor::Init(
-            parameters, problem -> sub_graphs + 0, Enactor_None, 2, NULL, target, false));
+            parameters, problem.sub_graphs + 0,
+            Enactor_None, 2, NULL, target, false));
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
         {
             GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
-            auto &enactor_slice = this -> enactor_slices[gpu * this -> num_gpus + 0];
-            auto &graph = problem -> sub_graphs[gpu];
+            auto &enactor_slice
+                = this -> enactor_slices[gpu * this -> num_gpus + 0];
+            auto &graph = problem.sub_graphs[gpu];
             GUARD_CU(enactor_slice.frontier.Allocate(
                 graph.nodes, graph.edges, this -> queue_factors));
 
             for (int peer = 0; peer < this -> num_gpus; peer ++)
             {
-                this -> enactor_slices[gpu * this -> num_gpus + peer].oprtr_parameters.labels
-                    = &(problem -> data_slices[gpu] -> labels);
+                this -> enactor_slices[gpu * this -> num_gpus + peer]
+                    .oprtr_parameters.labels
+                    = &(problem.data_slices[gpu] -> labels);
             }
         }
 
@@ -279,7 +288,8 @@ public:
             GUARD_CU(((IterationT*)iterations)[gpu].Init(this, gpu));
         }
 
-        GUARD_CU(this -> Init_Threads(this, (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
+        GUARD_CU(this -> Init_Threads(this,
+            (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
         return retval;
     }
 
@@ -289,8 +299,9 @@ public:
         typedef SSSPIteration<EnactorT> IterationT;
 
         gunrock::app::Iteration_Loop<
-            ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0, 1, IterationT>(thread_data,
-                ((IterationT*)iterations)[thread_data.thread_num]);
+            ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0,
+            1, IterationT>(
+            thread_data, ((IterationT*)iterations)[thread_data.thread_num]);
         return cudaSuccess;
     }
 
@@ -313,11 +324,14 @@ public:
                 this -> thread_slices[gpu].init_size = 1;
                 for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
                 {
-                    auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
+                    auto &frontier = this ->
+                        enactor_slices[gpu * this -> num_gpus + peer_].frontier;
                     frontier.queue_length = (peer_ == 0) ? 1 : 0;
                     if (peer_ == 0)
                     {
-                        GUARD_CU(frontier.V_Q() -> ForEach([src]__host__ __device__ (VertexT &v){
+                        GUARD_CU(frontier.V_Q() -> ForEach(
+                            [src]__host__ __device__ (VertexT &v)
+                        {
                             v = src;
                         }, 1, target, 0));
                     }
@@ -328,8 +342,8 @@ public:
                 this -> thread_slices[gpu].init_size = 0;
                 for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
                 {
-                    this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier.queue_length
-                        = 0;
+                    this -> enactor_slices[gpu * this -> num_gpus + peer_]
+                        .frontier.queue_length = 0;
                 }
             }
         }

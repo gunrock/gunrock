@@ -164,10 +164,14 @@ __device__ static float atomicMin(float* addr, float val)
 }
 
 template <typename T>
-__device__ __forceinline__ T _ldg(T* addr)
+__device__ __host__ __forceinline__ T _ldg(T* addr)
 {
-#if __GR_CUDA_ARCH__ >= 350
-    return __ldg(addr);
+#ifdef __CUDA_ARCH__
+    #if __GR_CUDA_ARCH__ >= 350
+        return __ldg(addr);
+    #else
+        return *addr;
+    #endif
 #else
     return *addr;
 #endif

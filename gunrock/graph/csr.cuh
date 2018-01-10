@@ -18,6 +18,7 @@
 #include <gunrock/graph/graph_base.cuh>
 #include <gunrock/graph/coo.cuh>
 #include <gunrock/util/binary_search.cuh>
+#include <gunrock/util/device_intrinsics.cuh>
 
 namespace gunrock {
 namespace graph {

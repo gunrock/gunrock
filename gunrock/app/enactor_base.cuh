@@ -106,7 +106,7 @@ cudaError_t UseParameters2(
 
     GUARD_CU(parameters.Use<std::string>(
         "advance-mode",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         "LB",
         "Advance strategy, LB for Load-Balanced, "
         "TWC for Dynamic-Cooperative, add -LIGHT for "
@@ -353,7 +353,7 @@ public:
         if (parameters.Get<bool>("size-check"))
             flag = flag | Size_Check;
         this -> flag        = flag;
-        
+
 
         GUARD_CU(cuda_props    .Allocate(num_gpus, util::HOST));
         GUARD_CU(enactor_slices.Allocate(num_gpus * num_gpus, util::HOST));
@@ -417,7 +417,7 @@ public:
                 sub_graph.nodes * queue_factors[0],
                 sub_graph.GpT::in_counter + 0,
                 sub_graph.GpT::out_counter + 0,
-                trans_factor, skip_makeout_selection)); 
+                trans_factor, skip_makeout_selection));
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
             iter_sub_queue_time         [gpu].clear();

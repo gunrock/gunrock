@@ -246,12 +246,19 @@ cudaError_t ReadMarketStream(
                 else if (num_input == 2)
                 {
                     //double x = rand() * 1.0;
-                    ll_value = std::remainder(rand(), edge_value_range);
-                    if (ll_value < 0)
-                        ll_value += edge_value_range;
+                    //ll_value = std::remainder(rand(), edge_value_range);
+                    auto x = rand();
+                    double int_x = 0;
+                    std::modf(x * 1.0 / edge_value_range, &int_x);
+                    ll_value = x - int_x * edge_value_range;
+                    //if (ll_value < 0)
+                    //    ll_value += edge_value_range;
                     ll_value += edge_value_min;
-                    //printf("edge_values[%lld] = %lf, range = %lf, min = %lf\n", 
+                    //printf("edge_values[%lld] = %lf, range = %lf, min = %lf\n",
                     //    edges_read, ll_value, edge_value_range, edge_value_min);
+                    //std::cout << "edge_values[" << edges_read << "] = "
+                    //    << ll_value << ", range = " << edge_value_range
+                    //    << ", min = " << edge_value_min << std::endl;
                 }
                 //graph.CooT::edge_values[edges_read] = ll_value;
             }

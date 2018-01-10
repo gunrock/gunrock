@@ -128,6 +128,12 @@ public:
             false,
             "Print this usage.",
             __FILE__, __LINE__);
+
+        Use("quick",
+            OPTIONAL_ARGUMENT | SINGLE_VALUE | OPTIONAL_PARAMETER,
+            false,
+            "Whether to skip the CPU reference validation process.",
+            __FILE__, __LINE__);
     }
 
     ~Parameters()
