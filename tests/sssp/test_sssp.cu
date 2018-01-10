@@ -134,6 +134,7 @@ void ReferenceSssp(
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::ValueT  ValueT;
+    typedef typename GraphT::CsrT    CsrT;
 
     // Prepare Boost Datatype and Data structure
     typedef adjacency_list<vecS, vecS, directedS, no_property,
@@ -263,8 +264,8 @@ struct SSSPGraph :
     cudaError_t FromCoo(CooT_in &coo, bool self_coo = false)
     {
         cudaError_t retval = cudaSuccess;
-        nodes = coo.CooT::nodes;
-        edges = coo.CooT::edges;
+        nodes = coo.CooT_in::CooT::nodes;
+        edges = coo.CooT_in::CooT::edges;
         retval = this -> CsrT::FromCoo(coo);
         if (retval) return retval;
         //retval = this -> CscT::FromCoo(coo);
@@ -336,6 +337,7 @@ cudaError_t RunTests(
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::ValueT  ValueT;
+    typedef typename GraphT::CsrT    CsrT;
     typedef gunrock::app::sssp::Problem<GraphT  > ProblemT;
     typedef gunrock::app::sssp::Enactor<ProblemT> EnactorT;
 
@@ -509,8 +511,9 @@ cudaError_t RunTests(
 
                 for (SizeT e = edge_start; e < edge_start + num_neighbors; e++)
                 {
-                    if (std::abs((pred_distance + graph.CsrT::edge_values[e]
-                        - pred_distance) * 1.0 > 1e-6))
+                    if (v == graph.CsrT::GetEdgeDest(e) &&
+                        std::abs((pred_distance + graph.CsrT::edge_values[e]
+                        - v_distance) * 1.0) < 1e-6)
                     {
                         edge_found = true;
                         break;
@@ -630,6 +633,7 @@ template <
 cudaError_t main_(util::Parameters &parameters)
 {
     typedef SSSPGraph<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> GraphT;
+    typedef typename GraphT::CsrT CsrT;
 
     cudaError_t retval = cudaSuccess;
     CpuTimer cpu_timer, cpu_timer2;
@@ -710,6 +714,7 @@ cudaError_t main_(util::Parameters &parameters)
 
     //info->CollectInfo();  // collected all the info and put into JSON mObject
     //delete info; info=NULL;
+    GUARD_CU(parameters.Set("src", src));
     return retval;
 }
 

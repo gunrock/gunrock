@@ -290,7 +290,8 @@ public:
         util::Location target = util::DEVICE,
         util::CudaProperties *cuda_properties = NULL,
         std::string advance_mode = "",
-        std::string filter_mode = "")
+        std::string filter_mode = "",
+        int max_grid_size = 0)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -320,6 +321,7 @@ public:
         oprtr_parameters.cuda_props = cuda_properties;
         oprtr_parameters.advance_mode = advance_mode;
         oprtr_parameters.filter_mode = filter_mode;
+        oprtr_parameters.max_grid_size = max_grid_size;
         return retval;
     }
 

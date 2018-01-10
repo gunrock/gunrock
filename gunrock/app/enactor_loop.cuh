@@ -852,7 +852,7 @@ static CUT_THREADPROC GunrockThread(
         if (thread_status == ThreadSlice::Status::ToKill)
             break;
 
-        util::PrintMsg("Run started");
+        //util::PrintMsg("Run started");
         enactor.Run(thread_data);
         thread_status = ThreadSlice::Status::Idle;
     }

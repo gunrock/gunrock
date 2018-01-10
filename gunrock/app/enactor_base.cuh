@@ -142,6 +142,14 @@ cudaError_t UseParameters2(
         true,
         "Whether to enable frontier auto resizing",
         __FILE__, __LINE__));
+    
+    GUARD_CU(parameters.Use<int>(
+        "max-grid-size",
+        util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        0,
+        "Maximun number of grids for GPU kernels",
+        __FILE__, __LINE__));
+
     return retval;
 }
 
@@ -392,7 +400,8 @@ public:
                     std::to_string(peer) + "]", /*node_lock_size,*/ target,
                     cuda_props + gpu,
                     parameters.Get<std::string>("advance-mode"),
-                    parameters.Get<std::string>("filter-mode")));
+                    parameters.Get<std::string>("filter-mode"),
+                    parameters.Get<int>("max-grid-size")));
 
                 if (gpu != peer && (target & util::DEVICE) != 0)
                 {

@@ -267,7 +267,7 @@ cudaError_t Launch(
     // load edge-expand-partitioned kernel
     if (parameters.get_output_length)
     {
-        util::PrintMsg("getting output length");
+        //util::PrintMsg("getting output length");
         GUARD_CU (ComputeOutputLength<FLAG>(graph, frontier_in, parameters));
         GUARD_CU (parameters.frontier -> output_length.Move(util::DEVICE, util::HOST, 1, 0, parameters.stream));
         GUARD_CU2(cudaStreamSynchronize(parameters.stream),
@@ -276,10 +276,14 @@ cudaError_t Launch(
         //    "cudaDeviceSynchronize failed");
     }
 
-    int blocks = 1; // TODO: calculate number of blocks
+    //int blocks = 1; // TODO: calculate number of blocks
+    int num_blocks = (parameters.max_grid_size <= 0)
+        ? parameters.cuda_props -> device_props.multiProcessorCount 
+            * KernelPolicyT::CTA_OCCUPANCY
+        : parameters.max_grid_size;
     Kernel
         <FLAG, GraphT, InKeyT, OutKeyT>
-        <<<blocks, KernelPolicyT::THREADS,
+        <<<num_blocks, KernelPolicyT::THREADS,
         0, parameters.stream>>>(
         parameters.frontier -> queue_reset,
         parameters.frontier -> queue_index,

@@ -1123,7 +1123,7 @@ cudaError_t Launch(
     // load edge-expand-partitioned kernel
     if (parameters.get_output_length)
     {
-        util::PrintMsg("getting output length");
+        //util::PrintMsg("getting output length");
         GUARD_CU (ComputeOutputLength<FLAG>(graph, frontier_in, parameters));
         GUARD_CU (parameters.frontier -> output_length.Move(util::DEVICE, util::HOST, 1, 0, parameters.stream));
         GUARD_CU2(cudaStreamSynchronize(parameters.stream),
@@ -1138,9 +1138,9 @@ cudaError_t Launch(
         SizeT num_blocks = parameters.frontier -> queue_length
             / KernelPolicyT::SCRATCH_ELEMENTS + 1;
         //printf("using RelaxLightEdges\n");
-        util::PrintMsg("output_length = " + std::to_string(parameters.frontier -> output_length[0])
-            + ", threads = " + std::to_string(KernelPolicyT::THREADS)
-            + ", blocks = " + std::to_string(num_blocks));
+        //util::PrintMsg("output_length = " + std::to_string(parameters.frontier -> output_length[0])
+        //    + ", threads = " + std::to_string(KernelPolicyT::THREADS)
+        //    + ", blocks = " + std::to_string(num_blocks));
         RelaxLightEdges
             <FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT>
             <<< num_blocks, KernelPolicyT::THREADS, 0, parameters.stream>>>(
@@ -1173,11 +1173,11 @@ cudaError_t Launch(
             / 2 / KernelPolicyT::THREADS + 1; // LBPOLICY::BLOCKS
         if (num_blocks > KernelPolicyT::BLOCKS)
             num_blocks = KernelPolicyT::BLOCKS;
-        util::PrintMsg("output_length = " + std::to_string(parameters.frontier -> output_length[0])
-            + ", threads = " + std::to_string(KernelPolicyT::THREADS)
-            + ", blocks = " + std::to_string(num_blocks)
-            + ", block_output_starts = " + util::to_string(parameters.frontier -> block_output_starts.GetPointer(util::DEVICE))
-            + ", length = " + std::to_string(parameters.frontier -> block_output_starts.GetSize()));
+        //util::PrintMsg("output_length = " + std::to_string(parameters.frontier -> output_length[0])
+        //    + ", threads = " + std::to_string(KernelPolicyT::THREADS)
+        //    + ", blocks = " + std::to_string(num_blocks)
+        //    + ", block_output_starts = " + util::to_string(parameters.frontier -> block_output_starts.GetPointer(util::DEVICE))
+        //    + ", length = " + std::to_string(parameters.frontier -> block_output_starts.GetSize()));
         SizeT outputs_per_block = (parameters.frontier -> output_length[0] +
             num_blocks - 1) / num_blocks;
 
