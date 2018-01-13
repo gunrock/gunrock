@@ -108,12 +108,14 @@ cudaError_t UseParameters2(
         "advance-mode",
         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         "LB",
-        "Advance strategy, LB for Load-Balanced, "
-        "TWC for Dynamic-Cooperative, add -LIGHT for "
-        "small frontiers, add -CULL for fuzed kernels; "
-        "not all modes are available for specific problem; "
-        "default is determined based on input graph",
-        __FILE__, __LINE__));
+        "Advance strategy, <LB | LB_CULL | LB_LIGHT | LB_LIGHT_CULL | TWC>,\n"
+        "\tdefault is determined based on input graph",
+        __FILE__, __LINE__,
+        "LB for Load-Balanced,\n"
+        "\tTWC for Dynamic-Cooperative,\n"
+        "\tadd -LIGHT for small frontiers,\n"
+        "\tadd -CULL for fuzed kernels;\n"
+        "\tnot all modes are available for specific problem;\n"));
 
     GUARD_CU(parameters.Use<std::string>(
         "filter-mode",
@@ -142,7 +144,7 @@ cudaError_t UseParameters2(
         true,
         "Whether to enable frontier auto resizing",
         __FILE__, __LINE__));
-    
+
     GUARD_CU(parameters.Use<int>(
         "max-grid-size",
         util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
