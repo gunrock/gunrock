@@ -39,7 +39,7 @@ struct OprtrParameters
     util::Array1D<SizeT, unsigned char> *visited_masks;
     util::Array1D<SizeT, LabelT>  *labels;
     util::CudaProperties          *cuda_props;
-
+    
     //VertexT *d_backward_index_queue;
     //bool    *d_backward_frontier_map_in;
     //bool    *d_backward_frontier_map_out;
@@ -53,6 +53,7 @@ struct OprtrParameters
     //bool          filtering_flag;
     //bool          skip_marking;
     LabelT        label;
+    int           max_grid_size;
 
     OprtrParameters()
     {
@@ -84,6 +85,7 @@ struct OprtrParameters
         get_output_length  = true;
         advance_mode       = "";
         filter_mode        = "";
+        max_grid_size      = 0;
         return cudaSuccess;
     }
 };

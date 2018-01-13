@@ -42,7 +42,7 @@ template <
     typename _SizeT,
     typename _ValueT,
     //int _CUDA_ARCH,         // Machine parameters
-    int _MIN_CTA_OCCUPANCY, // Tunable parameters
+    int _MAX_CTA_OCCUPANCY, // Tunable parameters
     int _LOG_THREADS,
     int _LOG_BLOCKS,
     int _LIGHT_EDGE_THRESHOLD>
@@ -97,7 +97,7 @@ struct KernelPolicy
     enum {
         THREAD_OCCUPANCY                = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
         SMEM_OCCUPANCY                  = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
-        CTA_OCCUPANCY                   = GR_MIN(_MIN_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
+        CTA_OCCUPANCY                   = GR_MIN(_MAX_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
 
         VALID                           = (CTA_OCCUPANCY > 0),
     };

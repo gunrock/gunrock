@@ -130,6 +130,33 @@ cudaError_t UseParameters(
         __FILE__, __LINE__);
     if (retval) return retval;
 
+    if (graph_prefix == "")
+    {
+        retval = parameters.Use<bool>(
+            "64bit-VertexT",
+            util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+            false,
+            "whether to use 64-bit VertexT",
+            __FILE__, __LINE__);
+        if (retval) return retval;
+
+        retval = parameters.Use<bool>(
+            "64bit-SizeT",
+            util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+            false,
+            "whether to use 64-bit SizeT",
+            __FILE__, __LINE__);
+        if (retval) return retval;
+
+        retval = parameters.Use<bool>(
+            "64bit-ValueT",
+            util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+            false,
+            "whether to use 64-bit ValueT",
+            __FILE__, __LINE__);
+        if (retval) return retval;
+    }
+
     retval = market::UseParameters(parameters, graph_prefix);
     if (retval) return retval;
     retval = rgg::UseParameters(parameters, graph_prefix);

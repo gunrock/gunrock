@@ -202,15 +202,18 @@ struct Block_Scan
     {
         T warp_sum;
         int warp_id = threadIdx.x >> LOG_WARP_THREADS;
-        Warp_Scan(thread_in, thread_out, warp_sum);
-        if ((threadIdx.x & WARP_THREADS_MASK) == 0)
+        Warp_Scan(thread_in, thread_out);
+        if ((threadIdx.x & WARP_THREADS_MASK) == WARP_THREADS_MASK)
         {
-            //printf("(%4d, %4d) : warp_sum = %d\n",
-            //    blockIdx.x, threadIdx.x, warp_sum);
+            warp_sum = thread_in + thread_out;
+            //if (warp_sum != 0)
+            //    printf("(%4d, %4d) : warp_sum = %d\n",
+            //        blockIdx.x, threadIdx.x, warp_sum);
             temp_space. warp_counter_offset[warp_id] = warp_sum;
         }
-        //printf("(%4d, %4d) : thread_out = %4d\n",
-        //    blockIdx.x, threadIdx.x, thread_out);
+        //if (thread_in != 0)
+        //    printf("(%4d, %4d) : thread_out = %4d, warp_sum = %4d\n",
+        //        blockIdx.x, threadIdx.x, thread_out, warp_sum);
         __syncthreads();
 
         if ((warp_id) == 0)
@@ -224,6 +227,9 @@ struct Block_Scan
         __syncthreads();
 
         thread_out += temp_space. warp_counter_offset[warp_id];
+        //if (thread_in != 0)
+        //    printf("(%4d, %4d) : thread_out2 = %4d\n",
+        //        blockIdx.x, threadIdx.x, thread_out);
     }
 
     static __device__ __forceinline__ void Scan(T thread_in, T &thread_out, Temp_Space &temp_space, T &block_sum)

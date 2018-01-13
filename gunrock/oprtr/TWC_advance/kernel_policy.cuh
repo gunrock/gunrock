@@ -12,26 +12,15 @@
  * @brief Kernel configuration policy for Forward Edge Expansion Kernel
  */
 
-
-
 #pragma once
 
-#include <gunrock/util/basic_utils.h>
-#include <gunrock/util/cuda_properties.cuh>
-#include <gunrock/util/cta_work_distribution.cuh>
-#include <gunrock/util/soa_tuple.cuh>
 #include <gunrock/util/srts_grid.cuh>
+#include <gunrock/util/soa_tuple.cuh>
 #include <gunrock/util/srts_soa_details.cuh>
-#include <gunrock/util/io/modified_load.cuh>
-#include <gunrock/util/io/modified_store.cuh>
-#include <gunrock/util/operators.cuh>
-
-#include <gunrock/app/problem_base.cuh>
 
 namespace gunrock {
 namespace oprtr {
-namespace edge_map_forward {
-
+namespace TWC {
 
 /**
  * @brief Kernel configuration policy for forward edge mapping kernels.
@@ -59,35 +48,39 @@ namespace edge_map_forward {
  * @tparam _LOG_SCHEDULE_GRANULARITY    The scheduling granularity of incoming frontier tiles (for even-share work distribution only) (log)
  */
 template <
-    typename _ProblemData,
-    // Machine parameters
-    int _CUDA_ARCH,
-    // Behavioral control parameters
-    //bool _INSTRUMENT,
-    // Tunable parameters
-    int _MIN_CTA_OCCUPANCY,                                             
-    int _LOG_THREADS,                                                   
-    int _LOG_LOAD_VEC_SIZE,                                             
-    int _LOG_LOADS_PER_TILE,                                            
-    int _LOG_RAKING_THREADS,                                            
-    int _WARP_GATHER_THRESHOLD,                                          
-    int _CTA_GATHER_THRESHOLD,                                           
-    int _LOG_SCHEDULE_GRANULARITY>                                      
-
+    //typename _ProblemData,
+    OprtrFlag _FLAG,
+    typename _VertexT,      // Data types
+    typename _InKeyT,
+    typename _OutKeyT,
+    typename _SizeT,
+    typename _ValueT,
+    //int _CUDA_ARCH, // Machine parameters
+    //bool _INSTRUMENT, // Behavioral control parameters
+    int _MIN_CTA_OCCUPANCY, // Tunable parameters
+    int _LOG_THREADS,
+    int _LOG_LOAD_VEC_SIZE,
+    int _LOG_LOADS_PER_TILE,
+    int _LOG_RAKING_THREADS,
+    int _WARP_GATHER_THRESHOLD,
+    int _CTA_GATHER_THRESHOLD,
+    int _LOG_SCHEDULE_GRANULARITY>
 struct KernelPolicy
 {
     //---------------------------------------------------------------------
     // Constants and typedefs
     //---------------------------------------------------------------------
 
-    typedef _ProblemData                    ProblemData;
-    typedef typename ProblemData::VertexId  VertexId;
-    typedef typename ProblemData::SizeT     SizeT;
-    typedef typename ProblemData::Value     Value;
+    //typedef _ProblemData                    ProblemData;
+    typedef _VertexT  VertexT;
+    typedef _InKeyT   InKeyT;
+    typedef _OutKeyT  OutKeyT;
+    typedef _SizeT    SizeT;
+    typedef _ValueT   ValueT;
 
     enum {
-
-        CUDA_ARCH                       = _CUDA_ARCH,
+        FLAG                            = _FLAG,
+        //CUDA_ARCH                       = _CUDA_ARCH,
         //INSTRUMENT                      = _INSTRUMENT,
 
         LOG_THREADS                     = _LOG_THREADS,
@@ -119,7 +112,7 @@ struct KernelPolicy
     };
 
     // Prefix sum raking grid for coarse-grained expansion allocations
-    typedef util::RakingGrid<
+    typedef gunrock::util::RakingGrid<
         CUDA_ARCH,
         SizeT,                  // Partial type
         LOG_THREADS,            // Depositing threads (the CTA size)
@@ -129,7 +122,7 @@ struct KernelPolicy
             CoarseGrid;
 
     // Prefix sum raking grid for fine-grained expansion allocations
-    typedef util::RakingGrid<
+    typedef gunrock::util::RakingGrid<
         CUDA_ARCH,
         SizeT,                  // Partial type
         LOG_THREADS,            // Depositing threads (the CTA size)
@@ -138,20 +131,17 @@ struct KernelPolicy
         true>                   // There are prefix dependences between lanes
             FineGrid;
 
-
-    
     // Type for (coarse-partial, fine-partial) tuples
-    typedef util::Tuple<SizeT, SizeT> TileTuple;
+    typedef gunrock::util::Tuple<SizeT, SizeT>
+        TileTuple;
 
     // Structure-of-array (SOA) prefix sum raking grid type (CoarseGrid, FineGrid)
-    typedef util::Tuple<
-    CoarseGrid,
-    FineGrid> RakingGridTuple;
+    typedef gunrock::util::Tuple<CoarseGrid, FineGrid>
+        RakingGridTuple;
 
     // Operational details type for SOA raking grid
-    typedef util::RakingSoaDetails<
-        TileTuple,
-        RakingGridTuple> RakingSoaDetails;
+    typedef gunrock::util::RakingSoaDetails<TileTuple, RakingGridTuple>
+        RakingSoaDetails;
 
    /**
     * @brief Prefix sum tuple operator for SOA raking grid
@@ -199,8 +189,8 @@ struct KernelPolicy
             int                                 cta_comm;
 
             // Storage for scanning local contract-expand ranks
-            SizeT                               coarse_warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
-            SizeT                               fine_warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
+            SizeT coarse_warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
+            SizeT fine_warpscan  [2][GR_WARP_THREADS(CUDA_ARCH)];
 
             // Enqueue offset for neighbors of the current tile
             SizeT                               coarse_enqueue_offset;
@@ -214,9 +204,14 @@ struct KernelPolicy
                                                 - sizeof(State)
                                                 - 128,                                          // Fudge-factor to guarantee occupancy
 
-            SCRATCH_ELEMENT_SIZE            = (ProblemData::MARK_PREDECESSORS) ? sizeof(SizeT) + sizeof(VertexId)*2 : sizeof(SizeT)+sizeof(VertexId),                 // Both gather offset and predecessor
+            SCRATCH_ELEMENT_SIZE            =
+                ((FLAG & OprtrOption_Mark_Predecessors) != 0)
+                ? (sizeof(SizeT) + sizeof(VertexT) * 2)
+                : (sizeof(SizeT) + sizeof(VertexT)), // Both gather offset and predecessor
             GATHER_ELEMENTS                 = MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE,
-            PARENT_ELEMENTS                 = (ProblemData::MARK_PREDECESSORS) ? GATHER_ELEMENTS : 0,
+            PARENT_ELEMENTS                 = GATHER_ELEMENTS,
+                //((FLAG & OprtrOption_Mark_Predecessors) != 0)
+                //? GATHER_ELEMENTS : 0,
         };
 
         union {
@@ -225,15 +220,14 @@ struct KernelPolicy
                 SizeT                       coarse_raking_elements[CoarseGrid::TOTAL_RAKING_ELEMENTS];
                 SizeT                       fine_raking_elements[FineGrid::TOTAL_RAKING_ELEMENTS];
             };
-            
+
             // Scratch elements
             struct {
-                SizeT                       gather_offsets[GATHER_ELEMENTS];
-                VertexId                    gather_edges[GATHER_ELEMENTS];
-                VertexId                    gather_predecessors[PARENT_ELEMENTS];
+                SizeT   gather_offsets     [GATHER_ELEMENTS];
+                VertexT gather_edges       [GATHER_ELEMENTS];
+                VertexT gather_predecessors[PARENT_ELEMENTS];
             };
         };
-
     };
 
     enum {

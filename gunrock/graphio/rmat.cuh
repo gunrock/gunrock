@@ -372,12 +372,12 @@ static cudaError_t Load(
 template <typename GraphT>
 struct CooSwitch<GraphT, false>
 {
-cudaError_t Load(
+static cudaError_t Load(
     util::Parameters &parameters,
     GraphT &graph,
     std::string graph_prefix = "")
 {
-    typedef graph::Csr<typename GraphT::VertexT,
+    typedef graph::Coo<typename GraphT::VertexT,
         typename GraphT::SizeT,
         typename GraphT::ValueT,
         GraphT::FLAG | graph::HAS_COO, GraphT::cudaHostRegisterFlag> CooT;
@@ -396,11 +396,11 @@ cudaError_t Load(
 template <typename GraphT>
 cudaError_t Load(
     util::Parameters &parameters,
-    GraphT &graph,
+    GraphT &graph_,
     std::string graph_prefix = "")
 {
-    return CooSwitch<GraphT, (GraphT::FLAG & graph::HAS_COO) != 0>
-        ::Load(parameters, graph, graph_prefix);
+    return CooSwitch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_COO) != 0>
+        ::Load(parameters, graph_, graph_prefix);
 }
 
 } // namespace rmat

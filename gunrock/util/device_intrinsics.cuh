@@ -17,6 +17,7 @@
 #ifndef DEVICE_INTRINSICS_CUH
 #define DEVICE_INTRINSICS_CUH
 
+#include <limits>
 #include <gunrock/util/cuda_properties.cuh>
 //#include <gunrock/util/types.cuh>
 
@@ -134,6 +135,14 @@ __device__ static long long atomicAdd(long long *addr, long long val)
         (unsigned long long )val);
 }
 
+#if ULONG_MAX == ULLONG_MAX
+__device__ static unsigned long atomicAdd(unsigned long *addr, unsigned long val)
+{
+    return (unsigned long long)atomicAdd(
+        (unsigned long long*)addr, (unsigned long long)val);
+}
+#endif
+
 #if __GR_CUDA_ARCH__ <= 300
 // TODO: only works if both *addr and val are non-negetive
 /*__device__ static signed long long int atomicMin(signed long long int* addr, signed long long int val)
@@ -164,10 +173,14 @@ __device__ static float atomicMin(float* addr, float val)
 }
 
 template <typename T>
-__device__ __forceinline__ T _ldg(T* addr)
+__device__ __host__ __forceinline__ T _ldg(T* addr)
 {
-#if __GR_CUDA_ARCH__ >= 350
-    return __ldg(addr);
+#ifdef __CUDA_ARCH__
+    #if __GR_CUDA_ARCH__ >= 350
+        return __ldg(addr);
+    #else
+        return *addr;
+    #endif
 #else
     return *addr;
 #endif

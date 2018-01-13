@@ -53,6 +53,7 @@ public:
     Parameter_Flag  flag;
     std::string     default_value;
     std::string     description;
+    std::string     detailed_description;
     std::string     value;
     bool            use_default;
     const std::type_info* value_type_info;
@@ -64,6 +65,7 @@ public:
         flag            (OPTIONAL_ARGUMENT | SINGLE_VALUE | OPTIONAL_PARAMETER),
         default_value   (""),
         description     (""),
+        detailed_description(""),
         value           (""),
         use_default     (true),
         value_type_info (NULL),
@@ -77,6 +79,7 @@ public:
         flag            (OPTIONAL_ARGUMENT | SINGLE_VALUE | OPTIONAL_PARAMETER),
         default_value   (""),
         description     (""),
+        detailed_description(""),
         value           (""),
         use_default     (true),
         value_type_info (value_tinfo),
@@ -90,6 +93,7 @@ public:
         flag            (item.flag),
         default_value   (item.default_value),
         description     (item.description),
+        detailed_description(item.detailed_description),
         value           (item.value),
         use_default     (item.use_default),
         value_type_info (item.value_type_info),
@@ -128,6 +132,12 @@ public:
             false,
             "Print this usage.",
             __FILE__, __LINE__);
+
+        Use("quick",
+            OPTIONAL_ARGUMENT | SINGLE_VALUE | OPTIONAL_PARAMETER,
+            false,
+            "Whether to skip the CPU reference validation process.",
+            __FILE__, __LINE__);
     }
 
     ~Parameters()
@@ -142,7 +152,8 @@ public:
         std::string     description,
         const std::type_info* value_type_info,
         const char*     file_name,
-        int             line_num)
+        int             line_num,
+        std::string     detailed_description = "")
     {
         // special case for no argument parameters
         if ((flag & NO_ARGUMENT) == NO_ARGUMENT)
@@ -173,6 +184,7 @@ public:
         p_item.flag           = flag;
         p_item.default_value  = default_value;
         p_item.description    = description;
+        p_item.detailed_description = detailed_description;
         p_item.value          = default_value;
         p_item.use_default    = true;
         p_item.file_name      = std::string(file_name);
@@ -205,7 +217,8 @@ public:
         T               default_value,
         std::string     description,
         const char*     file_name,
-        int             line_num)
+        int             line_num,
+        std::string     detailed_description = "")
     {
         std::ostringstream ostr;
         ostr << default_value;
@@ -214,7 +227,7 @@ public:
             (((flag & MULTI_VALUE) == MULTI_VALUE
                && !IS_VECTOR<T>::value ) ?
               &typeid(std::vector<T>) : &typeid(T)),
-            file_name, line_num);
+            file_name, line_num, detailed_description);
     } // Use()
 
     cudaError_t Set(
@@ -520,9 +533,43 @@ public:
         return retval;
     } // Phase_CommandLine()
 
+    cudaError_t Print_Para(Parameter_Item &item)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        std::cout << "--" << item.name << " : "
+            << TypeName(item.value_type_info)
+            << ", default = ";
+        if (item.default_value != "")
+        {
+            if (std::type_index(*(item.value_type_info))
+                == std::type_index(typeid(bool)))
+                std::cout << ((item.default_value == "0") ? "false" : "true");
+            else
+                std::cout << item.default_value;
+        }
+        std::cout << std::endl << "\t" << item.description << std::endl;
+        return retval;
+    }
+
     cudaError_t Print_Help()
     {
+        cudaError_t retval = cudaSuccess;
         std::cout << summary << std::endl;
+
+        if (!UseDefault("graph-type"))
+        {
+            auto it = p_map.find(Get<std::string>("graph-type"));
+            std::cout << "finding " << Get<std::string>("graph-type") << std::endl;
+            if (it != p_map.end())
+            {
+                Print_Para(it -> second);
+                if (it -> second.detailed_description != "")
+                    std::cout<< "\t" << it -> second.detailed_description
+                        << std::endl;
+                return retval;
+            }
+        }
 
         for (int t=0; t<2; t++)
         {
@@ -546,22 +593,11 @@ public:
                     first_parameter = false;
                 }
 
-                std::cout << "--" << it -> second.name << " : "
-                    << TypeName(it -> second.value_type_info)
-                    << ", default = ";
-                if (it -> second.default_value != "")
-                {
-                    if (std::type_index(*(it -> second.value_type_info))
-                        == std::type_index(typeid(bool)))
-                        std::cout << ((it -> second.default_value == "0") ? "false" : "true");
-                    else
-                        std::cout << it -> second.default_value;
-                }
-                std::cout << std::endl << "\t" << it -> second.description << std::endl;
+                Print_Para(it -> second);
             }
         }
 
-        return cudaSuccess;
+        return retval;
     } // Print_Help()
 
     std::map<std::string, std::string> List()

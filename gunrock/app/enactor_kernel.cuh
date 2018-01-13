@@ -391,8 +391,7 @@ __global__ void MakeOutput_Kernel(
         if (threadIdx.x < num_gpus)
         {
             //printf("sum[%d] = %d\n", threadIdx.x, sum[threadIdx.x]);
-            sum_offset[threadIdx.x] = atomicAdd(
-                d_out_length + threadIdx.x, sum_offset[threadIdx.x]);
+            sum_offset[threadIdx.x] = atomicAdd(d_out_length + threadIdx.x, sum_offset[threadIdx.x]);
         }
         __syncthreads();
 

@@ -26,7 +26,9 @@ namespace app {
 template <
     typename VertexT,
     typename SizeT,
-    typename ValueT>
+    typename ValueT,
+    util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
+    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
     //int MAX_NUM_VERTEX_ASSOCIATES,
     //int MAX_NUM_VALUE__ASSOCIATES>
 struct MgpuSlice
@@ -45,55 +47,165 @@ struct MgpuSlice
     //bool   use_double_buffer   ;
     //typedef unsigned char MaskT;
 
-    util::Array1D<SizeT, VertexT    >  *vertex_associate_in  [2]; // Incoming VertexId type associate values
-    //util::Array1D<SizeT, VertexId*   >  *vertex_associate_ins [2]; // Device pointers to incoming VertexId type associate values
-    util::Array1D<SizeT, VertexT    >  *vertex_associate_out    ; // Outgoing VertexId type associate values
-    util::Array1D<SizeT, VertexT*   >   vertex_associate_outs   ; // Device pointers to outgoing VertexId type associate values
-    //util::Array1D<SizeT, VertexId**  >   vertex_associate_outss  ; // Device pointers to device points to outgoing VertexId type associate values
-    util::Array1D<SizeT, VertexT*   >   vertex_associate_orgs   ; // Device pointers to original VertexId type associate values
-    util::Array1D<SizeT, ValueT     >  *value__associate_in  [2]; // Incoming Value type associate values
-    //util::Array1D<SizeT, Value*      >  *value__associate_ins [2]; // Device pointers to incoming Value type associate values
-    util::Array1D<SizeT, ValueT     >  *value__associate_out    ; // Outgoing Value type associate values
-    util::Array1D<SizeT, ValueT*    >   value__associate_outs   ; // Device pointers to outgoing Value type associate values
-    //util::Array1D<SizeT, Value**     >   value__associate_outss  ; // Device pointers to device pointers to outgoing Value type associate values
-    util::Array1D<SizeT, ValueT*    >   value__associate_orgs   ; // Device pointers to original Value type associate values
-    util::Array1D<SizeT, SizeT      >   out_length              ; // Number of outgoing vertices to peers
-    util::Array1D<SizeT, SizeT      >   in_length            [2]; // Number of incoming vertices from peers
-    util::Array1D<SizeT, SizeT      >   in_length_out           ;
-    util::Array1D<SizeT, VertexT    >   in_iteration         [2]; // Incoming iteration numbers
-    util::Array1D<SizeT, VertexT    >  *keys_in              [2]; // Incoming vertices
-    util::Array1D<SizeT, VertexT*   >   keys_outs               ; // Outgoing vertices
-    util::Array1D<SizeT, VertexT    >  *keys_out                ; // Device pointers to outgoing vertices
-    //util::Array1D<SizeT, SizeT       >  *keys_marker             ; // Markers to separate vertices to peer GPUs
-    //util::Array1D<SizeT, SizeT*      >   keys_markers            ; // Device pointer to the markers
+    // Incoming VertexId type associate values
+    util::Array1D<SizeT, VertexT , ARRAY_FLAG, cudaHostRegisterFlag>
+        *vertex_associate_in  [2];
 
-    //util::Array1D<SizeT, SizeT       >  *visit_lookup            ; // Vertex lookup array
-    //util::Array1D<SizeT, VertexId    >  *valid_in                ; // Vertex valid in
-    //util::Array1D<SizeT, VertexId    >  *valid_out               ; // Vertex valid out
+    // Device pointers to incoming VertexId type associate values
+    //util::Array1D<SizeT, VertexT*, ARRAY_FLAG, cudaHostRegisterFlag>
+    //    *vertex_associate_ins [2]; 
+    
+    // Outgoing VertexId type associate values
+    util::Array1D<SizeT, VertexT , ARRAY_FLAG, cudaHostRegisterFlag>
+        *vertex_associate_out    ;
 
-    util::Array1D<SizeT, cudaEvent_t*>   events               [4]; // GPU stream events arrays
-    util::Array1D<SizeT, bool*     >   events_set           [4]; // Whether the GPU stream events are set
-    util::Array1D<SizeT, int       >   wait_marker             ; //
-    //util::Array1D<SizeT, cudaStream_t>   streams                 ; // GPU streams
-    util::Array1D<SizeT, int       >   stages                  ; // current stages of each streams
-    util::Array1D<SizeT, bool      >   to_show                 ; // whether to show debug information for the streams
-    //util::Array1D<SizeT, char        >   make_out_array          ; // compressed data structure for make_out kernel
-    //util::Array1D<SizeT, char        >  *expand_incoming_array   ; // compressed data structure for expand_incoming kernel
-    //util::Array1D<SizeT, VertexId    >   preds                   ; // predecessors of vertices
-    //util::Array1D<SizeT, VertexId    >   temp_preds              ; // temporary storages for predecessors
-    //util::Array1D<SizeT, VertexId    >   labels                  ; // Used for source distance
+    // Device pointers to outgoing VertexId type associate values
+    util::Array1D<SizeT, VertexT*, ARRAY_FLAG, cudaHostRegisterFlag | cudaHostAllocMapped | cudaHostAllocPortable>
+        vertex_associate_outs   ; 
+   
+    // Device pointers to device points to outgoing VertexId type associate values 
+    //util::Array1D<SizeT, VertexT**, ARRAY_FLAG, cudaHostRegisterFlag>
+    //    vertex_associate_outss  ; 
+    
+    // Device pointers to original VertexId type associate values
+    util::Array1D<SizeT, VertexT*, ARRAY_FLAG, cudaHostRegisterFlag>
+        vertex_associate_orgs   ;
+    
+    // Incoming Value type associate values 
+    util::Array1D<SizeT, ValueT  , ARRAY_FLAG, cudaHostRegisterFlag>  
+        *value__associate_in  [2]; 
 
-    //util::Array1D<SizeT, MaskT        > visited_mask;
-    util::Array1D<SizeT, int        > latency_data;
+    // Device pointers to incoming Value type associate values
+    //util::Array1D<SizeT, ValueT*      >  
+    //    *value__associate_ins [2]; 
+   
+    // Outgoing Value type associate values 
+    util::Array1D<SizeT, ValueT  , ARRAY_FLAG, cudaHostRegisterFlag>  
+        *value__associate_out    ; 
+    
+    // Device pointers to outgoing Value type associate values
+    util::Array1D<SizeT, ValueT* , ARRAY_FLAG, cudaHostRegisterFlag | cudaHostAllocMapped | cudaHostAllocPortable>   
+        value__associate_outs   ;
+
+    // Device pointers to device pointers to outgoing Value type associate values 
+    //util::Array1D<SizeT, ValueT**     >   
+    //    value__associate_outss  ;
+
+    // Device pointers to original Value type associate values 
+    util::Array1D<SizeT, ValueT* , ARRAY_FLAG, cudaHostRegisterFlag>   
+        value__associate_orgs   ;
+
+    // Number of outgoing vertices to peers 
+    util::Array1D<SizeT, SizeT   , ARRAY_FLAG, cudaHostRegisterFlag | cudaHostAllocMapped | cudaHostAllocPortable>   
+        out_length              ;
+
+    // Number of incoming vertices from peers 
+    util::Array1D<SizeT, SizeT   , ARRAY_FLAG, cudaHostRegisterFlag>   
+        in_length            [2]; 
+    util::Array1D<SizeT, SizeT   , ARRAY_FLAG, cudaHostRegisterFlag | cudaHostAllocMapped | cudaHostAllocPortable>   
+        in_length_out           ;
+
+    // Incoming iteration numbers
+    util::Array1D<SizeT, VertexT , ARRAY_FLAG, cudaHostRegisterFlag>   
+        in_iteration         [2];
+
+    // Incoming vertices
+    util::Array1D<SizeT, VertexT , ARRAY_FLAG, cudaHostRegisterFlag>  
+        *keys_in              [2];
+
+    // Outgoing vertices
+    util::Array1D<SizeT, VertexT*, ARRAY_FLAG, cudaHostRegisterFlag | cudaHostAllocMapped | cudaHostAllocPortable>   
+        keys_outs               ; 
+    
+    // Device pointers to outgoing vertices
+    util::Array1D<SizeT, VertexT , ARRAY_FLAG, cudaHostRegisterFlag>  
+        *keys_out                ;
+
+    // Markers to separate vertices to peer GPUs 
+    //util::Array1D<SizeT, SizeT   , ARRAY_FLAG, cudaHostRegisterFlag>  
+    //    *keys_marker             ;
+
+    // Device pointer to the markers  
+    //util::Array1D<SizeT, SizeT*  , ARRAY_FLAG, cudaHostRegisterFlag>   
+    //    keys_markers            ; 
+
+    // Vertex lookup array
+    //util::Array1D<SizeT, SizeT   , ARRAY_FLAG, cudaHostRegisterFlag>  
+    //    *visit_lookup            ;
+
+    // Vertex valid in 
+    //util::Array1D<SizeT, VertexT , ARRAY_FLAG, cudaHostRegisterFlag>  
+    //    *valid_in                ;
+
+    // Vertex valid out
+    //util::Array1D<SizeT, VertexT , ARRAY_FLAG, cudaHostRegisterFlag>  
+    //    *valid_out               ; 
+
+    // GPU stream events arrays
+    util::Array1D<SizeT, cudaEvent_t*, ARRAY_FLAG, cudaHostRegisterFlag>   
+        events               [4];
+
+    // Whether the GPU stream events are set 
+    util::Array1D<SizeT, bool*   , ARRAY_FLAG, cudaHostRegisterFlag>   
+        events_set           [4];
+
+    //
+    util::Array1D<SizeT, int     , ARRAY_FLAG, cudaHostRegisterFlag>   
+        wait_marker             ; 
+    
+    // GPU streams
+    //util::Array1D<SizeT, cudaStream_t, ARRAY_FLAG, cudaHostRegisterFlag>   
+    //    streams                 ; 
+    
+    // current stages of each streams
+    util::Array1D<SizeT, int     , ARRAY_FLAG, cudaHostRegisterFlag>   
+        stages                  ;
+
+    // whether to show debug information for the streams 
+    util::Array1D<SizeT, bool    , ARRAY_FLAG, cudaHostRegisterFlag> 
+        to_show                 ;
+
+    // compressed data structure for make_out kernel
+    //util::Array1D<SizeT, char    , ARRAY_FLAG, cudaHostRegisterFlag>
+    //    make_out_array          ;
+
+    // compressed data structure for expand_incoming kernel 
+    //util::Array1D<SizeT, char    , ARRAY_FLAG, cudaHostRegisterFlag>
+    //    *expand_incoming_array   ; 
+   
+    // predecessors of vertices 
+    //util::Array1D<SizeT, VertexT , ARRAY_FLAG, cudaHostRegisterFlag>
+    //    preds                   ;
+
+    // temporary storages for predecessors 
+    //util::Array1D<SizeT, VertexT , ARRAY_FLAG, cudaHostRegisterFlag>
+    //    temp_preds              ;
+
+    // Used for source distance 
+    //util::Array1D<SizeT, VertexT , ARRAY_FLAG, cudaHostRegisterFlag>
+    //    labels                  ; 
+
+    //util::Array1D<SizeT, MaskT   , ARRAY_FLAG, cudaHostRegisterFlag> 
+    //    visited_mask;
+    
+    util::Array1D<SizeT, int     , ARRAY_FLAG, cudaHostRegisterFlag>
+        latency_data;
 
     // arrays used to track data race, containing info about pervious assigment
-    util::Array1D<SizeT, int        > org_checkpoint            ; // checkpoint number
-    util::Array1D<SizeT, VertexT*   > org_d_out                 ; // d_out address
-    util::Array1D<SizeT, SizeT      > org_offset1               ; // offset1
-    util::Array1D<SizeT, SizeT      > org_offset2               ; // offset2
-    util::Array1D<SizeT, VertexT    > org_queue_idx             ; // queue index
-    util::Array1D<SizeT, int        > org_block_idx             ; // blockIdx.x
-    util::Array1D<SizeT, int        > org_thread_idx            ; // threadIdx.x
+    util::Array1D<SizeT, int     , ARRAY_FLAG, cudaHostRegisterFlag> 
+        org_checkpoint            ; // checkpoint number
+    util::Array1D<SizeT, VertexT*, ARRAY_FLAG, cudaHostRegisterFlag> 
+        org_d_out                 ; // d_out address
+    util::Array1D<SizeT, SizeT   , ARRAY_FLAG, cudaHostRegisterFlag> 
+        org_offset1               ; // offset1
+    util::Array1D<SizeT, SizeT   , ARRAY_FLAG, cudaHostRegisterFlag> 
+        org_offset2               ; // offset2
+    util::Array1D<SizeT, VertexT , ARRAY_FLAG, cudaHostRegisterFlag> 
+        org_queue_idx             ; // queue index
+    util::Array1D<SizeT, int     , ARRAY_FLAG, cudaHostRegisterFlag> 
+        org_block_idx             ; // blockIdx.x
+    util::Array1D<SizeT, int     , ARRAY_FLAG, cudaHostRegisterFlag> 
+        org_thread_idx            ; // threadIdx.x
 
     /**
      * @brief DataSliceBase default constructor
@@ -158,7 +270,7 @@ struct MgpuSlice
         Release();
     }*/
 
-    cudaError_t Release()
+    cudaError_t Release(util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
         // Set device by index
@@ -169,13 +281,16 @@ struct MgpuSlice
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
-                GUARD_CU(vertex_associate_in[0][gpu].Release());
-                GUARD_CU(vertex_associate_in[1][gpu].Release());
+                GUARD_CU(vertex_associate_in[0][gpu].Release(target));
+                GUARD_CU(vertex_associate_in[1][gpu].Release(target));
             }
-            delete[] vertex_associate_in [0];
-            delete[] vertex_associate_in [1];
-            vertex_associate_in [0] = NULL;
-            vertex_associate_in [1] = NULL;
+            if (target & util::HOST)
+            {
+                delete[] vertex_associate_in [0];
+                delete[] vertex_associate_in [1];
+                vertex_associate_in [0] = NULL;
+                vertex_associate_in [1] = NULL;
+            }
         }
 
         // Release Value type incoming associate values and related pointers
@@ -183,13 +298,16 @@ struct MgpuSlice
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
-                GUARD_CU(value__associate_in[0][gpu].Release());
-                GUARD_CU(value__associate_in[1][gpu].Release());
+                GUARD_CU(value__associate_in[0][gpu].Release(target));
+                GUARD_CU(value__associate_in[1][gpu].Release(target));
             }
-            delete[] value__associate_in [0];
-            delete[] value__associate_in [1];
-            value__associate_in [0] = NULL;
-            value__associate_in [1] = NULL;
+            if (target & util::HOST)
+            {
+                delete[] value__associate_in [0];
+                delete[] value__associate_in [1];
+                value__associate_in [0] = NULL;
+                value__associate_in [1] = NULL;
+            }
         }
 
         // Release incoming keys and related pointers
@@ -197,13 +315,16 @@ struct MgpuSlice
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
-                GUARD_CU(keys_in[0][gpu].Release());
-                GUARD_CU(keys_in[1][gpu].Release());
+                GUARD_CU(keys_in[0][gpu].Release(target));
+                GUARD_CU(keys_in[1][gpu].Release(target));
             }
-            delete[] keys_in[0];
-            delete[] keys_in[1];
-            keys_in[0] = NULL;
-            keys_in[1] = NULL;
+            if (target & util::HOST)
+            {
+                delete[] keys_in[0];
+                delete[] keys_in[1];
+                keys_in[0] = NULL;
+                keys_in[1] = NULL;
+            }
         }
 
         // Release VertexId type outgoing associate values and pointers
@@ -211,12 +332,16 @@ struct MgpuSlice
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
-                vertex_associate_outs [gpu] = NULL;
-                GUARD_CU(vertex_associate_out[gpu].Release());
+                if (target & util::HOST)
+                    vertex_associate_outs [gpu] = NULL;
+                GUARD_CU(vertex_associate_out[gpu].Release(target));
             }
-            delete[] vertex_associate_out;
-            vertex_associate_out = NULL;
-            GUARD_CU(vertex_associate_outs.Release());
+            if (target & util::HOST)
+            {
+                delete[] vertex_associate_out;
+                vertex_associate_out = NULL;
+            }
+            GUARD_CU(vertex_associate_outs.Release(target));
         }
 
         // Release Value type outgoing associate values and pointers
@@ -224,15 +349,20 @@ struct MgpuSlice
         {
             for (int gpu = 0; gpu < num_gpus; gpu++)
             {
-                value__associate_outs [gpu] = NULL;
-                GUARD_CU(value__associate_out[gpu].Release());
+                if (target & util::HOST)
+                    value__associate_outs [gpu] = NULL;
+                GUARD_CU(value__associate_out[gpu].Release(target));
             }
-            delete[] value__associate_out ;
-            value__associate_out = NULL;
-            GUARD_CU(value__associate_outs.Release());
+            if (target & util::HOST)
+            {
+                delete[] value__associate_out ;
+                value__associate_out = NULL;
+            }
+            GUARD_CU(value__associate_outs.Release(target));
         }
 
         // Release events and markers
+        if (target & util::HOST)
         for (int i = 0; i < 4; i++)
         {
             if (events[i].GetPointer() != NULL)
@@ -244,8 +374,8 @@ struct MgpuSlice
                 delete[] events    [i][gpu]; events    [i][gpu] = NULL;
                 delete[] events_set[i][gpu]; events_set[i][gpu] = NULL;
             }
-            GUARD_CU(events    [i].Release());
-            GUARD_CU(events_set[i].Release());
+            GUARD_CU(events    [i].Release(target));
+            GUARD_CU(events_set[i].Release(target));
         }
 
         // Release frontiers
@@ -272,27 +402,27 @@ struct MgpuSlice
         }*/
 
         //Release all other arrays
-        GUARD_CU(keys_outs     .Release());
-        GUARD_CU(in_length  [0].Release());
-        GUARD_CU(in_length  [1].Release());
-        GUARD_CU(in_length_out .Release());
-        GUARD_CU(in_iteration[0].Release());
-        GUARD_CU(in_iteration[1].Release());
-        GUARD_CU(wait_marker   .Release());
-        GUARD_CU(out_length    .Release());
-        GUARD_CU(vertex_associate_orgs.Release());
-        GUARD_CU(value__associate_orgs.Release());
-        GUARD_CU(stages        .Release());
-        GUARD_CU(to_show       .Release());
-        GUARD_CU(latency_data  .Release());
+        GUARD_CU(keys_outs     .Release(target));
+        GUARD_CU(in_length  [0].Release(target));
+        GUARD_CU(in_length  [1].Release(target));
+        GUARD_CU(in_length_out .Release(target));
+        GUARD_CU(in_iteration[0].Release(target));
+        GUARD_CU(in_iteration[1].Release(target));
+        GUARD_CU(wait_marker   .Release(target));
+        GUARD_CU(out_length    .Release(target));
+        GUARD_CU(vertex_associate_orgs.Release(target));
+        GUARD_CU(value__associate_orgs.Release(target));
+        GUARD_CU(stages        .Release(target));
+        GUARD_CU(to_show       .Release(target));
+        GUARD_CU(latency_data  .Release(target));
 
-        GUARD_CU(org_checkpoint.Release());
-        GUARD_CU(org_d_out     .Release());
-        GUARD_CU(org_offset1   .Release());
-        GUARD_CU(org_offset2   .Release());
-        GUARD_CU(org_queue_idx .Release());
-        GUARD_CU(org_block_idx .Release());
-        GUARD_CU(org_thread_idx.Release());
+        GUARD_CU(org_checkpoint.Release(target));
+        GUARD_CU(org_d_out     .Release(target));
+        GUARD_CU(org_offset1   .Release(target));
+        GUARD_CU(org_offset2   .Release(target));
+        GUARD_CU(org_queue_idx .Release(target));
+        GUARD_CU(org_block_idx .Release(target));
+        GUARD_CU(org_thread_idx.Release(target));
         return retval;
     } // end Release()
 
@@ -319,7 +449,7 @@ struct MgpuSlice
         SizeT  max_queue_length    ,
         SizeT *num_in_nodes        ,
         SizeT *num_out_nodes       ,
-        float  in_sizing = 1.0     ,
+        double trans_factor = 1.0  ,
         bool   skip_makeout_selection = false)
     {
         cudaError_t retval         = cudaSuccess;
@@ -337,12 +467,14 @@ struct MgpuSlice
 
         GUARD_CU(in_length[0].Allocate(num_gpus, util::HOST));
         GUARD_CU(in_length[1].Allocate(num_gpus, util::HOST));
-        GUARD_CU(in_length_out.Init(num_gpus, util::HOST | util::DEVICE,
-            true, cudaHostAllocMapped | cudaHostAllocPortable));
+        //GUARD_CU(in_length_out.Init(num_gpus, util::HOST | util::DEVICE,
+        //    true, cudaHostAllocMapped | cudaHostAllocPortable));
+        GUARD_CU(in_length_out.Allocate(num_gpus, util::HOST | util::DEVICE));
         GUARD_CU(in_iteration[0].Allocate(num_gpus, util::HOST));
         GUARD_CU(in_iteration[1].Allocate(num_gpus, util::HOST));
-        GUARD_CU(out_length .Init(num_gpus, util::HOST | util::DEVICE,
-            true, cudaHostAllocMapped | cudaHostAllocPortable));
+        //GUARD_CU(out_length .Init(num_gpus, util::HOST | util::DEVICE,
+        //    true, cudaHostAllocMapped | cudaHostAllocPortable));
+        GUARD_CU(out_length     .Allocate(num_gpus, util::HOST | util::DEVICE));
         GUARD_CU(vertex_associate_orgs.Allocate(
             max_num_vertex_associates, util::HOST | util::DEVICE));
         GUARD_CU(value__associate_orgs.Allocate(
@@ -354,17 +486,17 @@ struct MgpuSlice
         GUARD_CU(latency_data.Move(util::HOST, util::DEVICE));
 
         // Allocate / create event related variables
-        GUARD_CU(wait_marker .Allocate(num_gpus * 2));
-        GUARD_CU(stages      .Allocate(num_gpus * 2));
-        GUARD_CU(to_show     .Allocate(num_gpus * 2));
+        GUARD_CU(wait_marker .Allocate(num_gpus * 2, util::HOST));
+        GUARD_CU(stages      .Allocate(num_gpus * 2, util::HOST));
+        GUARD_CU(to_show     .Allocate(num_gpus * 2, util::HOST));
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
             wait_marker[gpu] = 0;
         }
         for (int i = 0; i < 4; i++)
         {
-            GUARD_CU(events    [i].Allocate(num_gpus * 2));
-            GUARD_CU(events_set[i].Allocate(num_gpus * 2));
+            GUARD_CU(events    [i].Allocate(num_gpus * 2, util::HOST));
+            GUARD_CU(events_set[i].Allocate(num_gpus * 2, util::HOST));
             for (int gpu = 0; gpu < num_gpus * 2; gpu++)
             {
                 events    [i][gpu] = new cudaEvent_t[num_stages];
@@ -399,13 +531,15 @@ struct MgpuSlice
         {
             for (int t = 0; t < 2; t++)
             {
-                SizeT num_in_node = num_in_nodes[gpu] * in_sizing;
+                SizeT num_in_node = num_in_nodes[gpu] * trans_factor;
 
                 vertex_associate_in[t][gpu].SetName("vertex_associate_in[][]");
-                GUARD_CU(vertex_associate_in[t][gpu].Allocate(num_in_node * max_num_vertex_associates, util::DEVICE));
+                GUARD_CU(vertex_associate_in[t][gpu].Allocate(
+                    num_in_node * max_num_vertex_associates, util::DEVICE));
 
                 value__associate_in[t][gpu].SetName("vertex_associate_in[][]");
-                GUARD_CU(value__associate_in[t][gpu].Allocate(num_in_node * max_num_value__associates, util::DEVICE));
+                GUARD_CU(value__associate_in[t][gpu].Allocate(
+                    num_in_node * max_num_value__associates, util::DEVICE));
 
                 keys_in[t][gpu].SetName("keys_in");
                 if (gpu != 0)
@@ -420,15 +554,20 @@ struct MgpuSlice
         value__associate_out  = new util::Array1D<SizeT, ValueT  > [num_gpus];
         keys_out              = new util::Array1D<SizeT, VertexT > [num_gpus];
 
-        GUARD_CU(vertex_associate_outs. Init(num_gpus, util::HOST | util::DEVICE,
-            true, cudaHostAllocMapped | cudaHostAllocPortable));
-        GUARD_CU(value__associate_outs. Init(num_gpus, util::HOST | util::DEVICE,
-            true, cudaHostAllocMapped | cudaHostAllocPortable));
-        GUARD_CU(keys_outs            . Init(num_gpus, util::HOST | util::DEVICE,
-            true, cudaHostAllocMapped | cudaHostAllocPortable));
+        //GUARD_CU(vertex_associate_outs. Init(num_gpus, util::HOST | util::DEVICE,
+        //    true, cudaHostAllocMapped | cudaHostAllocPortable));
+        GUARD_CU(vertex_associate_outs.Allocate(num_gpus, util::HOST | util::DEVICE));
+
+        //GUARD_CU(value__associate_outs. Init(num_gpus, util::HOST | util::DEVICE,
+        //    true, cudaHostAllocMapped | cudaHostAllocPortable));
+        GUARD_CU(value__associate_outs.Allocate(num_gpus, util::HOST | util::DEVICE));
+
+        //GUARD_CU(keys_outs            . Init(num_gpus, util::HOST | util::DEVICE,
+        //    true, cudaHostAllocMapped | cudaHostAllocPortable));
+        GUARD_CU(keys_outs            .Allocate(num_gpus, util::HOST | util::DEVICE));
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
-            SizeT num_out_node = num_nodes * in_sizing;
+            SizeT num_out_node = num_nodes * trans_factor;
             keys_out   [gpu].SetName("keys_out[]");
             if (gpu != 0)
             {
@@ -439,14 +578,16 @@ struct MgpuSlice
             vertex_associate_out [gpu].SetName("vertex_associate_outs[]");
             if (gpu != 0)
             {
-                GUARD_CU(vertex_associate_out[gpu].Allocate(num_out_node * max_num_vertex_associates, util::DEVICE));
+                GUARD_CU(vertex_associate_out[gpu].Allocate(
+                    num_out_node * max_num_vertex_associates, util::DEVICE));
                 vertex_associate_outs[gpu] = vertex_associate_out[gpu].GetPointer(util::DEVICE);
             }
 
             value__associate_out[gpu].SetName("value__associate_outs[]");
             if (gpu != 0)
             {
-                GUARD_CU(value__associate_out[gpu].Allocate(num_out_node * max_num_value__associates, util::DEVICE));
+                GUARD_CU(value__associate_out[gpu].Allocate(
+                    num_out_node * max_num_value__associates, util::DEVICE));
                 value__associate_outs[gpu] = value__associate_out[gpu].GetPointer(util::DEVICE);
             }
             if (skip_makeout_selection && gpu == 1) break;
@@ -493,7 +634,7 @@ struct MgpuSlice
      * @brief Performs reset work needed for mgpu slice. Must be called prior to each search
      * \return cudaError_t object which indicates the success of all CUDA function calls.
      */
-    cudaError_t Reset()
+    cudaError_t Reset(util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
         //if (retval = util::SetDevice(gpu_idx)) return retval;
