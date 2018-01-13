@@ -383,7 +383,7 @@ int CompareResults(
         {
             if (!quiet)
             {
-                printf("\nWRONG: [%lu]: ", (unsigned long) i);
+                printf("\nFAIL: [%lu]: ", (unsigned long) i);
                 PrintValue<T>(computed[i]);
                 printf(" != ");
                 PrintValue<T>(reference[i]);
@@ -419,7 +419,7 @@ int CompareResults(
     {
         if (!quiet)
         {
-            printf("CORRECT");
+            printf("PASS");
         }
     }
     return flag;
@@ -477,7 +477,7 @@ int CompareResults(
         {
             if (!quiet && flag < 10)
             {
-                printf("\nWRONG: [%lu]: ", (unsigned long) i);
+                printf("\nFAIL: [%lu]: ", (unsigned long) i);
                 PrintValue<float>(computed[i]);
                 printf(" != ");
                 PrintValue<float>(reference[i]);
@@ -512,7 +512,7 @@ int CompareResults(
     {
         if (!quiet)
         {
-            printf("CORRECT");
+            printf("PASS");
         }
     }
     return flag;

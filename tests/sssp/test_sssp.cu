@@ -523,7 +523,7 @@ cudaError_t RunTests(
                 {
                     if (num_errors < 1)
                     {
-                        printf("\nWRONG: [%lu] (", pred);
+                        printf("\nFAIL: [%lu] (", pred);
                         PrintValue<ValueT>(pred_distance);
                         printf(") -> [%lu] (", v);
                         PrintValue<ValueT>(v_distance);
@@ -536,7 +536,7 @@ cudaError_t RunTests(
             {
                 printf("%d errors occurred.\n", num_errors);
             } else {
-                printf("\nCORRECT\n");
+                printf("\nPASS\n");
             }
 
             printf("First 40 preds of the GPU result.\n");
