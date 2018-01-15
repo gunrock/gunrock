@@ -200,6 +200,7 @@ typename GraphT::SizeT Validate_Results(
 {
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::CsrT    CsrT;
 
     SizeT num_errors = 0;
     bool quick = parameters.Get<bool>("quick");

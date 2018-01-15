@@ -102,3 +102,5 @@ gunrockError_t GRError(
     retval = gunrock::util::GRError(cuda_call, message, __FILE__, __LINE__); \
     if (retval) return retval; \
 } \
+
+

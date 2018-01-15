@@ -71,6 +71,7 @@ cudaError_t Set_Srcs(
 {
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::CsrT    CsrT;
     cudaError_t retval = cudaSuccess;
 
     std::string src = parameters.Get<std::string>("src");
