@@ -44,6 +44,7 @@ enum {
 
     REQUIRED_PARAMETER = 0x100,
     OPTIONAL_PARAMETER = 0x200,
+    INTERNAL_PARAMETER = 0x400,
 };
 
 class Parameter_Item
@@ -286,8 +287,8 @@ public:
     }
 
     cudaError_t Get(
-        std::string name,
-        std::string &value)
+        const std::string name,
+        std::string &value) const
     {
         auto it = p_map.find(name);
         if (it == p_map.end())
@@ -302,9 +303,9 @@ public:
 
     template <typename T>
     cudaError_t Get(
-        std::string name,
+        const std::string name,
         T          &value,
-        int         base = 0)
+        int         base = 0) const
     {
         std::string str_value;
         cudaError_t retval = Get(name, str_value);
@@ -327,7 +328,7 @@ public:
     }
 
     template <typename T>
-    T Get(std::string name, int base = 0)
+    T Get(const std::string name, int base = 0) const
     {
         T val;
         Get(name, val, base);
@@ -335,7 +336,7 @@ public:
     }
 
     template <typename T>
-    T Get(const char* name, int base = 0)
+    T Get(const char* name, int base = 0) const
     {
         T val;
         Get(std::string(name), val, base);

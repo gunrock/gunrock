@@ -20,36 +20,37 @@ namespace gunrock {
 namespace app {
 namespace sssp {
 
-cudaError_t UseParameters(
+/**
+ * @brief Speciflying parameters for SSSP Problem
+ * @param parameters The util::Parameter<...> structure holding all parameter info
+ * \return cudaError_t error message(s), if any
+ */
+cudaError_t UseParameters_problem(
     util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
 
-    retval = gunrock::app::UseParameters(parameters);
-    if (retval) return retval;
-
-    retval = parameters.Use<bool>(
+    GUARD_CU(gunrock::app::UseParameters_problem(parameters));
+    GUARD_CU(parameters.Use<bool>(
         "mark-pred",
         util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         false,
         "Whether to mark predecessor info.",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
     return retval;
 }
 
 /**
- * @brief Single-Source Shortest Path Problem structure stores device-side vectors for doing SSSP computing on the GPU.
- *
- * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam _Value               Type of value used for computed values.
- * @tparam _MARK_PREDECESSORS   Whether to mark predecessor value for each node.
+ * @brief Single-Source Shortest Path Problem structure.
+ * @tparam _GraphT  Type of the graph
+ * @tparam _LabelT  Type of labels used in sssp
+ * @tparam _FLAG    Problem flags
  */
 template <
     typename _GraphT,
     typename _LabelT = typename _GraphT::VertexT,
+    typename _ValueT = typename _GraphT::ValueT,
     ProblemFlag _FLAG = Problem_None>
 struct Problem : ProblemBase<_GraphT, _FLAG>
 {
@@ -57,29 +58,25 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     static const ProblemFlag FLAG = _FLAG;
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
-    typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::CsrT    CsrT;
     typedef typename GraphT::GpT     GpT;
-    typedef                  _LabelT LabelT;
+    typedef          _LabelT         LabelT;
+    typedef          _ValueT         ValueT;
 
     typedef ProblemBase   <GraphT, FLAG> BaseProblem;
     typedef DataSliceBase <GraphT, FLAG> BaseDataSlice;
-    typedef unsigned char MaskT;
 
     //Helper structures
 
     /**
-     * @brief Data slice structure which contains SSSP problem specific data.
+     * @brief Data structure containing SSSP-specific data on indivual GPU.
      */
     struct DataSlice : BaseDataSlice
     {
-        // device storage arrays
-        util::Array1D<SizeT, ValueT >    distances  ;     /**< Used for source distance */
-        //util::Array1D<SizeT, VertexT>    visit_lookup;    /**< Used for check duplicate */
-        //util::Array1D<SizeT, float  >    delta;
-        //util::Array1D<SizeT, int    >    sssp_marker;
-        util::Array1D<SizeT, LabelT>     labels; // labels to mark latest iteration the vertex been visited
-        util::Array1D<SizeT, VertexT>    preds ; // predecessors of vertices
+        // sssp-specific storage arrays
+        util::Array1D<SizeT, ValueT >    distances  ; // source distance
+        util::Array1D<SizeT, LabelT >    labels     ; // labels to mark latest iteration the vertex been visited
+        util::Array1D<SizeT, VertexT>    preds      ; // predecessors of vertices
         util::Array1D<SizeT, VertexT>    temp_preds ; // predecessors of vertices
 
         /*
@@ -88,9 +85,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         DataSlice() : BaseDataSlice()
         {
             distances       .SetName("distances"       );
-            //visit_lookup    .SetName("visit_lookup"    );
-            //delta           .SetName("delta"           );
-            //sssp_marker     .SetName("sssp_marker"     );
             labels          .SetName("labels"          );
             preds           .SetName("preds"           );
             temp_preds      .SetName("temp_preds"      );
@@ -104,6 +98,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             Release();
         }
 
+        /*
+         * @brief Releasing allocated memory space
+         * @param target the location to release memory from
+         * \return cudaError_t error message(s), if any
+         */
         cudaError_t Release(util::Location target = util::LOCATION_ALL)
         {
             cudaError_t retval = cudaSuccess;
@@ -111,9 +110,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
             GUARD_CU(distances      .Release(target));
-            //GUARD_CU(visit_lookup  .Release(target));
-            //GUARD_CU(delta         .Release(target));
-            //GUARD_CU(sssp_marker   .Release(target));
             GUARD_CU(labels         .Release(target));
             GUARD_CU(preds          .Release(target));
             GUARD_CU(temp_preds     .Release(target));
@@ -122,22 +118,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         }
 
         /**
-         * @brief initialization function.
-         *
-         * @param[in] num_gpus Number of the GPUs used.
-         * @param[in] gpu_idx GPU index used for testing.
-         * @param[in] use_double_buffer Whether to use double buffer.
-         * @param[in] graph Pointer to the graph we process on.
-         * @param[in] graph_slice Pointer to the GraphSlice object.
-         * @param[in] num_in_nodes
-         * @param[in] num_out_nodes
-         * @param[in] delta_factor Delta factor for delta-stepping.
-         * @param[in] queue_sizing Maximum queue sizing factor.
-         * @param[in] in_sizing
-         * @param[in] skip_makeout_selection
-         * @param[in] keep_node_num
-         *
-         * \return cudaError_t object Indicates the success of all CUDA calls.
+         * @brief initializing sssp-specific data on each gpu
+         * @param     sub_graph sub graph on the GPU.
+         * @param[in] gpu_idx GPU device index
+         * @param[in] target targeting device location
+         * @param[in] flag problem flag containling options
+         * \return cudaError_t error message(s), if any
          */
         cudaError_t Init(
             GraphT        &sub_graph,
@@ -152,50 +138,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(labels    .Allocate(sub_graph.nodes, target));
             if (flag & Mark_Predecessors)
             {
-                GUARD_CU(preds .Allocate(sub_graph.nodes, target));
+                GUARD_CU(preds      .Allocate(sub_graph.nodes, target));
                 GUARD_CU(temp_preds .Allocate(sub_graph.nodes, target));
             }
 
             if (target & util::DEVICE)
             {
-                GUARD_CU(sub_graph.CsrT::row_offsets   .Move(
-                    util::HOST, target,
-                    util::PreDefinedValues<SizeT>::InvalidValue,
-                    0, this -> stream));
-                GUARD_CU(sub_graph.CsrT::column_indices.Move(
-                    util::HOST, target,
-                    util::PreDefinedValues<SizeT>::InvalidValue,
-                    0, this -> stream));
-                GUARD_CU(sub_graph.CsrT::edge_values   .Move(
-                    util::HOST, target,
-                    util::PreDefinedValues<SizeT>::InvalidValue,
-                    0, this -> stream));
+                GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
             }
             return retval;
         } // Init
 
-        /*
-         * @brief Estimate delta factor for delta-stepping.
-         *
-         * @param[in] graph Reference to the graph we process on.
-         *
-         * \return float Delta factor.
-         */
-        /*float EstimatedDelta(const Csr<VertexId, Value, SizeT> &graph) {
-            double  avgV = graph.average_edge_value;
-            int     avgD = graph.average_degree;
-            return avgV * 32 / avgD;
-        }*/
-
         /**
          * @brief Reset problem function. Must be called prior to each run.
-         *
-         * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
-         * @param[in] graph_slice Pointer to the graph slice we process on.
-         * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
-         * @param[in] queue_sizing1 Size scaling factor for work queue allocation.
-         *
-         * \return cudaError_t object Indicates the success of all CUDA calls.
+         * @param[in] target targeting device location
+         * \return cudaError_t error message(s), if any
          */
         cudaError_t Reset(util::Location target = util::DEVICE)
         {
@@ -210,7 +167,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(preds.EnsureSize_(nodes, target));
                 GUARD_CU(temp_preds.EnsureSize_(nodes, target));
             }
-            //GUARD_CU(visit_lookup.EnsureSize_(this -> sub_graph -> nodes, target));
 
             // Reset data
             GUARD_CU(distances.ForEach([]__host__ __device__
@@ -236,14 +192,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 }, nodes, target, this -> stream));
             }
 
-            //GUARD_CU(visit_lookup.ForEach([]__host__ __device__ (VertexT &lookup){
-            //        lookup = util::PreDefinedValues<VertexT>::InvalidValue;
-            //    }, nodes, target, this -> stream));
-
-            //GUARD_CU(sssp_marker.ForEach([]__host__ __device__ (int &marker){
-            //        marker = 0;
-            //    }, nodes, target, this -> stream));
-
             return retval;
         }
     }; // DataSlice
@@ -257,9 +205,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     /**
      * @brief SSSPProblem default constructor
      */
-
-    Problem(ProblemFlag _flag = Problem_None) :
-        BaseProblem(_flag),
+    Problem(
+        util::Parameters &_parameters,
+        ProblemFlag _flag = Problem_None) :
+        BaseProblem(_parameters, _flag),
         data_slices(NULL)
     {
     }
@@ -272,6 +221,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         Release();
     }
 
+    /*
+     * @brief Releasing allocated memory space
+     * @param target the location to release memory from
+     * \return cudaError_t error message(s), if any
+     */
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
@@ -294,17 +248,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
 
     /**
-     * @brief Copy result distancess computed on the GPU back to host-side vectors.
-     *
-     * @param[out] h_distances host-side vector to store computed node distances (distances from the source).
-     * @param[out] h_preds host-side vector to store computed node predecessors (used for extracting the actual shortest path).
-     *
-     *\return cudaError_t object Indicates the success of all CUDA calls.
+     * @brief Copy result distancess computed on GPUs back to host-side arrays.
+     * @param[out] h_distances host array to store computed vertex distances from the source.
+     * @param[out] h_preds host array to store computed vertex predecessors.
+     * \return cudaError_t error message(s), if any
      */
     cudaError_t Extract(
-        ValueT  *h_distances,
-        VertexT *h_preds = NULL,
-        util::Location target = util::DEVICE)
+        ValueT         *h_distances,
+        VertexT        *h_preds     = NULL,
+        util::Location  target      = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
         SizeT nodes = this -> org_graph -> nodes;
@@ -322,7 +274,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     h_distances, nodes, util::HOST));
                 GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
 
-                if ((this -> flag & Mark_Predecessors) == 0) return retval;
+                if ((this -> flag & Mark_Predecessors) == 0)
+                    return retval;
                 GUARD_CU(data_slice.preds.SetPointer(h_preds, nodes, util::HOST));
                 GUARD_CU(data_slice.preds.Move(util::DEVICE, util::HOST));
             }
@@ -384,32 +337,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     /**
      * @brief initialization function.
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Pointer to the CSR graph object we process on. @see Csr
-     * @param[in] inversegraph Pointer to the inversed CSR graph object we process on.
-     * @param[in] num_gpus Number of the GPUs used.
-     * @param[in] gpu_idx GPU index used for testing.
-     * @param[in] partition_method Partition method to partition input graph.
-     * @param[in] streams CUDA stream.
-     * @param[in] delta_factor delta factor for delta-stepping.
-     * @param[in] queue_sizing Maximum queue sizing factor.
-     * @param[in] in_sizing
-     * @param[in] partition_factor Partition factor for partitioner.
-     * @param[in] partition_seed Partition seed used for partitioner.
-     *
-     * \return cudaError_t object Indicates the success of all CUDA calls.
+     * @param[in] parameters data structure holding all parameter info
+     * @param     graph the graph that SSSP processes on
+     * @param[in] location memory location to work on
+     * \return cudaError_t error message(s), if any
      */
     cudaError_t Init(
-            util::Parameters &parameters,
             GraphT           &graph,
             util::Location    target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
-        GUARD_CU(BaseProblem::Init(parameters, graph, target));
+        GUARD_CU(BaseProblem::Init(graph, target));
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
-        if (parameters.Get<bool>("mark-pred"))
+        if (this -> parameters.template Get<bool>("mark-pred"))
             this -> flag = this -> flag | Mark_Predecessors;
 
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
@@ -430,13 +371,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     /**
      * @brief Reset problem function. Must be called prior to each run.
-     *
      * @param[in] src Source node to start.
-     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
-     * @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
-     * @param[in] queue_sizing1
-     *
-     *  \return cudaError_t object Indicates the success of all CUDA calls.
+     * @param[in] location memory location to work on
+     * \return cudaError_t error message(s), if any
      */
     cudaError_t Reset(
             VertexT    src,
@@ -481,13 +418,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         if (target & util::DEVICE)
         {
-            //util::PrintMsg("distances [" + std::to_string(src) +
-            //    " (" + std::to_string(src_) + ")] <- "
-            //    + std::to_string(src_distance));
-            //util::PrintMsg("distances = "
-            //    + util::to_string(data_slices[gpu] -> distances.GetPointer(util::DEVICE))
-            //    + " sizeof(ValueT) = " + std::to_string(sizeof(ValueT)));
-
             GUARD_CU2(cudaMemcpy(
                 data_slices[gpu]->distances.GetPointer(util::DEVICE) + src_,
                 &src_distance, sizeof(ValueT),

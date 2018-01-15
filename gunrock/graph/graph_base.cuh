@@ -22,8 +22,9 @@ namespace graph {
 /**
  * @brief Predefined flags for graph types
  */
-using GraphFlag = unsigned int;
-enum {
+using GraphFlag = uint32_t;
+enum : GraphFlag
+{
     ARRAY_RESERVE   = 0x000F,
 
     GRAPH_NONE      = 0x0000,
@@ -125,6 +126,27 @@ struct GraphBase
         this -> edges = source.edges;
         this -> directed = source.directed;
         return retval;
+    }
+
+    template <typename CooT_in>
+    cudaError_t FromCoo(CooT_in &coo)
+    {
+        Set(coo);
+        return cudaSuccess;
+    }
+
+    template <typename CsrT_in>
+    cudaError_t FromCsr(CsrT_in &csr)
+    {
+        Set(csr);
+        return cudaSuccess;
+    }
+
+    template <typename CscT_in>
+    cudaError_t FromCsc(CscT_in &csc)
+    {
+        Set(csc);
+        return cudaSuccess;
     }
 };
 

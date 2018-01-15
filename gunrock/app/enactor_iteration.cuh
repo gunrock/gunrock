@@ -40,14 +40,14 @@ enum : IterationFlag
 };
 
 /*
- * @brief IterationBase data structure.
+ * @brief IterationLoopBase data structure.
  * @tparam Iteration_Flag
  * @tparam Enactor
  */
 template <
     typename _Enactor,
     IterationFlag _FLAG = Iteration_Default>
-struct IterationBase
+struct IterationLoopBase
 {
 public:
     typedef _Enactor                    Enactor  ;
@@ -62,7 +62,7 @@ public:
     int      gpu_num;
     IterationFlag flag;
 
-    IterationBase() :
+    IterationLoopBase() :
         enactor (NULL),
         gpu_num (0)
     {}

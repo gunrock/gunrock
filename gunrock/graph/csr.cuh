@@ -37,7 +37,8 @@ template<
     typename SizeT   = VertexT,
     typename ValueT  = VertexT,
     GraphFlag _FLAG   = GRAPH_NONE,
-    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
+    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault,
+    bool VALID = true>
 struct Csr :
     public GraphBase<VertexT, SizeT, ValueT, _FLAG | HAS_CSR, cudaHostRegisterFlag>
 {
@@ -131,6 +132,24 @@ struct Csr :
             return retval;
         if (retval = edge_values   .Allocate(edges      , target))
             return retval;
+        return retval;
+    }
+
+    cudaError_t Move(
+        util::Location source,
+        util::Location target,
+        cudaStream_t   stream)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        GUARD_CU(row_offsets   .Move(source, target,
+            util::PreDefinedValues<SizeT>::InvalidValue, 0, stream));
+        GUARD_CU(column_indices.Move(source, target,
+            util::PreDefinedValues<SizeT>::InvalidValue, 0, stream));
+        GUARD_CU(edge_values   .Move(source, target,
+            util::PreDefinedValues<SizeT>::InvalidValue, 0, stream));
+        GUARD_CU(node_values   .Move(source, target,
+            util::PreDefinedValues<SizeT>::InvalidValue, 0, stream));
         return retval;
     }
 
@@ -887,6 +906,38 @@ struct Csr :
 
     /**@}*/
 }; // CSR
+
+template<
+    typename VertexT,
+    typename SizeT  ,
+    typename ValueT ,
+    GraphFlag _FLAG ,
+    unsigned int cudaHostRegisterFlag>
+struct Csr<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
+{
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
+    {
+        return cudaSuccess;
+    }
+
+    template <typename CooT_in>
+    cudaError_t FromCoo(CooT_in &coo)
+    {
+        return cudaSuccess;
+    }
+
+    template <typename CsrT_in>
+    cudaError_t FromCsr(CsrT_in &csr)
+    {
+        return cudaSuccess;
+    }
+
+    template <typename CscT_in>
+    cudaError_t FromCsc(CscT_in &csc)
+    {
+        return cudaSuccess;
+    }
+};
 
 } // namespace graph
 } // namespace gunrock

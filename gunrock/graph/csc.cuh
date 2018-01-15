@@ -36,7 +36,8 @@ template<
     typename SizeT   = VertexT,
     typename ValueT  = VertexT,
     GraphFlag _FLAG   = GRAPH_NONE | HAS_CSC,
-    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
+    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault,
+    bool VALID = true>
 struct Csc :
     public GraphBase<VertexT, SizeT, ValueT, _FLAG | HAS_CSC, cudaHostRegisterFlag>
 {
@@ -361,6 +362,38 @@ struct Csc :
         return row_indices[e];
     }
 }; // CSC
+
+template<
+    typename VertexT,
+    typename SizeT  ,
+    typename ValueT ,
+    GraphFlag _FLAG ,
+    unsigned int cudaHostRegisterFlag>
+struct Csc<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
+{
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
+    {
+        return cudaSuccess;
+    }
+
+    template <typename CooT_in>
+    cudaError_t FromCoo(CooT_in &coo)
+    {
+        return cudaSuccess;
+    }
+
+    template <typename CsrT_in>
+    cudaError_t FromCsr(CsrT_in &csr)
+    {
+        return cudaSuccess;
+    }
+
+    template <typename CscT_in>
+    cudaError_t FromCsc(CscT_in &csc)
+    {
+        return cudaSuccess;
+    }
+};
 
 } // namespace graph
 } // namespace gunrock

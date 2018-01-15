@@ -52,7 +52,7 @@ cudaError_t UseParameters(
 
     retval = parameters.Use<bool>(
         graph_prefix + "undirected",
-        util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         "false",
         "Whether " + graph_prefix + " graph is undirected",
         __FILE__, __LINE__);

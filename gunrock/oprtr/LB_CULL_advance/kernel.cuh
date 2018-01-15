@@ -200,7 +200,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
 
         //if (thread_output_count != 0)
         //    printf("(%4d, %4d) writting %d outputs, offset = %d\n",
-        //        blockIdx.x, threadIdx.x, thread_output_count, output_pos);    
+        //        blockIdx.x, threadIdx.x, thread_output_count, output_pos);
 
         //KernelPolicy::BlockScanT(smem_storage.cub_storage.scan_space)
         //    .ExclusiveSum(thread_output_count, output_pos);
@@ -213,7 +213,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
                         output_pos + thread_output_count);
                 //printf("(%4d, %4d) writing %d outputs, offset = %d\n",
                 //    blockIdx.x, threadIdx.x, output_pos + thread_output_count,
-                //    smem_storage.block_offset); 
+                //    smem_storage.block_offset);
             }
         }
         __syncthreads();
@@ -343,7 +343,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
                         (FLAG & OprtrType_V2E) != 0)
                     {
                         //smem_storage.vertices [threadIdx.x] = input_item;
-                        if (isValid(input_item)) //(input_item >= 0)
+                        if (util::isValid(input_item)) //(input_item >= 0)
                             smem_storage.row_offset[threadIdx.x]
                                 = graph.GetNeighborListOffset(input_item);
                         else
@@ -353,7 +353,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
                     else // if (ADVANCE_TYPE == gunrock::oprtr::advance::E2V ||
                          //ADVANCE_TYPE == gunrock::oprtr::advance::E2E)
                     {
-                        if (isValid(input_item))
+                        if (util::isValid(input_item))
                         {
                             VertexT v = graph.GetEdgeDest(input_item);
                             smem_storage.vertices  [threadIdx.x] = v;
@@ -662,7 +662,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
                         (FLAG & OprtrType_V2E) != 0)
                     {
                         //smem_storage.vertices[threadIdx.x] = input_item;
-                        if (isValid(input_item))
+                        if (util::isValid(input_item))
                             smem_storage.row_offset[threadIdx.x]
                                 = graph.GetNeighborListOffset(input_item);
                         else
@@ -672,7 +672,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
                     else //if ((FLAG & OprtrType_E2V) != 0 ||
                          //    (FLAG & OprtrType_E2E) != 0))
                     {
-                        if (isValid(input_item))
+                        if (util::isValid(input_item))
                         {
                             VertexT v = graph.GetEdgeDest(input_item);
                             smem_storage.vertices  [threadIdx.x] = v;

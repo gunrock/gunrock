@@ -13,42 +13,185 @@
 
 #include <gunrock/gunrock.h>
 
-// graph construction utilities
-#include <gunrock/graphio/market.cuh>
+// Utilities and correctness-checking
+#include <gunrock/util/test_utils.cuh>
+
+// Graph definations
+#include <gunrock/graphio/graphio.cuh>
+#include <gunrock/app/app_base.cuh>
 
 // single-source shortest path includes
 #include <gunrock/app/sssp/sssp_enactor.cuh>
-#include <gunrock/app/sssp/sssp_problem.cuh>
-#include <gunrock/app/sssp/sssp_functor.cuh>
+#include <gunrock/app/sssp/sssp_test.cuh>
 
-#include <moderngpu.cuh>
+namespace gunrock {
+namespace app {
+namespace sssp {
 
-using namespace gunrock;
-using namespace gunrock::util;
-using namespace gunrock::oprtr;
-using namespace gunrock::app::sssp;
+cudaError_t UseParameters(util::Parameters &parameters)
+{
+    cudaError_t retval = cudaSuccess;
+
+    //GUARD_CU(graphio::UseParameters(parameters));
+    GUARD_CU(UseParameters_app    (parameters));
+    GUARD_CU(UseParameters_problem(parameters));
+    GUARD_CU(UseParameters_enactor(parameters));
+
+    GUARD_CU(parameters.Use<std::string>(
+        "src",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        "0",
+        "<Vertex-ID|random|largestdegree> The source vertices\n"
+        "\tIf random, randomly select non-zero degree vertices;\n"
+        "\tIf largestdegree, select vertices with largest degrees",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "src-seed",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        util::PreDefinedValues<int>::InvalidValue,
+        "seed to generate random sources",
+        __FILE__, __LINE__));
+
+    return retval;
+}
 
 /**
- * @brief SSSP_Parameter structure
+ * @brief Run SSSP tests
+ *
+ * @tparam VertexId
+ * @tparam Value
+ * @tparam SizeT
+ * @tparam MARK_PREDECESSORS
+ *
+ * @param[in] info Pointer to info contains parameters and statistics.
+ *
+ * \return cudaError_t object which indicates the success of
+ * all CUDA function calls.
  */
-struct SSSP_Parameter : gunrock::app::TestParameter_Base
+template <typename GraphT>
+cudaError_t RunTests(
+    util::Parameters &parameters,
+    GraphT           &graph,
+    util::Location target = util::DEVICE)
 {
-public:
-    bool   mark_predecessors;
-    int    delta_factor;
-    double max_queue_sizing1;
+    cudaError_t retval = cudaSuccess;
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::ValueT  ValueT;
+    typedef Problem<GraphT  > ProblemT;
+    typedef Enactor<ProblemT> EnactorT;
 
-    SSSP_Parameter()
+    // parse configurations from parameters
+    bool quiet_mode = parameters.Get<bool>("quiet");
+    bool quick_mode = parameters.Get<bool>("quick");
+    bool mark_pred  = parameters.Get<bool>("mark-pred");
+    int  num_runs   = parameters.Get<int >("num-runs");
+    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+    int  num_srcs   = srcs   .size();
+
+    util::CpuTimer    cpu_timer;
+    cpu_timer.Start();
+    //Info<VertexT, SizeT, ValueT> *info = new Info<VertexT, SizeT, ValueT>;
+    //info->Init("SSSP", parameters, graph);  // initialize Info structure
+    //info->info["load_time"] = cpu_timer2.ElapsedMillis();
+
+    // Allocate host-side array (for both reference and GPU-computed results)
+    ValueT  *h_distances = new ValueT[graph.nodes];
+    VertexT *h_preds = (mark_pred ) ? new VertexT[graph.nodes] : NULL;
+
+    // Allocate problem and enactor on GPU, and initialize them
+    ProblemT problem(parameters);
+    EnactorT enactor;
+    GUARD_CU(problem.Init(graph  , target));
+    GUARD_CU(enactor.Init(problem, target));
+    cpu_timer.Stop();
+    //info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
+
+    // perform SSSP
+    //double total_elapsed  = 0.0;
+    double single_elapsed = 0.0;
+    //double max_elapsed    = 0.0;
+    //double min_elapsed    = 1e10;
+    //json_spirit::mArray process_times;
+
+    util::PrintMsg("Using advance mode "
+        + parameters.Get<std::string>("advance-mode"), !quiet_mode);
+    util::PrintMsg("Using filter mode "
+        + parameters.Get<std::string>("filter-mode"), !quiet_mode);
+
+    VertexT src;
+    for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        delta_factor      =    32;
-        mark_predecessors = false;
-        max_queue_sizing1 =  -1.0;
+        src = srcs[run_num % num_srcs];
+        GUARD_CU(problem.Reset(src, target));
+        GUARD_CU(enactor.Reset(src, target));
+        util::PrintMsg("__________________________", !quiet_mode);
+
+        cpu_timer.Start();
+        GUARD_CU(enactor.Enact(src));
+        cpu_timer.Stop();
+        single_elapsed = cpu_timer.ElapsedMillis();
+        //total_elapsed += single_elapsed;
+        //process_times.push_back(single_elapsed);
+        //if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
+        //if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
+        util::PrintMsg("--------------------------\nRun "
+            + std::to_string(run_num) + " elapsed: "
+            + std::to_string(single_elapsed) + " ms, src = "
+            + std::to_string(src) + ", #iterations = "
+            + std::to_string(enactor.enactor_slices[0]
+                .enactor_stats.iteration), !quiet_mode);
+    }
+    //total_elapsed /= num_runs;
+    //info -> info["process_times"] = process_times;
+    //info -> info["min_process_time"] = min_elapsed;
+    //info -> info["max_process_time"] = max_elapsed;
+
+    cpu_timer.Start();
+    // Copy out results
+    GUARD_CU(problem.Extract(h_distances, h_preds));
+    SizeT num_errors = app::sssp::Validate_Results(
+        parameters, graph, src, h_distances, h_preds);
+
+    //info->ComputeTraversalStats(  // compute running statistics
+    //    enactor.enactor_stats.GetPointer(), total_elapsed, h_distances);
+
+    if (!quiet_mode)
+    {
+        //Display_Memory_Usage(num_gpus, gpu_idx, org_size, problem);
+        #ifdef ENABLE_PERFORMANCE_PROFILING
+            //Display_Performance_Profiling(enactor);
+        #endif
     }
 
-    ~SSSP_Parameter()
+    // Clean up
+    util::PrintMsg("1");
+    GUARD_CU(enactor.Release(target));
+    util::PrintMsg("2");
+    GUARD_CU(problem.Release(target));
+    delete[] h_distances  ; h_distances   = NULL;
+    util::PrintMsg("3");
+    delete[] h_preds      ; h_preds       = NULL;
+    util::PrintMsg("4");
+    cpu_timer.Stop();
+    //info->info["postprocess_time"] = cpu_timer.ElapsedMillis();
+    //info->info["total_time"] = cpu_timer.ElapsedMillis();
+
+    if (!parameters.Get<bool>("quiet"))
     {
+        //info->DisplayStats();  // display collected statistics
     }
-};
+
+    //info->CollectInfo();  // collected all the info and put into JSON mObject
+    //delete info; info=NULL;
+    util::PrintMsg("5");
+    return retval;
+}
+
+} // namespace sssp
+} // namespace app
+} // namespace gunrock
 
 /**
  * @brief Run test
@@ -62,12 +205,13 @@ public:
  *
  * \return Elapsed run time in milliseconds
  */
-template <
+/*template <
     typename VertexId,
     typename SizeT,
     typename Value,
     bool MARK_PREDECESSORS >
 float runSSSP(GRGraph* output, SSSP_Parameter *parameter);
+*/
 
 /**
  * @brief Run test
@@ -81,7 +225,7 @@ float runSSSP(GRGraph* output, SSSP_Parameter *parameter);
  *
  * \return Elapsed run time in milliseconds
  */
-template <
+/*template <
     typename    VertexId,
     typename    SizeT,
     typename    Value>
@@ -92,137 +236,7 @@ float markPredecessorsSSSP(GRGraph* output, SSSP_Parameter *parameter)
     else
         return runSSSP<VertexId, SizeT, Value, false>(output, parameter);
 }
-
-/**
- * @brief Run test
- *
- * @tparam VertexId          Vertex identifier type*
- * @tparam SizeT             Graph size type
- * @tparam Value             Attribute type
- * @tparam MARK_PREDECESSORS Enable mark predecessors
- *
- * @param[out] output    Pointer to output graph structure of the problem
- * @param[in]  parameter primitive-specific test parameters
- *
- * \return Elapsed run time in milliseconds
- */
-template <
-    typename VertexId,
-    typename SizeT,
-    typename Value,
-    bool MARK_PREDECESSORS >
-float runSSSP(GRGraph* output, SSSP_Parameter *parameter)
-{
-    typedef SSSPProblem < VertexId,
-            SizeT,
-            Value,
-            MARK_PREDECESSORS > Problem;
-
-    typedef SSSPEnactor < Problem>
-            //INSTRUMENT,
-            //DEBUG,
-            //SIZE_CHECK >
-            Enactor;
-
-    Csr<VertexId, SizeT, Value>
-        *graph = (Csr<VertexId, SizeT, Value>*)parameter->graph;
-    bool          quiet              = parameter -> g_quiet;
-    int           max_grid_size      = parameter -> max_grid_size;
-    int           num_gpus           = parameter -> num_gpus;
-    int           num_iters          = parameter -> iterations;
-    double        max_queue_sizing   = parameter -> max_queue_sizing;
-    double        max_queue_sizing1   = parameter -> max_queue_sizing1;
-    double        max_in_sizing      = parameter -> max_in_sizing;
-    ContextPtr   *context            = (ContextPtr*)parameter -> context;
-    std::string   partition_method   = parameter -> partition_method;
-    int          *gpu_idx            = parameter -> gpu_idx;
-    cudaStream_t *streams            = parameter -> streams;
-    float         partition_factor   = parameter -> partition_factor;
-    int           partition_seed     = parameter -> partition_seed;
-    bool          g_stream_from_host = parameter -> g_stream_from_host;
-    int           delta_factor       = parameter -> delta_factor;
-    std::string   traversal_mode     = parameter -> traversal_mode;
-    bool          instrument         = parameter -> instrumented;
-    bool          debug              = parameter -> debug;
-    bool          size_check         = parameter -> size_check;
-    size_t       *org_size           = new size_t[num_gpus];
-    // Allocate host-side distance arrays
-    Value    *h_distances = new Value[graph->nodes];
-    VertexId *h_preds  = MARK_PREDECESSORS ? new VertexId[graph->nodes] : NULL;
-    if (max_queue_sizing < 1.2) max_queue_sizing=1.2;
-
-    for (int gpu = 0; gpu < num_gpus; gpu++)
-    {
-        size_t dummy;
-        cudaSetDevice(gpu_idx[gpu]);
-        cudaMemGetInfo(&(org_size[gpu]), &dummy);
-    }
-
-    Problem* problem = new Problem;  // Allocate problem on GPU
-    util::GRError(
-        problem->Init(
-            g_stream_from_host,
-            graph,
-            NULL,
-            num_gpus,
-            gpu_idx,
-            partition_method,
-            streams,
-            delta_factor,
-            max_queue_sizing,
-            max_in_sizing,
-            partition_factor,
-            partition_seed),
-        "Problem SSSP Initialization Failed", __FILE__, __LINE__);
-
-    Enactor* enactor = new Enactor(
-        num_gpus, gpu_idx, instrument, debug, size_check);  // enactor map
-    util::GRError(
-        enactor->Init (context, problem, max_grid_size, traversal_mode),
-        "SSSP Enactor init failed", __FILE__, __LINE__);
-
-    // Perform SSSP
-    CpuTimer cpu_timer;
-    float elapsed = 0.0f;
-    for (int i = 0; i < num_iters; ++i)
-    {
-        printf("Round %d of sssp.\n", i+1);
-
-        util::GRError(
-                problem->Reset(parameter->src[i], enactor->GetFrontierType(), max_queue_sizing, max_queue_sizing1),
-                "SSSP Problem Data Reset Failed", __FILE__, __LINE__);
-        util::GRError(
-                enactor->Reset(), "SSSP Enactor Reset failed", __FILE__, __LINE__);
-
-        cpu_timer.Start();
-        util::GRError(
-                enactor->Enact(parameter->src[i], traversal_mode),
-                "SSSP Problem Enact Failed", __FILE__, __LINE__);
-        cpu_timer.Stop();
-
-        elapsed += cpu_timer.ElapsedMillis();
-    }
-
-    // Copy out results
-    util::GRError(
-        problem->Extract(h_distances, h_preds),
-        "SSSP Problem Data Extraction Failed", __FILE__, __LINE__);
-
-    output->node_value1 = (Value*)&h_distances[0];
-    if (MARK_PREDECESSORS) output->node_value2 = (VertexId*)&h_preds[0];
-
-    if (!quiet)
-    {
-        printf(" GPU Single-Source Shortest Path finished in %lf msec.\n", elapsed);
-    }
-
-    // Clean up
-    if (org_size) { delete[] org_size; org_size = NULL; }
-    if (enactor ) { delete   enactor ; enactor  = NULL; }
-    if (problem ) { delete   problem ; problem  = NULL; }
-
-    return elapsed;
-}
+*/
 
 /**
  * @brief Dispatch function to handle configurations
@@ -236,7 +250,7 @@ float runSSSP(GRGraph* output, SSSP_Parameter *parameter)
  *
  * \return Elapsed run time in milliseconds
  */
-float dispatchSSSP(
+/*float dispatchSSSP(
     GRGraph*       grapho,
     const GRGraph* graphi,
     const GRSetup* config,
@@ -339,6 +353,7 @@ float dispatchSSSP(
     free(parameter->src);
     return elapsed_time;
 }
+*/
 
 /*
  * @brief Entry of gunrock_sssp function
@@ -348,7 +363,7 @@ float dispatchSSSP(
  * @param[in]  config Gunrock primitive specific configurations
  * @param[in]  data_t Gunrock data type structure
  */
-float gunrock_sssp(
+/*float gunrock_sssp(
     GRGraph*       grapho,
     const GRGraph* graphi,
     const GRSetup* config,
@@ -391,7 +406,7 @@ float gunrock_sssp(
     if (!config -> quiet) { printf("\n"); }
 
     return dispatchSSSP(grapho, graphi, config, data_t, context, streams);
-}
+}*/
 
 /*
  * @brief Simple interface take in CSR arrays as input
@@ -403,17 +418,22 @@ float gunrock_sssp(
  * @param[in]  col_indices CSR-formatted graph input column indices
  * @param[in]  source      Source to begin traverse
  */
+/*template <
+    typename VertexT,
+    typename SizeT,
+    typename GValueT,
+    typename SSSPValueT>
 float sssp(
-    unsigned int*       distances,
-    int*                preds,
-    const int           num_nodes,
-    const int           num_edges,
-    const int*          row_offsets,
-    const int*          col_indices,
-    const unsigned int* edge_values,
-    const int           num_iters,
-    int*                source,
-    const bool          mark_preds)
+          SSSPValueT *distances,
+          VertexT    *preds,
+    const SizeT       num_nodes,
+    const SizeT       num_edges,
+    const SizeT      *row_offsets,
+    const VertexT    *col_indices,
+    const GValueT    *edge_values,
+    const int         num_runs,
+          VertexT    *source,
+    const bool        mark_preds)
 {
     struct GRTypes data_t;          // primitive-specific data types
     data_t.VTXID_TYPE = VTXID_INT;  // integer vertex identifier
@@ -440,9 +460,9 @@ float sssp(
     if (graphi) free(graphi);
     if (grapho) free(grapho);
     if (config) free(config);
-    
+
     return elapsed_time;
-}
+}*/
 
 // Leave this at the end of the file
 // Local Variables:
