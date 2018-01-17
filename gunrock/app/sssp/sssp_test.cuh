@@ -14,12 +14,18 @@
 
 #pragma once
 
-// Boost includes for CPU Dijkstra SSSP reference algorithms
-#include <boost/config.hpp>
-#include <boost/graph/graph_traits.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/dijkstra_shortest_paths.hpp>
-#include <boost/property_map/property_map.hpp>
+#ifdef BOOST_FOUND
+    // Boost includes for CPU Dijkstra SSSP reference algorithms
+    #include <boost/config.hpp>
+    #include <boost/graph/graph_traits.hpp>
+    #include <boost/graph/adjacency_list.hpp>
+    #include <boost/graph/dijkstra_shortest_paths.hpp>
+    #include <boost/property_map/property_map.hpp>
+#else
+    #include <queue>
+    #include <vector>
+    #include <utility>
+#endif
 
 namespace gunrock {
 namespace app {
@@ -56,38 +62,38 @@ void DisplaySolution(T *array, SizeT length)
  *****************************************************************************/
 
 /**
- * @brief A simple CPU-based reference SSSP ranking implementation.
- *
- * @tparam VertexId
- * @tparam Value
- * @tparam SizeT
- * @tparam MARK_PREDECESSORS
- *
- * @param[in] graph Reference to the CSR graph we process on
- * @param[in] node_values Host-side vector to store CPU computed labels for each node
- * @param[in] node_preds Host-side vector to store CPU computed predecessors for each node
- * @param[in] src Source node where SSSP starts
- * @param[in] quiet Don't print out anything to stdout
+ * @brief Simple CPU-based reference SSSP ranking implementations
+ * @tparam      GraphT        Type of the graph
+ * @tparam      ValueT        Type of the distances
+ * @param[in]   graph         Input graph
+ * @param[out]  distances     Computed distances from the source to each vertex
+ * @param[out]  preds         Computed predecessors for each vertex
+ * @param[in]   src           The source vertex
+ * @param[in]   quiet         Whether to print out anything to stdout
+ * @param[in]   mark_preds    Whether to compute predecessor info
+ * \return      double        Time taken for the SSSP
  */
 template <
-    typename GraphT>
-void CPU_Reference(
+    typename GraphT,
+    typename ValueT = typename GraphT::ValueT>
+double CPU_Reference(
     const    GraphT          &graph,
-    typename GraphT::ValueT  *distances,
+                     ValueT  *distances,
     typename GraphT::VertexT *preds,
     typename GraphT::VertexT  src,
     bool                      quiet,
     bool                      mark_preds)
 {
+#ifdef BOOST_FOUND
     using namespace boost;
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
-    typedef typename GraphT::ValueT  ValueT;
+    typedef typename GraphT::ValueT  GValueT;
     typedef typename GraphT::CsrT    CsrT;
 
     // Prepare Boost Datatype and Data structure
     typedef adjacency_list<vecS, vecS, directedS, no_property,
-            property <edge_weight_t, ValueT> > BGraphT;
+            property <edge_weight_t, GValueT> > BGraphT;
 
     typedef typename graph_traits<BGraphT>::vertex_descriptor vertex_descriptor;
     typedef typename graph_traits<BGraphT>::edge_descriptor edge_descriptor;
@@ -95,7 +101,7 @@ void CPU_Reference(
     typedef std::pair<VertexT, VertexT> EdgeT;
 
     EdgeT   *edges = ( EdgeT*)malloc(sizeof( EdgeT) * graph.edges);
-    ValueT *weight = (ValueT*)malloc(sizeof(ValueT) * graph.edges);
+    GValueT *weight = (GValueT*)malloc(sizeof(GValueT) * graph.edges);
 
     for (VertexT v = 0; v < graph.nodes; ++v)
     {
@@ -141,8 +147,8 @@ void CPU_Reference(
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
 
-    util::PrintMsg("CPU SSSP finished in " + std::to_string(elapsed)
-        + " msec.", !quiet);
+    //util::PrintMsg("CPU SSSP finished in " + std::to_string(elapsed)
+    //    + " msec.", !quiet);
 
     typedef std::pair<VertexT, ValueT> PairT;
     PairT* sort_dist = new PairT[graph.nodes];
@@ -183,8 +189,83 @@ void CPU_Reference(
             preds[v] = sort_pred[v].second;
         delete[] sort_pred; sort_pred = NULL;
     }
+
+    return elapsed;
+#else
+
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    typedef std::pair<VertexT, ValueT> PairT;
+    struct GreaterT
+    {
+        bool operator()(const PairT& lhs, const PairT& rhs)
+        {
+            return lhs.second > rhs.second;
+        }
+    };
+    typedef std::priority_queue<PairT, std::vector<PairT>, GreaterT> PqT;
+
+    for (VertexT v = 0; v < graph.nodes; v++)
+    {
+        distances[v] = util::PreDefinedValues<ValueT>::MaxValue;
+        if (mark_preds && preds != NULL)
+            preds[v] = util::PreDefinedValues<VertexT>::InvalidValue;
+    }
+    distances[src] = 0;
+    if (mark_preds && preds != NULL)
+        preds[src] = src;
+
+    PqT pq;
+    pq.push(std::make_pair(src, 0));
+    util::CpuTimer cpu_timer;
+    cpu_timer.Start();
+    while (!pq.empty())
+    {
+        auto pair = pq.top();
+        pq.pop();
+        VertexT v = pair.first;
+        ValueT v_distance = pair.second;
+        if (v_distance > distances[v])
+            continue;
+
+        SizeT e_start = graph.GetNeighborListOffset(v);
+        SizeT e_end = e_start + graph.GetNeighborListLength(v);
+        for (SizeT e = e_start; e < e_end; e++)
+        {
+            VertexT u = graph.GetEdgeDest(e);
+            ValueT u_distance = v_distance + graph.edge_values[e];
+            if (u_distance < distances[u])
+            {
+                distances[u] = u_distance;
+                if (mark_preds && preds != NULL)
+                    preds[u] = v;
+                pq.push(std::make_pair(u, u_distance));
+            }
+        }
+    }
+    cpu_timer.Stop();
+    float elapsed = cpu_timer.ElapsedMillis();
+    //util::PrintMsg("CPU SSSP finished in " + std::to_string(elapsed)
+    //    + " msec.", !quiet);
+
+    return elapsed;
+#endif
 }
 
+/**
+ * @brief Validation of SSSP results
+ * @tparam     GraphT        Type of the graph
+ * @tparam     ValueT        Type of the distances
+ * @param[in]  parameters    Excution parameters
+ * @param[in]  graph         Input graph
+ * @param[in]  src           The source vertex
+ * @param[in]  h_distances   Computed distances from the source to each vertex
+ * @param[in]  h_preds       Computed predecessors for each vertex
+ * @param[in]  ref_distances Reference distances from the source to each vertex
+ * @param[in]  ref_preds     Reference predecessors for each vertex
+ * @param[in]  verbose       Whether to output detail comparsions
+ * \return     GraphT::SizeT Number of errors
+ */
 template <
     typename GraphT,
     typename ValueT = typename GraphT::ValueT>
@@ -203,12 +284,12 @@ typename GraphT::SizeT Validate_Results(
     typedef typename GraphT::CsrT    CsrT;
 
     SizeT num_errors = 0;
-    bool quick = parameters.Get<bool>("quick");
+    //bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
     bool mark_pred = parameters.Get<bool>("mark-pred");
 
     // Verify the result
-    if (!quick && ref_distances != NULL)
+    if (ref_distances != NULL)
     {
         for (VertexT v = 0; v < graph.nodes; v++)
         {
@@ -227,7 +308,7 @@ typename GraphT::SizeT Validate_Results(
             num_errors += errors_num;
         }
     }
-    else if (!quick && ref_distances == NULL)
+    else if (ref_distances == NULL)
     {
         util::PrintMsg("Distance Validity: ", !quiet, false);
         SizeT errors_num = 0;
@@ -280,7 +361,7 @@ typename GraphT::SizeT Validate_Results(
         util::PrintMsg("");
     }
 
-    if (mark_pred && !quick)
+    if (mark_pred)
     {
         util::PrintMsg("Predecessors Validity: ", !quiet, false);
         SizeT errors_num = 0;

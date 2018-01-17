@@ -148,7 +148,48 @@ struct GraphBase
         Set(csc);
         return cudaSuccess;
     }
+
+    SizeT GetNeighborListLength(const VertexT &v)
+    {
+        return 0;
+    }
 };
+
+/**
+ * @brief Get the average degree of all the nodes in graph
+ */
+template <typename GraphT>
+double GetAverageDegree(GraphT &graph)
+{
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    double mean = 0, count = 0;
+    for (VertexT v = 0; v < graph.nodes; ++v)
+    {
+        count += 1;
+        mean += (graph.GetNeighborListLength(v) - mean) / count;
+    }
+    return mean;
+}
+
+/**
+ * @brief Get the average degree of all the nodes in graph
+ */
+template <typename GraphT>
+double GetStddevDegree(GraphT &graph)
+{
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    auto average_degree = GetAverageDegree(graph);
+
+    float accum = 0.0f;
+    for (VertexT v=0; v < graph.nodes; ++v)
+    {
+        float d = graph.GetNeighborListLength(v);
+        accum += (d - average_degree) * (d - average_degree);
+    }
+    return sqrt(accum / (graph.nodes-1));
+}
 
 } // namespace graph
 } // namespace gunrock

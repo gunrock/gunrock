@@ -98,12 +98,9 @@ cudaError_t ReadMarketStream(
     bool  array = false; //whether the mtx file is in dense array format
 
     time_t mark0 = time(NULL);
-    if (!quiet)
-    {
-        util::PrintMsg("  Parsing MARKET COO format" + (
-            (GraphT::FLAG & graph::HAS_EDGE_VALUES) ?
-            " edge-value-seed = " + std::to_string(edge_value_seed) : ""));
-    }
+    util::PrintMsg("  Parsing MARKET COO format" + (
+        (GraphT::FLAG & graph::HAS_EDGE_VALUES) ?
+        " edge-value-seed = " + std::to_string(edge_value_seed) : ""), !quiet);
     if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
         srand(edge_value_seed);
 
@@ -165,16 +162,13 @@ cudaError_t ReadMarketStream(
             nodes = ll_nodes_x;
             edges = ll_edges;
 
-            if (!quiet)
-            {
-                util::PrintMsg(" (" +
-                    std::to_string(ll_nodes_x) + " nodes, " +
-                    std::to_string(ll_edges) + " directed edges)... ");
-            }
+            util::PrintMsg(" (" +
+                std::to_string(ll_nodes_x) + " nodes, " +
+                std::to_string(ll_edges) + " directed edges)... ", !quiet);
 
             // Allocate coo graph
-            if (retval = graph.CooT::Allocate(nodes + ((vertex_start_from_zero) ? 0 : 1), edges, util::HOST))
-                return retval;
+            GUARD_CU(graph.CooT::Allocate(nodes
+                + ((vertex_start_from_zero) ? 0 : 1), edges, util::HOST));
 
             /*unsigned long long allo_size = sizeof(EdgeTupleType);
             allo_size = allo_size * edges;
@@ -202,8 +196,7 @@ cudaError_t ReadMarketStream(
             }
             if (edges_read >= edges)
             {
-                if (retval = graph.CooT::Release())
-                    return retval;
+                GUARD_CU(graph.CooT::Release());
                 return util::GRError(
                     "Error parsing MARKET graph: "
                     "encountered more than " +
@@ -235,8 +228,7 @@ cudaError_t ReadMarketStream(
 
                 else if (array || num_input < 2)
                 {
-                    if (retval = graph.CooT::Release())
-                        return retval;
+                    GUARD_CU(graph.CooT::Release());
                     return util::GRError(
                         "Error parsing MARKET graph: "
                         "badly formed edge",
@@ -275,8 +267,7 @@ cudaError_t ReadMarketStream(
 
                 else if (array || (num_input != 2))
                 {
-                    if (retval = graph.CooT::Release())
-                        return retval;
+                    GUARD_CU(graph.CooT::Release());
                     return util::GRError(
                         "Error parsing MARKET graph: "
                         "badly formed edge",
@@ -328,8 +319,7 @@ cudaError_t ReadMarketStream(
 
     if (edges_read != edges)
     {
-        if (retval = graph.CooT::Release())
-            return retval;
+        GUARD_CU(graph.CooT::Release());
         return util::GRError("Error parsing MARKET graph: "
             "only " + std::to_string(edges_read) +
             "/" + std::to_string(edges) + " edges read",
@@ -338,20 +328,16 @@ cudaError_t ReadMarketStream(
 
     if (vertex_start_from_zero)
     {
-        if (retval = edge_pairs.ForEach(
+        GUARD_CU(edge_pairs.ForEach(
             []__host__ __device__ (EdgePairT &edge_pair){
                 edge_pair.x -= 1;
                 edge_pair.y -= 1;
-            }, edges, util::HOST))
-            return retval;
+            }, edges, util::HOST));
     }
 
     time_t mark1 = time(NULL);
-    if (!quiet)
-    {
-        util::PrintMsg("Done parsing (" +
-            std::to_string(mark1 - mark0) + " s).");
-    }
+    util::PrintMsg("Done parsing (" +
+        std::to_string(mark1 - mark0) + " s).", !quiet);
 
     // Convert COO to CSR
     /*csr_graph.template FromCoo<LOAD_VALUES>(output_file, coo,
@@ -396,25 +382,16 @@ cudaError_t BuildMarketGraph(
     bool quiet = parameters.Get<bool>("quiet");
     if (filename == "")
     { // Read from stdin
-        if (!quiet)
-        {
-            util::PrintMsg("Reading from stdin:");
-        }
-        if (retval = ReadMarketStream(
-            stdin, parameters, graph, graph_prefix))
-        {
-            return retval;
-        }
+        util::PrintMsg("Reading from stdin:", !quiet);
+        GUARD_CU(ReadMarketStream(
+            stdin, parameters, graph, graph_prefix));
     }
 
     else { // Read from file
         FILE *f_in = fopen(filename.c_str(), "r");
         if (f_in)
         {
-            if (!quiet)
-            {
-                util::PrintMsg("Reading from " + filename + ":");
-            }
+            util::PrintMsg("Reading from " + filename + ":", !quiet);
             if (retval = ReadMarketStream(
                 f_in, parameters, graph, graph_prefix))
             {
@@ -446,10 +423,8 @@ cudaError_t Read(
 {
     cudaError_t retval = cudaSuccess;
     bool quiet = parameters.Get<bool>("quiet");
-    if (!quiet)
-    {
-        util::PrintMsg("Loading Matrix-market coordinate-formatted " + graph_prefix + "graph ...");
-    }
+    util::PrintMsg("Loading Matrix-market coordinate-formatted "
+        + graph_prefix + "graph ...", !quiet);
 
     std::string filename = parameters.Get<std::string>(
         graph_prefix + "graph-file");
@@ -464,11 +439,19 @@ cudaError_t Read(
     //boost::filesystem::path market_filename_path(market_filename);
     //file_stem = market_filename_path.stem().string();
     //info["dataset"] = file_stem;
-    if (retval = BuildMarketGraph(
-        filename, parameters, graph, graph_prefix))
+    if (parameters.UseDefault("dataset"))
     {
-        return retval;
+        std::string dir, file, extension;
+        util::SeperateFileName(filename, dir, file, extension);
+        //util::PrintMsg("filename = " + filename
+        //    + ", dir = " + dir
+        //    + ", file = " + file
+        //    + ", extension = " + extension);
+        parameters.Set("dataset", file);
     }
+
+    GUARD_CU(BuildMarketGraph(
+        filename, parameters, graph, graph_prefix));
     return retval;
 }
 
@@ -481,9 +464,8 @@ static cudaError_t Load(
     std::string graph_prefix = "")
 {
     cudaError_t retval = cudaSuccess;
-    retval = Read(parameters, graph, graph_prefix);
-    if (retval) return retval;
-    retval = graph.FromCoo(graph, true);
+    GUARD_CU(Read(parameters, graph, graph_prefix));
+    GUARD_CU(graph.FromCoo(graph, true));
     return retval;
 }
 };
@@ -502,11 +484,9 @@ static cudaError_t Load(
         GraphT::FLAG | graph::HAS_COO, GraphT::cudaHostRegisterFlag> CooT;
     cudaError_t retval = cudaSuccess;
     CooT coo;
-    retval = Read(parameters, coo, graph_prefix);
-    if (retval) return retval;
-    retval = graph.FromCoo(coo);
-    if (retval) return retval;
-    retval = coo.Release();
+    GUARD_CU(Read(parameters, coo, graph_prefix));
+    GUARD_CU(graph.FromCoo(coo));
+    GUARD_CU(coo.Release());
     return retval;
 }
 };
@@ -533,10 +513,8 @@ cudaError_t Write(
     cudaError_t retval = cudaSuccess;
 
     bool quiet = parameters.Get<bool>("quiet");
-    if (!quiet)
-    {
-        util::PrintMsg("Saving Matrix-market coordinate-formatted " + graph_prefix + "graph ...");
-    }
+    util::PrintMsg("Saving Matrix-market coordinate-formatted "
+        + graph_prefix + "graph ...", !quiet);
 
     std::string filename = parameters.Get<std::string>(
         graph_prefix + "output-file");
@@ -548,7 +526,8 @@ cudaError_t Write(
         fout << "%%MatrixMarket matrix coordinate pattern";
         if (graph.undirected) fout << " symmetric";
         fout << std::endl;
-        fout << graph.nodes << " " << graph.nodes << " " << graph.edges << std::endl;
+        fout << graph.nodes << " " << graph.nodes << " "
+             << graph.edges << std::endl;
         for (SizeT e=0; e<graph.edges; e++)
         {
             EdgePairT &edge_pair = graph.CooT::edge_pairs[e];

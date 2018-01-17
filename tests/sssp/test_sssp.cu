@@ -21,8 +21,20 @@ using namespace gunrock;
 * Main
 ******************************************************************************/
 
+/**
+ * @brief Enclosure to the main function
+ */
 struct main_struct
 {
+    /**
+     * @brief the actual main function, after type switching
+     * @tparam VertexT    Type of vertex identifier
+     * @tparam SizeT      Type of graph size, i.e. type of edge identifier
+     * @tparam ValueT     Type of edge values
+     * @param  parameters Command line parameters
+     * @param  v,s,val    Place holders for type deduction
+     * \return cudaError_t error message(s), if any
+     */
     template <
         typename VertexT, // Use int as the vertex identifier
         typename SizeT,   // Use int as the graph size type
@@ -47,24 +59,50 @@ struct main_struct
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
         GUARD_CU(app::Set_Srcs    (parameters, graph));
+        ValueT  **ref_distances = NULL;
+        int num_srcs = 0;
+        bool quick = parameters.Get<bool>("quick");
         // compute reference CPU SSSP solution for source-distance
-        /*if (!quick_mode)
+        if (!quick)
         {
-            if (!quiet_mode)
+            bool quiet = parameters.Get<bool>("quiet");
+            std::string validation = parameters.Get<std::string>("validation");
+            util::PrintMsg("Computing reference value ...", !quiet);
+            std::vector<VertexT> srcs
+                = parameters.Get<std::vector<VertexT> >("srcs");
+            num_srcs = srcs.size();
+            SizeT nodes = graph.nodes;
+            ref_distances = new ValueT*[num_srcs];
+            for (int i = 0; i < num_srcs; i++)
             {
-                printf("Computing reference value ...\n");
+                ref_distances[i] = new ValueT[nodes];
+                VertexT src = srcs[i];
+                util::PrintMsg("__________________________", !quiet);
+                float elapsed = app::sssp::CPU_Reference(
+                    graph.csr(), ref_distances[i], NULL,
+                    src, quiet, false);
+                util::PrintMsg("--------------------------\nRun "
+                    + std::to_string(i) + " elapsed: "
+                    + std::to_string(elapsed) + " ms, src = "
+                    + std::to_string(src), !quiet);
             }
-            ReferenceSssp(
-                graph, ref_distances, ref_preds,
-                src, quiet_mode, mark_pred);
-        }*/
+        }
 
         std::vector<std::string> switches{"mark-pred", "advance-mode"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [](util::Parameters &parameters, GraphT &graph)
+            [ref_distances](util::Parameters &parameters, GraphT &graph)
             {
-                return app::sssp::RunTests(parameters, graph);
+                return app::sssp::RunTests(parameters, graph, ref_distances);
             }));
+
+        if (!quick)
+        {
+            for (int i = 0; i < num_srcs; i ++)
+            {
+                delete[] ref_distances[i]; ref_distances[i] = NULL;
+            }
+            delete[] ref_distances; ref_distances = NULL;
+        }
         return retval;
     }
 };

@@ -33,15 +33,19 @@ namespace graph {
  * @tparam ValueT Associated value type.
  */
 template<
-    typename VertexT = int,
-    typename SizeT   = VertexT,
-    typename ValueT  = VertexT,
+    typename _VertexT = int,
+    typename _SizeT   = _VertexT,
+    typename _ValueT  = _VertexT,
     GraphFlag _FLAG   = GRAPH_NONE,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault,
     bool VALID = true>
 struct Csr :
-    public GraphBase<VertexT, SizeT, ValueT, _FLAG | HAS_CSR, cudaHostRegisterFlag>
+    public GraphBase<_VertexT, _SizeT, _ValueT,
+        _FLAG | HAS_CSR, cudaHostRegisterFlag>
 {
+    typedef _VertexT VertexT;
+    typedef _SizeT   SizeT;
+    typedef _ValueT  ValueT;
     static const GraphFlag FLAG = _FLAG | HAS_CSR;
     static const util::ArrayFlag ARRAY_FLAG =
         util::If_Val<(FLAG & GRAPH_PINNED) != 0, (FLAG & ARRAY_RESERVE) | util::PINNED,
@@ -365,7 +369,7 @@ struct Csr :
     __device__ __host__ __forceinline__
     SizeT GetNeighborListLength(const VertexT &v) const
     {
-        if (v < 0 || v >= this -> nodes)
+        if (util::lessThanZero(v) || v >= this -> nodes)
             return 0;
         return _ldg(row_offsets + (v+1)) - _ldg(row_offsets + v);
     }
@@ -813,44 +817,6 @@ struct Csr :
     }*/
 
     /**
-     * @brief Get the average degree of all the nodes in graph
-     */
-    /*SizeT GetAverageDegree()
-    {
-        if (average_degree == 0)
-        {
-            double mean = 0, count = 0;
-            for (SizeT node = 0; node < nodes; ++node)
-            {
-                count += 1;
-                mean += (row_offsets[node + 1] - row_offsets[node] - mean) / count;
-            }
-            average_degree = static_cast<SizeT>(mean);
-        }
-        return average_degree;
-    }*/
-
-    /**
-     * @brief Get the average degree of all the nodes in graph
-     */
-    /*SizeT GetStddevDegree()
-    {
-        if (average_degree == 0)
-        {
-           GetAverageDegree();
-        }
-
-        float accum = 0.0f;
-        for (SizeT node=0; node < nodes; ++node)
-        {
-            float d = (row_offsets[node+1]-row_offsets[node]);
-            accum += (d - average_degree) * (d - average_degree);
-        }
-        stddev_degree = sqrt(accum / (nodes-1));
-        return stddev_degree;
-    }*/
-
-    /**
      * @brief Get the degrees of all the nodes in graph
      *
      * @param[in] node_degrees node degrees to fill in
@@ -936,6 +902,11 @@ struct Csr<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
     cudaError_t FromCsc(CscT_in &csc)
     {
         return cudaSuccess;
+    }
+
+    SizeT GetNeighborListLength(const VertexT &v)
+    {
+        return 0;
     }
 };
 

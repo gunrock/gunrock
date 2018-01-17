@@ -16,6 +16,11 @@
 
 // Graph definations
 #include <gunrock/graphio/graphio.cuh>
+#ifdef BOOST_FOUND
+    #include <gunrock/util/info.cuh>
+#else
+    #include <gunrock/util/info_noboost.cuh>
+#endif
 
 namespace gunrock {
 namespace app {
@@ -23,6 +28,7 @@ namespace app {
 cudaError_t UseParameters_app(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
+    GUARD_CU(util::UseParameters_info(parameters));
 
     GUARD_CU(parameters.Use<int>(
         "num-runs",
@@ -132,6 +138,42 @@ struct TestGraph :
     CooT &coo()
     {
         return (static_cast<CooT*>(this))[0];
+    }
+
+    double GetStddevDegree()
+    {
+        double retval = 0;
+        if (FLAG & graph::HAS_CSR)
+            retval = graph::GetStddevDegree(this -> csr());
+        else if (FLAG & graph::HAS_CSC)
+            retval = graph::GetStddevDegree(this -> csc());
+        else if (FLAG & graph::HAS_COO)
+            retval = graph::GetStddevDegree(this -> coo());
+        return retval;
+    }
+
+    double GetAverageDegree()
+    {
+        double retval = 0;
+        if (FLAG & graph::HAS_CSR)
+            retval = graph::GetAverageDegree(this -> csr());
+        else if (FLAG & graph::HAS_CSC)
+            retval = graph::GetAverageDegree(this -> csc());
+        else if (FLAG & graph::HAS_COO)
+            retval = graph::GetAverageDegree(this -> coo());
+        return retval;
+    }
+
+    SizeT GetNeighborListLength(const VertexT &v)
+    {
+        SizeT retval = 0;
+        if (FLAG & graph::HAS_CSR)
+            retval = CsrT::GetNeighborListLength(v);
+        else if (FLAG & graph::HAS_CSC)
+            retval = CscT::GetNeighborListLength(v);
+        else if (FLAG & graph::HAS_COO)
+            retval = CooT::GetNeighborListLength(v);
+        return retval;
     }
 };
 

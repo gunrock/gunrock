@@ -12,6 +12,8 @@
  * @brief common routines for test drivers
  */
 
+#pragma once
+
 namespace gunrock {
 namespace app {
 
@@ -61,6 +63,14 @@ cudaError_t UseParameters_test(
         0,
         "Time used to load / generate the graph",
         __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<std::string>(
+        "validation",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        "last",
+        "<none | last | each> When to validate the results",
+        __FILE__, __LINE__));
+
     return retval;
 }
 
@@ -185,7 +195,6 @@ cudaError_t Switch_Parameters(
         else break;
     }
 
-    util::PrintMsg("6");
     for (int i = 0; i < num_levels; i++)
     {
         parameters.Set(switching_paras[i], level_strings[i]);
@@ -194,7 +203,6 @@ cudaError_t Switch_Parameters(
     delete[] level_counters; level_counters = NULL;
     delete[] level_limits  ; level_limits   = NULL;
     delete[] level_strings ; level_strings  = NULL;
-    util::PrintMsg("7");
     return retval;
 }
 

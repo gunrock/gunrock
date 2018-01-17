@@ -355,6 +355,14 @@ protected:
         makeout_latency     = parameters.Get<int   >("makeout-latency");
         queue_factors       = parameters.Get<std::vector<double>>("queue-factor");
         trans_factor        = parameters.Get<double>("trans-factor");
+        std::string advance_mode = parameters.Get<std::string>("advance-mode");
+        std::string filter_mode  = parameters.Get<std::string>("filter-mode");
+        int max_grid_size   = parameters.Get<int   >("max-grid-size");
+        bool quiet          = parameters.Get<bool  >("quiet");
+
+        util::PrintMsg("Using advance mode " + advance_mode, !quiet);
+        util::PrintMsg("Using filter mode " + filter_mode, !quiet);
+
         min_sm_version      = -1;
         this -> parameters  = &parameters;
         if (parameters.Get<bool>("v"))
@@ -398,10 +406,7 @@ protected:
                 GUARD_CU(enactor_slice.Init(num_queues, frontier_types,
                     algo_name + "::frontier[" + std::to_string(gpu) + "," +
                     std::to_string(peer) + "]", /*node_lock_size,*/ target,
-                    cuda_props + gpu,
-                    parameters.Get<std::string>("advance-mode"),
-                    parameters.Get<std::string>("filter-mode"),
-                    parameters.Get<int>("max-grid-size")));
+                    cuda_props + gpu, advance_mode, filter_mode, max_grid_size));
 
                 if (gpu != peer && (target & util::DEVICE) != 0)
                 {

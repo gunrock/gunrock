@@ -85,21 +85,19 @@ cudaError_t UseParameters(
 {
     cudaError_t retval = cudaSuccess;
 
-    retval = parameters.Use<double>(
+    GUARD_CU(parameters.Use<double>(
         graph_prefix + "rgg-thfactor",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0.55,
         "Threshold-factor",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<double>(
+    GUARD_CU(parameters.Use<double>(
         graph_prefix + "rgg-threshold",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "Threshold, default is thfactor * sqrt(log(#nodes) / #nodes)",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
     return retval;
 }
@@ -133,17 +131,31 @@ cudaError_t Build(
     typedef typename GraphT::CsrT    CsrT;
 
     bool quiet = parameters.Get<bool>("quiet");
+    std::string dataset = "rgg_";
     //bool undirected = !parameters.Get<bool>(graph_prefix + "directed");
     SizeT scale = parameters.Get<SizeT>(graph_prefix + "graph-scale");
-    SizeT num_nodes = 1 << scale;
+    SizeT num_nodes = 0;
     if (!parameters.UseDefault(graph_prefix + "graph-nodes"))
+    {
         num_nodes = parameters.Get<SizeT>(graph_prefix + "graph-nodes");
-
+        dataset = dataset + std::to_string(num_nodes) + "_";
+    } else {
+        num_nodes = 1 << scale;
+        dataset = dataset + "n" + std::to_string(scale) + "_";
+    }
     double thfactor = parameters.Get<double>(graph_prefix + "rgg-thfactor");
-    double threshold = thfactor * sqrt(log(num_nodes) / num_nodes);
+    double threshold = 0;
     if (!parameters.UseDefault(graph_prefix + "rgg-threshold"))
+    {
         threshold = parameters.Get<double>(graph_prefix + "rgg-threshold");
-
+        dataset = dataset + "t" + std::to_string(threshold);
+    } else {
+        threshold = thfactor * sqrt(log(num_nodes) / num_nodes);
+        dataset = dataset + std::to_string(threshold);
+    }
+    if (parameters.UseDefault("dataset"))
+        parameters.Set<std::string>("dataset", dataset);
+        
     double edge_value_range = parameters.Get<double>(graph_prefix + "edge-value-range");
     double edge_value_min   = parameters.Get<double>(graph_prefix + "edge-value-min");
 
@@ -151,10 +163,9 @@ cudaError_t Build(
     if (parameters.UseDefault(graph_prefix + "graph-seed"))
         seed = parameters.Get<int>(graph_prefix + "graph-seed");
 
-    if (!quiet)
-        util::PrintMsg("Generating RGG " + graph_prefix +
-            "graph, threshold = " + std::to_string(threshold) +
-            ", seed = " + std::to_string(seed) + "...");
+    util::PrintMsg("Generating RGG " + graph_prefix +
+        "graph, threshold = " + std::to_string(threshold) +
+        ", seed = " + std::to_string(seed) + "...", !quiet);
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
 
@@ -184,34 +195,26 @@ cudaError_t Build(
     block_size .SetName("graphio::rgg::block_size");
     block_length.SetName("graphio::rgg::block_length");
 
-    if (retval = points.Allocate(num_nodes + 1, target))
-        return retval;
-    if (retval = row_offsets.Allocate(num_nodes + 1, target))
-        return retval;
-    if (retval = col_index_.Allocate(reserved_size * num_nodes, target))
-        return retval;
+    GUARD_CU(points.Allocate(num_nodes + 1, target));
+    GUARD_CU(row_offsets.Allocate(num_nodes + 1, target));
+    GUARD_CU(col_index_.Allocate(reserved_size * num_nodes, target));
     if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
-        if (retval = values_.Allocate(reserved_size * num_nodes, target))
-            return retval;
+        GUARD_CU(values_.Allocate(reserved_size * num_nodes, target));
     SizeT tLength = row_length * row_length + 1;
-    if (retval = blocks.Allocate(tLength, target))
-        return retval;
-    if (retval = block_size.Allocate(tLength, target))
-        return retval;
-    if (retval = block_length.Allocate(tLength, target))
-        return retval;
+    GUARD_CU(blocks.Allocate(tLength, target));
+    GUARD_CU(block_size.Allocate(tLength, target));
+    GUARD_CU(block_length.Allocate(tLength, target));
 
     if (initial_length <4) initial_length = 4;
 
-    if (retval = block_size.ForEach(
+    GUARD_CU(block_size.ForEach(
         block_length, blocks,[]__host__ __device__
         (SizeT &size, SizeT &length, VertexT* &block)
         {
             size = 0;
             length = 0;
             block = NULL;
-        }, tLength, target))
-        return retval;
+        }, tLength, target));
 
     #pragma omp parallel
     do {
@@ -293,7 +296,8 @@ cudaError_t Build(
             for (SizeT x1 = x_index-2; x1 <= x_index+2; x1++)
             for (SizeT y1 = y_index-2; y1 <= y_index+2; y1++)
             {
-                if (x1 < 0 || y1 < 0 || x1 >= row_length || y1 >= row_length)
+                if (util::lessThanZero(x1) || util::lessThanZero(y1) ||
+                    x1 >= row_length || y1 >= row_length)
                     continue;
 
                 SizeT block_index = x1*row_length + y1;
@@ -354,11 +358,8 @@ cudaError_t Build(
 
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
-    if (!quiet)
-    {
-        util::PrintMsg("RGG generated in " +
-            std::to_string(elapsed) + " ms.");
-    }
+    util::PrintMsg("RGG generated in " +
+        std::to_string(elapsed) + " ms.", !quiet);
 
     SizeT counter = 0;
     for (SizeT i=0;  i < row_length * row_length; i++)
@@ -368,14 +369,14 @@ cudaError_t Build(
         delete[] blocks[i]; blocks[i] = NULL;
     }
 
-    if (retval = row_offsets.Release()) return retval;
-    if (retval = offsets    .Release()) return retval;
-    if (retval = points     .Release()) return retval;
-    if (retval = blocks     .Release()) return retval;
-    if (retval = block_size .Release()) return retval;
-    if (retval = block_length.Release()) return retval;
-    if (retval = col_index_ .Release()) return retval;
-    if (retval = values_    .Release()) return retval;
+    GUARD_CU(row_offsets.Release());
+    GUARD_CU(offsets    .Release());
+    GUARD_CU(points     .Release());
+    GUARD_CU(blocks     .Release());
+    GUARD_CU(block_size .Release());
+    GUARD_CU(block_length.Release());
+    GUARD_CU(col_index_ .Release());
+    GUARD_CU(values_    .Release());
 
     return retval;
 }
@@ -389,9 +390,8 @@ static cudaError_t Load(
     std::string graph_prefix = "")
 {
     cudaError_t retval = cudaSuccess;
-    retval = Build(parameters, graph, graph_prefix);
-    if (retval) return retval;
-    retval = graph.FromCsr(graph, true);
+    GUARD_CU(Build(parameters, graph, graph_prefix));
+    GUARD_CU(graph.FromCsr(graph, true));
     return retval;
 }
 };
@@ -411,11 +411,9 @@ cudaError_t Load(
     cudaError_t retval = cudaSuccess;
 
     CsrT csr;
-    retval = Build(parameters, csr, graph_prefix);
-    if (retval) return retval;
-    retval = graph.FromCsr(csr);
-    if (retval) return retval;
-    retval = csr.Release();
+    GUARD_CU(Build(parameters, csr, graph_prefix));
+    GUARD_CU(graph.FromCsr(csr));
+    GUARD_CU(csr.Release());
     return retval;
 }
 };

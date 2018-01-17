@@ -50,14 +50,18 @@ namespace graph {
  * @tparam ValueT Associated value type.
  */
 template<
-    typename VertexT = int,
-    typename SizeT   = VertexT,
-    typename ValueT  = VertexT,
+    typename _VertexT = int,
+    typename _SizeT   = _VertexT,
+    typename _ValueT  = _VertexT,
     GraphFlag _FLAG   = GRAPH_NONE | HAS_GP,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct Gp :
-    public GraphBase<VertexT, SizeT, ValueT, _FLAG | HAS_GP, cudaHostRegisterFlag>
+    public GraphBase<_VertexT, _SizeT, _ValueT,
+        _FLAG | HAS_GP, cudaHostRegisterFlag>
 {
+    typedef _VertexT VertexT;
+    typedef _SizeT   SizeT;
+    typedef _ValueT  ValueT;
     static const GraphFlag FLAG = _FLAG | HAS_GP;
     static const util::ArrayFlag ARRAY_FLAG =
         util::If_Val<(FLAG & GRAPH_PINNED) != 0, (FLAG & ARRAY_RESERVE) | util::PINNED,

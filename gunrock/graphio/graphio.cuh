@@ -33,138 +33,126 @@ cudaError_t UseParameters(
 {
     cudaError_t retval = cudaSuccess;
 
-    retval = parameters.Use<std::string>(
+    GUARD_CU(parameters.Use<std::string>(
         graph_prefix + "graph-type",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
         "",
         graph_prefix + " graph type, be one of market, rgg,"
             " rmat, grmat or smallworld",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<std::string>(
+    GUARD_CU(parameters.Use<std::string>(
         graph_prefix + "graph-file",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         "",
         graph_prefix + " graph file, empty points to STDIN",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<bool>(
+    GUARD_CU(parameters.Use<bool>(
         graph_prefix + "undirected",
         util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         "false",
         "Whether " + graph_prefix + " graph is undirected",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<float>(
+    GUARD_CU(parameters.Use<float>(
         graph_prefix + "edge-value-range",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         64,
-        "range of edge values when randomly generated",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        "Range of edge values when randomly generated",
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<float>(
+    GUARD_CU(parameters.Use<float>(
         graph_prefix + "edge-value-min",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
-        "minimum value of edge values when randomly generated",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        "Minimum value of edge values when randomly generated",
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<bool>(
+    GUARD_CU(parameters.Use<bool>(
         graph_prefix + "vertex-start-from-zero",
         util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         true,
         "Whether the vertex Id in " + graph_prefix + " starts from 0 instead of 1",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<long>(
+    GUARD_CU(parameters.Use<long>(
         graph_prefix + "edge-value-seed",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
-        "rand seed to generate edge values, default is time(NULL)",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        "Rand seed to generate edge values, default is time(NULL)",
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<long long>(
+    GUARD_CU(parameters.Use<long long>(
         graph_prefix + "graph-nodes",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         1 << 10,
         "Number of nodes",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<long long>(
+    GUARD_CU(parameters.Use<long long>(
         graph_prefix + "graph-edges",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         (1 << 10) * 48,
         "Number of edges",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<long long>(
+    GUARD_CU(parameters.Use<long long>(
         graph_prefix + "graph-scale",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         10,
         "Vertex scale",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<double>(
+    GUARD_CU(parameters.Use<double>(
         graph_prefix + "graph-edgefactor",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         48,
-        "edge factor",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        "Edge factor",
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<int>(
+    GUARD_CU(parameters.Use<int>(
         graph_prefix + "graph-seed",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0,
-        "rand seed to generate the graph, default is time(NULL)",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        "Rand seed to generate the graph, default is time(NULL)",
+        __FILE__, __LINE__));
 
     if (graph_prefix == "")
     {
-        retval = parameters.Use<bool>(
+        GUARD_CU(parameters.Use<bool>(
             "64bit-VertexT",
             util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
             false,
-            "whether to use 64-bit VertexT",
-            __FILE__, __LINE__);
-        if (retval) return retval;
+            "Whether to use 64-bit VertexT",
+            __FILE__, __LINE__));
 
-        retval = parameters.Use<bool>(
+        GUARD_CU(parameters.Use<bool>(
             "64bit-SizeT",
             util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
             false,
-            "whether to use 64-bit SizeT",
-            __FILE__, __LINE__);
-        if (retval) return retval;
+            "Whether to use 64-bit SizeT",
+            __FILE__, __LINE__));
 
-        retval = parameters.Use<bool>(
+        GUARD_CU(parameters.Use<bool>(
             "64bit-ValueT",
             util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
             false,
-            "whether to use 64-bit ValueT",
-            __FILE__, __LINE__);
-        if (retval) return retval;
+            "Whether to use 64-bit ValueT",
+            __FILE__, __LINE__));
+
+        GUARD_CU(parameters.Use<std::string>(
+            "dataset",
+            util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+            "",
+            "Name of dataset, default value is set by graph reader / generator",
+            __FILE__, __LINE__));
     }
 
-    retval = market::UseParameters(parameters, graph_prefix);
-    if (retval) return retval;
-    retval = rgg::UseParameters(parameters, graph_prefix);
-    if (retval) return retval;
-    retval = small_world::UseParameters(parameters, graph_prefix);
-    if (retval) return retval;
-    retval = rmat::UseParameters(parameters, graph_prefix);
-    if (retval) return retval;
+    GUARD_CU(market     ::UseParameters(parameters, graph_prefix));
+    GUARD_CU(rgg        ::UseParameters(parameters, graph_prefix));
+    GUARD_CU(small_world::UseParameters(parameters, graph_prefix));
+    GUARD_CU(rmat       ::UseParameters(parameters, graph_prefix));
     return retval;
 }
 
@@ -354,6 +342,10 @@ cudaError_t LoadGraph(
     else if (graph_type == "smallworld")
     {
         retval = small_world::Load(parameters, graph, graph_prefix);
+    }
+
+    else if (graph_type == "by-pass")
+    {
     }
 
     else

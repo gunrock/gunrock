@@ -109,6 +109,7 @@ class Parameters
 private:
     std::map<std::string, Parameter_Item> p_map;
     std::string summary;
+    std::string command_line;
 
 public:
     Parameters(
@@ -255,8 +256,7 @@ public:
         }
 
 #ifdef ENABLE_PARAMETER_DEBUG
-        std::cout << "Parameter " << name << " <- "
-            << value << std::endl;
+        util::PrintMsg("Parameter " + name + " <- " + value);
 #endif
 
         it -> second.value = value;
@@ -436,6 +436,11 @@ public:
         char* const argv[])
     {
         cudaError_t retval = cudaSuccess;
+        command_line = "";
+        for (int i = 0; i < argc; i++)
+            command_line = command_line + (i == 0 ? "" : " ")
+                + std::string(argv[i]);
+
         typedef struct option Option;
         int num_options = p_map.size();
         Option *long_options = new Option[num_options + 1];
@@ -533,6 +538,11 @@ public:
         delete[] names; names = NULL;
         return retval;
     } // Phase_CommandLine()
+
+    std::string Get_CommandLine()
+    {
+        return command_line;
+    }
 
     cudaError_t Print_Para(Parameter_Item &item)
     {

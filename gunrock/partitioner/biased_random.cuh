@@ -176,7 +176,7 @@ cudaError_t Partition(
         for (int i = 0; i < num_subgraphs; i++)
         {
             SizeT e = nodes * weitage[i] - current_count[i];
-            total_count += (e >= 0 ? e : 0);
+            total_count += (util::atLeastZero(e) ? e : 0);
         }
         for (int i = 0; i < num_subgraphs; i++)
         {

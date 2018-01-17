@@ -22,7 +22,7 @@ namespace sssp {
 
 /**
  * @brief Speciflying parameters for SSSP Problem
- * @param parameters The util::Parameter<...> structure holding all parameter info
+ * @param  parameters  The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
 cudaError_t UseParameters_problem(
@@ -100,8 +100,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         /*
          * @brief Releasing allocated memory space
-         * @param target the location to release memory from
-         * \return cudaError_t error message(s), if any
+         * @param[in] target      The location to release memory from
+         * \return    cudaError_t Error message(s), if any
          */
         cudaError_t Release(util::Location target = util::LOCATION_ALL)
         {
@@ -119,11 +119,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         /**
          * @brief initializing sssp-specific data on each gpu
-         * @param     sub_graph sub graph on the GPU.
-         * @param[in] gpu_idx GPU device index
-         * @param[in] target targeting device location
-         * @param[in] flag problem flag containling options
-         * \return cudaError_t error message(s), if any
+         * @param     sub_graph   Sub graph on the GPU.
+         * @param[in] gpu_idx     GPU device index
+         * @param[in] target      Targeting device location
+         * @param[in] flag        Problem flag containling options
+         * \return    cudaError_t Error message(s), if any
          */
         cudaError_t Init(
             GraphT        &sub_graph,
@@ -151,8 +151,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         /**
          * @brief Reset problem function. Must be called prior to each run.
-         * @param[in] target targeting device location
-         * \return cudaError_t error message(s), if any
+         * @param[in] target      Targeting device location
+         * \return    cudaError_t Error message(s), if any
          */
         cudaError_t Reset(util::Location target = util::DEVICE)
         {
@@ -223,8 +223,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     /*
      * @brief Releasing allocated memory space
-     * @param target the location to release memory from
-     * \return cudaError_t error message(s), if any
+     * @param[in] target      The location to release memory from
+     * \return    cudaError_t Error message(s), if any
      */
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
@@ -249,9 +249,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     /**
      * @brief Copy result distancess computed on GPUs back to host-side arrays.
-     * @param[out] h_distances host array to store computed vertex distances from the source.
-     * @param[out] h_preds host array to store computed vertex predecessors.
-     * \return cudaError_t error message(s), if any
+     * @param[out] h_distances Host array to store computed vertex distances from the source.
+     * @param[out] h_preds     Host array to store computed vertex predecessors.
+     * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
         ValueT         *h_distances,
@@ -337,10 +337,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     /**
      * @brief initialization function.
-     * @param[in] parameters data structure holding all parameter info
-     * @param     graph the graph that SSSP processes on
-     * @param[in] location memory location to work on
-     * \return cudaError_t error message(s), if any
+     * @param     graph       The graph that SSSP processes on
+     * @param[in] Location    Memory location to work on
+     * \return    cudaError_t Error message(s), if any
      */
     cudaError_t Init(
             GraphT           &graph,
@@ -371,9 +370,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     /**
      * @brief Reset problem function. Must be called prior to each run.
-     * @param[in] src Source node to start.
-     * @param[in] location memory location to work on
-     * \return cudaError_t error message(s), if any
+     * @param[in] src      Source vertex to start.
+     * @param[in] location Memory location to work on
+     * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
             VertexT    src,

@@ -185,37 +185,33 @@ cudaError_t UseParameters(
 {
     cudaError_t retval = cudaSuccess;
 
-    retval = parameters.Use<double>(
+    GUARD_CU(parameters.Use<double>(
         graph_prefix + "rmat-a",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0.57,
         "a for rmat generator",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<double>(
+    GUARD_CU(parameters.Use<double>(
         graph_prefix + "rmat-b",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0.19,
         "b for rmat generator",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<double>(
+    GUARD_CU(parameters.Use<double>(
         graph_prefix + "rmat-c",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0.19,
         "c for rmat generator",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<double>(
+    GUARD_CU(parameters.Use<double>(
         graph_prefix + "rmat-d",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0.05,
         "d for rmat generator, default is 1 - a - b - c",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
     return retval;
 }
@@ -253,16 +249,31 @@ cudaError_t Build(
     typedef typename GraphT::CooT    CooT;
 
     bool quiet = parameters.Get<bool>("quiet");
+    std::string dataset = "rmat_";
     //bool undirected = !parameters.Get<bool>(graph_prefix + "directed");
     SizeT scale = parameters.Get<SizeT>(graph_prefix + "graph-scale");
-    SizeT num_nodes = 1 << scale;
+    SizeT num_nodes = 0;
     if (!parameters.UseDefault(graph_prefix + "graph-nodes"))
+    {
         num_nodes = parameters.Get<SizeT>(graph_prefix + "graph-nodes");
+        dataset = dataset + std::to_string(num_nodes) + "_";
+    } else {
+        num_nodes = 1 << scale;
+        dataset = dataset + "n" + std::to_string(scale) + "_";
+    }
 
     double edge_factor = parameters.Get<double>(graph_prefix + "graph-edgefactor");
-    SizeT num_edges = num_nodes * edge_factor;
+    SizeT num_edges = 0;
     if (!parameters.UseDefault(graph_prefix + "graph-edges"))
+    {
         num_edges = parameters.Get<SizeT>(graph_prefix + "graph-edges");
+        dataset = dataset + std::to_string(num_edges);
+    } else {
+        num_edges = num_nodes * edge_factor;
+        dataset = dataset + "e" + std::to_string(edge_factor);
+    }
+    if (parameters.UseDefault("dataset"))
+        parameters.Set<std::string>("dataset", dataset);
 
     double a0 = parameters.Get<double>(graph_prefix + "rmat-a");
     double b0 = parameters.Get<double>(graph_prefix + "rmat-b");
@@ -278,7 +289,7 @@ cudaError_t Build(
     double edge_value_range = parameters.Get<double>(graph_prefix + "edge-value-range");
     double edge_value_min   = parameters.Get<double>(graph_prefix + "edge-value-min");
 
-    if ((num_nodes < 0) || (num_edges < 0))
+    if (util::lessThanZero(num_nodes) || util::lessThanZero(num_edges))
     {
         retval = util::GRError("Invalid graph size: nodes = "
             + std::to_string(num_nodes) +
@@ -287,20 +298,18 @@ cudaError_t Build(
         return retval;
     }
 
-    if (!quiet)
-        util::PrintMsg("Generating RMAT " + graph_prefix +
-            "graph, seed = " + std::to_string(seed) +
-            ", (a, b, c, d) = (" + std::to_string(a0) +
-            ", " + std::to_string(b0) +
-            ", " + std::to_string(c0) +
-            ", " + std::to_string(d0) + ")");
+    util::PrintMsg("Generating RMAT " + graph_prefix +
+        "graph, seed = " + std::to_string(seed) +
+        ", (a, b, c, d) = (" + std::to_string(a0) +
+        ", " + std::to_string(b0) +
+        ", " + std::to_string(c0) +
+        ", " + std::to_string(d0) + ")", !quiet);
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
     util::Location  target        = util::HOST;
 
     // construct COO format graph
-    if (retval = graph.CooT::Allocate(num_nodes, num_edges, target))
-        return retval;
+    GUARD_CU(graph.CooT::Allocate(num_nodes, num_edges, target));
 
     #pragma omp parallel
     {
@@ -340,16 +349,12 @@ cudaError_t Build(
             }
         }
     }
-
     if (retval) return retval;
 
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
-    if (!quiet)
-    {
-        util::PrintMsg("RMAT generated in " +
-            std::to_string(elapsed) + " ms.");
-    }
+    util::PrintMsg("RMAT generated in " +
+        std::to_string(elapsed) + " ms.", !quiet);
     return retval;
 }
 
@@ -362,9 +367,8 @@ static cudaError_t Load(
     std::string graph_prefix = "")
 {
     cudaError_t retval = cudaSuccess;
-    retval = Build(parameters, graph, graph_prefix);
-    if (retval) return retval;
-    retval = graph.FromCoo(graph, true);
+    GUARD_CU(Build(parameters, graph, graph_prefix));
+    GUARD_CU(graph.FromCoo(graph, true));
     return retval;
 }
 };
@@ -384,11 +388,9 @@ static cudaError_t Load(
     cudaError_t retval = cudaSuccess;
 
     CooT coo;
-    retval = Build(parameters, coo, graph_prefix);
-    if (retval) return retval;
-    retval = graph.FromCoo(coo);
-    if (retval) return retval;
-    retval = coo.Release();
+    GUARD_CU(Build(parameters, coo, graph_prefix));
+    GUARD_CU(graph.FromCoo(coo));
+    GUARD_CU(coo.Release());
     return retval;
 }
 };
