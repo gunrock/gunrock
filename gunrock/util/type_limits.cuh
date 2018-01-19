@@ -33,6 +33,7 @@ struct PreDefinedValues<char>
     static const char AllZeros = (char)0;
     static const char AllOnes  = ~AllZeros;
     static const char InvalidValue = AllOnes;
+    static const bool Signed   = true;
 };
 
 template <>
@@ -43,6 +44,7 @@ struct PreDefinedValues<unsigned char>
     static const unsigned char AllZeros = (unsigned char)0;
     static const unsigned char AllOnes  = ~AllZeros;
     static const unsigned char InvalidValue = AllOnes;
+    static const bool Signed   = false;
 };
 
 template <>
@@ -53,6 +55,7 @@ struct PreDefinedValues<signed char>
     static const signed char AllZeros = (signed char)0;
     static const signed char AllOnes  = ~AllZeros;
     static const signed char InvalidValue = AllOnes;
+    static const bool Signed   = true;
 };
 
 template <>
@@ -63,6 +66,7 @@ struct PreDefinedValues<short>
     static const short AllZeros = (short)0;
     static const short AllOnes  = ~AllZeros;
     static const short InvalidValue = AllOnes;
+    static const bool Signed   = true;
 };
 
 template <>
@@ -73,6 +77,7 @@ struct PreDefinedValues<unsigned short>
     static const unsigned short AllZeros = (unsigned short)0;
     static const unsigned short AllOnes  = ~AllZeros;
     static const unsigned short InvalidValue = AllOnes;
+    static const bool Signed   = false;
 };
 
 template <>
@@ -83,6 +88,7 @@ struct PreDefinedValues<int>
     static const int AllZeros = (int)0;
     static const int AllOnes  = ~AllZeros;
     static const int InvalidValue = AllOnes;
+    static const bool Signed   = true;
 };
 
 template <>
@@ -93,6 +99,7 @@ struct PreDefinedValues<unsigned int>
     static const unsigned int AllZeros = (unsigned int)0;
     static const unsigned int AllOnes  = ~AllZeros;
     static const unsigned int InvalidValue = AllOnes;
+    static const bool Signed   = false;
 };
 
 template <>
@@ -103,6 +110,7 @@ struct PreDefinedValues<long>
     static const long AllZeros = (long)0;
     static const long AllOnes  = ~AllZeros;
     static const long InvalidValue = AllOnes;
+    static const bool Signed   = true;
 };
 
 template <>
@@ -113,6 +121,7 @@ struct PreDefinedValues<unsigned long>
     static const unsigned long AllZeros = (unsigned long)0;
     static const unsigned long AllOnes  = ~AllZeros;
     static const unsigned long InvalidValue = AllOnes;
+    static const bool Signed   = false;
 };
 
 template <>
@@ -123,6 +132,7 @@ struct PreDefinedValues<long long>
     static const long long AllZeros = (long long)0;
     static const long long AllOnes  = ~AllZeros;
     static const long long InvalidValue = AllOnes;
+    static const bool Signed   = true;
 };
 
 template <>
@@ -133,6 +143,7 @@ struct PreDefinedValues<unsigned long long>
     static const unsigned long long AllZeros = (unsigned long long)0;
     static const unsigned long long AllOnes  = ~AllZeros;
     static const unsigned long long InvalidValue = AllOnes;
+    static const bool Signed   = false;
 };
 
 template <>
@@ -140,6 +151,23 @@ struct PreDefinedValues<float>
 {
     constexpr static const float MinValue = FLT_MIN;
     constexpr static const float MaxValue = FLT_MAX;
+    static const bool Signed   = true;
+};
+
+template <>
+struct PreDefinedValues<double>
+{
+    constexpr static const double MinValue = DBL_MIN;
+    constexpr static const double MaxValue = DBL_MAX;
+    static const bool Signed   = true;
+};
+
+template <>
+struct PreDefinedValues<long double>
+{
+    constexpr static const long double MinValue = LDBL_MIN;
+    constexpr static const long double MaxValue = LDBL_MAX;
+    static const bool Signed   = true;
 };
 
 template <typename T>
@@ -147,6 +175,52 @@ __device__ __host__ __forceinline__
 bool isValid(T val)
 {
     return (val != PreDefinedValues<T>::InvalidValue);
+}
+
+template <typename T, bool SIGNED>
+struct Switch_Signed
+{
+    __device__ __host__ __forceinline__
+    static bool lessThanZero(const T &val)
+    {
+        return val < 0;
+    }
+
+    __device__ __host__ __forceinline__
+    static bool atLeastZero(const T &val)
+    {
+        return val >= 0;
+    }
+};
+
+template <typename T>
+struct Switch_Signed<T, false>
+{
+    __device__ __host__ __forceinline__
+    static bool lessThanZero(const T &val)
+    {
+        return false;
+    }
+
+    __device__ __host__ __forceinline__
+    static bool atLeastZero(const T &val)
+    {
+        return true;
+    }
+};
+
+template <typename T>
+__device__ __host__ __forceinline__
+bool lessThanZero(const T &val)
+{
+    return Switch_Signed<T, PreDefinedValues<T>::Signed>::lessThanZero(val);
+}
+
+template <typename T>
+__device__ __host__ __forceinline__
+bool atLeastZero(const T &val)
+{
+    return Switch_Signed<T, PreDefinedValues<T>::Signed>::atLeastZero(val);
 }
 
 } // namespace util

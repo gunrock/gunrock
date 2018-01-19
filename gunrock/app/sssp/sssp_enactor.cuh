@@ -24,15 +24,24 @@ namespace gunrock {
 namespace app {
 namespace sssp {
 
-cudaError_t UseParameters2(util::Parameters &parameters)
+/**
+ * @brief Speciflying parameters for SSSP Enactor
+ * @param parameters The util::Parameter<...> structure holding all parameter info
+ * \return cudaError_t error message(s), if any
+ */
+cudaError_t UseParameters_enactor(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
-    GUARD_CU(app::UseParameters2(parameters));
+    GUARD_CU(app::UseParameters_enactor(parameters));
     return retval;
 }
 
+/**
+ * @brief defination of SSSP iteration loop
+ * @tparam EnactorT Type of enactor
+ */
 template <typename EnactorT>
-struct SSSPIteration : public IterationBase
+struct SSSPIterationLoop : public IterationLoopBase
     <EnactorT, Use_FullQ | Push |
     (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
     Update_Predecessors : 0x0)>
@@ -42,15 +51,21 @@ struct SSSPIteration : public IterationBase
     typedef typename EnactorT::ValueT  ValueT;
     typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
-    typedef IterationBase
+    typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push |
         (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-         Update_Predecessors : 0x0)> BaseIteration;
+         Update_Predecessors : 0x0)> BaseIterationLoop;
 
-    SSSPIteration() : BaseIteration() {}
+    SSSPIterationLoop() : BaseIterationLoop() {}
 
+    /**
+     * @brief Core computation of sssp, one iteration
+     * @param[in] peer_ Which GPU peers to work on, 0 means local
+     * \return cudaError_t error message(s), if any
+     */
     cudaError_t Core(int peer_ = 0)
     {
+        // Data sssp that works on
         auto         &data_slice         =   this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
         auto         &enactor_slice      =   this -> enactor ->
@@ -60,7 +75,7 @@ struct SSSPIteration : public IterationBase
         auto         &distances          =   data_slice.distances;
         auto         &labels             =   data_slice.labels;
         auto         &preds              =   data_slice.preds;
-        auto         &row_offsets        =   graph.CsrT::row_offsets;
+        //auto         &row_offsets        =   graph.CsrT::row_offsets;
         auto         &weights            =   graph.CsrT::edge_values;
         auto         &original_vertex    =   graph.GpT::original_vertex;
         auto         &frontier           =   enactor_slice.frontier;
@@ -69,15 +84,7 @@ struct SSSPIteration : public IterationBase
         //auto         &stream             =   enactor_slice.stream;
         auto         &iteration          =   enactor_stats.iteration;
 
-        //if (iteration == 0)
-        //    util::cpu_mt::PrintGPUArray<SizeT, SizeT>("row_offsets",
-        //        row_offsets.GetPointer(util::DEVICE),
-        //        graph.nodes + 1);
-
-        //util::cpu_mt::PrintGPUArray<SizeT, VertexT>("input_queue",
-        //    frontier.V_Q() -> GetPointer(util::DEVICE),
-        //    frontier.queue_length);
-
+        // The advance operation
         auto advance_op = [distances, weights, original_vertex, preds]
         __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
@@ -90,9 +97,6 @@ struct SSSPIteration : public IterationBase
 
             // Check if the destination node has been claimed as someone's child
             ValueT old_distance = atomicMin(distances + dest, new_distance);
-            //printf("%d : %f -> %f (%d) + %f (%d) : %f\n",
-            //    dest, old_distance, src_distance, src, edge_weight, edge_id,
-            //    min(new_distance, old_distance));
 
             if (new_distance < old_distance)
             {
@@ -102,13 +106,13 @@ struct SSSPIteration : public IterationBase
                     if (!original_vertex.isEmpty())
                         pred = original_vertex[src];
                     Store(preds + dest, pred);
-                    //printf("Pred[%d] -> %d\n", dest, pred);
                 }
                 return true;
             }
             return false;
         };
 
+        // The filter operation
         auto filter_op = [labels, iteration] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
@@ -117,11 +121,11 @@ struct SSSPIteration : public IterationBase
             if (!util::isValid(dest)) return false;
             if (labels[dest] == iteration) return false;
             labels[dest] = iteration;
-            //printf("%d -> output\n", dest);
             return true;
         };
 
         oprtr_parameters.label = iteration + 1;
+        // Call the advance operator, using the advance operation
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
             oprtr_parameters, advance_op, filter_op));
@@ -130,11 +134,13 @@ struct SSSPIteration : public IterationBase
             oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
         {
             frontier.queue_reset = false;
+            // Call the filter operator, using the filter operation
             GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
                 oprtr_parameters, filter_op));
         }
 
+        // Get back the resulted frontier length
         GUARD_CU(frontier.work_progress.GetQueueLength(
             frontier.queue_index, frontier.queue_length,
             false, oprtr_parameters.stream, true));
@@ -142,6 +148,14 @@ struct SSSPIteration : public IterationBase
         return retval;
     }
 
+    /**
+     * @brief Routine to combine received data and local data
+     * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each transmition item, typed VertexT
+     * @tparam NUM_VALUE__ASSOCIATES Number of data associated with each transmition item, typed ValueT
+     * @param  received_length The numver of transmition items received
+     * @param[in] peer_ which peer GPU the data came from
+     * \return cudaError_t error message(s), if any
+     */
     template <
         int NUM_VERTEX_ASSOCIATES,
         int NUM_VALUE__ASSOCIATES>
@@ -162,7 +176,8 @@ struct SSSPIteration : public IterationBase
         __host__ __device__(
             VertexT &key, const SizeT &in_pos,
             VertexT *vertex_associate_ins,
-            ValueT  *value__associate_ins) -> bool{
+            ValueT  *value__associate_ins) -> bool
+        {
             ValueT in_val  = value__associate_ins[in_pos];
             ValueT old_val = atomicMin(distances + key, in_val);
             if (old_val <= in_val)
@@ -175,16 +190,18 @@ struct SSSPIteration : public IterationBase
             return true;
         };
 
-        cudaError_t retval = BaseIteration:: template ExpandIncomingBase
+        cudaError_t retval = BaseIterationLoop:: template ExpandIncomingBase
             <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
             (received_length, peer_, expand_op);
         return retval;
     }
-}; // end of struct SSSPIteration
+}; // end of SSSPIteration
 
 /**
- * @brief Problem enactor class.
+ * @brief SSSP enactor class.
  * @tparam _Problem Problem type we process on
+ * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
+ * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
  */
 template <
     typename _Problem,
@@ -193,6 +210,7 @@ template <
 class Enactor :
     public EnactorBase<
         typename _Problem::GraphT, typename _Problem::LabelT,
+        typename _Problem::ValueT,
         ARRAY_FLAG, cudaHostRegisterFlag>
 {
 public:
@@ -202,16 +220,17 @@ public:
     typedef typename Problem::ValueT   ValueT  ;
     typedef typename Problem::GraphT   GraphT  ;
     typedef typename Problem::LabelT   LabelT  ;
-    typedef EnactorBase<GraphT , LabelT, ARRAY_FLAG, cudaHostRegisterFlag>
+    typedef EnactorBase<GraphT , LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
         BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
+    typedef SSSPIterationLoop<EnactorT> IterationT;
 
     Problem     *problem   ;
-    void        *iterations;
+    IterationT  *iterations;
 
     /**
-     * @brief BFSEnactor constructor
+     * @brief SSSPEnactor constructor
      */
     Enactor() :
         BaseEnactor("sssp"),
@@ -223,20 +242,24 @@ public:
     }
 
     /**
-     * @brief BFSEnactor destructor
+     * @brief SSSPEnactor destructor
      */
     virtual ~Enactor()
     {
-        Release();
+        //Release();
     }
 
+    /*
+     * @brief Releasing allocated memory space
+     * @param target The location to release memory from
+     * \return cudaError_t error message(s), if any
+     */
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
-        typedef SSSPIteration<EnactorT> IterationT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Release(target));
-        delete []((IterationT*)iterations);
-        problem = NULL; iterations = NULL;
+        delete []iterations; iterations = NULL;
+        problem = NULL;
         return retval;
     }
 
@@ -248,23 +271,21 @@ public:
     /**
      * @brief Initialize the problem.
      * @param[in] parameters Running parameters.
-     * @param[in] problem Pointer to Problem object.
+     * @param[in] problem The problem object.
      * @param[in] target Target location of data
-     * \return cudaError_t object Indicates the success of all CUDA calls.
+     * \return cudaError_t error message(s), if any
      */
     cudaError_t Init(
-        util::Parameters &parameters,
+        //util::Parameters &parameters,
         Problem          &problem,
         util::Location    target = util::DEVICE)
     {
-        typedef SSSPIteration<EnactorT> IterationT;
         cudaError_t retval = cudaSuccess;
         this->problem = &problem;
 
         // Lazy initialization
         GUARD_CU(BaseEnactor::Init(
-            parameters, problem.sub_graphs + 0,
-            Enactor_None, 2, NULL, target, false));
+            problem, Enactor_None, 2, NULL, target, false));
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
         {
             GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
@@ -285,7 +306,7 @@ public:
         iterations = new IterationT[this -> num_gpus];
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
         {
-            GUARD_CU(((IterationT*)iterations)[gpu].Init(this, gpu));
+            GUARD_CU(iterations[gpu].Init(this, gpu));
         }
 
         GUARD_CU(this -> Init_Threads(this,
@@ -293,15 +314,17 @@ public:
         return retval;
     }
 
-    // one run of sssp, to be called within GunrockThread
+    /**
+      * @brief one run of sssp, to be called within GunrockThread
+      * @param thread_data Data for the CPU thread
+      * \return cudaError_t error message(s), if any
+      */
     cudaError_t Run(ThreadSlice &thread_data)
     {
-        typedef SSSPIteration<EnactorT> IterationT;
-
         gunrock::app::Iteration_Loop<
             ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0,
             1, IterationT>(
-            thread_data, ((IterationT*)iterations)[thread_data.thread_num]);
+            thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
     }
 
@@ -309,7 +332,7 @@ public:
      * @brief Reset enactor
      * @param[in] src Source node to start primitive.
      * @param[in] target Target location of data
-     * \return cudaError_t object Indicates the success of all CUDA calls.
+     * \return cudaError_t error message(s), if any
      */
     cudaError_t Reset(VertexT src, util::Location target = util::DEVICE)
     {
@@ -347,13 +370,14 @@ public:
                 }
             }
         }
+        GUARD_CU(BaseEnactor::Sync());
         return retval;
     }
 
     /**
      * @brief Enacts a SSSP computing on the specified graph.
      * @param[in] src Source node to start primitive.
-     * \return cudaError_t object Indicates the success of all CUDA calls.
+     * \return cudaError_t error message(s), if any
      */
     cudaError_t Enact(VertexT src)
     {

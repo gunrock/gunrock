@@ -164,7 +164,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
                         (FLAG & OprtrType_V2E) != 0)
                     {
                         //smem_storage.vertices [threadIdx.x] = input_item;
-                        if (isValid(input_item))
+                        if (util::isValid(input_item))
                             smem_storage.row_offset[threadIdx.x]
                                 = graph.GetNeighborListOffset(input_item);
                         else
@@ -174,7 +174,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
                     else //if ((FLAG & OprtrType_E2V) != 0 ||
                          //    (FLAG & OprtrType_E2E) != 0))
                     {
-                        if (isValid(input_item))
+                        if (util::isValid(input_item))
                         {
                             VertexT v = graph.GetEdgeDest(input_item);
                             smem_storage.vertices  [threadIdx.x] = v;
@@ -292,7 +292,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
                         (FLAG & OprtrType_V2E) != 0)
                     {
                         //smem_storage.vertices[threadIdx.x] = input_item;
-                        if (isValid(input_item))
+                        if (util::isValid(input_item))
                             smem_storage.row_offset[threadIdx.x]
                                 = graph.GetNeighborListOffset(input_item);
                         else
@@ -302,7 +302,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
                     else //if ((FLAG & OprtrType_E2V) != 0 ||
                          //    (FLAG & OprtrType_E2E) != 0))
                     {
-                        if (isValid(input_item))
+                        if (util::isValid(input_item))
                         {
                             VertexT v = graph.GetEdgeDest(input_item);
                             smem_storage.vertices  [threadIdx.x] = v;

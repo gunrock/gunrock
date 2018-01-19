@@ -18,15 +18,18 @@
 namespace gunrock {
 namespace util {
 
-void PrintMsg(const char* msg)
+void PrintMsg(const char* msg, bool to_print, bool new_line)
 {
-    printf("%s\n", msg);
-    fflush(stdout);
+    if (!to_print) return;
+    printf("%s%s", msg, new_line ? "\n" : "");
+    if (new_line)
+        fflush(stdout);
 }
 
-void PrintMsg(std::string msg)
+void PrintMsg(std::string msg, bool to_print, bool new_line)
 {
-    PrintMsg(msg.c_str());
+    if (!to_print) return;
+    PrintMsg(msg.c_str(), to_print, new_line);
 }
 
 /**

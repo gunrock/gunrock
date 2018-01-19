@@ -36,25 +36,31 @@ enum : ProblemFlag
     Enable_Idempotence = 0x02,
 };
 
-cudaError_t UseParameters(
+/**
+ * @brief Speciflying parameters for ProblemBase
+ * @param parameters The util::Parameter<...> structure holding all parameter info
+ * \return cudaError_t error message(s), if any
+ */
+cudaError_t UseParameters_problem(
     util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
 
-    retval = partitioner::UseParameters(parameters);
-    if (retval) return retval;
-
-    retval = parameters.Use<int>(
-        "device",
-        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-        0,
-        "Set GPU(s) for testing",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+    GUARD_CU(partitioner::UseParameters(parameters));
+    if (!parameters.Have("device"))
+        GUARD_CU(parameters.Use<int>(
+            "device",
+            util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+            0,
+            "Set GPU(s) for testing",
+            __FILE__, __LINE__));
 
     return retval;
 }
 
+/**
+ * @brief Data structure containing non-problem-specific data on indivual GPU.
+ */
 template <
     typename _GraphT,
     ProblemFlag _FLAG = Problem_None>
@@ -63,11 +69,14 @@ struct DataSliceBase
     typedef _GraphT GraphT;
     static const ProblemFlag FLAG = _FLAG;
 
-    int gpu_idx; // index of GPU the data slice is allocated
-    cudaStream_t stream;
-    GraphT *sub_graph;
-    ProblemFlag flag;
+    int           gpu_idx  ; // index of GPU the data slice is allocated
+    cudaStream_t  stream   ; // cuda stream that data movement works on
+    GraphT       *sub_graph; // pointer to the sub graph
+    ProblemFlag   flag     ; // problem flag
 
+    /*
+     * @brief Default constructor
+     */
     DataSliceBase() :
         gpu_idx  (0),
         stream   (0),
@@ -76,30 +85,41 @@ struct DataSliceBase
     {
     }
 
+    /**
+     * @brief initializing sssp-specific data on each gpu
+     * @param     sub_graph sub graph on the GPU.
+     * @param[in] gpu_idx GPU device index
+     * @param[in] target targeting device location
+     * @param[in] flag problem flag containling options
+     * \return cudaError_t error message(s), if any
+     */
     cudaError_t Init(
-        _GraphT &sub_graph,
-        int      gpu_idx = 0,
-        util::Location target = util::DEVICE,
-        ProblemFlag flag = Problem_None)
+        GraphT         &sub_graph,
+        int             gpu_idx = 0,
+        util::Location  target  = util::DEVICE,
+        ProblemFlag     flag    = Problem_None)
     {
         cudaError_t retval = cudaSuccess;
 
-        this -> gpu_idx = gpu_idx;
+        this -> gpu_idx   =  gpu_idx;
         this -> sub_graph = &sub_graph;
-        this -> flag = flag;
+        this -> flag      =  flag;
         if (target & util::DEVICE)
         {
-            retval = util::SetDevice(gpu_idx);
-            if (retval) return retval;
-            retval = util::GRError(cudaStreamCreateWithFlags(
+            GUARD_CU(util::SetDevice(gpu_idx));
+            GUARD_CU2(cudaStreamCreateWithFlags(
                 &stream, cudaStreamNonBlocking),
-                "cudaStreamCreateWithFlags failed.", __FILE__, __LINE__);
-            if (retval) return retval;
+                "cudaStreamCreateWithFlags failed.");
         }
 
         return retval;
     }
 
+    /*
+     * @brief Releasing allocated memory space
+     * @param target the location to release memory from
+     * \return cudaError_t error message(s), if any
+     */
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
@@ -107,27 +127,17 @@ struct DataSliceBase
         if (target & util::DEVICE)
         {
             if (stream != 0)
-                retval = util::GRError(cudaStreamDestroy(stream),
-                    "cudaStreamDestroy failed", __FILE__, __LINE__);
-            if (retval) return retval;
+                GUARD_CU2(cudaStreamDestroy(stream),
+                    "cudaStreamDestroy failed");
         }
         return retval;
     }
-// empty for now
-};
+}; // DataSliceBase
 
 /**
  * @brief Base problem structure.
- *
- * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer
- * @tparam _MARK_PREDCESSORS    Whether or not to mark predecessors for vertices
- * @tparam _ENABLE_IDEMPOTENCE  Whether or not to use idempotent
- * @tparam _USE_DOUBLE_BUFFER   Whether or not to use double buffer for frontier queues
- * @tparam _ENABLE_BACKWARD     Whether or not to use backward propagation
- * @tparam _KEEP_ORDER          Whether or not to keep vertices order after partitioning
- * @tparam _KEEP_NODE_NUM       Whether or not to keep vertex IDs after partitioning
+ * @tparam _GraphT  Type of the graph
+ * @tparam _FLAG    Problem flags
  */
 template <
     typename _GraphT,
@@ -137,32 +147,41 @@ struct ProblemBase
     typedef _GraphT GraphT;
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
-    typedef typename GraphT::ValueT  ValueT;
-
     static const ProblemFlag FLAG = _FLAG;
     ProblemFlag flag;
 
     // Members
-    int      num_gpus; // Number of GPUs to be sliced over
-    //util::Array1D<int, int> gpu_idx; // GPU indices
-    std::vector<int> gpu_idx;
-    GraphT  *org_graph; // pointer to the input graph
-    //SizeT    nodes                 ; // Number of vertices in the graph
-    //SizeT    edges                 ; // Number of edges in the graph
-
-    util::Array1D<int, GraphT> sub_graphs; // Subgraphs for multi-GPU implementation
+    int                         num_gpus  ; // Number of GPUs to be sliced over
+    std::vector<int>            gpu_idx   ; // GPU indices
+    GraphT                     *org_graph ; // pointer to the input graph
+    size_t                     *org_mem_size; // original memory size on GPUs
+    util::Array1D<int, GraphT>  sub_graphs; // Subgraphs for multi-GPU implementation
+    util::Parameters           &parameters; // Running parameters
 
     // Methods
 
     /**
      * @brief ProblemBase default constructor
      */
-    ProblemBase(ProblemFlag _flag = Problem_None) :
+    ProblemBase(
+        util::Parameters &_parameters,
+        ProblemFlag _flag = Problem_None) :
+        parameters (_parameters),
         flag       (_flag),
         num_gpus   (1    )
     {
-        //gpu_idx   .SetName("gpu_idx");
         sub_graphs.SetName("sub_graphs");
+
+        gpu_idx = parameters.Get<std::vector<int>>("device");
+        num_gpus = gpu_idx.size();
+        org_mem_size = new size_t[num_gpus];
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            size_t dummy;
+            util::GRError(util::SetDevice(gpu_idx[gpu]));
+            util::GRError(cudaMemGetInfo(&(org_mem_size[gpu]), &dummy),
+                "cudaMemGetInfo failed", __FILE__, __LINE__);
+        }
     } // end ProblemBase()
 
     /**
@@ -173,52 +192,48 @@ struct ProblemBase
         Release();
     }
 
+    /*
+     * @brief Releasing allocated memory space
+     * @param target the location to release memory from
+     * \return cudaError_t error message(s), if any
+     */
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
         // Cleanup graph slices on the heap
-        if (sub_graphs.GetPointer(util::HOST) != NULL && num_gpus != 1)
+        if (sub_graphs.GetPointer(util::HOST) != NULL &&
+            num_gpus != 1)
         {
             for (int i = 0; i < num_gpus; ++i)
             {
                 if (target & util::DEVICE)
-                    retval = util::SetDevice(gpu_idx[i]);
-                if (retval) return retval;
-                retval = sub_graphs[i].Release(target);
-                if (retval) return retval;
+                    GUARD_CU(util::SetDevice(gpu_idx[i]));
+                GUARD_CU(sub_graphs[i].Release(target));
             }
-            retval = sub_graphs.Release(target);
-            if (retval) return retval;
+            GUARD_CU(sub_graphs.Release(target));
+        }
+
+        if (target & util::HOST)
+        {
+            delete[] org_mem_size     ; org_mem_size      = NULL;
         }
         return retval;
     }  // end Release()
 
     /**
-     * @brief Initialize problem from host CSR graph.
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph            Pointer to the input CSR graph.
-     * @param[in] inverse_graph    Pointer to the inversed input CSR graph.
-     * @param[in] num_gpus         Number of GPUs
-     * @param[in] gpu_idx          Array of GPU indices
-     * @param[in] partition_method Partition methods
-     * @param[in] queue_sizing     Queue sizing
-     * @param[in] partition_factor Partition factor
-     * @param[in] partition_seed   Partition seed
-     *
-     * \return cudaError_t object indicates the success of all CUDA calls.
+     * @brief initialization function.
+     * @param[in] parameters data structure holding all parameter info
+     * @param     graph the graph that SSSP processes on
+     * @param[in] location memory location to work on
+     * \return cudaError_t error message(s), if any
      */
     cudaError_t Init(
-        util::Parameters &parameters,
-        GraphT &graph,
-        //partitioner::PartitionFlag partition_flag = partitioner::PARTITION_NONE,
-        util::Location target = util::DEVICE)
+        //util::Parameters &parameters,
+        GraphT           &graph,
+        util::Location    target = util::DEVICE)
     {
         cudaError_t retval      = cudaSuccess;
         this->org_graph         = &graph;
-
-        gpu_idx = parameters.Get<std::vector<int>>("device");
-        num_gpus = gpu_idx.size();
 
         if (num_gpus == 1)
             sub_graphs.SetPointer(&graph, 1, util::HOST);
@@ -235,7 +250,7 @@ struct ProblemBase
         return retval;
     } // end Init(...)
 
-};
+}; // ProblemBase
 
 } // namespace app
 } // namespace gunrock

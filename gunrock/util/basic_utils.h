@@ -236,5 +236,44 @@ std::string to_string(T* ptr)
     return std::string(temp_str);
 }
 
+template <typename T>
+void SeperateFileName(
+    T _filename,
+    std::string &dir,
+    std::string &file,
+    std::string &extension)
+{
+    std::string filename(_filename);
+
+    auto dir_pos = std::string::npos;
+    #ifdef _WIN32
+        dir_pos = filename.find_last_of('\\');
+    #else
+        dir_pos = filename.find_last_of('/');
+    #endif
+    auto extension_pos = filename.find_last_of('.');
+
+    if (dir_pos == std::string::npos)
+    {
+        dir_pos = 0;
+        dir = "";
+        file = filename.substr(0, extension_pos);
+    } else {
+        if (dir_pos == 0)
+            dir = "/";
+        else
+            dir  = filename.substr(0, dir_pos);
+        if (extension_pos == std::string::npos)
+            file = filename.substr(dir_pos + 1);
+        else
+            file = filename.substr(dir_pos + 1, extension_pos - dir_pos - 1);
+    }
+
+    if (extension_pos != std::string::npos)
+        extension = filename.substr(extension_pos + 1);
+    else
+        extension = "";
+}
+
 } // namespace util
 } // namespace gunrock
