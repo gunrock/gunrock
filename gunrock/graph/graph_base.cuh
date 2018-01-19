@@ -22,8 +22,9 @@ namespace graph {
 /**
  * @brief Predefined flags for graph types
  */
-using GraphFlag = unsigned int;
-enum {
+using GraphFlag = uint32_t;
+enum : GraphFlag
+{
     ARRAY_RESERVE   = 0x000F,
 
     GRAPH_NONE      = 0x0000,
@@ -126,7 +127,69 @@ struct GraphBase
         this -> directed = source.directed;
         return retval;
     }
+
+    template <typename CooT_in>
+    cudaError_t FromCoo(CooT_in &coo)
+    {
+        Set(coo);
+        return cudaSuccess;
+    }
+
+    template <typename CsrT_in>
+    cudaError_t FromCsr(CsrT_in &csr)
+    {
+        Set(csr);
+        return cudaSuccess;
+    }
+
+    template <typename CscT_in>
+    cudaError_t FromCsc(CscT_in &csc)
+    {
+        Set(csc);
+        return cudaSuccess;
+    }
+
+    SizeT GetNeighborListLength(const VertexT &v)
+    {
+        return 0;
+    }
 };
+
+/**
+ * @brief Get the average degree of all the nodes in graph
+ */
+template <typename GraphT>
+double GetAverageDegree(GraphT &graph)
+{
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    double mean = 0, count = 0;
+    for (VertexT v = 0; v < graph.nodes; ++v)
+    {
+        count += 1;
+        mean += (graph.GetNeighborListLength(v) - mean) / count;
+    }
+    return mean;
+}
+
+/**
+ * @brief Get the average degree of all the nodes in graph
+ */
+template <typename GraphT>
+double GetStddevDegree(GraphT &graph)
+{
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    auto average_degree = GetAverageDegree(graph);
+
+    float accum = 0.0f;
+    for (VertexT v=0; v < graph.nodes; ++v)
+    {
+        float d = graph.GetNeighborListLength(v);
+        accum += (d - average_degree) * (d - average_degree);
+    }
+    return sqrt(accum / (graph.nodes-1));
+}
 
 } // namespace graph
 } // namespace gunrock

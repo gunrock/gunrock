@@ -34,21 +34,19 @@ cudaError_t UseParameters(
 {
     cudaError_t retval = cudaSuccess;
 
-    retval = parameters.Use<double>(
+    GUARD_CU(parameters.Use<double>(
         graph_prefix + "sw-p",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         0.00,
         "p",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
-    retval = parameters.Use<long long>(
+    GUARD_CU(parameters.Use<long long>(
         graph_prefix + "sw-k",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         6,
         "k",
-        __FILE__, __LINE__);
-    if (retval) return retval;
+        __FILE__, __LINE__));
 
     return retval;
 }
@@ -72,15 +70,24 @@ cudaError_t Build(
 #else
     //using namespace boost;
     bool quiet = parameters.Get<bool>("quiet");
+    std::string dataset = "smallworld_";
     //bool undirected = !parameters.Get<bool>(graph_prefix + "directed");
     SizeT scale = parameters.Get<SizeT>(graph_prefix + "graph-scale");
-    SizeT num_nodes = 1 << scale;
+    SizeT num_nodes = 0;
     if (!parameters.UseDefault(graph_prefix + "graph-nodes"))
+    {
         num_nodes = parameters.Get<SizeT>(graph_prefix + "graph-nodes");
-
+        dataset = dataset + std::to_string(num_nodes) + "_";
+    } else {
+        num_nodes = 1 << scale;
+        dataset = dataset + "n" + std::to_string(scale) + "_";
+    }
     double p = parameters.Get<double>(graph_prefix + "sw-p");
     SizeT k = parameters.Get<SizeT>(graph_prefix + "sw-k");
-
+    dataset = dataset + "_k" + std::to_string(k) + "_p" + std::to_string(p);
+    if (parameters.UseDefault("dataset"))
+        parameters.Set<std::string>("dataset", dataset);
+        
     double edge_value_range = parameters.Get<double>(graph_prefix + "edge-value-range");
     double edge_value_min   = parameters.Get<double>(graph_prefix + "edge-value-min");
 
@@ -91,11 +98,10 @@ cudaError_t Build(
     Engine engine(seed_);
     Distribution distribution(0.0, 1.0);
 
-    if (!quiet)
-        util::PrintMsg("Generating Small World " + graph_prefix +
-            "graph, p = " + std::to_string(p) +
-            ", k = " + std::to_string(k) +
-            ", seed = " + std::to_string(seed) + "...");
+    util::PrintMsg("Generating Small World " + graph_prefix +
+        "graph, p = " + std::to_string(p) +
+        ", k = " + std::to_string(k) +
+        ", seed = " + std::to_string(seed) + "...", !quiet);
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
 
@@ -109,8 +115,7 @@ cudaError_t Build(
     boost::property_map<BGraph, boost::vertex_index_t>::type vi = boost::get(boost::vertex_index, g);
 
     SizeT num_edges = boost::num_edges(g);
-    if (retval = graph.CooT::Allocate(num_nodes, num_edges, target))
-        return retval;
+    GUARD_CU(graph.CooT::Allocate(num_nodes, num_edges, target));
 
     boost::graph_traits<BGraph>::edge_iterator ei;
     boost::graph_traits<BGraph>::edge_iterator ei_end;
@@ -130,11 +135,8 @@ cudaError_t Build(
 
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
-    if (!quiet)
-    {
-        util::PrintMsg("Small world generated in " +
-            std::to_string(elapsed) + " ms.");
-    }
+    util::PrintMsg("Small world generated in " +
+        std::to_string(elapsed) + " ms.", !quiet);
 
     return retval;
 #endif
@@ -149,9 +151,8 @@ static cudaError_t Load(
     std::string graph_prefix = "")
 {
     cudaError_t retval = cudaSuccess;
-    retval = Build(parameters, graph, graph_prefix);
-    if (retval) return retval;
-    retval = graph.FromCoo(graph, true);
+    GUARD_CU(Build(parameters, graph, graph_prefix));
+    GUARD_CU(graph.FromCoo(graph, true));
     return retval;
 }
 };
@@ -171,11 +172,9 @@ static cudaError_t Load(
     cudaError_t retval = cudaSuccess;
 
     CooT coo;
-    retval = Build(parameters, coo, graph_prefix);
-    if (retval) return retval;
-    retval = graph.FromCoo(coo);
-    if (retval) return retval;
-    retval = coo.Release();
+    GUARD_CU(Build(parameters, coo, graph_prefix));
+    GUARD_CU(graph.FromCoo(coo));
+    GUARD_CU(coo.Release());
     return retval;
 }
 };

@@ -32,14 +32,19 @@ namespace graph {
  * @tparam ValueT Associated value type.
  */
 template<
-    typename VertexT = int,
-    typename SizeT   = VertexT,
-    typename ValueT  = VertexT,
+    typename _VertexT = int,
+    typename _SizeT   = _VertexT,
+    typename _ValueT  = _VertexT,
     GraphFlag _FLAG   = GRAPH_NONE | HAS_CSC,
-    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
+    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault,
+    bool VALID = true>
 struct Csc :
-    public GraphBase<VertexT, SizeT, ValueT, _FLAG | HAS_CSC, cudaHostRegisterFlag>
+    public GraphBase<_VertexT, _SizeT, _ValueT,
+        _FLAG | HAS_CSC, cudaHostRegisterFlag>
 {
+    typedef _VertexT VertexT;
+    typedef _SizeT   SizeT;
+    typedef _ValueT  ValueT;
     static const GraphFlag FLAG = _FLAG | HAS_CSC;
     static const util::ArrayFlag ARRAY_FLAG =
         util::If_Val<(FLAG & GRAPH_PINNED) != 0, (FLAG & ARRAY_RESERVE) | util::PINNED,
@@ -361,6 +366,43 @@ struct Csc :
         return row_indices[e];
     }
 }; // CSC
+
+template<
+    typename VertexT,
+    typename SizeT  ,
+    typename ValueT ,
+    GraphFlag _FLAG ,
+    unsigned int cudaHostRegisterFlag>
+struct Csc<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
+{
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
+    {
+        return cudaSuccess;
+    }
+
+    template <typename CooT_in>
+    cudaError_t FromCoo(CooT_in &coo)
+    {
+        return cudaSuccess;
+    }
+
+    template <typename CsrT_in>
+    cudaError_t FromCsr(CsrT_in &csr)
+    {
+        return cudaSuccess;
+    }
+
+    template <typename CscT_in>
+    cudaError_t FromCsc(CscT_in &csc)
+    {
+        return cudaSuccess;
+    }
+
+    SizeT GetNeighborListLength(const VertexT &v)
+    {
+        return 0;
+    }
+};
 
 } // namespace graph
 } // namespace gunrock

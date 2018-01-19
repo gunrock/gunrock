@@ -13,24 +13,14 @@
  */
 
 #pragma once
-//#include <time.h>
 
-//#include <boost/predef.h>
-
-#include <moderngpu.cuh>
+//#include <moderngpu.cuh>
 
 #include <gunrock/util/cuda_properties.cuh>
-
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/array_utils.cuh>
-
 #include <gunrock/app/enactor_types.cuh>
 #include <gunrock/app/mgpu_slice.cuh>
-//#include <gunrock/app/enactor_helper.cuh>
-//#include <gunrock/app/enactor_loop.cuh>
-
-
-//using namespace mgpu;
 
 /* this is the "stringize macro macro" hack */
 #define STR(x) #x
@@ -39,7 +29,7 @@
 namespace gunrock {
 namespace app {
 
-using Enactor_Flag = unsigned int;
+using Enactor_Flag = uint32_t;
 
 enum : Enactor_Flag
 {
@@ -49,7 +39,12 @@ enum : Enactor_Flag
     Size_Check = 0x04,
 };
 
-cudaError_t UseParameters2(
+/**
+ * @brief Speciflying parameters for EnactorBase
+ * @param parameters The util::Parameter<...> structure holding all parameter info
+ * \return cudaError_t error message(s), if any
+ */
+cudaError_t UseParameters_enactor(
     util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
@@ -156,25 +151,28 @@ cudaError_t UseParameters2(
 }
 
 /**
- * @brief Base class for graph problem enactor.
- *
- * @tparam SizeT
+ * @brief Base class for enactor.
+ * @tparam GraphT  Type of the graph
+ * @tparam LabelT  Type of labels used in the operators
+ * @tparam ValueT  Type of values used in the mgpu slices
+ * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
+ * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
  */
 template <
     typename GraphT,
     typename LabelT,
+    typename _ValueT = typename GraphT::ValueT,
     util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 class EnactorBase
 {
 public:
     typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::ValueT  ValueT;
+    //typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::SizeT   SizeT;
+    typedef _ValueT ValueT;
     typedef EnactorSlice<GraphT, LabelT, ARRAY_FLAG, cudaHostRegisterFlag>
                                      EnactorSliceT;
-    //typedef Frontier<VertexT, SizeT, ARRAY_FLAG, cudaHostRegisterFlag>
-    //                                 FrontierT;
     typedef MgpuSlice<VertexT, SizeT, ValueT>
                                      MgpuSliceT;
 
@@ -210,10 +208,6 @@ public:
         cudaHostRegisterFlag>// | cudaHostAllocMapped | cudaHostAllocPortable>
         mgpu_slices;
 
-    //Frontiers
-    //util::Array1D<int, FrontierT, ARRAY_FLAG, cudaHostRegisterFlag>
-    //    frontiers;
-
     // Per-CPU-thread data
     util::Array1D<int, ThreadSlice> thread_slices;
     util::Array1D<int, CUTThread  > thread_Ids  ;
@@ -226,17 +220,11 @@ public:
     util::Array1D<int, std::vector<std::vector<SizeT > > > iter_full_queue_edges_queued;
 #endif
 
-//protected:
+protected:
 
     /**
-     * @brief Constructor
-     *
-     * @param[in] _frontier_type The frontier type (i.e., edge/vertex/mixed)
-     * @param[in] _num_gpus
-     * @param[in] _gpu_idx
-     * @param[in] _instrument
-     * @param[in] _debug
-     * @param[in] _size_check
+     * @brief EnactorBase constructor
+     * @param[in] algo_name Name of the algorithm
      */
     EnactorBase(std::string algo_name = "test")
     {
@@ -263,10 +251,15 @@ public:
         //Release();
     }
 
+    /*
+     * @brief Releasing allocated memory space
+     * @param target The location to release memory from
+     * \return cudaError_t error message(s), if any
+     */
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval;
-        util::PrintMsg("EnactorBase::Release() entered");
+        //util::PrintMsg("EnactorBase::Release() entered");
 
         if (thread_slices.GetPointer(util::HOST)!= NULL)
             GUARD_CU(Kill_Threads());
@@ -321,22 +314,26 @@ public:
             GUARD_CU(iter_full_queue_edges_queued.Release(target));
         }
 #endif
-        util::PrintMsg("EnactorBase::Release() returning");
+        //util::PrintMsg("EnactorBase::Release() returning");
         return retval;
     }
 
    /**
-     * @brief Init function for enactor base class.
-     * @param[in] max_grid_size Maximum CUDA block numbers in on grid
-     * @param[in] advance_occupancy CTA Occupancy for Advance operator
-     * @param[in] filter_occupancy CTA Occupancy for Filter operator
-     * @param[in] node_lock_size The size of an auxiliary array used in enactor, 1024 by default.
-     *
-     * \return cudaError_t object indicates the success of all CUDA calls.
+     * @brief Init function for enactor base, called within Enactor::Init()
+     * @param[in] parameters Running parameters.
+     * @param[in] sub_graphs Pointer to the sub graphs on indivual GPUs
+     * @param[in] flag Enactor flag
+     * @param[in] num_queues The number queues in the frontier
+     * @param[in] frontier_type The types of each queue in the frontier, default is VERTEX_FRONTIER
+     * @param[in] target Target location of data
+     * @param[in] skip_makeout_selection Whether to skip the makeout selection routine during communication
+     * \return cudaError_t error message(s), if any
      */
+    template <typename ProblemT>
     cudaError_t Init(
-        util::Parameters &parameters,
-        GraphT           *sub_graphs,
+        //util::Parameters &parameters,
+        //GraphT           *sub_graphs,
+        ProblemT         &problem,
         Enactor_Flag      flag           = Enactor_None,
         unsigned int      num_queues     = 2,
         FrontierType     *frontier_types = NULL,
@@ -345,6 +342,8 @@ public:
     {
         typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
+        util::Parameters &parameters = problem.parameters;
+        GraphT* sub_graphs = problem.sub_graphs + 0;
 
         gpu_idx             = parameters.Get<std::vector<int>>("device");
         num_gpus            = gpu_idx.size();
@@ -356,6 +355,14 @@ public:
         makeout_latency     = parameters.Get<int   >("makeout-latency");
         queue_factors       = parameters.Get<std::vector<double>>("queue-factor");
         trans_factor        = parameters.Get<double>("trans-factor");
+        std::string advance_mode = parameters.Get<std::string>("advance-mode");
+        std::string filter_mode  = parameters.Get<std::string>("filter-mode");
+        int max_grid_size   = parameters.Get<int   >("max-grid-size");
+        bool quiet          = parameters.Get<bool  >("quiet");
+
+        util::PrintMsg("Using advance mode " + advance_mode, !quiet);
+        util::PrintMsg("Using filter mode " + filter_mode, !quiet);
+
         min_sm_version      = -1;
         this -> parameters  = &parameters;
         if (parameters.Get<bool>("v"))
@@ -363,7 +370,6 @@ public:
         if (parameters.Get<bool>("size-check"))
             flag = flag | Size_Check;
         this -> flag        = flag;
-
 
         GUARD_CU(cuda_props    .Allocate(num_gpus, util::HOST));
         GUARD_CU(enactor_slices.Allocate(num_gpus * num_gpus, util::HOST));
@@ -400,10 +406,7 @@ public:
                 GUARD_CU(enactor_slice.Init(num_queues, frontier_types,
                     algo_name + "::frontier[" + std::to_string(gpu) + "," +
                     std::to_string(peer) + "]", /*node_lock_size,*/ target,
-                    cuda_props + gpu,
-                    parameters.Get<std::string>("advance-mode"),
-                    parameters.Get<std::string>("filter-mode"),
-                    parameters.Get<int>("max-grid-size")));
+                    cuda_props + gpu, advance_mode, filter_mode, max_grid_size));
 
                 if (gpu != peer && (target & util::DEVICE) != 0)
                 {
@@ -441,8 +444,10 @@ public:
         return retval;
     }
 
-    /*
-     * @brief Reset function.
+    /**
+     * @brief Reset base enactor, called within Enactor::Reset() function
+     * @param[in] target Target location of data
+     * \return cudaError_t error message(s), if any
      */
     cudaError_t Reset(util::Location target = util::DEVICE)
     {
@@ -458,10 +463,6 @@ public:
             {
                 GUARD_CU(enactor_slices[gpu * num_gpus + peer]
                     .Reset(target));
-                //GUARD_CU(work_progress     [gpu * num_gpus + peer]
-                //    .Reset_());
-                //GUARD_CU(frontier_attribute[gpu * num_gpus + peer]
-                //    .Reset());
             }
 
             GUARD_CU(mgpu_slices[gpu].Reset(target));
@@ -478,9 +479,28 @@ public:
         return retval;
     }
 
+    cudaError_t Sync()
+    {
+        cudaError_t retval = cudaSuccess;
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            GUARD_CU(util::SetDevice(gpu_idx[gpu]));
+            GUARD_CU2(cudaDeviceSynchronize(),
+                "cudaDeviceSynchronize failed");
+        }
+        return retval;
+    }
+
+    /**
+     * @brief Initialize the controling threads on CPU, called within Enactor::Init() function
+     * @tparam EnactorT Type of enactor
+     * @param enactor pointer to the enactor
+     * @param thread_func The function pointer to the CPU thread
+     * \return cudaError_t error message(s), if any
+     */
     template <typename EnactorT>
     cudaError_t Init_Threads(EnactorT *enactor,
-        CUT_THREADROUTINE Thread_Func)
+        CUT_THREADROUTINE thread_func)
     {
         for (int gpu=0; gpu<this->num_gpus; gpu++)
         {
@@ -490,7 +510,7 @@ public:
             //thread_slices[gpu].context       = &(context[gpu*this->num_gpus]);
             thread_slices[gpu].status        = ThreadSlice::Status::Inited;
             thread_slices[gpu].thread_Id     = cutStartThread(
-                    Thread_Func,
+                    thread_func,
                     (void*)&(thread_slices[gpu]));
             thread_Ids[gpu] = thread_slices[gpu].thread_Id;
         }
@@ -506,6 +526,10 @@ public:
         return cudaSuccess;
     }
 
+    /**
+      * @brief Run the CPU threads, called within the Enactor::Enact() function
+      * \return cudaError_t error message(s), if any
+      */
     cudaError_t Run_Threads()
     {
         cudaError_t retval = cudaSuccess;
@@ -530,6 +554,10 @@ public:
         return retval;
     }
 
+    /**
+      * @brief Kill the CPU threads, called within the Enactor::Release() function
+      * \return cudaError_t error message(s), if any
+      */
     cudaError_t Kill_Threads()
     {
         cudaError_t retval = cudaSuccess;
@@ -542,52 +570,7 @@ public:
         }
         return retval;
     }
-
-    /**
-     * @brief Setup function for enactor base class.
-     *
-     * @tparam Problem
-     *
-     * @param[in] max_grid_size Maximum CUDA block numbers in on grid
-     * @param[in] advance_occupancy CTA Occupancy for Advance operator
-     * @param[in] filter_occupancy CTA Occupancy for Filter operator
-     * @param[in] node_lock_size The size of an auxiliary array used in enactor, 256 by default.
-     *
-     * \return cudaError_t object indicates the success of all CUDA calls.
-     */
-    //template <typename Problem>
-    //cudaError_t Setup(
-    //    int max_grid_size,
-    //    int advance_occupancy,
-    //    int filter_occupancy,
-    //    int node_lock_size = 1024)
-    //{
-    //    cudaError_t retval = cudaSuccess;
-
-    //    if (retval = Init(/*problem,*/ max_grid_size,
-    //        advance_occupancy, filter_occupancy, node_lock_size)) return retval;
-    //    if (retval = Reset()) return retval;
-    //    return retval;
-    //}
-
-    /**
-     * @brief Utility function for getting the max grid size.
-     *
-     * @param[in] gpu
-     * @param[in] cta_occupancy CTA occupancy for current architecture
-     * @param[in] max_grid_size Preset max grid size. If less or equal to 0, fully populate all SMs
-     *
-     * \return The maximum number of thread blocks this enactor class can launch.
-     */
-    int MaxGridSize(int gpu, int cta_occupancy, int max_grid_size = 0)
-    {
-        if (max_grid_size <= 0) {
-            max_grid_size = cuda_props[gpu].device_props.multiProcessorCount * cta_occupancy;
-        }
-
-        return max_grid_size;
-    }
-};
+}; // EnactorBase
 
 } // namespace app
 } // namespace gunrock
