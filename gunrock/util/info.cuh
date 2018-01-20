@@ -124,13 +124,13 @@ public:
     void AssignInitValues()
     {
         // assign default values
-        info["algorithm"]          = "";     // algorithm/primitive name
+        //info["algorithm"]          = "";     // algorithm/primitive name
         info["average_duty"]       = 0.0f;   // average runtime duty
-        info["command_line"]       = "";     // entire command line
-        info["compiler"]           = "";     // what compiled this program?
-        info["compiler_version"]   = "";     // what version compiler?
+        //info["command_line"]       = "";     // entire command line
+        //info["compiler"]           = "";     // what compiled this program?
+        //info["compiler_version"]   = "";     // what version compiler?
         //info["debug_mode"]         = false;  // verbose flag print debug info
-        info["dataset"]            = "";     // dataset name used in test
+        //info["dataset"]            = "";     // dataset name used in test
         info["edges_visited"]      = 0;      // number of edges touched
         info["elapsed"]            = 0.0f;   // elapsed device running time
         info["preprocess_time"]    = 0.0f;   // elapsed preprocessing time
@@ -141,18 +141,18 @@ public:
         info["load_time"]          = 0.0f;   // data loading time
         info["write_time"]         = 0.0f;   // output writing time
         info["output_filename"]    = "";     // output filename
-        info["engine"]             = "";     // engine name - Gunrock
-        info["edge_value"]         = false;  // default don't load weights
-        info["random_edge_value"]  = false;  // whether to generate edge weights
-        info["git_commit_sha1"]    = "";     // git commit sha1
+        //info["engine"]             = "";     // engine name - Gunrock
+        //info["edge_value"]         = false;  // default don't load weights
+        //info["random_edge_value"]  = false;  // whether to generate edge weights
+        //info["git_commit_sha1"]    = "";     // git commit sha1
         //info["graph_type"]         = "";     // input graph type
-        info["gunrock_version"]    = "";     // gunrock version number
+        //info["gunrock_version"]    = "";     // gunrock version number
         //info["idempotent"]         = false;  // enable idempotent (BFS)
         //info["instrument"]         = false;  // enable instrumentation
         //info["num_iteration"]      = 1;      // number of runs
-        info["json"]               = false;  // --json flag
-        info["jsonfile"]           = "";     // --jsonfile
-        info["jsondir"]            = "";     // --jsondir
+        //info["json"]               = false;  // --json flag
+        //info["jsonfile"]           = "";     // --jsonfile
+        //info["jsondir"]            = "";     // --jsondir
         //info["mark_predecessors"]  = false;  // mark predecessors (BFS, SSSP)
         //info["max_grid_size"]      = 0;      // maximum grid size
         //info["max_iteration"]      = 50;     // default maximum iteration
@@ -169,13 +169,13 @@ public:
         //info["quick_mode"]         = false;  // skip CPU validation
         info["edges_redundance"]   = 0.0f;   // redundant edge work (BFS)
         info["nodes_redundance"]   = 0.0f;   // redundant node work
-        info["ref_filename"]       = "";     // reference file input
+        //info["ref_filename"]       = "";     // reference file input
         info["search_depth"]       = 0;      // search depth (iterations)
         //info["size_check"]         = true;   // enable or disable size check
         //info["source_type"]        = "";     // source type
         //info["source_seed"]        = 0;      // source seed
         //info["source_vertex"]      = 0;      // source (BFS, SSSP)
-        info["destination_vertex"] = -1;     // destination
+        //info["destination_vertex"] = -1;     // destination
         //info["stream_from_host"]   = false;  // stream from host to device
         //info["traversal_mode"]     = "default";     // advance mode
         info["edges_queued"]       = 0;      // number of edges in queue
@@ -190,9 +190,9 @@ public:
         //info["beta"]               = 6.0f;   // default beta for DOBFS
         //info["top_nodes"]          = 0;      // default number of nodes for top-k primitive
         //info["normalized"]         = false;  // default normalized for PageRank
-        info["multi_graphs"]       = false;  // default only one input graph
-        info["node_value"]         = false;  // default don't load labels
-        info["label"]              = "";     // label file name used in test
+        //info["multi_graphs"]       = false;  // default only one input graph
+        //info["node_value"]         = false;  // default don't load labels
+        //info["label"]              = "";     // label file name used in test
         //info["communicate_latency"]= 0;      // inter-GPU communication latency
         //info["communicate_multipy"]= -1.0f;  // inter-GPU communication multiplier
         //info["expand_latency"     ]= 0;      // expand_incoming latency
@@ -259,11 +259,12 @@ public:
 
         // get configuration parameters from command line arguments
         info["algorithm"]  =  algorithm_name;  // set algorithm name
-        auto para_list = parameters.List();
-        for (auto it = para_list.begin(); it != para_list.end(); it++)
-        {
-            info[it -> first] = it -> second;
-        }
+        //auto para_list = parameters.List();
+        //for (auto it = para_list.begin(); it != para_list.end(); it++)
+        //{
+        //    info[it -> first] = it -> second;
+        //}
+        parameters.List(*this);
 
         //info["instrument"] =  args.CheckCmdLineFlag("instrumented");
         //info["size_check"] = !args.CheckCmdLineFlag("disable-size-check");
@@ -548,6 +549,15 @@ public:
     void SetVal(std::string name, const T &val)
     {
         info[name] = val;
+    }
+
+    template <typename T>
+    void SetVal(std::string name, const std::vector<T> &vec)
+    {
+        json_spirit::mArray list;   // return mArray
+        for (auto it = vec.begin(); it != vec.end(); it++)
+            list.push_back(*it);
+        info[name] = list;
     }
 
     void CollectSingleRun(double single_elapsed)

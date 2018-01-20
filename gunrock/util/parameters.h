@@ -255,9 +255,9 @@ public:
                 __FILE__, __LINE__);
         }
 
-#ifdef ENABLE_PARAMETER_DEBUG
-        util::PrintMsg("Parameter " + name + " <- " + value);
-#endif
+        #ifdef ENABLE_PARAMETER_DEBUG
+            util::PrintMsg("Parameter " + name + " <- " + value);
+        #endif
 
         it -> second.value = value;
         it -> second.use_default = false;
@@ -492,16 +492,16 @@ public:
             if (retval) break;
         } while (i!=-1);
 
-#ifdef ENABLE_PARAMETER_DEBUG
-        if (optind < argc-1)
-            std::cout << "Left over arguments" << std::endl;
-#endif
+        #ifdef ENABLE_PARAMETER_DEBUG
+            if (optind < argc-1)
+                std::cout << "Left over arguments" << std::endl;
+        #endif
         for (int i=optind; i<argc; i++)
         {
             bool valid_parameter = false;
-#ifdef ENABLE_PARAMETER_DEBUG
-            std::cout << argv[i] << std::endl;
-#endif
+            #ifdef ENABLE_PARAMETER_DEBUG
+                std::cout << argv[i] << std::endl;
+            #endif
             if (i == optind)
             {
                 auto it = p_map.find("graph-type");
@@ -623,6 +623,93 @@ public:
         return list;
     }
 
+
+    template <typename InfoT>
+    void List(InfoT& info)
+    {
+        for (auto it = p_map.begin(); it != p_map.end(); it ++)
+        {
+            auto item = it -> second;
+            auto tidx = std::type_index(*(item.value_type_info));
+            auto &str = item.value;
+            std::string str_end;
+            if      (tidx == std::type_index(typeid(         char )))
+                info.SetVal(item.name, strtoT<               char >(str, str_end));
+            else if (tidx == std::type_index(typeid(  signed char )))
+                info.SetVal(item.name, strtoT<        signed char >(str, str_end));
+            else if (tidx == std::type_index(typeid(unsigned char )))
+                info.SetVal(item.name, strtoT<      unsigned char >(str, str_end));
+            else if (tidx == std::type_index(typeid(         short)))
+                info.SetVal(item.name, strtoT<               short>(str, str_end));
+            else if (tidx == std::type_index(typeid(unsigned short)))
+                info.SetVal(item.name, strtoT<      unsigned short>(str, str_end));
+            else if (tidx == std::type_index(typeid(         int  )))
+                info.SetVal(item.name, strtoT<                int64_t>(str, str_end));
+            else if (tidx == std::type_index(typeid(unsigned int  )))
+                info.SetVal(item.name, strtoT<               uint64_t>(str, str_end));
+            else if (tidx == std::type_index(typeid(         long )))
+                info.SetVal(item.name, strtoT<                int64_t>(str, str_end));
+            else if (tidx == std::type_index(typeid(unsigned long )))
+                info.SetVal(item.name, strtoT<               uint64_t>(str, str_end));
+            else if (tidx == std::type_index(typeid(         long long)))
+                info.SetVal(item.name, strtoT<                int64_t>(str, str_end));
+            else if (tidx == std::type_index(typeid(unsigned long long)))
+                info.SetVal(item.name, strtoT<               uint64_t>(str, str_end));
+            else if (tidx == std::type_index(typeid(         bool )))
+                info.SetVal(item.name, strtoT<               bool >(str, str_end));
+            else if (tidx == std::type_index(typeid(         float)))
+                info.SetVal(item.name, strtoT<               float>(str, str_end));
+            else if (tidx == std::type_index(typeid(         double)))
+                info.SetVal(item.name, strtoT<               double>(str, str_end));
+            else if (tidx == std::type_index(typeid(    long double)))
+                info.SetVal(item.name, strtoT<               double>(str, str_end));
+            else if (tidx == std::type_index(typeid(     std::string)))
+                info.SetVal(item.name, strtoT<           std::string>(str, str_end));
+            else if (tidx == std::type_index(typeid(         char*)))
+                info.SetVal(item.name, strtoT<               char*>(str, str_end));
+
+            else if (tidx == std::type_index(typeid(std::vector<         char >)))
+                info.SetVal(item.name, strtoT<      std::vector<         char > >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<  signed char >)))
+                info.SetVal(item.name, strtoT<      std::vector<  signed char > >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<unsigned char >)))
+                info.SetVal(item.name, strtoT<      std::vector<unsigned char > >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<         short>)))
+                info.SetVal(item.name, strtoT<      std::vector<         short> >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<unsigned short>)))
+                info.SetVal(item.name, strtoT<      std::vector<unsigned short> >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<         int  >)))
+                info.SetVal(item.name, strtoT<      std::vector<          int64_t> >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<unsigned int  >)))
+                info.SetVal(item.name, strtoT<      std::vector<         uint64_t> >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<         long >)))
+                info.SetVal(item.name, strtoT<      std::vector<          int64_t> >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<unsigned long >)))
+                info.SetVal(item.name, strtoT<      std::vector<         uint64_t> >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<         long long>)))
+                info.SetVal(item.name, strtoT<      std::vector<          int64_t> >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<unsigned long long>)))
+                info.SetVal(item.name, strtoT<      std::vector<         uint64_t> >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<         bool >)))
+            {
+                auto vec = strtoT<      std::vector<     std::string> >(str, str_end);
+                if (vec.size() == 1)
+                    info.SetVal(item.name, vec[0]);
+                else
+                    info.SetVal(item.name, vec);
+            } else if (tidx == std::type_index(typeid(std::vector<         float>)))
+                info.SetVal(item.name, strtoT<      std::vector<         float> >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<         double>)))
+                info.SetVal(item.name, strtoT<      std::vector<         double> >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<    long double>)))
+                info.SetVal(item.name, strtoT<      std::vector<         double> >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<     std::string>)))
+                info.SetVal(item.name, strtoT<      std::vector<     std::string> >(str, str_end));
+            else if (tidx == std::type_index(typeid(std::vector<         char*>)))
+                info.SetVal(item.name, strtoT<      std::vector<         char*> >(str, str_end));
+            else info.SetVal(item.name,str);
+        }
+    }
 }; // class Parameters;
 
 } // namespace util
