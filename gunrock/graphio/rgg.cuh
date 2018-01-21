@@ -155,7 +155,7 @@ cudaError_t Build(
     }
     if (parameters.UseDefault("dataset"))
         parameters.Set<std::string>("dataset", dataset);
-        
+
     double edge_value_range = parameters.Get<double>(graph_prefix + "edge-value-range");
     double edge_value_min   = parameters.Get<double>(graph_prefix + "edge-value-min");
 
@@ -391,7 +391,7 @@ static cudaError_t Load(
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(Build(parameters, graph, graph_prefix));
-    GUARD_CU(graph.FromCsr(graph, true));
+    GUARD_CU(graph.FromCsr(graph, util::HOST, 0, parameters.Get<bool>("quiet"), true));
     return retval;
 }
 };
@@ -412,7 +412,7 @@ cudaError_t Load(
 
     CsrT csr;
     GUARD_CU(Build(parameters, csr, graph_prefix));
-    GUARD_CU(graph.FromCsr(csr));
+    GUARD_CU(graph.FromCsr(csr, util::HOST, 0, parameters.Get<bool>("quiet"), false));
     GUARD_CU(csr.Release());
     return retval;
 }

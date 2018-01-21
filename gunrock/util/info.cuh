@@ -244,13 +244,13 @@ public:
         info["gpuinfo"] = gpuinfo.getGpuinfo();
         util::Userinfo userinfo;
         info["userinfo"] = userinfo.getUserinfo();
-#if BOOST_COMP_CLANG
-        info["compiler"] = BOOST_COMP_CLANG_NAME;
-        info["compiler_version"] = BOOST_COMP_CLANG_DETECTION;
-#elif BOOST_COMP_GNUC
-        info["compiler"] = BOOST_COMP_GNUC_NAME;
-        info["compiler_version"] = BOOST_COMP_GNUC_DETECTION;
-#endif /* BOOST_COMP */
+        #if BOOST_COMP_CLANG
+            info["compiler"] = BOOST_COMP_CLANG_NAME;
+            info["compiler_version"] = BOOST_COMP_CLANG_DETECTION;
+        #elif BOOST_COMP_GNUC
+            info["compiler"] = BOOST_COMP_GNUC_NAME;
+            info["compiler_version"] = BOOST_COMP_GNUC_DETECTION;
+        #endif /* BOOST_COMP */
         time_t now = time(NULL); info["time"] = ctime(&now);
         info["gunrock_version"] = XSTR(GUNROCKVERSION);
         info["git_commit_sha1"] = g_GIT_SHA1;
@@ -1133,7 +1133,8 @@ public:
         double  nodes_redundance = info["nodes_redundance"].get_real();
         double  edges_redundance = info["edges_redundance"].get_real();
         double  load_time        = info["load_time"       ].get_real();
-        double  preprocess_time  = info["preprocess_time" ].get_real();
+        //double  preprocess_time  = info["preprocess_time" ].get_real();
+        double  preprocess_time  = parameters -> Get<double>("preprocess-time");
         double  postprocess_time = info["postprocess_time"].get_real();
         double  write_time       = info["write_time"      ].get_real();
         double  total_time       = info["total_time"      ].get_real();

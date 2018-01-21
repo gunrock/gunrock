@@ -87,7 +87,7 @@ cudaError_t Build(
     dataset = dataset + "_k" + std::to_string(k) + "_p" + std::to_string(p);
     if (parameters.UseDefault("dataset"))
         parameters.Set<std::string>("dataset", dataset);
-        
+
     double edge_value_range = parameters.Get<double>(graph_prefix + "edge-value-range");
     double edge_value_min   = parameters.Get<double>(graph_prefix + "edge-value-min");
 
@@ -152,7 +152,7 @@ static cudaError_t Load(
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(Build(parameters, graph, graph_prefix));
-    GUARD_CU(graph.FromCoo(graph, true));
+    GUARD_CU(graph.FromCoo(graph, util::HOST, 0, parameters.Get<bool>("quiet"), true));
     return retval;
 }
 };
@@ -173,7 +173,7 @@ static cudaError_t Load(
 
     CooT coo;
     GUARD_CU(Build(parameters, coo, graph_prefix));
-    GUARD_CU(graph.FromCoo(coo));
+    GUARD_CU(graph.FromCoo(coo, util::HOST, 0, parameters.Get<bool>("quiet"), false));
     GUARD_CU(coo.Release());
     return retval;
 }

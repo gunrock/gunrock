@@ -116,10 +116,7 @@ void Iteration_Loop(
     }
 #endif
 
-    if (enactor.flag & Debug)
-    {
-        util::PrintMsg("Iteration entered");
-    }
+    util::PrintMsg("Iteration entered", enactor.flag & Debug);
     while (!iteration.Stop_Condition(gpu_num))
     {
         total_length             = 0;
@@ -154,8 +151,8 @@ void Iteration_Loop(
                     "cudaStreamSynchronize failed", __FILE__, __LINE__))
                 break;
             }
-        } 
-        else 
+        }
+        else
         {
             //auto &frontier = enactor_slices[0].frontier;
             //frontier.queue_reset  = true;
@@ -552,9 +549,10 @@ void Iteration_Loop(
 #endif
             if (enactor.flag & Debug)
             {
-                printf("%d\t %lld\t \t Subqueue finished. Total_Length= %lld\n",
-                    gpu_num, enactor_stats0.iteration, (long long)total_length);
-                fflush(stdout);
+                util::PrintMsg(std::to_string(gpu_num) + "\t "
+                    + std::to_string(enactor_stats0.iteration)
+                    + "\t \t Subqueue finished. Total_Length= "
+                    + std::to_string(total_length));
             }
 
             //grid_size = Total_Length/256+1;
@@ -735,9 +733,10 @@ void Iteration_Loop(
 #endif
                 if (enactor.flag & Debug)
                 {
-                    printf("%d\t %lld\t \t Fullqueue finished. Total_Length= %lld\n",
-                        gpu_num, enactor_stats0.iteration, (long long)total_length);
-                    fflush(stdout);
+                    util::PrintMsg(std::to_string(gpu_num) + "\t "
+                        + std::to_string(enactor_stats0.iteration)
+                        + "\t \t Fullqueue finished. Total_Length= "
+                        + std::to_string(total_length));
                 }
                 //frontier_queue_ = &(data_slice->frontier_queues[enactor -> size_check?0:num_gpus]);
                 if (num_gpus == 1)
@@ -839,7 +838,7 @@ static CUT_THREADPROC GunrockThread(
         CUT_THREADEND;
     }
 
-    util::PrintMsg("Thread entered.");
+    //util::PrintMsg("Thread entered.");
     thread_status = ThreadSlice::Status::Idle;
     while (thread_status != ThreadSlice::Status::ToKill)
     {

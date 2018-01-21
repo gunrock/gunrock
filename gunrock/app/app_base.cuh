@@ -19,7 +19,7 @@
 #ifdef BOOST_FOUND
     #include <gunrock/util/info.cuh>
 #else
-    #include <gunrock/util/info_noboost.cuh>
+    #include <gunrock/util/info_rapidjson.cuh>
 #endif
 
 namespace gunrock {
@@ -74,41 +74,56 @@ struct TestGraph :
     SizeT nodes, edges;
 
     template <typename CooT_in>
-    cudaError_t FromCoo(CooT_in &coo, bool self_coo = false)
+    cudaError_t FromCoo(
+        CooT_in &coo,
+        util::Location target = util::LOCATION_DEFAULT,
+        cudaStream_t stream = 0,
+        bool quiet = false,
+        bool self_coo = false)
     {
         cudaError_t retval = cudaSuccess;
         nodes = coo.CooT_in::CooT::nodes;
         edges = coo.CooT_in::CooT::edges;
-        GUARD_CU(this -> CsrT::FromCoo(coo));
-        GUARD_CU(this -> CscT::FromCoo(coo));
+        GUARD_CU(this -> CsrT::FromCoo(coo, target, stream, quiet));
+        GUARD_CU(this -> CscT::FromCoo(coo, target, stream, quiet));
         if (!self_coo)
-            GUARD_CU(this -> CooT::FromCoo(coo));
+            GUARD_CU(this -> CooT::FromCoo(coo, target, stream, quiet));
         return retval;
     }
 
     template <typename CsrT_in>
-    cudaError_t FromCsr(CsrT_in &csr, bool self_csr = false)
+    cudaError_t FromCsr(
+        CsrT_in &csr,
+        util::Location target = util::LOCATION_DEFAULT,
+        cudaStream_t stream = 0,
+        bool quiet = false,
+        bool self_csr = false)
     {
         cudaError_t retval = cudaSuccess;
         nodes = csr.CsrT::nodes;
         edges = csr.CsrT::edges;
-        GUARD_CU(this -> CooT::FromCsr(csr));
-        GUARD_CU(this -> CscT::FromCsr(csr));
+        GUARD_CU(this -> CooT::FromCsr(csr, target, stream, quiet));
+        GUARD_CU(this -> CscT::FromCsr(csr, target, stream, quiet));
         if (!self_csr)
-            GUARD_CU(this -> CsrT::FromCsr(csr));
+            GUARD_CU(this -> CsrT::FromCsr(csr, target, stream, quiet));
         return retval;
     }
 
     template <typename CscT_in>
-    cudaError_t FromCsc(CscT_in &csc, bool self_csc = false)
+    cudaError_t FromCsc(
+        CscT_in &csc,
+        util::Location target = util::LOCATION_DEFAULT,
+        cudaStream_t stream = 0,
+        bool quiet = false,
+        bool self_csc = false)
     {
         cudaError_t retval = cudaSuccess;
         nodes = csc.CscT::nodes;
         edges = csc.CscT::edges;
-        GUARD_CU(this -> CooT::FromCsc(csc));
-        GUARD_CU(this -> CsrT::FromCsc(csc));
+        GUARD_CU(this -> CooT::FromCsc(csc, target, stream, quiet));
+        GUARD_CU(this -> CsrT::FromCsc(csc, target, stream, quiet));
         if (!self_csc)
-            GUARD_CU(this -> CscT::FromCsr(csc));
+            GUARD_CU(this -> CscT::FromCsr(csc, target, stream, quiet));
         return retval;
     }
 
