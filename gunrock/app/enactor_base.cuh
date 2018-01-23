@@ -15,6 +15,8 @@
 #pragma once
 
 //#include <moderngpu.cuh>
+#include <chrono>
+#include <thread>
 
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/error_utils.cuh>
@@ -519,7 +521,8 @@ protected:
         {
             while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
             {
-                sleep(0);
+                //sleep(0);
+                std::this_thread::sleep_for(std::chrono::microseconds(0));
                 //std::this_thread::yield();
             }
         }
@@ -542,7 +545,8 @@ protected:
         {
             while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
             {
-                sleep(0);
+                //sleep(0);
+                std::this_thread::sleep_for(std::chrono::microseconds(0));
                 //std::this_thread::yield();
             }
         }

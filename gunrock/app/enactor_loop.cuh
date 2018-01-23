@@ -14,6 +14,9 @@
 
 #pragma once
 
+#include <chrono>
+#include <thread>
+
 #include <gunrock/app/enactor_kernel.cuh>
 #include <gunrock/app/enactor_helper.cuh>
 #include <gunrock/util/latency_utils.cuh>
@@ -678,20 +681,23 @@ void Iteration_Loop(
                     enactor_stats.edges_queued.Move(util::DEVICE, util::HOST, 1, 0, stream);
                     enactor_stats.nodes_queued.Move(util::DEVICE, util::HOST, 1, 0, stream);
 #endif
-                    //if (enactor_stats_ -> retval = util::GRError(
-                    //    cudaStreamSynchronize(streams[peer_]),
-                    //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
-                    //    break;
-                    cudaError_t tretval = cudaErrorNotReady;
-                    while (tretval == cudaErrorNotReady)
-                    {
-                        tretval = cudaStreamQuery(stream);
-                        if (tretval == cudaErrorNotReady)
-                            sleep(0);
-                    }
-                    if (retval = util::GRError(tretval,
+                    if (retval = util::GRError(
+                        cudaStreamSynchronize(stream),
                         "FullQueue_Core failed.", __FILE__, __LINE__))
                         break;
+                    //cudaError_t tretval = cudaErrorNotReady;
+                    //while (tretval == cudaErrorNotReady)
+                    //{
+                    //    tretval = cudaStreamQuery(stream);
+                    //    if (tretval == cudaErrorNotReady)
+                    //    {
+                    //        //sleep(0);
+                    //        std::this_thread::sleep_for(std::chrono::microseconds(0));
+                    //    }
+                    //}
+                    //if (retval = util::GRError(tretval,
+                    //    "FullQueue_Core failed.", __FILE__, __LINE__))
+                    //    break;
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
                     iter_full_queue_nodes_queued.push_back(
@@ -845,7 +851,8 @@ static CUT_THREADPROC GunrockThread(
         while (thread_status == ThreadSlice::Status::Wait ||
                thread_status == ThreadSlice::Status::Idle)
         {
-            sleep(0);
+            //sleep(0);
+            std::this_thread::sleep_for(std::chrono::microseconds(0));
             //std::this_thread::yield();
         }
         if (thread_status == ThreadSlice::Status::ToKill)
