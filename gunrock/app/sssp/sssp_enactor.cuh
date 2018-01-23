@@ -382,9 +382,8 @@ public:
     cudaError_t Enact(VertexT src)
     {
         cudaError_t  retval     = cudaSuccess;
-        GUARD_CU(this -> Run_Threads());
-        if (this -> flag & Debug)
-            util::PrintMsg("\nGPU SSSP Done.\n");
+        GUARD_CU(this -> Run_Threads(this));
+        util::PrintMsg("GPU SSSP Done.", this -> flag & Debug);
         return retval;
     }
 
