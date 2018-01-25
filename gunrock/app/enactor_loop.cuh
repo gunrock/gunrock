@@ -14,6 +14,9 @@
 
 #pragma once
 
+#include <chrono>
+#include <thread>
+
 #include <gunrock/app/enactor_kernel.cuh>
 #include <gunrock/app/enactor_helper.cuh>
 #include <gunrock/util/latency_utils.cuh>
@@ -116,10 +119,7 @@ void Iteration_Loop(
     }
 #endif
 
-    if (enactor.flag & Debug)
-    {
-        util::PrintMsg("Iteration entered");
-    }
+    util::PrintMsg("Iteration entered", enactor.flag & Debug);
     while (!iteration.Stop_Condition(gpu_num))
     {
         total_length             = 0;
@@ -154,8 +154,8 @@ void Iteration_Loop(
                     "cudaStreamSynchronize failed", __FILE__, __LINE__))
                 break;
             }
-        } 
-        else 
+        }
+        else
         {
             //auto &frontier = enactor_slices[0].frontier;
             //frontier.queue_reset  = true;
@@ -552,9 +552,10 @@ void Iteration_Loop(
 #endif
             if (enactor.flag & Debug)
             {
-                printf("%d\t %lld\t \t Subqueue finished. Total_Length= %lld\n",
-                    gpu_num, enactor_stats0.iteration, (long long)total_length);
-                fflush(stdout);
+                util::PrintMsg(std::to_string(gpu_num) + "\t "
+                    + std::to_string(enactor_stats0.iteration)
+                    + "\t \t Subqueue finished. Total_Length= "
+                    + std::to_string(total_length));
             }
 
             //grid_size = Total_Length/256+1;
@@ -680,20 +681,23 @@ void Iteration_Loop(
                     enactor_stats.edges_queued.Move(util::DEVICE, util::HOST, 1, 0, stream);
                     enactor_stats.nodes_queued.Move(util::DEVICE, util::HOST, 1, 0, stream);
 #endif
-                    //if (enactor_stats_ -> retval = util::GRError(
-                    //    cudaStreamSynchronize(streams[peer_]),
-                    //    "cudaStreamSynchronize failed", __FILE__, __LINE__))
-                    //    break;
-                    cudaError_t tretval = cudaErrorNotReady;
-                    while (tretval == cudaErrorNotReady)
-                    {
-                        tretval = cudaStreamQuery(stream);
-                        if (tretval == cudaErrorNotReady)
-                            sleep(0);
-                    }
-                    if (retval = util::GRError(tretval,
+                    if (retval = util::GRError(
+                        cudaStreamSynchronize(stream),
                         "FullQueue_Core failed.", __FILE__, __LINE__))
                         break;
+                    //cudaError_t tretval = cudaErrorNotReady;
+                    //while (tretval == cudaErrorNotReady)
+                    //{
+                    //    tretval = cudaStreamQuery(stream);
+                    //    if (tretval == cudaErrorNotReady)
+                    //    {
+                    //        //sleep(0);
+                    //        std::this_thread::sleep_for(std::chrono::microseconds(0));
+                    //    }
+                    //}
+                    //if (retval = util::GRError(tretval,
+                    //    "FullQueue_Core failed.", __FILE__, __LINE__))
+                    //    break;
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
                     iter_full_queue_nodes_queued.push_back(
@@ -735,9 +739,10 @@ void Iteration_Loop(
 #endif
                 if (enactor.flag & Debug)
                 {
-                    printf("%d\t %lld\t \t Fullqueue finished. Total_Length= %lld\n",
-                        gpu_num, enactor_stats0.iteration, (long long)total_length);
-                    fflush(stdout);
+                    util::PrintMsg(std::to_string(gpu_num) + "\t "
+                        + std::to_string(enactor_stats0.iteration)
+                        + "\t \t Fullqueue finished. Total_Length= "
+                        + std::to_string(total_length));
                 }
                 //frontier_queue_ = &(data_slice->frontier_queues[enactor -> size_check?0:num_gpus]);
                 if (num_gpus == 1)
@@ -839,7 +844,7 @@ static CUT_THREADPROC GunrockThread(
         CUT_THREADEND;
     }
 
-    util::PrintMsg("Thread entered.");
+    //util::PrintMsg("Thread entered.");
     thread_status = ThreadSlice::Status::Idle;
     while (thread_status != ThreadSlice::Status::ToKill)
     {
@@ -847,6 +852,7 @@ static CUT_THREADPROC GunrockThread(
                thread_status == ThreadSlice::Status::Idle)
         {
             sleep(0);
+            //std::this_thread::sleep_for(std::chrono::microseconds(0));
             //std::this_thread::yield();
         }
         if (thread_status == ThreadSlice::Status::ToKill)

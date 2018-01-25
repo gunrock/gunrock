@@ -52,6 +52,13 @@ cudaError_t UseParameters(util::Parameters &parameters)
         "seed to generate random sources",
         __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<double>(
+        "preprocess-time",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
+        0.0,
+        "Proprocessing time",
+        __FILE__, __LINE__));
+
     return retval;
 }
 
@@ -96,10 +103,13 @@ cudaError_t RunTests(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
+    util::PrintMsg("Before init");
     GUARD_CU(problem.Init(graph  , target));
     GUARD_CU(enactor.Init(problem, target));
+    util::PrintMsg("After init");
     cpu_timer.Stop();
-    info.SetVal("preprocess_time",cpu_timer.ElapsedMillis());
+    parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
+    //info.preprocess_time = cpu_timer.ElapsedMillis();
 
     // perform SSSP
     VertexT src;
@@ -270,13 +280,14 @@ float sssp(
         srcs.push_back(sources[i]);
     parameters.Set("srcs", srcs);
 
+    bool quiet = parameters.Get<bool>("quiet");
     GraphT graph;
     // Assign pointers into gunrock graph format
     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
     graph.CsrT::row_offsets   .SetPointer(row_offsets, gunrock::util::HOST);
     graph.CsrT::column_indices.SetPointer(col_indices, gunrock::util::HOST);
     graph.CsrT::edge_values   .SetPointer(edge_values, gunrock::util::HOST);
-    graph.FromCsr(graph.csr(), true);
+    graph.FromCsr(graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, graph);
 
     // Run the SSSP

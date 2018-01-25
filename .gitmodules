@@ -4,3 +4,6 @@
 [submodule "externals/moderngpu"]
 	path = externals/moderngpu
 	url = https://github.com/NVlabs/moderngpu.git
+[submodule "externals/rapidjson"]
+	path = externals/rapidjson
+	url = https://github.com/Tencent/rapidjson.git

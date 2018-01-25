@@ -368,7 +368,7 @@ static cudaError_t Load(
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(Build(parameters, graph, graph_prefix));
-    GUARD_CU(graph.FromCoo(graph, true));
+    GUARD_CU(graph.FromCoo(graph, util::HOST, 0, parameters.Get<bool>("quiet"), true));
     return retval;
 }
 };
@@ -389,7 +389,7 @@ static cudaError_t Load(
 
     CooT coo;
     GUARD_CU(Build(parameters, coo, graph_prefix));
-    GUARD_CU(graph.FromCoo(coo));
+    GUARD_CU(graph.FromCoo(coo, util::HOST, 0, parameters.Get<bool>("quiet"), false));
     GUARD_CU(coo.Release());
     return retval;
 }

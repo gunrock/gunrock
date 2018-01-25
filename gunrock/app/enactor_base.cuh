@@ -15,6 +15,8 @@
 #pragma once
 
 //#include <moderngpu.cuh>
+#include <chrono>
+#include <thread>
 
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/error_utils.cuh>
@@ -509,20 +511,21 @@ protected:
             thread_slices[gpu].enactor       = (void*)enactor;
             //thread_slices[gpu].context       = &(context[gpu*this->num_gpus]);
             thread_slices[gpu].status        = ThreadSlice::Status::Inited;
-            thread_slices[gpu].thread_Id     = cutStartThread(
-                    thread_func,
-                    (void*)&(thread_slices[gpu]));
-            thread_Ids[gpu] = thread_slices[gpu].thread_Id;
+            //thread_slices[gpu].thread_Id     = cutStartThread(
+            //        thread_func,
+            //        (void*)&(thread_slices[gpu]));
+            //thread_Ids[gpu] = thread_slices[gpu].thread_Id;
         }
 
-        for (int gpu=0; gpu < this->num_gpus; gpu++)
-        {
-            while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
-            {
-                sleep(0);
-                //std::this_thread::yield();
-            }
-        }
+        //for (int gpu=0; gpu < this->num_gpus; gpu++)
+        //{
+        //    while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
+        //    {
+        //        sleep(0);
+        //        //std::this_thread::sleep_for(std::chrono::microseconds(0));
+        //        //std::this_thread::yield();
+        //    }
+        //}
         return cudaSuccess;
     }
 
@@ -530,20 +533,33 @@ protected:
       * @brief Run the CPU threads, called within the Enactor::Enact() function
       * \return cudaError_t error message(s), if any
       */
-    cudaError_t Run_Threads()
+    template <typename EnactorT>
+    cudaError_t Run_Threads(EnactorT *enactor)
     {
         cudaError_t retval = cudaSuccess;
 
-        for (int gpu=0; gpu< num_gpus; gpu++)
+        //for (int gpu=0; gpu< num_gpus; gpu++)
+        //{
+        //    thread_slices[gpu].status = ThreadSlice::Status::Running;
+        //}
+        //for (int gpu=0; gpu< num_gpus; gpu++)
+        //{
+        //    while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
+        //    {
+        //        sleep(0);
+        //        //std::this_thread::sleep_for(std::chrono::microseconds(0));
+        //        //std::this_thread::yield();
+        //    }
+        //}
+
+        #pragma omp parallel for num_threads(num_gpus)
+        for (int gpu = 0; gpu < num_gpus; gpu ++)
         {
-            thread_slices[gpu].status = ThreadSlice::Status::Running;
-        }
-        for (int gpu=0; gpu< num_gpus; gpu++)
-        {
-            while (thread_slices[gpu].status != ThreadSlice::Status::Idle)
+            auto &retval = enactor_slices[gpu * num_gpus].enactor_stats.retval;
+            retval = util::SetDevice(gpu_idx[gpu]);
+            if (retval == cudaSuccess)
             {
-                sleep(0);
-                //std::this_thread::yield();
+                enactor -> Run(thread_slices[gpu]);
             }
         }
 
@@ -562,12 +578,12 @@ protected:
     {
         cudaError_t retval = cudaSuccess;
 
-        if (thread_slices.GetPointer(util::HOST) != NULL)
-        {
-            for (int gpu = 0; gpu < this->num_gpus; gpu++)
-                thread_slices[gpu].status = ThreadSlice::Status::ToKill;
-            cutWaitForThreads(thread_Ids + 0, this->num_gpus);
-        }
+        //if (thread_slices.GetPointer(util::HOST) != NULL)
+        //{
+        //    for (int gpu = 0; gpu < this->num_gpus; gpu++)
+        //        thread_slices[gpu].status = ThreadSlice::Status::ToKill;
+        //    cutWaitForThreads(thread_Ids + 0, this->num_gpus);
+        //}
         return retval;
     }
 }; // EnactorBase

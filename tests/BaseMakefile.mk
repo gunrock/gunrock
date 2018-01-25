@@ -11,7 +11,7 @@
 
 force64 = 1
 use_metis = 1
-use_boost = 1
+use_boost = 0
 NVCC = "$(shell which nvcc)"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
@@ -51,6 +51,8 @@ BOOST_LINK =
 ifeq ($(use_boost), 1)
     BOOST_INC = -I"/usr/local/include"
     BOOST_LINK = -Xcompiler -DBOOST_FOUND -L"/usr/local/lib" -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
+else
+    BOOST_INC = -I"../../externals/rapidjson/include"
 endif
 
 ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))

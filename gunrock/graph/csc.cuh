@@ -103,11 +103,11 @@ struct Csc :
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
         cudaError_t retval = cudaSuccess;
-        if (retval = column_offsets.Release(target)) return retval;
-        if (retval = row_indices   .Release(target)) return retval;
-        if (retval = node_values   .Release(target)) return retval;
-        if (retval = edge_values   .Release(target)) return retval;
-        if (retval = BaseGraph    ::Release(target)) return retval;
+        GUARD_CU(column_offsets.Release(target));
+        GUARD_CU(row_indices   .Release(target));
+        GUARD_CU(node_values   .Release(target));
+        GUARD_CU(edge_values   .Release(target));
+        GUARD_CU(BaseGraph    ::Release(target));
         return retval;
     }
 
@@ -121,16 +121,11 @@ struct Csc :
         util::Location target = GRAPH_DEFAULT_TARGET)
     {
         cudaError_t retval = cudaSuccess;
-        if (retval = BaseGraph    ::Allocate(nodes, edges, target))
-            return retval;
-        if (retval = column_offsets .Allocate(nodes + 1  , target))
-            return retval;
-        if (retval = row_indices   .Allocate(edges      , target))
-            return retval;
-        if (retval = node_values   .Allocate(nodes      , target))
-            return retval;
-        if (retval = edge_values   .Allocate(edges      , target))
-            return retval;
+        GUARD_CU(BaseGraph   ::Allocate(nodes, edges, target));
+        GUARD_CU(column_offsets.Allocate(nodes + 1  , target));
+        GUARD_CU(row_indices   .Allocate(edges      , target));
+        GUARD_CU(node_values   .Allocate(nodes      , target));
+        GUARD_CU(edge_values   .Allocate(edges      , target));
         return retval;
     }
 
@@ -142,11 +137,13 @@ struct Csc :
         Csc<VertexT_in, SizeT_in, ValueT_in, FLAG_in,
             cudaHostRegisterFlag_in> &source,
         util::Location target = util::LOCATION_DEFAULT,
-        cudaStream_t stream = 0)
+        cudaStream_t stream = 0,
+        bool quiet = false)
     {
         cudaError_t retval = cudaSuccess;
         if (target == util::LOCATION_DEFAULT)
-            target = source.column_offsets.GetSetted() | source.column_offsets.GetAllocated();
+            target = source.column_offsets.GetSetted() |
+                source.column_offsets.GetAllocated();
 
         //if (retval = BaseGraph::Set(source))
         //    return retval;
@@ -154,24 +151,19 @@ struct Csc :
         this -> edges = source.edges;
         this -> directed = source.directed;
 
-        if (retval = Allocate(source.nodes, source.edges, target))
-            return retval;
+        GUARD_CU(Allocate(source.nodes, source.edges, target));
 
-        if (retval = column_offsets   .Set(source.column_offsets,
-            this -> nodes + 1, target, stream))
-            return retval;
+        GUARD_CU(column_offsets   .Set(source.column_offsets,
+            this -> nodes + 1, target, stream));
 
-        if (retval = row_indices.Set(source.row_indices,
-            this -> edges, target, stream))
-            return retval;
+        GUARD_CU(row_indices.Set(source.row_indices,
+            this -> edges, target, stream));
 
-        if (retval = edge_values   .Set(source.edge_values,
-            this -> edges, target, stream))
-            return retval;
+        GUARD_CU(edge_values   .Set(source.edge_values,
+            this -> edges, target, stream));
 
-        if (retval = node_values   .Set(source.node_values,
-            this -> nodes, target, stream))
-            return retval;
+        GUARD_CU(node_values   .Set(source.node_values,
+            this -> nodes, target, stream));
 
         return retval;
     }
@@ -216,7 +208,8 @@ struct Csc :
         time_t mark1 = time(NULL);
         cudaError_t retval = cudaSuccess;
         if (target == util::LOCATION_DEFAULT)
-            target = source.CooT::edge_pairs.GetSetted() | source.CooT::edge_pairs.GetAllocated();
+            target = source.CooT::edge_pairs.GetSetted() |
+                source.CooT::edge_pairs.GetAllocated();
 
         /*if (retval = BaseGraph:: template Set<typename CooT::CooT>((typename CooT::CooT)source))
             return retval;
@@ -225,30 +218,28 @@ struct Csc :
         this -> edges = source.CooT::edges;
         this -> directed = source.CooT::directed;
 
-        if (retval = Allocate(source.CooT::nodes, source.CooT::edges, target))
-            return retval;
+        GUARD_CU(Allocate(source.CooT::nodes, source.CooT::edges, target));
 
         // Sort COO by row
-        if (retval = source.CooT::Order(BY_COLUMN_ASCENDING, target, stream))
-            return retval;
+        GUARD_CU(source.CooT::Order(BY_COLUMN_ASCENDING, target, stream));
         //source.CooT::Display();
 
         // assign row_indices
-        if (retval = row_indices.ForEach(source.CooT::edge_pairs,
+        GUARD_CU(row_indices.ForEach(source.CooT::edge_pairs,
                 []__host__ __device__ (VertexT &row_index,
                 const typename CooT::EdgePairT &edge_pair){
                 row_index = edge_pair.x;},
-                this -> edges, target, stream))
-            return retval;
+                this -> edges, target, stream));
 
         // assign edge_values
         if (FLAG & HAS_EDGE_VALUES)
-            if (retval = edge_values.ForEach(source.CooT::edge_values,
+        {
+            GUARD_CU(edge_values.ForEach(source.CooT::edge_values,
                 []__host__ __device__ (ValueT &edge_value,
                 const typename CooT::ValueT &edge_value_in){
                 edge_value = edge_value_in;},
-                this -> edges, target, stream))
-            return retval;
+                this -> edges, target, stream));
+        }
 
         // assign column_offsets
         SizeT edges = this -> edges;
@@ -258,7 +249,7 @@ struct Csc :
             const VertexT &column){
             return edge_pair.y < column;
         };
-        if (retval = column_offsets.ForAll(source.CooT::edge_pairs,
+        GUARD_CU(column_offsets.ForAll(source.CooT::edge_pairs,
             [nodes, edges, column_edge_compare] __host__ __device__ (
                 SizeT *column_offsets,
                 const typename CooT::EdgePairT *edge_pairs,
@@ -268,15 +259,12 @@ struct Csc :
                             edge_pairs, (SizeT)0, edges-1,
                             column_edge_compare);
                     else column_offsets[column] = edges;
-                }, this -> nodes + 1, target, stream))
-            return retval;
+                }, this -> nodes + 1, target, stream));
 
         time_t mark2 = time(NULL);
-        if (!quiet)
-        {
-            util::PrintMsg("Done converting (" +
-                std::to_string(mark2 - mark1) + "s).");
-        }
+        util::PrintMsg("Done converting (" +
+            std::to_string(mark2 - mark1) + "s).", !quiet);
+
         return retval;
     }
 
@@ -284,19 +272,17 @@ struct Csc :
     cudaError_t FromCsr(
         GraphT &source,
         util::Location target = util::LOCATION_DEFAULT,
-        cudaStream_t stream = 0)
+        cudaStream_t stream = 0,
+        bool quiet = false)
     {
         typedef typename GraphT::CsrT CsrT;
         typedef Coo<VertexT, SizeT, ValueT, FLAG | HAS_COO, cudaHostRegisterFlag> CooT;
         cudaError_t retval = cudaSuccess;
 
         CooT coo;
-        retval = coo.FromCsr(source, target, stream);
-        if (retval) return retval;
-        retval = FromCoo(coo, target, stream);
-        if (retval) return retval;
-        retval = coo.Release();
-        if (retval) return retval;
+        GUARD_CU(coo.FromCsr(source, target, stream, quiet));
+        GUARD_CU(    FromCoo(   coo, target, stream, quiet));
+        GUARD_CU(coo.Release());
         return retval;
     }
 
@@ -381,19 +367,31 @@ struct Csc<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
     }
 
     template <typename CooT_in>
-    cudaError_t FromCoo(CooT_in &coo)
+    cudaError_t FromCoo(
+        CooT_in &coo,
+        util::Location target = util::LOCATION_DEFAULT,
+        cudaStream_t stream = 0,
+        bool quiet = false)
     {
         return cudaSuccess;
     }
 
     template <typename CsrT_in>
-    cudaError_t FromCsr(CsrT_in &csr)
+    cudaError_t FromCsr(
+        CsrT_in &csr,
+        util::Location target = util::LOCATION_DEFAULT,
+        cudaStream_t stream = 0,
+        bool quiet = false)
     {
         return cudaSuccess;
     }
 
     template <typename CscT_in>
-    cudaError_t FromCsc(CscT_in &csc)
+    cudaError_t FromCsc(
+        CscT_in &csc,
+        util::Location target = util::LOCATION_DEFAULT,
+        cudaStream_t stream = 0,
+        bool quiet = false)
     {
         return cudaSuccess;
     }

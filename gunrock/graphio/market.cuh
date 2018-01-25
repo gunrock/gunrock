@@ -107,8 +107,7 @@ cudaError_t ReadMarketStream(
     char line[1024];
 
     //bool ordered_rows = true;
-    if (retval = graph.CooT::Release())
-        return retval;
+    GUARD_CU(graph.CooT::Release());
 
     while (true)
     {
@@ -465,7 +464,7 @@ static cudaError_t Load(
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(Read(parameters, graph, graph_prefix));
-    GUARD_CU(graph.FromCoo(graph, true));
+    GUARD_CU(graph.FromCoo(graph, util::HOST, 0, parameters.Get<bool>("quiet"), true));
     return retval;
 }
 };
@@ -485,7 +484,7 @@ static cudaError_t Load(
     cudaError_t retval = cudaSuccess;
     CooT coo;
     GUARD_CU(Read(parameters, coo, graph_prefix));
-    GUARD_CU(graph.FromCoo(coo));
+    GUARD_CU(graph.FromCoo(coo, util::HOST, 0, parameters.Get<bool>("quiet"), false));
     GUARD_CU(coo.Release());
     return retval;
 }
