@@ -851,8 +851,8 @@ static CUT_THREADPROC GunrockThread(
         while (thread_status == ThreadSlice::Status::Wait ||
                thread_status == ThreadSlice::Status::Idle)
         {
-            sleep(0);
-            //std::this_thread::sleep_for(std::chrono::microseconds(0));
+            //sleep(0);
+            std::this_thread::sleep_for(std::chrono::microseconds(0));
             //std::this_thread::yield();
         }
         if (thread_status == ThreadSlice::Status::ToKill)
