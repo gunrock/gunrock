@@ -39,6 +39,60 @@ enum : IterationFlag
     Iteration_Default = Use_FullQ | Push,
 };
 
+template <typename EnactorT, bool valid>
+struct BoolSwitch
+{
+    static cudaError_t UpdatePreds(
+        EnactorT *enactor,
+        int gpu_num,
+        typename EnactorT::SizeT num_elements)
+    {
+        return cudaSuccess;
+    }
+};
+
+template <typename EnactorT>
+struct BoolSwitch<EnactorT, true>
+{
+    static cudaError_t UpdatePreds(
+        EnactorT *enactor,
+        int gpu_num,
+        typename EnactorT::SizeT num_elements)
+    {
+        typedef typename EnactorT::VertexT VertexT;
+        typedef typename EnactorT::SizeT   SizeT;
+        cudaError_t retval = cudaSuccess;
+
+        int k = gpu_num * enactor -> num_gpus;
+        if (enactor -> flag & Size_Check)
+            k += enactor -> num_gpus;
+        //int selector    = frontier_attribute->selector;
+        int block_size  = 256;
+        int grid_size   = num_elements / block_size;
+        if ((num_elements % block_size) !=0) grid_size++;
+        if (grid_size > 512) grid_size = 512;
+        auto &enactor_slice = enactor -> enactor_slices[k];
+        auto &data_slice    = enactor -> problem -> data_slices[gpu_num][0];
+        auto &frontier = enactor_slice.frontier;
+        auto &stream   = enactor_slice.stream;
+        auto &sub_graph = enactor -> problem -> sub_graphs[gpu_num];
+        CopyPreds_Kernel<VertexT, SizeT> <<<grid_size, block_size, 0, stream>>>(
+            num_elements,
+            frontier  .V_Q()   -> GetPointer(util::DEVICE),
+            data_slice.preds     .GetPointer(util::DEVICE),
+            data_slice.temp_preds.GetPointer(util::DEVICE));
+
+        UpdatePreds_Kernel<VertexT, SizeT> <<<grid_size, block_size, 0, stream>>>(
+            num_elements, sub_graph.nodes,
+            frontier  .V_Q()        -> GetPointer(util::DEVICE),
+            sub_graph .original_vertex.GetPointer(util::DEVICE),
+            data_slice.temp_preds     .GetPointer(util::DEVICE),
+            data_slice.preds          .GetPointer(util::DEVICE));
+
+        return retval;
+    }
+};
+
 /*
  * @brief IterationLoopBase data structure.
  * @tparam Iteration_Flag
@@ -103,34 +157,9 @@ public:
     {
         cudaError_t retval = cudaSuccess;
         if (num_elements == 0) return retval;
-        if (FLAG & Update_Predecessors)
-        {
-            int k = gpu_num * enactor -> num_gpus;
-            if (enactor -> flag & Size_Check)
-                k += enactor -> num_gpus;
-            //int selector    = frontier_attribute->selector;
-            int block_size  = 256;
-            int grid_size   = num_elements / block_size;
-            if ((num_elements % block_size) !=0) grid_size++;
-            if (grid_size > 512) grid_size = 512;
-            auto &enactor_slice = enactor -> enactor_slices[k];
-            auto &data_slice    = enactor -> problem -> data_slices[gpu_num][0];
-            auto &frontier = enactor_slice.frontier;
-            auto &stream   = enactor_slice.stream;
-            auto &sub_graph = enactor -> problem -> sub_graphs[gpu_num];
-            CopyPreds_Kernel<VertexT, SizeT> <<<grid_size, block_size, 0, stream>>>(
-                num_elements,
-                frontier  .V_Q()   -> GetPointer(util::DEVICE),
-                data_slice.preds     .GetPointer(util::DEVICE),
-                data_slice.temp_preds.GetPointer(util::DEVICE));
 
-            UpdatePreds_Kernel<VertexT, SizeT> <<<grid_size, block_size, 0, stream>>>(
-                num_elements, sub_graph.nodes,
-                frontier  .V_Q()        -> GetPointer(util::DEVICE),
-                sub_graph .original_vertex.GetPointer(util::DEVICE),
-                data_slice.temp_preds     .GetPointer(util::DEVICE),
-                data_slice.preds          .GetPointer(util::DEVICE));//,
-        }
+        retval = BoolSwitch<Enactor, (FLAG & Update_Predecessors) != 0>::
+            UpdatePreds(enactor, gpu_num, num_elements);
         return retval;
     }
 
