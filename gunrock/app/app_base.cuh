@@ -36,6 +36,14 @@ cudaError_t UseParameters_app(util::Parameters &parameters)
         1,
         "Number of runs to perform the test, per parameter-set",
         __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<double>(
+        "preprocess-time",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
+        0.0,
+        "Preprocessing time",
+        __FILE__, __LINE__));
+        
     return retval;
 }
 

@@ -22,12 +22,13 @@
 #include <gunrock/app/test_base.cuh>
 
 // single-source shortest path includes
-#include <gunrock/app/sssp/sssp_enactor.cuh>
-#include <gunrock/app/sssp/sssp_test.cuh>
+#include <gunrock/app/Template/Template_enactor.cuh>
+#include <gunrock/app/Template/Template_test.cuh>
 
 namespace gunrock {
 namespace app {
-namespace sssp {
+// TODO: change the space name
+namespace Template {
 
 cudaError_t UseParameters(util::Parameters &parameters)
 {
@@ -36,21 +37,22 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
-    GUARD_CU(parameters.Use<std::string>(
-        "src",
-        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-        "0",
-        "<Vertex-ID|random|largestdegree> The source vertices\n"
-        "\tIf random, randomly select non-zero degree vertices;\n"
-        "\tIf largestdegree, select vertices with largest degrees",
-        __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<int>(
-        "src-seed",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        util::PreDefinedValues<int>::InvalidValue,
-        "seed to generate random sources",
-        __FILE__, __LINE__));
+    // TODO: add app specific parameters, e.g.:
+    // GUARD_CU(parameters.Use<std::string>(
+    //    "src",
+    //    util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+    //    "0",
+    //    "<Vertex-ID|random|largestdegree> The source vertices\n"
+    //    "\tIf random, randomly select non-zero degree vertices;\n"
+    //    "\tIf largestdegree, select vertices with largest degrees",
+    //    __FILE__, __LINE__));
+    //
+    // GUARD_CU(parameters.Use<int>(
+    //    "src-seed",
+    //    util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+    //    util::PreDefinedValues<int>::InvalidValue,
+    //    "seed to generate random sources",
+    //    __FILE__, __LINE__));
 
     return retval;
 }
@@ -69,7 +71,8 @@ template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
-    ValueT **ref_distances = NULL,
+    // TODO: add problem specific reference results, e.g.:
+    // ValueT **ref_distances = NULL,
     util::Location target = util::DEVICE)
 {
     cudaError_t retval = cudaSuccess;
@@ -82,70 +85,81 @@ cudaError_t RunTests(
 
     // parse configurations from parameters
     bool quiet_mode = parameters.Get<bool>("quiet");
-    bool mark_pred  = parameters.Get<bool>("mark-pred");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-    int  num_srcs   = srcs   .size();
-    util::Info info("SSSP", parameters, graph); // initialize Info structure
+    util::Info info("Template", parameters, graph); // initialize Info structure
+
+    // TODO: get problem specific inputs, e.g.:
+    // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+    // int  num_srcs   = srcs   .size();
 
     // Allocate host-side array (for both reference and GPU-computed results)
-    ValueT  *h_distances = new ValueT[graph.nodes];
-    VertexT *h_preds = (mark_pred) ? new VertexT[graph.nodes] : NULL;
+    // TODO: allocate problem specific host data, e.g.:
+    // ValueT  *h_distances = new ValueT[graph.nodes];
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    util::PrintMsg("Before init");
     GUARD_CU(problem.Init(graph  , target));
     GUARD_CU(enactor.Init(problem, target));
-    util::PrintMsg("After init");
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
-    //info.preprocess_time = cpu_timer.ElapsedMillis();
 
-    // perform SSSP
-    VertexT src;
+    // perform the algorithm
+    // TODO: Declear problem specific variables, e.g.:
+    // VertexT src;
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        src = srcs[run_num % num_srcs];
-        GUARD_CU(problem.Reset(src, target));
-        GUARD_CU(enactor.Reset(src, target));
+        // TODO: assign problem specific variables, e.g.:
+        // src = srcs[run_num % num_srcs];
+        GUARD_CU(problem.Reset(/*src,*/ target));
+        GUARD_CU(enactor.Reset(/*src,*/ target));
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
-        GUARD_CU(enactor.Enact(src));
+        GUARD_CU(enactor.Enact(/*src*/));
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
         util::PrintMsg("--------------------------\nRun "
             + std::to_string(run_num) + " elapsed: "
-            + std::to_string(cpu_timer.ElapsedMillis()) + " ms, src = "
-            + std::to_string(src) + ", #iterations = "
+            + std::to_string(cpu_timer.ElapsedMillis()) +
+            //" ms, src = " + std::to_string(src) +
+            ", #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
         if (validation == "each")
         {
-            GUARD_CU(problem.Extract(h_distances, h_preds));
-            SizeT num_errors = app::sssp::Validate_Results(
-                parameters, graph, src, h_distances, h_preds,
-                ref_distances == NULL ? NULL : ref_distances[run_num % num_srcs],
-                NULL, false);
+            // TODO: fill in problem specific data, e.g.:
+            GUARD_CU(problem.Extract(/*h_distances*/));
+            SizeT num_errors = app::Template::Validate_Results(
+                parameters, graph,
+                // TODO: add problem specific data for validation, e.g.:
+                // src, h_distances,
+                // ref_distances == NULL ? NULL : ref_distances[run_num % num_srcs],
+                // NULL,
+                false);
         }
     }
 
     cpu_timer.Start();
     // Copy out results
-    GUARD_CU(problem.Extract(h_distances, h_preds));
+    // TODO: fill in problem specific data, e.g.:
+    GUARD_CU(problem.Extract(/*h_distances*/));
     if (validation == "last")
     {
-        SizeT num_errors = app::sssp::Validate_Results(
-            parameters, graph, src, h_distances, h_preds,
-            ref_distances == NULL ? NULL : ref_distances[(num_runs -1) % num_srcs]);
+        SizeT num_errors = app::Template::Validate_Results(
+            parameters, graph,
+            // TODO: place problem specific data and result for validation, e.g.:
+            // src, h_distances,
+            // ref_distances == NULL ? NULL : ref_distances[(num_runs -1) % num_srcs],
+            // NULL,
+            true);
     }
 
     // compute running statistics
-    info.ComputeTraversalStats(enactor, h_distances);
+    // TODO: change NULL to problem specific per-vertex visited marker, e.g. h_distances
+    info.ComputeTraversalStats(enactor, (VertexT*)NULL);
     //Display_Memory_Usage(problem);
     #ifdef ENABLE_PERFORMANCE_PROFILING
         //Display_Performance_Profiling(enactor);
@@ -154,20 +168,20 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    delete[] h_distances  ; h_distances   = NULL;
-    delete[] h_preds      ; h_preds       = NULL;
+    // TODO: Release problem specific data, e.g.:
+    // delete[] h_distances  ; h_distances   = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
     return retval;
 }
 
-} // namespace sssp
+} // namespace Template
 } // namespace app
 } // namespace gunrock
 
 /*
- * @brief Entry of gunrock_sssp function
+ * @brief Entry of gunrock_template function
  * @tparam     GraphT     Type of the graph
  * @tparam     ValueT     Type of the distances
  * @param[in]  parameters Excution parameters
@@ -177,15 +191,16 @@ cudaError_t RunTests(
  * \return     double     Return accumulated elapsed times for all runs
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
-double gunrock_sssp(
+double gunrock_Template(
     gunrock::util::Parameters &parameters,
-    GraphT &graph,
-    ValueT **distances,
-    typename GraphT::VertexT **preds = NULL)
+    GraphT &graph
+    // TODO: add problem specific outputs, e.g.:
+    //ValueT **distances
+    )
 {
     typedef typename GraphT::VertexT VertexT;
-    typedef gunrock::app::sssp::Problem<GraphT  > ProblemT;
-    typedef gunrock::app::sssp::Enactor<ProblemT> EnactorT;
+    typedef gunrock::app::Template::Problem<GraphT  > ProblemT;
+    typedef gunrock::app::Template::Enactor<ProblemT> EnactorT;
     gunrock::util::CpuTimer cpu_timer;
     gunrock::util::Location target = gunrock::util::DEVICE;
     double total_time = 0;
@@ -198,28 +213,31 @@ double gunrock_sssp(
     problem.Init(graph  , target);
     enactor.Init(problem, target);
 
-    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
     int num_runs = parameters.Get<int>("num-runs");
-    int num_srcs = srcs.size();
+    // TODO: get problem specific inputs, e.g.:
+    // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+    // int num_srcs = srcs.size();
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        int src_num = run_num % num_srcs;
-        VertexT src = srcs[src_num];
-        problem.Reset(src, target);
-        enactor.Reset(src, target);
+        // TODO: problem specific inputs, e.g.:
+        // int src_num = run_num % num_srcs;
+        // VertexT src = srcs[src_num];
+        problem.Reset(/*src,*/ target);
+        enactor.Reset(/*src,*/ target);
 
         cpu_timer.Start();
-        enactor.Enact(src);
+        enactor.Enact(/*src*/);
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-        problem.Extract(distances[src_num],
-            preds == NULL ? NULL : preds[src_num]);
+        // TODO: extract problem specific data, e.g.:
+        problem.Extract(/*distances[src_num]*/);
     }
 
     enactor.Release(target);
     problem.Release(target);
-    srcs.clear();
+    // TODO: problem specific clean ups, e.g.:
+    // srcs.clear();
     return total_time;
 }
 
@@ -241,41 +259,43 @@ template <
     typename VertexT = int,
     typename SizeT   = int,
     typename GValueT = unsigned int,
-    typename SSSPValueT = GValueT>
-float sssp(
+    typename TValueT = GValueT>
+float Template(
     const SizeT        num_nodes,
     const SizeT        num_edges,
     const SizeT       *row_offsets,
     const VertexT     *col_indices,
     const GValueT     *edge_values,
-    const int          num_runs,
-          VertexT     *sources,
-    const bool         mark_pred,
-          SSSPValueT **distances,
-          VertexT    **preds = NULL)
+    const int          num_runs
+    // TODO: add problem specific inputs and outputs, e.g.:
+    //      VertexT     *sources,
+    //      SSSPValueT **distances
+    )
 {
+    // TODO: change to other graph representation, if not using CSR
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
         gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
         GraphT;
     typedef typename GraphT::CsrT CsrT;
 
     // Setup parameters
-    gunrock::util::Parameters parameters("sssp");
+    gunrock::util::Parameters parameters("Template");
     gunrock::graphio::UseParameters(parameters);
-    gunrock::app::sssp::UseParameters(parameters);
+    gunrock::app::Template::UseParameters(parameters);
     gunrock::app::UseParameters_test(parameters);
     parameters.Parse_CommandLine(0, NULL);
     parameters.Set("graph-type", "by-pass");
-    parameters.Set("mark-pred", mark_pred);
     parameters.Set("num-runs", num_runs);
-    std::vector<VertexT> srcs;
-    for (int i = 0; i < num_runs; i ++)
-        srcs.push_back(sources[i]);
-    parameters.Set("srcs", srcs);
+    // TODO: problem specific inputs, e.g.:
+    // std::vector<VertexT> srcs;
+    // for (int i = 0; i < num_runs; i ++)
+    //     srcs.push_back(sources[i]);
+    // parameters.Set("srcs", srcs);
 
     bool quiet = parameters.Get<bool>("quiet");
     GraphT graph;
     // Assign pointers into gunrock graph format
+    // TODO: change to other graph representation, if not using CSR
     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
     graph.CsrT::row_offsets   .SetPointer(row_offsets, gunrock::util::HOST);
     graph.CsrT::column_indices.SetPointer(col_indices, gunrock::util::HOST);
@@ -283,12 +303,14 @@ float sssp(
     graph.FromCsr(graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, graph);
 
-    // Run the SSSP
-    double elapsed_time = gunrock_sssp(parameters, graph, distances, preds);
+    // Run the Template
+    // TODO: add problem specific outputs, e.g.
+    double elapsed_time = gunrock_Template(parameters, graph /*, distances*/);
 
     // Cleanup
     graph.Release();
-    srcs.clear();
+    // TODO: problem specific cleanup
+    // srcs.clear();
 
     return elapsed_time;
 }
