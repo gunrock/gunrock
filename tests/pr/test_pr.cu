@@ -522,7 +522,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     bool        debug               = info->info["debug_mode"       ].get_bool ();
     bool        size_check          = info->info["size_check"       ].get_bool ();
     int         iterations          = info->info["num_iteration"    ].get_int  ();
-    std::string traversal_mode      = info->info["traversal_mode"   ].get_str  ();
+    std::string traversal_mode      = "LB_CULL";
+
     std::string ref_filename        = info->info["ref_filename"     ].get_str  ();
     Value       delta               = info->info["delta"            ].get_real ();
     Value       error               = info->info["error"            ].get_real ();
