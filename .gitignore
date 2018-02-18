@@ -40,3 +40,6 @@ tests/*/*.txt
 
 # Ignore cmake configure_file() files
 gunrock/util/gitsha1.c
+
+# Ignore build directory
+build
