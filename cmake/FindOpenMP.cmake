@@ -22,7 +22,7 @@ IF (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
       SET(OPENMP_SOURCES_DIR ${CMAKE_BINARY_DIR}/omp)
       SET(OPENMP_INSTALL_DIR ${CMAKE_BINARY_DIR}/install/omp)
       SET(OPENMP_INCLUDE "${OPENMP_INSTALL_DIR}/include" CACHE PATH "openmp include directory." FORCE)
-      SET(OPENMP_LIB "${OPENMP_INSTALL_DIR}/lib/libomp.dylib" CACHE FILEPATH "openmp library." FORCE)
+      SET(OPENMP_LIBRARY "${OPENMP_INSTALL_DIR}/lib/libomp.dylib" CACHE FILEPATH "openmp library." FORCE)
 
       # external dependencies log output
       SET(EXTERNAL_PROJECT_LOG_ARGS
@@ -54,7 +54,7 @@ IF (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
                          -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
       )   
       ADD_LIBRARY(openmp SHARED IMPORTED GLOBAL)
-      SET_PROPERTY(TARGET openmp PROPERTY IMPORTED_LOCATION ${OPENMP_LIB})
+      SET_PROPERTY(TARGET openmp PROPERTY IMPORTED_LOCATION ${OPENMP_LIBRARY})
       ADD_DEPENDENCIES(openmp extern_openmp)
       SET(OPENMP_LIB openmp)
     ENDIF()
