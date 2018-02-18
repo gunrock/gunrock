@@ -7,6 +7,10 @@ add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MIN
 
 cmake_minimum_required(VERSION 2.8)
 
+# enable @rpath in the install name for any shared library being built
+# note: it is planned that a future version of CMake will enable this by default
+set(CMAKE_MACOSX_RPATH 1)
+
 # begin /* Added make check target to improve ctest command */
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure)
 # end /* Added make check target to improve ctest command */
