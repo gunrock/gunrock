@@ -79,11 +79,10 @@ pipeline {
   }
   post { 
       always {
-	archiveArtifacts artifacts: 'build/libs/**/*.jar', fingerprint: true
-        junit 'build/reports/**/*.xml' 
         cleanWs()
       }
       success {
+        // Implement: junit 'build/reports/**/*.xml'  
         notifySlack('SUCCESS')
       }
       failure {
