@@ -48,6 +48,9 @@ def notifySlack(String buildStatus = 'STARTED') {
 
 pipeline {
   agent any
+  triggers {
+    pollSCM '@hourly'
+  }
   stages {
     stage('Init') {
       steps {
@@ -75,7 +78,9 @@ pipeline {
     }
   }
   post { 
-      always { 
+      always {
+	archiveArtifacts artifacts: 'build/libs/**/*.jar', fingerprint: true
+        junit 'build/reports/**/*.xml' 
         cleanWs()
       }
       success {
