@@ -77,9 +77,10 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
         while (pos - threadIdx.x < input_queue_length)
         {
             bool to_process = true;
-            VertexId input_item = (d_in_queue == NULL) ? pos : d_in_queue[pos];
+            VertexId input_item;
             if (pos < input_queue_length)
             {
+                input_item = (d_in_queue == NULL) ? pos : d_in_queue[pos];
                 to_process = Functor::CondFilter(
                     util::InvalidValue<VertexId>(),
                     input_item,
