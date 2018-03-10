@@ -115,14 +115,12 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         //__shared__ typename KernelPolicy::SmemStorage smem;
         //SizeT *output_queue_length;
 
-        if (threadIdx.x == 0 && blockIdx.x == 0)
+        if (threadIdx.x == 0)
         {
-            if (queue_reset)
-            {
-                work_progress.StoreQueueLength(input_queue_length, queue_index);
-            } else {
+            if (!queue_reset)
                 input_queue_length = work_progress.LoadQueueLength(queue_index);
-            }
+            else if (blockIdx.x == 0)
+                work_progress.StoreQueueLength(input_queue_length, queue_index);
         }
         //if (threadIdx.x == blockDim.x -1)
         //    output_queue_length = work_progress.GetQueueCounter(queue_index + 1);
