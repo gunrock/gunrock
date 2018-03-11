@@ -14,17 +14,7 @@
 
 #pragma once
 
-#include <limits.h>
 #include <float.h>
-#include <string>
-#include <cstdlib>
-#include <cstring>
-#include <typeinfo>
-#include <typeindex>
-#include <sstream>
-#include <ostream>
-#include <istream>
-#include <vector>
 
 namespace gunrock {
 namespace util {

@@ -63,14 +63,18 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
         typedef util::Block_Scan<SizeT, KernelPolicy::CUDA_ARCH, KernelPolicy::LOG_THREADS> BlockScanT;
                 
         __shared__ typename BlockScanT::Temp_Space scan_space;
-        if (threadIdx.x == 0 && blockIdx.x == 0)
+        if (threadIdx.x == 0)
         {
-            if (queue_reset)
-                work_progress.StoreQueueLength(input_queue_length, queue_index);
-            else 
+            if (!queue_reset)
                 input_queue_length = work_progress.LoadQueueLength(queue_index);
-            work_progress.StoreQueueLength(0, queue_index + 2);
+            if (blockIdx.x == 0)
+            {
+                if (queue_reset)
+                    work_progress.StoreQueueLength(input_queue_length, queue_index);
+                work_progress.StoreQueueLength(0, queue_index + 2);
+            }
         }
+         
         SizeT *d_out_length = work_progress.GetQueueCounter(queue_index + 1);
         __syncthreads();
 
@@ -102,12 +106,13 @@ struct Dispatch<KernelPolicy, Problem, Functor, true>
                     pos);
             if (d_out_queue != NULL && pos < input_queue_length)
                 d_out_queue[pos] = to_process ? d_in_queue[pos] : util::InvalidValue<VertexId>();
-            
+ 
+            //printf("(%3d, %3d) scanning\n", blockIdx.x, threadIdx.x);
             SizeT output_offset;
             BlockScanT::LogicScan(to_process, output_offset, scan_space);
-            if (threadIdx.x == blockDim.x -1)
+            if (threadIdx.x + 1 == blockDim.x)
                 atomicAdd(d_out_length, output_offset + ((to_process) ? 1 : 0));
-
+            //printf("(%3d, %3d) scanned\n", blockIdx.x, threadIdx.x);
             //if (pos - threadIdx.x >= input_queue_length - STRIDE) break;
             pos += STRIDE;
         }

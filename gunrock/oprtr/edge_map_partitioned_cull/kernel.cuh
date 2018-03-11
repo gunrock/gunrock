@@ -267,7 +267,6 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         __syncthreads();*/
         KernelPolicy::BlockScanT::Scan(thread_output_count, output_pos, smem_storage.scan_space);
 
-
         //KernelPolicy::BlockScanT(smem_storage.cub_storage.scan_space)
         //    .ExclusiveSum(thread_output_count, output_pos);
         if (threadIdx.x == KernelPolicy::THREADS -1)
@@ -735,6 +734,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 work_progress);
         }
         __syncthreads();
+        //printf("(%3d, %3d) 1\n", blockIdx.x, threadIdx.x);
 
         SizeT* row_offsets = (output_inverse_graph) ?
             d_inverse_row_offsets :
@@ -809,6 +809,7 @@ struct Dispatch<KernelPolicy, Problem, Functor,
             }
 
             __syncthreads();
+            //printf("(%3d, %3d) 2\n", blockIdx.x, threadIdx.x);
 
 
             //printf("(%4d, %4d)  : block_input = %d ~ %d, block_output = %d ~ %d, %d\n",

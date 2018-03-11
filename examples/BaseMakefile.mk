@@ -23,6 +23,8 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 # Gen targets
 #-------------------------------------------------------------------------------
 
+GEN_SM71 = -gencode=arch=compute_71,code=\"sm_71,compute_71\"
+GEN_SM70 = -gencode=arch=compute_70,code=\"sm_70,compute_70\"
 GEN_SM61 = -gencode=arch=compute_61,code=\"sm_61,compute_61\"
 GEN_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
 GEN_SM52 = -gencode=arch=compute_52,code=\"sm_52,compute_52\"
@@ -31,7 +33,7 @@ GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 
-SM_TARGETS = $(GEN_SM35) #$(GEN_SM35) $(GEN_SM60) $(GEN_SM61) 
+SM_TARGETS = $(GEN_SM70) $(GEN_SM35) $(GEN_SM61) #$(GEN_SM61) 
 #-------------------------------------------------------------------------------
 # Libs
 #-------------------------------------------------------------------------------

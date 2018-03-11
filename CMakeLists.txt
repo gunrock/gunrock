@@ -7,6 +7,10 @@ add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MIN
 
 cmake_minimum_required(VERSION 2.8)
 
+# enable @rpath in the install name for any shared library being built
+# note: it is planned that a future version of CMake will enable this by default
+set(CMAKE_MACOSX_RPATH 1)
+
 # begin /* Added make check target to improve ctest command */
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure)
 # end /* Added make check target to improve ctest command */
@@ -117,6 +121,10 @@ set(GENCODE_SM60
   -gencode=arch=compute_60,code=sm_60 -gencode=arch=compute_60,code=compute_60)
 set(GENCODE_SM61
   -gencode=arch=compute_61,code=sm_61 -gencode=arch=compute_61,code=compute_61)
+set(GENCODE_SM70
+  -gencode=arch=compute_70,code=sm_70 -gencode=arch=compute_70,code=compute_70)
+set(GENCODE_SM71
+  -gencode=arch=compute_71,code=sm_71 -gencode=arch=compute_71,code=compute_71)
 #set(GENCODE -gencode=arch=compute_10,code=compute_10) # at least generate PTX
 # end /* SET GENCODE_SM */
 
@@ -203,7 +211,7 @@ option(GUNROCK_GENCODE_SM20
 
 option(GUNROCK_GENCODE_SM30
   "ON to generate code for Compute Capability 3.0 devices (e.g. Tesla K10)"
-  ON)
+  OFF)
 
 option(GUNROCK_GENCODE_SM35
   "ON to generate code for Compute Capability 3.5 devices (e.g. Tesla K20)"
@@ -218,14 +226,21 @@ option(GUNROCK_GENCODE_SM50
   OFF)
 
 #Pascal Architecture: CUDA 8
-if (CUDA_VERSION VERSION_EQUAL "8.0" OR CUDA_VERSION VERSION_GREATER "8.0")
+if (CUDA_VERSION VERSION_EQUAL "8.0" OR (CUDA_VERSION VERSION_GREATER "8.0" AND CUDA_VERSION VERSION_LESS "9.0"))
   option(GUNROCK_GENCODE_SM60
     "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
     OFF)
-
   option(GUNROCK_GENCODE_SM61
     "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
     ON)
+#Volta Architecture: CUDA 9
+elseif (CUDA_VERSION VERSION_EQUAL "9.0" OR CUDA_VERSION VERSION_GREATER "9.0")
+  option(GUNROCK_GENCODE_SM70
+    "ON to generate code for Compute Capability 7.0 devices (e.g. Volta V100)"
+    ON)
+  option(GUNROCK_GENCODE_SM71
+    "ON to generate code for Compute Capability 7.1 devices"
+    OFF)
 endif ()
 
 option(CUDA_VERBOSE_PTXAS

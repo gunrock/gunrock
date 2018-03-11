@@ -523,6 +523,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
     bool        size_check          = info->info["size_check"       ].get_bool ();
     int         iterations          = info->info["num_iteration"    ].get_int  ();
     std::string traversal_mode      = info->info["traversal_mode"   ].get_str  ();
+
     std::string ref_filename        = info->info["ref_filename"     ].get_str  ();
     Value       delta               = info->info["delta"            ].get_real ();
     Value       error               = info->info["error"            ].get_real ();
@@ -538,6 +539,12 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
 
     CpuTimer    cpu_timer;
     cudaError_t retval              = cudaSuccess;
+    
+    if (traversal_mode == "LB_CULL")
+    {
+	    printf("Traversal Mode LB_CULL not available for PageRank\n");
+	    exit(0);
+    }    
 
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();

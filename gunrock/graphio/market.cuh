@@ -205,7 +205,7 @@ int ReadMarketStream(
     EdgeTupleType *coo = NULL; // read in COO format
     bool  skew  = false; //whether edge values are the inverse for symmetric matrices
     bool  array = false; //whether the mtx file is in dense array format
-
+    
     time_t mark0 = time(NULL);
     if (!quiet)
     {
@@ -216,15 +216,21 @@ int ReadMarketStream(
     char line[1024];
 
     bool ordered_rows = true;
+    
+    bool is_first_line_empty = false;
 
     while (true)
     {
 
         if (fscanf(f_in, "%[^\n]\n", line) <= 0)
         {
-            break;
-        }
-
+	   if (edges_read == -1)
+	   {	
+		is_first_line_empty = true;
+	   }
+	   break;
+	}
+	
         if (line[0] == '%')
         {
 
@@ -246,8 +252,8 @@ int ReadMarketStream(
             long long ll_nodes_x, ll_nodes_y, ll_edges;
             int items_scanned = sscanf(line, "%lld %lld %lld",
                        &ll_nodes_x, &ll_nodes_y, &ll_edges);
-
-            if (array && items_scanned == 2)
+ 
+	    if (array && items_scanned == 2)
             {
                 ll_edges = ll_nodes_x * ll_nodes_y;
             } 
@@ -419,6 +425,12 @@ int ReadMarketStream(
                 edges_read++;
             }
         }
+    }
+
+    if (is_first_line_empty)
+    {
+	fprintf(stderr, "\nInvalid graph, first line cannot be empty.\n");
+        exit(1);
     }
 
     if (coo == NULL)
