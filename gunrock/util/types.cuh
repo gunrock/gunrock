@@ -14,7 +14,7 @@
 
 #pragma once
 
-
+#include <float.h>
 
 namespace gunrock {
 namespace util {

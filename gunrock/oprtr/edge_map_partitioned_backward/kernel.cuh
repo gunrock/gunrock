@@ -137,28 +137,25 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         //}
 
         // Determine work decomposition
-        if (threadIdx.x == 0 && blockIdx.x == 0) {
-
-            // obtain problem size
-            if (queue_reset)
-            {
-                work_progress.StoreQueueLength(input_queue_len, queue_index);
-            }
-            else
-            {
+        if (threadIdx.x == 0) 
+        {
+            if (!queue_reset)
                 input_queue_len = work_progress.LoadQueueLength(queue_index);
 
-                // Signal to host that we're done
-                //if (input_queue_len == 0) {
-                //    if (d_done) d_done[0] = input_queue_len;
-                //}
+            if (blockIdx.x == 0)
+            {
+                // obtain problem size
+                if (queue_reset)
+                {
+                    work_progress.StoreQueueLength(input_queue_len, queue_index);
+                }
+
+                work_progress.Enqueue(output_queue_len[0], queue_index+1);
+
+                // Reset our next outgoing queue counter to zero
+                work_progress.StoreQueueLength(0, queue_index + 2);
+                work_progress.PrepResetSteal(queue_index + 1);
             }
-
-            work_progress.Enqueue(output_queue_len[0], queue_index+1);
-
-            // Reset our next outgoing queue counter to zero
-            work_progress.StoreQueueLength(0, queue_index + 2);
-            work_progress.PrepResetSteal(queue_index + 1);
         }
 
         // Barrier to protect work decomposition
@@ -340,28 +337,24 @@ struct Dispatch<KernelPolicy, ProblemData, Functor, true>
         //}
 
         // Determine work decomposition
-        if (blockIdx.x == 0 && threadIdx.x == 0) {
-
+        if (threadIdx.x == 0)
+        {
             // obtain problem size
-            if (queue_reset)
-            {
-                work_progress.StoreQueueLength(input_queue_len, queue_index);
-            }
-            else
-            {
+            if (!queue_reset)
                 input_queue_len = work_progress.LoadQueueLength(queue_index);
 
-                // Signal to host that we're done
-                //if (input_queue_len == 0) {
-                //    if (d_done) d_done[0] = input_queue_len;
-                //}
+            if (blockIdx.x == 0)
+            {                
+                if (queue_reset)
+                {
+                    work_progress.StoreQueueLength(input_queue_len, queue_index);
+                }
+                work_progress.Enqueue(output_queue_len[0], queue_index+1);
+
+                // Reset our next outgoing queue counter to zero
+                work_progress.StoreQueueLength(0, queue_index + 2);
+                work_progress.PrepResetSteal(queue_index + 1);
             }
-
-            work_progress.Enqueue(output_queue_len[0], queue_index+1);
-
-            // Reset our next outgoing queue counter to zero
-            work_progress.StoreQueueLength(0, queue_index + 2);
-            work_progress.PrepResetSteal(queue_index + 1);
         }
 
         // Barrier to protect work decomposition

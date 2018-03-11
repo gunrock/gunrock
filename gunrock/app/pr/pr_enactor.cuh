@@ -388,25 +388,6 @@ struct PRIteration : public IterationBase <
                 util::cpu_mt::PrintMessage("Filter start.",
                     thread_num, enactor_stats->iteration, peer_);
              // filter kernel
-            /*gunrock::oprtr::filter::LaunchKernel
-                <FilterKernelPolicy, Problem, PrFunctor>(
-                enactor_stats->filter_grid_size,
-                FilterKernelPolicy::THREADS,
-                (size_t)0,
-                stream,
-                typename PrFunctor::LabelT(),//enactor_stats->iteration,
-                frontier_attribute->queue_reset,
-                frontier_attribute->queue_index,
-                frontier_attribute->queue_length,
-                frontier_queue->keys[frontier_attribute->selector  ].GetPointer(util::DEVICE),      // d_in_queue
-                (Value*)NULL,
-                (VertexId*)NULL,//frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),// d_out_queue
-                d_data_slice,
-                (unsigned char*)NULL,
-                work_progress[0],
-                frontier_queue->keys[frontier_attribute->selector  ].GetSize(),           // max_in_queue
-                util::MaxValue<VertexId>(), //frontier_queue->keys[frontier_attribute->selector^1].GetSize(),         // max_out_queue
-                enactor_stats->filter_kernel_stats);*/
             gunrock::oprtr::filter::LaunchKernel
                 <FilterKernelPolicy, Problem, PrFunctor>(
                 enactor_stats[0],
@@ -429,6 +410,7 @@ struct PRIteration : public IterationBase <
                 util::MaxValue<SizeT>(),
                 enactor_stats -> filter_kernel_stats,
                 false); // do not filter
+
             if (enactor -> debug)
                 util::cpu_mt::PrintMessage("Filter end.",
                     thread_num, enactor_stats -> iteration, peer_);

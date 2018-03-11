@@ -118,23 +118,25 @@ __device__ __forceinline__ void PrepareQueue(
     util::CtaWorkProgress<SizeT> &work_progress)
 {
     // Determine work decomposition
-    if (threadIdx.x == 0 && blockIdx.x == 0)
+    if (threadIdx.x == 0)
     {
-        // obtain problem size
-        if (queue_reset)
-        {
-            work_progress.StoreQueueLength(input_queue_length, queue_index);
-        }
-        else
-        {
+        if (!queue_reset)
             input_queue_length = work_progress.LoadQueueLength(queue_index);
+
+        if (blockIdx.x == 0)
+        {
+            // obtain problem size
+            if (queue_reset)
+            {
+                work_progress.StoreQueueLength(input_queue_length, queue_index);
+            }
+
+            work_progress.Enqueue(output_queue_length[0], queue_index + 1);
+
+            // Reset our next outgoing queue counter to zero
+            work_progress.StoreQueueLength(0, queue_index + 2);
+            //work_progress.PrepResetSteal(queue_index + 1);
         }
-
-        work_progress.Enqueue(output_queue_length[0], queue_index + 1);
-
-        // Reset our next outgoing queue counter to zero
-        work_progress.StoreQueueLength(0, queue_index + 2);
-        //work_progress.PrepResetSteal(queue_index + 1);
     }
 
     // Barrier to protect work decomposition
