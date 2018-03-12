@@ -1,5 +1,5 @@
 GRAPH_NAME = roadNet-CA
-GRAPH_URL = http://www.cise.ufl.edu/research/sparse/MM/SNAP/roadNet-CA.tar.gz
+GRAPH_URL = https://www.cise.ufl.edu/research/sparse/MM/SNAP/roadNet-CA.tar.gz
 
 
 include ../ufl.mk
