@@ -414,7 +414,8 @@ struct Csr
     {
         if (!quiet)
         {
-            printf("  Reading directly from stored binary CSR arrays ...\n");
+            printf("  Reading directly from stored binary CSR arrays from %s ...\n",
+                f_in);
         }
         time_t mark1 = time(NULL);
 
@@ -464,9 +465,11 @@ struct Csr
     {
         if (!quiet)
         {
-            printf("  Reading directly from stored binary CSR arrays ...\n");
-	    if(LOAD_NODE_VALUES)
-                printf("  Reading directly from stored binary label arrays ...\n");
+            printf("  Reading directly from stored binary CSR arrays from %s ...\n",
+                f_in);
+	        if(LOAD_NODE_VALUES)
+                printf("  Reading directly from stored binary label arrays from %s ...\n",
+                    f_label);
         }
         time_t mark1 = time(NULL);
 
