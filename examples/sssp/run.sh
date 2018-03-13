@@ -1,16 +1,16 @@
 #!/bin/bash
 
 #get all execution files in ./bin
-files=(./bin/*)
+files=./bin/*
 #split file names into arr
 arr=$(echo $files | tr " " "\n")
 max_ver_num="$"
 
-exe_file=${arr[0]}
+exe_file=""
 #iterate over all file names to get the largest version number
 for x in $arr
 do
-    output=$(grep -o "[0-9]\.[0-9]" <<<"$x")
+    output=$(grep -o "[0-9]\.[0-9]" <<< "$x")
     if [ "$output" \> "$max_ver_num" ]; then
         exe_file=$x
     fi
@@ -37,7 +37,7 @@ MARK[3]=${MARK[1]}"_markpath"
 
 #put OS and Device type here
 EXCUTION=$exe_file
-DATADIR="/data/gunrock_dataset/large"
+DATADIR="../../dataset/large"
 
 NAME[ 0]="ak2010"            && Q_SIZE_DIR[ 0]="0.05" && I_SIZE_DIR[ 0]="0.02" && Q_SIZE_UDIR[ 0]="3.00" && I_SIZE_UDIR[ 0]="1.00"
 
@@ -95,7 +95,7 @@ F[10]="1.0"
 for k in {0..10}
 do
     #put OS and Device type here
-    SUFFIX="ubuntu12.04_k40cx2_brp${F[$k]}"
+    SUFFIX="ubuntu16.04_TitanVx2_brp${F[$k]}"
     mkdir -p eval/$SUFFIX
 
     for i in  {0..43} 

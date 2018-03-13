@@ -3,8 +3,14 @@
 #
 #GRAPH_URL:  the url path to the file
 
+OSUPPER := $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 
-WGET := wget
+ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
+    WGET := curl -O
+else
+    WGET := wget -N
+endif
+
 TAR  := tar
 GZIP := gzip
 MATRIX2SNAP := ../matrix2snap.py
@@ -16,6 +22,6 @@ all: setup
 fetch: $(GRAPH_FILE)
 
 $(GRAPH_FILE):
-	$(WGET) -N $(GRAPH_URL)
+	$(WGET) $(GRAPH_URL)
 
 IPDPS17: setup

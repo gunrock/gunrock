@@ -14,17 +14,12 @@
 
 #pragma once
 
-#include <limits.h>
+#include <cstring>
 #include <float.h>
 #include <string>
-#include <cstdlib>
-#include <cstring>
-#include <typeinfo>
+#include <vector>
 #include <typeindex>
 #include <sstream>
-#include <ostream>
-#include <istream>
-#include <vector>
 
 namespace gunrock {
 namespace util {
@@ -362,7 +357,7 @@ std::ostream& operator<< (std::ostream& sout, const std::vector<T>& vec)
     bool first_element = true;
     for (auto item : vec)
     {
-        sout<< (first_element ? "" : ",") << item;
+        sout<< std::string(first_element ? "" : ",") << item;
         first_element = false;
     }
     return sout;

@@ -410,6 +410,7 @@ struct Dispatch<Parameter, BY_PASS>
         cudaError_t retval = cudaSuccess;
         int num_blocks = parameter.num_elements / KernelPolicy::THREADS / 4 + 1;
         if (num_blocks > 480) num_blocks = 480;
+
         gunrock::oprtr::bypass_filter::Kernel<
             KernelPolicy,
             typename Parameter::Problem,

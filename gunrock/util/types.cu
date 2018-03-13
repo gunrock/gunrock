@@ -426,7 +426,8 @@ std::ostream& operator<< (std::ostream& sout, const std::vector<bool>& vec)
     bool first_element = true;
     for (auto item : vec)
     {
-        sout<< (first_element ? "" : ",") << (item ? "true" : "false");
+        sout<< std::string(first_element ? "" : ",") 
+            << std::string(item ? "true" : "false");
         first_element = false;
     }
     return sout;

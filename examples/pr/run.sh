@@ -3,7 +3,7 @@ OPTION1="--undirected" #undirected
 OPTION2="--quick" #quick running without CPU reference algorithm, if you want to test CPU reference algorithm, delete $OPTION2 in some lines. Warning: for large data this can take a long time.
 
 #get all execution files in ./bin
-files=(./bin/*)
+files=./bin/*
 #split file names into arr
 arr=$(echo $files | tr " " "\n")
 max_ver_num="$"
@@ -11,7 +11,7 @@ exe_file=${arr[0]}
 #iterate over all file names to get the largest version number
 for x in $arr
 do
-    output=$(grep -o "[0-9]\.[0-9]" <<<"$x")
+    output=$(grep -o "[0-9]\.[0-9]" <<< "$x")
     if [ "$output" \> "$max_ver_num" ]; then
         exe_file=$x
     fi
@@ -22,7 +22,7 @@ OPTION[0]="--partition-method=random --undirected --quick"
 MARK[0]=""
 
 EXCUTION=$exe_file
-DATADIR="/data/gunrock_dataset/large/"
+DATADIR="../../dataset/large/"
 
 NAME[ 0]="ak2010"            && Q_SIZE_DIR[ 0]="0.30" && I_SIZE_DIR[ 0]="0.10" && Q_SIZE_UDIR[ 0]="3.00" && I_SIZE_UDIR[ 0]="1.00"
 
@@ -81,7 +81,7 @@ for ndevice in 1 4 2 3
 do
     for k in 0 #{1..9}
     do
-        SUFFIX="ubuntu12.04_k40cx${ndevice}_rand"
+        SUFFIX="ubuntu16.04_TitanVx${ndevice}_rand"
         mkdir -p eval/$SUFFIX
         DEVICE="0"
         for (( i = 1; i<$ndevice; i++ ))
