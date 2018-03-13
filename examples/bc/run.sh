@@ -5,7 +5,7 @@ OPTION[0]="--src=largestdegree --device=0 --partition_method=random"
 MARK[0]=""
 
 #get all execution files in ./bin
-files=(./bin/*)
+files=./bin/*
 #split file names into arr
 arr=$(echo $files | tr " " "\n")
 max_ver_num="$"
@@ -20,9 +20,9 @@ do
 done
 
 #put OS and Device type here
-SUFFIX="ubuntu12.04_k40c"
+SUFFIX="ubuntu16.04_TitanV"
 EXCUTION=$exe_file
-DATADIR="/data/gunrock_dataset/large"
+DATADIR="../../dataset/large"
 
 mkdir -p eval/$SUFFIX
 

@@ -6,31 +6,31 @@ OPTION[2]=""                    && MARK[2]=".dired"
 OPTION[3]=" --undirected"       && MARK[3]=".undir"
 OPTION[4]=""                    && MARK[4]=".non_idempot"
 OPTION[5]=" --idempotence"      && MARK[5]=".idempotence"
-OPTION[6]=" --traversal-mode=0" && MARK[6]=".t0"
-OPTION[7]=" --traversal-mode=1" && MARK[7]=".t1"
+OPTION[6]=" --traversal-mode=LB" && MARK[6]=".t0"
+OPTION[7]=" --traversal-mode=TWC" && MARK[7]=".t1"
 OPTION[8]=""                    && MARK[8]=".32bSizeT"
 OPTION[9]=" --64bit-SizeT"      && MARK[9]=".64bSizeT"
 
 #get all execution files in ./bin
-#files=(./bin/*)
+files=./bin/*
 #split file names into arr
-#arr=$(echo $files | tr " " "\n")
-#max_ver_num="$"
-#EXECUTION=${arr[0]}
+arr=$(echo $files | tr " " "\n")
+max_ver_num="$"
+EXECUTION=""
 #iterate over all file names to get the largest version number
-#for x in $arr
-#do
-#    output=$(grep -o "[0-9]\.[0-9]" <<<"$x")
-#    if [ "$output" \> "$max_ver_num" ]; then
-#        EXECUTION=$x
-#    fi
-#done
+for x in $arr;
+do
+    output=$(grep -o "[0-9]\.[0-9]" <<< "$x")
+    if [ "$output" \> "$max_ver_num" ]; then
+        EXECUTION=$x
+    fi
+done
 
 #put OS and Device type here
-SUFFIX="ubuntu14_04.k40cx4_rand"
-EXECUTION="./bin/test_bfs_7.5_x86_64"
-DATADIR="/data/gunrock_dataset/large"
-ORG_OPTION="--src=largestdegree --device=0,1,2,3 --partition_method=random --iteration-num=10 --queue-sizing=0 --in-sizing=0 --jsondir=./eval/$SUFFIX"
+SUFFIX="ubuntu16.04_TitanV"
+#EXECUTION="./bin/test_bfs_7.5_x86_64"
+DATADIR="../../dataset/large"
+ORG_OPTION="--src=largestdegree --device=0 --partition_method=random --iteration-num=10 --queue-sizing=0 --in-sizing=0 --jsondir=./eval/$SUFFIX"
 ORG_MARK=""
 
 mkdir -p eval/$SUFFIX
