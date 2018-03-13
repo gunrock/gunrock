@@ -778,7 +778,8 @@ void Iteration_Loop(
                             sleep(0);
                     }
                     if (enactor_stats_ -> retval = util::GRError(tretval,
-                        "FullQueue_Core failed.", __FILE__, __LINE__))
+                        "FullQueue_Core failed. If size-check is disabled, "
+                        "please try to increase the queue-sizing", __FILE__, __LINE__))
                         break;
 
 #ifdef ENABLE_PERFORMANCE_PROFILING
