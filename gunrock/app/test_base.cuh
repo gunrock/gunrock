@@ -354,11 +354,11 @@ struct Switch_ValueT<OpT, VertexT, SizeT, FLAG, VALUET_S32B | VALUET_S64B>
             GUARD_CU(parameters.Set("64bit-ValueT", current_val));
             if (current_val)
             {
-                retval = Switch_Direction<OpT, VertexT, SizeT, int32_t, FLAG>
+                retval = Switch_Direction<OpT, VertexT, SizeT, int64_t, FLAG>
                     (parameters, op);
                 if (retval) return retval;
             } else {
-                retval = Switch_Direction<OpT, VertexT, SizeT, int64_t, FLAG>
+                retval = Switch_Direction<OpT, VertexT, SizeT, int32_t, FLAG>
                     (parameters, op);
                 if (retval) return retval;
             }
@@ -383,11 +383,11 @@ struct Switch_ValueT<OpT, VertexT, SizeT, FLAG, VALUET_U32B | VALUET_U64B>
             GUARD_CU(parameters.Set("64bit-ValueT", current_val));
             if (current_val)
             {
-                retval = Switch_Direction<OpT, VertexT, SizeT, uint32_t, FLAG>
+                retval = Switch_Direction<OpT, VertexT, SizeT, uint64_t, FLAG>
                     (parameters, op);
                 if (retval) return retval;
             } else {
-                retval = Switch_Direction<OpT, VertexT, SizeT, uint64_t, FLAG>
+                retval = Switch_Direction<OpT, VertexT, SizeT, uint32_t, FLAG>
                     (parameters, op);
                 if (retval) return retval;
             }
@@ -412,11 +412,11 @@ struct Switch_ValueT<OpT, VertexT, SizeT, FLAG, VALUET_F32B | VALUET_F64B>
             GUARD_CU(parameters.Set("64bit-ValueT", current_val));
             if (current_val)
             {
-                retval = Switch_Direction<OpT, VertexT, SizeT, float, FLAG>
+                retval = Switch_Direction<OpT, VertexT, SizeT, double, FLAG>
                     (parameters, op);
                 if (retval) return retval;
             } else {
-                retval = Switch_Direction<OpT, VertexT, SizeT, double, FLAG>
+                retval = Switch_Direction<OpT, VertexT, SizeT, float , FLAG>
                     (parameters, op);
                 if (retval) return retval;
             }
@@ -440,7 +440,7 @@ struct Switch_SizeT
 };
 
 template <typename OpT, typename VertexT, SwitchFlag FLAG>
-struct Switch_SizeT<OpT, VertexT, FLAG, VERTEXT_S32B>
+struct Switch_SizeT<OpT, VertexT, FLAG, SIZET_S32B>
 {
     static cudaError_t Act(util::Parameters &parameters, OpT op)
     {
@@ -457,7 +457,7 @@ struct Switch_SizeT<OpT, VertexT, FLAG, VERTEXT_S32B>
 };
 
 template <typename OpT, typename VertexT, SwitchFlag FLAG>
-struct Switch_SizeT<OpT, VertexT, FLAG, VERTEXT_S64B>
+struct Switch_SizeT<OpT, VertexT, FLAG, SIZET_S64B>
 {
     static cudaError_t Act(util::Parameters &parameters, OpT op)
     {
@@ -474,7 +474,7 @@ struct Switch_SizeT<OpT, VertexT, FLAG, VERTEXT_S64B>
 };
 
 template <typename OpT, typename VertexT, SwitchFlag FLAG>
-struct Switch_SizeT<OpT, VertexT, FLAG, VERTEXT_U32B>
+struct Switch_SizeT<OpT, VertexT, FLAG, SIZET_U32B>
 {
     static cudaError_t Act(util::Parameters &parameters, OpT op)
     {
@@ -491,7 +491,7 @@ struct Switch_SizeT<OpT, VertexT, FLAG, VERTEXT_U32B>
 };
 
 template <typename OpT, typename VertexT, SwitchFlag FLAG>
-struct Switch_SizeT<OpT, VertexT, FLAG, VERTEXT_U64B>
+struct Switch_SizeT<OpT, VertexT, FLAG, SIZET_U64B>
 {
     static cudaError_t Act(util::Parameters &parameters, OpT op)
     {
@@ -522,11 +522,11 @@ struct Switch_SizeT<OpT, VertexT, FLAG, SIZET_S32B | SIZET_S64B>
             GUARD_CU(parameters.Set("64bit-SizeT", current_val));
             if (current_val)
             {
-                retval = Switch_ValueT<OpT, VertexT, int32_t, FLAG, FLAG & VALUET_BASE>
+                retval = Switch_ValueT<OpT, VertexT, int64_t, FLAG, FLAG & VALUET_BASE>
                     ::Act(parameters, op);
                 if (retval) return retval;
             } else {
-                retval = Switch_ValueT<OpT, VertexT, int64_t, FLAG, FLAG & VALUET_BASE>
+                retval = Switch_ValueT<OpT, VertexT, int32_t, FLAG, FLAG & VALUET_BASE>
                     ::Act(parameters, op);
                 if (retval) return retval;
             }
@@ -551,11 +551,11 @@ struct Switch_SizeT<OpT, VertexT, FLAG, SIZET_U32B | SIZET_U64B>
             GUARD_CU(parameters.Set("64bit-SizeT", current_val));
             if (current_val)
             {
-                retval = Switch_ValueT<OpT, VertexT, uint32_t, FLAG, FLAG & VALUET_BASE>
+                retval = Switch_ValueT<OpT, VertexT, uint64_t, FLAG, FLAG & VALUET_BASE>
                     ::Act(parameters, op);
                 if (retval) return retval;
             } else {
-                retval = Switch_ValueT<OpT, VertexT, uint64_t, FLAG, FLAG & VALUET_BASE>
+                retval = Switch_ValueT<OpT, VertexT, uint32_t, FLAG, FLAG & VALUET_BASE>
                     ::Act(parameters, op);
                 if (retval) return retval;
             }
@@ -660,11 +660,11 @@ struct Switch_VertexT<OpT, FLAG, VERTEXT_S32B | VERTEXT_S64B>
             GUARD_CU(parameters.Set("64bit-VertexT", current_val));
             if (current_val)
             {
-                retval = Switch_SizeT<OpT, int32_t, FLAG, FLAG & SIZET_BASE>
+                retval = Switch_SizeT<OpT, int64_t, FLAG, FLAG & SIZET_BASE>
                     ::Act(parameters, op);
                 if (retval) return retval;
             } else {
-                retval = Switch_SizeT<OpT, int64_t, FLAG, FLAG & SIZET_BASE>
+                retval = Switch_SizeT<OpT, int32_t, FLAG, FLAG & SIZET_BASE>
                     ::Act(parameters, op);
                 if (retval) return retval;
             }
@@ -689,11 +689,11 @@ struct Switch_VertexT<OpT, FLAG, VERTEXT_U32B | VERTEXT_U64B>
             GUARD_CU(parameters.Set("64bit-VertexT", current_val));
             if (current_val)
             {
-                retval = Switch_SizeT<OpT, uint32_t, FLAG, FLAG & SIZET_BASE>
+                retval = Switch_SizeT<OpT, uint64_t, FLAG, FLAG & SIZET_BASE>
                     ::Act(parameters, op);
                 if (retval) return retval;
             } else {
-                retval = Switch_SizeT<OpT, uint64_t, FLAG, FLAG & SIZET_BASE>
+                retval = Switch_SizeT<OpT, uint32_t, FLAG, FLAG & SIZET_BASE>
                     ::Act(parameters, op);
                 if (retval) return retval;
             }
