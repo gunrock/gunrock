@@ -106,7 +106,7 @@ cudaError_t Set_Srcs(
             while (!src_valid)
             {
                 v = rand() % graph.nodes;
-                if (graph.CsrT::GetNeighborListLength(v) != 0)
+                if (graph.GetNeighborListLength(v) != 0)
                     src_valid = true;
             }
             srcs.push_back(v);
@@ -119,7 +119,7 @@ cudaError_t Set_Srcs(
         SizeT largest_degree = 0;
         for (VertexT v = 0; v < graph.nodes; v++)
         {
-            SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+            SizeT num_neighbors = graph.GetNeighborListLength(v);
             if (largest_degree < num_neighbors)
             {
                 srcs.clear();
@@ -131,6 +131,12 @@ cudaError_t Set_Srcs(
             }
         }
         GUARD_CU(parameters.Set<std::vector<VertexT>>("srcs", srcs));
+    }
+
+    else if (src == "invalid")
+    {
+        GUARD_CU(parameters.Set("srcs",
+            util::PreDefinedValues<VertexT>::InvalidValue))
     }
 
     else

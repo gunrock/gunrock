@@ -93,6 +93,7 @@ struct Csr :
     /**
      * @brief CSR destructor
      */
+    __host__ __device__
     ~Csr()
     {
         //Release();
@@ -137,18 +138,15 @@ struct Csr :
     cudaError_t Move(
         util::Location source,
         util::Location target,
-        cudaStream_t   stream)
+        cudaStream_t   stream = 0)
     {
         cudaError_t retval = cudaSuccess;
-
-        GUARD_CU(row_offsets   .Move(source, target,
-            util::PreDefinedValues<SizeT>::InvalidValue, 0, stream));
-        GUARD_CU(column_indices.Move(source, target,
-            util::PreDefinedValues<SizeT>::InvalidValue, 0, stream));
-        GUARD_CU(edge_values   .Move(source, target,
-            util::PreDefinedValues<SizeT>::InvalidValue, 0, stream));
-        GUARD_CU(node_values   .Move(source, target,
-            util::PreDefinedValues<SizeT>::InvalidValue, 0, stream));
+        SizeT invalid_size = util::PreDefinedValues<SizeT>::InvalidValue;
+        GUARD_CU(BaseGraph    ::Move(source, target, stream));
+        GUARD_CU(row_offsets   .Move(source, target, invalid_size, 0, stream));
+        GUARD_CU(column_indices.Move(source, target, invalid_size, 0, stream));
+        GUARD_CU(edge_values   .Move(source, target, invalid_size, 0, stream));
+        GUARD_CU(node_values   .Move(source, target, invalid_size, 0, stream));
         return retval;
     }
 
@@ -364,10 +362,23 @@ struct Csr :
     }
 
     __device__ __host__ __forceinline__
+    VertexT GetEdgeSrc(const SizeT &e) const
+    {
+        return Binary_Search(row_offsets + 0, e, 0, this -> nodes);
+    }
+
+    __device__ __host__ __forceinline__
     VertexT GetEdgeDest(const SizeT &e) const
     {
         //return _ldg(column_indices + e);
         return column_indices[e];
+    }
+
+    __device__ __host__ __forceinline__
+    void GetEdgeSrcDest(const SizeT &e, VertexT &src, VertexT &dest) const
+    {
+        src = Binary_Search(row_offsets + 0, e, 0, this -> nodes);
+        dest = column_indices[e];
     }
 
     /*template <typename Tuple>
@@ -899,9 +910,18 @@ struct Csr<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
         return cudaSuccess;
     }
 
-    SizeT GetNeighborListLength(const VertexT &v)
+    __device__ __host__ __forceinline__
+    SizeT GetNeighborListLength(const VertexT &v) const
     {
         return 0;
+    }
+
+    cudaError_t Move(
+        util::Location source,
+        util::Location target,
+        cudaStream_t   stream = 0)
+    {
+        return cudaSuccess;
     }
 };
 

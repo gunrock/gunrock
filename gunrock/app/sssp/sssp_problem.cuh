@@ -45,6 +45,7 @@ cudaError_t UseParameters_problem(
  * @brief Single-Source Shortest Path Problem structure.
  * @tparam _GraphT  Type of the graph
  * @tparam _LabelT  Type of labels used in sssp
+ * @tparam _ValueT  Type of per-vertex distance values
  * @tparam _FLAG    Problem flags
  */
 template <
@@ -120,6 +121,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         /**
          * @brief initializing sssp-specific data on each gpu
          * @param     sub_graph   Sub graph on the GPU.
+         * @param[in] num_gpus    Number of GPUs
          * @param[in] gpu_idx     GPU device index
          * @param[in] target      Targeting device location
          * @param[in] flag        Problem flag containling options
@@ -127,13 +129,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          */
         cudaError_t Init(
             GraphT        &sub_graph,
+            int            num_gpus = 1,
             int            gpu_idx = 0,
             util::Location target  = util::DEVICE,
             ProblemFlag    flag    = Problem_None)
         {
             cudaError_t retval  = cudaSuccess;
 
-            GUARD_CU(BaseDataSlice::Init(sub_graph, gpu_idx, target, flag));
+            GUARD_CU(BaseDataSlice::Init(
+                sub_graph, num_gpus, gpu_idx, target, flag));
             GUARD_CU(distances .Allocate(sub_graph.nodes, target));
             GUARD_CU(labels    .Allocate(sub_graph.nodes, target));
             if (flag & Mark_Predecessors)
@@ -142,10 +146,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(temp_preds .Allocate(sub_graph.nodes, target));
             }
 
-            if (target & util::DEVICE)
+            /*if (target & util::DEVICE)
             {
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
-            }
+            }*/
+            GUARD_CU(sub_graph.Move(util::Host, target, this -> stream));
             return retval;
         } // Init
 
@@ -251,6 +256,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * @brief Copy result distancess computed on GPUs back to host-side arrays.
      * @param[out] h_distances Host array to store computed vertex distances from the source.
      * @param[out] h_preds     Host array to store computed vertex predecessors.
+     * @param[in]  target where the results are stored
      * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
@@ -342,8 +348,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return    cudaError_t Error message(s), if any
      */
     cudaError_t Init(
-            GraphT           &graph,
-            util::Location    target = util::DEVICE)
+        GraphT           &graph,
+        util::Location    target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseProblem::Init(graph, target));
@@ -362,7 +368,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             auto &data_slice = data_slices[gpu][0];
             GUARD_CU(data_slice.Init(this -> sub_graphs[gpu],
-                this -> gpu_idx[gpu], target, this -> flag));
+                this -> num_gpus, this -> gpu_idx[gpu], target, this -> flag));
         } // end for (gpu)
 
         return retval;
@@ -375,8 +381,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
-            VertexT    src,
-            util::Location target = util::DEVICE)
+        VertexT    src,
+        util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -402,9 +408,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             else
                 src_ = this -> org_graph -> GpT::convertion_table[src];
         }
-        GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-        GUARD_CU2(cudaDeviceSynchronize(),
-            "cudaDeviceSynchronize failed");
+        if (target & util::DEVICE)
+        {
+            GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+            GUARD_CU2(cudaDeviceSynchronize(),
+                "cudaDeviceSynchronize failed");
+        }
 
         ValueT src_distance = 0;
         if (target & util::HOST)
@@ -432,9 +441,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     cudaMemcpyHostToDevice),
                     "SSSPProblem cudaMemcpy preds failed");
             }
+            GUARD_CU2(cudaDeviceSynchronize(),
+                "cudaDeviceSynchronize failed");
         }
-        GUARD_CU2(cudaDeviceSynchronize(),
-            "cudaDeviceSynchronize failed");
+
         return retval;
     }
 

@@ -122,7 +122,7 @@ struct NullArray
     cudaError_t Move(
         Location source,
         Location target,
-        SizeT size  =-1,
+        SizeT size  = util::PreDefinedValues<SizeT>::InvalidValue,
         SizeT offset=0,
         cudaStream_t stream=0)
     {
@@ -1381,7 +1381,7 @@ public:
             limit = size;
         if (target == LOCATION_DEFAULT)
             target = setted | allocated;
-            
+
         ValueT *h_array = GetPointer(HOST);
         bool temp_allocated = false;
         if (h_array == NULL && limit != 0)

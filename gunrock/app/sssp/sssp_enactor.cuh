@@ -209,11 +209,13 @@ template <
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 class Enactor :
     public EnactorBase<
-        typename _Problem::GraphT, typename _Problem::LabelT,
+        typename _Problem::GraphT,
+        typename _Problem::LabelT,
         typename _Problem::ValueT,
         ARRAY_FLAG, cudaHostRegisterFlag>
 {
 public:
+    // Definations
     typedef _Problem                   Problem ;
     typedef typename Problem::SizeT    SizeT   ;
     typedef typename Problem::VertexT  VertexT ;
@@ -226,8 +228,14 @@ public:
         EnactorT;
     typedef SSSPIterationLoop<EnactorT> IterationT;
 
+    // Members
     Problem     *problem   ;
     IterationT  *iterations;
+
+    /**
+     * \addtogroup PublicInterface
+     * @{
+     */
 
     /**
      * @brief SSSPEnactor constructor
@@ -264,26 +272,18 @@ public:
     }
 
     /**
-     * \addtogroup PublicInterface
-     * @{
-     */
-
-    /**
-     * @brief Initialize the problem.
-     * @param[in] parameters Running parameters.
+     * @brief Initialize the enactor.
      * @param[in] problem The problem object.
      * @param[in] target Target location of data
      * \return cudaError_t error message(s), if any
      */
     cudaError_t Init(
-        //util::Parameters &parameters,
         Problem          &problem,
         util::Location    target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
         this->problem = &problem;
 
-        // Lazy initialization
         GUARD_CU(BaseEnactor::Init(
             problem, Enactor_None, 2, NULL, target, false));
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
@@ -312,20 +312,6 @@ public:
         GUARD_CU(this -> Init_Threads(this,
             (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
         return retval;
-    }
-
-    /**
-      * @brief one run of sssp, to be called within GunrockThread
-      * @param thread_data Data for the CPU thread
-      * \return cudaError_t error message(s), if any
-      */
-    cudaError_t Run(ThreadSlice &thread_data)
-    {
-        gunrock::app::Iteration_Loop<
-            ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0,
-            1, IterationT>(
-            thread_data, iterations[thread_data.thread_num]);
-        return cudaSuccess;
     }
 
     /**
@@ -372,6 +358,20 @@ public:
         }
         GUARD_CU(BaseEnactor::Sync());
         return retval;
+    }
+
+    /**
+      * @brief one run of sssp, to be called within GunrockThread
+      * @param thread_data Data for the CPU thread
+      * \return cudaError_t error message(s), if any
+      */
+    cudaError_t Run(ThreadSlice &thread_data)
+    {
+        gunrock::app::Iteration_Loop<
+            ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0,
+            1, IterationT>(
+            thread_data, iterations[thread_data.thread_num]);
+        return cudaSuccess;
     }
 
     /**

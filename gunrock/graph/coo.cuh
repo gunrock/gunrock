@@ -93,6 +93,7 @@ struct Coo :
     /**
      * @brief COO destructor
      */
+    __host__ __device__
     ~Coo()
     {
         //Release();
@@ -125,6 +126,20 @@ struct Coo :
         GUARD_CU(edge_pairs    .Allocate(edges      , target));
         GUARD_CU(node_values   .Allocate(nodes      , target));
         GUARD_CU(edge_values   .Allocate(edges      , target));
+        return retval;
+    }
+
+    cudaError_t Move(
+        util::Location source,
+        util::Location target,
+        cudaStream_t   stream = 0)
+    {
+        cudaError_t retval = cudaSuccess;
+        SizeT invalid_size = util::PreDefinedValues<SizeT>::InvalidValue;
+        GUARD_CU(BaseGraph:: Move(source, target, stream));
+        GUARD_CU(edge_pairs .Move(source, target, invalid_size, 0, stream));
+        GUARD_CU(node_values.Move(source, target, invalid_size, 0, stream));
+        GUARD_CU(edge_values.Move(source, target, invalid_size, 0, stream));
         return retval;
     }
 
@@ -205,13 +220,14 @@ struct Coo :
 
         GUARD_CU(Allocate(source.CsrT::nodes, source.CsrT::edges, target));
 
-        GUARD_CU(source.row_offsets.ForAll(
-            edge_pairs, source.column_indices,
+        GUARD_CU(source.CsrT::row_offsets.ForAll(
+            edge_pairs, source.CsrT::column_indices,
             [] __host__ __device__ (
                 typename CsrT::SizeT *row_offsets,
                 EdgePairT *edge_pairs,
                 typename CsrT::VertexT *column_indices,
-                const VertexT &row){
+                const VertexT &row)
+                {
                     SizeT e_end = row_offsets[row+1];
                     for (SizeT e = row_offsets[row]; e < e_end; e++)
                     {
@@ -393,6 +409,34 @@ struct Coo :
         return retval;
     }
 
+    __device__ __host__ __forceinline__
+    SizeT GetNeighborListLength(const VertexT &v) const
+    {
+        // Not implemented
+        return util::PreDefinedValues<SizeT>::InvalidValue;
+    }
+
+    __device__ __host__ __forceinline__
+    VertexT GetEdgeDest(const SizeT &e) const
+    {
+        auto &pair = edge_pairs[e];
+        return e.y;
+    }
+
+    __device__ __host__ __forceinline__
+    VertexT GetEdgeSrc(const SizeT &e) const
+    {
+        auto &pair = edge_pairs[e];
+        return e.x;
+    }
+
+    __device__ __host__ __forceinline__
+    void GetEdgeSrcDest(const SizeT &e, VertexT &src, VertexT &dest) const 
+    {
+        auto &pair = edge_pairs[e];
+        src = pair.x;
+        dest = pair.y;
+    }
 }; // Coo
 
 template<
@@ -438,9 +482,17 @@ struct Coo<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
         return cudaSuccess;
     }
 
-    SizeT GetNeighborListLength(const VertexT &v)
+    SizeT GetNeighborListLength(const VertexT &v) const
     {
         return 0;
+    }
+
+    cudaError_t Move(
+        util::Location source,
+        util::Location target,
+        cudaStream_t   stream = 0)
+    {
+        return cudaSuccess;
     }
 };
 

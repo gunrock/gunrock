@@ -29,19 +29,14 @@ namespace LB {
  * expanding/unrolling the kernel code for specific architectures and problem
  * types.
  *
- * @tparam _ProblemData                 Problem data type.
- * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code for.
- * @tparam _INSTRUMENT                  Whether or not we want instrumentation logic generated
  * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have resident per SM (influences per-CTA smem cache sizes and register allocation/spills).
  * @tparam _LOG_THREADS                 Number of threads per CTA (log).
  */
 template <
-    //typename _ProblemData,
     typename _VertexT,      // Data types
     typename _InKeyT,
     typename _SizeT,
     typename _ValueT,
-    //int _CUDA_ARCH,         // Machine parameters
     int _MAX_CTA_OCCUPANCY, // Tunable parameters
     int _LOG_THREADS,
     int _LOG_BLOCKS,

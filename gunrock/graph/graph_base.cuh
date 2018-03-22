@@ -38,7 +38,43 @@ enum : GraphFlag
     GRAPH_PINNED    = 0x1000,
 };
 
+template <GraphFlag FLAG>
+struct GraphType_Num
+{
+    static const GraphFlag VAL =
+         ((FLAG & HAS_CSR) != 0) ? HAS_CSR :
+        (((FLAG & HAS_CSC) != 0) ? HAS_CSC :
+        (((FLAG & HAS_COO) != 0) ? HAS_COO : 0));
+};
+
 static const util::Location GRAPH_DEFAULT_TARGET = util::DEVICE;
+
+template <typename T, typename SizeT>
+__device__ __host__ __forceinline__
+SizeT Binary_Search(
+    const T* data, T item_to_find, SizeT lower_bound, SizeT upper_bound)
+{
+    while (lower_bound < upper_bound)
+    {
+        SizeT mid_point = (lower_bound + upper_bound) >> 1;
+        if (_ldg(data + mid_point) < item_to_find)
+            lower_bound = mid_point + 1;
+        else
+            upper_bound = mid_point;
+    }
+
+    SizeT retval = util::PreDefinedValues<SizeT>::InvalidValue;
+    if (upper_bound == lower_bound)
+    {
+        if (item_to_find < _ldg(data + upper_bound))
+            retval = upper_bound -1;
+        else
+            retval = upper_bound;
+    } else
+        retval = util::PreDefinedValues<SizeT>::InvalidValue;
+
+    return retval;
+}
 
 /**
  * @brief Enum to show how the edges are ordered
@@ -94,6 +130,7 @@ struct GraphBase
         directed(true)
     {}
 
+    __host__ __device__
     ~GraphBase()
     {
         //Release();
@@ -112,6 +149,14 @@ struct GraphBase
     {
         this -> nodes = nodes;
         this -> edges = edges;
+        return cudaSuccess;
+    }
+
+    cudaError_t Move(
+        util::Location source,
+        util::Location target,
+        cudaStream_t   stream = 0)
+    {
         return cudaSuccess;
     }
 

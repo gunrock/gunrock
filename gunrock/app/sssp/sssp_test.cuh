@@ -62,7 +62,7 @@ void DisplaySolution(T *array, SizeT length)
  *****************************************************************************/
 
 /**
- * @brief Simple CPU-based reference SSSP ranking implementations
+ * @brief Simple CPU-based reference SSSP implementations
  * @tparam      GraphT        Type of the graph
  * @tparam      ValueT        Type of the distances
  * @param[in]   graph         Input graph

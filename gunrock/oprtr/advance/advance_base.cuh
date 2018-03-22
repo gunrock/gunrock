@@ -47,8 +47,8 @@ OutKeyT ProcessNeighbor(
           SizeT      output_pos,
           OutKeyT  * keys_out,
           ValueT   * values_out,
-    const ValueT   *&reduce_values_in,
-          ValueT   *&reduce_values_out,
+    const ValueT   * reduce_values_in,
+          ValueT   * reduce_values_out,
           OpT        op)
 {
     OutKeyT out_key = 0;

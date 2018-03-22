@@ -18,7 +18,7 @@
 
 namespace gunrock {
 namespace oprtr {
-namespace all_edges_advance {
+namespace AE {
 
 /**
  * @brief Kernel configuration policy for partitioned edge mapping kernels.
@@ -31,43 +31,38 @@ namespace all_edges_advance {
  * expanding/unrolling the kernel code for specific architectures and problem
  * types.
  *
- * @tparam _ProblemData                 Problem data type.
- * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code for.
- * @tparam _INSTRUMENT                  Whether or not we want instrumentation logic generated
- * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have resident per SM (influences per-CTA smem cache sizes and register allocation/spills).
+ * @tparam _MAX_CTA_OCCUPANCY           Lower bound on number of CTAs to have resident per SM (influences per-CTA smem cache sizes and register allocation/spills).
  * @tparam _LOG_THREADS                 Number of threads per CTA (log).
  */
 template <
-    typename _Problem,
-    // Machine parameters
-    int _CUDA_ARCH,
-    // Behavioral control parameters
-    //bool _INSTRUMENT,
-    // Tunable parameters
-    int _MIN_CTA_OCCUPANCY,
+    typename _VertexT,      // Data types
+    typename _InKeyT,
+    typename _SizeT,
+    typename _ValueT,
+    int _MAX_CTA_OCCUPANCY, // Tunable parameters
     int _LOG_THREADS,
-    int _LOG_BLOCKS>
-
+    int _LOG_BLOCKS,
+    int _OUTPUTS_PER_THREAD>
 struct KernelPolicy
 {
     //---------------------------------------------------------------------
     // Constants and typedefs
     //---------------------------------------------------------------------
 
-    typedef _Problem                    Problem;
-    typedef typename Problem::VertexId  VertexId;
-    typedef typename Problem::SizeT     SizeT;
-    typedef typename Problem::Value     Value;
+    typedef _VertexT  VertexT;
+    typedef _InKeyT   InKeyT;
+    typedef _SizeT    SizeT;
+    typedef _ValueT   ValueT;
 
     enum {
-
-        CUDA_ARCH                       = _CUDA_ARCH,
+        //CUDA_ARCH                       = _CUDA_ARCH,
         LOG_THREADS                     = _LOG_THREADS,
         THREADS                         = 1 << LOG_THREADS,
         LOG_BLOCKS                      = _LOG_BLOCKS,
         BLOCKS                          = 1 << LOG_BLOCKS,
+        OUTPUTS_PER_THREAD              = _OUTPUTS_PER_THREAD,
     };
-    typedef util::Block_Scan<SizeT, CUDA_ARCH, LOG_THREADS> BlockScanT;
+    typedef util::Block_Scan<SizeT, LOG_THREADS> BlockScanT;
 
     /**
      * @brief Shared memory storage type for the CTA
@@ -79,13 +74,14 @@ struct KernelPolicy
         struct {
             typename BlockScanT::Temp_Space scan_space;
             SizeT block_offset;
+            SizeT *output_counter;
         };
     };
 
     enum {
         THREAD_OCCUPANCY                = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
         SMEM_OCCUPANCY                  = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
-        CTA_OCCUPANCY                   = GR_MIN(_MIN_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
+        CTA_OCCUPANCY                   = GR_MIN(_MAX_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
         VALID                           = (CTA_OCCUPANCY > 0),
     };
 };
