@@ -154,8 +154,8 @@ int main(int argc, char** argv)
     GUARD_CU(parameters.Check_Required());
 
     return app::Switch_Types<
-        app::VERTEXT_U32B | //app::VERTEXT_U64B |
-        app::SIZET_U32B | //app::SIZET_U64B |
+        app::VERTEXT_U32B | app::VERTEXT_U64B |
+        app::SIZET_U32B | app::SIZET_U64B |
         app::VALUET_F32B | //app::VALUET_F64B |
         app::DIRECTED | app::UNDIRECTED>
         (parameters, main_struct());

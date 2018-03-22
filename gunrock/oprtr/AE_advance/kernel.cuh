@@ -295,8 +295,9 @@ cudaError_t Launch(
         ::KernelPolicyT KernelPolicyT;
 
     cudaError_t retval = cudaSuccess;
-    SizeT num_blocks = (graph.edges + KernelPolicyT::THREADS - 1)
-        / KernelPolicyT::THREADS;
+
+    SizeT num_blocks
+        = (graph.edges + KernelPolicyT::THREADS - 1) / KernelPolicyT::THREADS;
     if (num_blocks > KernelPolicyT::BLOCKS)
         num_blocks = KernelPolicyT::BLOCKS;
 

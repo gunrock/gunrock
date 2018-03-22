@@ -21,8 +21,8 @@
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/device_intrinsics.cuh>
 
-#include <gunrock/oprtr/cull_filter/cta.cuh>
-#include <gunrock/oprtr/cull_filter/kernel_policy.cuh>
+#include <gunrock/oprtr/CULL_filter/cta.cuh>
+#include <gunrock/oprtr/CULL_filter/kernel_policy.cuh>
 //#include <gunrock/oprtr/bypass_filter/kernel.cuh>
 
 namespace gunrock {
