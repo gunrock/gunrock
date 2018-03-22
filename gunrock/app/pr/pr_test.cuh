@@ -201,6 +201,7 @@ double CPU_Reference(
     typename GraphT::VertexT *node_ids,
                      ValueT  *ranks)
 {
+    typedef typename GraphT::CooT    CooT;
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
 

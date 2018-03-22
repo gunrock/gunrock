@@ -247,27 +247,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             // Compute degrees
             //auto &sub_graph = this -> sub_graph[0];
-            if (GraphT::FLAG & gunrock::graph::HAS_CSR)
-            {
-                GUARD_CU(degrees.ForAll(
-                    [sub_graph]__host__ __device__(
-                        SizeT *degrees, const SizeT &pos)
-                {
-                    degrees[pos] = sub_graph.GetNeighborListLength(pos);
-                }, nodes, target));
-            } else if (GraphT::FLAG & gunrock::graph::HAS_COO)
-            {
-                auto &degrees = this -> degrees;
-                GUARD_CU(oprtr::ForAll((VertexT*)NULL,
-                    [sub_graph, degrees]
-                    __host__ __device__ (VertexT *dummy, const SizeT &e)
-                {
-                    VertexT src, dest;
-                    sub_graph.GetEdgeSrcDest(e, src, dest);
-                    atomicAdd(degrees + src, 1);
-                }, sub_graph.edges, target));
-            }
-
             if (num_gpus == 1)
             {
                 GUARD_CU(local_vertices.Allocate(nodes, target));
@@ -320,6 +299,28 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             }
 
             GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
+
+            if (GraphT::FLAG & gunrock::graph::HAS_CSR)
+            {
+                GUARD_CU(degrees.ForAll(
+                    [sub_graph]__host__ __device__(
+                        SizeT *degrees, const SizeT &pos)
+                {
+                    degrees[pos] = sub_graph.GetNeighborListLength(pos);
+                }, nodes, target, this -> stream));
+            } else if (GraphT::FLAG & gunrock::graph::HAS_COO)
+            {
+                auto &degrees = this -> degrees;
+                GUARD_CU(oprtr::ForAll((VertexT*)NULL,
+                    [sub_graph, degrees]
+                    __host__ __device__ (VertexT *dummy, const SizeT &e)
+                {
+                    VertexT src, dest;
+                    sub_graph.GetEdgeSrcDest(e, src, dest);
+                    atomicAdd(degrees + src, 1);
+                }, sub_graph.edges, target, this -> stream));
+            }
+
             return retval;
         }
 

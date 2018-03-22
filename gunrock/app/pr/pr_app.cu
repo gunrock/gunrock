@@ -101,6 +101,7 @@ cudaError_t RunTests(
     EnactorT enactor;
     util::PrintMsg("Before init");
     GUARD_CU(problem.Init(graph  , target));
+    util::PrintMsg("Problem init");
     GUARD_CU(enactor.Init(problem, target));
     util::PrintMsg("After init");
     cpu_timer.Stop();

@@ -107,9 +107,11 @@ struct TestGraph :
         bool quiet = false,
         bool self_csr = false)
     {
+        typedef typename CsrT_in::CsrT CsrT_;
+
         cudaError_t retval = cudaSuccess;
-        nodes = csr.CsrT::nodes;
-        edges = csr.CsrT::edges;
+        nodes = csr.CsrT_::nodes;
+        edges = csr.CsrT_::edges;
         GUARD_CU(this -> CooT::FromCsr(csr, target, stream, quiet));
         GUARD_CU(this -> CscT::FromCsr(csr, target, stream, quiet));
         if (!self_csr)

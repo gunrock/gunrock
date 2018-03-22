@@ -179,13 +179,14 @@ struct ProblemBase
         gpu_idx = parameters.Get<std::vector<int>>("device");
         num_gpus = gpu_idx.size();
         org_mem_size = new size_t[num_gpus];
+        size_t *dummy_size = new size_t[num_gpus];
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
-            size_t dummy;
             util::GRError(util::SetDevice(gpu_idx[gpu]));
-            util::GRError(cudaMemGetInfo(&(org_mem_size[gpu]), &dummy),
+            util::GRError(cudaMemGetInfo(org_mem_size + gpu, dummy_size + gpu),
                 "cudaMemGetInfo failed", __FILE__, __LINE__);
         }
+        delete[] dummy_size; dummy_size = NULL;
     } // end ProblemBase()
 
     /**

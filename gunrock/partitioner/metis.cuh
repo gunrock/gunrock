@@ -26,7 +26,7 @@ namespace partitioner {
 namespace metis {
 
 template <typename GraphT>
-cudaError_t Partition(
+cudaError_t Partition_CSR_CSC(
     GraphT     &org_graph,
     GraphT*    &sub_graphs,
     util::Parameters &parameters,
@@ -125,6 +125,73 @@ cudaError_t Partition(
 #endif
 
     return retval;
+}
+
+template <typename GraphT, gunrock::graph::GraphFlag GraphN>
+struct GraphT_Switch
+{
+    static cudaError_t Partition(
+        GraphT     &org_graph,
+        GraphT*    &sub_graphs,
+        util::Parameters &parameters,
+        int         num_subgraphs = 1,
+        PartitionFlag flag = PARTITION_NONE,
+        util::Location target = util::HOST,
+        float      *weitage = NULL)
+    {
+        return util::GRError(cudaErrorUnknown,
+            "Metis dows not work with given graph representation",
+            __FILE__, __LINE__);
+    }
+};
+
+template <typename GraphT>
+struct GraphT_Switch<GraphT, gunrock::graph::HAS_CSR>
+{
+    static cudaError_t Partition(
+        GraphT     &org_graph,
+        GraphT*    &sub_graphs,
+        util::Parameters &parameters,
+        int         num_subgraphs = 1,
+        PartitionFlag flag = PARTITION_NONE,
+        util::Location target = util::HOST,
+        float      *weitage = NULL)
+    {
+        return Partition_CSR_CSC(org_graph, sub_graphs, 
+            parameters, num_subgraphs, flag, target, weitage);
+    }
+};
+
+template <typename GraphT>
+struct GraphT_Switch<GraphT, gunrock::graph::HAS_CSC>
+{
+    static cudaError_t Partition(
+        GraphT     &org_graph,
+        GraphT*    &sub_graphs,
+        util::Parameters &parameters,
+        int         num_subgraphs = 1,
+        PartitionFlag flag = PARTITION_NONE,
+        util::Location target = util::HOST,
+        float      *weitage = NULL)
+    {
+        return Partition_CSR_CSC(org_graph, sub_graphs, 
+            parameters, num_subgraphs, flag, target, weitage);
+    }
+};
+
+template <typename GraphT>
+cudaError_t Partition(
+    GraphT     &org_graph,
+    GraphT*    &sub_graphs,
+    util::Parameters &parameters,
+    int         num_subgraphs = 1,
+    PartitionFlag flag = PARTITION_NONE,
+    util::Location target = util::HOST,
+    float      *weitage = NULL)
+{
+    return GraphT_Switch<GraphT, gunrock::graph::GraphType_Num<GraphT::FLAG>::VAL>
+        ::Partition(org_graph, sub_graphs,
+            parameters, num_subgraphs, flag, target, weitage);
 }
 
 } //namespace metis

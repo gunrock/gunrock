@@ -146,6 +146,7 @@ struct PRIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
+            //printf("%d -> %d\n", src, dest);
             ValueT add_value = rank_curr[src];
             if (isfinite(add_value))
             {

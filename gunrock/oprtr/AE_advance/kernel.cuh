@@ -160,15 +160,13 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
         if (thread_output_count != 0)
         {
             output_pos += smem_storage.block_offset;
-            for (SizeT i=0; i<thread_output_count; i++)
-            {
-                if (keys_out != NULL)
+            if (keys_out != NULL)
+                for (SizeT i=0; i<thread_output_count; i++)
                 {
                     util::io::ModifiedStore<QUEUE_WRITE_MODIFIER>::St(
                         thread_keys_out[i],
                         keys_out + output_pos + i);
                 }
-            }
             thread_output_count = 0;
         }
     }
@@ -222,17 +220,18 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
 
             if (__syncthreads_or(thread_output_count == KernelPolicyT::OUTPUTS_PER_THREAD))
             {
-                Write_Global_Output(smem_storage,
-                    thread_outputs, thread_output_count, keys_out, out_pos);
+                //Write_Global_Output(smem_storage,
+                //    thread_outputs, thread_output_count, keys_out, out_pos);
             }
             edge_id += STRIDE;
         }
+        //printf("(%3d, %3d)\n", blockIdx.x, threadIdx.x);
 
         if (__syncthreads_or(thread_output_count != 0))
         {
             SizeT   out_pos = util::PreDefinedValues<SizeT  >::InvalidValue;
-            Write_Global_Output(smem_storage,
-                thread_outputs, thread_output_count, keys_out, out_pos);
+            //Write_Global_Output(smem_storage,
+            //    thread_outputs, thread_output_count, keys_out, out_pos);
         }
     }
 };
