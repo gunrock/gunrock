@@ -106,6 +106,12 @@ struct NullArray
         return cudaSuccess;
     }
 
+    __host__ __device__ __forceinline__
+    Location GetAllocated()
+    {
+        return LOCATION_NONE;
+    }
+
     cudaError_t Release(Location target = LOCATION_ALL)
     {
         return cudaSuccess;

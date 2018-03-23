@@ -106,7 +106,7 @@ struct PRIterationLoop : public IterationLoopBase
                 rank_curr[dest] = new_value;
                 //if (dest == 42029)
                 //    printf("rank[%d] = %f -> %f = (%f + %f * %f) / %d\n",
-                //        dest, old_value, new_value, reset_value, 
+                //        dest, old_value, new_value, reset_value,
                 //        delta, rank_next[dest], degrees[dest]);
                 return (fabs(new_value - old_value) > (threshold * old_value));
             };
@@ -675,7 +675,7 @@ public:
                 ids[pos] = pos;
             }, nodes, util::DEVICE, this -> enactor_slices[0].stream));
 
-        util::PrintMsg("#nodes = " + std::to_string(nodes));
+        //util::PrintMsg("#nodes = " + std::to_string(nodes));
         size_t cub_required_size = 0;
         void* temp_storage = NULL;
         /*cub::DoubleBuffer<ValueT > key_buffer(
@@ -724,7 +724,7 @@ public:
             data_slice.node_ids   .GetPointer(util::DEVICE),
             data_slice.rank_next  .GetPointer(util::DEVICE),
             data_slice.temp_vertex.GetPointer(util::DEVICE),
-            temp_storage, cub_required_size, 
+            temp_storage, cub_required_size,
             //data_slice.cub_sort_storage.GetPointer(util::DEVICE),
             //data_slice.cub_sort_storage.GetSize(),
             this -> enactor_slices[0].stream);

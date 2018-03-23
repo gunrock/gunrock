@@ -368,7 +368,27 @@ static cudaError_t Load(
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(Build(parameters, graph, graph_prefix));
-    GUARD_CU(graph.FromCoo(graph, util::HOST, 0, parameters.Get<bool>("quiet"), true));
+
+    bool remove_self_loops
+        = parameters.Get<bool>(graph_prefix + "remove-self-loops");
+    bool remove_duplicate_edges
+        = parameters.Get<bool>(graph_prefix + "remove-duplicate-edges");
+    bool quiet
+        = parameters.Get<bool>("quiet");
+    if (remove_self_loops && remove_duplicate_edges)
+    {
+        GUARD_CU(graph.RemoveSelfLoops_DuplicateEdges(
+            gunrock::graph::BY_ROW_ASCENDING, util::HOST, 0, quiet));
+    } else if (remove_self_loops)
+    {
+        GUARD_CU(graph.RemoveSelfLoops(
+            gunrock::graph::BY_ROW_ASCENDING, util::HOST, 0, quiet));
+    } else if (remove_duplicate_edges)
+    {
+        GUARD_CU(graph.RemoveDuplicateEdges(
+            gunrock::graph::BY_ROW_ASCENDING, util::HOST, 0, quiet));
+    }
+    GUARD_CU(graph.FromCoo(graph, util::HOST, 0, quiet, true));
     return retval;
 }
 };
@@ -389,7 +409,28 @@ static cudaError_t Load(
 
     CooT coo;
     GUARD_CU(Build(parameters, coo, graph_prefix));
-    GUARD_CU(graph.FromCoo(coo, util::HOST, 0, parameters.Get<bool>("quiet"), false));
+
+    bool remove_self_loops
+        = parameters.Get<bool>(graph_prefix + "remove-self-loops");
+    bool remove_duplicate_edges
+        = parameters.Get<bool>(graph_prefix + "remove-duplicate-edges");
+    bool quiet
+        = parameters.Get<bool>("quiet");
+    if (remove_self_loops && remove_duplicate_edges)
+    {
+        GUARD_CU(coo.RemoveSelfLoops_DuplicateEdges(
+            gunrock::graph::BY_ROW_ASCENDING, util::HOST, 0, quiet));
+    } else if (remove_self_loops)
+    {
+        GUARD_CU(coo.RemoveSelfLoops(
+            gunrock::graph::BY_ROW_ASCENDING, util::HOST, 0, quiet));
+    } else if (remove_duplicate_edges)
+    {
+        GUARD_CU(coo.RemoveDuplicateEdges(
+            gunrock::graph::BY_ROW_ASCENDING, util::HOST, 0, quiet));
+    }
+
+    GUARD_CU(graph.FromCoo(coo, util::HOST, 0, quiet, false));
     GUARD_CU(coo.Release());
     return retval;
 }
