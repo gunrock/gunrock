@@ -93,6 +93,7 @@ struct Coo :
     /**
      * @brief COO destructor
      */
+    __host__ __device__
     ~Coo()
     {
         //Release();
@@ -125,6 +126,20 @@ struct Coo :
         GUARD_CU(edge_pairs    .Allocate(edges      , target));
         GUARD_CU(node_values   .Allocate(nodes      , target));
         GUARD_CU(edge_values   .Allocate(edges      , target));
+        return retval;
+    }
+
+    cudaError_t Move(
+        util::Location source,
+        util::Location target,
+        cudaStream_t   stream = 0)
+    {
+        cudaError_t retval = cudaSuccess;
+        SizeT invalid_size = util::PreDefinedValues<SizeT>::InvalidValue;
+        GUARD_CU(BaseGraph:: Move(source, target, stream));
+        GUARD_CU(edge_pairs .Move(source, target, invalid_size, 0, stream));
+        GUARD_CU(node_values.Move(source, target, invalid_size, 0, stream));
+        GUARD_CU(edge_values.Move(source, target, invalid_size, 0, stream));
         return retval;
     }
 
@@ -205,13 +220,14 @@ struct Coo :
 
         GUARD_CU(Allocate(source.CsrT::nodes, source.CsrT::edges, target));
 
-        GUARD_CU(source.row_offsets.ForAll(
-            edge_pairs, source.column_indices,
+        GUARD_CU(source.CsrT::row_offsets.ForAll(
+            edge_pairs, source.CsrT::column_indices,
             [] __host__ __device__ (
                 typename CsrT::SizeT *row_offsets,
                 EdgePairT *edge_pairs,
                 typename CsrT::VertexT *column_indices,
-                const VertexT &row){
+                const VertexT &row)
+                {
                     SizeT e_end = row_offsets[row+1];
                     for (SizeT e = row_offsets[row]; e < e_end; e++)
                     {
@@ -283,9 +299,10 @@ struct Coo :
         return retval;
     }
 
-    cudaError_t Order(EdgeOrder new_order = BY_ROW_ASCENDING,
-        util::Location target = util::LOCATION_DEFAULT,
-        cudaStream_t stream = 0)
+    cudaError_t Order(
+        EdgeOrder      new_order = BY_ROW_ASCENDING,
+        util::Location target    = util::LOCATION_DEFAULT,
+        cudaStream_t   stream    = 0)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -393,6 +410,246 @@ struct Coo :
         return retval;
     }
 
+    template <typename EdgeCondT>
+    cudaError_t RemoveEdges(
+        EdgeCondT      edge_cond,
+        EdgeOrder      new_order = BY_ROW_ASCENDING,
+        util::Location target    = util::LOCATION_DEFAULT,
+        cudaStream_t   stream    = 0)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        if (edge_order == UNORDERED)
+        {
+            GUARD_CU(Order(new_order, target, stream));
+        }
+
+        SizeT *thread_edges = NULL;
+        SizeT edge_counter = 0;
+        util::Array1D<SizeT, EdgePairT, ARRAY_FLAG,
+            cudaHostRegisterFlag> old_edge_pairs;
+        typename util::If<(FLAG & HAS_EDGE_VALUES) != 0,
+            Array_ValueT, Array_NValueT>::Type old_edge_values;
+        #pragma omp parallel
+        {
+            int num_threads = omp_get_num_threads();
+            int thread_num  = omp_get_thread_num();
+            SizeT edge_start = this -> edges / num_threads * thread_num;
+            SizeT edge_end   = this -> edges / num_threads * (thread_num + 1);
+            if (thread_num == 0)
+                edge_start = 0;
+            if (thread_num == thread_num -1)
+                edge_end = this -> edges;
+
+            #pragma omp single
+            {
+                thread_edges = new SizeT[num_threads + 1];
+            }
+
+            SizeT t_edges = 0;
+            for (SizeT e = edge_start; e < edge_end; e++)
+            {
+                if (!edge_cond(edge_pairs + 0, e))
+                    continue;
+                t_edges ++;
+            }
+            thread_edges[thread_num] = t_edges;
+
+            #pragma omp barrier
+            #pragma omp single
+            {
+                edge_counter = 0;
+                for (int i = 0; i < num_threads; i++)
+                {
+                    SizeT old_val = edge_counter;
+                    edge_counter += thread_edges[i];
+                    thread_edges[i] = old_val;
+                }
+                thread_edges[num_threads] = edge_counter;
+                //util::PrintMsg("Edges : " + std::to_string(this -> edges)
+                //    + " -> " + std::to_string(edge_counter));
+
+                if (edge_counter != this -> edges)
+                {
+                    retval = old_edge_pairs.Allocate(this -> edges, target);
+                    if (retval == cudaSuccess)
+                        retval = old_edge_pairs.ForEach(edge_pairs,
+                            []__host__ __device__(
+                                EdgePairT &old_pair, const EdgePairT &pair)
+                        {
+                            old_pair.x = pair.x;
+                            old_pair.y = pair.y;
+                        }, this -> edges, target, stream);
+                    auto org_allocated = edge_pairs.GetAllocated();
+                    if (retval == cudaSuccess)
+                        retval = edge_pairs.Release();
+                    if (retval == cudaSuccess)
+                        retval = edge_pairs.Allocate(edge_counter, org_allocated);
+
+                    if (FLAG & HAS_EDGE_VALUES)
+                    {
+                        if (retval == cudaSuccess)
+                            retval = old_edge_values.Allocate(this -> edges, target);
+                        if (retval == cudaSuccess)
+                            retval = old_edge_values.ForEach(edge_values,
+                                []__host__ __device__(ValueT &old_val, const ValueT &val)
+                            {
+                                old_val = val;
+                            }, this -> edges, target, stream);
+                        org_allocated = edge_values.GetAllocated();
+                        if (retval == cudaSuccess)
+                            retval = edge_values.Release();
+                        if (retval == cudaSuccess)
+                            retval = edge_values.Allocate(edge_counter, org_allocated);
+                    }
+                }
+
+                //util::PrintMsg("Allocated");
+            }
+
+            if (edge_counter != this -> edges && retval == cudaSuccess)
+            {
+                t_edges = 0;
+                SizeT t_offset = thread_edges[thread_num];
+                //util::PrintMsg("Thread " + std::to_string(thread_num)
+                //    + ", offset = " + std::to_string(t_offset));
+                for (SizeT e = edge_start; e < edge_end; e++)
+                {
+                    //if ((e%100) == 0)
+                    //util::PrintMsg(std::to_string(e));
+                    if (!edge_cond(old_edge_pairs + 0, e))
+                        continue;
+                    auto &old_pair = old_edge_pairs[e];
+                    auto &pair = edge_pairs[t_offset + t_edges];
+                    pair.x = old_pair.x;
+                    pair.y = old_pair.y;
+                    if (FLAG & HAS_EDGE_VALUES)
+                        edge_values[t_offset + t_edges] = old_edge_values[e];
+                    t_edges ++;
+                }
+            }
+        }
+        if (retval)
+            return retval;
+
+        if (edge_counter != this -> edges)
+        {
+            GUARD_CU(old_edge_pairs .Release());
+            GUARD_CU(old_edge_values.Release());
+            this -> edges = edge_counter;
+        }
+        delete[] thread_edges; thread_edges = NULL;
+
+        return retval;
+    }
+
+    cudaError_t RemoveSelfLoops(
+        EdgeOrder      new_order = BY_ROW_ASCENDING,
+        util::Location target    = util::LOCATION_DEFAULT,
+        cudaStream_t   stream    = 0,
+        bool           quiet     = false)
+    {
+        cudaError_t retval = cudaSuccess;
+        SizeT old_num_edges = this -> edges;
+        GUARD_CU(RemoveEdges(
+            []__host__ __device__(EdgePairT *pairs, const SizeT &edge_id)
+            {
+                auto &edge_pair = pairs[edge_id];
+                return edge_pair.x != edge_pair.y;
+            }, new_order, target, stream));
+
+        if (old_num_edges != this -> edges)
+            util::PrintMsg("Removed " + std::to_string(old_num_edges - this -> edges)
+                + " self circles.", !quiet);
+        return retval;
+    }
+
+    cudaError_t RemoveDuplicateEdges(
+        EdgeOrder      new_order = BY_ROW_ASCENDING,
+        util::Location target    = util::LOCATION_DEFAULT,
+        cudaStream_t   stream    = 0,
+        bool           quiet     = false)
+    {
+        cudaError_t retval = cudaSuccess;
+        SizeT old_num_edges = this -> edges;
+        GUARD_CU(RemoveEdges(
+            []__host__ __device__(EdgePairT *pairs, const SizeT &edge_id)
+            {
+                if (edge_id == 0)
+                    return true;
+                auto &edge_pair = pairs[edge_id];
+                auto &p_edge_pair = pairs[edge_id - 1];
+                if (p_edge_pair.x != edge_pair.x)
+                    return true;
+                if (p_edge_pair.y != edge_pair.y)
+                    return true;
+                return false;
+            }, new_order, target, stream));
+
+        if (old_num_edges != this -> edges)
+            util::PrintMsg("Removed " + std::to_string(old_num_edges - this -> edges)
+                + " duplicate edges.", !quiet);
+        return retval;
+    }
+
+    cudaError_t RemoveSelfLoops_DuplicateEdges(
+        EdgeOrder      new_order = BY_ROW_ASCENDING,
+        util::Location target    = util::LOCATION_DEFAULT,
+        cudaStream_t   stream    = 0,
+        bool           quiet     = false)
+    {
+        cudaError_t retval = cudaSuccess;
+        SizeT old_num_edges = this -> edges;
+        GUARD_CU(RemoveEdges(
+            []__host__ __device__(EdgePairT *pairs, const SizeT &edge_id)
+            {
+                auto &edge_pair = pairs[edge_id];
+                if (edge_pair.x == edge_pair.y)
+                    return false;
+                if (edge_id == 0)
+                    return true;
+                auto &p_edge_pair = pairs[edge_id - 1];
+                if (p_edge_pair.x != edge_pair.x)
+                    return true;
+                if (p_edge_pair.y != edge_pair.y)
+                    return true;
+                return false;
+            }, new_order, target, stream));
+
+        if (old_num_edges != this -> edges)
+            util::PrintMsg("Removed " + std::to_string(old_num_edges - this -> edges)
+                + " duplicate edges and self circles.", !quiet);
+        return retval;
+    }
+
+    __device__ __host__ __forceinline__
+    SizeT GetNeighborListLength(const VertexT &v) const
+    {
+        // Not implemented
+        return util::PreDefinedValues<SizeT>::InvalidValue;
+    }
+
+    __device__ __host__ __forceinline__
+    VertexT GetEdgeDest(const SizeT &e) const
+    {
+        auto &pair = edge_pairs[e];
+        return e.y;
+    }
+
+    __device__ __host__ __forceinline__
+    VertexT GetEdgeSrc(const SizeT &e) const
+    {
+        auto &pair = edge_pairs[e];
+        return e.x;
+    }
+
+    __device__ __host__ __forceinline__
+    void GetEdgeSrcDest(const SizeT &e, VertexT &src, VertexT &dest) const
+    {
+        auto &pair = edge_pairs[e];
+        src = pair.x;
+        dest = pair.y;
+    }
 }; // Coo
 
 template<
@@ -438,9 +695,17 @@ struct Coo<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
         return cudaSuccess;
     }
 
-    SizeT GetNeighborListLength(const VertexT &v)
+    SizeT GetNeighborListLength(const VertexT &v) const
     {
         return 0;
+    }
+
+    cudaError_t Move(
+        util::Location source,
+        util::Location target,
+        cudaStream_t   stream = 0)
+    {
+        return cudaSuccess;
     }
 };
 

@@ -224,7 +224,7 @@ struct Frontier
     {
         if (index == util::PreDefinedValues<SizeT>::InvalidValue)
             index = queue_index;
-        return vertex_queues + queue_map[index % num_queues];
+        return (num_queues == 0) ? NULL : vertex_queues + queue_map[index % num_queues];
     }
 
     VertexQT *Next_V_Q(SizeT index = util::PreDefinedValues<SizeT>::InvalidValue)
@@ -239,7 +239,7 @@ struct Frontier
     {
         if (index == util::PreDefinedValues<SizeT>::InvalidValue)
             index = queue_index;
-        return edge_queues + queue_map[index % num_queues];
+        return (num_queues == 0) ? NULL : edge_queues + queue_map[index % num_queues];
     }
 
     EdgeQT *Next_E_Q(SizeT index  = util::PreDefinedValues<SizeT>::InvalidValue)

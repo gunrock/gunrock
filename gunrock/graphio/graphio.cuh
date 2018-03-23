@@ -149,6 +149,20 @@ cudaError_t UseParameters(
             __FILE__, __LINE__));
     }
 
+    GUARD_CU(parameters.Use<bool>(
+        graph_prefix + "remove-duplicate-edges",
+        util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        true,
+        "Whether to remove duplicate edges",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<bool>(
+        graph_prefix + "remove-self-loops",
+        util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        true,
+        "Whether to remove self loops",
+        __FILE__, __LINE__));
+
     GUARD_CU(market     ::UseParameters(parameters, graph_prefix));
     GUARD_CU(rgg        ::UseParameters(parameters, graph_prefix));
     GUARD_CU(small_world::UseParameters(parameters, graph_prefix));

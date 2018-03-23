@@ -55,34 +55,35 @@ struct Block_Scan
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 4
-            lane_recv = _shfl_xor(lane_local, 2);
+            lane_recv = _shfl_xor(lane_local, 2, WARPSIZE, 0x55555555u);
         }
 
         if ((lane_id & 3) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 3
-            lane_recv = _shfl_xor(lane_local, 4);
+            lane_recv = _shfl_xor(lane_local, 4, WARPSIZE, 0x11111111u);
         }
 
         if ((lane_id & 7) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 2
-            lane_recv = _shfl_xor(lane_local, 8);
+            lane_recv = _shfl_xor(lane_local, 8, WARPSIZE, 0x01010101u);
         }
 
         if ((lane_id & 0xF) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 1
-            lane_recv = _shfl_xor(lane_local, 0x10);
+            lane_recv = _shfl_xor(lane_local, 0x10, WARPSIZE, 0x00010001u);
         }
 
         if (lane_id == 0)
         {
             lane_local += lane_recv;
         }
+        _all(1);
         sum = _shfl(lane_local, 0);
         if (lane_id == 0)
         {
@@ -93,7 +94,7 @@ struct Block_Scan
         //DownSweep<int, LOG_WARP_THREADS-2>::Sweep(lane_local, lane_recv, lane_id);
         //DownSweep LOG_WIDTH = 3
         lane_recv = _shfl_up(lane_local, 8);
-        if ((lane_id & 15) == 8)
+        if ((lane_id & 0xF) == 8)
             lane_local += lane_recv;
 
         //DownSweep LOG_WIDTH = 2
@@ -127,28 +128,28 @@ struct Block_Scan
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 4
-            lane_recv = _shfl_xor(lane_local, 2);
+            lane_recv = _shfl_xor(lane_local, 2, WARPSIZE, 0x55555555u);
         }
 
         if ((lane_id & 3) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 3
-            lane_recv = _shfl_xor(lane_local, 4);
+            lane_recv = _shfl_xor(lane_local, 4, WARPSIZE, 0x11111111u);
         }
 
         if ((lane_id & 7) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 2
-            lane_recv = _shfl_xor(lane_local, 8);
+            lane_recv = _shfl_xor(lane_local, 8, WARPSIZE, 0x01010101u);
         }
 
         if ((lane_id & 0xF) == 0)
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 1
-            lane_recv = _shfl_xor(lane_local, 0x10);
+            lane_recv = _shfl_xor(lane_local, 0x10, WARPSIZE, 0x00010001u);
         }
 
         if (lane_id == 0)
@@ -158,6 +159,7 @@ struct Block_Scan
             lane_recv =0;
         }
         lane_local = lane_recv;
+        _all(1);
 
         //DownSweep<int, LOG_WARP_THREADS-2>::Sweep(lane_local, lane_recv, lane_id);
         //DownSweep LOG_WIDTH = 3

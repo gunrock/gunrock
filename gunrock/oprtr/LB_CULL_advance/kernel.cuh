@@ -1103,7 +1103,7 @@ template <
     typename  ParametersT,
     typename  AdvanceOpT,
     typename  FilterOpT>
-cudaError_t Launch(
+cudaError_t Launch_CSR_CSC(
     const GraphT          &graph,
     const FrontierInT    * frontier_in,
           FrontierOutT   * frontier_out,
@@ -1236,7 +1236,7 @@ template <
     typename  ParametersT,
     typename  AdvanceOpT,
     typename  FilterOpT>
-cudaError_t Launch_Light(
+cudaError_t Launch_Light_CSR_CSC(
     const GraphT          &graph,
     const FrontierInT    * frontier_in,
           FrontierOutT   * frontier_out,
@@ -1295,6 +1295,138 @@ cudaError_t Launch_Light(
     {
         parameters.frontier -> queue_index ++;
     }
+    return retval;
+}
+
+template <typename GraphT, bool VALID>
+struct GraphT_Switch
+{
+    template <OprtrFlag FLAG, typename  FrontierInT, typename  FrontierOutT,
+        typename  ParametersT, typename  AdvanceOpT, typename  FilterOpT>
+    static cudaError_t Launch_Csr_Csc(
+        const GraphT          &graph,
+        const FrontierInT    * frontier_in,
+              FrontierOutT   * frontier_out,
+              ParametersT     &parameters,
+              AdvanceOpT       advance_op,
+              FilterOpT        filter_op)
+    {
+        return util::GRError(cudaErrorInvalidDeviceFunction,
+            "LB_CULL is not implemented for given graph representation.");
+    }
+
+    template <OprtrFlag FLAG, typename  FrontierInT, typename  FrontierOutT,
+        typename  ParametersT, typename  AdvanceOpT, typename  FilterOpT>
+    static cudaError_t Launch_Light_Csr_Csc(
+        const GraphT          &graph,
+        const FrontierInT    * frontier_in,
+              FrontierOutT   * frontier_out,
+              ParametersT     &parameters,
+              AdvanceOpT       advance_op,
+              FilterOpT        filter_op)
+    {
+        return util::GRError(cudaErrorInvalidDeviceFunction,
+            "LB_CULL_Light is not implemented for given graph representation.");
+    }
+};
+
+template <typename GraphT>
+struct GraphT_Switch<GraphT, true>
+{
+    template <OprtrFlag FLAG, typename  FrontierInT, typename  FrontierOutT,
+        typename  ParametersT, typename  AdvanceOpT, typename  FilterOpT>
+    static cudaError_t Launch_Csr_Csc(
+        const GraphT          &graph,
+        const FrontierInT    * frontier_in,
+              FrontierOutT   * frontier_out,
+              ParametersT     &parameters,
+              AdvanceOpT       advance_op,
+              FilterOpT        filter_op)
+    {
+        return Launch_CSR_CSC<FLAG>(graph, frontier_in, frontier_out,
+            parameters, advance_op, filter_op);
+    }
+
+    template <OprtrFlag FLAG, typename  FrontierInT, typename  FrontierOutT,
+        typename  ParametersT, typename  AdvanceOpT, typename  FilterOpT>
+    static cudaError_t Launch_Light_Csr_Csc(
+        const GraphT          &graph,
+        const FrontierInT    * frontier_in,
+              FrontierOutT   * frontier_out,
+              ParametersT     &parameters,
+              AdvanceOpT       advance_op,
+              FilterOpT        filter_op)
+    {
+        return Launch_Light_CSR_CSC<FLAG>(graph, frontier_in, frontier_out,
+            parameters, advance_op, filter_op);
+    }
+};
+
+template <
+    OprtrFlag FLAG,
+    typename  GraphT,
+    typename  FrontierInT,
+    typename  FrontierOutT,
+    typename  ParametersT,
+    typename  AdvanceOpT,
+    typename  FilterOpT>
+cudaError_t Launch(
+    const GraphT          &graph,
+    const FrontierInT    * frontier_in,
+          FrontierOutT   * frontier_out,
+          ParametersT     &parameters,
+          AdvanceOpT       advance_op,
+          FilterOpT        filter_op)
+{
+    cudaError_t retval = cudaSuccess;
+
+    if (GraphT::FLAG & gunrock::graph::HAS_CSR)
+        retval = GraphT_Switch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSR) != 0>
+            ::template Launch_Csr_Csc<FLAG> (graph, frontier_in, frontier_out,
+                parameters, advance_op, filter_op);
+
+    else if (GraphT::FLAG & gunrock::graph::HAS_CSC)
+        retval = GraphT_Switch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSC) != 0>
+            ::template Launch_Csr_Csc<FLAG> (graph, frontier_in, frontier_out,
+                parameters, advance_op, filter_op);
+
+    else
+        retval = util::GRError(cudaErrorInvalidDeviceFunction,
+        "LB_CULL is not implemented for given graph representation.");
+    return retval;
+}
+
+template <
+    OprtrFlag FLAG,
+    typename  GraphT,
+    typename  FrontierInT,
+    typename  FrontierOutT,
+    typename  ParametersT,
+    typename  AdvanceOpT,
+    typename  FilterOpT>
+cudaError_t Launch_Light(
+    const GraphT          &graph,
+    const FrontierInT    * frontier_in,
+          FrontierOutT   * frontier_out,
+          ParametersT     &parameters,
+          AdvanceOpT       advance_op,
+          FilterOpT        filter_op)
+{
+    cudaError_t retval = cudaSuccess;
+
+    if (GraphT::FLAG & gunrock::graph::HAS_CSR)
+        retval = GraphT_Switch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSR) != 0>
+            ::template Launch_Light_Csr_Csc<FLAG> (graph, frontier_in,
+                frontier_out, parameters, advance_op, filter_op);
+
+    else if (GraphT::FLAG & gunrock::graph::HAS_CSC)
+        retval = GraphT_Switch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSC) != 0>
+            ::template Launch_Light_Csr_Csc<FLAG> (graph, frontier_in,
+                frontier_out, parameters, advance_op, filter_op);
+
+    else
+        retval = util::GRError(cudaErrorInvalidDeviceFunction,
+        "LB_CULL is not implemented for given graph representation.");
     return retval;
 }
 

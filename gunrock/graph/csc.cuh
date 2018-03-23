@@ -92,6 +92,7 @@ struct Csc :
     /**
      * @brief CSC destructor
      */
+    __host__ __device__
     ~Csc()
     {
         //Release();
@@ -126,6 +127,21 @@ struct Csc :
         GUARD_CU(row_indices   .Allocate(edges      , target));
         GUARD_CU(node_values   .Allocate(nodes      , target));
         GUARD_CU(edge_values   .Allocate(edges      , target));
+        return retval;
+    }
+
+    cudaError_t Move(
+        util::Location source,
+        util::Location target,
+        cudaStream_t   stream = 0)
+    {
+        cudaError_t retval = cudaSuccess;
+        SizeT invalid_size = util::PreDefinedValues<SizeT>::InvalidValue;
+        GUARD_CU(BaseGraph    ::Move(source, target, stream));
+        GUARD_CU(column_offsets.Move(source, target, invalid_size, 0, stream));
+        GUARD_CU(row_indices   .Move(source, target, invalid_size, 0, stream));
+        GUARD_CU(node_values   .Move(source, target, invalid_size, 0, stream));
+        GUARD_CU(edge_values   .Move(source, target, invalid_size, 0, stream));
         return retval;
     }
 
@@ -332,7 +348,7 @@ struct Csc :
     }
 
     __device__ __host__ __forceinline__
-    SizeT GetNeighborListLength(const VertexT &v)
+    SizeT GetNeighborListLength(const VertexT &v) const
     {
         if (v < 0 || v >= this -> nodes)
             return 0;
@@ -346,10 +362,23 @@ struct Csc :
     }
 
     __device__ __host__ __forceinline__
+    VertexT GetEdgeSrc(const SizeT &e) const
+    {
+        return Binary_Search(column_offsets + 0, e, 0, this -> nodes);
+    }
+
+    __device__ __host__ __forceinline__
     VertexT GetEdgeDest(const SizeT &e)
     {
         //return _ldg(row_indices + e);
         return row_indices[e];
+    }
+
+    __device__ __host__ __forceinline__
+    void GetEdgeSrcDest(const SizeT &e, VertexT &src, VertexT &dest) const
+    {
+        src = Binary_Search(column_offsets + 0, e, 0, this -> nodes);
+        dest = row_indices[e];
     }
 }; // CSC
 
@@ -396,9 +425,17 @@ struct Csc<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
         return cudaSuccess;
     }
 
-    SizeT GetNeighborListLength(const VertexT &v)
+    SizeT GetNeighborListLength(const VertexT &v) const
     {
         return 0;
+    }
+
+    cudaError_t Move(
+        util::Location source,
+        util::Location target,
+        cudaStream_t   stream = 0)
+    {
+        return cudaSuccess;
     }
 };
 

@@ -69,6 +69,7 @@ struct DataSliceBase
     typedef _GraphT GraphT;
     static const ProblemFlag FLAG = _FLAG;
 
+    int           num_gpus ; // number of GPUs
     int           gpu_idx  ; // index of GPU the data slice is allocated
     cudaStream_t  stream   ; // cuda stream that data movement works on
     GraphT       *sub_graph; // pointer to the sub graph
@@ -78,6 +79,7 @@ struct DataSliceBase
      * @brief Default constructor
      */
     DataSliceBase() :
+        num_gpus (1),
         gpu_idx  (0),
         stream   (0),
         sub_graph(NULL),
@@ -95,12 +97,14 @@ struct DataSliceBase
      */
     cudaError_t Init(
         GraphT         &sub_graph,
+        int             num_gpus = 1,
         int             gpu_idx = 0,
         util::Location  target  = util::DEVICE,
         ProblemFlag     flag    = Problem_None)
     {
         cudaError_t retval = cudaSuccess;
 
+        this -> num_gpus  = num_gpus;
         this -> gpu_idx   =  gpu_idx;
         this -> sub_graph = &sub_graph;
         this -> flag      =  flag;
@@ -175,13 +179,14 @@ struct ProblemBase
         gpu_idx = parameters.Get<std::vector<int>>("device");
         num_gpus = gpu_idx.size();
         org_mem_size = new size_t[num_gpus];
+        size_t *dummy_size = new size_t[num_gpus];
         for (int gpu = 0; gpu < num_gpus; gpu++)
         {
-            size_t dummy;
             util::GRError(util::SetDevice(gpu_idx[gpu]));
-            util::GRError(cudaMemGetInfo(&(org_mem_size[gpu]), &dummy),
+            util::GRError(cudaMemGetInfo(org_mem_size + gpu, dummy_size + gpu),
                 "cudaMemGetInfo failed", __FILE__, __LINE__);
         }
+        delete[] dummy_size; dummy_size = NULL;
     } // end ProblemBase()
 
     /**

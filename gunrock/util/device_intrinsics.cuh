@@ -21,7 +21,7 @@
 #include <gunrock/util/cuda_properties.cuh>
 //#include <gunrock/util/types.cuh>
 
-#define MEMBERMASK 0xffffffff
+#define MEMBERMASK 0xffffffffu
 #define WARPSIZE 32
 
 // CUDA 9 warp shuffles (device intrinsics)

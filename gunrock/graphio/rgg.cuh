@@ -399,7 +399,7 @@ static cudaError_t Load(
 template <typename GraphT>
 struct CsrSwitch<GraphT, false>
 {
-cudaError_t Load(
+static cudaError_t Load(
     util::Parameters &parameters,
     GraphT &graph,
     std::string graph_prefix = "")
@@ -421,11 +421,11 @@ cudaError_t Load(
 template <typename GraphT>
 cudaError_t Load(
     util::Parameters &parameters,
-    GraphT &graph,
+    GraphT &graph_,
     std::string graph_prefix = "")
 {
-    return CsrSwitch<GraphT, (GraphT::FLAG & graph::HAS_CSR) != 0>
-        ::Load(parameters, graph, graph_prefix);
+    return CsrSwitch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSR) != 0>
+        ::Load(parameters, graph_, graph_prefix);
 }
 
 } // namespace rgg

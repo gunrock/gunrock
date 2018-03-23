@@ -151,6 +151,7 @@ struct PreDefinedValues<float>
 {
     constexpr static const float MinValue = FLT_MIN;
     constexpr static const float MaxValue = FLT_MAX;
+    constexpr static const float InvalidValue = NAN;
     static const bool Signed   = true;
 };
 
@@ -159,6 +160,7 @@ struct PreDefinedValues<double>
 {
     constexpr static const double MinValue = DBL_MIN;
     constexpr static const double MaxValue = DBL_MAX;
+    constexpr static const double InvalidValue = NAN;
     static const bool Signed   = true;
 };
 
@@ -167,14 +169,36 @@ struct PreDefinedValues<long double>
 {
     constexpr static const long double MinValue = LDBL_MIN;
     constexpr static const long double MaxValue = LDBL_MAX;
+    constexpr static const long double InvalidValue = NAN;
     static const bool Signed   = true;
 };
 
 template <typename T>
 __device__ __host__ __forceinline__
-bool isValid(T val)
+bool isValid(const T &val)
 {
     return (val != PreDefinedValues<T>::InvalidValue);
+}
+
+template <>
+__device__ __host__ __forceinline__
+bool isValid(const float &val)
+{
+    return (!isnan(val));
+}
+
+template <>
+__device__ __host__ __forceinline__
+bool isValid(const double &val)
+{
+    return (!isnan(val));
+}
+
+template <>
+__device__ __host__ __forceinline__
+bool isValid(const long double &val)
+{
+    return (!isnan(val));
 }
 
 template <typename T, bool SIGNED>

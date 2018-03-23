@@ -45,6 +45,7 @@ struct main_struct
         typedef typename app::TestGraph<VertexT, SizeT, ValueT,
             graph::HAS_EDGE_VALUES | graph::HAS_CSR>
             GraphT;
+        typedef typename GraphT::CsrT CsrT;
 
         cudaError_t retval = cudaSuccess;
         util::CpuTimer cpu_timer;
@@ -57,6 +58,10 @@ struct main_struct
         //    graph.CsrT::edge_values[e] = 1;
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
+        //GUARD_CU(graph.CsrT::edge_values.Print("", 100)); 
+        //util::PrintMsg("sizeof(VertexT) = " + std::to_string(sizeof(VertexT))
+        //    + ", sizeof(SizeT) = " + std::to_string(sizeof(SizeT))
+        //    + ", sizeof(ValueT) = " + std::to_string(sizeof(ValueT)));
 
         GUARD_CU(app::Set_Srcs    (parameters, graph));
         ValueT  **ref_distances = NULL;
@@ -75,7 +80,7 @@ struct main_struct
             ref_distances = new ValueT*[num_srcs];
             for (int i = 0; i < num_srcs; i++)
             {
-                ref_distances[i] = new ValueT[nodes];
+                ref_distances[i] = (ValueT*)malloc(sizeof(ValueT) * nodes);
                 VertexT src = srcs[i];
                 util::PrintMsg("__________________________", !quiet);
                 float elapsed = app::sssp::CPU_Reference(
@@ -99,7 +104,7 @@ struct main_struct
         {
             for (int i = 0; i < num_srcs; i ++)
             {
-                delete[] ref_distances[i]; ref_distances[i] = NULL;
+                free(ref_distances[i]); ref_distances[i] = NULL;
             }
             delete[] ref_distances; ref_distances = NULL;
         }

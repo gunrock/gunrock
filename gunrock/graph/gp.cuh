@@ -107,6 +107,7 @@ struct Gp :
     /**
      * @brief GP destructor
      */
+    __device__ __host__
     ~Gp()
     {
         //Release();

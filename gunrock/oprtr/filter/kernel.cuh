@@ -15,11 +15,11 @@
 
 //#include <gunrock/app/enactor_types.cuh>
 //#include <gunrock/oprtr/filter/kernel_policy.cuh>
-#include <gunrock/oprtr/cull_filter/kernel.cuh>
+#include <gunrock/oprtr/CULL_filter/kernel.cuh>
 //#include <gunrock/oprtr/compacted_cull_filter/kernel.cuh>
 //#include <gunrock/oprtr/simplified_filter/kernel.cuh>
 //#include <gunrock/oprtr/simplified2_filter/kernel.cuh>
-//#include <gunrock/oprtr/bypass_filter/kernel.cuh>
+#include <gunrock/oprtr/BP_filter/kernel.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -35,43 +35,6 @@ struct Dispatch{
         UnSupportedFilterMode();
         return util::GRError(cudaErrorInvalidDeviceFunction,
             "UnSupported Filter Mode", __FILE__, __LINE__);
-    }
-};
-
-template <typename Parameter>
-struct Dispatch<Parameter, CULL>
-{
-    typedef typename Parameter::Problem::SizeT         SizeT;
-    typedef typename Parameter::Problem::VertexId      VertexId;
-    typedef typename Parameter::Problem::Value         Value   ;
-    typedef typename Parameter::KernelPolicy::CULL_FILTER KernelPolicy;
-
-    static cudaError_t Launch(Parameter &parameter)
-    {
-        cudaError_t retval = cudaSuccess;
-        gunrock::oprtr::cull_filter::Kernel<
-            KernelPolicy,
-            typename Parameter::Problem,
-            typename Parameter::Functor>
-            <<<parameter. enactor_stats.filter_grid_size,
-            KernelPolicy::THREADS,
-            (size_t)0,
-            parameter. stream>>> (
-            (VertexId)parameter. label,
-            parameter. frontier_attribute. queue_reset,
-            (VertexId)parameter. frontier_attribute. queue_index,
-            parameter. num_elements,
-            parameter. d_in_key_queue,
-            parameter. d_in_value_queue,
-            parameter. d_out_key_queue,
-            parameter. d_data_slice,
-            parameter. d_visited_mask,
-            parameter. work_progress,
-            parameter. max_in_queue,
-            parameter. max_out_queue,
-            parameter. kernel_stats);
-            //parameter. filtering_flag);
-        return retval;
     }
 };
 
@@ -306,45 +269,6 @@ struct Dispatch<Parameter, SIMPLIFIED>
     }
 };
 
-template <typename Parameter>
-struct Dispatch<Parameter, BY_PASS>
-{
-    typedef typename Parameter::Problem::SizeT         SizeT;
-    typedef typename Parameter::Problem::VertexId      VertexId;
-    typedef typename Parameter::Problem::Value         Value   ;
-    typedef typename Parameter::KernelPolicy::BYPASS_FILTER KernelPolicy;
-
-    static cudaError_t Launch(Parameter &parameter)
-    {
-        cudaError_t retval = cudaSuccess;
-        int num_blocks = parameter.num_elements / KernelPolicy::THREADS / 4 + 1;
-        if (num_blocks > 480) num_blocks = 480;
-        gunrock::oprtr::bypass_filter::Kernel<
-            KernelPolicy,
-            typename Parameter::Problem,
-            typename Parameter::Functor>
-            <<<num_blocks, //parameter. enactor_stats.filter_grid_size,
-            KernelPolicy::THREADS,
-            (size_t)0,
-            parameter. stream>>> (
-            parameter. label,
-            parameter. frontier_attribute. queue_reset,
-            (VertexId)parameter. frontier_attribute. queue_index,
-            parameter. num_elements,
-            parameter. d_in_key_queue,
-            //parameter. d_in_value_queue,
-            parameter. d_out_key_queue,
-            parameter. d_data_slice,
-            //parameter. d_visited_mask,
-            parameter. work_progress,
-            parameter. max_in_queue,
-            parameter. max_out_queue,
-            parameter. kernel_stats);
-            //parameter. filtering_flag);
-        return retval;
-    }
-};
-
 template <typename KernelPolicy, typename Problem, typename Functor>
 cudaError_t LaunchKernel(
     gunrock::app::EnactorStats<typename Problem::SizeT>
@@ -434,6 +358,10 @@ cudaError_t Launch(
     if (parameters.filter_mode == "CULL")
         return CULL::Launch<FLAG>(graph, frontier_in, frontier_out,
             parameters, advance_op, filter_op);
+    if (parameters.filter_mode == "BY_PASS")
+        return BP::Launch<FLAG>(graph, frontier_in, frontier_out,
+            parameters, advance_op, filter_op);
+
     return util::GRError(cudaErrorInvalidValue,
         "FilterMode " + parameters.filter_mode + " undefined.", __FILE__, __LINE__);
 }

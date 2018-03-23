@@ -31,7 +31,7 @@ namespace util {
 /**
  * @brief location flags
  */
-using Location = unsigned int;
+using Location = uint32_t;
 //enum Location : unsigned int
 enum : Location
 {
@@ -62,7 +62,7 @@ std::string Location_to_string(Location target)
 /**
  * @brief flags for arrays
  */
-using ArrayFlag = unsigned int;
+using ArrayFlag = uint32_t;
 //enum ArrayFlag : unsigned int
 enum : ArrayFlag
 {
@@ -106,6 +106,12 @@ struct NullArray
         return cudaSuccess;
     }
 
+    __host__ __device__ __forceinline__
+    Location GetAllocated()
+    {
+        return LOCATION_NONE;
+    }
+
     cudaError_t Release(Location target = LOCATION_ALL)
     {
         return cudaSuccess;
@@ -122,7 +128,7 @@ struct NullArray
     cudaError_t Move(
         Location source,
         Location target,
-        SizeT size  =-1,
+        SizeT size  = util::PreDefinedValues<SizeT>::InvalidValue,
         SizeT offset=0,
         cudaStream_t stream=0)
     {
@@ -1366,6 +1372,59 @@ public:
         fout.close();
         return retval;
     }
+
+    cudaError_t Print(
+        std::string message = "",
+        SizeT       limit   = PreDefinedValues<SizeT>::InvalidValue,
+        Location    target  = LOCATION_DEFAULT,
+        cudaStream_t stream = 0)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        if (message == "")
+            message = std::string(name) + " : ";
+        if (!isValid(limit) || limit > size)
+            limit = size;
+        if (target == LOCATION_DEFAULT)
+            target = setted | allocated;
+
+        ValueT *h_array = GetPointer(HOST);
+        bool temp_allocated = false;
+        if (h_array == NULL && limit != 0)
+        {
+            temp_allocated = true;
+            h_array = new ValueT[limit];
+            if (h_array == NULL)
+                return GRError(cudaErrorMemoryAllocation,
+                    "temp arrary for printing " + std::string(name) + " allocation failed.",
+                    __FILE__, __LINE__);
+        }
+
+        if (limit != 0 && (target & DEVICE) != 0)
+        {
+            GUARD_CU2(cudaMemcpyAsync(h_array, d_pointer, sizeof(ValueT) * limit,
+                cudaMemcpyDeviceToHost, stream),
+                "cudaMemcpyDeviceToHost failed.");
+            GUARD_CU2(cudaStreamSynchronize(stream),
+                "cudaStreamSynchronize failed.");
+        }
+
+        std::string str = message;
+        for (SizeT i = 0; i < limit; i++)
+        {
+            if ((i % 10) == 0) str = str + " |(" + std::to_string(i) + ")";
+            str = str + " " + std::to_string(h_array[i]);
+        }
+        PrintMsg(str);
+
+        if (temp_allocated)
+        {
+            delete[] h_array; h_array = NULL;
+            temp_allocated = false;
+        }
+        return retval;
+    }
+
 }; // struct Array1D
 
 } // namespace util

@@ -43,7 +43,7 @@ cudaError_t UseParameters_app(util::Parameters &parameters)
         0.0,
         "Preprocessing time",
         __FILE__, __LINE__));
-        
+
     return retval;
 }
 
@@ -107,9 +107,11 @@ struct TestGraph :
         bool quiet = false,
         bool self_csr = false)
     {
+        typedef typename CsrT_in::CsrT CsrT_;
+
         cudaError_t retval = cudaSuccess;
-        nodes = csr.CsrT::nodes;
-        edges = csr.CsrT::edges;
+        nodes = csr.CsrT_::nodes;
+        edges = csr.CsrT_::edges;
         GUARD_CU(this -> CooT::FromCsr(csr, target, stream, quiet));
         GUARD_CU(this -> CscT::FromCsr(csr, target, stream, quiet));
         if (!self_csr)
@@ -187,7 +189,7 @@ struct TestGraph :
         return retval;
     }
 
-    SizeT GetNeighborListLength(const VertexT &v)
+    SizeT GetNeighborListLength(const VertexT &v) const
     {
         SizeT retval = 0;
         if (FLAG & graph::HAS_CSR)
@@ -196,6 +198,23 @@ struct TestGraph :
             retval = CscT::GetNeighborListLength(v);
         else if (FLAG & graph::HAS_COO)
             retval = CooT::GetNeighborListLength(v);
+        return retval;
+    }
+
+    cudaError_t Move(
+        util::Location source,
+        util::Location target,
+        cudaStream_t   stream = 0)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        if (FLAG & graph::HAS_CSR)
+            GUARD_CU(CsrT::Move(source, target, stream));
+        if (FLAG & graph::HAS_CSC)
+            GUARD_CU(CscT::Move(source, target, stream));
+        if (FLAG & graph::HAS_COO)
+            GUARD_CU(CooT::Move(source, target, stream));
+
         return retval;
     }
 };
