@@ -80,7 +80,7 @@ struct main_struct
             ref_distances = new ValueT*[num_srcs];
             for (int i = 0; i < num_srcs; i++)
             {
-                ref_distances[i] = new ValueT[nodes];
+                ref_distances[i] = (ValueT*)malloc(sizeof(ValueT) * nodes);
                 VertexT src = srcs[i];
                 util::PrintMsg("__________________________", !quiet);
                 float elapsed = app::sssp::CPU_Reference(
@@ -104,7 +104,7 @@ struct main_struct
         {
             for (int i = 0; i < num_srcs; i ++)
             {
-                delete[] ref_distances[i]; ref_distances[i] = NULL;
+                free(ref_distances[i]); ref_distances[i] = NULL;
             }
             delete[] ref_distances; ref_distances = NULL;
         }

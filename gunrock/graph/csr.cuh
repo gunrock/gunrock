@@ -364,7 +364,7 @@ struct Csr :
     __device__ __host__ __forceinline__
     VertexT GetEdgeSrc(const SizeT &e) const
     {
-        return Binary_Search(row_offsets + 0, e, 0, this -> nodes);
+        return Binary_Search(row_offsets + 0, e, (SizeT)0, this -> nodes);
     }
 
     __device__ __host__ __forceinline__
@@ -377,7 +377,7 @@ struct Csr :
     __device__ __host__ __forceinline__
     void GetEdgeSrcDest(const SizeT &e, VertexT &src, VertexT &dest) const
     {
-        src = Binary_Search(row_offsets + 0, e, 0, this -> nodes);
+        src = Binary_Search(row_offsets + 0, e, (SizeT)0, this -> nodes);
         dest = column_indices[e];
     }
 

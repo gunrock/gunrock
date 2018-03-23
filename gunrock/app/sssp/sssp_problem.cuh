@@ -150,7 +150,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             {
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
             }*/
-            GUARD_CU(sub_graph.Move(util::Host, target, this -> stream));
+            GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
             return retval;
         } // Init
 

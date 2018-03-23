@@ -362,18 +362,22 @@ cudaError_t Launch(
           AdvanceOpT       advance_op,
           FilterOpT        filter_op)
 {
+    cudaError_t retval = cudaSuccess;
+
     if (GraphT::FLAG & gunrock::graph::HAS_CSR)
-        return GraphT_Switch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSR) != 0>
+        retval = GraphT_Switch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSR) != 0>
             ::template Launch_Csr_Csc<FLAG> (graph, frontier_in, frontier_out,
                 parameters, advance_op, filter_op);
 
-    if (GraphT::FLAG & gunrock::graph::HAS_CSC)
-        return GraphT_Switch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSC) != 0>
+    else if (GraphT::FLAG & gunrock::graph::HAS_CSC)
+        retval = GraphT_Switch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSC) != 0>
             ::template Launch_Csr_Csc<FLAG> (graph, frontier_in, frontier_out,
                 parameters, advance_op, filter_op);
 
-    return util::GRError(cudaErrorInvalidDeviceFunction,
+    else
+        retval = util::GRError(cudaErrorInvalidDeviceFunction,
         "TWC is not implemented for given graph representation.");
+    return retval;
 }
 
 } //TWC

@@ -81,8 +81,9 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, true>
                 if (keys_in != NULL)
                     key = keys_in[pos];
                 SizeT inv_size = util::PreDefinedValues<SizeT>::InvalidValue;
+                InKeyT inv_key = util::PreDefinedValues<InKeyT>::InvalidValue;
                 to_process = filter_op(
-                    util::PreDefinedValues<InKeyT>::InvalidValue,
+                    inv_key,
                     key,
                     inv_size,
                     key,

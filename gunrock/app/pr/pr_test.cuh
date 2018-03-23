@@ -427,7 +427,7 @@ typename GraphT::SizeT Validate_Results(
             continue;
         }
         v_counts[v] ++;
-        unorder_ranks[v] = h_ranks[v];
+        unorder_ranks[v] = h_ranks[v_];
     }
     for (VertexT v = 0; v < nodes; v++)
     if (v_counts[v] == 0)
