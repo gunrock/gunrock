@@ -299,6 +299,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             }
 
             GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
+            GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
 
             if (GraphT::FLAG & gunrock::graph::HAS_CSR)
             {
@@ -311,14 +312,30 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             } else if (GraphT::FLAG & gunrock::graph::HAS_COO)
             {
                 auto &degrees = this -> degrees;
+                GUARD_CU(degrees.ForEach(
+                    []__host__ __device__ (SizeT &degree)
+                    {
+                        degree = 0;
+                    }, nodes + 1, target, this -> stream));
+
                 GUARD_CU(oprtr::ForAll((VertexT*)NULL,
                     [sub_graph, degrees]
                     __host__ __device__ (VertexT *dummy, const SizeT &e)
                 {
                     VertexT src, dest;
                     sub_graph.GetEdgeSrcDest(e, src, dest);
-                    atomicAdd(degrees + src, 1);
+                    SizeT old_val = atomicAdd(degrees + src, 1);
+                    //if (src == 42029)
+                    //    printf("degree[%d] -> %d, dest = %d\n",
+                    //        src, old_val + 1, dest);
                 }, sub_graph.edges, target, this -> stream));
+
+                //GUARD_CU(oprtr::ForAll((VertexT*)NULL,
+                //    [degrees]
+                //    __host__ __device__ (VertexT *dummy, const SizeT &e)
+                //{
+                //    printf("degree[42029] = %d\n", degrees[42029]);
+                //}, 1, target, this -> stream));
             }
 
             return retval;
@@ -363,14 +380,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 [normalize, delta]__host__ __device__(ValueT &rank)
                 {
                     rank = normalize ? (ValueT)0.0 : (ValueT)(1.0 - delta);
-                }, nodes, target));
+                }, nodes, target, this -> stream));
 
             ValueT &init_value = this -> init_value;
-            GUARD_CU(rank_curr.ForEach(degrees,
-                [init_value]__host__ __device__(ValueT &rank, const SizeT &degree)
+            GUARD_CU(rank_curr.ForAll(degrees,
+                [init_value]__host__ __device__(ValueT *ranks, SizeT *degrees_, const SizeT &v)
                 {
-                    rank = (degree == 0) ? init_value : (init_value / degree);
-                }, nodes, target));
+                    SizeT degree = degrees_[v];
+                    ranks[v] = (degree == 0) ? init_value : (init_value / degree);
+                    //if (v == 42029)
+                    //    printf("rank[%d] = %f = %f / %d\n",
+                    //       v, ranks[v], init_value, degree);
+                }, nodes, target, this -> stream));
 
             this -> to_continue     = true;
             this -> final_event_set = false;
@@ -448,12 +469,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     {
         cudaError_t retval = cudaSuccess;
         auto &data_slice = data_slices[0][0];
+        SizeT nodes = this -> org_graph -> nodes;
 
         if (target == util::DEVICE)
         {
             GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-            data_slice.rank_curr.SetPointer(h_ranks);
-            data_slice.node_ids .SetPointer(h_node_ids);
+            data_slice.rank_curr.SetPointer(h_ranks, nodes, util::HOST);
+            data_slice.node_ids .SetPointer(h_node_ids, nodes, util::HOST);
             GUARD_CU(data_slice.rank_curr.Move(
                 util::DEVICE, util::HOST));
             GUARD_CU(data_slice.node_ids .Move(
@@ -461,7 +483,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         }
         else if (target == util::HOST)
         {
-            SizeT nodes = this -> org_graph -> nodes;
             GUARD_CU(data_slice.rank_curr.ForEach(h_ranks,
                 []__host__ __device__(const ValueT &rank, ValueT &h_rank)
                 {
@@ -507,6 +528,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 this -> num_gpus, this -> gpu_idx[gpu], target, this -> flag));
         }
 
+        for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
+        {
+            if (target & util::DEVICE)
+            {
+                GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
+                GUARD_CU2(cudaStreamSynchronize(data_slices[gpu] -> stream),
+                    "cudaStreamSynchronize failed");
+            }
+        }
         return retval;
     }
 

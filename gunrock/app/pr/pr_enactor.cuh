@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <gunrock/util/sort_utils.cuh>
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
@@ -103,6 +104,10 @@ struct PRIterationLoop : public IterationLoopBase
                 if (!isfinite(new_value))
                     new_value = 0;
                 rank_curr[dest] = new_value;
+                //if (dest == 42029)
+                //    printf("rank[%d] = %f -> %f = (%f + %f * %f) / %d\n",
+                //        dest, old_value, new_value, reset_value, 
+                //        delta, rank_next[dest], degrees[dest]);
                 return (fabs(new_value - old_value) > (threshold * old_value));
             };
 
@@ -151,6 +156,10 @@ struct PRIterationLoop : public IterationLoopBase
             if (isfinite(add_value))
             {
                 atomicAdd(rank_next + dest, add_value);
+                //ValueT old_val = atomicAdd(rank_next + dest, add_value);
+                //if (dest == 42029)
+                //    printf("rank[%d] = %f = %f (rank[%d]) + %f\n",
+                //        dest, old_val + add_value, add_value, src, old_val);
             }
             return true;
         };
@@ -666,9 +675,10 @@ public:
                 ids[pos] = pos;
             }, nodes, util::DEVICE, this -> enactor_slices[0].stream));
 
+        util::PrintMsg("#nodes = " + std::to_string(nodes));
         size_t cub_required_size = 0;
         void* temp_storage = NULL;
-        cub::DoubleBuffer<ValueT > key_buffer(
+        /*cub::DoubleBuffer<ValueT > key_buffer(
             data_slice.rank_curr.GetPointer(util::DEVICE),
             data_slice.rank_next.GetPointer(util::DEVICE));
         cub::DoubleBuffer<VertexT> value_buffer(
@@ -688,15 +698,42 @@ public:
             0, sizeof(ValueT) * 8, this -> enactor_slices[0].stream),
             "cubDeviceRadixSort failed");
 
-        //util::CUBRadixSort<ValueT, VertexT>(
-        //    false, data_slice -> nodes,
-        //    data_slice.rank_curr  .GetPointer(util::DEVICE),
-        //    data_slice.node_ids   .GetPointer(util::DEVICE),
-        //    data_slice.rank_next  .GetPointer(util::DEVICE),
-        //    data_slice.temp_vertex.GetPointer(util::DEVICE),
-        //    data_slice.cub_sort_storage.GetPointer(util::DEVICE),
-        //    data_slice.cub_sort_storage.GetSize(),
-        //    data_slice.streams[0]);
+        if (key_buffer.Current() != data_slice.rank_curr.GetPointer(util::DEVICE))
+        {
+            ValueT *keys = key_buffer.Current();
+            GUARD_CU(data_slice.rank_curr.ForEach(keys,
+                []__host__ __device__(ValueT &rank, const ValueT &key)
+                {
+                    rank = key;
+                }, nodes, util::DEVICE, this -> enactor_slices[0].stream));
+        }
+
+        if (value_buffer.Current() != data_slice.node_ids.GetPointer(util::DEVICE))
+        {
+            VertexT *values = value_buffer.Current();
+            GUARD_CU(data_slice.node_ids.ForEach(values,
+                []__host__ __device__(VertexT &node_id, const VertexT &val)
+                {
+                    node_id = val;
+                }, nodes, util::DEVICE, this -> enactor_slices[0].stream));
+        }*/
+
+        util::CUBRadixSort<ValueT, VertexT>(
+            false, nodes,
+            data_slice.rank_curr  .GetPointer(util::DEVICE),
+            data_slice.node_ids   .GetPointer(util::DEVICE),
+            data_slice.rank_next  .GetPointer(util::DEVICE),
+            data_slice.temp_vertex.GetPointer(util::DEVICE),
+            temp_storage, cub_required_size, 
+            //data_slice.cub_sort_storage.GetPointer(util::DEVICE),
+            //data_slice.cub_sort_storage.GetSize(),
+            this -> enactor_slices[0].stream);
+
+        //GUARD_CU(data_slice.rank_curr.ForAll(data_slice.node_ids,
+        //    []__host__ __device__(ValueT *ranks, VertexT *ids, const SizeT &pos)
+        //    {
+        //        printf("%d : rank = %f, id = %d\n", pos, ranks[pos], ids[pos]);
+        //    }, (nodes < 10) ? nodes : 10, util::DEVICE, this -> enactor_slices[0].stream));
 
         if (data_slice.scale)
         {

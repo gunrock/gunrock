@@ -208,9 +208,12 @@ struct TestGraph :
     {
         cudaError_t retval = cudaSuccess;
 
-        GUARD_CU(CsrT::Move(source, target, stream));
-        GUARD_CU(CscT::Move(source, target, stream));
-        GUARD_CU(CooT::Move(source, target, stream));
+        if (FLAG & graph::HAS_CSR)
+            GUARD_CU(CsrT::Move(source, target, stream));
+        if (FLAG & graph::HAS_CSC)
+            GUARD_CU(CscT::Move(source, target, stream));
+        if (FLAG & graph::HAS_COO)
+            GUARD_CU(CooT::Move(source, target, stream));
 
         return retval;
     }

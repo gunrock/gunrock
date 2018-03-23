@@ -285,15 +285,16 @@ double CPU_Reference(
     for (VertexT v = 0; v < nodes; v++)
     {
         rank_current[v] = init_value;
-        rank_next   [v] = 0;
+        rank_next   [v] = normalize ? 0.0 : (1.0 - delta);
         rev_degrees [v] = 0;
     }
 
     #pragma omp parallel for
     for (SizeT e = 0; e < edges; e++)
     {
+        VertexT v = graph.CooT::edge_pairs[e].x;
         #pragma omp atomic
-            rev_degrees[graph.CooT::edge_pairs[e].x] += 1;
+            rev_degrees[v] += 1;
     }
     #pragma omp parallel for
     for (VertexT v = 0; v < nodes; v++)

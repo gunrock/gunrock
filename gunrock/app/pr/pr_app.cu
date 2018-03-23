@@ -54,6 +54,13 @@ cudaError_t UseParameters(util::Parameters &parameters)
         "seed to generate random sources",
         __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<std::string>(
+        "output-filename",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        "",
+        "file to output ranking values",
+        __FILE__, __LINE__));
+
     return retval;
 }
 
@@ -131,6 +138,14 @@ cudaError_t RunTests(
         {
             GUARD_CU(enactor.Extract());
             GUARD_CU(problem.Extract(h_node_ids, h_ranks));
+            ValueT total_rank = 0;
+            #pragma omp parallel for reduction(+: total_rank)
+            for (VertexT v = 0; v < graph.nodes; v++)
+            {
+                total_rank += h_ranks[v];
+            }
+            util::PrintMsg("Total_rank = " + std::to_string(total_rank));
+
             SizeT num_errors = app::pr::Validate_Results(
                 parameters, graph, src, h_node_ids, h_ranks,
                 ref_node_ids == NULL ? NULL : ref_node_ids[run_num % num_srcs],
@@ -146,6 +161,14 @@ cudaError_t RunTests(
         GUARD_CU(problem.Extract(h_node_ids, h_ranks));
         if (!quiet)
         {
+            ValueT total_rank = 0;
+            #pragma omp parallel for reduction(+: total_rank)
+            for (VertexT v = 0; v < graph.nodes; v++)
+            {
+                total_rank += h_ranks[v];
+            }
+            util::PrintMsg("Total_rank = " + std::to_string(total_rank));
+
             // Display Solution
             DisplaySolution(h_node_ids, h_ranks, graph.nodes);
         }

@@ -94,7 +94,7 @@ struct Block_Scan
         //DownSweep<int, LOG_WARP_THREADS-2>::Sweep(lane_local, lane_recv, lane_id);
         //DownSweep LOG_WIDTH = 3
         lane_recv = _shfl_up(lane_local, 8);
-        if ((lane_id & 15) == 8)
+        if ((lane_id & 0xF) == 8)
             lane_local += lane_recv;
 
         //DownSweep LOG_WIDTH = 2
@@ -149,7 +149,7 @@ struct Block_Scan
         {
             lane_local += lane_recv;
         //UpSweep LOG_WIDTH = 1
-            lane_recv = _shfl_xor(lane_local, 0x10, WARPSIZE< 0x00010001u);
+            lane_recv = _shfl_xor(lane_local, 0x10, WARPSIZE, 0x00010001u);
         }
 
         if (lane_id == 0)

@@ -220,8 +220,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
 
             if (__syncthreads_or(thread_output_count == KernelPolicyT::OUTPUTS_PER_THREAD))
             {
-                //Write_Global_Output(smem_storage,
-                //    thread_outputs, thread_output_count, keys_out, out_pos);
+                Write_Global_Output(smem_storage,
+                    thread_outputs, thread_output_count, keys_out, out_pos);
             }
             edge_id += STRIDE;
         }
@@ -230,8 +230,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
         if (__syncthreads_or(thread_output_count != 0))
         {
             SizeT   out_pos = util::PreDefinedValues<SizeT  >::InvalidValue;
-            //Write_Global_Output(smem_storage,
-            //    thread_outputs, thread_output_count, keys_out, out_pos);
+            Write_Global_Output(smem_storage,
+                thread_outputs, thread_output_count, keys_out, out_pos);
         }
     }
 };
