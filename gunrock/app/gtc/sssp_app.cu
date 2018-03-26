@@ -75,8 +75,6 @@ cudaError_t RunTests(
     cudaError_t retval = cudaSuccess;
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
-    typedef Problem<GraphT  > ProblemT;
-    typedef Enactor<ProblemT> EnactorT;
     util::CpuTimer    cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
 
@@ -94,9 +92,13 @@ cudaError_t RunTests(
     VertexT *h_preds = (mark_pred) ? new VertexT[graph.nodes] : NULL;
 
     // Allocate problem and enactor on GPU, and initialize them
-    // TODO: define Problem and Enactor
+    typedef Problem<GraphT  > ProblemT;
+    typedef Enactor<ProblemT> EnactorT;
+    ProblemT problem(parameters);
+    EnactorT enactor;
 
-    // TODO: init Problem and Enactor
+    GUARD_CU(problem.Init(graph, target));
+    GUARD_CU(enactor.Init(problem, target));
 
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
@@ -106,11 +108,12 @@ cudaError_t RunTests(
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
         src = srcs[run_num % num_srcs];
-        // TODO: Reset problem and enactor
+        GUARD_CU(problem.Reset(src, target));
+        GUARD_CU(enactor.Reset(src, target));
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
-        // TODO: Enact
+        GUARD_CU(enactor.Enact(src));
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
@@ -118,12 +121,11 @@ cudaError_t RunTests(
             + std::to_string(run_num) + " elapsed: "
             + std::to_string(cpu_timer.ElapsedMillis()) + " ms, src = "
             + std::to_string(src) + ", #iterations = "
-            // TODO: to uncomment
-            /*+ std::to_string(enactor.enactor_slices[0]
-                .enactor_stats.iteration)*/, !quiet_mode);
+            + std::to_string(enactor.enactor_slices[0]
+                .enactor_stats.iteration), !quiet_mode);
         if (validation == "each")
         {
-            // TODO: Extract
+            GUARD_CU(problem.Extract(h_distances, h_preds, target));
             SizeT num_errors = app::sssp::Validate_Results(
                 parameters, graph, src, h_distances, h_preds,
                 ref_distances == NULL ? NULL : ref_distances[run_num % num_srcs],
@@ -133,7 +135,7 @@ cudaError_t RunTests(
 
     cpu_timer.Start();
     // Copy out results
-    // TODO: Extract
+    GUARD_CU(problem.Extract(h_distances, h_preds, target));
     if (validation == "last")
     {
         SizeT num_errors = app::sssp::Validate_Results(
@@ -142,15 +144,15 @@ cudaError_t RunTests(
     }
 
     // compute running statistics
-    // TODO: to uncomment
-    // info.ComputeTraversalStats(enactor, h_distances);
+     info.ComputeTraversalStats(enactor, h_distances);
     //Display_Memory_Usage(problem);
     #ifdef ENABLE_PERFORMANCE_PROFILING
         //Display_Performance_Profiling(enactor);
     #endif
 
     // Clean up
-    // TODO: Release enactor and problem
+    GUARD_CU(enactor.Release(target));
+    GUARD_CU(problem.Release(target));
     delete[] h_distances  ; h_distances   = NULL;
     delete[] h_preds      ; h_preds       = NULL;
     cpu_timer.Stop(); total_timer.Stop();
@@ -190,11 +192,10 @@ double gunrock_sssp(
         parameters.Set("quiet", true);
 
     // Allocate problem and enactor on GPU, and initialize them
-    // TODO: to uncomment problem and enactor
-    //ProblemT problem(parameters);
-    //EnactorT enactor;
-    //problem.Init(graph  , target);
-    //enactor.Init(problem, target);
+    ProblemT problem(parameters);
+    EnactorT enactor;
+    problem.Init(graph  , target);
+    enactor.Init(problem, target);
 
     std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
     int num_runs = parameters.Get<int>("num-runs");
@@ -203,20 +204,20 @@ double gunrock_sssp(
     {
         int src_num = run_num % num_srcs;
         VertexT src = srcs[src_num];
-        //problem.Reset(src, target);
-        //enactor.Reset(src, target);
+        problem.Reset(src, target);
+        enactor.Reset(src, target);
 
         cpu_timer.Start();
-        //enactor.Enact(src);
+        enactor.Enact(src);
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-        //problem.Extract(distances[src_num],
-        //    preds == NULL ? NULL : preds[src_num]);
+        problem.Extract(distances[src_num],
+            preds == NULL ? NULL : preds[src_num]);
     }
 
-    //enactor.Release(target);
-    //problem.Release(target);
+    enactor.Release(target);
+    problem.Release(target);
     srcs.clear();
     return total_time;
 }

@@ -85,34 +85,53 @@ struct SSSPIterationLoop : public IterationLoopBase
         auto         &iteration          =   enactor_stats.iteration;
 
         // The advance operation
-        auto advance_op = [distances, weights, original_vertex, preds]
+        auto advance_lambda = [distances, weights, original_vertex, preds]
         __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // TODO: advance_op
+            ValueT src_distance = distances[src];
+            ValueT edge_weight = weights[edge_id];
+            ValueT new_distance = src_distance + edge_weight;
+
+            ValueT temp_distance = atomicMin(distances + dest, new_distance);
+            if (new_distance < temp_distance)
+            {
+                if (!preds.isEmpty())
+                    preds[dest] = src;
+                return true;
+            }
+            return false;
         };
 
         // The filter operation
-        auto filter_op = [labels, iteration] __host__ __device__(
+        auto filter_lambda = [labels, iteration] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // TODO: filter_op
+            if (!util::isValid(dest)) return false;
+            if (labels[dest] == iteration)
+                return false;
+            labels[dest] = iteration;
+            return true;
         };
 
         oprtr_parameters.label = iteration + 1;
         // Call the advance operator, using the advance operation
-        // TODO: Call advance
+        oprtr::Advance<oprtr::OprtrType_V2V>(
+            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+            oprtr_parameters, advance_lambda, filter_lambda);
 
         if (oprtr_parameters.advance_mode != "LB_CULL" &&
             oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
         {
             frontier.queue_reset = false;
             // Call the filter operator, using the filter operation
-            // TODO: call filter
+            oprtr::Filter<oprtr::OprtrType_V2V>(
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                oprtr_parameters, filter_lambda);
         }
 
         // Get back the resulted frontier length

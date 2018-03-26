@@ -75,7 +75,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     struct DataSlice : BaseDataSlice
     {
         // sssp-specific storage arrays
-        // TODO: add distances defination
+        util::Array1D<SizeT, ValueT >    distances  ;
         util::Array1D<SizeT, LabelT >    labels     ; // labels to mark latest iteration the vertex been visited
         util::Array1D<SizeT, VertexT>    preds      ; // predecessors of vertices
         util::Array1D<SizeT, VertexT>    temp_preds ; // predecessors of vertices
@@ -85,7 +85,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          */
         DataSlice() : BaseDataSlice()
         {
-            // TODO: add distances set name
+            distances       .SetName("distances"       );
             labels          .SetName("labels"          );
             preds           .SetName("preds"           );
             temp_preds      .SetName("temp_preds"      );
@@ -110,7 +110,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            // TODO: add distances release
+            GUARD_CU(distances      .Release(target));
             GUARD_CU(labels         .Release(target));
             GUARD_CU(preds          .Release(target));
             GUARD_CU(temp_preds     .Release(target));
@@ -138,7 +138,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(BaseDataSlice::Init(
                 sub_graph, num_gpus, gpu_idx, target, flag));
-            // TODO: Add distances allocate
+            GUARD_CU(distances .Allocate(sub_graph.nodes, target));
             GUARD_CU(labels    .Allocate(sub_graph.nodes, target));
             if (flag & Mark_Predecessors)
             {
@@ -161,7 +161,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT nodes = this -> sub_graph -> nodes;
 
             // Ensure data are allocated
-            // TODO: add distances EnsureSize_
+            GUARD_CU(distances.EnsureSize_(nodes, target));
             GUARD_CU(labels   .EnsureSize_(nodes, target));
             if (this -> flag & Mark_Predecessors)
             {
@@ -170,7 +170,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             }
 
             // Reset data
-            // TODO: add distances reset
+            GUARD_CU(distances.ForEach([]__host__ __device__
+                (ValueT &distance){
+                distance = util::PreDefinedValues<ValueT>::MaxValue;
+            }, nodes, target, this -> stream));
 
             GUARD_CU(labels   .ForEach([]__host__ __device__
             (LabelT &label){
@@ -269,7 +272,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-                // TODO: Add distances extract
+                GUARD_CU(data_slice.distances.SetPointer(h_distances, nodes, util::HOST));
+                GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
 
                 if ((this -> flag & Mark_Predecessors) == 0)
                     return retval;
@@ -392,7 +396,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 "cudaDeviceSynchronize failed");
         }
 
-        // TODO: Set distances[src_] to 0
+        GUARD_CU(data_slices[gpu] -> distances.ForAll(
+            [src_]__host__ __device__(ValueT *distances_, const SizeT &pos)
+            {
+                distances_[src_] = 0;
+            }, 1, target));
 
         if (this -> flag & Mark_Predecessors)
         {
