@@ -1,4 +1,20 @@
-Road Map {#road_map}
+---
+title: Road Map
+
+language_tabs: # must be one of https://git.io/vQNgJ
+  -
+
+toc_footers:
+  - Gunrock: GPU Graph Analytics
+  - <a href='https://github.com/lord/slate'>Documentation Powered by Slate</a>
+
+includes:
+  - errors
+
+search: false
+---
+
+Road Map
 =====================
 
  - **Framework:** We are exploring more operators such as neighborhood
