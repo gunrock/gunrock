@@ -1,4 +1,20 @@
-Why Gunrock? {#why-gunrock}
+---
+title: Why Gunrock?
+
+language_tabs: # must be one of https://git.io/vQNgJ
+  - 
+
+toc_footers:
+  - Gunrock: GPU Graph Analytics
+  - <a href='https://github.com/lord/slate'>Documentation Powered by Slate</a>
+
+includes:
+  - errors
+
+search: false
+---
+
+Why Gunrock?
 ============
 
 Gunrock is a stable, powerful, and forward-looking substrate for GPU-based graph-centric research and development. Like many graph frameworks, it leverages a bulk-synchronous programming model and targets iterative convergent graph computations. We believe that today Gunrock offers both the best performance on GPU graph analytics as well as the widest range of primitives.
