@@ -317,6 +317,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // util::Array1D<SizeT, ValueT *> th_distances;
             // th_distances.SetName("bfs::Problem::Extract::th_distances");
             // GUARD_CU(th_distances.Allocate(this->num_gpus, util::HOST));
+            util::Array1D<SizeT, ValueT *> h_excess;
+            th_excess.SetName("bfs::Problem::Extract::th_excess");
+            GUARD_CU(th_excess.Allocate(this->num_gpus, util::HOST));
 
             for (int gpu = 0; gpu < this->num_gpus; gpu++)
             {
@@ -324,9 +327,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 if (target == util::DEVICE)
                 {
                     GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-                    // GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
+                    GUARD_CU(data_slice.excess.Move(util::DEVICE, util::HOST));
                 }
-                // th_distances[gpu] = data_slice.distances.GetPointer(util::HOST);
+                th_excess[gpu] = data_slice.excess.GetPointer(util::HOST);
             } //end for(gpu)
 
             for (VertexT v = 0; v < nodes; v++)
@@ -336,10 +339,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
                     v_ = this -> org_graph -> GpT::convertion_table[v];
 
-                // h_distances[v] = th_distances[gpu][v_];
+                h_excess[v] = th_excess[gpu][v_];
             }
 
-            // GUARD_CU(th_distances.Release());
+            GUARD_CU(th_excess.Release());
         } //end if
 
         return retval;
