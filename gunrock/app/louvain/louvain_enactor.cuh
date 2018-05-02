@@ -36,19 +36,32 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 
     GUARD_CU(parameters.Use<uint64_t>(
         "max-passes",
-        util::REQUIRE_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         10,
         "Maximum number of passes to run the louvain algorithm.",
         __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<uint64_t>(
         "max-iters",
-        util::REQUIRE_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         10,
         "Maximum number of iterations to run for each pass.",
         __FILE__, __LINE__));
 
-    
+    GUARD_CU(parameters.Use<bool>(
+        "pass-stats",
+        util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        false,
+        "Whether to show per-pass stats.",
+        __FILE__, __LINE__));
+ 
+   GUARD_CU(parameters.Use<bool>(
+        "iter-stats",
+        util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        false,
+        "Whether to show per-iteration stats.",
+        __FILE__, __LINE__));
+ 
     return retval;
 }
 
@@ -213,7 +226,7 @@ struct LouvainIterationLoop : public IterationLoopBase
 }; // end of SSSPIteration
 
 /**
- * @brief Template enactor class.
+ * @brief Louvain enactor class.
  * @tparam _Problem Problem type we process on
  * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
  * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor

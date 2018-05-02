@@ -55,63 +55,42 @@ struct main_struct
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        // TODO: get srcs if needed, e.g.:
-        // GUARD_CU(app::Set_Srcs    (parameters, graph));
-        int num_srcs = 0;
-
-        // TODO: reference result on CPU, e.e.:
-        // ValueT  **ref_distances = NULL;
+        VertexT  *ref_communities = NULL;
         bool quick = parameters.Get<bool>("quick");
-        // compute reference CPU SSSP solution for source-distance
+        // compute reference CPU Louvain solution
         if (!quick)
         {
             bool quiet = parameters.Get<bool>("quiet");
             std::string validation = parameters.Get<std::string>("validation");
             util::PrintMsg("Computing reference value ...", !quiet);
 
-            // TODO: get srcs if needed, e.g.:
-            // std::vector<VertexT> srcs
-            //    = parameters.Get<std::vector<VertexT> >("srcs");
-            // num_srcs = srcs.size();
-
-            // SizeT nodes = graph.nodes;
-            // TODO: problem specific data, e.g.:
-            // ref_distances = new ValueT*[num_srcs];
-            for (int i = 0; i < num_srcs; i++)
+            SizeT nodes = graph.nodes;
+            ref_communities = new VertexT[nodes];
+            //for (int i = 0; i < num_srcs; i++)
             {
-                // ref_distances[i] = new ValueT[nodes];
-                // VertexT src = srcs[i];
+                int i = 0;
                 util::PrintMsg("__________________________", !quiet);
-                float elapsed = app::Template::CPU_Reference(
-                    graph.csr(),
-                    // TODO: add problem specific data, e.g.:
-                    // ref_distances[i], NULL, src,
-                    quiet);
+                float elapsed = app::louvain::CPU_Reference(
+                    parameters, graph.csr(), ref_communities);
                 util::PrintMsg("--------------------------\nRun "
                     + std::to_string(i) + " elapsed: "
                     + std::to_string(elapsed)
-                    //+ " ms, src = " + std::to_string(src)
+                    + " ms, q = " + std::to_string(app::louvain::Get_Modularity(
+                        graph, ref_communities))
                     , !quiet);
             }
         }
 
-        // TODO: add other switching parameters, if needed
         std::vector<std::string> switches{"advance-mode"};
-        // TODO: add problem specific data
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [/*ref_distances*/](util::Parameters &parameters, GraphT &graph)
+            [ref_communities](util::Parameters &parameters, GraphT &graph)
             {
-                return app::Template::RunTests(parameters, graph/*, ref_distances*/);
+                return app::louvain::RunTests(parameters, graph, ref_communities);
             }));
 
         if (!quick)
         {
-            // TODO: deallocate host references, e.g.:
-            // for (int i = 0; i < num_srcs; i ++)
-            // {
-            //    delete[] ref_distances[i]; ref_distances[i] = NULL;
-            // }
-            // delete[] ref_distances; ref_distances = NULL;
+            delete[] ref_communities; ref_communities = NULL;
         }
         return retval;
     }
@@ -135,7 +114,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | //app::VERTEXT_U64B |
         app::SIZET_U32B | //app::SIZET_U64B |
-        app::VALUET_F32B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F64B | app::DIRECTED | app::UNDIRECTED>
         (parameters, main_struct());
 }
 

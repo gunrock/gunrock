@@ -22,13 +22,12 @@
 #include <gunrock/app/test_base.cuh>
 
 // single-source shortest path includes
-#include <gunrock/app/Template/Template_enactor.cuh>
-#include <gunrock/app/Template/Template_test.cuh>
+#include <gunrock/app/louvain/louvain_enactor.cuh>
+#include <gunrock/app/louvain/louvain_test.cuh>
 
 namespace gunrock {
 namespace app {
-// TODO: change the space name
-namespace Template {
+namespace louvain {
 
 cudaError_t UseParameters(util::Parameters &parameters)
 {
@@ -36,23 +35,6 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_app    (parameters));
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
-
-    // TODO: add app specific parameters, e.g.:
-    // GUARD_CU(parameters.Use<std::string>(
-    //    "src",
-    //    util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-    //    "0",
-    //    "<Vertex-ID|random|largestdegree> The source vertices\n"
-    //    "\tIf random, randomly select non-zero degree vertices;\n"
-    //    "\tIf largestdegree, select vertices with largest degrees",
-    //    __FILE__, __LINE__));
-    //
-    // GUARD_CU(parameters.Use<int>(
-    //    "src-seed",
-    //    util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-    //    util::PreDefinedValues<int>::InvalidValue,
-    //    "seed to generate random sources",
-    //    __FILE__, __LINE__));
 
     return retval;
 }
@@ -71,8 +53,7 @@ template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
-    // TODO: add problem specific reference results, e.g.:
-    // ValueT **ref_distances = NULL,
+    typename GraphT::VertexT *ref_communities = NULL,
     util::Location target = util::DEVICE)
 {
     cudaError_t retval = cudaSuccess;
@@ -87,7 +68,7 @@ cudaError_t RunTests(
     bool quiet_mode = parameters.Get<bool>("quiet");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    util::Info info("Template", parameters, graph); // initialize Info structure
+    util::Info info("Louvain", parameters, graph); // initialize Info structure
 
     // TODO: get problem specific inputs, e.g.:
     // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
@@ -132,7 +113,7 @@ cudaError_t RunTests(
         {
             // TODO: fill in problem specific data, e.g.:
             GUARD_CU(problem.Extract(/*h_distances*/));
-            SizeT num_errors = app::Template::Validate_Results(
+            SizeT num_errors = app::louvain::Validate_Results(
                 parameters, graph,
                 // TODO: add problem specific data for validation, e.g.:
                 // src, h_distances,
@@ -148,7 +129,7 @@ cudaError_t RunTests(
     GUARD_CU(problem.Extract(/*h_distances*/));
     if (validation == "last")
     {
-        SizeT num_errors = app::Template::Validate_Results(
+        SizeT num_errors = app::louvain::Validate_Results(
             parameters, graph,
             // TODO: place problem specific data and result for validation, e.g.:
             // src, h_distances,
@@ -176,7 +157,7 @@ cudaError_t RunTests(
     return retval;
 }
 
-} // namespace Template
+} // namespace louvain
 } // namespace app
 } // namespace gunrock
 
@@ -191,7 +172,7 @@ cudaError_t RunTests(
  * \return     double     Return accumulated elapsed times for all runs
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
-double gunrock_Template(
+double gunrock_louvain(
     gunrock::util::Parameters &parameters,
     GraphT &graph
     // TODO: add problem specific outputs, e.g.:
@@ -199,8 +180,8 @@ double gunrock_Template(
     )
 {
     typedef typename GraphT::VertexT VertexT;
-    typedef gunrock::app::Template::Problem<GraphT  > ProblemT;
-    typedef gunrock::app::Template::Enactor<ProblemT> EnactorT;
+    typedef gunrock::app::louvain::Problem<GraphT  > ProblemT;
+    typedef gunrock::app::louvain::Enactor<ProblemT> EnactorT;
     gunrock::util::CpuTimer cpu_timer;
     gunrock::util::Location target = gunrock::util::DEVICE;
     double total_time = 0;
@@ -260,7 +241,7 @@ template <
     typename SizeT   = int,
     typename GValueT = unsigned int,
     typename TValueT = GValueT>
-float Template(
+float louvain(
     const SizeT        num_nodes,
     const SizeT        num_edges,
     const SizeT       *row_offsets,
@@ -279,9 +260,9 @@ float Template(
     typedef typename GraphT::CsrT CsrT;
 
     // Setup parameters
-    gunrock::util::Parameters parameters("Template");
+    gunrock::util::Parameters parameters("louvain");
     gunrock::graphio::UseParameters(parameters);
-    gunrock::app::Template::UseParameters(parameters);
+    gunrock::app::louvain::UseParameters(parameters);
     gunrock::app::UseParameters_test(parameters);
     parameters.Parse_CommandLine(0, NULL);
     parameters.Set("graph-type", "by-pass");
@@ -303,9 +284,9 @@ float Template(
     graph.FromCsr(graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, graph);
 
-    // Run the Template
+    // Run the Louvain
     // TODO: add problem specific outputs, e.g.
-    double elapsed_time = gunrock_Template(parameters, graph /*, distances*/);
+    double elapsed_time = gunrock_louvain(parameters, graph /*, distances*/);
 
     // Cleanup
     graph.Release();

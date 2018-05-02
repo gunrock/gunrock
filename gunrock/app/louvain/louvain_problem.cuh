@@ -9,7 +9,7 @@
  * @file
  * template_problem.cuh
  *
- * @brief GPU Storage management Structure for Template Problem Data
+ * @brief GPU Storage management Structure for Louvain Problem Data
  */
 
 #pragma once
@@ -18,8 +18,7 @@
 
 namespace gunrock {
 namespace app {
-// TODO: change the name space
-namespace Template {
+namespace louvain {
 
 /**
  * @brief Speciflying parameters for SSSP Problem
@@ -45,7 +44,7 @@ cudaError_t UseParameters_problem(
 }
 
 /**
- * @brief Template Problem structure.
+ * @brief Louvain Problem structure.
  * @tparam _GraphT  Type of the graph
  * @tparam _FLAG    Problem flags
  */
@@ -386,7 +385,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     /** @} */
 };
 
-} //namespace Template
+} //namespace louvain
 } //namespace app
 } //namespace gunrock
 
