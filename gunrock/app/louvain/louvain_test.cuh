@@ -114,8 +114,9 @@ ValueT Get_Modularity(
         + ", w_c^2 = " + std::to_string(q)
         + ", q = " + std::to_string((w_in - q/m)/m));
 
-    //return (w_in - q/m/2)/m/2;
+    return (w_in - q/m)/m;
 
+    /*
     q = 0;
     ValueT w1 = 0, w2 = 0;
     //#pragma omp parallel for //reduction(+:q)
@@ -169,6 +170,7 @@ ValueT Get_Modularity(
     delete[] w_2v; w_2v = NULL;
     delete[] w_v2; w_v2 = NULL;
     return q;
+    */
 }
 
 /**
@@ -198,6 +200,8 @@ double CPU_Reference(
     VertexT max_iters  = parameters.Get<VertexT>("max-iters");
     bool    pass_stats = parameters.Get<bool   >("pass-stats");
     bool    iter_stats = parameters.Get<bool   >("iter-stats");
+    ValueT  pass_gain_threshold = parameters.Get<ValueT>("pass-th");
+    ValueT  iter_gain_threshold = parameters.Get<ValueT>("iter-th");
 
     bool has_pass_communities = false;
     if (pass_communities != NULL)
@@ -216,8 +220,8 @@ double CPU_Reference(
     std::unordered_map<VertexT, ValueT> *w_c2c
         = new std::unordered_map<VertexT, ValueT>[graph.nodes];
     ValueT *w_v2self = new ValueT[graph.nodes];
-    ValueT *w_2v     = new ValueT[graph.nodes];
-    ValueT *w_2c     = new ValueT[graph.nodes];
+    ValueT *w_v2     = new ValueT[graph.nodes];
+    ValueT *w_c2     = new ValueT[graph.nodes];
 
     auto c_graph = &graph;
     auto n_graph = c_graph;
@@ -247,7 +251,7 @@ double CPU_Reference(
         for (VertexT v = 0; v < nodes; v++)
         {
             current_communities[v] = v;
-            w_2v[v] = 0;
+            w_v2[v] = 0;
             w_v2self[v] = 0;
         }
         for (VertexT v = 0; v < nodes; v++)
@@ -260,14 +264,14 @@ double CPU_Reference(
                 SizeT   e = start_e + k;
                 VertexT u = current_graph.GetEdgeDest(e);
                 ValueT  w = current_graph.edge_values[e];
-                w_2v[u] += w;
+                w_v2[v] += w;
                 if (u == v)
                     w_v2self[v] += w;
             }
         }
         for (VertexT v = 0; v < nodes; v++)
         {
-            w_2c[v] = w_2v[v];
+            w_c2[v] = w_v2[v];
         }
 
         // Modulation Optimization
@@ -303,8 +307,8 @@ double CPU_Reference(
                 auto it = w_v2c.find(org_comm);
                 if (it != w_v2c.end())
                     w_v2c_org = it -> second;
-                ValueT  w_2c_org = w_2c[org_comm];
-                ValueT  w_2v_v   = w_2v[v];
+                ValueT  w_c2_org = w_c2[org_comm];
+                ValueT  w_v2_v   = w_v2[v];
                 ValueT  w_v2self_v = w_v2self[v];
 
                 for (auto it = w_v2c.begin(); it != w_v2c.end(); it++)
@@ -313,8 +317,9 @@ double CPU_Reference(
                         continue;
 
                     ValueT gain = 0;
-                    gain += it -> second - w_v2c_org + w_v2self_v;
-                    gain -= (w_2c[it -> first] - w_2c_org + w_v2self_v) * w_2v_v / m;
+                    gain = it -> second - w_v2c_org + w_v2self_v;
+                    gain *= 2;
+                    gain -= (w_c2[it -> first] - w_c2_org + w_v2_v) * w_v2_v * 2 / m;
                     if (gain > max_gain)
                     {
                         max_gain = gain;
@@ -325,8 +330,8 @@ double CPU_Reference(
                 {
                     iter_gain += max_gain;
                     current_communities[v] = new_comm;
-                    w_2c[new_comm] += w_2v[v];//w_v2c[new_comm] + w_v2self_v;
-                    w_2c[org_comm] -= w_2v[v];//w_v2c[org_comm];
+                    w_c2[new_comm] += w_v2[v];//w_v2c[new_comm] + w_v2self_v;
+                    w_c2[org_comm] -= w_v2[v];//w_v2c[org_comm];
                 }
             }
 
@@ -339,6 +344,8 @@ double CPU_Reference(
                 + ", q = " + std::to_string(q)
                 + ", iter_gain = " + std::to_string(iter_gain)
                 + ", pass_gain = " + std::to_string(pass_gain), iter_stats);
+            if (iter_gain < iter_gain_threshold)
+                break;
         }
         util::PrintMsg("pass " + std::to_string(pass_num)
             + ", #v = " + std::to_string(nodes)
@@ -438,6 +445,8 @@ double CPU_Reference(
         n_graph = NULL;
 
         pass_num ++;
+        if (pass_gain < pass_gain_threshold)
+            break;
     }
 
     cpu_timer.Stop();
@@ -479,8 +488,8 @@ double CPU_Reference(
     delete[] comm_convert; comm_convert = NULL;
     delete[] w_c2c;        w_c2c        = NULL;
     delete[] w_v2self;     w_v2self     = NULL;
-    delete[] w_2v;         w_2v         = NULL;
-    delete[] w_2c;         w_2c         = NULL;
+    delete[] w_v2;         w_v2         = NULL;
+    delete[] w_c2;         w_c2         = NULL;
     return elapsed;
 }
 
