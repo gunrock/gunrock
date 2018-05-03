@@ -1,4 +1,4 @@
-Gunrock [![Build Status](http://mario.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/master)](http://mario.ece.ucdavis.edu:8080/job/gunrock/job/master/)
+Gunrock
 =====================
 Gunrock is a CUDA library for graph-processing designed specifically for the
 GPU. It uses a high-level, bulk-synchronous, data-centric abstraction focused
@@ -19,13 +19,15 @@ See [Release Notes](http://gunrock.github.io/gunrock/doc/latest/release_notes.ht
 
 Gunrock is featured on NVIDIA's list of [GPU Accelerated Libraries](https://developer.nvidia.com/gpu-accelerated-libraries) as the only external library for GPU graph analytics.
 
+| **Service**                    | **System**         | **Environment**       | **Status**                                                                                                                                    |
+|--------------------------------|--------------------|-----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| [Jenkins](https://jenkins.io/) | Ubuntu 16.04.4 LTS | CUDA 9.1, GCC/G++ 5.4 | [![Build Status](http://mario.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/master)](http://mario.ece.ucdavis.edu:8080/job/gunrock/job/master/) |
+
 Links for Gunrock source code
 -----------------------------
-[ [Related Pages](http://gunrock.github.io/gunrock/doc/latest/pages.html) |
-[Modules](http://gunrock.github.io/gunrock/doc/latest/modules.html) |
-[Namespaces](http://gunrock.github.io/gunrock/doc/latest/namespaces.html) |
-[Data Structures](http://gunrock.github.io/gunrock/doc/latest/annotated.html) |
-[Files](http://gunrock.github.io/gunrock/doc/latest/files.html) ]
+
+[Related Pages](http://gunrock.github.io/gunrock/doc/latest/pages.html) | [Modules](http://gunrock.github.io/gunrock/doc/latest/modules.html) | [Namespaces](http://gunrock.github.io/gunrock/doc/latest/namespaces.html) | [Data Structures](http://gunrock.github.io/gunrock/doc/latest/annotated.html) | [Files](http://gunrock.github.io/gunrock/doc/latest/files.html) |
+-------------------------------------------------------------------------|---------------------------------------------------------------------|---------------------------------------------------------------------------|-------------------------------------------------------------------------------|-----------------------------------------------------------------|
 
 
 Getting Started with Gunrock
@@ -119,6 +121,10 @@ COSN '14, pages 63&ndash;68, October 2014.
 Presentations
 -------------
 
+GTC 2018, Latest Development of the Gunrock Graph Processing Library on GPUs, March 2018. [[slides](http://on-demand.gputechconf.com/gtc/2018/presentation/s8594-latest-development-of-the-gunrock-graph-processing-library-on-gpus.pdf) | [video](http://on-demand.gputechconf.com/gtc/2018/video/S8594/)]
+
+GTC 2018, Writing Graph Primitives with Gunrock, March 2018. [[video](http://on-demand.gputechconf.com/gtc/2018/video/S8586/)]
+
 GTC 2016, Gunrock: A Fast and Programmable Multi-GPU Graph Processing Library, April 2016. [[slides](http://on-demand.gputechconf.com/gtc/2016/presentation/s6374-yangzihao-wang-gunrock.pdf)]
 
 NVIDIA [webinar](http://info.nvidianews.com/gunrock-webinar-reg-0416.html), April 2016. [[slides](http://tinyurl.com/owens-nv-webinar-160426)]
@@ -194,6 +200,6 @@ Copyright and Software License
 ----------------------------
 
 Gunrock is copyright The Regents of the University of
-California, 2013--2017. The library, examples, and all source code are
+California, 2013--2018. The library, examples, and all source code are
 released under
 [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0).
