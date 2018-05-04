@@ -53,11 +53,11 @@ NAME[17]="as-Skitter"
 for k in 0
 do
     #put OS and Device type here
-    SUFFIX="ubuntu16.04_TitanVx1"
+    SUFFIX="ubuntu16.04_TitanVx1c"
     LOGDIR=eval/$SUFFIX
     mkdir -p $LOGDIR
 
-    for i in 0 1 2 3 4 6 7 9 10 11 12 13 14 15 16 
+    for i in {0..16} #0 1 2 3 4 6 7 8 9 10 11 12 13 14 15 16 
     do
         for j in {0..1}
         do
