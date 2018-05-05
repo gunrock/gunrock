@@ -64,35 +64,28 @@ ValueT Get_Modularity(
 
     SizeT nodes = graph.nodes;
     ValueT *w_v2 = new ValueT[nodes];
-    //ValueT *w_2v = new ValueT[nodes];
     ValueT *w_c  = new ValueT[nodes];
-    //ValueT *q_v  = new ValueT[nodes];
-    //std::vector<VertexT> *comms = new std::vector<VertexT>[nodes];
     ValueT m2 = 0;
+    ValueT w_in = 0;
 
     for (VertexT v = 0; v < nodes; v++)
     {
         w_v2[v] = 0;
-        //w_2v[v] = 0;
         w_c [v] = 0;
-        //comms[v].clear();
     }
 
-    ValueT w_in = 0;
     //#pragma omp parallel for //reduction(+:m)
     for (VertexT v = 0; v < nodes; v++)
     {
         SizeT start_e = graph.GetNeighborListOffset(v);
         SizeT degree  = graph.GetNeighborListLength(v);
         VertexT c_v   = (communities == NULL) ? v : communities[v];
-        //comms[c_v].push_back(v);
 
         for (SizeT k = 0; k < degree; k++)
         {
             SizeT   e = start_e + k;
             VertexT u = graph.GetEdgeDest(e);
             ValueT  w = graph.edge_values[e];
-            //w_2v[u] += w;
             w_v2[v] += w;
             w_c[c_v] += w;
 
@@ -100,8 +93,8 @@ ValueT Get_Modularity(
             if (c_v != c_u) continue;
             w_in += w;
         }
-        //m += w_2v[v];
     }
+
     ValueT q = 0;
     for (VertexT v = 0; v < nodes; v++)
     {
@@ -109,10 +102,6 @@ ValueT Get_Modularity(
         if (w_c[v] != 0)
             q += w_c[v] * w_c[v];
     }
-    //util::PrintMsg("w_in = " + std::to_string(w_in)
-    //    + ", m = " + std::to_string(m)
-    //    + ", w_c^2 = " + std::to_string(q)
-    //    + ", q = " + std::to_string((w_in - q/m)/m));
 
     delete[] w_v2; w_v2 = NULL;
     delete[] w_c ; w_c  = NULL;
@@ -151,7 +140,7 @@ ValueT Get_Modularity(
             VertexT u = *it;
             auto it2 = w_v2v.find(u);
             ValueT  w = 0;
-            if (it2 != w_v2v.end()) 
+            if (it2 != w_v2v.end())
                 w = w_v2v[u];
             w1 += w;
             w2 += w_v2_v * w_v2[u];
@@ -160,11 +149,11 @@ ValueT Get_Modularity(
         //q += q_v;
         w_v2v.clear();
     }
-    
+
     for (VertexT v = 0; v < nodes; v++)
         q += q_v[v];
-    util::PrintMsg("w1 = " + std::to_string(w1) + 
-        + ", w2 = " + std::to_string(w2) 
+    util::PrintMsg("w1 = " + std::to_string(w1) +
+        + ", w2 = " + std::to_string(w2)
         + ", w_c^2 / m = " + std::to_string(w1 - q));
     q /= m;
 
@@ -216,18 +205,15 @@ double CPU_Reference(
         has_pass_graphs = true;
 
     ValueT q = Get_Modularity(graph);
-    //std::unordered_map<VertexT, ValueT> w_v2c;
-    ValueT  *w_v2c    = new ValueT[graph.nodes];
+    ValueT  *w_v2c          = new ValueT [graph.nodes];
     VertexT *neighbor_comms = new VertexT[graph.nodes];
-    //std::set<VertexT> comm_sets;
-    VertexT *comm_convert = new VertexT[graph.nodes];
-    //std::unordered_map<VertexT, ValueT> *w_c2c
-    //    = new std::unordered_map<VertexT, ValueT>[graph.nodes];
+    VertexT *comm_convert   = new VertexT[graph.nodes];
+    ValueT  *w_v2self       = new ValueT [graph.nodes];
+    ValueT  *w_v2           = new ValueT [graph.nodes];
+    ValueT  *w_c2           = new ValueT [graph.nodes];
     typedef std::pair<VertexT, ValueT> pairT;
-    std::vector<pairT> *w_c2c = new std::vector<pairT>[graph.nodes]; 
-    ValueT *w_v2self = new ValueT[graph.nodes];
-    ValueT *w_v2     = new ValueT[graph.nodes];
-    ValueT *w_c2     = new ValueT[graph.nodes];
+    std::vector<pairT> *w_c2c = new std::vector<pairT>[graph.nodes];
+
     GraphT temp_graph;
     temp_graph.Allocate(graph.nodes, graph.edges, util::HOST);
     auto &temp_row_offsets    = temp_graph.CsrT::row_offsets;
@@ -240,14 +226,9 @@ double CPU_Reference(
 
     ValueT m2 = 0;
     for (SizeT e = 0; e < graph.edges; e++)
-    {
         m2 += graph.CsrT::edge_values[e];
-    }
     for (SizeT v = 0; v < graph.nodes; v++)
-    {
         w_v2c[v] = util::PreDefinedValues<ValueT>::InvalidValue;
-        //w_v2c[v] = -1;
-    }
 
     util::CpuTimer cpu_timer, pass_timer, iter_timer;
     cpu_timer.Start();
@@ -255,28 +236,23 @@ double CPU_Reference(
     int pass_num = 0;
     while (pass_num < max_passes)
     {
+        // Pass initialization
         if (pass_stats)
             pass_timer.Start();
-
         if (iter_stats)
             iter_timer.Start();
-        // Pass initialization
+
         auto &current_graph = *c_graph;
         SizeT nodes = current_graph.nodes;
-        //util::PrintMsg("pass " + std::to_string(pass_num)
-        //    + ", #v = " + std::to_string(nodes)
-        //    + ", #e = " + std::to_string(current_graph.edges));
-        std::vector<VertexT> *c_communities = new std::vector<VertexT>;
+        auto c_communities = new std::vector<VertexT>;
         auto &current_communities = *c_communities;
         current_communities.reserve(nodes);
+
         for (VertexT v = 0; v < nodes; v++)
         {
             current_communities[v] = v;
             w_v2[v] = 0;
             w_v2self[v] = 0;
-        }
-        for (VertexT v = 0; v < nodes; v++)
-        {
             SizeT start_e = current_graph.GetNeighborListOffset(v);
             SizeT degree  = current_graph.GetNeighborListLength(v);
 
@@ -289,15 +265,13 @@ double CPU_Reference(
                 if (u == v)
                     w_v2self[v] += w;
             }
-        }
-        for (VertexT v = 0; v < nodes; v++)
-        {
             w_c2[v] = w_v2[v];
         }
         if (iter_stats)
             iter_timer.Stop();
         util::PrintMsg("pass " + std::to_string(pass_num)
-            + ", pre-iter, elapsed = " + std::to_string(iter_timer.ElapsedMillis()), iter_stats);
+            + ", pre-iter, elapsed = "
+            + std::to_string(iter_timer.ElapsedMillis()), iter_stats);
 
         // Modulation Optimization
         int iter_num = 0;
@@ -309,7 +283,6 @@ double CPU_Reference(
             ValueT iter_gain = 0;
             for (VertexT v = 0; v < nodes; v++)
             {
-                //w_v2c.clear();
                 SizeT start_e = current_graph.GetNeighborListOffset(v);
                 SizeT degree  = current_graph.GetNeighborListLength(v);
 
@@ -321,13 +294,7 @@ double CPU_Reference(
                     ValueT  w = current_graph.edge_values[e];
                     VertexT c = current_communities[u];
 
-                    //auto it = w_v2c.find(c);
-                    //if (it == w_v2c.end())
-                    //    w_v2c[c] = w;
-                    //else
-                    //    it -> second += w;
                     if (!util::isValid(w_v2c[c]))
-                    //if (w_v2c[c] < 0)
                     {
                         w_v2c[c] = w;
                         neighbor_comms[num_neighbor_comms] = c;
@@ -339,24 +306,15 @@ double CPU_Reference(
                 VertexT org_comm = current_communities[v];
                 VertexT new_comm = org_comm;
                 ValueT  w_v2c_org = 0;
-                //auto it = w_v2c.find(org_comm);
-                //if (it != w_v2c.end())
-                //    w_v2c_org = it -> second;
                 if (util::isValid(w_v2c[org_comm]))
-                //if (w_v2c[org_comm] >= 0)
                     w_v2c_org = w_v2c[org_comm];
-                //ValueT  w_c2_org = w_c2[org_comm];
                 ValueT  w_v2_v   = w_v2[v];
-                //ValueT  w_v2self_v = w_v2self[v];
-                //ValueT  w_v2_v_div_m2 = w_v2[v] / m2;
-                ValueT  gain_base  = w_v2self[v] - w_v2c_org - (w_v2[v] - w_c2[org_comm]) * w_v2_v / m2;
+                ValueT  gain_base = w_v2self[v] - w_v2c_org
+                    - (w_v2[v] - w_c2[org_comm]) * w_v2_v / m2;
                 ValueT  max_gain = 0;
 
-                //for (auto it = w_v2c.begin(); it != w_v2c.end(); it++)
                 for (VertexT i = 0; i < num_neighbor_comms; i ++)
                 {
-                    //if (it -> first == org_comm)
-                    //    continue;
                     VertexT c = neighbor_comms[i];
                     if (c == org_comm)
                     {
@@ -365,24 +323,21 @@ double CPU_Reference(
                     }
                     ValueT  w_v2c_c = w_v2c[c];
                     w_v2c[c] = util::PreDefinedValues<ValueT>::InvalidValue;
-                    //w_v2c[c] = -1;
-                    //ValueT gain = it -> second - w_c2[it -> first] * w_v2_v_div_m2;
                     ValueT gain = gain_base + w_v2c_c - w_c2[c] * w_v2_v / m2;
-                    
+
                     if (gain > max_gain)
                     {
                         max_gain = gain;
-                        //new_comm = it -> first;
                         new_comm = c;
                     }
                 }
-                //max_gain += gain_base;
+
                 if (max_gain > 0 && new_comm != current_communities[v])
                 {
                     iter_gain += max_gain;
                     current_communities[v] = new_comm;
-                    w_c2[new_comm] += w_v2[v];//w_v2c[new_comm] + w_v2self_v;
-                    w_c2[org_comm] -= w_v2[v];//w_v2c[org_comm];
+                    w_c2[new_comm] += w_v2[v];
+                    w_c2[org_comm] -= w_v2[v];
                 }
             }
 
@@ -398,16 +353,15 @@ double CPU_Reference(
                 + ", q = " + std::to_string(q)
                 + ", iter_gain = " + std::to_string(iter_gain)
                 + ", pass_gain = " + std::to_string(pass_gain)
-                + ", elapsed = " + std::to_string(iter_timer.ElapsedMillis()), iter_stats);
+                + ", elapsed = "
+                + std::to_string(iter_timer.ElapsedMillis()), iter_stats);
             if (iter_gain < iter_gain_threshold)
                 break;
         }
 
+        // Community Aggregation
         if (iter_stats)
             iter_timer.Start();
-        // Community Aggregation
-        //w_v2c.clear();
-        //comm_sets.clear();
         VertexT num_comms = 0;
         for (VertexT v = 0; v < nodes; v++)
             comm_convert[v] = 0;
@@ -420,15 +374,9 @@ double CPU_Reference(
             comm_convert[v] = num_comms;
             num_comms ++;
         }
-        //comm_sets.clear();
 
         for (VertexT v = 0; v < nodes; v++)
-        {
             current_communities[v] = comm_convert[current_communities[v]];
-            //util::PrintMsg("pass " + std::to_string(pass_num)
-            //    + " : " + std::to_string(v) + " => "
-            //    + std::to_string(current_communities[v]));
-        }
         pass_communities -> push_back(c_communities);
 
         for (VertexT v = 0; v < nodes; v++)
@@ -445,21 +393,12 @@ double CPU_Reference(
                 ValueT  w = current_graph.edge_values[e];
                 VertexT comm_u = current_communities[u];
 
-                //auto it = w_c2c_v.find(comm_u);
-                //if (it == w_c2c_v.end())
-                //    w_c2c_v[comm_u] = w;
-                //else
-                //    it -> second += w;
                 w_c2c_c.push_back(std::make_pair(comm_u, w));
             }
         }
 
         SizeT num_edges = 0;
         auto &w_2c = w_v2c;
-        //new_column_indices.clear();
-        //new_row_offsets   .clear();
-        //new_edge_values   .clear();
-        //new_column_indices.push_back(0);
         temp_row_offsets[0] = 0;
         for (VertexT c = 0; c < num_comms; c++)
         {
@@ -474,7 +413,7 @@ double CPU_Reference(
                     w_2c[u_c] = w;
                     neighbor_comms[num_neighbor_comms] = u_c;
                     num_neighbor_comms ++;
-                } else 
+                } else
                     w_2c[u_c] += w;
             }
             w_c2c_c.clear();
@@ -496,51 +435,30 @@ double CPU_Reference(
         if (has_pass_graphs)
             pass_graphs -> push_back(n_graph);
         next_graph.Allocate(num_comms, num_edges, util::HOST);
-        /*auto &row_offsets    = next_graph.CsrT::row_offsets;
-        auto &column_indices = next_graph.CsrT::column_indices;
-        auto &edge_values    = next_graph.CsrT::edge_values;
-        SizeT edge_counter = 0;
-        for (VertexT c = 0; c < num_comms; c++)
-        {
-            row_offsets[c] = edge_counter;
-            auto &w_c2c_c = w_c2c[c];
-            SizeT degree = w_c2c_c.size();
-            SizeT k = 0;
-
-            for (auto it = w_c2c_c.begin(); it != w_c2c_c.end(); it++)
-            {
-                SizeT e = edge_counter + k;
-                VertexT u = it -> first;
-                ValueT  w = it -> second;
-                column_indices[e] = u;
-                edge_values   [e] = w;
-                k ++;
-            }
-            edge_counter += degree;
-            w_c2c_c.clear();
-        }
-        row_offsets[num_comms] = num_edges;*/
-        memcpy(next_graph.CsrT::row_offsets    + 0, temp_row_offsets    + 0, sizeof(SizeT) * (num_comms + 1));
-        memcpy(next_graph.CsrT::column_indices + 0, temp_column_indices + 0, sizeof(VertexT) * num_edges);
-        memcpy(next_graph.CsrT::edge_values    + 0, temp_edge_values    + 0, sizeof(ValueT ) * num_edges);
-        //new_row_offsets.clear();
-        //new_column_indices.clear();
-        //new_edge_values.clear();
+        memcpy(next_graph.CsrT::row_offsets    + 0, temp_row_offsets    + 0,
+            sizeof(SizeT  ) * (num_comms + 1));
+        memcpy(next_graph.CsrT::column_indices + 0, temp_column_indices + 0,
+            sizeof(VertexT) * num_edges);
+        memcpy(next_graph.CsrT::edge_values    + 0, temp_edge_values    + 0,
+            sizeof(ValueT ) * num_edges);
 
         if (iter_stats)
             iter_timer.Stop();
         util::PrintMsg("pass " + std::to_string(pass_num)
-            + ", graph compaction, elapsed = " + std::to_string(iter_timer.ElapsedMillis()), iter_stats);
+            + ", graph compaction, elapsed = "
+            + std::to_string(iter_timer.ElapsedMillis()), iter_stats);
 
         if (pass_stats)
             pass_timer.Stop();
         util::PrintMsg("pass " + std::to_string(pass_num)
             + ", #v = " + std::to_string(nodes) + " -> " + std::to_string(num_comms)
-            + ", #e = " + std::to_string(current_graph.edges) + " -> " + std::to_string(num_edges)
+            + ", #e = " + std::to_string(current_graph.edges)
+            + " -> " + std::to_string(num_edges)
             + ", #iter = " + std::to_string(iter_num)
             + ", q = " + std::to_string(q)
             + ", pass_gain = " + std::to_string(pass_gain)
-            + ", elapsed = " + std::to_string(pass_timer.ElapsedMillis()), pass_stats);
+            + ", elapsed = "
+            + std::to_string(pass_timer.ElapsedMillis()), pass_stats);
 
         if (pass_num != 0 && !has_pass_graphs)
         {
@@ -564,19 +482,10 @@ double CPU_Reference(
         auto &v2c = *(*it);
         for (VertexT v = 0; v < graph.nodes; v++)
         {
-            //if (communities[v] >= v2c.size())
-            //{
-            //    util::PrintMsg("pass " + std::to_string(pass_num)
-            //        + ", communites[" + std::to_string(v)
-            //        + "] >= " + std::to_string(v2c.size()));
-            //    continue;
-            //}
             communities[v] = v2c[communities[v]];
         }
         pass_num ++;
     }
-    //for (VertexT v = 0; v < graph.nodes; v++)
-    //    util::PrintMsg(std::to_string(v) + " => " + std::to_string(communities[v]));
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
 
