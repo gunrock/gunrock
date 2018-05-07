@@ -70,7 +70,7 @@ struct main_struct
             {
                 int i = 0;
                 util::PrintMsg("__________________________", !quiet);
-                float elapsed = app::louvain::CPU_Reference(
+                float elapsed = app::louvain::OMP_Reference(
                     parameters, graph.csr(), ref_communities);
                 util::PrintMsg("--------------------------\nRun "
                     + std::to_string(i) + " elapsed: "

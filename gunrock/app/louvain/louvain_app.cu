@@ -35,7 +35,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_app    (parameters));
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
-
+    GUARD_CU(UseParameters_test   (parameters));
     return retval;
 }
 
