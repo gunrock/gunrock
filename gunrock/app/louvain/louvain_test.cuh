@@ -26,15 +26,22 @@ namespace louvain {
  * Housekeeping Routines
  ******************************************************************************/
 
-cudaError_t UseParameters_enactor(util::Parameters &parameters)
+cudaError_t UseParameters_test(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
 
     GUARD_CU(parameters.Use<uint32_t>(
         "omp-threads",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         0,
         "Number of threads for parallel omp louvain implementation; 0 for default.",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "omp-runs",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        1,
+        "Number of runs for parallel omp louvain implementation.",
         __FILE__, __LINE__));
 
     return retval;
@@ -562,6 +569,7 @@ double OMP_Reference(
         if (num_threads == 0)
             num_threads = omp_get_num_threads();
     }
+    util::PrintMsg("#threads = " + std::to_string(num_threads));
 
     bool has_pass_communities = false;
     if (pass_communities != NULL)
@@ -575,37 +583,45 @@ double OMP_Reference(
 
     ValueT q = Get_Modularity(graph);
     ValueT  **w_v2cs        = new ValueT*[num_threads];
-    VertexT *neighbor_comms = new VertexT[graph.nodes];
+    VertexT **neighbor_commss = new VertexT*[num_threads];
+    ValueT  *iter_gains     = new ValueT [num_threads];
     VertexT *comm_convert   = new VertexT[graph.nodes];
     ValueT  *w_v2self       = new ValueT [graph.nodes];
     ValueT  *w_v2           = new ValueT [graph.nodes];
     ValueT  *w_c2           = new ValueT [graph.nodes];
+    VertexT *comm_counts    = new VertexT[num_threads];
+
     typedef std::pair<VertexT, ValueT> pairT;
-    std::vector<pairT> *w_c2c = new std::vector<pairT>[graph.nodes];
+    std::vector<pairT> **w_c2cs = new std::vector<pairT>*[num_threads];
     #pragma omp parallel num_threads(num_threads)
     {
         int thread_num = omp_get_thread_num();
         w_v2cs[thread_num] = new ValueT[graph.nodes];
+        auto &w_v2c = w_v2cs[thread_num];
+        for (SizeT v = 0; v < graph.nodes; v++)
+            w_v2c[v] = util::PreDefinedValues<ValueT>::InvalidValue;
+
+        neighbor_commss[thread_num] = new VertexT[graph.nodes];
+        w_c2cs         [thread_num] = new std::vector<pairT>[graph.nodes];
     }
 
-    GraphT temp_graph;
-    temp_graph.Allocate(graph.nodes, graph.edges, util::HOST);
-    auto &temp_row_offsets    = temp_graph.CsrT::row_offsets;
-    auto &temp_column_indices = temp_graph.CsrT::column_indices;
-    auto &temp_edge_values    = temp_graph.CsrT::edge_values;
+    //GraphT temp_graph;
+    //temp_graph.Allocate(graph.nodes, graph.edges, util::HOST);
+    //auto &temp_row_offsets    = temp_graph.CsrT::row_offsets;
+    //auto &temp_column_indices = temp_graph.CsrT::column_indices;
+    //auto &temp_edge_values    = temp_graph.CsrT::edge_values;
+    SizeT *temp_row_offsets = new SizeT[graph.nodes + 1];
+    std::vector<SizeT > *temp_column_indicess = new std::vector<SizeT >[num_threads];
+    std::vector<ValueT> *temp_edge_valuess    = new std::vector<ValueT>[num_threads];
 
     auto c_graph = &graph;
     auto n_graph = c_graph;
     n_graph = NULL;
 
     ValueT m2 = 0;
-    #pragma omp parallel for num_threads(num_threads) reduction(+:m2)
+    //#pragma omp parallel for num_threads(num_threads) reduction(+:m2)
     for (SizeT e = 0; e < graph.edges; e++)
         m2 += graph.CsrT::edge_values[e];
-
-    #pragma omp parallel for num_threads(num_threads)
-    for (SizeT v = 0; v < graph.nodes; v++)
-        w_v2c[v] = util::PreDefinedValues<ValueT>::InvalidValue;
 
     util::CpuTimer cpu_timer, pass_timer, iter_timer;
     cpu_timer.Start();
@@ -613,6 +629,9 @@ double OMP_Reference(
     int pass_num = 0;
     while (pass_num < max_passes)
     {
+        //if (pass_num > 1)
+        //    num_threads = 1;
+
         // Pass initialization
         if (pass_stats)
             pass_timer.Start();
@@ -654,214 +673,380 @@ double OMP_Reference(
         // Modulation Optimization
         int iter_num = 0;
         ValueT pass_gain = 0;
-        while (iter_num < max_iters)
+        ValueT iter_gain = 0;
+        bool to_continue = true;
+
+        
+        //#pragma omp parallel num_threads(num_threads)
+        //while (iter_num < max_iters)
         {
-            if (iter_stats)
-                iter_timer.Start();
-            ValueT iter_gain = 0;
-
-            #pragma omp parallel reduction(+:iter_gain)
+            while (to_continue)
             {
-                int thread_num = omp_get_thread_num();
-                VertexT start_v = nodes / num_threads * thread_num;
-                VertexT end_v   = nodes / num_threads * (thread_num + 1);
-                auto &w_v2c = w_v2cs[thread_num];
-                ValueT thread_gain = 0;
-                if (thread_num == 0)
-                    start_v = 0;
-                if (thread_num == num_threads - 1)
-                    end_v = nodes;
-
-                for (VertexT v = start_v; v < end_v; v++)
+                //int thread_num = omp_get_thread_num();
+                //#pragma omp single
                 {
-                    SizeT start_e = current_graph.GetNeighborListOffset(v);
-                    SizeT degree  = current_graph.GetNeighborListLength(v);
+                    if (iter_stats)
+                        iter_timer.Start();
+                    iter_gain = 0;
+                }
+                for (int t = 0; t < num_threads; t++)
+                    iter_gains[t] = 0;
+                //iter_gains[thread_num] = 0;
+                //auto &w_v2c = w_v2cs[thread_num];
+                //auto &neighbor_comms = neighbor_commss[thread_num];
+                //auto &iter_gain = iter_gains[thread_num];
 
-                    VertexT num_neighbor_comms = 0;
-                    for (SizeT k = 0; k < degree; k++)
+                #pragma omp parallel for num_threads(num_threads)
+                //#pragma omp for
+                for (VertexT v =  0; v < nodes; v++)
+                //#pragma omp parallel num_threads(num_threads)
+                {
+                    int thread_num = omp_get_thread_num();
+                    //iter_gains[thread_num] = 0;
+                    //VertexT start_v = nodes / num_threads * thread_num;
+                    //VertexT end_v   = nodes / num_threads * (thread_num + 1);
+                    auto &w_v2c = w_v2cs[thread_num];
+                    auto &neighbor_comms = neighbor_commss[thread_num];
+                    //auto &iter_gain = iter_gains[thread_num];
+                    //if (thread_num == 0)
+                    //    start_v = 0;
+                    //if (thread_num == num_threads - 1)
+                    //    end_v = nodes;
+
+                    //for (VertexT v = start_v; v < end_v; v++)
                     {
-                        SizeT   e = start_e + k;
-                        VertexT u = current_graph.GetEdgeDest(e);
-                        ValueT  w = current_graph.edge_values[e];
-                        VertexT c = current_communities[u];
+                        SizeT start_e = current_graph.GetNeighborListOffset(v);
+                        SizeT degree  = current_graph.GetNeighborListLength(v);
 
-                        if (!util::isValid(w_v2c[c]))
+                        VertexT num_neighbor_comms = 0;
+                        for (SizeT k = 0; k < degree; k++)
                         {
-                            w_v2c[c] = w;
-                            neighbor_comms[num_neighbor_comms] = c;
-                            num_neighbor_comms ++;
-                        } else
-                            w_v2c[c] += w;
-                    }
+                            SizeT   e = start_e + k;
+                            VertexT u = current_graph.GetEdgeDest(e);
+                            ValueT  w = current_graph.edge_values[e];
+                            VertexT c = current_communities[u];
 
-                    VertexT org_comm = current_communities[v];
-                    VertexT new_comm = org_comm;
-                    ValueT  w_v2c_org = 0;
-                    if (util::isValid(w_v2c[org_comm]))
-                        w_v2c_org = w_v2c[org_comm];
-                    ValueT  w_v2_v   = w_v2[v];
-                    ValueT  gain_base = w_v2self[v] - w_v2c_org
-                        - (w_v2[v] - w_c2[org_comm]) * w_v2_v / m2;
-                    ValueT  max_gain = 0;
+                            if (!util::isValid(w_v2c[c]))
+                            {
+                                w_v2c[c] = w;
+                                neighbor_comms[num_neighbor_comms] = c;
+                                num_neighbor_comms ++;
+                            } else
+                                w_v2c[c] += w;
+                        }
 
-                    for (VertexT i = 0; i < num_neighbor_comms; i ++)
-                    {
-                        VertexT c = neighbor_comms[i];
-                        if (c == org_comm)
+                        VertexT org_comm = current_communities[v];
+                        VertexT new_comm = org_comm;
+                        ValueT  w_v2c_org = 0;
+                        if (util::isValid(w_v2c[org_comm]))
+                            w_v2c_org = w_v2c[org_comm];
+                        ValueT  w_v2_v   = w_v2[v];
+                        ValueT  gain_base = w_v2self[v] - w_v2c_org
+                            - (w_v2_v - w_c2[org_comm]) * w_v2_v / m2;
+                            //- w_v2_v * w_v2_v / m2;
+                        ValueT  max_gain = 0;
+                        ValueT  max_w_v2c_c = 0;
+
+                        for (VertexT i = 0; i < num_neighbor_comms; i ++)
                         {
+                            VertexT c = neighbor_comms[i];
+                            if (c == org_comm)
+                            {
+                                w_v2c[c] = util::PreDefinedValues<ValueT>::InvalidValue;
+                                continue;
+                            }
+                            ValueT  w_v2c_c = w_v2c[c];
                             w_v2c[c] = util::PreDefinedValues<ValueT>::InvalidValue;
-                            continue;
-                        }
-                        ValueT  w_v2c_c = w_v2c[c];
-                        w_v2c[c] = util::PreDefinedValues<ValueT>::InvalidValue;
-                        ValueT gain = gain_base + w_v2c_c - w_c2[c] * w_v2_v / m2;
+                            ValueT gain = gain_base + w_v2c_c
+                                - w_c2[c] * w_v2_v / m2;
+                                //- (w_c2[c] - w_c2[org_comm]) * w_v2_v / m2;
 
-                        if (gain > max_gain)
-                        {
-                            max_gain = gain;
-                            new_comm = c;
+                            if (gain > max_gain)
+                            {
+                                max_gain = gain;
+                                new_comm = c;
+                                max_w_v2c_c = w_v2c_c;
+                            }
                         }
-                    }
 
-                    if (max_gain > 0 && new_comm != current_communities[v])
-                    {
-                        thread_gain += max_gain;
-                        current_communities[v] = new_comm;
-                        #pragma omp atomic
+                        if (max_gain > 0 && new_comm != current_communities[v])
                         {
-                            w_c2[new_comm] += w_v2[v];
-                        }
-                        #pragma omp atomic
-                        {
-                            w_c2[org_comm] -= w_v2[v];
+                            max_gain = gain_base + max_w_v2c_c
+                                - (w_c2[new_comm] - w_c2[org_comm]) * w_v2_v / m2;
+                            current_communities[v] = new_comm;
+                            #pragma omp atomic
+                                w_c2[new_comm] += w_v2[v];
+                            
+                            #pragma omp atomic
+                                w_c2[org_comm] -= w_v2[v];
+                            
+                            iter_gains[thread_num] += max_gain;
                         }
                     }
                 }
 
-                #pragma omp atomic
+                //#pragma omp barrier
+                //#pragma omp single
                 {
-                    iter_gain += thread_gain;
-                }
-            }
+                    iter_gain = 0;
+                    for (int t = 0; t < num_threads; t++)
+                    {
+                        iter_gain += iter_gains[t];
+                    }
 
-            iter_num ++;
-            iter_gain *= 2;
-            iter_gain /= m2;
-            q += iter_gain;
-            pass_gain += iter_gain;
-            if (iter_stats)
-                iter_timer.Stop();
-            util::PrintMsg("pass " + std::to_string(pass_num)
-                + ", iter " + std::to_string(iter_num)
-                + ", q = " + std::to_string(q)
-                + ", iter_gain = " + std::to_string(iter_gain)
-                + ", pass_gain = " + std::to_string(pass_gain)
-                + ", elapsed = "
-                + std::to_string(iter_timer.ElapsedMillis()), iter_stats);
-            if (iter_gain < iter_gain_threshold)
-                break;
-        }
+                    iter_gain *= 2;
+                    iter_gain /= m2;
+                    q += iter_gain;
+                    pass_gain += iter_gain;
+                    if (iter_stats)
+                    {
+                        iter_timer.Stop();
+                        util::PrintMsg("pass " + std::to_string(pass_num)
+                            + ", iter " + std::to_string(iter_num)
+                            + ", q = " + std::to_string(q)
+                            + ", iter_gain = " + std::to_string(iter_gain)
+                            + ", pass_gain = " + std::to_string(pass_gain)
+                            + ", elapsed = "
+                            + std::to_string(iter_timer.ElapsedMillis()), iter_stats);
+                    }
+                    iter_num ++;
+                    if (iter_gain < iter_gain_threshold || iter_num >= max_iters)
+                        to_continue = false;
+                }
+            } // end of while (to_continue)
+        } // end of omp parallel
 
         // Community Aggregation
         if (iter_stats)
             iter_timer.Start();
+       
+        //util::CpuTimer timer1, timer2, timer3, timer4;
+
+        //timer1.Start(); 
         VertexT num_comms = 0;
-        for (VertexT v = 0; v < nodes; v++)
-            comm_convert[v] = 0;
-        for (VertexT v = 0; v < nodes; v++)
-            comm_convert[current_communities[v]] = 1;
-        for (VertexT v = 0; v < nodes; v++)
-        {
-            if (comm_convert[v] == 0)
-                continue;
-            comm_convert[v] = num_comms;
-            num_comms ++;
-        }
-
-        for (VertexT v = 0; v < nodes; v++)
-            current_communities[v] = comm_convert[current_communities[v]];
-        pass_communities -> push_back(c_communities);
-
-        for (VertexT v = 0; v < nodes; v++)
-        {
-            SizeT start_e = current_graph.GetNeighborListOffset(v);
-            SizeT degree  = current_graph.GetNeighborListLength(v);
-            VertexT comm_v = current_communities[v];
-            auto &w_c2c_c = w_c2c[comm_v];
-
-            for (SizeT k = 0; k < degree; k++)
-            {
-                SizeT   e = start_e + k;
-                VertexT u = current_graph.GetEdgeDest(e);
-                ValueT  w = current_graph.edge_values[e];
-                VertexT comm_u = current_communities[u];
-
-                w_c2c_c.push_back(std::make_pair(comm_u, w));
-            }
-        }
-
         SizeT num_edges = 0;
-        auto &w_2c = w_v2c;
-        temp_row_offsets[0] = 0;
-        for (VertexT c = 0; c < num_comms; c++)
+        #pragma omp parallel num_threads(num_threads)
         {
-            auto &w_c2c_c = w_c2c[c];
-            VertexT num_neighbor_comms = 0;
-            for (auto it = w_c2c_c.begin(); it != w_c2c_c.end(); it++)
+            int thread_num = omp_get_thread_num();
+            VertexT start_v = nodes / num_threads * thread_num;
+            VertexT end_v   = nodes / num_threads * (thread_num + 1);
+            if (thread_num == 0)
+                start_v = 0;
+            if (thread_num == num_threads - 1)
+                end_v = nodes;
+
+            #pragma omp for
+            for (VertexT v = 0; v < nodes; v++)
+            //for (VertexT v = start_v; v < end_v; v++)
+                comm_convert[v] = 0;
+            #pragma omp barrier
+            //util::PrintMsg(std::to_string(thread_num) + " 0");
+
+            #pragma omp for
+            for (VertexT v = 0; v < nodes; v++)
+            //for (VertexT v = start_v; v < end_v; v++)
+                comm_convert[current_communities[v]] = 1;
+            #pragma omp barrier
+            //util::PrintMsg(std::to_string(thread_num) + " 1");
+
+            auto &comm_count = comm_counts[thread_num];
+            comm_count = 1;
+            for (VertexT v = start_v; v < end_v; v++)
             {
-                VertexT u_c = it -> first;
-                ValueT  w = it -> second;
-                if (!util::isValid(w_2c[u_c]))
+                if (comm_convert[v] == 0)
+                    continue;
+
+                comm_convert[v] = comm_count;
+                comm_count ++;
+            }
+            #pragma omp barrier
+            //util::PrintMsg(std::to_string(thread_num) + " 2");
+            
+            #pragma omp single
+            {
+                num_comms = 0;
+                for (int t = 0; t < num_threads; t++)
                 {
-                    w_2c[u_c] = w;
-                    neighbor_comms[num_neighbor_comms] = u_c;
-                    num_neighbor_comms ++;
-                } else
-                    w_2c[u_c] += w;
+                    VertexT temp = comm_counts[t] - 1;
+                    comm_counts[t] = num_comms;
+                    num_comms += temp;
+                }
             }
-            w_c2c_c.clear();
 
-            for (VertexT i = 0; i < num_neighbor_comms; i++)
+            //#pragma omp for
+            //for (VertexT v = 0; v < nodes; v++)
+            for (VertexT v = start_v; v < end_v; v++)
             {
-                VertexT u_c = neighbor_comms[i];
-                ValueT  w = w_2c[u_c];
-                temp_column_indices[num_edges + i] = u_c;
-                temp_edge_values   [num_edges + i] = w;
-                w_2c[u_c] = util::PreDefinedValues<ValueT>::InvalidValue;
+                if (comm_convert[v] != 0)
+                {
+                    comm_convert[v] --;
+                    comm_convert[v] += comm_counts[thread_num];
+                }
             }
-            num_edges += num_neighbor_comms;
-            temp_row_offsets[c+1] = num_edges;
-        }
+            #pragma omp barrier
+            //util::PrintMsg(std::to_string(thread_num) + " 3");
 
-        n_graph = new GraphT;
-        auto &next_graph = *n_graph;
-        if (has_pass_graphs)
-            pass_graphs -> push_back(n_graph);
-        next_graph.Allocate(num_comms, num_edges, util::HOST);
-        memcpy(next_graph.CsrT::row_offsets    + 0, temp_row_offsets    + 0,
-            sizeof(SizeT  ) * (num_comms + 1));
-        memcpy(next_graph.CsrT::column_indices + 0, temp_column_indices + 0,
-            sizeof(VertexT) * num_edges);
-        memcpy(next_graph.CsrT::edge_values    + 0, temp_edge_values    + 0,
-            sizeof(ValueT ) * num_edges);
+            #pragma omp for
+            for (VertexT v = 0; v < nodes; v++)
+            //for (VertexT v = start_v; v < end_v; v++)
+                current_communities[v] = comm_convert[current_communities[v]];
+       //}
+ 
+            #pragma omp single
+            {
+                pass_communities -> push_back(c_communities);
+                //timer1.Stop();
+
+                //timer2.Start();
+            }
+        
+        //#pragma omp parallel for num_threads(num_threads) //reduction(+:iter_gain)
+        //for (VertexT v = 0; v < nodes; v++)
+        //{
+            //int thread_num = omp_get_thread_num();
+            //VertexT start_v = nodes / num_threads * thread_num;
+            //VertexT end_v   = nodes / num_threads * (thread_num + 1);
+            //if (thread_num == 0)
+            //    start_v = 0;
+            //if (thread_num == num_threads - 1)
+            //    end_v = nodes;
+
+            #pragma omp for
+            for (VertexT v = 0; v < nodes; v++)
+            //for (VertexT v = start_v; v < end_v; v++)
+            {
+                int thread_num = omp_get_thread_num();
+                auto &w_c2c = w_c2cs[thread_num];
+                SizeT start_e = current_graph.GetNeighborListOffset(v);
+                SizeT degree  = current_graph.GetNeighborListLength(v);
+                VertexT comm_v = current_communities[v];
+                auto &w_c2c_c = w_c2c[comm_v];
+
+                for (SizeT k = 0; k < degree; k++)
+                {
+                    SizeT   e = start_e + k;
+                    VertexT u = current_graph.GetEdgeDest(e);
+                    ValueT  w = current_graph.edge_values[e];
+                    VertexT comm_u = current_communities[u];
+
+                    w_c2c_c.push_back(std::make_pair(comm_u, w));
+                }
+            }
+        //}
+
+            //#pragma omp single
+            //{
+            //    timer2.Stop();
+            //    timer3.Start();
+            //}
+        //temp_row_offsets[0] = 0;
+        //#pragma omp parallel num_threads(num_threads)
+        //{
+            //int thread_num = omp_get_thread_num();
+            VertexT start_c = num_comms / num_threads * thread_num;
+            VertexT end_c   = num_comms / num_threads * (thread_num + 1);
+            if (thread_num == 0)
+                start_c = 0;
+            if (thread_num == num_threads - 1)
+                end_c = num_comms;
+
+            auto &temp_column_indices = temp_column_indicess[thread_num];
+            auto &temp_edge_values    = temp_edge_valuess   [thread_num];
+            auto &w_2c                = w_v2cs              [thread_num];
+            auto &neighbor_comms      = neighbor_commss     [thread_num];
+
+            for (VertexT c = start_c; c < end_c; c++)
+            {
+                VertexT num_neighbor_comms = 0;
+                for (int t = 0; t < num_threads; t++)
+                {
+                    auto &w_c2c_c = w_c2cs[t][c];
+                    for (auto it = w_c2c_c.begin(); it != w_c2c_c.end(); it++)
+                    {
+                        VertexT u_c = it -> first;
+                        ValueT  w = it -> second;
+                        if (!util::isValid(w_2c[u_c]))
+                        {
+                            w_2c[u_c] = w;
+                            neighbor_comms[num_neighbor_comms] = u_c;
+                            num_neighbor_comms ++;
+                        } else
+                            w_2c[u_c] += w;
+                    }
+                    w_c2c_c.clear();
+                }
+
+                for (VertexT i = 0; i < num_neighbor_comms; i++)
+                {
+                    VertexT u_c = neighbor_comms[i];
+                    ValueT  w = w_2c[u_c];
+                    temp_column_indices.push_back(u_c);
+                    temp_edge_values   .push_back(w);
+                    w_2c[u_c] = util::PreDefinedValues<ValueT>::InvalidValue;
+                }
+                temp_row_offsets[c] = num_neighbor_comms;
+            }
+            
+            #pragma omp barrier
+            #pragma omp single
+            {
+                num_edges = 0;
+                for (VertexT c = 0; c < num_comms; c++)
+                {
+                    SizeT temp = temp_row_offsets[c];
+                    temp_row_offsets[c] = num_edges;
+                    num_edges += temp;
+                }
+                temp_row_offsets[num_comms] = num_edges;
+
+                n_graph = new GraphT;
+                //auto &next_graph = *n_graph;
+                if (has_pass_graphs)
+                    pass_graphs -> push_back(n_graph);
+                n_graph -> Allocate(num_comms, num_edges, util::HOST);   
+            }
+
+            memcpy(n_graph -> CsrT::column_indices + temp_row_offsets[start_c], temp_column_indices.data(),
+                temp_column_indices.size() * sizeof(VertexT));
+            memcpy(n_graph -> CsrT::edge_values + temp_row_offsets[start_c], temp_edge_values.data(),
+                temp_edge_values.size() * sizeof(ValueT));
+            memcpy(n_graph -> CsrT::row_offsets    + start_c, temp_row_offsets    + start_c,
+                sizeof(SizeT  ) * (end_c - start_c + ((thread_num == num_threads - 1) ? 1 : 0)));
+            temp_column_indices.clear();
+            temp_edge_values.clear();
+        }
+        //timer3.Stop();
+
+        //timer4.Start();
+       //timer4.Stop();
+
+        //util::PrintMsg("Timers = "
+        //    + std::to_string(timer1.ElapsedMillis()) + " "
+        //    + std::to_string(timer2.ElapsedMillis()) + " "
+        //    + std::to_string(timer3.ElapsedMillis()) + " "
+        //    + std::to_string(timer4.ElapsedMillis()));
 
         if (iter_stats)
+        {
             iter_timer.Stop();
-        util::PrintMsg("pass " + std::to_string(pass_num)
-            + ", graph compaction, elapsed = "
-            + std::to_string(iter_timer.ElapsedMillis()), iter_stats);
+            util::PrintMsg("pass " + std::to_string(pass_num)
+                + ", graph compaction, elapsed = "
+                + std::to_string(iter_timer.ElapsedMillis()));
+        }
 
         if (pass_stats)
+        {
             pass_timer.Stop();
-        util::PrintMsg("pass " + std::to_string(pass_num)
-            + ", #v = " + std::to_string(nodes) + " -> " + std::to_string(num_comms)
-            + ", #e = " + std::to_string(current_graph.edges)
-            + " -> " + std::to_string(num_edges)
-            + ", #iter = " + std::to_string(iter_num)
-            + ", q = " + std::to_string(q)
-            + ", pass_gain = " + std::to_string(pass_gain)
-            + ", elapsed = "
-            + std::to_string(pass_timer.ElapsedMillis()), pass_stats);
+            util::PrintMsg("pass " + std::to_string(pass_num)
+                + ", #v = " + std::to_string(nodes) + " -> " + std::to_string(num_comms)
+                + ", #e = " + std::to_string(current_graph.edges)
+                + " -> " + std::to_string(num_edges)
+                + ", #iter = " + std::to_string(iter_num)
+                + ", q = " + std::to_string(q)
+                + ", pass_gain = " + std::to_string(pass_gain)
+                + ", elapsed = "
+                + std::to_string(pass_timer.ElapsedMillis()));
+        }
 
         if (pass_num != 0 && !has_pass_graphs)
         {
@@ -904,14 +1089,29 @@ double OMP_Reference(
         delete pass_communities; pass_communities = NULL;
     }
 
-    temp_graph.Release();
+    //temp_graph.Release();
+    delete[] temp_row_offsets; temp_row_offsets = NULL;
+    delete[] temp_column_indicess; temp_column_indicess = NULL;
+    delete[] temp_edge_valuess; temp_edge_valuess = NULL;
     delete[] comm_convert; comm_convert = NULL;
-    delete[] w_c2c;        w_c2c        = NULL;
     delete[] w_v2self;     w_v2self     = NULL;
     delete[] w_v2;         w_v2         = NULL;
     delete[] w_c2;         w_c2         = NULL;
-    delete[] w_v2c;        w_v2c        = NULL;
-    delete[] neighbor_comms; neighbor_comms = NULL;
+    #pragma omp parallel num_threads(num_threads)
+    {
+        int thread_num = omp_get_thread_num();
+        delete[] w_v2cs[thread_num];
+        w_v2cs[thread_num]= NULL;
+
+        delete[] neighbor_commss[thread_num];
+        neighbor_commss[thread_num] = NULL;
+
+        delete[] w_c2cs[thread_num];
+        w_c2cs[thread_num] = 0; 
+    }
+    delete[] w_c2cs;       w_c2cs        = NULL;
+    delete[] w_v2cs; w_v2cs = NULL;
+    delete[] neighbor_commss; neighbor_commss = NULL;
     return elapsed;
 }
 

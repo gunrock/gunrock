@@ -66,9 +66,10 @@ struct main_struct
 
             SizeT nodes = graph.nodes;
             ref_communities = new VertexT[nodes];
-            //for (int i = 0; i < num_srcs; i++)
+            int num_runs = parameters.Get<int>("omp-runs");
+            for (int i = 0; i < num_runs; i++)
             {
-                int i = 0;
+                //int i = 0;
                 util::PrintMsg("__________________________", !quiet);
                 float elapsed = app::louvain::OMP_Reference(
                     parameters, graph.csr(), ref_communities);
@@ -81,7 +82,7 @@ struct main_struct
             }
         }
 
-        std::vector<std::string> switches{"advance-mode"};
+        std::vector<std::string> switches{"advance-mode","omp-threads"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [ref_communities](util::Parameters &parameters, GraphT &graph)
             {
