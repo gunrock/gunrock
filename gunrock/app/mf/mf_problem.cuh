@@ -63,7 +63,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     // TODO: Add algorithm specific types here, e.g.:
-    // typedef _ValueT ValueT;
+    typedef _ValueT ValueT;
 
     // TODO: Add the graph representation used in the algorithm, e.g.:
     // typedef typename GraphT::CsrT    CsrT;
@@ -81,10 +81,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     {
         // TODO: add problem specific storage arrays, for example:
         // util::Array1D<SizeT, ValueT>   distances; // distances from source
-        util::Array1D<SizeT, Value>     capacity;           /* Used for storing edge capacity */
-        util::Array1D<SizeT, Value>     excess;             /* Used for storing vertex excess */
-        util::Array1D<SizeT, Value>     flow;               /* Used for storing edge flow */
-        util::Array1D<SizeT, Value>     height;             /* Used for storing vertex height */
+        util::Array1D<SizeT, ValueT>     capacity;           /* Used for storing edge capacity */
+        util::Array1D<SizeT, ValueT>     excess;             /* Used for storing vertex excess */
+        util::Array1D<SizeT, ValueT>     flow;               /* Used for storing edge flow */
+        util::Array1D<SizeT, ValueT>     height;             /* Used for storing vertex height */
         /*
          * @brief Default constructor
          */
