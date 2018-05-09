@@ -61,6 +61,13 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
         1e-6,
         "Modularity threshold to continue further iterations within a pass.",
         __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<double>(
+        "1st-th",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        1e-4,
+        "Modularity threshold to continue further iterations in the first pass.",
+        __FILE__, __LINE__));
    
     GUARD_CU(parameters.Use<bool>(
         "pass-stats",

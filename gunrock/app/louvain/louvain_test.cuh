@@ -563,13 +563,15 @@ double OMP_Reference(
     ValueT  pass_gain_threshold = parameters.Get<ValueT>("pass-th");
     ValueT  iter_gain_threshold = parameters.Get<ValueT>("iter-th");
     int     num_threads = parameters.Get<int   >("omp-threads");
+    ValueT  first_threshold = parameters.Get<ValueT>("1st-th");
 
     #pragma omp parallel
     {
         if (num_threads == 0)
             num_threads = omp_get_num_threads();
     }
-    util::PrintMsg("#threads = " + std::to_string(num_threads));
+    util::PrintMsg("#threads = " + std::to_string(num_threads)
+        + ", 1st-th = " + std::to_string(first_threshold));
 
     bool has_pass_communities = false;
     if (pass_communities != NULL)
@@ -769,18 +771,22 @@ double OMP_Reference(
                             }
                         }
 
-                        if (max_gain > 0 && new_comm != current_communities[v])
+                        if (new_comm != current_communities[v])
                         {
-                            max_gain = gain_base + max_w_v2c_c
-                                - (w_c2[new_comm] - w_c2[org_comm]) * w_v2_v / m2;
-                            current_communities[v] = new_comm;
-                            #pragma omp atomic
-                                w_c2[new_comm] += w_v2[v];
+                            //max_gain = w_v2self[v] - w_v2c_org + max_w_v2c_c
+                            //    - (w_v2_v - w_c2[org_comm] + w_c2[new_comm]) * w_v2_v / m2;
+
+                            if (max_gain > 0)
+                            {
+                                current_communities[v] = new_comm;
+                                #pragma omp atomic
+                                    w_c2[new_comm] += w_v2[v];
                             
-                            #pragma omp atomic
-                                w_c2[org_comm] -= w_v2[v];
+                                #pragma omp atomic
+                                    w_c2[org_comm] -= w_v2[v];
                             
-                            iter_gains[thread_num] += max_gain;
+                                iter_gains[thread_num] += max_gain;
+                            }
                         }
                     }
                 }
@@ -810,7 +816,9 @@ double OMP_Reference(
                             + std::to_string(iter_timer.ElapsedMillis()), iter_stats);
                     }
                     iter_num ++;
-                    if (iter_gain < iter_gain_threshold || iter_num >= max_iters)
+                    if ((pass_num != 0 && iter_gain < iter_gain_threshold) ||
+                        (pass_num == 0 && iter_gain < first_threshold) || 
+                        iter_num >= max_iters)
                         to_continue = false;
                 }
             } // end of while (to_continue)

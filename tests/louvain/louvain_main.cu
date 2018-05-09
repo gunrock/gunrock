@@ -66,12 +66,12 @@ struct main_struct
 
             SizeT nodes = graph.nodes;
             ref_communities = new VertexT[nodes];
-            int num_runs = parameters.Get<int>("omp-runs");
-            for (int i = 0; i < num_runs; i++)
+            //int num_runs = parameters.Get<int>("omp-runs");
+            //for (int i = 0; i < num_runs; i++)
             {
-                //int i = 0;
+                int i = 0;
                 util::PrintMsg("__________________________", !quiet);
-                float elapsed = app::louvain::OMP_Reference(
+                float elapsed = app::louvain::CPU_Reference(
                     parameters, graph.csr(), ref_communities);
                 util::PrintMsg("--------------------------\nRun "
                     + std::to_string(i) + " elapsed: "
@@ -82,14 +82,32 @@ struct main_struct
             }
         }
 
-        std::vector<std::string> switches{"advance-mode","omp-threads"};
+        std::vector<std::string> switches{"advance-mode","omp-threads", "1st-th"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [ref_communities](util::Parameters &parameters, GraphT &graph)
+            [&ref_communities](util::Parameters &parameters, GraphT &graph)
             {
+                bool quiet = parameters.Get<bool>("quiet");
+                bool quick = parameters.Get<bool>("quick");
+                int num_runs = parameters.Get<int>("omp-runs");
+                if (quick && num_runs > 1)
+                    ref_communities = new VertexT[graph.nodes];
+                for (int i = 0; i < num_runs; i++)
+                {
+                    util::PrintMsg("__________________________", !quiet);
+                    float elapsed = app::louvain::OMP_Reference(
+                        parameters, graph.csr(), ref_communities);
+                    util::PrintMsg("--------------------------\nRun "
+                        + std::to_string(i) + " elapsed: "
+                        + std::to_string(elapsed)
+                        + " ms, q = " + std::to_string(app::louvain::Get_Modularity(
+                            graph, ref_communities))
+                        , !quiet);
+                }
+
                 return app::louvain::RunTests(parameters, graph, ref_communities);
             }));
 
-        if (!quick)
+        if (ref_communities != NULL)
         {
             delete[] ref_communities; ref_communities = NULL;
         }
