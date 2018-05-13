@@ -68,21 +68,21 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
         1e-4,
         "Modularity threshold to continue further iterations in the first pass.",
         __FILE__, __LINE__));
-   
+
     GUARD_CU(parameters.Use<bool>(
         "pass-stats",
         util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         false,
         "Whether to show per-pass stats.",
         __FILE__, __LINE__));
- 
+
    GUARD_CU(parameters.Use<bool>(
         "iter-stats",
         util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         false,
         "Whether to show per-iteration stats.",
         __FILE__, __LINE__));
- 
+
     return retval;
 }
 
@@ -133,34 +133,174 @@ struct LouvainIterationLoop : public IterationLoopBase
         auto         &frontier           =   enactor_slice.frontier;
         auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
         auto         &retval             =   enactor_stats.retval;
-        //auto         &iteration          =   enactor_stats.iteration;
-        // TODO: add problem specific data alias here, e.g.:
-        // auto         &distances          =   data_slice.distances;
-        // auto         &weights            =   graph.CsrT::edge_values;
+        auto         &pass_num           =   enactor_stats.iteration;
+        auto         &weights            =   graph.CsrT::edge_values;
+        auto         &w_v2               =   data_slice.w_v2;
+        auto         &w_v2self           =   data_slice.w_v2slef;
+        cudaStream_t  stream             =   oprtr_parameters.stream;
+        auto          target             =   util::DEVICE;
+        VertexT       iter               =   0;
+        util::Array1D<SizeT, VertexT>* null_frontier = NULL;
 
-        // The advance operation
-        auto advance_op = [
-        // TODO: if needed, pass data used by the lambda, e.g.:
-        // distances, weights
-        ] __host__ __device__ (
+        // Pass initialization
+        GUARD_CU(w_v2.ForAll([w_v2self, current_communities]
+            (ValueT *w_v2_, const SizeT &v)
+            {
+                w_v2_    [v] = 0;
+                w_v2self [v] = 0;
+                current_communities[v] = v;
+            }, graph.nodes, target, stream));
+        //GUARD_CU(w_v2self.ForEach([](ValueT &w)
+        //    {
+        //        w = 0;
+        //    }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+
+        // Accumulate edge values
+        auto accu_op = [w_v2, w_v2self, weights] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // TODO: fill in the per-edge advance operation, e.g.:
-            // ValueT src_distance = Load<cub::LOAD_CG>(distances + src);
-            // ValueT edge_weight  = Load<cub::LOAD_CS>(weights + edge_id);
-            // ValueT new_distance = src_distance + edge_weight;
-
-            // Check if the destination node has been claimed as someone's child
-            // ValueT old_distance = atomicMin(distances + dest, new_distance);
-
-            // if (new_distance < old_distance)
-            // { // keep dest in the output frontier if distance has been updated
-            //     return true;
-            // }
+            atomicAdd(w_v2 + src, weights[edge_id]);
+            if (src == dest)
+                atomicAdd(w_v2self + src, weights[edge_id]);
             return false;
         };
+        frontier.queue_length = graph.nodes;
+        frontier.queue_reset  = true;
+        oprtr_parameters.advance_mode = "ALL_EDGES";
+        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+            graph.csr(), null_frontier, null_frontier,
+            oprtr_parameters, accu_op));
+
+        GUARD_CU(w_c2.ForEach(w_v2, [](ValueT &w_c, const ValueT &w_v)
+            {
+                w_c = w_v;
+            }, graph.nodes, target, stream));
+
+        int iter_num = 0;
+        ValueT pass_gain = 0;
+        ValueT iter_gain = 0;
+        bool to_continue = true;
+
+        // Iterations
+        while (to_continue)
+        {
+            if (iter_stats)
+                iter_timer.Start();
+            iter_gain = 0;
+
+            GUARD_CU(edge_comms0.ForAll(
+                [edge_weights0, weights, current_communities, column_indices]
+                (VertexT *e_comms, const SizeT &e)
+                {
+                    e_comms[e] = current_communities[column_indices[e]];
+                    edge_weights0[e] = weights[e];
+                }, graph.edges, target, stream));
+
+            cub::DoubleBuffer<VertexT> keys_frontiers(
+                edge_comms0.GetPointer(util::DEVICE),
+                edge_comms1.GetPointer(util::DEVICE));
+            cub::DoubleBuffer<ValueT > vals_frontiers(
+                edge_weights0.GetPointer(util::DEVICE),
+                edge_weights1.GetPointer(util::DEVICE));
+
+            GUARD_CU(cub_SegmentedRadixSortPairs(
+                cub_temp_space,
+                keys_frontiers,
+                vals_frontiers,
+                graph.edges, graph.nodes,
+                graph.CsrT::row_offsets.GetPointer(util::DEVICE),
+                graph.CsrT::row_offsets.GetPointer(util::DEVICE) + (graph.nodes + 1),
+                0, std::ceil(std::log(graph.nodes)), stream));
+
+            GUARD_CU(temp_seg_offsets.ForAll(
+                [](SizeT *offsets, const SizeT &e){
+                    offsets[e] = e;
+                }, graph.edges, target, stream));
+
+            // Filter in order
+            auto edge_comms = keys_frontiers.Current();
+            GUARD_CU(cub_SelectIf(
+                cub_temp_space,
+                temp_seg_offsets.GetPointer(util::DEVICE),
+                neighbor_comm_offsets.GetPointer(util::DEVICE),
+                num_neighbor_comms.GetPointer(util::DEVICE),
+                graph.edges,
+                [edge_comms](const SizeT &e){
+                    if (e == 0)
+                        return true;
+                    if (edge_comms[e] != edge_comms[e-1])
+                        return true;
+                    SizeT pos = util::BinarySearch(row_offsets, e, 0, edges);
+                    if (row_offsets[pos] == e)
+                        return true;
+                    return false;
+                }, stream));
+
+            // TODO: use a special kernel to find community boundary for vertices
+
+            GUARD_CU(oprtr::Set(neighbor_comm_offsets.GetPointer(util::DEVICE)
+                + (num_neighbor_comms[0] + 1), graph.edges, target, stream));
+            GUARD_CU(num_neighbor_comms.Move(util::DEVICE, util::HOST, 1, 0, stream));
+
+            GUARD_CU2(cudaStreamSynchronize(stream),
+                "cudaStreamSynchronize failed.");
+
+            GUARD_CU(cub_SegmentedSum(
+                cub_temp_space,
+                vals_frontiers.Current(),
+                vals_frontiers.Alternative(),
+                num_neighbor_comms[0],
+                neighbor_comm_offsets.GetPointer(util::DEVICE),
+                neighbor_comm_offsets.GetPointer(util::DEVICE)
+                    + (num_neighbor_comms[0] + 1), stream));
+
+            GUARD_CU(gain_bases.ForAll(
+                [w_v2, current_communities, w_v2self, w_v2c_org, m2]
+                (ValueT *gains, const VertexT &v)
+                {
+                    ValueT w_v2_v = w_v2[v];
+                    VertexT comm = current_communities[v];
+                    gains[v] = w_v2self[v] - w_v2c_org[v]
+                        - (w_v2_v - w_c2[comm]) * w_v2_v / m2;
+                }, graphs.nodes, target, stream));
+
+            ValueT *w_v2c = vals_frontiers.Alternative();
+            GUARD_CU(oprtr::ForAll(
+                vals_frontiers.Current(),
+                [vc_offsets, w_v2c, gain_bases, w_c2, w_v2, m2]
+                (ValueT *gains, const SizeT &pos)
+                {
+                    VertexT v = BinarySearch(
+                        vc_offsets + 0, pos, 0, num_neighbor_comms_);
+                    gains[pos] = gain_bases[v] + w_v2c[pos]
+                        - w_c2[comm] * w_v2[v] / m2;
+                }, num_neighbor_comms[0], target, stream));
+
+
+
+            iter_gain *= 2;
+            iter_gain /= m2;
+            q += iter_gain;
+            pass_gain += iter_gain;
+            if (iter_stats)
+            {
+                iter_timer.Stop();
+                util::PrintMsg("pass " + std::to_string(pass_num)
+                    + ", iter " + std::to_string(iter_num)
+                    + ", q = " + std::to_string(q)
+                    + ", iter_gain = " + std::to_string(iter_gain)
+                    + ", pass_gain = " + std::to_string(pass_gain)
+                    + ", elapsed = "
+                    + std::to_string(iter_timer.ElapsedMillis()), iter_stats);
+            }
+            iter_num ++;
+            if ((pass_num != 0 && iter_gain < iter_gain_threshold) ||
+                (pass_num == 0 && iter_gain < first_threshold) ||
+                iter_num >= max_iters)
+                to_continue = false;
+        }
 
         // The filter operation
         auto filter_op = [
@@ -433,10 +573,7 @@ public:
      * @param[in] src Source node to start primitive.
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Enact(
-        // TODO: add problem specific info, e.g.:
-        // VertexT src
-        )
+    cudaError_t Enact()
     {
         cudaError_t  retval     = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));
