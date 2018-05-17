@@ -335,7 +335,7 @@ public:
      */
     cudaError_t Reset(
         // TODO: add problem specific info, e.g.:
-        VertexT src,
+        //VertexT src,
         util::Location target = util::DEVICE)
     {
         typedef typename GraphT::GpT GpT;
@@ -343,30 +343,30 @@ public:
         GUARD_CU(BaseEnactor::Reset(target));
 
         // TODO: Initialize frontiers according to the algorithm, e.g.:
-        for (int gpu = 0; gpu < this->num_gpus; gpu++)
+       	for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
-            if ((this->num_gpus == 1) ||
-                 (gpu == this->problem->org_graph->GpT::partition_table[src]))
-            {
-                this -> thread_slices[gpu].init_size = 1;
-                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
-                {
-                    auto &frontier = this ->
-                        enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                    frontier.queue_length = (peer_ == 0) ? 1 : 0;
-                    if (peer_ == 0)
-                    {
-                        GUARD_CU(frontier.V_Q() -> ForEach(
-                            [src]__host__ __device__ (VertexT &v)
-                        {
-                            v = src;
-                        }, 1, target, 0));
-                  }
-                }
-            }
+          //  if ((this->num_gpus == 1) ||
+            //     (gpu == this->problem->org_graph->GpT::partition_table[src]))
+           // {
+             //   this -> thread_slices[gpu].init_size = 1;
+               // for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
+               // {
+                 //   auto &frontier = this ->
+                  //      enactor_slices[gpu * this -> num_gpus + peer_].frontier;
+                   // frontier.queue_length = (peer_ == 0) ? 1 : 0;
+                   // if (peer_ == 0)
+                    //{
+                     //   GUARD_CU(frontier.V_Q() -> ForEach(
+                      //      [src]__host__ __device__ (VertexT &v)
+                       // {
+                        //    v = src;
+                       // }, 1, target, 0));
+                 // }
+                //}
+            //}
 
-            else {
-                this -> thread_slices[gpu].init_size = 0;
+         //   else {
+             this -> thread_slices[gpu].init_size = 0;
                 for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
                 {
                     this -> enactor_slices[gpu * this -> num_gpus + peer_]

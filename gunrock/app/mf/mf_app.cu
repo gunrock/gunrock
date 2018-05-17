@@ -190,7 +190,7 @@ cudaError_t RunTests(
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_mf(
     gunrock::util::Parameters &parameters,
-    GraphT &graph
+    GraphT &graph,
     // TODO: add problem specific outputs, e.g.:
     ValueT **excess
     )
@@ -258,7 +258,7 @@ template <
     typename VertexT = int,
     typename SizeT   = int,
     typename GValueT = unsigned int,
-    typename TValueT = GValueT>
+    typename MFValueT = GValueT>
 float mf(
     const SizeT        num_nodes,
     const SizeT        num_edges,
