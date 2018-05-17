@@ -234,9 +234,10 @@ typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
     // TODO: add problem specific data for validation, e.g.:
-    // typename GraphT::VertexT   src,
-    //                  ValueT   *h_distances,
-    //                  ValueT   *ref_distances = NULL,
+    	typename GraphT::VertexT   src,
+                    ValueT   *h_excess,
+         ValueT   *ref_excess = NULL,
+				NULL,
                      bool      verbose       = true)
 {
     typedef typename GraphT::VertexT VertexT;

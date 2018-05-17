@@ -314,11 +314,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         else
         { // num_gpus != 1
             // TODO: extract the results from multiple GPUs, e.g.:
-            // util::Array1D<SizeT, ValueT *> th_distances;
+            util::Array1D<SizeT, ValueT *> th_excess;
             // th_distances.SetName("bfs::Problem::Extract::th_distances");
             // GUARD_CU(th_distances.Allocate(this->num_gpus, util::HOST));
-            util::Array1D<SizeT, ValueT *> h_excess;
-            th_excess.SetName("bfs::Problem::Extract::th_excess");
+            util::Array1D<SizeT, ValueT *> th_excess;
+            th_excess.SetName("mf::Problem::Extract::th_excess");
             GUARD_CU(th_excess.Allocate(this->num_gpus, util::HOST));
 
             for (int gpu = 0; gpu < this->num_gpus; gpu++)

@@ -148,7 +148,7 @@ cudaError_t RunTests(
     if (validation == "last")
     {
         SizeT num_errors = app::mf::Validate_Results(
-            parameters, graph, src, h_distances,
+            parameters, graph, src, h_excess,
             ref_excess == NULL ? NULL : ref_excess[(num_runs -1) % num_srcs],
             NULL,
             true);
