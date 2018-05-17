@@ -77,7 +77,7 @@ struct main_struct
             std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
             num_srcs = srcs.size();
 
-            // SizeT nodes = graph.nodes;
+            SizeT nodes = graph.nodes;
             // TODO: problem specific data, e.g.:
             // ref_distances = new ValueT*[num_srcs];
             ref_excess = new ValueT*[num_srcs];
@@ -91,7 +91,7 @@ struct main_struct
                     graph.csr(), ref_excess[i], NULL, src,
                     // TODO: add problem specific data, e.g.:
                     // ref_distances[i], NULL, src,
-                    quiet);
+                    quiet, false);
                 util::PrintMsg("--------------------------\nRun "
                     + std::to_string(i) + " elapsed: "
                     + std::to_string(elapsed)
