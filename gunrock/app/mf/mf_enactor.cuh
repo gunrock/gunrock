@@ -335,7 +335,7 @@ public:
      */
     cudaError_t Reset(
         // TODO: add problem specific info, e.g.:
-        //VertexT src,
+        VertexT src,
         util::Location target = util::DEVICE)
     {
         typedef typename GraphT::GpT GpT;
