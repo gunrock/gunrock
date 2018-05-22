@@ -136,7 +136,6 @@ cudaError_t RunTests(
             SizeT num_errors = app::mf::Validate_Results(
                 parameters, graph, src, h_excess,
                 ref_excess == NULL ? NULL : ref_excess[run_num % num_srcs],
-                NULL,
                 false);
         }
     }
@@ -150,7 +149,6 @@ cudaError_t RunTests(
         SizeT num_errors = app::mf::Validate_Results(
             parameters, graph, src, h_excess,
             ref_excess == NULL ? NULL : ref_excess[(num_runs -1) % num_srcs],
-            NULL,
             true);
     }
 
@@ -214,7 +212,6 @@ double gunrock_mf(
     int num_runs = parameters.Get<int>("num-runs");
 
     int num_srcs = srcs.size();
-    int num_runs = parameters.Get<int>("num-runs");
 
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {

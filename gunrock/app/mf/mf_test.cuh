@@ -237,8 +237,7 @@ typename GraphT::SizeT Validate_Results(
     	typename GraphT::VertexT   src,
                     ValueT   *h_excess,
          ValueT   *ref_excess = NULL,
-				NULL,
-                     bool      verbose       = true)
+	 bool      verbose       = true)
 {
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
