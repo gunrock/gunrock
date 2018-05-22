@@ -70,13 +70,8 @@ cudaError_t RunTests(
     std::string validation = parameters.Get<std::string>("validation");
     util::Info info("Louvain", parameters, graph); // initialize Info structure
 
-    // TODO: get problem specific inputs, e.g.:
-    // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-    // int  num_srcs   = srcs   .size();
-
-    // Allocate host-side array (for both reference and GPU-computed results)
-    // TODO: allocate problem specific host data, e.g.:
-    // ValueT  *h_distances = new ValueT[graph.nodes];
+    // allocate problem specific host data, e.g.:
+    VertexT  *h_communities = new VertexT[graph.nodes];
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -87,59 +82,47 @@ cudaError_t RunTests(
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
     // perform the algorithm
-    // TODO: Declear problem specific variables, e.g.:
-    // VertexT src;
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        // TODO: assign problem specific variables, e.g.:
-        // src = srcs[run_num % num_srcs];
-        GUARD_CU(problem.Reset(/*src,*/ target));
-        GUARD_CU(enactor.Reset(/*src,*/ target));
+        GUARD_CU(problem.Reset(target));
+        GUARD_CU(enactor.Reset(target));
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
-        GUARD_CU(enactor.Enact(/*src*/));
+        GUARD_CU(enactor.Enact());
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
-        util::PrintMsg("--------------------------\nRun "
-            + std::to_string(run_num) + " elapsed: "
-            + std::to_string(cpu_timer.ElapsedMillis()) +
-            //" ms, src = " + std::to_string(src) +
-            ", #iterations = "
-            + std::to_string(enactor.enactor_slices[0]
-                .enactor_stats.iteration), !quiet_mode);
+        util::PrintMsg("--------------------------", !quiet_mode);
+
         if (validation == "each")
         {
-            // TODO: fill in problem specific data, e.g.:
-            GUARD_CU(problem.Extract(/*h_distances*/));
+            util::PrintMsg("Run " + std::to_string(run_num) + " elapsed: "
+            + std::to_string(cpu_timer.ElapsedMillis()) + " ms, #passes = "
+            + std::to_string(enactor.enactor_slices[0]
+                .enactor_stats.iteration), !quiet_mode);
+            
+            GUARD_CU(problem.Extract(h_communities, target));
             SizeT num_errors = app::louvain::Validate_Results(
-                parameters, graph,
-                // TODO: add problem specific data for validation, e.g.:
-                // src, h_distances,
-                // ref_distances == NULL ? NULL : ref_distances[run_num % num_srcs],
-                // NULL,
-                false);
+                parameters, graph, h_communities, ref_communities);
+        } else {
+            util::PrintMsg("Run " + std::to_string(run_num) + " elapsed: "
+            + std::to_string(cpu_timer.ElapsedMillis()) + " ms, #passes = "
+            + std::to_string(enactor.enactor_slices[0]
+                .enactor_stats.iteration), !quiet_mode); 
         }
     }
 
     cpu_timer.Start();
     // Copy out results
-    // TODO: fill in problem specific data, e.g.:
-    GUARD_CU(problem.Extract(/*h_distances*/));
+    GUARD_CU(problem.Extract(h_communities, target));
     if (validation == "last")
     {
         SizeT num_errors = app::louvain::Validate_Results(
-            parameters, graph,
-            // TODO: place problem specific data and result for validation, e.g.:
-            // src, h_distances,
-            // ref_distances == NULL ? NULL : ref_distances[(num_runs -1) % num_srcs],
-            // NULL,
-            true);
+            parameters, graph, h_communities, ref_communities);
     }
 
     // compute running statistics
-    // TODO: change NULL to problem specific per-vertex visited marker, e.g. h_distances
     info.ComputeTraversalStats(enactor, (VertexT*)NULL);
     //Display_Memory_Usage(problem);
     #ifdef ENABLE_PERFORMANCE_PROFILING
@@ -149,8 +132,7 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    // TODO: Release problem specific data, e.g.:
-    // delete[] h_distances  ; h_distances   = NULL;
+    delete[] h_communities; h_communities   = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
@@ -174,10 +156,8 @@ cudaError_t RunTests(
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_louvain(
     gunrock::util::Parameters &parameters,
-    GraphT &graph
-    // TODO: add problem specific outputs, e.g.:
-    //ValueT **distances
-    )
+    GraphT &graph,
+    typename GraphT::VertexT *communities)
 {
     typedef typename GraphT::VertexT VertexT;
     typedef gunrock::app::louvain::Problem<GraphT  > ProblemT;
@@ -195,30 +175,21 @@ double gunrock_louvain(
     enactor.Init(problem, target);
 
     int num_runs = parameters.Get<int>("num-runs");
-    // TODO: get problem specific inputs, e.g.:
-    // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-    // int num_srcs = srcs.size();
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        // TODO: problem specific inputs, e.g.:
-        // int src_num = run_num % num_srcs;
-        // VertexT src = srcs[src_num];
-        problem.Reset(/*src,*/ target);
-        enactor.Reset(/*src,*/ target);
+        problem.Reset(target);
+        enactor.Reset(target);
 
         cpu_timer.Start();
-        enactor.Enact(/*src*/);
+        enactor.Enact();
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-        // TODO: extract problem specific data, e.g.:
-        problem.Extract(/*distances[src_num]*/);
+        problem.Extract(communities);
     }
 
     enactor.Release(target);
     problem.Release(target);
-    // TODO: problem specific clean ups, e.g.:
-    // srcs.clear();
     return total_time;
 }
 
@@ -247,13 +218,9 @@ float louvain(
     const SizeT       *row_offsets,
     const VertexT     *col_indices,
     const GValueT     *edge_values,
-    const int          num_runs
-    // TODO: add problem specific inputs and outputs, e.g.:
-    //      VertexT     *sources,
-    //      SSSPValueT **distances
-    )
+    const int          num_runs,
+          VertexT     *communities)
 {
-    // TODO: change to other graph representation, if not using CSR
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
         gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
         GraphT;
@@ -267,16 +234,10 @@ float louvain(
     parameters.Parse_CommandLine(0, NULL);
     parameters.Set("graph-type", "by-pass");
     parameters.Set("num-runs", num_runs);
-    // TODO: problem specific inputs, e.g.:
-    // std::vector<VertexT> srcs;
-    // for (int i = 0; i < num_runs; i ++)
-    //     srcs.push_back(sources[i]);
-    // parameters.Set("srcs", srcs);
-
     bool quiet = parameters.Get<bool>("quiet");
     GraphT graph;
+
     // Assign pointers into gunrock graph format
-    // TODO: change to other graph representation, if not using CSR
     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
     graph.CsrT::row_offsets   .SetPointer(row_offsets, gunrock::util::HOST);
     graph.CsrT::column_indices.SetPointer(col_indices, gunrock::util::HOST);
@@ -285,13 +246,10 @@ float louvain(
     gunrock::graphio::LoadGraph(parameters, graph);
 
     // Run the Louvain
-    // TODO: add problem specific outputs, e.g.
-    double elapsed_time = gunrock_louvain(parameters, graph /*, distances*/);
+    double elapsed_time = gunrock_louvain(parameters, graph, communities);
 
     // Cleanup
     graph.Release();
-    // TODO: problem specific cleanup
-    // srcs.clear();
 
     return elapsed_time;
 }

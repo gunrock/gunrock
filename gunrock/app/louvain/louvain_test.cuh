@@ -1141,96 +1141,95 @@ template <
     typename GraphT,
     typename ValueT = typename GraphT::ValueT>
 typename GraphT::SizeT Validate_Results(
-             util::Parameters &parameters,
-             GraphT           &graph,
-    // TODO: add problem specific data for validation, e.g.:
-    // typename GraphT::VertexT   src,
-    //                  ValueT   *h_distances,
-    //                  ValueT   *ref_distances = NULL,
-                     bool      verbose       = true)
+    util::Parameters &parameters,
+    GraphT           &graph,
+    typename GraphT::VertexT *communities,
+    typename GraphT::VertexT *ref_communities = NULL, 
+    bool              verbose       = true)
 {
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
-    // TODO: change to other representation, if not using CSR
     typedef typename GraphT::CsrT    CsrT;
 
     SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
 
-    // Verify the result
-    // TODO: result validation and display, e.g.:
-    // if (ref_distances != NULL)
-    // {
-    //    for (VertexT v = 0; v < graph.nodes; v++)
-    //    {
-    //        if (!util::isValid(ref_distances[v]))
-    //            ref_distances[v] = util::PreDefinedValues<ValueT>::MaxValue;
-    //    }
-    //
-    //    util::PrintMsg("Distance Validity: ", !quiet, false);
-    //    SizeT errors_num = util::CompareResults(
-    //        h_distances, ref_distances,
-    //        graph.nodes, true, quiet);
-    //    if (errors_num > 0)
-    //    {
-    //        util::PrintMsg(
-    //            std::to_string(errors_num) + " errors occurred.", !quiet);
-    //        num_errors += errors_num;
-    //    }
-    // }
-    // else if (ref_distances == NULL)
-    // {
-    //    util::PrintMsg("Distance Validity: ", !quiet, false);
-    //    SizeT errors_num = 0;
-    //    for (VertexT v = 0; v < graph.nodes; v++)
-    //    {
-    //        ValueT v_distance = h_distances[v];
-    //        if (!util::isValid(v_distance))
-    //            continue;
-    //        SizeT e_start = graph.CsrT::GetNeighborListOffset(v);
-    //        SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-    //        SizeT e_end = e_start + num_neighbors;
-    //        for (SizeT e = e_start; e < e_end; e++)
-    //        {
-    //            VertexT u = graph.CsrT::GetEdgeDest(e);
-    //            ValueT u_distance = h_distances[u];
-    //            ValueT e_value = graph.CsrT::edge_values[e];
-    //            if (v_distance + e_value >= u_distance)
-    //                continue;
-    //            errors_num ++;
-    //            if (errors_num > 1)
-    //                continue;
-    //
-    //            util::PrintMsg("FAIL: v[" + std::to_string(v)
-    //                + "] ("    + std::to_string(v_distance)
-    //                + ") + e[" + std::to_string(e)
-    //                + "] ("    + std::to_string(e_value)
-    //                + ") < u[" + std::to_string(u)
-    //                + "] ("    + std::to_string(u_distance) + ")", !quiet);
-    //        }
-    //    }
-    //    if (errors_num > 0)
-    //    {
-    //        util::PrintMsg(std::to_string(errors_num) + " errors occurred.", !quiet);
-    //        num_errors += errors_num;
-    //    } else {
-    //        util::PrintMsg("PASS", !quiet);
-    //    }
-    // }
-    //
-    // if (!quiet && verbose)
-    // {
-    //    // Display Solution
-    //    util::PrintMsg("First 40 distances of the GPU result:");
-    //    DisplaySolution(h_distances, graph.nodes);
-    //    if (ref_distances != NULL)
-    //    {
-    //        util::PrintMsg("First 40 distances of the reference CPU result.");
-    //        DisplaySolution(ref_distances, graph.nodes);
-    //    }
-    //    util::PrintMsg("");
-    // }
+    char *comm_markers = new char[graph.nodes];
+    for (VertexT v = 0; v < graph.nodes; v++)
+        comm_markers[v] = 0;
 
+    util::PrintMsg("Community Validity: ", !quiet, false);
+    // Verify the result
+    for (VertexT v = 0; v < graph.nodes; v++)
+    {
+        auto c = communities[v];
+        if (c < 0 || c >= graph.nodes)
+        {
+            util::PrintMsg("FAIL: communties[" + std::to_string(v)
+                + "] = " + std::to_string(c) + " out of bound",
+                (!quiet) && (num_errors == 0));
+            num_errors ++;
+            continue;
+        }
+        comm_markers[c] = 1;
+    }
+    if (num_errors != 0)
+    {
+        delete[] comm_markers; comm_markers = NULL;
+        util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
+        return num_errors;
+    }
+    util::PrintMsg("PASS", !quiet);
+
+    ValueT num_comms = 0;
+    for (VertexT v = 0; v < graph.nodes; v++)
+    {
+        if (comm_markers[v] != 0)
+        {
+            num_comms ++;
+            comm_markers[v] = 0;
+        }
+    }
+    ValueT q = Get_Modularity(graph, communities);
+    util::PrintMsg("Computed: #communities = "
+        + std::to_string(num_comms) + ", modularity = "
+        + std::to_string(q));
+
+    if (ref_communities == NULL)
+    {
+        delete[] comm_markers; comm_markers = NULL;
+        return num_errors;
+    }
+
+    for (VertexT v = 0; v < graph.nodes; v++)
+    {
+        auto c = ref_communities[v];
+        if (c < 0 || c >= graph.nodes)
+        {
+            num_errors ++;
+            continue;
+        }
+        comm_markers[c] = 1;
+    }
+    if (num_errors != 0)
+    {
+        util::PrintMsg("Reference: " + std::to_string(num_errors)
+            + " vertices have communities out of bound.", !quiet);
+        delete[] comm_markers; comm_markers = NULL;
+        return 0;
+    }
+
+    num_comms = 0;
+    for (VertexT v = 0; v < graph.nodes; v++)
+        if (comm_markers[v] != 0)
+            num_comms ++;
+
+    q = Get_Modularity(graph, ref_communities);
+    util::PrintMsg("Reference: #communities = "
+        + std::to_string(num_comms) + ", modularity = "
+        + std::to_string(q));
+
+    delete[] comm_markers; comm_markers = NULL;
     return num_errors;
 }
 

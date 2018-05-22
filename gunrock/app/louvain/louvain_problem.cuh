@@ -225,8 +225,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
-        // TODO: add list of results to extract, e.g.:
-        // ValueT         *h_distances,
+        VertexT         *h_communities,
         util::Location  target      = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;

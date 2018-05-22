@@ -60,12 +60,12 @@ do
     LOGDIR=eval/$SUFFIX
     mkdir -p $LOGDIR
 
-    for i in {0..16} #0 1 2 3 4 6 7 8 9 10 11 12 13 14 15 16 
+    for i in 6 #{0..16} #0 1 2 3 4 6 7 8 9 10 11 12 13 14 15 16 
     do
         for j in {0..1}
         do
             echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --jsondir=$LOGDIR "> $LOGDIR/${NAME[$i]}${MARK[$j]}.txt"
-                 $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --jsondir=$LOGDIR  > $LOGDIR/${NAME[$i]}${MARK[$j]}.txt
+                 #$EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --jsondir=$LOGDIR  > $LOGDIR/${NAME[$i]}${MARK[$j]}.txt
             sleep 1
         done
     done

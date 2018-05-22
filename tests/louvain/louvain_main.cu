@@ -87,21 +87,43 @@ struct main_struct
             [&ref_communities](util::Parameters &parameters, GraphT &graph)
             {
                 bool quiet = parameters.Get<bool>("quiet");
-                bool quick = parameters.Get<bool>("quick");
+                //bool quick = parameters.Get<bool>("quick");
                 int num_runs = parameters.Get<int>("omp-runs");
-                if (quick && num_runs > 1)
-                    ref_communities = new VertexT[graph.nodes];
-                for (int i = 0; i < num_runs; i++)
+                std::string validation = parameters.Get<std::string>("validation");
+                if (num_runs > 0)
                 {
-                    util::PrintMsg("__________________________", !quiet);
-                    float elapsed = app::louvain::OMP_Reference(
-                        parameters, graph.csr(), ref_communities);
-                    util::PrintMsg("--------------------------\nRun "
-                        + std::to_string(i) + " elapsed: "
-                        + std::to_string(elapsed)
-                        + " ms, q = " + std::to_string(app::louvain::Get_Modularity(
-                            graph, ref_communities))
-                        , !quiet);
+                    VertexT *omp_communities = new VertexT[graph.nodes];
+                    for (int i = 0; i < num_runs; i++)
+                    {
+                        util::PrintMsg("__________________________", !quiet);
+                        float elapsed = app::louvain::OMP_Reference(
+                            parameters, graph.csr(), ref_communities);
+                        util::PrintMsg("--------------------------", !quiet);
+
+                        if (validation == "each")
+                        {
+                            util::PrintMsg("Run " + std::to_string(i) + " elapsed: "
+                                + std::to_string(elapsed) + " ms", !quiet);
+                            
+                            app::louvain::Validate_Results(parameters, graph, 
+                                omp_communities, ref_communities);
+                        } else {
+                            util::PrintMsg("Run " + std::to_string(i) + " elapsed: "
+                                + std::to_string(elapsed) + " ms, q = " 
+                                + std::to_string(app::louvain::Get_Modularity(
+                                    graph, omp_communities)), !quiet);
+                        }
+                    }
+                    if (validation == "last")
+                        app::louvain::Validate_Results(parameters, graph,
+                            omp_communities, ref_communities);
+
+                    if (ref_communities == NULL)
+                        ref_communities = omp_communities;
+                    else
+                    {
+                        delete[] omp_communities; omp_communities = NULL;
+                    }
                 }
 
                 return app::louvain::RunTests(parameters, graph, ref_communities);
