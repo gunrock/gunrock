@@ -88,10 +88,11 @@ struct main_struct
                 VertexT src = srcs[i];
                 util::PrintMsg("__________________________", !quiet);
                 float elapsed = app::mf::CPU_Reference(
-                    graph.csr(), ref_excess[i], NULL, src,
+                    graph.csr(), ref_excess[i],// NULL,
+		    src,
                     // TODO: add problem specific data, e.g.:
                     // ref_distances[i], NULL, src,
-                    quiet, false);
+                    false);
                 util::PrintMsg("--------------------------\nRun "
                     + std::to_string(i) + " elapsed: "
                     + std::to_string(elapsed)
