@@ -122,7 +122,7 @@ __global__ void RandomNext(T *paths, T *num_neighbor, D *d_rand, T *d_row_offset
 	    }
 
     }
-};. 
+}; 
 
 /**
  * @brief Multiply the source vector to the destination vector with the same length
@@ -261,7 +261,7 @@ __global__ void BlockRandomNext(T *paths, T *node_id, T *num_neighbor, D *d_rand
 /*******************************/
 /* CUB BLOCKSORT KERNEL SHARED */
 /*******************************/
-template <int BLOCK_THREADS, int ITEMS_PER_THREAD>
+template <typename T, typename D, typename SizeT, int BLOCK_THREADS, int ITEMS_PER_THREAD>
 __global__ void shared_BlockSortKernel(T *paths, T *node_id, T *num_neighbor, D *d_rand, T *d_row_offsets, T *d_col_indices,
                                         SizeT length, SizeT itr)
 {
