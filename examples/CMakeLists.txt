@@ -62,9 +62,9 @@ else(GUNROCK_BUILD_APPLICATIONS)
     add_subdirectory(topk)
   endif(GUNROCK_APP_TOPK)
 
-  if(GUNROCK_APP_TOPK)
-    add_subdirectory(topk)
-  endif(GUNROCK_APP_TOPK)
+  if(GUNROCK_APP_RW)
+    add_subdirectory(rw)
+  endif(GUNROCK_APP_RW)
 
   # if(GUNROCK_APP_MF)
   #  add_subdirectory(mf)

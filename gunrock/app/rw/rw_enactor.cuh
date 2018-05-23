@@ -20,6 +20,7 @@
 #include <gunrock/util/sort_utils.cuh>
 #include <math.h>
 #include <curand.h>
+#include <curand_kernel.h>
 
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/advance/kernel_policy.cuh>
