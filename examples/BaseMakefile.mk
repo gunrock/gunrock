@@ -77,6 +77,8 @@ else
 endif
 
 NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 #-ccbin=g++-4.8
+#used to link to curand library
+NVCCFLAGS += -lcurand
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
@@ -99,7 +101,7 @@ endif
 # Dependency Lists
 #-------------------------------------------------------------------------------
 EXTRA_SOURCE = ../../gunrock/util/types.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp ../../gunrock/util/gitsha1.c
-      
+
 DEPS = 	./Makefile \
     ../BaseMakefile.mk \
     $(EXTRA_SOURCE) \
