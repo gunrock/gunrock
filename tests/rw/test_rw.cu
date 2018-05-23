@@ -327,7 +327,8 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info, int mode)
     cudaError_t retval              = cudaSuccess;
     if (max_queue_sizing < 0) max_queue_sizing=1.0;
     if(max_in_sizing < 0) max_in_sizing = 1.0;
-
+    iterations = 1;
+    info -> info["search_depth"] = iterations;
 
     cpu_timer.Start();
     json_spirit::mArray device_list = info->info["device_list"].get_array();
@@ -397,8 +398,11 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info, int mode)
     cpu_timer.Stop();
     info -> info["preprocess_time"] = cpu_timer.ElapsedMillis();
 
-
-    double elapsed_gpu = 0.0f;
+    double total_elapsed  = 0.0;
+    double single_elapsed = 0.0;
+    double max_elapsed    = 0.0;
+    double min_elapsed    = 1e10;
+    json_spirit::mArray process_times;
     if (retval = util::GRError(problem->Reset(enactor->GetFrontierType(),
                                         max_queue_sizing, max_queue_sizing1),
                                         "RW Problem Data Reset Failed", __FILE__, __LINE__))
@@ -414,14 +418,28 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info, int mode)
             "RW Problem Enact Failed", __FILE__, __LINE__))
         return retval;
     cpu_timer.Stop();
-    elapsed_gpu += cpu_timer.ElapsedMillis();
+
+    single_elapsed += cpu_timer.ElapsedMillis();
+    total_elapsed += single_elapsed;
+    process_times.push_back(single_elapsed);
+        if (single_elapsed > max_elapsed) max_elapsed = single_elapsed;
+        if (single_elapsed < min_elapsed) min_elapsed = single_elapsed;
 
     if (!quiet_mode)
     {
-        printf("GPU RW computation complete in %lf msec.\n", elapsed_gpu);
+        printf("--------------------------\n"
+                "iteration %d elapsed: %lf ms, #iteration = %lld\n",
+                iterations, single_elapsed,
+                (long long)enactor -> enactor_stats -> iteration);
+            fflush(stdout);
+	// printf("GPU RW computation completed in %lf msec.\n", single_elapsed);
     }
 
-
+    total_elapsed /= iterations;
+    info -> info["process_times"] = process_times;
+    info -> info["min_process_time"] = min_elapsed;
+    info -> info["max_process_time"] = max_elapsed;
+    info -> info["elapsed"] = single_elapsed;
     /*
     if (!quick_mode)
     {
