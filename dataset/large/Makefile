@@ -8,6 +8,8 @@ SUBDIRS_IPDPS17 = soc-LiveJournal1 hollywood-2009 soc-orkut soc-sinaweibo soc-tw
 
 SUBDIRS_TOPC = soc-LiveJournal1 hollywood-2009 soc-orkut indochina-2004 road_usa
 
+SUBDIRS_STANDARD = soc-LiveJournal1 hollywood-2009 soc-orkut indochina-2004 road_usa
+
 .PHONY: $(GRAPHS)
 
 #fetches all graphs, extracts and sets up files for tests
@@ -35,6 +37,11 @@ TOPC: recurse_topc
 
 recurse_topc:
 	for subdir in $(SUBDIRS_TOPC); do $(MAKE) -C $$subdir; done
+
+STANDARD: recurse_standard
+
+recurse_standard:
+	for subdir in $(SUBDIRS_STANDARD); do $(MAKE) -C $$subdir; done
 
 $(GRAPHS):
 	$(MAKE) -C $@
