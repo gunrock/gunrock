@@ -117,6 +117,8 @@ set(GENCODE_SM37
   -gencode=arch=compute_37,code=sm_37 -gencode=arch=compute_37,code=compute_37)
 set(GENCODE_SM50
   -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_50,code=compute_50)
+set(GENCODE_SM52
+  -gencode=arch=compute_52,code=sm_52 -gencode=arch=compute_52,code=compute_52)
 set(GENCODE_SM60
   -gencode=arch=compute_60,code=sm_60 -gencode=arch=compute_60,code=compute_60)
 set(GENCODE_SM61
@@ -214,7 +216,7 @@ option(GUNROCK_GENCODE_SM30
   OFF)
 
 option(GUNROCK_GENCODE_SM35
-  "ON to generate code for Compute Capability 3.5 devices (e.g. Tesla K20)"
+  "ON to generate code for Compute Capability 3.5 devices (e.g. Tesla K40)"
   ON)
 
 option(GUNROCK_GENCODE_SM37
@@ -225,11 +227,15 @@ option(GUNROCK_GENCODE_SM50
   "ON to generate code for Compute Capability 5.0 devices (e.g. GeForce GTX 750 TI)"
   OFF)
 
+option(GUNROCK_GENCODE_SM52
+  "ON to generate code for Compute Capability 5.2 devices (e.g. GeForce Titan X)"
+  ON)
+
 #Pascal Architecture: CUDA 8
 if (CUDA_VERSION VERSION_EQUAL "8.0" OR (CUDA_VERSION VERSION_GREATER "8.0" AND CUDA_VERSION VERSION_LESS "9.0"))
   option(GUNROCK_GENCODE_SM60
     "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
-    OFF)
+    ON)
   option(GUNROCK_GENCODE_SM61
     "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
     ON)
@@ -275,6 +281,10 @@ if (GUNROCK_GENCODE_SM50)
   set(GENCODE ${GENCODE} ${GENCODE_SM50})
 endif(GUNROCK_GENCODE_SM50)
 
+if (GUNROCK_GENCODE_SM52)
+  set(GENCODE ${GENCODE} ${GENCODE_SM52})
+endif(GUNROCK_GENCODE_SM52)
+
 if (GUNROCK_GENCODE_SM60)
   set(GENCODE ${GENCODE} ${GENCODE_SM60})
 endif(GUNROCK_GENCODE_SM60)
@@ -282,6 +292,14 @@ endif(GUNROCK_GENCODE_SM60)
 if (GUNROCK_GENCODE_SM61)
   set(GENCODE ${GENCODE} ${GENCODE_SM61})
 endif(GUNROCK_GENCODE_SM61)
+
+if (GUNROCK_GENCODE_SM70)
+  set(GENCODE ${GENCODE} ${GENCODE_SM70})
+endif(GUNROCK_GENCODE_SM70)
+
+if (GUNROCK_GENCODE_SM71)
+  set(GENCODE ${GENCODE} ${GENCODE_SM71})
+endif(GUNROCK_GENCODE_SM71)
 
 if (CUDA_VERBOSE_PTXAS)
   set(VERBOSE_PTXAS --ptxas-options=-v)
