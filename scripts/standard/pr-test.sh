@@ -4,6 +4,9 @@ EXEDIR=${1:-"../../build/bin"}
 DATADIR=${2:-"/data/gunrock_dataset/large"}
 EXECUTION="pr"
 SETTING=" --quick --iteration-num=10 --max-iter=1"
+DEVICE=${3:-"0"}
+TAG=${4:-""}
+
 NAME[0]="soc-LiveJournal1" && DO_A[0]="0.200"   && DO_B[0]="0.1" && T_MODE[0]="LB"
 NAME[1]="soc-orkut"        && DO_A[1]="0.012"   && DO_B[1]="0.1" && T_MODE[1]="LB"
 NAME[2]="hollywood-2009"   && DO_A[2]="0.006"   && DO_B[2]="0.1" && T_MODE[2]="LB"
@@ -25,7 +28,6 @@ GRAPH[7]="market $DATADIR/${NAME[7]}/${NAME[7]}.mtx"
 GRAPH[8]="rgg --rgg_scale=24 --rgg_theshold=0.000548"
 
 mkdir -p eval
-DEVICE=${3:-"0"}
 for i in {0..8}
 do
     echo $EXEDIR/$EXECUTION ${GRAPH[$i]} $SETTING --device=$DEVICE --traversal-mode=${T_MODE[$i]} --jsondir=./eval/ "> ./eval/${NAME[$i]}.$EXECUTION.output.txt"
