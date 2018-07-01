@@ -37,12 +37,15 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
-    GUARD_CU(parameters.Use<std::string>(    
-         "src",   
-         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,  
-         "invalid",   
-         "vertex id", 
-         __FILE__, __LINE__));
+    GUARD_CU(parameters.Use<std::string>(
+        "src",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        "0",
+        "<Vertex-ID|random|largestdegree> The source vertices\n"
+        "\tIf random, randomly select non-zero degree vertices;\n"
+        "\tIf largestdegree, select vertices with largest degrees",
+        __FILE__, __LINE__));
+
     return retval;
 }
 
