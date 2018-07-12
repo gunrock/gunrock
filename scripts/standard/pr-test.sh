@@ -30,7 +30,7 @@ GRAPH[8]="rgg --rgg_scale=24 --rgg_theshold=0.000548"
 mkdir -p eval
 for i in {0..8}
 do
-    echo $EXEDIR/$EXECUTION ${GRAPH[$i]} $SETTING --device=$DEVICE --traversal-mode=${T_MODE[$i]} --jsondir=./eval/ "> ./eval/${NAME[$i]}.$EXECUTION.output.txt"
-         $EXEDIR/$EXECUTION ${GRAPH[$i]} $SETTING --device=$DEVICE --traversal-mode=${T_MODE[$i]} --jsondir=./eval/  > ./eval/${NAME[$i]}.$EXECUTION.output.txt
+    echo $EXEDIR/$EXECUTION ${GRAPH[$i]} $SETTING  --tag=$TAG --device=$DEVICE --traversal-mode=${T_MODE[$i]} --jsondir=./eval/ "> ./eval/${NAME[$i]}.$EXECUTION.output.txt"
+         $EXEDIR/$EXECUTION ${GRAPH[$i]} $SETTING  --tag=$TAG --device=$DEVICE --traversal-mode=${T_MODE[$i]} --jsondir=./eval/  > ./eval/${NAME[$i]}.$EXECUTION.output.txt
     sleep 1
 done
