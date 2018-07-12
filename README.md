@@ -7,7 +7,7 @@
   <a href="https://github.com/gunrock/gunrock/blob/master/LICENSE.TXT"><img src="https://img.shields.io/github/license/gunrock/gunrock.svg" alt="Apache 2"></a> 
   <a href="https://github.com/gunrock/gunrock/issues"><img src="https://img.shields.io/github/issues/gunrock/gunrock.svg" alt="Issues Open"></a>
 </p>
-<h1 align="center">Gunrock: GPU Graph Analytics</h1>
+<h1 id="gunrock-gpu-graph-analytics" align="center">Gunrock: GPU Graph Analytics</h1>
 
 Gunrock is a CUDA library for graph-processing designed specifically for the GPU. It uses a high-level, bulk-synchronous, data-centric abstraction focused on operations on a vertex or edge frontier. Gunrock achieves a balance between performance and expressiveness by coupling high performance GPU computing primitives and optimization strategies with a high-level programming model that allows programmers to quickly develop new graph primitives with small code size and minimal GPU programming knowledge.
 
