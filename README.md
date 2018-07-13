@@ -3,8 +3,8 @@
   <br>
   <a href="https://github.com/gunrock/gunrock/releases/tag/v0.4"><img src="https://img.shields.io/badge/gunrock-0.4-blue.svg"></a>
   <br>
-  <a href="http://mario.ece.ucdavis.edu:8080/job/gunrock/job/dev/"><img src="http://mario.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/dev" alt="Build Status"></a> 
-  <a href="https://github.com/gunrock/gunrock/blob/master/LICENSE.TXT"><img src="https://img.shields.io/github/license/gunrock/gunrock.svg" alt="Apache 2"></a> 
+  <a href="http://mario.ece.ucdavis.edu:8080/job/gunrock/job/dev/"><img src="http://mario.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/dev" alt="Build Status"></a>
+  <a href="https://github.com/gunrock/gunrock/blob/master/LICENSE.TXT"><img src="https://img.shields.io/github/license/gunrock/gunrock.svg" alt="Apache 2"></a>
   <a href="https://github.com/gunrock/gunrock/issues"><img src="https://img.shields.io/github/issues/gunrock/gunrock.svg" alt="Issues Open"></a>
 </p>
 <h1 id="gunrock-gpu-graph-analytics" align="center">Gunrock: GPU Graph Analytics</h1>
@@ -68,7 +68,7 @@ We are gradually adding summaries of our results to these web pages (please let 
 - [Gunrock BFS throughput as a function of frontier size](https://gunrock.github.io/docs/frontier.html)
 - [Multi-GPU Gunrock Speedups](https://gunrock.github.io/docs/mgpu_speedup.html) and [Multi-GPU Gunrock Scalability](https://gunrock.github.io/docs/mgpu_scalability.html)
 - [Multi-GPU Gunrock Partition Performance](https://gunrock.github.io/docs/mgpu_partition.html)
-- [Comparison to Groute](http://gunrock.github.io/gunrock/doc/latest/md_stats_groute.html)
+- [Comparison to Groute](http://gunrock.github.io/docs/groute.html)
 
 For reproducibility, we maintain Gunrock configurations and results in our github [gunrock/io](https://github.com/gunrock/io/tree/master/gunrock-output) repository.
 
