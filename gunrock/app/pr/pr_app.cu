@@ -299,8 +299,8 @@ double pagerank(
     const SizeT        *row_offsets,
     const VertexT      *col_indices,
     const int           num_runs,
-          VertexT      *sources,
           bool          normalize,
+          VertexT      *sources,
           VertexT     **node_ids,
           ValueT      **ranks)
 {
@@ -374,8 +374,8 @@ double pagerank(
     const SizeT         num_edges,
     const SizeT        *row_offsets,
     const VertexT      *col_indices,
-          VertexT       source,
           bool          normalize,
+          VertexT       source,
           VertexT      *node_ids,
           ValueT       *ranks)
 {

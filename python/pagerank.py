@@ -19,10 +19,13 @@ edges = len(col_list)
 node = pointer((c_int * nodes)())
 rank = pointer((c_float * nodes)())
 
+normalize = 1
+
 ### call gunrock function on device
-gunrock.pagerank(node, rank, nodes, edges, row, col)
+elapsed = gunrock.pagerank(nodes, edges, row, col, normalize, node, rank)
 
 ### sample results
+print 'elapsed: ' + str(elapsed)
 print 'top page rank:'
 for idx in range(nodes):
     print node[0][idx],

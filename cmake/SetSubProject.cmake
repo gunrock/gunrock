@@ -2,6 +2,12 @@
 #  Gunrock: Set sub projects includes, links and executables.
 # ------------------------------------------------------------------------
 
+if(RAPIDJSON_FOUND)
+  include_directories(${RAPIDJSON_INCLUDEDIR})
+else()
+  message(SEND_ERROR "RapidJson include directory not set.")
+endif()
+
 # begin /* moderngpu include directories */
 if(mgpu_INCLUDE_DIRS)
   include_directories(${mgpu_INCLUDE_DIRS})
@@ -29,7 +35,7 @@ CUDA_ADD_EXECUTABLE(${PROJECT_NAME}
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/misc_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/gitsha1.c
-  ${CMAKE_SOURCE_DIR}/gunrock/util/types.cu
+  ${CMAKE_SOURCE_DIR}/gunrock/util/str_to_T.cu
   ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
 # end /* Add CUDA executables */
