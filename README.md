@@ -31,6 +31,17 @@ Gunrock is featured on NVIDIA's list of [GPU Accelerated Libraries](https://deve
 </tr>
 </tbody></table>
 
+## Quickstart
+```
+git clone --recursive https://github.com/gunrock/gunrock/
+cd gunrock
+mkdir build
+cd build
+cmake ..
+make -j$(nproc)
+make test
+```
+
 ## Gunrock Source Code
 
 <table style="font-size: 12px;"><thead>
