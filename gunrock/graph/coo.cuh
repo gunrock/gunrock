@@ -436,9 +436,11 @@ struct Coo :
             int thread_num  = omp_get_thread_num();
             SizeT edge_start = this -> edges / num_threads * thread_num;
             SizeT edge_end   = this -> edges / num_threads * (thread_num + 1);
+            
             if (thread_num == 0)
                 edge_start = 0;
-            if (thread_num == thread_num -1)
+            
+            if (thread_num == num_threads - 1)
                 edge_end = this -> edges;
 
             #pragma omp single

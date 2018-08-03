@@ -42,7 +42,7 @@ struct main_struct
         typename ValueT>  // Use int as the value type
     cudaError_t operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val)
     {
-        typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_EDGE_VALUES | graph::HAS_COO> GraphT; // PR different
+        typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_EDGE_VALUES | graph::HAS_CSR> GraphT; // PR different
         
         cudaError_t retval = cudaSuccess;
         util::CpuTimer cpu_timer;
@@ -55,11 +55,11 @@ struct main_struct
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        auto &graph_coo = graph.coo();
-        for(VertexT i=0; i < graph_coo.edges; i++) {
-            auto &edge_pair = graph_coo.edge_pairs[i];
-            std::cout << edge_pair.x << "|" << edge_pair.y << std::endl;
-        }
+        // auto &graph_coo = graph.coo();
+        // for(VertexT i=0; i < graph_coo.edges; i++) {
+        //     auto &edge_pair = graph_coo.edge_pairs[i];
+        //     std::cout << edge_pair.x << "|" << edge_pair.y << std::endl;
+        // }
         
         // GUARD_CU(app::Set_Srcs    (parameters, graph));
         // int num_srcs = 0;
