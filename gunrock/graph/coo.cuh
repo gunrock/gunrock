@@ -214,7 +214,7 @@ struct Coo :
         //if (retval = BaseGraph::Set(source))
         //    return retval;
         this -> nodes = source.CsrT::nodes;
-        this -> nodes = source.CsrT::edges;
+        this -> edges = source.CsrT::edges;
         this -> directed = source.CsrT::directed;
         this -> edge_order = UNORDERED;
 
