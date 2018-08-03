@@ -239,6 +239,8 @@ double gunrock_pagerank(
     typedef typename GraphT::VertexT VertexT;
     typedef gunrock::app::pr::Problem<GraphT  > ProblemT;
     typedef gunrock::app::pr::Enactor<ProblemT> EnactorT;
+
+    printf("Set up CPUTimer.\n");
     gunrock::util::CpuTimer cpu_timer;
     gunrock::util::Location target = gunrock::util::DEVICE;
     double total_time = 0;
@@ -248,6 +250,8 @@ double gunrock_pagerank(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
+
+    printf("Init Problem and Enactor for PR.\n");
     problem.Init(graph  , target);
     enactor.Init(problem, target);
 
@@ -256,6 +260,8 @@ double gunrock_pagerank(
     int num_srcs = srcs.size();
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
+
+	printf("For run_num: %d, Reset problem and enactor and Enact.\n", run_num);
         int src_num = run_num % num_srcs;
         VertexT src = srcs[src_num];
         problem.Reset(src, target);
@@ -313,6 +319,7 @@ double pagerank(
         Graph_CsrT;
     typedef typename Graph_CsrT::CsrT CsrT;
 
+    printf("Setting up Gunrock's parameters. \n");
     // Setup parameters
     gunrock::util::Parameters parameters("pr");
     gunrock::graphio::UseParameters(parameters);
@@ -325,6 +332,7 @@ double pagerank(
     std::vector<VertexT> srcs;
     VertexT InvalidValue = gunrock::util::PreDefinedValues<VertexT>::InvalidValue;
 
+    printf("Check if sources == NULL, else populate sources. \n");
     for (int i = 0; i < num_runs; i ++)
     {
         if (sources != NULL)
@@ -335,6 +343,8 @@ double pagerank(
     parameters.Set("srcs", srcs);
 
     bool quiet = parameters.Get<bool>("quiet");
+
+    printf("Assign pointers into gunrock graph format.\n");
     CsrT csr;
     // Assign pointers into gunrock graph format
     csr.Allocate(num_nodes, num_edges, gunrock::util::HOST);
@@ -343,12 +353,14 @@ double pagerank(
 
     gunrock::util::Location target = gunrock::util::DEVICE;    
 
+    printf("Convert graph to coo type for PageRank.\n");
     Graph_CooT graph;
     graph.FromCsr(csr, target, 0, quiet, false);
     csr.Release();
     gunrock::graphio::LoadGraph(parameters, graph);
 
-    // Run the SSSP
+    printf("Run gunrock pagerank.\n");
+    // Run the PR
     double elapsed_time = gunrock_pagerank(parameters, graph, node_ids, ranks);
 
     // Cleanup
@@ -385,7 +397,7 @@ double pagerank(
           ValueT       *ranks)
 {
     return pagerank(num_nodes, num_edges, row_offsets, col_indices,
-        1, 1, &source, &node_ids, &ranks);
+        1 /* num_runs */, normalize, (int *) &source, &node_ids, &ranks);
 }
 
 /*
@@ -419,9 +431,9 @@ double pagerank(
           float      *ranks)
 {
 
-    printf("reached the c call.\n");
+    printf("CXX: PageRank C Call ().\n");
     return pagerank(num_nodes, num_edges, row_offsets, col_indices,
-        1, 1, (int*)NULL, &node_ids, &ranks);
+        normalize, (int) NULL, node_ids, ranks);
 }
 
 // Leave this at the end of the file
