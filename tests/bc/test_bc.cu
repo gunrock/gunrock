@@ -55,50 +55,49 @@ struct main_struct
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        // auto &graph_coo = graph.coo();
-        // for(VertexT i=0; i < graph_coo.edges; i++) {
-        //     auto &edge_pair = graph_coo.edge_pairs[i];
-        //     std::cout << edge_pair.x << "|" << edge_pair.y << std::endl;
-        // }
+        auto &graph_coo = graph.coo();
+        for(VertexT i=0; i < graph_coo.edges; i++) {
+            auto &edge_pair = graph_coo.edge_pairs[i];
+            std::cout << edge_pair.x << "|" << edge_pair.y << std::endl;
+        }
         
         // GUARD_CU(app::Set_Srcs    (parameters, graph));
         // int num_srcs = 0;
 
-//         // TODO: reference result on CPU, e.e.:
-//         // ValueT  **ref_distances = NULL;
-//         bool quick = parameters.Get<bool>("quick");
-//         // compute reference CPU SSSP solution for source-distance
-//         if (!quick)
-//         {
-//             bool quiet = parameters.Get<bool>("quiet");
-//             std::string validation = parameters.Get<std::string>("validation");
-//             util::PrintMsg("Computing reference value ...", !quiet);
+        // TODO: reference result on CPU, e.e.:
+        // ValueT  **ref_distances = NULL;
+        bool quick = parameters.Get<bool>("quick");
+        bool quiet = parameters.Get<bool>("quiet");
+        
+        if (!quick)
+        {
+            // std::string validation = parameters.Get<std::string>("validation");
+            util::PrintMsg("Computing reference value ...", !quiet);
 
-//             // TODO: get srcs if needed, e.g.:
-//             // std::vector<VertexT> srcs
-//             //    = parameters.Get<std::vector<VertexT> >("srcs");
-//             // num_srcs = srcs.size();
+            // // TODO: get srcs if needed, e.g.:
+            // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
+            // num_srcs = srcs.size();
 
-//             // SizeT nodes = graph.nodes;
-//             // TODO: problem specific data, e.g.:
-//             // ref_distances = new ValueT*[num_srcs];
-//             for (int i = 0; i < num_srcs; i++)
-//             {
-//                 // ref_distances[i] = new ValueT[nodes];
-//                 // VertexT src = srcs[i];
-//                 util::PrintMsg("__________________________", !quiet);
-//                 float elapsed = app::Template::CPU_Reference(
-//                     graph.csr(),
-//                     // TODO: add problem specific data, e.g.:
-//                     // ref_distances[i], NULL, src,
-//                     quiet);
-//                 util::PrintMsg("--------------------------\nRun "
-//                     + std::to_string(i) + " elapsed: "
-//                     + std::to_string(elapsed)
-//                     //+ " ms, src = " + std::to_string(src)
-//                     , !quiet);
-//             }
-//         }
+            // SizeT nodes = graph.nodes;
+            // // TODO: problem specific data, e.g.:
+            // ref_distances = new ValueT*[num_srcs];
+            // for (int i = 0; i < num_srcs; i++)
+            // {
+            //     // ref_distances[i] = new ValueT[nodes];
+            //     // VertexT src = srcs[i];
+            //     util::PrintMsg("__________________________", !quiet);
+            //     float elapsed = app::Template::CPU_Reference(
+            //         graph.csr(),
+            //         // TODO: add problem specific data, e.g.:
+            //         // ref_distances[i], NULL, src,
+            //         quiet);
+            //     util::PrintMsg("--------------------------\nRun "
+            //         + std::to_string(i) + " elapsed: "
+            //         + std::to_string(elapsed)
+            //         //+ " ms, src = " + std::to_string(src)
+            //         , !quiet);
+            // }
+        }
 
 //         // TODO: add other switching parameters, if needed
 //         std::vector<std::string> switches{"advance-mode"};
