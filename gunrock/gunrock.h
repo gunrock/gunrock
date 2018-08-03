@@ -337,9 +337,7 @@ float sssp(
  * @param[in] col_indices Input graph col_indices.
  * @param[in] normalized Whether to perform a normalized PageRank
  */
-float pagerank(
-   // int*       node_ids,      // Return top-ranked vertex IDs
-   // float*     pagerank,      // Return top-ranked PageRank scores
+double pagerank(
     const int  num_nodes,     // Input graph number of nodes
     const int  num_edges,     // Input graph number of edges
     const int* row_offsets,   // Input graph row_offsets

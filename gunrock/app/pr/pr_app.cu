@@ -304,6 +304,7 @@ double pagerank(
           VertexT     **node_ids,
           ValueT      **ranks)
 {
+
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, ValueT,
         gunrock::graph::HAS_COO>
         Graph_CooT;
@@ -322,12 +323,14 @@ double pagerank(
     parameters.Set("normalize", normalize);
     parameters.Set("num-runs", num_runs);
     std::vector<VertexT> srcs;
+    VertexT InvalidValue = gunrock::util::PreDefinedValues<VertexT>::InvalidValue;
+
     for (int i = 0; i < num_runs; i ++)
     {
         if (sources != NULL)
             srcs.push_back(sources[i]);
         else
-            srcs.push_back(gunrock::util::PreDefinedValues<VertexT>::InvalidValue);
+            srcs.push_back(InvalidValue);
     }
     parameters.Set("srcs", srcs);
 
@@ -335,11 +338,13 @@ double pagerank(
     CsrT csr;
     // Assign pointers into gunrock graph format
     csr.Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    csr.row_offsets   .SetPointer(row_offsets, gunrock::util::HOST);
-    csr.column_indices.SetPointer(col_indices, gunrock::util::HOST);
+    csr.row_offsets   .SetPointer((int*)row_offsets, gunrock::util::HOST);
+    csr.column_indices.SetPointer((int*)col_indices, gunrock::util::HOST);
+
+    gunrock::util::Location target = gunrock::util::DEVICE;    
 
     Graph_CooT graph;
-    graph.FromCsr(csr, false, quiet);
+    graph.FromCsr(csr, target, 0, quiet, false);
     csr.Release();
     gunrock::graphio::LoadGraph(parameters, graph);
 
@@ -380,7 +385,7 @@ double pagerank(
           ValueT       *ranks)
 {
     return pagerank(num_nodes, num_edges, row_offsets, col_indices,
-        1, &source, &node_ids, &ranks);
+        1, 1, &source, &node_ids, &ranks);
 }
 
 /*
@@ -394,21 +399,29 @@ double pagerank(
  * @param[out] pagerank    Return PageRank scores per node
  * \return     double      Return accumulated elapsed times for all runs
  */
+/*
 template <
     typename VertexT = int,
     typename SizeT   = int,
     typename ValueT  = float>
+
+*/
+
+//            argument types are: (const int, const int, const int *, const int *, int, int *, int **, float **)
+
 double pagerank(
-    const SizeT         num_nodes,
-    const SizeT         num_edges,
-    const SizeT        *row_offsets,
-    const VertexT      *col_indices,
-          bool          normalize,
-          VertexT      *node_ids,
-          ValueT       *ranks)
+    const int         num_nodes,
+    const int         num_edges,
+    const int        *row_offsets,
+    const int	     *col_indices,
+          bool        normalize,
+          int 	     *node_ids,
+          float      *ranks)
 {
+
+    printf("reached the c call.\n");
     return pagerank(num_nodes, num_edges, row_offsets, col_indices,
-        1, (VertexT*)NULL, &node_ids, &ranks);
+        1, 1, (int*)NULL, &node_ids, &ranks);
 }
 
 // Leave this at the end of the file

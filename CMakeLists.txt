@@ -264,7 +264,7 @@ endif(GUNROCK_BUILD_LIB)
 
 # begin /* Add premitives' subdirectories */
 if(GUNROCK_BUILD_APPLICATIONS)
-  # add_subdirectory(shared_lib_tests)
+  add_subdirectory(shared_lib_tests)
   # add_subdirectory(simple_example)
   # add_subdirectory(tests/bc)
   # add_subdirectory(tests/bfs)

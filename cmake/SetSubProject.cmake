@@ -31,11 +31,11 @@ endif()
 # begin /* Add CUDA executables */
 CUDA_ADD_EXECUTABLE(${PROJECT_NAME}
   test_${PROJECT_NAME}.cu
+  ${CMAKE_SOURCE_DIR}/gunrock/util/str_to_T.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/test_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/misc_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/gitsha1.c
-  ${CMAKE_SOURCE_DIR}/gunrock/util/str_to_T.cu
   ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
 # end /* Add CUDA executables */
