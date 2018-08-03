@@ -102,8 +102,7 @@ cudaError_t Compensate_ZeroDegrees(
             + " edges to compensate 0 degree vertices");
 
     CooT new_coo;
-    GUARD_CU(new_coo.Allocate(graph_coo.nodes + 1,
-        graph_coo.edges + counter + graph_coo.nodes, util::HOST));
+    GUARD_CU(new_coo.Allocate(graph_coo.nodes + 1,graph_coo.edges + counter + graph_coo.nodes, util::HOST));
     GUARD_CU(new_coo.edge_pairs.ForEach(graph_coo.edge_pairs,
         []__host__ __device__(EdgePairT &new_pair, const EdgePairT &old_pair)
         {

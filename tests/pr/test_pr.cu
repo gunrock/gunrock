@@ -39,11 +39,9 @@ struct main_struct
         typename VertexT, // Use int as the vertex identifier
         typename SizeT,   // Use int as the graph size type
         typename ValueT>  // Use int as the value type
-    cudaError_t operator()(util::Parameters &parameters,
-        VertexT v, SizeT s, ValueT val)
+    cudaError_t operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val)
     {
-        typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_COO>
-            GraphT;
+        typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_COO> GraphT;
         typedef typename GraphT::CooT CooT;
 
         cudaError_t retval = cudaSuccess;
@@ -65,8 +63,7 @@ struct main_struct
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        std::vector<bool> compensate_vec
-            = parameters.Get<std::vector<bool>>("compensate");
+        std::vector<bool> compensate_vec = parameters.Get<std::vector<bool>>("compensate");
         for (auto it = compensate_vec.begin(); it != compensate_vec.end(); it++)
         {
             bool compensate = *it;
@@ -75,10 +72,8 @@ struct main_struct
                 GUARD_CU(gunrock::app::pr::Compensate_ZeroDegrees(graph, quiet));
             }
             GUARD_CU(parameters.Set("compensate", compensate));
-            std::vector<std::string> switches{
-                "normalize", "delta", "threshold", "max-iter"};
-            GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-                [quick, quiet](util::Parameters &parameters, GraphT &graph)
+            std::vector<std::string> switches{"normalize", "delta", "threshold", "max-iter"};
+            GUARD_CU(app::Switch_Parameters(parameters, graph, switches,[quick, quiet](util::Parameters &parameters, GraphT &graph)
                 {
                     cudaError_t retval = cudaSuccess;
                     GUARD_CU(app::Set_Srcs(parameters, graph));
@@ -90,8 +85,7 @@ struct main_struct
                     if (!quick)
                     {
                         util::PrintMsg("Computing reference value ...", !quiet);
-                        std::vector<VertexT> srcs
-                            = parameters.Get<std::vector<VertexT> >("srcs");
+                        std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
                         num_srcs = srcs.size();
                         SizeT nodes = graph.nodes;
                         ref_ranks    = (ValueT **)malloc(sizeof(ValueT*) * num_srcs);
@@ -102,8 +96,7 @@ struct main_struct
                             ref_vertices[i] = (VertexT*)malloc(sizeof(VertexT) * nodes);
                             VertexT src = srcs[i];
                             util::PrintMsg("__________________________", !quiet);
-                            float elapsed = app::pr::CPU_Reference(parameters,
-                                graph, src, ref_vertices[i], ref_ranks[i]);
+                            float elapsed = app::pr::CPU_Reference(parameters, graph, src, ref_vertices[i], ref_ranks[i]);
                             util::PrintMsg("--------------------------\nRun "
                                 + std::to_string(i) + " elapsed: "
                                 + std::to_string(elapsed) + " ms, src = "
