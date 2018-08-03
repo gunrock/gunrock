@@ -439,7 +439,7 @@ struct Coo :
             
             if (thread_num == 0)
                 edge_start = 0;
-            
+
             if (thread_num == num_threads - 1)
                 edge_end = this -> edges;
 
