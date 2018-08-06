@@ -240,7 +240,6 @@ double gunrock_pagerank(
     typedef gunrock::app::pr::Problem<GraphT  > ProblemT;
     typedef gunrock::app::pr::Enactor<ProblemT> EnactorT;
 
-    printf("Set up CPUTimer.\n");
     gunrock::util::CpuTimer cpu_timer;
     gunrock::util::Location target = gunrock::util::DEVICE;
     double total_time = 0;
@@ -319,7 +318,6 @@ double pagerank(
         Graph_CsrT;
     typedef typename Graph_CsrT::CsrT CsrT;
 
-    printf("Setting up Gunrock's parameters. \n");
     // Setup parameters
     gunrock::util::Parameters parameters("pr");
     gunrock::graphio::UseParameters(parameters);
@@ -332,7 +330,6 @@ double pagerank(
     std::vector<VertexT> srcs;
     VertexT InvalidValue = gunrock::util::PreDefinedValues<VertexT>::InvalidValue;
 
-    printf("Check if sources == NULL, else populate sources. \n");
     for (int i = 0; i < num_runs; i ++)
     {
         if (sources != NULL)
@@ -344,7 +341,6 @@ double pagerank(
 
     bool quiet = parameters.Get<bool>("quiet");
 
-    printf("Assign pointers into gunrock graph format.\n");
     CsrT csr;
     // Assign pointers into gunrock graph format
     csr.Allocate(num_nodes, num_edges, gunrock::util::HOST);
@@ -353,13 +349,11 @@ double pagerank(
 
     gunrock::util::Location target = gunrock::util::DEVICE;    
 
-    printf("Convert graph to coo type for PageRank.\n");
     Graph_CooT graph;
     graph.FromCsr(csr, target, 0, quiet, false);
     csr.Release();
     gunrock::graphio::LoadGraph(parameters, graph);
 
-    printf("Run gunrock pagerank.\n");
     // Run the PR
     double elapsed_time = gunrock_pagerank(parameters, graph, node_ids, ranks);
 
@@ -396,8 +390,13 @@ double pagerank(
           VertexT      *node_ids,
           ValueT       *ranks)
 {
+    if (source == -1) {
+    	return pagerank(num_nodes, num_edges, row_offsets, col_indices,
+             1 /* num_runs */, normalize, (int *) NULL, &node_ids, &ranks);
+    }
+
     return pagerank(num_nodes, num_edges, row_offsets, col_indices,
-        1 /* num_runs */, normalize, (int *) &source, &node_ids, &ranks);
+        1 /* num_runs */, normalize, &source, &node_ids, &ranks);
 }
 
 /*
@@ -431,9 +430,8 @@ double pagerank(
           float      *ranks)
 {
 
-    printf("CXX: PageRank C Call ().\n");
     return pagerank(num_nodes, num_edges, row_offsets, col_indices,
-        normalize, (int) NULL, node_ids, ranks);
+        normalize, (int) -1 /* source */, node_ids, ranks);
 }
 
 // Leave this at the end of the file

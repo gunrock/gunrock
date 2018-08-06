@@ -18,9 +18,7 @@ int main(int argc, char* argv[])
     int * node_ids = (int *)malloc(sizeof(int) * num_nodes);
     float * ranks = (float *)malloc(sizeof(float) * num_nodes);
 
-    double elapsed =  pagerank(num_nodes, num_edges, 
-			row_offsets, col_indices, 1, node_ids, ranks); 
-
+    double elapsed =  pagerank(num_nodes, num_edges, row_offsets, col_indices, 1, node_ids, ranks); 
 
     int node; for (node = 0; node < num_nodes; ++node)
         printf("Node_ID [%d] : Score: [%f]\n", node_ids[node], ranks[node]);
