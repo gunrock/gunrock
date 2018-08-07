@@ -102,24 +102,27 @@ struct main_struct
             }
         }
 
-//         // TODO: add other switching parameters, if needed
-//         std::vector<std::string> switches{"advance-mode"};
-//         // TODO: add problem specific data
-//         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-//             [/*ref_distances*/](util::Parameters &parameters, GraphT &graph)
-//             {
-//                 return app::Template::RunTests(parameters, graph/*, ref_distances*/);
-//             }));
-
-//         if (!quick)
-//         {
-//             // TODO: deallocate host references, e.g.:
-//             // for (int i = 0; i < num_srcs; i ++)
-//             // {
-//             //    delete[] ref_distances[i]; ref_distances[i] = NULL;
-//             // }
-//             // delete[] ref_distances; ref_distances = NULL;
-//         }
+        // TODO: add other switching parameters, if needed
+        std::vector<std::string> switches{"advance-mode"};
+        GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
+            [reference_bc_values, reference_sigmas, reference_source_path](util::Parameters &parameters, GraphT &graph)
+            {
+                return app::bc::RunTests(parameters, graph, reference_bc_values, reference_sigmas, reference_source_path);
+            }));
+        
+        // Cleanup
+        if (!quick)
+        {
+            for (int i = 0; i < num_srcs; i ++) {
+               delete[] reference_bc_values[i]; reference_bc_values[i] = NULL;
+               delete[] reference_sigmas[i]; reference_sigmas[i] = NULL;
+               delete[] reference_source_path[i]; reference_source_path[i] = NULL;
+            }
+            delete[] reference_bc_values; reference_bc_values = NULL;
+            delete[] reference_sigmas; reference_sigmas = NULL;
+            delete[] reference_source_path; reference_source_path = NULL;
+            
+        }
         return retval;
     }
 };

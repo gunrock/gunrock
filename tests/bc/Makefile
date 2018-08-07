@@ -30,7 +30,8 @@ new : test_bc.cu $(DEPS)
 	mkdir -p bin
 	$(NVCC) -g $(DEFINES) $(SM_TARGETS) -o bin/test_bc test_bc.cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) #-O3 
 
-old : test_bc_old.cu $(DEPS)
-	mkdir -p bin
-	$(NVCC) -g $(DEFINES) $(SM_TARGETS) -o bin/test_bc_old test_bc_old.cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) #-O3 
+# old : test_bc_old.cu $(DEPS)
+# 	mkdir -p bin
+# 	$(NVCC) -g $(DEFINES) $(SM_TARGETS) -o bin/test_bc_old test_bc_old.cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) #-O3 
 
+.DEFAULT_GOAL := new

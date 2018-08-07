@@ -14,12 +14,12 @@
 
 #pragma once
 
+#include <iostream>
 #include <gunrock/app/problem_base.cuh>
 
 namespace gunrock {
 namespace app {
-// TODO: change the name space
-namespace Template {
+namespace bc {
 
 /**
  * @brief Speciflying parameters for SSSP Problem
@@ -51,8 +51,6 @@ cudaError_t UseParameters_problem(
  */
 template <
     typename _GraphT,
-    // TODO: Add problem specific template parameters here, e.g.:
-    // typename _ValueT = typename _GraphT::ValueT,
     ProblemFlag _FLAG = Problem_None>
 struct Problem : ProblemBase<_GraphT, _FLAG>
 {
@@ -60,11 +58,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     static const ProblemFlag FLAG = _FLAG;
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
-    // TODO: Add algorithm specific types here, e.g.:
-    // typedef _ValueT ValueT;
+    typedef typename GraphT::ValueT  ValueT;
 
     // TODO: Add the graph representation used in the algorithm, e.g.:
-    // typedef typename GraphT::CsrT    CsrT;
+    // - DONE
+    typedef typename GraphT::CsrT    CsrT;
     typedef typename GraphT::GpT     GpT;
 
     typedef ProblemBase   <GraphT, FLAG> BaseProblem;
@@ -77,8 +75,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     struct DataSlice : BaseDataSlice
     {
-        // TODO: add problem specific storage arrays, for example:
+
         // util::Array1D<SizeT, ValueT>   distances; // distances from source
+        util::Array1D<SizeT, ValueT>   bc_values;
+        util::Array1D<SizeT, ValueT>   sigmas;
+        util::Array1D<SizeT, VertexT>  source_path;
 
         /*
          * @brief Default constructor
@@ -86,7 +87,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         DataSlice() : BaseDataSlice()
         {
             // TODO: Set names of the problem specific arrays, for example:
-            // distances         .SetName("distances"           );
+            // - DONE
+            bc_values.SetName("bc_values");
+            sigmas.SetName("sigmas");
+            source_path.SetName("source_path");
         }
 
         /*
@@ -108,10 +112,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            // TODO: Release problem specific data, e.g.:
-            // GUARD_CU(distances      .Release(target));
+            GUARD_CU(bc_values.Release(target));
+            GUARD_CU(sigmas.Release(target));
+            GUARD_CU(source_path.Release(target));
 
-            GUARD_CU(BaseDataSlice ::Release(target));
+            GUARD_CU(BaseDataSlice::Release(target));
             return retval;
         }
 
@@ -134,12 +139,16 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(BaseDataSlice::Init(sub_graph, gpu_idx, target, flag));
 
             // TODO: allocate problem specific data here, e.g.:
-            // GUARD_CU(distances .Allocate(sub_graph.nodes, target));
+            // - DONE
+            GUARD_CU(bc_values.Allocate(sub_graph.nodes, target));
+            GUARD_CU(sigmas.Allocate(sub_graph.nodes, target));
+            GUARD_CU(source_path.Allocate(sub_graph.nodes, target));
 
             if (target & util::DEVICE)
             {
                 // TODO: move sub-graph used by the problem onto GPU, e.g.:
-                // GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
+                // - DONE
+                GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
             }
             return retval;
         } // Init
@@ -152,18 +161,29 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         cudaError_t Reset(util::Location target = util::DEVICE)
         {
             cudaError_t retval = cudaSuccess;
-            //SizeT nodes = this -> sub_graph -> nodes;
+            SizeT nodes = this -> sub_graph -> nodes;
 
             // Ensure data are allocated
             // TODO: ensure size of problem specific data, e.g.:
-            // GUARD_CU(distances.EnsureSize_(nodes, target));
+            // - DONE
+            GUARD_CU(bc_values.EnsureSize_(nodes, target));
+            GUARD_CU(sigmas.EnsureSize_(nodes, target));
+            GUARD_CU(source_path.EnsureSize_(nodes, target));
 
             // Reset data
             // TODO: reset problem specific data, e.g.:
-            // GUARD_CU(distances.ForEach([]__host__ __device__
-            // (ValueT &distance){
-            //    distance = util::PreDefinedValues<ValueT>::MaxValue;
-            // }, nodes, target, this -> stream));
+            // - DONE
+            GUARD_CU(bc_values.ForEach([]__host__ __device__(ValueT &x){
+               x = 0;
+            }, nodes, target, this -> stream));
+
+            GUARD_CU(sigmas.ForEach([]__host__ __device__(ValueT &x){
+               x = 0;
+            }, nodes, target, this -> stream));
+
+            GUARD_CU(source_path.ForEach([]__host__ __device__(VertexT &x){
+               x = -1;
+            }, nodes, target, this -> stream));
 
             return retval;
         }
@@ -176,7 +196,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     // Methods
 
     /**
-     * @brief SSSPProblem default constructor
+     * @brief BCProblem default constructor
      */
     Problem(
         util::Parameters &_parameters,
@@ -187,7 +207,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     }
 
     /**
-     * @brief SSSPProblem default destructor
+     * @brief BCProblem default destructor
      */
     virtual ~Problem()
     {
@@ -227,8 +247,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     cudaError_t Extract(
         // TODO: add list of results to extract, e.g.:
-        // ValueT         *h_distances,
-        util::Location  target      = util::DEVICE)
+        // - DONE
+        ValueT *h_bc_values,
+        ValueT *h_sigmas,
+        VertexT *h_source_path,
+        util::Location  target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
         SizeT nodes = this -> org_graph -> nodes;
@@ -243,26 +266,46 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
                 // TODO: extract the results from single GPU, e.g.:
-                // GUARD_CU(data_slice.distances.SetPointer(
-                //    h_distances, nodes, util::HOST));
-                // GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
+                // - DONE
+                GUARD_CU(data_slice.bc_values.SetPointer(h_bc_values, nodes, util::HOST));
+                GUARD_CU(data_slice.bc_values.Move(util::DEVICE, util::HOST));
+
+                GUARD_CU(data_slice.sigmas.SetPointer(h_sigmas, nodes, util::HOST));
+                GUARD_CU(data_slice.sigmas.Move(util::DEVICE, util::HOST));
+
+                GUARD_CU(data_slice.source_path.SetPointer(h_source_path, nodes, util::HOST));
+                GUARD_CU(data_slice.source_path.Move(util::DEVICE, util::HOST));                
+                
             }
             else if (target == util::HOST)
             {
                 // TODO: extract the results from single CPU, e.g.:
-                // GUARD_CU(data_slice.distances.ForEach(h_distances,
-                //    []__host__ __device__
-                //    (const ValueT &distance, ValueT &h_distance){
-                //        h_distance = distance;
-                //    }, nodes, util::HOST));
+                // - DONE
+                GUARD_CU(data_slice.bc_values.ForEach(h_bc_values,
+                    []__host__ __device__ (const ValueT &x, ValueT &h_x){ h_x = x; }, nodes, util::HOST));
+
+                GUARD_CU(data_slice.sigmas.ForEach(h_sigmas,
+                    []__host__ __device__ (const ValueT &x, ValueT &h_x){ h_x = x; }, nodes, util::HOST));
+                
+                GUARD_CU(data_slice.source_path.ForEach(h_source_path,
+                   []__host__ __device__ (const VertexT &x, VertexT &h_x){ h_x = x; }, nodes, util::HOST));
             }
         }
         else
         { // num_gpus != 1
             // TODO: extract the results from multiple GPUs, e.g.:
-            // util::Array1D<SizeT, ValueT *> th_distances;
-            // th_distances.SetName("bfs::Problem::Extract::th_distances");
-            // GUARD_CU(th_distances.Allocate(this->num_gpus, util::HOST));
+            // - DONE
+            util::Array1D<SizeT, ValueT *> th_bc_values;
+            util::Array1D<SizeT, ValueT *> th_sigmas;
+            util::Array1D<SizeT, VertexT *> th_source_path;
+            
+            th_bc_values.SetName("bfs::Problem::Extract::th_bc_values");
+            th_sigmas.SetName("bfs::Problem::Extract::th_sigmas");
+            th_source_path.SetName("bfs::Problem::Extract::th_source_path");
+            
+            GUARD_CU(th_bc_values.Allocate(this->num_gpus, util::HOST));
+            GUARD_CU(th_sigmas.Allocate(this->num_gpus, util::HOST));
+            GUARD_CU(th_source_path.Allocate(this->num_gpus, util::HOST));
 
             for (int gpu = 0; gpu < this->num_gpus; gpu++)
             {
@@ -270,9 +313,16 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 if (target == util::DEVICE)
                 {
                     GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-                    // GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
+                    
+                    GUARD_CU(data_slice.bc_values.Move(util::DEVICE, util::HOST));
+                    GUARD_CU(data_slice.sigmas.Move(util::DEVICE, util::HOST));
+                    GUARD_CU(data_slice.source_path.Move(util::DEVICE, util::HOST));
+                    
                 }
-                // th_distances[gpu] = data_slice.distances.GetPointer(util::HOST);
+                th_bc_values[gpu]   = data_slice.bc_values.GetPointer(util::HOST);
+                th_sigmas[gpu]      = data_slice.sigmas.GetPointer(util::HOST);
+                th_source_path[gpu] = data_slice.source_path.GetPointer(util::HOST);
+                
             } //end for(gpu)
 
             for (VertexT v = 0; v < nodes; v++)
@@ -282,10 +332,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
                     v_ = this -> org_graph -> GpT::convertion_table[v];
 
-                // h_distances[v] = th_distances[gpu][v_];
+                h_bc_values[v]   = th_bc_values[gpu][v_];
+                h_sigmas[v]      = th_sigmas[gpu][v_];
+                h_source_path[v] = th_source_path[gpu][v_];
+                
             }
 
-            // GUARD_CU(th_distances.Release());
+            GUARD_CU(th_bc_values.Release());
+            GUARD_CU(th_sigmas.Release());
+            GUARD_CU(th_source_path.Release());
         } //end if
 
         return retval;
@@ -316,10 +371,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
 
             GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
-
             auto &data_slice = data_slices[gpu][0];
-            GUARD_CU(data_slice.Init(this -> sub_graphs[gpu],
-                this -> gpu_idx[gpu], target, this -> flag));
+            
+            GUARD_CU(data_slice.Init(
+                this -> sub_graphs[gpu],
+                this -> gpu_idx[gpu], 
+                target, 
+                this -> flag
+            ));
         } // end for (gpu)
 
         return retval;
@@ -332,10 +391,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
-        // TODO: add problem specific info, e.g.:
-        // VertexT    src,
+        VertexT src,
         util::Location target = util::DEVICE)
     {
+        
+        std::cout << "Problem->Reset(" << src << ")" << std::endl;
         cudaError_t retval = cudaSuccess;
 
         for (int gpu = 0; gpu < this->num_gpus; ++gpu)
@@ -348,38 +408,45 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         }
 
         // TODO: Initial problem specific starting point, e.g.:
-        // int gpu;
-        // VertexT src_;
-        // if (this->num_gpus <= 1)
-        // {
-        //    gpu = 0; src_=src;
-        // } else {
-        //    gpu = this -> org_graph -> partition_table[src];
-        //    if (this -> flag & partitioner::Keep_Node_Num)
-        //        src_ = src;
-        //    else
-        //        src_ = this -> org_graph -> GpT::convertion_table[src];
-        // }
-        // GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-        // GUARD_CU2(cudaDeviceSynchronize(),
-        //    "cudaDeviceSynchronize failed");
-        //
-        // ValueT src_distance = 0;
-        // if (target & util::HOST)
-        // {
-        //     data_slices[gpu] -> distances[src_] = src_distance;
-        // }
-        // if (target & util::DEVICE)
-        // {
-        //    GUARD_CU2(cudaMemcpy(
-        //        data_slices[gpu]->distances.GetPointer(util::DEVICE) + src_,
-        //        &src_distance, sizeof(ValueT),
-        //        cudaMemcpyHostToDevice),
-        //        "SSSPProblem cudaMemcpy distances failed");
-        // }
-
+        int gpu;
+        VertexT src_;
+        if (this->num_gpus <= 1)
+        {
+           gpu = 0; src_=src;
+        } else {
+           gpu = this -> org_graph -> partition_table[src];
+           if (this -> flag & partitioner::Keep_Node_Num) {
+               src_ = src;
+           } else {
+               src_ = this -> org_graph -> GpT::convertion_table[src];
+           }
+        }
+        GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
         GUARD_CU2(cudaDeviceSynchronize(),
-            "cudaDeviceSynchronize failed");
+           "cudaDeviceSynchronize failed");
+        
+        ValueT _src_sigma = 1.0;
+        VertexT _src_source_path = -1;
+        if (target & util::HOST)
+        {
+            data_slices[gpu]->sigmas[src_] = _src_sigma;
+            data_slices[gpu]->source_path[src_] = _src_source_path;
+        }
+        if (target & util::DEVICE)
+        {
+           GUARD_CU2(cudaMemcpy(
+               data_slices[gpu]->sigmas.GetPointer(util::DEVICE) + src_,
+               &_src_sigma, sizeof(ValueT),
+               cudaMemcpyHostToDevice),
+               "SSSPProblem cudaMemcpy distances failed");
+           GUARD_CU2(cudaMemcpy(
+               data_slices[gpu]->source_path.GetPointer(util::DEVICE) + src_,
+               &_src_source_path, sizeof(VertexT),
+               cudaMemcpyHostToDevice),
+               "SSSPProblem cudaMemcpy distances failed");
+        }
+        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
+        
         return retval;
     }
 

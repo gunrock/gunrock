@@ -562,8 +562,10 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
                 (Value)0.0, problem->sub_graphs[gpu].nodes);
         }
         if (retval = util::GRError(problem->Reset(
-            0, enactor->GetFrontierType(),
-            max_queue_sizing, max_queue_sizing1),
+            0,
+            enactor->GetFrontierType(),
+            max_queue_sizing,
+            max_queue_sizing1),
             "BC Problem Data Reset Failed", __FILE__, __LINE__))
             return retval;
 

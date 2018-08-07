@@ -11,6 +11,7 @@
 //  * @brief single-source shortest path (SSSP) application
 //  */
 
+#include <iostream>
 #include <gunrock/gunrock.h>
 
 // Utilities and correctness-checking
@@ -47,124 +48,145 @@ cudaError_t UseParameters(util::Parameters &parameters)
     return retval;
 }
 
-// /**
-//  * @brief Run SSSP tests
-//  * @tparam     GraphT        Type of the graph
-//  * @tparam     ValueT        Type of the distances
-//  * @param[in]  parameters    Excution parameters
-//  * @param[in]  graph         Input graph
-//  * @param[in]  ref_distances Reference distances
-//  * @param[in]  target        Whether to perform the SSSP
-//  * \return cudaError_t error message(s), if any
-//  */
-// template <typename GraphT, typename ValueT = typename GraphT::ValueT>
-// cudaError_t RunTests(
-//     util::Parameters &parameters,
-//     GraphT           &graph,
-//     // TODO: add problem specific reference results, e.g.:
-//     // ValueT **ref_distances = NULL,
-//     util::Location target = util::DEVICE)
-// {
-//     cudaError_t retval = cudaSuccess;
-//     typedef typename GraphT::VertexT VertexT;
-//     typedef typename GraphT::SizeT   SizeT;
-//     typedef Problem<GraphT  > ProblemT;
-//     typedef Enactor<ProblemT> EnactorT;
-//     util::CpuTimer    cpu_timer, total_timer;
-//     cpu_timer.Start(); total_timer.Start();
+/**
+ * @brief Run SSSP tests
+ * @tparam     GraphT        Type of the graph
+ * @tparam     ValueT        Type of the distances
+ * @param[in]  parameters    Excution parameters
+ * @param[in]  graph         Input graph
+ * @param[in]  ref_distances Reference distances
+ * @param[in]  target        Whether to perform the SSSP
+ * \return cudaError_t error message(s), if any
+ */
+template <
+    typename GraphT, 
+    typename ValueT = typename GraphT::ValueT,
+    typename VertexT = typename GraphT::VertexT>
+cudaError_t RunTests(
+    util::Parameters &parameters,
+    GraphT           &graph,
+    
+    ValueT **reference_bc_values = NULL,
+    ValueT **reference_sigmas = NULL,
+    VertexT **reference_source_path = NULL,
+    
+    util::Location target = util::DEVICE)
+{
+    
+    std::cout << "--- RunTests ---" << std::endl;
+    
+    cudaError_t retval = cudaSuccess;
+    typedef typename GraphT::SizeT   SizeT;
+    typedef Problem<GraphT>   ProblemT;
+    typedef Enactor<ProblemT> EnactorT;
+    util::CpuTimer cpu_timer, total_timer;
+    cpu_timer.Start(); total_timer.Start();
 
-//     // parse configurations from parameters
-//     bool quiet_mode = parameters.Get<bool>("quiet");
-//     int  num_runs   = parameters.Get<int >("num-runs");
-//     std::string validation = parameters.Get<std::string>("validation");
-//     util::Info info("bc", parameters, graph); // initialize Info structure
+    // parse configurations from parameters
+    bool quiet_mode = parameters.Get<bool>("quiet");
+    int  num_runs   = parameters.Get<int >("num-runs");
+    std::string validation = parameters.Get<std::string>("validation");
+    util::Info info("bc", parameters, graph); // initialize Info structure
+    
+    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+    int num_srcs = srcs.size();
 
-//     // TODO: get problem specific inputs, e.g.:
-//     // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-//     // int  num_srcs   = srcs   .size();
+    // Allocate host-side array (for both reference and GPU-computed results)
+    ValueT  *h_bc_values   = new ValueT[graph.nodes];
+    ValueT  *h_sigmas      = new ValueT[graph.nodes];
+    VertexT *h_source_path = new VertexT[graph.nodes];
 
-//     // Allocate host-side array (for both reference and GPU-computed results)
-//     // TODO: allocate problem specific host data, e.g.:
-//     // ValueT  *h_distances = new ValueT[graph.nodes];
+    // Allocate problem and enactor on GPU, and initialize them
+    ProblemT problem(parameters);
+    EnactorT enactor;
+    GUARD_CU(problem.Init(graph, target));
+    GUARD_CU(enactor.Init(problem, target));
+    cpu_timer.Stop();
+    parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
-//     // Allocate problem and enactor on GPU, and initialize them
-//     ProblemT problem(parameters);
-//     EnactorT enactor;
-//     GUARD_CU(problem.Init(graph  , target));
-//     GUARD_CU(enactor.Init(problem, target));
-//     cpu_timer.Stop();
-//     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
+    // perform the algorithm
+    // TODO: Declear problem specific variables, e.g.:
+    VertexT src;
+    for (int run_num = 0; run_num < num_runs; ++run_num)
+    {
+        // TODO: assign problem specific variables, e.g.:
+        src = srcs[run_num % num_srcs];
+        GUARD_CU(problem.Reset(src, target));
+        GUARD_CU(enactor.Reset(src, target));
+        util::PrintMsg("__________________________", !quiet_mode);
 
-//     // perform the algorithm
-//     // TODO: Declear problem specific variables, e.g.:
-//     // VertexT src;
-//     for (int run_num = 0; run_num < num_runs; ++run_num)
-//     {
-//         // TODO: assign problem specific variables, e.g.:
-//         // src = srcs[run_num % num_srcs];
-//         GUARD_CU(problem.Reset(/*src,*/ target));
-//         GUARD_CU(enactor.Reset(/*src,*/ target));
-//         util::PrintMsg("__________________________", !quiet_mode);
+        cpu_timer.Start();
+        GUARD_CU(enactor.Enact(src));
+        cpu_timer.Stop();
+        info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
-//         cpu_timer.Start();
-//         GUARD_CU(enactor.Enact(/*src*/));
-//         cpu_timer.Stop();
-//         info.CollectSingleRun(cpu_timer.ElapsedMillis());
+        util::PrintMsg("--------------------------\nRun "
+            + std::to_string(run_num) + " elapsed: "
+            + std::to_string(cpu_timer.ElapsedMillis()) +
+            //" ms, src = " + std::to_string(src) +
+            ", #iterations = "
+            + std::to_string(enactor.enactor_slices[0]
+                .enactor_stats.iteration), !quiet_mode);
 
-//         util::PrintMsg("--------------------------\nRun "
-//             + std::to_string(run_num) + " elapsed: "
-//             + std::to_string(cpu_timer.ElapsedMillis()) +
-//             //" ms, src = " + std::to_string(src) +
-//             ", #iterations = "
-//             + std::to_string(enactor.enactor_slices[0]
-//                 .enactor_stats.iteration), !quiet_mode);
-//         if (validation == "each")
-//         {
-//             // TODO: fill in problem specific data, e.g.:
-//             GUARD_CU(problem.Extract(/*h_distances*/));
-//             SizeT num_errors = app::bc::Validate_Results(
-//                 parameters, graph,
-//                 // TODO: add problem specific data for validation, e.g.:
-//                 // src, h_distances,
-//                 // ref_distances == NULL ? NULL : ref_distances[run_num % num_srcs],
-//                 // NULL,
-//                 false);
-//         }
-//     }
+        if (validation == "each") {
+            // TODO: fill in problem specific data, e.g.:
+            // - DONE
+            GUARD_CU(problem.Extract(h_bc_values, h_sigmas, h_source_path));
+            SizeT num_errors = app::bc::Validate_Results(
+                parameters, graph,
+                // // TODO: place problem specific data and result for validation, e.g.:
+                // // - DONE
+                src,
+                h_bc_values,
+                h_sigmas,
+                h_source_path,
+                reference_bc_values == NULL ? NULL : reference_bc_values[run_num % num_srcs],
+                reference_sigmas == NULL ? NULL : reference_sigmas[run_num % num_srcs],
+                reference_source_path == NULL ? NULL : reference_source_path[run_num % num_srcs],
+                true);
+        }
+    }
 
-//     cpu_timer.Start();
-//     // Copy out results
-//     // TODO: fill in problem specific data, e.g.:
-//     GUARD_CU(problem.Extract(/*h_distances*/));
-//     if (validation == "last")
-//     {
-//         SizeT num_errors = app::bc::Validate_Results(
-//             parameters, graph,
-//             // TODO: place problem specific data and result for validation, e.g.:
-//             // src, h_distances,
-//             // ref_distances == NULL ? NULL : ref_distances[(num_runs -1) % num_srcs],
-//             // NULL,
-//             true);
-//     }
+    cpu_timer.Start();
+    // Copy out results
+    // TODO: fill in problem specific data, e.g.:
+    GUARD_CU(problem.Extract(h_bc_values, h_sigmas, h_source_path));
+    if (validation == "last") {
+        SizeT num_errors = app::bc::Validate_Results(
+            parameters, graph,
+            // TODO: place problem specific data and result for validation, e.g.:
+            // - DONE
+            src,
+            h_bc_values,
+            h_sigmas,
+            h_source_path,
+            reference_bc_values == NULL ? NULL : reference_bc_values[(num_runs - 1) % num_srcs],
+            reference_sigmas == NULL ? NULL : reference_sigmas[(num_runs - 1) % num_srcs],
+            reference_source_path == NULL ? NULL : reference_source_path[(num_runs - 1) % num_srcs],
+            true);
+    }
 
-//     // compute running statistics
-//     // TODO: change NULL to problem specific per-vertex visited marker, e.g. h_distances
-//     info.ComputeTraversalStats(enactor, (VertexT*)NULL);
-//     //Display_Memory_Usage(problem);
-//     #ifdef ENABLE_PERFORMANCE_PROFILING
-//         //Display_Performance_Profiling(enactor);
-//     #endif
+    // compute running statistics
+    // TODO: change NULL to problem specific per-vertex visited marker, e.g. h_distances
+    // info.ComputeTraversalStats(enactor, (VertexT*)NULL);
+    //Display_Memory_Usage(problem);
+    // #ifdef ENABLE_PERFORMANCE_PROFILING
+        //Display_Performance_Profiling(enactor);
+    // #endif
 
-//     // Clean up
-//     GUARD_CU(enactor.Release(target));
-//     GUARD_CU(problem.Release(target));
-//     // TODO: Release problem specific data, e.g.:
-//     // delete[] h_distances  ; h_distances   = NULL;
-//     cpu_timer.Stop(); total_timer.Stop();
+    // Clean up
+    GUARD_CU(enactor.Release(target));
+    GUARD_CU(problem.Release(target));
+    // TODO: Release problem specific data, e.g.:
+    delete[] h_bc_values  ; h_bc_values = NULL;
+    delete[] h_sigmas  ; h_sigmas = NULL;
+    delete[] h_source_path  ; h_source_path = NULL;
+    
+    cpu_timer.Stop(); total_timer.Stop();
 
-//     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
-//     return retval;
-// }
+    info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
+    return retval;
+}
 
 } // namespace bc
 } // namespace app

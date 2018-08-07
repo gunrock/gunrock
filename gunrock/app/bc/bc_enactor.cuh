@@ -17,14 +17,12 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-// TODO: change to problem specific problem.cuh file
-#include <gunrock/app/Template/Template_problem.cuh>
+#include <gunrock/app/bc/bc_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
 namespace gunrock {
 namespace app {
-// TODO: change the name space
-namespace Template {
+namespace bc {
 
 /**
  * @brief Speciflying parameters for SSSP Enactor
@@ -339,7 +337,7 @@ public:
      */
     cudaError_t Reset(
         // TODO: add problem specific info, e.g.:
-        // VertexT src,
+        VertexT src,
         util::Location target = util::DEVICE)
     {
         typedef typename GraphT::GpT GpT;
@@ -389,7 +387,7 @@ public:
      */
     cudaError_t Enact(
         // TODO: add problem specific info, e.g.:
-        // VertexT src
+        VertexT src
         )
     {
         cudaError_t  retval     = cudaSuccess;
