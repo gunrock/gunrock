@@ -36,6 +36,14 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
     
+    // Don't need this, because we already have `srcs` in `UseParameters_test`
+    // GUARD_CU(parameters.Use<std::string>(
+    //     "src",
+    //     util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+    //     "invalid",
+    //     "vertex id",
+    //     __FILE__, __LINE__));
+    
     return retval;
 }
 

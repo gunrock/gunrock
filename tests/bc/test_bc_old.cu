@@ -194,8 +194,7 @@ void ReferenceBC(
         // Perform full exact BC using BGL
 
         using namespace boost;
-        typedef adjacency_list <setS, vecS, undirectedS, no_property,
-                EdgeProperties> Graph;
+        typedef adjacency_list <setS, vecS, undirectedS, no_property, EdgeProperties> Graph;
         typedef Graph::vertex_descriptor Vertex;
         typedef Graph::edge_descriptor Edge;
 
@@ -223,8 +222,7 @@ void ReferenceBC(
         // Define EdgeCentralityMap
         std::vector< double > e_centrality_vec(boost::num_edges(G), 0.0);
         // Create the external property map
-        boost::iterator_property_map< std::vector< double >::iterator,
-              EdgeIndexMap >
+        boost::iterator_property_map< std::vector< double >::iterator, EdgeIndexMap >
               e_centrality_map(e_centrality_vec.begin(), e_index);
 
         // Define VertexCentralityMap
@@ -234,8 +232,7 @@ void ReferenceBC(
         std::vector< double > v_centrality_vec(boost::num_vertices(G), 0.0);
 
         // Create the external property map
-        boost::iterator_property_map< std::vector< double >::iterator,
-              VertexIndexMap>
+        boost::iterator_property_map< std::vector< double >::iterator, VertexIndexMap>
               v_centrality_map(v_centrality_vec.begin(), v_index);
 
         // Perform BC

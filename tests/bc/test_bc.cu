@@ -55,48 +55,51 @@ struct main_struct
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        auto &graph_coo = graph.coo();
-        for(VertexT i=0; i < graph_coo.edges; i++) {
-            auto &edge_pair = graph_coo.edge_pairs[i];
-            std::cout << edge_pair.x << "|" << edge_pair.y << std::endl;
-        }
-        
-        // GUARD_CU(app::Set_Srcs    (parameters, graph));
-        // int num_srcs = 0;
+        // Enable is set sources        
+        // GUARD_CU(app::Set_Srcs(parameters, graph));
+        int num_srcs = 0;
 
         // TODO: reference result on CPU, e.e.:
-        // ValueT  **ref_distances = NULL;
+        ValueT **reference_bc_values    = NULL;
+        ValueT **reference_sigmas       = NULL;
+        VertexT **reference_source_path = NULL; 
+        
         bool quick = parameters.Get<bool>("quick");
         bool quiet = parameters.Get<bool>("quiet");
         
-        if (!quick)
-        {
+        if (!quick) {
             // std::string validation = parameters.Get<std::string>("validation");
             util::PrintMsg("Computing reference value ...", !quiet);
+            std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
+            num_srcs = srcs.size();
+            
+            SizeT nodes = graph.nodes;
 
-            // // TODO: get srcs if needed, e.g.:
-            // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
-            // num_srcs = srcs.size();
-
-            // SizeT nodes = graph.nodes;
-            // // TODO: problem specific data, e.g.:
-            // ref_distances = new ValueT*[num_srcs];
-            // for (int i = 0; i < num_srcs; i++)
-            // {
-            //     // ref_distances[i] = new ValueT[nodes];
-            //     // VertexT src = srcs[i];
-            //     util::PrintMsg("__________________________", !quiet);
-            //     float elapsed = app::Template::CPU_Reference(
-            //         graph.csr(),
-            //         // TODO: add problem specific data, e.g.:
-            //         // ref_distances[i], NULL, src,
-            //         quiet);
-            //     util::PrintMsg("--------------------------\nRun "
-            //         + std::to_string(i) + " elapsed: "
-            //         + std::to_string(elapsed)
-            //         //+ " ms, src = " + std::to_string(src)
-            //         , !quiet);
-            // }
+            reference_bc_values   = new ValueT*[num_srcs];
+            reference_sigmas      = new ValueT*[num_srcs];
+            reference_source_path = new VertexT*[num_srcs];
+            
+            for (int i = 0; i < num_srcs; i++) {
+                VertexT src = srcs[i];
+                util::PrintMsg("__________________________", !quiet);
+                            
+                reference_bc_values[i]   = new ValueT[nodes];
+                reference_sigmas[i]      = new ValueT[nodes];
+                reference_source_path[i] = new VertexT[nodes];
+                
+                float elapsed = app::bc::CPU_Reference(
+                    graph,
+                    reference_bc_values[i],
+                    reference_sigmas[i],
+                    reference_source_path[i],
+                    src,
+                    quiet);
+                util::PrintMsg("--------------------------\nRun "
+                    + std::to_string(i) + " elapsed: "
+                    + std::to_string(elapsed)
+                    + " ms, src = " + std::to_string(src)
+                    , !quiet);
+            }
         }
 
 //         // TODO: add other switching parameters, if needed
