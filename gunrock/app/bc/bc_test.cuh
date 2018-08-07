@@ -27,27 +27,27 @@ namespace bc {
  * Housekeeping Routines
  ******************************************************************************/
 
-/**
- * @brief Displays the SSSP result (i.e., distance from source)
- * @tparam T Type of values to display
- * @tparam SizeT Type of size counters
- * @param[in] preds Search depth from the source for each node.
- * @param[in] num_nodes Number of nodes in the graph.
- */
-template<typename T, typename SizeT>
-void DisplaySolution(T *array, SizeT length)
-{
-    if (length > 40)
-        length = 40;
+// /**
+//  * @brief Displays the SSSP result (i.e., distance from source)
+//  * @tparam T Type of values to display
+//  * @tparam SizeT Type of size counters
+//  * @param[in] preds Search depth from the source for each node.
+//  * @param[in] num_nodes Number of nodes in the graph.
+//  */
+// template<typename T, typename SizeT>
+// void DisplaySolution(T *array, SizeT length)
+// {
+//     if (length > 40)
+//         length = 40;
 
-    util::PrintMsg("[", true, false);
-    for (SizeT i = 0; i < length; ++i)
-    {
-        util::PrintMsg(std::to_string(i) + ":"
-            + std::to_string(array[i]) + " ", true, false);
-    }
-    util::PrintMsg("]");
-}
+//     util::PrintMsg("[", true, false);
+//     for (SizeT i = 0; i < length; ++i)
+//     {
+//         util::PrintMsg(std::to_string(i) + ":"
+//             + std::to_string(array[i]) + " ", true, false);
+//     }
+//     util::PrintMsg("]");
+// }
 
 /******************************************************************************
  * Template Testing Routines

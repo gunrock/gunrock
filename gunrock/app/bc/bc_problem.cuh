@@ -422,8 +422,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
            }
         }
         GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-        GUARD_CU2(cudaDeviceSynchronize(),
-           "cudaDeviceSynchronize failed");
+        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
         
         ValueT _src_sigma = 1.0;
         VertexT _src_source_path = -1;

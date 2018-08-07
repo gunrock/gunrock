@@ -35,6 +35,8 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
     GUARD_CU(app::UseParameters_enactor(parameters));
 
     // TODO: if needed, add command line parameters used by the enactor here
+    // - NONE
+    
     return retval;
 }
 
@@ -43,7 +45,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct TemplateIterationLoop : public IterationLoopBase
+struct BCIterationLoop : public IterationLoopBase
     <EnactorT, Use_FullQ | Push
     // TODO: if needed, stack more option, e.g.:
     // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
@@ -53,9 +55,11 @@ struct TemplateIterationLoop : public IterationLoopBase
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
     // TODO: make alias of data types used in the enactor, e.g.:
+    // - NONE
     typedef typename EnactorT::ValueT  ValueT;
 
     // TODO: make alias of graph representation used in the enactor, e.g.:
+    // - NONE
     typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
 
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
@@ -66,7 +70,7 @@ struct TemplateIterationLoop : public IterationLoopBase
         // Update_Predecessors : 0x0)
         > BaseIterationLoop;
 
-    TemplateIterationLoop() : BaseIterationLoop() {}
+    BCIterationLoop() : BaseIterationLoop() {}
 
     /**
      * @brief Core computation of sssp, one iteration
@@ -76,10 +80,8 @@ struct TemplateIterationLoop : public IterationLoopBase
     cudaError_t Core(int peer_ = 0)
     {
         // Data alias the enactor works on
-        auto         &data_slice         =   this -> enactor ->
-            problem -> data_slices[this -> gpu_num][0];
-        auto         &enactor_slice      =   this -> enactor ->
-            enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
+        auto         &data_slice         =   this -> enactor ->problem -> data_slices[this -> gpu_num][0];
+        auto         &enactor_slice      =   this -> enactor ->enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
         auto         &enactor_stats      =   enactor_slice.enactor_stats;
         auto         &graph              =   data_slice.sub_graph[0];
         auto         &frontier           =   enactor_slice.frontier;
@@ -87,8 +89,10 @@ struct TemplateIterationLoop : public IterationLoopBase
         auto         &retval             =   enactor_stats.retval;
         //auto         &iteration          =   enactor_stats.iteration;
         // TODO: add problem specific data alias here, e.g.:
-        // auto         &distances          =   data_slice.distances;
-        // auto         &weights            =   graph.CsrT::edge_values;
+        // - DONE
+        auto &bc_values   = data_slice.bc_values;
+        auto &sigmas      = data_slice.sigmas;
+        auto &source_path = data_slice.source_path;
 
         // The advance operation
         auto advance_op = [
@@ -99,6 +103,21 @@ struct TemplateIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
+
+            if (s_id == d_data_slice->src_node[0]) return;
+            Value from_sigma = _ldg(d_data_slice -> sigmas + s_id);
+
+            Value to_sigma = _ldg(d_data_slice -> sigmas + d_id);
+
+            Value to_delta = _ldg(d_data_slice -> deltas + d_id);
+
+            Value result = from_sigma / to_sigma * (1.0 + to_delta);
+
+            //Accumulate bc value
+            {
+                Value old_delta = atomicAdd(d_data_slice->deltas + s_id, result);
+                Value old_bc_value = atomicAdd(d_data_slice->bc_values + s_id, result);
+            }
             // TODO: fill in the per-edge advance operation, e.g.:
             // ValueT src_distance = Load<cub::LOAD_CG>(distances + src);
             // ValueT edge_weight  = Load<cub::LOAD_CS>(weights + edge_id);
@@ -227,7 +246,7 @@ public:
         BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
-    typedef TemplateIterationLoop<EnactorT> IterationT;
+    typedef BCIterationLoop<EnactorT> IterationT;
 
     Problem     *problem   ;
     IterationT  *iterations;
@@ -236,7 +255,7 @@ public:
      * @brief SSSPEnactor constructor
      */
     Enactor() :
-        BaseEnactor("Template"),
+        BaseEnactor("bc"),
         problem    (NULL  )
     {
         // TODO: change according to algorithmic needs
@@ -279,7 +298,6 @@ public:
      * \return cudaError_t error message(s), if any
      */
     cudaError_t Init(
-        //util::Parameters &parameters,
         Problem          &problem,
         util::Location    target = util::DEVICE)
     {
@@ -290,8 +308,9 @@ public:
         GUARD_CU(BaseEnactor::Init(
             problem, Enactor_None,
             // TODO: change to how many frontier queues, and their types
-            2, NULL,
-            target, false));
+            // - ??
+            2, NULL, target, false));
+        
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
         {
             GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
@@ -323,8 +342,7 @@ public:
         gunrock::app::Iteration_Loop<
             // TODO: change to how many {VertexT, ValueT} data need to communicate
             //       per element in the inter-GPU sub-frontiers
-            0, 1,
-            IterationT>(
+            0, 1, IterationT>(
             thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
     }
@@ -337,6 +355,7 @@ public:
      */
     cudaError_t Reset(
         // TODO: add problem specific info, e.g.:
+        // - ???
         VertexT src,
         util::Location target = util::DEVICE)
     {
@@ -369,10 +388,8 @@ public:
         //
         //    else {
                 this -> thread_slices[gpu].init_size = 0;
-                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
-                {
-                    this -> enactor_slices[gpu * this -> num_gpus + peer_]
-                        .frontier.queue_length = 0;
+                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
+                    this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier.queue_length = 0;
                 }
         //    }
         }
@@ -387,19 +404,20 @@ public:
      */
     cudaError_t Enact(
         // TODO: add problem specific info, e.g.:
+        // - ???
         VertexT src
         )
     {
-        cudaError_t  retval     = cudaSuccess;
+        cudaError_t  retval = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));
-        util::PrintMsg("GPU Template Done.", this -> flag & Debug);
+        util::PrintMsg("GPU BC Done.", this -> flag & Debug);
         return retval;
     }
 
     /** @} */
 };
 
-} // namespace Template
+} // namespace bc
 } // namespace app
 } // namespace gunrock
 
