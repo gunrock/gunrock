@@ -318,8 +318,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
 
             auto &data_slice = data_slices[gpu][0];
-            GUARD_CU(data_slice.Init(this -> sub_graphs[gpu],
-                this -> gpu_idx[gpu], target, this -> flag));
+            GUARD_CU(data_slice.Init(
+                this -> sub_graphs[gpu],
+                this -> gpu_idx[gpu], 
+                target,
+                this -> flag
+            ));
         } // end for (gpu)
 
         return retval;

@@ -87,53 +87,37 @@ struct BCIterationLoop : public IterationLoopBase
         auto         &frontier           =   enactor_slice.frontier;
         auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
         auto         &retval             =   enactor_stats.retval;
-        //auto         &iteration          =   enactor_stats.iteration;
+        auto         &iteration          =   enactor_stats.iteration;
+        
         // TODO: add problem specific data alias here, e.g.:
-        // - DONE
-        auto &bc_values   = data_slice.bc_values;
-        auto &sigmas      = data_slice.sigmas;
-        auto &source_path = data_slice.source_path;
+        auto &bc_values = data_slice.bc_values;
+        auto &sigmas    = data_slice.sigmas;
+        auto &deltas    = data_slice.deltas;
+        auto &labels    = data_slice.labels;
+        auto &src_node  = data_slicde.src_node;
 
-        // The advance operation
+        // ----------------------------
+        // Forward advance
         auto advance_op = [
-        // TODO: if needed, pass data used by the lambda, e.g.:
-        // distances, weights
+            labels, sigmas,
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-
-            if (s_id == d_data_slice->src_node[0]) return;
-            Value from_sigma = _ldg(d_data_slice -> sigmas + s_id);
-
-            Value to_sigma = _ldg(d_data_slice -> sigmas + d_id);
-
-            Value to_delta = _ldg(d_data_slice -> deltas + d_id);
-
-            Value result = from_sigma / to_sigma * (1.0 + to_delta);
-
-            //Accumulate bc value
-            {
-                Value old_delta = atomicAdd(d_data_slice->deltas + s_id, result);
-                Value old_bc_value = atomicAdd(d_data_slice->bc_values + s_id, result);
-            }
-            // TODO: fill in the per-edge advance operation, e.g.:
-            // ValueT src_distance = Load<cub::LOAD_CG>(distances + src);
-            // ValueT edge_weight  = Load<cub::LOAD_CS>(weights + edge_id);
-            // ValueT new_distance = src_distance + edge_weight;
-
             // Check if the destination node has been claimed as someone's child
-            // ValueT old_distance = atomicMin(distances + dest, new_distance);
-
-            // if (new_distance < old_distance)
-            // { // keep dest in the output frontier if distance has been updated
-            //     return true;
-            // }
-            return false;
+            VertexT old_label = atomicCAS(labels + dest, -1, labels[src]);
+            if (old_label != labels[src] && old_label != -1) return false;
+            
+            //Accumulate sigma value
+            atomicAdd(sigmas + dest, sigmas[src]);
+            if (old_label == -1)  {
+                return true;
+            } else {
+                return false;
+            }
         };
 
-        // The filter operation
         auto filter_op = [
         // TODO: if needed, pass data used by the lambda
         ] __host__ __device__ (
@@ -141,11 +125,50 @@ struct BCIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // TODO: finll in the per-vertex filter operation, e.g.:
-            // if (!util::isValid(dest)) return false;
-            return true;
+            return dest != -1;
+        };
+        
+        // ------------------------------
+        // Backward2 advance
+
+        auto advance_op_backward = [
+            labels, deltas, bc_values, iteration, src_node
+        ] __host__ __device__ (
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            VertexT s_label = Load<cub::LOAD_CG>(labels + src);
+            VertexT d_label = Load<cub::LOAD_CG>(labels + dest);
+
+            if(iteration == 0) {
+                return (d_label == s_label + 1);
+            } else {
+                if (d_label == s_label + 1) {
+                    if (src == src_node[0]) return;
+                    ValueT from_sigma = Load<cub::LOAD_CG>(sigmas + src);
+                    ValueT to_sigma   = Load<cub::LOAD_CG>(sigmas + dest);
+                    ValueT to_delta   = Load<cub::LOAD_CG>(deltas + dest);
+                    ValueT result     = from_sigma / to_sigma * (1.0 + to_delta);
+                    
+                    {
+                        ValueT old_delta    = atomicAdd(deltas + src, result);
+                        ValueT old_bc_value = atomicAdd(bc_values + src, result);
+                    }                
+                }                
+            }
         };
 
+        auto filter_op_backward = [
+            labels
+        ] __host__ __device__ (
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            return labels + dest == 0;
+        };
+        
         // Call the advance operator, using the advance operation
         // TODO: modify the operator callers according to algorithmic needs,
         //       this example only uses an advance + a filter, with

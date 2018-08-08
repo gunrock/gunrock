@@ -92,9 +92,9 @@ cudaError_t RunTests(
     int num_srcs = srcs.size();
 
     // Allocate host-side array (for both reference and GPU-computed results)
-    ValueT  *h_bc_values   = new ValueT[graph.nodes];
-    ValueT  *h_sigmas      = new ValueT[graph.nodes];
-    VertexT *h_source_path = new VertexT[graph.nodes];
+    ValueT  *h_bc_values = new ValueT[graph.nodes];
+    ValueT  *h_sigmas    = new ValueT[graph.nodes];
+    VertexT *h_labels    = new VertexT[graph.nodes];
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -123,26 +123,20 @@ cudaError_t RunTests(
         util::PrintMsg("--------------------------\nRun "
             + std::to_string(run_num) + " elapsed: "
             + std::to_string(cpu_timer.ElapsedMillis()) +
-            //" ms, src = " + std::to_string(src) +
+            " ms, src = " + std::to_string(src) +
             ", #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
 
         if (validation == "each") {
-            // TODO: fill in problem specific data, e.g.:
-            // - DONE
-            GUARD_CU(problem.Extract(h_bc_values, h_sigmas, h_source_path));
+            GUARD_CU(problem.Extract(h_bc_values, h_sigmas, h_labels));
             SizeT num_errors = app::bc::Validate_Results(
                 parameters, graph,
-                // // TODO: place problem specific data and result for validation, e.g.:
-                // // - DONE
                 src,
                 h_bc_values,
                 h_sigmas,
-                h_source_path,
                 reference_bc_values == NULL ? NULL : reference_bc_values[run_num % num_srcs],
                 reference_sigmas == NULL ? NULL : reference_sigmas[run_num % num_srcs],
-                reference_source_path == NULL ? NULL : reference_source_path[run_num % num_srcs],
                 true);
         }
     }
@@ -150,19 +144,15 @@ cudaError_t RunTests(
     cpu_timer.Start();
     // Copy out results
     // TODO: fill in problem specific data, e.g.:
-    GUARD_CU(problem.Extract(h_bc_values, h_sigmas, h_source_path));
     if (validation == "last") {
+        GUARD_CU(problem.Extract(h_bc_values, h_sigmas, h_labels));
         SizeT num_errors = app::bc::Validate_Results(
             parameters, graph,
-            // TODO: place problem specific data and result for validation, e.g.:
-            // - DONE
             src,
             h_bc_values,
             h_sigmas,
-            h_source_path,
             reference_bc_values == NULL ? NULL : reference_bc_values[(num_runs - 1) % num_srcs],
             reference_sigmas == NULL ? NULL : reference_sigmas[(num_runs - 1) % num_srcs],
-            reference_source_path == NULL ? NULL : reference_source_path[(num_runs - 1) % num_srcs],
             true);
     }
 
@@ -177,10 +167,11 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
+    
     // TODO: Release problem specific data, e.g.:
-    delete[] h_bc_values  ; h_bc_values = NULL;
-    delete[] h_sigmas  ; h_sigmas = NULL;
-    delete[] h_source_path  ; h_source_path = NULL;
+    delete[] h_bc_values; h_bc_values = NULL;
+    delete[] h_sigmas; h_sigmas = NULL;
+    delete[] h_labels; h_labels = NULL;
     
     cpu_timer.Stop(); total_timer.Stop();
 

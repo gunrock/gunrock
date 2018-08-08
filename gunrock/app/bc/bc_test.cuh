@@ -167,21 +167,20 @@ double CPU_Reference(
  */
 template <
     typename GraphT,
-    typename ValueT = typename GraphT::ValueT>
+    typename ValueT = typename GraphT::ValueT,
+    typename VertexT = typename GraphT::VertexT>
 typename GraphT::SizeT Validate_Results(
             util::Parameters &parameters,
             GraphT           &graph,
             // TODO: add problem specific data for validation, e.g.:
             // - DONE
-            typename GraphT::VertexT   src,
+            VertexT   src,
             
             ValueT   *h_bc_values,
             ValueT   *h_sigmas,
-            typename GraphT::VertexT  *h_source_path,
 
             ValueT   *ref_bc_values = NULL,
             ValueT   *ref_sigmas = NULL,
-            typename GraphT::VertexT  *ref_source_path = NULL,
 
             bool      verbose = true)
 {
@@ -192,31 +191,6 @@ typename GraphT::SizeT Validate_Results(
 
     SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
-
-    // Print results
-    for(int i = 0; i < graph.nodes; ++i) {
-        std::cout 
-            << "i=" << i 
-            << " | ref_bc_values[i]=" << ref_bc_values[i]
-            << " | h_bc_values[i]="   << h_bc_values[i]
-        << std::endl;
-    }
-
-    for(int i = 0; i < graph.nodes; ++i) {
-        std::cout 
-            << "i=" << i 
-            << " | ref_sigmas[i]=" << ref_sigmas[i]
-            << " | h_sigmas[i]="   << h_sigmas[i]
-        << std::endl;
-    }
-    
-    for(int i = 0; i < graph.nodes; ++i) {
-        std::cout 
-            << "i=" << i 
-            << " | ref_source_path[i]=" << ref_source_path[i]
-            << " | h_source_path[i]="   << h_source_path[i]
-        << std::endl;
-    }
     
     // Verify the result
     // TODO: result validation and display, e.g.:

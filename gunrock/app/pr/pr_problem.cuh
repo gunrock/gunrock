@@ -119,6 +119,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         bool     normalize  ; // Whether to normalize the ranking value
         bool     compensate ; // Whether to compensate for zero-degree vertices
         bool     scale      ; // Whether to scale the ranking values during computation
+        
         ValueT   threshold  ; // Threshold for ranking errors
         ValueT   delta      ; // Damping factor
         SizeT    max_iter   ; // Maximum number of PR iterations
@@ -238,8 +239,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT       nodes    = sub_graph.nodes;
             this -> org_nodes    = org_nodes;
 
-            GUARD_CU(BaseDataSlice::Init(
-                sub_graph, num_gpus, gpu_idx, target, flag));
+            GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
             GUARD_CU(rank_curr   .Allocate(nodes  , target));
             GUARD_CU(rank_next   .Allocate(nodes  , target));

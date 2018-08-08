@@ -116,6 +116,7 @@ struct PRIterationLoop : public IterationLoopBase
             GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
                 graph.coo(), &local_vertices, null_ptr,
                 oprtr_parameters, filter_op));
+            
             if (enactor.flag & Debug)
                 util::cpu_mt::PrintMessage("Filter end.",
                     gpu_num, iteration, peer_);
