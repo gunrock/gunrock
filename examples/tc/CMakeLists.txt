@@ -1,6 +1,6 @@
 # ------------------------------------------------------------------------
-#  Gunrock: Sub-Project Random Walk
+#  Gunrock: Sub-Project Triangle Counting
 # ------------------------------------------------------------------------
-project(rw)
+project(tc)
 message("-- Project Added: ${PROJECT_NAME}")
 include(${CMAKE_SOURCE_DIR}/cmake/SetSubProject.cmake)

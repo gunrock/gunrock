@@ -2,8 +2,10 @@
 
 # begin /* Add premitives' subdirectories */
 if(GUNROCK_BUILD_APPLICATIONS)
-  add_subdirectory(shared_libs)
   #add_subdirectory(simple_example)
+  add_subdirectory(shared_libs)
+
+  add_subdirectory(astar)
   add_subdirectory(bc)
   add_subdirectory(bfs)
   add_subdirectory(cc)
@@ -15,6 +17,9 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(wtf)
   add_subdirectory(topk)
   add_subdirectory(rw)
+  add_subdirectory(lp)
+  add_subdirectory(tc)
+
   #add_subdirectory(mf)
   #add_subdirectory(template)
   #add_subdirectory(vis)
@@ -22,6 +27,10 @@ if(GUNROCK_BUILD_APPLICATIONS)
 
 # Individual options to build specific applications
 else(GUNROCK_BUILD_APPLICATIONS)
+  if(GUNROCK_APP_ASTAR)
+    add_subdirectory(astar)
+  endif(GUNROCK_APP_ASTAR)
+
   if(GUNROCK_APP_BC)
     add_subdirectory(bc)
   endif(GUNROCK_APP_BC)
@@ -66,6 +75,14 @@ else(GUNROCK_BUILD_APPLICATIONS)
     add_subdirectory(rw)
   endif(GUNROCK_APP_RW)
 
+  if(GUNROCK_APP_LP)
+    add_subdirectory(lp)
+  endif(GUNROCK_APP_LP)
+
+  if(GUNROCK_APP_TC)
+    add_subdirectory(tc)
+  endif(GUNROCK_APP_TC)
+
   # if(GUNROCK_APP_MF)
   #  add_subdirectory(mf)
   # endif(GUNROCK_APP_MF)
@@ -81,6 +98,11 @@ endif(GUNROCK_BUILD_APPLICATIONS)
 enable_testing()
 
 ### primitive tests with bips98_606 graph
+add_test(NAME TEST_ASTAR COMMAND astar market
+  ${gunrock_INCLUDE_DIRS}/dataset/small/map/cities.mtx
+  --mapfile=${gunrock_INCLUDE_DIRS}/dataset/small/map/cities.map)
+set_tests_properties(TEST_ASTAR PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
+
 add_test(NAME TEST_BFS COMMAND bfs market
   ${gunrock_INCLUDE_DIRS}/dataset/small/bips98_606.mtx --undirected --src=0)
 set_tests_properties(TEST_BFS PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
@@ -97,6 +119,11 @@ add_test(NAME TEST_SSSP COMMAND sssp market
   ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx --undirected --src=0)
 set_tests_properties(TEST_SSSP PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 
+# TODO: Add the correct expression output in rw's app.
+# add_test(NAME TEST_RW COMMAND rw market
+#   ${gunrock_INCLUDE_DIRS}/dataset/small/bips98_606.mtx --undirected --walk_length=5)
+# set_tests_properties(TEST_RW PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
+
 add_test(NAME TEST_PAGERANK COMMAND pr market
   ${gunrock_INCLUDE_DIRS}/dataset/small/bips98_606.mtx --normalized --compensate --undirected)
 set_tests_properties(TEST_PAGERANK PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
@@ -104,6 +131,10 @@ set_tests_properties(TEST_PAGERANK PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT
 add_test(NAME TEST_TOPK COMMAND topk market
   ${gunrock_INCLUDE_DIRS}/dataset/small/bips98_606.mtx --undirected)
 set_tests_properties(TEST_TOPK PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
+
+add_test(NAME TEST_MST COMMAND mst market
+  ${gunrock_INCLUDE_DIRS}/dataset/small/test_mst.mtx)
+set_tests_properties(TEST_MST PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 
 ### shared library application interface tests
 add_test(NAME SHARED_LIB_TEST_BFS COMMAND shared_lib_bfs)
