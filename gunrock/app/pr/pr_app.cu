@@ -346,11 +346,12 @@ double pagerank(
     csr.Allocate(num_nodes, num_edges, gunrock::util::HOST);
     csr.row_offsets   .SetPointer((int*)row_offsets, gunrock::util::HOST);
     csr.column_indices.SetPointer((int*)col_indices, gunrock::util::HOST);
+    // csr.Move(gunrock::util::HOST, gunrock::util::DEVICE);
 
-    gunrock::util::Location target = gunrock::util::DEVICE;    
+    gunrock::util::Location target = gunrock::util::HOST;    
 
     Graph_CooT graph;
-    graph.FromCsr(csr, target, 0, quiet, false);
+    graph.FromCsr(csr, target, 0, quiet, true);
     csr.Release();
     gunrock::graphio::LoadGraph(parameters, graph);
 
