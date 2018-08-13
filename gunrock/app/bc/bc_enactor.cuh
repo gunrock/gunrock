@@ -45,7 +45,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct BCIterationLoop : public IterationLoopBase
+struct BCForwardIterationLoop : public IterationLoopBase
     <EnactorT, Use_FullQ | Push
     // TODO: if needed, stack more option, e.g.:
     // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
@@ -70,7 +70,7 @@ struct BCIterationLoop : public IterationLoopBase
         // Update_Predecessors : 0x0)
         > BaseIterationLoop;
 
-    BCIterationLoop() : BaseIterationLoop() {}
+    BCForwardIterationLoop() : BaseIterationLoop() {}
 
     /**
      * @brief Core computation of sssp, one iteration
@@ -128,10 +128,131 @@ struct BCIterationLoop : public IterationLoopBase
             return dest != -1;
         };
         
-        // ------------------------------
-        // Backward advance
+        // Call the advance operator, using the advance operation
+        // TODO: modify the operator callers according to algorithmic needs,
+        //       this example only uses an advance + a filter, with
+        //       possible optimization to fuze the two kernels.
+        //       Define more operations (i.e. lambdas) if needed
+        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+            oprtr_parameters, advance_op, filter_op));
 
-        auto advance_op_backward = [
+        if (oprtr_parameters.advance_mode != "LB_CULL" &&
+            oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
+        {
+            frontier.queue_reset = false;
+            // Call the filter operator, using the filter operation
+            GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                oprtr_parameters, filter_op));
+        }
+
+        // Get back the resulted frontier length
+        GUARD_CU(frontier.work_progress.GetQueueLength(
+            frontier.queue_index, frontier.queue_length,
+            false, oprtr_parameters.stream, true));
+
+        return retval;
+    }
+
+    /**
+     * @brief Routine to combine received data and local data
+     * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each transmition item, typed VertexT
+     * @tparam NUM_VALUE__ASSOCIATES Number of data associated with each transmition item, typed ValueT
+     * @param  received_length The numver of transmition items received
+     * @param[in] peer_ which peer GPU the data came from
+     * \return cudaError_t error message(s), if any
+     */
+    template <
+        int NUM_VERTEX_ASSOCIATES,
+        int NUM_VALUE__ASSOCIATES>
+    cudaError_t ExpandIncoming(SizeT &received_length, int peer_)
+    {
+        auto         &data_slice         =   this -> enactor ->
+            problem -> data_slices[this -> gpu_num][0];
+        auto         &enactor_slice      =   this -> enactor ->
+            enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
+        //auto iteration = enactor_slice.enactor_stats.iteration;
+        // TODO: add problem specific data alias here, e.g.:
+        // auto         &distances          =   data_slice.distances;
+
+        auto expand_op = [
+        // TODO: pass data used by the lambda, e.g.:
+        // distances
+        ] __host__ __device__(
+            VertexT &key, const SizeT &in_pos,
+            VertexT *vertex_associate_ins,
+            ValueT  *value__associate_ins) -> bool
+        {
+            // TODO: fill in the lambda to combine received and local data, e.g.:
+            // ValueT in_val  = value__associate_ins[in_pos];
+            // ValueT old_val = atomicMin(distances + key, in_val);
+            // if (old_val <= in_val)
+            //     return false;
+            return true;
+        };
+
+        cudaError_t retval = BaseIterationLoop:: template ExpandIncomingBase
+            <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
+            (received_length, peer_, expand_op);
+        return retval;
+    }
+}; // end of SSSPIteration
+
+
+template <typename EnactorT>
+struct BCBackwardIterationLoop : public IterationLoopBase
+    <EnactorT, Use_FullQ | Push
+    // TODO: if needed, stack more option, e.g.:
+    // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
+    // Update_Predecessors : 0x0)
+    >
+{
+    typedef typename EnactorT::VertexT VertexT;
+    typedef typename EnactorT::SizeT   SizeT;
+    // TODO: make alias of data types used in the enactor, e.g.:
+    // - NONE
+    typedef typename EnactorT::ValueT  ValueT;
+
+    // TODO: make alias of graph representation used in the enactor, e.g.:
+    // - NONE
+    typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
+
+    typedef typename EnactorT::Problem::GraphT::GpT  GpT;
+    typedef IterationLoopBase
+        <EnactorT, Use_FullQ | Push
+        // TODO: add the same options as in template parameters here, e.g.:
+        // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
+        // Update_Predecessors : 0x0)
+        > BaseIterationLoop;
+
+    BCBackwardIterationLoop() : BaseIterationLoop() {}
+
+    /**
+     * @brief Core computation of sssp, one iteration
+     * @param[in] peer_ Which GPU peers to work on, 0 means local
+     * \return cudaError_t error message(s), if any
+     */
+    cudaError_t Core(int peer_ = 0)
+    {
+        // Data alias the enactor works on
+        auto         &data_slice         =   this -> enactor ->problem -> data_slices[this -> gpu_num][0];
+        auto         &enactor_slice      =   this -> enactor ->enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
+        auto         &enactor_stats      =   enactor_slice.enactor_stats;
+        auto         &graph              =   data_slice.sub_graph[0];
+        auto         &frontier           =   enactor_slice.frontier;
+        auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
+        auto         &retval             =   enactor_stats.retval;
+        auto         &iteration          =   enactor_stats.iteration;
+        
+        // TODO: add problem specific data alias here, e.g.:
+        auto &bc_values = data_slice.bc_values;
+        auto &sigmas    = data_slice.sigmas;
+        auto &deltas    = data_slice.deltas;
+        auto &labels    = data_slice.labels;
+        auto &src_node  = data_slice.src_node;
+
+        auto advance_op = [
             labels, deltas, bc_values, iteration, src_node, sigmas
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
@@ -164,7 +285,7 @@ struct BCIterationLoop : public IterationLoopBase
             }
         };
 
-        auto filter_op_backward = [
+        auto filter_op = [
             labels
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
@@ -245,6 +366,7 @@ struct BCIterationLoop : public IterationLoopBase
     }
 }; // end of SSSPIteration
 
+
 /**
  * @brief Template enactor class.
  * @tparam _Problem Problem type we process on
@@ -274,10 +396,13 @@ public:
         BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
-    typedef BCIterationLoop<EnactorT> IterationT;
+    
+    typedef BCForwardIterationLoop<EnactorT> ForwardIterationT;
+    typedef BCBackwardIterationLoop<EnactorT> BackwardIterationT;
 
     Problem     *problem   ;
-    IterationT  *iterations;
+    ForwardIterationT  *forward_iterations;
+    BackwardIterationT  *backward_iterations;
 
     /**
      * @brief SSSPEnactor constructor
@@ -308,7 +433,8 @@ public:
     {
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Release(target));
-        delete []iterations; iterations = NULL;
+        delete []forward_iterations; forward_iterations = NULL;
+        delete []backward_iterations; backward_iterations = NULL;
         problem = NULL;
         return retval;
     }
@@ -349,10 +475,14 @@ public:
                 graph.nodes, graph.edges, this -> queue_factors));
         }
 
-        iterations = new IterationT[this -> num_gpus];
-        for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
-        {
-            GUARD_CU(iterations[gpu].Init(this, gpu));
+        forward_iterations = new ForwardIterationT[this -> num_gpus];
+        for (int gpu = 0; gpu < this -> num_gpus; gpu ++) {
+            GUARD_CU(forward_iterations[gpu].Init(this, gpu));
+        }
+
+        backward_iterations = new BackwardIterationT[this -> num_gpus];
+        for (int gpu = 0; gpu < this -> num_gpus; gpu ++) {
+            GUARD_CU(backward_iterations[gpu].Init(this, gpu));
         }
 
         GUARD_CU(this -> Init_Threads(this,
@@ -367,11 +497,8 @@ public:
       */
     cudaError_t Run(ThreadSlice &thread_data)
     {
-        gunrock::app::Iteration_Loop<
-            // TODO: change to how many {VertexT, ValueT} data need to communicate
-            //       per element in the inter-GPU sub-frontiers
-            0, 1, IterationT>(
-            thread_data, iterations[thread_data.thread_num]);
+        gunrock::app::Iteration_Loop<0, 1, ForwardIterationT>(thread_data, forward_iterations[thread_data.thread_num]);
+        // gunrock::app::Iteration_Loop<0, 1, BackwardIterationT>(thread_data, backward_iterations[thread_data.thread_num]);
         return cudaSuccess;
     }
 
@@ -394,32 +521,32 @@ public:
         // TODO: Initialize frontiers according to the algorithm, e.g.:
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
-        //    if ((this->num_gpus == 1) ||
-        //         (gpu == this->problem->org_graph->GpT::partition_table[src]))
-        //    {
-        //        this -> thread_slices[gpu].init_size = 1;
-        //        for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
-        //        {
-        //            auto &frontier = this ->
-        //                enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-        //            frontier.queue_length = (peer_ == 0) ? 1 : 0;
-        //            if (peer_ == 0)
-        //            {
-        //                GUARD_CU(frontier.V_Q() -> ForEach(
-        //                    [src]__host__ __device__ (VertexT &v)
-        //                {
-        //                    v = src;
-        //                }, 1, target, 0));
-        //            }
-        //        }
-        //    }
-        //
-        //    else {
+           if ((this->num_gpus == 1) ||
+                (gpu == this->problem->org_graph->GpT::partition_table[src]))
+           {
+               this -> thread_slices[gpu].init_size = 1;
+               for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
+               {
+                   auto &frontier = this ->
+                       enactor_slices[gpu * this -> num_gpus + peer_].frontier;
+                   frontier.queue_length = (peer_ == 0) ? 1 : 0;
+                   if (peer_ == 0)
+                   {
+                       GUARD_CU(frontier.V_Q() -> ForEach(
+                           [src]__host__ __device__ (VertexT &v)
+                       {
+                           v = src;
+                       }, 1, target, 0));
+                   }
+               }
+           }
+        
+           else {
                 this -> thread_slices[gpu].init_size = 0;
                 for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
                     this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier.queue_length = 0;
                 }
-        //    }
+           }
         }
         GUARD_CU(BaseEnactor::Sync());
         return retval;

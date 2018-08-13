@@ -146,6 +146,10 @@ double CPU_Reference(
         bc_values[i] *= 0.5f;
         std::cout << "i=" << i << " | bc_values[i]=" << bc_values[i] << std::endl;
     }
+
+    for(int i =0; i < graph.nodes; ++i) {
+        std::cout << "i=" << i << " | sigmas[i]=" << sigmas[i] << std::endl;
+    }
     
     cpu_timer.Stop();
     return cpu_timer.ElapsedMillis();
