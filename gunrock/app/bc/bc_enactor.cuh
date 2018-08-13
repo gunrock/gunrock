@@ -94,12 +94,12 @@ struct BCIterationLoop : public IterationLoopBase
         auto &sigmas    = data_slice.sigmas;
         auto &deltas    = data_slice.deltas;
         auto &labels    = data_slice.labels;
-        auto &src_node  = data_slicde.src_node;
+        auto &src_node  = data_slice.src_node;
 
         // ----------------------------
         // Forward advance
         auto advance_op = [
-            labels, sigmas,
+            labels, sigmas
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
@@ -129,10 +129,10 @@ struct BCIterationLoop : public IterationLoopBase
         };
         
         // ------------------------------
-        // Backward2 advance
+        // Backward advance
 
         auto advance_op_backward = [
-            labels, deltas, bc_values, iteration, src_node
+            labels, deltas, bc_values, iteration, src_node, sigmas
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
@@ -145,17 +145,22 @@ struct BCIterationLoop : public IterationLoopBase
                 return (d_label == s_label + 1);
             } else {
                 if (d_label == s_label + 1) {
-                    if (src == src_node[0]) return;
+                    if (src == src_node[0]) return true; // !! Is this right?
+                    
                     ValueT from_sigma = Load<cub::LOAD_CG>(sigmas + src);
                     ValueT to_sigma   = Load<cub::LOAD_CG>(sigmas + dest);
                     ValueT to_delta   = Load<cub::LOAD_CG>(deltas + dest);
                     ValueT result     = from_sigma / to_sigma * (1.0 + to_delta);
                     
+                    //Accumulate bc value
                     {
                         ValueT old_delta    = atomicAdd(deltas + src, result);
                         ValueT old_bc_value = atomicAdd(bc_values + src, result);
-                    }                
-                }                
+                    }
+                    return true;
+                } else {
+                    return false;
+                }               
             }
         };
 
