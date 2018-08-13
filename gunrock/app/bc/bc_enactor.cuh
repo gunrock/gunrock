@@ -106,6 +106,8 @@ struct BCForwardIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
+            printf("src=%d | dest=%d \n", src, dest);
+            
             // Check if the destination node has been claimed as someone's child
             VertexT old_label = atomicCAS(labels + dest, -1, labels[src] + 1);
             if (old_label != (labels[src] + 1) && old_label != -1) return false;
@@ -260,6 +262,9 @@ struct BCBackwardIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
+            printf("backward advance_op");
+            printf("iteration=%d \n", iteration);
+
             VertexT s_label = Load<cub::LOAD_CG>(labels + src);
             VertexT d_label = Load<cub::LOAD_CG>(labels + dest);
 
@@ -293,6 +298,7 @@ struct BCBackwardIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
+            printf("backward filter_op");
             return labels + dest == 0;
         };
         
@@ -499,7 +505,7 @@ public:
     cudaError_t Run(ThreadSlice &thread_data)
     {
         gunrock::app::Iteration_Loop<0, 1, ForwardIterationT>(thread_data, forward_iterations[thread_data.thread_num]);
-        // gunrock::app::Iteration_Loop<0, 1, BackwardIterationT>(thread_data, backward_iterations[thread_data.thread_num]);
+        gunrock::app::Iteration_Loop<0, 1, BackwardIterationT>(thread_data, backward_iterations[thread_data.thread_num]);
         return cudaSuccess;
     }
 
@@ -510,8 +516,6 @@ public:
      * \return cudaError_t error message(s), if any
      */
     cudaError_t Reset(
-        // TODO: add problem specific info, e.g.:
-        // - ???
         VertexT src,
         util::Location target = util::DEVICE)
     {
