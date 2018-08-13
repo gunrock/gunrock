@@ -328,6 +328,31 @@ struct BCBackwardIterationLoop : public IterationLoopBase
 
         return retval;
     }
+    
+    cudaError_t Change() {
+        auto &enactor_stats = this -> enactor -> enactor_slices[this -> gpu_num * this -> enactor -> num_gpus].enactor_stats;
+        enactor_stats.iteration--;
+        return enactor_stats.retval;
+    }
+    
+    bool Stop_Condition(int gpu_num = 0)
+    {
+        auto &enactor_slices = this -> enactor -> enactor_slices;
+        auto it = enactor_slices[0].enactor_stats.iteration;
+        if(All_Done(this -> enactor[0], gpu_num)) {
+            if(it > 1) {
+                return false;
+            } else {
+                return true;
+            }
+        } else {
+            if(it < 0) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
 
     /**
      * @brief Routine to combine received data and local data
