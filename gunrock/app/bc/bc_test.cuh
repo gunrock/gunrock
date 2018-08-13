@@ -150,6 +150,10 @@ double CPU_Reference(
     for(int i =0; i < graph.nodes; ++i) {
         std::cout << "i=" << i << " | sigmas[i]=" << sigmas[i] << std::endl;
     }
+
+    for(int i =0; i < graph.nodes; ++i) {
+        std::cout << "i=" << i << " | source_path[i]=" << source_path[i] << std::endl;
+    }
     
     cpu_timer.Stop();
     return cpu_timer.ElapsedMillis();

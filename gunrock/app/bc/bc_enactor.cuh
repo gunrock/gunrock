@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <iostream>
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
@@ -106,8 +107,8 @@ struct BCForwardIterationLoop : public IterationLoopBase
             SizeT &output_pos) -> bool
         {
             // Check if the destination node has been claimed as someone's child
-            VertexT old_label = atomicCAS(labels + dest, -1, labels[src]);
-            if (old_label != labels[src] && old_label != -1) return false;
+            VertexT old_label = atomicCAS(labels + dest, -1, labels[src] + 1);
+            if (old_label != (labels[src] + 1) && old_label != -1) return false;
             
             //Accumulate sigma value
             atomicAdd(sigmas + dest, sigmas[src]);
