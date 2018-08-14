@@ -239,6 +239,7 @@ double gunrock_pagerank(
     typedef typename GraphT::VertexT VertexT;
     typedef gunrock::app::pr::Problem<GraphT  > ProblemT;
     typedef gunrock::app::pr::Enactor<ProblemT> EnactorT;
+
     gunrock::util::CpuTimer cpu_timer;
     gunrock::util::Location target = gunrock::util::DEVICE;
     double total_time = 0;
@@ -248,6 +249,8 @@ double gunrock_pagerank(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
+
+    printf("Init Problem and Enactor for PR.\n");
     problem.Init(graph  , target);
     enactor.Init(problem, target);
 
@@ -256,6 +259,8 @@ double gunrock_pagerank(
     int num_srcs = srcs.size();
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
+
+	printf("For run_num: %d, Reset problem and enactor and Enact.\n", run_num);
         int src_num = run_num % num_srcs;
         VertexT src = srcs[src_num];
         problem.Reset(src, target);
@@ -299,11 +304,12 @@ double pagerank(
     const SizeT        *row_offsets,
     const VertexT      *col_indices,
     const int           num_runs,
-          VertexT      *sources,
           bool          normalize,
+          VertexT      *sources,
           VertexT     **node_ids,
           ValueT      **ranks)
 {
+
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, ValueT,
         gunrock::graph::HAS_COO>
         Graph_CooT;
@@ -322,28 +328,34 @@ double pagerank(
     parameters.Set("normalize", normalize);
     parameters.Set("num-runs", num_runs);
     std::vector<VertexT> srcs;
+    VertexT InvalidValue = gunrock::util::PreDefinedValues<VertexT>::InvalidValue;
+
     for (int i = 0; i < num_runs; i ++)
     {
         if (sources != NULL)
             srcs.push_back(sources[i]);
         else
-            srcs.push_back(gunrock::util::PreDefinedValues<VertexT>::InvalidValue);
+            srcs.push_back(InvalidValue);
     }
     parameters.Set("srcs", srcs);
 
     bool quiet = parameters.Get<bool>("quiet");
+
     CsrT csr;
     // Assign pointers into gunrock graph format
     csr.Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    csr.row_offsets   .SetPointer(row_offsets, gunrock::util::HOST);
-    csr.column_indices.SetPointer(col_indices, gunrock::util::HOST);
+    csr.row_offsets   .SetPointer((int*)row_offsets, num_nodes+1, gunrock::util::HOST);
+    csr.column_indices.SetPointer((int*)col_indices, num_edges, gunrock::util::HOST);
+    // csr.Move(gunrock::util::HOST, gunrock::util::DEVICE);
+
+    gunrock::util::Location target = gunrock::util::HOST;    
 
     Graph_CooT graph;
-    graph.FromCsr(csr, false, quiet);
+    graph.FromCsr(csr, target, 0, quiet, true);
     csr.Release();
     gunrock::graphio::LoadGraph(parameters, graph);
 
-    // Run the SSSP
+    // Run the PR
     double elapsed_time = gunrock_pagerank(parameters, graph, node_ids, ranks);
 
     // Cleanup
@@ -374,13 +386,18 @@ double pagerank(
     const SizeT         num_edges,
     const SizeT        *row_offsets,
     const VertexT      *col_indices,
-          VertexT       source,
           bool          normalize,
+          VertexT       source,
           VertexT      *node_ids,
           ValueT       *ranks)
 {
+    if (source == -1) {
+    	return pagerank(num_nodes, num_edges, row_offsets, col_indices,
+             1 /* num_runs */, normalize, (int *) NULL, &node_ids, &ranks);
+    }
+
     return pagerank(num_nodes, num_edges, row_offsets, col_indices,
-        1, &source, &node_ids, &ranks);
+        1 /* num_runs */, normalize, &source, &node_ids, &ranks);
 }
 
 /*
@@ -394,21 +411,28 @@ double pagerank(
  * @param[out] pagerank    Return PageRank scores per node
  * \return     double      Return accumulated elapsed times for all runs
  */
+/*
 template <
     typename VertexT = int,
     typename SizeT   = int,
     typename ValueT  = float>
+
+*/
+
+//            argument types are: (const int, const int, const int *, const int *, int, int *, int **, float **)
+
 double pagerank(
-    const SizeT         num_nodes,
-    const SizeT         num_edges,
-    const SizeT        *row_offsets,
-    const VertexT      *col_indices,
-          bool          normalize,
-          VertexT      *node_ids,
-          ValueT       *ranks)
+    const int         num_nodes,
+    const int         num_edges,
+    const int        *row_offsets,
+    const int	     *col_indices,
+          bool        normalize,
+          int 	     *node_ids,
+          float      *ranks)
 {
+
     return pagerank(num_nodes, num_edges, row_offsets, col_indices,
-        1, (VertexT*)NULL, &node_ids, &ranks);
+        normalize, (int) -1 /* source */, node_ids, ranks);
 }
 
 // Leave this at the end of the file

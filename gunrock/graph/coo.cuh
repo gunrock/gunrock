@@ -214,7 +214,7 @@ struct Coo :
         //if (retval = BaseGraph::Set(source))
         //    return retval;
         this -> nodes = source.CsrT::nodes;
-        this -> nodes = source.CsrT::edges;
+        this -> edges = source.CsrT::edges;
         this -> directed = source.CsrT::directed;
         this -> edge_order = UNORDERED;
 
@@ -234,7 +234,7 @@ struct Coo :
                         edge_pairs[e].x = row;
                         edge_pairs[e].y = column_indices[e];
                     }
-                }, this -> nodes, target, stream));
+               }, this -> nodes, target, stream));
 
         GUARD_CU(edge_values   .Set(source.CsrT::edge_values,
             this -> edges, target, stream));
