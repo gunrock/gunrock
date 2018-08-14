@@ -228,14 +228,12 @@ struct Coo :
                 typename CsrT::VertexT *column_indices,
                 const VertexT &row)
                 {
-/*
                     SizeT e_end = row_offsets[row+1];
                     for (SizeT e = row_offsets[row]; e < e_end; e++)
                     {
                         edge_pairs[e].x = row;
                         edge_pairs[e].y = column_indices[e];
                     }
-*/  
                }, this -> nodes, target, stream));
 
         GUARD_CU(edge_values   .Set(source.CsrT::edge_values,

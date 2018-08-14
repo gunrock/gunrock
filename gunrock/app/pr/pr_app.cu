@@ -344,8 +344,8 @@ double pagerank(
     CsrT csr;
     // Assign pointers into gunrock graph format
     csr.Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    csr.row_offsets   .SetPointer((int*)row_offsets, gunrock::util::HOST);
-    csr.column_indices.SetPointer((int*)col_indices, gunrock::util::HOST);
+    csr.row_offsets   .SetPointer((int*)row_offsets, num_nodes+1, gunrock::util::HOST);
+    csr.column_indices.SetPointer((int*)col_indices, num_edges, gunrock::util::HOST);
     // csr.Move(gunrock::util::HOST, gunrock::util::DEVICE);
 
     gunrock::util::Location target = gunrock::util::HOST;    
