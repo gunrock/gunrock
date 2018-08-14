@@ -157,6 +157,44 @@ struct BCForwardIterationLoop : public IterationLoopBase
 
         return retval;
     }
+    
+    cudaError_t Gather(int peer_) {
+
+        auto &data_slice       = this -> enactor ->problem -> data_slices[this -> gpu_num][0];
+        auto &enactor_slice    = this -> enactor ->enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
+        auto &enactor_stats    = enactor_slice.enactor_stats;
+        auto &frontier         = enactor_slice.frontier;
+        auto &oprtr_parameters = enactor_slice.oprtr_parameters;
+
+        printf("-- Gather --\n");
+        printf("  queue_length=%d\n", frontier.queue_length);
+        
+        if (enactor_stats.iteration <= 0) return cudaSuccess;
+        
+        SizeT cur_offset = data_slice.forward_queue_offsets[peer_].back();
+        printf("  cur_offset=%d\n", cur_offset);
+        // bool oversized = false;
+        // if (enactor_stats->retval =
+        //     Check_Size<SizeT, VertexId> (
+        //         enactor -> size_check, "forward_output", 
+        //         cur_offset + frontier_attribute -> queue_length, 
+        //         &data_slice -> forward_output[peer_], 
+        //         oversized, thread_num, enactor_stats -> iteration, peer_)) return;
+
+        // util::MemsetCopyVectorKernel<<<120, 512, 0, stream>>>(
+        //     data_slice -> forward_output[peer_].GetPointer(util::DEVICE) + cur_offset,
+        //     frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
+        //     frontier_attribute -> queue_length);
+
+        // GUARD_CU(data_slice.forward_output[peer_].ForEach(frontier.V_Q(),
+        //     []__host__ __device__ (const VertexT &x, VertexT &h_x){ h_x = x; }, frontier.queue_length, util::DEVICE));
+
+        data_slice.forward_queue_offsets[peer_].push_back(frontier.queue_length + cur_offset);
+        for(int i = 0; i < data_slice.forward_queue_offsets[peer_].size(); i++) {
+            printf("el[i]=%d\n", data_slice.forward_queue_offsets[peer_][i]);
+        }
+        return cudaSuccess;
+    }
 
     /**
      * @brief Routine to combine received data and local data
@@ -332,6 +370,7 @@ struct BCBackwardIterationLoop : public IterationLoopBase
     cudaError_t Change() {
         auto &enactor_stats = this -> enactor -> enactor_slices[this -> gpu_num * this -> enactor -> num_gpus].enactor_stats;
         enactor_stats.iteration--;
+        printf("enactor_stats.iteration=%d \n", enactor_stats.iteration);
         return enactor_stats.retval;
     }
     
@@ -367,10 +406,8 @@ struct BCBackwardIterationLoop : public IterationLoopBase
         int NUM_VALUE__ASSOCIATES>
     cudaError_t ExpandIncoming(SizeT &received_length, int peer_)
     {
-        auto         &data_slice         =   this -> enactor ->
-            problem -> data_slices[this -> gpu_num][0];
-        auto         &enactor_slice      =   this -> enactor ->
-            enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
+        auto &data_slice = this -> enactor -> problem -> data_slices[this -> gpu_num][0];
+        auto &enactor_slice = this -> enactor -> enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
         //auto iteration = enactor_slice.enactor_stats.iteration;
         // TODO: add problem specific data alias here, e.g.:
         // auto         &distances          =   data_slice.distances;

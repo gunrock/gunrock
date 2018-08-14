@@ -77,13 +77,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     {
 
         // device storage arrays
-        util::Array1D<SizeT, ValueT>  bc_values;           /**< Used to store final BC values for each node */
-        util::Array1D<SizeT, ValueT>  sigmas;              /**< Accumulated sigma values for each node */
-        util::Array1D<SizeT, ValueT>  deltas;              /**< Accumulated delta values for each node */
-        util::Array1D<SizeT, VertexT>  src_node;            /**< Used to store source node ID */
-        util::Array1D<SizeT, VertexT>  *forward_output;     /**< Used to store output noe IDs by the forward pass */
+        util::Array1D<SizeT, ValueT>      bc_values;           /**< Used to store final BC values for each node */
+        util::Array1D<SizeT, ValueT>      sigmas;              /**< Accumulated sigma values for each node */
+        util::Array1D<SizeT, ValueT>      deltas;              /**< Accumulated delta values for each node */
+        util::Array1D<SizeT, VertexT>     src_node;            /**< Used to store source node ID */
+        util::Array1D<SizeT, VertexT>     *forward_output;     /**< Used to store output noe IDs by the forward pass */
         std::vector<SizeT>                *forward_queue_offsets;
-        util::Array1D<SizeT, VertexT>  original_vertex;
+        util::Array1D<SizeT, VertexT>     original_vertex;
         util::Array1D<int, unsigned char> *barrier_markers;
         util::Array1D<SizeT, bool>        first_backward_incoming;
         util::Array1D<SizeT, VertexT>     local_vertices;
@@ -179,13 +179,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          */
         cudaError_t Init(
             GraphT        &sub_graph,
-            int            gpu_idx = 0,
-            util::Location target  = util::DEVICE,
-            ProblemFlag    flag    = Problem_None)
+            int            num_gpus = 1,
+            int            gpu_idx  = 0,
+            util::Location target   = util::DEVICE,
+            ProblemFlag    flag     = Problem_None)
         {
             cudaError_t retval  = cudaSuccess;
 
-            GUARD_CU(BaseDataSlice::Init(sub_graph, gpu_idx, target, flag));
+            GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
             // TODO: allocate problem specific data here, e.g.:
             // - DONE
@@ -202,9 +203,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             
             // --
             
-            forward_queue_offsets = new std::vector<SizeT>[this->num_gpus];
-            forward_output = new util::Array1D<SizeT, VertexT>[this->num_gpus];
-            for (int gpu=0; gpu < this->num_gpus; gpu++) {
+            forward_queue_offsets = new std::vector<SizeT>[num_gpus];
+            
+            forward_output = new util::Array1D<SizeT, VertexT>[num_gpus];
+            for (int gpu=0; gpu < num_gpus; gpu++) {
                 forward_queue_offsets[gpu].reserve(sub_graph.nodes);
                 forward_queue_offsets[gpu].push_back(0);
                 forward_output[gpu].SetName("forward_output[]");
@@ -265,7 +267,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 forward_queue_offsets[gpu].reserve(nodes);
                 forward_queue_offsets[gpu].push_back(0);
                 
-                if (this -> num_gpus > 1) middle_event_set[gpu] = false;
+                if (this->num_gpus > 1) middle_event_set[gpu] = false;
             }
             middle_iteration = -1;
             middle_finish    = false;
@@ -415,8 +417,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         // TODO get problem specific flags from parameters, e.g.:
         // if (this -> parameters.template Get<bool>("mark-pred"))
         //    this -> flag = this -> flag | Mark_Predecessors;
-
-        for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+        
+        for (int gpu = 0; gpu < this->num_gpus; gpu++)
+        {
             data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
@@ -426,7 +429,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             
             GUARD_CU(data_slice.Init(
                 this -> sub_graphs[gpu],
-                this -> gpu_idx[gpu], 
+                this -> num_gpus,
+                this -> gpu_idx[gpu],
                 target, 
                 this -> flag
             ));
