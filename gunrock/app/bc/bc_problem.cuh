@@ -374,8 +374,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         } else {
             // TODO: extract the results from multiple GPUs, e.g.:
         }
-
-        // Print results
+        
+        // Scale final results by 0.5
+        for(int i = 0; i < nodes; ++i) {
+            h_bc_values[i] *= (ValueT)0.5;
+        }
+        
+        // Logging
         for(int i = 0; i < nodes; ++i) {
             std::cout 
                 << "i=" << i 

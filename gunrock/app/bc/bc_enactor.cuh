@@ -25,6 +25,17 @@ namespace gunrock {
 namespace app {
 namespace bc {
 
+template <typename T, typename SizeT>
+__global__ void MemsetCopyVectorKernel(T *d_dst, T *d_src, SizeT length)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
+         idx < length; idx += STRIDE)
+    {
+        d_dst[idx] = d_src[idx];
+    }
+}
+
 /**
  * @brief Speciflying parameters for SSSP Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter info
@@ -106,7 +117,7 @@ struct BCForwardIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            printf("src=%d | dest=%d \n", src, dest);
+            // printf("src=%d | dest=%d \n", src, dest);
             
             // Check if the destination node has been claimed as someone's child
             VertexT old_label = atomicCAS(labels + dest, -1, labels[src] + 1);
@@ -166,13 +177,13 @@ struct BCForwardIterationLoop : public IterationLoopBase
         auto &frontier         = enactor_slice.frontier;
         auto &oprtr_parameters = enactor_slice.oprtr_parameters;
 
-        printf("-- Gather --\n");
-        printf("  queue_length=%d\n", frontier.queue_length);
+        // printf("-- Gather --\n");
+        // printf("  queue_length=%d\n", frontier.queue_length);
         
         if (enactor_stats.iteration <= 0) return cudaSuccess;
         
         SizeT cur_offset = data_slice.forward_queue_offsets[peer_].back();
-        printf("  cur_offset=%d\n", cur_offset);
+        // printf("  cur_offset=%d\n", cur_offset);
         // bool oversized = false;
         // if (enactor_stats->retval =
         //     Check_Size<SizeT, VertexId> (
@@ -181,18 +192,15 @@ struct BCForwardIterationLoop : public IterationLoopBase
         //         &data_slice -> forward_output[peer_], 
         //         oversized, thread_num, enactor_stats -> iteration, peer_)) return;
 
-        // util::MemsetCopyVectorKernel<<<120, 512, 0, stream>>>(
-        //     data_slice -> forward_output[peer_].GetPointer(util::DEVICE) + cur_offset,
-        //     frontier_queue -> keys[frontier_attribute -> selector].GetPointer(util::DEVICE),
-        //     frontier_attribute -> queue_length);
-
-        // GUARD_CU(data_slice.forward_output[peer_].ForEach(frontier.V_Q(),
-        //     []__host__ __device__ (const VertexT &x, VertexT &h_x){ h_x = x; }, frontier.queue_length, util::DEVICE));
+        MemsetCopyVectorKernel<<<120, 512, 0, oprtr_parameters.stream>>>(
+            data_slice.forward_output[peer_].GetPointer(util::DEVICE) + cur_offset,
+            frontier.V_Q()->GetPointer(util::DEVICE),
+            frontier.queue_length);
 
         data_slice.forward_queue_offsets[peer_].push_back(frontier.queue_length + cur_offset);
-        for(int i = 0; i < data_slice.forward_queue_offsets[peer_].size(); i++) {
-            printf("el[i]=%d\n", data_slice.forward_queue_offsets[peer_][i]);
-        }
+        // for(int i = 0; i < data_slice.forward_queue_offsets[peer_].size(); i++) {
+        //     printf("el[i]=%d\n", data_slice.forward_queue_offsets[peer_][i]);
+        // }
         return cudaSuccess;
     }
 
@@ -300,8 +308,8 @@ struct BCBackwardIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            printf("backward advance_op");
-            printf("iteration=%d \n", iteration);
+            // printf("backward advance_op");
+            // printf("iteration=%d \n", iteration);
 
             VertexT s_label = Load<cub::LOAD_CG>(labels + src);
             VertexT d_label = Load<cub::LOAD_CG>(labels + dest);
@@ -336,7 +344,7 @@ struct BCBackwardIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            printf("backward filter_op");
+            // printf("backward filter_op");
             return labels + dest == 0;
         };
         
@@ -370,7 +378,7 @@ struct BCBackwardIterationLoop : public IterationLoopBase
     cudaError_t Change() {
         auto &enactor_stats = this -> enactor -> enactor_slices[this -> gpu_num * this -> enactor -> num_gpus].enactor_stats;
         enactor_stats.iteration--;
-        printf("enactor_stats.iteration=%d \n", enactor_stats.iteration);
+        // printf("enactor_stats.iteration=%d \n", enactor_stats.iteration);
         return enactor_stats.retval;
     }
     
@@ -432,6 +440,40 @@ struct BCBackwardIterationLoop : public IterationLoopBase
             <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
             (received_length, peer_, expand_op);
         return retval;
+    }
+    
+    cudaError_t Gather(int peer_) {
+
+        auto &data_slice       = this -> enactor ->problem -> data_slices[this -> gpu_num][0];
+        auto &enactor_slice    = this -> enactor ->enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
+        auto &enactor_stats    = enactor_slice.enactor_stats;
+        auto &frontier         = enactor_slice.frontier;
+        auto &oprtr_parameters = enactor_slice.oprtr_parameters;
+
+        // printf("-- Gather --\n");
+        // printf("  queue_length=%d\n", frontier.queue_length);
+        
+        SizeT cur_pos = data_slice.forward_queue_offsets[peer_].back();
+        data_slice.forward_queue_offsets[peer_].pop_back();
+        SizeT pre_pos = data_slice.forward_queue_offsets[peer_].back();
+        frontier.queue_reset  = true;
+        if (enactor_stats.iteration > 0 && cur_pos - pre_pos > 0) {
+            frontier.queue_length = cur_pos - pre_pos;
+            
+            // bool over_sized = false;
+            // if (enactor_stats -> retval = Check_Size<SizeT, VertexId> (
+            //     enactor -> size_check, "queue1", 
+            //     frontier.queue_length, 
+            //     &frontier_queue -> keys[frontier_queue -> selector], 
+            //     over_sized, thread_num, enactor_stats->iteration, peer_, false)) return;
+            
+            MemsetCopyVectorKernel<<<120, 512, 0, oprtr_parameters.stream>>>(
+                frontier.V_Q()->GetPointer(util::DEVICE),
+                data_slice.forward_output[peer_].GetPointer(util::DEVICE) + pre_pos,
+                frontier.queue_length);
+        } else {
+          frontier.queue_length = 0;
+      }
     }
 }; // end of SSSPIteration
 

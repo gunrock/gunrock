@@ -116,6 +116,7 @@ cudaError_t RunTests(
         util::PrintMsg("__________________________", !quiet_mode);
         cpu_timer.Start();
         GUARD_CU(enactor.Enact(src));
+        
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
