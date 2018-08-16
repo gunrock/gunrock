@@ -20,7 +20,7 @@ SUFFIX="ubuntu16.04_TitanV"
 
 mkdir -p eval/$SUFFIX
 
-for i in delaunay_n13 delaunay_n21 delaunay_n24
+for i in delaunay_n13 delaunay_n21 delaunay_n24 soc-LiveJournal1 hollywood-2009 indochina-2004
 do
     echo $exe_file market ../../dataset/large/$i/$i.mtx"> ./eval/$SUFFIX/${i}.$SUFFIX${MARKS}.txt"
          $exe_file market ../../dataset/large/$i/$i.mtx > ./eval/$SUFFIX/${i}.$SUFFIX${MARKS}.txt
