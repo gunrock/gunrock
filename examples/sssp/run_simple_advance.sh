@@ -36,7 +36,7 @@ NAME[ 0]="delaunay_n13"      && Q_SIZE_DIR[ 4]="0.25" && I_SIZE_DIR[ 4]="0.15" &
 F[0]="0.0" && F[1]="0.1" && F[2]="0.2" && F[3]="0.3" && F[4]="0.4" && F[5]="0.5" && F[6]="0.6" && F[7]="0.7" && F[8]="0.8" && F[9]="0.9"
 F[10]="1.0"
  
-for k in {0..1}
+for k in {0..0}
 do
     #put OS and Device type here
     SUFFIX="ubuntu16.04_TitanVx2_brp${F[$k]}"
@@ -48,10 +48,10 @@ do
         do
             if [ "$j" -eq "0" ] || [ "$j" -eq "2" ] ; then
                 echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 --partition-factor=${F[$k]} --traversal-mode=SIMPLE"> eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt"
-                $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 --partition-factor=${F[$k]} > eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt
+                $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 --partition-factor=${F[$k]} --traversal-mode=SIMPLE > eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt
             else
-                echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 --partition-factor=${F[$k]} "> eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt"
-                $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 --partition-factor=${F[$k]} > eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt
+                echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 --partition-factor=${F[$k]} --traversal-mode=SIMPLE "> eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt"
+                $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --queue-sizing=0.01 --in-sizing=0.01 --partition-factor=${F[$k]} --traversal-mode=SIMPLE> eval/$SUFFIX/${NAME[$i]}_$SUFFIX${MARK[$j]}.txt
             fi
             sleep 1
         done
