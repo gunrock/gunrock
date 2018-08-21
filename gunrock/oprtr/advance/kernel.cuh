@@ -24,6 +24,7 @@
 #include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
 #include <gunrock/oprtr/edge_map_partitioned_cull/kernel.cuh>
 #include <gunrock/oprtr/all_edges_advance/kernel.cuh>
+#include <gunrock/oprtr/simplified_advance/kernel.cuh>
 
 #include <gunrock/util/multithread_utils.cuh>
 
