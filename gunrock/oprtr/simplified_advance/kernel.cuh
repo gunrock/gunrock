@@ -77,8 +77,6 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         while (lower_bound < upper_bound)
         {
             SizeT mid_point = (lower_bound + upper_bound) >> 1;
-            //printf("(%d, %d) looking for %d, current range [%d, %d], mid_point = %d\n",
-            //    blockIdx.x, threadIdx.x, item_to_find, lower_bound, upper_bound, data[mid_point]);
             if (_ldg(data + mid_point) < item_to_find)
                 lower_bound = mid_point + 1;
             else upper_bound = mid_point;
@@ -87,13 +85,10 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         SizeT retval = util::InvalidValue<SizeT>();
         if (upper_bound == lower_bound)
         {
-            /*if (data[upper_bound] == item_to_find) retval = upper_bound;
-            else*/ if (item_to_find < _ldg(data + upper_bound)) retval = upper_bound -1;
+            if (item_to_find < _ldg(data + upper_bound)) retval = upper_bound -1;
             else retval = upper_bound;
         } else retval = util::InvalidValue<SizeT>();
 
-        //printf("(%d, %d) search end, [%d, %d], data[up] = %d, retval = %d\n",
-        //    blockIdx.x, threadIdx.x, lower_bound, upper_bound, data[upper_bound], retval);
         return retval;
     }
 
@@ -121,9 +116,6 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         Value     *&d_value_to_reduce,
         Value     *&d_reduce_frontier)
     {
-        //__shared__ typename KernelPolicy::SmemStorage smem;
-        //SizeT *output_queue_length;
-
         if (threadIdx.x == 0 && blockIdx.x == 0)
         {
             if (queue_reset)
@@ -133,8 +125,6 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                 input_queue_length = work_progress.LoadQueueLength(queue_index);
             }
         }
-        //if (threadIdx.x == blockDim.x -1)
-        //    output_queue_length = work_progress.GetQueueCounter(queue_index + 1);
         __syncthreads();
 
         SizeT* row_offsets = (output_inverse_graph) ?
@@ -148,7 +138,6 @@ struct Dispatch<KernelPolicy, Problem, Functor,
         const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
         while (x - threadIdx.x< input_queue_length)
         {
-            //bool to_process = true;
             SizeT edge_id = util::InvalidValue<SizeT>();
             VertexId src = util::InvalidValue<VertexId>();
             VertexId des = util::InvalidValue<VertexId>();
@@ -161,10 +150,6 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     SizeT start_offset = (x > 0) ? d_scanned_edges[x-1] : 0;
                     edge_id =_ldg(row_offsets + input_item) - start_offset;
                     des = _ldg(d_column_indices + edge_id);
-                    //src = Binary_Search(d_row_offsets, edge_id, 0, nodes);
-
-                    //printf("(%d, %d) : Edge %d, %d -> %d, input_queue_len = %d\n",
-                    //    blockIdx.x, threadIdx.x, edge_id, src, des, input_queue_length);
                     if (Functor::CondEdge(
                         src, des, d_data_slice, edge_id, edge_id,
                         label, x, output_pos))
@@ -183,22 +168,8 @@ struct Dispatch<KernelPolicy, Problem, Functor,
                     }
                 }
 
-            }// else to_process = false;
-
-            /*KernelPolicy::BlockScanT::LogicScan(to_process, output_pos, smem.scan_space);
-            if (threadIdx.x == blockDim.x -1)
-            {
-                smem.block_offset = atomicAdd(output_queue_length, output_pos + ((to_process) ? 1 : 0));
             }
-            __syncthreads();
 
-            if (to_process)
-            {
-                output_pos += smem.block_offset;
-                if (d_edges_out != NULL)
-                    d_edges_out[output_pos] = edge_id;
-            }
-            __syncthreads();*/
             x += STRIDE;
         }
     } 
