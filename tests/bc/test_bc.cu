@@ -7,9 +7,9 @@
 
 /**
  * @file
- * test_sssp.cu
+ * test_bc.cu
  *
- * @brief Simple test driver program for Gunrock template.
+ * @brief Simple test driver program for Gunrock GC.
  */
 
 #include <iostream>
@@ -40,53 +40,52 @@ struct main_struct
         typename VertexT, // Use int as the vertex identifier
         typename SizeT,   // Use int as the graph size type
         typename ValueT>  // Use int as the value type
-    cudaError_t operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val)
+    cudaError_t operator()(util::Parameters &parameters,
+        VertexT v, SizeT s, ValueT val)
     {
-        typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_EDGE_VALUES | graph::HAS_CSR> GraphT; // PR different
-        
+        typedef typename app::TestGraph<VertexT, SizeT, ValueT,
+            graph::HAS_EDGE_VALUES | graph::HAS_CSR> GraphT;
+
         cudaError_t retval = cudaSuccess;
         util::CpuTimer cpu_timer;
         GraphT graph;
-
-        parameters.Set("undirected", true);
 
         cpu_timer.Start();
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        // Enable is set sources        
-        // GUARD_CU(app::Set_Srcs(parameters, graph));
+        // Enable is set sources
+        GUARD_CU(app::Set_Srcs(parameters, graph));
         int num_srcs = 0;
 
-        // TODO: reference result on CPU, e.e.:
-        ValueT **reference_bc_values    = NULL;
-        ValueT **reference_sigmas       = NULL;
-        VertexT **reference_source_path = NULL; 
-        
+        ValueT  **reference_bc_values    = NULL;
+        ValueT  **reference_sigmas       = NULL;
+        VertexT **reference_source_path = NULL;
+
         bool quick = parameters.Get<bool>("quick");
         bool quiet = parameters.Get<bool>("quiet");
-        
+
         if (!quick) {
             // std::string validation = parameters.Get<std::string>("validation");
             util::PrintMsg("Computing reference value ...", !quiet);
             std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
             num_srcs = srcs.size();
-            
+
             SizeT nodes = graph.nodes;
 
             reference_bc_values   = new ValueT*[num_srcs];
             reference_sigmas      = new ValueT*[num_srcs];
             reference_source_path = new VertexT*[num_srcs];
-            
+
             for (int i = 0; i < num_srcs; i++) {
                 VertexT src = srcs[i];
                 util::PrintMsg("__________________________", !quiet);
-                            
+
                 reference_bc_values[i]   = new ValueT[nodes];
                 reference_sigmas[i]      = new ValueT[nodes];
                 reference_source_path[i] = new VertexT[nodes];
-                
+
                 float elapsed = app::bc::CPU_Reference(
                     graph,
                     reference_bc_values[i],
@@ -102,14 +101,15 @@ struct main_struct
             }
         }
 
-        // TODO: add other switching parameters, if needed
         std::vector<std::string> switches{"advance-mode"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [reference_bc_values, reference_sigmas, reference_source_path](util::Parameters &parameters, GraphT &graph)
+            [reference_bc_values, reference_sigmas, reference_source_path](
+                util::Parameters &parameters, GraphT &graph)
             {
-                return app::bc::RunTests(parameters, graph, reference_bc_values, reference_sigmas, reference_source_path);
+                return app::bc::RunTests(parameters, graph,
+                    reference_bc_values, reference_sigmas, reference_source_path);
             }));
-        
+
         // Cleanup
         if (!quick)
         {
@@ -121,7 +121,7 @@ struct main_struct
             delete[] reference_bc_values; reference_bc_values = NULL;
             delete[] reference_sigmas; reference_sigmas = NULL;
             delete[] reference_source_path; reference_source_path = NULL;
-            
+
         }
         return retval;
     }
@@ -142,12 +142,11 @@ int main(int argc, char** argv)
     }
     GUARD_CU(parameters.Check_Required());
 
-    // TODO: change available graph types, according to requirements
     return app::Switch_Types<
         app::VERTEXT_U32B | // app::VERTEXT_U64B |
         app::SIZET_U32B | // app::SIZET_U64B |
-        app::VALUET_F32B | 
-        app::UNDIRECTED>
+        app::VALUET_F32B |
+        app::DIRECTED | app::UNDIRECTED>
         (parameters, main_struct());
 }
 
