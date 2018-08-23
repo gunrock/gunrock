@@ -375,26 +375,26 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         }
 
         // Logging
-        for(VertexT v = 0; v < nodes; ++v) {
-            std::cout
-                << "v=" << v
-                << " | h_bc_values[v]="   << h_bc_values[v]
-            << std::endl;
-        }
+        //for(VertexT v = 0; v < nodes; ++v) {
+        //    std::cout
+        //        << "v=" << v
+        //        << " | h_bc_values[v]="   << h_bc_values[v]
+        //    << std::endl;
+        //}
 
-        for(VertexT v = 0; v < nodes; ++v) {
-            std::cout
-                << "v=" << v
-                << " | h_sigmas[v]="   << h_sigmas[v]
-            << std::endl;
-        }
+        //for(VertexT v = 0; v < nodes; ++v) {
+        //    std::cout
+        //        << "v=" << v
+        //        << " | h_sigmas[v]="   << h_sigmas[v]
+        //    << std::endl;
+        //}
 
-        for(VertexT v = 0; v < nodes; ++v) {
-            std::cout
-                << "v=" << v
-                << " | h_labels[v]="   << h_labels[v]
-            << std::endl;
-        }
+        //for(VertexT v = 0; v < nodes; ++v) {
+        //    std::cout
+        //        << "v=" << v
+        //        << " | h_labels[v]="   << h_labels[v]
+        //    << std::endl;
+        //}
 
         return retval;
     }

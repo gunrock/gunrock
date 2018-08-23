@@ -150,16 +150,16 @@ double CPU_Reference(
 
     for (VertexT v =0; v < graph.nodes; ++v) {
         bc_values[v] *= 0.5f;
-        std::cout << "v=" << v << " | bc_values[v]=" << bc_values[v] << std::endl;
+    //    std::cout << "v=" << v << " | bc_values[v]=" << bc_values[v] << std::endl;
     }
 
-    for (VertexT v =0; v < graph.nodes; ++v) {
-        std::cout << "v=" << v << " | sigmas[v]=" << sigmas[v] << std::endl;
-    }
+    //for (VertexT v =0; v < graph.nodes; ++v) {
+    //    std::cout << "v=" << v << " | sigmas[v]=" << sigmas[v] << std::endl;
+    //}
 
-    for (VertexT v =0; v < graph.nodes; ++v) {
-        std::cout << "v=" << v << " | source_path[v]=" << source_path[v] << std::endl;
-    }
+    //for (VertexT v =0; v < graph.nodes; ++v) {
+    //    std::cout << "v=" << v << " | source_path[v]=" << source_path[v] << std::endl;
+    //}
 
     cpu_timer.Stop();
     return cpu_timer.ElapsedMillis();
