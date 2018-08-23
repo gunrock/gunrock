@@ -37,6 +37,12 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
+    GUARD_CU(parameters.Use<std::string>(    
+         "src",   
+         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,  
+         "invalid",   
+         "vertex id", 
+         __FILE__, __LINE__));
     return retval;
 }
 
@@ -58,9 +64,9 @@ cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
 
-    ValueT **reference_bc_values = NULL,
-    ValueT **reference_sigmas = NULL,
-    VertexT **reference_source_path = NULL,
+    ValueT  **reference_bc_values = NULL,
+    ValueT  **reference_sigmas = NULL,
+    VertexT **reference_labels = NULL,
 
     util::Location target = util::DEVICE)
 {
@@ -190,14 +196,14 @@ cudaError_t RunTests(
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_bc(
     gunrock::util::Parameters &parameters,
-    GraphT &graph
+    GraphT &graph,
     ValueT **bc_values,
     ValueT **sigmas,
     typename GraphT::VertexT **labels)
 {
     typedef typename GraphT::VertexT VertexT;
-    typedef gunrock::app::Template::Problem<GraphT  > ProblemT;
-    typedef gunrock::app::Template::Enactor<ProblemT> EnactorT;
+    typedef gunrock::app::bc::Problem<GraphT  > ProblemT;
+    typedef gunrock::app::bc::Enactor<ProblemT> EnactorT;
     gunrock::util::CpuTimer cpu_timer;
     gunrock::util::Location target = gunrock::util::DEVICE;
     double total_time = 0;
@@ -234,7 +240,7 @@ double gunrock_bc(
     return total_time;
 }
 
-
+/*
  * @brief Simple interface take in graph as CSR format
  * @param[in]  num_nodes   Number of veritces in the input graph
  * @param[in]  num_edges   Number of edges in the input graph
@@ -247,7 +253,7 @@ double gunrock_bc(
  * @param[out] sigmas      Return sigma of each vertex
  * @param[out] labels      Return label of each vertex
  * \return     double      Return accumulated elapsed times for all runs
-
+ */
 template <
     typename VertexT = int,
     typename SizeT   = int,
@@ -258,15 +264,15 @@ float bc(
     const SizeT        num_edges,
     const SizeT       *row_offsets,
     const VertexT     *col_indices,
-    const GValueT     *edge_values,
-    const int          num_runs
+    //const GValueT     *edge_values,
+    const int          num_runs,
           VertexT     *sources,
           BCValueT   **bc_values,
           BCValueT   **sigmas,
           VertexT    **labels)
 {
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-        gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
+        gunrock::graph::HAS_CSR>
         GraphT;
     typedef typename GraphT::CsrT CsrT;
 
@@ -289,11 +295,11 @@ float bc(
     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
     graph.CsrT::row_offsets   .SetPointer(row_offsets, gunrock::util::HOST);
     graph.CsrT::column_indices.SetPointer(col_indices, gunrock::util::HOST);
-    graph.CsrT::edge_values   .SetPointer(edge_values, gunrock::util::HOST);
+    //graph.CsrT::edge_values   .SetPointer(edge_values, gunrock::util::HOST);
     graph.FromCsr(graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, graph);
 
-    // Run the Template
+    // Run BC
     double elapsed_time = gunrock_bc(
         parameters, graph, bc_values, sigmas, labels);
 

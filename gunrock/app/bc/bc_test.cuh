@@ -35,14 +35,14 @@ namespace bc {
  * @param[in] num_nodes Number of nodes in the graph.
  * @param[in] quiet Whether to disable print out.
  */
-template<typename SizeT, typename ValueT>
+template <typename SizeT, typename ValueT>
 void DisplaySolution(
     ValueT *sigmas, ValueT *bc_values, SizeT nodes, bool quiet = false)
 {
     if (quiet)
         return;
-    if (length > 40)
-        length = 40;
+    if (nodes > 40)
+        nodes = 40;
 
     util::PrintMsg("[", true, false);
     for (SizeT v = 0; v < nodes; ++v)
@@ -85,10 +85,10 @@ double CPU_Reference(
 {
     typedef typename GraphT::SizeT SizeT;
 
-    for(VertexT v = 0; i < graph.nodes; ++i) {
-        bc_values[i]   = 0;
-        sigmas[i]      = i == src ? 1 : 0;
-        source_path[i] = i == src ? 0 : util::PreDefinedValues<VertexT>::InvalidValue;
+    for(VertexT v = 0; v < graph.nodes; ++v) {
+        bc_values[v]   = 0;
+        sigmas[v]      = v == src ? 1 : 0;
+        source_path[v] = v == src ? 0 : util::PreDefinedValues<VertexT>::InvalidValue;
     }
 
     VertexT search_depth = 0;
@@ -110,7 +110,7 @@ double CPU_Reference(
         for (SizeT edge = edges_begin; edge < edges_end; ++edge) {
             VertexT neighbor = graph.column_indices[edge];
 
-            if (!util::isValie(source_path[neighbor])) {
+            if (!util::isValid(source_path[neighbor])) {
                 // if unseen
                 source_path[neighbor] = neighbor_dist;
                 sigmas[neighbor] += sigmas[v];
@@ -183,18 +183,19 @@ template <
     typename GraphT,
     typename ValueT = typename GraphT::ValueT>
 typename GraphT::SizeT Validate_Results(
-            util::Parameters &parameters,
-            GraphT           &graph,
-            VertexT   src,
-            ValueT   *h_bc_values,
-            ValueT   *h_sigmas,
-            VertexT  *h_labels,
-            ValueT   *ref_bc_values = NULL,
-            ValueT   *ref_sigmas = NULL,
-            VertexT  *ref_labels = NULL,
-            bool      verbose = true)
+             util::Parameters &parameters,
+             GraphT           &graph,
+    typename GraphT::VertexT   src,
+                     ValueT   *h_bc_values,
+                     ValueT   *h_sigmas,
+    typename GraphT::VertexT  *h_labels,
+                     ValueT   *ref_bc_values = NULL,
+                     ValueT   *ref_sigmas = NULL,
+    typename GraphT::VertexT  *ref_labels = NULL,
+                     bool      verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
 
     SizeT num_errors = 0;
     SizeT num_vertices = graph.nodes;
@@ -227,7 +228,7 @@ typename GraphT::SizeT Validate_Results(
     if (ref_labels != NULL) {
         util::PrintMsg("Label validity:", !quiet, false);
         SizeT errors_num = util::CompareResults(
-            h_lables, ref_labels,
+            h_labels, ref_labels,
             num_vertices, true, quiet);
         if (errors_num > 0) {
             util::PrintMsg(std::to_string(errors_num)

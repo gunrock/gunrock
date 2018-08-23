@@ -7,9 +7,9 @@
 
 /**
  * @file
- * Template_enactor.cuh
+ * bc_enactor.cuh
  *
- * @brief Template Problem Enactor
+ * @brief BC Problem Enactor
  */
 
 #pragma once
@@ -55,7 +55,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
  */
 template <typename EnactorT>
 struct BCForwardIterationLoop : public IterationLoopBase
-    <EnactorT, Use_FullQ | Push | Update_Predecessors>
+    <EnactorT, Use_FullQ | Push > //| Update_Predecessors>
 {
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
@@ -64,7 +64,7 @@ struct BCForwardIterationLoop : public IterationLoopBase
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
 
     typedef IterationLoopBase
-        <EnactorT, Use_FullQ | Push | Update_Predecessors
+        <EnactorT, Use_FullQ | Push //| Update_Predecessors
         > BaseIterationLoop;
 
     BCForwardIterationLoop() : BaseIterationLoop() {}
@@ -86,14 +86,14 @@ struct BCForwardIterationLoop : public IterationLoopBase
         auto    &frontier           =   enactor_slice.frontier;
         auto    &oprtr_parameters   =   enactor_slice.oprtr_parameters;
         auto    &retval             =   enactor_stats.retval;
-        auto    &iteration          =   enactor_stats.iteration;
+        //auto    &iteration          =   enactor_stats.iteration;
 
         // BC specific data alias here, e.g.:
-        auto    &bc_values          =   data_slice.bc_values;
+        //auto    &bc_values          =   data_slice.bc_values;
         auto    &sigmas             =   data_slice.sigmas;
-        auto    &deltas             =   data_slice.deltas;
+        //auto    &deltas             =   data_slice.deltas;
         auto    &labels             =   data_slice.labels;
-        auto    &src_node           =   data_slice.src_node;
+        //auto    &src_node           =   data_slice.src_node;
 
         // ----------------------------
         // Forward advance
@@ -173,22 +173,24 @@ struct BCForwardIterationLoop : public IterationLoopBase
 
         SizeT cur_offset = data_slice.forward_queue_offsets[peer_].back();
         // printf("  cur_offset=%d\n", cur_offset);
-        bool oversized = false;
-        GUARD_CU(CheckSize<SizeT, VertexT> (
+        bool over_sized = false;
+        retval = CheckSize <SizeT, VertexT> (
             (this -> enactor -> flag & Size_Check) != 0, "forward_output",
-            curr_offset + frontier.queue_length,
-            data_slice.forward_output[peer_],
-            over_sized, this -> gpu_num, enactor_stats.iteration, peer_));
+            cur_offset + frontier.queue_length,
+            &data_slice.forward_output[peer_],
+            over_sized, this -> gpu_num, enactor_stats.iteration, peer_);
+        if (retval)
+            return retval;
 
         //MemsetCopyVectorKernel<<<120, 512, 0, oprtr_parameters.stream>>>(
         //    data_slice.forward_output[peer_].GetPointer(util::DEVICE) + cur_offset,
         //    frontier.V_Q()->GetPointer(util::DEVICE),
         //    frontier.queue_length);
-        auto &forward_output = data_slice.forward_output[peer_];
+        auto  &forward_output = data_slice.forward_output[peer_];
         GUARD_CU(frontier.V_Q()->ForAll([
             forward_output, cur_offset
-            ] __host__ __device__ (const VertexT& *v_q, const SizeT& i){
-                forward_output[curr_offset + i] = v_q[i];
+            ] __host__ __device__ (const VertexT* v_q, const SizeT &i){
+                forward_output[cur_offset + i] = v_q[i];
             }, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
 
         data_slice.forward_queue_offsets[peer_].push_back(
@@ -321,7 +323,7 @@ struct BCBackwardIterationLoop : public IterationLoopBase
         };
 
         auto filter_op = [
-            labels, interation
+            labels, iteration
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
@@ -377,7 +379,7 @@ struct BCBackwardIterationLoop : public IterationLoopBase
                 return true;
             }
         } else {
-            if(it < 0) {
+            if(iter < 0) {
                 return true;
             } else {
                 return false;
@@ -429,7 +431,7 @@ struct BCBackwardIterationLoop : public IterationLoopBase
     }
 
     cudaError_t Gather(int peer_) {
-
+        cudaError_t retval     = cudaSuccess;
         auto &data_slice       = this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
         auto &enactor_slice    = this -> enactor ->
@@ -454,30 +456,33 @@ struct BCBackwardIterationLoop : public IterationLoopBase
             //     frontier.queue_length,
             //     &frontier_queue -> keys[frontier_queue -> selector],
             //     over_sized, thread_num, enactor_stats->iteration, peer_, false)) return;
-            GUARD_CU(CheckSize<SizeT, VertexT> (
+            retval = CheckSize<SizeT, VertexT> (
                 (this -> enactor -> flag & Size_Check) != 0, "queue1",
                 frontier.queue_length, frontier.V_Q(),
-                over_sized, this -> gpu_num, enactor_stats.iteration, peer_));
+                over_sized, this -> gpu_num, enactor_stats.iteration, peer_);
+            if (retval)
+                return retval;
 
             //MemsetCopyVectorKernel<<<120, 512, 0, oprtr_parameters.stream>>>(
             //    frontier.V_Q()->GetPointer(util::DEVICE),
             //    data_slice.forward_output[peer_].GetPointer(util::DEVICE) + pre_pos,
             //    frontier.queue_length);
-            auto &forward_output = data_slice.forward_output;
+            auto &forward_output = data_slice.forward_output[peer_];
             GUARD_CU(frontier.V_Q()->ForAll([
                 forward_output, pre_pos
-                ] __host__ __device__ (VertexT *v_q, const SizeT& i){
+                ] __host__ __device__ (VertexT *v_q, const SizeT &i){
                     v_q[i] = forward_output[pre_pos + i];
                 }, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
         } else {
           frontier.queue_length = 0;
-      }
+        }
+        return retval;
     }
 }; // end of BCBackwardIterationLoop
 
 
 /**
- * @brief Template enactor class.
+ * @brief BC enactor class.
  * @tparam _Problem Problem type we process on
  * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
  * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor

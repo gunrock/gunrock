@@ -44,7 +44,7 @@ cudaError_t UseParameters_problem(
  */
 template <
     typename _GraphT,
-    typename _ValueT = typename GraphT::ValueT,
+    typename _ValueT = typename _GraphT::ValueT,
     ProblemFlag _FLAG = Problem_None>
 struct Problem : ProblemBase<_GraphT, _FLAG>
 {
@@ -102,7 +102,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             bc_values              .SetName("bc_values");
             sigmas                 .SetName("sigmas");
             deltas                 .SetName("deltas");
-            src_node               .SetName("src_node");
+            //src_node               .SetName("src_node");
             original_vertex        .SetName("original_vertex");
             first_backward_incoming.SetName("first_backward_incoming");
             local_vertices         .SetName("local_vertices");
@@ -258,7 +258,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
                 if (this->num_gpus > 1) middle_event_set[gpu] = false;
             }
-            middle_iteration = -1;
+            middle_iteration = util::PreDefinedValues<VertexT>::InvalidValue;
             middle_finish    = false;
 
             return retval;
@@ -389,7 +389,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             << std::endl;
         }
 
-        for(VertexT v = 0; v < nodes; ++i) {
+        for(VertexT v = 0; v < nodes; ++v) {
             std::cout
                 << "v=" << v
                 << " | h_labels[v]="   << h_labels[v]
@@ -477,7 +477,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
 
         VertexT src_label = 0;
-        VertexT src_pred  = -1;
+        VertexT src_pred  = util::PreDefinedValues<VertexT>::InvalidValue;
         ValueT  src_sigma = 1.0;
         data_slices[gpu] -> src_node = tsrc;
 
