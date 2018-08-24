@@ -483,7 +483,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         if (target & util::HOST)
         {
-            //data_slices[gpu]->src_node[0]  = tsrc;
             data_slices[gpu]->labels[tsrc] = src_label;
             data_slices[gpu]->preds [tsrc] = src_pred;
             data_slices[gpu]->sigmas[tsrc] = src_sigma;

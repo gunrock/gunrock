@@ -104,13 +104,18 @@ struct BCForwardIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // printf("src=%d | dest=%d \n", src, dest);
+            //printf("src=%d | dest=%d \n", src, dest);
 
             // Check if the destination node has been claimed as someone's child
+            VertexT new_label = Load<cub::LOAD_CG>(labels + src) + 1;
             VertexT old_label = atomicCAS(labels + dest,
-                util::PreDefinedValues<VertexT>::InvalidValue, labels[src] + 1);
-            if (old_label != (labels[src] + 1) &&
+                util::PreDefinedValues<VertexT>::InvalidValue, new_label);
+            if (old_label != new_label &&
                 util::isValid(old_label)) return false;
+
+            //printf("%lld -> %lld, label: %lld -> %lld\n",
+            //    (long long)src, (long long)dest,
+            //    (long long)old_label, (long long)new_label);
 
             //Accumulate sigma value
             atomicAdd(sigmas + dest, sigmas[src]);
@@ -129,6 +134,10 @@ struct BCForwardIterationLoop : public IterationLoopBase
         {
             return util::isValid(dest);
         };
+
+        //util::PrintMsg("Iter " + std::to_string(enactor_stats.iteration)
+        //    + ", n_v_q = " 
+        //    + util::to_string(frontier.Next_V_Q() -> GetPointer(util::DEVICE)));
 
         // Call the advance operator, using the advance operation.
         // BC only uses an advance + a filter, with
@@ -168,8 +177,8 @@ struct BCForwardIterationLoop : public IterationLoopBase
         // printf("-- Gather --\n");
         // printf("  queue_length=%d\n", frontier.queue_length);
 
-        if (enactor_stats.iteration <= 0)
-            return retval;
+        //if (enactor_stats.iteration <= 0)
+        //    return retval;
 
         SizeT cur_offset = data_slice.forward_queue_offsets[peer_].back();
         // printf("  cur_offset=%d\n", cur_offset);
@@ -191,8 +200,14 @@ struct BCForwardIterationLoop : public IterationLoopBase
             forward_output, cur_offset
             ] __host__ __device__ (const VertexT* v_q, const SizeT &i){
                 forward_output[cur_offset + i] = v_q[i];
+                //printf("f_o[%lld] <- %lld\n",
+                //    (long long)cur_offset + i, (long long)v_q[i]);
             }, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
 
+        //util::PrintMsg("Iter " + std::to_string(enactor_stats.iteration)
+        //    + ", [" + std::to_string(cur_offset)
+        //    + ", " + std::to_string(cur_offset + frontier.queue_length) + "), v_q = "
+        //    + util::to_string(frontier.V_Q()->GetPointer(util::DEVICE)));
         data_slice.forward_queue_offsets[peer_].push_back(
             frontier.queue_length + cur_offset);
         // for(int i = 0; i < data_slice.forward_queue_offsets[peer_].size(); i++) {
@@ -286,10 +301,11 @@ struct BCBackwardIterationLoop : public IterationLoopBase
         auto    &sigmas             =   data_slice.sigmas;
         auto    &deltas             =   data_slice.deltas;
         auto    &labels             =   data_slice.labels;
-        auto    &src_node           =   data_slice.src_node;
+        auto     src_node           =   data_slice.src_node;
+        auto     num_vertices       =   graph.nodes;
 
         auto advance_op = [
-            labels, deltas, bc_values, iteration, src_node, sigmas
+            labels, deltas, bc_values, iteration, src_node, sigmas, num_vertices
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
@@ -297,11 +313,23 @@ struct BCBackwardIterationLoop : public IterationLoopBase
         {
             // printf("backward advance_op");
             // printf("iteration=%d \n", iteration);
+            //if (src >= num_vertices) {
+            //    printf("src = %lld out of bound, input_pos = %lld\n",
+            //        (long long) src, (long long)input_pos);
+            //    return false;
+            //}
+            //if (dest >= num_vertices) {
+            //    printf("dest = %lld out of bound, src = %lld, "
+            //        "edge_id = %lld, output_pos = %lld\n",
+            //        (long long)dest, (long long) src,
+            //        (long long)edge_id, (long long)output_pos);
+            //    return false;
+            //}
 
             VertexT s_label = Load<cub::LOAD_CG>(labels + src);
             VertexT d_label = Load<cub::LOAD_CG>(labels + dest);
 
-            if(iteration == 0) {
+            if (iteration == 0) {
                 return (d_label == s_label + 1);
             } else {
                 if (d_label == s_label + 1) {
@@ -315,8 +343,15 @@ struct BCBackwardIterationLoop : public IterationLoopBase
                     //Accumulate bc value
                     ValueT old_delta    = atomicAdd(deltas + src, result);
                     ValueT old_bc_value = atomicAdd(bc_values + src, result);
+                    //printf("Updating %lld by %lld, bc: %f -> %f\n",
+                    //    (long long)src, (long long)dest, old_bc_value, old_bc_value + result);
                     return true;
                 } else {
+                    //printf("Label[%lld] (%lld @ %lld) != Label[%lld] (%lld @ %lld) + 1, "
+                    //    "eId = %lld\n",
+                    //    (long long)dest, (long long)d_label, (long long)output_pos,
+                    //    (long long)src, (long long)s_label, (long long)input_pos,
+                    //    (long long)edge_id);
                     return false;
                 }
             }
@@ -333,19 +368,38 @@ struct BCBackwardIterationLoop : public IterationLoopBase
             return labels[dest] == 0;
         };
 
-        frontier.queue_reset = false;
+        frontier.queue_reset = true;
         auto empty_q = frontier.Next_V_Q();
         empty_q = NULL;
         // Call the advance operator, using the advance operation.
         // BC only uses an advance + a filter, with
         // possible optimization to fuze the two kernels.
+        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+            "Failed before backward advance");
+
+        GUARD_CU(frontier.V_Q() -> ForAll([
+            num_vertices] __host__ __device__ (const VertexT* v_q, const SizeT &i){
+                //if (v_q[i] >= num_vertices) {
+                //    printf("v_q[%lld] = %lld is OOB\n",
+                //        (long long)i, (long long)v_q[i]);
+                //}
+                //if (i == 0)
+                //    printf("Q[0] = %lld\n", (long long)v_q[0]);
+            }, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+        //util::PrintMsg("Iter " + std::to_string(enactor_stats.iteration)
+        //    + ", v_q = " + util::to_string(frontier.V_Q() -> GetPointer(util::DEVICE))); 
+
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), empty_q,
             oprtr_parameters, advance_op, filter_op));
 
+        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+            "Backward advance failed");
+
         if (oprtr_parameters.advance_mode != "LB_CULL" &&
             oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
         {
+            frontier.queue_reset = false;
             // Call the filter operator, using the filter operation
             GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), empty_q,
@@ -372,7 +426,7 @@ struct BCBackwardIterationLoop : public IterationLoopBase
     {
         auto &enactor_slices = this -> enactor -> enactor_slices;
         auto iter = enactor_slices[0].enactor_stats.iteration;
-        if(All_Done(this -> enactor[0], gpu_num)) {
+        if (All_Done(this -> enactor[0], gpu_num)) {
             if(iter > 1) {
                 return false;
             } else {
@@ -472,7 +526,13 @@ struct BCBackwardIterationLoop : public IterationLoopBase
                 forward_output, pre_pos
                 ] __host__ __device__ (VertexT *v_q, const SizeT &i){
                     v_q[i] = forward_output[pre_pos + i];
+                    //printf("v_q[%lld] <- f_o[%lld] = %lld\n",
+                    //    (long long)i, (long long)pre_pos + i, (long long)v_q[i]);
                 }, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+        
+            //util::PrintMsg("Iter " + std::to_string(enactor_stats.iteration)
+            //    + ", [" + std::to_string(pre_pos) + ", " + std::to_string(cur_pos) 
+            //    + "), v_q = " + util::to_string(frontier.V_Q() -> GetPointer(util::DEVICE)));
         } else {
           frontier.queue_length = 0;
         }

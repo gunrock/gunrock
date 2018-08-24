@@ -50,12 +50,13 @@ struct main_struct
         util::CpuTimer cpu_timer;
         GraphT graph;
 
-        util::PrintMsg("Loading graph");
+        //util::PrintMsg("Loading graph");
         cpu_timer.Start();
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
-        util::PrintMsg("Graph loaded");
+        //util::PrintMsg("Graph loaded");
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
+        //graph.csr().Display();
 
         // Enable is set sources
         GUARD_CU(app::Set_Srcs(parameters, graph));

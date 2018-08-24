@@ -22,7 +22,7 @@ $(EXEC) : test_$(ALGO).cu $(DEPS)
 a : test_$(ALGO).cu $(DEPS)
 	mkdir -p bin
 	rm -f $(EXEC)
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3 > a.txt 2>&1 || true
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3 -g > a.txt 2>&1 || true
 	grep rror: a.txt; grep arn a.txt
 
 .DEFAULT_GOAL := test

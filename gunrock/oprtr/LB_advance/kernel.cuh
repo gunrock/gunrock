@@ -265,6 +265,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
             AdvanceOpT   advance_op)
     {
         __shared__ typename KernelPolicyT::SmemStorage smem_storage;
+        //if (threadIdx.x == 0 && blockIdx.x == 0)
+        //    printf("thread 0, 0, #inputs = %lld\n", (long long)num_inputs);
 
         SizeT block_input_start  = (SizeT) blockIdx.x * KernelPolicyT::SCRATCH_ELEMENTS;
         while (block_input_start < num_inputs)
@@ -277,7 +279,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
                 output_offsets[block_input_start - 1] : 0;
             SizeT block_output_end   = output_offsets[block_input_end];
             SizeT block_output_size  = block_output_end - block_output_start;
-
+            //if (threadIdx.x == 0 && blockIdx.x == 0)
+            //    printf("thread 0, 1\n");
             if (threadIdx.x < KernelPolicyT::SCRATCH_ELEMENTS)
             {
                 if (thread_input <= block_input_end + 1 &&
@@ -286,6 +289,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
                     input_item = (keys_in == NULL) ?
                         thread_input : keys_in[thread_input];
                     smem_storage.input_queue  [threadIdx.x] = input_item;
+                    //printf("Q[%lld] = %lld\n",
+                    //    (long long)thread_input, (long long)input_item);
                     smem_storage.output_offset[threadIdx.x]
                         = output_offsets[thread_input] - block_output_start;
                     if ((FLAG & OprtrType_V2V) != 0 ||
