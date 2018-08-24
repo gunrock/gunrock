@@ -71,7 +71,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT>      bc_values;           // Final BC values for each vertex
         util::Array1D<SizeT, ValueT>      sigmas;              // Accumulated sigma values for each vertex
         util::Array1D<SizeT, ValueT>      deltas;              // Accumulated delta values for each vertex
-        //util::Array1D<SizeT, VertexT>     src_node;            // Source vertex ID
         VertexT                           src_node;            // Source vertex ID
         util::Array1D<SizeT, VertexT>     *forward_output;     // Output vertex IDs by the forward pass
         std::vector<SizeT>                *forward_queue_offsets;
@@ -102,7 +101,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             bc_values              .SetName("bc_values");
             sigmas                 .SetName("sigmas");
             deltas                 .SetName("deltas");
-            //src_node               .SetName("src_node");
             original_vertex        .SetName("original_vertex");
             first_backward_incoming.SetName("first_backward_incoming");
             local_vertices         .SetName("local_vertices");
@@ -136,7 +134,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(bc_values              .Release(target));
             GUARD_CU(sigmas                 .Release(target));
             GUARD_CU(deltas                 .Release(target));
-            //GUARD_CU(src_node               .Release(target));
             GUARD_CU(original_vertex        .Release(target));
             GUARD_CU(first_backward_incoming.Release(target));
             GUARD_CU(local_vertices         .Release(target));
@@ -184,7 +181,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(bc_values.Allocate(sub_graph.nodes, target));
             GUARD_CU(sigmas   .Allocate(sub_graph.nodes, target | util::HOST));
             GUARD_CU(deltas   .Allocate(sub_graph.nodes, target));
-            //GUARD_CU(src_node.Allocate(1, target));
 
             GUARD_CU(bc_values.ForEach([]__host__ __device__(ValueT &x){
                x = (ValueT)0.0;
@@ -247,7 +243,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                x = (ValueT)0.0;
             }, nodes, target, this -> stream));
 
-            // ?? Reset `src_node`
+            // ?? Reset `src_node YC: in problem::Reset()`
 
             for (int gpu = 0; gpu < this->num_gpus; gpu++) {
                 GUARD_CU(forward_output[gpu].EnsureSize_(nodes, util::DEVICE));
@@ -464,13 +460,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
 
-        // TODO: Initial problem specific starting point, e.g.:
         int gpu;
         VertexT tsrc;
         if (this->num_gpus <= 1) {
            gpu = 0; tsrc = src;
         } else {
-           // ...
+           // TODO
         }
 
         GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
@@ -489,13 +484,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         }
         if (target & util::DEVICE) {
-            //GUARD_CU2(cudaMemcpy(
-            //            data_slices[gpu]->src_node.GetPointer(util::DEVICE),
-            //            &tsrc,
-            //            sizeof(VertexT),
-            //            cudaMemcpyHostToDevice),
-            //            "BCProblem cudaMemcpy src node failed");
-
             GUARD_CU2(cudaMemcpy(
                 data_slices[gpu]->labels.GetPointer(util::DEVICE) + tsrc,
                 &src_label, sizeof(VertexT), cudaMemcpyHostToDevice),
