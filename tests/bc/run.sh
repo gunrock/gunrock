@@ -21,8 +21,9 @@ done
 
 #put OS and Device type here
 SUFFIX="ubuntu16.04_TitanV"
-EXCUTION="./bin/test_bc_9.2_x86_64" #$exe_file
-DATADIR="/data/gunrock_dataset/large"
+EXCUTION="./bin/test_bc_9.1_x86_64" #$exe_file
+# DATADIR="/data/gunrock_dataset/large"
+DATADIR="../../dataset/large"
 
 mkdir -p eval/$SUFFIX
 
@@ -36,7 +37,7 @@ do
     done
 done
 
-OPTION[0]="--src=-1 --device=0 --partition_method=random"
+OPTION[0]="--src=-1 --device=0 --partition-method=random"
 MARK[0]=""
 
 for i in chesapeake test_bc

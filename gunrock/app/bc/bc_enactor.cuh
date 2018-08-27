@@ -25,17 +25,6 @@ namespace gunrock {
 namespace app {
 namespace bc {
 
-//template <typename T, typename SizeT>
-//__global__ void MemsetCopyVectorKernel(T *d_dst, T *d_src, SizeT length)
-//{
-//    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-//    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-//         idx < length; idx += STRIDE)
-//    {
-//        d_dst[idx] = d_src[idx];
-//    }
-//}
-
 /**
  * @brief Speciflying parameters for BC Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter info
@@ -160,7 +149,6 @@ struct BCForwardIterationLoop : public IterationLoopBase
         auto &frontier         = enactor_slice.frontier;
         auto &oprtr_parameters = enactor_slice.oprtr_parameters;
 
-        // printf("-- Gather --\n");
         if (enactor_stats.iteration <= 0)
             return retval;
 
@@ -173,11 +161,7 @@ struct BCForwardIterationLoop : public IterationLoopBase
             over_sized, this -> gpu_num, enactor_stats.iteration, peer_);
         if (retval)
             return retval;
-
-        //MemsetCopyVectorKernel<<<120, 512, 0, oprtr_parameters.stream>>>(
-        //    data_slice.forward_output[peer_].GetPointer(util::DEVICE) + cur_offset,
-        //    frontier.V_Q()->GetPointer(util::DEVICE),
-        //    frontier.queue_length);
+        
         auto  &forward_output = data_slice.forward_output[peer_];
         GUARD_CU(frontier.V_Q()->ForAll([
             forward_output, cur_offset
