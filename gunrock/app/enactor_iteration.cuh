@@ -177,7 +177,7 @@ public:
 
         if (enactor->flag & Debug)
         {
-            printf("%d\t %lld\t %d\t queue_length = %lld, output_length = %lld\n",
+            printf("%d\t %lld\t %d\t queue_size = %lld, output_length = %lld\n",
                 gpu_num, (long long)iteration, peer_,
                 (long long)(frontier.Next_V_Q() -> GetSize()),
                 (long long)request_length);

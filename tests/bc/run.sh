@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OPTION[0]="--src=largestdegree --device=0 --partition_method=random"
+OPTION[0]="--src=largestdegree --device=0 --partition-method=random"
 
 MARK[0]=""
 
@@ -20,8 +20,8 @@ do
 done
 
 #put OS and Device type here
-SUFFIX="ubuntu12.04_k40c"
-EXCUTION=$exe_file
+SUFFIX="ubuntu16.04_TitanV"
+EXCUTION="./bin/test_bc_9.2_x86_64" #$exe_file
 DATADIR="/data/gunrock_dataset/large"
 
 mkdir -p eval/$SUFFIX

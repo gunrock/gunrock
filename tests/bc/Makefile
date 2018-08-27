@@ -9,29 +9,20 @@
 # (make test) Test driver for ALGO
 #-------------------------------------------------------------------------------
 
-# include ../BaseMakefile.mk
-
-# objs : $(EXTRA_SOURCE) $(DEPS)
-# 	mkdir -p objs
-# 	$(NVCC) -g $(DEFINES) $(SM_TARGETS) -c $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) #-O3 
-# 	mv *.o objs
-
-# bin : test_bc.cu $(DEPS)
-# 	mkdir -p bin
-# 	$(NVCC) -g $(DEFINES) $(SM_TARGETS) -o bin/test_bc test_bc.cu objs/*.o $(NVCCFLAGS) $(ARCH) $(INC) #-O3 
-
-
-# --
-# Orig
-
 include ../BaseMakefile.mk
+ALGO = bc
+EXEC = bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-new : test_bc.cu $(DEPS)
+test: $(EXEC)
+
+$(EXEC) : test_$(ALGO).cu $(DEPS)
 	mkdir -p bin
-	$(NVCC) -w -g $(DEFINES) $(SM_TARGETS) -o bin/test_bc test_bc.cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) #-O3 
+	$(NVCC) -w $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
-# old : test_bc_old.cu $(DEPS)
-# 	mkdir -p bin
-# 	$(NVCC) -g $(DEFINES) $(SM_TARGETS) -o bin/test_bc_old test_bc_old.cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) #-O3 
+a : test_$(ALGO).cu $(DEPS)
+	mkdir -p bin
+	rm -f $(EXEC)
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3 > a.txt 2>&1 || true
+	grep rror: a.txt; grep arn a.txt
 
-.DEFAULT_GOAL := new
+.DEFAULT_GOAL := test

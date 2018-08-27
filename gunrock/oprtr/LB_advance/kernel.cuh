@@ -277,7 +277,6 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
                 output_offsets[block_input_start - 1] : 0;
             SizeT block_output_end   = output_offsets[block_input_end];
             SizeT block_output_size  = block_output_end - block_output_start;
-
             if (threadIdx.x < KernelPolicyT::SCRATCH_ELEMENTS)
             {
                 if (thread_input <= block_input_end + 1 &&
