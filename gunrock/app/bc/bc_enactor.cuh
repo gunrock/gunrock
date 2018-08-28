@@ -25,17 +25,6 @@ namespace gunrock {
 namespace app {
 namespace bc {
 
-//template <typename T, typename SizeT>
-//__global__ void MemsetCopyVectorKernel(T *d_dst, T *d_src, SizeT length)
-//{
-//    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-//    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-//         idx < length; idx += STRIDE)
-//    {
-//        d_dst[idx] = d_src[idx];
-//    }
-//}
-
 /**
  * @brief Speciflying parameters for BC Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter info
@@ -160,7 +149,6 @@ struct BCForwardIterationLoop : public IterationLoopBase
         auto &frontier         = enactor_slice.frontier;
         auto &oprtr_parameters = enactor_slice.oprtr_parameters;
 
-        // printf("-- Gather --\n");
         if (enactor_stats.iteration <= 0)
             return retval;
 
@@ -173,11 +161,7 @@ struct BCForwardIterationLoop : public IterationLoopBase
             over_sized, this -> gpu_num, enactor_stats.iteration, peer_);
         if (retval)
             return retval;
-
-        //MemsetCopyVectorKernel<<<120, 512, 0, oprtr_parameters.stream>>>(
-        //    data_slice.forward_output[peer_].GetPointer(util::DEVICE) + cur_offset,
-        //    frontier.V_Q()->GetPointer(util::DEVICE),
-        //    frontier.queue_length);
+        
         auto  &forward_output = data_slice.forward_output[peer_];
         GUARD_CU(frontier.V_Q()->ForAll([
             forward_output, cur_offset
@@ -310,7 +294,7 @@ struct BCBackwardIterationLoop : public IterationLoopBase
         };
 
         auto filter_op = [
-            labels, iteration
+            labels
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
@@ -325,15 +309,10 @@ struct BCBackwardIterationLoop : public IterationLoopBase
         // Call the advance operator, using the advance operation.
         // BC only uses an advance + a filter, with
         // possible optimization to fuze the two kernels.
-        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-            "Failed before backward advance");
 
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), empty_q,
             oprtr_parameters, advance_op, filter_op));
-
-        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-            "Backward advance failed");
 
         if (oprtr_parameters.advance_mode != "LB_CULL" &&
             oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
