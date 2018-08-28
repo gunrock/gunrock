@@ -20,9 +20,9 @@ SUFFIX="ubuntu16.04_TitanV"
 
 mkdir -p eval/$SUFFIX
 
-for i in delaunay_n13 delaunay_n21 delaunay_n24
+for i in small cities
 do
-    echo $exe_file market ../../dataset/large/$i/$i.mtx"> ./eval/$SUFFIX/${i}.$SUFFIX${MARKS}.txt"
-         $exe_file market ../../dataset/large/$i/$i.mtx > ./eval/$SUFFIX/${i}.$SUFFIX${MARKS}.txt
-    sleep 1
+	echo $exe_file market ../../dataset/small/map/${i}.mtx --mapfile=../../dataset/small/map/${i}.map"> ./eval/$SUFFIX/${i}.$SUFFIX${MARKS}.txt"
+     	     $exe_file market ../../dataset/small/map/${i}.mtx --mapfile=../../dataset/small/map/${i}.map> ./eval/$SUFFIX/${i}.$SUFFIX${MARKS}.txt
+	sleep 1
 done

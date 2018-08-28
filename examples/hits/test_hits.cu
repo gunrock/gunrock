@@ -195,7 +195,7 @@ void ReferenceHITS(
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
 
-    if (!quiet) { printf("CPU BFS finished in %lf msec.\n", elapsed); }
+    if (!quiet) { printf("CPU HITS finished in %lf msec.\n", elapsed); }
 }
 
 /**
