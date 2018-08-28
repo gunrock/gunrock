@@ -20,6 +20,7 @@
 #include <gunrock/oprtr/edge_map_partitioned/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_partitioned_cull/kernel_policy.cuh>
 #include <gunrock/oprtr/all_edges_advance/kernel_policy.cuh>
+#include <gunrock/oprtr/simplified_advance/kernel_policy.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -37,6 +38,7 @@ enum MODE {
     LB_CULL,
     LB_LIGHT_CULL,
     ALL_EDGES,
+    SIMPLE,
 };
 
 template <MODE A_MODE>
@@ -309,6 +311,16 @@ struct KernelPolicy {
         _LOG_THREADS,
         _LOG_BLOCKS>
     EDGES;
+
+    typedef gunrock::oprtr::simplified_advance::KernelPolicy<
+        _Problem,
+        _CUDA_ARCH,
+        //_INSTRUMENT,
+        _MAX_CTA_OCCUPANCY,
+        _LOG_THREADS,
+        _LOG_BLOCKS,
+        _LIGHT_EDGE_THRESHOLD>
+    SIMPLE;
 
     static const int CTA_OCCUPANCY =
          (ADVANCE_MODE == TWC_FORWARD ) ?

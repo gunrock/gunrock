@@ -19,6 +19,7 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(rw)
   add_subdirectory(lp)
   add_subdirectory(tc)
+  add_subdirectory(sm)
 
   #add_subdirectory(mf)
   #add_subdirectory(template)
@@ -82,6 +83,10 @@ else(GUNROCK_BUILD_APPLICATIONS)
   if(GUNROCK_APP_TC)
     add_subdirectory(tc)
   endif(GUNROCK_APP_TC)
+
+  if(GUNROCK_APP_SM)
+    add_subdirectory(sm)
+  endif(GUNROCK_APP_SM)
 
   # if(GUNROCK_APP_MF)
   #  add_subdirectory(mf)

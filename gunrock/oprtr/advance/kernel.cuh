@@ -24,6 +24,7 @@
 #include <gunrock/oprtr/edge_map_partitioned/kernel.cuh>
 #include <gunrock/oprtr/edge_map_partitioned_cull/kernel.cuh>
 #include <gunrock/oprtr/all_edges_advance/kernel.cuh>
+#include <gunrock/oprtr/simplified_advance/kernel.cuh>
 
 #include <gunrock/util/multithread_utils.cuh>
 
@@ -889,6 +890,63 @@ struct LaunchKernel_<Parameter, gunrock::oprtr::advance::ALL_EDGES>
    }
 };
 
+template <typename Parameter>
+struct LaunchKernel_<Parameter, gunrock::oprtr::advance::SIMPLE>
+{
+    typedef typename Parameter::Problem::SizeT         SizeT;
+    typedef typename Parameter::Problem::VertexId      VertexId;
+    typedef typename Parameter::Problem::Value         Value;
+    typedef typename Parameter::KernelPolicy::SIMPLE   KernelPolicy;
+
+    static cudaError_t Launch(Parameter *parameter)
+    {
+        cudaError_t retval = cudaSuccess;
+        //SizeT num_block = (parameter -> frontier_attribute -> queue_length +
+        //     LBPOLICY::SCRATCH_ELEMENTS - 1) / LBPOLICY::SCRATCH_ELEMENTS;
+
+        SizeT num_blocks = (parameter -> frontier_attribute -> queue_length +
+             KernelPolicy::THREADS - 1) / KernelPolicy::THREADS;
+        if (num_blocks > 480) num_blocks = 480;
+
+        if (parameter -> get_output_length)
+        {
+            if (retval = ComputeOutputLength(parameter))
+                return retval;
+        }
+
+        gunrock::oprtr::simplified_advance::SimpleAdvance
+            <KernelPolicy,
+            typename Parameter::Problem,
+            typename Parameter::Functor,
+            Parameter::ADVANCE_TYPE,
+            Parameter::R_TYPE,
+            Parameter::R_OP>
+            <<<num_blocks, KernelPolicy::THREADS, 0, parameter -> stream>>>(
+            parameter -> frontier_attribute -> queue_reset,
+            parameter -> frontier_attribute -> queue_index,
+            parameter -> label, //parameter -> enactor_stats -> iteration,
+            parameter -> d_row_offsets,
+            parameter -> d_column_offsets,
+            parameter -> d_column_indices,
+            parameter -> d_row_indices,
+            parameter -> d_partitioned_scanned_edges, // TODO: +1?
+            parameter -> d_in_key_queue,
+            parameter -> d_out_key_queue,
+            parameter -> d_out_value_queue,
+            parameter -> d_data_slice,
+            parameter -> frontier_attribute -> queue_length,
+            parameter -> frontier_attribute -> output_length.GetPointer(util::DEVICE),
+            parameter -> max_in,
+            parameter -> max_out,
+            parameter -> work_progress[0],
+            parameter -> enactor_stats -> advance_kernel_stats,
+            parameter -> input_inverse_graph,
+            parameter -> output_inverse_graph,
+            parameter -> d_value_to_reduce,
+            parameter -> d_reduce_frontier);
+        return retval;
+   }
+};
 
 /**
  * @brief Advance operator kernel entry point.

@@ -969,6 +969,22 @@ public:
         gunrock::oprtr::advance::LB_LIGHT_CULL>
     LB_LIGHT_CULL_AdvanceKernelPolicy;
 
+    typedef gunrock::oprtr::advance::KernelPolicy<
+        Problem,                            // Problem data type
+        300,                                // CUDA_ARCH
+        1,                                  // MIN_CTA_OCCUPANCY
+        10,                                 // LOG_THREADS
+        9,                                  // LOG_BLOCKS
+        32*1024,                            // LIGHT_EDGE_THRESHOLD
+        1,                                  // LOG_LOAD_VEC_SIZE
+        0,                                  // LOG_LOADS_PER_TILE
+        5,                                  // LOG_RAKING_THREADS
+        32,                                 // WARP_GATHER_THRESHOLD
+        128 * 4,                            // CTA_GATHER_THRESHOLD
+        7,                                  // LOG_SCHEDULE_GRANULARITY
+        gunrock::oprtr::advance::LB_LIGHT_CULL>
+    SIMPLE_AdvanceKernelPolicy;
+
     template <typename Dummy, gunrock::oprtr::advance::MODE A_MODE>
     struct MODE_SWITCH{};
 
@@ -1042,6 +1058,20 @@ public:
         }
     };
 
+    template <typename Dummy>
+    struct MODE_SWITCH<Dummy, gunrock::oprtr::advance::SIMPLE>
+    {
+        static cudaError_t Enact(Enactor &enactor, VertexId src)
+        {
+            return enactor.EnactSSSP<SIMPLE_AdvanceKernelPolicy, FilterKernelPolicy>(src);
+        }
+        static cudaError_t Init(Enactor &enactor, ContextPtr *context, Problem *problem, int max_grid_size = 0)
+        {
+            return enactor.InitSSSP <SIMPLE_AdvanceKernelPolicy, FilterKernelPolicy>(
+                context, problem, max_grid_size);
+        }
+    };
+
     /**
      * \addtogroup PublicInterface
      * @{
@@ -1076,6 +1106,9 @@ public:
                     ::Enact(*this, src);
             else if (traversal_mode == "LB_LIGHT_CULL")
                  return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT_CULL>
+                    ::Enact(*this, src);
+            else if (traversal_mode == "SIMPLE")
+                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::SIMPLE>
                     ::Enact(*this, src);
         }
 
@@ -1117,6 +1150,9 @@ public:
                     ::Init(*this, context, problem, max_grid_size);
             else if (traversal_mode == "LB_LIGHT_CULL")
                  return MODE_SWITCH<SizeT, gunrock::oprtr::advance::LB_LIGHT_CULL>
+                    ::Init(*this, context, problem, max_grid_size);
+            else if (traversal_mode == "SIMPLE")
+                 return MODE_SWITCH<SizeT, gunrock::oprtr::advance::SIMPLE>
                     ::Init(*this, context, problem, max_grid_size);
             else printf("Traversal_mode %s is undefined for SSSP\n", traversal_mode.c_str());
         }
