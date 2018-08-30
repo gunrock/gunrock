@@ -81,7 +81,8 @@ struct BCForwardIterationLoop : public IterationLoopBase
         auto    &labels             =   data_slice.labels;
 
         // ----------------------------
-        // Forward advance
+        // Forward advance -- BFS
+        
         auto advance_op = [
             labels, sigmas
         ] __host__ __device__ (
@@ -262,6 +263,9 @@ struct BCBackwardIterationLoop : public IterationLoopBase
         auto     src_node           =   data_slice.src_node;
         auto     num_vertices       =   graph.nodes;
 
+        // ----------------------------
+        // Backward advance -- accumulating BC values
+        
         auto advance_op = [
             labels, deltas, bc_values, iteration, src_node, sigmas, num_vertices
         ] __host__ __device__ (

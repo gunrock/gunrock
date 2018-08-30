@@ -264,7 +264,6 @@ float bc(
     const SizeT        num_edges,
     const SizeT       *row_offsets,
     const VertexT     *col_indices,
-    //const GValueT     *edge_values,
     const int          num_runs,
           VertexT     *sources,
           BCValueT   **bc_values,
@@ -291,12 +290,13 @@ float bc(
 
     bool quiet = parameters.Get<bool>("quiet");
     GraphT graph;
+    
     // Assign pointers into gunrock graph format
-    graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    graph.CsrT::row_offsets   .SetPointer(row_offsets, gunrock::util::HOST);
-    graph.CsrT::column_indices.SetPointer(col_indices, gunrock::util::HOST);
-    //graph.CsrT::edge_values   .SetPointer(edge_values, gunrock::util::HOST);
-    graph.FromCsr(graph.csr(), true, quiet);
+    CsrT csr;
+    csr.Allocate(num_nodes, num_edges, gunrock::util::HOST);
+    csr.row_offsets.SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
+    csr.column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
+    
     gunrock::graphio::LoadGraph(parameters, graph);
 
     // Run BC
@@ -310,6 +310,20 @@ float bc(
     return elapsed_time;
 }
 
+float bc(
+    const int         num_nodes,
+    const int         num_edges,
+    const int        *row_offsets,
+    const int        *col_indices,
+    const int         num_runs,
+          int        *sources,
+          float      **bc_values,
+          float      **sigmas,
+          int        **labels)
+{
+    return bc(num_nodes, num_edges, row_offsets, col_indices, num_runs,
+        sources, bc_values, sigmas, labels);
+}
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++
