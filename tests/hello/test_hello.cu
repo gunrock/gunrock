@@ -105,13 +105,12 @@ struct main_struct
                 // </TODO>
             }));
 
-        // if (!quick)
-        // {
-        //     // <TODO> deallocate host references
-        //     delete[] ref_degrees; ref_degrees = NULL;
-        //     // </TODO>
-        // }
-        // return retval;
+        if (!quick) {
+            // <TODO> deallocate host references
+            delete[] ref_degrees; ref_degrees = NULL;
+            // </TODO>
+        }
+        return retval;
     }
 };
 
