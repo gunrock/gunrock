@@ -7,9 +7,9 @@
 
 /**
  * @file
- * SimpleTemplate_problem.cuh
+ * hello_problem.cuh
  *
- * @brief GPU Storage management Structure for SimpleTemplate Problem Data
+ * @brief GPU Storage management Structure for hello Problem Data
  */
 
 #pragma once
@@ -18,13 +18,13 @@
 
 namespace gunrock {
 namespace app {
-// <todo> change namespace
-namespace SimpleTemplate {
-// </todo>
+// <TODO> change namespace
+namespace hello {
+// </TODO>
 
 
 /**
- * @brief Speciflying parameters for SimpleTemplate Problem
+ * @brief Speciflying parameters for hello Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -35,14 +35,14 @@ cudaError_t UseParameters_problem(
 
     GUARD_CU(gunrock::app::UseParameters_problem(parameters));
 
-    // <todo> Add problem specific command-line parameter usages here, e.g.:
+    // <TODO> Add problem specific command-line parameter usages here, e.g.:
     // GUARD_CU(parameters.Use<bool>(
     //    "mark-pred",
     //    util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
     //    false,
     //    "Whether to mark predecessor info.",
     //    __FILE__, __LINE__));
-    // </todo>
+    // </TODO>
 
     return retval;
 }
@@ -76,20 +76,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     struct DataSlice : BaseDataSlice
     {
-        // <todo> add problem specific storage arrays:
+        // <TODO> add problem specific storage arrays:
         util::Array1D<SizeT, ValueT> degrees;
         util::Array1D<SizeT, int> visited;
-        // </todo>
+        // </TODO>
 
         /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice()
         {
-            // <todo> name of the problem specific arrays:
+            // <TODO> name of the problem specific arrays:
             degrees.SetName("degrees");
             visited.SetName("visited");
-            // </todo>
+            // </TODO>
         }
 
         /*
@@ -108,10 +108,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            // <todo> Release problem specific data, e.g.:
+            // <TODO> Release problem specific data, e.g.:
             GUARD_CU(degrees.Release(target));
             GUARD_CU(visited.Release(target));
-            // </todo>
+            // </TODO>
 
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
@@ -136,15 +136,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
-            // <todo> allocate problem specific data here, e.g.:
+            // <TODO> allocate problem specific data here, e.g.:
             GUARD_CU(degrees.Allocate(sub_graph.nodes, target));
             GUARD_CU(visited.Allocate(sub_graph.nodes, target));
-            // </todo>
+            // </TODO>
 
             if (target & util::DEVICE) {
-                // <todo> move sub-graph used by the problem onto GPU,
+                // <TODO> move sub-graph used by the problem onto GPU,
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
-                // </todo>
+                // </TODO>
             }
             return retval;
         }
@@ -160,13 +160,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT nodes = this -> sub_graph -> nodes;
 
             // Ensure data are allocated
-            // <todo> ensure size of problem specific data:
+            // <TODO> ensure size of problem specific data:
             GUARD_CU(degrees.EnsureSize_(nodes, target));
             GUARD_CU(visited.EnsureSize_(nodes, target));
-            // </todo>
+            // </TODO>
 
             // Reset data
-            // <todo> reset problem specific data, e.g.:
+            // <TODO> reset problem specific data, e.g.:
             GUARD_CU(degrees.ForEach([]__host__ __device__ (ValueT &x){
                x = (ValueT)0;
             }, nodes, target, this -> stream));
@@ -174,7 +174,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(visited.ForEach([]__host__ __device__ (int &x){
                x = (int)0;
             }, nodes, target, this -> stream));
-            // </todo>
+            // </TODO>
 
             return retval;
         }
@@ -187,7 +187,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     // Problem Methods
 
     /**
-     * @brief SimpleTemplate default constructor
+     * @brief hello default constructor
      */
     Problem(
         util::Parameters &_parameters,
@@ -196,7 +196,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         data_slices(NULL) {}
 
     /**
-     * @brief SimpleTemplate default destructor
+     * @brief hello default destructor
      */
     virtual ~Problem() { Release(); }
 
@@ -227,9 +227,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
-        // <todo> problem specific data to extract
+        // <TODO> problem specific data to extract
         ValueT *h_degrees,
-        // </todo>
+        // </TODO>
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -242,17 +242,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target == util::DEVICE) {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-                // <todo> extract the results from single GPU, e.g.:
+                // <TODO> extract the results from single GPU, e.g.:
                 GUARD_CU(data_slice.degrees.SetPointer(h_degrees, nodes, util::HOST));
                 GUARD_CU(data_slice.degrees.Move(util::DEVICE, util::HOST));
-                // </todo>
+                // </TODO>
             } else if (target == util::HOST) {
-                // <todo> extract the results from single CPU, e.g.:
+                // <TODO> extract the results from single CPU, e.g.:
                 GUARD_CU(data_slice.degrees.ForEach(h_degrees,
                    []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
                        host_val = device_val;
                    }, nodes, util::HOST));
-                // </todo>
+                // </TODO>
             }
         } else { // num_gpus != 1
             
@@ -304,10 +304,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         GUARD_CU(BaseProblem::Init(graph, target));
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
-        // <todo> get problem specific flags from parameters, e.g.:
+        // <TODO> get problem specific flags from parameters, e.g.:
         // if (this -> parameters.template Get<bool>("mark-pred"))
         //    this -> flag = this -> flag | Mark_Predecessors;
-        // </todo>
+        // </TODO>
 
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
             data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
@@ -336,9 +336,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
-        // <todo> problem specific data if necessary, eg
+        // <TODO> problem specific data if necessary, eg
         // VertexT src,
-        // </todo>
+        // </TODO>
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -351,8 +351,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
 
-        // <todo> Additional problem specific initialization
-        // </todo>
+        // <TODO> Additional problem specific initialization
+        // </TODO>
 
         GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
         return retval;

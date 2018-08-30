@@ -9,7 +9,7 @@
  * @file
  * Template_enactor.cuh
  *
- * @brief SimpleTemplate Problem Enactor
+ * @brief hello Problem Enactor
  */
 
 #pragma once
@@ -19,19 +19,19 @@
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
  
-// <todo> change includes
-#include <gunrock/app/SimpleTemplate/SimpleTemplate_problem.cuh>
-// </todo>
+// <TODO> change includes
+#include <gunrock/app/hello/hello_problem.cuh>
+// </TODO>
 
 
 namespace gunrock {
 namespace app {
-// <todo> change namespace
-namespace SimpleTemplate {
-// </todo>
+// <TODO> change namespace
+namespace hello {
+// </TODO>
 
 /**
- * @brief Speciflying parameters for SimpleTemplate Enactor
+ * @brief Speciflying parameters for hello Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -40,23 +40,23 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
 
-    // <todo> if needed, add command line parameters used by the enactor here
-    // </todo>
+    // <TODO> if needed, add command line parameters used by the enactor here
+    // </TODO>
     
     return retval;
 }
 
 /**
- * @brief defination of SimpleTemplate iteration loop
+ * @brief defination of hello iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct SimpleTemplateIterationLoop : public IterationLoopBase
+struct helloIterationLoop : public IterationLoopBase
     <EnactorT, Use_FullQ | Push
-    // <todo>if needed, stack more option, e.g.:
+    // <TODO>if needed, stack more option, e.g.:
     // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
     // Update_Predecessors : 0x0)
-    // </todo>
+    // </TODO>
     >
 {
     typedef typename EnactorT::VertexT VertexT;
@@ -67,16 +67,16 @@ struct SimpleTemplateIterationLoop : public IterationLoopBase
     
     typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push
-        // <todo> add the same options as in template parameters here, e.g.:
+        // <TODO> add the same options as in template parameters here, e.g.:
         // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
         // Update_Predecessors : 0x0)
-        // </todo>
+        // </TODO>
         > BaseIterationLoop;
 
-    SimpleTemplateIterationLoop() : BaseIterationLoop() {}
+    helloIterationLoop() : BaseIterationLoop() {}
 
     /**
-     * @brief Core computation of SimpleTemplate, one iteration
+     * @brief Core computation of hello, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
      * \return cudaError_t error message(s), if any
      */
@@ -98,26 +98,26 @@ struct SimpleTemplateIterationLoop : public IterationLoopBase
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
         
-        // <todo> add problem specific data alias here:
+        // <TODO> add problem specific data alias here:
         auto &degrees = data_slice.degrees;
         auto &visited = data_slice.visited;
-        // </todo>
+        // </TODO>
         
         // --
         // Define operations
 
         // advance operation
         auto advance_op = [
-            // <todo> pass data to lambda
+            // <TODO> pass data to lambda
             degrees,
             visited
-            // </todo>
+            // </TODO>
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // <todo> Implement advance operation
+            // <TODO> Implement advance operation
                         
             // Mark src and dest as visited
             atomicMax(visited + src, 1);
@@ -129,27 +129,27 @@ struct SimpleTemplateIterationLoop : public IterationLoopBase
             // Add dest to queue if previously unsen
             return dest_visited == 0;
             
-            // </todo>
+            // </TODO>
         };
 
         // filter operation
         auto filter_op = [
-            // <todo> pass data to lambda
-            // </todo>
+            // <TODO> pass data to lambda
+            // </TODO>
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // <todo> implement filter operation
+            // <TODO> implement filter operation
             return true;
-            // </todo>
+            // </TODO>
         };
         
         // --
         // Run
         
-        // <todo> some of this may need to be edited depending on algorithmic needs
+        // <TODO> some of this may need to be edited depending on algorithmic needs
         // !! How much variation between apps is there in these calls?
         
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
@@ -170,7 +170,7 @@ struct SimpleTemplateIterationLoop : public IterationLoopBase
             frontier.queue_index, frontier.queue_length,
             false, oprtr_parameters.stream, true));
 
-        // </todo>
+        // </TODO>
         
         return retval;
     }
@@ -220,7 +220,7 @@ struct SimpleTemplateIterationLoop : public IterationLoopBase
             (received_length, peer_, expand_op);
         return retval;
     }
-}; // end of SimpleTemplateIteration
+}; // end of helloIteration
 
 /**
  * @brief Template enactor class.
@@ -250,27 +250,27 @@ public:
         BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> 
         EnactorT;
-    typedef SimpleTemplateIterationLoop<EnactorT> 
+    typedef helloIterationLoop<EnactorT> 
         IterationT;
 
     Problem *problem;
     IterationT *iterations;
 
     /**
-     * @brief SimpleTemplate constructor
+     * @brief hello constructor
      */
     Enactor() :
         BaseEnactor("Template"),
         problem    (NULL  )
     {
-        // <todo> change according to algorithmic needs
+        // <TODO> change according to algorithmic needs
         this -> max_num_vertex_associates = 0;
         this -> max_num_value__associates = 1;
-        // </todo>
+        // </TODO>
     }
 
     /**
-     * @brief SimpleTemplate destructor
+     * @brief hello destructor
      */
     virtual ~Enactor() { /*Release();*/ }
 
@@ -304,9 +304,9 @@ public:
         // Lazy initialization
         GUARD_CU(BaseEnactor::Init(
             problem, Enactor_None,
-            // <todo> change to how many frontier queues, and their types
+            // <TODO> change to how many frontier queues, and their types
             2, NULL,
-            // </todo>
+            // </TODO>
             target, false));
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++) {
             GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
@@ -327,17 +327,17 @@ public:
     }
 
     /**
-      * @brief one run of SimpleTemplate, to be called within GunrockThread
+      * @brief one run of hello, to be called within GunrockThread
       * @param thread_data Data for the CPU thread
       * \return cudaError_t error message(s), if any
       */
     cudaError_t Run(ThreadSlice &thread_data)
     {
         gunrock::app::Iteration_Loop<
-            // <todo> change to how many {VertexT, ValueT} data need to communicate
+            // <TODO> change to how many {VertexT, ValueT} data need to communicate
             //       per element in the inter-GPU sub-frontiers
             0, 1,
-            // </todo>
+            // </TODO>
             IterationT>(
             thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
@@ -350,16 +350,16 @@ public:
      * \return cudaError_t error message(s), if any
      */
     cudaError_t Reset(
-        // <todo> problem specific data if necessary, eg
+        // <TODO> problem specific data if necessary, eg
         VertexT src = 0,
-        // </todo>
+        // </TODO>
         util::Location target = util::DEVICE)
     {
         typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
 
-        // <todo> Initialize frontiers according to the algorithm:
+        // <TODO> Initialize frontiers according to the algorithm:
         // In this case, we add a single `src` to the frontier
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
            if ((this->num_gpus == 1) ||
@@ -382,21 +382,21 @@ public:
                 }
            }
         }
-        // </todo>
+        // </TODO>
         
         GUARD_CU(BaseEnactor::Sync());
         return retval;
     }
 
     /**
-     * @brief Enacts a SimpleTemplate computing on the specified graph.
+     * @brief Enacts a hello computing on the specified graph.
 ...
      * \return cudaError_t error message(s), if any
      */
     cudaError_t Enact(
-        // <todo> problem specific data if necessary, eg
+        // <TODO> problem specific data if necessary, eg
         VertexT src = 0
-        // </todo>
+        // </TODO>
     )
     {
         cudaError_t retval = cudaSuccess;

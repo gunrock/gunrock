@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file SimpleTemplate_app.cu
+ * @file hello_app.cu
  *
  * @brief Simple Gunrock Application
  */
@@ -17,16 +17,16 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// <todo> change includes
-#include <gunrock/app/SimpleTemplate/SimpleTemplate_enactor.cuh>
-#include <gunrock/app/SimpleTemplate/SimpleTemplate_test.cuh>
-// </todo>
+// <TODO> change includes
+#include <gunrock/app/hello/hello_enactor.cuh>
+#include <gunrock/app/hello/hello_test.cuh>
+// </TODO>
 
 namespace gunrock {
 namespace app {
-// <todo> change namespace
-namespace SimpleTemplate {
-// </todo>
+// <TODO> change namespace
+namespace hello {
+// </TODO>
 
 
 cudaError_t UseParameters(util::Parameters &parameters)
@@ -36,7 +36,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
-    // <todo> add app specific parameters, eg:
+    // <TODO> add app specific parameters, eg:
     // GUARD_CU(parameters.Use<std::string>(
     //    "src",
     //    util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
@@ -45,13 +45,13 @@ cudaError_t UseParameters(util::Parameters &parameters)
     //    "\tIf random, randomly select non-zero degree vertices;\n"
     //    "\tIf largestdegree, select vertices with largest degrees",
     //    __FILE__, __LINE__));
-    // </todo>
+    // </TODO>
 
     return retval;
 }
 
 /**
- * @brief Run SimpleTemplate tests
+ * @brief Run hello tests
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the distances
  * @param[in]  parameters    Excution parameters
@@ -64,9 +64,9 @@ template <typename GraphT>
 cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
-    // <todo> add problem specific reference results, e.g.:
+    // <TODO> add problem specific reference results, e.g.:
     typename GraphT::ValueT *ref_degrees,
-    // </todo>
+    // </TODO>
     util::Location target)
 {
     
@@ -82,19 +82,19 @@ cudaError_t RunTests(
     bool quiet_mode = parameters.Get<bool>("quiet");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    util::Info info("SimpleTemplate", parameters, graph);
+    util::Info info("hello", parameters, graph);
     
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
 
-    // <todo> get problem specific inputs, e.g.:
+    // <TODO> get problem specific inputs, e.g.:
     // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
     // printf("RunTests: %d srcs: src[0]=%d\n", srcs.size(), srcs[0]);
-    // </todo>
+    // </TODO>
 
-    // <todo> allocate problem specific host data, e.g.:
+    // <TODO> allocate problem specific host data, e.g.:
     ValueT *h_degrees = new ValueT[graph.nodes];
-    // </todo>
+    // </TODO>
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -107,15 +107,15 @@ cudaError_t RunTests(
     
     for (int run_num = 0; run_num < num_runs; ++run_num) {
         GUARD_CU(problem.Reset(
-            // <todo> problem specific data if necessary, eg:
+            // <TODO> problem specific data if necessary, eg:
             // src,
-            // </todo>
+            // </TODO>
             target
         ));
         GUARD_CU(enactor.Reset(
-            // <todo> problem specific data if necessary:
+            // <TODO> problem specific data if necessary:
             // srcs[run_num % srcs.size()],
-            // </todo>
+            // </TODO>
             target
         ));
         
@@ -123,9 +123,9 @@ cudaError_t RunTests(
 
         cpu_timer.Start();
         GUARD_CU(enactor.Enact(
-            // <todo> problem specific data if necessary:
+            // <TODO> problem specific data if necessary:
             // srcs[run_num % srcs.size()]
-            // </todo>
+            // </TODO>
         ));
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
@@ -140,16 +140,16 @@ cudaError_t RunTests(
         if (validation == "each") {
             
             GUARD_CU(problem.Extract(
-                // <todo> problem specific data
+                // <TODO> problem specific data
                 h_degrees
-                // </todo>
+                // </TODO>
             ));
             SizeT num_errors = Validate_Results(
                 parameters,
                 graph,
-                // <todo> problem specific data
+                // <TODO> problem specific data
                 h_degrees, ref_degrees,
-                // </todo>
+                // </TODO>
                 false);
         }
     }
@@ -157,17 +157,17 @@ cudaError_t RunTests(
     cpu_timer.Start();
     
     GUARD_CU(problem.Extract(
-        // <todo> problem specific data
+        // <TODO> problem specific data
         h_degrees
-        // </todo>
+        // </TODO>
     ));
     if (validation == "last") {
         SizeT num_errors = Validate_Results(
             parameters,
             graph,
-            // <todo> problem specific data
+            // <TODO> problem specific data
             h_degrees, ref_degrees,
-            // </todo>
+            // </TODO>
             false);
     }
 
@@ -182,16 +182,16 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    // <todo> Release problem specific data, e.g.:
+    // <TODO> Release problem specific data, e.g.:
     delete[] h_degrees; h_degrees   = NULL;
-    // </todo>
+    // </TODO>
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
     return retval;
 }
 
-} // namespace Template
+} // namespace hello
 } // namespace app
 } // namespace gunrock
 

@@ -7,18 +7,18 @@
 
 /**
  * @file
- * SimpleTemplate_test.cu
+ * hello_test.cu
  *
- * @brief Test related functions for SimpleTemplate
+ * @brief Test related functions for hello
  */
 
 #pragma once
 
 namespace gunrock {
 namespace app {
-// <todo> change namespace
-namespace SimpleTemplate {
-// </todo>
+// <TODO> change namespace
+namespace hello {
+// </TODO>
 
 
 /******************************************************************************
@@ -26,7 +26,7 @@ namespace SimpleTemplate {
  *****************************************************************************/
 
 /**
- * @brief Simple CPU-based reference SimpleTemplate ranking implementations
+ * @brief Simple CPU-based reference hello ranking implementations
  * @tparam      GraphT        Type of the graph
  * @tparam      ValueT        Type of the values
  * @param[in]   graph         Input graph
@@ -36,9 +36,9 @@ namespace SimpleTemplate {
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    // <todo> add problem specific inputs and outputs 
+    // <TODO> add problem specific inputs and outputs 
     typename GraphT::ValueT *degrees,
-    // </todo>
+    // </TODO>
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
@@ -46,12 +46,12 @@ double CPU_Reference(
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
     
-    // <todo> 
+    // <TODO> 
     // implement CPU reference implementation
     for(SizeT v = 0; v < graph.nodes; ++v) {
         degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
     }
-    // </todo>
+    // </TODO>
     
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
@@ -59,7 +59,7 @@ double CPU_Reference(
 }
 
 /**
- * @brief Validation of SimpleTemplate results
+ * @brief Validation of hello results
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the values
  * @param[in]  parameters    Excution parameters
@@ -82,11 +82,11 @@ typename GraphT::SizeT Validate_Results(
     SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
 
-    // <todo> result validation and display
+    // <TODO> result validation and display
     for(SizeT v = 0; v < graph.nodes; ++v) {
         printf("%d %d %d\n", v, h_degrees[v], ref_degrees[v]);
     }
-    // </todo>
+    // </TODO>
 
     if(num_errors == 0) {
        util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);

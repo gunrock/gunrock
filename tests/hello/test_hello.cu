@@ -7,17 +7,17 @@
 
 /**
  * @file
- * test_SimpleTemplate.cu
+ * test_hello.cu
  *
  * @brief Simple test driver program for Gunrock template.
  */
 
-#include <gunrock/app/SimpleTemplate/SimpleTemplate_app.cu>
+#include <gunrock/app/hello/hello_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
 
-namespace APP_NAMESPACE = app::SimpleTemplate;
+namespace APP_NAMESPACE = app::hello;
 
 /******************************************************************************
 * Main
@@ -61,26 +61,26 @@ struct main_struct
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        // <todo> get srcs if needed, e.g.:
+        // <TODO> get srcs if needed, e.g.:
         // GUARD_CU(app::Set_Srcs (parameters, graph));
         // std::vector<VertexT> srcs
         //    = parameters.Get<std::vector<VertexT> >("srcs");
         // int num_srcs = srcs.size();
-        // </todo>
+        // </TODO>
         
-        // <todo> declare datastructures for reference result on GPU
+        // <TODO> declare datastructures for reference result on GPU
         ValueT *ref_degrees;
-        // </todo>
+        // </TODO>
         
         if (!quick) {
-            // <todo> init datastructures for reference result on GPU
+            // <TODO> init datastructures for reference result on GPU
             ref_degrees = new ValueT[graph.nodes];
-            // </todo>
+            // </TODO>
 
             // If not in `quick` mode, compute CPU reference implementation
             util::PrintMsg("__________________________", !quiet);
             
-            float elapsed = app::SimpleTemplate::CPU_Reference(
+            float elapsed = app::hello::CPU_Reference(
                 graph.csr(),
                 ref_degrees,
                 quiet);
@@ -89,27 +89,27 @@ struct main_struct
                 + std::to_string(elapsed), !quiet);
         }
 
-        // <todo> add other switching parameters, if needed
+        // <TODO> add other switching parameters, if needed
         std::vector<std::string> switches{"advance-mode"};
-        // </todo>
+        // </TODO>
         
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
-                // </todo> pass necessary data to lambda
+                // </TODO> pass necessary data to lambda
                 ref_degrees
-                // </todo>
+                // </TODO>
             ](util::Parameters &parameters, GraphT &graph)
             {
-                // <todo> pass necessary data to app::Template::RunTests
-                return app::SimpleTemplate::RunTests(parameters, graph, ref_degrees, util::DEVICE);
-                // </todo>
+                // <TODO> pass necessary data to app::Template::RunTests
+                return app::hello::RunTests(parameters, graph, ref_degrees, util::DEVICE);
+                // </TODO>
             }));
 
         // if (!quick)
         // {
-        //     // <todo> deallocate host references
+        //     // <TODO> deallocate host references
         //     delete[] ref_degrees; ref_degrees = NULL;
-        //     // </todo>
+        //     // </TODO>
         // }
         // return retval;
     }
@@ -118,9 +118,9 @@ struct main_struct
 int main(int argc, char** argv)
 {
     cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test SimpleTemplate");
+    util::Parameters parameters("test hello");
     GUARD_CU(graphio::UseParameters(parameters));
-    GUARD_CU(app::SimpleTemplate::UseParameters(parameters));
+    GUARD_CU(app::hello::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
     GUARD_CU(parameters.Parse_CommandLine(argc, argv));
     if (parameters.Get<bool>("help"))
