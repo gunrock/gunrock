@@ -82,7 +82,7 @@ cudaError_t RunTests(
     bool quiet_mode = parameters.Get<bool>("quiet");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    util::Info info("Template", parameters, graph);
+    util::Info info("SimpleTemplate", parameters, graph);
     
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
