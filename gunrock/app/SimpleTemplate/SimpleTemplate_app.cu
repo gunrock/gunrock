@@ -6,9 +6,9 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file sssp_app.cu
+ * @file SimpleTemplate_app.cu
  *
- * @brief single-source shortest path (SSSP) application
+ * @brief Simple Gunrock Application
  */
 
 #include <gunrock/gunrock.h>
@@ -32,32 +32,32 @@ namespace SimpleTemplate {
 cudaError_t UseParameters(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
-    GUARD_CU(UseParameters_app    (parameters));
+    GUARD_CU(UseParameters_app(parameters));
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
-    // <todo> add app specific parameters
-    GUARD_CU(parameters.Use<std::string>(
-       "src",
-       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-       "0",
-       "<Vertex-ID|random|largestdegree> The source vertices\n"
-       "\tIf random, randomly select non-zero degree vertices;\n"
-       "\tIf largestdegree, select vertices with largest degrees",
-       __FILE__, __LINE__));
+    // <todo> add app specific parameters, eg:
+    // GUARD_CU(parameters.Use<std::string>(
+    //    "src",
+    //    util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+    //    "0",
+    //    "<Vertex-ID|random|largestdegree> The source vertices\n"
+    //    "\tIf random, randomly select non-zero degree vertices;\n"
+    //    "\tIf largestdegree, select vertices with largest degrees",
+    //    __FILE__, __LINE__));
     // </todo>
 
     return retval;
 }
 
 /**
- * @brief Run SSSP tests
+ * @brief Run SimpleTemplate tests
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the distances
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
- * @param[in]  ref_distances Reference distances
- * @param[in]  target        Whether to perform the SSSP
+...
+ * @param[in]  target        where to perform the app 
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT>
@@ -88,7 +88,8 @@ cudaError_t RunTests(
     cpu_timer.Start(); total_timer.Start();
 
     // <todo> get problem specific inputs, e.g.:
-    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+    // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+    // printf("RunTests: %d srcs: src[0]=%d\n", srcs.size(), srcs[0]);
     // </todo>
 
     // <todo> allocate problem specific host data, e.g.:
@@ -104,7 +105,6 @@ cudaError_t RunTests(
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
     
-    VertexT src;
     for (int run_num = 0; run_num < num_runs; ++run_num) {
         GUARD_CU(problem.Reset(
             // <todo> problem specific data if necessary, eg:
@@ -114,7 +114,7 @@ cudaError_t RunTests(
         ));
         GUARD_CU(enactor.Reset(
             // <todo> problem specific data if necessary:
-            srcs[run_num % srcs.size()],
+            // srcs[run_num % srcs.size()],
             // </todo>
             target
         ));
@@ -124,7 +124,7 @@ cudaError_t RunTests(
         cpu_timer.Start();
         GUARD_CU(enactor.Enact(
             // <todo> problem specific data if necessary:
-            srcs[run_num % srcs.size()]
+            // srcs[run_num % srcs.size()]
             // </todo>
         ));
         cpu_timer.Stop();

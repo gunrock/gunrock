@@ -59,7 +59,7 @@ struct main_struct
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
         // TODO: get srcs if needed, e.g.:
-        // GUARD_CU(app::Set_Srcs    (parameters, graph));
+        GUARD_CU(app::Set_Srcs    (parameters, graph));
         int num_srcs = 0;
 
         // TODO: reference result on CPU, e.e.:

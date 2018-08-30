@@ -76,7 +76,7 @@ struct SimpleTemplateIterationLoop : public IterationLoopBase
     SimpleTemplateIterationLoop() : BaseIterationLoop() {}
 
     /**
-     * @brief Core computation of sssp, one iteration
+     * @brief Core computation of SimpleTemplate, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
      * \return cudaError_t error message(s), if any
      */
@@ -327,7 +327,7 @@ public:
     }
 
     /**
-      * @brief one run of sssp, to be called within GunrockThread
+      * @brief one run of SimpleTemplate, to be called within GunrockThread
       * @param thread_data Data for the CPU thread
       * \return cudaError_t error message(s), if any
       */
@@ -351,7 +351,7 @@ public:
      */
     cudaError_t Reset(
         // <todo> problem specific data if necessary, eg
-        VertexT src,
+        VertexT src = 0,
         // </todo>
         util::Location target = util::DEVICE)
     {
@@ -389,13 +389,13 @@ public:
     }
 
     /**
-     * @brief Enacts a SSSP computing on the specified graph.
+     * @brief Enacts a SimpleTemplate computing on the specified graph.
 ...
      * \return cudaError_t error message(s), if any
      */
     cudaError_t Enact(
         // <todo> problem specific data if necessary, eg
-        VertexT src
+        VertexT src = 0
         // </todo>
     )
     {

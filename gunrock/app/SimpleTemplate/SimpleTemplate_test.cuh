@@ -59,7 +59,7 @@ double CPU_Reference(
 }
 
 /**
- * @brief Validation of SSSP results
+ * @brief Validation of SimpleTemplate results
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the values
  * @param[in]  parameters    Excution parameters
@@ -87,6 +87,10 @@ typename GraphT::SizeT Validate_Results(
         printf("%d %d %d\n", v, h_degrees[v], ref_degrees[v]);
     }
     // </todo>
+
+    if(num_errors == 0) {
+       util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
+    }
 
     return num_errors;
 }
