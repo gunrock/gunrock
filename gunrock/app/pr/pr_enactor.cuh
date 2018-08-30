@@ -15,6 +15,7 @@
 #pragma once
 
 #include <gunrock/util/sort_utils.cuh>
+
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
@@ -49,8 +50,7 @@ struct PRIterationLoop : public IterationLoopBase
     typedef typename EnactorT::SizeT   SizeT;
     typedef typename EnactorT::ValueT  ValueT;
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
-    typedef IterationLoopBase
-        <EnactorT, Use_FullQ | Push> BaseIterationLoop;
+    typedef IterationLoopBase <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
     PRIterationLoop() : BaseIterationLoop() {}
 
@@ -64,10 +64,8 @@ struct PRIterationLoop : public IterationLoopBase
         // Data PageRank that works on
         auto         &enactor            =   this -> enactor[0];
         auto         &gpu_num            =   this -> gpu_num;
-        auto         &data_slice         =   enactor.
-            problem -> data_slices[gpu_num][0];
-        auto         &enactor_slice      =   enactor.
-            enactor_slices[gpu_num * enactor.num_gpus + peer_];
+        auto         &data_slice         =   enactor.problem -> data_slices[gpu_num][0];
+        auto         &enactor_slice      =   enactor.enactor_slices[gpu_num * enactor.num_gpus + peer_];
         auto         &enactor_stats      =   enactor_slice.enactor_stats;
         auto         &graph              =   data_slice.sub_graph[0];
         auto         &rank_curr          =   data_slice.rank_curr;
@@ -87,10 +85,8 @@ struct PRIterationLoop : public IterationLoopBase
         if (iteration != 0)
         {
             if (enactor.flag & Debug)
-                util::cpu_mt::PrintMessage("Filter start.",
-                    gpu_num, iteration, peer_);
-            auto filter_op =
-            [rank_curr, rank_next, degrees, delta, threshold, reset_value]
+                util::cpu_mt::PrintMessage("Filter start.", gpu_num, iteration, peer_);
+            auto filter_op = [rank_curr, rank_next, degrees, delta, threshold, reset_value]
             __host__ __device__ (
                 const VertexT &src, VertexT &dest, const SizeT &edge_id,
                 const VertexT &input_item, const SizeT &input_pos,
@@ -120,6 +116,7 @@ struct PRIterationLoop : public IterationLoopBase
             GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
                 graph.coo(), &local_vertices, null_ptr,
                 oprtr_parameters, filter_op));
+            
             if (enactor.flag & Debug)
                 util::cpu_mt::PrintMessage("Filter end.",
                     gpu_num, iteration, peer_);
@@ -145,8 +142,7 @@ struct PRIterationLoop : public IterationLoopBase
             util::cpu_mt::PrintMessage("Advance start.",
                 gpu_num, iteration, peer_);
 
-        auto advance_op = [rank_curr, rank_next]
-        __host__ __device__ (
+        auto advance_op = [rank_curr, rank_next] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool

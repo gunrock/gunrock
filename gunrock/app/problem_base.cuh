@@ -97,13 +97,13 @@ struct DataSliceBase
      */
     cudaError_t Init(
         GraphT         &sub_graph,
-        int             num_gpus = 1,
-        int             gpu_idx = 0,
-        util::Location  target  = util::DEVICE,
-        ProblemFlag     flag    = Problem_None)
+        int             num_gpus,
+        int             gpu_idx,
+        util::Location  target,
+        ProblemFlag     flag)
     {
         cudaError_t retval = cudaSuccess;
-
+                
         this -> num_gpus  = num_gpus;
         this -> gpu_idx   =  gpu_idx;
         this -> sub_graph = &sub_graph;
