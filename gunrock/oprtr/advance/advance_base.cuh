@@ -200,6 +200,13 @@ cudaError_t ComputeOutputLength(
         return retval;
     }
 
+    //util::PrintMsg("output_offsets.size() = " 
+    //    + std::to_string(parameters.frontier -> output_offsets.GetSize())
+    //    + ", queue_length = "
+    //    + std::to_string(parameters.frontier -> queue_length)
+    //    + ", queue_size = "
+    //    + std::to_string(frontier_in == NULL ? 0 : frontier_in -> GetSize()));
+
     int block_size = 512;
     SizeT num_blocks = parameters.frontier -> queue_length / block_size + 1;
     if (num_blocks > 80 * 4)

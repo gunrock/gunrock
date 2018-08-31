@@ -2,8 +2,9 @@
 
 BASEOPTION="--src=randomize2 --in-sizing=1.1 --queue-sizing=1.2 --iteration-num=16"
 BASEMARK=""
-EXECUTION="./bin/test_bc_8.0_x86_64"
-DATADIR="/data/gunrock_dataset/large"
+EXECUTION="./bin/test_bc_9.1_x86_64"
+# DATADIR="/data/gunrock_dataset/large"
+DATADIR="../../dataset/large"
 
 OPTION[8]="" && FLAG[8]=".32bit_SizeT"
 OPTION[9]=" --64bit-SizeT" && FLAG[9]=".64bit_SizeT"

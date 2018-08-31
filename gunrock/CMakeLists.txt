@@ -1,4 +1,9 @@
 # gunrock shared library cmake file
+if(RAPIDJSON_FOUND)
+  include_directories(${RAPIDJSON_INCLUDEDIR})
+else()
+  message(SEND_ERROR "RapidJson include directory not set.")
+endif()
 
 if(mgpu_INCLUDE_DIRS)
   include_directories(${mgpu_INCLUDE_DIRS})
@@ -20,15 +25,15 @@ set(HFILES_PUBLIC
   gunrock.h)
 
 set(CUFILES
-  app/bfs/bfs_app.cu
-  app/bc/bc_app.cu
-  app/cc/cc_app.cu
+  #app/bfs/bfs_app.cu
+  #app/bc/bc_app.cu
+  #app/cc/cc_app.cu
   app/pr/pr_app.cu
-  app/sssp/sssp_app.cu
+  #app/sssp/sssp_app.cu
   util/test_utils.cu
   util/error_utils.cu
   util/misc_utils.cu
-  util/types.cu
+  util/str_to_T.cu
   ${mgpu_SOURCE_FILES}
   util/gitsha1.c)
 

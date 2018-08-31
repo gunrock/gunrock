@@ -133,7 +133,7 @@ struct TestGraph :
         GUARD_CU(this -> CooT::FromCsc(csc, target, stream, quiet));
         GUARD_CU(this -> CsrT::FromCsc(csc, target, stream, quiet));
         if (!self_csc)
-            GUARD_CU(this -> CscT::FromCsr(csc, target, stream, quiet));
+            GUARD_CU(this -> CscT::FromCsc(csc, target, stream, quiet));
         return retval;
     }
 

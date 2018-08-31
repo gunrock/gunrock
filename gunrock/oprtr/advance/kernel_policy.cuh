@@ -14,12 +14,12 @@
 
 #pragma once
 
-#include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
+// #include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_backward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_partitioned_backward/kernel_policy.cuh>
-#include <gunrock/oprtr/edge_map_partitioned/kernel_policy.cuh>
-#include <gunrock/oprtr/edge_map_partitioned_cull/kernel_policy.cuh>
-#include <gunrock/oprtr/all_edges_advance/kernel_policy.cuh>
+// #include <gunrock/oprtr/edge_map_partitioned/kernel_policy.cuh>
+// #include <gunrock/oprtr/edge_map_partitioned_cull/kernel_policy.cuh>
+// #include <gunrock/oprtr/all_edges_advance/kernel_policy.cuh>
 
 namespace gunrock {
 namespace oprtr {
