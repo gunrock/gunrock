@@ -286,6 +286,7 @@ cudaError_t Build(
     if (!parameters.UseDefault(graph_prefix + "graph-seed"))
         seed = parameters.Get<int>(graph_prefix + "graph-seed");
 
+    bool random_edge_values = parameters.Get<bool>(graph_prefix + "random-edge-values");
     double edge_value_range = parameters.Get<double>(graph_prefix + "edge-value-range");
     double edge_value_min   = parameters.Get<double>(graph_prefix + "edge-value-min");
 
@@ -345,7 +346,15 @@ cudaError_t Build(
             graph.CooT::edge_pairs[e].y = v - 1; // zero based
             if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
             {
-                graph.CooT::edge_values[e] = Sprng(rand_state) * edge_value_range + edge_value_min;
+                if(random_edge_values)
+                {
+                    graph.CooT::edge_values[e] = Sprng(rand_state) * edge_value_range + edge_value_min;
+                }
+                else
+                {
+                    graph.CooT::edge_values[e] = 1;
+                }
+
             }
         }
     }

@@ -55,6 +55,13 @@ cudaError_t UseParameters(
         "Whether " + graph_prefix + " graph is undirected",
         __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<bool>(
+        graph_prefix + "random-edge-values",
+        util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        false,
+        "Whether " + graph_prefix + " graph edge values are randomly generate",
+        __FILE__, __LINE__));
+
     GUARD_CU(parameters.Use<float>(
         graph_prefix + "edge-value-range",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
