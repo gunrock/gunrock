@@ -156,6 +156,7 @@ cudaError_t Build(
     if (parameters.UseDefault("dataset"))
         parameters.Set<std::string>("dataset", dataset);
 
+    bool random_edge_values = parameters.Get<bool>(graph_prefix + "random-edge-values");
     double edge_value_range = parameters.Get<double>(graph_prefix + "edge-value-range");
     double edge_value_min   = parameters.Get<double>(graph_prefix + "edge-value-min");
 
@@ -317,7 +318,15 @@ cudaError_t Build(
                     col_index[counter] = peer;
                     if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
                     {
-                        values[counter] = distribution(engine) * edge_value_range + edge_value_min;
+                        if(random_edge_values)
+                        {
+                            values[counter] = distribution(engine) * edge_value_range + edge_value_min;
+                        }
+                        else
+                        {
+                            values[counter] = 1;
+                        }
+
                     }
                     counter++;
                 }
