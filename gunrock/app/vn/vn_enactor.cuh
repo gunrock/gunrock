@@ -7,9 +7,9 @@
 
 /**
  * @file
- * sssp_enactor.cuh
+ * vn_enactor.cuh
  *
- * @brief SSSP Problem Enactor
+ * @brief vn Problem Enactor
  */
 
 #pragma once
@@ -17,15 +17,15 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-#include <gunrock/app/sssp/sssp_problem.cuh>
+#include <gunrock/app/vn/vn_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
 namespace gunrock {
 namespace app {
-namespace sssp {
+namespace vn {
 
 /**
- * @brief Speciflying parameters for SSSP Enactor
+ * @brief Speciflying parameters for vn Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -37,11 +37,11 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 }
 
 /**
- * @brief defination of SSSP iteration loop
+ * @brief defination of VN iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct SSSPIterationLoop : public IterationLoopBase
+struct VNIterationLoop : public IterationLoopBase
     <EnactorT, Use_FullQ | Push |
     (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
     Update_Predecessors : 0x0)>
@@ -56,16 +56,16 @@ struct SSSPIterationLoop : public IterationLoopBase
         (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
          Update_Predecessors : 0x0)> BaseIterationLoop;
 
-    SSSPIterationLoop() : BaseIterationLoop() {}
+    VNIterationLoop() : BaseIterationLoop() {}
 
     /**
-     * @brief Core computation of sssp, one iteration
+     * @brief Core computation of VN, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
      * \return cudaError_t error message(s), if any
      */
     cudaError_t Core(int peer_ = 0)
     {
-        // Data sssp that works on
+        // Data vn that works on
         auto         &data_slice         =   this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
         auto         &enactor_slice      =   this -> enactor ->
@@ -195,10 +195,10 @@ struct SSSPIterationLoop : public IterationLoopBase
             (received_length, peer_, expand_op);
         return retval;
     }
-}; // end of SSSPIteration
+}; // end of vnIteration
 
 /**
- * @brief SSSP enactor class.
+ * @brief vn enactor class.
  * @tparam _Problem Problem type we process on
  * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
  * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
@@ -226,7 +226,7 @@ public:
         BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
-    typedef SSSPIterationLoop<EnactorT> IterationT;
+    typedef VNIterationLoop<EnactorT> IterationT;
 
     // Members
     Problem     *problem   ;
@@ -238,10 +238,10 @@ public:
      */
 
     /**
-     * @brief SSSPEnactor constructor
+     * @brief VNEnactor constructor
      */
     Enactor() :
-        BaseEnactor("sssp"),
+        BaseEnactor("vn"),
         problem    (NULL  )
     {
         this -> max_num_vertex_associates
@@ -250,7 +250,7 @@ public:
     }
 
     /**
-     * @brief SSSPEnactor destructor
+     * @brief VNEnactor destructor
      */
     virtual ~Enactor()
     {
@@ -316,33 +316,45 @@ public:
 
     /**
      * @brief Reset enactor
-     * @param[in] src Source node to start primitive.
+     * @param[in] srcs Source nodes to start primitive.
      * @param[in] target Target location of data
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Reset(VertexT src, util::Location target = util::DEVICE)
+    cudaError_t Reset(VertexT *srcs, SizeT num_srcs, util::Location target = util::DEVICE)
     {
         typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
+                
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
-            if ((this->num_gpus == 1) ||
-                (gpu == this->problem->org_graph->GpT::partition_table[src]))
+            if ((this->num_gpus == 1))
+            // if ((this->num_gpus == 1) ||
+            //     (gpu == this->problem->org_graph->GpT::partition_table[src])) // TODO -- finish multiGPU implementation
             {
-                this -> thread_slices[gpu].init_size = 1;
+                this -> thread_slices[gpu].init_size = num_srcs;
                 for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
                 {
                     auto &frontier = this ->
                         enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                    frontier.queue_length = (peer_ == 0) ? 1 : 0;
+                    
+                    frontier.queue_length = (peer_ == 0) ? num_srcs : 0;
                     if (peer_ == 0)
                     {
-                        GUARD_CU(frontier.V_Q() -> ForEach(
-                            [src]__host__ __device__ (VertexT &v)
-                        {
+                        // Copy `srcs` to GPU
+                        util::Array1D<SizeT, VertexT> tmp_srcs;
+                        tmp_srcs.Allocate(num_srcs, target | util::HOST);
+                        for(SizeT i = 0; i < num_srcs; ++i) {
+                            tmp_srcs[i] = srcs[i];
+                        }
+                        GUARD_CU(tmp_srcs.Move(util::HOST, target));
+                        
+                        GUARD_CU(frontier.V_Q() -> ForEach(tmp_srcs,
+                            []__host__ __device__ (VertexT &v, VertexT &src) {
                             v = src;
-                        }, 1, target, 0));
+                        }, num_srcs, target, 0));
+                        
+                        tmp_srcs.Release();
                     }
                 }
             }
@@ -361,7 +373,7 @@ public:
     }
 
     /**
-      * @brief one run of sssp, to be called within GunrockThread
+      * @brief one run of vn, to be called within GunrockThread
       * @param thread_data Data for the CPU thread
       * \return cudaError_t error message(s), if any
       */
@@ -375,22 +387,22 @@ public:
     }
 
     /**
-     * @brief Enacts a SSSP computing on the specified graph.
+     * @brief Enacts a vn computing on the specified graph.
      * @param[in] src Source node to start primitive.
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Enact(VertexT src)
+    cudaError_t Enact(VertexT *srcs)
     {
         cudaError_t  retval     = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));
-        util::PrintMsg("GPU SSSP Done.", this -> flag & Debug);
+        util::PrintMsg("GPU VN Done.", this -> flag & Debug);
         return retval;
     }
 
     /** @} */
 };
 
-} // namespace sssp
+} // namespace vn
 } // namespace app
 } // namespace gunrock
 

@@ -7,12 +7,12 @@
 
 /**
  * @file
- * test_sssp.cu
+ * test_vn.cu
  *
  * @brief Simple test driver program for single source shortest path.
  */
 
-#include <gunrock/app/sssp/sssp_app.cu>
+#include <gunrock/app/vn/vn_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
@@ -53,59 +53,57 @@ struct main_struct
 
         cpu_timer.Start();
         GUARD_CU(graphio::LoadGraph(parameters, graph));
-        // force edge values to be 1, don't enable this unless you really want to
-        //for (SizeT e=0; e < graph.edges; e++)
-        //    graph.CsrT::edge_values[e] = 1;
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
-        //GUARD_CU(graph.CsrT::edge_values.Print("", 100)); 
-        //util::PrintMsg("sizeof(VertexT) = " + std::to_string(sizeof(VertexT))
-        //    + ", sizeof(SizeT) = " + std::to_string(sizeof(SizeT))
-        //    + ", sizeof(ValueT) = " + std::to_string(sizeof(ValueT)));
 
         GUARD_CU(app::Set_Srcs    (parameters, graph));
-        ValueT  **ref_distances = NULL;
+        ValueT  *ref_distances = NULL;
         int num_srcs = 0;
         bool quick = parameters.Get<bool>("quick");
-        // compute reference CPU SSSP solution for source-distance
+        // compute reference CPU vn solution for source-distance
         if (!quick)
         {
             bool quiet = parameters.Get<bool>("quiet");
-            std::string validation = parameters.Get<std::string>("validation");
+            
             util::PrintMsg("Computing reference value ...", !quiet);
-            std::vector<VertexT> srcs
+            std::vector<VertexT> srcs_vector
                 = parameters.Get<std::vector<VertexT> >("srcs");
-            num_srcs = srcs.size();
-            SizeT nodes = graph.nodes;
-            ref_distances = new ValueT*[num_srcs];
-            for (int i = 0; i < num_srcs; i++)
-            {
-                ref_distances[i] = (ValueT*)malloc(sizeof(ValueT) * nodes);
-                VertexT src = srcs[i];
-                util::PrintMsg("__________________________", !quiet);
-                float elapsed = app::sssp::CPU_Reference(
-                    graph.csr(), ref_distances[i], NULL,
-                    src, quiet, false);
-                util::PrintMsg("--------------------------\nRun "
-                    + std::to_string(i) + " elapsed: "
-                    + std::to_string(elapsed) + " ms, src = "
-                    + std::to_string(src), !quiet);
+            num_srcs = srcs_vector.size();
+            printf("srcs_vector | num_srcs=%d\n", num_srcs);
+            
+            VertexT *srcs = new VertexT[num_srcs];
+            for(SizeT i = 0; i < num_srcs; ++i) {
+                srcs[i] = srcs_vector[i];
+                printf("test_vn srcs[i]=%d\n", srcs[i]);
             }
+            
+            SizeT nodes = graph.nodes;
+            ref_distances = new ValueT[nodes];
+            
+            util::PrintMsg("__________________________", !quiet);
+            float elapsed = app::vn::CPU_Reference(
+                graph.csr(), ref_distances, NULL,
+                srcs, num_srcs, quiet, false);
+            
+            std::string src_msg = "";
+            for(SizeT i = 0; i < num_srcs; ++i) {
+                src_msg += std::to_string(srcs[i]);
+                if(i != num_srcs - 1) src_msg += ",";
+            }
+            util::PrintMsg("--------------------------\nRun 0 elapsed: "
+                + std::to_string(elapsed) + " ms, srcs = "
+                + src_msg, !quiet);
         }
 
         std::vector<std::string> switches{"mark-pred", "advance-mode"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [ref_distances](util::Parameters &parameters, GraphT &graph)
             {
-                return app::sssp::RunTests(parameters, graph, ref_distances);
+                return app::vn::RunTests(parameters, graph, ref_distances);
             }));
 
         if (!quick)
         {
-            for (int i = 0; i < num_srcs; i ++)
-            {
-                free(ref_distances[i]); ref_distances[i] = NULL;
-            }
             delete[] ref_distances; ref_distances = NULL;
         }
         return retval;
@@ -115,9 +113,9 @@ struct main_struct
 int main(int argc, char** argv)
 {
     cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test sssp");
+    util::Parameters parameters("test vn");
     GUARD_CU(graphio::UseParameters(parameters));
-    GUARD_CU(app::sssp::UseParameters(parameters));
+    GUARD_CU(app::vn::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
     GUARD_CU(parameters.Parse_CommandLine(argc, argv));
     if (parameters.Get<bool>("help"))

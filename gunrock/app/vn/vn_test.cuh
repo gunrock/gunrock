@@ -7,36 +7,28 @@
 
 /**
  * @file
- * sssp_test.cu
+ * vn_test.cu
  *
- * @brief Test related functions for SSSP
+ * @brief Test related functions for vn
  */
 
 #pragma once
 
-#ifdef BOOST_FOUND
-    // Boost includes for CPU Dijkstra SSSP reference algorithms
-    #include <boost/config.hpp>
-    #include <boost/graph/graph_traits.hpp>
-    #include <boost/graph/adjacency_list.hpp>
-    #include <boost/graph/dijkstra_shortest_paths.hpp>
-    #include <boost/property_map/property_map.hpp>
-#else
-    #include <queue>
-    #include <vector>
-    #include <utility>
-#endif
+#include <iostream>
+#include <queue>
+#include <vector>
+#include <utility>
 
 namespace gunrock {
 namespace app {
-namespace sssp {
+namespace vn {
 
 /******************************************************************************
  * Housekeeping Routines
  ******************************************************************************/
 
 /**
- * @brief Displays the SSSP result (i.e., distance from source)
+ * @brief Displays the vn result (i.e., distance from source)
  * @tparam T Type of values to display
  * @tparam SizeT Type of size counters
  * @param[in] preds Search depth from the source for each node.
@@ -58,20 +50,20 @@ void DisplaySolution(T *array, SizeT length)
 }
 
 /******************************************************************************
- * SSSP Testing Routines
+ * vn Testing Routines
  *****************************************************************************/
 
 /**
- * @brief Simple CPU-based reference SSSP implementations
+ * @brief Simple CPU-based reference vn implementations
  * @tparam      GraphT        Type of the graph
  * @tparam      ValueT        Type of the distances
  * @param[in]   graph         Input graph
  * @param[out]  distances     Computed distances from the source to each vertex
  * @param[out]  preds         Computed predecessors for each vertex
- * @param[in]   src           The source vertex
+ * @param[in]   srcs          The source vertex array
  * @param[in]   quiet         Whether to print out anything to stdout
  * @param[in]   mark_preds    Whether to compute predecessor info
- * \return      double        Time taken for the SSSP
+ * \return      double        Time taken for the vn
  */
 template <
     typename GraphT,
@@ -80,118 +72,12 @@ double CPU_Reference(
     const    GraphT          &graph,
                      ValueT  *distances,
     typename GraphT::VertexT *preds,
-    typename GraphT::VertexT  src,
+    typename GraphT::VertexT *srcs,
+    typename GraphT::SizeT    num_srcs,
     bool                      quiet,
     bool                      mark_preds)
 {
-#ifdef BOOST_FOUND
-    using namespace boost;
-    typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::SizeT   SizeT;
-    typedef typename GraphT::ValueT  GValueT;
-    typedef typename GraphT::CsrT    CsrT;
 
-    // Prepare Boost Datatype and Data structure
-    typedef adjacency_list<vecS, vecS, directedS, no_property,
-            property <edge_weight_t, GValueT> > BGraphT;
-
-    typedef typename graph_traits<BGraphT>::vertex_descriptor vertex_descriptor;
-    typedef typename graph_traits<BGraphT>::edge_descriptor edge_descriptor;
-
-    typedef std::pair<VertexT, VertexT> EdgeT;
-
-    EdgeT   *edges = ( EdgeT*)malloc(sizeof( EdgeT) * graph.edges);
-    GValueT *weight = (GValueT*)malloc(sizeof(GValueT) * graph.edges);
-
-    for (VertexT v = 0; v < graph.nodes; ++v)
-    {
-        SizeT edge_start = graph.CsrT::GetNeighborListOffset(v);
-        SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-        for (SizeT e = 0; e < num_neighbors; ++e)
-        {
-            edges [e + edge_start] = EdgeT(v, graph.CsrT::GetEdgeDest(e + edge_start));
-            weight[e + edge_start] = graph.CsrT::edge_values[e + edge_start];
-        }
-    }
-
-    BGraphT g(edges, edges + graph.edges, weight, graph.nodes);
-
-    std::vector<ValueT>            d(graph.nodes);
-    std::vector<vertex_descriptor> p(graph.nodes);
-    vertex_descriptor s = vertex(src, g);
-
-    typename property_map<BGraphT, vertex_index_t>::type
-        indexmap = get(vertex_index, g);
-
-    //
-    // Perform SSSP
-    //
-
-    util::CpuTimer cpu_timer;
-    cpu_timer.Start();
-
-    if (mark_preds)
-    {
-        dijkstra_shortest_paths(g, s,
-            predecessor_map(boost::make_iterator_property_map(
-                p.begin(), get(boost::vertex_index, g))).distance_map(
-                    boost::make_iterator_property_map(
-                        d.begin(), get(boost::vertex_index, g))));
-    }
-    else
-    {
-        dijkstra_shortest_paths(g, s,
-            distance_map(boost::make_iterator_property_map(
-                d.begin(), get(boost::vertex_index, g))));
-    }
-    cpu_timer.Stop();
-    float elapsed = cpu_timer.ElapsedMillis();
-
-    //util::PrintMsg("CPU SSSP finished in " + std::to_string(elapsed)
-    //    + " msec.", !quiet);
-
-    typedef std::pair<VertexT, ValueT> PairT;
-    PairT* sort_dist = new PairT[graph.nodes];
-    typename graph_traits <BGraphT>::vertex_iterator vi, vend;
-    for (tie(vi, vend) = vertices(g); vi != vend; ++vi)
-    {
-        sort_dist[(*vi)].first  = (*vi);
-        sort_dist[(*vi)].second = d[(*vi)];
-    }
-    std::stable_sort(
-        sort_dist, sort_dist + graph.nodes,
-        //RowFirstTupleCompare<Coo<Value, Value> >);
-        [](const PairT &a, const PairT &b) -> bool
-        {
-            return a.first < b.first;
-        });
-    for (VertexT v = 0; v < graph.nodes; ++v)
-        distances[v] = sort_dist[v].second;
-    delete[] sort_dist; sort_dist = NULL;
-
-    if (mark_preds)
-    {
-        typedef std::pair<VertexT, VertexT> VPairT;
-        VPairT* sort_pred = new VPairT[graph.nodes];
-        for (tie(vi, vend) = vertices(g); vi != vend; ++vi)
-        {
-            sort_pred[(*vi)].first  = (*vi);
-            sort_pred[(*vi)].second = p[(*vi)];
-        }
-        std::stable_sort(
-            sort_pred, sort_pred + graph.nodes,
-            //RowFirstTupleCompare< Coo<VertexId, VertexId> >);
-            [](const VPairT &a, const VPairT &b) -> bool
-            {
-                return a.first < b.first;
-            });
-        for (VertexT v = 0; v < graph.nodes; ++v)
-            preds[v] = sort_pred[v].second;
-        delete[] sort_pred; sort_pred = NULL;
-    }
-
-    return elapsed;
-#else
 
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
@@ -211,12 +97,18 @@ double CPU_Reference(
         if (mark_preds && preds != NULL)
             preds[v] = util::PreDefinedValues<VertexT>::InvalidValue;
     }
-    distances[src] = 0;
-    if (mark_preds && preds != NULL)
-        preds[src] = src;
-
+    
     PqT pq;
-    pq.push(std::make_pair(src, 0));
+
+    printf("CPU num_srcs=%d\n", num_srcs);
+    for(int i = 0; i < num_srcs; ++i) {
+        distances[srcs[i]] = 0;    
+        if (mark_preds && preds != NULL)
+            preds[srcs[i]] = srcs[i];
+        
+        pq.push(std::make_pair(srcs[i], 0));
+    }
+    
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
     while (!pq.empty())
@@ -245,15 +137,15 @@ double CPU_Reference(
     }
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
-    //util::PrintMsg("CPU SSSP finished in " + std::to_string(elapsed)
+    //util::PrintMsg("CPU VN finished in " + std::to_string(elapsed)
     //    + " msec.", !quiet);
 
     return elapsed;
-#endif
+
 }
 
 /**
- * @brief Validation of SSSP results
+ * @brief Validation of vn results
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the distances
  * @param[in]  parameters    Excution parameters
@@ -272,7 +164,7 @@ template <
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
-    typename GraphT::VertexT   src,
+    typename GraphT::VertexT  *srcs,
                      ValueT   *h_distances,
     typename GraphT::VertexT  *h_preds,
                      ValueT   *ref_distances = NULL,
@@ -287,7 +179,8 @@ typename GraphT::SizeT Validate_Results(
     //bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
     bool mark_pred = parameters.Get<bool>("mark-pred");
-
+    SizeT num_srcs = sizeof(srcs) / sizeof(srcs[0]);
+    
     // Verify the result
     if (ref_distances != NULL)
     {
@@ -368,8 +261,18 @@ typename GraphT::SizeT Validate_Results(
         for (VertexT v = 0; v < graph.nodes; v++)
         {
             VertexT pred          = h_preds[v];
-            if (!util::isValid(pred) || v == src)
+            
+            bool do_continue;
+            do_continue = false;
+            for(SizeT i = 0; i < num_srcs; ++i) {
+                if(v == srcs[i]) {
+                    do_continue = true;
+                }
+            }
+            
+            if (!util::isValid(pred) || do_continue)
                 continue;
+            
             ValueT  v_distance    = h_distances[v];
             if (v_distance == util::PreDefinedValues<ValueT>::MaxValue)
                 continue;
@@ -425,7 +328,7 @@ typename GraphT::SizeT Validate_Results(
     return num_errors;
 }
 
-} // namespace sssp
+} // namespace vn
 } // namespace app
 } // namespace gunrock
 

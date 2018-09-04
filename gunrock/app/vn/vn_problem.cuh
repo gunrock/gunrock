@@ -7,9 +7,9 @@
 
 /**
  * @file
- * sssp_problem.cuh
+ * vn_problem.cuh
  *
- * @brief GPU Storage management Structure for SSSP Problem Data
+ * @brief GPU Storage management Structure for VN Problem Data
  */
 
 #pragma once
@@ -18,10 +18,10 @@
 
 namespace gunrock {
 namespace app {
-namespace sssp {
+namespace vn {
 
 /**
- * @brief Speciflying parameters for SSSP Problem
+ * @brief Speciflying parameters for VN Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -44,7 +44,7 @@ cudaError_t UseParameters_problem(
 /**
  * @brief Single-Source Shortest Path Problem structure.
  * @tparam _GraphT  Type of the graph
- * @tparam _LabelT  Type of labels used in sssp
+ * @tparam _LabelT  Type of labels used in VN
  * @tparam _ValueT  Type of per-vertex distance values
  * @tparam _FLAG    Problem flags
  */
@@ -70,11 +70,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     //Helper structures
 
     /**
-     * @brief Data structure containing SSSP-specific data on indivual GPU.
+     * @brief Data structure containing VN-specific data on indivual GPU.
      */
     struct DataSlice : BaseDataSlice
     {
-        // sssp-specific storage arrays
+        // VN-specific storage arrays
         util::Array1D<SizeT, ValueT >    distances  ; // source distance
         util::Array1D<SizeT, LabelT >    labels     ; // labels to mark latest iteration the vertex been visited
         util::Array1D<SizeT, VertexT>    preds      ; // predecessors of vertices
@@ -119,7 +119,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         }
 
         /**
-         * @brief initializing sssp-specific data on each gpu
+         * @brief initializing VN-specific data on each gpu
          * @param     sub_graph   Sub graph on the GPU.
          * @param[in] num_gpus    Number of GPUs
          * @param[in] gpu_idx     GPU device index
@@ -208,7 +208,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     // Methods
 
     /**
-     * @brief SSSPProblem default constructor
+     * @brief VNProblem default constructor
      */
     Problem(
         util::Parameters &_parameters,
@@ -219,7 +219,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     }
 
     /**
-     * @brief SSSPProblem default destructor
+     * @brief VNProblem default destructor
      */
     virtual ~Problem()
     {
@@ -343,7 +343,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     /**
      * @brief initialization function.
-     * @param     graph       The graph that SSSP processes on
+     * @param     graph       The graph that VN processes on
      * @param[in] Location    Memory location to work on
      * \return    cudaError_t Error message(s), if any
      */
@@ -381,7 +381,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
-        VertexT    src,
+        VertexT    *srcs,
+        SizeT      num_srcs,
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -395,18 +396,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
 
-        // Fillin the initial input_queue for SSSP problem
+        // Fillin the initial input_queue for VN problem
         int gpu;
-        VertexT src_;
+        VertexT *srcs_;
         if (this->num_gpus <= 1)
         {
-            gpu = 0; src_=src;
+            gpu = 0; srcs_=srcs;
         } else {
-            gpu = this -> org_graph -> partition_table[src];
-            if (this -> flag & partitioner::Keep_Node_Num)
-                src_ = src;
-            else
-                src_ = this -> org_graph -> GpT::convertion_table[src];
+            // <TODO> finish multiGPU implementation
+            // gpu = this -> org_graph -> partition_table[src];
+            // if (this -> flag & partitioner::Keep_Node_Num)
+            //     src_ = src;
+            // else
+            //     src_ = this -> org_graph -> GpT::convertion_table[src];
+            // </TODO>
         }
         if (target & util::DEVICE)
         {
@@ -415,35 +418,41 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 "cudaDeviceSynchronize failed");
         }
 
-        ValueT src_distance = 0;
-        if (target & util::HOST)
-        {
-            data_slices[gpu] -> distances[src_] = src_distance;
-            if (this -> flag & Mark_Predecessors)
-                data_slices[gpu] -> preds[src_]
-                    = util::PreDefinedValues<VertexT>::InvalidValue;
-        }
+        // <TODO> Is there a preferable way to do this in parallel?
+        for(SizeT i = 0; i < num_srcs; ++i) {
+            VertexT src_ = srcs_[i];
 
-        if (target & util::DEVICE)
-        {
-            GUARD_CU2(cudaMemcpy(
-                data_slices[gpu]->distances.GetPointer(util::DEVICE) + src_,
-                &src_distance, sizeof(ValueT),
-                cudaMemcpyHostToDevice),
-                "SSSPProblem cudaMemcpy distances failed");
-
-            if (this -> flag & Mark_Predecessors)
+            ValueT src_distance = 0;
+            if (target & util::HOST)
             {
-                VertexT src_pred = util::PreDefinedValues<VertexT>::InvalidValue;
-                GUARD_CU2(cudaMemcpy(
-                    data_slices[gpu]->preds.GetPointer(util::DEVICE) + src_,
-                    &src_pred, sizeof(VertexT),
-                    cudaMemcpyHostToDevice),
-                    "SSSPProblem cudaMemcpy preds failed");
+                data_slices[gpu] -> distances[src_] = src_distance;
+                if (this -> flag & Mark_Predecessors)
+                    data_slices[gpu] -> preds[src_]
+                        = util::PreDefinedValues<VertexT>::InvalidValue;
             }
-            GUARD_CU2(cudaDeviceSynchronize(),
-                "cudaDeviceSynchronize failed");
+
+            if (target & util::DEVICE)
+            {
+                GUARD_CU2(cudaMemcpy(
+                    data_slices[gpu]->distances.GetPointer(util::DEVICE) + src_,
+                    &src_distance, sizeof(ValueT),
+                    cudaMemcpyHostToDevice),
+                    "VNProblem cudaMemcpy distances failed");
+
+                if (this -> flag & Mark_Predecessors)
+                {
+                    VertexT src_pred = util::PreDefinedValues<VertexT>::InvalidValue;
+                    GUARD_CU2(cudaMemcpy(
+                        data_slices[gpu]->preds.GetPointer(util::DEVICE) + src_,
+                        &src_pred, sizeof(VertexT),
+                        cudaMemcpyHostToDevice),
+                        "VNProblem cudaMemcpy preds failed");
+                }
+                GUARD_CU2(cudaDeviceSynchronize(),
+                    "cudaDeviceSynchronize failed");
+            }
         }
+        // </TODO>
 
         return retval;
     }
@@ -451,7 +460,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     /** @} */
 };
 
-} //namespace sssp
+} //namespace vn
 } //namespace app
 } //namespace gunrock
 
