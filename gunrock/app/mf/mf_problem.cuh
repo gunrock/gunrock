@@ -139,13 +139,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          */
         cudaError_t Init(
             GraphT        &sub_graph,
+	    int		   num_gpus= 1,
             int            gpu_idx = 0,
             util::Location target  = util::DEVICE,
             ProblemFlag    flag    = Problem_None)
         {
             cudaError_t retval  = cudaSuccess;
 
-            GUARD_CU(BaseDataSlice::Init(sub_graph, gpu_idx, target, flag));
+            GUARD_CU(BaseDataSlice::Init(
+		    sub_graph, num_gpus, gpu_idx, target, flag));
 
             // TODO: allocate problem specific data here, e.g.:
             // GUARD_CU(distances .Allocate(sub_graph.nodes, target));
