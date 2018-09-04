@@ -59,7 +59,9 @@ cudaError_t UseParameters(
         graph_prefix + "random-edge-values",
         util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         false,
-        "Whether " + graph_prefix + " graph edge values are randomly generate",
+        "If true, " + graph_prefix + 
+        " graph edge values are randomly generated when missing. " +
+        "If false, they are set to 1.",
         __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<float>(
