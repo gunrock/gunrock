@@ -277,10 +277,10 @@ double sssp(
     GraphT graph;
     // Assign pointers into gunrock graph format
     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    graph.CsrT::row_offsets   .SetPointer(row_offsets, gunrock::util::HOST);
-    graph.CsrT::column_indices.SetPointer(col_indices, gunrock::util::HOST);
-    graph.CsrT::edge_values   .SetPointer(edge_values, gunrock::util::HOST);
-    graph.FromCsr(graph.csr(), true, quiet);
+    graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
+    graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
+    graph.CsrT::edge_values   .SetPointer(edge_values, num_edges, gunrock::util::HOST);
+    // graph.FromCsr(graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, graph);
 
     // Run the SSSP
