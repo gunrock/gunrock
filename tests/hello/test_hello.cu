@@ -7,15 +7,17 @@
 
 /**
  * @file
- * test_sssp.cu
+ * test_hello.cu
  *
  * @brief Simple test driver program for Gunrock template.
  */
 
-#include <gunrock/app/Template/Template_app.cu>
+#include <gunrock/app/hello/hello_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
+
+namespace APP_NAMESPACE = app::hello;
 
 /******************************************************************************
 * Main
@@ -42,79 +44,71 @@ struct main_struct
     cudaError_t operator()(util::Parameters &parameters,
         VertexT v, SizeT s, ValueT val)
     {
+        // CLI parameters        
+        bool quick = parameters.Get<bool>("quick");
+        bool quiet = parameters.Get<bool>("quiet");
+
         typedef typename app::TestGraph<VertexT, SizeT, ValueT,
             graph::HAS_EDGE_VALUES | graph::HAS_CSR>
             GraphT;
 
         cudaError_t retval = cudaSuccess;
         util::CpuTimer cpu_timer;
-        GraphT graph; // graph we process on
+        GraphT graph;
 
         cpu_timer.Start();
         GUARD_CU(graphio::LoadGraph(parameters, graph));
-        // force edge values to be 1, don't enable this unless you really want to
-        //for (SizeT e=0; e < graph.edges; e++)
-        //    graph.CsrT::edge_values[e] = 1;
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        // TODO: get srcs if needed, e.g.:
-        GUARD_CU(app::Set_Srcs    (parameters, graph));
-        int num_srcs = 0;
+        // <TODO> get srcs if needed, e.g.:
+        // GUARD_CU(app::Set_Srcs (parameters, graph));
+        // std::vector<VertexT> srcs
+        //    = parameters.Get<std::vector<VertexT> >("srcs");
+        // int num_srcs = srcs.size();
+        // </TODO>
+        
+        // <TODO> declare datastructures for reference result on GPU
+        ValueT *ref_degrees;
+        // </TODO>
+        
+        if (!quick) {
+            // <TODO> init datastructures for reference result on GPU
+            ref_degrees = new ValueT[graph.nodes];
+            // </TODO>
 
-        // TODO: reference result on CPU, e.e.:
-        // ValueT  **ref_distances = NULL;
-        bool quick = parameters.Get<bool>("quick");
-        // compute reference CPU SSSP solution for source-distance
-        if (!quick)
-        {
-            bool quiet = parameters.Get<bool>("quiet");
-            std::string validation = parameters.Get<std::string>("validation");
-            util::PrintMsg("Computing reference value ...", !quiet);
-
-            // TODO: get srcs if needed, e.g.:
-            // std::vector<VertexT> srcs
-            //    = parameters.Get<std::vector<VertexT> >("srcs");
-            // num_srcs = srcs.size();
-
-            // SizeT nodes = graph.nodes;
-            // TODO: problem specific data, e.g.:
-            // ref_distances = new ValueT*[num_srcs];
-            for (int i = 0; i < num_srcs; i++)
-            {
-                // ref_distances[i] = new ValueT[nodes];
-                // VertexT src = srcs[i];
-                util::PrintMsg("__________________________", !quiet);
-                float elapsed = app::Template::CPU_Reference(
-                    graph.csr(),
-                    // TODO: add problem specific data, e.g.:
-                    // ref_distances[i], NULL, src,
-                    quiet);
-                util::PrintMsg("--------------------------\nRun "
-                    + std::to_string(i) + " elapsed: "
-                    + std::to_string(elapsed)
-                    //+ " ms, src = " + std::to_string(src)
-                    , !quiet);
-            }
+            // If not in `quick` mode, compute CPU reference implementation
+            util::PrintMsg("__________________________", !quiet);
+            
+            float elapsed = app::hello::CPU_Reference(
+                graph.csr(),
+                ref_degrees,
+                quiet);
+            
+            util::PrintMsg("--------------------------\n Elapsed: "
+                + std::to_string(elapsed), !quiet);
         }
 
-        // TODO: add other switching parameters, if needed
+        // <TODO> add other switching parameters, if needed
         std::vector<std::string> switches{"advance-mode"};
-        // TODO: add problem specific data
+        // </TODO>
+        
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [/*ref_distances*/](util::Parameters &parameters, GraphT &graph)
+            [
+                // </TODO> pass necessary data to lambda
+                ref_degrees
+                // </TODO>
+            ](util::Parameters &parameters, GraphT &graph)
             {
-                return app::Template::RunTests(parameters, graph/*, ref_distances*/);
+                // <TODO> pass necessary data to app::Template::RunTests
+                return app::hello::RunTests(parameters, graph, ref_degrees, util::DEVICE);
+                // </TODO>
             }));
 
-        if (!quick)
-        {
-            // TODO: deallocate host references, e.g.:
-            // for (int i = 0; i < num_srcs; i ++)
-            // {
-            //    delete[] ref_distances[i]; ref_distances[i] = NULL;
-            // }
-            // delete[] ref_distances; ref_distances = NULL;
+        if (!quick) {
+            // <TODO> deallocate host references
+            delete[] ref_degrees; ref_degrees = NULL;
+            // </TODO>
         }
         return retval;
     }
@@ -123,9 +117,9 @@ struct main_struct
 int main(int argc, char** argv)
 {
     cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test Template");
+    util::Parameters parameters("test hello");
     GUARD_CU(graphio::UseParameters(parameters));
-    GUARD_CU(app::Template::UseParameters(parameters));
+    GUARD_CU(app::hello::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
     GUARD_CU(parameters.Parse_CommandLine(argc, argv));
     if (parameters.Get<bool>("help"))
