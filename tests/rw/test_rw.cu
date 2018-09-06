@@ -12,12 +12,12 @@
  * @brief Simple test driver program for Gunrock template.
  */
 
-#include <gunrock/app/hello/hello_app.cu>
+#include <gunrock/app/rw/rw_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
 
-namespace APP_NAMESPACE = app::hello;
+namespace APP_NAMESPACE = app::rw;
 
 /******************************************************************************
 * Main
@@ -61,54 +61,53 @@ struct main_struct
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        // <TODO> get srcs if needed, e.g.:
-        // GUARD_CU(app::Set_Srcs (parameters, graph));
-        // std::vector<VertexT> srcs
-        //    = parameters.Get<std::vector<VertexT> >("srcs");
-        // int num_srcs = srcs.size();
-        // </TODO>
+        // <OPEN> get srcs if needed, e.g.:
+        // Probably we just want to do walks from a certain set of nodes?
+        // </OPEN>
         
-        // <TODO> declare datastructures for reference result on GPU
-        ValueT *ref_degrees;
-        // </TODO>
+        // <DONE> declare datastructures for reference result on GPU
+        int walk_length = parameters.Get<int>("walk-length");
+        VertexT *ref_walks;
+        // </DONE>
         
         if (!quick) {
-            // <TODO> init datastructures for reference result on GPU
-            ref_degrees = new ValueT[graph.nodes];
-            // </TODO>
+            // <DONE> init datastructures for reference result on GPU
+            ref_walks = new VertexT[graph.nodes * walk_length];
+            // </DONE>
 
             // If not in `quick` mode, compute CPU reference implementation
             util::PrintMsg("__________________________", !quiet);
             
-            float elapsed = app::hello::CPU_Reference(
+            float elapsed = APP_NAMESPACE::CPU_Reference(
                 graph.csr(),
-                ref_degrees,
+                walk_length,
+                ref_walks,
                 quiet);
             
             util::PrintMsg("--------------------------\n Elapsed: "
                 + std::to_string(elapsed), !quiet);
         }
 
-        // <TODO> add other switching parameters, if needed
+        // <DONE> add other switching parameters, if needed
         std::vector<std::string> switches{"advance-mode"};
-        // </TODO>
+        // </DONE>
         
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
-                // </TODO> pass necessary data to lambda
-                ref_degrees
-                // </TODO>
+                // </DONE> pass necessary data to lambda
+                walk_length, ref_walks
+                // </DONE>
             ](util::Parameters &parameters, GraphT &graph)
             {
-                // <TODO> pass necessary data to app::Template::RunTests
-                return app::hello::RunTests(parameters, graph, ref_degrees, util::DEVICE);
-                // </TODO>
+                // <DONE> pass necessary data to app::Template::RunTests
+                return APP_NAMESPACE::RunTests(parameters, graph, walk_length, ref_walks, util::DEVICE);
+                // </DONE>
             }));
 
         if (!quick) {
-            // <TODO> deallocate host references
-            delete[] ref_degrees; ref_degrees = NULL;
-            // </TODO>
+            // <DONE> deallocate host references
+            delete[] ref_walks; ref_walks = NULL;
+            // </DONE>
         }
         return retval;
     }
@@ -117,9 +116,9 @@ struct main_struct
 int main(int argc, char** argv)
 {
     cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test hello");
+    util::Parameters parameters("test rw");
     GUARD_CU(graphio::UseParameters(parameters));
-    GUARD_CU(app::hello::UseParameters(parameters));
+    GUARD_CU(APP_NAMESPACE::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
     GUARD_CU(parameters.Parse_CommandLine(argc, argv));
     if (parameters.Get<bool>("help"))

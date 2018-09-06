@@ -18,17 +18,20 @@
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
- 
-// <TODO> change includes
-#include <gunrock/app/hello/hello_problem.cuh>
-// </TODO>
+
+// <DONE> change includes
+#include <gunrock/app/rw/rw_problem.cuh>
+#include <math.h>
+#include <curand.h>
+#include <curand_kernel.h>
+// </DONE>
 
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
-namespace hello {
-// </TODO>
+// <DONE> change namespace
+namespace rw {
+// </DONE>
 
 /**
  * @brief Speciflying parameters for hello Enactor
@@ -40,8 +43,8 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
 
-    // <TODO> if needed, add command line parameters used by the enactor here
-    // </TODO>
+    // <DONE> if needed, add command line parameters used by the enactor here
+    // </DONE>
     
     return retval;
 }
@@ -51,12 +54,12 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct helloIterationLoop : public IterationLoopBase
+struct RWIterationLoop : public IterationLoopBase
     <EnactorT, Use_FullQ | Push
-    // <TODO>if needed, stack more option, e.g.:
+    // <OPEN>if needed, stack more option, e.g.:
     // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
     // Update_Predecessors : 0x0)
-    // </TODO>
+    // </OPEN>
     >
 {
     typedef typename EnactorT::VertexT VertexT;
@@ -67,13 +70,13 @@ struct helloIterationLoop : public IterationLoopBase
     
     typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push
-        // <TODO> add the same options as in template parameters here, e.g.:
+        // <OPEN> add the same options as in template parameters here, e.g.:
         // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
         // Update_Predecessors : 0x0)
-        // </TODO>
+        // </OPEN>
         > BaseIterationLoop;
 
-    helloIterationLoop() : BaseIterationLoop() {}
+    RWIterationLoop() : BaseIterationLoop() {}
 
     /**
      * @brief Core computation of hello, one iteration
@@ -98,82 +101,50 @@ struct helloIterationLoop : public IterationLoopBase
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
         
-        // <TODO> add problem specific data alias here:
-        auto &degrees = data_slice.degrees;
-        auto &visited = data_slice.visited;
-        // </TODO>
+        // <DONE> add problem specific data alias here:
+        auto &walks       = data_slice.walks;
+        auto &rand        = data_slice.rand;
+        auto &walk_length = data_slice.walk_length;
+        auto &gen         = data_slice.gen;
+        // </DONE>
         
-        // --
-        // Define operations
+        curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
+        
+        GUARD_CU(frontier.V_Q()->ForAll(
+          [
+            graph,
+            walks,
+            rand,
+            iteration,
+            walk_length
+          ] __host__ __device__ (VertexT *v, const SizeT &i) {
+          
+          SizeT write_idx  = (i * walk_length) + iteration; // Write location in RW array
+          walks[write_idx] = v[i];                          // record current position in walk
+          
+          if(iteration < walk_length - 1) {
+            // Determine next neighbor to walk to
+            SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
+            SizeT offset        = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
+            VertexT neighbor    = graph.GetEdgeDest(graph.GetNeighborListOffset(v[i]) + offset);
+            v[i]                = neighbor; // Replace vertex w/ neighbor in queue            
+          }
+          
+        }, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));          
 
-        // advance operation
-        auto advance_op = [
-            // <TODO> pass data to lambda
-            degrees,
-            visited
-            // </TODO>
-        ] __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            // <TODO> Implement advance operation
-                        
-            // Mark src and dest as visited
-            atomicMax(visited + src, 1);
-            auto dest_visited = atomicMax(visited + dest, 1);
-            
-            // Increment degree of src
-            atomicAdd(degrees + src, 1);
-            
-            // Add dest to queue if previously unsen
-            return dest_visited == 0;
-            
-            // </TODO>
-        };
-
-        // filter operation
-        auto filter_op = [
-            // <TODO> pass data to lambda
-            // </TODO>
-        ] __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            // <TODO> implement filter operation
-            return true;
-            // </TODO>
-        };
-        
-        // --
-        // Run
-        
-        // <TODO> some of this may need to be edited depending on algorithmic needs
-        // !! How much variation between apps is there in these calls?
-        
-        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, advance_op, filter_op));
-        
-        if (oprtr_parameters.advance_mode != "LB_CULL" &&
-            oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
-        {
-            frontier.queue_reset = false;
-            GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-                oprtr_parameters, filter_op));
-        }
-
-        // Get back the resulted frontier length
-        GUARD_CU(frontier.work_progress.GetQueueLength(
-            frontier.queue_index, frontier.queue_length,
-            false, oprtr_parameters.stream, true));
-
-        // </TODO>
-        
         return retval;
     }
+
+    bool Stop_Condition(int gpu_num = 0)
+    {
+      auto &data_slice = this -> enactor ->
+            problem -> data_slices[this -> gpu_num][0];
+      auto &enactor_slices = this -> enactor -> enactor_slices;
+      auto iter = enactor_slices[0].enactor_stats.iteration;
+      
+      return iter == data_slice.walk_length;
+    }
+    
 
     /**
      * @brief Routine to combine received data and local data
@@ -220,7 +191,7 @@ struct helloIterationLoop : public IterationLoopBase
             (received_length, peer_, expand_op);
         return retval;
     }
-}; // end of helloIteration
+}; // end of RWIteration
 
 /**
  * @brief Template enactor class.
@@ -235,8 +206,8 @@ template <
 class Enactor :
     public EnactorBase<
         typename _Problem::GraphT,
-        typename _Problem::GraphT::VertexT, // TODO: change to other label types used for the operators, e.g.: typename _Problem::LabelT,
-        typename _Problem::GraphT::ValueT, // TODO: change to other value types used for inter GPU communication, e.g.: typename _Problem::ValueT,
+        typename _Problem::GraphT::VertexT,
+        typename _Problem::GraphT::ValueT,
         ARRAY_FLAG, cudaHostRegisterFlag>
 {
 public:
@@ -250,7 +221,7 @@ public:
         BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> 
         EnactorT;
-    typedef helloIterationLoop<EnactorT> 
+    typedef RWIterationLoop<EnactorT> 
         IterationT;
 
     Problem *problem;
@@ -263,10 +234,10 @@ public:
         BaseEnactor("Template"),
         problem    (NULL  )
     {
-        // <TODO> change according to algorithmic needs
+        // <OPEN> change according to algorithmic needs
         this -> max_num_vertex_associates = 0;
         this -> max_num_value__associates = 1;
-        // </TODO>
+        // </OPEN>
     }
 
     /**
@@ -304,9 +275,9 @@ public:
         // Lazy initialization
         GUARD_CU(BaseEnactor::Init(
             problem, Enactor_None,
-            // <TODO> change to how many frontier queues, and their types
+            // <OPEN> change to how many frontier queues, and their types
             2, NULL,
-            // </TODO>
+            // </OPEN>
             target, false));
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++) {
             GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
@@ -334,10 +305,10 @@ public:
     cudaError_t Run(ThreadSlice &thread_data)
     {
         gunrock::app::Iteration_Loop<
-            // <TODO> change to how many {VertexT, ValueT} data need to communicate
+            // <OPEN> change to how many {VertexT, ValueT} data need to communicate
             //       per element in the inter-GPU sub-frontiers
             0, 1,
-            // </TODO>
+            // </OPEN>
             IterationT>(
             thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
@@ -350,39 +321,37 @@ public:
      * \return cudaError_t error message(s), if any
      */
     cudaError_t Reset(
-        // <TODO> problem specific data if necessary, eg
-        VertexT src = 0,
-        // </TODO>
+        // <DONE> problem specific data if necessary, eg
+        // </DONE>
         util::Location target = util::DEVICE)
     {
         typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
 
-        // <TODO> Initialize frontiers according to the algorithm:
-        // In this case, we add a single `src` to the frontier
+        auto nodes = this -> problem -> data_slices[0][0].sub_graph[0].nodes;
+        
+        // <PARTIAL> Initialize frontiers according to the algorithm:
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
-           if ((this->num_gpus == 1) ||
-                (gpu == this->problem->org_graph->GpT::partition_table[src])) {
-               this -> thread_slices[gpu].init_size = 1;
+           if (this->num_gpus == 1) {
+               this -> thread_slices[gpu].init_size = nodes;
                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
                    auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                   frontier.queue_length = (peer_ == 0) ? 1 : 0;
+                   frontier.queue_length = (peer_ == 0) ? nodes : 0;
                    if (peer_ == 0) {
-                       GUARD_CU(frontier.V_Q() -> ForEach(
-                           [src]__host__ __device__ (VertexT &v) {
-                           v = src;
-                       }, 1, target, 0));
+                      
+                      // Add all nodes to the frontier
+                      GUARD_CU(frontier.V_Q() -> ForAll([]__host__ __device__ (VertexT *v, const SizeT &i) {
+                        v[i] = i;
+                      }, nodes, target, 0));
+                      
                    }
                }
            } else {
-                this -> thread_slices[gpu].init_size = 0;
-                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
-                    this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier.queue_length = 0;
-                }
+                // MULTIGPU INCOMPLETE
            }
         }
-        // </TODO>
+        // </PARTIAL>
         
         GUARD_CU(BaseEnactor::Sync());
         return retval;
@@ -394,9 +363,8 @@ public:
      * \return cudaError_t error message(s), if any
      */
     cudaError_t Enact(
-        // <TODO> problem specific data if necessary, eg
-        VertexT src = 0
-        // </TODO>
+        // <DONE> problem specific data if necessary, eg
+        // </DONE>
     )
     {
         cudaError_t retval = cudaSuccess;

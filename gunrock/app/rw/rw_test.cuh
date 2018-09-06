@@ -16,9 +16,9 @@
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
-namespace hello {
-// </TODO>
+// <DONE> change namespace
+namespace rw {
+// </DONE>
 
 
 /******************************************************************************
@@ -36,20 +36,21 @@ namespace hello {
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    // <TODO> add problem specific inputs and outputs 
-    typename GraphT::ValueT *degrees,
-    // </TODO>
+    // <DONE> add problem specific inputs and outputs 
+    int walk_length,
+    typename GraphT::VertexT *walks,
+    // </DONE>
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
+    typedef typename GraphT::SizeT VertexT;
     
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
     
     // <TODO> 
-    // implement CPU reference implementation
-    for(SizeT v = 0; v < graph.nodes; ++v) {
-        degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
+    for(SizeT i = 0; i < graph.nodes * walk_length; ++i) {
+        walks[i] = util::PreDefinedValues<VertexT>::InvalidValue;
     }
     // </TODO>
     
@@ -70,11 +71,14 @@ double CPU_Reference(
  */
 template <typename GraphT>
 typename GraphT::SizeT Validate_Results(
-             util::Parameters &parameters,
-             GraphT           &graph,
-             typename GraphT::ValueT *h_degrees,
-             typename GraphT::ValueT *ref_degrees,
-             bool verbose = true)
+            util::Parameters &parameters,
+            GraphT           &graph,
+            // <DONE> add problem specific inputs and outputs 
+            int                       walk_length,
+            typename GraphT::VertexT *h_walks,
+            typename GraphT::VertexT *ref_walks,
+            // </DONE>
+            bool verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
@@ -82,11 +86,16 @@ typename GraphT::SizeT Validate_Results(
     SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
 
-    // <TODO> result validation and display
-    for(SizeT v = 0; v < graph.nodes; ++v) {
-        printf("%d %d %d\n", v, h_degrees[v], ref_degrees[v]);
+    // <DONE> result validation and display
+    printf("[[");
+    for(SizeT v = 0; v < graph.nodes * walk_length; ++v) {
+        if((v > 0) && (v % walk_length == 0)) {
+            printf("],\n[");
+        }
+        printf("%d, ", h_walks[v]);
     }
-    // </TODO>
+    printf("]]\n");
+    // </DONE>
 
     if(num_errors == 0) {
        util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
