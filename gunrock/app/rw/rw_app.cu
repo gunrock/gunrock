@@ -43,6 +43,13 @@ cudaError_t UseParameters(util::Parameters &parameters)
          10,   
          "vertex id", 
          __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(    
+         "seed",   
+         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,  
+         time(NULL),   
+         "seed for random number generator", 
+         __FILE__, __LINE__));
     // </DONE>
 
     return retval;

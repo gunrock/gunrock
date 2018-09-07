@@ -128,7 +128,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             int            gpu_idx,
             util::Location target,
             ProblemFlag    flag,
-            int walk_length_)
+            int walk_length_,
+            int seed)
         {
             cudaError_t retval  = cudaSuccess;
 
@@ -137,7 +138,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // <DONE> allocate problem specific data here, e.g.:
             walk_length = walk_length_;
             curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
-            curandSetPseudoRandomGeneratorSeed(gen, time(NULL));
+            curandSetPseudoRandomGeneratorSeed(gen, seed);
 
             GUARD_CU(walks.Allocate(sub_graph.nodes * walk_length, target));
             GUARD_CU(rand.Allocate(sub_graph.nodes, target));
@@ -173,7 +174,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                x = (VertexT)0;
             }, nodes * this -> walk_length, target, this -> stream));
             GUARD_CU(rand.ForEach([]__host__ __device__ (float &x){
-               x = 0.0;
+               x = 0.0f;
             }, nodes, target, this -> stream));
             // </DONE>
 
@@ -185,6 +186,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     util::Array1D<SizeT, DataSlice> *data_slices;
     // <ADDITIONAL_TODO>
     int walk_length;
+    int seed;
     // </ADDITIONAL_TODO>
 
     // ----------------------------------------------------------------
@@ -200,6 +202,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         data_slices(NULL) {
         // <ADDITIONAL_TODO>
         walk_length = _parameters.Get<int>("walk-length");
+        seed = _parameters.Get<int>("seed");
         // </ADDITIONAL_TODO>
     }
 
@@ -331,7 +334,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 this -> gpu_idx[gpu],
                 target,
                 this -> flag,
-                this -> walk_length
+                this -> walk_length,
+                this -> seed
             ));
         }
 

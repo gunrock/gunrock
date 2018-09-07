@@ -7,7 +7,7 @@
 
 /**
  * @file
- * Template_enactor.cuh
+ * rw_enactor.cuh
  *
  * @brief hello Problem Enactor
  */
@@ -231,7 +231,7 @@ public:
      * @brief hello constructor
      */
     Enactor() :
-        BaseEnactor("Template"),
+        BaseEnactor("RW"),
         problem    (NULL  )
     {
         // <OPEN> change according to algorithmic needs
@@ -369,12 +369,12 @@ public:
     {
         cudaError_t retval = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));
-        util::PrintMsg("GPU Template Done.", this -> flag & Debug);
+        util::PrintMsg("GPU RW Done.", this -> flag & Debug);
         return retval;
     }
 };
 
-} // namespace Template
+} // namespace rw
 } // namespace app
 } // namespace gunrock
 
