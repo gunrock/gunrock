@@ -7,18 +7,18 @@
 
 /**
  * @file
- * hello_test.cu
+ * pr_nibble_test.cu
  *
- * @brief Test related functions for hello
+ * @brief Test related functions for pr_nibble
  */
 
 #pragma once
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
-namespace hello {
-// </TODO>
+// <DONE> change namespace
+namespace pr_nibble {
+// </DONE>
 
 
 /******************************************************************************
@@ -26,7 +26,7 @@ namespace hello {
  *****************************************************************************/
 
 /**
- * @brief Simple CPU-based reference hello ranking implementations
+ * @brief Simple CPU-based reference pr_nibble ranking implementations
  * @tparam      GraphT        Type of the graph
  * @tparam      ValueT        Type of the values
  * @param[in]   graph         Input graph
@@ -36,9 +36,10 @@ namespace hello {
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    // <TODO> add problem specific inputs and outputs 
-    typename GraphT::ValueT *degrees,
-    // </TODO>
+    // <DONE> add problem specific inputs and outputs 
+    typename GraphT::VertexT src,
+    typename GraphT::ValueT *values,
+    // </DONE>
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
@@ -46,12 +47,15 @@ double CPU_Reference(
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
     
-    // <TODO> 
+    // <DONE> 
     // implement CPU reference implementation
     for(SizeT v = 0; v < graph.nodes; ++v) {
-        degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
+        values[v] = (double)(graph.row_offsets[v + 1] - graph.row_offsets[v]);
     }
-    // </TODO>
+    values[src] = -1;
+    
+    printf("CPU_Reference: NotImplemented\n");
+    // </DONE>
     
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
@@ -59,7 +63,7 @@ double CPU_Reference(
 }
 
 /**
- * @brief Validation of hello results
+ * @brief Validation of pr_nibble results
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the values
  * @param[in]  parameters    Excution parameters
@@ -72,10 +76,8 @@ template <typename GraphT>
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
-             // <TODO>
              typename GraphT::ValueT *h_degrees,
              typename GraphT::ValueT *ref_degrees,
-             // </TODO>
              bool verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
@@ -85,9 +87,11 @@ typename GraphT::SizeT Validate_Results(
     bool quiet = parameters.Get<bool>("quiet");
 
     // <TODO> result validation and display
-    for(SizeT v = 0; v < graph.nodes; ++v) {
-        printf("%d %d %d\n", v, h_degrees[v], ref_degrees[v]);
-    }
+    // for(SizeT v = 0; v < graph.nodes; ++v) {
+    //     std::cout << "v: "              << v              << 
+    //                 " h_degrees[v]: "   << h_degrees[v]   <<
+    //                 " ref_degrees[v]: " << ref_degrees[v] << std::endl;
+    // }
     // </TODO>
 
     if(num_errors == 0) {

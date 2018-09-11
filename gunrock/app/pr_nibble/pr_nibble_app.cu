@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file hello_app.cu
+ * @file pr_nibble_app.cu
  *
  * @brief Simple Gunrock Application
  */
@@ -17,16 +17,16 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// <TODO> change includes
-#include <gunrock/app/hello/hello_enactor.cuh>
-#include <gunrock/app/hello/hello_test.cuh>
-// </TODO>
+// <DONE> change includes
+#include <gunrock/app/pr_nibble/pr_nibble_enactor.cuh>
+#include <gunrock/app/pr_nibble/pr_nibble_test.cuh>
+// </DONE>
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
-namespace hello {
-// </TODO>
+// <DONE> change namespace
+namespace pr_nibble {
+// </DONE>
 
 
 cudaError_t UseParameters(util::Parameters &parameters)
@@ -36,22 +36,48 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
-    // <TODO> add app specific parameters, eg:
-    // GUARD_CU(parameters.Use<std::string>(
-    //    "src",
-    //    util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-    //    "0",
-    //    "<Vertex-ID|random|largestdegree> The source vertices\n"
-    //    "\tIf random, randomly select non-zero degree vertices;\n"
-    //    "\tIf largestdegree, select vertices with largest degrees",
-    //    __FILE__, __LINE__));
-    // </TODO>
+    // <DONE> add app specific parameters, eg:
+    GUARD_CU(parameters.Use<std::string>(
+       "src",
+       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+       "0",
+       "<Vertex-ID|random|largestdegree> The source vertices\n"
+       "\tIf random, randomly select non-zero degree vertices;\n"
+       "\tIf largestdegree, select vertices with largest degrees",
+       __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<double>(
+       "eps",
+       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+       1e-2,
+       "Convergence criteria.",
+       __FILE__, __LINE__));
+    GUARD_CU(parameters.Use<double>(
+       "phi",
+       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+       0.5,
+       "phi parameter", // <TODO: DOCS>
+       __FILE__, __LINE__));
+    GUARD_CU(parameters.Use<double>(
+       "vol",
+       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+       40.0,
+       "volume parameter", // <TODO: DOCS>
+       __FILE__, __LINE__));
+    GUARD_CU(parameters.Use<int>(
+       "max-iter",
+       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+       3,
+       "Max number of iterations",
+       __FILE__, __LINE__));
+
+    // </DONE>
 
     return retval;
 }
 
 /**
- * @brief Run hello tests
+ * @brief Run pr_nibble tests
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the distances
  * @param[in]  parameters    Excution parameters
@@ -64,9 +90,9 @@ template <typename GraphT>
 cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
-    // <TODO> add problem specific reference results, e.g.:
-    typename GraphT::ValueT *ref_degrees,
-    // </TODO>
+    // <DONE> add problem specific reference results, e.g.:
+    typename GraphT::ValueT **ref_values,
+    // </DONE>
     util::Location target)
 {
     
@@ -82,19 +108,20 @@ cudaError_t RunTests(
     bool quiet_mode = parameters.Get<bool>("quiet");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    util::Info info("hello", parameters, graph);
+    util::Info info("pr_nibble", parameters, graph);
     
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
 
-    // <TODO> get problem specific inputs, e.g.:
-    // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-    // printf("RunTests: %d srcs: src[0]=%d\n", srcs.size(), srcs[0]);
-    // </TODO>
+    // <DONE> get problem specific inputs, e.g.:
+    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+    int num_srcs = srcs.size();
+    printf("RunTests: %d srcs: src[0]=%d\n", srcs.size(), srcs[0]);
+    // </DONE>
 
-    // <TODO> allocate problem specific host data, e.g.:
-    ValueT *h_degrees = new ValueT[graph.nodes];
-    // </TODO>
+    // <DONE> allocate problem specific host data, e.g.:
+    ValueT *h_values = new ValueT[graph.nodes];
+    // </DONE>
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -106,16 +133,19 @@ cudaError_t RunTests(
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
     
     for (int run_num = 0; run_num < num_runs; ++run_num) {
+        auto run_index = run_num % num_srcs;
+        VertexT src = srcs[run_index];
+        VertexT src_neib = graph.GetEdgeDest(graph.GetNeighborListOffset(src));
         GUARD_CU(problem.Reset(
-            // <TODO> problem specific data if necessary, eg:
-            // src,
-            // </TODO>
+            // <DONE> problem specific data if necessary, eg:
+            src, src_neib,
+            // </DONE>
             target
         ));
         GUARD_CU(enactor.Reset(
-            // <TODO> problem specific data if necessary:
-            // srcs[run_num % srcs.size()],
-            // </TODO>
+            // <DONE> problem specific data if necessary:
+            src, src_neib,
+            // </DONE>
             target
         ));
         
@@ -123,9 +153,8 @@ cudaError_t RunTests(
 
         cpu_timer.Start();
         GUARD_CU(enactor.Enact(
-            // <TODO> problem specific data if necessary:
-            // srcs[run_num % srcs.size()]
-            // </TODO>
+            // <DONE> problem specific data if necessary:
+            // </DONE>
         ));
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
@@ -140,16 +169,16 @@ cudaError_t RunTests(
         if (validation == "each") {
             
             GUARD_CU(problem.Extract(
-                // <TODO> problem specific data
-                h_degrees
-                // </TODO>
+                // <DONE> problem specific data
+                h_values
+                // </DONE>
             ));
             SizeT num_errors = Validate_Results(
                 parameters,
                 graph,
-                // <TODO> problem specific data
-                h_degrees, ref_degrees,
-                // </TODO>
+                // <DONE> problem specific data
+                h_values, ref_values[run_index],
+                // </DONE>
                 false);
         }
     }
@@ -157,42 +186,43 @@ cudaError_t RunTests(
     cpu_timer.Start();
     
     GUARD_CU(problem.Extract(
-        // <TODO> problem specific data
-        h_degrees
-        // </TODO>
+        // <DONE> problem specific data
+        h_values
+        // </DONE>
     ));
     if (validation == "last") {
+        auto run_index = (num_runs - 1) % num_srcs;
         SizeT num_errors = Validate_Results(
             parameters,
             graph,
-            // <TODO> problem specific data
-            h_degrees, ref_degrees,
-            // </TODO>
+            // <DONE> problem specific data
+            h_values, ref_values[run_index],
+            // </DONE>
             false);
     }
 
     // compute running statistics
     // <TODO> change NULL to problem specific per-vertex visited marker, e.g. h_distances
-    info.ComputeTraversalStats(enactor, (VertexT*)NULL);
+    // info.ComputeTraversalStats(enactor, (VertexT*)NULL);
     //Display_Memory_Usage(problem);
-    #ifdef ENABLE_PERFORMANCE_PROFILING
+    // #ifdef ENABLE_PERFORMANCE_PROFILING
         //Display_Performance_Profiling(enactor);
-    #endif
+    // #endif
     // </TODO>
 
     // Clean up
-    GUARD_CU(enactor.Release(target));
+    // GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    // <TODO> Release problem specific data, e.g.:
-    delete[] h_degrees; h_degrees   = NULL;
-    // </TODO>
+    // <DONE> Release problem specific data, e.g.:
+    delete[] h_values; h_values   = NULL;
+    // </DONE>
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
     return retval;
 }
 
-} // namespace hello
+} // namespace pr_nibble
 } // namespace app
 } // namespace gunrock
 

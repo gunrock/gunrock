@@ -9,7 +9,7 @@
  * @file
  * Template_enactor.cuh
  *
- * @brief hello Problem Enactor
+ * @brief pr_nibble Problem Enactor
  */
 
 #pragma once
@@ -20,18 +20,18 @@
 #include <gunrock/oprtr/oprtr.cuh>
  
 // <TODO> change includes
-#include <gunrock/app/hello/hello_problem.cuh>
+#include <gunrock/app/pr_nibble/pr_nibble_problem.cuh>
 // </TODO>
 
 
 namespace gunrock {
 namespace app {
 // <TODO> change namespace
-namespace hello {
+namespace pr_nibble {
 // </TODO>
 
 /**
- * @brief Speciflying parameters for hello Enactor
+ * @brief Speciflying parameters for pr_nibble Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -47,11 +47,11 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 }
 
 /**
- * @brief defination of hello iteration loop
+ * @brief defination of pr_nibble iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct helloIterationLoop : public IterationLoopBase
+struct PRNibbleIterationLoop : public IterationLoopBase
     <EnactorT, Use_FullQ | Push
     // <TODO>if needed, stack more option, e.g.:
     // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
@@ -73,10 +73,10 @@ struct helloIterationLoop : public IterationLoopBase
         // </TODO>
         > BaseIterationLoop;
 
-    helloIterationLoop() : BaseIterationLoop() {}
+    PRNibbleIterationLoop() : BaseIterationLoop() {}
 
     /**
-     * @brief Core computation of hello, one iteration
+     * @brief Core computation of pr_nibble, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
      * \return cudaError_t error message(s), if any
      */
@@ -98,63 +98,144 @@ struct helloIterationLoop : public IterationLoopBase
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
         
-        // <TODO> add problem specific data alias here:
-        auto &degrees = data_slice.degrees;
-        auto &visited = data_slice.visited;
-        // </TODO>
+        // <DONE> add problem specific data alias here:
+        auto &grad    = data_slice.grad;
+        auto &q       = data_slice.q;
+        auto &y       = data_slice.y;
+        auto &z       = data_slice.z;
+        auto &touched = data_slice.touched;
+        
+        auto &alpha   = data_slice.alpha;
+        auto &rho     = data_slice.rho;
+        
+        auto &src_node = data_slice.src;
+        auto &src_neib = data_slice.src_neib;
+        auto &num_ref_nodes = data_slice.num_ref_nodes;
         
         // --
         // Define operations
 
+        // compute operation
+        auto compute_op = [
+            graph,
+            iteration,
+            src_node,
+            src_neib,
+            z,
+            y,
+            grad,
+            q,
+            alpha,
+            rho,
+            touched,
+            num_ref_nodes
+        ] __host__ __device__ (VertexT *v, const SizeT &i) {
+            
+            VertexT idx = v[i];
+            
+            // ignore the neighbor on the first iteration
+            if((iteration == 0) && (idx == src_neib)) return;
+            
+            // Compute degrees
+            SizeT idx_d        = graph.GetNeighborListLength(idx);
+            ValueT idx_d_sqrt  = sqrt((ValueT)idx_d);
+            ValueT idx_dn_sqrt = 1.0 / idx_d_sqrt;
+            
+            
+            // this is at end in original implementation, but works here
+            // after the first iteration (+ have to adjust for it in StopCondition)
+            if((iteration > 0) && (idx == src_node)) {
+                ValueT val = alpha / num_ref_nodes * idx_dn_sqrt;
+                grad[idx] -= val;
+            }
+            
+            z[idx] = y[idx] - grad[idx];
+            
+            if(z[idx] == 0) return;
+            
+            ValueT q_old = q[idx];
+            ValueT thresh = rho * alpha * idx_d_sqrt;
+            
+            if(z[idx] >= thresh) {
+                q[idx] = z[idx] - thresh;
+            } else if (z[idx] <= -thresh) {
+                q[idx] = z[idx] + thresh;
+            } else {
+                q[idx] = (ValueT)0;
+            }
+            
+            if(iteration == 0) {
+                y[idx] = q[idx];
+            } else {
+                ValueT beta = (1 - sqrt(alpha)) / (1 + sqrt(alpha));
+                y[idx] = q[idx] + beta * (q[idx] - q_old);
+            }
+            
+            touched[idx] = 0;
+            grad[idx]    = y[idx] * (1.0 + alpha) / 2;
+            
+        };
+
         // advance operation
         auto advance_op = [
-            // <TODO> pass data to lambda
-            degrees,
-            visited
-            // </TODO>
+            graph,
+            touched,
+            grad,
+            y,
+            alpha,
+            iteration
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
-        {
-            // <TODO> Implement advance operation
-                        
-            // Mark src and dest as visited
-            atomicMax(visited + src, 1);
-            auto dest_visited = atomicMax(visited + dest, 1);
+        {   
+            ValueT src_dn_sqrt  = 1.0 / sqrt((ValueT)graph.GetNeighborListLength(src));
+            ValueT dest_dn_sqrt = 1.0 / sqrt((ValueT)graph.GetNeighborListLength(dest));
+            ValueT src_y = Load<cub::LOAD_CG>(y + src);
             
-            // Increment degree of src
-            atomicAdd(degrees + src, 1);
+            ValueT grad_update = - src_dn_sqrt * src_y * dest_dn_sqrt * (1.0 - alpha) / 2;
+            ValueT last_grad = atomicAdd(grad + dest, grad_update);
+            if (last_grad + grad_update == 0) return false;
             
-            // Add dest to queue if previously unsen
-            return dest_visited == 0;
-            
-            // </TODO>
+            bool already_touched = atomicMax(touched + dest, 1) == 1;
+            return !already_touched;
+
         };
 
         // filter operation
         auto filter_op = [
-            // <TODO> pass data to lambda
-            // </TODO>
+            // <DONE> pass data to lambda
+            // </DONE>
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // <TODO> implement filter operation
+            // <DONE> implement filter operation
             return true;
-            // </TODO>
+            // </DONE>
         };
         
         // --
         // Run
         
-        // <TODO> some of this may need to be edited depending on algorithmic needs
-        // !! How much variation between apps is there in these calls?
-        
+        // <DONE> some of this may need to be edited depending on algorithmic needs
+        GUARD_CU(frontier.V_Q()->ForAll(
+            compute_op,
+            frontier.queue_length,
+            util::DEVICE,
+            oprtr_parameters.stream
+        ));
+
+        GUARD_CU2(cudaDeviceSynchronize(),
+            "cudaDeviceSynchronize failed");
+
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
             oprtr_parameters, advance_op, filter_op));
+
+        GUARD_CU2(cudaDeviceSynchronize(),
+            "cudaDeviceSynchronize failed");
         
         if (oprtr_parameters.advance_mode != "LB_CULL" &&
             oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
@@ -170,9 +251,44 @@ struct helloIterationLoop : public IterationLoopBase
             frontier.queue_index, frontier.queue_length,
             false, oprtr_parameters.stream, true));
 
-        // </TODO>
+        // </DONE>
         
         return retval;
+    }
+    
+    bool Stop_Condition(int gpu_num = 0) {
+        auto &data_slice = this -> enactor ->
+            problem -> data_slices[this -> gpu_num][0];
+        auto &enactor_slices = this -> enactor -> enactor_slices;
+        
+        // Reached max iterations
+        auto iter = enactor_slices[0].enactor_stats.iteration;
+        bool break_iter = iter == data_slice.max_iter;
+        if(break_iter) return true;
+        
+        // Gradient is too small
+        // auto &graph       = data_slice.sub_graph[0];
+        // auto &grad        = data_slice.grad;
+        // int num_ref_nodes = 1;
+        // ValueT grad_thresh = data_slice.rho * data_slice.alpha * (1 + data_slice.eps);
+        
+        
+        // SizeT src_d        = graph.GetNeighborListLength(data_slice.src);
+        // ValueT src_dn_sqrt = 1 / sqrt((double)src_d);
+        // ValueT src_grad    = grad[data_slice.src] - 
+        //     (data_slice.alpha / num_ref_nodes) * src_dn_sqrt;
+        
+        // ValueT max_grad = abs(src_grad);
+        // for(SizeT i = 1; i < graph.nodes; ++i) {
+        //     if(abs(grad[i]) > max_grad) {
+        //         max_grad = abs(grad[i]);
+        //     }
+        // }
+        
+        // bool break_grad = max_grad <= grad_thresh;
+        // if(break_grad) return true;
+        
+        return false;
     }
 
     /**
@@ -220,7 +336,7 @@ struct helloIterationLoop : public IterationLoopBase
             (received_length, peer_, expand_op);
         return retval;
     }
-}; // end of helloIteration
+}; // end of PRNibbleIterationLoop
 
 /**
  * @brief Template enactor class.
@@ -250,27 +366,27 @@ public:
         BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> 
         EnactorT;
-    typedef helloIterationLoop<EnactorT> 
+    typedef PRNibbleIterationLoop<EnactorT> 
         IterationT;
 
     Problem *problem;
     IterationT *iterations;
 
     /**
-     * @brief hello constructor
+     * @brief pr_nibble constructor
      */
     Enactor() :
         BaseEnactor("Template"),
         problem    (NULL  )
     {
-        // <TODO> change according to algorithmic needs
+        // <OPEN> change according to algorithmic needs
         this -> max_num_vertex_associates = 0;
         this -> max_num_value__associates = 1;
-        // </TODO>
+        // </OPEN>
     }
 
     /**
-     * @brief hello destructor
+     * @brief pr_nibble destructor
      */
     virtual ~Enactor() { /*Release();*/ }
 
@@ -304,9 +420,9 @@ public:
         // Lazy initialization
         GUARD_CU(BaseEnactor::Init(
             problem, Enactor_None,
-            // <TODO> change to how many frontier queues, and their types
+            // <OPEN> change to how many frontier queues, and their types
             2, NULL,
-            // </TODO>
+            // </OPEN>
             target, false));
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++) {
             GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
@@ -327,17 +443,17 @@ public:
     }
 
     /**
-      * @brief one run of hello, to be called within GunrockThread
+      * @brief one run of pr_nibble, to be called within GunrockThread
       * @param thread_data Data for the CPU thread
       * \return cudaError_t error message(s), if any
       */
     cudaError_t Run(ThreadSlice &thread_data)
     {
         gunrock::app::Iteration_Loop<
-            // <TODO> change to how many {VertexT, ValueT} data need to communicate
+            // <OPEN> change to how many {VertexT, ValueT} data need to communicate
             //       per element in the inter-GPU sub-frontiers
             0, 1,
-            // </TODO>
+            // </OPEN>
             IterationT>(
             thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
@@ -350,29 +466,30 @@ public:
      * \return cudaError_t error message(s), if any
      */
     cudaError_t Reset(
-        // <TODO> problem specific data if necessary, eg
-        VertexT src = 0,
-        // </TODO>
+        // <DONE> problem specific data if necessary, eg
+        VertexT src,
+        VertexT src_neib,
+        // </DONE>
         util::Location target = util::DEVICE)
     {
         typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
 
-        // <TODO> Initialize frontiers according to the algorithm:
-        // In this case, we add a single `src` to the frontier
+        // <DONE> Initialize frontiers according to the algorithm:
+        // In this case, we add a `src` + a neighbor to the frontier
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
            if ((this->num_gpus == 1) ||
                 (gpu == this->problem->org_graph->GpT::partition_table[src])) {
-               this -> thread_slices[gpu].init_size = 1;
+               this -> thread_slices[gpu].init_size = 2;
                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
                    auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                   frontier.queue_length = (peer_ == 0) ? 1 : 0;
+                   frontier.queue_length = (peer_ == 0) ? 2 : 0;
                    if (peer_ == 0) {
-                       GUARD_CU(frontier.V_Q() -> ForEach(
-                           [src]__host__ __device__ (VertexT &v) {
-                           v = src;
-                       }, 1, target, 0));
+                       GUARD_CU(frontier.V_Q() -> ForAll(
+                           [src, src_neib]__host__ __device__ (VertexT *v, const SizeT &i) {
+                           v[i] = i == 0 ? src : src_neib;
+                       }, 2, target, 0));
                    }
                }
            } else {
@@ -382,20 +499,20 @@ public:
                 }
            }
         }
-        // </TODO>
+        // </DONE>
         
         GUARD_CU(BaseEnactor::Sync());
         return retval;
     }
 
     /**
-     * @brief Enacts a hello computing on the specified graph.
+     * @brief Enacts a pr_nibble computing on the specified graph.
 ...
      * \return cudaError_t error message(s), if any
      */
     cudaError_t Enact(
         // <TODO> problem specific data if necessary, eg
-        VertexT src = 0
+        // VertexT src = 0
         // </TODO>
     )
     {
