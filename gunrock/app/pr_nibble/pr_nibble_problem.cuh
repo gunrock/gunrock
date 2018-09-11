@@ -491,7 +491,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     {
         cudaError_t retval = cudaSuccess;
         
-        int num_ref_nodes = 1
+        int num_ref_nodes = 1;
         
         // Reset data slices
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
@@ -517,11 +517,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         }
         
         SizeT src_d = this -> org_graph -> GetNeighborListLength(src_);
-        ValueT src_d_sqrt = sqrt((ValueT)src_d);
+        std::cout << "** src_: " << src_ << std::endl;
+        std::cout << "** src_d: " << src_d << std::endl;
+        
+        ValueT src_d_sqrt  = sqrt((ValueT)src_d);
         ValueT src_dn_sqrt = 1.0 / src_d_sqrt;
         
-        ValueT src_grad = -1.0 * this -> alpha * src_dn_sqrt / num_ref_nodes;
-        std::cout << "src_grad: " << src_grad << std::endl;
+        ValueT src_grad = -1.0 * this -> alpha * src_dn_sqrt / (double)num_ref_nodes;
+        
+        printf("alpha: %.17g\n", this -> alpha);
+        printf("src_d: %d\n", src_d);
+        printf("src_d_sqrt: %.17g\n", src_d_sqrt);
+        printf("src_dn_sqrt: %.17g\n", src_dn_sqrt);
+        printf("src_grad: %.17g\n", src_grad);
         
         ValueT thresh = this -> rho * this -> alpha * src_d_sqrt;
         if(- src_grad < thresh) {

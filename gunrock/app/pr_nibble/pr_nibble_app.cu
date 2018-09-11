@@ -134,7 +134,7 @@ cudaError_t RunTests(
     
     for (int run_num = 0; run_num < num_runs; ++run_num) {
         auto run_index = run_num % num_srcs;
-        VertexT src = srcs[run_index];
+        VertexT src      = srcs[run_index];
         VertexT src_neib = graph.GetEdgeDest(graph.GetNeighborListOffset(src));
         GUARD_CU(problem.Reset(
             // <DONE> problem specific data if necessary, eg:

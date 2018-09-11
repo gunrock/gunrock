@@ -12,6 +12,7 @@
  * @brief Simple test driver program for Gunrock template.
  */
 
+#include <iostream>
 #include <gunrock/app/pr_nibble/pr_nibble_app.cu>
 #include <gunrock/app/test_base.cuh>
 
@@ -48,8 +49,7 @@ struct main_struct
         bool quick = parameters.Get<bool>("quick");
         bool quiet = parameters.Get<bool>("quiet");
 
-        typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-            graph::HAS_EDGE_VALUES | graph::HAS_CSR>
+        typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_CSR>
             GraphT;
 
         cudaError_t retval = cudaSuccess;
@@ -60,7 +60,7 @@ struct main_struct
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
-
+                
         // <DONE> get srcs if needed, e.g.:
         GUARD_CU(app::Set_Srcs (parameters, graph));
         std::vector<VertexT> srcs
