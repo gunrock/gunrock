@@ -66,6 +66,7 @@ struct main_struct
         std::vector<VertexT> srcs
            = parameters.Get<std::vector<VertexT> >("srcs");
         int num_srcs = srcs.size();
+
         // </DONE>
         
         // <DONE> declare datastructures for reference result on GPU
@@ -87,6 +88,7 @@ struct main_struct
                 
                 float elapsed = app::pr_nibble::CPU_Reference(
                     graph.csr(),
+                    parameters,
                     src,
                     ref_values[i],
                     quiet);
@@ -97,21 +99,21 @@ struct main_struct
 
         }
 
-        // <OPEN> add other switching parameters, if needed
-        std::vector<std::string> switches{"advance-mode"};
-        // </OPEN>
+        // // <OPEN> add other switching parameters, if needed
+        // std::vector<std::string> switches{"advance-mode"};
+        // // </OPEN>
         
-        GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [
-                // </DONE> pass necessary data to lambda
-                ref_values
-                // </DONE>
-            ](util::Parameters &parameters, GraphT &graph)
-            {
-                // <DONE> pass necessary data to app::Template::RunTests
-                return app::pr_nibble::RunTests(parameters, graph, ref_values, util::DEVICE);
-                // </DONE>
-            }));
+        // GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
+        //     [
+        //         // </DONE> pass necessary data to lambda
+        //         ref_values
+        //         // </DONE>
+        //     ](util::Parameters &parameters, GraphT &graph)
+        //     {
+        //         // <DONE> pass necessary data to app::Template::RunTests
+        //         return app::pr_nibble::RunTests(parameters, graph, ref_values, util::DEVICE);
+        //         // </DONE>
+        //     }));
 
         if (!quick) {
             for(int i = 0; i < num_srcs; i++) {

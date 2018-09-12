@@ -141,12 +141,10 @@ struct PRNibbleIterationLoop : public IterationLoopBase
             ValueT idx_d_sqrt  = sqrt((ValueT)idx_d);
             ValueT idx_dn_sqrt = 1.0 / idx_d_sqrt;
             
-            
             // this is at end in original implementation, but works here
             // after the first iteration (+ have to adjust for it in StopCondition)
             if((iteration > 0) && (idx == src_node)) {
-                ValueT val = alpha / num_ref_nodes * idx_dn_sqrt;
-                grad[idx] -= val;
+                grad[idx] -= alpha / num_ref_nodes * idx_dn_sqrt;
             }
             
             z[idx] = y[idx] - grad[idx];
@@ -173,7 +171,6 @@ struct PRNibbleIterationLoop : public IterationLoopBase
             
             touched[idx] = 0;
             grad[idx]    = y[idx] * (1.0 + alpha) / 2;
-            
         };
 
         // advance operation
@@ -199,7 +196,6 @@ struct PRNibbleIterationLoop : public IterationLoopBase
             
             bool already_touched = atomicMax(touched + dest, 1) == 1;
             return !already_touched;
-
         };
 
         // filter operation
@@ -251,39 +247,44 @@ struct PRNibbleIterationLoop : public IterationLoopBase
             frontier.queue_index, frontier.queue_length,
             false, oprtr_parameters.stream, true));
 
+        // >>
+        // Convergence
+        // ValueT grad_thresh = rho * alpha * (1 + eps);
+        // auto convergence_op = [
+        //     graph,
+        //     grad,
+        //     do_continue,
+        //     grad_thresh
+        // ] __host__ __device__ (VertexT *v, const SizeT &i) {
+        //     if(abs(grad[i] * dn_sqrt[i]) > grad_thresh) do_continue = true;
+        // }
+        // GUARD_CU(frontier.V_Q()->ForAll(
+        //     convergence_op,
+        //     frontier.queue_length,
+        //     util::DEVICE,
+        //     oprtr_parameters.stream
+        // ));
+        // <//
+
+        GUARD_CU2(cudaDeviceSynchronize(),
+            "cudaDeviceSynchronize failed");
+        
         // </DONE>
         
         return retval;
     }
     
     bool Stop_Condition(int gpu_num = 0) {
-        auto &data_slice = this -> enactor ->
-            problem -> data_slices[this -> gpu_num][0];
-        auto &enactor_slices = this -> enactor -> enactor_slices;
+        auto &enactor_slice = this -> enactor -> enactor_slices[0];
+        auto &enactor_stats = enactor_slice.enactor_stats;
+        auto &data_slice    = this -> enactor -> problem -> data_slices[this -> gpu_num][0];
         
         // Reached max iterations
-        auto iter = enactor_slices[0].enactor_stats.iteration;
-        bool break_iter = iter == data_slice.max_iter;
+        bool break_iter = enactor_stats.iteration >= data_slice.max_iter;
         if(break_iter) return true;
         
-        // Gradient is too small
-        // auto &graph       = data_slice.sub_graph[0];
-        // auto &grad        = data_slice.grad;
-        // int num_ref_nodes = 1;
-        // ValueT grad_thresh = data_slice.rho * data_slice.alpha * (1 + data_slice.eps);
-        
-        
-        // SizeT src_d        = graph.GetNeighborListLength(data_slice.src);
-        // ValueT src_dn_sqrt = 1 / sqrt((double)src_d);
-        // ValueT src_grad    = grad[data_slice.src] - 
-        //     (data_slice.alpha / num_ref_nodes) * src_dn_sqrt;
-        
-        // ValueT max_grad = abs(src_grad);
-        // for(SizeT i = 1; i < graph.nodes; ++i) {
-        //     if(abs(grad[i]) > max_grad) {
-        //         max_grad = abs(grad[i]);
-        //     }
-        // }
+        // if gradient is too small
+        // ... TODO ...
         
         // bool break_grad = max_grad <= grad_thresh;
         // if(break_grad) return true;
