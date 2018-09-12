@@ -248,7 +248,7 @@ struct PRNibbleIterationLoop : public IterationLoopBase
             false, oprtr_parameters.stream, true));
 
         // >>
-        // Convergence
+        // TODO -- Check gradient convergence
         // ValueT grad_thresh = rho * alpha * (1 + eps);
         // auto convergence_op = [
         //     graph,
