@@ -116,7 +116,7 @@ cudaError_t RunTests(
     // <DONE> get problem specific inputs, e.g.:
     std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
     int num_srcs = srcs.size();
-    printf("RunTests: %d srcs: src[0]=%d\n", srcs.size(), srcs[0]);
+    // printf("RunTests: %d srcs: src[0]=%d\n", srcs.size(), srcs[0]);
     // </DONE>
 
     // <DONE> allocate problem specific host data, e.g.:

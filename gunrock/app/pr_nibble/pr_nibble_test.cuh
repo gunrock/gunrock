@@ -104,16 +104,15 @@ double CPU_Reference(
     grad[ref_node] = - (alpha / num_ref_nodes) * dn_sqrt[ref_node];
     
     // -- 
-    std::cout << "num_edges: "     << num_edges        << std::endl;
-    std::cout << "log_num_edges: " << log_num_edges    << std::endl;
-    std::cout << "alpha: "         << alpha            << std::endl;
-    std::cout << "rho: "           << rho              << std::endl;
-    std::cout << "vol: "           << vol              << std::endl;
-    std::cout << "eps: "           << eps              << std::endl;
-    std::cout << "max_iter: "      << max_iter         << std::endl;
-    
-    printf("dn_sqrt[ref_node] %.17g\n", dn_sqrt[ref_node]);
-    printf("grad[ref_node] %.17g\n", grad[ref_node]);
+    // std::cout << "num_edges: "     << num_edges        << std::endl;
+    // std::cout << "log_num_edges: " << log_num_edges    << std::endl;
+    // std::cout << "alpha: "         << alpha            << std::endl;
+    // std::cout << "rho: "           << rho              << std::endl;
+    // std::cout << "vol: "           << vol              << std::endl;
+    // std::cout << "eps: "           << eps              << std::endl;
+    // std::cout << "max_iter: "      << max_iter         << std::endl;
+    // printf("dn_sqrt[ref_node] %.17g\n", dn_sqrt[ref_node]);
+    // printf("grad[ref_node] %.17g\n", grad[ref_node]);
     // -- 
     
     ValueT scale_grad = -1.0 * grad[ref_node] * dn_sqrt[ref_node];
@@ -121,11 +120,11 @@ double CPU_Reference(
     
     while(true) {
         if(scale_grad <= rho * alpha * (1.0 + eps)) {
-            printf("breaking scale_grad\n");
+            // printf("breaking scale_grad\n");
             break;
         }
         if(it >= max_iter) {
-            printf("breaking iter\n");
+            // printf("breaking iter\n");
             break;
         }
         
@@ -178,10 +177,10 @@ double CPU_Reference(
         it += 1;
     }
     
-    for(SizeT i = 0; i < graph.nodes; ++i) {
-        values[i] = abs(q[i] * d_sqrt[i]);
-        printf("%d %.17g\n", i, values[i]);
-    }
+    // for(SizeT i = 0; i < graph.nodes; ++i) {
+    //     values[i] = abs(q[i] * d_sqrt[i]);
+    //     printf("%d %.17g\n", i, values[i]);
+    // }
     
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
@@ -207,17 +206,30 @@ typename GraphT::SizeT Validate_Results(
              bool verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::SizeT   SizeT;
 
     bool quiet = parameters.Get<bool>("quiet");
 
-    SizeT num_errors = util::CompareResults(
-        h_values,
-        ref_values,
-        graph.nodes,
-        true,
-        quiet
-    );
+    // printf("Validate_Results: \n");
+    // for(int i = 0; i < graph.nodes; ++i) {
+    //     printf("%d %.17g %.17g\n", i, h_values[i], ref_values[i]);
+    // }
+
+    // Check agreement (within a small tolerance)
+    SizeT num_errors = 0;
+    ValueT tolerance = 0.00001;
+    for (SizeT i = 0; i < graph.nodes; i++) {
+        if (h_values[i] != ref_values[i]) {
+            float err = abs(h_values[i] - ref_values[i]) / abs(ref_values[i]);
+            if (err > tolerance) {
+                num_errors++;
+                util::PrintMsg("FAIL: [" + std::to_string(i)
+                    + "]: " + std::to_string(h_values[i])
+                    + " != " + std::to_string(ref_values[i]));
+            }
+        }
+    }
 
     util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
 

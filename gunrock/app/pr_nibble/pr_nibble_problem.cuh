@@ -368,10 +368,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 h_values[i] = abs(h_q[i] * d_sqrt);
             }
             
-            for(int i = 0; i < nodes; i++) {
-                printf("%d %.17g %.17g %.17g %.17g\n", 
-                    i, h_values[i], h_q[i], h_y[i], h_z[i]);
-            }
+            // for(int i = 0; i < nodes; i++) {
+            //     printf("%d %.17g %.17g %.17g %.17g\n", 
+            //         i, h_values[i], h_q[i], h_y[i], h_z[i]);
+            // }
+        
         } else { // num_gpus != 1
             
             // ============ INCOMPLETE TEMPLATE - MULTIGPU ============
@@ -525,11 +526,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         
         ValueT src_grad = -1.0 * this -> alpha * src_dn_sqrt / (double)num_ref_nodes;
         
-        printf("alpha: %.17g\n", this -> alpha);
-        printf("src_d: %d\n", src_d);
-        printf("src_d_sqrt: %.17g\n", src_d_sqrt);
-        printf("src_dn_sqrt: %.17g\n", src_dn_sqrt);
-        printf("src_grad: %.17g\n", src_grad);
+        // printf("alpha: %.17g\n", this -> alpha);
+        // printf("src_d: %d\n", src_d);
+        // printf("src_d_sqrt: %.17g\n", src_d_sqrt);
+        // printf("src_dn_sqrt: %.17g\n", src_dn_sqrt);
+        // printf("src_grad: %.17g\n", src_grad);
         
         ValueT thresh = this -> rho * this -> alpha * src_d_sqrt;
         if(- src_grad < thresh) {
