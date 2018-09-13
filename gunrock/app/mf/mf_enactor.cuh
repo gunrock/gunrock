@@ -176,6 +176,12 @@ struct MFIterationLoop : public IterationLoopBase
         return retval;
     }
 
+    cudaError_t Compute_OutputLength(int peer_)
+    {   
+        // No need to load balance or get output size
+        return cudaSuccess;
+    }
+
     /**
      * @brief Routine to combine received data and local data
      * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each transmition item, typed VertexT
