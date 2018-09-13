@@ -384,7 +384,7 @@ public:
         this -> problem = &problem;
 
         GUARD_CU(BaseEnactor::Init(
-            problem, Enactor_None, 0, NULL, target, false));
+            problem, Enactor_None, 2, NULL, target, false));
 
         iterations = new IterationT[this -> num_gpus];
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
