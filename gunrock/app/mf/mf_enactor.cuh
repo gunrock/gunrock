@@ -68,221 +68,219 @@ struct MFIterationLoop : public IterationLoopBase
      */
     cudaError_t Core(int peer_ = 0)
     {
-	auto enactor		= this -> enactor;
-	auto gpu_num		= this -> gpu_num;
-	auto num_gpus		= enactor -> num_gpus;
-	auto gpu_offset		= num_gpus * gpu_num;
+        auto enactor		= this -> enactor;
+        auto gpu_num		= this -> gpu_num;
+        auto num_gpus		= enactor -> num_gpus;
+        auto gpu_offset		= num_gpus * gpu_num;
         auto &data_slice	= enactor -> problem -> data_slices[gpu_num][0];
-        auto &enactor_slice	= enactor -> 
-				  enactor_slices[gpu_offset + peer_];
+        auto &enactor_slice	= enactor -> enactor_slices[gpu_offset + peer_];
         auto &enactor_stats	= enactor_slice.enactor_stats;
         auto &graph		= data_slice.sub_graph[0];
         auto &frontier        	= enactor_slice.frontier;
         auto &oprtr_parameters	= enactor_slice.oprtr_parameters;
         auto &retval          	= enactor_stats.retval;
-        auto &iteration       	= enactor_stats.iteration;
-      
-	auto source		= data_slice.source;
-	auto sink		= data_slice.sink;
-	auto &capacity        	= graph.edge_values;
-	auto &reverse		= data_slice.reverse;
+        auto &iteration       	= enactor_stats.iteration;      
+        auto source             = data_slice.source;
+        auto sink               = data_slice.sink;
+        auto &capacity        	= graph.edge_values;
+        auto &reverse           = data_slice.reverse;
         auto &flow            	= data_slice.flow;
         auto &excess          	= data_slice.excess;
         auto &height	      	= data_slice.height;
-	auto &lowest_neighbor	= data_slice.lowest_neighbor;
-	auto &local_vertices	= data_slice.local_vertices;
-	auto &active		= data_slice.active;
-	auto null_ptr		= &local_vertices;
-	null_ptr = NULL;
+        auto &lowest_neighbor	= data_slice.lowest_neighbor;
+        auto &local_vertices	= data_slice.local_vertices;
+        auto &active            = data_slice.active;
+        auto null_ptr           = &local_vertices;
+        null_ptr = NULL;
 
-	auto advance_push_op = [capacity, flow, excess, height, reverse, 
-	     source, sink, active]
-	    __host__ __device__
-	    (const VertexT &src, VertexT &dest, const SizeT &edge_id, 
-	    const VertexT &input_item, const SizeT &input_pos,
-	    const SizeT &output_pos) -> bool
-	{
-	    if (!util::isValid(dest) or !util::isValid(src) or 
-		    src == source or src == sink)
-		return false;
-	    auto e = excess[src];
-	    auto cf = capacity[edge_id] - flow[edge_id];
-	    auto f = min(cf, e);
-	    auto rev_id = reverse[edge_id];
-	    if (f > 0 && height[src] > height[dest])
-	    {
-		if (atomicAdd(&excess[src], -f) >= f)
-		{
-		    atomicAdd(&excess[dest], f);
-		    atomicAdd(&flow[edge_id], f);
-		    atomicAdd(&flow[rev_id], -f);
-//		    printf("push %d->%d, flow %lf, e[%d] %lf, e[%d] %lf\n", \
-			    src, dest, f, src, excess[src], dest, excess[dest]);
-		    active[0] = 1;
-		}else{
-		    atomicAdd(&excess[src], f);
-//		    printf("rollback push %d->%d, excess[%d] = %lf\n", \
-			    src, dest, src, excess[src]);
-		} 
-		return true;
-	    }
-	    return false;
-	};
-
-	auto advance_find_lowest_op = 
-	    [excess, capacity, flow, lowest_neighbor, height, iteration,
-	    source, sink, active]
-	    __host__ __device__
-	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
+        auto advance_push_op = [capacity, flow, excess, height, reverse, 
+             source, sink, active]
+            __host__ __device__
+            (const VertexT &src, VertexT &dest, const SizeT &edge_id, 
             const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
+            const SizeT &output_pos) -> bool
         {
-	    if (!util::isValid(dest) or !util::isValid(src) or 
-		    src == source or src == sink)
-		return false;
-	    if (excess[src] > (ValueT)0 and 
-		    capacity[edge_id] - flow[edge_id] > (ValueT)0)
-	    {
-		auto l = lowest_neighbor[src];
-		auto height_dest = height[dest];
-		while (!util::isValid(l) or height_dest < height[l]){
-		    l = atomicCAS(&lowest_neighbor[src], l, dest);
-		}
-		if (lowest_neighbor[src] == dest){
-		    return true;
-		}
-	    }
-	    return false;
-	};
+            if (!util::isValid(dest) or !util::isValid(src) or 
+                src == source or src == sink)
+            return false;
+            auto e = excess[src];
+            auto cf = capacity[edge_id] - flow[edge_id];
+            auto f = min(cf, e);
+            auto rev_id = reverse[edge_id];
+            if (f > 0 && height[src] > height[dest])
+            {
+                if (atomicAdd(&excess[src], -f) >= f)
+                {
+                    atomicAdd(&excess[dest], f);
+                    atomicAdd(&flow[edge_id], f);
+                    atomicAdd(&flow[rev_id], -f);
+        //		    printf("push %d->%d, flow %lf, e[%d] %lf, e[%d] %lf\n", \
+                        src, dest, f, src, excess[src], dest, excess[dest]);
+                    active[0] = 1;
+                }else{
+                    atomicAdd(&excess[src], f);
+        //		    printf("rollback push %d->%d, excess[%d] = %lf\n", \
+                        src, dest, src, excess[src]);
+                } 
+                return true;
+            }
+            return false;
+        };
 
-	auto advance_relabel_op = 
-	    [excess, capacity, flow, lowest_neighbor, height, iteration, 
-	    source, sink, active]
-	    __host__ __device__
-	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-	    if (!util::isValid(dest) or !util::isValid(src) or 
-		    src == source or src == sink)
-		return false;
-	    if (excess[src] > (ValueT)0 and 
-		    capacity[edge_id] - flow[edge_id] > (ValueT)0 and
-		    lowest_neighbor[src] == dest){ 
-		if (height[src] <= height[dest])
-		{
-	//	    printf("relabel src %d, dest %d, H[%d]=%d, -> %d\n",\
-			src, dest, src, height[src], height[dest]+1);
-		    height[src] = height[dest] + 1;
-		    active[0] = 1;
-		    return true;
-		}
-	    }
-	    return false;
-	};
-	
-//	GUARD_CU(excess.ForAll(
-//	    [] __host__ __device__ (ValueT *excess_, const SizeT &v){
-//	      printf("excess_[%d] = %lf\n", v, excess_[v]);
-//	    }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-//
-//	GUARD_CU(height.ForAll(
-//	    [] __host__ __device__ (VertexT *h, const SizeT &v){
-//	      printf("height[%d] = %d\n", v, h[v]);
-//	    }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-//
-//	GUARD_CU(flow.ForAll(
-//	    [] __host__ __device__ (ValueT *f, const SizeT &v){
-//	      printf("flow[%d] = %lf\n", v, f[v]);
-//	    }, graph.edges, util::DEVICE, oprtr_parameters.stream));
+        auto advance_find_lowest_op = 
+            [excess, capacity, flow, lowest_neighbor, height, iteration,
+            source, sink, active]
+            __host__ __device__
+            (const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                const VertexT &input_item, const SizeT &input_pos,
+                SizeT &output_pos) -> bool
+            {
+                if (!util::isValid(dest) or !util::isValid(src) or 
+                    src == source or src == sink)
+                    return false;
+                if (excess[src] > (ValueT)0 and 
+                    capacity[edge_id] - flow[edge_id] > (ValueT)0)
+                {
+                    auto l = lowest_neighbor[src];
+                    auto height_dest = height[dest];
+                    while (!util::isValid(l) or height_dest < height[l]){
+                        l = atomicCAS(&lowest_neighbor[src], l, dest);
+                    }
+                    if (lowest_neighbor[src] == dest){
+                        return true;
+                    }
+                }
+                return false;
+            };
 
-	
-	oprtr_parameters.advance_mode = "ALL_EDGES";
-	GUARD_CU(active.ForAll(
-	    [] __host__ __device__ (SizeT *a, const SizeT &v){
-	      a[v] = 0;
-	    }, 1, util::DEVICE, oprtr_parameters.stream));
-	
-	// ADVANCE_PUSH_OP
-	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-		    graph.csr(), &local_vertices, null_ptr,
-		    oprtr_parameters, advance_push_op));
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-	    "cudaStreamSynchronize failed");
-	
-	GUARD_CU(lowest_neighbor.ForAll(
-          [] __host__ __device__ (VertexT *el, const SizeT &v){
-	    el[v] = util::PreDefinedValues<VertexT>::InvalidValue;
-          }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-          "cudaStreamSynchronize failed");
+        auto advance_relabel_op = 
+            [excess, capacity, flow, lowest_neighbor, height, iteration, 
+            source, sink, active]
+            __host__ __device__
+            (const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                const VertexT &input_item, const SizeT &input_pos,
+                SizeT &output_pos) -> bool
+            {
+                if (!util::isValid(dest) or !util::isValid(src) or 
+                    src == source or src == sink)
+                    return false;
+                if (excess[src] > (ValueT)0 and 
+                    capacity[edge_id] - flow[edge_id] > (ValueT)0 and
+                    lowest_neighbor[src] == dest){ 
+                    if (height[src] <= height[dest])
+                    {
+                //	    printf("relabel src %d, dest %d, H[%d]=%d, -> %d\n",\
+                        src, dest, src, height[src], height[dest]+1);
+                        height[src] = height[dest] + 1;
+                        active[0] = 1;
+                        return true;
+                    }
+                }
+                return false;
+            };
+        
+    //	GUARD_CU(excess.ForAll(
+    //	    [] __host__ __device__ (ValueT *excess_, const SizeT &v){
+    //	      printf("excess_[%d] = %lf\n", v, excess_[v]);
+    //	    }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+    //
+    //	GUARD_CU(height.ForAll(
+    //	    [] __host__ __device__ (VertexT *h, const SizeT &v){
+    //	      printf("height[%d] = %d\n", v, h[v]);
+    //	    }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+    //
+    //	GUARD_CU(flow.ForAll(
+    //	    [] __host__ __device__ (ValueT *f, const SizeT &v){
+    //	      printf("flow[%d] = %lf\n", v, f[v]);
+    //	    }, graph.edges, util::DEVICE, oprtr_parameters.stream));
+
+        
+        oprtr_parameters.advance_mode = "ALL_EDGES";
+        GUARD_CU(active.ForAll(
+            [] __host__ __device__ (SizeT *a, const SizeT &v){
+              a[v] = 0;
+            }, 1, util::DEVICE, oprtr_parameters.stream));
+        
+        // ADVANCE_PUSH_OP
+        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                graph.csr(), &local_vertices, null_ptr,
+                oprtr_parameters, advance_push_op));
+        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+            "cudaStreamSynchronize failed");
+        
+        GUARD_CU(lowest_neighbor.ForAll(
+              [] __host__ __device__ (VertexT *el, const SizeT &v){
+            el[v] = util::PreDefinedValues<VertexT>::InvalidValue;
+              }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+              "cudaStreamSynchronize failed");
 
 
-	// ADVANCE_FIND_LOWEST_OP
-	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-		    graph.csr(), &local_vertices, null_ptr,
-		    oprtr_parameters, advance_find_lowest_op)); 
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-	    "cudaStreamSynchronize failed");
-      
-//	GUARD_CU(lowest_neighbor.ForAll(
-//          [] __host__ __device__ (VertexT *el, const SizeT &v){
-//            printf("lowest_neighbor[%d] = %d\n", v, el[v]);
-//          }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-//	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-//          "cudaStreamSynchronize failed");
+        // ADVANCE_FIND_LOWEST_OP
+        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                graph.csr(), &local_vertices, null_ptr,
+                oprtr_parameters, advance_find_lowest_op)); 
+        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+            "cudaStreamSynchronize failed");
+          
+    //	GUARD_CU(lowest_neighbor.ForAll(
+    //          [] __host__ __device__ (VertexT *el, const SizeT &v){
+    //            printf("lowest_neighbor[%d] = %d\n", v, el[v]);
+    //          }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+    //	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+    //          "cudaStreamSynchronize failed");
 
-	// ADVANCE RELABEL OP
-	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-		    graph.csr(), &local_vertices, null_ptr,
-		    oprtr_parameters, advance_relabel_op));
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-	    "cudaStreamSynchronize failed");
-	
-//	GUARD_CU(active.ForAll(
-//	    [] __host__ __device__ (SizeT *a, const SizeT &v){
-//	      if (a[v]){
-//		printf("there are");
-//	      }else{
-//		printf("there are not");
-//	      }
-//	      printf(" active nodes\n");
-//	    }, 1, util::DEVICE, oprtr_parameters.stream));
-//	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-//	    "cudaStreamSynchronize failed");
+        // ADVANCE RELABEL OP
+        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                graph.csr(), &local_vertices, null_ptr,
+                oprtr_parameters, advance_relabel_op));
+        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+            "cudaStreamSynchronize failed");
+        
+    //	GUARD_CU(active.ForAll(
+    //	    [] __host__ __device__ (SizeT *a, const SizeT &v){
+    //	      if (a[v]){
+    //		printf("there are");
+    //	      }else{
+    //		printf("there are not");
+    //	      }
+    //	      printf(" active nodes\n");
+    //	    }, 1, util::DEVICE, oprtr_parameters.stream));
+    //	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+    //	    "cudaStreamSynchronize failed");
 
-	//printf("new updated vertices %d\n", frontier.queue_length);
+        //printf("new updated vertices %d\n", frontier.queue_length);
 
-	frontier.queue_reset = true;
-	oprtr_parameters.filter_mode = "BY_PASS";
-	GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-		    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-		    oprtr_parameters, 
-	[active]
-	__host__ __device__
-	(const VertexT &src, VertexT &dest, const SizeT &edge_id,
-	  const VertexT &input_item, const SizeT &input_pos,
-	  SizeT &output_pos) -> bool
-	  {
-	    return active[0] > 0;
-	  }));
+        frontier.queue_reset = true;
+        oprtr_parameters.filter_mode = "BY_PASS";
+        GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                oprtr_parameters, 
+        [active]
+        __host__ __device__
+        (const VertexT &src, VertexT &dest, const SizeT &edge_id,
+          const VertexT &input_item, const SizeT &input_pos,
+          SizeT &output_pos) -> bool
+          {
+            return active[0] > 0;
+          }));
 
-	frontier.queue_index++;
-	// Get back the resulted frontier length
-	GUARD_CU(frontier.work_progress.GetQueueLength(
-		    frontier.queue_index, frontier.queue_length,
-		    false, oprtr_parameters.stream, true));
+        frontier.queue_index++;
+        // Get back the resulted frontier length
+        GUARD_CU(frontier.work_progress.GetQueueLength(
+                frontier.queue_index, frontier.queue_length,
+                false, oprtr_parameters.stream, true));
 
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-	    "cudaStreamSynchronize failed");
+        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+            "cudaStreamSynchronize failed");
 
-//	printf("new updated vertices %d (version after filter)\n", \
-		frontier.queue_length);\
-	fflush(stdout);
+    //	printf("new updated vertices %d (version after filter)\n", \
+            frontier.queue_length);\
+        fflush(stdout);
 
-	data_slice.num_updated_vertices = frontier.queue_length;
+        data_slice.num_updated_vertices = frontier.queue_length;
 
-	return retval;
+        return retval;
     }
 
     /* cudaError_t Compute_OutputLength(int peer_)
@@ -306,10 +304,10 @@ struct MFIterationLoop : public IterationLoopBase
         int NUM_VALUE__ASSOCIATES>
     cudaError_t ExpandIncoming(SizeT &received_length, int peer_)
     {
-	auto &enactor	    = this -> enactor;
-	auto &problem	    = enactor -> problem;
-	auto gpu_num	    = this -> gpu_num;
-	auto gpu_offset	    = gpu_num * enactor -> num_gpus;
+        auto &enactor	    = this -> enactor;
+        auto &problem	    = enactor -> problem;
+        auto gpu_num	    = this -> gpu_num;
+        auto gpu_offset	    = gpu_num * enactor -> num_gpus;
         auto &data_slice    = problem -> data_slices[gpu_num][0];
         auto &enactor_slice = enactor -> enactor_slices[gpu_offset + peer_];
         auto iteration	    = enactor_slice.enactor_stats.iteration;
@@ -319,56 +317,56 @@ struct MFIterationLoop : public IterationLoopBase
         auto &excess	    = data_slice.excess;
         auto &height	    = data_slice.height;
         
-	debug_aml("ExpandIncomming do nothing");
-/*	for key " + 
-		    std::to_string(key) + " and for in_pos " +
-		    std::to_string(in_pos) + " and for vertex ass ins " +
-		    std::to_string(vertex_associate_ins[in_pos]) +
-		    " and for value ass ins " +
-		    std::to_string(value__associate_ins[in_pos]));*/
-	auto expand_op = [capacity, flow, excess, height] 
-	__host__ __device__(VertexT &key, const SizeT &in_pos,
+        debug_aml("ExpandIncomming do nothing");
+    /*	for key " + 
+                std::to_string(key) + " and for in_pos " +
+                std::to_string(in_pos) + " and for vertex ass ins " +
+                std::to_string(vertex_associate_ins[in_pos]) +
+                " and for value ass ins " +
+                std::to_string(value__associate_ins[in_pos]));*/
+        auto expand_op = [capacity, flow, excess, height] 
+        __host__ __device__(VertexT &key, const SizeT &in_pos,
 
-            VertexT *vertex_associate_ins,
-            ValueT  *value__associate_ins) -> bool
-        {
-	    
-            // TODO: fill in the lambda to combine received and local data, e.g.:
-            // ValueT in_val  = value__associate_ins[in_pos];
-            // ValueT old_val = atomicMin(distances + key, in_val);
-            // if (old_val <= in_val)
-            //     return false;
-            return true;
-        };
+                VertexT *vertex_associate_ins,
+                ValueT  *value__associate_ins) -> bool
+            {
+            
+                // TODO: fill in the lambda to combine received and local data, e.g.:
+                // ValueT in_val  = value__associate_ins[in_pos];
+                // ValueT old_val = atomicMin(distances + key, in_val);
+                // if (old_val <= in_val)
+                //     return false;
+                return true;
+            };
 
-	debug_aml("expand incoming\n");
-        cudaError_t retval = BaseIterationLoop:: template ExpandIncomingBase
-            <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
-            (received_length, peer_, expand_op);
-	return retval; 
+        debug_aml("expand incoming\n");
+            cudaError_t retval = BaseIterationLoop:: template ExpandIncomingBase
+                <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
+                (received_length, peer_, expand_op);
+	    return retval; 
     }
 
     bool Stop_Condition(int gpu_num = 0)
     {
-	auto enactor = this -> enactor;
-	int num_gpus = enactor -> num_gpus;
-	auto &enactor_slice = enactor -> enactor_slices[0];
-	auto iteration	= enactor_slice.enactor_stats.iteration;
-	
-	auto &retval = enactor_slice.enactor_stats.retval;
-	if (retval != cudaSuccess){
-	    printf("(CUDA error %d @ GPU %d: %s\n", retval, 0 % num_gpus,
-		cudaGetErrorString(retval));
-	    fflush(stdout);
-	    return true;
-	}
+        auto enactor = this -> enactor;
+        int num_gpus = enactor -> num_gpus;
+        auto &enactor_slice = enactor -> enactor_slices[0];
+        auto iteration	= enactor_slice.enactor_stats.iteration;
+        
+        auto &retval = enactor_slice.enactor_stats.retval;
+        if (retval != cudaSuccess){
+            printf("(CUDA error %d @ GPU %d: %s\n", retval, 0 % num_gpus,
+            cudaGetErrorString(retval));
+            fflush(stdout);
+            return true;
+        }
 
-	auto &data_slice = enactor -> problem -> data_slices[gpu_num][0];
+        auto &data_slice = enactor -> problem -> data_slices[gpu_num][0];
 
-	if (data_slice.num_updated_vertices == 0)
-	    return true;
+        if (data_slice.num_updated_vertices == 0)
+            return true;
 
-	return false;
+        return false;
     }
 }; // end of MFIteration
 
@@ -460,28 +458,28 @@ public:
         GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target, 
 		    false));
 
-	auto num_gpus = this->num_gpus;
+        auto num_gpus = this->num_gpus;
 
-	for (int gpu = 0; gpu < num_gpus; ++gpu)
-	{
-	    GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-	    auto gpu_offset = gpu * num_gpus;
-	    auto &enactor_slice = this->enactor_slices[gpu_offset + 0];
-	    auto &graph = problem.sub_graphs[gpu];
-	    auto nodes = graph.nodes;
-	    auto edges = graph.edges;
-	    GUARD_CU(enactor_slice.frontier.Allocate(nodes, edges, 
-			this->queue_factors));
-	}
-	iterations = new IterationT[num_gpus];
+        for (int gpu = 0; gpu < num_gpus; ++gpu)
+        {
+            GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+            auto gpu_offset = gpu * num_gpus;
+            auto &enactor_slice = this->enactor_slices[gpu_offset + 0];
+            auto &graph = problem.sub_graphs[gpu];
+            auto nodes = graph.nodes;
+            auto edges = graph.edges;
+            GUARD_CU(enactor_slice.frontier.Allocate(nodes, edges, 
+                this->queue_factors));
+        }
+        iterations = new IterationT[num_gpus];
         for (int gpu = 0; gpu < num_gpus; gpu ++)
         {
             GUARD_CU(iterations[gpu].Init(this, gpu));
         }
 
-	GUARD_CU(this -> Init_Threads(this, 
-		    (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
-	return retval;
+        GUARD_CU(this -> Init_Threads(this, 
+                (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
+        return retval;
     }
 
     /**
@@ -491,10 +489,10 @@ public:
       */
     cudaError_t Run(ThreadSlice &thread_data)
     {
-	debug_aml("Run enact");
+	    debug_aml("Run enact");
         gunrock::app::Iteration_Loop<
             0, // NUM_VERTEX_ASSOCIATES
-	    1, // NUM_VALUE__ASSOCIATES
+	        1, // NUM_VALUE__ASSOCIATES
             IterationT>(thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
     }
@@ -508,47 +506,47 @@ public:
     cudaError_t Reset(const VertexT& src, util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
-	debug_aml("Enactor Reset, src %d", src);
-       
-	typedef typename EnactorT::Problem::GraphT::GpT GpT;
-	auto num_gpus = this->num_gpus;
+        debug_aml("Enactor Reset, src %d", src);
+           
+        typedef typename EnactorT::Problem::GraphT::GpT GpT;
+        auto num_gpus = this->num_gpus;
 
-	GUARD_CU(BaseEnactor::Reset(target));
+        GUARD_CU(BaseEnactor::Reset(target));
 
-        // Initialize frontiers according to the algorithm MF
-	for (int gpu = 0; gpu < num_gpus; gpu++)
-	{
-	    auto gpu_offset = gpu * num_gpus;
-	    if (num_gpus == 1 ||
-		(gpu == this->problem->org_graph->GpT::partition_table[src]))
-	    {
-		this -> thread_slices[gpu].init_size = 1;
-		for (int peer_ = 0; peer_ < num_gpus; ++peer_)
-		{
-		    auto &frontier = 
-			this -> enactor_slices[gpu_offset + peer_].frontier;
-		    frontier.queue_length = (peer_ == 0) ? 1 : 0;
-		    if (peer_ == 0)
-		    {
-			GUARD_CU(frontier.V_Q() -> ForEach(
-			    [src]__host__ __device__ (VertexT &v){v = src;}, 
-			    1, target, 0));
-		    }
-		}
-	    }
-            else 
-	    {
-		this -> thread_slices[gpu].init_size = 0;
+            // Initialize frontiers according to the algorithm MF
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        {
+            auto gpu_offset = gpu * num_gpus;
+            if (num_gpus == 1 ||
+            (gpu == this->problem->org_graph->GpT::partition_table[src]))
+            {
+                this -> thread_slices[gpu].init_size = 1;
+                for (int peer_ = 0; peer_ < num_gpus; ++peer_)
+                {
+                    auto &frontier = 
+                    this -> enactor_slices[gpu_offset + peer_].frontier;
+                    frontier.queue_length = (peer_ == 0) ? 1 : 0;
+                    if (peer_ == 0)
+                    {
+                        GUARD_CU(frontier.V_Q() -> ForEach(
+                            [src]__host__ __device__ (VertexT &v){v = src;}, 
+                            1, target, 0));
+                    }
+                }
+            }
+                else 
+            {
+                this -> thread_slices[gpu].init_size = 0;
                 for (int peer_ = 0; peer_ < num_gpus; peer_++)
                 {
-		    auto &frontier = 
-			this -> enactor_slices[gpu_offset + peer_].frontier;
-		    frontier.queue_length = 0;
+                    auto &frontier = 
+                        this -> enactor_slices[gpu_offset + peer_].frontier;
+                    frontier.queue_length = 0;
                 }
-	    }
+            }
         }
         GUARD_CU(BaseEnactor::Sync());
-	debug_aml("Enactor Reset end");
+	    debug_aml("Enactor Reset end");
         return retval;
     }
 
@@ -560,7 +558,7 @@ public:
     cudaError_t Enact()
     {
         cudaError_t  retval     = cudaSuccess;
-	debug_aml("enact");
+	    debug_aml("enact");
         GUARD_CU(this -> Run_Threads(this));
         util::PrintMsg("GPU MF Done.", this -> flag & Debug);
         return retval;

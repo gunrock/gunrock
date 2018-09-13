@@ -238,10 +238,10 @@ cudaError_t RunTests(
     cpu_timer.Start();
     if (validation == "last")
     {
-	GUARD_CU(problem.Extract(h_flow));
- 	app::mf::minCut(graph, source, h_flow, min_cut);
-    int num_errors = app::mf::Validate_Results(parameters, graph, 
-		source, sink, h_flow, h_reverse, min_cut, ref_flow, quiet_mode);
+        GUARD_CU(problem.Extract(h_flow));
+        app::mf::minCut(graph, source, h_flow, min_cut);
+        int num_errors = app::mf::Validate_Results(parameters, graph, 
+            source, sink, h_flow, h_reverse, min_cut, ref_flow, quiet_mode);
     }
 
     // Compute running statistics
@@ -325,7 +325,7 @@ double gunrock_mf(
 
         total_time += cpu_timer.ElapsedMillis();
         problem.Extract(flow);
-	gunrock::app::mf::minCut(graph, source, flow, min_cut);
+	    gunrock::app::mf::minCut(graph, source, flow, min_cut);
     }
 
     enactor.Release(target);
