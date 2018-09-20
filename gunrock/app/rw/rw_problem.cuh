@@ -7,9 +7,9 @@
 
 /**
  * @file
- * hello_problem.cuh
+ * RW_problem.cuh
  *
- * @brief GPU Storage management Structure for hello Problem Data
+ * @brief GPU Storage management Structure for RW Problem Data
  */
 
 #pragma once
@@ -18,13 +18,11 @@
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace rw {
-// </DONE>
 
 
 /**
- * @brief Speciflying parameters for hello Problem
+ * @brief Speciflying parameters for RW Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -34,9 +32,6 @@ cudaError_t UseParameters_problem(
     cudaError_t retval = cudaSuccess;
 
     GUARD_CU(gunrock::app::UseParameters_problem(parameters));
-
-    // <DONE> Add problem specific command-line parameter usages here, e.g.:
-    // </DONE>
 
     return retval;
 }
@@ -70,23 +65,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     struct DataSlice : BaseDataSlice
     {
-        // <DONE> add problem specific storage arrays:
+        // problem specific storage arrays:
         util::Array1D<SizeT, VertexT> walks;
         util::Array1D<SizeT, float> rand;
         int walk_length;
+        int walks_per_node;
         curandGenerator_t gen;
-
-        // </DONE>
 
         /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice()
         {
-            // <DONE> name of the problem specific arrays:
             walks.SetName("walks");
             rand.SetName("rand");
-            // </DONE>
         }
 
         /*
@@ -105,10 +97,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            // <DONE> Release problem specific data, e.g.:
             GUARD_CU(walks.Release(target));
             GUARD_CU(rand.Release(target));
-            // </DONE>
 
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
@@ -129,25 +119,23 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             util::Location target,
             ProblemFlag    flag,
             int walk_length_,
+            int walks_per_node_,
             int seed)
         {
             cudaError_t retval  = cudaSuccess;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
-            // <DONE> allocate problem specific data here, e.g.:
             walk_length = walk_length_;
+            walks_per_node = walks_per_node_;
             curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
             curandSetPseudoRandomGeneratorSeed(gen, seed);
 
-            GUARD_CU(walks.Allocate(sub_graph.nodes * walk_length, target));
-            GUARD_CU(rand.Allocate(sub_graph.nodes, target));
-            // </DONE>
+            GUARD_CU(walks.Allocate(sub_graph.nodes * walk_length * walks_per_node, target));
+            GUARD_CU(rand.Allocate(sub_graph.nodes * walks_per_node, target));
 
             if (target & util::DEVICE) {
-                // <DONE> move sub-graph used by the problem onto GPU,
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
-                // </DONE>
             }
             return retval;
         }
@@ -163,20 +151,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT nodes = this -> sub_graph -> nodes;
 
             // Ensure data are allocated
-            // <DONE> ensure size of problem specific data:
-            GUARD_CU(walks.EnsureSize_(nodes * this -> walk_length, target));
-            GUARD_CU(rand.EnsureSize_(nodes, target));
-            // </DONE>
+            GUARD_CU(walks.EnsureSize_(nodes * this -> walk_length * this -> walks_per_node, target));
+            GUARD_CU(rand.EnsureSize_(nodes * this -> walks_per_node, target));
 
             // Reset data
-            // <DONE> reset problem specific data, e.g.:
             GUARD_CU(walks.ForEach([]__host__ __device__ (VertexT &x){
-               x = (VertexT)0;
-            }, nodes * this -> walk_length, target, this -> stream));
+               x = util::PreDefinedValues<VertexT>::InvalidValue;
+            }, nodes * this -> walk_length * this -> walks_per_node, target, this -> stream));
+            
             GUARD_CU(rand.ForEach([]__host__ __device__ (float &x){
-               x = 0.0f;
-            }, nodes, target, this -> stream));
-            // </DONE>
+               x = (float)0.0;
+            }, nodes * this -> walks_per_node, target, this -> stream));
 
             return retval;
         }
@@ -184,30 +169,29 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
-    // <ADDITIONAL_TODO>
     int walk_length;
+    int walks_per_node;
     int seed;
-    // </ADDITIONAL_TODO>
 
     // ----------------------------------------------------------------
     // Problem Methods
 
     /**
-     * @brief hello default constructor
+     * @brief RW default constructor
      */
     Problem(
         util::Parameters &_parameters,
         ProblemFlag _flag = Problem_None) :
         BaseProblem(_parameters, _flag),
         data_slices(NULL) {
-        // <ADDITIONAL_TODO>
-        walk_length = _parameters.Get<int>("walk-length");
-        seed = _parameters.Get<int>("seed");
-        // </ADDITIONAL_TODO>
+            
+        walk_length    = _parameters.Get<int>("walk-length");
+        walks_per_node = _parameters.Get<int>("walks-per-node");
+        seed           = _parameters.Get<int>("seed");
     }
 
     /**
-     * @brief hello default destructor
+     * @brief RW default destructor
      */
     virtual ~Problem() { Release(); }
 
@@ -238,9 +222,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
-        // <DONE> problem specific data to extract
         VertexT *h_walks,
-        // </DONE>
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -252,18 +234,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // Set device
             if (target == util::DEVICE) {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-
-                // <DONE> extract the results from single GPU, e.g.:
-                GUARD_CU(data_slice.walks.SetPointer(h_walks, nodes * this -> walk_length, util::HOST));
+                GUARD_CU(data_slice.walks.SetPointer(h_walks, nodes * this -> walk_length * this -> walks_per_node, util::HOST));
                 GUARD_CU(data_slice.walks.Move(util::DEVICE, util::HOST));
-                // </DONE>
             } else if (target == util::HOST) {
-                // <DONE> extract the results from single CPU, e.g.:
+                // extract the results from single CPU
                 GUARD_CU(data_slice.walks.ForEach(h_walks,
                    []__host__ __device__ (const VertexT &device_val, VertexT &host_val){
                        host_val = device_val;
-                   }, nodes, util::HOST));
-                // </DONE>
+                   }, nodes * this -> walk_length * this -> walks_per_node, util::HOST));
             }
         } else { // num_gpus != 1
             
@@ -314,11 +292,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseProblem::Init(graph, target));
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
-
-        // <TODO> get problem specific flags from parameters, e.g.:
-        // if (this -> parameters.template Get<bool>("mark-pred"))
-        //    this -> flag = this -> flag | Mark_Predecessors;
-        // </TODO>
         
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
             data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
@@ -335,6 +308,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 target,
                 this -> flag,
                 this -> walk_length,
+                this -> walks_per_node,
                 this -> seed
             ));
         }
@@ -349,9 +323,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
-        // <TODO> problem specific data if necessary, eg
-        // VertexT src,
-        // </TODO>
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -364,15 +335,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
 
-        // <TODO> Additional problem specific initialization
-        // </TODO>
-
         GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
         return retval;
     }
 };
 
-} //namespace Template
+} //namespace rw
 } //namespace app
 } //namespace gunrock
 
