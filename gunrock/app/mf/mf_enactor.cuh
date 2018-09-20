@@ -21,6 +21,10 @@
 #include <gunrock/app/mf/mf_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
+//#define debug_aml(a) printf("%s:%d %s\n", __FILE__, __LINE__, a);
+#define debug_aml(a) std::cout << __FILE__ << ":" << __LINE__ << " " << a \
+    << "\n";
+
 namespace gunrock {
 namespace app {
 namespace mf {
@@ -60,104 +64,73 @@ struct MFIterationLoop : public IterationLoopBase
      */
     cudaError_t Core(int peer_ = 0)
     {
+	debug_aml("core start");
 	auto enactor		= this -> enactor;
 	auto gpu_num		= this -> gpu_num;
 	auto num_gpus		= enactor -> num_gpus;
-        auto &data_slice	= enactor -> problem -> 
-				  data_slices[gpu_num][0];
+	auto gpu_offset		= num_gpus * gpu_num;
+        auto &data_slice	= enactor -> problem -> data_slices[gpu_num][0];
         auto &enactor_slice	= enactor -> 
-				  enactor_slices[gpu_num * num_gpus + peer_];
+				  enactor_slices[gpu_offset + peer_];
         auto &enactor_stats	= enactor_slice.enactor_stats;
         auto &graph		= data_slice.sub_graph[0];
         auto &frontier        	= enactor_slice.frontier;
         auto &oprtr_parameters	= enactor_slice.oprtr_parameters;
         auto &retval          	= enactor_stats.retval;
         auto &iteration       	= enactor_stats.iteration;
-        auto &capacity        	= data_slice.capacity;
-        auto &excess          	= data_slice.excess;
+       
+	auto &capacity        	= graph.edge_values;
+	auto &reverse		= data_slice.reverse;
         auto &flow            	= data_slice.flow;
+        auto &excess          	= data_slice.excess;
         auto &height	      	= data_slice.height;
 
-/*
-        // The advance push operation
-	// Frontier contains only vertices with excess > 0
-        auto advance_op = [capacity, excess, flow, height]
-        __host__ __device__ (
-            const VertexT &src, VertexT &dest, 
-	    const SizeT &edge_id, const SizeT &reverse_edge_id) -> bool
-        {
-	    VertexT src_height = Load<cub::LOAD_CG>(height + src);
-	    VertexT dest_height = Load<cub::LOAD_CS>(height + dest);
-	    ValueT edge_capacity = Load<cub::LOAD_CG>(capacity + edge_id);
 
-	    // Check if an excess of the source vertex is positive and the 
-	    // destination vertex has claimed as the source height is equal
-	    // the destination height + 1.
-	    // If so, then push operation is performed.
-	    if (edge_capacity > 0 && src_height == dest_height + 1)
-	    {
-		ValueT src_excess = Load<cub::LOAD_CG>(excess + src);
-		ValueT delta = min(src_excess, edge_capacity);
-		atomicAdd(excess + src, -delta);
-		atomicAdd(excess + dest, delta);
-		atomicAdd(capacity + edge_id, -delta);
-		atomicAdd(capacity + reverse_edge_id, delta);
-		return true;
-	    }
-	    return false;
-        };
-
-	// The advance relabel operation
-	// Frontier contains only vertices with excess > 0
-        auto advance_relabel_op = [height]
-        __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id) -> bool
-        {
-	    ValueT src_height = Load<cub::LOAD_CG>(height + src);
-	    ValueT dest_height = Load<cub::LOAD_CS>(height + dest);
-
-	    // Increasing height of source vertex to height of destination 
-	    // vertex + 1.
-	    if (src_height <= dest_height)
-	    {
-		height[src] = dest_height + 1;
-		return true;
-	    }
-	    return false;
-        };
-
-
-
-        // The filter operation
-        auto filter_op = [ iteration
-        // TODO: if needed, pass data used by the lambda
-        ] __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+	auto filter_active_nodes_op = [excess]
+	    __host__ __device__
+	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // TODO: fill in the per-vertex filter operation, e.g.:
-            if (!util::isValid(dest)) return false;
-	    // ????
-            return true;
-        };
+	    printf("filter_op, src = %u, dest = %u, excess[%u] = %u\n", 
+		    src, dest, dest, excess[dest]);
+	    return (excess[dest] > 0);
+	};
+	
+	auto advance_push_op = [capacity, flow, excess, height]
+	    __host__ __device__
+	    (const VertexT &src, VertexT &dest, const SizeT &edge_id, 
+	    const VertexT &input_item, const SizeT &input_pos,
+	    const SizeT &output_pos) -> bool
+	{
+	    printf("advance_push_op, src = %u, dest = %u, \
+		    excess[%u] = %u, excess[%u] = %u, \
+		    capacity[%u-%u] = %u, flow[%u-%u] = %u, \
+		    height[%u] = %u, height[%u] = %u\n", 
+		    src, dest, src, excess[src], dest, excess[dest], 
+		    src, dest, capacity[edge_id], 
+		    src, dest, flow[edge_id], src, 
+		    height[src], dest, height[dest]);
+	    return ;
+	};
 
-        // Call the advance operator, using the advance operation
-        // TODO: modify the operator callers according to algorithmic needs,
-        //       this example only uses an advance + a filter, with
-        //       possible optimization to fuze the two kernels.
-        //       Define more operations (i.e. lambdas) if needed
+	debug_aml("iteration number " << iteration);
+	debug_aml("frontier queue length " << frontier.queue_length);
+	debug_aml("filter mode " << oprtr_parameters.filter_mode);
 
+	oprtr_parameters.filter_mode = "BY_PASS";
+	GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+		    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+		    oprtr_parameters, filter_active_nodes_op));
+	debug_aml("filter queue_length " << frontier.queue_length);
 
-	if (enactor.flag & Debug)
-	    util::cpu_mt::PrintMessage("Advance start.", gpu_num, iteration, 
-		    peer_);
-	*/
-  /* aga 
+	oprtr_parameters.advance_mode = "LB"; //all neighbours
 	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, advance_op, filter_op));
+		    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+		    oprtr_parameters, advance_push_op));
+	
 
+/*aga
         if (oprtr_parameters.advance_mode != "LB_CULL" &&
             oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
         {
@@ -176,18 +149,20 @@ struct MFIterationLoop : public IterationLoopBase
         return retval;
     }
 
-    cudaError_t Compute_OutputLength(int peer_)
+   /* cudaError_t Compute_OutputLength(int peer_)
     {   
         // No need to load balance or get output size
         return cudaSuccess;
-    }
+    }*/
 
     /**
      * @brief Routine to combine received data and local data
-     * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each transmition item, typed VertexT
-     * @tparam NUM_VALUE__ASSOCIATES Number of data associated with each transmition item, typed ValueT
-     * @param  received_length The numver of transmition items received
-     * @param[in] peer_ which peer GPU the data came from
+     * @tparam NUM_VERTEX_ASSOCIATES  Number of data associated with each 
+     *				      transmition item, typed VertexT
+     * @tparam NUM_VALUE__ASSOCIATES  Number of data associated with each 
+				      transmition item, typed ValueT
+     * @param[in] received_length     The number of transmition items received
+     * @param[in] peer_		      which peer GPU the data came from
      * \return cudaError_t error message(s), if any
      */
     template <
@@ -195,26 +170,32 @@ struct MFIterationLoop : public IterationLoopBase
         int NUM_VALUE__ASSOCIATES>
     cudaError_t ExpandIncoming(SizeT &received_length, int peer_)
     {
-        auto         &data_slice         =   this -> enactor ->
-            problem -> data_slices[this -> gpu_num][0];
-        auto         &enactor_slice      =   this -> enactor ->
-            enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
-        auto iteration = enactor_slice.enactor_stats.iteration;
-        // TODO: add problem specific data alias here, e.g.:
-        // auto         &distances          =   data_slice.distances;
-        auto         &capacity           =   data_slice.capacity;
-        auto         &excess             =   data_slice.excess;
-        auto         &flow               =   data_slice.flow;
-        auto         &height           =   data_slice.height;
-/*
-        auto expand_op = [
-        // TODO: pass data used by the lambda, e.g.:
-        // distances
-        ] __host__ __device__(
-            VertexT &key, const SizeT &in_pos,
+	auto &enactor	    = this -> enactor;
+	auto &problem	    = enactor -> problem;
+	auto gpu_num	    = this -> gpu_num;
+	auto gpu_offset	    = gpu_num * enactor -> num_gpus;
+        auto &data_slice    = problem -> data_slices[gpu_num][0];
+        auto &enactor_slice = enactor -> enactor_slices[gpu_offset + peer_];
+        auto iteration	    = enactor_slice.enactor_stats.iteration;
+
+        auto &capacity	    = data_slice.sub_graph[0].edge_values; 
+        auto &flow  	    = data_slice.flow;
+        auto &excess	    = data_slice.excess;
+        auto &height	    = data_slice.height;
+        
+	debug_aml("ExpandIncomming do nothing");
+/*	for key " + 
+		    std::to_string(key) + " and for in_pos " +
+		    std::to_string(in_pos) + " and for vertex ass ins " +
+		    std::to_string(vertex_associate_ins[in_pos]) +
+		    " and for value ass ins " +
+		    std::to_string(value__associate_ins[in_pos]));*/
+	auto expand_op = [capacity, flow, excess, height] 
+	__host__ __device__(VertexT &key, const SizeT &in_pos,
             VertexT *vertex_associate_ins,
             ValueT  *value__associate_ins) -> bool
         {
+	    
             // TODO: fill in the lambda to combine received and local data, e.g.:
             // ValueT in_val  = value__associate_ins[in_pos];
             // ValueT old_val = atomicMin(distances + key, in_val);
@@ -223,11 +204,12 @@ struct MFIterationLoop : public IterationLoopBase
             return true;
         };
 
+	debug_aml("expand incoming\n");
         cudaError_t retval = BaseIterationLoop:: template ExpandIncomingBase
             <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
             (received_length, peer_, expand_op);
-	return retval; */
-        return (cudaError_t)0;
+	return retval; 
+        //return (cudaError_t)0;
     }
 }; // end of MFIteration
 
@@ -254,7 +236,6 @@ public:
     typedef typename Problem::ValueT  ValueT;
     typedef typename Problem::SizeT   SizeT;
     typedef typename Problem::GraphT  GraphT;
-    // TODO: change according to the EnactorBase template parameters above
     typedef EnactorBase<GraphT, VertexT, ValueT, ARRAY_FLAG, 
 	    cudaHostRegisterFlag>				BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
@@ -317,40 +298,39 @@ public:
         this->problem = &problem;
         
 	// Lazy initialization
-        GUARD_CU(BaseEnactor::Init(
-            problem, Enactor_None,
-            // TODO: change to how many frontier queues, and their types
-            2, NULL,
-            target, false));
-	
-	iterations = new IterationT[this -> num_gpus];
-        for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
+        GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target, 
+		    false));
+
+	auto num_gpus = this->num_gpus;
+
+	for (int gpu = 0; gpu < num_gpus; ++gpu)
+	{
+	    GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+	    auto gpu_offset = gpu * num_gpus;
+	    auto &enactor_slice = this->enactor_slices[gpu_offset + 0];
+	    auto &graph = problem.sub_graphs[gpu];
+	    auto nodes = graph.nodes;
+	    auto edges = graph.edges;
+	    GUARD_CU(enactor_slice.frontier.Allocate(nodes, edges, 
+			this->queue_factors));
+	  
+	    // Do I need labels?
+	    /*
+	    for (int peer = 0; peer < num_gpus; ++peer){
+		auto &enactor_slice = this->enactor_slices[gpu_offset + peer];
+		enactor_slice.oprtr_parameters.labels = 
+		    &(problem.data_slices[gpu]->labels);
+	    }*/
+	}
+	iterations = new IterationT[num_gpus];
+        for (int gpu = 0; gpu < num_gpus; gpu ++)
         {
             GUARD_CU(iterations[gpu].Init(this, gpu));
         }
 
-	if (this->num_gpus == 1){
-	    GUARD_CU(this -> Init_Threads(this,
-			(CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
-
-	}
-/*
-        for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
-        {
-            GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-            auto &enactor_slice = this->enactor_slices[gpu*this->num_gpus+0];
-            auto &graph = problem.sub_graphs[gpu];
-            GUARD_CU(enactor_slice.frontier.Allocate(
-                graph.nodes, graph.edges, this->queue_factors));
-	    //for (int peer = 0; peer < this -> num_gpus; peer ++)
-            //{
-            //    this -> enactor_slices[gpu * this -> num_gpus + peer]
-            //        .oprtr_parameters.labels
-            //        = &(problem.data_slices[gpu] -> labels);
-            //}
-        }*/
-	
-        return retval;
+	GUARD_CU(this -> Init_Threads(this, 
+		    (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
+	return retval;
     }
 
     /**
@@ -360,6 +340,7 @@ public:
       */
     cudaError_t Run(ThreadSlice &thread_data)
     {
+	debug_aml("Run enact");
         gunrock::app::Iteration_Loop<
             0, // NUM_VERTEX_ASSOCIATES
 	    1, // NUM_VALUE__ASSOCIATES
@@ -373,58 +354,62 @@ public:
      * @param[in] target Target location of data
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Reset(
-        // TODO: add problem specific info, e.g.:
-        util::Location target = util::DEVICE)
+    cudaError_t Reset(const VertexT& src, util::Location target = util::DEVICE)
     {
-        typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
-        GUARD_CU(BaseEnactor::Reset(target));
+	debug_aml("Enactor Reset, src " << src);
+       
+	typedef typename EnactorT::Problem::GraphT::GpT GpT;
+	auto num_gpus = this->num_gpus;
 
-        // TODO: Initialize frontiers according to the algorithm, e.g.:
-       	for (int gpu = 0; gpu < this->num_gpus; gpu++)
-        {
-          //  if ((this->num_gpus == 1) ||
-            //     (gpu == this->problem->org_graph->GpT::partition_table[src]))
-           // {
-             //   this -> thread_slices[gpu].init_size = 1;
-               // for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
-               // {
-                 //   auto &frontier = this ->
-                  //      enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                   // frontier.queue_length = (peer_ == 0) ? 1 : 0;
-                   // if (peer_ == 0)
-                    //{
-                     //   GUARD_CU(frontier.V_Q() -> ForEach(
-                      //      [src]__host__ __device__ (VertexT &v)
-                       // {
-                        //    v = src;
-                       // }, 1, target, 0));
-                 // }
-                //}
-            //}
+	GUARD_CU(BaseEnactor::Reset(target));
 
-         //   else {
-             this -> thread_slices[gpu].init_size = 0;
-                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
+        // Initialize frontiers according to the algorithm MF
+	for (int gpu = 0; gpu < num_gpus; gpu++)
+	{
+	    auto gpu_offset = gpu * num_gpus;
+	    if (num_gpus == 1 ||
+		(gpu == this->problem->org_graph->GpT::partition_table[src]))
+	    {
+		this -> thread_slices[gpu].init_size = 1;
+		for (int peer_ = 0; peer_ < num_gpus; ++peer_)
+		{
+		    auto &frontier = 
+			this -> enactor_slices[gpu_offset + peer_].frontier;
+		    frontier.queue_length = (peer_ == 0) ? 1 : 0;
+		    if (peer_ == 0)
+		    {
+			GUARD_CU(frontier.V_Q() -> ForEach(
+			    [src]__host__ __device__ (VertexT &v){v = src;}, 
+			    1, target, 0));
+		    }
+		}
+	    }
+            else 
+	    {
+		this -> thread_slices[gpu].init_size = 0;
+                for (int peer_ = 0; peer_ < num_gpus; peer_++)
                 {
-                    this -> enactor_slices[gpu * this -> num_gpus + peer_]
-                        .frontier.queue_length = 0;
+		    auto &frontier = 
+			this -> enactor_slices[gpu_offset + peer_].frontier;
+		    frontier.queue_length = 0;
                 }
-        //    }
+	    }
         }
         GUARD_CU(BaseEnactor::Sync());
+	debug_aml("Enactor Reset end");
         return retval;
     }
 
     /**
-     * @brief Enacts a SSSP computing on the specified graph.
+     * @brief Enacts a MF computing on the specified graph.
      * @param[in] src Source node to start primitive.
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Enact(VertexT src, VertexT sink)
+    cudaError_t Enact()
     {
         cudaError_t  retval     = cudaSuccess;
+	debug_aml("enact");
         GUARD_CU(this -> Run_Threads(this));
         util::PrintMsg("GPU MF Done.", this -> flag & Debug);
         return retval;
