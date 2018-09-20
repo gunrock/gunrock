@@ -20,7 +20,7 @@ namespace rw {
 
 
 /******************************************************************************
- * Template Testing Routines
+ * TW Testing Routines
  *****************************************************************************/
 
 /**
@@ -64,7 +64,10 @@ double CPU_Reference(
  * @tparam     ValueT        Type of the values
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
-...
+ * @param[in]  walk_length         Random walk length
+ * @param[in]  walks_per_node      Number of random walks per node
+ * @param[in]  h_walks       GPU walks
+ * @param[in]  ref_walks     CPU walks
  * @param[in]  verbose       Whether to output detail comparsions
  * \return     GraphT::SizeT Number of errors
  */
@@ -81,7 +84,7 @@ typename GraphT::SizeT Validate_Results(
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
 
-    // SizeT num_errors = 0;
+    SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
     
     if(!quiet) {
@@ -103,7 +106,7 @@ typename GraphT::SizeT Validate_Results(
     return num_errors;
 }
 
-} // namespace Template
+} // namespace rw
 } // namespace app
 } // namespace gunrock
 
