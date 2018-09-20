@@ -20,9 +20,7 @@
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace pr_nibble {
-// </DONE>
 
 
 /**
@@ -34,12 +32,7 @@ cudaError_t UseParameters_problem(
     util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
-
     GUARD_CU(gunrock::app::UseParameters_problem(parameters));
-
-    // <DONE> Add problem specific command-line parameter usages here, e.g.:
-    // </DONE>
-
     return retval;
 }
 
@@ -72,7 +65,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     struct DataSlice : BaseDataSlice
     {
-        // <DONE> add problem specific storage arrays:
+        // problem specific storage arrays:
         util::Array1D<SizeT, ValueT> values;
         
         util::Array1D<SizeT, ValueT> grad;
@@ -85,25 +78,25 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         VertexT src_neib;
         int num_ref_nodes;
         
+        int *d_grad_scale;
+        int *h_grad_scale;
+        
         ValueT eps;
         ValueT alpha;
         ValueT rho;
         int max_iter;
-        // </DONE>
 
         /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice()
         {
-            // <DONE> name of the problem specific arrays:
             values.SetName("values");
             grad.SetName("grad");
             q.SetName("q");
             y.SetName("y");
             z.SetName("z");
             touched.SetName("touched");
-            // </DONE>
         }
 
         /*
@@ -122,16 +115,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            // <DONE> Release problem specific data, e.g.:
             GUARD_CU(values.Release(target));
             GUARD_CU(grad.Release(target));
             GUARD_CU(q.Release(target));
             GUARD_CU(y.Release(target));
             GUARD_CU(z.Release(target));
             GUARD_CU(touched.Release(target));
-            // </DONE>
 
-            GUARD_CU(BaseDataSlice ::Release(target));
+            GUARD_CU(BaseDataSlice::Release(target));
             return retval;
         }
 
@@ -141,6 +132,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          * @param[in] gpu_idx     GPU device index
          * @param[in] target      Targeting device location
          * @param[in] flag        Problem flag containling options
+         * @param[in] _eps        Convergence criteria
+         * @param[in] _alpha
+         * @param[in] _rho
+         * @param[in] _max_iter   Max number of iterations
+         
          * \return    cudaError_t Error message(s), if any
          */
         cudaError_t Init(
@@ -163,19 +159,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
-            // <DONE> allocate problem specific data here, e.g.:
             GUARD_CU(values.Allocate(sub_graph.nodes, target));
             GUARD_CU(grad.Allocate(sub_graph.nodes, target));
             GUARD_CU(q.Allocate(sub_graph.nodes, target));
             GUARD_CU(y.Allocate(sub_graph.nodes, target));
             GUARD_CU(z.Allocate(sub_graph.nodes, target));
             GUARD_CU(touched.Allocate(sub_graph.nodes, target));
-            // </DONE>
+            
+            h_grad_scale = (int*)malloc(sizeof(int) * 1);
+            GUARD_CU(cudaMalloc((void **)&d_grad_scale, 1 * sizeof(int)));
 
             if (target & util::DEVICE) {
-                // <DONE> move sub-graph used by the problem onto GPU,
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
-                // </DONE>
             }
             return retval;
         }
@@ -183,6 +178,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         /**
          * @brief Reset problem function. Must be called prior to each run.
          * @param[in] target      Targeting device location
+         * @param[in] _src             Source node
+         * @param[in] _src_neib        Neighbor of source node (!! HACK)
+         * @param[in] _num_ref_nodes   Number of source nodes (HARDCODED to 1 elsewhere)
          * \return    cudaError_t Error message(s), if any
          */
         cudaError_t Reset(
@@ -199,17 +197,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             num_ref_nodes = _num_ref_nodes;
             
             // Ensure data are allocated
-            // <DONE> ensure size of problem specific data:
             GUARD_CU(values.EnsureSize_(nodes, target));
             GUARD_CU(grad.EnsureSize_(nodes, target));
             GUARD_CU(q.EnsureSize_(nodes, target));
             GUARD_CU(y.EnsureSize_(nodes, target));
             GUARD_CU(z.EnsureSize_(nodes, target));
             GUARD_CU(touched.EnsureSize_(nodes, target));
-            // </DONE>
 
             // Reset data
-            // <DONE> reset problem specific data, e.g.:
             GUARD_CU(values.ForEach([]__host__ __device__ (ValueT &x){
                x = (ValueT)0;
             }, nodes, target, this -> stream));
@@ -234,13 +229,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                x = 0;
             }, nodes, target, this -> stream));
             
-            // </DONE>
-
             return retval;
         }
     }; // DataSlice
 
-    // Set of data slices (one for each GPU)
+    // Problem attributes
     util::Array1D<SizeT, DataSlice> *data_slices;
     
     ValueT phi;
@@ -263,6 +256,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         BaseProblem(_parameters, _flag),
         data_slices(NULL) {
         
+        // Load command line parameters
         phi      = _parameters.Get<ValueT>("phi");
         max_iter = _parameters.Get<int>("max-iter");
         eps      = _parameters.Get<ValueT>("eps");
@@ -300,13 +294,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     
     /**
      * @brief Copy result distancess computed on GPUs back to host-side arrays.
-...
+     * @param[in] h_values      Host array for PR values
      * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
-        // <DONE> problem specific data to extract
         ValueT *h_values,
-        // </DONE>
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -324,7 +316,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target == util::DEVICE) {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-                // <DONE> extract the results from single GPU, e.g.:
                 GUARD_CU(data_slice.grad.SetPointer(h_grad, nodes, util::HOST));
                 GUARD_CU(data_slice.grad.Move(util::DEVICE, util::HOST));
                 
@@ -337,9 +328,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(data_slice.q.SetPointer(h_q, nodes, util::HOST));
                 GUARD_CU(data_slice.q.Move(util::DEVICE, util::HOST));
                 
-                // </DONE>
             } else if (target == util::HOST) {
-                // <DONE> extract the results from single CPU, e.g.:
                 GUARD_CU(data_slice.grad.ForEach(h_grad,
                    []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
                        host_val = device_val;
@@ -359,7 +348,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                    []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
                        host_val = device_val;
                    }, nodes, util::HOST));
-                // </DONE>
             }
 
             for(SizeT i = 0; i < nodes; ++i) {
@@ -367,11 +355,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 double d_sqrt = sqrt((double)d);
                 h_values[i] = abs(h_q[i] * d_sqrt);
             }
-            
-            // for(int i = 0; i < nodes; i++) {
-            //     printf("%d %.17g %.17g %.17g %.17g\n", 
-            //         i, h_values[i], h_q[i], h_y[i], h_z[i]);
-            // }
         
         } else { // num_gpus != 1
             
@@ -423,7 +406,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         GUARD_CU(BaseProblem::Init(graph, target));
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
         
-        // <DONE> Initialize variables
         ValueT num_edges     = (ValueT)graph.edges / 2.0;
         ValueT log_num_edges = log2(num_edges);
         
@@ -440,19 +422,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         this -> rho = 1.0 / this -> rho;
         this -> rho *= 1.0 / (48.0 * log_num_edges);
         
-        std::cout << "num_edges: "     << num_edges        << std::endl;
-        std::cout << "log_num_edges: " << log_num_edges    << std::endl;
-        std::cout << "alpha: "         << this -> alpha    << std::endl;
-        std::cout << "rho: "           << this -> rho      << std::endl;
-        std::cout << "eps: "           << this -> eps      << std::endl;
-        std::cout << "max_iter: "      << this -> max_iter << std::endl;
-        // </DONE>
-        
-        // <OPEN> get problem specific flags from parameters, e.g.:
-        // if (this -> parameters.template Get<bool>("mark-pred"))
-        //    this -> flag = this -> flag | Mark_Predecessors;
-        // </OPEN>
-
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
             data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
             if (target & util::DEVICE)
@@ -479,15 +448,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     /**
      * @brief Reset problem function. Must be called prior to each run.
-     * @param[in] src      Source vertex to start.
+     * @param[in] src       Source vertex
+     * @param[in] src_neib  Source vertex neighbor (!! HACK)
      * @param[in] location Memory location to work on
      * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
-        // <DONE> problem specific data if necessary, eg
         VertexT src,
         VertexT src_neib,
-        // </DONE>
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -517,24 +485,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 "cudaDeviceSynchronize failed");
         }
         
-        SizeT src_d = this -> org_graph -> GetNeighborListLength(src_);
-        std::cout << "** src_: " << src_ << std::endl;
-        std::cout << "** src_d: " << src_d << std::endl;
-        
+        SizeT src_d        = this -> org_graph -> GetNeighborListLength(src_);
         ValueT src_d_sqrt  = sqrt((ValueT)src_d);
         ValueT src_dn_sqrt = 1.0 / src_d_sqrt;
-        
-        ValueT src_grad = -1.0 * this -> alpha * src_dn_sqrt / (double)num_ref_nodes;
-        
-        // printf("alpha: %.17g\n", this -> alpha);
-        // printf("src_d: %d\n", src_d);
-        // printf("src_d_sqrt: %.17g\n", src_d_sqrt);
-        // printf("src_dn_sqrt: %.17g\n", src_dn_sqrt);
-        // printf("src_grad: %.17g\n", src_grad);
+        ValueT src_grad    = -1.0 * this -> alpha * src_dn_sqrt / (double)num_ref_nodes;
         
         ValueT thresh = this -> rho * this -> alpha * src_d_sqrt;
         if(- src_grad < thresh) {
-            std::cerr << "- src_grad < thresh" << std::endl;
+            printf("pr_nibble::Problem: `-1 * src_grad < thresh` -> breaking");
             return retval;
         }
         
@@ -552,7 +510,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU2(cudaDeviceSynchronize(),
                 "cudaDeviceSynchronize failed");
         }
-        // </TODO>
 
         GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
         return retval;

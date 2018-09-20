@@ -18,9 +18,7 @@
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace pr_nibble {
-// </DONE>
 
 
 /******************************************************************************
@@ -32,26 +30,27 @@ namespace pr_nibble {
  * @tparam      GraphT        Type of the graph
  * @tparam      ValueT        Type of the values
  * @param[in]   graph         Input graph
-...
+ * @param[in]   ref_node      Source node
+ * @param[in]   values        Array for output pagerank values
  * @param[in]   quiet         Whether to print out anything to stdout
  */
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    // <DONE> add problem specific inputs and outputs 
     util::Parameters &parameters,
     typename GraphT::VertexT ref_node,
     typename GraphT::ValueT *values,
-    // </DONE>
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
     typedef typename GraphT::ValueT ValueT;
     typedef typename GraphT::VertexT VertexT;
 
-    // Compute graph statistics
+    int num_ref_nodes = 1; // HARDCODED
+    
+    // Graph statistics
     SizeT nodes          = graph.nodes;
-    ValueT num_edges      = (ValueT)graph.edges / 2;
+    ValueT num_edges     = (ValueT)graph.edges / 2;
     ValueT log_num_edges = log2(num_edges);
 
     // Load parameters
@@ -60,6 +59,7 @@ double CPU_Reference(
     ValueT eps   = parameters.Get<ValueT>("eps");
     int max_iter = parameters.Get<int>("max-iter");
     
+    // Magic numbers? From `kfoynt` implementation
     ValueT alpha = pow(phi, 2) / (225.0 * log(100.0 * sqrt(num_edges)));
     
     // rho
@@ -71,12 +71,12 @@ double CPU_Reference(
     }
     rho = pow(2.0f, rho);
     rho = 1.0 / rho;
-    rho *= 1.0 / (48.0 * log_num_edges);
+    rho *= 1.0 / (48.0 * log_num_edges); // More magic numbers?
 
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
     
-    // Algorithm arrays 
+    // Init algorithm storage
     ValueT *grad    = new ValueT[nodes];
     ValueT *q       = new ValueT[nodes];
     ValueT *y       = new ValueT[nodes];
@@ -98,33 +98,19 @@ double CPU_Reference(
         dn[i]      = 1.0 / d[i];
         dn_sqrt[i] = 1.0 / d_sqrt[i];
     }
-    
-    int num_ref_nodes = 1; // HARDCODED
-    
+        
     grad[ref_node] = - (alpha / num_ref_nodes) * dn_sqrt[ref_node];
-    
-    // -- 
-    // std::cout << "num_edges: "     << num_edges        << std::endl;
-    // std::cout << "log_num_edges: " << log_num_edges    << std::endl;
-    // std::cout << "alpha: "         << alpha            << std::endl;
-    // std::cout << "rho: "           << rho              << std::endl;
-    // std::cout << "vol: "           << vol              << std::endl;
-    // std::cout << "eps: "           << eps              << std::endl;
-    // std::cout << "max_iter: "      << max_iter         << std::endl;
-    // printf("dn_sqrt[ref_node] %.17g\n", dn_sqrt[ref_node]);
-    // printf("grad[ref_node] %.17g\n", grad[ref_node]);
-    // -- 
-    
+
     ValueT scale_grad = -1.0 * grad[ref_node] * dn_sqrt[ref_node];
-    int it = 0;
+    int iter = 0;
     
     while(true) {
         if(scale_grad <= rho * alpha * (1.0 + eps)) {
-            // printf("breaking scale_grad\n");
+            printf("pr_nibble::CPU_Reference: gradient too small. breaking at it=%d\n", iter);
             break;
         }
-        if(it >= max_iter) {
-            // printf("breaking iter\n");
+        if(iter >= max_iter) {
+            printf("pr_nibble::CPU_Reference: reached max iterations. breaking at it=%d\n", iter);
             break;
         }
         
@@ -143,7 +129,7 @@ double CPU_Reference(
                 q[idx] = (ValueT)0;
             }
             
-            if(it == 0) {
+            if(iter == 0) {
                 y[idx] = q[idx];
             } else {
                 ValueT beta = (1.0 - sqrt(alpha)) / (1.0 + sqrt(alpha));
@@ -174,7 +160,7 @@ double CPU_Reference(
             }
         }
         
-        it += 1;
+        iter += 1;
     }
     
     for(SizeT i = 0; i < graph.nodes; ++i) {
@@ -192,7 +178,8 @@ double CPU_Reference(
  * @tparam     ValueT        Type of the values
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
-...
+ * @param[in]  h_values      GPU PR values
+ * @param[in]  ref_values    CPU PR values
  * @param[in]  verbose       Whether to output detail comparsions
  * \return     GraphT::SizeT Number of errors
  */
@@ -210,11 +197,6 @@ typename GraphT::SizeT Validate_Results(
 
     bool quiet = parameters.Get<bool>("quiet");
 
-    // printf("Validate_Results: \n");
-    // for(int i = 0; i < graph.nodes; ++i) {
-    //     printf("%d %.17g %.17g\n", i, h_values[i], ref_values[i]);
-    // }
-
     // Check agreement (within a small tolerance)
     SizeT num_errors = 0;
     ValueT tolerance = 0.00001;
@@ -223,9 +205,8 @@ typename GraphT::SizeT Validate_Results(
             float err = abs(h_values[i] - ref_values[i]) / abs(ref_values[i]);
             if (err > tolerance) {
                 num_errors++;
-                util::PrintMsg("FAIL: [" + std::to_string(i)
-                    + "]: " + std::to_string(h_values[i])
-                    + " != " + std::to_string(ref_values[i]));
+                printf("FAIL: [%d]:\t%0.17g != %0.17g\n", 
+                    i, h_values[i], ref_values[i]);
             }
         }
     }

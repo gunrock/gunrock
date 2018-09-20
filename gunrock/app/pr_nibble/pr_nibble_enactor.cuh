@@ -14,21 +14,18 @@
 
 #pragma once
 
+#include <iostream>
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
  
-// <TODO> change includes
 #include <gunrock/app/pr_nibble/pr_nibble_problem.cuh>
-// </TODO>
 
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
 namespace pr_nibble {
-// </TODO>
 
 /**
  * @brief Speciflying parameters for pr_nibble Enactor
@@ -39,10 +36,6 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
-
-    // <TODO> if needed, add command line parameters used by the enactor here
-    // </TODO>
-    
     return retval;
 }
 
@@ -52,12 +45,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
  */
 template <typename EnactorT>
 struct PRNibbleIterationLoop : public IterationLoopBase
-    <EnactorT, Use_FullQ | Push
-    // <TODO>if needed, stack more option, e.g.:
-    // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-    // Update_Predecessors : 0x0)
-    // </TODO>
-    >
+    <EnactorT, Use_FullQ | Push>
 {
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
@@ -66,12 +54,7 @@ struct PRNibbleIterationLoop : public IterationLoopBase
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
     
     typedef IterationLoopBase
-        <EnactorT, Use_FullQ | Push
-        // <TODO> add the same options as in template parameters here, e.g.:
-        // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-        // Update_Predecessors : 0x0)
-        // </TODO>
-        > BaseIterationLoop;
+        <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
     PRNibbleIterationLoop() : BaseIterationLoop() {}
 
@@ -98,15 +81,17 @@ struct PRNibbleIterationLoop : public IterationLoopBase
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
         
-        // <DONE> add problem specific data alias here:
-        auto &grad    = data_slice.grad;
-        auto &q       = data_slice.q;
-        auto &y       = data_slice.y;
-        auto &z       = data_slice.z;
-        auto &touched = data_slice.touched;
+        // problem specific data alias
+        auto &grad       = data_slice.grad;
+        auto &q          = data_slice.q;
+        auto &y          = data_slice.y;
+        auto &z          = data_slice.z;
+        auto &touched    = data_slice.touched;
         
-        auto &alpha   = data_slice.alpha;
-        auto &rho     = data_slice.rho;
+        auto &alpha    = data_slice.alpha;
+        auto &rho      = data_slice.rho;
+        auto &eps      = data_slice.eps;
+        auto &max_iter = data_slice.max_iter;
         
         auto &src_node = data_slice.src;
         auto &src_neib = data_slice.src_neib;
@@ -200,22 +185,17 @@ struct PRNibbleIterationLoop : public IterationLoopBase
 
         // filter operation
         auto filter_op = [
-            // <DONE> pass data to lambda
-            // </DONE>
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // <DONE> implement filter operation
             return true;
-            // </DONE>
         };
         
         // --
         // Run
         
-        // <DONE> some of this may need to be edited depending on algorithmic needs
         GUARD_CU(frontier.V_Q()->ForAll(
             compute_op,
             frontier.queue_length,
@@ -223,15 +203,15 @@ struct PRNibbleIterationLoop : public IterationLoopBase
             oprtr_parameters.stream
         ));
 
-        GUARD_CU2(cudaDeviceSynchronize(),
-            "cudaDeviceSynchronize failed");
+        // GUARD_CU2(cudaDeviceSynchronize(),
+        //     "cudaDeviceSynchronize failed");
 
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
             oprtr_parameters, advance_op, filter_op));
 
-        GUARD_CU2(cudaDeviceSynchronize(),
-            "cudaDeviceSynchronize failed");
+        // GUARD_CU2(cudaDeviceSynchronize(),
+        //     "cudaDeviceSynchronize failed");
         
         if (oprtr_parameters.advance_mode != "LB_CULL" &&
             oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
@@ -246,30 +226,47 @@ struct PRNibbleIterationLoop : public IterationLoopBase
         GUARD_CU(frontier.work_progress.GetQueueLength(
             frontier.queue_index, frontier.queue_length,
             false, oprtr_parameters.stream, true));
+        
+        // Convergence checking
+        ValueT grad_thresh = rho * alpha * (1 + eps);
 
-        // >>
-        // TODO -- Check gradient convergence
-        // ValueT grad_thresh = rho * alpha * (1 + eps);
-        // auto convergence_op = [
-        //     graph,
-        //     grad,
-        //     do_continue,
-        //     grad_thresh
-        // ] __host__ __device__ (VertexT *v, const SizeT &i) {
-        //     if(abs(grad[i] * dn_sqrt[i]) > grad_thresh) do_continue = true;
-        // }
-        // GUARD_CU(frontier.V_Q()->ForAll(
-        //     convergence_op,
-        //     frontier.queue_length,
-        //     util::DEVICE,
-        //     oprtr_parameters.stream
-        // ));
-        // <//
-
+        auto &d_grad_scale = data_slice.d_grad_scale;
+        GUARD_CU(cudaMemset(d_grad_scale, 0, 1 * sizeof(int)));
+        
+        auto convergence_op = [
+            graph,
+            grad,
+            d_grad_scale,
+            grad_thresh,
+            iteration,
+            src_node,
+            alpha,
+            num_ref_nodes
+        ] __host__ __device__ (VertexT &v) {
+            
+            ValueT v_dn_sqrt  = 1.0 / sqrt((ValueT)graph.GetNeighborListLength(v));
+            
+            ValueT val = abs(grad[v] * v_dn_sqrt);
+            
+            if(v == src_node) 
+                val -= (alpha / num_ref_nodes) * v_dn_sqrt;
+            
+            if(val > grad_thresh)
+                atomicMax(d_grad_scale, 1);
+        };
+        
+        GUARD_CU(frontier.V_Q()->ForEach(
+            convergence_op,
+            frontier.queue_length,
+            util::DEVICE,
+            oprtr_parameters.stream
+        ));
+        
+        cudaDeviceSynchronize();
+        cudaMemcpy(data_slice.h_grad_scale, d_grad_scale, 1 * sizeof(int), cudaMemcpyDeviceToHost);
+        
         GUARD_CU2(cudaDeviceSynchronize(),
             "cudaDeviceSynchronize failed");
-        
-        // </DONE>
         
         return retval;
     }
@@ -279,15 +276,22 @@ struct PRNibbleIterationLoop : public IterationLoopBase
         auto &enactor_stats = enactor_slice.enactor_stats;
         auto &data_slice    = this -> enactor -> problem -> data_slices[this -> gpu_num][0];
         
-        // Reached max iterations
-        bool break_iter = enactor_stats.iteration >= data_slice.max_iter;
-        if(break_iter) return true;
+        auto &iter = enactor_stats.iteration;
         
-        // if gradient is too small
-        // ... TODO ...
+        // never break on first iteration
+        if(iter == 0) { return false; }
         
-        // bool break_grad = max_grad <= grad_thresh;
-        // if(break_grad) return true;
+        // max iterations
+        if(iter >= data_slice.max_iter) {
+            printf("pr_nibble::Stop_Condition: reached max iterations. breaking at it=%d\n", iter);
+            return true;
+        }
+        
+        // gradient too small
+        if(!(*data_slice.h_grad_scale)) {
+            printf("pr_nibble::Stop_Condition: gradient too small. breaking at it=%d\n", iter);
+            return true;
+        }
         
         return false;
     }

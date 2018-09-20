@@ -61,28 +61,21 @@ struct main_struct
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
                 
-        // <DONE> get srcs if needed, e.g.:
+        // Problem specific variables
         GUARD_CU(app::Set_Srcs(parameters, graph));
         std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
         int num_srcs = srcs.size();
-        printf("num_srcs=%d\n", num_srcs);
-        // </DONE>
         
-        // <DONE> declare datastructures for reference result on GPU
         ValueT **ref_values = NULL;
-        // </DONE>
         
         if (!quick) {
-            // <DONE> init datastructures for reference result on GPU
             ref_values = new ValueT*[num_srcs];
-            // </DONE>
             
             for(int i = 0; i < num_srcs; i++) {
                 
                 VertexT src = srcs[i];
                 ref_values[i] = new ValueT[graph.nodes];
                 
-                // If not in `quick` mode, compute CPU reference implementation
                 util::PrintMsg("__________________________", !quiet);
                 
                 float elapsed = app::pr_nibble::CPU_Reference(
@@ -98,29 +91,20 @@ struct main_struct
 
         }
 
-        // <OPEN> add other switching parameters, if needed
-        std::vector<std::string> switches{"advance-mode"};
-        // </OPEN>
-        
+        std::vector<std::string> switches{"advance-mode"};        
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
-                // </DONE> pass necessary data to lambda
                 ref_values
-                // </DONE>
             ](util::Parameters &parameters, GraphT &graph)
             {
-                // <DONE> pass necessary data to app::Template::RunTests
                 return app::pr_nibble::RunTests(parameters, graph, ref_values, util::DEVICE);
-                // </DONE>
             }));
 
         if (!quick) {
             for(int i = 0; i < num_srcs; i++) {
                 delete[] ref_values[i]; ref_values[i] = NULL;
             }
-            // <DONE> deallocate host references
             delete[] ref_values; ref_values = NULL;
-            // </DONE>
         }
         return retval;
     }
@@ -141,7 +125,6 @@ int main(int argc, char** argv)
     }
     GUARD_CU(parameters.Check_Required());
 
-    // DONE: change available graph types, according to requirements
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |

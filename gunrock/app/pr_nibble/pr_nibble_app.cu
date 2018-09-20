@@ -17,16 +17,12 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// <DONE> change includes
 #include <gunrock/app/pr_nibble/pr_nibble_enactor.cuh>
 #include <gunrock/app/pr_nibble/pr_nibble_test.cuh>
-// </DONE>
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace pr_nibble {
-// </DONE>
 
 
 cudaError_t UseParameters(util::Parameters &parameters)
@@ -36,7 +32,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
-    // <DONE> add app specific parameters, eg:
+    // app specific parameters
     GUARD_CU(parameters.Use<std::string>(
        "src",
        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
@@ -71,8 +67,6 @@ cudaError_t UseParameters(util::Parameters &parameters)
        "Max number of iterations",
        __FILE__, __LINE__));
 
-    // </DONE>
-
     return retval;
 }
 
@@ -82,7 +76,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
  * @tparam     ValueT        Type of the distances
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
-...
+ * @param[in]  ref_values    Array of CPU reference values
  * @param[in]  target        where to perform the app 
  * \return cudaError_t error message(s), if any
  */
@@ -90,9 +84,7 @@ template <typename GraphT>
 cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
-    // <DONE> add problem specific reference results, e.g.:
     typename GraphT::ValueT **ref_values,
-    // </DONE>
     util::Location target)
 {
     
@@ -113,15 +105,10 @@ cudaError_t RunTests(
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
 
-    // <DONE> get problem specific inputs, e.g.:
     std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
     int num_srcs = srcs.size();
-    // printf("RunTests: %d srcs: src[0]=%d\n", srcs.size(), srcs[0]);
-    // </DONE>
 
-    // <DONE> allocate problem specific host data, e.g.:
     ValueT *h_values = new ValueT[graph.nodes];
-    // </DONE>
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -137,25 +124,18 @@ cudaError_t RunTests(
         VertexT src      = srcs[run_index];
         VertexT src_neib = graph.GetEdgeDest(graph.GetNeighborListOffset(src));
         GUARD_CU(problem.Reset(
-            // <DONE> problem specific data if necessary, eg:
             src, src_neib,
-            // </DONE>
             target
         ));
         GUARD_CU(enactor.Reset(
-            // <DONE> problem specific data if necessary:
             src, src_neib,
-            // </DONE>
             target
         ));
         
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
-        GUARD_CU(enactor.Enact(
-            // <DONE> problem specific data if necessary:
-            // </DONE>
-        ));
+        GUARD_CU(enactor.Enact());
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
@@ -168,36 +148,26 @@ cudaError_t RunTests(
         
         if (validation == "each") {
             
-            GUARD_CU(problem.Extract(
-                // <DONE> problem specific data
-                h_values
-                // </DONE>
-            ));
+            GUARD_CU(problem.Extract(h_values));
             SizeT num_errors = Validate_Results(
                 parameters,
                 graph,
-                // <DONE> problem specific data
-                h_values, ref_values[run_index],
-                // </DONE>
+                h_values,
+                ref_values[run_index],
                 false);
         }
     }
 
     cpu_timer.Start();
     
-    GUARD_CU(problem.Extract(
-        // <DONE> problem specific data
-        h_values
-        // </DONE>
-    ));
+    GUARD_CU(problem.Extract(h_values));
     if (validation == "last") {
         auto run_index = (num_runs - 1) % num_srcs;
         SizeT num_errors = Validate_Results(
             parameters,
             graph,
-            // <DONE> problem specific data
-            h_values, ref_values[run_index],
-            // </DONE>
+            h_values,
+            ref_values[run_index],
             false);
     }
 
@@ -213,9 +183,7 @@ cudaError_t RunTests(
     // Clean up
     // GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    // <DONE> Release problem specific data, e.g.:
     delete[] h_values; h_values   = NULL;
-    // </DONE>
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
