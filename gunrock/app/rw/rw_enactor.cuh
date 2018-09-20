@@ -9,7 +9,7 @@
  * @file
  * rw_enactor.cuh
  *
- * @brief hello Problem Enactor
+ * @brief RW Problem Enactor
  */
 
 #pragma once
@@ -19,22 +19,18 @@
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
-// <DONE> change includes
 #include <gunrock/app/rw/rw_problem.cuh>
 #include <math.h>
 #include <curand.h>
 #include <curand_kernel.h>
-// </DONE>
 
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace rw {
-// </DONE>
 
 /**
- * @brief Speciflying parameters for hello Enactor
+ * @brief Speciflying parameters for RW Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -42,25 +38,16 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
-
-    // <DONE> if needed, add command line parameters used by the enactor here
-    // </DONE>
-    
     return retval;
 }
 
 /**
- * @brief defination of hello iteration loop
+ * @brief defination of RW iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
 struct RWIterationLoop : public IterationLoopBase
-    <EnactorT, Use_FullQ | Push
-    // <OPEN>if needed, stack more option, e.g.:
-    // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-    // Update_Predecessors : 0x0)
-    // </OPEN>
-    >
+    <EnactorT, Use_FullQ | Push>
 {
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
@@ -69,17 +56,12 @@ struct RWIterationLoop : public IterationLoopBase
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
     
     typedef IterationLoopBase
-        <EnactorT, Use_FullQ | Push
-        // <OPEN> add the same options as in template parameters here, e.g.:
-        // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-        // Update_Predecessors : 0x0)
-        // </OPEN>
-        > BaseIterationLoop;
+        <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
     RWIterationLoop() : BaseIterationLoop() {}
 
     /**
-     * @brief Core computation of hello, one iteration
+     * @brief Core computation of RW, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
      * \return cudaError_t error message(s), if any
      */
@@ -101,15 +83,15 @@ struct RWIterationLoop : public IterationLoopBase
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
         
-        // <DONE> add problem specific data alias here:
-        auto &walks       = data_slice.walks;
-        auto &rand        = data_slice.rand;
-        auto &walk_length = data_slice.walk_length;
-        auto &gen         = data_slice.gen;
-        // </DONE>
+        // problem specific data alias:
+        auto &walks          = data_slice.walks;
+        auto &rand           = data_slice.rand;
+        auto &walk_length    = data_slice.walk_length;
+        auto &walks_per_node = data_slice.walks_per_node;
+        auto &gen            = data_slice.gen;
         
-        curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
-        
+        curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
+                
         GUARD_CU(frontier.V_Q()->ForAll(
           [
             graph,
@@ -228,20 +210,18 @@ public:
     IterationT *iterations;
 
     /**
-     * @brief hello constructor
+     * @brief RW constructor
      */
     Enactor() :
         BaseEnactor("RW"),
         problem    (NULL  )
     {
-        // <OPEN> change according to algorithmic needs
         this -> max_num_vertex_associates = 0;
         this -> max_num_value__associates = 1;
-        // </OPEN>
     }
 
     /**
-     * @brief hello destructor
+     * @brief RW destructor
      */
     virtual ~Enactor() { /*Release();*/ }
 
@@ -273,13 +253,12 @@ public:
         this->problem = &problem;
 
         // Lazy initialization
+        // !! POSSIBLE BUG: @sgpyc suggested changing the 2 to 1, but that causes
+        //  strange behavior, where V_Q does not get initialized properly.
         GUARD_CU(BaseEnactor::Init(
-            problem, Enactor_None,
-            // <OPEN> change to how many frontier queues, and their types
-            2, NULL,
-            // </OPEN>
-            target, false));
-        for (int gpu = 0; gpu < this -> num_gpus; gpu ++) {
+            problem, Enactor_None, 2, NULL, target, false)); 
+        for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
+        {
             GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
             auto &enactor_slice = this -> enactor_slices[gpu * this -> num_gpus + 0];
             auto &graph = problem.sub_graphs[gpu];
@@ -298,7 +277,7 @@ public:
     }
 
     /**
-      * @brief one run of hello, to be called within GunrockThread
+      * @brief one run of RW, to be called within GunrockThread
       * @param thread_data Data for the CPU thread
       * \return cudaError_t error message(s), if any
       */
@@ -316,56 +295,55 @@ public:
 
     /**
      * @brief Reset enactor
-...
      * @param[in] target Target location of data
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Reset(
-        // <DONE> problem specific data if necessary, eg
-        // </DONE>
-        util::Location target = util::DEVICE)
+    cudaError_t Reset(int walks_per_node, util::Location target = util::DEVICE)
     {
         typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
 
-        auto nodes = this -> problem -> data_slices[0][0].sub_graph[0].nodes;
+        SizeT num_nodes = this -> problem -> data_slices[0][0].sub_graph[0].nodes;
+        printf("num_nodes=%d\n", num_nodes);
         
-        // <PARTIAL> Initialize frontiers according to the algorithm:
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
            if (this->num_gpus == 1) {
-               this -> thread_slices[gpu].init_size = nodes;
+               this -> thread_slices[gpu].init_size = num_nodes * walks_per_node;
                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
                    auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                   frontier.queue_length = (peer_ == 0) ? nodes : 0;
+                   frontier.queue_length = (peer_ == 0) ? num_nodes * walks_per_node : 0;
                    if (peer_ == 0) {
+                        
+                      util::Array1D<SizeT, VertexT> tmp;
+                      tmp.Allocate(num_nodes * walks_per_node, target | util::HOST);
+                      for(SizeT i = 0; i < num_nodes * walks_per_node; ++i) {
+                          tmp[i] = (VertexT)i % num_nodes;
+                      }
+                      GUARD_CU(tmp.Move(util::HOST, target));
                       
-                      // Add all nodes to the frontier
-                      GUARD_CU(frontier.V_Q() -> ForAll([]__host__ __device__ (VertexT *v, const SizeT &i) {
-                        v[i] = i;
-                      }, nodes, target, 0));
+                      GUARD_CU(frontier.V_Q() -> ForEach(tmp,
+                          []__host__ __device__ (VertexT &v, VertexT &i) {
+                          v = i;
+                      }, num_nodes * walks_per_node, target, 0));
                       
-                   }
+                      tmp.Release();
+                 }
                }
            } else {
                 // MULTIGPU INCOMPLETE
            }
         }
-        // </PARTIAL>
         
         GUARD_CU(BaseEnactor::Sync());
         return retval;
     }
 
     /**
-     * @brief Enacts a hello computing on the specified graph.
-...
+     * @brief Enacts a RW computing on the specified graph.
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Enact(
-        // <DONE> problem specific data if necessary, eg
-        // </DONE>
-    )
+    cudaError_t Enact()
     {
         cudaError_t retval = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));

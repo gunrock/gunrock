@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file hello_app.cu
+ * @file rw_app.cu
  *
  * @brief Simple Gunrock Application
  */
@@ -17,16 +17,12 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// <DONE> change includes
 #include <gunrock/app/rw/rw_enactor.cuh>
 #include <gunrock/app/rw/rw_test.cuh>
-// </DONE>
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace rw {
-// </DONE>
 
 
 cudaError_t UseParameters(util::Parameters &parameters)
@@ -36,43 +32,49 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
-    // <DONE> add app specific parameters, eg:
-    GUARD_CU(parameters.Use<int>(    
-         "walk-length",   
-         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,  
-         10,   
-         "vertex id", 
+    GUARD_CU(parameters.Use<int>(
+         "walk-length",
+         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+         10,
+         "length of random walks",
          __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<int>(    
-         "seed",   
-         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,  
+         "walks-per-node",
+         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+         2,
+         "number of random walks per source node",
+         __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+         "seed",
+         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
          time(NULL),   
          "seed for random number generator", 
          __FILE__, __LINE__));
-    // </DONE>
 
     return retval;
 }
 
 /**
- * @brief Run hello tests
- * @tparam     GraphT        Type of the graph
- * @tparam     ValueT        Type of the distances
- * @param[in]  parameters    Excution parameters
- * @param[in]  graph         Input graph
-...
- * @param[in]  target        where to perform the app 
+ * @brief Run RW tests
+ * @tparam     GraphT           Type of the graph
+ * @tparam     ValueT           Type of the distances
+ * @param[in]  parameters       Excution parameters
+ * @param[in]  graph            Input graph
+ * @param[in]  walk_length      Length of random walks
+ * @param[in]  walks_per_node   Number of random walks per node
+ * @param[in]  ref_walks        Array of random walks from CPU
+ * @param[in]  target           where to perform the app 
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT>
 cudaError_t RunTests(
-    util::Parameters &parameters,
-    GraphT           &graph,
-    // <DONE> add problem specific reference results, e.g.:
-    int walk_length,
+    util::Parameters         &parameters,
+    GraphT                   &graph,
+    int                      walk_length,
+    int                      walks_per_node,
     typename GraphT::VertexT *ref_walks,
-    // </DONE>
     util::Location target)
 {
     
@@ -93,12 +95,8 @@ cudaError_t RunTests(
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
 
-    // <DONE> get problem specific inputs, e.g.:
-    // </DONE>
-
-    // <DONE> allocate problem specific host data, e.g.:
-    VertexT *h_walks = new VertexT[graph.nodes * walk_length];
-    // </DONE>
+    // Allocate problem specific host data
+    VertexT *h_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -110,27 +108,13 @@ cudaError_t RunTests(
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
     
     for (int run_num = 0; run_num < num_runs; ++run_num) {
-        GUARD_CU(problem.Reset(
-            // <TODO> problem specific data if necessary, eg:
-            // src,
-            // </TODO>
-            target
-        ));
-        GUARD_CU(enactor.Reset(
-            // <TODO> problem specific data if necessary:
-            // srcs[run_num % srcs.size()],
-            // </TODO>
-            target
-        ));
+        GUARD_CU(problem.Reset(target));
+        GUARD_CU(enactor.Reset(walks_per_node, target));
         
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
-        GUARD_CU(enactor.Enact(
-            // <TODO> problem specific data if necessary:
-            // srcs[run_num % srcs.size()]
-            // </TODO>
-        ));
+        GUARD_CU(enactor.Enact());
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
@@ -144,16 +128,12 @@ cudaError_t RunTests(
         if (validation == "each") {
             
             GUARD_CU(problem.Extract(
-                // <DONE> problem specific data
                 h_walks
-                // </DONE>
             ));
             SizeT num_errors = Validate_Results(
                 parameters,
                 graph,
-                // <DONE> problem specific data
-                walk_length, h_walks, ref_walks,
-                // </DONE>
+                walk_length, walks_per_node, h_walks, ref_walks,
                 false);
         }
     }
@@ -161,17 +141,13 @@ cudaError_t RunTests(
     cpu_timer.Start();
     
     GUARD_CU(problem.Extract(
-        // <DONE> problem specific data
         h_walks
-        // </DONE>
     ));
     if (validation == "last") {
         SizeT num_errors = Validate_Results(
             parameters,
             graph,
-            // <DONE> problem specific data
-            walk_length, h_walks, ref_walks,
-            // </DONE>
+            walk_length, walks_per_node, h_walks, ref_walks,
             false);
     }
 
@@ -186,16 +162,14 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    // <DONE> Release problem specific data, e.g.:
     delete[] h_walks; h_walks   = NULL;
-    // </DONE>
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
     return retval;
 }
 
-} // namespace hello
+} // namespace rw
 } // namespace app
 } // namespace gunrock
 

@@ -7,7 +7,7 @@
 
 /**
  * @file
- * test_hello.cu
+ * test_rw.cu
  *
  * @brief Simple test driver program for Gunrock template.
  */
@@ -60,27 +60,20 @@ struct main_struct
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
-
-        // <OPEN> get srcs if needed, e.g.:
-        // Probably we just want to do walks from a certain set of nodes?
-        // </OPEN>
         
-        // <DONE> declare datastructures for reference result on GPU
-        int walk_length = parameters.Get<int>("walk-length");
+        int walk_length    = parameters.Get<int>("walk-length");
+        int walks_per_node = parameters.Get<int>("walks-per-node");
         VertexT *ref_walks;
-        // </DONE>
         
         if (!quick) {
-            // <DONE> init datastructures for reference result on GPU
-            ref_walks = new VertexT[graph.nodes * walk_length];
-            // </DONE>
-
-            // If not in `quick` mode, compute CPU reference implementation
+            ref_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
+            
             util::PrintMsg("__________________________", !quiet);
             
             float elapsed = APP_NAMESPACE::CPU_Reference(
                 graph.csr(),
                 walk_length,
+                walks_per_node,
                 ref_walks,
                 quiet);
             
@@ -94,20 +87,14 @@ struct main_struct
         
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
-                // </DONE> pass necessary data to lambda
-                walk_length, ref_walks
-                // </DONE>
+                walk_length, walks_per_node, ref_walks
             ](util::Parameters &parameters, GraphT &graph)
             {
-                // <DONE> pass necessary data to app::Template::RunTests
-                return APP_NAMESPACE::RunTests(parameters, graph, walk_length, ref_walks, util::DEVICE);
-                // </DONE>
+                return APP_NAMESPACE::RunTests(parameters, graph, walk_length, walks_per_node, ref_walks, util::DEVICE);
             }));
 
         if (!quick) {
-            // <DONE> deallocate host references
             delete[] ref_walks; ref_walks = NULL;
-            // </DONE>
         }
         return retval;
     }
