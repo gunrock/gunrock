@@ -177,10 +177,9 @@ double CPU_Reference(
         it += 1;
     }
     
-    // for(SizeT i = 0; i < graph.nodes; ++i) {
-    //     values[i] = abs(q[i] * d_sqrt[i]);
-    //     printf("%d %.17g\n", i, values[i]);
-    // }
+    for(SizeT i = 0; i < graph.nodes; ++i) {
+        values[i] = abs(q[i] * d_sqrt[i]);
+    }
     
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();

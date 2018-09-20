@@ -62,11 +62,10 @@ struct main_struct
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
                 
         // <DONE> get srcs if needed, e.g.:
-        GUARD_CU(app::Set_Srcs (parameters, graph));
-        std::vector<VertexT> srcs
-           = parameters.Get<std::vector<VertexT> >("srcs");
+        GUARD_CU(app::Set_Srcs(parameters, graph));
+        std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
         int num_srcs = srcs.size();
-
+        printf("num_srcs=%d\n", num_srcs);
         // </DONE>
         
         // <DONE> declare datastructures for reference result on GPU
