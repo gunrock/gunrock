@@ -21,8 +21,8 @@
 #include <gunrock/app/mf/mf_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
-//#define debug_aml(a) printf("%s:%d %s\n", __FILE__, __LINE__, a);
-#define debug_aml(a) std::cout << __FILE__ << ":" << __LINE__ << " " << a \
+#define debug_aml(a) 
+//#define debug_aml(a) std::cout << __FILE__ << ":" << __LINE__ << " " << a \
     << "\n";
 
 namespace gunrock {
@@ -92,8 +92,6 @@ struct MFIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-	    printf("filter_op, src = %u, dest = %u, excess[%u] = %u\n", 
-		    src, dest, dest, excess[dest]);
 	    return (excess[dest] > 0);
 	};
 	
@@ -103,15 +101,7 @@ struct MFIterationLoop : public IterationLoopBase
 	    const VertexT &input_item, const SizeT &input_pos,
 	    const SizeT &output_pos) -> bool
 	{
-	    printf("advance_push_op, src = %u, dest = %u, \
-		    excess[%u] = %u, excess[%u] = %u, \
-		    capacity[%u-%u] = %u, flow[%u-%u] = %u, \
-		    height[%u] = %u, height[%u] = %u\n", 
-		    src, dest, src, excess[src], dest, excess[dest], 
-		    src, dest, capacity[edge_id], 
-		    src, dest, flow[edge_id], src, 
-		    height[src], dest, height[dest]);
-	    return ;
+	    return false;
 	};
 
 	debug_aml("iteration number " << iteration);
@@ -130,7 +120,7 @@ struct MFIterationLoop : public IterationLoopBase
 		    oprtr_parameters, advance_push_op));
 	
 
-/*aga
+/*
         if (oprtr_parameters.advance_mode != "LB_CULL" &&
             oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
         {

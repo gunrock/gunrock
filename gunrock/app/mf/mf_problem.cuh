@@ -17,7 +17,8 @@
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/oprtr/1D_oprtr/for_all.cuh>
 
-#define debug_aml(a) std::cerr << __FILE__ << ":" << __LINE__ << " " << a \
+#define debug_aml(a)
+//#define debug_aml(a) std::cerr << __FILE__ << ":" << __LINE__ << " " << a \
     << "\n";
 
 namespace gunrock {

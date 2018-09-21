@@ -26,8 +26,9 @@
 #include <gunrock/app/mf/mf_enactor.cuh>
 #include <gunrock/app/mf/mf_test.cuh>
 
-#define debug_aml(a...) std::cerr << __FILE__ << ":" << __LINE__ << " " << \
+//#define debug_aml(a) std::cerr << __FILE__ << ":" << __LINE__ << " " << \
     a << "\n";
+#define debug_aml(a)
 
 namespace gunrock {
 namespace app {
@@ -71,22 +72,23 @@ cudaError_t UseParameters(util::Parameters &parameters)
  * @brief Run mf tests
  * @tparam     GraphT	  Type of the graph
  * @tparam     ValueT	  Type of the capacity on edges
+ * @tparam     VertexT	  Type of vertex
  * @param[in]  parameters Excution parameters
  * @param[in]  graph	  Input graph
  * @param[in]  ref_flow	  Reference flow on edges
  * @param[in]  target	  Whether to perform the mf
  * \return cudaError_t error message(s), if any
  */
-template <typename GraphT, typename ValueT>
+template <typename GraphT, typename ValueT, typename VertexT>
 cudaError_t RunTests(
     util::Parameters  &parameters,
     GraphT	      &graph,
-    ValueT	      **ref_flow = NULL,
+    VertexT	      *reverse, 
+    ValueT	      *ref_flow,
     util::Location    target = util::DEVICE)
 {
     debug_aml("RunTests starts");
     cudaError_t retval = cudaSuccess;
-    typedef typename GraphT::VertexT  VertexT;
     typedef Problem<GraphT>	      ProblemT;
     typedef Enactor<ProblemT>	      EnactorT;
 
@@ -107,9 +109,6 @@ cudaError_t RunTests(
     // Allocate host-side array (for both reference and GPU-computed results)
     // ... for function Extract
     ValueT *h_flow   = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
-    for (VertexT i = 0; i < graph.edges; ++i){
-	h_flow[i] = 0;
-    }
     
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -146,7 +145,7 @@ cudaError_t RunTests(
             // TODO: fill in problem specific data, e.g.:
             GUARD_CU(problem.Extract(h_flow));
             int num_errors = app::mf::Validate_Results(parameters, graph, 
-		    source, sink, h_flow, ref_flow, quiet_mode);
+		    source, sink, h_flow, reverse, ref_flow, quiet_mode);
         }
     }
     
@@ -156,7 +155,7 @@ cudaError_t RunTests(
     if (validation == "last")
     {
         int num_errors = app::mf::Validate_Results(parameters, graph, 
-		source, sink, h_flow, ref_flow, quiet_mode);
+		source, sink, h_flow, reverse, ref_flow, quiet_mode);
     }
 
     // Compute running statistics
