@@ -108,95 +108,64 @@ struct GEOIterationLoop : public IterationLoopBase
         // --
         // Define operations
 
-	// compute operation
-	GUARD_CU(frontier.V_Q() -> ForAll(
-	  [
+	// compute operation, substitute for neighbor reduce,
+	// ForAll() with a for loop inside (nested forloop),
+	// visiting all the neighbors and calculating the spatial center
+	// after a gather.
+	auto gather_op = [
+	    graph,
+	    locations,
+	    predicted,
+	    iteration
+	] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
+
+	    VertexT v 		= v_q[pos];
+	    SizeT start_edge 	= graph.CsrT::GetNeighborListOffset(v);
+	    SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+	
+	    locations[v] 	= new ValueT[num_neighbors];
+	    SizeT i 		= 0;
+
+	    for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+		VertexT u = graph.CsrT::GetEdgeDest(e);
+		if (util::isValid(predicted[u])) {
+		    // gather locations from neighbors	
+		    locations[v][i] = predicted[u];   
+		} else {
+		    // if the neighbor had no location, use an invalid.
+		    locations[v][i] = util::PreDefinedValues<ValueT>::InvalidValue;
+		}
+
+		i++;
+	    }
+
+	};
+
+	auto compute_op =  [
 	    graph,
 	    locations,
 	    predicted,
             iteration
-	  ] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
-		VertexT v = v_q[pos];
-		SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
-		SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-	
-		for (SizeT e = start_edge; e < start_edge + num_neighbors; e++)
-		{
-			VertexT u = graph.CsrT::GetEdgeDest(e);
-			// visit edge <v, u>, with edge id e
-			if (1)
-			  break;
-		}
+	] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
 
-	}, frontier.queue_length, target, oprtr_parameters.stream));
+	    VertexT v 		= v_q[pos];
+	    SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
 
-#if 0
-        // advance operation
-        auto advance_op = [
-            // <TODO> pass data to lambda
-            degrees,
-            visited
-            // </TODO>
-        ] __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            // <TODO> Implement advance operation
-                        
-            // Mark src and dest as visited
-            atomicMax(visited + src, 1);
-            auto dest_visited = atomicMax(visited + dest, 1);
-            
-            // Increment degree of src
-            atomicAdd(degrees + src, 1);
-            
-            // Add dest to queue if previously unsen
-            return dest_visited == 0;
-            
-            // </TODO>
-        };
+	    // if no predicted location, and neighbor locations exists
+	    if (!util::isValid(predicted[v]) && locations[v]) {
+		predicted[v] = spatial_center(locations[v], num_neighbors);
+	    }
+	};
 
-        // filter operation
-        auto filter_op = [
-            // <TODO> pass data to lambda
-            // </TODO>
-        ] __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            // <TODO> implement filter operation
-            return true;
-            // </TODO>
-        };
-        
-        // --
-        // Run
-        
-        // <TODO> some of this may need to be edited depending on algorithmic needs
-        // !! How much variation between apps is there in these calls?
-        
-        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, advance_op, filter_op));
-        
-        if (oprtr_parameters.advance_mode != "LB_CULL" &&
-            oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
-        {
-            frontier.queue_reset = false;
-            GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-                oprtr_parameters, filter_op));
-        }
 
-        // Get back the resulted frontier length
-        GUARD_CU(frontier.work_progress.GetQueueLength(
-            frontier.queue_index, frontier.queue_length,
-            false, oprtr_parameters.stream, true));
+	// Run --
+        GUARD_CU(frontier.V_Q()->ForAll(
+            gather_op, frontier.queue_length,
+            util::DEVICE, oprtr_parameters.stream));
 
-        // </TODO>
-#endif
+	GUARD_CU(frontier.V_Q()->ForAll(
+	    compute_op, frontier.queue_length,
+	    util::DEVICE, oprtr_parameters.stream));
         
         return retval;
     }
