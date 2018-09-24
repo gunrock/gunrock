@@ -77,7 +77,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     struct DataSlice : BaseDataSlice
     {
         // <DONE> add problem specific storage arrays:
-        util::Array1D<SizeT, ValueT> locations;
+        util::Array1D<SizeT, ValueT*> locations;
         util::Array1D<SizeT, ValueT> predicted;
         // </DONE>
 
@@ -137,7 +137,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
             // <DONE> allocate problem specific data here, e.g.:
-            GUARD_CU(locations.Allocate(sub_graph.nodes, target));
+            GUARD_CU(locations.Allocate(sub_graph.nodes * sub_graph.nodes, target));
             GUARD_CU(predicted.Allocate(sub_graph.nodes, target));
             // </DONE>
 
@@ -161,19 +161,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             // Ensure data are allocated
             // <DONE> ensure size of problem specific data:
-            GUARD_CU(locations.EnsureSize_(nodes, target));
+            GUARD_CU(locations.EnsureSize_(nodes * nodes, target));
             GUARD_CU(predicted.EnsureSize_(nodes, target));
             // </DONE>
 
             // Reset data
             // <DONE> reset problem specific data, e.g.:
 
+#if 0
 	    // Set locations of neighbors to null, this needs to be populated
 	    // and using spatial center we can determine the predicted.
             GUARD_CU(locations.ForEach([]__host__ __device__ (ValueT &x){
                x = (ValueT)0;
-            }, nodes, target, this -> stream));
-
+            }, nodes * nodes, target, this -> stream));
+#endif
 
 	    // Assumes that all vertices have invalid positions, in reality
 	    // a preprocessing step is needed to assign nodes that do have

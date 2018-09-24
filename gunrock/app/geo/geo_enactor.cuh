@@ -100,13 +100,17 @@ struct GEOIterationLoop : public IterationLoopBase
         
         // <DONE> add problem specific data alias here:
         auto &locations	       = data_slice.locations;
-        auto &predicted 	       = data_slice.predicted;
+        auto &predicted	       = data_slice.predicted;
         // </DONE>
 
 	util::Location target = util::DEVICE;
         
         // --
         // Define operations
+
+	// Custom spatial center kernel for geolocation
+	// <TODO> Needs proper implementation for median calculation
+	// </TODO> -- median calculation.
 
 	// compute operation, substitute for neighbor reduce,
 	// ForAll() with a for loop inside (nested forloop),
@@ -149,12 +153,30 @@ struct GEOIterationLoop : public IterationLoopBase
 	] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
 
 	    VertexT v 		= v_q[pos];
-	    SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+	    SizeT n		= graph.CsrT::GetNeighborListLength(v);
 
 	    // if no predicted location, and neighbor locations exists
-	    if (!util::isValid(predicted[v]) && locations[v]) {
-		predicted[v] = spatial_center(locations[v], num_neighbors);
-	    }
+	    // Custom spatial center kernel for geolocation
+            // <TODO> Needs proper implementation for median calculation
+	    if (!util::isValid(predicted[v])) {
+		SizeT valid_locations = 0;
+		
+		// Filter invalid values (neighbors with no locations)
+		for (int i = 0; i < n; i++) {
+                    if (util::isValid(locations[v][i]))
+                        valid_locations++;
+                }
+
+		if (valid_locations == 0) {
+                    predicted[v] = util::PreDefinedValues<ValueT>::InvalidValue;
+		} else if (valid_locations == 1) {
+                    predicted[v] = 1; // the only location that is valid
+		} else if (valid_locations == 2) {
+                    predicted[v] = 1; // mid-point of the two locations
+                } else {
+                    predicted[v] = 1; // calculate spatial median
+                }
+	    } // </TODO> -- median calculation.
 	};
 
 
