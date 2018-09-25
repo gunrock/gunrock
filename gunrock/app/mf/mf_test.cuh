@@ -376,38 +376,10 @@ double CPU_Reference(
 
     typedef typename GraphT::CsrT CsrT;
 
-    ValueT* capacity  = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
-    ValueT* flow      = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
-    //VertexT* reverse  = (VertexT*)malloc(sizeof(VertexT)*graph.edges);
-    auto flow_from_source_to_neighbours = 0;
+    ValueT* flow = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
+    ValueT* capacity = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
+    auto flow_from_source_to_neighbors = 0;
 
-    for (VertexT x = 0; x < graph.nodes; ++x)
-    {
-	auto e_start = graph.CsrT::GetNeighborListOffset(x);
-	auto num_neighbors = graph.CsrT::GetNeighborListLength(x);
-	auto e_end = e_start + num_neighbors;
-	for (auto e = e_start; e < e_end; ++e)
-	{
-	    auto y = graph.CsrT::GetEdgeDest(e);
-	    auto f_start = graph.CsrT::GetNeighborListOffset(y);
-	    auto num_neighbors = graph.CsrT::GetNeighborListLength(y);
-	    auto f_end = f_start + num_neighbors;
-	    bool not_founded = true;
-	    for (auto f = f_start; f < f_end; ++f)
-	    {
-		auto z = graph.CsrT::GetEdgeDest(f);
-		if (z == x){
-		    reverse[e] = f;
-		    reverse[f] = e;
-		    not_founded = false;
-		    break;
-		}
-	    }
-	    if (not_founded)
-		debug_aml("there is no reverse edge for (" << x << "," << y 
-			<< ")");
-	}
-    }
     for (VertexT x = 0; x < graph.nodes; ++x)
     {
 	auto e_start = graph.CsrT::GetNeighborListOffset(x);
@@ -416,11 +388,9 @@ double CPU_Reference(
 	for (SizeT e = e_start; e < e_end; ++e)
 	{
 	    capacity[e] = graph.CsrT::edge_values[e];
-	    capacity[reverse[e]] = capacity[e];
 	    flow[e] = 0;
-	    flow[reverse[e]] = 0;
 	    if (x == src){
-		flow_from_source_to_neighbours += capacity[e];
+		flow_from_source_to_neighbors += capacity[e];
 	    }
 	}
     }
@@ -431,7 +401,7 @@ double CPU_Reference(
 	excess[v] = height[v] = 0;
     }
     height[src] = 2 * graph.nodes + 1;
-    excess[src] = std::numeric_limits<ValueT>::max();
+    excess[src] = flow_from_source_to_neighbors;
     
     //
     // Perform simple max flow reference

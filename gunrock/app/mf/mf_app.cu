@@ -122,7 +122,7 @@ cudaError_t RunTests(
     // perform the MF algorithm
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        GUARD_CU(problem.Reset(target));
+        GUARD_CU(problem.Reset(graph, target));
         GUARD_CU(enactor.Reset(source, target));
 
         util::PrintMsg("__________________________", !quiet_mode);
@@ -254,7 +254,7 @@ double gunrock_mf(
 template <
     typename VertexT  = uint32_t,
     typename SizeT    = uint32_t,
-    typename ValueT   = uint32_t>
+    typename ValueT   = double>
 float mf(
 	const SizeT   num_nodes,
 	const SizeT   num_edges,

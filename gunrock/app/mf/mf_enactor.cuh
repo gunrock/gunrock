@@ -53,6 +53,9 @@ struct MFIterationLoop : public IterationLoopBase
     typedef typename EnactorT::VertexT	VertexT;
     typedef typename EnactorT::ValueT	ValueT;
     typedef typename EnactorT::SizeT	SizeT;
+    typedef typename EnactorT::Problem	ProblemT;
+    typedef typename ProblemT::GraphT	GraphT;
+    typedef typename GraphT::CsrT	CsrT;
     typedef IterationLoopBase <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
     MFIterationLoop() : BaseIterationLoop() {}
@@ -64,7 +67,6 @@ struct MFIterationLoop : public IterationLoopBase
      */
     cudaError_t Core(int peer_ = 0)
     {
-	debug_aml("core start");
 	auto enactor		= this -> enactor;
 	auto gpu_num		= this -> gpu_num;
 	auto num_gpus		= enactor -> num_gpus;
@@ -84,59 +86,238 @@ struct MFIterationLoop : public IterationLoopBase
         auto &flow            	= data_slice.flow;
         auto &excess          	= data_slice.excess;
         auto &height	      	= data_slice.height;
+	auto &lowest_neighbor	= data_slice.lowest_neighbor;
 
-
-	auto filter_active_nodes_op = [excess]
-	    __host__ __device__
-	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-	    return (excess[dest] > 0);
-	};
-	
-	auto advance_push_op = [capacity, flow, excess, height]
+/*	debug_aml("core start");
+	auto advance_push_op = [capacity, flow, excess, height, reverse, 
+	     iteration]
 	    __host__ __device__
 	    (const VertexT &src, VertexT &dest, const SizeT &edge_id, 
 	    const VertexT &input_item, const SizeT &input_pos,
 	    const SizeT &output_pos) -> bool
 	{
+	    auto e = excess[src];
+	    auto cf = capacity[edge_id] - flow[edge_id];
+	    auto rev_id = reverse[edge_id];
+	    //printf("(push op) %d -> %d, excess[%d]=%lf, h1 = %d, h2 = %d\n",\
+		    src, dest, src, e, height[src], height[dest]);
+	    auto f = min(cf, e);
+	    if (f > 0 && height[src] > height[dest])
+	    {
+		if (atomicAdd(&excess[src], -f) >= f)
+		{
+		    atomicAdd(&excess[dest], f);
+		    atomicAdd(&flow[edge_id], f);
+		    atomicAdd(&flow[rev_id], -f);
+		    printf("push %d->%d, flow %lf, excess[%d] = %lf, \
+excess[%d] = %lf\n", src, dest, f, src, excess[src], dest, excess[dest]);
+		    return true;
+		}else
+		    atomicAdd(&excess[src], f);
+	    }
 	    return false;
 	};
 
-	debug_aml("iteration number " << iteration);
-	debug_aml("frontier queue length " << frontier.queue_length);
-	debug_aml("filter mode " << oprtr_parameters.filter_mode);
+	auto advance_lowest_op = 
+	    [excess, capacity, flow, lowest_neighbor, height, iteration]
+	    __host__ __device__
+	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+	    if (!util::isValid(dest) or !util::isValid(src))
+		return false;
+//	    printf("advance lowest neighbor: src %d, dest %d\n", src, dest);
+	    if (excess[src] > 0 and capacity[edge_id] - flow[edge_id] > 0)
+	    {
+		auto l = lowest_neighbor[src];
+		auto height_dest = height[dest];
+		while (height_dest < height[l]){
+		    l = atomicCAS(&lowest_neighbor[src], l, dest);
+		}
+		printf("advance lowest neighbor iter %d, src %d, ex[%d] = %lf\
+, lowest[%d] = %d\n", iteration, src, src, excess[src], src, dest);
+		return true;
+	    }
+	    return false;
+	};
 
-	oprtr_parameters.filter_mode = "BY_PASS";
-	GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-		    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-		    oprtr_parameters, filter_active_nodes_op));
-	debug_aml("filter queue_length " << frontier.queue_length);
+	auto filter_active_op = [excess]
+	    __host__ __device__
+	    (const VertexT &src, VertexT &dest, const SizeT &edge_id, 
+	    const VertexT &input_item, const SizeT &input_pos,
+	    const SizeT &output_pos) -> bool
+	{
+		printf("filter src %d, dest %d, excess[%d] = %lf\n", 
+			src, dest, dest, excess[dest]);
+	    return excess[dest] > 0;
+	};
 
-	oprtr_parameters.advance_mode = "LB"; //all neighbours
+	oprtr_parameters.filter_mode = "CULL";
+	oprtr_parameters.advance_mode = "LB_CULL";
+	frontier.queue_reset = true;
+
+	printf("queue_index0 = %d\n", frontier.queue_index);
+	printf("queue_length = %d\n", frontier.queue_length);
+	GUARD_CU(frontier.V_Q() -> ForAll(
+	    [] __host__ __device__ (VertexT *queue, const SizeT &pos)
+	    {
+		printf("q[%d] = %d\n", pos, queue[pos]);
+	    }, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+	
+
+	GUARD_CU(excess.ForAll(
+	    [] __host__ __device__ (ValueT *excess_, const SizeT &v){
+	      printf("excess_[%d] = %lf\n", v, excess_[v]);
+	    }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+
+	GUARD_CU(lowest_neighbor.ForAll(
+	    [] __host__ __device__ (VertexT *el, const SizeT &v){
+	      printf("lowest_neighbor[%d] = %d\n", v, el[v]);
+	    }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+
+	GUARD_CU(height.ForAll(
+	    [] __host__ __device__ (VertexT *h, const SizeT &v){
+	      printf("height[%d] = %d\n", v, h[v]);
+	    }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+
 	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
 		    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
 		    oprtr_parameters, advance_push_op));
+
+	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+	    "cudaStreamSynchronize failed");
 	
+	printf("queue_index1 = %d\n", frontier.queue_index);
+	printf("queue_length = %d\n", frontier.queue_length);
+	GUARD_CU(frontier.V_Q() -> ForAll(
+	    [] __host__ __device__ (VertexT *queue, const SizeT &pos)
+	    {
+		printf("q[%d] = %d\n", pos, queue[pos]);
+	    }, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+	
+	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+	    "cudaStreamSynchronize failed");
 
-/*
-        if (oprtr_parameters.advance_mode != "LB_CULL" &&
-            oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
+	oprtr_parameters.advance_mode = "ALL_EDGES";
+	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+		    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+		    oprtr_parameters, advance_lowest_op)); 
+	
+	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+	    "cudaStreamSynchronize failed");
+	
+	printf("queue_index2 = %d\n", frontier.queue_index);
+	frontier.queue_index --;
+	printf("queue_index2 = %d\n", frontier.queue_index);
+
+//	GUARD_CU(frontier.work_progress.GetQueueLength(
+//	    frontier.queue_index, frontier.queue_length,
+//	    false, oprtr_parameters.stream, true));
+
+	printf("queue_length = %d\n", frontier.queue_length);
+	GUARD_CU(frontier.V_Q() -> ForAll(
+	    [] __host__ __device__ (VertexT *queue, const SizeT &pos)
+	    {
+		printf("q[%d] = %d\n", pos, queue[pos]);
+	    }, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+
+	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+		    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+		    oprtr_parameters, 
+		    
+	    [excess, capacity, flow, lowest_neighbor, height, iteration]
+	    __host__ __device__
+	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
         {
-            frontier.queue_reset = false;
-            // Call the filter operator, using the filter operation
-            GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-                oprtr_parameters, filter_op));
-        }
-
-        // Get back the resulted frontier length
-        GUARD_CU(frontier.work_progress.GetQueueLength(
-            frontier.queue_index, frontier.queue_length,
-            false, oprtr_parameters.stream, true));
+	    if (!util::isValid(dest) or !util::isValid(src))
+		return false;
+	    if (excess[src] > 0 and capacity[edge_id] - flow[edge_id] > 0 and
+		    lowest_neighbor[src] == dest){ 
+		if (height[src] <= height[dest])
+		{
+		    printf("relabel src %d, dest %d, H[%d]=%d, -> %d\n",
+			src, dest, src, height[src], height[dest]+1);
+		    height[src] = height[dest] + 1;
+		    return true;
+		}
+	    }
+	    return false;
+	}));
+	
+	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+	    "cudaStreamSynchronize failed");
+	
+	//frontier.queue_index = frontier.queue_index % 2;
+	printf("queue_index3 = %d\n", frontier.queue_index);
+	//GUARD_CU(frontier.work_progress.GetQueueLength(
+	//    frontier.queue_index, frontier.queue_length,
+	//    false, oprtr_parameters.stream, true));
+	
+	printf("queue_length = %d\n", frontier.queue_length);
+	GUARD_CU(frontier.V_Q() -> ForAll(
+	    [] __host__ __device__ (VertexT *queue, const SizeT &pos)
+	    {
+		printf("q[%d] = %d\n", pos, queue[pos]);
+	    }, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
 */
-        return retval;
+
+//	auto filter_lowest_neighbor_op = [iteration, lowest_neighbor, height]
+//	    __host__ __device__
+//	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
+//            const VertexT &input_item, const SizeT &input_pos,
+//            SizeT &output_pos) -> bool
+//	{
+//	    if (!util::isValid(dest) or !util::isValid(src))
+//		return false;
+//	    printf("filter relabel op src %d, dest %d, lowest[%d] = %d\n", 
+//		    src, dest, src, lowest_neighbor[src]);
+//	    if (lowest_neighbor[src] == dest){
+//		printf("src = %d, dest = %d - ok\n", src, dest);
+//		return true;
+//	    }
+//	    return false;
+//	};
+//
+//	GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+//		    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+//		    oprtr_parameters, filter_lowest_neighbor_op));
+//
+//	oprtr_parameters.advance_mode = "LB";
+//      	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+//		    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+//		    oprtr_parameters, advance_relabel_op));
+//
+//		[excess, capacity, flow, 
+//	     lowest_neighbor, height, iteration]
+//	    __host__ __device__
+//	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
+//            const VertexT &input_item, const SizeT &input_pos,
+//            SizeT &output_pos) -> bool
+//        {
+//	    if (!util::isValid(dest) or !util::isValid(src))
+//		return false;
+//	    printf("advance lowest neighbor: src %d, dest %d\n", src, dest);
+//	    if (excess[src] > 0 and capacity[edge_id] - flow[edge_id] > 0)
+//	    {
+//		auto l = lowest_neighbor[src];
+//		auto height_dest = height[dest];
+//		while (height_dest < height[l]){
+//		    l = atomicCAS(&lowest_neighbor[src], l, dest);
+//		}
+//		printf("advance lowest neighbor iter %d, src %d, ex[%d] = %lf\
+//, lowest[%d] = %d\n", iteration, src, src, excess[src], src, dest);
+//		return true;
+//	    }
+//	    return false;
+//	}
+//	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+//		    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+//		    oprtr_parameters, advance_relabel_op));
+//
+	return retval;
     }
 
    /* cudaError_t Compute_OutputLength(int peer_)

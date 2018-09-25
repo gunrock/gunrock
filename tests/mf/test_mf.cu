@@ -15,7 +15,8 @@
 #include <gunrock/app/mf/mf_app.cu>
 #include <gunrock/app/test_base.cuh>
 
-#define debug_aml(a...) std::cerr << __FILE__ << ":" << __LINE__ << " " << \
+#define debug_aml(a...)
+//#define debug_aml(a...) std::cerr << __FILE__ << ":" << __LINE__ << " " << \
     a << "\n";
 
 using namespace gunrock;
@@ -55,15 +56,23 @@ struct main_struct
 	//
 	// Load Graph
 	//
-        GraphT graph;
+	bool undirected = parameters.Get<int>("undirected");
         util::CpuTimer cpu_timer; cpu_timer.Start();
 	debug_aml("Start Load Graph");
-        GUARD_CU(graphio::LoadGraph(parameters, graph));
         
-	//FOR DEBUG: force edge values to be 1
-        /*for (SizeT e=0; e < graph.edges; e++){
-	    graph.CsrT::edge_values[e] = 2;
-	}*/
+	GraphT d_graph;
+	parameters.Set<int>("undirected", 0);
+        GUARD_CU(graphio::LoadGraph(parameters, d_graph));
+	
+	GraphT u_graph;
+	parameters.Set<int>("undirected", 1);
+	GUARD_CU(graphio::LoadGraph(parameters, u_graph));
+
+	cpu_timer.Stop();
+
+	parameters.Set("load-time", cpu_timer.ElapsedMillis());
+	debug_aml("load-time is " << cpu_timer.ElapsedMillis());
+
 
 	if (parameters.Get<VertexT>("source") == 
 		util::PreDefinedValues<VertexT>::InvalidValue){
@@ -71,42 +80,124 @@ struct main_struct
 	}
 	if (parameters.Get<VertexT>("sink") == 
 		util::PreDefinedValues<VertexT>::InvalidValue){
-	    parameters.Set("sink", graph.nodes-1);
+	    parameters.Set("sink", d_graph.nodes-1);
 	}
-        
-	cpu_timer.Stop();
-        
-	parameters.Set("load-time", cpu_timer.ElapsedMillis());
-	debug_aml("load-time is " << cpu_timer.ElapsedMillis());
 
 	VertexT source = parameters.Get<VertexT>("source");
 	VertexT sink = parameters.Get<VertexT>("sink");
 
+	debug_aml("Directed graph:");
+	debug_aml("number of edges " << d_graph.edges);
+	debug_aml("number of nodes " << d_graph.nodes);
+	debug_aml("source " << source);
+	debug_aml("sink " << sink);
+
+	for (auto u = 0; u < d_graph.nodes; ++u){
+	    debug_aml("vertex " << u);
+	    auto e_start = d_graph.CsrT::GetNeighborListOffset(u);
+	    auto num_neighbors = d_graph.CsrT::GetNeighborListLength(u);
+	    auto e_end = e_start + num_neighbors;
+	    for (auto e = e_start; e < e_end; ++e)
+	    {
+		auto v = d_graph.CsrT::GetEdgeDest(e);
+		auto cap = d_graph.edge_values[e];
+		debug_aml("edge (" << u << ", " << v << ") cap = " << cap);
+	    }
+	}
+	ValueT* flow_edge = (ValueT*)malloc(sizeof(ValueT)*u_graph.edges);
+	SizeT* reverse = (SizeT*)malloc(sizeof(SizeT)*u_graph.edges);
+
+	// Initialize reverse array.
+	for (auto u = 0; u < u_graph.nodes; ++u)
+	{
+	    auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+	    auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+	    auto e_end = e_start + num_neighbors;
+	    for (auto e = e_start; e < e_end; ++e)
+	    {
+		auto v = u_graph.CsrT::GetEdgeDest(e);
+		auto f_start = u_graph.CsrT::GetNeighborListOffset(v);
+		auto num_neighbors2 = u_graph.CsrT::GetNeighborListLength(v);
+		auto f_end = f_start + num_neighbors2;
+		for (auto f = f_start; f < f_end; ++f)
+		{
+		    auto z = u_graph.CsrT::GetEdgeDest(f);
+		    if (z == u)
+		    {
+			reverse[e] = f;
+			reverse[f] = e;
+		    }
+		}
+	    }
+	}
+
+	// Correct capacity values on reverse edges
+	for (auto u = 0; u < d_graph.nodes; ++u)
+	{
+	    auto e_start = d_graph.CsrT::GetNeighborListOffset(u);
+	    auto num_neighbors = d_graph.CsrT::GetNeighborListLength(u);
+	    auto e_end = e_start + num_neighbors;
+	    for (auto e = e_start; e < e_end; ++e)
+	    {
+		auto v = d_graph.CsrT::GetEdgeDest(e);
+		// Looking for the reverse edge in undirected graph
+		auto f_start = u_graph.CsrT::GetNeighborListOffset(v);
+		auto num_neighbors2 = u_graph.CsrT::GetNeighborListLength(v);
+		auto f_end = f_start + num_neighbors2;
+		for (auto f = f_start; f < f_end; ++f)
+		{
+		    auto z = u_graph.CsrT::GetEdgeDest(f);
+		    if (z == u)
+		    {
+			u_graph.CsrT::edge_values[f] = 0;
+		    }
+		}
+	    }
+	}
+
+      	debug_aml("Undirected graph:");
+	debug_aml("number of edges " << u_graph.edges);
+	debug_aml("number of nodes " << u_graph.nodes);
+	debug_aml("source " << source);
+	debug_aml("sink " << sink);
+
+	for (auto u = 0; u < u_graph.nodes; ++u){
+	    debug_aml("vertex " << u);
+	    auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+	    auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+	    auto e_end = e_start + num_neighbors;
+	    for (auto e = e_start; e < e_end; ++e)
+	    {
+		auto v = u_graph.CsrT::GetEdgeDest(e);
+		auto cap = u_graph.edge_values[e];
+		debug_aml("edge (" << u << ", " << v << ") cap = " << cap);
+	    }
+	}
+
 	//
         // Compute reference CPU max flow algorithm.
 	//
+	GraphT graph = u_graph;
         ValueT max_flow;
-	ValueT* flow_edges = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
-	VertexT* reverse = (VertexT*)malloc(sizeof(VertexT)*graph.edges);
 	
-        util::PrintMsg("______CPU reference algorithm______", true);
+	util::PrintMsg("______CPU reference algorithm______", true);
 	double elapsed = app::mf::CPU_Reference
-	    (parameters, graph, source, sink, max_flow, reverse, flow_edges);
+	    (parameters, graph, source, sink, max_flow, reverse, flow_edge);
         util::PrintMsg("------------------------------------\n\elapsed: " + 
 		std::to_string(elapsed) + " ms, max flow = " +
 		std::to_string(max_flow), true);
-
 	
         std::vector<std::string> switches{"advance-mode"};
 	GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-	[flow_edges, reverse](util::Parameters &parameters, GraphT &graph)
+	[flow_edge, reverse](util::Parameters &parameters, GraphT &graph)
 	{
 	debug_aml("go to RunTests");
-	return app::mf::RunTests(parameters, graph, reverse, flow_edges);
+	return app::mf::RunTests(parameters, graph, reverse, flow_edge);
 	}));
 
 	// Clean up
-	free(flow_edges);
+	free(flow_edge);
+	free(reverse);
 	
         return retval;
     }
@@ -132,8 +223,8 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | 
         app::SIZET_U32B | 
-        app::VALUET_U32B | 
-	app::UNDIRECTED >
+        app::VALUET_F64B | 
+	app::DIRECTED >
         (parameters, main_struct());
 }
 
