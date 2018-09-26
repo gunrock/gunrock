@@ -415,6 +415,9 @@ double CPU_Reference(
     cpu_timer.Start();
     maxflow = max_flow(graph, capacity, flow, excess, height, src, sin, 
 	    reverse);
+    for (int i=0; i< graph.edges; ++i){
+	debug_aml("flow(" << i << ") = " << flow[i]);
+    }
     cpu_timer.Stop();
     double elapsed = cpu_timer.ElapsedMillis();
 
@@ -466,10 +469,11 @@ int Validate_Results(
     int num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
     auto nodes = graph.nodes;
+    auto edges = graph.edges;
 
     // Verify the result
     if (ref_flow != NULL)
-    {
+    {/*
 	for (VertexT v = 0; v < nodes; ++v)
 	{
 	    SizeT e_start = graph.CsrT::GetNeighborListOffset(v);
@@ -477,15 +481,18 @@ int Validate_Results(
             SizeT e_end = e_start + num_neighbors;
             for (SizeT e = e_start; e < e_end; e++)
 	    {
+		printf("flow(%d) = %lf ", e, ref_flow[e]);
 		if (!util::isValid(ref_flow[e])){
 		    ref_flow[e] = 0;
-		}
+		    printf(" poprawka na 0\n");
+		}else
+		    printf("\n");
 	    }
-	}
+	}*/
 
-	util::PrintMsg("Flow Validity: ", !quiet, false);
+	util::PrintMsg("Flow Validity (compare results): ", !quiet, false);
 
-	num_errors = util::CompareResults(h_flow, ref_flow, nodes, true, quiet);
+	num_errors = util::CompareResults(h_flow, ref_flow, edges, true, quiet);
 
 	if (num_errors > 0)
 	{

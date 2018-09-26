@@ -86,9 +86,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, VertexT> height; 	      // vertex height
         util::Array1D<SizeT, SizeT>   reverse;	      // id reverse edge
 	util::Array1D<SizeT, SizeT>   lowest_neighbor;// id lowest neighbor
+	util::Array1D<SizeT, VertexT> local_vertices; // set of vertices
+	util::Array1D<SizeT, SizeT>   active;	      // flag active vertices
 
 	VertexT	source;	// source vertex
 	VertexT sink;	// sink vertex
+	SizeT num_updated_vertices;
 
         /*
          * @brief Default constructor
@@ -97,11 +100,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         {
 	    source = util::PreDefinedValues<VertexT>::InvalidValue;
 	    sink = util::PreDefinedValues<VertexT>::InvalidValue;
+	    num_updated_vertices = 1;
 	    reverse	    .SetName("reverse"	      );
             excess	    .SetName("excess"	      );
             flow   	    .SetName("flow"  	      );
             height 	    .SetName("height"	      );
 	    lowest_neighbor .SetName("lowest_neighbor");
+	    local_vertices  .SetName("local_vertices" );
+	    active	    .SetName("active"      );
         }
 
         /*
@@ -128,6 +134,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(height  	    .Release(target));
             GUARD_CU(reverse	    .Release(target));
             GUARD_CU(lowest_neighbor.Release(target));
+            GUARD_CU(local_vertices .Release(target));
+            GUARD_CU(active	    .Release(target));
             
 	    GUARD_CU(BaseDataSlice::Release(target));
             
@@ -135,7 +143,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         }
 
         /**
-         * @brief initializing MF-specific data on each gpu
+         * @brief initializing MF-specific Data Slice a on each gpu
          * @param     sub_graph   Sub graph on the GPU.
          * @param[in] gpu_idx     GPU device index
          * @param[in] target      Targeting device location
@@ -144,6 +152,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          */
         cudaError_t Init(
             GraphT        &sub_graph,
+	    VertexT	  *h_reverse,
 	    int		   num_gpus = 1,
             int            gpu_idx  = 0,
             util::Location target   = util::DEVICE,
@@ -166,12 +175,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(excess  	    .Allocate(nodes_size, target));
             GUARD_CU(height  	    .Allocate(nodes_size, target));
             GUARD_CU(lowest_neighbor.Allocate(nodes_size, target));
+            GUARD_CU(local_vertices .Allocate(nodes_size, target));
+            GUARD_CU(active	    .Allocate(1, util::HOST|target));
 
-            GUARD_CU(reverse.Move(util::HOST, target, edges_size, 0, 
+
+	    GUARD_CU(util::SetDevice(gpu_idx));
+	    GUARD_CU(reverse.SetPointer(h_reverse, edges_size, util::HOST));
+	    GUARD_CU(reverse.Move(util::HOST, target, edges_size, 0, 
 			this->stream));
             GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
             return retval;
-        } // Init
+        } // Init Data Slice
 
         /**
          * @brief Reset DataSlice function. Must be called prior to each run.
@@ -191,11 +205,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT edges_size = graph.edges;
 
             // Ensure data are allocated
+            GUARD_CU(active	      .EnsureSize_(1, target|util::HOST));
             GUARD_CU(flow	      .EnsureSize_(edges_size, target));
             GUARD_CU(reverse 	      .EnsureSize_(edges_size, target));
             GUARD_CU(excess  	      .EnsureSize_(nodes_size, target));
             GUARD_CU(height  	      .EnsureSize_(nodes_size, target));
             GUARD_CU(lowest_neighbor  .EnsureSize_(nodes_size, target));
+            GUARD_CU(local_vertices   .EnsureSize_(nodes_size, target));
+
+	    this->num_updated_vertices = 1;
 
 	    ValueT src_flow = 0;
 	    SizeT e_start = graph.CsrT::GetNeighborListOffset(source);
@@ -204,13 +222,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    for (auto e = e_start; e < e_end; ++e)
 	    {
 		VertexT v = graph.CsrT::GetEdgeDest(e);
-		printf("edge outgoing from source: %d-%d, cap %lf\n", source, 
-			v, graph.edge_values[e]);
+		//printf("edge outgoing from source: %d-%d, cap %lf\n", 
+		//source, v, graph.edge_values[e]);
 		src_flow += graph.edge_values[e];
 	    }
-	    printf("source flow = %lf\n", src_flow);
+	    //printf("source flow = %lf\n", src_flow);
 
             // Reset data
+            GUARD_CU(active.ForAll([]
+	      __host__ __device__(SizeT *active_, const VertexT &pos)
+	      {
+		active_[pos] = 1;
+	      }, 1, target, this -> stream));
+		
             GUARD_CU(excess.ForAll([source, src_flow]
 	      __host__ __device__(ValueT *excess_, const VertexT &pos)
 	      {
@@ -219,8 +243,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 		}else{
 		  excess_[pos] = src_flow;
 		}
-		printf("excess_[%d] = %lf\n", pos, excess_[pos]);
+	//	printf("excess_[%d] = %lf\n", pos, excess_[pos]);
 	      }, nodes_size, target, this -> stream));
+
+	    GUARD_CU(reverse.ForAll([]
+	      __host__ __device__(VertexT *r_, const VertexT &pos)
+	      {
+	//	printf("reverse[%d] = %d\n", pos, r_[pos]);
+	      }, edges_size, target, this -> stream));
 
 	    GUARD_CU(height.ForAll([source, nodes_size]
 	      __host__ __device__(VertexT *height, const VertexT pos)
@@ -235,11 +265,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    GUARD_CU(lowest_neighbor.ForAll([graph, source]
 	      __host__ __device__(VertexT *lowest_neighbor, const VertexT pos)
 	      {
+	      /*
 		auto e = graph.CsrT::GetNeighborListOffset(pos);
 		auto neighbor = graph.CsrT::GetEdgeDest(e);
-		lowest_neighbor[pos] = neighbor;
-		printf("lowest neighbor[%d] = %d\n", pos, neighbor);
+		lowest_neighbor[pos] = neighbor;*/
+		lowest_neighbor[pos] = 
+				util::PreDefinedValues<VertexT>::InvalidValue;
+	//	printf("lowest neighbor[%d] = %d\n", pos, lowest_neighbor[pos]);
 	      }, nodes_size, target, this -> stream));
+
+	    GUARD_CU(local_vertices.ForAll([]
+	      __host__ __device__(VertexT *local_vertex, const VertexT pos)
+	      {
+		local_vertex[pos] = pos;
+	      }, nodes_size, target));
 
             GUARD_CU(flow.ForEach([]
 	      __host__ __device__(ValueT &flow)
@@ -323,6 +362,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 	    GUARD_CU(data_slice.flow.SetPointer(h_flow, eN, util::HOST));
 	    GUARD_CU(data_slice.flow.Move(util::DEVICE, util::HOST));
+	    //for (int i=0; i< eN; ++i)
+		//printf("flow (%d)  = %lf\n", i, h_flow[i]);
 	}
 	else if (target == util::HOST)
 	{
@@ -337,13 +378,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     }
 
     /**
-     * @brief initialization function.
+     * @brief Init MF Problem
      * @param     graph       The graph that MF processes on
      * @param[in] Location    Memory location to work on
      * \return    cudaError_t Error message(s), if any
      */
     cudaError_t Init(
             GraphT	    &graph,
+	    VertexT	    *h_reverse,
             util::Location  target = util::DEVICE)
     {
 	debug_aml("Problem Init");
@@ -364,6 +406,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             auto &data_slice = data_slices[gpu][0];
             GUARD_CU(data_slice.Init(
 			this->sub_graphs[gpu],
+			h_reverse,
 			this->num_gpus,
 			this->gpu_idx[gpu], 
 			target, 
@@ -373,7 +416,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 		   "sync failed.");
         } // end for (gpu)
         return retval;
-    }
+    }// End Init MF Problem
 
     /**
      * @brief Reset Problem function. Must be called prior to each run.
@@ -381,8 +424,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * @param[in] location Memory location to work on
      * \return cudaError_t Error message(s), if any
      */
-    cudaError_t Reset(
-	    GraphT& graph, util::Location target = util::DEVICE)
+    cudaError_t Reset(GraphT& graph, util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -400,8 +442,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    // Set device
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-	    GUARD_CU(data_slices[gpu]->Reset(graph, source_vertex, 
-			target));
+	    GUARD_CU(data_slices[gpu]->Reset(graph, source_vertex, target));
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
         
