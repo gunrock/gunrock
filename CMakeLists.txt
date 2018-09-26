@@ -160,6 +160,10 @@ option(GUNROCK_APP_TOPK
   "If on, builds only TOPK application."
   OFF)
 
+option(GUNROCK_APP_GRMAT
+  "If on, builds only GRMAT application."
+  OFF)
+
 #option(GUNROCK_APP_SAMPLE
 #  "If on, builds only SAMPLE application."
 #  OFF)
@@ -294,6 +298,7 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(tests/salsa)
   add_subdirectory(tests/wtf)
   add_subdirectory(tests/topk)
+  add_subdirectory(tests/grmat)
   #add_subdirectory(tests/template)
   #add_subdirectory(tests/vis)
   #add_subdirectory(tests/mis)
@@ -335,6 +340,10 @@ else(GUNROCK_BUILD_APPLICATIONS)
   if(GUNROCK_APP_TOPK)
     add_subdirectory(tests/topk)
   endif(GUNROCK_APP_TOPK)
+  
+  if(GUNROCK_APP_GRMAT)
+    add_subdirectory(tests/grmat)
+  endif(GUNROCK_APP_GRMAT)
 
   # if(GUNROCK_APP_SAMPLE)
   #   add_subdirectory(tests/sample)
@@ -370,6 +379,10 @@ set_tests_properties(TEST_PAGERANK PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT
 add_test(NAME TEST_TOPK COMMAND topk market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
 set_tests_properties(TEST_TOPK PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
+
+add_test(NAME TEST_GRMAT COMMAND grmat market
+  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --normalized --compensate --undirected)
+set_tests_properties(TEST_GRMAT PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 
 ### shared library application interface tests
 add_test(NAME SHARED_LIB_TEST_BFS COMMAND shared_lib_bfs)
@@ -432,6 +445,10 @@ if(GUNROCK_MGPU_TESTS)
   add_test(NAME TEST_MGPU_PR COMMAND pr market
     ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
   set_tests_properties(TEST_PAGERANK PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
+  
+  add_test(NAME TEST_MGPU_GRMAT COMMAND grmat market
+    ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
+  set_tests_properties(TEST_GRMAT PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 
   # add_test(NAME TEST_MGPU_TOPK COMMAND topk market
   #  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
