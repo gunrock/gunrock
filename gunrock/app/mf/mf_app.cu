@@ -83,7 +83,7 @@ template <typename GraphT, typename ValueT, typename VertexT>
 cudaError_t RunTests(
     util::Parameters  &parameters,
     GraphT	      &graph,
-    VertexT	      *reverse, 
+    VertexT	      *h_reverse,
     ValueT	      *ref_flow,
     util::Location    target = util::DEVICE)
 {
@@ -113,7 +113,7 @@ cudaError_t RunTests(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    GUARD_CU(problem.Init(graph  , target));
+    GUARD_CU(problem.Init(graph, h_reverse, target));
     GUARD_CU(enactor.Init(problem, target));
 
     cpu_timer.Stop();
@@ -142,20 +142,22 @@ cudaError_t RunTests(
                 .enactor_stats.iteration), !quiet_mode);
         if (validation == "each")
         {
-            // TODO: fill in problem specific data, e.g.:
             GUARD_CU(problem.Extract(h_flow));
             int num_errors = app::mf::Validate_Results(parameters, graph, 
-		    source, sink, h_flow, reverse, ref_flow, quiet_mode);
+		    source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
         }
     }
     
     // Copy out results
     cpu_timer.Start();
-    GUARD_CU(problem.Extract(h_flow));
     if (validation == "last")
     {
+	GUARD_CU(problem.Extract(h_flow));
+//	    printf("h_flow: ");
+//	    for (int i=0; i<graph.edges; ++i)
+//		printf("flow(%d)=%lf\n", i, h_flow[i]);
         int num_errors = app::mf::Validate_Results(parameters, graph, 
-		source, sink, h_flow, reverse, ref_flow, quiet_mode);
+		source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
     }
 
     // Compute running statistics
