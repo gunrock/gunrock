@@ -451,6 +451,136 @@ cudaError_t BuildMetaRmatGraph(
     return retval;
 }
 
+/**
+ * @brief Builds a R-MAT CSR graph and returns it in coo format.
+ *
+ * @tparam WITH_VALUES Whether or not associate with per edge weight values.
+ * @tparam VertexId Vertex identifier.
+ * @tparam Value Value type.
+ * @tparam SizeT Graph size type.
+ *
+ * @param[in] nodes
+ * @param[in] edges
+ * @param[in] undirected
+ * @param[in] a0
+ * @param[in] b0
+ * @param[in] c0
+ * @param[in] d0
+ * @param[in] vmultipiler
+ * @param[in] vmin
+ * @param[in] seed
+ */
+template <bool WITH_VALUES, typename VertexId, typename SizeT, typename Value>
+void* BuildRmatGraph_coo(
+    SizeT num_nodes, SizeT num_edges,
+//    Csr<VertexId, SizeT, Value> &graph,
+    bool undirected,
+    double a0 = 0.55,
+    double b0 = 0.2,
+    double c0 = 0.2,
+    double d0 = 0.05,
+    double vmultipiler = 1.00,
+    double vmin = 1.00,
+    int    seed = -1,
+    bool   quiet = false,
+    int    num_gpus = 1,
+    int   *gpu_idx = NULL)
+{
+    typedef Coo<VertexId, Value> EdgeTupleType;
+    //cudaError_t retval = cudaSuccess;
+
+    if ((num_nodes < 0) || (num_edges < 0))
+    {
+        fprintf(stderr, "Invalid graph size: nodes=%lld, edges=%lld",
+            (long long)num_nodes, (long long)num_edges);
+        util::GRError("Invalid graph size");
+        return NULL;
+    }
+
+    SizeT directed_edges = (undirected) ? num_edges * 2 : num_edges;
+    EdgeTupleType *coo = (EdgeTupleType*) malloc (
+        sizeof(EdgeTupleType) * directed_edges);
+
+    if (seed == -1) seed = time(NULL);
+    if (!quiet)
+    {
+        printf("rmat_seed = %lld\n", (long long)seed);
+    }
+
+    cudaStream_t *streams = new cudaStream_t[num_gpus];
+    util::Array1D<SizeT, EdgeTupleType> *edges = new util::Array1D<SizeT, EdgeTupleType>[num_gpus];
+    util::Array1D<SizeT, curandState> *rand_states = new util::Array1D<SizeT, curandState>[num_gpus];
+
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {
+        if (gpu_idx != NULL)
+        {
+            if (util::SetDevice(gpu_idx[gpu]))
+                return NULL;
+        }
+
+        if (util::GRError(cudaStreamCreate(streams + gpu),
+            "cudaStreamCreate failed", __FILE__, __LINE__))
+            return NULL;
+        SizeT start_edge = num_edges * 1.0 / num_gpus * gpu;
+        SizeT end_edge = num_edges * 1.0 / num_gpus * (gpu+1);
+        SizeT edge_count = end_edge - start_edge;
+        if (undirected) edge_count *=2;
+        unsigned int seed_ = seed + 616 * gpu;
+        if (edges[gpu].Allocate(edge_count, util::DEVICE))
+            return NULL;
+        if (edges[gpu].SetPointer(coo + start_edge * (undirected ? 2 : 1), edge_count, util::HOST))
+            return NULL;
+
+        int block_size = (sizeof(VertexId) == 4) ? 1024 : 512;
+        int grid_size = edge_count / block_size + 1;
+        if (grid_size > 480) grid_size = 480;
+        if (rand_states[gpu].Allocate(block_size * grid_size, util::DEVICE))
+            return NULL;
+        Rand_Init
+             <SizeT>
+            <<<grid_size, block_size, 0, streams[gpu]>>>
+            (seed_, rand_states[gpu].GetPointer(util::DEVICE));
+
+        Rmat_Kernel
+            <WITH_VALUES, VertexId, SizeT, Value>
+            <<<grid_size, block_size, 0, streams[gpu]>>>
+            (num_nodes, (undirected ? edge_count/2 : edge_count),
+            edges[gpu].GetPointer(util::DEVICE),
+            undirected, vmultipiler, vmin,
+            a0, b0, c0, d0,
+            rand_states[gpu].GetPointer(util::DEVICE));
+
+        if (edges[gpu].Move(util::DEVICE, util::HOST, edge_count, 0, streams[gpu]))
+            return NULL;
+    }
+
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {
+        if (gpu_idx != NULL)
+        {
+            if (util::SetDevice(gpu_idx[gpu]))
+                return NULL;
+        }
+        if (util::GRError(cudaStreamSynchronize(streams[gpu]),
+            "cudaStreamSynchronize failed", __FILE__, __LINE__))
+            return NULL;
+        if (util::GRError(cudaStreamDestroy(streams[gpu]),
+            "cudaStreamDestroy failed", __FILE__, __LINE__))
+            return NULL;
+        if (edges[gpu].Release())
+            return NULL;
+        if (rand_states[gpu].Release())
+            return NULL;
+    }
+
+    delete[] rand_states; rand_states = NULL;
+    delete[] edges;   edges   = NULL;
+    delete[] streams; streams = NULL;
+
+    return coo;
+}
+
 } // namespace grmat
 } // namespace graphio
 } // namespace gunrock
