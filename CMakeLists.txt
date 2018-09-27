@@ -380,10 +380,6 @@ add_test(NAME TEST_TOPK COMMAND topk market
   ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --undirected)
 set_tests_properties(TEST_TOPK PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 
-add_test(NAME TEST_GRMAT COMMAND grmat market
-  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx --normalized --compensate --undirected)
-set_tests_properties(TEST_GRMAT PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
-
 ### shared library application interface tests
 add_test(NAME SHARED_LIB_TEST_BFS COMMAND shared_lib_bfs)
 set_tests_properties(SHARED_LIB_TEST_BFS
@@ -445,10 +441,6 @@ if(GUNROCK_MGPU_TESTS)
   add_test(NAME TEST_MGPU_PR COMMAND pr market
     ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
   set_tests_properties(TEST_PAGERANK PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
-  
-  add_test(NAME TEST_MGPU_GRMAT COMMAND grmat market
-    ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
-  set_tests_properties(TEST_GRMAT PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 
   # add_test(NAME TEST_MGPU_TOPK COMMAND topk market
   #  ${gunrock_INCLUDE_DIRS}/simple_example/bips98_606.mtx ${DEVICES} --undirected)
