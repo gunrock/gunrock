@@ -39,7 +39,21 @@ cudaError_t UseParameters(util::Parameters &parameters)
          "length of random walks",
          __FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<int>(    
+    GUARD_CU(parameters.Use<int>(
+         "walk-mode",
+         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+         0,
+         "random walk mode (0=random; 1=max)",
+         __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<std::string>(
+         "node-value-path",
+         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+         "",
+         "path to file containing node values",
+         __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
          "walks-per-node",
          util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
          2,
@@ -49,8 +63,8 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(parameters.Use<int>(
          "seed",
          util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
-         time(NULL),   
-         "seed for random number generator", 
+         time(NULL),
+         "seed for random number generator",
          __FILE__, __LINE__));
 
     return retval;
@@ -65,7 +79,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
  * @param[in]  walk_length      Length of random walks
  * @param[in]  walks_per_node   Number of random walks per node
  * @param[in]  ref_walks        Array of random walks from CPU
- * @param[in]  target           where to perform the app 
+ * @param[in]  target           where to perform the app
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT>
@@ -74,12 +88,13 @@ cudaError_t RunTests(
     GraphT                   &graph,
     int                      walk_length,
     int                      walks_per_node,
+    int                      walk_mode,
     typename GraphT::VertexT *ref_walks,
     util::Location target)
 {
-    
+
     cudaError_t retval = cudaSuccess;
-       
+
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::SizeT   SizeT;
@@ -91,7 +106,7 @@ cudaError_t RunTests(
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
     util::Info info("rw", parameters, graph);
-    
+
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
 
@@ -103,14 +118,14 @@ cudaError_t RunTests(
     EnactorT enactor;
     GUARD_CU(problem.Init(graph, target));
     GUARD_CU(enactor.Init(problem, target));
-    
+
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
-    
+
     for (int run_num = 0; run_num < num_runs; ++run_num) {
         GUARD_CU(problem.Reset(target));
         GUARD_CU(enactor.Reset(walks_per_node, target));
-        
+
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
@@ -124,9 +139,9 @@ cudaError_t RunTests(
             ", #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
-        
+
         if (validation == "each") {
-            
+
             GUARD_CU(problem.Extract(
                 h_walks
             ));
@@ -139,7 +154,7 @@ cudaError_t RunTests(
     }
 
     cpu_timer.Start();
-    
+
     GUARD_CU(problem.Extract(
         h_walks
     ));
@@ -234,7 +249,7 @@ double gunrock_rw(
 //  * @param[in]  walks          Array for random walks
 //  * @param[in]  walks_per_node Number of random walks per node
 //  * \return     double      Return accumulated elapsed times for all runs
- 
+
 template <
     typename VertexT = int,
     typename SizeT   = int,
@@ -267,15 +282,15 @@ float rw(
 
     bool quiet = parameters.Get<bool>("quiet");
     GraphT graph;
-    
+
     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
     graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
     graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
     graph.FromCsr(graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, graph);
-    
+
     double elapsed_time = gunrock_rw(parameters, graph, h_walks, walks_per_node);
-    
+
     graph.Release();
 
     return elapsed_time;

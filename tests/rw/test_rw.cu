@@ -12,6 +12,10 @@
  * @brief Simple test driver program for Gunrock template.
  */
 
+#include <iostream>
+#include <string>
+#include <fstream>
+
 #include <gunrock/app/rw/rw_app.cu>
 #include <gunrock/app/test_base.cuh>
 
@@ -44,13 +48,14 @@ struct main_struct
     cudaError_t operator()(util::Parameters &parameters,
         VertexT v, SizeT s, ValueT val)
     {
-        // CLI parameters        
+        // CLI parameters
         bool quick = parameters.Get<bool>("quick");
         bool quiet = parameters.Get<bool>("quiet");
 
         typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-            graph::HAS_EDGE_VALUES | graph::HAS_CSR>
+            graph::HAS_NODE_VALUES | graph::HAS_CSR>
             GraphT;
+        typedef typename GraphT::CsrT CsrT;
 
         cudaError_t retval = cudaSuccess;
         util::CpuTimer cpu_timer;
@@ -60,41 +65,72 @@ struct main_struct
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
-        
+
         int walk_length    = parameters.Get<int>("walk-length");
         int walks_per_node = parameters.Get<int>("walks-per-node");
+        int walk_mode      = parameters.Get<int>("walk-mode");
         VertexT *ref_walks;
-        
+
+        ValueT *node_values;
+        if(walk_mode != 0) {
+            node_values = new ValueT[graph.nodes];
+            graph.CsrT::node_values.SetPointer(node_values, graph.nodes, gunrock::util::HOST);
+
+            std::string node_value_path = parameters.Get<std::string>("node-value-path");
+            if(node_value_path.compare("") == 0) {
+                printf("test_rw: `node-value-path` must be set if `walk-mode` != 0");
+                return retval;
+            }
+
+            std::ifstream node_value_file(node_value_path, std::ios_base::in);
+            for(int i = 0; i < graph.nodes; i++) {
+                node_value_file >> node_values[i];
+            }
+        }
+
         if (!quick) {
             ref_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
-            
+
             util::PrintMsg("__________________________", !quiet);
-            
+
             float elapsed = APP_NAMESPACE::CPU_Reference(
                 graph.csr(),
                 walk_length,
                 walks_per_node,
+                walk_mode,
                 ref_walks,
-                quiet);
-            
+                quiet
+            );
+
             util::PrintMsg("--------------------------\n Elapsed: "
                 + std::to_string(elapsed), !quiet);
         }
 
-        // <DONE> add other switching parameters, if needed
         std::vector<std::string> switches{"advance-mode"};
-        // </DONE>
-        
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
-                walk_length, walks_per_node, ref_walks
+                walk_length,
+                walks_per_node,
+                walk_mode,
+                ref_walks
             ](util::Parameters &parameters, GraphT &graph)
             {
-                return APP_NAMESPACE::RunTests(parameters, graph, walk_length, walks_per_node, ref_walks, util::DEVICE);
+                return APP_NAMESPACE::RunTests(
+                    parameters,
+                    graph,
+                    walk_length,
+                    walks_per_node,
+                    walk_mode,
+                    ref_walks,
+                    util::DEVICE
+                );
             }));
 
         if (!quick) {
             delete[] ref_walks; ref_walks = NULL;
+        }
+        if(walk_mode != 0) {
+            delete[] node_values; node_values = NULL;
         }
         return retval;
     }
@@ -115,7 +151,6 @@ int main(int argc, char** argv)
     }
     GUARD_CU(parameters.Check_Required());
 
-    // TODO: change available graph types, according to requirements
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |
