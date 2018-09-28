@@ -72,8 +72,10 @@ template <typename GraphT>
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
+             // <TODO>
              typename GraphT::ValueT *h_degrees,
              typename GraphT::ValueT *ref_degrees,
+             // </TODO>
              bool verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
