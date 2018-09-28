@@ -12,6 +12,7 @@
  * @brief Simple test driver program for Gunrock template.
  */
 
+#include <iostream>
 #include <gunrock/app/proj/proj_app.cu>
 #include <gunrock/app/test_base.cuh>
 
@@ -61,17 +62,17 @@ struct main_struct
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        ValueT *ref_projection;
+        ValueT *ref_projections;
 
         if (!quick) {
-            ref_projection = new ValueT[graph.nodes * graph.nodes];
+            ref_projections = new ValueT[graph.nodes * graph.nodes];
 
             // If not in `quick` mode, compute CPU reference implementation
             util::PrintMsg("__________________________", !quiet);
 
             float elapsed = app::proj::CPU_Reference(
                 graph.csr(),
-                ref_projection,
+                ref_projections,
                 quiet);
 
             util::PrintMsg("--------------------------\n Elapsed: "
@@ -81,14 +82,14 @@ struct main_struct
         std::vector<std::string> switches{"advance-mode"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
-                ref_projection
+                ref_projections
             ](util::Parameters &parameters, GraphT &graph)
             {
-                return app::proj::RunTests(parameters, graph, ref_projection, util::DEVICE);
+                return app::proj::RunTests(parameters, graph, ref_projections, util::DEVICE);
             }));
 
         if (!quick) {
-            delete[] ref_projection; ref_projection = NULL;
+            delete[] ref_projections; ref_projections = NULL;
         }
         return retval;
     }
@@ -97,7 +98,7 @@ struct main_struct
 int main(int argc, char** argv)
 {
     cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test proj");
+    util::Parameters parameters("test graph_projections");
     GUARD_CU(graphio::UseParameters(parameters));
     GUARD_CU(app::proj::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
@@ -109,11 +110,10 @@ int main(int argc, char** argv)
     }
     GUARD_CU(parameters.Check_Required());
 
-    // TODO: change available graph types, according to requirements
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |
-        app::VALUET_U32B | app::DIRECTED>
+        app::VALUET_F32B | app::DIRECTED>
         (parameters, main_struct());
 }
 
