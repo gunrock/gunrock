@@ -132,7 +132,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         {
             cudaError_t retval = cudaSuccess;
             SizeT nodes = this -> sub_graph -> nodes;
-            printf("Reset::nodes=%d\n", nodes);
 
             // Ensure data are allocated
             GUARD_CU(projections.EnsureSize_(nodes * nodes, target));
@@ -204,8 +203,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             // Set device
             if (target == util::DEVICE) {
-                printf("Extract: target == util::DEVICE\n");
-                printf("Extract: nodes=%d\n", nodes);
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
                 GUARD_CU(data_slice.projections.SetPointer(h_projections, nodes * nodes, util::HOST));
                 GUARD_CU(data_slice.projections.Move(util::DEVICE, util::HOST));
@@ -214,7 +211,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(data_slice.projections.ForEach(h_projections,
                    []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
                        host_val = device_val;
-                       printf("host_val=%d | device_val=%d", host_val, device_val);
                    }, nodes * nodes, util::HOST));
             }
         } else { // num_gpus != 1

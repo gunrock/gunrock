@@ -12,7 +12,6 @@
  * @brief Simple test driver program for Gunrock template.
  */
 
-#include <iostream>
 #include <gunrock/app/proj/proj_app.cu>
 #include <gunrock/app/test_base.cuh>
 

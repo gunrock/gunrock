@@ -377,7 +377,7 @@ public:
     {
         cudaError_t retval = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));
-        util::PrintMsg("GPU Template Done.", this -> flag & Debug);
+        util::PrintMsg("GPU graph_projections Done.", this -> flag & Debug);
         return retval;
     }
 };
