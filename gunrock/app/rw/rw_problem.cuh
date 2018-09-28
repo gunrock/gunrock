@@ -70,6 +70,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, float> rand;
         int walk_length;
         int walks_per_node;
+        int walk_mode;
         curandGenerator_t gen;
 
         /*
@@ -120,6 +121,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             ProblemFlag    flag,
             int walk_length_,
             int walks_per_node_,
+            int walk_mode_,
             int seed)
         {
             cudaError_t retval  = cudaSuccess;
@@ -128,6 +130,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             walk_length = walk_length_;
             walks_per_node = walks_per_node_;
+            walk_mode = walk_mode_;
             curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
             curandSetPseudoRandomGeneratorSeed(gen, seed);
 
@@ -158,7 +161,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(walks.ForEach([]__host__ __device__ (VertexT &x){
                x = util::PreDefinedValues<VertexT>::InvalidValue;
             }, nodes * this -> walk_length * this -> walks_per_node, target, this -> stream));
-            
+
             GUARD_CU(rand.ForEach([]__host__ __device__ (float &x){
                x = (float)0.0;
             }, nodes * this -> walks_per_node, target, this -> stream));
@@ -171,6 +174,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     util::Array1D<SizeT, DataSlice> *data_slices;
     int walk_length;
     int walks_per_node;
+    int walk_mode;
     int seed;
 
     // ----------------------------------------------------------------
@@ -184,9 +188,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         ProblemFlag _flag = Problem_None) :
         BaseProblem(_parameters, _flag),
         data_slices(NULL) {
-            
+
         walk_length    = _parameters.Get<int>("walk-length");
         walks_per_node = _parameters.Get<int>("walks-per-node");
+        walk_mode      = _parameters.Get<int>("walk-mode");
         seed           = _parameters.Get<int>("seed");
     }
 
@@ -215,7 +220,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         GUARD_CU(BaseProblem::Release(target));
         return retval;
     }
-    
+
     /**
      * @brief Copy result distancess computed on GPUs back to host-side arrays.
 ...
@@ -244,9 +249,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                    }, nodes * this -> walk_length * this -> walks_per_node, util::HOST));
             }
         } else { // num_gpus != 1
-            
+
             // ============ INCOMPLETE TEMPLATE - MULTIGPU ============
-            
+
             // // TODO: extract the results from multiple GPUs, e.g.:
             // // util::Array1D<SizeT, ValueT *> th_distances;
             // // th_distances.SetName("bfs::Problem::Extract::th_distances");
@@ -292,7 +297,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseProblem::Init(graph, target));
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
-        
+
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
             data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
             if (target & util::DEVICE)
@@ -309,6 +314,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 this -> flag,
                 this -> walk_length,
                 this -> walks_per_node,
+                this -> walk_mode,
                 this -> seed
             ));
         }
