@@ -94,7 +94,7 @@ struct RWIterationLoop : public IterationLoopBase
         curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
 
         if(walk_mode == 0) {
-          auto rw_op = [
+          auto uniform_rw_op = [
               graph,
               walks,
               rand,
@@ -117,10 +117,10 @@ struct RWIterationLoop : public IterationLoopBase
           };
 
           GUARD_CU(frontier.V_Q()->ForAll(
-            rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+            uniform_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
 
         } else if (walk_mode == 1) {
-          auto rw_op = [
+          auto max_rw_op = [
               graph,
               walks,
               rand,
@@ -151,7 +151,7 @@ struct RWIterationLoop : public IterationLoopBase
           };
 
           GUARD_CU(frontier.V_Q()->ForAll(
-            rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+            max_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
 
         }
 
