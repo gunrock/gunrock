@@ -19,7 +19,7 @@
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
- 
+
 #include <gunrock/app/pr_nibble/pr_nibble_problem.cuh>
 
 
@@ -52,7 +52,7 @@ struct PRNibbleIterationLoop : public IterationLoopBase
     typedef typename EnactorT::ValueT  ValueT;
     typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
-    
+
     typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
@@ -67,36 +67,36 @@ struct PRNibbleIterationLoop : public IterationLoopBase
     {
         // --
         // Alias variables
-        
+
         auto &data_slice = this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
-        
+
         auto &enactor_slice = this -> enactor ->
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
-        
+
         auto &enactor_stats    = enactor_slice.enactor_stats;
         auto &graph            = data_slice.sub_graph[0];
         auto &frontier         = enactor_slice.frontier;
         auto &oprtr_parameters = enactor_slice.oprtr_parameters;
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
-        
+
         // problem specific data alias
         auto &grad       = data_slice.grad;
         auto &q          = data_slice.q;
         auto &y          = data_slice.y;
         auto &z          = data_slice.z;
         auto &touched    = data_slice.touched;
-        
+
         auto &alpha    = data_slice.alpha;
         auto &rho      = data_slice.rho;
         auto &eps      = data_slice.eps;
         auto &max_iter = data_slice.max_iter;
-        
+
         auto &src_node = data_slice.src;
         auto &src_neib = data_slice.src_neib;
         auto &num_ref_nodes = data_slice.num_ref_nodes;
-        
+
         // --
         // Define operations
 
@@ -115,30 +115,30 @@ struct PRNibbleIterationLoop : public IterationLoopBase
             touched,
             num_ref_nodes
         ] __host__ __device__ (VertexT *v, const SizeT &i) {
-            
+
             VertexT idx = v[i];
-            
+
             // ignore the neighbor on the first iteration
             if((iteration == 0) && (idx == src_neib)) return;
-            
+
             // Compute degrees
             SizeT idx_d        = graph.GetNeighborListLength(idx);
             ValueT idx_d_sqrt  = sqrt((ValueT)idx_d);
             ValueT idx_dn_sqrt = 1.0 / idx_d_sqrt;
-            
+
             // this is at end in original implementation, but works here
             // after the first iteration (+ have to adjust for it in StopCondition)
             if((iteration > 0) && (idx == src_node)) {
                 grad[idx] -= alpha / num_ref_nodes * idx_dn_sqrt;
             }
-            
+
             z[idx] = y[idx] - grad[idx];
-            
+
             if(z[idx] == 0) return;
-            
+
             ValueT q_old = q[idx];
             ValueT thresh = rho * alpha * idx_d_sqrt;
-            
+
             if(z[idx] >= thresh) {
                 q[idx] = z[idx] - thresh;
             } else if (z[idx] <= -thresh) {
@@ -146,14 +146,14 @@ struct PRNibbleIterationLoop : public IterationLoopBase
             } else {
                 q[idx] = (ValueT)0;
             }
-            
+
             if(iteration == 0) {
                 y[idx] = q[idx];
             } else {
                 ValueT beta = (1 - sqrt(alpha)) / (1 + sqrt(alpha));
                 y[idx] = q[idx] + beta * (q[idx] - q_old);
             }
-            
+
             touched[idx] = 0;
             grad[idx]    = y[idx] * (1.0 + alpha) / 2;
         };
@@ -170,15 +170,15 @@ struct PRNibbleIterationLoop : public IterationLoopBase
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
-        {   
+        {
             ValueT src_dn_sqrt  = 1.0 / sqrt((ValueT)graph.GetNeighborListLength(src));
             ValueT dest_dn_sqrt = 1.0 / sqrt((ValueT)graph.GetNeighborListLength(dest));
             ValueT src_y = Load<cub::LOAD_CG>(y + src);
-            
+
             ValueT grad_update = - src_dn_sqrt * src_y * dest_dn_sqrt * (1.0 - alpha) / 2;
             ValueT last_grad = atomicAdd(grad + dest, grad_update);
             if (last_grad + grad_update == 0) return false;
-            
+
             bool already_touched = atomicMax(touched + dest, 1) == 1;
             return !already_touched;
         };
@@ -192,10 +192,10 @@ struct PRNibbleIterationLoop : public IterationLoopBase
         {
             return true;
         };
-        
+
         // --
         // Run
-        
+
         GUARD_CU(frontier.V_Q()->ForAll(
             compute_op,
             frontier.queue_length,
@@ -212,7 +212,7 @@ struct PRNibbleIterationLoop : public IterationLoopBase
 
         // GUARD_CU2(cudaDeviceSynchronize(),
         //     "cudaDeviceSynchronize failed");
-        
+
         if (oprtr_parameters.advance_mode != "LB_CULL" &&
             oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
         {
@@ -226,13 +226,13 @@ struct PRNibbleIterationLoop : public IterationLoopBase
         GUARD_CU(frontier.work_progress.GetQueueLength(
             frontier.queue_index, frontier.queue_length,
             false, oprtr_parameters.stream, true));
-        
+
         // Convergence checking
         ValueT grad_thresh = rho * alpha * (1 + eps);
 
         auto &d_grad_scale = data_slice.d_grad_scale;
         GUARD_CU(cudaMemset(d_grad_scale, 0, 1 * sizeof(int)));
-        
+
         auto convergence_op = [
             graph,
             grad,
@@ -243,56 +243,56 @@ struct PRNibbleIterationLoop : public IterationLoopBase
             alpha,
             num_ref_nodes
         ] __host__ __device__ (VertexT &v) {
-            
+
             ValueT v_dn_sqrt  = 1.0 / sqrt((ValueT)graph.GetNeighborListLength(v));
-            
+
             ValueT val = abs(grad[v] * v_dn_sqrt);
-            
-            if(v == src_node) 
+
+            if(v == src_node)
                 val -= (alpha / num_ref_nodes) * v_dn_sqrt;
-            
+
             if(val > grad_thresh)
                 atomicMax(d_grad_scale, 1);
         };
-        
+
         GUARD_CU(frontier.V_Q()->ForEach(
             convergence_op,
             frontier.queue_length,
             util::DEVICE,
             oprtr_parameters.stream
         ));
-        
+
         cudaDeviceSynchronize();
         cudaMemcpy(data_slice.h_grad_scale, d_grad_scale, 1 * sizeof(int), cudaMemcpyDeviceToHost);
-        
+
         GUARD_CU2(cudaDeviceSynchronize(),
             "cudaDeviceSynchronize failed");
-        
+
         return retval;
     }
-    
+
     bool Stop_Condition(int gpu_num = 0) {
         auto &enactor_slice = this -> enactor -> enactor_slices[0];
         auto &enactor_stats = enactor_slice.enactor_stats;
         auto &data_slice    = this -> enactor -> problem -> data_slices[this -> gpu_num][0];
-        
+
         auto &iter = enactor_stats.iteration;
-        
+
         // never break on first iteration
         if(iter == 0) { return false; }
-        
+
         // max iterations
         if(iter >= data_slice.max_iter) {
             printf("pr_nibble::Stop_Condition: reached max iterations. breaking at it=%d\n", iter);
             return true;
         }
-        
+
         // gradient too small
         if(!(*data_slice.h_grad_scale)) {
             printf("pr_nibble::Stop_Condition: gradient too small. breaking at it=%d\n", iter);
             return true;
         }
-        
+
         return false;
     }
 
@@ -309,9 +309,9 @@ struct PRNibbleIterationLoop : public IterationLoopBase
         int NUM_VALUE__ASSOCIATES>
     cudaError_t ExpandIncoming(SizeT &received_length, int peer_)
     {
-        
+
         // ================ INCOMPLETE TEMPLATE - MULTIGPU ====================
-        
+
         auto &data_slice    = this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
         auto &enactor_slice = this -> enactor ->
@@ -369,9 +369,9 @@ public:
     typedef typename GraphT::ValueT    ValueT  ;
     typedef EnactorBase<GraphT, LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
         BaseEnactor;
-    typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> 
+    typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
-    typedef PRNibbleIterationLoop<EnactorT> 
+    typedef PRNibbleIterationLoop<EnactorT>
         IterationT;
 
     Problem *problem;
@@ -381,7 +381,7 @@ public:
      * @brief pr_nibble constructor
      */
     Enactor() :
-        BaseEnactor("Template"),
+        BaseEnactor("pr_nibble"),
         problem    (NULL  )
     {
         // <OPEN> change according to algorithmic needs
@@ -505,7 +505,7 @@ public:
            }
         }
         // </DONE>
-        
+
         GUARD_CU(BaseEnactor::Sync());
         return retval;
     }
