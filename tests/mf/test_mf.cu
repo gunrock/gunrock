@@ -57,14 +57,24 @@ struct main_struct
 	//
         util::CpuTimer cpu_timer; cpu_timer.Start();
 	debug_aml("Start Load Graph");
-       
-	debug_aml("Load directed graph\n");
-	GraphT d_graph;
-	parameters.Set<int>("undirected", 0);
-	parameters.Set<int>("remove-duplicate-edges", false);
-        GUARD_CU(graphio::LoadGraph(parameters, d_graph));
+      
+	bool undirected;
+	parameters.Get("undirected", undirected);
+	if (undirected){
+	    debug_aml("graph is undirected");
+	}else{
+	    debug_aml("graph is directed");
+	}
 
-	debug_aml("Load undirected graph\n");
+	GraphT d_graph;
+	if (not undirected){
+	    debug_aml("Load directed graph");
+	    parameters.Set<int>("undirected", 0);
+	    parameters.Set<int>("remove-duplicate-edges", false);
+	    GUARD_CU(graphio::LoadGraph(parameters, d_graph));
+	}
+
+	debug_aml("Load undirected graph");
 	GraphT u_graph;
 	parameters.Set<int>("undirected", 1);
 	parameters.Set<int>("remove-duplicate-edges", true);
@@ -87,9 +97,11 @@ struct main_struct
 	VertexT source = parameters.Get<VertexT>("source");
 	VertexT sink = parameters.Get<VertexT>("sink");
 
-	debug_aml("Directed graph:");
-	debug_aml("number of edges %d", d_graph.edges);
-	debug_aml("number of nodes %d", d_graph.nodes);
+	if (not undirected){
+	    debug_aml("Directed graph:");
+	    debug_aml("number of edges %d", d_graph.edges);
+	    debug_aml("number of nodes %d", d_graph.nodes);
+	}
 
 	debug_aml("Undirected graph:");
 	debug_aml("number of edges %d", u_graph.edges);
@@ -123,35 +135,77 @@ struct main_struct
 	    }
 	}
 
-	// Correct capacity values on reverse edges
-	for (auto u = 0; u < u_graph.nodes; ++u)
-	{
-	    auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
-	    auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
-	    auto e_end = e_start + num_neighbors;
-	    debug_aml("vertex %d\nnumber of neighbors %d", u, num_neighbors);
-	    for (auto e = e_start; e < e_end; ++e)
+	if (not undirected){
+	    // Correct capacity values on reverse edges
+	    for (auto u = 0; u < u_graph.nodes; ++u)
 	    {
-		u_graph.CsrT::edge_values[e] = (ValueT)0;
-		auto v = u_graph.CsrT::GetEdgeDest(e);
-		// Looking for edge u->v in directed graph
-		auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
-		auto num_neighbors2 = d_graph.CsrT::GetNeighborListLength(u);
-		auto f_end = f_start + num_neighbors2;
-		for (auto f = f_start; f < f_end; ++f)
+		auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+		auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+		auto e_end = e_start + num_neighbors;
+		debug_aml("vertex %d\nnumber of neighbors %d", u, 
+			num_neighbors);
+		for (auto e = e_start; e < e_end; ++e)
 		{
-		    auto z = d_graph.CsrT::GetEdgeDest(f);
-		    if (z == v and d_graph.CsrT::edge_values[f] > 0)
+		    u_graph.CsrT::edge_values[e] = (ValueT)0;
+		    auto v = u_graph.CsrT::GetEdgeDest(e);
+		    // Looking for edge u->v in directed graph
+		    auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
+		    auto num_neighbors2 = 
+			d_graph.CsrT::GetNeighborListLength(u);
+		    auto f_end = f_start + num_neighbors2;
+		    for (auto f = f_start; f < f_end; ++f)
 		    {
-			u_graph.CsrT::edge_values[e]  = 
-			    d_graph.CsrT::edge_values[f];
-			debug_aml("edge (%d, %d) cap = %lf\n", u, v, \
-				u_graph.CsrT::edge_values[e]);
-			break;
+			auto z = d_graph.CsrT::GetEdgeDest(f);
+			if (z == v and d_graph.CsrT::edge_values[f] > 0)
+			{
+			    u_graph.CsrT::edge_values[e]  = 
+				d_graph.CsrT::edge_values[f];
+			    debug_aml("edge (%d, %d) cap = %lf\n", u, v, \
+				    u_graph.CsrT::edge_values[e]);
+			    break;
+			}
 		    }
 		}
 	    }
 	}
+/*
+	ValueT** rGraph = (ValueT**)malloc(sizeof(ValueT*)*u_graph.nodes);
+	for (auto x = 0; x < u_graph.nodes; ++x){
+	    rGraph[x] = (ValueT*)malloc(sizeof(ValueT)*u_graph.nodes);
+	    for (auto y = 0; y < u_graph.nodes; ++y){
+		rGraph[x][y] = (ValueT)0;
+	    }
+	}
+	for (auto x = 0; x < u_graph.nodes; ++x)
+	{
+	    auto e_start = u_graph.CsrT::GetNeighborListOffset(x);
+	    auto num_neighbors = u_graph.CsrT::GetNeighborListLength(x);
+	    auto e_end = e_start + num_neighbors;
+	    for (auto e = e_start; e < e_end; ++e){
+		auto y = u_graph.CsrT::GetEdgeDest(e);
+		auto f = u_graph.CsrT::edge_values[e];
+		rGraph[x][y] = f;
+	    }
+	}
+
+	FILE * rgraph_file = fopen("rgraph_output", "w");
+	printf("number of nodes %d\n", u_graph.nodes);
+	fprintf(rgraph_file, "{");
+	for (auto n = 0; n < u_graph.nodes; ++n){
+	    fprintf(rgraph_file, "{");
+	    for (auto m = 0; m < u_graph.nodes; ++m){
+		fprintf(rgraph_file, "%.0lf", rGraph[n][m]);
+		if (m == u_graph.nodes-1){
+		    fprintf(rgraph_file, " ");
+		}else{
+		    fprintf(rgraph_file, ", ");
+		}
+	    }
+	    fprintf(rgraph_file, "}\n");
+	}
+	fprintf(rgraph_file, "}");
+	fclose(rgraph_file);
+*/
 
 	//
         // Compute reference CPU max flow algorithm.
@@ -210,7 +264,7 @@ int main(int argc, char** argv)
         app::VERTEXT_U32B | 
         app::SIZET_U32B | 
         app::VALUET_F64B | 
-	app::DIRECTED >
+	app::DIRECTED | app::UNDIRECTED >
         (parameters, main_struct());
 }
 
