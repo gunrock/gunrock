@@ -21,9 +21,9 @@
 #include <gunrock/app/mf/mf_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
-#define debug_aml(a) 
-//#define debug_aml(a) std::cout << __FILE__ << ":" << __LINE__ << " " << a \
-    << "\n";
+#define debug_aml(a...) 
+//#define debug_aml(a...) \
+  {printf("%s:%d ", __FILE__, __LINE__); printf(a); printf("\n");}
 
 namespace gunrock {
 namespace app {
@@ -95,77 +95,83 @@ struct MFIterationLoop : public IterationLoopBase
 	null_ptr = NULL;
 
 	auto advance_push_op = [capacity, flow, excess, height, reverse, 
-	     sink, active]
+	     source, sink, active]
 	    __host__ __device__
 	    (const VertexT &src, VertexT &dest, const SizeT &edge_id, 
 	    const VertexT &input_item, const SizeT &input_pos,
 	    const SizeT &output_pos) -> bool
 	{
-	    if (!util::isValid(dest) or !util::isValid(src) or src == sink)
+	    if (!util::isValid(dest) or !util::isValid(src) or 
+		    src == source or src == sink)
 		return false;
 	    auto e = excess[src];
 	    auto cf = capacity[edge_id] - flow[edge_id];
-	    auto rev_id = reverse[edge_id];
 	    auto f = min(cf, e);
-	    if (f > 0 && height[src] > height[dest])
+	    auto rev_id = reverse[edge_id];
+	    if (f > 0 && height[src] == height[dest] + 1)
 	    {
 		if (atomicAdd(&excess[src], -f) >= f)
 		{
 		    atomicAdd(&excess[dest], f);
 		    atomicAdd(&flow[edge_id], f);
 		    atomicAdd(&flow[rev_id], -f);
-//		    printf("push %d->%d, flow %lf, e[%d] %lf, e[%d] %lf\n", 
-//			    src, dest, f, src, excess[src], dest, 
-//			    excess[dest]);
-		    active[0] = 1;
-		    return true;
+//		    printf("push %d->%d, flow %lf, e[%d] %lf, e[%d] %lf\n", \
+			    src, dest, f, src, excess[src], dest, excess[dest]);
 		}else{
 		    atomicAdd(&excess[src], f);
-//		    printf("rollback push %d->%d, excess[%d] = %lf\n", 
-//			    src, dest, src, excess[src]);
-		}
+//		    printf("rollback push %d->%d, excess[%d] = %lf\n", \
+			    src, dest, src, excess[src]);
+		} 
+		active[0] = 1;
+		return true;
 	    }
 	    return false;
 	};
 
 	auto advance_find_lowest_op = 
 	    [excess, capacity, flow, lowest_neighbor, height, iteration,
-	    sink]
+	    source, sink, active]
 	    __host__ __device__
 	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-	    if (!util::isValid(dest) or !util::isValid(src) or src == sink)
+	    if (!util::isValid(dest) or !util::isValid(src) or 
+		    src == source or src == sink)
 		return false;
-	    if (excess[src] > 0 and capacity[edge_id] - flow[edge_id] > 0)
+	    if (excess[src] > (ValueT)0 and 
+		    capacity[edge_id] - flow[edge_id] > (ValueT)0)
 	    {
 		auto l = lowest_neighbor[src];
 		auto height_dest = height[dest];
 		while (!util::isValid(l) or height_dest < height[l]){
 		    l = atomicCAS(&lowest_neighbor[src], l, dest);
 		}
-		return true;
+		if (lowest_neighbor[src] == dest){
+		    return true;
+		}
 	    }
 	    return false;
 	};
 
 	auto advance_relabel_op = 
-	    [excess, capacity, flow, lowest_neighbor, height, iteration, sink
-	    ,active]
+	    [excess, capacity, flow, lowest_neighbor, height, iteration, 
+	    source, sink, active]
 	    __host__ __device__
 	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-	    if (!util::isValid(dest) or !util::isValid(src) or src == sink)
+	    if (!util::isValid(dest) or !util::isValid(src) or 
+		    src == source or src == sink)
 		return false;
-	    if (excess[src] > 0 and capacity[edge_id] - flow[edge_id] > 0 and
+	    if (excess[src] > (ValueT)0 and 
+		    capacity[edge_id] - flow[edge_id] > (ValueT)0 and
 		    lowest_neighbor[src] == dest){ 
 		if (height[src] <= height[dest])
 		{
-	//	    printf("relabel src %d, dest %d, H[%d]=%d, -> %d\n",
-	//		src, dest, src, height[src], height[dest]+1);
+	//	    printf("relabel src %d, dest %d, H[%d]=%d, -> %d\n",\
+			src, dest, src, height[src], height[dest]+1);
 		    height[src] = height[dest] + 1;
 		    active[0] = 1;
 		    return true;
@@ -174,7 +180,6 @@ struct MFIterationLoop : public IterationLoopBase
 	    return false;
 	};
 	
-//	debug_aml("core start");
 //	GUARD_CU(excess.ForAll(
 //	    [] __host__ __device__ (ValueT *excess_, const SizeT &v){
 //	      printf("excess_[%d] = %lf\n", v, excess_[v]);
@@ -204,6 +209,14 @@ struct MFIterationLoop : public IterationLoopBase
 	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
 	    "cudaStreamSynchronize failed");
 	
+	GUARD_CU(lowest_neighbor.ForAll(
+          [] __host__ __device__ (VertexT *el, const SizeT &v){
+	    el[v] = util::PreDefinedValues<VertexT>::InvalidValue;
+          }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+          "cudaStreamSynchronize failed");
+
+
 	// ADVANCE_FIND_LOWEST_OP
 	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
 		    graph.csr(), &local_vertices, null_ptr,
@@ -215,8 +228,8 @@ struct MFIterationLoop : public IterationLoopBase
 //          [] __host__ __device__ (VertexT *el, const SizeT &v){
 //            printf("lowest_neighbor[%d] = %d\n", v, el[v]);
 //          }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-//	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-//          "cudaStreamSynchronize failed");
+	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+          "cudaStreamSynchronize failed");
 
 	// ADVANCE RELABEL OP
 	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
@@ -238,7 +251,7 @@ struct MFIterationLoop : public IterationLoopBase
 	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
 	    "cudaStreamSynchronize failed");
 
-//	printf("new updated vertices %d\n", frontier.queue_length);
+	//printf("new updated vertices %d\n", frontier.queue_length);
 
 	frontier.queue_reset = true;
 	oprtr_parameters.filter_mode = "BY_PASS";
@@ -263,9 +276,9 @@ struct MFIterationLoop : public IterationLoopBase
 	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
 	    "cudaStreamSynchronize failed");
 
-//	printf("new updated vertices %d (version after filter)\n", 
-//		frontier.queue_length);
-//	fflush(stdout);
+//	printf("new updated vertices %d (version after filter)\n", \
+		frontier.queue_length);\
+	fflush(stdout);
 
 	data_slice.num_updated_vertices = frontier.queue_length;
 
@@ -495,7 +508,7 @@ public:
     cudaError_t Reset(const VertexT& src, util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
-	debug_aml("Enactor Reset, src " << src);
+	debug_aml("Enactor Reset, src %d", src);
        
 	typedef typename EnactorT::Problem::GraphT::GpT GpT;
 	auto num_gpus = this->num_gpus;

@@ -16,8 +16,7 @@
 #include <gunrock/app/test_base.cuh>
 
 #define debug_aml(a...)
-//#define debug_aml(a...) std::cerr << __FILE__ << ":" << __LINE__ << " " << \
-    a << "\n";
+//#define debug_aml(a...) {printf(a); printf("\n");}
 
 using namespace gunrock;
 
@@ -56,23 +55,35 @@ struct main_struct
 	//
 	// Load Graph
 	//
-	bool undirected = parameters.Get<int>("undirected");
         util::CpuTimer cpu_timer; cpu_timer.Start();
 	debug_aml("Start Load Graph");
-        
+      
+	bool undirected;
+	parameters.Get("undirected", undirected);
+	if (undirected){
+	    debug_aml("graph is undirected");
+	}else{
+	    debug_aml("graph is directed");
+	}
+
 	GraphT d_graph;
-	parameters.Set<int>("undirected", 0);
-        GUARD_CU(graphio::LoadGraph(parameters, d_graph));
-	
+	if (not undirected){
+	    debug_aml("Load directed graph");
+	    parameters.Set<int>("undirected", 0);
+	    parameters.Set<int>("remove-duplicate-edges", false);
+	    GUARD_CU(graphio::LoadGraph(parameters, d_graph));
+	}
+
+	debug_aml("Load undirected graph");
 	GraphT u_graph;
 	parameters.Set<int>("undirected", 1);
-	GUARD_CU(graphio::LoadGraph(parameters, u_graph));
-
+	parameters.Set<int>("remove-duplicate-edges", true);
+        GUARD_CU(graphio::LoadGraph(parameters, u_graph));
+	
 	cpu_timer.Stop();
 
 	parameters.Set("load-time", cpu_timer.ElapsedMillis());
-	debug_aml("load-time is " << cpu_timer.ElapsedMillis());
-
+	debug_aml("load-time is %lf",cpu_timer.ElapsedMillis());
 
 	if (parameters.Get<VertexT>("source") == 
 		util::PreDefinedValues<VertexT>::InvalidValue){
@@ -86,26 +97,18 @@ struct main_struct
 	VertexT source = parameters.Get<VertexT>("source");
 	VertexT sink = parameters.Get<VertexT>("sink");
 
-	debug_aml("Directed graph:");
-	debug_aml("number of edges " << d_graph.edges);
-	debug_aml("number of nodes " << d_graph.nodes);
-	debug_aml("source " << source);
-	debug_aml("sink " << sink);
-
-	for (auto u = 0; u < d_graph.nodes; ++u){
-	    debug_aml("vertex " << u);
-	    auto e_start = d_graph.CsrT::GetNeighborListOffset(u);
-	    auto num_neighbors = d_graph.CsrT::GetNeighborListLength(u);
-	    auto e_end = e_start + num_neighbors;
-	    for (auto e = e_start; e < e_end; ++e)
-	    {
-		auto v = d_graph.CsrT::GetEdgeDest(e);
-		auto cap = d_graph.edge_values[e];
-		debug_aml("edge (" << u << ", " << v << ") cap = " << cap);
-	    }
+	if (not undirected){
+	    debug_aml("Directed graph:");
+	    debug_aml("number of edges %d", d_graph.edges);
+	    debug_aml("number of nodes %d", d_graph.nodes);
 	}
+
+	debug_aml("Undirected graph:");
+	debug_aml("number of edges %d", u_graph.edges);
+	debug_aml("number of nodes %d", u_graph.nodes);
+
 	ValueT* flow_edge = (ValueT*)malloc(sizeof(ValueT)*u_graph.edges);
-	SizeT* reverse = (SizeT*)malloc(sizeof(SizeT)*u_graph.edges);
+	SizeT* reverse	  = (SizeT*)malloc(sizeof(SizeT)*u_graph.edges);
 
 	// Initialize reverse array.
 	for (auto u = 0; u < u_graph.nodes; ++u)
@@ -126,73 +129,110 @@ struct main_struct
 		    {
 			reverse[e] = f;
 			reverse[f] = e;
+			break;
 		    }
 		}
 	    }
 	}
 
-	// Correct capacity values on reverse edges
-	for (auto u = 0; u < d_graph.nodes; ++u)
-	{
-	    auto e_start = d_graph.CsrT::GetNeighborListOffset(u);
-	    auto num_neighbors = d_graph.CsrT::GetNeighborListLength(u);
-	    auto e_end = e_start + num_neighbors;
-	    for (auto e = e_start; e < e_end; ++e)
+	if (not undirected){
+	    // Correct capacity values on reverse edges
+	    for (auto u = 0; u < u_graph.nodes; ++u)
 	    {
-		auto v = d_graph.CsrT::GetEdgeDest(e);
-		// Looking for the reverse edge in undirected graph
-		auto f_start = u_graph.CsrT::GetNeighborListOffset(v);
-		auto num_neighbors2 = u_graph.CsrT::GetNeighborListLength(v);
-		auto f_end = f_start + num_neighbors2;
-		for (auto f = f_start; f < f_end; ++f)
+		auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+		auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+		auto e_end = e_start + num_neighbors;
+		debug_aml("vertex %d\nnumber of neighbors %d", u, 
+			num_neighbors);
+		for (auto e = e_start; e < e_end; ++e)
 		{
-		    auto z = u_graph.CsrT::GetEdgeDest(f);
-		    if (z == u)
+		    u_graph.CsrT::edge_values[e] = (ValueT)0;
+		    auto v = u_graph.CsrT::GetEdgeDest(e);
+		    // Looking for edge u->v in directed graph
+		    auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
+		    auto num_neighbors2 = 
+			d_graph.CsrT::GetNeighborListLength(u);
+		    auto f_end = f_start + num_neighbors2;
+		    for (auto f = f_start; f < f_end; ++f)
 		    {
-			u_graph.CsrT::edge_values[f] = 0;
+			auto z = d_graph.CsrT::GetEdgeDest(f);
+			if (z == v and d_graph.CsrT::edge_values[f] > 0)
+			{
+			    u_graph.CsrT::edge_values[e]  = 
+				d_graph.CsrT::edge_values[f];
+			    debug_aml("edge (%d, %d) cap = %lf\n", u, v, \
+				    u_graph.CsrT::edge_values[e]);
+			    break;
+			}
 		    }
 		}
 	    }
 	}
-
-      	debug_aml("Undirected graph:");
-	debug_aml("number of edges " << u_graph.edges);
-	debug_aml("number of nodes " << u_graph.nodes);
-	debug_aml("source " << source);
-	debug_aml("sink " << sink);
-
-	for (auto u = 0; u < u_graph.nodes; ++u){
-	    debug_aml("vertex " << u);
-	    auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
-	    auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
-	    auto e_end = e_start + num_neighbors;
-	    for (auto e = e_start; e < e_end; ++e)
-	    {
-		auto v = u_graph.CsrT::GetEdgeDest(e);
-		auto cap = u_graph.edge_values[e];
-		debug_aml("edge (" << u << ", " << v << ") cap = " << cap);
+/*
+	ValueT** rGraph = (ValueT**)malloc(sizeof(ValueT*)*u_graph.nodes);
+	for (auto x = 0; x < u_graph.nodes; ++x){
+	    rGraph[x] = (ValueT*)malloc(sizeof(ValueT)*u_graph.nodes);
+	    for (auto y = 0; y < u_graph.nodes; ++y){
+		rGraph[x][y] = (ValueT)0;
 	    }
 	}
+	for (auto x = 0; x < u_graph.nodes; ++x)
+	{
+	    auto e_start = u_graph.CsrT::GetNeighborListOffset(x);
+	    auto num_neighbors = u_graph.CsrT::GetNeighborListLength(x);
+	    auto e_end = e_start + num_neighbors;
+	    for (auto e = e_start; e < e_end; ++e){
+		auto y = u_graph.CsrT::GetEdgeDest(e);
+		auto f = u_graph.CsrT::edge_values[e];
+		rGraph[x][y] = f;
+	    }
+	}
+
+	FILE * rgraph_file = fopen("rgraph_output", "w");
+	printf("number of nodes %d\n", u_graph.nodes);
+	fprintf(rgraph_file, "{");
+	for (auto n = 0; n < u_graph.nodes; ++n){
+	    fprintf(rgraph_file, "{");
+	    for (auto m = 0; m < u_graph.nodes; ++m){
+		fprintf(rgraph_file, "%.0lf", rGraph[n][m]);
+		if (m == u_graph.nodes-1){
+		    fprintf(rgraph_file, " ");
+		}else{
+		    fprintf(rgraph_file, ", ");
+		}
+	    }
+	    fprintf(rgraph_file, "}\n");
+	}
+	fprintf(rgraph_file, "}");
+	fclose(rgraph_file);
+*/
 
 	//
         // Compute reference CPU max flow algorithm.
 	//
-	GraphT graph = u_graph;
         ValueT max_flow;
 	
 	util::PrintMsg("______CPU reference algorithm______", true);
 	double elapsed = app::mf::CPU_Reference
-	    (parameters, graph, source, sink, max_flow, reverse, flow_edge);
-        util::PrintMsg("------------------------------------\n\elapsed: " + 
-		std::to_string(elapsed) + " ms, max flow = " +
+	    (parameters, u_graph, source, sink, max_flow, reverse, flow_edge);
+        util::PrintMsg("-----------------------------------\nElapsed: " + 
+		std::to_string(elapsed) + " ms\nMax flow CPU = " +
 		std::to_string(max_flow), true);
 	
         std::vector<std::string> switches{"advance-mode"};
-	GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-	[flow_edge, reverse](util::Parameters &parameters, GraphT &graph)
+	GUARD_CU(app::Switch_Parameters(parameters, u_graph, switches,
+	[flow_edge, reverse](util::Parameters &parameters, GraphT &u_graph)
 	{
-	debug_aml("go to RunTests");
-	return app::mf::RunTests(parameters, graph, reverse, flow_edge);
+	  debug_aml("go to RunTests");
+	  if (flow_edge)
+	  {
+	    for (int i=0; i<u_graph.edges; ++i)
+	    {
+	      debug_aml("%s:%d flow_edge[%d] = %lf", 
+		__FILE__, __LINE__, i, flow_edge[i]);
+	    }
+	  }
+	  return app::mf::RunTests(parameters, u_graph, reverse, flow_edge);
 	}));
 
 	// Clean up
@@ -224,7 +264,7 @@ int main(int argc, char** argv)
         app::VERTEXT_U32B | 
         app::SIZET_U32B | 
         app::VALUET_F64B | 
-	app::DIRECTED >
+	app::DIRECTED | app::UNDIRECTED >
         (parameters, main_struct());
 }
 

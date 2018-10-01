@@ -26,9 +26,9 @@
 #include <gunrock/app/mf/mf_enactor.cuh>
 #include <gunrock/app/mf/mf_test.cuh>
 
-//#define debug_aml(a) std::cerr << __FILE__ << ":" << __LINE__ << " " << \
-    a << "\n";
-#define debug_aml(a)
+//#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a);\
+    printf("\n");}
+#define debug_aml(a...)
 
 namespace gunrock {
 namespace app {
@@ -101,8 +101,8 @@ cudaError_t RunTests(
     std::string validation  = parameters.Get<std::string>("validation");
     VertexT source	    = parameters.Get<VertexT>("source");
     VertexT sink	    = parameters.Get<VertexT>("sink");
-    debug_aml("source " << source << ", sink " << sink << ", quiet " 
-	    << quiet_mode << ", num-runs " << num_runs);
+    debug_aml("source %d, sink %d, quite_mode %d, num-runs %d", source, sink,
+	    quiet_mode, num_runs);
 
     util::Info info("MF", parameters, graph); // initialize Info structure
 
@@ -113,7 +113,7 @@ cudaError_t RunTests(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    GUARD_CU(problem.Init(graph, h_reverse, target));
+    GUARD_CU(problem.Init(graph, target));
     GUARD_CU(enactor.Init(problem, target));
 
     cpu_timer.Stop();
@@ -122,22 +122,20 @@ cudaError_t RunTests(
     // perform the MF algorithm
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        GUARD_CU(problem.Reset(graph, target));
+        GUARD_CU(problem.Reset(graph, h_reverse, target));
         GUARD_CU(enactor.Reset(source, target));
 
-        util::PrintMsg("__________________________", !quiet_mode);
+        util::PrintMsg("______GPU PushRelabel algorithm____", !quiet_mode);
 
         cpu_timer.Start();
         GUARD_CU(enactor.Enact());
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
-        util::PrintMsg("--------------------------\nRun "
-            + std::to_string(run_num) + " elapsed: "
+        util::PrintMsg("-----------------------------------\nRun "
+            + std::to_string(run_num) + ", elapsed: "
             + std::to_string(cpu_timer.ElapsedMillis()) +
-            " ms, src = " + std::to_string(source) +
-	    " , sink = " + std::to_string(sink) +
-            ", #iterations = "
+            " ms, #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
         if (validation == "each")
@@ -153,9 +151,12 @@ cudaError_t RunTests(
     if (validation == "last")
     {
 	GUARD_CU(problem.Extract(h_flow));
-//	    printf("h_flow: ");
-//	    for (int i=0; i<graph.edges; ++i)
-//		printf("flow(%d)=%lf\n", i, h_flow[i]);
+	/*for (int i=0; i<graph.edges; ++i){
+	    if (ref_flow){
+		debug_aml("h_flow[%d]=%lf, ref_flow[%d] = %lf", 
+			  i, h_flow[i], i, ref_flow[i]);
+	    }
+	}*/
         int num_errors = app::mf::Validate_Results(parameters, graph, 
 		source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
     }
