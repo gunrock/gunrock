@@ -23,7 +23,7 @@
     #include <boost/config.hpp>
     #include <iostream>
     #include <string>
-    #include <boost/graph/push_relabel_max_flow.hpp>
+    #include <boost/graph/edmonds_karp_max_flow.hpp>
     #include <boost/graph/adjacency_list.hpp>
     #include <boost/graph/read_dimacs.hpp>
 #endif
@@ -245,14 +245,7 @@ double CPU_Reference(
     typedef typename GraphT::SizeT SizeT;
     typedef typename GraphT::CsrT CsrT;
 
-    if (typeid(ValueT) != typeid(double) and typeid(ValueT) != typeid(float))
-    {
-#define NOT_FLOATING_POINT_TYPE 1
-    }else{
-#define NOT_FLOATING_POINT_TYPE 0
-    }
-
-#if (BOOST_FOUND==1) && (NOT_FLOATING_POINT_TYPE==1)
+#if (BOOST_FOUND==1)
     
     debug_aml("boost found");
     using namespace boost;
@@ -314,7 +307,7 @@ double CPU_Reference(
 
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
-    maxflow = push_relabel_max_flow(boost_graph, source, sink); 
+    maxflow = edmonds_karp_max_flow(boost_graph, source, sink); 
     cpu_timer.Stop();
     double elapsed = cpu_timer.ElapsedMillis();
 
@@ -353,7 +346,7 @@ double CPU_Reference(
 
 #else
 
-    debug_aml("no boost or floating point value of capacity");
+    debug_aml("no boost");
 
     debug_aml("graph nodes %d, edges %d source %d sink %d src %d", 
 	    graph.nodes, graph.edges, src, sin);
