@@ -192,8 +192,55 @@ bool push(GraphT& graph, VertexT x, ValueT* excess, VertexT* height,
   * return Value of computed max flow
   */
 template<typename ValueT, typename VertexT, typename GraphT>
-ValueT max_flow(GraphT& graph, ValueT* flow, ValueT* excess, VertexT* height,
+ValueT max_flow(GraphT& graph, ValueT* flow,
 	VertexT source, VertexT sink, VertexT* reverse){
+
+    debug_aml("CPU_Reference start");
+    typedef typename GraphT::SizeT SizeT;
+
+    debug_aml("no boost");
+
+    debug_aml("graph nodes %d, edges %d source %d sink %d source %d",
+	    graph.nodes, graph.edges, source, sink);
+
+    typedef typename GraphT::CsrT CsrT;
+
+    ValueT*   excess =  (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
+    VertexT*  height = (VertexT*)malloc(sizeof(VertexT)*graph.nodes);
+    for (VertexT v = 0; v < graph.nodes; ++v){
+	     excess[v] = (ValueT)0;
+	     height[v] = 0;
+    }
+    height[source] = graph.nodes;
+
+    for (SizeT e = 0; e < graph.edges; ++e){
+	     flow[e] = (ValueT) 0;
+    }
+
+    auto e_start = graph.CsrT::GetNeighborListOffset(source);
+    auto num_neighbors = graph.CsrT::GetNeighborListLength(source);
+    auto e_end = e_start + num_neighbors;
+
+    ValueT preflow = (ValueT) 0;
+    for (SizeT e = e_start; e < e_end; ++e)
+    {
+	     auto y = graph.CsrT::GetEdgeDest(e);
+	     auto c = graph.CsrT::edge_values[e];
+	     excess[y] += c;
+	     flow[e] = c;
+	     flow[reverse[e]] = -c;
+	     preflow += c;
+    }
+
+    //
+    // Perform simple max flow reference
+    //
+    debug_aml("perform simple max flow reference");
+    debug_aml("source %d, sink %d", source, sink);
+    debug_aml("source excess %lf, sink excess %lf", excess[source], excess[sink]);
+    debug_aml("pre flow push from source %lf", preflow);
+    debug_aml("source height %d, sink height %d", height[source], height[sink]);
+
     bool update = true;
     while (update){
 	update = false;
@@ -207,6 +254,9 @@ ValueT max_flow(GraphT& graph, ValueT* flow, ValueT* excess, VertexT* height,
 	    }
 	}
     }
+
+    free(excess);
+    free(height);
     return excess[sink];
 }
 
@@ -241,178 +291,18 @@ double CPU_Reference(
 	ValueT *flow)
 {
 
-    debug_aml("CPU_Reference start");
-    typedef typename GraphT::SizeT SizeT;
 
-#ifdef BOOST_FOUND
-
-    debug_aml("boost found");
-    using namespace boost;
-
-    // Prepare Boost Datatype and Data structure
-    typedef adjacency_list_traits < vecS, vecS, undirectedS > Traits;
-
-    struct boost_vertex{
-	std::string name;
-    };
-
-    struct boost_edge{
-	/*ValueT*/double capacity;
-	/*ValueT*/double  residual_capacity;
-	Traits::edge_descriptor reverse;
-    };
-//    typedef adjacency_list < vecS, vecS, undirectedS,
-//	    property < vertex_name_t, std::string >,
-//	    property < edge_capacity_t, ValueT,
-//	    property < edge_residual_capacity_t, ValueT,
-//	    property < edge_reverse_t, Traits::edge_descriptor > > > >
-//    BGraphT;
-
-    typedef adjacency_list < vecS, vecS, undirectedS, boost_vertex,
-	    boost_edge> BGraphT;
-
-    BGraphT boost_graph;
-/*
-    typename property_map < BGraphT, edge_capacity_t >::type
-	capacity = get(edge_capacity, boost_graph);
-
-    typename property_map < BGraphT, edge_reverse_t >::type
-	rev = get(edge_reverse, boost_graph);
-
-    typename property_map < BGraphT, edge_residual_capacity_t >::type
-	residual_capacity = get(edge_residual_capacity, boost_graph);
-*/
-    std::vector<Traits::vertex_descriptor> verts;
-    for (VertexT v = 0; v < graph.nodes; ++v)
-	verts.push_back(add_vertex(boost_graph));
-
-    Traits::vertex_descriptor source = verts[src];
-    Traits::vertex_descriptor sink = verts[sin];
-    debug_aml("src = %d, sin %d", src, sin);
-
-    for (VertexT e = 0; e < graph.edges; ++e){
-	VertexT x = graph.edge_pairs[e].x;
-	VertexT y = graph.edge_pairs[e].y;
-	ValueT cap = graph.edge_values[e];
-	Traits::edge_descriptor e1, e2;
-	bool in1, in2;
-	tie(e1, in1) = add_edge(verts[x], verts[y], boost_graph);
-	tie(e2, in2) = add_edge(verts[y], verts[x], boost_graph);
-	boost_graph[e1].reverse = e2;
-	boost_graph[e2].reverse = e1;
-	boost_graph[e1].capacity = cap;
-	boost_graph[e2].capacity = 0;
-	boost_graph[e1].residual_capacity = 0;
-	boost_graph[e2].residual_capacity = cap;
-	if (x == src || y == src || x == sin || y == sin)
-	    debug_aml("(%d, %d): %lf", x, y, cap);
-
-	if (!in1 || !in2){
-	    debug_aml("error");
-	    return -1;
-	}
-	/*capacity[e1] = cap;
-	capacity[e2] = 0;
-	rev[e1] = e2;
-	rev[e2] = e1;*/
-    }
-
-
-    //
-    // Perform Boost reference
-    //
 
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
 
-    maxflow = push_relabel_max_flow(boost_graph, source, sink,
-	    boost::get(&boost_edge::capacity, boost_graph),
-	    boost::get(&boost_edge::residual_capacity, boost_graph),
-	    boost::get(&boost_edge::reverse, boost_graph),
-	    boost::get(boost::vertex_index, boost_graph)
-	    );
+    maxflow = max_flow(graph, flow, src, sin, reverse);
 
     cpu_timer.Stop();
     double elapsed = cpu_timer.ElapsedMillis();
 
-    //
-    // Extracting results on CPU
-    //
-/*
-    typename graph_traits<BGraphT>::vertex_iterator u_it, u_end;
-    typename graph_traits<BGraphT>::out_edge_iterator e_it, e_end;
-    for (tie(u_it, u_end) = vertices(boost_graph); u_it != u_end; ++u_it){
-	for (tie(e_it, e_end) = out_edges(*u_it, boost_graph); e_it != e_end;
-		++e_it){
-	if (capacity[*e_it] > 0){
-	    ValueT e_f = capacity[*e_it] - residual_capacity[*e_it];
-	    VertexT t = target(*e_it, boost_graph);
-	    util::PrintMsg("flow on edge " + std::to_string(*u_it) + "-" +
-		    std::to_string(t) + " is " + std::to_string(e_f));
-	    flow[*u_it][t] = e_f;
-	}
-    }
-    }*/
 
     return elapsed;
-
-#else
-
-    debug_aml("no boost");
-
-    debug_aml("graph nodes %d, edges %d source %d sink %d src %d",
-	    graph.nodes, graph.edges, src, sin);
-
-    typedef typename GraphT::CsrT CsrT;
-
-    ValueT*   excess =  (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
-    VertexT*  height = (VertexT*)malloc(sizeof(VertexT)*graph.nodes);
-    for (VertexT v = 0; v < graph.nodes; ++v){
-	excess[v] = (ValueT)0;
-	height[v] = 0;
-    }
-    height[src] = graph.nodes;
-
-    for (SizeT e = 0; e < graph.edges; ++e){
-	flow[e] = (ValueT) 0;
-    }
-
-    auto e_start = graph.CsrT::GetNeighborListOffset(src);
-    auto num_neighbors = graph.CsrT::GetNeighborListLength(src);
-    auto e_end = e_start + num_neighbors;
-
-    ValueT preflow = (ValueT) 0;
-    for (SizeT e = e_start; e < e_end; ++e)
-    {
-	auto y = graph.CsrT::GetEdgeDest(e);
-	auto c = graph.CsrT::edge_values[e];
-	excess[y] += c;
-	flow[e] = c;
-	flow[reverse[e]] = -c;
-	preflow += c;
-    }
-
-    //
-    // Perform simple max flow reference
-    //
-    debug_aml("perform simple max flow reference");
-    debug_aml("source %d, sink %d", src, sin);
-    debug_aml("source excess %lf, sink excess %lf", excess[src], excess[sin]);
-    debug_aml("pre flow push from source %lf", preflow);
-    debug_aml("source height %d, sink height %d", height[src], height[sin]);
-
-    util::CpuTimer cpu_timer;
-    cpu_timer.Start();
-
-    maxflow = max_flow(graph, flow, excess, height, src, sin, reverse);
-
-    cpu_timer.Stop();
-    double elapsed = cpu_timer.ElapsedMillis();
-
-    free(excess);
-    free(height);
-    return elapsed;
-#endif
 }
 
 /**
@@ -448,7 +338,6 @@ int Validate_Results(
     int num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
     auto nodes = graph.nodes;
-    auto edges = graph.edges;
 
     auto e_start = graph.CsrT::GetNeighborListOffset(sink);
     auto num_neighbors = graph.CsrT::GetNeighborListLength(sink);
