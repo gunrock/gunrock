@@ -174,6 +174,15 @@ bool push(GraphT& graph, VertexT x, ValueT* excess, VertexT* height,
     }
     return false;
 }
+
+template<typename ValueT, typename VertexT, typename GraphT>
+void dfs(ValueT** rGraph, VertexT s, bool visited[], const int V) {
+    visited[s] = true;
+    for (int i = 0; i < V; i++)
+       if (abs(rGraph[s][i]) > 1e-6 && !visited[i])
+           dfs(rGraph, i, visited, V);
+}
+
 /**
   * @brief Push relabel reference algorithm
   *
@@ -254,7 +263,44 @@ ValueT max_flow(GraphT& graph, ValueT* flow,
 	    }
 	}
     }
+    /*
+    for (auto u = source; u < graph.nodes; ++u)
+    {
+      auto e_start = graph.CsrT::GetNeighborListOffset(u);
+      auto num_neighbors = graph.CsrT::GetNeighborListLength(u);
+      auto e_end = e_start + num_neighbors;
+      for (auto e = e_start; e < e_end; ++e)
+      {
+        auto v = graph.CsrT::GetEdgeDest(e);
+        printf("flow(%d -> %d) = %f\n", u, v, flow[e]);
+      }
+    }
 
+    GraphT u_graph = graph;
+    ValueT** rGraph = (ValueT**)malloc(sizeof(ValueT*)*u_graph.nodes);
+      for (auto x = 0; x < u_graph.nodes; ++x){
+	    rGraph[x] = (ValueT*)malloc(sizeof(ValueT)*u_graph.nodes);
+	    for (auto y = 0; y < u_graph.nodes; ++y){
+		      rGraph[x][y] = (ValueT)0;
+	    }
+	  }
+	  for (auto x = 0; x < u_graph.nodes; ++x)
+	    {
+	       auto e_start = u_graph.CsrT::GetNeighborListOffset(x);
+	       auto num_neighbors = u_graph.CsrT::GetNeighborListLength(x);
+	       auto e_end = e_start + num_neighbors;
+	       for (auto e = e_start; e < e_end; ++e){
+		         auto y = u_graph.CsrT::GetEdgeDest(e);
+		         auto f = u_graph.CsrT::edge_values[e];
+		     rGraph[x][y] = f;
+	    }
+	   }
+     bool *visited = new bool[graph.nodes];
+     dfs(rGraph, source, visited, graph.nodes);
+     for(int i = 0; i < graph.nodes; i++){
+       cout << i << " " << visited[i] << endl;
+     }
+     */
     free(excess);
     free(height);
     return excess[sink];
