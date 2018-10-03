@@ -37,22 +37,28 @@ double CPU_Reference(
     const GraphT &graph,
     int walk_length,
     int walks_per_node,
+    int walk_mode,
     typename GraphT::VertexT *walks,
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
     typedef typename GraphT::SizeT VertexT;
-    
+
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
-    
-    // <TODO> How should we implement a CPU reference?  Doesn't really make sense
-    // I think we should actually be implementing a "checker" in Validate_Results
-    for(SizeT i = 0; i < graph.nodes * walk_length; ++i) {
-        walks[i] = util::PreDefinedValues<VertexT>::InvalidValue;
+
+    if(walk_mode == 0) { // Random
+        // <TODO> How should we implement a CPU reference?  Doesn't really make sense
+        // I think we should actually be implementing a "checker" in Validate_Results
+        for(SizeT i = 0; i < graph.nodes * walk_length; ++i) {
+            walks[i] = util::PreDefinedValues<VertexT>::InvalidValue;
+        }
+        // </TODO>
+    } else if (walk_mode == 1) { // Max
+        // <TODO> Could implement max walking
+        // </TODO>
     }
-    // </TODO>
-    
+
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
     return elapsed;
@@ -86,7 +92,7 @@ typename GraphT::SizeT Validate_Results(
 
     SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
-    
+
     if(!quiet) {
         printf("[[");
         for(SizeT v = 0; v < graph.nodes * walk_length * walks_per_node; ++v) {
@@ -95,7 +101,7 @@ typename GraphT::SizeT Validate_Results(
             }
             printf("%d, ", h_walks[v]);
         }
-        printf("]]\n");        
+        printf("]]\n");
     }
 
     // if(num_errors == 0) {
