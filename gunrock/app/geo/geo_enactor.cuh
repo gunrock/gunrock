@@ -97,10 +97,13 @@ struct GEOIterationLoop : public IterationLoopBase
         auto &oprtr_parameters = enactor_slice.oprtr_parameters;
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
-        
+       
+	//auto &weights	       = graph.CsrT::edge_values; 
         // <DONE> add problem specific data alias here:
         auto &locations	       = data_slice.locations;
         auto &predicted	       = data_slice.predicted;
+	auto &valid_locations  = data_slice.valid_locations;
+	auto &predictions_left = data_slice.predictions_left;
         // </DONE>
 
 	util::Location target = util::DEVICE;
@@ -120,13 +123,14 @@ struct GEOIterationLoop : public IterationLoopBase
 	    graph,
 	    locations,
 	    predicted,
+	    valid_locations,
 	    iteration
 	] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
 
 	    VertexT v 		= v_q[pos];
 	    SizeT start_edge 	= graph.CsrT::GetNeighborListOffset(v);
 	    SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-	
+
 	    locations[v] 	= new ValueT[num_neighbors];
 	    SizeT i 		= 0;
 
@@ -134,14 +138,12 @@ struct GEOIterationLoop : public IterationLoopBase
 		VertexT u = graph.CsrT::GetEdgeDest(e);
 		if (util::isValid(predicted[u])) {
 		    // gather locations from neighbors	
-		    locations[v][i] = predicted[u];   
-		} else {
-		    // if the neighbor had no location, use an invalid.
-		    locations[v][i] = util::PreDefinedValues<ValueT>::InvalidValue;
+		    locations[v][i] = predicted[u];
+		    i++;
 		}
-
-		i++;
 	    }
+
+	    valid_locations[v] = i;
 
 	};
 
@@ -149,6 +151,8 @@ struct GEOIterationLoop : public IterationLoopBase
 	    graph,
 	    locations,
 	    predicted,
+	    valid_locations,
+	    predictions_left,
             iteration
 	] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
 
@@ -159,23 +163,25 @@ struct GEOIterationLoop : public IterationLoopBase
 	    // Custom spatial center kernel for geolocation
             // <TODO> Needs proper implementation for median calculation
 	    if (!util::isValid(predicted[v])) {
-		SizeT valid_locations = 0;
 		
-		// Filter invalid values (neighbors with no locations)
-		for (int i = 0; i < n; i++) {
-                    if (util::isValid(locations[v][i]))
-                        valid_locations++;
-                }
-
-		if (valid_locations == 0) {
+		if (valid_locations[v] == 0) {
                     predicted[v] = util::PreDefinedValues<ValueT>::InvalidValue;
-		} else if (valid_locations == 1) {
-                    predicted[v] = 1; // the only location that is valid
-		} else if (valid_locations == 2) {
-                    predicted[v] = 1; // mid-point of the two locations
+		} else if (valid_locations[v] == 1) {
+                    // the only location that is valid
+		    predicted[v] = locations[v][0];
+		} else if (valid_locations[v] == 2) {
+                    // mid-point of the two locations
+		    predicted[v] = (ValueT)((locations[v][0] + locations[v][1]) / 2);
                 } else {
-                    predicted[v] = 1; // calculate spatial median
+		    ValueT temp = 0;
+                   // calculate spatial median
+		   for (SizeT i = 0; i < valid_locations[v]; i++) {
+			temp += locations[v][i];
+		   }
+		   predicted[v] = (ValueT) (temp/valid_locations[v]);
                 }
+	    } else {
+		atomicSub(predictions_left, 1);
 	    } // </TODO> -- median calculation.
 	};
 
@@ -237,6 +243,23 @@ struct GEOIterationLoop : public IterationLoopBase
             (received_length, peer_, expand_op);
         return retval;
     }
+
+    bool Stop_Condition(int gpu_num = 0) 
+    {
+        auto &enactor_slice = this -> enactor -> enactor_slices[0];
+        auto &enactor_stats = enactor_slice.enactor_stats;
+        auto &data_slice    = this -> enactor -> problem -> data_slices[this -> gpu_num][0];
+
+        auto &iter = enactor_stats.iteration;
+
+	// Anymore work to do?	
+	if(data_slice.predictions_left[0] == 0)
+	    return true;
+
+	// else, keep running
+        return false;
+    }
+
 }; // end of GEOIteration
 
 /**

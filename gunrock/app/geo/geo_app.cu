@@ -13,7 +13,10 @@
 
 #include <gunrock/gunrock.h>
 #include <gunrock/util/test_utils.cuh>
+
 #include <gunrock/graphio/graphio.cuh>
+#include <gunrock/graphio/labels.cuh>
+
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
@@ -46,6 +49,13 @@ cudaError_t UseParameters(util::Parameters &parameters)
     //    "\tIf largestdegree, select vertices with largest degrees",
     //    __FILE__, __LINE__));
     // </TODO>
+
+    GUARD_CU(parameters.Use<std::string>(
+        "labels-file",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        "",
+        " labels file.",
+        __FILE__, __LINE__));
 
     return retval;
 }
@@ -82,8 +92,25 @@ cudaError_t RunTests(
     bool quiet_mode = parameters.Get<bool>("quiet");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
+    std::string labels_file = parameters.Get<std::string>("labels-file");
     util::Info info("geolocation", parameters, graph);
-    
+
+    util::PrintMsg("Labels File Input: "
+            + labels_file, !quiet_mode);   
+
+ 
+    ValueT *h_labels_a = new ValueT[graph.nodes];
+    ValueT *h_labels_b = new ValueT[graph.nodes];
+
+    retval = gunrock::graphio::labels::Read(parameters, h_labels_a, h_labels_b);
+
+    util::PrintMsg("Debugging Labels, \n    h_labels_a[0] = " + std::to_string(h_labels_a[0]) +
+                   "\n    h_labels_a[2] = " + std::to_string(h_labels_a[2]) +
+                   "\n    h_labels_a[26] = " + std::to_string(h_labels_a[26]) +
+                   "\n    h_labels_a[27] = " + std::to_string(h_labels_a[27]) +
+                   "\n    h_labels_a[29] = " + std::to_string(h_labels_a[29]),
+			!quiet_mode);
+
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
 

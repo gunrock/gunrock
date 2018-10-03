@@ -79,6 +79,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         // <DONE> add problem specific storage arrays:
         util::Array1D<SizeT, ValueT*> locations;
         util::Array1D<SizeT, ValueT> predicted;
+	util::Array1D<SizeT, SizeT> valid_locations;
+
+	int * predictions_left;
         // </DONE>
 
         /*
@@ -89,6 +92,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // <DONE> name of the problem specific arrays:
             locations.SetName("locations");
             predicted.SetName("predicted");
+	    valid_locations.SetName("valid_locations");
             // </DONE>
         }
 
@@ -111,6 +115,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // <DONE> Release problem specific data, e.g.:
             GUARD_CU(locations.Release(target));
             GUARD_CU(predicted.Release(target));
+	    GUARD_CU(valid_locations.Release(target));
             // </DONE>
 
             GUARD_CU(BaseDataSlice ::Release(target));
@@ -139,6 +144,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // <DONE> allocate problem specific data here, e.g.:
             GUARD_CU(locations.Allocate(sub_graph.nodes * sub_graph.nodes, target));
             GUARD_CU(predicted.Allocate(sub_graph.nodes, target));
+	    GUARD_CU(valid_locations.Allocate(sub_graph.nodes, target));
             // </DONE>
 
             if (target & util::DEVICE) {
@@ -163,18 +169,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // <DONE> ensure size of problem specific data:
             GUARD_CU(locations.EnsureSize_(nodes * nodes, target));
             GUARD_CU(predicted.EnsureSize_(nodes, target));
+            GUARD_CU(valid_locations.EnsureSize_(nodes, target));
             // </DONE>
 
             // Reset data
             // <DONE> reset problem specific data, e.g.:
 
-#if 0
 	    // Set locations of neighbors to null, this needs to be populated
 	    // and using spatial center we can determine the predicted.
-            GUARD_CU(locations.ForEach([]__host__ __device__ (ValueT &x){
-               x = (ValueT)0;
-            }, nodes * nodes, target, this -> stream));
-#endif
+            GUARD_CU(valid_locations.ForEach([]__host__ __device__ (SizeT &x){
+               x = (SizeT)0;
+            }, nodes, target, this -> stream));
+
 
 	    // Assumes that all vertices have invalid positions, in reality
 	    // a preprocessing step is needed to assign nodes that do have
@@ -184,6 +190,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             }, nodes, target, this -> stream));
             // </DONE>
 
+	    this->predictions_left[0] = (int) nodes;
+	    printf("predictions left: %u\n", (int) nodes);
+	
             return retval;
         }
     }; // DataSlice
