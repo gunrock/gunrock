@@ -73,6 +73,7 @@ cudaError_t CorrectReverseCapacities(
     GraphT &d_graph,
     GraphT &u_graph)
 {
+    typedef typename GraphT::CsrT CsrT;
     cudaError_t retval = cudaSuccess;
 
     // Correct capacity values on reverse edges
@@ -86,7 +87,7 @@ cudaError_t CorrectReverseCapacities(
             num_neighbors);
         for (auto e = e_start; e < e_end; ++e)
         {
-            u_graph.CsrT::edge_values[e] = (ValueT)0;
+            u_graph.CsrT::edge_values[e] = 0;
             auto v = u_graph.CsrT::GetEdgeDest(e);
             // Looking for edge u->v in directed graph
             auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
@@ -116,6 +117,7 @@ cudaError_t InitReverse(
     GraphT &u_graph,
     ArrayT &reverse)
 {
+    typedef typename GraphT::CsrT CsrT;
     cudaError_t retval = cudaSuccess;
 
     // Initialize reverse array.

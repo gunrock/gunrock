@@ -32,7 +32,7 @@ cudaError_t UseParameters_test(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
 
-    GUARD_CU(parameters.Use<string>(
+    GUARD_CU(parameters.Use<std::string>(
         "weights",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
         "",
@@ -105,8 +105,8 @@ cudaError_t MinCut(
     double error_threshold = parameters.Get<double>("error_threshold");
 
     ValueT max_flow = 0;
-    GUARD_CU(mf::CPU_Reference(parameters, graph,
-        source, dest, max_flow, reverse_edges, edge_flows));
+    mf::CPU_Reference(parameters, graph,
+        source, dest, max_flow, reverse_edges, edge_flows);
     auto &edge_capacities = graph.edge_values;
 
     for (auto e = 0; e < graph.edges; e++)
@@ -331,12 +331,12 @@ cudaError_t CPU_Reference(
                 abs(community_weights[comm]) > error_threshold)
             {
                 if (vertex_reachabilities[v] == 1)
-                    residual_capacity[num_edges - num_org_nodes * 2 + v] = 0;
+                    edge_residuals[num_edges - num_org_nodes * 2 + v] = 0;
                 if (vertex_reachabilities[v] != 1)
                 {
                     SizeT  e = graph.GetNeighborListOffset(v)
                         + graph.GetNeighborListLength(v) - 1;
-                    residual_capacity[e] = 0;
+                    edge_residuals[e] = 0;
                 }
                 vertex_active[v] = false;
                 community_active[comm] = false;
@@ -350,7 +350,7 @@ cudaError_t CPU_Reference(
                 if (vertex_reachabilities[v] == 1)
                 {
                     edge_residuals[e_from_src] -= community_weights[comm];
-                    if (edge_residuals[d_from_src] < 0)
+                    if (edge_residuals[e_from_src] < 0)
                     {
                         double temp = -1 * edge_residuals[e_from_src];
                         edge_residuals[e_from_src] = edge_residuals[e_to_dest];
@@ -413,6 +413,7 @@ int Validate_Results(
         ValueT		  *ref_flow = NULL,
 	bool		  verbose = true)
 {
+    typedef typename GraphT::SizeT SizeT;
     SizeT num_errors = 0;
 
     return num_errors;

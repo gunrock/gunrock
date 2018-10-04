@@ -166,8 +166,8 @@ cudaError_t MakeUndirected(
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::ValueT  ValueT;
     const graph::GraphFlag FLAG = GraphT::FLAG;
-    typedef TestGraph<VertexT, SizeT, ValueT,
-        (FLAG & (~ graph::0x0F00)) | graph::HAS_COO> CooT;
+    typedef graph::Coo<VertexT, SizeT, ValueT,
+        (FLAG & (~0x0F00)) | graph::HAS_COO> CooT;
 
     cudaError_t retval = cudaSuccess;
     CooT coo;
@@ -178,7 +178,7 @@ cudaError_t MakeUndirected(
     for (auto e = 0; e < directed_graph.edges; e ++)
     {
         VertexT src, dest;
-        directed_graph.GetEdgeSrc(e, src, dest);
+        directed_graph.GetEdgeSrcDest(e, src, dest);
         coo.edge_pairs[e * 2].x = src;
         coo.edge_pairs[e * 2].y = dest;
         coo.edge_pairs[e * 2 + 1].x = dest;
@@ -194,14 +194,14 @@ cudaError_t MakeUndirected(
     if (FLAG & graph::HAS_NODE_VALUES)
     {
         for (auto v = 0; v < directed_graph.nodes; v ++)
-            coo.node_values = directed_graph.node_values[v];
+            coo.node_values[v] = directed_graph.node_values[v];
     }
     if (remove_duplicate_edges)
     {
         GUARD_CU(coo.RemoveDuplicateEdges(
-            BY_ROW_ASCENDING, util::HOST, 0, true));
+            graph::BY_ROW_ASCENDING, util::HOST, 0, true));
     }
-    GUARD_CU(undirected_graph.FromCoo(coo, util::HOST, 0, stream));
+    GUARD_CU(undirected_graph.FromCoo(coo, util::HOST, 0, false));
     GUARD_CU(coo.Release(util::HOST));
     return retval;
 }

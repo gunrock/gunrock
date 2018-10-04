@@ -84,21 +84,24 @@ void DisplaySolution(GraphT graph, ValueT* h_flow, VertexT* reverse,
 template<typename ValueT, typename VertexT, typename GraphT>
 VertexT find_lowest(GraphT graph, VertexT x, VertexT* height, ValueT* flow, 
 	VertexT source){
+    typedef typename GraphT::SizeT SizeT;
     typedef typename GraphT::CsrT CsrT;
+
     auto e_start = graph.CsrT::GetNeighborListOffset(x);
     auto num_neighbors = graph.CsrT::GetNeighborListLength(x);
     auto e_end = e_start + num_neighbors;
     VertexT lowest;
-    VertexT lowest_id = -1; //graph.edges is unreachable value
+    SizeT lowest_id = util::PreDefinedValues<SizeT>::InvalidValue; 
+        //graph.edges is unreachable value
     for (auto e = e_start; e < e_end; ++e)
     {
-	if (graph.CsrT::edge_values[e] - flow[e] > (ValueT)0){
-	    auto y = graph.CsrT::GetEdgeDest(e);
-	    if (lowest_id == -1 || height[y] < lowest){
-		lowest = height[y];
-		lowest_id = e;
-	    }
-	}
+        if (graph.CsrT::edge_values[e] - flow[e] > (ValueT)0){
+            auto y = graph.CsrT::GetEdgeDest(e);
+            if (!util::isValid(lowest_id) || height[y] < lowest){
+                lowest = height[y];
+                lowest_id = e;
+            }
+        }
     }
     return lowest_id;
 }
@@ -122,14 +125,14 @@ bool relabel(GraphT graph, VertexT x, VertexT* height, ValueT* flow,
     typedef typename GraphT::CsrT CsrT;
     auto e = find_lowest(graph, x, height, flow, source);
     // graph.edges is unreachable value = there is no valid neighbour
-    if (e != -1){
-	VertexT y = graph.CsrT::GetEdgeDest(e);
-	if (height[y] >= height[x]){
-//	    printf("relabel %d H: %d->%d, res-cap %d-%d: %lf\n", x, height[x], 
-//		    height[y]+1, x, y, graph.CsrT::edge_values[e]-flow[e]);
-	    height[x] = height[y] + 1;
-	    return true;
-	}
+    if (util::isValid(e)) {
+        VertexT y = graph.CsrT::GetEdgeDest(e);
+        if (height[y] >= height[x]){
+    //	    printf("relabel %d H: %d->%d, res-cap %d-%d: %lf\n", x, height[x], 
+    //		    height[y]+1, x, y, graph.CsrT::edge_values[e]-flow[e]);
+            height[x] = height[y] + 1;
+            return true;
+        }
     }
     return false;
 }

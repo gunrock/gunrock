@@ -65,8 +65,8 @@ cudaError_t UseParameters(util::Parameters &parameters)
 template <typename GraphT, typename ArrayT>
 cudaError_t AddSourceSink(
     GraphT &u_graph,
-    GraphT &graph,
-    ArrayT &weights)
+    ArrayT &weights,
+    GraphT &graph)
 {
     cudaError_t retval = cudaSuccess;
 

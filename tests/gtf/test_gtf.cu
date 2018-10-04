@@ -12,6 +12,7 @@
  * @brief Simple test driver program for max-flow algorithm.
  */
 
+#include <gunrock/app/mf/mf_app.cu>
 #include <gunrock/app/gtf/gtf_app.cu>
 #include <gunrock/app/test_base.cuh>
 
@@ -81,7 +82,7 @@ struct main_struct
     	    debug_aml("number of nodes %d", d_graph.nodes);
 
             GUARD_CU(graphio::MakeUndirected(d_graph, u_graph, false));
-            GUARD_CU(mf::CorrectReverseCapacities(
+            GUARD_CU(app::mf::CorrectReverseCapacities(
                 d_graph.csr(), u_graph.csr()));
 
             GUARD_CU(d_graph.Release());
@@ -92,7 +93,7 @@ struct main_struct
         GUARD_CU(weights.Read(weights_filename));
 
         GraphT graph;
-        GUARD_CU(gtf::AddSourceSink(u_graph.csr(), weights, graph.csr()));
+        GUARD_CU(app::gtf::AddSourceSink(u_graph.csr(), weights, graph.csr()));
         GUARD_CU(u_graph.Release());
 
     	cpu_timer.Stop();
@@ -110,14 +111,15 @@ struct main_struct
         reverse_edges.SetName("reverse_edges");
         GUARD_CU(reverse_edges.Allocate(graph.edges, util::HOST));
 
-    	GUARD_CU(mf::InitReverse(graph, reverse_edges));
+    	GUARD_CU(app::mf::InitReverse(graph, reverse_edges));
 
 	    //
         // Compute reference CPU GTF algorithm.
 	    //
     	util::PrintMsg("______CPU reference algorithm______", true);
-    	double elapsed = app::gtf::CPU_Reference
-    	    (parameters, graph, reverse_edges);
+    	double elapsed = 0;
+        GUARD_CU(app::gtf::CPU_Reference
+    	    (parameters, graph, reverse_edges, elapsed));
         util::PrintMsg("-----------------------------------\n"
             "Elapsed: " + std::to_string(elapsed) + " ms", true);
 
@@ -126,7 +128,8 @@ struct main_struct
     	[reverse_edges](util::Parameters &parameters, GraphT &graph)
     	{
     	    //return app::gtf::RunTests(parameters, graph, reverse_edges);
-    	}));
+    	    return cudaSuccess;
+        }));
 
     	// Clean up
     	GUARD_CU(reverse_edges.Release());
