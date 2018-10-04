@@ -175,14 +175,6 @@ bool push(GraphT& graph, VertexT x, ValueT* excess, VertexT* height,
     return false;
 }
 
-template<typename ValueT, typename VertexT, typename GraphT>
-void dfs(ValueT** rGraph, VertexT s, bool visited[], const int V) {
-    visited[s] = true;
-    for (int i = 0; i < V; i++)
-       if (abs(rGraph[s][i]) > 1e-6 && !visited[i])
-           dfs(rGraph, i, visited, V);
-}
-
 /**
   * @brief Push relabel reference algorithm
   *
@@ -263,6 +255,7 @@ ValueT max_flow(GraphT& graph, ValueT* flow,
 	    }
 	}
     }
+
     /*
     for (auto u = source; u < graph.nodes; ++u)
     {
@@ -271,8 +264,7 @@ ValueT max_flow(GraphT& graph, ValueT* flow,
       auto e_end = e_start + num_neighbors;
       for (auto e = e_start; e < e_end; ++e)
       {
-        auto v = graph.CsrT::GetEdgeDest(e);
-        printf("flow(%d -> %d) = %f\n", u, v, flow[e]);
+        graph.CsrT::edge_values[e] = graph.CsrT::edge_values[e]-flow[e];
       }
     }
 
@@ -296,15 +288,18 @@ ValueT max_flow(GraphT& graph, ValueT* flow,
 	    }
 	   }
      bool *visited = new bool[graph.nodes];
-     dfs(rGraph, source, visited, graph.nodes);
      for(int i = 0; i < graph.nodes; i++){
-       cout << i << " " << visited[i] << endl;
+       printf("%d, %f \n", i, visited[i]);
      }
-     */
+    */
+    auto maxflow_value = excess[sink];
     free(excess);
     free(height);
-    return excess[sink];
+
+    return maxflow_value;
 }
+
+
 
 /****************************************************************************
  * GTF Testing Routines
