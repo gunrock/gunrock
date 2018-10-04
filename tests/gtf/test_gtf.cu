@@ -7,12 +7,12 @@
 
 /**
  * @file
- * test_mf.cu
+ * test_gtf.cu
  *
  * @brief Simple test driver program for max-flow algorithm.
  */
 
-#include <gunrock/app/mf/mf_app.cu>
+#include <gunrock/app/gtf/gtf_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 #define debug_aml(a...)
@@ -42,22 +42,22 @@ struct main_struct
         typename VertexT, // Use int as the vertex identifier
         typename SizeT,   // Use int as the graph size type
         typename ValueT>  // Use int as the value type
-    cudaError_t operator()(util::Parameters &parameters, VertexT v, SizeT s, 
+    cudaError_t operator()(util::Parameters &parameters, VertexT v, SizeT s,
 	    ValueT val)
     {
-        typedef typename app::TestGraph<VertexT, SizeT, ValueT, 
+        typedef typename app::TestGraph<VertexT, SizeT, ValueT,
 	  graph::HAS_EDGE_VALUES | graph::HAS_CSR> GraphT;
 	typedef typename GraphT::CsrT CsrT;
         cudaError_t retval = cudaSuccess;
 	bool quick = parameters.Get<bool>("quick");
         bool quiet = parameters.Get<bool>("quiet");
-	
+
 	//
 	// Load Graph
 	//
         util::CpuTimer cpu_timer; cpu_timer.Start();
 	debug_aml("Start Load Graph");
-      
+
 	bool undirected;
 	parameters.Get("undirected", undirected);
 	if (undirected){
@@ -79,17 +79,17 @@ struct main_struct
 	parameters.Set<int>("undirected", 1);
 	parameters.Set<int>("remove-duplicate-edges", true);
         GUARD_CU(graphio::LoadGraph(parameters, u_graph));
-	
+
 	cpu_timer.Stop();
 
 	parameters.Set("load-time", cpu_timer.ElapsedMillis());
 	debug_aml("load-time is %lf",cpu_timer.ElapsedMillis());
 
-	if (parameters.Get<VertexT>("source") == 
+	if (parameters.Get<VertexT>("source") ==
 		util::PreDefinedValues<VertexT>::InvalidValue){
 	    parameters.Set("source", 0);
 	}
-	if (parameters.Get<VertexT>("sink") == 
+	if (parameters.Get<VertexT>("sink") ==
 		util::PreDefinedValues<VertexT>::InvalidValue){
 	    parameters.Set("sink", d_graph.nodes-1);
 	}
@@ -142,7 +142,7 @@ struct main_struct
 		auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
 		auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
 		auto e_end = e_start + num_neighbors;
-		debug_aml("vertex %d\nnumber of neighbors %d", u, 
+		debug_aml("vertex %d\nnumber of neighbors %d", u,
 			num_neighbors);
 		for (auto e = e_start; e < e_end; ++e)
 		{
@@ -150,7 +150,7 @@ struct main_struct
 		    auto v = u_graph.CsrT::GetEdgeDest(e);
 		    // Looking for edge u->v in directed graph
 		    auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
-		    auto num_neighbors2 = 
+		    auto num_neighbors2 =
 			d_graph.CsrT::GetNeighborListLength(u);
 		    auto f_end = f_start + num_neighbors2;
 		    for (auto f = f_start; f < f_end; ++f)
@@ -158,7 +158,7 @@ struct main_struct
 			auto z = d_graph.CsrT::GetEdgeDest(f);
 			if (z == v and d_graph.CsrT::edge_values[f] > 0)
 			{
-			    u_graph.CsrT::edge_values[e]  = 
+			    u_graph.CsrT::edge_values[e]  =
 				d_graph.CsrT::edge_values[f];
 			    debug_aml("edge (%d, %d) cap = %lf\n", u, v, \
 				    u_graph.CsrT::edge_values[e]);
@@ -211,14 +211,14 @@ struct main_struct
         // Compute reference CPU max flow algorithm.
 	//
         ValueT max_flow;
-	
+
 	util::PrintMsg("______CPU reference algorithm______", true);
-	double elapsed = app::mf::CPU_Reference
+	double elapsed = app::gtf::CPU_Reference
 	    (parameters, u_graph, source, sink, max_flow, reverse, flow_edge);
-        util::PrintMsg("-----------------------------------\nElapsed: " + 
+        util::PrintMsg("-----------------------------------\nElapsed: " +
 		std::to_string(elapsed) + " ms\nMax flow CPU = " +
 		std::to_string(max_flow), true);
-	
+
         std::vector<std::string> switches{"advance-mode"};
 	GUARD_CU(app::Switch_Parameters(parameters, u_graph, switches,
 	[flow_edge, reverse](util::Parameters &parameters, GraphT &u_graph)
@@ -228,17 +228,17 @@ struct main_struct
 	  {
 	    for (int i=0; i<u_graph.edges; ++i)
 	    {
-	      debug_aml("%s:%d flow_edge[%d] = %lf", 
+	      debug_aml("%s:%d flow_edge[%d] = %lf",
 		__FILE__, __LINE__, i, flow_edge[i]);
 	    }
 	  }
-	  return app::mf::RunTests(parameters, u_graph, reverse, flow_edge);
+	  return app::gtf::RunTests(parameters, u_graph, reverse, flow_edge);
 	}));
 
 	// Clean up
 	free(flow_edge);
 	free(reverse);
-	
+
         return retval;
     }
 };
@@ -247,9 +247,9 @@ int main(int argc, char** argv)
 {
     debug_aml("Main: start");
     cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test mf");
+    util::Parameters parameters("test gtf");
     GUARD_CU(graphio::UseParameters(parameters));
-    GUARD_CU(app::mf::UseParameters(parameters));
+    GUARD_CU(app::gtf::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
     GUARD_CU(parameters.Parse_CommandLine(argc, argv));
     if (parameters.Get<bool>("help"))
@@ -261,9 +261,9 @@ int main(int argc, char** argv)
     debug_aml("Main: parameters checked - ok");
 
     return app::Switch_Types<
-        app::VERTEXT_U32B | 
-        app::SIZET_U32B | 
-        app::VALUET_F64B | 
+        app::VERTEXT_U32B |
+        app::SIZET_U32B |
+        app::VALUET_F64B |
 	app::DIRECTED | app::UNDIRECTED >
         (parameters, main_struct());
 }
@@ -273,4 +273,3 @@ int main(int argc, char** argv)
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-

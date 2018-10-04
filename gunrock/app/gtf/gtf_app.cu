@@ -6,9 +6,9 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file mf_app.cu
+ * @file gtf_app.cu
  *
- * @brief maxflow (mf) application
+ * @brief maxflow (gtf) application
  */
 
 #include <gunrock/gunrock.h>
@@ -22,9 +22,9 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// MF includes
-#include <gunrock/app/mf/mf_enactor.cuh>
-#include <gunrock/app/mf/mf_test.cuh>
+// gtf includes
+#include <gunrock/app/gtf/gtf_enactor.cuh>
+#include <gunrock/app/gtf/gtf_test.cuh>
 
 //#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a);\
     printf("\n");}
@@ -32,7 +32,7 @@
 
 namespace gunrock {
 namespace app {
-namespace mf {
+namespace gtf {
 
 cudaError_t UseParameters(util::Parameters &parameters)
 {
@@ -64,19 +64,19 @@ cudaError_t UseParameters(util::Parameters &parameters)
 	util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
 	util::PreDefinedValues<int>::InvalidValue,
 	"seed to generate random sources or sink",
-	__FILE__, __LINE__)); 
+	__FILE__, __LINE__));
     return retval;
 }
 
 /**
- * @brief Run mf tests
+ * @brief Run gtf tests
  * @tparam     GraphT	  Type of the graph
  * @tparam     ValueT	  Type of the capacity on edges
  * @tparam     VertexT	  Type of vertex
  * @param[in]  parameters Excution parameters
  * @param[in]  graph	  Input graph
  * @param[in]  ref_flow	  Reference flow on edges
- * @param[in]  target	  Whether to perform the mf
+ * @param[in]  target	  Whether to perform the gtf
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT, typename ValueT, typename VertexT>
@@ -93,7 +93,7 @@ cudaError_t RunTests(
     typedef Enactor<ProblemT>	      EnactorT;
 
     util::CpuTimer total_timer;	total_timer.Start();
-    util::CpuTimer cpu_timer;	cpu_timer.Start(); 
+    util::CpuTimer cpu_timer;	cpu_timer.Start();
 
     // parse configurations from parameters
     bool quiet_mode	    = parameters.Get<bool>("quiet");
@@ -104,12 +104,12 @@ cudaError_t RunTests(
     debug_aml("source %d, sink %d, quite_mode %d, num-runs %d", source, sink,
 	    quiet_mode, num_runs);
 
-    util::Info info("MF", parameters, graph); // initialize Info structure
+    util::Info info("gtf", parameters, graph); // initialize Info structure
 
     // Allocate host-side array (for both reference and GPU-computed results)
     // ... for function Extract
     ValueT *h_flow   = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
-    
+
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
@@ -119,7 +119,7 @@ cudaError_t RunTests(
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
-    // perform the MF algorithm
+    // perform the gtf algorithm
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
         GUARD_CU(problem.Reset(graph, h_reverse, target));
@@ -141,11 +141,11 @@ cudaError_t RunTests(
         if (validation == "each")
         {
             GUARD_CU(problem.Extract(h_flow));
-            int num_errors = app::mf::Validate_Results(parameters, graph, 
+            int num_errors = app::gtf::Validate_Results(parameters, graph,
 		    source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
         }
     }
-    
+
     // Copy out results
     cpu_timer.Start();
     if (validation == "last")
@@ -153,11 +153,11 @@ cudaError_t RunTests(
 	GUARD_CU(problem.Extract(h_flow));
 	/*for (int i=0; i<graph.edges; ++i){
 	    if (ref_flow){
-		debug_aml("h_flow[%d]=%lf, ref_flow[%d] = %lf", 
+		debug_aml("h_flow[%d]=%lf, ref_flow[%d] = %lf",
 			  i, h_flow[i], i, ref_flow[i]);
 	    }
 	}*/
-        int num_errors = app::mf::Validate_Results(parameters, graph, 
+        int num_errors = app::gtf::Validate_Results(parameters, graph,
 		source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
     }
 
@@ -171,18 +171,18 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    delete[] h_flow; 
+    delete[] h_flow;
     h_flow = NULL;
 
-    cpu_timer.Stop(); 
+    cpu_timer.Stop();
     total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
-    
+
     return retval;
 }
 
-} // namespace mf
+} // namespace gtf
 } // namespace app
 } // namespace gunrock
 
@@ -192,12 +192,12 @@ cudaError_t RunTests(
  * @tparam     ValueT     Type of the capacity/flow/excess
  * @param[in]  parameters Excution parameters
  * @param[in]  graph      Input graph
- * @param[out] flow	  Return 
- * @param[out] maxflow	  Return 
+ * @param[out] flow	  Return
+ * @param[out] maxflow	  Return
  * \return     double     Return accumulated elapsed times for all runs
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
-double gunrock_mf(
+double gunrock_gtf(
     gunrock::util::Parameters &parameters,
     GraphT &graph,
     ValueT *flow,
@@ -205,8 +205,8 @@ double gunrock_mf(
     )
 {
     typedef typename GraphT::VertexT		VertexT;
-    typedef gunrock::app::mf::Problem<GraphT>	ProblemT;
-    typedef gunrock::app::mf::Enactor<ProblemT> EnactorT;
+    typedef gunrock::app::gtf::Problem<GraphT>	ProblemT;
+    typedef gunrock::app::gtf::Enactor<ProblemT> EnactorT;
     gunrock::util::CpuTimer cpu_timer;
     gunrock::util::Location target = gunrock::util::DEVICE;
     double total_time = 0;
@@ -248,7 +248,7 @@ double gunrock_mf(
  * @param[in]  row_offsets  CSR-formatted graph input row offsets
  * @param[in]  col_indices  CSR-formatted graph input column indices
  * @param[in]  capacity	    CSR-formatted graph input edge weights
- * @param[in]  num_runs     Number of runs to perform mf
+ * @param[in]  num_runs     Number of runs to perform gtf
  * @param[in]  source	    Source to push flow towards the sink
  * @param[out] flow	    Return flow calculated on edges
  * @param[out] maxflow	    Return maxflow value
@@ -258,7 +258,7 @@ template <
     typename VertexT  = uint32_t,
     typename SizeT    = uint32_t,
     typename ValueT   = double>
-float mf(
+float gtf(
 	const SizeT   num_nodes,
 	const SizeT   num_edges,
 	const SizeT   *row_offsets,
@@ -278,9 +278,9 @@ float mf(
     typedef typename GraphT::CsrT				    CsrT;
 
     // Setup parameters
-    gunrock::util::Parameters parameters("mf");
+    gunrock::util::Parameters parameters("gtf");
     gunrock::graphio::UseParameters(parameters);
-    gunrock::app::mf::UseParameters(parameters);
+    gunrock::app::gtf::UseParameters(parameters);
     gunrock::app::UseParameters_test(parameters);
     parameters.Parse_CommandLine(0, NULL);
     parameters.Set("graph-type", "by-pass");
@@ -302,8 +302,8 @@ float mf(
     csr.Release();
     gunrock::graphio::LoadGraph(parameters, graph);
 
-    // Run the MF
-    double elapsed_time = gunrock_mf(parameters, graph, flow, maxflow);
+    // Run the gtf
+    double elapsed_time = gunrock_gtf(parameters, graph, flow, maxflow);
 
     // Cleanup
     graph.Release();
@@ -316,4 +316,3 @@ float mf(
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-

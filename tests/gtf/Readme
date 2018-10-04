@@ -1,0 +1,14 @@
+$ Agnes' code: two datasets are provided, 15 and 100 under this directory. 15 is a graph 15 nodes, 100 is a graph 100 nodes. 
+$ min.cpp: the equivalent to 15 is ./_data/e.txt and ./_data/n.txt, and 100 is ./_data/back/e.txt and ./_data/back/n.txt, which you will change in min.cpp line 308 and 309
+
+$ for running dense representation take a look at the line 308 and 309 for the correct dataset. 
+g++ -std=c++11 min.cpp
+./a.out
+
+$ for running Agnes code
+make
+./bin/test_gtf_8.0_x86_64 market 15 --source=15 --sink=16 --undirected=true
+./bin/test_gtf_8.0_x86_64 market 100 --source=100 --sink=101 --undirected=true
+
+
+Attention: Agnes code's data, 15 and 100, is not normalized and thus will give a different maxflow value than min.cpp.
