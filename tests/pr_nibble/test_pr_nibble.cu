@@ -7,21 +7,18 @@
 
 /**
  * @file
- * test_rw.cu
+ * test_pr_nibble.cu
  *
  * @brief Simple test driver program for Gunrock template.
  */
 
 #include <iostream>
-#include <string>
-#include <fstream>
-
-#include <gunrock/app/rw/rw_app.cu>
+#include <gunrock/app/pr_nibble/pr_nibble_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
 
-namespace APP_NAMESPACE = app::rw;
+namespace APP_NAMESPACE = app::pr_nibble;
 
 /******************************************************************************
 * Main
@@ -48,14 +45,12 @@ struct main_struct
     cudaError_t operator()(util::Parameters &parameters,
         VertexT v, SizeT s, ValueT val)
     {
-        // CLI parameters
+        // CLI parameters        
         bool quick = parameters.Get<bool>("quick");
         bool quiet = parameters.Get<bool>("quiet");
 
-        typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-            graph::HAS_NODE_VALUES | graph::HAS_CSR>
+        typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_CSR>
             GraphT;
-        typedef typename GraphT::CsrT CsrT;
 
         cudaError_t retval = cudaSuccess;
         util::CpuTimer cpu_timer;
@@ -65,72 +60,51 @@ struct main_struct
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
-
-        int walk_length    = parameters.Get<int>("walk-length");
-        int walks_per_node = parameters.Get<int>("walks-per-node");
-        int walk_mode      = parameters.Get<int>("walk-mode");
-        VertexT *ref_walks;
-
-        ValueT *node_values;
-        if(walk_mode != 0) {
-            node_values = new ValueT[graph.nodes];
-            graph.CsrT::node_values.SetPointer(node_values, graph.nodes, gunrock::util::HOST);
-
-            std::string node_value_path = parameters.Get<std::string>("node-value-path");
-            if(node_value_path.compare("") == 0) {
-                printf("test_rw: `node-value-path` must be set if `walk-mode` != 0");
-                return retval;
-            }
-
-            std::ifstream node_value_file(node_value_path, std::ios_base::in);
-            for(int i = 0; i < graph.nodes; i++) {
-                node_value_file >> node_values[i];
-            }
-        }
-
+                
+        // Problem specific variables
+        GUARD_CU(app::Set_Srcs(parameters, graph));
+        std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
+        int num_srcs = srcs.size();
+        
+        ValueT **ref_values = NULL;
+        
         if (!quick) {
-            ref_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
+            ref_values = new ValueT*[num_srcs];
+            
+            for(int i = 0; i < num_srcs; i++) {
+                
+                VertexT src = srcs[i];
+                ref_values[i] = new ValueT[graph.nodes];
+                
+                util::PrintMsg("__________________________", !quiet);
+                
+                float elapsed = app::pr_nibble::CPU_Reference(
+                    graph.csr(),
+                    parameters,
+                    src,
+                    ref_values[i],
+                    quiet);
+                
+                util::PrintMsg("--------------------------\n Elapsed: "
+                    + std::to_string(elapsed), !quiet);
+            }
 
-            util::PrintMsg("__________________________", !quiet);
-
-            float elapsed = APP_NAMESPACE::CPU_Reference(
-                graph.csr(),
-                walk_length,
-                walks_per_node,
-                walk_mode,
-                ref_walks,
-                quiet
-            );
-
-            util::PrintMsg("--------------------------\n Elapsed: "
-                + std::to_string(elapsed), !quiet);
         }
 
-        std::vector<std::string> switches{"advance-mode"};
+        std::vector<std::string> switches{"advance-mode"};        
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
-                walk_length,
-                walks_per_node,
-                walk_mode,
-                ref_walks
+                ref_values
             ](util::Parameters &parameters, GraphT &graph)
             {
-                return APP_NAMESPACE::RunTests(
-                    parameters,
-                    graph,
-                    walk_length,
-                    walks_per_node,
-                    walk_mode,
-                    ref_walks,
-                    util::DEVICE
-                );
+                return app::pr_nibble::RunTests(parameters, graph, ref_values, util::DEVICE);
             }));
 
         if (!quick) {
-            delete[] ref_walks; ref_walks = NULL;
-        }
-        if(walk_mode != 0) {
-            delete[] node_values; node_values = NULL;
+            for(int i = 0; i < num_srcs; i++) {
+                delete[] ref_values[i]; ref_values[i] = NULL;
+            }
+            delete[] ref_values; ref_values = NULL;
         }
         return retval;
     }
@@ -139,9 +113,9 @@ struct main_struct
 int main(int argc, char** argv)
 {
     cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test rw");
+    util::Parameters parameters("test pr_nibble");
     GUARD_CU(graphio::UseParameters(parameters));
-    GUARD_CU(APP_NAMESPACE::UseParameters(parameters));
+    GUARD_CU(app::pr_nibble::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
     GUARD_CU(parameters.Parse_CommandLine(argc, argv));
     if (parameters.Get<bool>("help"))
@@ -154,7 +128,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |
-        app::VALUET_U32B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F64B | app::UNDIRECTED>
         (parameters, main_struct());
 }
 

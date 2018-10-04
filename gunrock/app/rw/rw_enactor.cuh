@@ -54,7 +54,7 @@ struct RWIterationLoop : public IterationLoopBase
     typedef typename EnactorT::ValueT  ValueT;
     typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
-    
+
     typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
@@ -69,50 +69,91 @@ struct RWIterationLoop : public IterationLoopBase
     {
         // --
         // Alias variables
-        
+
         auto &data_slice = this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
-        
+
         auto &enactor_slice = this -> enactor ->
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
-        
+
         auto &enactor_stats    = enactor_slice.enactor_stats;
         auto &graph            = data_slice.sub_graph[0];
         auto &frontier         = enactor_slice.frontier;
         auto &oprtr_parameters = enactor_slice.oprtr_parameters;
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
-        
+
         // problem specific data alias:
         auto &walks          = data_slice.walks;
         auto &rand           = data_slice.rand;
         auto &walk_length    = data_slice.walk_length;
         auto &walks_per_node = data_slice.walks_per_node;
+        auto &walk_mode      = data_slice.walk_mode;
         auto &gen            = data_slice.gen;
-        
+
         curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
-                
-        GUARD_CU(frontier.V_Q()->ForAll(
-          [
-            graph,
-            walks,
-            rand,
-            iteration,
-            walk_length
+
+        if(walk_mode == 0) {
+          auto uniform_rw_op = [
+              graph,
+              walks,
+              rand,
+              iteration,
+              walk_length
           ] __host__ __device__ (VertexT *v, const SizeT &i) {
-          
-          SizeT write_idx  = (i * walk_length) + iteration; // Write location in RW array
-          walks[write_idx] = v[i];                          // record current position in walk
-          
-          if(iteration < walk_length - 1) {
-            // Determine next neighbor to walk to
-            SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
-            SizeT offset        = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
-            VertexT neighbor    = graph.GetEdgeDest(graph.GetNeighborListOffset(v[i]) + offset);
-            v[i]                = neighbor; // Replace vertex w/ neighbor in queue            
-          }
-          
-        }, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));          
+
+            // printf("graph.node_values[i]=%d\n", graph.node_values[i]);
+
+            SizeT write_idx  = (i * walk_length) + iteration; // Write location in RW array
+            walks[write_idx] = v[i];                          // record current position in walk
+
+            if(iteration < walk_length - 1) {
+              // Determine next neighbor to walk to
+              SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
+              SizeT offset        = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
+              VertexT neighbor    = graph.GetEdgeDest(graph.GetNeighborListOffset(v[i]) + offset);
+              v[i]                = neighbor; // Replace vertex w/ neighbor in queue
+            }
+          };
+
+          GUARD_CU(frontier.V_Q()->ForAll(
+            uniform_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+
+        } else if (walk_mode == 1) {
+          auto max_rw_op = [
+              graph,
+              walks,
+              rand,
+              iteration,
+              walk_length
+          ] __host__ __device__ (VertexT *v, const SizeT &i) {
+
+            SizeT write_idx  = (i * walk_length) + iteration; // Write location in RW array
+            walks[write_idx] = v[i];                          // record current position in walk
+
+            if(iteration < walk_length - 1) {
+              // Walk to neighbor w/ maximum node value
+              SizeT num_neighbors        = graph.GetNeighborListLength(v[i]);
+              SizeT neighbor_list_offset = graph.GetNeighborListOffset(v[i]);
+
+              VertexT max_neighbor_id  = graph.GetEdgeDest(neighbor_list_offset + 0);
+              VertexT max_neighbor_val = graph.node_values[max_neighbor_id];
+              for(SizeT offset = 1; offset < num_neighbors; offset++) {
+                VertexT neighbor     = graph.GetEdgeDest(neighbor_list_offset + offset);
+                ValueT  neighbor_val = graph.node_values[neighbor];
+                if(neighbor_val > max_neighbor_val) {
+                  max_neighbor_id  = neighbor;
+                  max_neighbor_val = neighbor_val;
+                }
+              }
+              v[i] = max_neighbor_id; // Replace vertex w/ neighbor in queue
+            }
+          };
+
+          GUARD_CU(frontier.V_Q()->ForAll(
+            max_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+
+        }
 
         return retval;
     }
@@ -123,10 +164,10 @@ struct RWIterationLoop : public IterationLoopBase
             problem -> data_slices[this -> gpu_num][0];
       auto &enactor_slices = this -> enactor -> enactor_slices;
       auto iter = enactor_slices[0].enactor_stats.iteration;
-      
+
       return iter == data_slice.walk_length;
     }
-    
+
 
     /**
      * @brief Routine to combine received data and local data
@@ -141,9 +182,9 @@ struct RWIterationLoop : public IterationLoopBase
         int NUM_VALUE__ASSOCIATES>
     cudaError_t ExpandIncoming(SizeT &received_length, int peer_)
     {
-        
+
         // ================ INCOMPLETE TEMPLATE - MULTIGPU ====================
-        
+
         auto &data_slice    = this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
         auto &enactor_slice = this -> enactor ->
@@ -201,9 +242,9 @@ public:
     typedef typename GraphT::ValueT    ValueT  ;
     typedef EnactorBase<GraphT, LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
         BaseEnactor;
-    typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> 
+    typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
-    typedef RWIterationLoop<EnactorT> 
+    typedef RWIterationLoop<EnactorT>
         IterationT;
 
     Problem *problem;
@@ -256,7 +297,7 @@ public:
         // !! POSSIBLE BUG: @sgpyc suggested changing the 2 to 1, but that causes
         //  strange behavior, where V_Q does not get initialized properly.
         GUARD_CU(BaseEnactor::Init(
-            problem, Enactor_None, 2, NULL, target, false)); 
+            problem, Enactor_None, 2, NULL, target, false));
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
         {
             GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
@@ -306,7 +347,7 @@ public:
 
         SizeT num_nodes = this -> problem -> data_slices[0][0].sub_graph[0].nodes;
         printf("num_nodes=%d\n", num_nodes);
-        
+
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
            if (this->num_gpus == 1) {
                this -> thread_slices[gpu].init_size = num_nodes * walks_per_node;
@@ -314,19 +355,19 @@ public:
                    auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
                    frontier.queue_length = (peer_ == 0) ? num_nodes * walks_per_node : 0;
                    if (peer_ == 0) {
-                        
+
                       util::Array1D<SizeT, VertexT> tmp;
                       tmp.Allocate(num_nodes * walks_per_node, target | util::HOST);
                       for(SizeT i = 0; i < num_nodes * walks_per_node; ++i) {
                           tmp[i] = (VertexT)i % num_nodes;
                       }
                       GUARD_CU(tmp.Move(util::HOST, target));
-                      
+
                       GUARD_CU(frontier.V_Q() -> ForEach(tmp,
                           []__host__ __device__ (VertexT &v, VertexT &i) {
                           v = i;
                       }, num_nodes * walks_per_node, target, 0));
-                      
+
                       tmp.Release();
                  }
                }
@@ -334,7 +375,7 @@ public:
                 // MULTIGPU INCOMPLETE
            }
         }
-        
+
         GUARD_CU(BaseEnactor::Sync());
         return retval;
     }
