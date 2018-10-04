@@ -28,6 +28,8 @@
     #include <boost/graph/read_dimacs.hpp>
 #endif
 
+#include<queue>
+
 namespace gunrock {
 namespace app {
 namespace mf {
@@ -210,6 +212,47 @@ ValueT max_flow(GraphT& graph, ValueT* flow, ValueT* excess, VertexT* height,
     return excess[sink];
 }
 
+/**
+  * @brief Min Cut algorithm
+  *
+  * @tparam ValueT	Type of capacity/flow/excess
+  * @tparam VertxeT	Type of vertex
+  * @tparam GraphT	Type of graph
+  * @param[in] graph	Graph
+  * @param[in] source	Source vertex
+  * @param[in] sink	Sink vertex
+  * @param[in] flow	Function of flow on edges
+  * @param[out] min_cut	Function on nodes, 1 = connected to source, 0 = sink
+  *
+  */
+template <typename VertexT, typename ValueT, typename GraphT>
+void minCut(GraphT &graph, 
+	VertexT src, 
+	ValueT *flow, 
+	int *min_cut){
+
+    typedef typename GraphT::CsrT CsrT;
+    std::vector<bool> flag; flag.resize(graph.nodes, true);
+    std::queue<VertexT> que;
+    que.push(src);
+    min_cut[src] = 1;
+
+    while (! que.empty()){
+	auto v = que.front(); que.pop();
+
+	auto e_start = graph.CsrT::GetNeighborListOffset(v);
+	auto num_neighbors = graph.CsrT::GetNeighborListLength(v);
+	auto e_end = e_start + num_neighbors;
+	for (auto e = e_start; e < e_end; ++e){
+	    auto u = graph.CsrT::GetEdgeDest(e);
+	    if (flag[u] and graph.CsrT::edge_values[e] - flow[e] > 1e-12){
+		flag[u] = false;
+		que.push(u);
+		min_cut[u] = 1;
+	    }
+	}
+    }
+}
 /****************************************************************************
  * MF Testing Routines
  ***************************************************************************/
@@ -244,6 +287,8 @@ double CPU_Reference(
     debug_aml("CPU_Reference start");
     typedef typename GraphT::SizeT SizeT;
     typedef typename GraphT::CsrT CsrT;
+
+    double elapsed = 0;
 
 #if (BOOST_FOUND==1)
     
@@ -309,7 +354,7 @@ double CPU_Reference(
     cpu_timer.Start();
     maxflow = edmonds_karp_max_flow(boost_graph, source, sink); 
     cpu_timer.Stop();
-    double elapsed = cpu_timer.ElapsedMillis();
+    elapsed = cpu_timer.ElapsedMillis();
 
     //
     // Extracting results on CPU
@@ -327,7 +372,7 @@ double CPU_Reference(
 	    if (capacity[*e_it] > 0){
 		ValueT e_f = capacity[*e_it] - residual_capacity[*e_it];
 	    	VertexT t = target(*e_it, boost_graph);
-	    	debug_aml("flow on edge %d - %d = %lf", *u_it, t, e_f);
+	    	//debug_aml("flow on edge %d - %d = %lf", *u_it, t, e_f);
 	    	boost_flow[*u_it][t] = e_f;
 	    }
 	}
@@ -341,8 +386,6 @@ double CPU_Reference(
 	    flow[e] = boost_flow[x][y];
 	}
     }
-
-    return elapsed;
 
 #else
 
@@ -394,12 +437,14 @@ double CPU_Reference(
     maxflow = max_flow(graph, flow, excess, height, src, sin, reverse);
     
     cpu_timer.Stop();
-    double elapsed = cpu_timer.ElapsedMillis();
+    elapsed = cpu_timer.ElapsedMillis();
 
     free(excess);
     free(height);
-    return elapsed;
+
 #endif
+    
+    return elapsed;
 }
 
 /**
@@ -426,6 +471,7 @@ int Validate_Results(
     	VertexT		  sink,
         ValueT		  *h_flow,
 	VertexT		  *reverse,
+	int		  *min_cut,
         ValueT		  *ref_flow = NULL,
 	bool		  verbose = true)
 {
@@ -449,6 +495,29 @@ int Validate_Results(
     }
     util::PrintMsg("Max Flow GPU = " + std::to_string(flow_incoming_sink));
 
+    // Verify min cut h_flow
+    ValueT mincut_flow = (ValueT)0;
+    for (auto u = 0; u < graph.nodes; ++u){
+	if (min_cut[u] == 1){
+	    auto e_start = graph.CsrT::GetNeighborListOffset(u);
+	    auto num_neighbors = graph.CsrT::GetNeighborListLength(u);
+	    auto e_end = e_start + num_neighbors;
+	    for (auto e = e_start; e < e_end; ++e){
+		auto v = graph.CsrT::GetEdgeDest(e);
+		if (min_cut[v] == 0){
+		    auto f = graph.CsrT::edge_values[e];
+		    mincut_flow += f;
+		}
+	    }
+	}
+    }
+    util::PrintMsg("MIN CUT flow = " + std::to_string(mincut_flow));
+    if (fabs(mincut_flow - flow_incoming_sink) > 1e-12){
+	++num_errors;
+	util::PrintMsg("FAIL: Min cut " + std::to_string(mincut_flow) +
+		    " and max flow " + std::to_string(flow_incoming_sink) + 
+		    " are not equal", !quiet);
+    }
 
     // Verify the result
     if (ref_flow != NULL)
@@ -507,8 +576,8 @@ int Validate_Results(
 		continue;
 	    ++errors_num;
 	    util::PrintMsg("FAIL: for vertex " + std::to_string(v) +
-		    " summary flow is " + std::to_string(flow_v) + 
-		    " not equal 0", !quiet);
+		    " summary flow " + std::to_string(flow_v) + 
+		    " is not equal 0", !quiet);
 	}
 	if (errors_num > 0)
 	{

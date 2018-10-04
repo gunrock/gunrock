@@ -108,13 +108,14 @@ cudaError_t RunTests(
 
     // Allocate host-side array (for both reference and GPU-computed results)
     // ... for function Extract
-    ValueT *h_flow   = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
+    ValueT *h_flow  = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
+    int *min_cut    = (int*)malloc(sizeof(int)*graph.nodes); 
     
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    GUARD_CU(problem.Init(graph, target));
-    GUARD_CU(enactor.Init(problem, target));
+    GUARD_CU(problem.Init(graph,  target));
+    GUARD_CU(enactor.Init(problem,target));
 
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
@@ -141,8 +142,10 @@ cudaError_t RunTests(
         if (validation == "each")
         {
             GUARD_CU(problem.Extract(h_flow));
+	    app::mf::minCut(graph, source, h_flow, min_cut);
             int num_errors = app::mf::Validate_Results(parameters, graph, 
-		    source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
+		    source, sink, h_flow, h_reverse, min_cut, ref_flow, 
+		    quiet_mode);
         }
     }
     
@@ -151,14 +154,9 @@ cudaError_t RunTests(
     if (validation == "last")
     {
 	GUARD_CU(problem.Extract(h_flow));
-	/*for (int i=0; i<graph.edges; ++i){
-	    if (ref_flow){
-		debug_aml("h_flow[%d]=%lf, ref_flow[%d] = %lf", 
-			  i, h_flow[i], i, ref_flow[i]);
-	    }
-	}*/
+	app::mf::minCut(graph, source, h_flow, min_cut);
         int num_errors = app::mf::Validate_Results(parameters, graph, 
-		source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
+		source, sink, h_flow, h_reverse, min_cut, ref_flow, quiet_mode);
     }
 
     // Compute running statistics
@@ -190,25 +188,30 @@ cudaError_t RunTests(
  * @brief Entry of gunrock_maxflow function
  * @tparam     GraphT     Type of the graph
  * @tparam     ValueT     Type of the capacity/flow/excess
+ *
  * @param[in]  parameters Excution parameters
  * @param[in]  graph      Input graph
- * @param[out] flow	  Return 
- * @param[out] maxflow	  Return 
+ * @param[out] flow	  Return flow on edges
+ * @param[out] maxflow	  Return flow value
+ * @param[out] min_cut	  Return partition into two sets of nodes
  * \return     double     Return accumulated elapsed times for all runs
  */
-template <typename GraphT, typename ValueT = typename GraphT::ValueT>
+template <typename GraphT, typename VertexT = typename GraphT::VertexT,
+    typename ValueT = typename GraphT::ValueT>
 double gunrock_mf(
     gunrock::util::Parameters &parameters,
-    GraphT &graph,
-    ValueT *flow,
-    ValueT &maxflow
-    )
+    GraphT  &graph,
+    VertexT reverse, 
+    ValueT  *flow,
+    int	    *min_cut,
+    ValueT  &maxflow)
 {
-    typedef typename GraphT::VertexT		VertexT;
     typedef gunrock::app::mf::Problem<GraphT>	ProblemT;
     typedef gunrock::app::mf::Enactor<ProblemT> EnactorT;
+
     gunrock::util::CpuTimer cpu_timer;
     gunrock::util::Location target = gunrock::util::DEVICE;
+
     double total_time = 0;
     if (parameters.UseDefault("quiet"))
         parameters.Set("quiet", true);
@@ -216,7 +219,7 @@ double gunrock_mf(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    problem.Init(graph  , target);
+    problem.Init(graph,	  target);
     enactor.Init(problem, target);
 
     int num_runs = parameters.Get<int>("num-runs");
@@ -225,15 +228,15 @@ double gunrock_mf(
 
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        problem.Reset(target);
-        enactor.Reset(target);
+        problem.Reset(graph, reverse, target);
+        enactor.Reset(source, target);
 
         cpu_timer.Start();
-        enactor.Enact(source, sink);
+        enactor.Enact();
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-        problem.Extract(flow);
+        problem.Extract(flow, min_cut);
     }
 
     enactor.Release(target);
