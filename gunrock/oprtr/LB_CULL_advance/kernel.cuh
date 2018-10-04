@@ -255,8 +255,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
               OutKeyT  *&keys_out,
               ValueT   *&values_out,
         const SizeT     &num_outputs,
-        const ValueT   *&reduce_values_in,
-              ValueT   *&reduce_values_out,
+        //const ValueT   *&reduce_values_in,
+        //      ValueT   *&reduce_values_out,
         util::CtaWorkProgress<SizeT> &work_progress,
               AdvanceOpT advance_op,
               FilterOpT  filter_op)
@@ -479,7 +479,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
                             v, u, edge_id,
                             smem_storage.iter_input_start + v_index, input_item,
                             output_pos, (OutKeyT*)NULL, (ValueT*)NULL,
-                            reduce_values_in, reduce_values_out,
+                            NULL, NULL, //reduce_values_in, reduce_values_out,
                             advance_op);
 
                         if (!util::isValid(out_key))
@@ -592,8 +592,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
               OutKeyT  *&keys_out,
               ValueT   *&values_out,
         const SizeT     &num_outputs,
-        const ValueT   *&reduce_values_in,
-              ValueT   *&reduce_values_out,
+        //const ValueT   *&reduce_values_in,
+        //      ValueT   *&reduce_values_out,
         util::CtaWorkProgress<SizeT> &work_progress,
             AdvanceOpT   advance_op,
             FilterOpT    filter_op)
@@ -771,7 +771,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
                             v, u, edge_id,
                             block_input_start + v_index, input_item,
                             output_pos, (OutKeyT*)NULL, (ValueT*)NULL,
-                            reduce_values_in, reduce_values_out,
+                            NULL, NULL, //reduce_values_in, reduce_values_out,
                             advance_op);
                         if (!util::isValid(out_key))
                             to_process = false;
@@ -920,8 +920,8 @@ void RelaxPartitionedEdges2(
           typename GraphT::SizeT   *num_outputs,
     util::CtaWorkProgress<typename GraphT::SizeT> work_progress,
     //util::KernelRuntimeStats        kernel_stats,
-    const                  ValueT  *reduce_values_in ,
-                           ValueT  *reduce_values_out,
+    //const                  ValueT  *reduce_values_in ,
+    //                       ValueT  *reduce_values_out,
                    AdvanceOpT       advance_op,
                    FilterOpT        filter_op)
 {
@@ -935,8 +935,8 @@ void RelaxPartitionedEdges2(
         label, labels, visited_masks, output_offsets,
         block_input_starts, //partition_size, //num_partitions,
         keys_out, values_out, num_outputs[0],
-        reduce_values_in, reduce_values_out, work_progress,
-        advance_op, filter_op);
+        //reduce_values_in, reduce_values_out, 
+        work_progress, advance_op, filter_op);
 }
 
 /**
@@ -987,8 +987,8 @@ void RelaxLightEdges(
           typename GraphT::SizeT   *num_outputs,
     util::CtaWorkProgress<typename GraphT::SizeT> work_progress,
     //util::KernelRuntimeStats        kernel_stats,
-    const                  ValueT  *reduce_values_in,
-                           ValueT  *reduce_values_out,
+    //const                  ValueT  *reduce_values_in,
+    //                       ValueT  *reduce_values_out,
                    AdvanceOpT       advance_op,
                    FilterOpT        filter_op)
 {
@@ -1001,8 +1001,8 @@ void RelaxLightEdges(
         graph, queue_index, keys_in, num_inputs,
         label, labels, visited_masks, output_offsets,
         keys_out, values_out, num_outputs[0],
-        reduce_values_in, reduce_values_out, work_progress,
-        advance_op, filter_op);
+        //reduce_values_in, reduce_values_out,
+        work_progress, advance_op, filter_op);
 }
 
 /**
@@ -1162,10 +1162,10 @@ cudaError_t Launch_CSR_CSC(
                 : parameters.values_out     -> GetPointer(util::DEVICE),
             parameters.frontier -> output_length .GetPointer(util::DEVICE),
             parameters.frontier -> work_progress,
-            (parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
-                : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
-            (parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
-                : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
+            //(parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
+            //    : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
+            //(parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
+            //    : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
             advance_op, filter_op);
     }
     else  {
@@ -1214,10 +1214,10 @@ cudaError_t Launch_CSR_CSC(
                 : parameters.values_out     -> GetPointer(util::DEVICE),
             parameters.frontier -> output_length.GetPointer(util::DEVICE),
             parameters.frontier -> work_progress,
-            (parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
-                : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
-            (parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
-                : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
+            //(parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
+            //    : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
+            //(parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
+            //    : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
             advance_op, filter_op);
     }
 
@@ -1285,10 +1285,10 @@ cudaError_t Launch_Light_CSR_CSC(
             : parameters.values_out     -> GetPointer(util::DEVICE),
         parameters.frontier -> output_length.GetPointer(util::DEVICE),
         parameters.frontier -> work_progress,
-        (parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
-            : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
-        (parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
-            : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
+        //(parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
+        //    : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
+        //(parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
+        //    : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
         advance_op, filter_op);
 
     if (frontier_out != NULL)

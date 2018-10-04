@@ -160,7 +160,7 @@ struct NullArray
     __host__ __device__ __forceinline__
     ValueT& operator[](std::size_t idx)
     {
-        return *((ValueT*)NULL);
+        return *((ValueT*)this);
     }
 };
 

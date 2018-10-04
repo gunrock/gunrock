@@ -30,6 +30,8 @@ enum : GraphFlag
     GRAPH_NONE      = 0x0000,
     HAS_EDGE_VALUES = 0x0010,
     HAS_NODE_VALUES = 0x0020,
+    
+    TypeMask        = 0x0F00,
     HAS_CSR         = 0x0100,
     HAS_CSC         = 0x0200,
     HAS_COO         = 0x0400,

@@ -350,13 +350,13 @@ struct Csc :
     __device__ __host__ __forceinline__
     SizeT GetNeighborListLength(const VertexT &v) const
     {
-        if (v < 0 || v >= this -> nodes)
+        if (util::lessThanZero(v) || v >= this -> nodes)
             return 0;
         return _ldg(column_offsets + (v+1)) - _ldg(column_offsets + v);
     }
 
     __device__ __host__ __forceinline__
-    SizeT GetNeighborListOffset(const VertexT &v)
+    SizeT GetNeighborListOffset(const VertexT &v) const
     {
         return _ldg(column_offsets + v);
     }
@@ -364,11 +364,11 @@ struct Csc :
     __device__ __host__ __forceinline__
     VertexT GetEdgeSrc(const SizeT &e) const
     {
-        return Binary_Search(column_offsets + 0, e, 0, this -> nodes);
+        return Binary_Search(column_offsets + 0, e, (SizeT)0, this -> nodes);
     }
 
     __device__ __host__ __forceinline__
-    VertexT GetEdgeDest(const SizeT &e)
+    VertexT GetEdgeDest(const SizeT &e) const
     {
         //return _ldg(row_indices + e);
         return row_indices[e];
@@ -377,7 +377,7 @@ struct Csc :
     __device__ __host__ __forceinline__
     void GetEdgeSrcDest(const SizeT &e, VertexT &src, VertexT &dest) const
     {
-        src = Binary_Search(column_offsets + 0, e, 0, this -> nodes);
+        src = Binary_Search(column_offsets + 0, e, (SizeT)0, this -> nodes);
         dest = row_indices[e];
     }
 }; // CSC

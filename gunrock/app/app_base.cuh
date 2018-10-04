@@ -54,12 +54,12 @@ template <
     graph::GraphFlag _FLAG   = graph::GRAPH_NONE,
     unsigned int _cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct TestGraph :
-    public graph::Csr<_VertexT, _SizeT, _ValueT, _FLAG, _cudaHostRegisterFlag,
-        (_FLAG & graph::HAS_CSR) != 0>,
-    public graph::Coo<_VertexT, _SizeT, _ValueT, _FLAG, _cudaHostRegisterFlag,
-        (_FLAG & graph::HAS_COO) != 0>,
-    public graph::Csc<_VertexT, _SizeT, _ValueT, _FLAG, _cudaHostRegisterFlag,
-        (_FLAG & graph::HAS_CSC) != 0>,
+    public graph::Csr<_VertexT, _SizeT, _ValueT, _FLAG & (~(graph::TypeMask - graph::HAS_CSR)), 
+        _cudaHostRegisterFlag, (_FLAG & graph::HAS_CSR) != 0>,
+    public graph::Coo<_VertexT, _SizeT, _ValueT, _FLAG & (~(graph::TypeMask - graph::HAS_COO)), 
+        _cudaHostRegisterFlag, (_FLAG & graph::HAS_COO) != 0>,
+    public graph::Csc<_VertexT, _SizeT, _ValueT, _FLAG & (~(graph::TypeMask - graph::HAS_CSC)), 
+        _cudaHostRegisterFlag, (_FLAG & graph::HAS_CSC) != 0>,
     public graph::Gp <_VertexT, _SizeT, _ValueT, _FLAG, _cudaHostRegisterFlag>
 {
     typedef _VertexT VertexT;
@@ -70,12 +70,12 @@ struct TestGraph :
     //typedef Csr<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CsrT;
     //typedef Coo<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CooT;
     //typedef Csc<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CscT;
-    typedef graph::Csr<_VertexT, _SizeT, _ValueT, _FLAG, _cudaHostRegisterFlag,
-        (_FLAG & graph::HAS_CSR) != 0> CsrT;
-    typedef graph::Csc<_VertexT, _SizeT, _ValueT, _FLAG, _cudaHostRegisterFlag,
-        (_FLAG & graph::HAS_CSC) != 0> CscT;
-    typedef graph::Coo<_VertexT, _SizeT, _ValueT, _FLAG, _cudaHostRegisterFlag,
-        (_FLAG & graph::HAS_COO) != 0> CooT;
+    typedef graph::Csr<_VertexT, _SizeT, _ValueT, _FLAG & (~(graph::TypeMask - graph::HAS_CSR)),
+        _cudaHostRegisterFlag, (_FLAG & graph::HAS_CSR) != 0> CsrT;
+    typedef graph::Csc<_VertexT, _SizeT, _ValueT, _FLAG & (~(graph::TypeMask - graph::HAS_CSC)),
+        _cudaHostRegisterFlag, (_FLAG & graph::HAS_CSC) != 0> CscT;
+    typedef graph::Coo<_VertexT, _SizeT, _ValueT, _FLAG & (~(graph::TypeMask - graph::HAS_COO)),
+        _cudaHostRegisterFlag, (_FLAG & graph::HAS_COO) != 0> CooT;
     typedef graph::Gp <_VertexT, _SizeT, _ValueT, _FLAG, _cudaHostRegisterFlag>
         GpT;
 

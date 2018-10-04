@@ -174,6 +174,25 @@ struct If_Val<false, ThenVal, ElseVal>
     static const unsigned int Value = ElseVal;
 };
 
+template <bool IF>
+struct If_Op
+{
+    template <typename Op>
+    static void Exec(Op op)
+    {
+    }
+};
+
+template <>
+struct If_Op<true>
+{
+    template <typename Op>
+    static void Exec(Op op)
+    {
+        op();
+    }
+};
+
 /**
  * Equals
  */
