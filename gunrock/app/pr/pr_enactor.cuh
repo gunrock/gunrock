@@ -35,6 +35,14 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
+    
+    GUARD_CU(parameters.Use<bool>(
+        "pull",
+        util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        false,
+        "Whether to use pull direction PageRank.",
+        __FILE__, __LINE__));
+
     return retval;
 }
 
@@ -138,35 +146,63 @@ struct PRIterationLoop : public IterationLoopBase
             data_slice.num_updated_vertices = frontier.queue_length;
         }
 
-        if (enactor.flag & Debug)
-            util::cpu_mt::PrintMessage("Advance start.",
-                gpu_num, iteration, peer_);
-
-        auto advance_op = [rank_curr, rank_next] __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
+        if (data_slice.pull)
         {
-            //printf("%d -> %d\n", src, dest);
-            ValueT add_value = rank_curr[src];
-            if (isfinite(add_value))
-            {
-                atomicAdd(rank_next + dest, add_value);
-                //ValueT old_val = atomicAdd(rank_next + dest, add_value);
-                //if (dest == 42029)
-                //    printf("rank[%d] = %f = %f (rank[%d]) + %f\n",
-                //        dest, old_val + add_value, add_value, src, old_val);
-            }
-            return true;
-        };
+            if (enactor.flag & Debug)
+                util::cpu_mt::PrintMessage("NeighborReduce start.",
+                    gpu_num, iteration, peer_);
 
-        // Edge Map
-        frontier.queue_length = local_vertices.GetSize();
-        frontier.queue_reset  = true;
-        oprtr_parameters.advance_mode = "ALL_EDGES";
-        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.coo(), &local_vertices, null_ptr,
-            oprtr_parameters, advance_op));
+            auto advance_op = [rank_curr] __host__ __device__ (
+                const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                const VertexT &input_item, const SizeT &input_pos,
+                SizeT &output_pos) -> ValueT
+            {
+                return rank_curr[src];
+            };
+            
+            frontier.queue_length = local_vertices.GetSize();
+            frontier.queue_reset  = true;
+            GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V | 
+                oprtr::OprtrMode_REDUCE_TO_SRC | oprtr::ReduceOp_Plus>(
+                graph.csc(), &local_vertices, null_ptr,
+                oprtr_parameters, advance_op, 
+                []__host__ __device__ (const ValueT &a, const ValueT &b)
+                {
+                    return a+b;
+                }, (ValueT)0));
+        }
+
+        else {
+            if (enactor.flag & Debug)
+                util::cpu_mt::PrintMessage("Advance start.",
+                    gpu_num, iteration, peer_);
+
+            auto advance_op = [rank_curr, rank_next] __host__ __device__ (
+                const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                const VertexT &input_item, const SizeT &input_pos,
+                SizeT &output_pos) -> bool
+            {
+                //printf("%d -> %d\n", src, dest);
+                ValueT add_value = rank_curr[src];
+                if (isfinite(add_value))
+                {
+                    atomicAdd(rank_next + dest, add_value);
+                    //ValueT old_val = atomicAdd(rank_next + dest, add_value);
+                    //if (dest == 42029)
+                    //    printf("rank[%d] = %f = %f (rank[%d]) + %f\n",
+                    //        dest, old_val + add_value, add_value, src, old_val);
+                }
+                return true;
+            };
+
+            // Edge Map
+            frontier.queue_length = local_vertices.GetSize();
+            frontier.queue_reset  = true;
+            oprtr_parameters.advance_mode = "ALL_EDGES";
+            GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                graph.coo(), &local_vertices, null_ptr,
+                oprtr_parameters, advance_op));
+        }
 
         enactor_stats.edges_queued[0] += graph.edges;
         return retval;

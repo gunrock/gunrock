@@ -93,6 +93,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     static const ProblemFlag FLAG = _FLAG;
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::CscT    CscT;
+    typedef typename GraphT::CooT    CooT;
     typedef typename GraphT::GpT     GpT;
     typedef          _ValueT         ValueT;
 
@@ -119,7 +121,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         bool     normalize  ; // Whether to normalize the ranking value
         bool     compensate ; // Whether to compensate for zero-degree vertices
         bool     scale      ; // Whether to scale the ranking values during computation
-        
+        bool     pull       ; // Whether to use pull direction PR       
+ 
         ValueT   threshold  ; // Threshold for ranking errors
         ValueT   delta      ; // Damping factor
         SizeT    max_iter   ; // Maximum number of PR iterations
@@ -146,6 +149,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             normalize          (true),
             compensate         (true),
             scale              (false),
+            pull               (false),
             threshold          (0),
             delta              (0),
             init_value         (0),
@@ -298,7 +302,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     out_counters[0], target));
             }
 
-            GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
+            if (pull)
+            {
+                GUARD_CU(sub_graph.CscT::Move(util::HOST, target, this -> stream));
+            } else {
+                GUARD_CU(sub_graph.CooT::Move(util::HOST, target, this -> stream));
+            }
             GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
 
             if (GraphT::FLAG & gunrock::graph::HAS_CSR)
@@ -323,7 +332,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     __host__ __device__ (VertexT *dummy, const SizeT &e)
                 {
                     VertexT src, dest;
-                    sub_graph.GetEdgeSrcDest(e, src, dest);
+                    sub_graph.CooT::GetEdgeSrcDest(e, src, dest);
                     SizeT old_val = atomicAdd(degrees + src, 1);
                     //if (src == 42029)
                     //    printf("degree[%d] -> %d, dest = %d\n",
@@ -567,6 +576,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 = this -> parameters.template Get<bool  >("compensate");
             data_slice.scale
                 = this -> parameters.template Get<bool  >("scale");
+            data_slice.pull
+                = this -> parameters.template Get<bool  >("pull");
             data_slice.threshold
                 = this -> parameters.template Get<ValueT>("threshold");
             data_slice.delta
