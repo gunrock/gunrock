@@ -41,30 +41,79 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
-    GUARD_CU(parameters.Use<uint32_t>(
-	"source",
-	util::REQUIRED_ARGUMENT,
-	util::PreDefinedValues<uint32_t>::InvalidValue,
-	"<Vertex-ID|random|largestdegree> The source vertex\n"
-	"\tIf random, randomly select non-zero degree vertex;\n"
-	"\tIf largestdegree, select vertex with largest degree",
-	__FILE__, __LINE__));
+    GUARD_CU(parameters.Use<uint64_t>(
+    	"source",
+    	util::INTERNAL_PARAMETER | util::REQUIRED_ARGUMENT,
+    	util::PreDefinedValues<uint64_t>::InvalidValue,
+    	"<Vertex-ID|random|largestdegree> The source vertex\n"
+    	"\tIf random, randomly select non-zero degree vertex;\n"
+    	"\tIf largestdegree, select vertex with largest degree",
+    	__FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<uint32_t>(
-	"sink",
-	util::REQUIRED_ARGUMENT,
-	util::PreDefinedValues<uint32_t>::InvalidValue,
-	"<Vertex-ID|random|largestdegree> The source vertex\n"
-	"\tIf random, randomly select non-zero degree vertex;\n"
-	"\tIf largestdegree, select vertex with largest degree",
-	__FILE__, __LINE__));
+    GUARD_CU(parameters.Use<uint64_t>(
+    	"sink",
+    	util::INTERNAL_PARAMETER | util::REQUIRED_ARGUMENT,
+    	util::PreDefinedValues<uint64_t>::InvalidValue,
+    	"<Vertex-ID|random|largestdegree> The source vertex\n"
+    	"\tIf random, randomly select non-zero degree vertex;\n"
+    	"\tIf largestdegree, select vertex with largest degree",
+    	__FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<int>(
-	"seed",
-	util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-	util::PreDefinedValues<int>::InvalidValue,
-	"seed to generate random sources or sink",
-	__FILE__, __LINE__));
+    return retval;
+}
+
+template <typename GraphT, typename ArrayT>
+cudaError_t AddSourceSink(
+    GraphT &u_graph,
+    GraphT &graph,
+    ArrayT &weights)
+{
+    cudaError_t retval = cudaSuccess;
+
+    GUARD_CU(graph.Allocate(u_graph.nodes + 2,
+        u_graph.edges + u_graph.nodes * 4, util::HOST));
+
+    #pragma omp parallel for
+    for (auto v = 0; v < u_graph.nodes; v ++)
+    {
+        auto e_start = u_graph.GetNeighborListOffset(v);
+        auto num_neighbors = u_graph.GetNeighborListLength(v);
+        auto e_end = e_start + num_neighbors;
+
+        graph.row_offsets[v] = u_graph.row_offsets[v] + v * 2;
+        for (auto e = e_start; e < e_end; e++)
+        {
+            graph.edge_values[e + v * 2] = u_graph.edge_values[e];
+        }
+        graph.column_indices[e_end + v * 2    ] = u_graph.nodes;
+        graph.edge_values   [e_end + v * 2    ] = 0;
+        graph.column_indices[e_end + v * 2 + 1] = u_graph.nodes + 1;
+        graph.edge_values   [e_end + v * 2 + 1] = 0;
+    }
+    for (auto v = u_graph.nodes; v < u_graph.nodes + 3; v ++)
+        graph.row_offsets[u_graph.nodes + v]
+            = u_graph.edges + u_graph.nodes * (2 + v);
+    auto offset = u_graph.edges + u_graph.nodes * 2;
+    for (auto v = 0; v < u_graph.nodes; v ++)
+    {
+        graph.column_indices[offset + v] = v;
+        graph.edge_values   [offset + v] = 0;
+        graph.column_indices[offset + v + u_graph.nodes] = v;
+        graph.edge_values   [offset + v + u_graph.nodes] = 0;
+    }
+
+    for (auto v = 0; v < u_graph.nodes; v ++)
+    {
+        auto weight = weights[v];
+        if (weight < 0)
+        { // weight to the sink
+            graph.edge_values[graph.row_offsets[v] + u_graph.nodes + 1]
+                = -1 * weight;
+        } else { // weight from the source
+            graph.edge_values[u_graph.edges + u_graph.nodes * 2 + v]
+                = weight;
+        }
+    }
     return retval;
 }
 

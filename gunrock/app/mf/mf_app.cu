@@ -41,30 +41,109 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
-    GUARD_CU(parameters.Use<uint32_t>(
-	"source",
-	util::REQUIRED_ARGUMENT,
-	util::PreDefinedValues<uint32_t>::InvalidValue,
-	"<Vertex-ID|random|largestdegree> The source vertex\n"
-	"\tIf random, randomly select non-zero degree vertex;\n"
-	"\tIf largestdegree, select vertex with largest degree",
-	__FILE__, __LINE__));
+    GUARD_CU(parameters.Use<uint64_t>(
+    	"source",
+    	util::REQUIRED_ARGUMENT | util::SINGLE_VALUE,
+    	util::PreDefinedValues<uint64_t>::InvalidValue,
+    	"<Vertex-ID|random|largestdegree> The source vertex\n"
+    	"\tIf random, randomly select non-zero degree vertex;\n"
+    	"\tIf largestdegree, select vertex with largest degree",
+    	__FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<uint32_t>(
-	"sink",
-	util::REQUIRED_ARGUMENT,
-	util::PreDefinedValues<uint32_t>::InvalidValue,
-	"<Vertex-ID|random|largestdegree> The source vertex\n"
-	"\tIf random, randomly select non-zero degree vertex;\n"
-	"\tIf largestdegree, select vertex with largest degree",
-	__FILE__, __LINE__));
+    GUARD_CU(parameters.Use<uint64_t>(
+    	"sink",
+    	util::REQUIRED_ARGUMENT | util::SINGLE_VALUE,
+    	util::PreDefinedValues<uint32_t>::InvalidValue,
+    	"<Vertex-ID|random|largestdegree> The source vertex\n"
+    	"\tIf random, randomly select non-zero degree vertex;\n"
+    	"\tIf largestdegree, select vertex with largest degree",
+    	__FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<int>(
-	"seed",
-	util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-	util::PreDefinedValues<int>::InvalidValue,
-	"seed to generate random sources or sink",
-	__FILE__, __LINE__)); 
+    	"seed",
+    	util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+    	util::PreDefinedValues<int>::InvalidValue,
+    	"seed to generate random sources or sink",
+    	__FILE__, __LINE__));
+    return retval;
+}
+
+template <typename GraphT>
+cudaError_t CorrectReverseCapacities(
+    GraphT &d_graph,
+    GraphT &u_graph)
+{
+    cudaError_t retval = cudaSuccess;
+
+    // Correct capacity values on reverse edges
+    #pragma omp parallel for
+    for (auto u = 0; u < u_graph.nodes; ++u)
+    {
+        auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+        auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+        auto e_end = e_start + num_neighbors;
+        debug_aml("vertex %d\nnumber of neighbors %d", u,
+            num_neighbors);
+        for (auto e = e_start; e < e_end; ++e)
+        {
+            u_graph.CsrT::edge_values[e] = (ValueT)0;
+            auto v = u_graph.CsrT::GetEdgeDest(e);
+            // Looking for edge u->v in directed graph
+            auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
+            auto num_neighbors2 =
+            d_graph.CsrT::GetNeighborListLength(u);
+            auto f_end = f_start + num_neighbors2;
+            for (auto f = f_start; f < f_end; ++f)
+            {
+                auto z = d_graph.CsrT::GetEdgeDest(f);
+                if (z == v and d_graph.CsrT::edge_values[f] > 0)
+                {
+                    u_graph.CsrT::edge_values[e]  =
+                    d_graph.CsrT::edge_values[f];
+                    debug_aml("edge (%d, %d) cap = %lf\n", u, v, \
+                        u_graph.CsrT::edge_values[e]);
+                    break;
+                }
+            }
+        }
+    }
+
+    return retval;
+}
+
+template <typename GraphT, typename ArrayT>
+cudaError_t InitReverse(
+    GraphT &u_graph,
+    ArrayT &reverse)
+{
+    cudaError_t retval = cudaSuccess;
+
+    // Initialize reverse array.
+    #pragma omp parallel for
+    for (auto u = 0; u < u_graph.nodes; ++u)
+    {
+        auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+        auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+        auto e_end = e_start + num_neighbors;
+        for (auto e = e_start; e < e_end; ++e)
+        {
+            auto v = u_graph.CsrT::GetEdgeDest(e);
+            auto f_start = u_graph.CsrT::GetNeighborListOffset(v);
+            auto num_neighbors2 = u_graph.CsrT::GetNeighborListLength(v);
+            auto f_end = f_start + num_neighbors2;
+            for (auto f = f_start; f < f_end; ++f)
+            {
+                auto z = u_graph.CsrT::GetEdgeDest(f);
+                if (z == u)
+                {
+                    reverse[e] = f;
+                    reverse[f] = e;
+                    break;
+                }
+            }
+        }
+    }
+
     return retval;
 }
 
@@ -93,7 +172,7 @@ cudaError_t RunTests(
     typedef Enactor<ProblemT>	      EnactorT;
 
     util::CpuTimer total_timer;	total_timer.Start();
-    util::CpuTimer cpu_timer;	cpu_timer.Start(); 
+    util::CpuTimer cpu_timer;	cpu_timer.Start();
 
     // parse configurations from parameters
     bool quiet_mode	    = parameters.Get<bool>("quiet");
@@ -109,7 +188,7 @@ cudaError_t RunTests(
     // Allocate host-side array (for both reference and GPU-computed results)
     // ... for function Extract
     ValueT *h_flow   = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
-    
+
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
@@ -141,11 +220,11 @@ cudaError_t RunTests(
         if (validation == "each")
         {
             GUARD_CU(problem.Extract(h_flow));
-            int num_errors = app::mf::Validate_Results(parameters, graph, 
+            int num_errors = app::mf::Validate_Results(parameters, graph,
 		    source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
         }
     }
-    
+
     // Copy out results
     cpu_timer.Start();
     if (validation == "last")
@@ -153,11 +232,11 @@ cudaError_t RunTests(
 	GUARD_CU(problem.Extract(h_flow));
 	/*for (int i=0; i<graph.edges; ++i){
 	    if (ref_flow){
-		debug_aml("h_flow[%d]=%lf, ref_flow[%d] = %lf", 
+		debug_aml("h_flow[%d]=%lf, ref_flow[%d] = %lf",
 			  i, h_flow[i], i, ref_flow[i]);
 	    }
 	}*/
-        int num_errors = app::mf::Validate_Results(parameters, graph, 
+        int num_errors = app::mf::Validate_Results(parameters, graph,
 		source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
     }
 
@@ -171,14 +250,14 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    delete[] h_flow; 
+    delete[] h_flow;
     h_flow = NULL;
 
-    cpu_timer.Stop(); 
+    cpu_timer.Stop();
     total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
-    
+
     return retval;
 }
 
@@ -192,8 +271,8 @@ cudaError_t RunTests(
  * @tparam     ValueT     Type of the capacity/flow/excess
  * @param[in]  parameters Excution parameters
  * @param[in]  graph      Input graph
- * @param[out] flow	  Return 
- * @param[out] maxflow	  Return 
+ * @param[out] flow	  Return
+ * @param[out] maxflow	  Return
  * \return     double     Return accumulated elapsed times for all runs
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
@@ -316,4 +395,3 @@ float mf(
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-
