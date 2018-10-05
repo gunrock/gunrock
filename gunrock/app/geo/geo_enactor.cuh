@@ -107,7 +107,7 @@ struct GEOIterationLoop : public IterationLoopBase
         // </DONE>
 
 	util::Location target = util::DEVICE;
-        util::Array1D<SizeT, VertexT>* null_frontier = NULL;
+        // util::Array1D<SizeT, VertexT>* null_frontier = NULL;
  
         // --
         // Define operations
@@ -133,22 +133,22 @@ struct GEOIterationLoop : public IterationLoopBase
 	    SizeT start_edge 	= graph.CsrT::GetNeighborListOffset(v);
 	    SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
 
-	    printf("Initialize per vertex location array ...\n");
+	    // printf("Initialize per vertex location array ...\n");
 
 	    SizeT i 		= 0;
 
 	    for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
 		VertexT u = graph.CsrT::GetEdgeDest(e);
-		printf("For each vertex, perform a gather and obtain predicted locations...\n");
+		// printf("For each vertex, perform a gather and obtain predicted locations...\n");
 		if (util::isValid(predicted[u])) {
 		    // gather locations from neighbors	
 		    locations[(v * num_neighbors) + i] = predicted[u];
-		    printf("Location of neighbor %u is %u.\n", u, predicted[u]);
+		    // printf("Location of neighbor %u at %u is %f.\n", u, (v*num_neighbors) +i, predicted[u]);
 		    i++;
 		}
 	    }
-	    printf("Number of neighbors for vertex %u is %u.\n", v, num_neighbors);
-	    printf("Valid locations for vertex %u at %u is %u.\n", v, pos, i+1);
+	    // printf("Number of neighbors for vertex %u is %u.\n", v, num_neighbors);
+	    // printf("Valid locations for vertex %u at %u is %u.\n", v, pos, i+1);
 	    valid_locations[v] = i;
 
 	};
@@ -193,27 +193,39 @@ struct GEOIterationLoop : public IterationLoopBase
 		// I don't think I need an atomic
 		// here, it doesn't matter who reaches the int
 		// first, as long as it gets to add 1 to it.
-		atomicAdd(&active[0], 1);
-		// active[0] -= 1;
-		printf("Current active predictions = %u.\n", active[0]);
 
 	    } // </TODO> -- median calculation.
 	};
 
+	auto status_op = [
+	    predicted,
+	    active
+	] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
+
+	    VertexT v           = v_q[pos];
+	    if (util::isValid(predicted[v])) {
+		printf("ANS: predicted location [%u] = %u.\n", v, predicted[v]);
+		atomicAdd(&active[0], 1);
+	    }
+	};
 
 	// Run --
         GUARD_CU(frontier.V_Q()->ForAll(
-            gather_op, graph.nodes,
+            gather_op, frontier.queue_length,
             util::DEVICE, oprtr_parameters.stream));
 
 	GUARD_CU(frontier.V_Q()->ForAll(
-	    compute_op, graph.nodes,
+	    compute_op, frontier.queue_length,
 	    util::DEVICE, oprtr_parameters.stream));
        
+	GUARD_CU(frontier.V_Q()->ForAll(
+            status_op, frontier.queue_length,
+            util::DEVICE, oprtr_parameters.stream));
+
         GUARD_CU(data_slice.active .SetPointer(&data_slice.active_, sizeof(SizeT), util::HOST));
         GUARD_CU(data_slice.active .Move(util::DEVICE, util::HOST));
 
-	printf("Current CPU active predictions = %u.\n", data_slice.active_);
+	// printf("Current CPU active predictions = %u.\n", data_slice.active_);
  
         return retval;
     }
@@ -274,7 +286,7 @@ struct GEOIterationLoop : public IterationLoopBase
         auto iter 	    = enactor_stats.iteration;
 
 	// Anymore work to do?
-	printf("Predictions active in Stop: %u vs. needed %u.\n", data_slice.active_, graph.nodes);	
+	// printf("Predictions active in Stop: %u vs. needed %u.\n", data_slice.active_, graph.nodes);	
 	if(data_slice.active_ >= graph.nodes)
 	    return true;
 
@@ -417,23 +429,40 @@ public:
     {
         typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
+       
         GUARD_CU(BaseEnactor::Reset(target));
 
-	auto nodes = this -> problem -> data_slices[0][0].sub_graph[0].nodes;
+        SizeT nodes = this -> problem -> data_slices[0][0].sub_graph[0].nodes;
+        printf("nodes=%d\n", nodes);
 
-        // <TODO> Initialize frontiers according to the algorithm:
-        // In this case, we add a single `src` to the frontier
-	// For Geolocation, can I queue in more work as an initial frontier?
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
-	    this -> thread_slices[gpu].init_size = 1;
-            for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
-            {
-		this -> enactor_slices[gpu * this -> num_gpus + peer_]
-                    .frontier.queue_length = 1;
-            }
-        }
-        // </TODO>
-        
+           if (this->num_gpus == 1) {
+               this -> thread_slices[gpu].init_size = nodes;
+               for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
+                   auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
+                   frontier.queue_length = (peer_ == 0) ? nodes : 0;
+                   if (peer_ == 0) {
+
+                      util::Array1D<SizeT, VertexT> tmp;
+                      tmp.Allocate(nodes, target | util::HOST);
+                      for(SizeT i = 0; i < nodes; ++i) {
+                          tmp[i] = (VertexT)i % nodes;
+                      }
+                      GUARD_CU(tmp.Move(util::HOST, target));
+
+                      GUARD_CU(frontier.V_Q() -> ForEach(tmp,
+                          []__host__ __device__ (VertexT &v, VertexT &i) {
+                          v = i;
+                      }, nodes, target, 0));
+
+                      tmp.Release();
+                 }
+               }
+           } else {
+                // MULTIGPU INCOMPLETE
+           }
+	}
+ 
         GUARD_CU(BaseEnactor::Sync());
         return retval;
     }
