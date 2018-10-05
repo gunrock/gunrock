@@ -122,9 +122,9 @@ cudaError_t ReadLabelsStream(
             util::PrintMsg(" (" +
                 std::to_string(ll_nodes) + " nodes) ", !quiet);
 
-	    labels_a[0] = (ValueT) 0;
-	    if(label_b_exists)
-		labels_b[0] = (ValueT) 0;
+	    // labels_a[0] = (ValueT) 0;
+	    // if(label_b_exists)
+	    // 	labels_b[0] = (ValueT) 0;
 
 	    labels_read = 0;
 	}
@@ -179,8 +179,8 @@ cudaError_t ReadLabelsStream(
 		    ll_label_b = util::PreDefinedValues<ValueT>::InvalidValue;
 		}
 		
-		labels_a[ll_node] = ll_label_a;
-		labels_b[ll_node] = ll_label_b;
+		labels_a[ll_node-1] = ll_label_a;
+		labels_b[ll_node-1] = ll_label_b;
 
 		labels_read++;		
 	    }
@@ -207,7 +207,7 @@ cudaError_t ReadLabelsStream(
                     ll_label_a = util::PreDefinedValues<ValueT>::InvalidValue; //-1;
                 }
 
-                labels_a[ll_node] = ll_label_a;
+                labels_a[ll_node-1] = ll_label_a;
 
                 labels_read++;
             }
