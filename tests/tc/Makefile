@@ -11,11 +11,19 @@
 
 include ../BaseMakefile.mk
 ALGO = tc
-test: bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+EXEC = bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_$(ALGO).cu $(DEPS)
+test: $(EXEC)
+
+$(EXEC) : test_$(ALGO).cu $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O2 -g -G
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3 #-O2 -g -G
+
+a : test_$(ALGO).cu $(DEPS)
+	mkdir -p bin
+	rm -f $(EXEC)
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3 > a.txt 2>&1 || true
+	grep rror: a.txt; grep arn a.txt
 
 .DEFAULT_GOAL := test
 
