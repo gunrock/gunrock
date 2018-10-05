@@ -77,11 +77,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     struct DataSlice : BaseDataSlice
     {
         // <DONE> add problem specific storage arrays:
-        util::Array1D<SizeT, ValueT*> locations;
-        util::Array1D<SizeT, ValueT> predicted;
-	util::Array1D<SizeT, SizeT> valid_locations;
-
-	int * predictions_left;
+        util::Array1D<SizeT, ValueT>  locations;
+        util::Array1D<SizeT, ValueT>  predicted;
+	util::Array1D<SizeT, SizeT>   valid_locations;
+	util::Array1D<SizeT, SizeT>   active;
+   	SizeT			      active_; 
         // </DONE>
 
         /*
@@ -90,9 +90,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         DataSlice() : BaseDataSlice()
         {
             // <DONE> name of the problem specific arrays:
-            locations.SetName("locations");
-            predicted.SetName("predicted");
-	    valid_locations.SetName("valid_locations");
+            locations		.SetName("locations");
+            predicted		.SetName("predicted");
+	    valid_locations	.SetName("valid_locations");
+	    active		.SetName("active");
             // </DONE>
         }
 
@@ -113,9 +114,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
             // <DONE> Release problem specific data, e.g.:
-            GUARD_CU(locations.Release(target));
-            GUARD_CU(predicted.Release(target));
-	    GUARD_CU(valid_locations.Release(target));
+            GUARD_CU(locations		.Release(target));
+            GUARD_CU(predicted		.Release(target));
+	    GUARD_CU(valid_locations	.Release(target));
+	    GUARD_CU(active		.Release(target));
             // </DONE>
 
             GUARD_CU(BaseDataSlice ::Release(target));
@@ -140,11 +142,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             cudaError_t retval  = cudaSuccess;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
+	    SizeT nodes = this -> sub_graph -> nodes;
+
+	    printf("Number of nodes for allocation: %u\n", nodes);
 
             // <DONE> allocate problem specific data here, e.g.:
-            GUARD_CU(locations.Allocate(sub_graph.nodes * sub_graph.nodes, target));
-            GUARD_CU(predicted.Allocate(sub_graph.nodes, target));
-	    GUARD_CU(valid_locations.Allocate(sub_graph.nodes, target));
+            GUARD_CU(locations		.Allocate(nodes * nodes, target));
+            GUARD_CU(predicted		.Allocate(nodes, target));
+	    GUARD_CU(valid_locations	.Allocate(nodes, target));
+	    GUARD_CU(active		.Allocate(1, util::HOST|target));
             // </DONE>
 
             if (target & util::DEVICE) {
@@ -160,16 +166,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          * @param[in] target      Targeting device location
          * \return    cudaError_t Error message(s), if any
          */
-        cudaError_t Reset(util::Location target = util::DEVICE)
+        cudaError_t Reset(
+		ValueT *h_locations,
+		util::Location target = util::DEVICE)
         {
             cudaError_t retval = cudaSuccess;
             SizeT nodes = this -> sub_graph -> nodes;
 
             // Ensure data are allocated
             // <DONE> ensure size of problem specific data:
-            GUARD_CU(locations.EnsureSize_(nodes * nodes, target));
-            GUARD_CU(predicted.EnsureSize_(nodes, target));
-            GUARD_CU(valid_locations.EnsureSize_(nodes, target));
+            GUARD_CU(locations		.EnsureSize_(nodes * nodes, target));
+            GUARD_CU(predicted		.EnsureSize_(nodes, target));
+            GUARD_CU(valid_locations	.EnsureSize_(nodes, target));
+	    GUARD_CU(active		.EnsureSize_(1, util::HOST|target));
             // </DONE>
 
             // Reset data
@@ -177,22 +186,33 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
 	    // Set locations of neighbors to null, this needs to be populated
 	    // and using spatial center we can determine the predicted.
-            GUARD_CU(valid_locations.ForEach([]__host__ __device__ (SizeT &x){
+	    GUARD_CU(locations.ForEach([]__host__ __device__ (ValueT &x)
+	    {
+               x = util::PreDefinedValues<ValueT>::InvalidValue;
+            }, nodes * nodes, target, this -> stream));
+
+            GUARD_CU(valid_locations.ForEach([]__host__ __device__ (SizeT &x)
+	    {
                x = (SizeT)0;
             }, nodes, target, this -> stream));
 
+	    GUARD_CU(active.ForAll([]__host__ __device__ (SizeT *x, const VertexT &pos)
+	    {
+		x[pos] = 0;
+            }, 1, target, this -> stream));
+
+	    this-> active_ = 0;
 
 	    // Assumes that all vertices have invalid positions, in reality
 	    // a preprocessing step is needed to assign nodes that do have
 	    // positions to have proper positions already.
-            GUARD_CU(predicted.ForEach([]__host__ __device__ (ValueT &x){
-               x = util::PreDefinedValues<ValueT>::InvalidValue;
-            }, nodes, target, this -> stream));
-            // </DONE>
+	    GUARD_CU(predicted	.SetPointer(h_locations, nodes, util::HOST));
+            GUARD_CU(predicted	.Move(util::HOST, util::DEVICE));
+	    // </DONE>
 
-	    this->predictions_left[0] = (int) nodes;
-	    printf("predictions left: %u\n", (int) nodes);
-	
+	    for (int i = 0; i < nodes; i++)
+	    	printf("predicted[%u] = %u\n", i, (int) predicted[i]);
+
             return retval;
         }
     }; // DataSlice
@@ -353,9 +373,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
-        // <TODO> problem specific data if necessary, eg
-        // VertexT src,
-        // </TODO>
+        // <DONE> problem specific data if necessary, eg
+        ValueT *h_locations,
+        // </DONE>
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -364,7 +384,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-            GUARD_CU(data_slices[gpu] -> Reset(target));
+            GUARD_CU(data_slices[gpu] -> Reset(h_locations, target));
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
 

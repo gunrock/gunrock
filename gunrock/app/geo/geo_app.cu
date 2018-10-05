@@ -104,12 +104,14 @@ cudaError_t RunTests(
 
     retval = gunrock::graphio::labels::Read(parameters, h_labels_a, h_labels_b);
 
-    util::PrintMsg("Debugging Labels, \n    h_labels_a[0] = " + std::to_string(h_labels_a[0]) +
-                   "\n    h_labels_a[2] = " + std::to_string(h_labels_a[2]) +
-                   "\n    h_labels_a[26] = " + std::to_string(h_labels_a[26]) +
-                   "\n    h_labels_a[27] = " + std::to_string(h_labels_a[27]) +
-                   "\n    h_labels_a[29] = " + std::to_string(h_labels_a[29]),
-			!quiet_mode);
+
+    util::PrintMsg("Debugging Labels -------------", !quiet_mode);
+    for (int p = 0; p < graph.nodes; p++) 
+    {
+    	util::PrintMsg("    h_labels_a[ " + std::to_string(p) + 
+			    " ] = " + std::to_string(h_labels_a[p]),
+			    !quiet_mode);
+    }
 
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
@@ -126,7 +128,13 @@ cudaError_t RunTests(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
+
+    util::PrintMsg("Initializing problem ... ", !quiet_mode);
+
     GUARD_CU(problem.Init(graph, target));
+
+    util::PrintMsg("Initializing enactor ... ", !quiet_mode);
+
     GUARD_CU(enactor.Init(problem, target));
     
     cpu_timer.Stop();
@@ -134,9 +142,9 @@ cudaError_t RunTests(
     
     for (int run_num = 0; run_num < num_runs; ++run_num) {
         GUARD_CU(problem.Reset(
-            // <TODO> problem specific data if necessary, eg:
-            // src,
-            // </TODO>
+            // <DONE> problem specific data if necessary, eg:
+            h_labels_a,
+            // </DONE>
             target
         ));
         GUARD_CU(enactor.Reset(

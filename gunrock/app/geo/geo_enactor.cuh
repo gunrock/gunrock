@@ -103,11 +103,12 @@ struct GEOIterationLoop : public IterationLoopBase
         auto &locations	       = data_slice.locations;
         auto &predicted	       = data_slice.predicted;
 	auto &valid_locations  = data_slice.valid_locations;
-	auto &predictions_left = data_slice.predictions_left;
+	auto &active	       = data_slice.active;
         // </DONE>
 
 	util::Location target = util::DEVICE;
-        
+        util::Array1D<SizeT, VertexT>* null_frontier = NULL;
+ 
         // --
         // Define operations
 
@@ -115,6 +116,7 @@ struct GEOIterationLoop : public IterationLoopBase
 	// <TODO> Needs proper implementation for median calculation
 	// </TODO> -- median calculation.
 
+	printf("Gather operator ... \n");
 	// compute operation, substitute for neighbor reduce,
 	// ForAll() with a for loop inside (nested forloop),
 	// visiting all the neighbors and calculating the spatial center
@@ -131,29 +133,35 @@ struct GEOIterationLoop : public IterationLoopBase
 	    SizeT start_edge 	= graph.CsrT::GetNeighborListOffset(v);
 	    SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
 
-	    locations[v] 	= new ValueT[num_neighbors];
+	    printf("Initialize per vertex location array ...\n");
+
 	    SizeT i 		= 0;
 
 	    for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
 		VertexT u = graph.CsrT::GetEdgeDest(e);
+		printf("For each vertex, perform a gather and obtain predicted locations...\n");
 		if (util::isValid(predicted[u])) {
 		    // gather locations from neighbors	
-		    locations[v][i] = predicted[u];
+		    locations[(v * num_neighbors) + i] = predicted[u];
+		    printf("Location of neighbor %u is %u.\n", u, predicted[u]);
 		    i++;
 		}
 	    }
-
+	    printf("Number of neighbors for vertex %u is %u.\n", v, num_neighbors);
+	    printf("Valid locations for vertex %u at %u is %u.\n", v, pos, i+1);
 	    valid_locations[v] = i;
 
 	};
+
+	printf("Spatial Median operator ... \n");
 
 	auto compute_op =  [
 	    graph,
 	    locations,
 	    predicted,
 	    valid_locations,
-	    predictions_left,
-            iteration
+            iteration,
+	    active
 	] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
 
 	    VertexT v 		= v_q[pos];
@@ -168,33 +176,45 @@ struct GEOIterationLoop : public IterationLoopBase
                     predicted[v] = util::PreDefinedValues<ValueT>::InvalidValue;
 		} else if (valid_locations[v] == 1) {
                     // the only location that is valid
-		    predicted[v] = locations[v][0];
+		    predicted[v] = locations[(v * n) + 0];
 		} else if (valid_locations[v] == 2) {
                     // mid-point of the two locations
-		    predicted[v] = (ValueT)((locations[v][0] + locations[v][1]) / 2);
+		    predicted[v] = (ValueT)((locations[(v * n) + 0] + locations[(v * n) + 1]) / 2);
                 } else {
 		    ValueT temp = 0;
                    // calculate spatial median
 		   for (SizeT i = 0; i < valid_locations[v]; i++) {
-			temp += locations[v][i];
+			temp += locations[(v * n) + i];
 		   }
 		   predicted[v] = (ValueT) (temp/valid_locations[v]);
                 }
 	    } else {
-		atomicSub(predictions_left, 1);
+		// TODO: Confirm atomic usage:
+		// I don't think I need an atomic
+		// here, it doesn't matter who reaches the int
+		// first, as long as it gets to add 1 to it.
+		atomicAdd(&active[0], 1);
+		// active[0] -= 1;
+		printf("Current active predictions = %u.\n", active[0]);
+
 	    } // </TODO> -- median calculation.
 	};
 
 
 	// Run --
         GUARD_CU(frontier.V_Q()->ForAll(
-            gather_op, frontier.queue_length,
+            gather_op, graph.nodes,
             util::DEVICE, oprtr_parameters.stream));
 
 	GUARD_CU(frontier.V_Q()->ForAll(
-	    compute_op, frontier.queue_length,
+	    compute_op, graph.nodes,
 	    util::DEVICE, oprtr_parameters.stream));
-        
+       
+        GUARD_CU(data_slice.active .SetPointer(&data_slice.active_, sizeof(SizeT), util::HOST));
+        GUARD_CU(data_slice.active .Move(util::DEVICE, util::HOST));
+
+	printf("Current CPU active predictions = %u.\n", data_slice.active_);
+ 
         return retval;
     }
 
@@ -249,11 +269,13 @@ struct GEOIterationLoop : public IterationLoopBase
         auto &enactor_slice = this -> enactor -> enactor_slices[0];
         auto &enactor_stats = enactor_slice.enactor_stats;
         auto &data_slice    = this -> enactor -> problem -> data_slices[this -> gpu_num][0];
+	auto &graph 	    = data_slice.sub_graph[0];
 
-        auto &iter = enactor_stats.iteration;
+        auto iter 	    = enactor_stats.iteration;
 
-	// Anymore work to do?	
-	if(data_slice.predictions_left[0] == 0)
+	// Anymore work to do?
+	printf("Predictions active in Stop: %u vs. needed %u.\n", data_slice.active_, graph.nodes);	
+	if(data_slice.active_ >= graph.nodes)
 	    return true;
 
 	// else, keep running
@@ -390,7 +412,6 @@ public:
      */
     cudaError_t Reset(
         // <TODO> problem specific data if necessary, eg
-        VertexT src = 0,
         // </TODO>
         util::Location target = util::DEVICE)
     {
@@ -398,29 +419,18 @@ public:
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
 
+	auto nodes = this -> problem -> data_slices[0][0].sub_graph[0].nodes;
+
         // <TODO> Initialize frontiers according to the algorithm:
         // In this case, we add a single `src` to the frontier
 	// For Geolocation, can I queue in more work as an initial frontier?
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
-           if ((this->num_gpus == 1) ||
-                (gpu == this->problem->org_graph->GpT::partition_table[src])) {
-               this -> thread_slices[gpu].init_size = 1;
-               for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
-                   auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                   frontier.queue_length = (peer_ == 0) ? 1 : 0;
-                   if (peer_ == 0) {
-                       GUARD_CU(frontier.V_Q() -> ForEach(
-                           [src]__host__ __device__ (VertexT &v) {
-                           v = src;
-                       }, 1, target, 0));
-                   }
-               }
-           } else {
-                this -> thread_slices[gpu].init_size = 0;
-                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
-                    this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier.queue_length = 0;
-                }
-           }
+	    this -> thread_slices[gpu].init_size = 1;
+            for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
+            {
+		this -> enactor_slices[gpu * this -> num_gpus + peer_]
+                    .frontier.queue_length = 1;
+            }
         }
         // </TODO>
         
@@ -435,7 +445,6 @@ public:
      */
     cudaError_t Enact(
         // <TODO> problem specific data if necessary, eg
-        VertexT src = 0
         // </TODO>
     )
     {
