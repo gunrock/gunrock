@@ -551,7 +551,6 @@ int Validate_Results(
     {
 	util::PrintMsg("Flow Validity:\n", !quiet, false);
 
-	int errors_num = 0;
 	for (VertexT v = 0; v < nodes; ++v)
 	{
 	    if (v == source || v == sink)
@@ -565,7 +564,7 @@ int Validate_Results(
 		if (util::isValid(h_flow[e]))
 		    flow_v += h_flow[e];
 		else{
-		    ++errors_num;
+		    ++num_errors;
 		    debug_aml("flow for edge %d is invalid\n", e);
 		}
 	    }
@@ -574,16 +573,15 @@ int Validate_Results(
 			v, fabs(flow_v), 1e-12);
 	    }else
 		continue;
-	    ++errors_num;
+	    ++num_errors;
 	    util::PrintMsg("FAIL: for vertex " + std::to_string(v) +
 		    " summary flow " + std::to_string(flow_v) + 
 		    " is not equal 0", !quiet);
 	}
-	if (errors_num > 0)
+	if (num_errors > 0)
 	{
-	    util::PrintMsg(std::to_string(errors_num) + " errors occurred.", 
+	    util::PrintMsg(std::to_string(num_errors) + " errors occurred.", 
 		    !quiet);
-	    num_errors += errors_num;
 	} else {
 	    util::PrintMsg("PASS", !quiet);
 	}

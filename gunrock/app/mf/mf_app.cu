@@ -109,7 +109,8 @@ cudaError_t RunTests(
     // Allocate host-side array (for both reference and GPU-computed results)
     // ... for function Extract
     ValueT *h_flow  = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
-    int *min_cut    = (int*)malloc(sizeof(int)*graph.nodes); 
+    int *min_cut    = (int*)malloc(sizeof(int)*graph.nodes);
+    for (auto u = 0; u < graph.nodes; ++u) min_cut[u] = 0;
     
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
