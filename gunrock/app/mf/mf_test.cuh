@@ -91,12 +91,12 @@ VertexT find_lowest(GraphT graph, VertexT x, VertexT* height, ValueT* flow,
     auto num_neighbors = graph.CsrT::GetNeighborListLength(x);
     auto e_end = e_start + num_neighbors;
     VertexT lowest;
-    VertexT lowest_id = -1; //graph.edges is unreachable value
+    VertexT lowest_id = util::PreDefinedValues<VertexT>::InvalidValue;
     for (auto e = e_start; e < e_end; ++e)
     {
 	if (graph.CsrT::edge_values[e] - flow[e] > (ValueT)0){
 	    auto y = graph.CsrT::GetEdgeDest(e);
-	    if (lowest_id == -1 || height[y] < lowest){
+	    if (not util::isValid(lowest_id) or height[y] < lowest){
 		lowest = height[y];
 		lowest_id = e;
 	    }
@@ -124,7 +124,7 @@ bool relabel(GraphT graph, VertexT x, VertexT* height, ValueT* flow,
     typedef typename GraphT::CsrT CsrT;
     auto e = find_lowest(graph, x, height, flow, source);
     // graph.edges is unreachable value = there is no valid neighbour
-    if (e != -1){
+    if (util::isValid(e)){
 	VertexT y = graph.CsrT::GetEdgeDest(e);
 	if (height[y] >= height[x]){
 //	    printf("relabel %d H: %d->%d, res-cap %d-%d: %lf\n", x, height[x], 
@@ -481,7 +481,6 @@ int Validate_Results(
     int num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
     auto nodes = graph.nodes;
-    auto edges = graph.edges;
 
     auto e_start = graph.CsrT::GetNeighborListOffset(sink);
     auto num_neighbors = graph.CsrT::GetNeighborListLength(sink);

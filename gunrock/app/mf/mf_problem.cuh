@@ -276,10 +276,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
 	    GUARD_CU2(cudaDeviceSynchronize(),
 	        "cudaDeviceSynchronize failed.");
-	    return retval;
 
 	    free(h_flow);
 	    free(h_excess);
+	    return retval;
         }
     }; // DataSlice
 

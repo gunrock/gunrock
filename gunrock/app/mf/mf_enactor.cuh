@@ -228,8 +228,8 @@ struct MFIterationLoop : public IterationLoopBase
 //          [] __host__ __device__ (VertexT *el, const SizeT &v){
 //            printf("lowest_neighbor[%d] = %d\n", v, el[v]);
 //          }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-          "cudaStreamSynchronize failed");
+//	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+//          "cudaStreamSynchronize failed");
 
 	// ADVANCE RELABEL OP
 	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(

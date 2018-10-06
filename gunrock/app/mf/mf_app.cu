@@ -45,26 +45,16 @@ cudaError_t UseParameters(util::Parameters &parameters)
 	"source",
 	util::REQUIRED_ARGUMENT,
 	util::PreDefinedValues<uint32_t>::InvalidValue,
-	"<Vertex-ID|random|largestdegree> The source vertex\n"
-	"\tIf random, randomly select non-zero degree vertex;\n"
-	"\tIf largestdegree, select vertex with largest degree",
+	"<Vertex-ID> The source vertex\n",
 	__FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<uint32_t>(
 	"sink",
 	util::REQUIRED_ARGUMENT,
 	util::PreDefinedValues<uint32_t>::InvalidValue,
-	"<Vertex-ID|random|largestdegree> The source vertex\n"
-	"\tIf random, randomly select non-zero degree vertex;\n"
-	"\tIf largestdegree, select vertex with largest degree",
+	"<Vertex-ID> The sink vertex\n",
 	__FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<int>(
-	"seed",
-	util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-	util::PreDefinedValues<int>::InvalidValue,
-	"seed to generate random sources or sink",
-	__FILE__, __LINE__)); 
     return retval;
 }
 
@@ -202,7 +192,7 @@ template <typename GraphT, typename VertexT = typename GraphT::VertexT,
 double gunrock_mf(
     gunrock::util::Parameters &parameters,
     GraphT  &graph,
-    VertexT reverse, 
+    VertexT *reverse,
     ValueT  *flow,
     int	    *min_cut,
     ValueT  &maxflow)
@@ -237,7 +227,8 @@ double gunrock_mf(
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-        problem.Extract(flow, min_cut);
+        problem.Extract(flow);
+	gunrock::app::mf::minCut(graph, source, flow, min_cut);
     }
 
     enactor.Release(target);
@@ -262,23 +253,16 @@ template <
     typename VertexT  = uint32_t,
     typename SizeT    = uint32_t,
     typename ValueT   = double>
-float mf(
-	const SizeT   num_nodes,
-	const SizeT   num_edges,
-	const SizeT   *row_offsets,
-	const VertexT *col_indices,
-	const ValueT  capacity,
+double mf(
 	const int     num_runs,
-	VertexT	      source,
-	VertexT	      sink,
 	ValueT	      *flow,
-	ValueT	      &maxflow
+	ValueT	      &maxflow,
+	int	      *min_cut,
+	int	      undirected = 0
 	)
 {
-    // TODO: change to other graph representation, if not using CSR
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, ValueT,
-        gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_COO>  GraphT;
-    typedef typename GraphT::CooT				    CooT;
+        gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>  GraphT;
     typedef typename GraphT::CsrT				    CsrT;
 
     // Setup parameters
@@ -287,30 +271,97 @@ float mf(
     gunrock::app::mf::UseParameters(parameters);
     gunrock::app::UseParameters_test(parameters);
     parameters.Parse_CommandLine(0, NULL);
-    parameters.Set("graph-type", "by-pass");
     parameters.Set("num-runs", num_runs);
-    parameters.Set("source", source);
-    parameters.Set("sink", sink);
 
     bool quiet = parameters.Get<bool>("quiet");
-    CsrT csr;
-    // Assign pointers into gunrock graph format
-    csr.Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    csr.row_offsets   .SetPointer(row_offsets,gunrock::util::HOST);
-    csr.column_indices.SetPointer(col_indices,gunrock::util::HOST);
-    csr.capacity      .SetPointer(capacity,   gunrock::util::HOST);
 
+    GraphT d_graph;
+    if (not undirected){
+	parameters.Set<int>("remove-duplicate-edges", false);
+	debug_aml("Load directed graph");
+	gunrock::graphio::LoadGraph(parameters, d_graph);
+    }
+
+    GraphT u_graph;
+    parameters.Set<int>("undirected", 1);
+    parameters.Set<int>("remove-duplicate-edges", true);
+    debug_aml("Load undirected graph");
+    gunrock::graphio::LoadGraph(parameters, u_graph);
+
+    if (parameters.Get<VertexT>("source") == 
+	    gunrock::util::PreDefinedValues<VertexT>::InvalidValue){
+	parameters.Set("source", 0);
+    }
+    if (parameters.Get<VertexT>("sink") == 
+	    gunrock::util::PreDefinedValues<VertexT>::InvalidValue){
+	parameters.Set("sink", u_graph.nodes-1);
+    }
+
+    VertexT* reverse = (VertexT*)malloc(sizeof(VertexT) * u_graph.edges);
+
+    // Initialize reverse array.
+    for (auto u = 0; u < u_graph.nodes; ++u)
+    {
+	auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+	auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+	auto e_end = e_start + num_neighbors;
+	for (auto e = e_start; e < e_end; ++e)
+	{
+	    auto v = u_graph.CsrT::GetEdgeDest(e);
+	    auto f_start = u_graph.CsrT::GetNeighborListOffset(v);
+	    auto num_neighbors2 = u_graph.CsrT::GetNeighborListLength(v);
+	    auto f_end = f_start + num_neighbors2;
+	    for (auto f = f_start; f < f_end; ++f)
+	    {
+		auto z = u_graph.CsrT::GetEdgeDest(f);
+		if (z == u)
+		{
+		    reverse[e] = f;
+		    reverse[f] = e;
+		    break;
+		}
+	    }
+	}
+    }
+
+    if (not undirected){
+	// Correct capacity values on reverse edges
+	for (auto u = 0; u < u_graph.nodes; ++u)
+	{
+	    auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+	    auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+	    auto e_end = e_start + num_neighbors;
+	    for (auto e = e_start; e < e_end; ++e)
+	    {
+		u_graph.CsrT::edge_values[e] = (ValueT)0;
+		auto v = u_graph.CsrT::GetEdgeDest(e);
+		// Looking for edge u->v in directed graph
+		auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
+		auto num_neighbors2 = d_graph.CsrT::GetNeighborListLength(u);
+		auto f_end = f_start + num_neighbors2;
+		for (auto f = f_start; f < f_end; ++f)
+		{
+		    auto z = d_graph.CsrT::GetEdgeDest(f);
+		    if (z == v and d_graph.CsrT::edge_values[f] > 0)
+		    {
+			u_graph.CsrT::edge_values[e]  = 
+			    d_graph.CsrT::edge_values[f];
+			break;
+		    }
+		}
+	    }
+	}
+    }
+    
     gunrock::util::Location target = gunrock::util::HOST;
-    CooT graph;
-    graph.FromCsr(csr, target, 0, quiet, true);
-    csr.Release();
-    gunrock::graphio::LoadGraph(parameters, graph);
 
     // Run the MF
-    double elapsed_time = gunrock_mf(parameters, graph, flow, maxflow);
+    double elapsed_time = gunrock_mf(parameters, u_graph, reverse, flow, 
+	    min_cut, maxflow);
 
     // Cleanup
-    graph.Release();
+    u_graph.Release();
+    d_graph.Release();
 
     return elapsed_time;
 }
