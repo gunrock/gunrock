@@ -15,7 +15,6 @@
 #include <gunrock/app/mf/mf_app.cu>
 #include <gunrock/app/gtf/gtf_app.cu>
 #include <gunrock/app/test_base.cuh>
-
 #define debug_aml(a...)
 //#define debug_aml(a...) {printf(a); printf("\n");}
 
@@ -58,74 +57,67 @@ struct main_struct
     	//
         util::CpuTimer cpu_timer; cpu_timer.Start();
     	debug_aml("Start Load Graph");
-        GraphT u_graph;
-    	bool undirected;
-    	parameters.Get("undirected", undirected);
 
-    	if (undirected) {
-    	    debug_aml("graph is undirected");
-            debug_aml("Load undirected graph");
-        	//parameters.Set<int>("undirected", 1);
-        	parameters.Set<bool>("remove-duplicate-edges", true);
-            GUARD_CU(graphio::LoadGraph(parameters, u_graph));
-
-    	} else {
-    	    debug_aml("graph is directed");
-            GraphT d_graph;
-            debug_aml("Load directed graph");
-            //parameters.Set<int>("undirected", 0);
-    	    //parameters.Set<bool>("remove-duplicate-edges", false);
-    	    GUARD_CU(graphio::LoadGraph(parameters, d_graph));
-
-            debug_aml("Directed graph:");
-    	    debug_aml("number of edges %d", d_graph.edges);
-    	    debug_aml("number of nodes %d", d_graph.nodes);
-
-            GUARD_CU(graphio::MakeUndirected(d_graph, u_graph, false));
-            GUARD_CU(app::mf::CorrectReverseCapacities(
-                d_graph.csr(), u_graph.csr()));
-
-            GUARD_CU(d_graph.Release());
+    	debug_aml("graph is directed");
+        GraphT d_graph;
+        debug_aml("Load directed graph");
+        //parameters.Set<int>("undirected", 0);
+    	parameters.Set<bool>("remove-duplicate-edges", false);
+    	GUARD_CU(graphio::LoadGraph(parameters, d_graph));
+        for (auto u = 0; u < d_graph.nodes; ++u)
+        {
+            auto e_start = d_graph.CsrT::GetNeighborListOffset(u);
+            auto num_neighbors = d_graph.CsrT::GetNeighborListLength(u);
+            auto e_end = e_start + num_neighbors;
+            for (auto e = e_start; e < e_end; ++e)
+            {
+                auto v = d_graph.CsrT::GetEdgeDest(e);
+                printf("(%d -> %d) = %f\n", u, v, d_graph.edge_values[e]);
+            }
         }
 
+        //printf("\n #of nodes and edges %d %d\n", u_graph.nodes, u_graph.edges);
+
+        
         util::Array1D<SizeT, ValueT> weights;
+        GUARD_CU(weights.Allocate(d_graph.nodes, util::HOST));
         std::string weights_filename = parameters.Get<std::string>("weights");
+        printf("%s \n", weights_filename.c_str());//, weights[v]);
         GUARD_CU(weights.Read(weights_filename));
-
-        GraphT graph;
-        GUARD_CU(app::gtf::AddSourceSink(u_graph.csr(), weights, graph.csr()));
-        GUARD_CU(u_graph.Release());
-
-    	cpu_timer.Stop();
+    	
+        cpu_timer.Stop();
     	parameters.Set("load-time", cpu_timer.ElapsedMillis());
     	debug_aml("load-time is %lf",cpu_timer.ElapsedMillis());
 
-        GUARD_CU(parameters.Set("source", graph.nodes - 2));
-        GUARD_CU(parameters.Set("sink"  , graph.nodes - 1));
+        GUARD_CU(parameters.Set("source", d_graph.nodes-1));
+        GUARD_CU(parameters.Set("sink"  , d_graph.nodes));
 
     	debug_aml("Undirected graph:");
-    	debug_aml("number of edges %d", graph.edges);
-    	debug_aml("number of nodes %d", graph.nodes);
+    	debug_aml("number of edges %d", d_graph.edges);
+    	debug_aml("number of nodes %d", d_graph.nodes);
 
         util::Array1D<SizeT, SizeT> reverse_edges;
         reverse_edges.SetName("reverse_edges");
-        GUARD_CU(reverse_edges.Allocate(graph.edges, util::HOST));
+        GUARD_CU(reverse_edges.Allocate(d_graph.edges, util::HOST));
 
-    	GUARD_CU(app::mf::InitReverse(graph, reverse_edges));
+        printf("shen me gui ya4 \n");
+    	GUARD_CU(app::mf::InitReverse(d_graph, reverse_edges));
+        printf("shen me gui ya5 \n");
 
 	    //
         // Compute reference CPU GTF algorithm.
 	    //
     	util::PrintMsg("______CPU reference algorithm______", true);
     	double elapsed = 0;
+        
         GUARD_CU(app::gtf::CPU_Reference
-    	    (parameters, graph, reverse_edges, elapsed));
+    	    (parameters, d_graph, reverse_edges, elapsed));
         util::PrintMsg("-----------------------------------\n"
             "Elapsed: " + std::to_string(elapsed) + " ms", true);
 
         std::vector<std::string> switches{"advance-mode"};
-    	GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-    	[reverse_edges](util::Parameters &parameters, GraphT &graph)
+    	GUARD_CU(app::Switch_Parameters(parameters, d_graph, switches,
+    	[reverse_edges](util::Parameters &parameters, GraphT &d_graph)
     	{
     	    //return app::gtf::RunTests(parameters, graph, reverse_edges);
     	    return cudaSuccess;
@@ -133,7 +125,7 @@ struct main_struct
 
     	// Clean up
     	GUARD_CU(reverse_edges.Release());
-        GUARD_CU(graph.Release());
+        GUARD_CU(d_graph.Release());
         
         return retval;
     }
