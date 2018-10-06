@@ -75,7 +75,8 @@ cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
     // <DONE> add problem specific reference results, e.g.:
-    typename GraphT::ValueT *ref_predicted,
+    typename GraphT::ValueT *ref_predicted_lat,
+    typename GraphT::ValueT *ref_predicted_lon,
     // </DONE>
     util::Location target)
 {
@@ -89,27 +90,29 @@ cudaError_t RunTests(
     typedef Enactor<ProblemT>        EnactorT;
 
     // CLI parameters
-    bool quiet_mode = parameters.Get<bool>("quiet");
-    int  num_runs   = parameters.Get<int >("num-runs");
-    std::string validation = parameters.Get<std::string>("validation");
-    std::string labels_file = parameters.Get<std::string>("labels-file");
+    bool quiet_mode 		= parameters.Get<bool>("quiet");
+    int  num_runs   		= parameters.Get<int >("num-runs");
+    std::string validation 	= parameters.Get<std::string>("validation");
+    std::string labels_file 	= parameters.Get<std::string>("labels-file");
     util::Info info("geolocation", parameters, graph);
 
     util::PrintMsg("Labels File Input: "
             + labels_file, !quiet_mode);   
 
  
-    ValueT *h_labels_a = new ValueT[graph.nodes];
-    ValueT *h_labels_b = new ValueT[graph.nodes];
+    ValueT *h_latitude  = new ValueT[graph.nodes];
+    ValueT *h_longitude = new ValueT[graph.nodes];
 
-    retval = gunrock::graphio::labels::Read(parameters, h_labels_a, h_labels_b);
+    retval = gunrock::graphio::labels::Read(parameters, h_latitude, h_longitude);
 
 
     util::PrintMsg("Debugging Labels -------------", !quiet_mode);
     for (int p = 0; p < graph.nodes; p++) 
     {
-    	util::PrintMsg("    h_labels_a[ " + std::to_string(p) + 
-			    " ] = " + std::to_string(h_labels_a[p]),
+    	util::PrintMsg("    locations[ " + std::to_string(p) + 
+			    " ] = < " + std::to_string(h_latitude[p]) +
+			    " , " + std::to_string(h_longitude[p]) +
+			    " > ",
 			    !quiet_mode);
     }
 
@@ -122,7 +125,8 @@ cudaError_t RunTests(
     // </TODO>
 
     // <DONE> allocate problem specific host data, e.g.:
-    ValueT *h_predicted = new ValueT[graph.nodes];
+    ValueT *h_predicted_lat = new ValueT[graph.nodes];
+    ValueT *h_predicted_lon = new ValueT[graph.nodes];
     // </DONE>
 
     // Allocate problem and enactor on GPU, and initialize them
@@ -143,7 +147,8 @@ cudaError_t RunTests(
     for (int run_num = 0; run_num < num_runs; ++run_num) {
         GUARD_CU(problem.Reset(
             // <DONE> problem specific data if necessary, eg:
-            h_labels_a,
+            h_latitude,
+	    h_longitude,
             // </DONE>
             target
         ));
@@ -176,14 +181,16 @@ cudaError_t RunTests(
             
             GUARD_CU(problem.Extract(
                 // <DONE> problem specific data
-                h_predicted
+                h_predicted_lat,
+		h_predicted_lon
                 // </DONE>
             ));
             SizeT num_errors = Validate_Results(
                 parameters,
                 graph,
                 // <DONE> problem specific data
-                h_predicted, ref_predicted,
+                h_predicted_lat, h_predicted_lon,
+		ref_predicted_lat, ref_predicted_lon,
                 // </DONE>
                 false);
         }
@@ -193,7 +200,8 @@ cudaError_t RunTests(
     
     GUARD_CU(problem.Extract(
         // <DONE> problem specific data
-        h_predicted
+        h_predicted_lat,
+	h_predicted_lon
         // </DONE>
     ));
     if (validation == "last") {
@@ -201,7 +209,8 @@ cudaError_t RunTests(
             parameters,
             graph,
             // <DONE> problem specific data
-            h_predicted, ref_predicted,
+            h_predicted_lat, h_predicted_lon,
+	    ref_predicted_lat, ref_predicted_lon,
             // </DONE>
             false);
     }
@@ -218,7 +227,10 @@ cudaError_t RunTests(
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
     // <DONE> Release problem specific data, e.g.:
-    delete[] h_predicted; h_predicted   = NULL;
+    delete[] h_predicted_lat; h_predicted_lat   = NULL;
+    delete[] h_predicted_lon; h_predicted_lon   = NULL;
+    delete[] h_latitude; h_latitude   = NULL;
+    delete[] h_longitude; h_longitude = NULL;
     // </DONE>
     cpu_timer.Stop(); total_timer.Stop();
 

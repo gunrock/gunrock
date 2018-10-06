@@ -69,12 +69,14 @@ struct main_struct
         // </TODO>
         
         // <DONE> declare datastructures for reference result on GPU
-        ValueT *ref_predicted;
+        ValueT *ref_predicted_lat;
+	ValueT *ref_predicted_lon;
         // </DONE>
         
         if (!quick) {
             // <DONE> init datastructures for reference result on GPU
-            ref_predicted = new ValueT[graph.nodes];
+            ref_predicted_lat = new ValueT[graph.nodes];
+            ref_predicted_lon = new ValueT[graph.nodes];
             // </DONE>
 
             // If not in `quick` mode, compute CPU reference implementation
@@ -82,7 +84,8 @@ struct main_struct
             
             float elapsed = app::geo::CPU_Reference(
                 graph.csr(),
-                ref_predicted,
+                ref_predicted_lat,
+		ref_predicted_lon,
                 quiet);
             
             util::PrintMsg("--------------------------\n Elapsed: "
@@ -96,18 +99,22 @@ struct main_struct
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
                 // </DONE> pass necessary data to lambda
-                ref_predicted
+                ref_predicted_lat,
+		ref_predicted_lon
                 // </DONE>
             ](util::Parameters &parameters, GraphT &graph)
             {
                 // <DONE> pass necessary data to app::Template::RunTests
-                return app::geo::RunTests(parameters, graph, ref_predicted, util::DEVICE);
+                return app::geo::RunTests(parameters, graph, 
+					  ref_predicted_lat, ref_predicted_lon,
+					  util::DEVICE);
                 // </DONE>
             }));
 
         if (!quick) {
             // <DONE> deallocate host references
-            delete[] ref_predicted; ref_predicted = NULL;
+            delete[] ref_predicted_lat; ref_predicted_lat = NULL;
+            delete[] ref_predicted_lon; ref_predicted_lon = NULL;
             // </DONE>
         }
         return retval;

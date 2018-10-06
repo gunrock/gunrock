@@ -37,7 +37,8 @@ template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
     // <DONE> add problem specific inputs and outputs 
-    typename GraphT::ValueT *predicted,
+    typename GraphT::ValueT *predicted_lat,
+    typename GraphT::ValueT *predicted_lon,
     // </DONE>
     bool quiet)
 {
@@ -72,8 +73,10 @@ template <typename GraphT>
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
-             typename GraphT::ValueT *h_predicted,
-             typename GraphT::ValueT *ref_predicted,
+             typename GraphT::ValueT *h_predicted_lat,
+             typename GraphT::ValueT *h_predicted_lon,
+             typename GraphT::ValueT *ref_predicted_lat,
+             typename GraphT::ValueT *ref_predicted_lon,
              bool verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
@@ -84,7 +87,9 @@ typename GraphT::SizeT Validate_Results(
 
     // <DONE> result validation and display
     for(SizeT v = 0; v < graph.nodes; ++v) {
-        printf("%d %d %d\n", v, h_predicted[v], ref_predicted[v]);
+        printf("Node [ %d ]: Predicted = < %d , %d > Reference = < %d , %d >\n", v, 
+		h_predicted_lat[v], h_predicted_lon[v], 
+		ref_predicted_lat[v], ref_predicted_lon[v]);
     }
     // </DONE>
 

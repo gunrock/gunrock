@@ -99,15 +99,19 @@ struct GEOIterationLoop : public IterationLoopBase
         auto &iteration        = enactor_stats.iteration;
        
 	//auto &weights	       = graph.CsrT::edge_values; 
+
         // <DONE> add problem specific data alias here:
-        auto &locations	       = data_slice.locations;
-        auto &predicted	       = data_slice.predicted;
+        auto &locations_lat    = data_slice.locations_lat;
+        auto &locations_lon    = data_slice.locations_lon;
+
+        auto &latitude	       = data_slice.latitude;
+	auto &longitude	       = data_slice.longitude;
+
 	auto &valid_locations  = data_slice.valid_locations;
 	auto &active	       = data_slice.active;
         // </DONE>
 
 	util::Location target = util::DEVICE;
-        // util::Array1D<SizeT, VertexT>* null_frontier = NULL;
  
         // --
         // Define operations
@@ -123,8 +127,10 @@ struct GEOIterationLoop : public IterationLoopBase
 	// after a gather.
 	auto gather_op = [
 	    graph,
-	    locations,
-	    predicted,
+	    locations_lat,
+	    locations_lon,
+	    latitude,
+	    longitude,
 	    valid_locations,
 	    iteration
 	] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
@@ -140,10 +146,10 @@ struct GEOIterationLoop : public IterationLoopBase
 	    for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
 		VertexT u = graph.CsrT::GetEdgeDest(e);
 		// printf("For each vertex, perform a gather and obtain predicted locations...\n");
-		if (util::isValid(predicted[u])) {
+		if (util::isValid(latitude[u]) && util::isValid(longitude[u])) {
 		    // gather locations from neighbors	
-		    locations[(v * num_neighbors) + i] = predicted[u];
-		    // printf("Location of neighbor %u at %u is %f.\n", u, (v*num_neighbors) +i, predicted[u]);
+		    locations_lat[(v * num_neighbors) + i] = latitude[u];
+                    locations_lon[(v * num_neighbors) + i] = longitude[u];
 		    i++;
 		}
 	    }
@@ -157,8 +163,10 @@ struct GEOIterationLoop : public IterationLoopBase
 
 	auto compute_op =  [
 	    graph,
-	    locations,
-	    predicted,
+	    locations_lat,
+	    locations_lon,
+	    latitude,
+	    longitude,
 	    valid_locations,
             iteration,
 	    active
@@ -170,41 +178,46 @@ struct GEOIterationLoop : public IterationLoopBase
 	    // if no predicted location, and neighbor locations exists
 	    // Custom spatial center kernel for geolocation
             // <TODO> Needs proper implementation for median calculation
-	    if (!util::isValid(predicted[v])) {
+	    if (!util::isValid(latitude[v]) && !util::isValid(longitude[v])) {
 		
 		if (valid_locations[v] == 0) {
-                    predicted[v] = util::PreDefinedValues<ValueT>::InvalidValue;
+                    latitude[v]  = util::PreDefinedValues<ValueT>::InvalidValue;
+                    longitude[v] = util::PreDefinedValues<ValueT>::InvalidValue;
 		} else if (valid_locations[v] == 1) {
                     // the only location that is valid
-		    predicted[v] = locations[(v * n) + 0];
+		    latitude[v] = locations_lat[(v * n) + 0];
+                    longitude[v] = locations_lon[(v * n) + 0];
+
 		} else if (valid_locations[v] == 2) {
                     // mid-point of the two locations
-		    predicted[v] = (ValueT)((locations[(v * n) + 0] + locations[(v * n) + 1]) / 2);
+		    latitude[v] = (ValueT)((locations_lat[(v * n) + 0] + locations_lat[(v * n) + 1]) / 2);
+		    longitude[v] = (ValueT)((locations_lon[(v * n) + 0] + locations_lon[(v * n) + 1]) / 2);
                 } else {
-		    ValueT temp = 0;
-                   // calculate spatial median
-		   for (SizeT i = 0; i < valid_locations[v]; i++) {
-			temp += locations[(v * n) + i];
-		   }
-		   predicted[v] = (ValueT) (temp/valid_locations[v]);
+		    ValueT temp_lat = 0;
+		    ValueT temp_lon = 0;
+                    // calculate spatial median
+		    for (SizeT i = 0; i < valid_locations[v]; i++) {
+			temp_lat += locations_lat[(v * n) + i];
+			temp_lon += locations_lon[(v * n) + i];
+		    }
+		    latitude[v] = (ValueT) (temp_lat/valid_locations[v]);
+		    longitude[v] = (ValueT) (temp_lon/valid_locations[v]);
                 }
-	    } else {
-		// TODO: Confirm atomic usage:
-		// I don't think I need an atomic
-		// here, it doesn't matter who reaches the int
-		// first, as long as it gets to add 1 to it.
-
 	    } // </TODO> -- median calculation.
 	};
 
 	auto status_op = [
-	    predicted,
+	    latitude,
+	    longitude,
 	    active
 	] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
 
 	    VertexT v           = v_q[pos];
-	    if (util::isValid(predicted[v])) {
-		printf("ANS: predicted location [%u] = %u.\n", v, predicted[v]);
+	    if (util::isValid(latitude[v]) && util::isValid(longitude[v])) {
+                // TODO: Confirm atomic usage:
+                // I don't think I need an atomic
+                // here, it doesn't matter who reaches the int
+                // first, as long as it gets to add 1 to it.
 		atomicAdd(&active[0], 1);
 	    }
 	};
@@ -217,7 +230,10 @@ struct GEOIterationLoop : public IterationLoopBase
 	GUARD_CU(frontier.V_Q()->ForAll(
 	    compute_op, frontier.queue_length,
 	    util::DEVICE, oprtr_parameters.stream));
-       
+
+	// GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+	//    "cudaStreamSynchronize failed");
+ 
 	GUARD_CU(frontier.V_Q()->ForAll(
             status_op, frontier.queue_length,
             util::DEVICE, oprtr_parameters.stream));

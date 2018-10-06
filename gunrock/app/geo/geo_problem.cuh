@@ -77,8 +77,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     struct DataSlice : BaseDataSlice
     {
         // <DONE> add problem specific storage arrays:
-        util::Array1D<SizeT, ValueT>  locations;
-        util::Array1D<SizeT, ValueT>  predicted;
+        util::Array1D<SizeT, ValueT>  locations_lat;
+	util::Array1D<SizeT, ValueT>  locations_lon;
+
+        util::Array1D<SizeT, ValueT>  latitude;
+	util::Array1D<SizeT, ValueT>  longitude;
+
 	util::Array1D<SizeT, SizeT>   valid_locations;
 	util::Array1D<SizeT, SizeT>   active;
    	SizeT			      active_; 
@@ -90,8 +94,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         DataSlice() : BaseDataSlice()
         {
             // <DONE> name of the problem specific arrays:
-            locations		.SetName("locations");
-            predicted		.SetName("predicted");
+            locations_lat	.SetName("locations_lat");
+	    locations_lon	.SetName("locations_lon");
+            latitude		.SetName("latitude");
+	    longitude		.SetName("longitude");
 	    valid_locations	.SetName("valid_locations");
 	    active		.SetName("active");
             // </DONE>
@@ -114,8 +120,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
             // <DONE> Release problem specific data, e.g.:
-            GUARD_CU(locations		.Release(target));
-            GUARD_CU(predicted		.Release(target));
+            GUARD_CU(locations_lat	.Release(target));
+	    GUARD_CU(locations_lon	.Release(target));
+
+            GUARD_CU(latitude		.Release(target));
+            GUARD_CU(longitude          .Release(target));
+
 	    GUARD_CU(valid_locations	.Release(target));
 	    GUARD_CU(active		.Release(target));
             // </DONE>
@@ -147,8 +157,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    printf("Number of nodes for allocation: %u\n", nodes);
 
             // <DONE> allocate problem specific data here, e.g.:
-            GUARD_CU(locations		.Allocate(nodes * nodes, target));
-            GUARD_CU(predicted		.Allocate(nodes, target));
+            GUARD_CU(locations_lat	.Allocate(nodes * nodes, target));
+            GUARD_CU(locations_lon      .Allocate(nodes * nodes, target));
+
+            GUARD_CU(latitude		.Allocate(nodes, target));
+            GUARD_CU(longitude          .Allocate(nodes, target));
+
 	    GUARD_CU(valid_locations	.Allocate(nodes, target));
 	    GUARD_CU(active		.Allocate(1, util::HOST|target));
             // </DONE>
@@ -167,7 +181,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          * \return    cudaError_t Error message(s), if any
          */
         cudaError_t Reset(
-		ValueT *h_locations,
+		ValueT *h_latitude,
+		ValueT *h_longitude,
 		util::Location target = util::DEVICE)
         {
             cudaError_t retval = cudaSuccess;
@@ -175,8 +190,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             // Ensure data are allocated
             // <DONE> ensure size of problem specific data:
-            GUARD_CU(locations		.EnsureSize_(nodes * nodes, target));
-            GUARD_CU(predicted		.EnsureSize_(nodes, target));
+            GUARD_CU(locations_lat	.EnsureSize_(nodes * nodes, target));
+            GUARD_CU(locations_lon      .EnsureSize_(nodes * nodes, target));
+
+            GUARD_CU(latitude		.EnsureSize_(nodes, target));
+	    GUARD_CU(longitude		.EnsureSize_(nodes, target));
+
             GUARD_CU(valid_locations	.EnsureSize_(nodes, target));
 	    GUARD_CU(active		.EnsureSize_(1, util::HOST|target));
             // </DONE>
@@ -186,8 +205,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
 	    // Set locations of neighbors to null, this needs to be populated
 	    // and using spatial center we can determine the predicted.
-	    GUARD_CU(locations.ForEach([]__host__ __device__ (ValueT &x)
+	    GUARD_CU(locations_lat.ForEach([]__host__ __device__ (ValueT &x)
 	    {
+               x = util::PreDefinedValues<ValueT>::InvalidValue;
+            }, nodes * nodes, target, this -> stream));
+
+            GUARD_CU(locations_lon.ForEach([]__host__ __device__ (ValueT &x)
+            {
                x = util::PreDefinedValues<ValueT>::InvalidValue;
             }, nodes * nodes, target, this -> stream));
 
@@ -206,13 +230,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    // Assumes that all vertices have invalid positions, in reality
 	    // a preprocessing step is needed to assign nodes that do have
 	    // positions to have proper positions already.
-	    GUARD_CU(predicted	.SetPointer(h_locations, nodes, util::HOST));
-            GUARD_CU(predicted	.Move(util::HOST, util::DEVICE));
+	    GUARD_CU(latitude	.SetPointer(h_latitude, nodes, util::HOST));
+            GUARD_CU(latitude	.Move(util::HOST, util::DEVICE));
+
+            GUARD_CU(longitude  .SetPointer(h_longitude, nodes, util::HOST));
+            GUARD_CU(longitude  .Move(util::HOST, util::DEVICE));
 	    // </DONE>
 
-	    for (int i = 0; i < nodes; i++)
-	    	printf("predicted[%u] = %u\n", i, (int) predicted[i]);
-
+	    for (int i = 0; i < nodes; i++) {
+	    	printf("    location[ %u ] = < %u, %u >\n", i, 
+			    (int) latitude[i], (int) longitude[i]);
+	    }
+	
             return retval;
         }
     }; // DataSlice
@@ -265,7 +294,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     cudaError_t Extract(
         // <DONE> problem specific data to extract
-        ValueT *h_predicted,
+        ValueT *h_predicted_lat,
+	ValueT *h_predicted_lon,
         // </DONE>
         util::Location target = util::DEVICE)
     {
@@ -280,12 +310,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
                 // <DONE> extract the results from single GPU, e.g.:
-                GUARD_CU(data_slice.predicted.SetPointer(h_predicted, nodes, util::HOST));
-                GUARD_CU(data_slice.predicted.Move(util::DEVICE, util::HOST));
+                GUARD_CU(data_slice.latitude.SetPointer(h_predicted_lat, nodes, util::HOST));
+                GUARD_CU(data_slice.latitude.Move(util::DEVICE, util::HOST));
+
+                GUARD_CU(data_slice.longitude.SetPointer(h_predicted_lon, nodes, util::HOST));
+                GUARD_CU(data_slice.longitude.Move(util::DEVICE, util::HOST));
                 // </DONE>
             } else if (target == util::HOST) {
                 // <DONE> extract the results from single CPU, e.g.:
-                GUARD_CU(data_slice.predicted.ForEach(h_predicted,
+                GUARD_CU(data_slice.latitude.ForEach(h_predicted_lat,
+                   []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
+                       host_val = device_val;
+                   }, nodes, util::HOST));
+
+                GUARD_CU(data_slice.longitude.ForEach(h_predicted_lon,
                    []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
                        host_val = device_val;
                    }, nodes, util::HOST));
@@ -374,7 +412,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     cudaError_t Reset(
         // <DONE> problem specific data if necessary, eg
-        ValueT *h_locations,
+        ValueT *h_latitude,
+	ValueT *h_longitude,
         // </DONE>
         util::Location target = util::DEVICE)
     {
@@ -384,7 +423,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-            GUARD_CU(data_slices[gpu] -> Reset(h_locations, target));
+            GUARD_CU(data_slices[gpu] -> Reset(h_latitude, h_longitude, target));
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
 
