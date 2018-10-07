@@ -222,7 +222,7 @@ cudaError_t CPU_Reference(
         SizeT  e = graph.GetNeighborListOffset(v) + graph.GetNeighborListLength(v) - 1;
         ValueT val = graph.edge_values[offset + v] - graph.edge_values[e]
             - avg_weights_source_sink;
-        /*
+
         if (val > 0)
         {
             graph.edge_values[offset + v] = val;
@@ -231,7 +231,7 @@ cudaError_t CPU_Reference(
             graph.edge_values[offset + v] = 0;
             graph.edge_values[e] = -1 * val;
         }
-        */
+
     }
 
     cpu_timer.Start();
@@ -243,9 +243,9 @@ cudaError_t CPU_Reference(
         printf("Iteration %d\n", iteration);
         iteration++;
 
-        //GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
-        //    edge_flows, edge_residuals, vertex_reachabilities));
-        // ---------------------------------------------------
+        GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
+            edge_flows, edge_residuals, vertex_reachabilities));
+        /* ---------------------------------------------------
         int tem_i = 0;
         for (auto u = 0; u < graph.nodes; ++u)
         {
@@ -271,11 +271,11 @@ cudaError_t CPU_Reference(
         }
         for(int i = 0; i < num_org_nodes; i++) std::cout << vertex_reachabilities[i] << " ";
         std::cout << std::endl;
-        
-        //----------------------------------------------------------
-        
+
+        ----------------------------------------------------------*/
+
         auto &edge_capacities = graph.edge_values;
-        
+
         for (comm = 0; comm < num_comms; comm++)
         {
             community_weights[comm] = 0;
@@ -325,7 +325,7 @@ cudaError_t CPU_Reference(
                     }
                 }
             }
-            printf("%d %f %f\n", comm, community_weights[comm], community_accus[comm]);
+            //printf("%d %f %f\n", comm, community_weights[comm], community_accus[comm]);
         } // end of for v
 
         for (comm = 0; comm < pervious_num_comms; comm ++)
@@ -341,7 +341,7 @@ cudaError_t CPU_Reference(
                     community_active [next_communities[comm]] = false;
                     community_weights[next_communities[comm]] = 0;
                 } else {
-                    printf("values: comm: %d, sizes: %d, weights: %f, accus: %f.\n", comm, community_sizes[comm], community_weights[comm], community_accus[comm]);
+                    //printf("values: comm: %d, sizes: %d, weights: %f, accus: %f.\n", comm, community_sizes[comm], community_weights[comm], community_accus[comm]);
                     community_weights[comm] /= community_sizes  [comm];
                     community_accus  [comm] += community_weights[comm];
                 }
@@ -353,7 +353,7 @@ cudaError_t CPU_Reference(
         {
             community_weights[comm] /= community_sizes  [comm];
             community_accus  [comm] += community_weights[comm];
-            printf("values: comm: %d, sizes: %d, weights: %f, accus: %f.\n", comm, community_sizes[comm], community_weights[comm], community_accus[comm]);
+            //printf("values: comm: %d, sizes: %d, weights: %f, accus: %f.\n", comm, community_sizes[comm], community_weights[comm], community_accus[comm]);
         }
 
         to_continue = false;
@@ -362,41 +362,43 @@ cudaError_t CPU_Reference(
             if (!vertex_active[v])
                 continue;
 
-            comm = curr_communities[v];
+            auto comm = curr_communities[v];
             if (!community_active[comm] ||
                 abs(community_weights[comm]) > error_threshold)
             {
                 if (vertex_reachabilities[v] == 1)
-                    graph.edge_values[num_edges - num_org_nodes * 2 + v] = 0;
+                    edge_residuals[num_edges - num_org_nodes * 2 + v] = 0;
                 if (vertex_reachabilities[v] != 1)
                 {
                     SizeT  e = graph.GetNeighborListOffset(v)
                         + graph.GetNeighborListLength(v) - 1;
-                    graph.edge_values[e] = 0;
+                    edge_residuals[e] = 0;
                 }
                 vertex_active[v] = false;
                 community_active[comm] = false;
             }
 
             else {
-                //to_continue = true;
+                to_continue = true;
                 SizeT e_from_src = num_edges - num_org_nodes * 2 + v;
                 SizeT e_to_dest  = graph.GetNeighborListOffset(v)
                     + graph.GetNeighborListLength(v) - 1;
                 if (vertex_reachabilities[v] == 1)
                 {
-                    double temp = edge_residuals[e_from_src] - community_weights[comm];
-                    if (temp < 0)
+                    edge_residuals[e_from_src] -= community_weights[comm];
+                    if (edge_residuals[e_from_src] < 0)
                     {
-                        graph.edge_values[e_from_src] = edge_residuals[e_to_dest];
-                        graph.edge_values[e_to_dest] = -temp;
+                        double temp = -1 * edge_residuals[e_from_src];
+                        edge_residuals[e_from_src] = edge_residuals[e_to_dest];
+                        edge_residuals[e_to_dest] = temp;
                     }
                 } else {
-                    double temp = edge_residuals[e_to_dest] + community_weights[comm];
-                    if (temp < 0)
+                    edge_residuals[e_to_dest] += community_weights[comm];
+                    if (edge_residuals[e_to_dest] < 0)
                     {
-                        graph.edge_values[e_to_dest] = edge_residuals[e_from_src];
-                        graph.edge_values[e_from_src] = -temp;
+                        double temp = -1 * edge_residuals[e_to_dest];
+                        edge_residuals[e_to_dest] = edge_residuals[e_from_src];
+                        edge_residuals[e_from_src] = temp;
                     }
                 }
             }
@@ -406,14 +408,13 @@ cudaError_t CPU_Reference(
             edge_capacities[e] = edge_residuals[e];
         //for(auto i = 0; i < num_org_nodes; i++)
         //    printf("inside: %f \n", community_accus[curr_communities[i]]);
-        std::ofstream out_pr( "./output_pr.txt" );
-        for(int i = 0; i < num_org_nodes; i++) out_pr << (double) community_accus[curr_communities[i]] << std::endl;
-        out_pr.close();
     } // end of while
     cpu_timer.Stop();
     elapsed = cpu_timer.ElapsedMillis();
-    for(auto i = 0; i < num_org_nodes; i++)
-        printf("%f \n", community_accus[curr_communities[i]]);
+
+    std::ofstream out_pr( "./output_pr.txt" );
+    for(int i = 0; i < num_org_nodes; i++) out_pr << (double) community_accus[curr_communities[i]] << std::endl;
+    out_pr.close();
 
     delete[] next_communities ; next_communities  = NULL;
     delete[] curr_communities ; curr_communities  = NULL;
