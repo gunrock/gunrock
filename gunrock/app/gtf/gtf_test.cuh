@@ -96,7 +96,7 @@ cudaError_t MinCut(
     typename GraphT::VertexT  dest,
     typename GraphT::ValueT  *edge_flows,
     typename GraphT::ValueT  *edge_residuals,
-    char                     *vertex_reachabilities)
+    bool                     *vertex_reachabilities)
 {
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
@@ -237,7 +237,7 @@ cudaError_t CPU_Reference(
     cpu_timer.Start();
     VertexT iteration   = 0;    // iter
     bool    to_continue = true; // flagstop
-    int tem = 0;
+    unsigned int comm;
     while (to_continue)
     {
         printf("Iteration %d\n", iteration);
@@ -245,7 +245,7 @@ cudaError_t CPU_Reference(
 
         //GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
         //    edge_flows, edge_residuals, vertex_reachabilities));
-        ///////////////////////////////////
+        // ---------------------------------------------------
         int tem_i = 0;
         for (auto u = 0; u < graph.nodes; ++u)
         {
@@ -255,24 +255,28 @@ cudaError_t CPU_Reference(
             for (auto e = e_start; e < e_end; ++e)
             {
                 auto v = graph.GraphT::CsrT::GetEdgeDest(e);
-                printf("inside graph loaded as %d (%d -> %d) = %f\n", tem++, u, v, graph.edge_values[e]);
+                printf("inside graph loaded as %d (%d -> %d) = %f\n", tem_i, u, v, graph.edge_values[e]);
                 edge_residuals[tem_i++] = graph.edge_values[e];
             }
         }
        std::string n_file_name = "./TVexact/acc.txt";
         std::ifstream n_infile(n_file_name);
         bool tm1;
+        double tm2;
         int j = 0;
+        n_infile >> tm2;
+        community_accus[0] = tm2; // !!!!!!!! come on this is also an input!
         while(n_infile >> tm1){
             vertex_reachabilities[j++] = tm1;
         }
         for(int i = 0; i < num_org_nodes; i++) std::cout << vertex_reachabilities[i] << " ";
         std::cout << std::endl;
-        //////////////////////////////////
+        
+        //----------------------------------------------------------
         
         auto &edge_capacities = graph.edge_values;
         
-        for (VertexT comm = 0; comm < num_comms; comm++)
+        for (comm = 0; comm < num_comms; comm++)
         {
             community_weights[comm] = 0;
             community_sizes  [comm] = 0;
@@ -284,7 +288,6 @@ cudaError_t CPU_Reference(
         {
             if (!vertex_active[v])
                 continue;
-            unsigned int comm;
             if (vertex_reachabilities[v] == 1)
             { // reachable by source
                 comm = next_communities[curr_communities[v]];
@@ -322,10 +325,10 @@ cudaError_t CPU_Reference(
                     }
                 }
             }
-            printf("%d %f \n", comm, community_weights[comm]);
+            printf("%d %f %f\n", comm, community_weights[comm], community_accus[comm]);
         } // end of for v
 
-        for (VertexT comm = 0; comm < pervious_num_comms; comm ++)
+        for (comm = 0; comm < pervious_num_comms; comm ++)
         {
             if (community_active[comm])
             {
@@ -338,6 +341,7 @@ cudaError_t CPU_Reference(
                     community_active [next_communities[comm]] = false;
                     community_weights[next_communities[comm]] = 0;
                 } else {
+                    printf("values: comm: %d, sizes: %d, weights: %f, accus: %f.\n", comm, community_sizes[comm], community_weights[comm], community_accus[comm]);
                     community_weights[comm] /= community_sizes  [comm];
                     community_accus  [comm] += community_weights[comm];
                 }
@@ -345,10 +349,11 @@ cudaError_t CPU_Reference(
                 community_weights[comm] = 0;
             }
         }
-        for (VertexT comm = pervious_num_comms; comm < num_comms; comm++)
+        for (; comm < num_comms; comm++)
         {
             community_weights[comm] /= community_sizes  [comm];
             community_accus  [comm] += community_weights[comm];
+            printf("values: comm: %d, sizes: %d, weights: %f, accus: %f.\n", comm, community_sizes[comm], community_weights[comm], community_accus[comm]);
         }
 
         to_continue = false;
@@ -357,17 +362,17 @@ cudaError_t CPU_Reference(
             if (!vertex_active[v])
                 continue;
 
-            auto comm = curr_communities[v];
+            comm = curr_communities[v];
             if (!community_active[comm] ||
                 abs(community_weights[comm]) > error_threshold)
             {
                 if (vertex_reachabilities[v] == 1)
-                    edge_residuals[num_edges - num_org_nodes * 2 + v] = 0;
+                    graph.edge_values[num_edges - num_org_nodes * 2 + v] = 0;
                 if (vertex_reachabilities[v] != 1)
                 {
                     SizeT  e = graph.GetNeighborListOffset(v)
                         + graph.GetNeighborListLength(v) - 1;
-                    edge_residuals[e] = 0;
+                    graph.edge_values[e] = 0;
                 }
                 vertex_active[v] = false;
                 community_active[comm] = false;
@@ -380,20 +385,18 @@ cudaError_t CPU_Reference(
                     + graph.GetNeighborListLength(v) - 1;
                 if (vertex_reachabilities[v] == 1)
                 {
-                    edge_residuals[e_from_src] -= community_weights[comm];
-                    if (edge_residuals[e_from_src] < 0)
+                    double temp = edge_residuals[e_from_src] - community_weights[comm];
+                    if (temp < 0)
                     {
-                        double temp = -1 * edge_residuals[e_from_src];
-                        edge_residuals[e_from_src] = edge_residuals[e_to_dest];
-                        edge_residuals[e_to_dest] = temp;
+                        graph.edge_values[e_from_src] = edge_residuals[e_to_dest];
+                        graph.edge_values[e_to_dest] = -temp;
                     }
                 } else {
-                    edge_residuals[e_to_dest] += community_weights[comm];
-                    if (edge_residuals[e_to_dest] < 0)
+                    double temp = edge_residuals[e_to_dest] + community_weights[comm];
+                    if (temp < 0)
                     {
-                        double temp = -1 * edge_residuals[e_to_dest];
-                        edge_residuals[e_to_dest] = edge_residuals[e_from_src];
-                        edge_residuals[e_from_src] = temp;
+                        graph.edge_values[e_to_dest] = edge_residuals[e_from_src];
+                        graph.edge_values[e_from_src] = -temp;
                     }
                 }
             }
@@ -401,8 +404,11 @@ cudaError_t CPU_Reference(
 
         for (SizeT e = 0; e < graph.edges; e ++)
             edge_capacities[e] = edge_residuals[e];
-        for(auto i = 0; i < num_org_nodes; i++)
-            printf("inside: %f \n", community_accus[curr_communities[i]]);
+        //for(auto i = 0; i < num_org_nodes; i++)
+        //    printf("inside: %f \n", community_accus[curr_communities[i]]);
+        std::ofstream out_pr( "./output_pr.txt" );
+        for(int i = 0; i < num_org_nodes; i++) out_pr << (double) community_accus[curr_communities[i]] << std::endl;
+        out_pr.close();
     } // end of while
     cpu_timer.Stop();
     elapsed = cpu_timer.ElapsedMillis();
