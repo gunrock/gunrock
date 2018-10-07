@@ -394,14 +394,16 @@ double CPU_Reference(
     debug_aml("graph nodes %d, edges %d source %d sink %d src %d", 
 	    graph.nodes, graph.edges, src, sin);
 
-
     ValueT*   excess =  (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
     VertexT*  height = (VertexT*)malloc(sizeof(VertexT)*graph.nodes);
     for (VertexT v = 0; v < graph.nodes; ++v){
 	excess[v] = (ValueT)0;
-	height[v] = 0;
+	height[v] = (VertexT)0;
     }
-    height[src] = graph.nodes;
+    relabeling(graph, sin, height);
+    if (height[src] < graph.nodes)
+	height[src] = graph.nodes;
+    //printf("height[source] = %d, should be %d\n", height[src], graph.nodes);
 
     for (SizeT e = 0; e < graph.edges; ++e){
 	flow[e] = (ValueT) 0;
@@ -435,6 +437,19 @@ double CPU_Reference(
     cpu_timer.Start();
 
     maxflow = max_flow(graph, flow, excess, height, src, sin, reverse);
+
+//    for (auto u = 0; u < graph.nodes; ++u){
+//	auto e_start = graph.CsrT::GetNeighborListOffset(u);
+//	auto num_neighbors = graph.CsrT::GetNeighborListLength(u);
+//	auto e_end = e_start + num_neighbors;
+//	for (auto e = e_start; e < e_end; ++e){
+//	    auto v = graph.CsrT::GetEdgeDest(e);
+//	    auto f = flow[e];
+//	    if (v == sin){
+//		printf("flow(%d->%d) = %lf (incoming sink CPU)\n", u, v, f);
+//	    }
+//	}
+//    }
     
     cpu_timer.Stop();
     elapsed = cpu_timer.ElapsedMillis();
@@ -482,15 +497,20 @@ int Validate_Results(
     bool quiet = parameters.Get<bool>("quiet");
     auto nodes = graph.nodes;
 
-    auto e_start = graph.CsrT::GetNeighborListOffset(sink);
-    auto num_neighbors = graph.CsrT::GetNeighborListLength(sink);
-    auto e_end = e_start + num_neighbors;
-    ValueT flow_incoming_sink = 0;
-    for (auto e = e_start; e < e_end; ++e)
-    {
-	auto flow_e_in = h_flow[reverse[e]];
-	if (util::isValid(flow_e_in))
-	    flow_incoming_sink += flow_e_in;
+    ValueT flow_incoming_sink = (ValueT)0;
+    for (auto u = 0; u < graph.nodes; ++u){
+	auto e_start = graph.CsrT::GetNeighborListOffset(u);
+	auto num_neighbors = graph.CsrT::GetNeighborListLength(u);
+	auto e_end = e_start + num_neighbors;
+	for (auto e = e_start; e < e_end; ++e){
+	    auto v = graph.CsrT::GetEdgeDest(e);
+	    if (v != sink)
+		continue;
+	    auto flow_e_in = h_flow[e];
+	    //printf("flow(%d->%d) = %lf (incoming sink)\n", u, v, flow_e_in);
+	    if (util::isValid(flow_e_in))
+		flow_incoming_sink += flow_e_in;
+	}
     }
     util::PrintMsg("Max Flow GPU = " + std::to_string(flow_incoming_sink));
 
@@ -505,6 +525,7 @@ int Validate_Results(
 		auto v = graph.CsrT::GetEdgeDest(e);
 		if (min_cut[v] == 0){
 		    auto f = graph.CsrT::edge_values[e];
+		    //printf("flow(%d->%d) = %lf (mincut)\n", u, v, f);
 		    mincut_flow += f;
 		}
 	    }
@@ -524,12 +545,20 @@ int Validate_Results(
 	util::PrintMsg("Flow Validity (compare results):\n", !quiet, false);
 
 	auto ref_flow_incoming_sink = (ValueT)0;
-	for (auto e = e_start; e < e_end; ++e)
-	{
-	    auto flow_e_in = ref_flow[reverse[e]];
-	    if (util::isValid(flow_e_in))
-		ref_flow_incoming_sink += flow_e_in;
+	for (auto u = 0; u < graph.nodes; ++u){
+	    auto e_start = graph.CsrT::GetNeighborListOffset(u);
+	    auto num_neighbors = graph.CsrT::GetNeighborListLength(u);
+	    auto e_end = e_start + num_neighbors;
+	    for (auto e = e_start; e < e_end; ++e){
+		auto v = graph.CsrT::GetEdgeDest(e);
+		if (v != sink)
+		    continue;
+		auto flow_e_in = ref_flow[e];
+		if (util::isValid(flow_e_in))
+		    ref_flow_incoming_sink += flow_e_in;
+	    }
 	}
+
 	if (fabs(flow_incoming_sink-ref_flow_incoming_sink) > 1e-12)
 	{
 	    ++num_errors;

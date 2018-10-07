@@ -223,14 +223,6 @@ struct main_struct
 	[flow_edge, reverse](util::Parameters &parameters, GraphT &u_graph)
 	{
 	  debug_aml("go to RunTests");
-	  if (flow_edge)
-	  {
-	    for (int i=0; i<u_graph.edges; ++i)
-	    {
-	      debug_aml("%s:%d flow_edge[%d] = %lf", 
-		__FILE__, __LINE__, i, flow_edge[i]);
-	    }
-	  }
 	  return app::mf::RunTests(parameters, u_graph, reverse, flow_edge);
 	}));
 
