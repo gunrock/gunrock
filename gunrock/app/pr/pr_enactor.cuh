@@ -16,7 +16,6 @@
 
 #include <gunrock/util/track_utils.cuh>
 #include <gunrock/util/sort_device.cuh>
-
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>

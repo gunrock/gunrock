@@ -382,7 +382,7 @@ cudaError_t cubSortPairsDescending(
                 values_o[pos] = values_[pos];
             }, num_items, util::DEVICE, stream));
     }
-   
+  
     return retval; 
 }
 
