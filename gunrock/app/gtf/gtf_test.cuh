@@ -181,7 +181,7 @@ cudaError_t CPU_Reference(
     auto     num_org_nodes    = num_nodes-2; // n
     auto     num_edges        = graph.edges; // m + n*4
     VertexT  source           = num_org_nodes; // originally 0
-    VertexT  dest             = num_org_nodes; // originally 1
+    VertexT  dest             = num_org_nodes+1; // originally 1
     double   lambda           = parameters.Get<double>("lambda");
     double   error_threshold  = parameters.Get<double>("error_threshold");
     VertexT  num_comms        = 1; // nlab
@@ -192,7 +192,7 @@ cudaError_t CPU_Reference(
     bool    *community_active = new bool   [num_nodes]; // !inactivelable
     ValueT  *community_accus  = new ValueT [num_nodes]; // values
     bool    *vertex_active    = new bool   [num_nodes]; // alive
-    char    *vertex_reachabilities = new char[num_nodes];
+    bool    *vertex_reachabilities = new bool[num_nodes];
         // visited: 1 reachable from source, 2 reachable from dest, 0 otherwise
     ValueT  *edge_residuals   = new ValueT [num_edges]; // graph
     ValueT  *edge_flows       = new ValueT [num_edges]; // edge flows
@@ -201,6 +201,7 @@ cudaError_t CPU_Reference(
 
     // Normalization and resets
     SizeT offset = num_edges - num_org_nodes * 2;
+    printf("offset is %d num edges %d \n", offset, num_edges);
     for (VertexT v = 0; v < num_org_nodes; v++)
     {
         sum_weights_source_sink += graph.edge_values[offset + v];
@@ -210,15 +211,18 @@ cudaError_t CPU_Reference(
         vertex_active   [v] = true;
         community_active[v] = true;
         curr_communities[v] = 0;
-        next_communities[v] = 0;
+        next_communities[v] = 0; //extra
     }
+
     auto avg_weights_source_sink = sum_weights_source_sink / num_org_nodes;
     community_accus[0] = avg_weights_source_sink;
+    printf("avg is %f \n", avg_weights_source_sink);
     for (VertexT v = 0; v < num_org_nodes; v++)
     {
         SizeT  e = graph.GetNeighborListOffset(v) + graph.GetNeighborListLength(v) - 1;
         ValueT val = graph.edge_values[offset + v] - graph.edge_values[e]
             - avg_weights_source_sink;
+        /*
         if (val > 0)
         {
             graph.edge_values[offset + v] = val;
@@ -227,20 +231,47 @@ cudaError_t CPU_Reference(
             graph.edge_values[offset + v] = 0;
             graph.edge_values[e] = -1 * val;
         }
+        */
     }
 
     cpu_timer.Start();
     VertexT iteration   = 0;    // iter
     bool    to_continue = true; // flagstop
+    int tem = 0;
     while (to_continue)
     {
         printf("Iteration %d\n", iteration);
         iteration++;
 
-        GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
-            edge_flows, edge_residuals, vertex_reachabilities));
+        //GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
+        //    edge_flows, edge_residuals, vertex_reachabilities));
+        ///////////////////////////////////
+        int tem_i = 0;
+        for (auto u = 0; u < graph.nodes; ++u)
+        {
+            auto e_start = graph.GraphT::CsrT::GetNeighborListOffset(u);
+            auto num_neighbors = graph.GraphT::CsrT::GetNeighborListLength(u);
+            auto e_end = e_start + num_neighbors;
+            for (auto e = e_start; e < e_end; ++e)
+            {
+                auto v = graph.GraphT::CsrT::GetEdgeDest(e);
+                printf("inside graph loaded as %d (%d -> %d) = %f\n", tem++, u, v, graph.edge_values[e]);
+                edge_residuals[tem_i++] = graph.edge_values[e];
+            }
+        }
+       std::string n_file_name = "./TVexact/acc.txt";
+        std::ifstream n_infile(n_file_name);
+        bool tm1;
+        int j = 0;
+        while(n_infile >> tm1){
+            vertex_reachabilities[j++] = tm1;
+        }
+        for(int i = 0; i < num_org_nodes; i++) std::cout << vertex_reachabilities[i] << " ";
+        std::cout << std::endl;
+        //////////////////////////////////
+        
         auto &edge_capacities = graph.edge_values;
-
+        
         for (VertexT comm = 0; comm < num_comms; comm++)
         {
             community_weights[comm] = 0;
@@ -253,10 +284,10 @@ cudaError_t CPU_Reference(
         {
             if (!vertex_active[v])
                 continue;
-
+            unsigned int comm;
             if (vertex_reachabilities[v] == 1)
             { // reachable by source
-                auto comm = next_communities[curr_communities[v]];
+                comm = next_communities[curr_communities[v]];
                 if (comm == 0)
                 { // not assigned yet
                     comm = num_comms;
@@ -275,7 +306,7 @@ cudaError_t CPU_Reference(
             }
 
             else { // otherwise
-                auto comm = curr_communities[v];
+                comm = curr_communities[v];
                 SizeT e_start = graph.GetNeighborListOffset(v);
                 SizeT num_neighbors = graph.GetNeighborListLength(v);
                 community_weights[comm] -= edge_residuals[e_start + num_neighbors - 1];
@@ -285,13 +316,13 @@ cudaError_t CPU_Reference(
                 for (auto e = e_start; e < e_end; e++)
                 {
                     VertexT u = graph.GetEdgeDest(e);
-                    if (edge_capacities[e] > error_threshold &&
-                        vertex_reachabilities[u] == 1)
+                    if (vertex_reachabilities[u] == 1)
                     {
                         edge_residuals[e] = 0;
                     }
                 }
             }
+            printf("%d %f \n", comm, community_weights[comm]);
         } // end of for v
 
         for (VertexT comm = 0; comm < pervious_num_comms; comm ++)
@@ -343,7 +374,7 @@ cudaError_t CPU_Reference(
             }
 
             else {
-                to_continue = true;
+                //to_continue = true;
                 SizeT e_from_src = num_edges - num_org_nodes * 2 + v;
                 SizeT e_to_dest  = graph.GetNeighborListOffset(v)
                     + graph.GetNeighborListLength(v) - 1;
@@ -370,9 +401,13 @@ cudaError_t CPU_Reference(
 
         for (SizeT e = 0; e < graph.edges; e ++)
             edge_capacities[e] = edge_residuals[e];
+        for(auto i = 0; i < num_org_nodes; i++)
+            printf("inside: %f \n", community_accus[curr_communities[i]]);
     } // end of while
     cpu_timer.Stop();
     elapsed = cpu_timer.ElapsedMillis();
+    for(auto i = 0; i < num_org_nodes; i++)
+        printf("%f \n", community_accus[curr_communities[i]]);
 
     delete[] next_communities ; next_communities  = NULL;
     delete[] curr_communities ; curr_communities  = NULL;
