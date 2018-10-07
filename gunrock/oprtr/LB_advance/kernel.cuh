@@ -582,7 +582,8 @@ cudaError_t Launch_CSR_CSC(
     {
         //util::PrintMsg("getting output length");
         GUARD_CU (ComputeOutputLength<FLAG>(graph, frontier_in, parameters));
-        GUARD_CU (parameters.frontier -> output_length.Move(util::DEVICE, util::HOST, 1, 0, parameters.stream));
+        GUARD_CU (parameters.frontier -> output_length.Move(
+            util::DEVICE, util::HOST, 1, 0, parameters.stream));
         GUARD_CU2(cudaStreamSynchronize(parameters.stream),
             "cudaStreamSynchronize failed");
         //GUARD_CU2(cudaDeviceSynchronize(),

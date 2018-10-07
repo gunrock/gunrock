@@ -51,6 +51,10 @@ struct Csc :
             FLAG & ARRAY_RESERVE>::Value;
     typedef GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> BaseGraph;
     typedef Csc<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag> CscT;
+    typedef typename util::If<(FLAG & HAS_EDGE_VALUES) != 0,
+        ValueT, util::NullType>::Type EdgeValueT;
+    typedef typename util::If<(FLAG & HAS_NODE_VALUES) != 0,
+        ValueT, util::NullType>::Type NodeValueT;
 
     // Column indices corresponding to all the
     // non-zero values in the sparse matrix
@@ -62,18 +66,23 @@ struct Csc :
     util::Array1D<SizeT, SizeT, ARRAY_FLAG,
         cudaHostRegisterFlag> column_offsets;
 
-    typedef util::Array1D<SizeT, ValueT, ARRAY_FLAG,
-        cudaHostRegisterFlag> Array_ValueT;
-    typedef util::NullArray<SizeT, ValueT, ARRAY_FLAG,
-        cudaHostRegisterFlag> Array_NValueT;
+    //typedef util::Array1D<SizeT, ValueT, ARRAY_FLAG,
+    //    cudaHostRegisterFlag> Array_ValueT;
+    //typedef util::NullArray<SizeT, ValueT, ARRAY_FLAG,
+    //    cudaHostRegisterFlag> Array_NValueT;
 
     // List of values attached to edges in the graph
-    typename util::If<(FLAG & HAS_EDGE_VALUES) != 0,
-        Array_ValueT, Array_NValueT >::Type edge_values;
+    //typename util::If<(FLAG & HAS_EDGE_VALUES) != 0,
+    //    Array_ValueT, Array_NValueT >::Type edge_values;
+    util::Array1D<SizeT, EdgeValueT,
+        ARRAY_FLAG, cudaHostRegisterFlag> edge_values;    
 
     // List of values attached to nodes in the graph
-    typename util::If<(FLAG & HAS_NODE_VALUES) != 0,
-        Array_ValueT, Array_NValueT >::Type node_values;
+    //typename util::If<(FLAG & HAS_NODE_VALUES) != 0,
+    //    Array_ValueT, Array_NValueT >::Type node_values;
+    //Array_ValueT node_values;
+    util::Array1D<SizeT, NodeValueT,
+        ARRAY_FLAG, cudaHostRegisterFlag> node_values;    
 
     /**
      * @brief CSC Constructor
@@ -138,10 +147,10 @@ struct Csc :
         cudaError_t retval = cudaSuccess;
         SizeT invalid_size = util::PreDefinedValues<SizeT>::InvalidValue;
         GUARD_CU(BaseGraph    ::Move(source, target, stream));
-        GUARD_CU(column_offsets.Move(source, target, invalid_size, 0, stream));
-        GUARD_CU(row_indices   .Move(source, target, invalid_size, 0, stream));
-        GUARD_CU(node_values   .Move(source, target, invalid_size, 0, stream));
-        GUARD_CU(edge_values   .Move(source, target, invalid_size, 0, stream));
+        GUARD_CU(column_offsets.Move(source, target, this -> nodes + 1, 0, stream));
+        GUARD_CU(row_indices   .Move(source, target, this -> edges    , 0, stream));
+        GUARD_CU(node_values   .Move(source, target, this -> nodes    , 0, stream));
+        GUARD_CU(edge_values   .Move(source, target, this -> edges    , 0, stream));
         return retval;
     }
 
@@ -251,11 +260,21 @@ struct Csc :
         if (FLAG & HAS_EDGE_VALUES)
         {
             GUARD_CU(edge_values.ForEach(source.CooT::edge_values,
-                []__host__ __device__ (ValueT &edge_value,
+                []__host__ __device__ (EdgeValueT &edge_value,
                 const typename CooT::ValueT &edge_value_in){
                 edge_value = edge_value_in;},
                 this -> edges, target, stream));
         }
+
+        if (FLAG & HAS_NODE_VALUES)
+        {
+            GUARD_CU(node_values.ForEach(source.CooT::node_values,
+                []__host__ __device__ (EdgeValueT &node_value,
+                const typename CooT::ValueT &node_value_in){
+                node_value = node_value_in;},
+                this -> nodes, target, stream));
+        }
+
 
         // assign column_offsets
         SizeT edges = this -> edges;
@@ -271,9 +290,13 @@ struct Csc :
                 const typename CooT::EdgePairT *edge_pairs,
                 const VertexT &column){
                     if (column < nodes)
-                        column_offsets[column] = util::BinarySearch(column,
-                            edge_pairs, (SizeT)0, edges-1,
-                            column_edge_compare);
+                        column_offsets[column] = util::BinarySearch_LeftMost(
+                            column, edge_pairs, (SizeT)0, edges-1,
+                            column_edge_compare,
+                            [] (const typename CooT::EdgePairT &pair, const VertexT &column)
+                            {
+                                return (pair.y == column);
+                            });
                     else column_offsets[column] = edges;
                 }, this -> nodes + 1, target, stream));
 
@@ -364,7 +387,7 @@ struct Csc :
     __device__ __host__ __forceinline__
     VertexT GetEdgeSrc(const SizeT &e) const
     {
-        return Binary_Search(column_offsets + 0, e, (SizeT)0, this -> nodes);
+        return util::BinarySearch_RightMost(e, column_offsets + 0, (SizeT)0, this -> nodes);
     }
 
     __device__ __host__ __forceinline__
@@ -377,7 +400,7 @@ struct Csc :
     __device__ __host__ __forceinline__
     void GetEdgeSrcDest(const SizeT &e, VertexT &src, VertexT &dest) const
     {
-        src = Binary_Search(column_offsets + 0, e, (SizeT)0, this -> nodes);
+        src = util::BinarySearch_RightMost(e, column_offsets + 0, (SizeT)0, this -> nodes);
         dest = row_indices[e];
     }
 }; // CSC
@@ -437,6 +460,14 @@ struct Csc<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
     {
         return cudaSuccess;
     }
+
+    cudaError_t Display(
+        std::string graph_prefix = "",
+        SizeT nodes_to_show = 40,
+        bool  with_edge_values = true)
+    {
+        return cudaSuccess;
+    } 
 };
 
 } // namespace graph

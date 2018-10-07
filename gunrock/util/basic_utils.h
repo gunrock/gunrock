@@ -108,7 +108,15 @@ struct MagnitudeShiftOp<K, magnitude, false>
 /**
  * Null type
  */
-struct NullType {};
+struct NullType {
+
+    template <typename T>
+    __host__ __device__ __forceinline__ 
+    NullType& operator =(const T&)
+    {
+        return *this;
+    }
+};
 
 
 /**

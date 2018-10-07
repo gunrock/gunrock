@@ -100,6 +100,9 @@ cudaError_t Launch(
         //GUARD_CU(values_temp.EnsureSize_(
         //    parameters.frontier.queue_length, util::DEVICE));
 
+        //util::PrintMsg("Advance Start, values_temp = "
+        //    + util::to_string(values_temp.GetPointer(util::DEVICE))
+        //    + ", size = " + std::to_string(values_temp.GetSize()));
         GUARD_CU(oprtr::Advance<FLAG>(
             graph, frontier_in, frontier_out, parameters,
             [advance_op, values_temp, init_value] 
@@ -116,6 +119,12 @@ cudaError_t Launch(
                     val = init_value;
                     retval = false;
                 }
+                //if (output_pos < 0 || output_pos >= values_temp.GetSize())
+                //    printf("Invalid : output_pos = %d, input_pos = %d, "
+                //        "edge %d, %d -> %d\n",
+                //        output_pos, input_pos, edge_id, src, dest);
+                //printf("values_temp[%d] : %f <- %f\n",
+                //    output_pos, values_temp[output_pos], val);
                 values_temp[output_pos] = val;
                 return retval;
             }));
@@ -125,7 +134,16 @@ cudaError_t Launch(
             values_temp2 = parameters.reduce_values_out;
         auto &values_temp2_ = values_temp2[0];
         auto offsets = frontier.segment_offsets;
+        //GUARD_CU(cudaStreamSynchronize(parameters.stream));
+        //util::PrintMsg("Past Advance");   
 
+        //GUARD_CU(values_temp2_.ForEach(
+        //    [] __host__ __device__ (ValueT &val)
+        //    {
+        //        val = 0;
+        //    }, parameters.advance_mode == "ALL_EDGES" ? graph.nodes : frontier.queue_length,
+        //    util::DEVICE, parameters.stream));
+ 
         typedef GraphTypeSwitch<GraphT, GraphT::FLAG & (graph::HAS_CSR | graph::HAS_CSC)>
             GraphSwitchT;
         if (parameters.advance_mode == "ALL_EDGES")
@@ -143,6 +161,8 @@ cudaError_t Launch(
                 frontier.queue_length, frontier.segment_offsets[0],
                 reduce_op, init_value, parameters.stream));
         }
+        //GUARD_CU(cudaStreamSynchronize(parameters.stream));
+        //util::PrintMsg("Past SegReduce");   
 
         bool reduce_reset = parameters.reduce_reset;
         if ((FLAG & OprtrMode_ReduceMask) == OprtrMode_REDUCE_TO_SRC &&
@@ -162,11 +182,16 @@ cudaError_t Launch(
                 [values_temp2_, reduce_reset, reduce_op] 
                 __host__ __device__ (ValueT *vals, const SizeT &pos)
                 {
-                    vals[pos] = reduce_reset ? values_temp2_[pos]
+                    ValueT new_val = reduce_reset ? values_temp2_[pos]
                         : reduce_op(vals[pos], values_temp2_[pos]);
+                    //printf("vals[%d] : %f <- %f\n",
+                    //    pos, vals[pos], new_val);
+                    vals[pos] = new_val;
                 }, parameters.advance_mode == "ALL_EDGES" ? graph.nodes : 
                 frontier.queue_length, util::DEVICE, parameters.stream));
         }
+        //GUARD_CU(cudaStreamSynchronize(parameters.stream));
+        //util::PrintMsg("Past Val Assigment");   
     }
 
     else if (parameters.advance_mode == "TWC" &&

@@ -72,7 +72,8 @@ struct main_struct
                 GUARD_CU(gunrock::app::pr::Compensate_ZeroDegrees(graph, quiet));
             }
             GUARD_CU(parameters.Set("compensate", compensate));
-            std::vector<std::string> switches{"normalize", "delta", "threshold", "max-iter"};
+            std::vector<std::string> switches{
+                "normalize", "delta", "threshold", "max-iter", "pull"};
             GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
                 [quick, quiet](util::Parameters &parameters, GraphT &graph)
                 {

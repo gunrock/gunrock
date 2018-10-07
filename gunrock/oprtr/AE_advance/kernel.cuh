@@ -195,7 +195,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
             bool to_process = true;
             VertexT src     = util::PreDefinedValues<VertexT>::InvalidValue;
             VertexT dest    = util::PreDefinedValues<VertexT>::InvalidValue;
-            SizeT   out_pos = util::PreDefinedValues<SizeT  >::InvalidValue;
+            SizeT   out_pos = edge_id;//util::PreDefinedValues<SizeT  >::InvalidValue;
             OutKeyT out_key = util::PreDefinedValues<OutKeyT>::InvalidValue;
 
             if (edge_id < graph.edges)

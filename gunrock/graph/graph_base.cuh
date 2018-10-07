@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <gunrock/util/binary_search.cuh>
+
 namespace gunrock {
 namespace graph {
 
@@ -51,7 +53,7 @@ struct GraphType_Num
 
 static const util::Location GRAPH_DEFAULT_TARGET = util::DEVICE;
 
-template <typename T, typename SizeT>
+/*template <typename T, typename SizeT>
 __device__ __host__ __forceinline__
 SizeT Binary_Search(
     const T* data, T item_to_find, SizeT lower_bound, SizeT upper_bound)
@@ -76,7 +78,7 @@ SizeT Binary_Search(
         retval = util::PreDefinedValues<SizeT>::InvalidValue;
 
     return retval;
-}
+}*/
 
 /**
  * @brief Enum to show how the edges are ordered

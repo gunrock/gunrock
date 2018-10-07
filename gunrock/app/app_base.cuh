@@ -217,6 +217,23 @@ struct TestGraph :
 
         return retval;
     }
+
+    cudaError_t Display(
+        std::string graph_prefix = "",
+        SizeT nodes_to_show = 40,
+        bool  with_edge_values = true)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        if (FLAG & graph::HAS_CSR)
+            GUARD_CU(CsrT::Display(graph_prefix, nodes_to_show, with_edge_values));
+        if (FLAG & graph::HAS_CSC)
+            GUARD_CU(CscT::Display(graph_prefix, nodes_to_show, with_edge_values));
+        if (FLAG & graph::HAS_COO)
+            GUARD_CU(CooT::Display(graph_prefix, nodes_to_show, with_edge_values));
+
+        return retval;
+    }
 };
 
 } // namespace app
