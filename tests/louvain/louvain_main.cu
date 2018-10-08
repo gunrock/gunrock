@@ -83,7 +83,8 @@ struct main_struct
             }
         }
 
-        std::vector<std::string> switches{"advance-mode","omp-threads", "1st-th"};
+        std::vector<std::string> switches{"unify-segments", 
+            "advance-mode","omp-threads", "1st-th"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [&ref_communities](util::Parameters &parameters, GraphT &graph)
             {
