@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file rw_app.cu
+ * @file pr_nibble_app.cu
  *
  * @brief Simple Gunrock Application
  */
@@ -17,12 +17,12 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-#include <gunrock/app/rw/rw_enactor.cuh>
-#include <gunrock/app/rw/rw_test.cuh>
+#include <gunrock/app/pr_nibble/pr_nibble_enactor.cuh>
+#include <gunrock/app/pr_nibble/pr_nibble_test.cuh>
 
 namespace gunrock {
 namespace app {
-namespace rw {
+namespace pr_nibble {
 
 
 cudaError_t UseParameters(util::Parameters &parameters)
@@ -32,69 +32,64 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
-    GUARD_CU(parameters.Use<int>(
-         "walk-length",
-         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
-         10,
-         "length of random walks",
-         __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<int>(
-         "walk-mode",
-         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
-         0,
-         "random walk mode (0=random; 1=max)",
-         __FILE__, __LINE__));
-
+    // app specific parameters
     GUARD_CU(parameters.Use<std::string>(
-         "node-value-path",
-         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
-         "",
-         "path to file containing node values",
-         __FILE__, __LINE__));
+       "src",
+       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+       "0",
+       "<Vertex-ID|random|largestdegree> The source vertices\n"
+       "\tIf random, randomly select non-zero degree vertices;\n"
+       "\tIf largestdegree, select vertices with largest degrees",
+       __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<double>(
+       "eps",
+       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+       1e-2,
+       "Convergence criteria.",
+       __FILE__, __LINE__));
+    GUARD_CU(parameters.Use<double>(
+       "phi",
+       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+       0.5,
+       "phi parameter", // <TODO: DOCS>
+       __FILE__, __LINE__));
+    GUARD_CU(parameters.Use<double>(
+       "vol",
+       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+       40.0,
+       "volume parameter", // <TODO: DOCS>
+       __FILE__, __LINE__));
     GUARD_CU(parameters.Use<int>(
-         "walks-per-node",
-         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
-         2,
-         "number of random walks per source node",
-         __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<int>(
-         "seed",
-         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
-         time(NULL),
-         "seed for random number generator",
-         __FILE__, __LINE__));
+       "max-iter",
+       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+       3,
+       "Max number of iterations",
+       __FILE__, __LINE__));
 
     return retval;
 }
 
 /**
- * @brief Run RW tests
- * @tparam     GraphT           Type of the graph
- * @tparam     ValueT           Type of the distances
- * @param[in]  parameters       Excution parameters
- * @param[in]  graph            Input graph
- * @param[in]  walk_length      Length of random walks
- * @param[in]  walks_per_node   Number of random walks per node
- * @param[in]  ref_walks        Array of random walks from CPU
- * @param[in]  target           where to perform the app
+ * @brief Run pr_nibble tests
+ * @tparam     GraphT        Type of the graph
+ * @tparam     ValueT        Type of the distances
+ * @param[in]  parameters    Excution parameters
+ * @param[in]  graph         Input graph
+ * @param[in]  ref_values    Array of CPU reference values
+ * @param[in]  target        where to perform the app 
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT>
 cudaError_t RunTests(
-    util::Parameters         &parameters,
-    GraphT                   &graph,
-    int                      walk_length,
-    int                      walks_per_node,
-    int                      walk_mode,
-    typename GraphT::VertexT *ref_walks,
+    util::Parameters &parameters,
+    GraphT           &graph,
+    typename GraphT::ValueT **ref_values,
     util::Location target)
 {
-
+    
     cudaError_t retval = cudaSuccess;
-
+       
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::SizeT   SizeT;
@@ -105,27 +100,38 @@ cudaError_t RunTests(
     bool quiet_mode = parameters.Get<bool>("quiet");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    util::Info info("rw", parameters, graph);
-
+    util::Info info("pr_nibble", parameters, graph);
+    
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
 
-    // Allocate problem specific host data
-    VertexT *h_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
+    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+    int num_srcs = srcs.size();
+
+    ValueT *h_values = new ValueT[graph.nodes];
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
     GUARD_CU(problem.Init(graph, target));
     GUARD_CU(enactor.Init(problem, target));
-
+    
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
-
+    
     for (int run_num = 0; run_num < num_runs; ++run_num) {
-        GUARD_CU(problem.Reset(target));
-        GUARD_CU(enactor.Reset(walks_per_node, target));
-
+        auto run_index = run_num % num_srcs;
+        VertexT src      = srcs[run_index];
+        VertexT src_neib = graph.GetEdgeDest(graph.GetNeighborListOffset(src));
+        GUARD_CU(problem.Reset(
+            src, src_neib,
+            target
+        ));
+        GUARD_CU(enactor.Reset(
+            src, src_neib,
+            target
+        ));
+        
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
@@ -139,57 +145,57 @@ cudaError_t RunTests(
             ", #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
-
+        
         if (validation == "each") {
-
-            GUARD_CU(problem.Extract(
-                h_walks
-            ));
+            
+            GUARD_CU(problem.Extract(h_values));
             SizeT num_errors = Validate_Results(
                 parameters,
                 graph,
-                walk_length, walks_per_node, h_walks, ref_walks,
+                h_values,
+                ref_values[run_index],
                 false);
         }
     }
 
     cpu_timer.Start();
-
-    GUARD_CU(problem.Extract(
-        h_walks
-    ));
+    
+    GUARD_CU(problem.Extract(h_values));
     if (validation == "last") {
+        auto run_index = (num_runs - 1) % num_srcs;
         SizeT num_errors = Validate_Results(
             parameters,
             graph,
-            walk_length, walks_per_node, h_walks, ref_walks,
+            h_values,
+            ref_values[run_index],
             false);
     }
 
     // compute running statistics
-    // TODO: change NULL to problem specific per-vertex visited marker, e.g. h_distances
-    info.ComputeTraversalStats(enactor, (VertexT*)NULL);
+    // <TODO> change NULL to problem specific per-vertex visited marker, e.g. h_distances
+    // info.ComputeTraversalStats(enactor, (VertexT*)NULL);
     //Display_Memory_Usage(problem);
-    #ifdef ENABLE_PERFORMANCE_PROFILING
+    // #ifdef ENABLE_PERFORMANCE_PROFILING
         //Display_Performance_Profiling(enactor);
-    #endif
+    // #endif
+    // </TODO>
 
     // Clean up
-    GUARD_CU(enactor.Release(target));
+    // GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    delete[] h_walks; h_walks   = NULL;
+    delete[] h_values; h_values   = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
     return retval;
 }
 
-} // namespace rw
+} // namespace pr_nibble
 } // namespace app
 } // namespace gunrock
 
 /*
-* @brief Entry of gunrock_rw function
+* @brief Entry of gunrock_template function
 * @tparam     GraphT     Type of the graph
 * @tparam     ValueT     Type of the distances
 * @param[in]  parameters Excution parameters
@@ -199,42 +205,59 @@ cudaError_t RunTests(
 * \return     double     Return accumulated elapsed times for all runs
 */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
-double gunrock_rw(
+double gunrock_pr_nibble(
     gunrock::util::Parameters &parameters,
     GraphT &graph,
-    typename GraphT::VertexT *h_walks,
-    int walks_per_node)
+    ValueT *h_values   
+  )
 {
     typedef typename GraphT::VertexT VertexT;
-    typedef gunrock::app::rw::Problem<GraphT  > ProblemT;
-    typedef gunrock::app::rw::Enactor<ProblemT> EnactorT;
+    typedef gunrock::app::pr_nibble::Problem<GraphT  > ProblemT;
+    typedef gunrock::app::pr_nibble::Enactor<ProblemT> EnactorT;
     gunrock::util::CpuTimer cpu_timer;
     gunrock::util::Location target = gunrock::util::DEVICE;
     double total_time = 0;
     if (parameters.UseDefault("quiet"))
         parameters.Set("quiet", true);
-
+    
+    
     ProblemT problem(parameters);
     EnactorT enactor;
     problem.Init(graph  , target);
     enactor.Init(problem, target);
 
     int num_runs = parameters.Get<int>("num-runs");
+    
+    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+    int num_srcs = srcs.size();
+
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        problem.Reset(target);
-        enactor.Reset(walks_per_node, target);
+        auto run_index = run_num % num_srcs;
+        
+        VertexT src      = srcs[run_index];
+        VertexT src_neib = graph.GetEdgeDest(graph.GetNeighborListOffset(src));
+        problem.Reset(
+            src, src_neib,
+            target
+        );
+        enactor.Reset(
+            src, src_neib,
+            target
+        );
 
         cpu_timer.Start();
         enactor.Enact();
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-        problem.Extract(h_walks);
+        
+        problem.Extract(h_values);
     }
 
     enactor.Release(target);
     problem.Release(target);
+    srcs.clear();
     return total_time;
 }
 
@@ -246,69 +269,69 @@ double gunrock_rw(
 //  * @param[in]  col_indices CSR-formatted graph input column indices
 //  * @param[in]  edge_values CSR-formatted graph input edge weights
 //  * @param[in]  num_runs    Number of runs to perform SSSP
-//  * @param[in]  walks          Array for random walks
-//  * @param[in]  walks_per_node Number of random walks per node
+//  * @param[in]  sources     Sources to begin traverse, one for each run
+//  * @param[in]  mark_preds  Whether to output predecessor info
+//  * @param[out] distances   Return shortest distance to source per vertex
+//  * @param[out] preds       Return predecessors of each vertex
 //  * \return     double      Return accumulated elapsed times for all runs
-
+ 
 template <
     typename VertexT = int,
+    typename ValueT  = float,
     typename SizeT   = int,
     typename GValueT = unsigned int,
     typename TValueT = GValueT>
-float rw(
+float pr_nibble(
     const SizeT        num_nodes,
     const SizeT        num_edges,
     const SizeT       *row_offsets,
     const VertexT     *col_indices,
+    const GValueT     *edge_values,
     const int          num_runs,
-          VertexT     *h_walks,
-    const int          walks_per_node
+         VertexT      *sources,
+         ValueT       *h_values
     )
 {
     // TODO: change to other graph representation, if not using CSR
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-        gunrock::graph::HAS_CSR>
+        gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
         GraphT;
     typedef typename GraphT::CsrT CsrT;
 
     // Setup parameters
-    gunrock::util::Parameters parameters("rw");
+    gunrock::util::Parameters parameters("pr_nibble");
     gunrock::graphio::UseParameters(parameters);
-    gunrock::app::rw::UseParameters(parameters);
+    gunrock::app::pr_nibble::UseParameters(parameters);
     gunrock::app::UseParameters_test(parameters);
     parameters.Parse_CommandLine(0, NULL);
     parameters.Set("graph-type", "by-pass");
     parameters.Set("num-runs", num_runs);
+    
+    std::vector<VertexT> srcs;
+    for (int i = 0; i < num_runs; i ++)
+        srcs.push_back(sources[i]);
+    parameters.Set("srcs", srcs);
 
     bool quiet = parameters.Get<bool>("quiet");
     GraphT graph;
-
+    
     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
     graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
     graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
-    graph.FromCsr(graph.csr(), true, quiet);
+    // graph.CsrT::edge_values   .SetPointer(edge_values, gunrock::util::HOST);
+    // graph.FromCsr(graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, graph);
 
-    double elapsed_time = gunrock_rw(parameters, graph, h_walks, walks_per_node);
+    // Run the pr_nibble
+    double elapsed_time = gunrock_pr_nibble(parameters, graph, h_values);
 
+    // Cleanup
     graph.Release();
+    srcs.clear();
 
     return elapsed_time;
 }
 
-float rw(
-    const int  num_nodes,
-    const int  num_edges,
-    const int *row_offsets,
-    const int *col_indices,
-    const int  num_runs,
-          int *h_walks,
-    const int  walks_per_node
-)
-{
-    return rw(num_nodes, num_edges, row_offsets, col_indices, num_runs,
-        h_walks, walks_per_node);
-}
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++

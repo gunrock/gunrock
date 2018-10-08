@@ -7,21 +7,17 @@
 
 /**
  * @file
- * test_rw.cu
+ * test_proj.cu
  *
  * @brief Simple test driver program for Gunrock template.
  */
 
-#include <iostream>
-#include <string>
-#include <fstream>
-
-#include <gunrock/app/rw/rw_app.cu>
+#include <gunrock/app/proj/proj_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
 
-namespace APP_NAMESPACE = app::rw;
+namespace APP_NAMESPACE = app::proj;
 
 /******************************************************************************
 * Main
@@ -53,9 +49,8 @@ struct main_struct
         bool quiet = parameters.Get<bool>("quiet");
 
         typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-            graph::HAS_NODE_VALUES | graph::HAS_CSR>
+            graph::HAS_EDGE_VALUES | graph::HAS_CSR>
             GraphT;
-        typedef typename GraphT::CsrT CsrT;
 
         cudaError_t retval = cudaSuccess;
         util::CpuTimer cpu_timer;
@@ -66,41 +61,18 @@ struct main_struct
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        int walk_length    = parameters.Get<int>("walk-length");
-        int walks_per_node = parameters.Get<int>("walks-per-node");
-        int walk_mode      = parameters.Get<int>("walk-mode");
-        VertexT *ref_walks;
-
-        ValueT *node_values;
-        if(walk_mode != 0) {
-            node_values = new ValueT[graph.nodes];
-            graph.CsrT::node_values.SetPointer(node_values, graph.nodes, gunrock::util::HOST);
-
-            std::string node_value_path = parameters.Get<std::string>("node-value-path");
-            if(node_value_path.compare("") == 0) {
-                printf("test_rw: `node-value-path` must be set if `walk-mode` != 0");
-                return retval;
-            }
-
-            std::ifstream node_value_file(node_value_path, std::ios_base::in);
-            for(int i = 0; i < graph.nodes; i++) {
-                node_value_file >> node_values[i];
-            }
-        }
+        ValueT *ref_projections;
 
         if (!quick) {
-            ref_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
+            ref_projections = new ValueT[graph.nodes * graph.nodes];
 
+            // If not in `quick` mode, compute CPU reference implementation
             util::PrintMsg("__________________________", !quiet);
 
-            float elapsed = APP_NAMESPACE::CPU_Reference(
+            float elapsed = app::proj::CPU_Reference(
                 graph.csr(),
-                walk_length,
-                walks_per_node,
-                walk_mode,
-                ref_walks,
-                quiet
-            );
+                ref_projections,
+                quiet);
 
             util::PrintMsg("--------------------------\n Elapsed: "
                 + std::to_string(elapsed), !quiet);
@@ -109,28 +81,14 @@ struct main_struct
         std::vector<std::string> switches{"advance-mode"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
-                walk_length,
-                walks_per_node,
-                walk_mode,
-                ref_walks
+                ref_projections
             ](util::Parameters &parameters, GraphT &graph)
             {
-                return APP_NAMESPACE::RunTests(
-                    parameters,
-                    graph,
-                    walk_length,
-                    walks_per_node,
-                    walk_mode,
-                    ref_walks,
-                    util::DEVICE
-                );
+                return app::proj::RunTests(parameters, graph, ref_projections, util::DEVICE);
             }));
 
         if (!quick) {
-            delete[] ref_walks; ref_walks = NULL;
-        }
-        if(walk_mode != 0) {
-            delete[] node_values; node_values = NULL;
+            delete[] ref_projections; ref_projections = NULL;
         }
         return retval;
     }
@@ -139,9 +97,9 @@ struct main_struct
 int main(int argc, char** argv)
 {
     cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test rw");
+    util::Parameters parameters("test graph_projections");
     GUARD_CU(graphio::UseParameters(parameters));
-    GUARD_CU(APP_NAMESPACE::UseParameters(parameters));
+    GUARD_CU(app::proj::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
     GUARD_CU(parameters.Parse_CommandLine(argc, argv));
     if (parameters.Get<bool>("help"))
@@ -154,7 +112,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |
-        app::VALUET_U32B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F32B | app::DIRECTED>
         (parameters, main_struct());
 }
 

@@ -7,18 +7,16 @@
 
 /**
  * @file
- * hello_test.cu
+ * proj_test.cu
  *
- * @brief Test related functions for hello
+ * @brief Test related functions for proj
  */
 
 #pragma once
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
-namespace hello {
-// </TODO>
+namespace proj {
 
 
 /******************************************************************************
@@ -26,7 +24,7 @@ namespace hello {
  *****************************************************************************/
 
 /**
- * @brief Simple CPU-based reference hello ranking implementations
+ * @brief Simple CPU-based reference proj ranking implementations
  * @tparam      GraphT        Type of the graph
  * @tparam      ValueT        Type of the values
  * @param[in]   graph         Input graph
@@ -36,30 +34,46 @@ namespace hello {
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    // <TODO> add problem specific inputs and outputs 
-    typename GraphT::ValueT *degrees,
-    // </TODO>
+    typename GraphT::ValueT *projections,
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
-    
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::ValueT ValueT;
+
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
-    
-    // <TODO> 
-    // implement CPU reference implementation
-    for(SizeT v = 0; v < graph.nodes; ++v) {
-        degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
+
+    for(SizeT edge_idx = 0; edge_idx < graph.nodes * graph.nodes; edge_idx++) {
+        projections[edge_idx] = 0;
     }
-    // </TODO>
-    
+
+    for(SizeT node = 0; node < graph.nodes; node++) {
+        SizeT num_neighbors = graph.GetNeighborListLength(node);
+        SizeT node_offset   = graph.GetNeighborListOffset(node);
+
+        for(SizeT offset_1 = 0; offset_1 < num_neighbors; offset_1++) {
+            VertexT neib1 = graph.GetEdgeDest(node_offset + offset_1);
+
+            for(SizeT offset_2 = 0; offset_2 < num_neighbors; offset_2++) {
+                VertexT neib2 = graph.GetEdgeDest(node_offset + offset_2);
+
+                if(neib1 != neib2) {
+                    ValueT edge_weight = (ValueT)1.0; // Could so more complex functions of edge weights
+                    SizeT edge_idx = (SizeT)neib1 * graph.nodes + (SizeT)neib2;
+                    projections[edge_idx] += edge_weight;
+                }
+            }
+        }
+    }
+
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
     return elapsed;
 }
 
 /**
- * @brief Validation of hello results
+ * @brief Validation of proj results
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the values
  * @param[in]  parameters    Excution parameters
@@ -72,10 +86,8 @@ template <typename GraphT>
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
-             // <TODO>
-             typename GraphT::ValueT *h_degrees,
-             typename GraphT::ValueT *ref_degrees,
-             // </TODO>
+             typename GraphT::ValueT *h_projections,
+             typename GraphT::ValueT *ref_projections,
              bool verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
@@ -84,14 +96,20 @@ typename GraphT::SizeT Validate_Results(
     SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
 
-    // <TODO> result validation and display
-    for(SizeT v = 0; v < graph.nodes; ++v) {
-        printf("%d %d %d\n", v, h_degrees[v], ref_degrees[v]);
+    for(SizeT v = 0; v < graph.nodes * graph.nodes; ++v) {
+        if(ref_projections[v] != 0) {
+            int row = (int)(v/graph.nodes);
+            int col = v % graph.nodes;
+            printf("%d->%d | GPU=%f CPU=%f\n", row, col, h_projections[v], ref_projections[v]);
+            num_errors += (int)(h_projections[v] != ref_projections[v]);
+        }
     }
-    // </TODO>
 
     if(num_errors == 0) {
-       util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
+        printf("======= PASSED ======\n");
+    } else {
+        printf("======= FAILED ======\n");
+        util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
     }
 
     return num_errors;

@@ -7,9 +7,9 @@
 
 /**
  * @file
- * RW_problem.cuh
+ * proj_problem.cuh
  *
- * @brief GPU Storage management Structure for RW Problem Data
+ * @brief GPU Storage management Structure for proj Problem Data
  */
 
 #pragma once
@@ -18,11 +18,11 @@
 
 namespace gunrock {
 namespace app {
-namespace rw {
+namespace proj {
 
 
 /**
- * @brief Speciflying parameters for RW Problem
+ * @brief Speciflying parameters for proj Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -30,9 +30,7 @@ cudaError_t UseParameters_problem(
     util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
-
     GUARD_CU(gunrock::app::UseParameters_problem(parameters));
-
     return retval;
 }
 
@@ -65,21 +63,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     struct DataSlice : BaseDataSlice
     {
-        // problem specific storage arrays:
-        util::Array1D<SizeT, VertexT> walks;
-        util::Array1D<SizeT, float> rand;
-        int walk_length;
-        int walks_per_node;
-        int walk_mode;
-        curandGenerator_t gen;
+
+        util::Array1D<SizeT, ValueT> projections;
 
         /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice()
         {
-            walks.SetName("walks");
-            rand.SetName("rand");
+            projections.SetName("projections");
         }
 
         /*
@@ -98,8 +90,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            GUARD_CU(walks.Release(target));
-            GUARD_CU(rand.Release(target));
+            GUARD_CU(projections.Release(target));
 
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
@@ -118,24 +109,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             int            num_gpus,
             int            gpu_idx,
             util::Location target,
-            ProblemFlag    flag,
-            int walk_length_,
-            int walks_per_node_,
-            int walk_mode_,
-            int seed)
+            ProblemFlag    flag)
         {
             cudaError_t retval  = cudaSuccess;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
-            walk_length = walk_length_;
-            walks_per_node = walks_per_node_;
-            walk_mode = walk_mode_;
-            curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
-            curandSetPseudoRandomGeneratorSeed(gen, seed);
-
-            GUARD_CU(walks.Allocate(sub_graph.nodes * walk_length * walks_per_node, target));
-            GUARD_CU(rand.Allocate(sub_graph.nodes * walks_per_node, target));
+            GUARD_CU(projections.Allocate(sub_graph.nodes * sub_graph.nodes, target));
 
             if (target & util::DEVICE) {
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
@@ -154,17 +134,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT nodes = this -> sub_graph -> nodes;
 
             // Ensure data are allocated
-            GUARD_CU(walks.EnsureSize_(nodes * this -> walk_length * this -> walks_per_node, target));
-            GUARD_CU(rand.EnsureSize_(nodes * this -> walks_per_node, target));
+            GUARD_CU(projections.EnsureSize_(nodes * nodes, target));
 
             // Reset data
-            GUARD_CU(walks.ForEach([]__host__ __device__ (VertexT &x){
-               x = util::PreDefinedValues<VertexT>::InvalidValue;
-            }, nodes * this -> walk_length * this -> walks_per_node, target, this -> stream));
-
-            GUARD_CU(rand.ForEach([]__host__ __device__ (float &x){
-               x = (float)0.0;
-            }, nodes * this -> walks_per_node, target, this -> stream));
+            GUARD_CU(projections.ForEach([]__host__ __device__ (ValueT &x){
+               x = (ValueT)0.0;
+            }, nodes * nodes, target, this -> stream));
 
             return retval;
         }
@@ -172,31 +147,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
-    int walk_length;
-    int walks_per_node;
-    int walk_mode;
-    int seed;
 
     // ----------------------------------------------------------------
     // Problem Methods
 
     /**
-     * @brief RW default constructor
+     * @brief proj default constructor
      */
     Problem(
         util::Parameters &_parameters,
         ProblemFlag _flag = Problem_None) :
         BaseProblem(_parameters, _flag),
-        data_slices(NULL) {
-
-        walk_length    = _parameters.Get<int>("walk-length");
-        walks_per_node = _parameters.Get<int>("walks-per-node");
-        walk_mode      = _parameters.Get<int>("walk-mode");
-        seed           = _parameters.Get<int>("seed");
-    }
+        data_slices(NULL) {}
 
     /**
-     * @brief RW default destructor
+     * @brief proj default destructor
      */
     virtual ~Problem() { Release(); }
 
@@ -227,7 +192,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
-        VertexT *h_walks,
+        ValueT *h_projections,
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -239,14 +204,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // Set device
             if (target == util::DEVICE) {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-                GUARD_CU(data_slice.walks.SetPointer(h_walks, nodes * this -> walk_length * this -> walks_per_node, util::HOST));
-                GUARD_CU(data_slice.walks.Move(util::DEVICE, util::HOST));
+                GUARD_CU(data_slice.projections.SetPointer(h_projections, nodes * nodes, util::HOST));
+                GUARD_CU(data_slice.projections.Move(util::DEVICE, util::HOST));
+
             } else if (target == util::HOST) {
-                // extract the results from single CPU
-                GUARD_CU(data_slice.walks.ForEach(h_walks,
-                   []__host__ __device__ (const VertexT &device_val, VertexT &host_val){
+                GUARD_CU(data_slice.projections.ForEach(h_projections,
+                   []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
                        host_val = device_val;
-                   }, nodes * this -> walk_length * this -> walks_per_node, util::HOST));
+                   }, nodes * nodes, util::HOST));
             }
         } else { // num_gpus != 1
 
@@ -311,11 +276,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 this -> num_gpus,
                 this -> gpu_idx[gpu],
                 target,
-                this -> flag,
-                this -> walk_length,
-                this -> walks_per_node,
-                this -> walk_mode,
-                this -> seed
+                this -> flag
             ));
         }
 
@@ -346,7 +307,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     }
 };
 
-} //namespace rw
+} //namespace Template
 } //namespace app
 } //namespace gunrock
 

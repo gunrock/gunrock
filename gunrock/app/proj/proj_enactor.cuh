@@ -7,9 +7,9 @@
 
 /**
  * @file
- * rw_enactor.cuh
+ * Template_enactor.cuh
  *
- * @brief RW Problem Enactor
+ * @brief proj Problem Enactor
  */
 
 #pragma once
@@ -19,18 +19,15 @@
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
-#include <gunrock/app/rw/rw_problem.cuh>
-#include <math.h>
-#include <curand.h>
-#include <curand_kernel.h>
+#include <gunrock/app/proj/proj_problem.cuh>
 
 
 namespace gunrock {
 namespace app {
-namespace rw {
+namespace proj {
 
 /**
- * @brief Speciflying parameters for RW Enactor
+ * @brief Speciflying parameters for proj Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -42,11 +39,11 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 }
 
 /**
- * @brief defination of RW iteration loop
+ * @brief defination of proj iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct RWIterationLoop : public IterationLoopBase
+struct projIterationLoop : public IterationLoopBase
     <EnactorT, Use_FullQ | Push>
 {
     typedef typename EnactorT::VertexT VertexT;
@@ -58,10 +55,10 @@ struct RWIterationLoop : public IterationLoopBase
     typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
-    RWIterationLoop() : BaseIterationLoop() {}
+    projIterationLoop() : BaseIterationLoop() {}
 
     /**
-     * @brief Core computation of RW, one iteration
+     * @brief Core computation of proj, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
      * \return cudaError_t error message(s), if any
      */
@@ -83,91 +80,73 @@ struct RWIterationLoop : public IterationLoopBase
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
 
-        // problem specific data alias:
-        auto &walks          = data_slice.walks;
-        auto &rand           = data_slice.rand;
-        auto &walk_length    = data_slice.walk_length;
-        auto &walks_per_node = data_slice.walks_per_node;
-        auto &walk_mode      = data_slice.walk_mode;
-        auto &gen            = data_slice.gen;
+        auto &projections = data_slice.projections;
 
-        curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
+        // --
+        // Define operations
 
-        if(walk_mode == 0) {
-          auto uniform_rw_op = [
-              graph,
-              walks,
-              rand,
-              iteration,
-              walk_length
-          ] __host__ __device__ (VertexT *v, const SizeT &i) {
+        // advance operation
+        auto advance_op = [
+            graph,
+            projections
+        ] __host__ __device__ (
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            SizeT num_neighbors = graph.GetNeighborListLength(src);
+            SizeT src_offset    = graph.GetNeighborListOffset(src);
+            for(SizeT neib_offset = 0; neib_offset < num_neighbors; neib_offset++) {
+              VertexT neib = graph.GetEdgeDest(src_offset + neib_offset);
 
-            // printf("graph.node_values[i]=%d\n", graph.node_values[i]);
-
-            SizeT write_idx  = (i * walk_length) + iteration; // Write location in RW array
-            walks[write_idx] = v[i];                          // record current position in walk
-
-            if(iteration < walk_length - 1) {
-              // Determine next neighbor to walk to
-              SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
-              SizeT offset        = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
-              VertexT neighbor    = graph.GetEdgeDest(graph.GetNeighborListOffset(v[i]) + offset);
-              v[i]                = neighbor; // Replace vertex w/ neighbor in queue
-            }
-          };
-
-          GUARD_CU(frontier.V_Q()->ForAll(
-            uniform_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
-
-        } else if (walk_mode == 1) {
-          auto max_rw_op = [
-              graph,
-              walks,
-              rand,
-              iteration,
-              walk_length
-          ] __host__ __device__ (VertexT *v, const SizeT &i) {
-
-            SizeT write_idx  = (i * walk_length) + iteration; // Write location in RW array
-            walks[write_idx] = v[i];                          // record current position in walk
-
-            if(iteration < walk_length - 1) {
-              // Walk to neighbor w/ maximum node value
-              SizeT num_neighbors        = graph.GetNeighborListLength(v[i]);
-              SizeT neighbor_list_offset = graph.GetNeighborListOffset(v[i]);
-
-              VertexT max_neighbor_id  = graph.GetEdgeDest(neighbor_list_offset + 0);
-              VertexT max_neighbor_val = graph.node_values[max_neighbor_id];
-              for(SizeT offset = 1; offset < num_neighbors; offset++) {
-                VertexT neighbor     = graph.GetEdgeDest(neighbor_list_offset + offset);
-                ValueT  neighbor_val = graph.node_values[neighbor];
-                if(neighbor_val > max_neighbor_val) {
-                  max_neighbor_id  = neighbor;
-                  max_neighbor_val = neighbor_val;
-                }
+              if(neib != dest) {
+                ValueT edge_weight = (ValueT)1.0; // Could do more complex functions of edge weights
+                SizeT edge_idx = (SizeT)neib * graph.nodes + (SizeT)dest;
+                atomicAdd(projections + edge_idx, edge_weight);
               }
-              v[i] = max_neighbor_id; // Replace vertex w/ neighbor in queue
             }
-          };
 
-          GUARD_CU(frontier.V_Q()->ForAll(
-            max_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+            return false;
+        };
 
+        // filter operation
+        auto filter_op = [
+        ] __host__ __device__ (
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            return false;
+        };
+
+        // --
+        // Run
+
+        // <TODO> some of this may need to be edited depending on algorithmic needs
+        // !! How much variation between apps is there in these calls?
+
+        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+            oprtr_parameters, advance_op, filter_op));
+
+        if (oprtr_parameters.advance_mode != "LB_CULL" &&
+            oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
+        {
+            frontier.queue_reset = false;
+            GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                oprtr_parameters, filter_op));
         }
+
+        // Get back the resulted frontier length
+        GUARD_CU(frontier.work_progress.GetQueueLength(
+            frontier.queue_index, frontier.queue_length,
+            false, oprtr_parameters.stream, true));
+
+        // </TODO>
 
         return retval;
     }
-
-    bool Stop_Condition(int gpu_num = 0)
-    {
-      auto &data_slice = this -> enactor ->
-            problem -> data_slices[this -> gpu_num][0];
-      auto &enactor_slices = this -> enactor -> enactor_slices;
-      auto iter = enactor_slices[0].enactor_stats.iteration;
-
-      return iter == data_slice.walk_length;
-    }
-
 
     /**
      * @brief Routine to combine received data and local data
@@ -214,7 +193,7 @@ struct RWIterationLoop : public IterationLoopBase
             (received_length, peer_, expand_op);
         return retval;
     }
-}; // end of RWIteration
+}; // end of projIteration
 
 /**
  * @brief Template enactor class.
@@ -229,8 +208,8 @@ template <
 class Enactor :
     public EnactorBase<
         typename _Problem::GraphT,
-        typename _Problem::GraphT::VertexT,
-        typename _Problem::GraphT::ValueT,
+        typename _Problem::GraphT::VertexT, // TODO: change to other label types used for the operators, e.g.: typename _Problem::LabelT,
+        typename _Problem::GraphT::ValueT, // TODO: change to other value types used for inter GPU communication, e.g.: typename _Problem::ValueT,
         ARRAY_FLAG, cudaHostRegisterFlag>
 {
 public:
@@ -244,25 +223,27 @@ public:
         BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
-    typedef RWIterationLoop<EnactorT>
+    typedef projIterationLoop<EnactorT>
         IterationT;
 
     Problem *problem;
     IterationT *iterations;
 
     /**
-     * @brief RW constructor
+     * @brief proj constructor
      */
     Enactor() :
-        BaseEnactor("RW"),
+        BaseEnactor("graph_projections"),
         problem    (NULL  )
     {
+        // <TODO> change according to algorithmic needs
         this -> max_num_vertex_associates = 0;
         this -> max_num_value__associates = 1;
+        // </TODO>
     }
 
     /**
-     * @brief RW destructor
+     * @brief proj destructor
      */
     virtual ~Enactor() { /*Release();*/ }
 
@@ -294,12 +275,13 @@ public:
         this->problem = &problem;
 
         // Lazy initialization
-        // !! POSSIBLE BUG: @sgpyc suggested changing the 2 to 1, but that causes
-        //  strange behavior, where V_Q does not get initialized properly.
         GUARD_CU(BaseEnactor::Init(
-            problem, Enactor_None, 2, NULL, target, false));
-        for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
-        {
+            problem, Enactor_None,
+            // <TODO> change to how many frontier queues, and their types
+            2, NULL,
+            // </TODO>
+            target, false));
+        for (int gpu = 0; gpu < this -> num_gpus; gpu ++) {
             GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
             auto &enactor_slice = this -> enactor_slices[gpu * this -> num_gpus + 0];
             auto &graph = problem.sub_graphs[gpu];
@@ -318,17 +300,17 @@ public:
     }
 
     /**
-      * @brief one run of RW, to be called within GunrockThread
+      * @brief one run of proj, to be called within GunrockThread
       * @param thread_data Data for the CPU thread
       * \return cudaError_t error message(s), if any
       */
     cudaError_t Run(ThreadSlice &thread_data)
     {
         gunrock::app::Iteration_Loop<
-            // <OPEN> change to how many {VertexT, ValueT} data need to communicate
+            // <TODO> change to how many {VertexT, ValueT} data need to communicate
             //       per element in the inter-GPU sub-frontiers
             0, 1,
-            // </OPEN>
+            // </TODO>
             IterationT>(
             thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
@@ -336,43 +318,49 @@ public:
 
     /**
      * @brief Reset enactor
+...
      * @param[in] target Target location of data
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Reset(int walks_per_node, util::Location target = util::DEVICE)
+    cudaError_t Reset(
+        util::Location target = util::DEVICE)
     {
         typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
 
         SizeT num_nodes = this -> problem -> data_slices[0][0].sub_graph[0].nodes;
-        printf("num_nodes=%d\n", num_nodes);
 
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
-           if (this->num_gpus == 1) {
-               this -> thread_slices[gpu].init_size = num_nodes * walks_per_node;
+           if ((this->num_gpus == 1)) {
+           // if ((this->num_gpus == 1) ||
+           //      (gpu == this->problem->org_graph->GpT::partition_table[src])) {
+               this -> thread_slices[gpu].init_size = num_nodes;
                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
                    auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                   frontier.queue_length = (peer_ == 0) ? num_nodes * walks_per_node : 0;
+                   frontier.queue_length = (peer_ == 0) ? num_nodes : 0;
                    if (peer_ == 0) {
-
+                      // Fill input frontier w/ all nodes
                       util::Array1D<SizeT, VertexT> tmp;
-                      tmp.Allocate(num_nodes * walks_per_node, target | util::HOST);
-                      for(SizeT i = 0; i < num_nodes * walks_per_node; ++i) {
-                          tmp[i] = (VertexT)i % num_nodes;
+                      tmp.Allocate(num_nodes, target | util::HOST);
+                      for(SizeT i = 0; i < num_nodes; ++i) {
+                          tmp[i] = (VertexT)i;
                       }
                       GUARD_CU(tmp.Move(util::HOST, target));
 
                       GUARD_CU(frontier.V_Q() -> ForEach(tmp,
                           []__host__ __device__ (VertexT &v, VertexT &i) {
                           v = i;
-                      }, num_nodes * walks_per_node, target, 0));
+                      }, num_nodes, target, 0));
 
                       tmp.Release();
-                 }
+                   }
                }
            } else {
-                // MULTIGPU INCOMPLETE
+                this -> thread_slices[gpu].init_size = 0;
+                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
+                    this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier.queue_length = 0;
+                }
            }
         }
 
@@ -381,19 +369,20 @@ public:
     }
 
     /**
-     * @brief Enacts a RW computing on the specified graph.
+     * @brief Enacts a proj computing on the specified graph.
+...
      * \return cudaError_t error message(s), if any
      */
     cudaError_t Enact()
     {
         cudaError_t retval = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));
-        util::PrintMsg("GPU RW Done.", this -> flag & Debug);
+        util::PrintMsg("GPU graph_projections Done.", this -> flag & Debug);
         return retval;
     }
 };
 
-} // namespace rw
+} // namespace Template
 } // namespace app
 } // namespace gunrock
 
