@@ -34,6 +34,7 @@ struct PreDefinedValues<char>
     static const char AllOnes  = ~AllZeros;
     static const char InvalidValue = AllOnes;
     static const bool Signed   = true;
+    typedef short PromoteType;
 };
 
 template <>
@@ -45,6 +46,7 @@ struct PreDefinedValues<unsigned char>
     static const unsigned char AllOnes  = ~AllZeros;
     static const unsigned char InvalidValue = AllOnes;
     static const bool Signed   = false;
+    typedef unsigned short PromoteType;
 };
 
 template <>
@@ -56,6 +58,7 @@ struct PreDefinedValues<signed char>
     static const signed char AllOnes  = ~AllZeros;
     static const signed char InvalidValue = AllOnes;
     static const bool Signed   = true;
+    typedef signed short PromoteType;
 };
 
 template <>
@@ -67,6 +70,8 @@ struct PreDefinedValues<short>
     static const short AllOnes  = ~AllZeros;
     static const short InvalidValue = AllOnes;
     static const bool Signed   = true;
+    typedef int PromoteType;
+    typedef char DemoteType;
 };
 
 template <>
@@ -78,6 +83,8 @@ struct PreDefinedValues<unsigned short>
     static const unsigned short AllOnes  = ~AllZeros;
     static const unsigned short InvalidValue = AllOnes;
     static const bool Signed   = false;
+    typedef unsigned int PromoteType;
+    typedef unsigned char DemoteType;
 };
 
 template <>
@@ -89,6 +96,12 @@ struct PreDefinedValues<int>
     static const int AllOnes  = ~AllZeros;
     static const int InvalidValue = AllOnes;
     static const bool Signed   = true;
+    typedef short DemoteType;
+    #if LONG_MAX == INT_MAX
+        typedef long long PromoteType;
+    #else
+        typedef long PromoteType;
+    #endif
 };
 
 template <>
@@ -100,6 +113,12 @@ struct PreDefinedValues<unsigned int>
     static const unsigned int AllOnes  = ~AllZeros;
     static const unsigned int InvalidValue = AllOnes;
     static const bool Signed   = false;
+    typedef unsigned short DemoteType;
+    #if LONG_MAX == INT_MAX
+        typedef unsigned long long PromoteType;
+    #else
+        typedef unsigned long PromoteType;
+    #endif
 };
 
 template <>
@@ -111,6 +130,12 @@ struct PreDefinedValues<long>
     static const long AllOnes  = ~AllZeros;
     static const long InvalidValue = AllOnes;
     static const bool Signed   = true;
+    typedef long long PromoteType;
+    #if LONG_MAX == INT_MAX
+        typedef short DemoteType;
+    #else
+        typedef int DemoteType;
+    #endif
 };
 
 template <>
@@ -122,6 +147,12 @@ struct PreDefinedValues<unsigned long>
     static const unsigned long AllOnes  = ~AllZeros;
     static const unsigned long InvalidValue = AllOnes;
     static const bool Signed   = false;
+    typedef unsigned long long PromoteType;
+    #if LONG_MAX == INT_MAX
+        typedef unsigned short DemoteType;
+    #else
+        typedef unsigned int DemoteType;
+    #endif
 };
 
 template <>
@@ -133,6 +164,7 @@ struct PreDefinedValues<long long>
     static const long long AllOnes  = ~AllZeros;
     static const long long InvalidValue = AllOnes;
     static const bool Signed   = true;
+    typedef long DemoteType;
 };
 
 template <>
@@ -144,6 +176,7 @@ struct PreDefinedValues<unsigned long long>
     static const unsigned long long AllOnes  = ~AllZeros;
     static const unsigned long long InvalidValue = AllOnes;
     static const bool Signed   = false;
+    typedef unsigned long DemoteType;
 };
 
 template <>
@@ -153,6 +186,7 @@ struct PreDefinedValues<float>
     constexpr static const float MaxValue = FLT_MAX;
     constexpr static const float InvalidValue = NAN;
     static const bool Signed   = true;
+    typedef double PromoteType;
 };
 
 template <>
@@ -162,6 +196,8 @@ struct PreDefinedValues<double>
     constexpr static const double MaxValue = DBL_MAX;
     constexpr static const double InvalidValue = NAN;
     static const bool Signed   = true;
+    typedef long double PromoteType;
+    typedef float DemoteType;
 };
 
 template <>
@@ -171,6 +207,7 @@ struct PreDefinedValues<long double>
     constexpr static const long double MaxValue = LDBL_MAX;
     constexpr static const long double InvalidValue = NAN;
     static const bool Signed   = true;
+    typedef double DemoteType;
 };
 
 template <typename T>

@@ -56,6 +56,7 @@ struct MFIterationLoop : public IterationLoopBase
     typedef typename EnactorT::Problem	ProblemT;
     typedef typename ProblemT::GraphT	GraphT;
     typedef typename GraphT::CsrT	CsrT;
+
     typedef IterationLoopBase <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
     MFIterationLoop() : BaseIterationLoop() {}
@@ -327,6 +328,7 @@ struct MFIterationLoop : public IterationLoopBase
 		    std::to_string(value__associate_ins[in_pos]));*/
 	auto expand_op = [capacity, flow, excess, height] 
 	__host__ __device__(VertexT &key, const SizeT &in_pos,
+
             VertexT *vertex_associate_ins,
             ValueT  *value__associate_ins) -> bool
         {
@@ -368,7 +370,6 @@ struct MFIterationLoop : public IterationLoopBase
 
 	return false;
     }
-
 }; // end of MFIteration
 
 /**

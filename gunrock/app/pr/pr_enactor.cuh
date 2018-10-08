@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <gunrock/util/sort_utils.cuh>
+#include <gunrock/util/sort_device.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
@@ -384,7 +384,7 @@ public:
         this -> problem = &problem;
 
         GUARD_CU(BaseEnactor::Init(
-            problem, Enactor_None, 0, NULL, target, false));
+            problem, Enactor_None, 2, NULL, target, false));
 
         iterations = new IterationT[this -> num_gpus];
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
@@ -672,8 +672,8 @@ public:
             }, nodes, util::DEVICE, this -> enactor_slices[0].stream));
 
         //util::PrintMsg("#nodes = " + std::to_string(nodes));
-        size_t cub_required_size = 0;
-        void* temp_storage = NULL;
+        //size_t cub_required_size = 0;
+        //void* temp_storage = NULL;
         /*cub::DoubleBuffer<ValueT > key_buffer(
             data_slice.rank_curr.GetPointer(util::DEVICE),
             data_slice.rank_next.GetPointer(util::DEVICE));
@@ -714,16 +714,12 @@ public:
                 }, nodes, util::DEVICE, this -> enactor_slices[0].stream));
         }*/
 
-        util::CUBRadixSort<ValueT, VertexT>(
-            false, nodes,
-            data_slice.rank_curr  .GetPointer(util::DEVICE),
-            data_slice.node_ids   .GetPointer(util::DEVICE),
-            data_slice.rank_next  .GetPointer(util::DEVICE),
-            data_slice.temp_vertex.GetPointer(util::DEVICE),
-            temp_storage, cub_required_size,
-            //data_slice.cub_sort_storage.GetPointer(util::DEVICE),
-            //data_slice.cub_sort_storage.GetSize(),
-            this -> enactor_slices[0].stream);
+        util::Array1D<SizeT, char> cub_temp_space;
+        GUARD_CU(util::cubSortPairs(
+            cub_temp_space,
+            data_slice.rank_curr, data_slice.rank_next,
+            data_slice.node_ids , data_slice.temp_vertex,
+            nodes, 0, sizeof(ValueT) * 8, this -> enactor_slices[0].stream));
 
         //GUARD_CU(data_slice.rank_curr.ForAll(data_slice.node_ids,
         //    []__host__ __device__(ValueT *ranks, VertexT *ids, const SizeT &pos)

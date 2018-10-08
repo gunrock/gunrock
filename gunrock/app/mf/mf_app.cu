@@ -79,6 +79,7 @@ cudaError_t RunTests(
 {
     debug_aml("RunTests starts");
     cudaError_t retval = cudaSuccess;
+
     typedef Problem<GraphT>	      ProblemT;
     typedef Enactor<ProblemT>	      EnactorT;
 
@@ -121,6 +122,7 @@ cudaError_t RunTests(
 
         cpu_timer.Start();
         GUARD_CU(enactor.Enact());
+
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
@@ -133,10 +135,10 @@ cudaError_t RunTests(
         if (validation == "each")
         {
             GUARD_CU(problem.Extract(h_flow));
-	    app::mf::minCut(graph, source, h_flow, min_cut);
+	          app::mf::minCut(graph, source, h_flow, min_cut);
             int num_errors = app::mf::Validate_Results(parameters, graph, 
-		    source, sink, h_flow, h_reverse, min_cut, ref_flow, 
-		    quiet_mode);
+		                      source, sink, h_flow, h_reverse, min_cut, ref_flow, 
+		                      quiet_mode);
         }
     }
     
@@ -152,6 +154,7 @@ cudaError_t RunTests(
 
     // Compute running statistics
     //info.ComputeTraversalStats(enactor, h_flow);
+
     // Display_Memory_Usage(problem);
     #ifdef ENABLE_PERFORMANCE_PROFILING
         //Display_Performance_Profiling(enactor);
@@ -160,6 +163,7 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
+
     delete[] h_flow; 
     h_flow = NULL;
 
@@ -189,6 +193,7 @@ cudaError_t RunTests(
  */
 template <typename GraphT, typename VertexT = typename GraphT::VertexT,
     typename ValueT = typename GraphT::ValueT>
+
 double gunrock_mf(
     gunrock::util::Parameters &parameters,
     GraphT  &graph,
@@ -235,7 +240,7 @@ double gunrock_mf(
     problem.Release(target);
     return total_time;
 }
-
+*/
 /*
  * @brief Simple interface  take in graph as CSR format
  * @param[in]  num_nodes    Number of veritces in the input graph
@@ -249,6 +254,7 @@ double gunrock_mf(
  * @param[out] maxflow	    Return maxflow value
  * \return     double       Return accumulated elapsed times for all runs
  */
+/*
 template <
     typename VertexT  = uint32_t,
     typename SizeT    = uint32_t,
@@ -364,7 +370,7 @@ double mf(
     d_graph.Release();
 
     return elapsed_time;
-}
+}*/
 
 // Leave this at the end of the file
 // Local Variables:

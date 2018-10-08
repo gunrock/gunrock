@@ -95,7 +95,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     typedef typename GraphT::SizeT    SizeT;
     typedef typename GraphT::GpT      GpT;
     typedef	    _ValueT	      ValueT;
-
     typedef ProblemBase	 <GraphT, FLAG>	BaseProblem;
     typedef DataSliceBase<GraphT, FLAG>	BaseDataSlice;
 
@@ -178,19 +177,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          */
         cudaError_t Init(
             GraphT        &sub_graph,
-	    int		   num_gpus = 1,
+	          int		   num_gpus = 1,
             int            gpu_idx  = 0,
             util::Location target   = util::DEVICE,
             ProblemFlag    flag     = Problem_None)
         {
-	    debug_aml("DataSlice Init");
+	          debug_aml("DataSlice Init");
 
             cudaError_t retval  = cudaSuccess;
-	    SizeT nodes_size = sub_graph.nodes;
-	    SizeT edges_size = sub_graph.edges;
+	          SizeT nodes_size = sub_graph.nodes;
+	          SizeT edges_size = sub_graph.edges;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, 
-			flag));
+			                                    flag));
 
             // 
 	    // Allocate data on Gpu
@@ -204,8 +203,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(active	    .Allocate(1, util::HOST|target));
 
 
-	    GUARD_CU(util::SetDevice(gpu_idx));
-	    GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
+	          GUARD_CU(util::SetDevice(gpu_idx));
+	          GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
+
             return retval;
         } // Init Data Slice
 
@@ -218,7 +218,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 		VertexT* h_reverse, util::Location target = util::DEVICE)
         {
             cudaError_t retval = cudaSuccess;
-
 	    typedef typename GraphT::CsrT CsrT;
 
 	    debug_aml("DataSlice Reset");
@@ -403,6 +402,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	      }, eN, util::HOST));
 	}
 	GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
+
         return retval;
     }
 
@@ -424,7 +424,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
-	    auto gpu_name = std::to_string(gpu);
+	          auto gpu_name = std::to_string(gpu);
             data_slices[gpu].SetName("data_slices[" + gpu_name + "]");
 
             if (target & util::DEVICE)
@@ -433,14 +433,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
             auto &data_slice = data_slices[gpu][0];
             GUARD_CU(data_slice.Init(
-			this->sub_graphs[gpu],
-			this->num_gpus,
-			this->gpu_idx[gpu], 
-			target, 
-			this->flag));
+                              this->sub_graphs[gpu],
+                              this->num_gpus,
+                              this->gpu_idx[gpu], 
+                              target, 
+                              this->flag));
 
-	    GUARD_CU2(cudaStreamSynchronize(data_slices[gpu]->stream),
-		   "sync failed.");
+            GUARD_CU2(cudaStreamSynchronize(data_slices[gpu]->stream),
+             "sync failed.");
+
         } // end for (gpu)
         return retval;
     }// End Init MF Problem

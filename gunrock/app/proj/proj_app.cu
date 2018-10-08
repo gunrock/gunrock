@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file hello_app.cu
+ * @file proj_app.cu
  *
  * @brief Simple Gunrock Application
  */
@@ -17,16 +17,12 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// <TODO> change includes
-#include <gunrock/app/hello/hello_enactor.cuh>
-#include <gunrock/app/hello/hello_test.cuh>
-// </TODO>
+#include <gunrock/app/proj/proj_enactor.cuh>
+#include <gunrock/app/proj/proj_test.cuh>
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
-namespace hello {
-// </TODO>
+namespace proj {
 
 
 cudaError_t UseParameters(util::Parameters &parameters)
@@ -35,43 +31,29 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_app(parameters));
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
-
-    // <TODO> add app specific parameters, eg:
-    // GUARD_CU(parameters.Use<std::string>(
-    //    "src",
-    //    util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-    //    "0",
-    //    "<Vertex-ID|random|largestdegree> The source vertices\n"
-    //    "\tIf random, randomly select non-zero degree vertices;\n"
-    //    "\tIf largestdegree, select vertices with largest degrees",
-    //    __FILE__, __LINE__));
-    // </TODO>
-
     return retval;
 }
 
 /**
- * @brief Run hello tests
+ * @brief Run proj tests
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the distances
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
 ...
- * @param[in]  target        where to perform the app 
+ * @param[in]  target        where to perform the app
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT>
 cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
-    // <TODO> add problem specific reference results, e.g.:
-    typename GraphT::ValueT *ref_degrees,
-    // </TODO>
+    typename GraphT::ValueT *ref_projections,
     util::Location target)
 {
-    
+
     cudaError_t retval = cudaSuccess;
-       
+
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::SizeT   SizeT;
@@ -82,51 +64,34 @@ cudaError_t RunTests(
     bool quiet_mode = parameters.Get<bool>("quiet");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    util::Info info("hello", parameters, graph);
-    
+    util::Info info("proj", parameters, graph);
+
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
 
-    // <TODO> get problem specific inputs, e.g.:
-    // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-    // printf("RunTests: %d srcs: src[0]=%d\n", srcs.size(), srcs[0]);
-    // </TODO>
-
-    // <TODO> allocate problem specific host data, e.g.:
-    ValueT *h_degrees = new ValueT[graph.nodes];
-    // </TODO>
+    ValueT *h_projections = new ValueT[graph.nodes * graph.nodes];
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
     GUARD_CU(problem.Init(graph, target));
     GUARD_CU(enactor.Init(problem, target));
-    
+
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
-    
+
     for (int run_num = 0; run_num < num_runs; ++run_num) {
         GUARD_CU(problem.Reset(
-            // <TODO> problem specific data if necessary, eg:
-            // src,
-            // </TODO>
             target
         ));
         GUARD_CU(enactor.Reset(
-            // <TODO> problem specific data if necessary:
-            // srcs[run_num % srcs.size()],
-            // </TODO>
             target
         ));
-        
+
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
-        GUARD_CU(enactor.Enact(
-            // <TODO> problem specific data if necessary:
-            // srcs[run_num % srcs.size()]
-            // </TODO>
-        ));
+        GUARD_CU(enactor.Enact());
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
@@ -136,63 +101,52 @@ cudaError_t RunTests(
             ", #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
-        
+
         if (validation == "each") {
-            
+
             GUARD_CU(problem.Extract(
-                // <TODO> problem specific data
-                h_degrees
-                // </TODO>
+                h_projections
             ));
             SizeT num_errors = Validate_Results(
                 parameters,
                 graph,
-                // <TODO> problem specific data
-                h_degrees, ref_degrees,
-                // </TODO>
+                h_projections, ref_projections,
                 false);
         }
     }
 
     cpu_timer.Start();
-    
+
     GUARD_CU(problem.Extract(
-        // <TODO> problem specific data
-        h_degrees
-        // </TODO>
+        h_projections
     ));
     if (validation == "last") {
         SizeT num_errors = Validate_Results(
             parameters,
             graph,
-            // <TODO> problem specific data
-            h_degrees, ref_degrees,
-            // </TODO>
+            h_projections, ref_projections,
             false);
     }
 
     // compute running statistics
-    // <TODO> change NULL to problem specific per-vertex visited marker, e.g. h_distances
-    info.ComputeTraversalStats(enactor, (VertexT*)NULL);
-    //Display_Memory_Usage(problem);
-    #ifdef ENABLE_PERFORMANCE_PROFILING
-        //Display_Performance_Profiling(enactor);
-    #endif
-    // </TODO>
+    // TODO: change NULL to problem specific per-vertex visited marker, e.g. h_distances
+    // info.ComputeTraversalStats(enactor, (VertexT*)NULL);
+    // //Display_Memory_Usage(problem);
+    // #ifdef ENABLE_PERFORMANCE_PROFILING
+    //     //Display_Performance_Profiling(enactor);
+    // #endif
 
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    // <TODO> Release problem specific data, e.g.:
-    delete[] h_degrees; h_degrees   = NULL;
-    // </TODO>
+    delete[] h_projections; h_projections   = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
     return retval;
 }
 
-} // namespace hello
+} // namespace proj
 } // namespace app
 } // namespace gunrock
 
@@ -274,7 +228,7 @@ cudaError_t RunTests(
 //  * @param[out] distances   Return shortest distance to source per vertex
 //  * @param[out] preds       Return predecessors of each vertex
 //  * \return     double      Return accumulated elapsed times for all runs
- 
+
 // template <
 //     typename VertexT = int,
 //     typename SizeT   = int,

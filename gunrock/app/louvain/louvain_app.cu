@@ -102,7 +102,7 @@ cudaError_t RunTests(
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
             
-            GUARD_CU(problem.Extract(h_communities, target));
+            GUARD_CU(problem.Extract(h_communities, NULL, target));
             SizeT num_errors = app::louvain::Validate_Results(
                 parameters, graph, h_communities, ref_communities);
         } else {
@@ -115,7 +115,7 @@ cudaError_t RunTests(
 
     cpu_timer.Start();
     // Copy out results
-    GUARD_CU(problem.Extract(h_communities, target));
+    GUARD_CU(problem.Extract(h_communities, NULL, target));
     if (validation == "last")
     {
         SizeT num_errors = app::louvain::Validate_Results(
@@ -185,7 +185,7 @@ double gunrock_louvain(
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-        problem.Extract(communities);
+        problem.Extract(communities, NULL, target);
     }
 
     enactor.Release(target);
