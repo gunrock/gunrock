@@ -54,6 +54,7 @@ struct main_struct
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
+        //GUARD_CU(graph.csr().Display());
 
         VertexT  *ref_communities = NULL;
         bool quick = parameters.Get<bool>("quick");
@@ -97,7 +98,7 @@ struct main_struct
                     {
                         util::PrintMsg("__________________________", !quiet);
                         float elapsed = app::louvain::OMP_Reference(
-                            parameters, graph.csr(), ref_communities);
+                            parameters, graph.csr(), omp_communities);
                         util::PrintMsg("--------------------------", !quiet);
 
                         if (validation == "each")

@@ -15,19 +15,19 @@
 
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
+#include <gunrock/util/type_limits.cuh>
 
 // Graph definations
 #include <gunrock/graphio/graphio.cuh>
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// single-source shortest path includes
+// MF includes
 #include <gunrock/app/mf/mf_enactor.cuh>
 #include <gunrock/app/mf/mf_test.cuh>
 
 namespace gunrock {
 namespace app {
-// TODO: change the space name
 namespace mf {
 
 cudaError_t UseParameters(util::Parameters &parameters)
@@ -59,103 +59,98 @@ cudaError_t UseParameters(util::Parameters &parameters)
 
 /**
  * @brief Run mf tests
- * @tparam     GraphT        Type of the graph
- * @tparam     ValueT        Type of the distances
- * @param[in]  parameters    Excution parameters
- * @param[in]  graph         Input graph
- * @param[in]  ref_distances Reference distances
- * @param[in]  target        Whether to perform the mf
+ * @tparam     GraphT	  Type of the graph
+ * @tparam     ValueT	  Type of the capacity on edges
+ * @param[in]  parameters Excution parameters
+ * @param[in]  graph	  Input graph
+ * @param[in]  ref_flow	  Reference flow on edges
+ * @param[in]  target	  Whether to perform the mf
  * \return cudaError_t error message(s), if any
  */
-template <typename GraphT, typename ValueT = typename GraphT::ValueT>
+template <typename GraphT, typename ValueT>
 cudaError_t RunTests(
-    util::Parameters &parameters,
-    GraphT           &graph,
-    // TODO: add problem specific reference results, e.g.:
-    // ValueT **ref_distances = NULL,
-    ValueT **ref_excess = NULL,
-    util::Location target = util::DEVICE)
+    util::Parameters  &parameters,
+    GraphT	      &graph,
+    ValueT	      **ref_flow = NULL,
+    util::Location    target = util::DEVICE)
 {
     cudaError_t retval = cudaSuccess;
-    typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::SizeT   SizeT;
-    typedef Problem<GraphT  > ProblemT;
-    typedef Enactor<ProblemT> EnactorT;
-    util::CpuTimer    cpu_timer, total_timer;
-    cpu_timer.Start(); total_timer.Start();
+    typedef typename GraphT::VertexT  VertexT;
+    typedef Problem<GraphT>	      ProblemT;
+    typedef Enactor<ProblemT>	      EnactorT;
+
+    util::CpuTimer total_timer;	total_timer.Start();
+    util::CpuTimer cpu_timer;	cpu_timer.Start(); 
 
     // parse configurations from parameters
-    bool quiet_mode = parameters.Get<bool>("quiet");
-    int  num_runs   = parameters.Get<int >("num-runs");
-    std::string validation = parameters.Get<std::string>("validation");
-    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-    int  num_srcs   = srcs   .size();
+    bool quiet_mode	    = parameters.Get<bool>("quiet");
+    int  num_runs	    = parameters.Get<int >("num-runs");
+    std::string validation  = parameters.Get<std::string>("validation");
+    VertexT source	    = parameters.Get<VertexT>("source");
+    VertexT sink	    = parameters.Get<VertexT>("sink");
     util::Info info("MF", parameters, graph); // initialize Info structure
 
-    // TODO: get problem specific inputs, e.g.:
-
     // Allocate host-side array (for both reference and GPU-computed results)
-    // TODO: allocate problem specific host data, e.g.:
-     ValueT  *h_excess = new ValueT[graph.nodes];
-
+    ValueT **h_flow   = (ValueT**)malloc(sizeof(ValueT*)*graph.nodes);
+    for (VertexT i = 0; i < graph.nodes; ++i){
+	h_flow[i] = (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
+	for (VertexT j = 0; j < graph.nodes; ++j){
+	    h_flow[i][j] = 0;
+	}
+    }
+    
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
     GUARD_CU(problem.Init(graph  , target));
     GUARD_CU(enactor.Init(problem, target));
+
+    /*
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
-    // perform the algorithm
-    // TODO: Declear problem specific variables, e.g.:
-    VertexT src;
+    // perform the MF algorithm
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        // TODO: assign problem specific variables, e.g.:
-        src = srcs[run_num % num_srcs];
-        GUARD_CU(problem.Reset(src, target));
-        GUARD_CU(enactor.Reset(src, target));
+        GUARD_CU(problem.Reset(target));
+        GUARD_CU(enactor.Reset(target));
+
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
-        GUARD_CU(enactor.Enact(src));
+        GUARD_CU(enactor.Enact(source, sink));
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
         util::PrintMsg("--------------------------\nRun "
             + std::to_string(run_num) + " elapsed: "
             + std::to_string(cpu_timer.ElapsedMillis()) +
-            " ms, src = " + std::to_string(src) +
+            " ms, src = " + std::to_string(source) +
+	    " , sink = " + std::to_string(sink) +
             ", #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
         if (validation == "each")
         {
             // TODO: fill in problem specific data, e.g.:
-            GUARD_CU(problem.Extract(h_excess));
-            SizeT num_errors = app::mf::Validate_Results(
-                parameters, graph, src, h_excess,
-                ref_excess == NULL ? NULL : ref_excess[run_num % num_srcs],
-                false);
+            GUARD_CU(problem.Extract(h_flow));
+            SizeT num_errors = app::mf::Validate_Results(parameters, graph, 
+		    source, sink, h_flow, ref_flow, quiet_mode);
         }
     }
 
-    cpu_timer.Start();
     // Copy out results
-    // TODO: fill in problem specific data, e.g.:
-    GUARD_CU(problem.Extract(h_excess));
+    cpu_timer.Start();
+    GUARD_CU(problem.Extract(h_flow));
     if (validation == "last")
     {
-        SizeT num_errors = app::mf::Validate_Results(
-            parameters, graph, src, h_excess,
-            ref_excess == NULL ? NULL : ref_excess[(num_runs -1) % num_srcs],
-            true);
+        SizeT num_errors = app::mf::Validate_Results(parameters, graph, 
+		source, sink, h_flow, ref_flow, quiet_mode);
     }
 
-    // compute running statistics
-    // TODO: change NULL to problem specific per-vertex visited marker, e.g. h_distances
-    info.ComputeTraversalStats(enactor, h_excess);
-    //Display_Memory_Usage(problem);
+    // Compute running statistics
+    info.ComputeTraversalStats(enactor, h_flow);
+    // Display_Memory_Usage(problem);
     #ifdef ENABLE_PERFORMANCE_PROFILING
         //Display_Performance_Profiling(enactor);
     #endif
@@ -163,11 +158,16 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    // TODO: Release problem specific data, e.g.:
-    delete[] h_excess  ; h_excess   = NULL;
-    cpu_timer.Stop(); total_timer.Stop();
+    for (SizeT i=0; i<graph.nodes; ++i) 
+	delete[] h_flow[i];
+    delete[] h_flow; 
+    h_flow = NULL;
+
+    cpu_timer.Stop(); 
+    total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
+    */
     return retval;
 }
 
@@ -185,6 +185,7 @@ cudaError_t RunTests(
  * @param[out] preds      Return predecessors of each vertex
  * \return     double     Return accumulated elapsed times for all runs
  */
+/*
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_mf(
     gunrock::util::Parameters &parameters,
@@ -193,8 +194,8 @@ double gunrock_mf(
     ValueT **excess
     )
 {
-    typedef typename GraphT::VertexT VertexT;
-    typedef gunrock::app::mf::Problem<GraphT  > ProblemT;
+    typedef typename GraphT::VertexT		VertexT;
+    typedef gunrock::app::mf::Problem<GraphT>	ProblemT;
     typedef gunrock::app::mf::Enactor<ProblemT> EnactorT;
     gunrock::util::CpuTimer cpu_timer;
     gunrock::util::Location target = gunrock::util::DEVICE;
@@ -236,7 +237,7 @@ double gunrock_mf(
     srcs.clear();
     return total_time;
 }
-
+*/
 /*
  * @brief Simple interface take in graph as CSR format
  * @param[in]  num_nodes   Number of veritces in the input graph
@@ -251,6 +252,7 @@ double gunrock_mf(
  * @param[out] preds       Return predecessors of each vertex
  * \return     double      Return accumulated elapsed times for all runs
  */
+/*
 template <
     typename VertexT = int,
     typename SizeT   = int,
@@ -309,7 +311,7 @@ float mf(
     srcs.clear();
 
     return elapsed_time;
-}
+}*/
 
 // Leave this at the end of the file
 // Local Variables:
