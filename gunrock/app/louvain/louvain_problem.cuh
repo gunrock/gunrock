@@ -254,7 +254,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             }
             ///pass_communities.clear();
             delete[] pass_communities; pass_communities = NULL;
-
+            
             GUARD_CU(BaseDataSlice     ::Release(target));
             return retval;
         }

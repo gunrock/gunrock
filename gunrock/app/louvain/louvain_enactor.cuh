@@ -318,7 +318,6 @@ struct LouvainIterationLoop : public IterationLoopBase
                             
                     }, graph.edges + 1, target, stream)); 
             }
-
            
             // Filter in order
             GUARD_CU(util::cubSelectIf(

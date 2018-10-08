@@ -16,6 +16,7 @@
 
 #include <gunrock/util/track_utils.cuh>
 #include <gunrock/util/sort_device.cuh>
+
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
@@ -794,7 +795,6 @@ public:
                 ids[v] = temp_vertex[v];
                 rank_curr[v] = rank_next[v];
             }, nodes, util::DEVICE, this -> enactor_slices[0].stream));
-
 
         if (data_slice.scale)
         {
