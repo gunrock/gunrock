@@ -52,6 +52,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename util::PreDefinedValues<VertexT>::PromoteType EdgePairT;
+    static const int BITS_VERTEXT = sizeof(VertexT) * 8;
+    static const EdgePairT VERTEXT_MASK = (EdgePairT)util::PreDefinedValues<VertexT>::AllOnes;
     typedef _ValueT ValueT;
 
     typedef typename GraphT::CsrT    CsrT;
@@ -59,6 +61,25 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     typedef ProblemBase   <GraphT, FLAG> BaseProblem;
     typedef DataSliceBase <GraphT, FLAG> BaseDataSlice;
+
+    // COnverters
+    static __host__ __device__ __forceinline__
+    EdgePairT MakePair(const VertexT &first, const VertexT &second)
+    {
+        return (((EdgePairT)first) << BITS_VERTEXT) + second;
+    }    
+
+    static __host__ __device__ __forceinline__
+    VertexT GetFirst(const EdgePairT &pair)
+    {
+        return pair >> BITS_VERTEXT;
+    }
+
+    static __host__ __device__ __forceinline__
+    VertexT GetSecond(const EdgePairT &pair)
+    {
+        return pair & VERTEXT_MASK;
+    }
 
     //Helper structures
 
@@ -132,16 +153,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         ValueT q;
         
         // Contracted graph
-        GraphT *new_graph;
+        GraphT new_graphs[2];
 
-        std::vector<util::Array1D<SizeT, VertexT>*> pass_communities;
+        //std::vector<util::Array1D<SizeT, VertexT>*> pass_communities;
+        util::Array1D<SizeT, VertexT>* pass_communities;
+        int num_pass, max_iters;
 
+        // Whether to use cubRedixSort instead of cubSegmentRadixSort
+        bool unify_segments;
         /*
          * @brief Default constructor
          */
         DataSlice() : 
             BaseDataSlice(),
-            new_graph    (NULL)
+            //new_graph    (NULL),
+            unify_segments(false)
         {
             current_communities.SetName("current_communities");
             next_communities   .SetName("next_communities"   );
@@ -209,18 +235,25 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(max_gains          .Release(target));
             GUARD_CU(iter_gain          .Release(target));
 
-            if (new_graph != NULL)
+            //if (new_graph != NULL)
             {
-                GUARD_CU(new_graph -> Release(target));
-                delete new_graph; new_graph = NULL;
+                GUARD_CU(new_graphs[0].Release(target));
+                GUARD_CU(new_graphs[1].Release(target));
+                //delete new_graph; new_graph = NULL;
             }
 
-            for (auto &pass_comm : pass_communities)
+            //for (auto &pass_comm : pass_communities)
+            if (pass_communities != NULL)
+            for (int i = 0; i < max_iters; i ++)
             {
-                GUARD_CU(pass_comm -> Release(target));
-                delete pass_comm; pass_comm = NULL;
+                auto &pass_comm = pass_communities[i];
+                //if (pass_comm == NULL)
+                //    continue;
+                GUARD_CU(pass_comm.Release(target));
+                //delete pass_comm; pass_comm = NULL;
             }
-            pass_communities.clear();
+            ///pass_communities.clear();
+            delete[] pass_communities; pass_communities = NULL;
 
             GUARD_CU(BaseDataSlice     ::Release(target));
             return retval;
@@ -273,6 +306,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             {
                 GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
             }
+            pass_communities = new util::Array1D<SizeT, VertexT>[max_iters];
             return retval;
         } // Init
 
@@ -285,20 +319,26 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         {
             cudaError_t retval = cudaSuccess;
 
-            if (new_graph != NULL)
+            //if (new_graph != NULL)
             {
-                GUARD_CU(new_graph -> Release(target));
-                delete new_graph; new_graph = NULL;
+                //GUARD_CU(new_graphs[0].Release(target));
+                //GUARD_CU(new_graphs[1].Release(target));
+                //delete new_graph; new_graph = NULL;
             }
 
             pass_gain = 0;
 
-            for (auto &pass_comm : pass_communities)
-            {
-                GUARD_CU(pass_comm -> Release(target));
-                delete pass_comm; pass_comm = NULL;
-            }
-            pass_communities.clear();
+            //for (auto &pass_comm : pass_communities)
+            //for (int i = 0; i < max_iters; i++)
+            //{
+            //    auto &pass_comm = pass_communities[i];
+            //    if (pass_comm == NULL)
+            //        continue;
+            //    GUARD_CU(pass_comm -> Release(target));
+            //    delete pass_comm; pass_comm = NULL;
+            //}
+            num_pass = 0;
+            //pass_communities.clear();
 
             return retval;
         }
@@ -380,9 +420,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 h_communities[v] = v;
             auto &data_slice = data_slices[0][0];
 
-            for (auto &pass_comm : data_slice.pass_communities)
+            //for (auto &pass_comm : data_slice.pass_communities)
+            for (int i = 0; i < data_slice.num_pass; i++)
             {
-                auto &v2c = pass_comm[0];
+                auto &v2c = data_slice.pass_communities[i];
                 for (VertexT v = 0; v < nodes; v++)
                     h_communities[v] = v2c[h_communities[v]];
             }
@@ -460,8 +501,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
 
             GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
-
+        
             auto &data_slice = data_slices[gpu][0];
+            data_slice.unify_segments 
+                = this -> parameters.template Get<bool>("unify-segments");
+            data_slice.max_iters
+                = this -> parameters.template Get<int >("max-iters");
             GUARD_CU(data_slice.Init(this -> sub_graphs[gpu],
                 this -> num_gpus, this -> gpu_idx[gpu], target, this -> flag));
 

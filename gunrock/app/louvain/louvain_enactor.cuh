@@ -80,11 +80,18 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
         "Whether to show per-pass stats.",
         __FILE__, __LINE__));
 
-   GUARD_CU(parameters.Use<bool>(
+    GUARD_CU(parameters.Use<bool>(
         "iter-stats",
         util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         false,
         "Whether to show per-iteration stats.",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<bool>(
+        "unify-segments",
+        util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        false,
+        "Whether to use cub::RadixSort instead of cub::SegmentedRadixSort.",
         __FILE__, __LINE__));
 
     return retval;
@@ -101,6 +108,7 @@ struct LouvainIterationLoop : public IterationLoopBase
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
     typedef typename EnactorT::ValueT  ValueT;
+    typedef typename EnactorT::Problem ProblemT;
     typedef typename EnactorT::Problem::EdgePairT EdgePairT;
 
     typedef typename EnactorT::Problem::GraphT       GraphT;
@@ -148,6 +156,7 @@ struct LouvainIterationLoop : public IterationLoopBase
         auto         &num_neighbor_comms =   data_slice.num_neighbor_comms;
         auto         &edge_pairs0        =   data_slice.edge_pairs0;
         auto         &edge_pairs1        =   data_slice.edge_pairs1;
+        auto          unify_segments     =   data_slice.unify_segments;
         auto         &num_new_comms      =   data_slice.num_new_comms;
         auto         &num_new_edges      =   data_slice.num_new_edges;
         auto         &iter_gain          =   data_slice.iter_gain;
@@ -159,7 +168,7 @@ struct LouvainIterationLoop : public IterationLoopBase
 
         auto          graph_ptr          =   data_slice.sub_graph;
         if (enactor_stats.iteration != 0)
-            graph_ptr = data_slice.new_graph;
+            graph_ptr = &(data_slice.new_graphs[enactor_stats.iteration % 2]);
         auto         &graph              =   graph_ptr[0];        
         auto         &weights            =   graph.CsrT::edge_values;
 
@@ -225,48 +234,92 @@ struct LouvainIterationLoop : public IterationLoopBase
             if (enactor.iter_stats)
                 iter_timer.Start();
 
-            GUARD_CU(edge_comms0.ForAll(
-                [edge_weights0, weights, current_communities, graph]
-                __host__ __device__ (VertexT *e_comms, const SizeT &e)
-                {
-                    e_comms[e] = current_communities[graph.GetEdgeDest(e)];
-                    edge_weights0[e] = weights[e];
-                }, graph.edges, target, stream));
+            if (unify_segments)
+            {
+                GUARD_CU(edge_pairs0.ForAll(
+                    [edge_weights0, weights, current_communities, graph]
+                    __host__ __device__ (EdgePairT *e_comms, const SizeT &e)
+                    {
+                        VertexT src, dest;
+                        graph.GetEdgeSrcDest(e, src, dest);
+                        e_comms[e] = ProblemT::MakePair(src, current_communities[dest]);
+                        //edge_weights0[e] = weights[e];
+                    }, graph.edges, target, stream));
 
-            GUARD_CU(util::cubSegmentedSortPairs(
-                cub_temp_space,
-                edge_comms0  , edge_comms1,
-                edge_weights0, edge_weights1,
-                graph.edges, graph.nodes,
-                graph.CsrT::row_offsets,
-                0, std::ceil(std::log(graph.nodes)), stream));
+                GUARD_CU(util::cubSortPairs(
+                    cub_temp_space,
+                    edge_pairs0, edge_pairs1,
+                    weights, edge_weights1,
+                    graph.edges,
+                    0, sizeof(EdgePairT) * 8, stream));
+ 
+                // using edge_comms0 as markers
+                GUARD_CU(seg_offsets0.Set(0, graph.edges+1, target, stream));
 
-            // using edge_comms0 as markers
-            GUARD_CU(seg_offsets0.Set(0, graph.edges+1, target, stream));
 
-            GUARD_CU(graph.CsrT::row_offsets.ForAll(
-                [seg_offsets0]
-                __host__ __device__ (SizeT *offsets, const SizeT &v)
-                {
-                    seg_offsets0[offsets[v]] = 1;
-                }, graph.nodes + 1, target, stream));
-
-            GUARD_CU(seg_offsets0.ForAll(
-                [edge_comms1]
-                __host__ __device__ (SizeT *offsets, const SizeT &e)
-                {
-                    bool to_keep = false;
-                    if (offsets[e] == 1)
-                        to_keep = true;
-                    else if (e == 0)
-                        to_keep = true;
-                    else if (edge_comms1[e] != edge_comms1[e-1])
-                        to_keep = true;
-
-                    offsets[e] = (to_keep) ? e : util::PreDefinedValues<SizeT>::InvalidValue;
+                GUARD_CU(seg_offsets0.ForAll(
+                    [edge_pairs1, graph]
+                    __host__ __device__ (SizeT *offsets, const SizeT &e)
+                    {
+                        bool to_keep = false;
+                        if (e == 0 || e == graph.edges)
+                            to_keep = true;
+                        else {
+                            EdgePairT pair = edge_pairs1[e];
+                            EdgePairT pervious_pair = edge_pairs1[e-1];
+                            if (ProblemT::GetFirst(pair) != ProblemT::GetFirst(pervious_pair) ||
+                                ProblemT::GetSecond(pair) != ProblemT::GetSecond(pervious_pair))
+                                to_keep = true;
+                        }
                         
-                }, graph.edges + 1, target, stream));
-            
+                        offsets[e] = (to_keep) ? e : util::PreDefinedValues<SizeT>::InvalidValue;
+                    }, graph.edges + 1, target, stream));
+
+            } else {
+                GUARD_CU(edge_comms0.ForAll(
+                    [edge_weights0, weights, current_communities, graph]
+                    __host__ __device__ (VertexT *e_comms, const SizeT &e)
+                    {
+                        e_comms[e] = current_communities[graph.GetEdgeDest(e)];
+                        edge_weights0[e] = weights[e];
+                    }, graph.edges, target, stream));
+
+                GUARD_CU(util::cubSegmentedSortPairs(
+                    cub_temp_space,
+                    edge_comms0  , edge_comms1,
+                    edge_weights0, edge_weights1,
+                    graph.edges, graph.nodes,
+                    graph.CsrT::row_offsets,
+                    0, std::ceil(std::log(graph.nodes)), stream));
+
+                // using edge_comms0 as markers
+                GUARD_CU(seg_offsets0.Set(0, graph.edges+1, target, stream));
+
+                GUARD_CU(graph.CsrT::row_offsets.ForAll(
+                    [seg_offsets0]
+                    __host__ __device__ (SizeT *offsets, const SizeT &v)
+                    {
+                        seg_offsets0[offsets[v]] = 1;
+                    }, graph.nodes + 1, target, stream));
+
+                GUARD_CU(seg_offsets0.ForAll(
+                    [edge_comms1]
+                    __host__ __device__ (SizeT *offsets, const SizeT &e)
+                    {
+                        bool to_keep = false;
+                        if (offsets[e] == 1)
+                            to_keep = true;
+                        else if (e == 0)
+                            to_keep = true;
+                        else if (edge_comms1[e] != edge_comms1[e-1])
+                            to_keep = true;
+
+                        offsets[e] = (to_keep) ? e : util::PreDefinedValues<SizeT>::InvalidValue;
+                            
+                    }, graph.edges + 1, target, stream)); 
+            }
+
+           
             // Filter in order
             GUARD_CU(util::cubSelectIf(
                 cub_temp_space,
@@ -306,13 +359,13 @@ struct LouvainIterationLoop : public IterationLoopBase
                     if (v == graph.nodes)
                         offsets[v] = n_neighbor_comms;
                     else 
-                        offsets[v] = util::BinarySearch(
+                        offsets[v] = util::BinarySearch_LeftMost(
                             graph.GetNeighborListOffset(v),
-                            seg_offsets1, (SizeT)0, n_neighbor_comms + 1,
-                            [] (const SizeT &a, const SizeT &b)
-                            {
-                                return a < b;
-                            });
+                            seg_offsets1, (SizeT)0, n_neighbor_comms + 1);//,
+                            //[] (const SizeT &a, const SizeT &b)
+                            //{
+                            //    return a < b;
+                            //});
                     //if (offsets[v] != graph.row_offsets[v])
                     //printf("offsets[%d] <- %d, row_offsets[v] = %d\n",
                     //    v, offsets[v], graph.row_offsets[v]);
@@ -321,7 +374,8 @@ struct LouvainIterationLoop : public IterationLoopBase
             auto m2 = data_slice.m2;
             GUARD_CU(gain_bases.ForAll(
                 [seg_offsets0, edge_weights0, edge_comms1, seg_offsets1,
-                 w_v2, current_communities, w_v2self, m2, w_c2]
+                 w_v2, current_communities, w_v2self, m2, w_c2,
+                 unify_segments, edge_pairs1]
                 __host__ __device__ (ValueT *bases, const VertexT &v)
                 {
                     SizeT start_pos = seg_offsets0[v];
@@ -333,7 +387,9 @@ struct LouvainIterationLoop : public IterationLoopBase
                     for (SizeT pos = start_pos; pos < end_pos; pos++)
                     {
                         SizeT seg_start = seg_offsets1[pos];
-                        VertexT comm = edge_comms1[seg_start];
+                        VertexT comm = (unify_segments ?
+                            ProblemT::GetSecond(edge_pairs1[seg_start]) : 
+                            edge_comms1[seg_start]);
                         //printf("seg %d: v %d -> c %d, w_v2c = %f\n",
                         //    pos, v, comm, edge_weights0[pos]);
                         if (org_comm == comm)
@@ -363,18 +419,21 @@ struct LouvainIterationLoop : public IterationLoopBase
             GUARD_CU(edge_weights0.ForAll(
                 [seg_offsets0, seg_offsets1, n_neighbor_comms, 
                  gain_bases, w_c2, w_v2, m2, current_communities,
-                 max_gains, next_communities, edge_comms1, graph]
+                 max_gains, next_communities, edge_comms1, graph,
+                 unify_segments, edge_pairs1]
                 __host__ __device__ (ValueT *w_v2c, const SizeT &pos)
                 {
-                    VertexT v = util::BinarySearch(
-                        pos, seg_offsets0, (SizeT)0, graph.nodes,
-                        [] (const SizeT &a, const SizeT &b)
-                        {
-                            return a < b;
-                        });
-                    if (pos < seg_offsets0[v] && v > 0)
-                        v--;
-                    VertexT comm = edge_comms1[seg_offsets1[pos]];
+                    VertexT v = util::BinarySearch_LeftMost(
+                        pos, seg_offsets0, (SizeT)0, graph.nodes);//,
+                        //[] (const SizeT &a, const SizeT &b)
+                        //{
+                        //    return a < b;
+                        //});
+                    //if (pos < seg_offsets0[v] && v > 0)
+                    //    v--;
+                    VertexT comm = unify_segments ? 
+                        ProblemT::GetSecond(edge_pairs1[seg_offsets1[pos]]) :
+                        edge_comms1[seg_offsets1[pos]];
                     ValueT gain = 0;
                     if (comm != current_communities[v])
                     {
@@ -396,25 +455,29 @@ struct LouvainIterationLoop : public IterationLoopBase
                 }, n_neighbor_comms, target, stream));
 
             GUARD_CU(edge_weights0.ForAll(
-                [max_gains, next_communities, seg_offsets0, graph, seg_offsets1, edge_comms1]
+                [max_gains, next_communities, seg_offsets0, graph, 
+                seg_offsets1, edge_comms1, unify_segments, edge_pairs1]
                 __host__ __device__ (ValueT *gains, const SizeT &pos)
                 {
                     auto gain = gains[pos];
                     if (gain < 1e-8)
                         return;
 
-                    VertexT v = util::BinarySearch(
-                        pos, seg_offsets0, (SizeT)0, graph.nodes,
-                        [] (const SizeT &a, const SizeT &b)
-                        {
-                            return a < b;
-                        });
-                    if (pos < seg_offsets0[v] && v > 0)
-                        v--;
+                    VertexT v = util::BinarySearch_LeftMost(
+                        pos, seg_offsets0, (SizeT)0, graph.nodes);//,
+                        //[] (const SizeT &a, const SizeT &b)
+                        //{
+                        //    return a < b;
+                        //});
+                    //if (pos < seg_offsets0[v] && v > 0)
+                    //    v--;
                     if (abs(gain - max_gains[v]) > 1e-6)
                         return;
 
-                    next_communities[v] = edge_comms1[seg_offsets1[pos]];
+                    next_communities[v] = 
+                        unify_segments ? 
+                            ProblemT::GetSecond(edge_pairs1[seg_offsets1[pos]]) : 
+                            edge_comms1[seg_offsets1[pos]];
                     //if (next_communities[v] >= graph.nodes)
                     //    printf("Invalid comm: next_comm[%d] = %d, seg_offsets1[%d] = %d\n",
                     //        v, next_communities[v],
@@ -633,19 +696,30 @@ struct LouvainIterationLoop : public IterationLoopBase
         auto n_new_edges = num_new_edges[0] -1;
         //util::PrintMsg("#new_edges = " + std::to_string(n_new_edges));
 
-        GraphT *new_graph = new GraphT;
-        GUARD_CU(new_graph -> CsrT::Allocate(n_new_comms, n_new_edges, util::DEVICE));
+        //GraphT *new_graph = new GraphT;
+        auto &new_graph = data_slice.new_graphs[(pass_num + 1) % 2];
+        if (n_new_comms > new_graph.CsrT::row_offsets.GetSize() -1 || 
+            n_new_edges > new_graph.CsrT::column_indices.GetSize())
+        {
+            GUARD_CU(new_graph.CsrT::Allocate(
+                n_new_comms * 1.1, n_new_edges * 1.1, util::DEVICE));
+        } //else {
+            new_graph.nodes = n_new_comms;
+            new_graph.edges = n_new_edges;
+            new_graph.CsrT::nodes = n_new_comms;
+            new_graph.CsrT::edges = n_new_edges;
+        //}
 
         GUARD_CU(util::cubSegmentedReduce(
             cub_temp_space,
-            edge_weights1, new_graph -> CsrT::edge_values,
+            edge_weights1, new_graph.CsrT::edge_values,
             n_new_edges, seg_offsets1,
             [] __host__ __device__ (const ValueT &a, const ValueT &b)
             {
                 return a + b;
             }, (ValueT)0, stream));
        
-        GUARD_CU(new_graph -> CsrT::column_indices.ForAll(
+        GUARD_CU(new_graph.CsrT::column_indices.ForAll(
             [edge_pairs1, seg_offsets1, n_new_comms] 
             __host__ __device__ (VertexT *indices, const SizeT &e)
             {
@@ -655,7 +729,7 @@ struct LouvainIterationLoop : public IterationLoopBase
                 //        indices[e], e, edge_pairs1[seg_offsets1[e]]);
             }, n_new_edges, target, stream));
 
-        auto &new_row_offsets = new_graph -> CsrT::row_offsets;
+        auto &new_row_offsets = new_graph.CsrT::row_offsets;
         GUARD_CU(seg_offsets1.ForAll(
             [new_row_offsets, edge_pairs1, n_new_comms, n_new_edges] 
             __host__ __device__ (SizeT *offsets, const SizeT &new_e)
@@ -703,25 +777,30 @@ struct LouvainIterationLoop : public IterationLoopBase
                 + ", elapsed = "
                 + std::to_string(pass_timer.ElapsedMillis()));
         }
-
-        util::Array1D<SizeT, VertexT> *pass_comm = new util::Array1D<SizeT, VertexT>;
-        GUARD_CU(pass_comm -> Allocate(graph.nodes, util::HOST));
-        GUARD_CU2(cudaMemcpyAsync(pass_comm -> GetPointer(util::HOST), 
+        GUARD_CU2(cudaStreamSynchronize(stream),
+            "cudaStreamSynchronize failed");
+ 
+        //util::Array1D<SizeT, VertexT> &pass_comm = new util::Array1D<SizeT, VertexT>;
+        auto &pass_comm = data_slice.pass_communities[pass_num];
+        GUARD_CU(pass_comm.EnsureSize_(graph.nodes, util::HOST));
+        GUARD_CU2(cudaMemcpyAsync(pass_comm.GetPointer(util::HOST), 
             current_communities.GetPointer(util::DEVICE), sizeof(VertexT) * graph.nodes,
             cudaMemcpyDeviceToHost, stream),
             "cudaMemcpyAsync failed.");
-        pass_communities.push_back(pass_comm); 
+        data_slice.num_pass = pass_num;
 
-        GUARD_CU(new_graph -> FromCsr(
-            new_graph -> csr(), target, stream, true, true)); 
-        GUARD_CU(new_graph -> csr().Move(target, util::HOST, stream));
+        //pass_communities.push_back(pass_comm); 
+
+        GUARD_CU(new_graph.FromCsr(
+            new_graph.csr(), target, stream, true, true)); 
+        //GUARD_CU(new_graph.csr().Move(target, util::HOST, stream));
         if (enactor_stats.iteration != 0)
         {
             //util::PrintMsg("Release graph");
-            GUARD_CU(data_slice.new_graph -> Release(target));
-            delete data_slice.new_graph;
+            //GUARD_CU(data_slice.new_graph -> Release(target));
+            //delete data_slice.new_graph;
         }
-        data_slice.new_graph = new_graph;
+        //data_slice.new_graph = new_graph;
 
         //GUARD_CU2(cudaStreamSynchronize(stream),
         //    "cudaStreamSynchronize failed");
