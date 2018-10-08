@@ -101,6 +101,7 @@ struct NullArray
     typedef _ValueT ValueT;
 
     void SetName(const char* const name) {}
+    
     cudaError_t Allocate(SizeT size, Location target = ARRAY_DEFAULT_TARGET)
     {
         return cudaSuccess;
@@ -160,7 +161,7 @@ struct NullArray
     __host__ __device__ __forceinline__
     ValueT& operator[](std::size_t idx)
     {
-        return *((ValueT*)NULL);
+        return *((ValueT*)this);
     }
 };
 
@@ -570,7 +571,7 @@ public:
 
         if (GetSize() < size)
         {
-            retval = Allocate(size, target & allocated);
+            retval = Allocate(size, target | allocated);
             return retval;
         } else size = GetSize();
 

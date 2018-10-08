@@ -708,6 +708,14 @@ struct Coo<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
     {
         return cudaSuccess;
     }
+
+    cudaError_t Display(
+        std::string graph_prefix = "",
+        SizeT nodes_to_show = 40,
+        bool  with_edge_values = true)
+    {
+        return cudaSuccess;
+    } 
 };
 
 } // namespace graph

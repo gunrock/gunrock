@@ -18,12 +18,54 @@
   #include <metis.h>
 #endif
 
+#include <gunrock/util/basic_utils.h>
 #include <gunrock/oprtr/1D_oprtr/for_each.cuh>
 #include <gunrock/partitioner/partitioner_base.cuh>
 
 namespace gunrock {
 namespace partitioner {
 namespace metis {
+
+template <typename GraphT, graph::GraphFlag FLAG>
+struct GraphTypeSwitch
+{
+};
+
+template <typename GraphT>
+struct GraphTypeSwitch<GraphT, graph::HAS_CSR>
+{
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::CsrT    CsrT;
+
+    static util::Array1D<SizeT, SizeT> &GetOffsets(GraphT &graph)
+    {   
+        return graph.CsrT::row_offsets;
+    }   
+
+    static util::Array1D<SizeT, VertexT> &GetIndices(GraphT &graph)
+    {
+        return graph.CsrT::column_indices;
+    }
+};
+
+template <typename GraphT>
+struct GraphTypeSwitch<GraphT, graph::HAS_CSC>
+{
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::CscT    CscT;
+
+    static util::Array1D<SizeT, SizeT> &GetOffsets(GraphT &graph)
+    {   
+        return graph.CscT::column_offsets;
+    }
+
+    static util::Array1D<SizeT, VertexT> &GetIndices(GraphT &graph)
+    {
+        return graph.CscT::row_indices;
+    }
+};
 
 template <typename GraphT>
 cudaError_t Partition_CSR_CSC(
@@ -39,6 +81,7 @@ cudaError_t Partition_CSR_CSC(
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::CsrT    CsrT;
+    typedef typename GraphT::CscT    CscT;
     typedef typename GraphT::GpT     GpT;
 
     cudaError_t retval = cudaSuccess;
@@ -74,15 +117,17 @@ cudaError_t Partition_CSR_CSC(
         org_graph.edges, target);
     if (retval) return retval;
 
-    retval = trow_offsets.ForEach(org_graph.CsrT::row_offsets,
-        []__host__ __device__(idx_t &trow_offset, const SizeT &row_offset){
-            trow_offset = row_offset;
+    typedef GraphTypeSwitch<GraphT, GraphT::FLAG & (graph::HAS_CSR | graph::HAS_CSC)>
+        GraphSwitchT;
+    retval = trow_offsets.ForEach(GraphSwitchT::GetOffsets(org_graph),
+        []__host__ __device__(idx_t &trow_offset, const SizeT &offset){
+            trow_offset = offset;
         }, org_graph.nodes + 1, target);
     if (retval) return retval;
 
-    retval = tcolumn_indices.ForEach(org_graph.CsrT::column_indices,
-        []__host__ __device__(idx_t &tcolumn_index, const VertexT &column_index){
-            tcolumn_index = column_index;
+    retval = tcolumn_indices.ForEach(GraphSwitchT::GetIndices(org_graph),
+        []__host__ __device__(idx_t &tcolumn_index, const VertexT &index){
+            tcolumn_index = index;
         }, org_graph.edges, target);
     if (retval) return retval;
 
