@@ -236,11 +236,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(longitude  .SetPointer(h_longitude, nodes, util::HOST));
             GUARD_CU(longitude  .Move(util::HOST, util::DEVICE));
 	    // </DONE>
-
-	    for (int i = 0; i < nodes; i++) {
-	    	printf("    location[ %u ] = < %u, %u >\n", i, 
-			    (int) latitude[i], (int) longitude[i]);
-	    }
 	
             return retval;
         }

@@ -65,10 +65,10 @@ cudaError_t ReadLabelsStream(
     unsigned int labels_read = -1;
     long long nodes = 0;
 
-    bool label_b_exists = false; //ValueT labels_b needed?
-    //util::Array1D<SizeT, EdgePairT> temp_edge_pairs;
-    //temp_edge_pairs.SetName("graphio::market::ReadMarketStream::temp_edge_pairs");
-    //EdgeTupleType *coo = NULL; // read in COO format
+    // bool label_b_exists = false; // change this to a parameter
+    // util::Array1D<SizeT, EdgePairT> temp_edge_pairs;
+    // temp_edge_pairs.SetName("graphio::market::ReadMarketStream::temp_edge_pairs");
+    // EdgeTupleType *coo = NULL; // read in COO format
 
     time_t mark0 = time(NULL);
     util::PrintMsg("  Parsing LABELS", !quiet);
@@ -87,55 +87,42 @@ cudaError_t ReadLabelsStream(
             if (strlen(line) >= 2 && line[1] == '%') {
 		// Header -> Can be used to extract info for labels
 	    }
-        }
+        } // -> if
 
         else if (!util::isValid(labels_read))
         { // Problem description-> First line with nodes and labels info
             long long ll_nodes, ll_label_x, ll_label_y;
             int items_scanned = sscanf(line, "%lld %lld %lld",
                        &ll_nodes, &ll_label_x, &ll_label_y);
-
-            if (items_scanned == 2)
+#if 0
+	    util::PrintMsg("  ll_nodes, ll_label_x, ll_label_y : " + 
+			      std::to_string(ll_nodes) + " , " + 
+			      std::to_string(ll_label_x) + " , " +
+			      std::to_string(ll_label_y) + " scanned = " +
+			      std::to_string(items_scanned), !quiet);
+#endif
+            if (ll_label_x != ll_label_y)
             {
-                label_b_exists = false;
-            }
-
-            else
-            {
-                if (ll_label_x != ll_label_y)
-                {
-                    return util::GRError(
-                        "Error parsing LABELS, problem description invalid (" +
-                        std::to_string(ll_label_x) + " =/= " +
-                        std::to_string(ll_label_y) + ")",
-                        __FILE__, __LINE__);
-                }
-
-		label_b_exists = true; // requires the use of labels_b (ValueT) array
-                
+                return util::GRError(
+                    "Error parsing LABELS, problem description invalid (" +
+                     std::to_string(ll_label_x) + " =/= " +
+                     std::to_string(ll_label_y) + ")",
+                     __FILE__, __LINE__);
             }
 
 
             nodes = ll_nodes;
-            
 
             util::PrintMsg(" (" +
                 std::to_string(ll_nodes) + " nodes) ", !quiet);
 
-	    // labels_a[0] = (ValueT) 0;
-	    // if(label_b_exists)
-	    // 	labels_b[0] = (ValueT) 0;
-
 	    labels_read = 0;
-	}
+	} // -> else if
 
 	else
 	{ // Now we can start storing labels
 	    if (labels_read >= nodes) 
 	    {
-		// GUARD_CU(labels_a	.Release(util::HOST));
-		// if(label_b_exists)
-		//    GUARD_CU(labels_b	.Release(util::HOST));
 
 		return util::GRError(
                     "Error parsing LABELS: "
@@ -145,81 +132,60 @@ cudaError_t ReadLabelsStream(
 	    }
 
 	    long long ll_node;			// Active node
-	    double lf_label_a, lf_label_b;	// Used for sscanf
+
+	    // Used for sscanf
+	    double lf_label_a = util::PreDefinedValues<ValueT>::InvalidValue; 
+	    double lf_label_b = util::PreDefinedValues<ValueT>::InvalidValue;
+
 	    ValueT ll_label_a, ll_label_b;	// Used to parse float/double
 	    int num_input;
 	    
-	    if (label_b_exists) 
-	    {
-		num_input = sscanf(line, "%lld %lf %lf",
+	    num_input = sscanf(line, "%lld %lf %lf",
 			&ll_node, &lf_label_a, &lf_label_b);
 
-		if(typeid(ValueT) == typeid(float) ||
-		   typeid(ValueT) == typeid(double) ||
-		   typeid(ValueT) == typeid(long double))
-		{
-		    ll_label_a = (ValueT) lf_label_a;
-		    ll_label_b = (ValueT) lf_label_b;
-		}
-
-		else
-		{
-		    ll_label_a = (ValueT)(lf_label_a + 1e-10);
-		    ll_label_b = (ValueT)(lf_label_b + 1e-10);
-		}
-
-		if (num_input == 1)
-		{ // Populate the missing labels as invalid (-1)
-		    ll_label_a = util::PreDefinedValues<ValueT>::InvalidValue; 
-		    ll_label_b = util::PreDefinedValues<ValueT>::InvalidValue;
-		}
-
-		else if (num_input == 2)
-		{ // Populate the missing label b as invalid (-1)
-		    ll_label_b = util::PreDefinedValues<ValueT>::InvalidValue;
-		}
-		
-		labels_a[ll_node-1] = ll_label_a;
-		labels_b[ll_node-1] = ll_label_b;
-
-		labels_read++;		
+	    if(typeid(ValueT) == typeid(float) ||
+	       typeid(ValueT) == typeid(double) ||
+	       typeid(ValueT) == typeid(long double))
+	    {
+	        ll_label_a = (ValueT) lf_label_a;
+	        ll_label_b = (ValueT) lf_label_b;
+	    }
+	    else
+	    {
+		ll_label_a = lf_label_a;
+		ll_label_b = lf_label_b;
+	    }
+#if 0
+	    util::PrintMsg("  lf_label_a, lf_label_b : " + 
+				std::to_string(lf_label_a) + " , " + 
+				std::to_string(lf_label_b) + " num = " +
+				std::to_string(num_input), !quiet);
+#endif
+	    if (!util::isValid(ll_label_a))
+	    { // Populate the missing labels as invalid (-1)
+		ll_label_a = util::PreDefinedValues<ValueT>::InvalidValue; 
 	    }
 
-            else
-            { // Use only one label
-                num_input = sscanf(line, "%lld %lf",
-                        &ll_node, &lf_label_a);
+	    if (!util::isValid(ll_label_b))
+	    { // Populate the missing label b as invalid (-1)
+		ll_label_b = util::PreDefinedValues<ValueT>::InvalidValue;
+	    }
 
-                if(typeid(ValueT) == typeid(float) ||
-                   typeid(ValueT) == typeid(double) ||
-                   typeid(ValueT) == typeid(long double))
-                {
-                    ll_label_a = (ValueT) lf_label_a;
-                }
-
-                else
-                {
-                    ll_label_a = (ValueT)(lf_label_a + 1e-10);
-                }
-
-                if (num_input == 1)
-                { // Populate the missing labels as invalid (-1)
-                    ll_label_a = util::PreDefinedValues<ValueT>::InvalidValue; //-1;
-                }
-
-                labels_a[ll_node-1] = ll_label_a;
-
-                labels_read++;
-            }
-	}
-    }
+	   
+	    labels_a[ll_node-1] = ll_label_a;
+	    labels_b[ll_node-1] = ll_label_b;
+#if 0	   
+       	    util::PrintMsg("  labels_a[], labels_b[] : " +
+                              std::to_string(labels_a[ll_node-1]) + " , " +
+                              std::to_string(labels_b[ll_node-1]), !quiet);
+#endif
+	    labels_read++;	
+	
+	} // -> else
+    } // -> while
 
     if (labels_read != nodes)
     {
-        //GUARD_CU(labels_a 	.Release());
-	//if (label_b_exists)
-	//    GUARD_CU(labels_b	.Release());
-
         return util::GRError("Error parsing LABELS: "
             "only " + std::to_string(labels_read) +
             "/" + std::to_string(nodes) + " nodes read",

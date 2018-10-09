@@ -68,20 +68,45 @@ struct main_struct
         // int num_srcs = srcs.size();
         // </TODO>
         
-        // <DONE> declare datastructures for reference result on GPU
+        // <DONE> declare datastructures for reference result
         ValueT *ref_predicted_lat;
 	ValueT *ref_predicted_lon;
         // </DONE>
+
+	std::string labels_file     = parameters.Get<std::string>("labels-file");
+
+	util::PrintMsg("Labels File Input: "
+            + labels_file, !quiet);
+
+	// Input locations from a labels file
+    	ValueT *h_latitude  = new ValueT[graph.nodes];
+    	ValueT *h_longitude = new ValueT[graph.nodes];
+
+    	retval = gunrock::graphio::labels::Read(parameters, h_latitude, h_longitude);
+
+    	util::PrintMsg("Debugging Labels -------------", !quiet);
+    	for (int p = 0; p < graph.nodes; p++)
+    	{
+        util::PrintMsg("    locations[ " + std::to_string(p) +
+                            " ] = < " + std::to_string(h_latitude[p]) +
+                            " , " + std::to_string(h_longitude[p]) +
+                            " > ",
+                            !quiet);
+    	}
         
         if (!quick) {
-            // <DONE> init datastructures for reference result on GPU
+            // <DONE> init datastructures for reference result
             ref_predicted_lat = new ValueT[graph.nodes];
             ref_predicted_lon = new ValueT[graph.nodes];
+
+	    memcpy(ref_predicted_lat, h_latitude, graph.nodes * sizeof(ValueT));
+	    memcpy(ref_predicted_lon, h_longitude, graph.nodes * sizeof(ValueT));
             // </DONE>
 
             // If not in `quick` mode, compute CPU reference implementation
             util::PrintMsg("__________________________", !quiet);
-            
+            util::PrintMsg("______ CPU Reference _____", !quiet);
+    
             float elapsed = app::geo::CPU_Reference(
                 graph.csr(),
                 ref_predicted_lat,
@@ -99,13 +124,16 @@ struct main_struct
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
                 // </DONE> pass necessary data to lambda
+		h_latitude,
+		h_longitude,
                 ref_predicted_lat,
 		ref_predicted_lon
                 // </DONE>
             ](util::Parameters &parameters, GraphT &graph)
             {
                 // <DONE> pass necessary data to app::Template::RunTests
-                return app::geo::RunTests(parameters, graph, 
+                return app::geo::RunTests(parameters, graph,
+					  h_latitude, h_longitude,
 					  ref_predicted_lat, ref_predicted_lon,
 					  util::DEVICE);
                 // </DONE>
@@ -140,7 +168,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |
-        app::VALUET_U32B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F32B | app::DIRECTED | app::UNDIRECTED>
         (parameters, main_struct());
 }
 

@@ -74,6 +74,8 @@ template <typename GraphT>
 cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
+    typename GraphT::ValueT *h_latitude,
+    typename GraphT::ValueT *h_longitude,
     // <DONE> add problem specific reference results, e.g.:
     typename GraphT::ValueT *ref_predicted_lat,
     typename GraphT::ValueT *ref_predicted_lon,
@@ -93,9 +95,10 @@ cudaError_t RunTests(
     bool quiet_mode 		= parameters.Get<bool>("quiet");
     int  num_runs   		= parameters.Get<int >("num-runs");
     std::string validation 	= parameters.Get<std::string>("validation");
-    std::string labels_file 	= parameters.Get<std::string>("labels-file");
+
     util::Info info("geolocation", parameters, graph);
 
+/*
     util::PrintMsg("Labels File Input: "
             + labels_file, !quiet_mode);   
 
@@ -115,7 +118,7 @@ cudaError_t RunTests(
 			    " > ",
 			    !quiet_mode);
     }
-
+*/
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
 
