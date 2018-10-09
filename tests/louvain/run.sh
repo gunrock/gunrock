@@ -56,7 +56,7 @@ NAME[17]="as-Skitter"
 for k in 0
 do
     #put OS and Device type here
-    SUFFIX="ubuntu16.04_V100x1m"
+    SUFFIX="ubuntu16.04_V100x1m2"
     LOGDIR=eval/$SUFFIX
     mkdir -p $LOGDIR
 

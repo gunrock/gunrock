@@ -7,9 +7,9 @@
 
 /**
  * @file
- * test_sssp.cu
+ * louvain_main.cu
  *
- * @brief Simple test driver program for Gunrock template.
+ * @brief Simple test driver program for Louvain
  */
 
 #include <gunrock/app/louvain/louvain_app.cu>

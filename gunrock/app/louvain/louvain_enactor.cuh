@@ -98,7 +98,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 }
 
 /**
- * @brief defination of SSSP iteration loop
+ * @brief defination of Louvain iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
@@ -120,7 +120,7 @@ struct LouvainIterationLoop : public IterationLoopBase
     LouvainIterationLoop() : BaseIterationLoop() {}
 
     /**
-     * @brief Core computation of sssp, one iteration
+     * @brief Core computation of Louvain, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
      * \return cudaError_t error message(s), if any
      */
@@ -344,7 +344,7 @@ struct LouvainIterationLoop : public IterationLoopBase
             //    graph.edges - num_neighbor_comms[0] - 1, 
             //    target, stream));
              
-            GUARD_CU(util::cubSegmentedReduce(
+            GUARD_CU(util::SegmentedReduce(
                 cub_temp_space,
                 edge_weights1, edge_weights0,
                 n_neighbor_comms, seg_offsets1,
@@ -884,7 +884,7 @@ struct LouvainIterationLoop : public IterationLoopBase
             (received_length, peer_, expand_op);
         return retval;
     }
-}; // end of SSSPIteration
+}; // end of LouvainIteration
 
 /**
  * @brief Louvain enactor class.
@@ -928,7 +928,7 @@ public:
     ValueT       first_threshold;
 
     /**
-     * @brief SSSPEnactor constructor
+     * @brief LouvainEnactor constructor
      */
     Enactor() :
         BaseEnactor("Louvain"),
@@ -939,7 +939,7 @@ public:
     }
 
     /**
-     * @brief SSSPEnactor destructor
+     * @brief LouvainEnactor destructor
      */
     virtual ~Enactor()
     {
@@ -1015,7 +1015,7 @@ public:
     }
 
     /**
-      * @brief one run of sssp, to be called within GunrockThread
+      * @brief one run of Louvain, to be called within GunrockThread
       * @param thread_data Data for the CPU thread
       * \return cudaError_t error message(s), if any
       */
@@ -1082,7 +1082,7 @@ public:
     }
 
     /**
-     * @brief Enacts a SSSP computing on the specified graph.
+     * @brief Enacts a Louvain computing on the specified graph.
      * @param[in] src Source node to start primitive.
      * \return cudaError_t error message(s), if any
      */

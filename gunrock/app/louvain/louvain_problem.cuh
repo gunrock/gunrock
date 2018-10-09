@@ -22,7 +22,7 @@ namespace app {
 namespace louvain {
 
 /**
- * @brief Speciflying parameters for SSSP Problem
+ * @brief Speciflying parameters for Louvain Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -84,7 +84,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     //Helper structures
 
     /**
-     * @brief Data structure containing SSSP-specific data on indivual GPU.
+     * @brief Data structure containing Louvain-specific data on indivual GPU.
      */
     struct DataSlice : BaseDataSlice
     {
@@ -260,7 +260,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         }
 
         /**
-         * @brief initializing sssp-specific data on each gpu
+         * @brief initializing Louvain-specific data on each gpu
          * @param     sub_graph   Sub graph on the GPU.
          * @param[in] gpu_idx     GPU device index
          * @param[in] target      Targeting device location
@@ -351,7 +351,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     // Methods
 
     /**
-     * @brief SSSPProblem default constructor
+     * @brief LouvainProblem default constructor
      */
     Problem(
         util::Parameters &_parameters,
@@ -362,7 +362,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     }
 
     /**
-     * @brief SSSPProblem default destructor
+     * @brief LouvainProblem default destructor
      */
     virtual ~Problem()
     {
@@ -476,7 +476,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     /**
      * @brief initialization function.
-     * @param     graph       The graph that SSSP processes on
+     * @param     graph       The graph that Louvain processes on
      * @param[in] Location    Memory location to work on
      * \return    cudaError_t Error message(s), if any
      */
