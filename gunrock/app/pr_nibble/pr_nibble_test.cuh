@@ -47,7 +47,7 @@ double CPU_Reference(
     typedef typename GraphT::VertexT VertexT;
 
     int num_ref_nodes = 1; // HARDCODED
-    
+
     // Graph statistics
     SizeT nodes          = graph.nodes;
     ValueT num_edges     = (ValueT)graph.edges / 2;
@@ -58,10 +58,10 @@ double CPU_Reference(
     ValueT phi   = parameters.Get<ValueT>("phi");
     ValueT eps   = parameters.Get<ValueT>("eps");
     int max_iter = parameters.Get<int>("max-iter");
-    
+
     // Magic numbers? From `kfoynt` implementation
     ValueT alpha = pow(phi, 2) / (225.0 * log(100.0 * sqrt(num_edges)));
-    
+
     // rho
     ValueT rho;
     if(1.0f + log2(vol) > log_num_edges) {
@@ -75,36 +75,37 @@ double CPU_Reference(
 
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
-    
+
     // Init algorithm storage
     ValueT *grad    = new ValueT[nodes];
     ValueT *q       = new ValueT[nodes];
     ValueT *y       = new ValueT[nodes];
     ValueT *z       = new ValueT[nodes];
-    
+
     ValueT *d       = new ValueT[nodes];
     ValueT *d_sqrt  = new ValueT[nodes];
     ValueT *dn      = new ValueT[nodes];
     ValueT *dn_sqrt = new ValueT[nodes];
-    
+
     for(SizeT i = 0; i < graph.nodes; ++i) {
         grad[i] = (ValueT)0;
         q[i]    = (ValueT)0;
         y[i]    = (ValueT)0;
         z[i]    = (ValueT)0;
-        
-        d[i]       = (ValueT)(graph.row_offsets[i + 1] - graph.row_offsets[i]);
+
+        d[i]       = (ValueT)(graph.GetNeighborListLength(i));
         d_sqrt[i]  = sqrt(d[i]);
         dn[i]      = 1.0 / d[i];
         dn_sqrt[i] = 1.0 / d_sqrt[i];
     }
-        
+
     grad[ref_node] = - (alpha / num_ref_nodes) * dn_sqrt[ref_node];
 
     ValueT scale_grad = -1.0 * grad[ref_node] * dn_sqrt[ref_node];
     int iter = 0;
-    
+
     while(true) {
+        // printf("scale_grad=%.17g | rho * alpha * (1.0 + eps)=%.17g\n", scale_grad, rho * alpha * (1.0 + eps));
         if(scale_grad <= rho * alpha * (1.0 + eps)) {
             printf("pr_nibble::CPU_Reference: gradient too small. breaking at it=%d\n", iter);
             break;
@@ -113,7 +114,7 @@ double CPU_Reference(
             printf("pr_nibble::CPU_Reference: reached max iterations. breaking at it=%d\n", iter);
             break;
         }
-        
+
         for(int idx = 0; idx < nodes; ++idx) {
             ValueT q_old = q[idx];
             z[idx] = y[idx] - grad[idx];
@@ -128,7 +129,7 @@ double CPU_Reference(
             } else {
                 q[idx] = (ValueT)0;
             }
-            
+
             if(iter == 0) {
                 y[idx] = q[idx];
             } else {
@@ -136,11 +137,11 @@ double CPU_Reference(
                 y[idx] = q[idx] + beta * (q[idx] - q_old);
             }
         }
-        
+
         for(int idx = 0; idx < nodes; ++idx) {
             grad[idx] = y[idx] * (1.0 + alpha) / 2.0;
         }
-        
+
         for(int idx = 0; idx < nodes; ++idx) {
             SizeT num_neighbors = graph.GetNeighborListLength(idx);
             for(int offset = 0; offset < num_neighbors; ++offset) {
@@ -149,9 +150,9 @@ double CPU_Reference(
                 grad[dest] += grad_update;
             }
         }
-        
+
         grad[ref_node] = grad[ref_node] - (alpha / num_ref_nodes) * dn_sqrt[ref_node];
-        
+
         scale_grad = -1;
         for(int idx = 0; idx < nodes; ++idx) {
             ValueT tmp = abs(grad[idx] * dn_sqrt[idx]);
@@ -159,14 +160,14 @@ double CPU_Reference(
                 scale_grad = tmp;
             }
         }
-        
+
         iter += 1;
     }
-    
+
     for(SizeT i = 0; i < graph.nodes; ++i) {
         values[i] = abs(q[i] * d_sqrt[i]);
     }
-    
+
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
     return elapsed;
@@ -205,8 +206,8 @@ typename GraphT::SizeT Validate_Results(
             float err = abs(h_values[i] - ref_values[i]) / abs(ref_values[i]);
             if (err > tolerance) {
                 num_errors++;
-                printf("FAIL: [%d]:\t%0.17g != %0.17g\n", 
-                    i, h_values[i], ref_values[i]);
+                // printf("FAIL: [%d]:\t%0.17g != %0.17g\n",
+                //     i, h_values[i], ref_values[i]);
             }
         }
     }

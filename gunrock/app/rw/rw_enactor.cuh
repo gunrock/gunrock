@@ -91,9 +91,9 @@ struct RWIterationLoop : public IterationLoopBase
         auto &walk_mode      = data_slice.walk_mode;
         auto &gen            = data_slice.gen;
 
-        curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
-
         if(walk_mode == 0) {
+          curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
+
           auto uniform_rw_op = [
               graph,
               walks,
@@ -123,7 +123,6 @@ struct RWIterationLoop : public IterationLoopBase
           auto max_rw_op = [
               graph,
               walks,
-              rand,
               iteration,
               walk_length
           ] __host__ __device__ (VertexT *v, const SizeT &i) {

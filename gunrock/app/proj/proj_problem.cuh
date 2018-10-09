@@ -115,11 +115,22 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
-            GUARD_CU(projections.Allocate(sub_graph.nodes * sub_graph.nodes, target));
-
             if (target & util::DEVICE) {
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
             }
+
+            // Check if problem is going to fit in memory
+            cudaDeviceSynchronize();
+            size_t free, total;
+            GUARD_CU(cudaMemGetInfo(&free, &total));
+            size_t required_mem = sub_graph.nodes * sub_graph.nodes * sizeof(ValueT);
+            printf("free=%lu | total=%lu | required_mem=%lu\n", free, total, required_mem);
+            if(required_mem > free) {
+                return retval;
+                printf("  not enough memory");
+            }
+            GUARD_CU(projections.Allocate(sub_graph.nodes * sub_graph.nodes, target));
+
             return retval;
         }
 
