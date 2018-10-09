@@ -14,6 +14,9 @@
 
 #pragma once
 #include <cub/cub.cuh>
+#include <gunrock/util/array_utils.cuh>
+#include <gunrock/oprtr/1D_oprtr/for_all.cuh>
+#include <gunrock/util/reduction/kernel.cuh>
 
 namespace gunrock {
 namespace util {
@@ -163,6 +166,72 @@ cudaError_t cubReduce(
     if (retval)
         return retval;
  
+    return retval;
+}
+
+template <typename InputT, typename OutputT,
+    typename SizeT, typename ReductionOp>
+cudaError_t SegmentedReduce(
+    util::Array1D<SizeT, char   > &temp_space,
+    util::Array1D<SizeT, InputT > &keys_in,
+    util::Array1D<SizeT, OutputT> &keys_out,
+                         SizeT     num_segments,
+    util::Array1D<SizeT, SizeT  > &segment_offsets,
+                     ReductionOp   reduction_op,
+                        OutputT    initial_value,
+                    cudaStream_t   stream = 0,
+                         bool      debug_synchronous = false,
+                  util::Location   target = util::DEVICE)
+{
+    cudaError_t retval = cudaSuccess;
+
+    if ((target & util::HOST) != 0)
+    {
+        #pragma omp parallel for
+        for (SizeT seg = 0; seg < num_segments; seg ++)
+        {
+            OutputT val = initial_value;
+            SizeT   seg_end = segment_offsets[seg + 1];
+            for (SizeT pos = segment_offsets[seg]; pos < seg_end; pos ++)
+                val = reduction_op(val, keys_in[pos]);
+            keys_out[seg] = val;
+        }
+    }
+
+    if ((target & util::DEVICE) != 0)
+    {
+        GUARD_CU(temp_space.EnsureSize_(sizeof(SizeT) * (1 + num_segments), util::DEVICE));
+        SizeT *grid_segments = (SizeT*)(temp_space.GetPointer(util::DEVICE));
+
+        int grid_size = num_segments / reduce::BLOCK_SIZE + 1;
+        if (grid_size > 384)
+            grid_size = 384;
+        GUARD_CU(keys_in.ForAll(
+            [grid_segments] __host__ __device__ (InputT *keys, const SizeT &pos)
+            {
+                grid_segments[0] = 0;
+            }, (SizeT)1, util::DEVICE, stream));
+
+        reduce::SegReduce_Kernel
+            <<< grid_size, reduce::BLOCK_SIZE, 0, stream >>> (
+            keys_in.GetPointer(util::DEVICE), keys_out.GetPointer(util::DEVICE),
+            num_segments, segment_offsets.GetPointer(util::DEVICE),
+            reduction_op, initial_value,
+            grid_segments, grid_segments + 1);
+
+        //reduce::SegReduce_GInit
+        //    <<< grid_size, reduce::BLOCK_SIZE, 0, stream >>> (
+        //    grid_segments, grid_segments + 1,
+        //    keys_out.GetPointer(util::DEVICE), initial_value);
+
+        reduce::SegReduce_GKernel
+            <<< grid_size, reduce::BLOCK_SIZE, 0, stream >>> (
+            keys_in.GetPointer(util::DEVICE), keys_out.GetPointer(util::DEVICE),
+            num_segments, segment_offsets.GetPointer(util::DEVICE),
+            reduction_op, initial_value,
+            grid_segments, grid_segments + 1);
+    }
+
     return retval;
 }
 
