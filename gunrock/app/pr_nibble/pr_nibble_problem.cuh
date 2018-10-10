@@ -79,6 +79,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         int *d_grad_scale; // Gradient magnitude for convergence check
         int *h_grad_scale; // Gradient magnitude for convergence check
+        ValueT* d_grad_scale_value;
+        ValueT* h_grad_scale_value;
 
         ValueT eps;   // Tolerance for convergence
         ValueT alpha; // Parameterizes conductance/size of output cluster
@@ -167,6 +169,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             h_grad_scale = (int*)malloc(sizeof(int) * 1);
             GUARD_CU(cudaMalloc((void **)&d_grad_scale, 1 * sizeof(int)));
+
+            h_grad_scale_value = (ValueT*)malloc(sizeof(ValueT) * 1);
+            GUARD_CU(cudaMalloc((void **)&d_grad_scale_value, 1 * sizeof(ValueT)));
 
             if (target & util::DEVICE) {
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
