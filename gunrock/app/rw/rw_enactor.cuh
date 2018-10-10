@@ -107,17 +107,26 @@ struct RWIterationLoop : public IterationLoopBase
             SizeT write_idx  = (i * walk_length) + iteration; // Write location in RW array
             walks[write_idx] = v[i];                          // record current position in walk
 
+            if (!util::isValid(v[i])) // stopped walk
+                return;
+
             if(iteration < walk_length - 1) {
               // Determine next neighbor to walk to
               SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
-              SizeT offset        = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
-              SizeT pos           = graph.GetNeighborListOffset(v[i]) + offset;
-              if (pos >= graph.edges)
-              {
-                printf("Error: pos = %d, v = %d, offset = %d, #neighbors = %d\n",
-                    pos, v, offset, num_neighbors);
+              if (num_neighbors == 0)
+              { // stop the walker, if no where to go
+                v[i] = util::PreDefinedValues<VertexT>::InvalidValue;
                 return;
               }
+
+              SizeT offset        = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
+              SizeT pos           = graph.GetNeighborListOffset(v[i]) + offset;
+              //if (pos >= graph.edges)
+              //{
+              //  printf("Error: i = %ld, pos = %ld, v = %ld, offset = %ld, #neighbors = %ld\n",
+              //      (long long)i, (long long)pos, (long long)v[i], (long long)offset, (long long)num_neighbors);
+              //  return;
+              //}
               VertexT neighbor    = graph.GetEdgeDest(graph.GetNeighborListOffset(v[i]) + offset);
               v[i]                = neighbor; // Replace vertex w/ neighbor in queue
             }

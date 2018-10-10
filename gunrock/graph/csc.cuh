@@ -289,19 +289,34 @@ struct Csc :
                 SizeT *column_offsets,
                 const typename CooT::EdgePairT *edge_pairs,
                 const VertexT &column){
-                    if (column < nodes)
+                    if (column >= nodes)
                     {
-                        auto pos = util::BinarySearch_LeftMost(
-                            column, edge_pairs, (SizeT)0, edges-1,
-                            column_edge_compare,
-                            [] (const typename CooT::EdgePairT &pair, const VertexT &column)
-                            {
-                                return (pair.y == column);
-                            });
-                        while (pos < edges && column > edge_pairs[pos].y)
-                            pos ++;
-                        column_offsets[column] = pos;
-                    } else column_offsets[column] = edges;
+                        column_offsets[column] = edges;
+                        return;
+                    }
+
+                    if (column <= edge_pairs[0].y)
+                    {
+                        column_offsets[column] = 0;
+                        return;
+                    }
+
+                    if (column > edge_pairs[edges - 1].y)
+                    {
+                        column_offsets[column] = edges;
+                        return;
+                    }
+
+                    auto pos = util::BinarySearch_LeftMost(
+                        column, edge_pairs, (SizeT)0, edges-1,
+                        column_edge_compare,
+                        [] (const typename CooT::EdgePairT &pair, const VertexT &column)
+                        {
+                            return (pair.y == column);
+                        });
+                    while (pos < edges && column > edge_pairs[pos].y)
+                        pos ++;
+                    column_offsets[column] = pos;
                 }, this -> nodes + 1, target, stream));
 
         time_t mark2 = time(NULL);
