@@ -73,6 +73,14 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
         "Modularity threshold to continue further iterations in the first pass.",
         __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<double>(
+        "neighborcomm-th",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        -1.0,
+        "Threshold of number of vertex-community pairs changes to quick an iteration; "
+        " value less than 0 will disable this feature",
+        __FILE__, __LINE__));
+
     GUARD_CU(parameters.Use<bool>(
         "pass-stats",
         util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
@@ -158,7 +166,7 @@ struct LouvainIterationLoop : public IterationLoopBase
         auto         &num_neighbor_comms =   data_slice.num_neighbor_comms;
         auto         &edge_pairs0        =   data_slice.edge_pairs0;
         auto         &edge_pairs1        =   data_slice.edge_pairs1;
-        auto          unify_segments     =   data_slice.unify_segments;
+        auto          unify_segments     =   enactor.unify_segments;
         auto         &num_new_comms      =   data_slice.num_new_comms;
         auto         &num_new_edges      =   data_slice.num_new_edges;
         auto         &iter_gain          =   data_slice.iter_gain;
@@ -229,6 +237,7 @@ struct LouvainIterationLoop : public IterationLoopBase
         int iter_num = 0;
         ValueT pass_gain = 0;
         bool to_continue = true;
+        SizeT pervious_num_neighbor_comms = 0;
 
         // Iterations
         while (to_continue)
@@ -555,8 +564,12 @@ struct LouvainIterationLoop : public IterationLoopBase
             iter_num ++;
             if ((pass_num != 0 && iter_gain[0] < enactor.iter_gain_threshold) ||
                 (pass_num == 0 && iter_gain[0] < enactor.first_threshold) ||
-                iter_num >= enactor.max_iters)
+                iter_num >= enactor.max_iters ||
+                (enactor.neighborcomm_threshold > 0 && iter_num != 1 && pass_num == 0 &&
+                    n_neighbor_comms > (1 - enactor.neighborcomm_threshold) 
+                        * pervious_num_neighbor_comms))
                 to_continue = false;
+            pervious_num_neighbor_comms = n_neighbor_comms;
         }
         data_slice.pass_gain = pass_gain;
 
@@ -925,9 +938,11 @@ public:
     VertexT      max_iters ;
     bool         pass_stats;
     bool         iter_stats;
+    bool         unify_segments;
     ValueT       pass_gain_threshold;
     ValueT       iter_gain_threshold;
     ValueT       first_threshold;
+    ValueT       neighborcomm_threshold;
 
     /**
      * @brief LouvainEnactor constructor
@@ -989,6 +1004,8 @@ public:
         pass_gain_threshold = problem.parameters.template Get<ValueT >("pass-th");
         iter_gain_threshold = problem.parameters.template Get<ValueT >("iter-th");
         first_threshold     = problem.parameters.template Get<ValueT >("1st-th");
+        unify_segments      = problem.parameters.template Get<bool   >("unify-segments");
+        neighborcomm_threshold = problem.parameters.template Get<ValueT>("neighborcomm-th");
  
         // Lazy initialization
         GUARD_CU(BaseEnactor::Init(
