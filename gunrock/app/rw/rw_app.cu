@@ -103,6 +103,7 @@ cudaError_t RunTests(
 
     // CLI parameters
     bool quiet_mode = parameters.Get<bool>("quiet");
+    bool quick      = parameters.Get<bool>("quick");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
     util::Info info("rw", parameters, graph);
@@ -140,7 +141,7 @@ cudaError_t RunTests(
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
 
-        if (validation == "each") {
+        if (validation == "each" && !quick) {
 
             GUARD_CU(problem.Extract(
                 h_walks
@@ -148,22 +149,30 @@ cudaError_t RunTests(
             SizeT num_errors = Validate_Results(
                 parameters,
                 graph,
-                walk_length, walks_per_node, h_walks, ref_walks,
-                false);
+                walk_length,
+                walks_per_node,
+                walk_mode,
+                h_walks,
+                ref_walks,
+                !quiet_mode);
         }
     }
 
     cpu_timer.Start();
 
-    GUARD_CU(problem.Extract(
-        h_walks
-    ));
-    if (validation == "last") {
+    if (validation == "last" && !quick) {
+        GUARD_CU(problem.Extract(
+            h_walks
+        ));
         SizeT num_errors = Validate_Results(
             parameters,
             graph,
-            walk_length, walks_per_node, h_walks, ref_walks,
-            false);
+            walk_length,
+            walks_per_node,
+            walk_mode,
+            h_walks,
+            ref_walks,
+            !quiet_mode);
     }
 
     // compute running statistics

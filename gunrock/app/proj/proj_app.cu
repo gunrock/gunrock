@@ -62,6 +62,7 @@ cudaError_t RunTests(
 
     // CLI parameters
     bool quiet_mode = parameters.Get<bool>("quiet");
+    bool quick      = parameters.Get<bool>("quick");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
     util::Info info("proj", parameters, graph);
@@ -103,28 +104,29 @@ cudaError_t RunTests(
                 .enactor_stats.iteration), !quiet_mode);
 
         if (validation == "each") {
-
             GUARD_CU(problem.Extract(
                 h_projections
             ));
             SizeT num_errors = Validate_Results(
                 parameters,
                 graph,
-                h_projections, ref_projections,
+                h_projections,
+                quick ? NULL : ref_projections,
                 false);
         }
     }
 
     cpu_timer.Start();
 
-    GUARD_CU(problem.Extract(
-        h_projections
-    ));
     if (validation == "last") {
+        GUARD_CU(problem.Extract(
+            h_projections
+        ));
         SizeT num_errors = Validate_Results(
             parameters,
             graph,
-            h_projections, ref_projections,
+            h_projections,
+            quick ? NULL : ref_projections,
             false);
     }
 
