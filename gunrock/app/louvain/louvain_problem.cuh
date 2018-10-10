@@ -123,7 +123,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, EdgePairT> edge_pairs1;
 
         // temp space for cub
-        util::Array1D<SizeT, char   >   cub_temp_space;
+        util::Array1D<uint64_t, char   >   cub_temp_space;
         
         // number of neighbor communities
         util::Array1D<SizeT, SizeT  >   num_neighbor_comms;
@@ -306,7 +306,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             {
                 GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
             }
-            pass_communities = new util::Array1D<SizeT, VertexT>[max_iters];
+            pass_communities = new util::Array1D<SizeT, VertexT>[max_iters + 1];
             return retval;
         } // Init
 

@@ -56,16 +56,16 @@ NAME[17]="as-Skitter"
 for k in 0
 do
     #put OS and Device type here
-    SUFFIX="ubuntu16.04_V100x1m2"
+    SUFFIX="ubuntu16.04_V100x1m3"
     LOGDIR=eval/$SUFFIX
     mkdir -p $LOGDIR
 
-    for i in {0..17} #0 1 2 3 4 6 7 8 9 10 11 12 13 14 15 16 
+    for i in 0 1 2 3 4 5 6 9 10 11 12 13 14 15 16 17
     do
         for j in {0..1}
         do
-            echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --jsondir=$LOGDIR "> $LOGDIR/${NAME[$i]}${MARK[$j]}.txt"
-                 $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --jsondir=$LOGDIR  > $LOGDIR/${NAME[$i]}${MARK[$j]}.txt
+            echo $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --jsondir=$LOGDIR "> $LOGDIR/${NAME[$i]}${MARK[$j]}.txt 2>&1"
+                 $EXCUTION market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx ${OPTION[$j]} --jsondir=$LOGDIR  > $LOGDIR/${NAME[$i]}${MARK[$j]}.txt 2>&1
             sleep 30
         done
     done

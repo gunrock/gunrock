@@ -19,7 +19,7 @@
 namespace gunrock {
 namespace graph {
 
-#define ENABLE_GRAPH_DEBUG
+//#define ENABLE_GRAPH_DEBUG
 
 /**
  * @brief Predefined flags for graph types

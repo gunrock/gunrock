@@ -157,7 +157,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | //app::VERTEXT_U64B |
         app::SIZET_U32B | //app::SIZET_U64B |
-        app::VALUET_F64B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F64B >
         (parameters, main_struct());
 }
 

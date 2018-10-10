@@ -263,7 +263,7 @@ cudaError_t CUBRadixSort(
 */
 template <typename KeyT, typename ValueT, typename SizeT>
 cudaError_t cubSortPairs(
-    util::Array1D<SizeT, char  > &temp_space,
+    util::Array1D<uint64_t, char> &temp_space,
     util::Array1D<SizeT, KeyT  > &keys_in,
     util::Array1D<SizeT, KeyT  > &keys_out,
     util::Array1D<SizeT, ValueT> &values_in,
@@ -279,7 +279,7 @@ cudaError_t cubSortPairs(
         keys_in.GetPointer(util::DEVICE)), keys_out.GetPointer(util::DEVICE));
     cub::DoubleBuffer<ValueT> values(const_cast<ValueT*>(
         values_in.GetPointer(util::DEVICE)), values_out.GetPointer(util::DEVICE));
- 
+
     size_t request_bytes = 0;
     retval = cub::DispatchRadixSort<false, KeyT, ValueT, SizeT>::Dispatch(
         NULL, request_bytes,
@@ -288,7 +288,9 @@ cudaError_t cubSortPairs(
         stream, debug_synchronous);
     if (retval)
         return retval;
-
+    //util::PrintMsg("num_items = " + std::to_string(num_items)
+    //    + ", request_bytes = " + std::to_string(request_bytes)); 
+ 
     retval = temp_space.EnsureSize_(request_bytes, util::DEVICE);
     if (retval)
         return retval;
@@ -325,7 +327,7 @@ cudaError_t cubSortPairs(
 
 template <typename KeyT, typename ValueT, typename SizeT>
 cudaError_t cubSortPairsDescending(
-    util::Array1D<SizeT, char  > &temp_space,
+    util::Array1D<uint64_t, char  > &temp_space,
     util::Array1D<SizeT, KeyT  > &keys_in,
     util::Array1D<SizeT, KeyT  > &keys_out,
     util::Array1D<SizeT, ValueT> &values_in,
@@ -389,7 +391,7 @@ cudaError_t cubSortPairsDescending(
 
 template <typename KeyT, typename ValueT, typename SizeT>
 cudaError_t cubSegmentedSortPairs(
-    util::Array1D<SizeT, char  > &temp_space,
+    util::Array1D<uint64_t, char  > &temp_space,
     util::Array1D<SizeT, KeyT  > &keys_in,
     util::Array1D<SizeT, KeyT  > &keys_out,
     util::Array1D<SizeT, ValueT> &values_in,
