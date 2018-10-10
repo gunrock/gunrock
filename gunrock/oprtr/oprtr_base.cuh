@@ -73,6 +73,11 @@ enum : OprtrMode {
     OprtrMode_SIMPLIFIED2    = 0x300000,
     OprtrMode_COMPACTED_CULL = 0x400000,
     OprtrMode_BY_PASS        = 0x500000,
+
+    OprtrMode_ReduceMask     = 0xF000000,
+    OprtrMode_REDUCE_TO_INPUT_POS = 0x1000000,
+    OprtrMode_REDUCE_TO_SRC  = 0x2000000,
+    OprtrMode_REDUCE_TO_DEST = 0x3000000,
 };
 
 using OprtrFlag = uint32_t;
@@ -104,13 +109,14 @@ enum : ReduceOp
     ReduceOp_None       = 0x00,
     ReduceOp_Plus       = 0x10,
     ReduceOp_Minus      = 0x20,
-    ReduceOp_Multiples  = 0x30,
-    ReduceOp_Modulus    = 0x40,
-    ReduceOp_Bit_Or     = 0x50,
-    ReduceOp_Bit_And    = 0x60,
-    ReduceOp_Bit_Xor    = 0x70,
-    ReduceOp_Maximum    = 0x80,
-    ReduceOp_Minimum    = 0x90,
+    ReduceOp_Multiply   = 0x30,
+    ReduceOp_Divide     = 0x40,
+    ReduceOp_Mod        = 0x50,
+    ReduceOp_Bitor      = 0x60,
+    ReduceOp_Bitand     = 0x70,
+    ReduceOp_Xor        = 0x80,
+    ReduceOp_Max        = 0x90,
+    ReduceOp_Min        = 0xA0,
 };
 
 using ReduceType = uint32_t;
@@ -158,63 +164,141 @@ bool isBackward()
 }
 
 template <typename T, ReduceOp R_OP>
-struct Identity
+struct Reduce
 {
-    static const T Val = 0;
-    //__device__ __host__ __forceinline__ T operator()()
-    //{
-    //    extern __device__ __host__ void Error_UnsupportedOperation();
-    //    Error_UnsupportedOperation();
-    //    return 0;
-    //}
+    static const T Identity = util::PreDefinedValues<T>::InvalidValue;
+
+    __device__ __host__ __forceinline__ 
+    static T op(const T &a, const T &b)
+    {
+        return util::PreDefinedValues<T>::InvalidValue;
+    }
+};
+
+//template <typename T>
+//struct Identity<T, ReduceOp_None>
+//{
+//    static const T Identity = 0;
+//};
+
+template <typename T>
+struct Reduce<T, ReduceOp_Plus>
+{
+    static const T Identity = 0;
+
+    __device__ __host__ __forceinline__
+    static T op(const T &a, const T &b)
+    {
+        return a + b;
+    }
 };
 
 template <typename T>
-struct Identity<T, ReduceOp_None>
+struct Reduce<T, ReduceOp_Minus>
 {
-    static const T Val = 0;
+    static const T Identity = 0;
+
+    __device__ __host__ __forceinline__
+    static T op(const T &a, const T &b)
+    {
+        return a - b;
+    }
 };
 
 template <typename T>
-struct Identity<T, ReduceOp_Plus>
+struct Reduce<T, ReduceOp_Multiply>
 {
-    static const T Val = 0;
+    static const T Identity = 1;
+
+    __device__ __host__ __forceinline__
+    static T op(const T &a, const T &b)
+    {
+        return a * b;
+    }
 };
 
 template <typename T>
-struct Identity<T, ReduceOp_Multiples>
+struct Reduce<T, ReduceOp_Divide>
 {
-    static const T Val = 1;
+    static const T Identity = 1;
+
+    __device__ __host__ __forceinline__
+    static T op(const T &a, const T &b)
+    {
+        return a / b;
+    }
 };
 
 template <typename T>
-struct Identity<T, ReduceOp_Bit_Or>
+struct Reduce<T, ReduceOp_Mod>
 {
-    static const T Val = util::PreDefinedValues<T>::AllZeros;
+    static const T Identity = util::PreDefinedValues<T>::InvalidValue;
+
+    __device__ __host__ __forceinline__
+    static T op(const T &a, const T &b)
+    {
+        return a % b;
+    }
 };
 
 template <typename T>
-struct Identity<T, ReduceOp_Bit_And>
+struct Reduce<T, ReduceOp_Bitor>
 {
-    static const T Val = util::PreDefinedValues<T>::AllOnes;
+    static const T Identity = util::PreDefinedValues<T>::AllZeros;
+
+    __device__ __host__ __forceinline__
+    static T op(const T &a, const T &b)
+    {
+        return a | b;
+    }
 };
 
 template <typename T>
-struct Identity<T, ReduceOp_Bit_Xor>
+struct Reduce<T, ReduceOp_Bitand>
 {
-    static const T Val = util::PreDefinedValues<T>::AllZeros;
+    static const T Identity = util::PreDefinedValues<T>::AllOnes;
+
+    __device__ __host__ __forceinline__
+    static T op(const T &a, const T &b)
+    {
+        return a & b;
+    }
 };
 
 template <typename T>
-struct Identity<T, ReduceOp_Maximum>
+struct Reduce<T, ReduceOp_Xor>
 {
-    static const T Val = util::PreDefinedValues<T>::MinValue;
+    static const T Identity = util::PreDefinedValues<T>::AllZeros;
+
+    __device__ __host__ __forceinline__
+    static T op(const T &a, const T &b)
+    {
+        return a ^ b;
+    }
 };
 
 template <typename T>
-struct Identity<T, ReduceOp_Minimum>
+struct Reduce<T, ReduceOp_Max>
 {
-    static const T Val = util::PreDefinedValues<T>::MaxValue;
+    static const T Identity = util::PreDefinedValues<T>::MinValue;
+
+    __device__ __host__ __forceinline__
+    static T op(const T &a, const T &b)
+    {
+        return (a < b) ? b : a;
+    }
+};
+
+template <typename T>
+struct Reduce<T, ReduceOp_Min>
+{
+    static const T Identity = util::PreDefinedValues<T>::MaxValue;
+
+    __device__ __host__ __forceinline__
+    static T op(const T &a, const T &b)
+    {
+        return (a < b) ? a : b;
+    }
 };
 
 } // namespace oprtr

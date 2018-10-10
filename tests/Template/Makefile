@@ -23,6 +23,6 @@ a : test_$(ALGO).cu $(DEPS)
 	mkdir -p bin
 	rm -f $(EXEC)
 	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) -w $(ARCH) $(INC) -O3 > a.txt 2>&1 || true
-	grep rror: a.txt; grep arn a.txt
+	grep rror: a.txt; grep arn a.txt || true
 
 .DEFAULT_GOAL := test

@@ -13,7 +13,7 @@
  */
 
 #pragma once
-#include <gunrock/util/sort_utils.cuh>
+#include <gunrock/util/sort_device.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>

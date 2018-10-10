@@ -234,7 +234,7 @@ template <
     typename InputT, typename OutputT,
     typename SizeT , typename SelectOp>
 cudaError_t cubSelectIf(
-    util::Array1D<SizeT, char   > &cub_temp_space,
+    util::Array1D<uint64_t, char   > &cub_temp_space,
     util::Array1D<SizeT, InputT > &keys_in,
     util::Array1D<SizeT, OutputT> &keys_out,
     util::Array1D<SizeT, SizeT  > &num_selected,
