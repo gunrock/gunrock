@@ -107,8 +107,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT >   w_c2;
 
         // communities each edge belongs to
-        util::Array1D<SizeT, VertexT>   edge_comms0;
-        util::Array1D<SizeT, VertexT>   edge_comms1;
+        //util::Array1D<SizeT, VertexT>   edge_comms0;
+        //util::Array1D<SizeT, VertexT>   edge_comms1;
        
         // weights of edges
         util::Array1D<SizeT, ValueT >   edge_weights0; 
@@ -175,8 +175,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             w_v2               .SetName("w_v2"               );
             w_v2self           .SetName("w_v2self"           );
             w_c2               .SetName("w_c2"               );
-            edge_comms0        .SetName("edge_comms0"        );
-            edge_comms1        .SetName("edge_comms1"        );
+            //edge_comms0        .SetName("edge_comms0"        );
+            //edge_comms1        .SetName("edge_comms1"        );
             edge_weights0      .SetName("edge_weights0"      );
             edge_weights1      .SetName("edge_weights1"      );
             seg_offsets0       .SetName("seg_offsets0"       );
@@ -218,8 +218,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(w_v2self           .Release(target));
             GUARD_CU(w_c2               .Release(target));
 
-            GUARD_CU(edge_comms0        .Release(target));
-            GUARD_CU(edge_comms1        .Release(target));
+            //GUARD_CU(edge_comms0        .Release(target));
+            //GUARD_CU(edge_comms1        .Release(target));
             GUARD_CU(edge_weights0      .Release(target));
             GUARD_CU(edge_weights1      .Release(target));
             GUARD_CU(seg_offsets0       .Release(target));            
@@ -285,8 +285,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(w_v2self           .Allocate(sub_graph.nodes, target));
             GUARD_CU(w_c2               .Allocate(sub_graph.nodes, target));
 
-            GUARD_CU(edge_comms0        .Allocate(sub_graph.edges+1, target));
-            GUARD_CU(edge_comms1        .Allocate(sub_graph.edges+1, target));
+            //GUARD_CU(edge_comms0        .Allocate(sub_graph.edges+1, target));
+            //GUARD_CU(edge_comms1        .Allocate(sub_graph.edges+1, target));
             GUARD_CU(edge_weights0      .Allocate(sub_graph.edges+1, target));
             GUARD_CU(edge_weights1      .Allocate(sub_graph.edges+1, target));
             GUARD_CU(seg_offsets0       .Allocate(sub_graph.edges+1, target));
