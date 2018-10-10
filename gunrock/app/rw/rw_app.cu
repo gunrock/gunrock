@@ -160,7 +160,7 @@ cudaError_t RunTests(
 
     cpu_timer.Start();
 
-    if (validation == "last" && !quick) {
+    if (validation == "last" && !quiet_mode) {
         GUARD_CU(problem.Extract(
             h_walks
         ));

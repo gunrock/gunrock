@@ -113,20 +113,13 @@ struct RWIterationLoop : public IterationLoopBase
             if(iteration < walk_length - 1) {
               // Determine next neighbor to walk to
               SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
-              if (num_neighbors == 0)
-              { // stop the walker, if no where to go
+              if (num_neighbors == 0) {
                 v[i] = util::PreDefinedValues<VertexT>::InvalidValue;
                 return;
               }
 
               SizeT offset        = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
               SizeT pos           = graph.GetNeighborListOffset(v[i]) + offset;
-              //if (pos >= graph.edges)
-              //{
-              //  printf("Error: i = %ld, pos = %ld, v = %ld, offset = %ld, #neighbors = %ld\n",
-              //      (long long)i, (long long)pos, (long long)v[i], (long long)offset, (long long)num_neighbors);
-              //  return;
-              //}
               VertexT neighbor    = graph.GetEdgeDest(graph.GetNeighborListOffset(v[i]) + offset);
               v[i]                = neighbor; // Replace vertex w/ neighbor in queue
             }
@@ -146,9 +139,17 @@ struct RWIterationLoop : public IterationLoopBase
             SizeT write_idx  = (i * walk_length) + iteration; // Write location in RW array
             walks[write_idx] = v[i];                          // record current position in walk
 
+            if (!util::isValid(v[i])) // stopped walk
+                return;
+
             if(iteration < walk_length - 1) {
               // Walk to neighbor w/ maximum node value
-              SizeT num_neighbors        = graph.GetNeighborListLength(v[i]);
+              SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
+              if (num_neighbors == 0) {
+                v[i] = util::PreDefinedValues<VertexT>::InvalidValue;
+                return;
+              }
+
               SizeT neighbor_list_offset = graph.GetNeighborListOffset(v[i]);
 
               VertexT max_neighbor_id  = graph.GetEdgeDest(neighbor_list_offset + 0);
@@ -195,7 +196,7 @@ struct RWIterationLoop : public IterationLoopBase
       return iter == data_slice.walk_length;
     }
 
-    
+
     /**
      * @brief Routine to combine received data and local data
      * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each transmition item, typed VertexT
