@@ -144,8 +144,10 @@ struct LouvainIterationLoop : public IterationLoopBase
         auto         &current_communities=   data_slice.current_communities;
         auto         &next_communities   =   data_slice.next_communities;
         auto         &community_sizes    =   data_slice.community_sizes;
-        auto         &edge_comms0        =   data_slice.edge_comms0;
-        auto         &edge_comms1        =   data_slice.edge_comms1;
+        //auto         &edge_comms0        =   data_slice.edge_comms0;
+        auto         &edge_comms0        =   data_slice.edge_pairs0;
+        //auto         &edge_comms1        =   data_slice.edge_comms1;
+        auto         &edge_comms1        =   data_slice.edge_pairs1;
         auto         &edge_weights0      =   data_slice.edge_weights0;
         auto         &edge_weights1      =   data_slice.edge_weights1;
         auto         &seg_offsets0       =   data_slice.seg_offsets0;
@@ -238,11 +240,11 @@ struct LouvainIterationLoop : public IterationLoopBase
             {
                 GUARD_CU(edge_pairs0.ForAll(
                     [edge_weights0, weights, current_communities, graph]
-                    __host__ __device__ (EdgePairT *e_comms, const SizeT &e)
+                    __host__ __device__ (EdgePairT *e_pairs, const SizeT &e)
                     {
                         VertexT src, dest;
                         graph.GetEdgeSrcDest(e, src, dest);
-                        e_comms[e] = ProblemT::MakePair(src, current_communities[dest]);
+                        e_pairs[e] = ProblemT::MakePair(src, current_communities[dest]);
                         //edge_weights0[e] = weights[e];
                     }, graph.edges, target, stream));
 
@@ -253,9 +255,7 @@ struct LouvainIterationLoop : public IterationLoopBase
                     graph.edges,
                     0, sizeof(EdgePairT) * 8, stream));
  
-                // using edge_comms0 as markers
                 GUARD_CU(seg_offsets0.Set(0, graph.edges+1, target, stream));
-
 
                 GUARD_CU(seg_offsets0.ForAll(
                     [edge_pairs1, graph]
@@ -278,7 +278,7 @@ struct LouvainIterationLoop : public IterationLoopBase
             } else {
                 GUARD_CU(edge_comms0.ForAll(
                     [edge_weights0, weights, current_communities, graph]
-                    __host__ __device__ (VertexT *e_comms, const SizeT &e)
+                    __host__ __device__ (EdgePairT *e_comms, const SizeT &e)
                     {
                         e_comms[e] = current_communities[graph.GetEdgeDest(e)];
                         edge_weights0[e] = weights[e];
@@ -567,13 +567,13 @@ struct LouvainIterationLoop : public IterationLoopBase
 
         // Graph contraction
         GUARD_CU(edge_comms0.ForEach(
-            [] __host__ __device__ (VertexT &comm)
+            [] __host__ __device__ (EdgePairT &comm)
             {
-                comm = util::PreDefinedValues<VertexT>::InvalidValue;
+                comm = util::PreDefinedValues<EdgePairT>::InvalidValue;
             }, graph.nodes, target, stream));
 
         GUARD_CU(edge_comms0.ForAll(
-            [current_communities] __host__ __device__ (VertexT *comms0, const VertexT &v)
+            [current_communities] __host__ __device__ (EdgePairT *comms0, const SizeT &v)
             {
                 VertexT comm = current_communities[v];
                 comms0[comm] = comm;
@@ -585,7 +585,7 @@ struct LouvainIterationLoop : public IterationLoopBase
             cub_temp_space,
             edge_comms0, edge_comms1,
             num_new_comms, graph.nodes,
-            [] __host__ __device__ (VertexT &comm)
+            [] __host__ __device__ (EdgePairT &comm)
             {
                 //if (comm == 8278)
                 //    printf("Comm %d, valid = %s\n", comm, 
@@ -605,7 +605,7 @@ struct LouvainIterationLoop : public IterationLoopBase
 
         GUARD_CU(edge_comms0.ForAll(
             [edge_comms1, n_new_comms] 
-            __host__ __device__ (VertexT *comms0, const VertexT &new_comm)
+            __host__ __device__ (EdgePairT *comms0, const SizeT &new_comm)
             {
                 comms0[edge_comms1[new_comm]] = new_comm;
                 //if (edge_comms1[new_comm] == 8278)
@@ -991,7 +991,7 @@ public:
         // Lazy initialization
         GUARD_CU(BaseEnactor::Init(
             problem, Enactor_None,
-            2, NULL,
+            0, NULL,
             target, false));
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
         {
@@ -1014,6 +1014,12 @@ public:
         return retval;
     }
 
+    cudaError_t Check_Queue_Size(int peer_)
+    {
+        // no need to check queue size for PR
+        return cudaSuccess;
+    }
+
     /**
       * @brief one run of Louvain, to be called within GunrockThread
       * @param thread_data Data for the CPU thread
@@ -1024,7 +1030,7 @@ public:
         gunrock::app::Iteration_Loop<
             // TODO: change to how many {VertexT, ValueT} data need to communicate
             //       per element in the inter-GPU sub-frontiers
-            0, 1,
+            0, 0,
             IterationT>(
             thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
