@@ -107,8 +107,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT >   w_c2;
 
         // communities each edge belongs to
-        util::Array1D<SizeT, VertexT>   edge_comms0;
-        util::Array1D<SizeT, VertexT>   edge_comms1;
+        //util::Array1D<SizeT, VertexT>   edge_comms0;
+        //util::Array1D<SizeT, VertexT>   edge_comms1;
        
         // weights of edges
         util::Array1D<SizeT, ValueT >   edge_weights0; 
@@ -123,7 +123,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, EdgePairT> edge_pairs1;
 
         // temp space for cub
-        util::Array1D<SizeT, char   >   cub_temp_space;
+        util::Array1D<uint64_t, char   >   cub_temp_space;
         
         // number of neighbor communities
         util::Array1D<SizeT, SizeT  >   num_neighbor_comms;
@@ -160,14 +160,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         int num_pass, max_iters;
 
         // Whether to use cubRedixSort instead of cubSegmentRadixSort
-        bool unify_segments;
+        //bool unify_segments;
         /*
          * @brief Default constructor
          */
         DataSlice() : 
-            BaseDataSlice(),
+            BaseDataSlice()
             //new_graph    (NULL),
-            unify_segments(false)
+            //unify_segments(false)
         {
             current_communities.SetName("current_communities");
             next_communities   .SetName("next_communities"   );
@@ -175,8 +175,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             w_v2               .SetName("w_v2"               );
             w_v2self           .SetName("w_v2self"           );
             w_c2               .SetName("w_c2"               );
-            edge_comms0        .SetName("edge_comms0"        );
-            edge_comms1        .SetName("edge_comms1"        );
+            //edge_comms0        .SetName("edge_comms0"        );
+            //edge_comms1        .SetName("edge_comms1"        );
             edge_weights0      .SetName("edge_weights0"      );
             edge_weights1      .SetName("edge_weights1"      );
             seg_offsets0       .SetName("seg_offsets0"       );
@@ -218,8 +218,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(w_v2self           .Release(target));
             GUARD_CU(w_c2               .Release(target));
 
-            GUARD_CU(edge_comms0        .Release(target));
-            GUARD_CU(edge_comms1        .Release(target));
+            //GUARD_CU(edge_comms0        .Release(target));
+            //GUARD_CU(edge_comms1        .Release(target));
             GUARD_CU(edge_weights0      .Release(target));
             GUARD_CU(edge_weights1      .Release(target));
             GUARD_CU(seg_offsets0       .Release(target));            
@@ -285,8 +285,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(w_v2self           .Allocate(sub_graph.nodes, target));
             GUARD_CU(w_c2               .Allocate(sub_graph.nodes, target));
 
-            GUARD_CU(edge_comms0        .Allocate(sub_graph.edges+1, target));
-            GUARD_CU(edge_comms1        .Allocate(sub_graph.edges+1, target));
+            //GUARD_CU(edge_comms0        .Allocate(sub_graph.edges+1, target));
+            //GUARD_CU(edge_comms1        .Allocate(sub_graph.edges+1, target));
             GUARD_CU(edge_weights0      .Allocate(sub_graph.edges+1, target));
             GUARD_CU(edge_weights1      .Allocate(sub_graph.edges+1, target));
             GUARD_CU(seg_offsets0       .Allocate(sub_graph.edges+1, target));
@@ -306,7 +306,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             {
                 GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
             }
-            pass_communities = new util::Array1D<SizeT, VertexT>[max_iters];
+            pass_communities = new util::Array1D<SizeT, VertexT>[max_iters + 1];
             return retval;
         } // Init
 
@@ -503,8 +503,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
         
             auto &data_slice = data_slices[gpu][0];
-            data_slice.unify_segments 
-                = this -> parameters.template Get<bool>("unify-segments");
+            //data_slice.unify_segments 
+            //    = this -> parameters.template Get<bool>("unify-segments");
             data_slice.max_iters
                 = this -> parameters.template Get<int >("max-iters");
             GUARD_CU(data_slice.Init(this -> sub_graphs[gpu],

@@ -120,12 +120,15 @@ struct BlockReduce
     }
 };
 
-enum : uint32_t {
-    LOG_THREADS     = 9,
-    BLOCK_SIZE      = 1 << LOG_THREADS,
+
+using ReduceFlag = uint32_t;
+enum : ReduceFlag 
+{
+    LOG_THREADS_    = 9,
+    BLOCK_SIZE_     = 1 << LOG_THREADS_,
     MAX_GRID_SIZE   = 160,
     WARP_THRESHOLD  = 64,
-    BLOCK_THRESHOLD = BLOCK_SIZE * 2,
+    BLOCK_THRESHOLD = BLOCK_SIZE_ * 2,
     GRID_THRESHOLD  = MAX_GRID_SIZE * BLOCK_THRESHOLD * 2,
 };
 
@@ -141,11 +144,11 @@ __global__ void SegReduce_Kernel(
     SizeT    *num_grid_segments,
     SizeT    *grid_segments)
 {
-    typedef Block_Scan <SizeT  , LOG_THREADS> BlockScanT;
-    typedef BlockReduce<OutputT, LOG_THREADS> BlockReduceT;
-    __shared__ SizeT s_seg_starts[BLOCK_SIZE];
-    __shared__ SizeT s_seg_sizes [BLOCK_SIZE];
-    __shared__ SizeT s_seg_idxs  [BLOCK_SIZE];
+    typedef Block_Scan <SizeT  , LOG_THREADS_> BlockScanT;
+    typedef BlockReduce<OutputT, LOG_THREADS_> BlockReduceT;
+    __shared__ SizeT s_seg_starts[BLOCK_SIZE_];
+    __shared__ SizeT s_seg_sizes [BLOCK_SIZE_];
+    __shared__ SizeT s_seg_idxs  [BLOCK_SIZE_];
     __shared__ union {
         typename BlockScanT::Temp_Space scan;
         typename BlockReduceT::TempSpace reduce;
@@ -230,7 +233,7 @@ __global__ void SegReduce_Kernel(
             SizeT block_seg_start = s_seg_starts[i];
             SizeT block_seg_size  = s_seg_sizes [i];
             OutputT val = init_value;
-            for (SizeT j = threadIdx.x; j < block_seg_size; j+= BLOCK_SIZE)
+            for (SizeT j = threadIdx.x; j < block_seg_size; j+= BLOCK_SIZE_)
             {
                 val = reduce_op(val, keys_in[j + block_seg_start]);
             }
@@ -280,7 +283,7 @@ __global__ void SegReduce_GKernel(
     SizeT    *num_grid_segments,
     SizeT    *grid_segments)
 {
-    typedef BlockReduce<OutputT, LOG_THREADS> BlockReduceT;
+    typedef BlockReduce<OutputT, LOG_THREADS_> BlockReduceT;
     __shared__ typename BlockReduceT::TempSpace s_temp_space;
     SizeT num_segs = num_grid_segments[0];
     SizeT thread_id = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;

@@ -66,7 +66,7 @@ struct Frontier
     util::Array1D<SizeT, SizeT        , FLAG, cudaHostRegisterFlag>  output_offsets; // length / offsets for offsets of the frontier queues
     util::Array1D<SizeT, SizeT        , FLAG, cudaHostRegisterFlag>  block_input_starts;
     util::Array1D<SizeT, SizeT        , FLAG, cudaHostRegisterFlag>  block_output_starts;
-    util::Array1D<SizeT, char         , FLAG, cudaHostRegisterFlag>  cub_temp_space;
+    util::Array1D<uint64_t, char      , FLAG, cudaHostRegisterFlag>  cub_temp_space;
 
     //Frontier queues. Used to track working frontier.
     VertexQT *vertex_queues; // vertex queues

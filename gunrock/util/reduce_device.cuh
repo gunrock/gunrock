@@ -83,7 +83,7 @@ cudaError_t CUBSegReduce_sum(
 template <typename InputT, typename OutputT,
     typename SizeT, typename ReductionOp>
 cudaError_t cubSegmentedReduce(
-    util::Array1D<SizeT, char   > &cub_temp_space,
+    util::Array1D<uint64_t, char   > &cub_temp_space,
     util::Array1D<SizeT, InputT > &keys_in,
     util::Array1D<SizeT, OutputT> &keys_out,
                          SizeT     num_segments,
@@ -130,7 +130,7 @@ cudaError_t cubSegmentedReduce(
 template <typename InputT, typename OutputT,
     typename SizeT, typename ReductionOp>
 cudaError_t cubReduce(
-    util::Array1D<SizeT, char   > &cub_temp_space,
+    util::Array1D<uint64_t, char   > &cub_temp_space,
     util::Array1D<SizeT, InputT > &keys_in,
     util::Array1D<SizeT, OutputT> &keys_out,
                          SizeT     num_keys,
@@ -172,7 +172,7 @@ cudaError_t cubReduce(
 template <typename InputT, typename OutputT,
     typename SizeT, typename ReductionOp>
 cudaError_t SegmentedReduce(
-    util::Array1D<SizeT, char   > &temp_space,
+    util::Array1D<uint64_t, char   > &temp_space,
     util::Array1D<SizeT, InputT > &keys_in,
     util::Array1D<SizeT, OutputT> &keys_out,
                          SizeT     num_segments,
@@ -200,12 +200,19 @@ cudaError_t SegmentedReduce(
 
     if ((target & util::DEVICE) != 0)
     {
-        GUARD_CU(temp_space.EnsureSize_(sizeof(SizeT) * (1 + num_segments), util::DEVICE));
+        uint64_t request_size = sizeof(SizeT) * (1 + num_segments);
+        GUARD_CU(temp_space.EnsureSize_(request_size, util::DEVICE));
         SizeT *grid_segments = (SizeT*)(temp_space.GetPointer(util::DEVICE));
+        int block_size = reduce::BLOCK_SIZE_;
 
-        int grid_size = num_segments / reduce::BLOCK_SIZE + 1;
+        int grid_size = num_segments / block_size + 1;
         if (grid_size > 384)
             grid_size = 384;
+        //util::PrintMsg("num_segments = " + std::to_string(num_segments)
+        //    + ", request_size = " + std::to_string(request_size)
+        //    + ", grid_size = " + std::to_string(grid_size)
+        //    + ", block_size = " + std::to_string(reduce::BLOCK_SIZE));
+
         GUARD_CU(keys_in.ForAll(
             [grid_segments] __host__ __device__ (InputT *keys, const SizeT &pos)
             {
@@ -213,7 +220,7 @@ cudaError_t SegmentedReduce(
             }, (SizeT)1, util::DEVICE, stream));
 
         reduce::SegReduce_Kernel
-            <<< grid_size, reduce::BLOCK_SIZE, 0, stream >>> (
+            <<< grid_size, block_size, 0, stream >>> (
             keys_in.GetPointer(util::DEVICE), keys_out.GetPointer(util::DEVICE),
             num_segments, segment_offsets.GetPointer(util::DEVICE),
             reduction_op, initial_value,
@@ -225,7 +232,7 @@ cudaError_t SegmentedReduce(
         //    keys_out.GetPointer(util::DEVICE), initial_value);
 
         reduce::SegReduce_GKernel
-            <<< grid_size, reduce::BLOCK_SIZE, 0, stream >>> (
+            <<< grid_size, block_size, 0, stream >>> (
             keys_in.GetPointer(util::DEVICE), keys_out.GetPointer(util::DEVICE),
             num_segments, segment_offsets.GetPointer(util::DEVICE),
             reduction_op, initial_value,

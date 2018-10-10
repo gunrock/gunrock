@@ -84,7 +84,7 @@ struct main_struct
         }
 
         std::vector<std::string> switches{"unify-segments", 
-            "advance-mode","omp-threads", "1st-th"};
+            "advance-mode","omp-threads", "1st-th", "neighborcomm-th"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [&ref_communities](util::Parameters &parameters, GraphT &graph)
             {
@@ -157,7 +157,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | //app::VERTEXT_U64B |
         app::SIZET_U32B | //app::SIZET_U64B |
-        app::VALUET_F64B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F64B >
         (parameters, main_struct());
 }
 

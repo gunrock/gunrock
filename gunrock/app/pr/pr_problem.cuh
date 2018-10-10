@@ -141,7 +141,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         util::Array1D<int  , SizeT  > in_counters;
         util::Array1D<int  , SizeT  > out_counters;
-        util::Array1D<SizeT, char   > cub_sort_storage;
+        util::Array1D<uint64_t, char> cub_sort_storage;
         util::Array1D<SizeT, VertexT> temp_vertex;
 
         /*
