@@ -160,14 +160,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         int num_pass, max_iters;
 
         // Whether to use cubRedixSort instead of cubSegmentRadixSort
-        bool unify_segments;
+        //bool unify_segments;
         /*
          * @brief Default constructor
          */
         DataSlice() : 
-            BaseDataSlice(),
+            BaseDataSlice()
             //new_graph    (NULL),
-            unify_segments(false)
+            //unify_segments(false)
         {
             current_communities.SetName("current_communities");
             next_communities   .SetName("next_communities"   );
@@ -503,8 +503,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
         
             auto &data_slice = data_slices[gpu][0];
-            data_slice.unify_segments 
-                = this -> parameters.template Get<bool>("unify-segments");
+            //data_slice.unify_segments 
+            //    = this -> parameters.template Get<bool>("unify-segments");
             data_slice.max_iters
                 = this -> parameters.template Get<int >("max-iters");
             GUARD_CU(data_slice.Init(this -> sub_graphs[gpu],
