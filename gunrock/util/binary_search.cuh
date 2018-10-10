@@ -81,16 +81,20 @@ SizeT BinarySearch_LeftMost(
     SizeT         left_index ,  // left index of range, inclusive
     SizeT         right_index,  // right index of range, inclusive
     LessOp        less,         // strictly less
-    EqualOp       equal)
+    EqualOp       equal,
+    bool          check_boundaries = true)
 {
     SizeT org_right_index = right_index;
     SizeT center_index = 0;
 
-    //if (!less (elements[left_index], element_to_find) &&
-    //    !equal(elements[left_index], element_to_find))
-    //    return left_index - 1;
-    //if (less(elements[right_index], element_to_find))
-    //    return right_index;
+    if (check_boundaries)
+    {
+        if ((!(less (elements[left_index], element_to_find))) &&
+            (!(equal(elements[left_index], element_to_find))))
+                return left_index - 1;
+        if (less(elements[right_index], element_to_find))
+                return right_index;
+    }
 
     while (right_index - left_index > 1)
     {
@@ -125,13 +129,14 @@ SizeT BinarySearch_LeftMost(
     const ArrayT &elements,
           SizeT   left_index,
           SizeT   right_index,
-          LessOp  less)
+          LessOp  less,
+          bool    check_boundaries = true)
 {
     return BinarySearch_LeftMost(element_to_find, elements, left_index, right_index,
         less, [](const T1 &a, const T1 &b)
         {
             return (a == b);
-        });
+        }, check_boundaries);
 }
 
 template <typename T1, typename ArrayT, typename SizeT>
@@ -140,7 +145,8 @@ SizeT BinarySearch_LeftMost(
     const T1     &element_to_find,
     const ArrayT &elements,
           SizeT   left_index,
-          SizeT   right_index)
+          SizeT   right_index,
+          bool    check_boundaries = true)
 {
     return BinarySearch_LeftMost(element_to_find, elements, left_index, right_index,
         [](const T1 &a, const T1 &b)
@@ -150,7 +156,7 @@ SizeT BinarySearch_LeftMost(
         [](const T1 &a, const T1 &b)
         {
             return (a == b);
-        });
+        }, check_boundaries);
 }
 
 template <typename T1, typename ArrayT, typename SizeT,
