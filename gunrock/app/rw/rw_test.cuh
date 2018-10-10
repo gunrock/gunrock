@@ -120,7 +120,11 @@ typename GraphT::SizeT Validate_Results(
             if((v > 0) && (v % walk_length == 0)) {
                 printf("],\n[");
             }
-            printf("%d:%d, ", h_walks[v], ref_walks[v]);
+            if(walk_mode != 0) {
+                printf("%d:%d, ", h_walks[v], ref_walks[v]);
+            } else {
+                printf("%d, ", h_walks[v]);
+            }
             if(walk_mode != 0) {
                 if(h_walks[v] != ref_walks[v]) {
                     num_errors++;
@@ -132,9 +136,9 @@ typename GraphT::SizeT Validate_Results(
     }
 
     if(walk_mode == 0) {
-        printf("-------- NO VALIDATION -----");
+        printf("-------- NO VALIDATION -----\n");
     } else {
-        printf("%d errors occurred.", num_errors);
+        printf("%d errors occurred.\n", num_errors);
     }
 
 
