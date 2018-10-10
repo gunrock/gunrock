@@ -111,6 +111,13 @@ struct RWIterationLoop : public IterationLoopBase
               // Determine next neighbor to walk to
               SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
               SizeT offset        = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
+              SizeT pos           = graph.GetNeighborListOffset(v[i]) + offset;
+              if (pos >= graph.edges)
+              {
+                printf("Error: pos = %d, v = %d, offset = %d, #neighbors = %d\n",
+                    pos, v, offset, num_neighbors);
+                return;
+              }
               VertexT neighbor    = graph.GetEdgeDest(graph.GetNeighborListOffset(v[i]) + offset);
               v[i]                = neighbor; // Replace vertex w/ neighbor in queue
             }
@@ -157,6 +164,18 @@ struct RWIterationLoop : public IterationLoopBase
         return retval;
     }
 
+    cudaError_t Compute_OutputLength(int peer_)
+    {
+        // No need to load balance or get output size
+        return cudaSuccess;
+    }
+
+    cudaError_t Check_Queue_Size(int peer_)
+    {
+        // no need to check queue size for PR
+        return cudaSuccess;
+    }
+
     bool Stop_Condition(int gpu_num = 0)
     {
       auto &data_slice = this -> enactor ->
@@ -167,7 +186,7 @@ struct RWIterationLoop : public IterationLoopBase
       return iter == data_slice.walk_length;
     }
 
-
+    
     /**
      * @brief Routine to combine received data and local data
      * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each transmition item, typed VertexT
@@ -326,7 +345,7 @@ public:
         gunrock::app::Iteration_Loop<
             // <OPEN> change to how many {VertexT, ValueT} data need to communicate
             //       per element in the inter-GPU sub-frontiers
-            0, 1,
+            0, 0,
             // </OPEN>
             IterationT>(
             thread_data, iterations[thread_data.thread_num]);
