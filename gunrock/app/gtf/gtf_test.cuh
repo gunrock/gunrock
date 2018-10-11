@@ -19,6 +19,7 @@
 #pragma once
 
 #include <gunrock/app/mf/mf_test.cuh>
+#include <queue>
 
 namespace gunrock {
 namespace app {
@@ -149,6 +150,143 @@ cudaError_t MinCut(
     return retval;
 }
 
+/*-----------------------------------------------*/
+template<typename ValueT, typename VertexT>
+int bfs(ValueT** rGraph, VertexT s, VertexT t, VertexT parent[], const int V) {
+    // Create a visited array and mark all vertices as not visited
+    bool *visited = new bool[V];
+    memset(visited, 0, V*sizeof(visited[0]));
+
+    // Create a queue, enqueue source vertex and mark source vertex
+    // as visited
+    std::queue <VertexT> q;
+    q.push(s);
+    visited[s] = true;
+    parent[s] = -1;
+
+    // Standard BFS Loop
+    while (!q.empty()) {
+        int u = q.front();
+        q.pop();
+
+        for (int v = 0; v < V; v++) {
+            if (visited[v] == false && rGraph[u][v] > 0) {
+                q.push(v);
+                parent[v] = u;
+                visited[v] = true;
+            }
+        }
+    }
+
+    // If we reached sink in BFS starting from source, then return
+    // true, else false
+    return (visited[t] == true);
+}
+
+// A DFS based function to find all reachable vertices from s.  The function
+// marks visited[i] as true if i is reachable from s.  The initial values in
+// visited[] must be false. We can also use BFS to find reachable vertices
+template<typename ValueT, typename VertexT>
+void dfs(ValueT** rGraph, VertexT s, bool visited[], const int V) {
+    visited[s] = true;
+    for (int i = 0; i < V; i++)
+       if (abs(rGraph[s][i]) > 1e-6 && !visited[i])
+           dfs(rGraph, i, visited, V);
+}
+
+// Prints the minimum s-t cut
+template<typename ValueT, typename VertexT, typename GraphT>
+void minCut(GraphT graph, VertexT s, VertexT t, bool *visited, ValueT *edge_residuals, const int V) {
+    ValueT max_flow = 0;
+    // Create a residual graph and fill the residual graph with
+    // given capacities in the original graph as residual capacities
+    // in residual graph
+    ValueT** rGraph = new ValueT*[V];  // rGraph[i][j] indicates residual capacity of edge i-j
+    for (int u = 0; u < V; u++) {
+        rGraph[u] = new ValueT[V];
+        for (int v = 0; v < V; v++) {
+             rGraph[u][v] = 0;
+        }
+    }
+
+    for (auto u = 0; u < graph.nodes; ++u)
+    {
+        auto e_start = graph.GraphT::CsrT::GetNeighborListOffset(u);
+        auto num_neighbors = graph.GraphT::CsrT::GetNeighborListLength(u);
+        auto e_end = e_start + num_neighbors;
+        for (auto e = e_start; e < e_end; ++e)
+        {
+            auto v = graph.GraphT::CsrT::GetEdgeDest(e);
+            rGraph[int(u)][int(v)] = graph.edge_values[e];
+        }
+    }
+    /*
+    printf("\n we are before maxflow \n");
+    for (int u = 0; u < V; u++) {
+          for (int v = 0; v < V; v++) {
+            printf("%5.2f ", rGraph[u][v]);
+          }
+          printf("\n");
+    }
+    printf("\n");
+    */
+
+    VertexT *parent = new VertexT[V];  // This array is filled by BFS and to store path
+
+    // Augment the flow while there is a path from source to sink
+    int counter = 0;
+    while (bfs(rGraph, s, t, parent, V)) {
+        // Find minimum residual capacity of the edges along the
+        // path filled by BFS. Or we can say find the maximum flow
+        // through the path found.
+        ValueT path_flow = INT_MAX;
+        for (int v = t; v != s; v = parent[v]) {
+            int u = parent[v];
+            path_flow = min(path_flow, rGraph[u][v]);
+        }
+
+        // update residual capacities of the edges and reverse edges
+        // along the path
+        for (int v = t; v != s; v = parent[v]) {
+            int u = parent[v];
+            //printf("%d -> %d\n", u, v);
+            rGraph[u][v] -= path_flow;
+            rGraph[v][u] += path_flow;
+        }
+        counter++;
+        max_flow += path_flow;
+    }
+
+    // Flow is maximum now, find vertices reachable from s
+    memset(visited, false, V*sizeof(visited[0]));
+    dfs(rGraph, s, visited, V);
+
+    int tem_i = 0;
+    for (auto u = 0; u < graph.nodes; ++u)
+    {
+        auto e_start = graph.GraphT::CsrT::GetNeighborListOffset(u);
+        auto num_neighbors = graph.GraphT::CsrT::GetNeighborListLength(u);
+        auto e_end = e_start + num_neighbors;
+        for (auto e = e_start; e < e_end; ++e)
+        {
+            auto v = graph.GraphT::CsrT::GetEdgeDest(e);
+            edge_residuals[tem_i] = rGraph[int(u)][int(v)];
+            //printf("inside graph loaded as %d (%d -> %d) = %f\n", tem_i, u, v, edge_residuals[tem_i]);
+            tem_i++;
+        }
+    }
+    /*
+    for (int u = 0; u < V; u++) {
+          for (int v = 0; v < V; v++) {
+            printf("%5.2f ", rGraph[u][v]);
+          }
+          printf("\n");
+    }
+    */
+
+}
+/*----------------------------------------------*/
+
 /**
  * @brief Simple CPU-based reference GTF implementations
  *
@@ -243,36 +381,9 @@ cudaError_t CPU_Reference(
         printf("Iteration %d\n", iteration);
         iteration++;
 
-        GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
-            edge_flows, edge_residuals, vertex_reachabilities));
-        /* ---------------------------------------------------
-        int tem_i = 0;
-        for (auto u = 0; u < graph.nodes; ++u)
-        {
-            auto e_start = graph.GraphT::CsrT::GetNeighborListOffset(u);
-            auto num_neighbors = graph.GraphT::CsrT::GetNeighborListLength(u);
-            auto e_end = e_start + num_neighbors;
-            for (auto e = e_start; e < e_end; ++e)
-            {
-                auto v = graph.GraphT::CsrT::GetEdgeDest(e);
-                printf("inside graph loaded as %d (%d -> %d) = %f\n", tem_i, u, v, graph.edge_values[e]);
-                edge_residuals[tem_i++] = graph.edge_values[e];
-            }
-        }
-       std::string n_file_name = "./TVexact/acc.txt";
-        std::ifstream n_infile(n_file_name);
-        bool tm1;
-        double tm2;
-        int j = 0;
-        n_infile >> tm2;
-        community_accus[0] = tm2; // !!!!!!!! come on this is also an input!
-        while(n_infile >> tm1){
-            vertex_reachabilities[j++] = tm1;
-        }
-        for(int i = 0; i < num_org_nodes; i++) std::cout << vertex_reachabilities[i] << " ";
-        std::cout << std::endl;
-
-        ----------------------------------------------------------*/
+        //GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
+        //    edge_flows, edge_residuals, vertex_reachabilities));
+        minCut(graph, source, dest, vertex_reachabilities, edge_residuals, num_nodes);
 
         auto &edge_capacities = graph.edge_values;
 
@@ -364,7 +475,7 @@ cudaError_t CPU_Reference(
 
             auto comm = curr_communities[v];
             if (!community_active[comm] ||
-                abs(community_weights[comm]) > error_threshold)
+                abs(community_weights[comm]) < error_threshold)
             {
                 if (vertex_reachabilities[v] == 1)
                     edge_residuals[num_edges - num_org_nodes * 2 + v] = 0;
@@ -406,8 +517,6 @@ cudaError_t CPU_Reference(
 
         for (SizeT e = 0; e < graph.edges; e ++)
             edge_capacities[e] = edge_residuals[e];
-        //for(auto i = 0; i < num_org_nodes; i++)
-        //    printf("inside: %f \n", community_accus[curr_communities[i]]);
     } // end of while
     cpu_timer.Stop();
     elapsed = cpu_timer.ElapsedMillis();
