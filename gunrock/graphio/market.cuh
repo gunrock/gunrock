@@ -59,11 +59,7 @@ template <typename GraphT>
 cudaError_t ReadMarketStream(
     FILE *f_in,
     util::Parameters &parameters,
-    //char *output_file,
     GraphT &graph,
-    //bool undirected,
-    //bool reversed,
-    //bool quiet = false)
     std::string graph_prefix = "")
 {
     typedef typename GraphT::VertexT VertexT;
@@ -88,6 +84,13 @@ cudaError_t ReadMarketStream(
         graph_prefix + "edge-value-seed");
     if (parameters.UseDefault(graph_prefix + "edge-value-seed"))
         edge_value_seed = time(NULL);
+    bool read_from_binary       = parameters.Get<bool>(
+        graph_prefix + "read-from-binary");
+    bool store_to_binary        = parameters.Get<bool>(
+        graph_prefix + "store-to-binary");
+    std::string binary_prefix   = 
+        parameters.UseDefault(graph_prefix + "binary-prefix") ?
+        
 
     auto &edge_pairs = graph.CooT::edge_pairs;
     SizeT edges_read = util::PreDefinedValues<SizeT>::InvalidValue; //-1;
@@ -111,6 +114,8 @@ cudaError_t ReadMarketStream(
     //bool ordered_rows = true;
     GUARD_CU(graph.CooT::Release());
 
+    bool to_read = true;
+    
     while (true)
     {
         if (fscanf(f_in, "%[^\n]\n", line) <= 0)
@@ -238,7 +243,7 @@ cudaError_t ReadMarketStream(
 
                 else if (num_input == 2)
                 {
-                    if(random_edge_values)
+                    if (random_edge_values)
                     {
                         //double x = rand() * 1.0;
                         //ll_value = std::remainder(rand(), edge_value_range);
@@ -303,7 +308,7 @@ cudaError_t ReadMarketStream(
 
             edges_read++;
 
-            if (undirected)
+            if (false) //(undirected)
             {
                 // Go ahead and insert reverse edge
                 edge_pairs[edges_read].x = ll_col;       // zero-based array
@@ -347,18 +352,28 @@ cudaError_t ReadMarketStream(
     util::PrintMsg("Done parsing (" +
         std::to_string(mark1 - mark0) + " s).", !quiet);
 
-    // Convert COO to CSR
-    /*csr_graph.template FromCoo<LOAD_VALUES>(output_file, coo,
-                                            nodes, edges, ordered_rows,
-                                            undirected, reversed, quiet);
-
-    free(coo);
-    fflush(stdout);
-
-    return 0;*/
     return retval;
 }
 
+template <typename GraphT>
+cudaError_t ReadBinary(
+    util::Parameters &parameters,
+    GraphT &graph,
+    std::string graph_prefix = "")
+{
+    cudaError_t retval = cudaSuccess;
+
+    std::string filename = "";
+    if (parameters.UseDefault(prefix + "binary-prefix"))
+        filename = parameters.Get<std::string>(prefix + "graph-file");
+    else
+        filename = parameters.Get<std::string>(prefix + "binary-prefix");
+
+    
+    return retval;
+}
+
+    
 /**
  * \defgroup Public Interface
  * @{

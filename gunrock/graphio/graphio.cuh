@@ -172,6 +172,27 @@ cudaError_t UseParameters(
         "Whether to remove self loops",
         __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<bool>(
+        graph_prefix + "read-from-binary",
+        util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        true,
+        "Whether to read a graph from binary file, if supported and file available",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<bool>(
+        graph_prefix + "store-to-binary",
+        util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        true,
+        "Whether to store the graph to binary file, if supported",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<std::string>(
+        graph_prefix + "binary-prefix",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        "",
+        "Prefix to store a binary copy of the graph, default is the value of " 
+        + graph_prefix + "-graph-file", __FILE__, __LINE__));
+
     GUARD_CU(market     ::UseParameters(parameters, graph_prefix));
     GUARD_CU(rgg        ::UseParameters(parameters, graph_prefix));
     GUARD_CU(small_world::UseParameters(parameters, graph_prefix));
