@@ -16,6 +16,7 @@
 
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/oprtr/1D_oprtr/for_all.cuh>
+#include <queue>
 
 #define debug_aml(a...)
 //#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a);\
@@ -49,7 +50,32 @@ cudaError_t UseParameters_problem(
 
     return retval;
 }
-
+template <typename GraphT, typename VertexT>
+void relabeling(GraphT graph, VertexT sink, VertexT* h_height){
+    typedef typename GraphT::CsrT CsrT;
+    std::queue<VertexT> que;
+    que.push(sink);
+    auto height = (VertexT)0;
+    while (! que.empty()){
+	auto v = que.front(); que.pop();
+	if (h_height[v] > (VertexT)0)
+	    continue;
+	h_height[v] = height;
+	//printf("h_height[%d] = %d\n", v, height);
+	++height;
+	auto e_start = graph.CsrT::GetNeighborListOffset(v);
+	auto num_neighbors = graph.CsrT::GetNeighborListLength(v);
+	auto e_end = e_start + num_neighbors;
+	for (auto e = e_start; e < e_end; ++e){
+	    auto neighbor = graph.CsrT::GetEdgeDest(e);
+	    //printf("%d->%d\n", v, neighbor);
+	    if (h_height[neighbor] > (VertexT)0 or neighbor == sink)
+		continue;
+	    que.push(neighbor);
+	}
+    }
+    return;
+}
 /**
  * @brief Max Flow Problem structure stores device-side arrays
  * @tparam _GraphT  Type of the graph
@@ -69,7 +95,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     typedef typename GraphT::SizeT    SizeT;
     typedef typename GraphT::GpT      GpT;
     typedef	    _ValueT	      ValueT;
-
     typedef ProblemBase	 <GraphT, FLAG>	BaseProblem;
     typedef DataSliceBase<GraphT, FLAG>	BaseDataSlice;
 
@@ -152,19 +177,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          */
         cudaError_t Init(
             GraphT        &sub_graph,
-	    int		   num_gpus = 1,
+	          int		   num_gpus = 1,
             int            gpu_idx  = 0,
             util::Location target   = util::DEVICE,
             ProblemFlag    flag     = Problem_None)
         {
-	    debug_aml("DataSlice Init");
+	          debug_aml("DataSlice Init");
 
             cudaError_t retval  = cudaSuccess;
-	    SizeT nodes_size = sub_graph.nodes;
-	    SizeT edges_size = sub_graph.edges;
+	          SizeT nodes_size = sub_graph.nodes;
+	          SizeT edges_size = sub_graph.edges;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, 
-			flag));
+			                                    flag));
 
             // 
 	    // Allocate data on Gpu
@@ -178,8 +203,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(active	    .Allocate(1, util::HOST|target));
 
 
-	    GUARD_CU(util::SetDevice(gpu_idx));
-	    GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
+	          GUARD_CU(util::SetDevice(gpu_idx));
+	          GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
+
             return retval;
         } // Init Data Slice
 
@@ -192,7 +218,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 		VertexT* h_reverse, util::Location target = util::DEVICE)
         {
             cudaError_t retval = cudaSuccess;
-
 	    typedef typename GraphT::CsrT CsrT;
 
 	    debug_aml("DataSlice Reset");
@@ -216,8 +241,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             
 	    ValueT* h_flow = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
 	    ValueT* h_excess = (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
+	    VertexT* h_height = (VertexT*)malloc(sizeof(VertexT)*graph.nodes);
 	    for (auto i = 0; i < graph.edges; ++i) h_flow[i] = (ValueT)0;
 	    for (auto i = 0; i < graph.nodes; ++i) h_excess[i] = (ValueT)0;
+	    for (auto i = 0; i < graph.nodes; ++i) h_height[i] = (VertexT)0;
+
+	    h_height[sink] = 0;
+	    relabeling(graph, sink, h_height);
+	    if (h_height[source] < nodes_size)
+		h_height[source] = nodes_size;
 
 	    SizeT e_start = graph.CsrT::GetNeighborListOffset(source);
 	    SizeT num_neighbors = graph.CsrT::GetNeighborListLength(source);
@@ -233,6 +265,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 		preflow += f;
 	    }
 	    debug_aml("preflow = %lf\n", preflow);
+
+	    GUARD_CU(height.SetPointer(h_height, nodes_size, util::HOST));
+	    GUARD_CU(height.Move(util::HOST, target, nodes_size, 0,
+			this->stream));
 
 	    GUARD_CU(excess.SetPointer(h_excess, nodes_size, util::HOST));
 	    GUARD_CU(excess.Move(util::HOST, target, nodes_size, 0, 
@@ -250,7 +286,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	      {
 		active_[pos] = 1;
 	      }, 1, target, this -> stream));
-	
+
+	    /*
 	    GUARD_CU(height.ForAll([source, nodes_size]
 	      __host__ __device__(VertexT *height, const VertexT pos)
 	      {
@@ -260,6 +297,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 		  height[pos] = nodes_size;
 		}
 	      }, nodes_size, target, this -> stream));
+	      */
 
 	    GUARD_CU(lowest_neighbor.ForAll([graph, source]
 	      __host__ __device__(VertexT *lowest_neighbor, const VertexT pos)
@@ -276,10 +314,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
 	    GUARD_CU2(cudaDeviceSynchronize(),
 	        "cudaDeviceSynchronize failed.");
-	    return retval;
 
 	    free(h_flow);
 	    free(h_excess);
+	    return retval;
         }
     }; // DataSlice
 
@@ -363,6 +401,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	      }
 	      }, eN, util::HOST));
 	}
+	GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
+
         return retval;
     }
 
@@ -384,7 +424,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
-	    auto gpu_name = std::to_string(gpu);
+	          auto gpu_name = std::to_string(gpu);
             data_slices[gpu].SetName("data_slices[" + gpu_name + "]");
 
             if (target & util::DEVICE)
@@ -393,14 +433,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
             auto &data_slice = data_slices[gpu][0];
             GUARD_CU(data_slice.Init(
-			this->sub_graphs[gpu],
-			this->num_gpus,
-			this->gpu_idx[gpu], 
-			target, 
-			this->flag));
+                              this->sub_graphs[gpu],
+                              this->num_gpus,
+                              this->gpu_idx[gpu], 
+                              target, 
+                              this->flag));
 
-	    GUARD_CU2(cudaStreamSynchronize(data_slices[gpu]->stream),
-		   "sync failed.");
+            GUARD_CU2(cudaStreamSynchronize(data_slices[gpu]->stream),
+             "sync failed.");
+
         } // end for (gpu)
         return retval;
     }// End Init MF Problem

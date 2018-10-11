@@ -40,6 +40,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_app    (parameters));
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
+    GUARD_CU(gtf::UseParameters_test   (parameters));
 
     GUARD_CU(parameters.Use<uint64_t>(
     	"source",

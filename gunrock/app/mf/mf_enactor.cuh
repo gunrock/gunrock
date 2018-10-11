@@ -56,6 +56,7 @@ struct MFIterationLoop : public IterationLoopBase
     typedef typename EnactorT::Problem	ProblemT;
     typedef typename ProblemT::GraphT	GraphT;
     typedef typename GraphT::CsrT	CsrT;
+
     typedef IterationLoopBase <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
     MFIterationLoop() : BaseIterationLoop() {}
@@ -108,7 +109,7 @@ struct MFIterationLoop : public IterationLoopBase
 	    auto cf = capacity[edge_id] - flow[edge_id];
 	    auto f = min(cf, e);
 	    auto rev_id = reverse[edge_id];
-	    if (f > 0 && height[src] == height[dest] + 1)
+	    if (f > 0 && height[src] > height[dest])
 	    {
 		if (atomicAdd(&excess[src], -f) >= f)
 		{
@@ -117,12 +118,12 @@ struct MFIterationLoop : public IterationLoopBase
 		    atomicAdd(&flow[rev_id], -f);
 //		    printf("push %d->%d, flow %lf, e[%d] %lf, e[%d] %lf\n", \
 			    src, dest, f, src, excess[src], dest, excess[dest]);
+		    active[0] = 1;
 		}else{
 		    atomicAdd(&excess[src], f);
 //		    printf("rollback push %d->%d, excess[%d] = %lf\n", \
 			    src, dest, src, excess[src]);
 		} 
-		active[0] = 1;
 		return true;
 	    }
 	    return false;
@@ -228,8 +229,8 @@ struct MFIterationLoop : public IterationLoopBase
 //          [] __host__ __device__ (VertexT *el, const SizeT &v){
 //            printf("lowest_neighbor[%d] = %d\n", v, el[v]);
 //          }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-          "cudaStreamSynchronize failed");
+//	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+//          "cudaStreamSynchronize failed");
 
 	// ADVANCE RELABEL OP
 	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
@@ -247,9 +248,8 @@ struct MFIterationLoop : public IterationLoopBase
 //	      }
 //	      printf(" active nodes\n");
 //	    }, 1, util::DEVICE, oprtr_parameters.stream));
-
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-	    "cudaStreamSynchronize failed");
+//	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+//	    "cudaStreamSynchronize failed");
 
 	//printf("new updated vertices %d\n", frontier.queue_length);
 
@@ -328,6 +328,7 @@ struct MFIterationLoop : public IterationLoopBase
 		    std::to_string(value__associate_ins[in_pos]));*/
 	auto expand_op = [capacity, flow, excess, height] 
 	__host__ __device__(VertexT &key, const SizeT &in_pos,
+
             VertexT *vertex_associate_ins,
             ValueT  *value__associate_ins) -> bool
         {
@@ -369,7 +370,6 @@ struct MFIterationLoop : public IterationLoopBase
 
 	return false;
     }
-
 }; // end of MFIteration
 
 /**

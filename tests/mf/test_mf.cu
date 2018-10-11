@@ -69,7 +69,6 @@ struct main_struct
 	GraphT d_graph;
 	if (not undirected){
 	    debug_aml("Load directed graph");
-	    parameters.Set<int>("undirected", 0);
 	    parameters.Set<int>("remove-duplicate-edges", false);
 	    GUARD_CU(graphio::LoadGraph(parameters, d_graph));
 	}
@@ -91,7 +90,7 @@ struct main_struct
 	}
 	if (parameters.Get<VertexT>("sink") == 
 		util::PreDefinedValues<VertexT>::InvalidValue){
-	    parameters.Set("sink", d_graph.nodes-1);
+	    parameters.Set("sink", u_graph.nodes-1);
 	}
 
 	VertexT source = parameters.Get<VertexT>("source");
@@ -224,14 +223,6 @@ struct main_struct
 	[flow_edge, reverse](util::Parameters &parameters, GraphT &u_graph)
 	{
 	  debug_aml("go to RunTests");
-	  if (flow_edge)
-	  {
-	    for (int i=0; i<u_graph.edges; ++i)
-	    {
-	      debug_aml("%s:%d flow_edge[%d] = %lf", 
-		__FILE__, __LINE__, i, flow_edge[i]);
-	    }
-	  }
 	  return app::mf::RunTests(parameters, u_graph, reverse, flow_edge);
 	}));
 
