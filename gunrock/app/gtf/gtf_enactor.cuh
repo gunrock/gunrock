@@ -7,7 +7,7 @@
 
 /**
  * @file
- * mf_enactor.cuh
+ * gtf_enactor.cuh
  *
  * @brief Max Flow Problem Enactor
  */
@@ -18,20 +18,20 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-#include <gunrock/app/mf/mf_problem.cuh>
+#include <gunrock/app/gtf/gtf_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
-#define debug_aml(a...) 
+#define debug_aml(a...)
 //#define debug_aml(a...) \
   {printf("%s:%d ", __FILE__, __LINE__); printf(a); printf("\n");}
 
 namespace gunrock {
 namespace app {
-namespace mf {
+namespace gtf {
 
 /**
- * @brief Speciflying parameters for MF Enactor
- * @param parameters The util::Parameter<...> structure holding all parameter 
+ * @brief Speciflying parameters for gtf Enactor
+ * @param parameters The util::Parameter<...> structure holding all parameter
  *		      info
  * \return cudaError_t error message(s), if any
  */
@@ -43,11 +43,11 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 }
 
 /**
- * @brief defination of MF iteration loop
+ * @brief defination of gtf iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct MFIterationLoop : public IterationLoopBase
+struct GTFIterationLoop : public IterationLoopBase
     <EnactorT, Use_FullQ | Push>
 {
     typedef typename EnactorT::VertexT	VertexT;
@@ -56,13 +56,12 @@ struct MFIterationLoop : public IterationLoopBase
     typedef typename EnactorT::Problem	ProblemT;
     typedef typename ProblemT::GraphT	GraphT;
     typedef typename GraphT::CsrT	CsrT;
-
     typedef IterationLoopBase <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
-    MFIterationLoop() : BaseIterationLoop() {}
+    GTFIterationLoop() : BaseIterationLoop() {}
 
     /**
-     * @brief Core computation of mf, one iteration
+     * @brief Core computation of gtf, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
      * \return cudaError_t error message(s), if any
      */
@@ -73,7 +72,7 @@ struct MFIterationLoop : public IterationLoopBase
 	auto num_gpus		= enactor -> num_gpus;
 	auto gpu_offset		= num_gpus * gpu_num;
         auto &data_slice	= enactor -> problem -> data_slices[gpu_num][0];
-        auto &enactor_slice	= enactor -> 
+        auto &enactor_slice	= enactor ->
 				  enactor_slices[gpu_offset + peer_];
         auto &enactor_stats	= enactor_slice.enactor_stats;
         auto &graph		= data_slice.sub_graph[0];
@@ -81,7 +80,7 @@ struct MFIterationLoop : public IterationLoopBase
         auto &oprtr_parameters	= enactor_slice.oprtr_parameters;
         auto &retval          	= enactor_stats.retval;
         auto &iteration       	= enactor_stats.iteration;
-      
+
 	auto source		= data_slice.source;
 	auto sink		= data_slice.sink;
 	auto &capacity        	= graph.edge_values;
@@ -95,21 +94,21 @@ struct MFIterationLoop : public IterationLoopBase
 	auto null_ptr		= &local_vertices;
 	null_ptr = NULL;
 
-	auto advance_push_op = [capacity, flow, excess, height, reverse, 
+	auto advance_push_op = [capacity, flow, excess, height, reverse,
 	     source, sink, active]
 	    __host__ __device__
-	    (const VertexT &src, VertexT &dest, const SizeT &edge_id, 
+	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
 	    const VertexT &input_item, const SizeT &input_pos,
 	    const SizeT &output_pos) -> bool
 	{
-	    if (!util::isValid(dest) or !util::isValid(src) or 
+	    if (!util::isValid(dest) or !util::isValid(src) or
 		    src == source or src == sink)
 		return false;
 	    auto e = excess[src];
 	    auto cf = capacity[edge_id] - flow[edge_id];
 	    auto f = min(cf, e);
 	    auto rev_id = reverse[edge_id];
-	    if (f > 0 && height[src] > height[dest])
+	    if (f > 0 && height[src] == height[dest] + 1)
 	    {
 		if (atomicAdd(&excess[src], -f) >= f)
 		{
@@ -118,18 +117,18 @@ struct MFIterationLoop : public IterationLoopBase
 		    atomicAdd(&flow[rev_id], -f);
 //		    printf("push %d->%d, flow %lf, e[%d] %lf, e[%d] %lf\n", \
 			    src, dest, f, src, excess[src], dest, excess[dest]);
-		    active[0] = 1;
 		}else{
 		    atomicAdd(&excess[src], f);
 //		    printf("rollback push %d->%d, excess[%d] = %lf\n", \
 			    src, dest, src, excess[src]);
-		} 
+		}
+		active[0] = 1;
 		return true;
 	    }
 	    return false;
 	};
 
-	auto advance_find_lowest_op = 
+	auto advance_find_lowest_op =
 	    [excess, capacity, flow, lowest_neighbor, height, iteration,
 	    source, sink, active]
 	    __host__ __device__
@@ -137,10 +136,10 @@ struct MFIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-	    if (!util::isValid(dest) or !util::isValid(src) or 
+	    if (!util::isValid(dest) or !util::isValid(src) or
 		    src == source or src == sink)
 		return false;
-	    if (excess[src] > (ValueT)0 and 
+	    if (excess[src] > (ValueT)0 and
 		    capacity[edge_id] - flow[edge_id] > (ValueT)0)
 	    {
 		auto l = lowest_neighbor[src];
@@ -155,20 +154,20 @@ struct MFIterationLoop : public IterationLoopBase
 	    return false;
 	};
 
-	auto advance_relabel_op = 
-	    [excess, capacity, flow, lowest_neighbor, height, iteration, 
+	auto advance_relabel_op =
+	    [excess, capacity, flow, lowest_neighbor, height, iteration,
 	    source, sink, active]
 	    __host__ __device__
 	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-	    if (!util::isValid(dest) or !util::isValid(src) or 
+	    if (!util::isValid(dest) or !util::isValid(src) or
 		    src == source or src == sink)
 		return false;
-	    if (excess[src] > (ValueT)0 and 
+	    if (excess[src] > (ValueT)0 and
 		    capacity[edge_id] - flow[edge_id] > (ValueT)0 and
-		    lowest_neighbor[src] == dest){ 
+		    lowest_neighbor[src] == dest){
 		if (height[src] <= height[dest])
 		{
 	//	    printf("relabel src %d, dest %d, H[%d]=%d, -> %d\n",\
@@ -180,7 +179,7 @@ struct MFIterationLoop : public IterationLoopBase
 	    }
 	    return false;
 	};
-	
+
 //	GUARD_CU(excess.ForAll(
 //	    [] __host__ __device__ (ValueT *excess_, const SizeT &v){
 //	      printf("excess_[%d] = %lf\n", v, excess_[v]);
@@ -196,20 +195,20 @@ struct MFIterationLoop : public IterationLoopBase
 //	      printf("flow[%d] = %lf\n", v, f[v]);
 //	    }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
-	
+
 	oprtr_parameters.advance_mode = "ALL_EDGES";
 	GUARD_CU(active.ForAll(
 	    [] __host__ __device__ (SizeT *a, const SizeT &v){
 	      a[v] = 0;
 	    }, 1, util::DEVICE, oprtr_parameters.stream));
-	
+
 	// ADVANCE_PUSH_OP
 	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
 		    graph.csr(), &local_vertices, null_ptr,
 		    oprtr_parameters, advance_push_op));
 	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
 	    "cudaStreamSynchronize failed");
-	
+
 	GUARD_CU(lowest_neighbor.ForAll(
           [] __host__ __device__ (VertexT *el, const SizeT &v){
 	    el[v] = util::PreDefinedValues<VertexT>::InvalidValue;
@@ -221,16 +220,16 @@ struct MFIterationLoop : public IterationLoopBase
 	// ADVANCE_FIND_LOWEST_OP
 	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
 		    graph.csr(), &local_vertices, null_ptr,
-		    oprtr_parameters, advance_find_lowest_op)); 
+		    oprtr_parameters, advance_find_lowest_op));
 	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
 	    "cudaStreamSynchronize failed");
-      
+
 //	GUARD_CU(lowest_neighbor.ForAll(
 //          [] __host__ __device__ (VertexT *el, const SizeT &v){
 //            printf("lowest_neighbor[%d] = %d\n", v, el[v]);
 //          }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-//	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-//          "cudaStreamSynchronize failed");
+	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+          "cudaStreamSynchronize failed");
 
 	// ADVANCE RELABEL OP
 	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
@@ -238,7 +237,7 @@ struct MFIterationLoop : public IterationLoopBase
 		    oprtr_parameters, advance_relabel_op));
 	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
 	    "cudaStreamSynchronize failed");
-	
+
 //	GUARD_CU(active.ForAll(
 //	    [] __host__ __device__ (SizeT *a, const SizeT &v){
 //	      if (a[v]){
@@ -248,8 +247,9 @@ struct MFIterationLoop : public IterationLoopBase
 //	      }
 //	      printf(" active nodes\n");
 //	    }, 1, util::DEVICE, oprtr_parameters.stream));
-//	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-//	    "cudaStreamSynchronize failed");
+
+	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+	    "cudaStreamSynchronize failed");
 
 	//printf("new updated vertices %d\n", frontier.queue_length);
 
@@ -257,7 +257,7 @@ struct MFIterationLoop : public IterationLoopBase
 	oprtr_parameters.filter_mode = "BY_PASS";
 	GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
 		    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-		    oprtr_parameters, 
+		    oprtr_parameters,
 	[active]
 	__host__ __device__
 	(const VertexT &src, VertexT &dest, const SizeT &edge_id,
@@ -286,16 +286,16 @@ struct MFIterationLoop : public IterationLoopBase
     }
 
     /* cudaError_t Compute_OutputLength(int peer_)
-    {   
+    {
         // No need to load balance or get output size
         return cudaSuccess;
     }*/
 
     /**
      * @brief Routine to combine received data and local data
-     * @tparam NUM_VERTEX_ASSOCIATES  Number of data associated with each 
+     * @tparam NUM_VERTEX_ASSOCIATES  Number of data associated with each
      *				      transmition item, typed VertexT
-     * @tparam NUM_VALUE__ASSOCIATES  Number of data associated with each 
+     * @tparam NUM_VALUE__ASSOCIATES  Number of data associated with each
 				      transmition item, typed ValueT
      * @param[in] received_length     The number of transmition items received
      * @param[in] peer_		      which peer GPU the data came from
@@ -314,25 +314,24 @@ struct MFIterationLoop : public IterationLoopBase
         auto &enactor_slice = enactor -> enactor_slices[gpu_offset + peer_];
         auto iteration	    = enactor_slice.enactor_stats.iteration;
 
-        auto &capacity	    = data_slice.sub_graph[0].edge_values; 
+        auto &capacity	    = data_slice.sub_graph[0].edge_values;
         auto &flow  	    = data_slice.flow;
         auto &excess	    = data_slice.excess;
         auto &height	    = data_slice.height;
-        
+
 	debug_aml("ExpandIncomming do nothing");
-/*	for key " + 
+/*	for key " +
 		    std::to_string(key) + " and for in_pos " +
 		    std::to_string(in_pos) + " and for vertex ass ins " +
 		    std::to_string(vertex_associate_ins[in_pos]) +
 		    " and for value ass ins " +
 		    std::to_string(value__associate_ins[in_pos]));*/
-	auto expand_op = [capacity, flow, excess, height] 
+	auto expand_op = [capacity, flow, excess, height]
 	__host__ __device__(VertexT &key, const SizeT &in_pos,
-
             VertexT *vertex_associate_ins,
             ValueT  *value__associate_ins) -> bool
         {
-	    
+
             // TODO: fill in the lambda to combine received and local data, e.g.:
             // ValueT in_val  = value__associate_ins[in_pos];
             // ValueT old_val = atomicMin(distances + key, in_val);
@@ -345,7 +344,7 @@ struct MFIterationLoop : public IterationLoopBase
         cudaError_t retval = BaseIterationLoop:: template ExpandIncomingBase
             <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
             (received_length, peer_, expand_op);
-	return retval; 
+	return retval;
     }
 
     bool Stop_Condition(int gpu_num = 0)
@@ -354,7 +353,7 @@ struct MFIterationLoop : public IterationLoopBase
 	int num_gpus = enactor -> num_gpus;
 	auto &enactor_slice = enactor -> enactor_slices[0];
 	auto iteration	= enactor_slice.enactor_stats.iteration;
-	
+
 	auto &retval = enactor_slice.enactor_stats.retval;
 	if (retval != cudaSuccess){
 	    printf("(CUDA error %d @ GPU %d: %s\n", retval, 0 % num_gpus,
@@ -370,10 +369,11 @@ struct MFIterationLoop : public IterationLoopBase
 
 	return false;
     }
-}; // end of MFIteration
+
+}; // end of gtfIteration
 
 /**
- * @brief MF enactor class.
+ * @brief gtf enactor class.
  * @tparam _Problem Problem type we process on
  * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
  * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
@@ -395,20 +395,20 @@ public:
     typedef typename Problem::ValueT  ValueT;
     typedef typename Problem::SizeT   SizeT;
     typedef typename Problem::GraphT  GraphT;
-    typedef EnactorBase<GraphT, VertexT, ValueT, ARRAY_FLAG, 
+    typedef EnactorBase<GraphT, VertexT, ValueT, ARRAY_FLAG,
 	    cudaHostRegisterFlag>				BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
 								EnactorT;
-    typedef MFIterationLoop<EnactorT>				IterationT;
+    typedef GTFIterationLoop<EnactorT>				IterationT;
 
     Problem     *problem   ;
     IterationT  *iterations;
 
     /**
-     * @brief MFEnactor constructor
+     * @brief gtfEnactor constructor
      */
     Enactor() :
-        BaseEnactor("mf"),
+        BaseEnactor("gtf"),
         problem    (NULL)
     {
         // TODO: change according to algorithmic needs
@@ -455,9 +455,9 @@ public:
     {
         cudaError_t retval = cudaSuccess;
         this->problem = &problem;
-        
+
 	// Lazy initialization
-        GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target, 
+        GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target,
 		    false));
 
 	auto num_gpus = this->num_gpus;
@@ -470,7 +470,7 @@ public:
 	    auto &graph = problem.sub_graphs[gpu];
 	    auto nodes = graph.nodes;
 	    auto edges = graph.edges;
-	    GUARD_CU(enactor_slice.frontier.Allocate(nodes, edges, 
+	    GUARD_CU(enactor_slice.frontier.Allocate(nodes, edges,
 			this->queue_factors));
 	}
 	iterations = new IterationT[num_gpus];
@@ -479,13 +479,13 @@ public:
             GUARD_CU(iterations[gpu].Init(this, gpu));
         }
 
-	GUARD_CU(this -> Init_Threads(this, 
+	GUARD_CU(this -> Init_Threads(this,
 		    (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
 	return retval;
     }
 
     /**
-      * @brief one run of mf, to be called within GunrockThread
+      * @brief one run of gtf, to be called within GunrockThread
       * @param thread_data Data for the CPU thread
       * \return cudaError_t error message(s), if any
       */
@@ -509,13 +509,13 @@ public:
     {
         cudaError_t retval = cudaSuccess;
 	debug_aml("Enactor Reset, src %d", src);
-       
+
 	typedef typename EnactorT::Problem::GraphT::GpT GpT;
 	auto num_gpus = this->num_gpus;
 
 	GUARD_CU(BaseEnactor::Reset(target));
 
-        // Initialize frontiers according to the algorithm MF
+        // Initialize frontiers according to the algorithm gtf
 	for (int gpu = 0; gpu < num_gpus; gpu++)
 	{
 	    auto gpu_offset = gpu * num_gpus;
@@ -525,23 +525,23 @@ public:
 		this -> thread_slices[gpu].init_size = 1;
 		for (int peer_ = 0; peer_ < num_gpus; ++peer_)
 		{
-		    auto &frontier = 
+		    auto &frontier =
 			this -> enactor_slices[gpu_offset + peer_].frontier;
 		    frontier.queue_length = (peer_ == 0) ? 1 : 0;
 		    if (peer_ == 0)
 		    {
 			GUARD_CU(frontier.V_Q() -> ForEach(
-			    [src]__host__ __device__ (VertexT &v){v = src;}, 
+			    [src]__host__ __device__ (VertexT &v){v = src;},
 			    1, target, 0));
 		    }
 		}
 	    }
-            else 
+            else
 	    {
 		this -> thread_slices[gpu].init_size = 0;
                 for (int peer_ = 0; peer_ < num_gpus; peer_++)
                 {
-		    auto &frontier = 
+		    auto &frontier =
 			this -> enactor_slices[gpu_offset + peer_].frontier;
 		    frontier.queue_length = 0;
                 }
@@ -553,7 +553,7 @@ public:
     }
 
     /**
-     * @brief Enacts a MF computing on the specified graph.
+     * @brief Enacts a gtf computing on the specified graph.
      * @param[in] src Source node to start primitive.
      * \return cudaError_t error message(s), if any
      */
@@ -562,7 +562,7 @@ public:
         cudaError_t  retval     = cudaSuccess;
 	debug_aml("enact");
         GUARD_CU(this -> Run_Threads(this));
-        util::PrintMsg("GPU MF Done.", this -> flag & Debug);
+        util::PrintMsg("GPU gtf Done.", this -> flag & Debug);
         return retval;
     }
 
@@ -578,4 +578,3 @@ public:
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-
