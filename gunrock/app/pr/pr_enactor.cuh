@@ -16,7 +16,6 @@
 
 #include <gunrock/util/track_utils.cuh>
 #include <gunrock/util/sort_device.cuh>
-
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
@@ -724,7 +723,6 @@ public:
         /*size_t cub_required_size = 0;
         void* temp_storage = NULL;
         cub::DoubleBuffer<ValueT > key_buffer(
-
             data_slice.rank_curr.GetPointer(util::DEVICE),
             data_slice.rank_next.GetPointer(util::DEVICE));
         cub::DoubleBuffer<VertexT> value_buffer(
@@ -779,7 +777,6 @@ public:
         //util::Array1D<SizeT, char> cub_temp_space;
         GUARD_CU(util::cubSortPairsDescending(
             data_slice.cub_sort_storage,
-
             data_slice.rank_curr, data_slice.rank_next,
             data_slice.node_ids , data_slice.temp_vertex,
             nodes, 0, sizeof(ValueT) * 8, this -> enactor_slices[0].stream));

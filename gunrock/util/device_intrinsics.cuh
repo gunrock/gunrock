@@ -135,6 +135,14 @@ __device__ static float atomicCAS(float *addr, float comp, float val)
         __float_as_int(val )));
 }
 
+__device__ static double atomicCAS(double *addr, double comp, double val)
+{
+    return __longlong_as_double(atomicCAS(
+        (long long*)addr,
+        __double_as_longlong(comp),
+        __double_as_longlong(val)));
+}
+
 // TODO: verify overflow condition
 __device__ static long long atomicAdd(long long *addr, long long val)
 {
