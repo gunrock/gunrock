@@ -211,13 +211,15 @@ struct main_struct
 	//
         ValueT max_flow;
 	
-	util::PrintMsg("______CPU reference algorithm______", true);
-	double elapsed = app::mf::CPU_Reference
-	    (parameters, u_graph, source, sink, max_flow, reverse, flow_edge);
-        util::PrintMsg("-----------------------------------\nElapsed: " + 
-		std::to_string(elapsed) + " ms\nMax flow CPU = " +
+	if (!quick) {
+	    util::PrintMsg("______CPU reference algorithm______", true);
+	    double elapsed = app::mf::CPU_Reference
+	        (parameters, u_graph, source, sink, max_flow, reverse, flow_edge);
+            util::PrintMsg("-----------------------------------\nElapsed: " + 
+		std::to_string(elapsed) + " ms\n Max flow CPU = " +
 		std::to_string(max_flow), true);
-	
+	}
+
         std::vector<std::string> switches{"advance-mode"};
 	GUARD_CU(app::Switch_Parameters(parameters, u_graph, switches,
 	[flow_edge, reverse](util::Parameters &parameters, GraphT &u_graph)
