@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <gunrock/util/device_intrinsics.cuh>
+
 namespace gunrock {
 namespace graph {
 
