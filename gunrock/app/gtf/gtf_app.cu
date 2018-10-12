@@ -6,9 +6,9 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file mf_app.cu
+ * @file gtf_app.cu
  *
- * @brief maxflow (mf) application
+ * @brief maxflow (gtf) application
  */
 
 #include <gunrock/gunrock.h>
@@ -22,9 +22,9 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// MF includes
-#include <gunrock/app/mf/mf_enactor.cuh>
-#include <gunrock/app/mf/mf_test.cuh>
+// gtf includes
+#include <gunrock/app/gtf/gtf_enactor.cuh>
+#include <gunrock/app/gtf/gtf_test.cuh>
 
 //#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a);\
     printf("\n");}
@@ -32,7 +32,7 @@
 
 namespace gunrock {
 namespace app {
-namespace mf {
+namespace gtf {
 
 cudaError_t UseParameters(util::Parameters &parameters)
 {
@@ -40,10 +40,11 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_app    (parameters));
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
+    GUARD_CU(gtf::UseParameters_test   (parameters));
 
     GUARD_CU(parameters.Use<uint64_t>(
     	"source",
-    	util::REQUIRED_ARGUMENT | util::SINGLE_VALUE,
+    	util::INTERNAL_PARAMETER | util::REQUIRED_ARGUMENT,
     	util::PreDefinedValues<uint64_t>::InvalidValue,
     	"<Vertex-ID|random|largestdegree> The source vertex\n"
     	"\tIf random, randomly select non-zero degree vertex;\n"
@@ -52,112 +53,80 @@ cudaError_t UseParameters(util::Parameters &parameters)
 
     GUARD_CU(parameters.Use<uint64_t>(
     	"sink",
-    	util::REQUIRED_ARGUMENT | util::SINGLE_VALUE,
+    	util::INTERNAL_PARAMETER | util::REQUIRED_ARGUMENT,
     	util::PreDefinedValues<uint64_t>::InvalidValue,
     	"<Vertex-ID|random|largestdegree> The source vertex\n"
     	"\tIf random, randomly select non-zero degree vertex;\n"
     	"\tIf largestdegree, select vertex with largest degree",
     	__FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<int>(
-    	"seed",
-    	util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-    	util::PreDefinedValues<int>::InvalidValue,
-    	"seed to generate random sources or sink",
-    	__FILE__, __LINE__));
-    return retval;
-}
-
-template <typename GraphT>
-cudaError_t CorrectReverseCapacities(
-    GraphT &d_graph,
-    GraphT &u_graph)
-{
-    typedef typename GraphT::CsrT CsrT;
-    cudaError_t retval = cudaSuccess;
-
-    // Correct capacity values on reverse edges
-    #pragma omp parallel for
-    for (auto u = 0; u < u_graph.nodes; ++u)
-    {
-        auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
-        auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
-        auto e_end = e_start + num_neighbors;
-        debug_aml("vertex %d\nnumber of neighbors %d", u,
-            num_neighbors);
-        for (auto e = e_start; e < e_end; ++e)
-        {
-            u_graph.CsrT::edge_values[e] = 0;
-            auto v = u_graph.CsrT::GetEdgeDest(e);
-            // Looking for edge u->v in directed graph
-            auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
-            auto num_neighbors2 =
-            d_graph.CsrT::GetNeighborListLength(u);
-            auto f_end = f_start + num_neighbors2;
-            for (auto f = f_start; f < f_end; ++f)
-            {
-                auto z = d_graph.CsrT::GetEdgeDest(f);
-                if (z == v and d_graph.CsrT::edge_values[f] > 0)
-                {
-                    u_graph.CsrT::edge_values[e]  =
-                    d_graph.CsrT::edge_values[f];
-                    debug_aml("edge (%d, %d) cap = %lf\n", u, v, \
-                        u_graph.CsrT::edge_values[e]);
-                    break;
-                }
-            }
-        }
-    }
-
     return retval;
 }
 
 template <typename GraphT, typename ArrayT>
-cudaError_t InitReverse(
+cudaError_t AddSourceSink(
     GraphT &u_graph,
-    ArrayT &reverse)
+    ArrayT &weights,
+    GraphT &graph)
 {
-    typedef typename GraphT::CsrT CsrT;
     cudaError_t retval = cudaSuccess;
 
-    // Initialize reverse array.
+    GUARD_CU(graph.Allocate(u_graph.nodes + 2,
+        u_graph.edges + u_graph.nodes * 4, util::HOST));
+
     #pragma omp parallel for
-    for (auto u = 0; u < u_graph.nodes; ++u)
+    for (auto v = 0; v < u_graph.nodes; v ++)
     {
-        auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
-        auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+        auto e_start = u_graph.GetNeighborListOffset(v);
+        auto num_neighbors = u_graph.GetNeighborListLength(v);
         auto e_end = e_start + num_neighbors;
-        for (auto e = e_start; e < e_end; ++e)
+
+        graph.row_offsets[v] = u_graph.row_offsets[v] + v * 2;
+        for (auto e = e_start; e < e_end; e++)
         {
-            auto v = u_graph.CsrT::GetEdgeDest(e);
-            auto f_start = u_graph.CsrT::GetNeighborListOffset(v);
-            auto num_neighbors2 = u_graph.CsrT::GetNeighborListLength(v);
-            auto f_end = f_start + num_neighbors2;
-            for (auto f = f_start; f < f_end; ++f)
-            {
-                auto z = u_graph.CsrT::GetEdgeDest(f);
-                if (z == u)
-                {
-                    reverse[e] = f;
-                    reverse[f] = e;
-                    break;
-                }
-            }
+            graph.edge_values[e + v * 2] = u_graph.edge_values[e];
         }
+        graph.column_indices[e_end + v * 2    ] = u_graph.nodes;
+        graph.edge_values   [e_end + v * 2    ] = 0;
+        graph.column_indices[e_end + v * 2 + 1] = u_graph.nodes + 1;
+        graph.edge_values   [e_end + v * 2 + 1] = 0;
+    }
+    for (auto v = u_graph.nodes; v < u_graph.nodes + 3; v ++)
+        graph.row_offsets[u_graph.nodes + v]
+            = u_graph.edges + u_graph.nodes * (2 + v);
+    auto offset = u_graph.edges + u_graph.nodes * 2;
+    for (auto v = 0; v < u_graph.nodes; v ++)
+    {
+        graph.column_indices[offset + v] = v;
+        graph.edge_values   [offset + v] = 0;
+        graph.column_indices[offset + v + u_graph.nodes] = v;
+        graph.edge_values   [offset + v + u_graph.nodes] = 0;
     }
 
+    for (auto v = 0; v < u_graph.nodes; v ++)
+    {
+        auto weight = weights[v];
+        if (weight < 0)
+        { // weight to the sink
+            graph.edge_values[graph.row_offsets[v] + u_graph.nodes + 1]
+                = -1 * weight;
+        } else { // weight from the source
+            graph.edge_values[u_graph.edges + u_graph.nodes * 2 + v]
+                = weight;
+        }
+    }
     return retval;
 }
 
 /**
- * @brief Run mf tests
+ * @brief Run gtf tests
  * @tparam     GraphT	  Type of the graph
  * @tparam     ValueT	  Type of the capacity on edges
  * @tparam     VertexT	  Type of vertex
  * @param[in]  parameters Excution parameters
  * @param[in]  graph	  Input graph
  * @param[in]  ref_flow	  Reference flow on edges
- * @param[in]  target	  Whether to perform the mf
+ * @param[in]  target	  Whether to perform the gtf
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT, typename ValueT, typename VertexT>
@@ -170,7 +139,6 @@ cudaError_t RunTests(
 {
     debug_aml("RunTests starts");
     cudaError_t retval = cudaSuccess;
-
     typedef Problem<GraphT>	      ProblemT;
     typedef Enactor<ProblemT>	      EnactorT;
 
@@ -186,25 +154,22 @@ cudaError_t RunTests(
     debug_aml("source %d, sink %d, quite_mode %d, num-runs %d", source, sink,
 	    quiet_mode, num_runs);
 
-    util::Info info("MF", parameters, graph); // initialize Info structure
+    util::Info info("gtf", parameters, graph); // initialize Info structure
 
     // Allocate host-side array (for both reference and GPU-computed results)
     // ... for function Extract
+    ValueT *h_flow   = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
 
-    ValueT *h_flow  = new ValueT[graph.edges];
-    int *min_cut    = new int   [graph.nodes];
-    for (auto u = 0; u < graph.nodes; ++u) min_cut[u] = 0;
-    
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    GUARD_CU(problem.Init(graph,  target));
-    GUARD_CU(enactor.Init(problem,target));
+    GUARD_CU(problem.Init(graph, target));
+    GUARD_CU(enactor.Init(problem, target));
 
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
-    // perform the MF algorithm
+    // perform the gtf algorithm
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
         GUARD_CU(problem.Reset(graph, h_reverse, target));
@@ -214,7 +179,6 @@ cudaError_t RunTests(
 
         cpu_timer.Start();
         GUARD_CU(enactor.Enact());
-
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
@@ -227,10 +191,8 @@ cudaError_t RunTests(
         if (validation == "each")
         {
             GUARD_CU(problem.Extract(h_flow));
-	        app::mf::minCut(graph, source, h_flow, min_cut);
-            int num_errors = app::mf::Validate_Results(parameters, graph, 
-		        source, sink, h_flow, h_reverse, min_cut, ref_flow, 
-		        quiet_mode);
+            int num_errors = app::gtf::Validate_Results(parameters, graph,
+		    source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
         }
     }
 
@@ -239,14 +201,18 @@ cudaError_t RunTests(
     if (validation == "last")
     {
 	GUARD_CU(problem.Extract(h_flow));
- 	app::mf::minCut(graph, source, h_flow, min_cut);
-    int num_errors = app::mf::Validate_Results(parameters, graph, 
-		source, sink, h_flow, h_reverse, min_cut, ref_flow, quiet_mode);
+	/*for (int i=0; i<graph.edges; ++i){
+	    if (ref_flow){
+		debug_aml("h_flow[%d]=%lf, ref_flow[%d] = %lf",
+			  i, h_flow[i], i, ref_flow[i]);
+	    }
+	}*/
+        int num_errors = app::gtf::Validate_Results(parameters, graph,
+		source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
     }
 
     // Compute running statistics
     //info.ComputeTraversalStats(enactor, h_flow);
-
     // Display_Memory_Usage(problem);
     #ifdef ENABLE_PERFORMANCE_PROFILING
         //Display_Performance_Profiling(enactor);
@@ -255,9 +221,8 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-
-    delete[] h_flow; h_flow = NULL;
-    delete[] min_cut; min_cut = NULL;
+    delete[] h_flow;
+    h_flow = NULL;
 
     cpu_timer.Stop();
     total_timer.Stop();
@@ -267,7 +232,7 @@ cudaError_t RunTests(
     return retval;
 }
 
-} // namespace mf
+} // namespace gtf
 } // namespace app
 } // namespace gunrock
 
@@ -275,31 +240,25 @@ cudaError_t RunTests(
  * @brief Entry of gunrock_maxflow function
  * @tparam     GraphT     Type of the graph
  * @tparam     ValueT     Type of the capacity/flow/excess
- *
  * @param[in]  parameters Excution parameters
  * @param[in]  graph      Input graph
- * @param[out] flow	  Return flow on edges
- * @param[out] maxflow	  Return flow value
- * @param[out] min_cut	  Return partition into two sets of nodes
+ * @param[out] flow	  Return
+ * @param[out] maxflow	  Return
  * \return     double     Return accumulated elapsed times for all runs
  */
-template <typename GraphT, typename VertexT = typename GraphT::VertexT,
-    typename ValueT = typename GraphT::ValueT>
-
-double gunrock_mf(
+template <typename GraphT, typename ValueT = typename GraphT::ValueT>
+double gunrock_gtf(
     gunrock::util::Parameters &parameters,
-    GraphT  &graph,
-    VertexT *reverse,
-    ValueT  *flow,
-    int	    *min_cut,
-    ValueT  &maxflow)
+    GraphT &graph,
+    ValueT *flow,
+    ValueT &maxflow
+    )
 {
-    typedef gunrock::app::mf::Problem<GraphT>	ProblemT;
-    typedef gunrock::app::mf::Enactor<ProblemT> EnactorT;
-
+    typedef typename GraphT::VertexT		VertexT;
+    typedef gunrock::app::gtf::Problem<GraphT>	ProblemT;
+    typedef gunrock::app::gtf::Enactor<ProblemT> EnactorT;
     gunrock::util::CpuTimer cpu_timer;
     gunrock::util::Location target = gunrock::util::DEVICE;
-
     double total_time = 0;
     if (parameters.UseDefault("quiet"))
         parameters.Set("quiet", true);
@@ -307,7 +266,7 @@ double gunrock_mf(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    problem.Init(graph,	  target);
+    problem.Init(graph  , target);
     enactor.Init(problem, target);
 
     int num_runs = parameters.Get<int>("num-runs");
@@ -316,16 +275,15 @@ double gunrock_mf(
 
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        problem.Reset(graph, reverse, target);
-        enactor.Reset(source, target);
+        problem.Reset(target);
+        enactor.Reset(target);
 
         cpu_timer.Start();
-        enactor.Enact();
+        enactor.Enact(source, sink);
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
         problem.Extract(flow);
-	gunrock::app::mf::minCut(graph, source, flow, min_cut);
     }
 
     enactor.Release(target);
@@ -340,129 +298,68 @@ double gunrock_mf(
  * @param[in]  row_offsets  CSR-formatted graph input row offsets
  * @param[in]  col_indices  CSR-formatted graph input column indices
  * @param[in]  capacity	    CSR-formatted graph input edge weights
- * @param[in]  num_runs     Number of runs to perform mf
+ * @param[in]  num_runs     Number of runs to perform gtf
  * @param[in]  source	    Source to push flow towards the sink
  * @param[out] flow	    Return flow calculated on edges
  * @param[out] maxflow	    Return maxflow value
  * \return     double       Return accumulated elapsed times for all runs
  */
-/*
 template <
     typename VertexT  = uint32_t,
     typename SizeT    = uint32_t,
     typename ValueT   = double>
-double mf(
+float gtf(
+	const SizeT   num_nodes,
+	const SizeT   num_edges,
+	const SizeT   *row_offsets,
+	const VertexT *col_indices,
+	const ValueT  capacity,
 	const int     num_runs,
+	VertexT	      source,
+	VertexT	      sink,
 	ValueT	      *flow,
-	ValueT	      &maxflow,
-	int	      *min_cut,
-	int	      undirected = 0
+	ValueT	      &maxflow
 	)
 {
+    // TODO: change to other graph representation, if not using CSR
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, ValueT,
-        gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>  GraphT;
+        gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_COO>  GraphT;
+    typedef typename GraphT::CooT				    CooT;
     typedef typename GraphT::CsrT				    CsrT;
 
     // Setup parameters
-    gunrock::util::Parameters parameters("mf");
+    gunrock::util::Parameters parameters("gtf");
     gunrock::graphio::UseParameters(parameters);
-    gunrock::app::mf::UseParameters(parameters);
+    gunrock::app::gtf::UseParameters(parameters);
     gunrock::app::UseParameters_test(parameters);
     parameters.Parse_CommandLine(0, NULL);
+    parameters.Set("graph-type", "by-pass");
     parameters.Set("num-runs", num_runs);
+    parameters.Set("source", source);
+    parameters.Set("sink", sink);
 
     bool quiet = parameters.Get<bool>("quiet");
+    CsrT csr;
+    // Assign pointers into gunrock graph format
+    csr.Allocate(num_nodes, num_edges, gunrock::util::HOST);
+    csr.row_offsets   .SetPointer(row_offsets,gunrock::util::HOST);
+    csr.column_indices.SetPointer(col_indices,gunrock::util::HOST);
+    csr.capacity      .SetPointer(capacity,   gunrock::util::HOST);
 
-    GraphT d_graph;
-    if (not undirected){
-	parameters.Set<int>("remove-duplicate-edges", false);
-	debug_aml("Load directed graph");
-	gunrock::graphio::LoadGraph(parameters, d_graph);
-    }
-
-    GraphT u_graph;
-    parameters.Set<int>("undirected", 1);
-    parameters.Set<int>("remove-duplicate-edges", true);
-    debug_aml("Load undirected graph");
-    gunrock::graphio::LoadGraph(parameters, u_graph);
-
-    if (parameters.Get<VertexT>("source") == 
-	    gunrock::util::PreDefinedValues<VertexT>::InvalidValue){
-	parameters.Set("source", 0);
-    }
-    if (parameters.Get<VertexT>("sink") == 
-	    gunrock::util::PreDefinedValues<VertexT>::InvalidValue){
-	parameters.Set("sink", u_graph.nodes-1);
-    }
-
-    VertexT* reverse = (VertexT*)malloc(sizeof(VertexT) * u_graph.edges);
-
-    // Initialize reverse array.
-    for (auto u = 0; u < u_graph.nodes; ++u)
-    {
-	auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
-	auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
-	auto e_end = e_start + num_neighbors;
-	for (auto e = e_start; e < e_end; ++e)
-	{
-	    auto v = u_graph.CsrT::GetEdgeDest(e);
-	    auto f_start = u_graph.CsrT::GetNeighborListOffset(v);
-	    auto num_neighbors2 = u_graph.CsrT::GetNeighborListLength(v);
-	    auto f_end = f_start + num_neighbors2;
-	    for (auto f = f_start; f < f_end; ++f)
-	    {
-		auto z = u_graph.CsrT::GetEdgeDest(f);
-		if (z == u)
-		{
-		    reverse[e] = f;
-		    reverse[f] = e;
-		    break;
-		}
-	    }
-	}
-    }
-
-    if (not undirected){
-	// Correct capacity values on reverse edges
-	for (auto u = 0; u < u_graph.nodes; ++u)
-	{
-	    auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
-	    auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
-	    auto e_end = e_start + num_neighbors;
-	    for (auto e = e_start; e < e_end; ++e)
-	    {
-		u_graph.CsrT::edge_values[e] = (ValueT)0;
-		auto v = u_graph.CsrT::GetEdgeDest(e);
-		// Looking for edge u->v in directed graph
-		auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
-		auto num_neighbors2 = d_graph.CsrT::GetNeighborListLength(u);
-		auto f_end = f_start + num_neighbors2;
-		for (auto f = f_start; f < f_end; ++f)
-		{
-		    auto z = d_graph.CsrT::GetEdgeDest(f);
-		    if (z == v and d_graph.CsrT::edge_values[f] > 0)
-		    {
-			u_graph.CsrT::edge_values[e]  = 
-			    d_graph.CsrT::edge_values[f];
-			break;
-		    }
-		}
-	    }
-	}
-    }
-    
     gunrock::util::Location target = gunrock::util::HOST;
+    CooT graph;
+    graph.FromCsr(csr, target, 0, quiet, true);
+    csr.Release();
+    gunrock::graphio::LoadGraph(parameters, graph);
 
-    // Run the MF
-    double elapsed_time = gunrock_mf(parameters, u_graph, reverse, flow, 
-	    min_cut, maxflow);
+    // Run the gtf
+    double elapsed_time = gunrock_gtf(parameters, graph, flow, maxflow);
 
     // Cleanup
-    u_graph.Release();
-    d_graph.Release();
+    graph.Release();
 
     return elapsed_time;
-}*/
+}
 
 // Leave this at the end of the file
 // Local Variables:
