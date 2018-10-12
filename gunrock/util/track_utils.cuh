@@ -13,27 +13,25 @@
  */
 
 #pragma once
-#include <gunrock/csr.cuh>
-#include <gunrock/util/io/modified_store.cuh>
 
 namespace gunrock {
 namespace util {
 
 #define TO_TRACK false
-#define NUM_TO_TRACK 3
+#define NUM_TO_TRACK 1
 #define MAX_GPU 0
 
-template <typename VertexId>
-static __device__ __host__ __inline__ bool to_track(VertexId node) {
-    const VertexId node_to_track[] = {
-        2131537,
-        13839597,
-        15173021};
+template <typename VertexT>
+__device__ __host__ __forceinline__ 
+bool isTracking(VertexT node) {
+    const VertexT node_to_track[] = {
+        11};
     if (!TO_TRACK) return false;
     else {
         #pragma unroll
         for (int i = 0; i < NUM_TO_TRACK; i++)
-            if (node == node_to_track[i]) return true;
+            if (node == node_to_track[i])
+                return true;
     }
     return false;
 }
@@ -452,7 +450,7 @@ void Print_Vertex(
     printf("\n");
 }
 
-template <
+/*template <
     typename VertexId,
     typename SizeT,
     typename Value,
@@ -549,7 +547,7 @@ void Track_Results (
             printf("\n");
         }
     }
-}
+}*/
 
 //Output errors
 template <
@@ -831,7 +829,7 @@ __global__ void Verify_Edges(
     }
 }
 
-template <typename VertexId, typename SizeT, typename ProblemData>
+/*template <typename VertexId, typename SizeT, typename ProblemData>
 static __device__ __forceinline__ void Store_d_out(
     VertexId  new_value,
     VertexId *d_out,
@@ -881,7 +879,7 @@ static __device__ __forceinline__ void Store_d_out(
     //            (long long)offset);
     //    }
     //}
-}
+}*/
 
 } // namespace util
 } // namespace gunrock

@@ -33,7 +33,8 @@ struct OprtrParameters
     FrontierT                     *frontier;
     util::Array1D<SizeT, ValueT>  *values_in;
     util::Array1D<SizeT, ValueT>  *values_out;
-    util::Array1D<SizeT, ValueT>  *reduce_values_in;
+    util::Array1D<SizeT, ValueT>  *reduce_values_temp;
+    util::Array1D<SizeT, ValueT>  *reduce_values_temp2;
     util::Array1D<SizeT, ValueT>  *reduce_values_out;
     util::Array1D<SizeT, SizeT >  *vertex_markers;
     util::Array1D<SizeT, unsigned char> *visited_masks;
@@ -48,6 +49,7 @@ struct OprtrParameters
     mgpu::ContextPtr context;
     cudaStream_t  stream;
     bool          get_output_length;
+    bool          reduce_reset;
     std::string   advance_mode;
     std::string   filter_mode;
     //bool          filtering_flag;
@@ -72,7 +74,8 @@ struct OprtrParameters
         values_in          = NULL;
         values_out         = NULL;
         //output_offsets     = NULL;
-        reduce_values_in   = NULL;
+        reduce_values_temp = NULL;
+        reduce_values_temp2 = NULL;
         reduce_values_out  = NULL;
         vertex_markers     = NULL;
         visited_masks      = NULL;
@@ -83,6 +86,7 @@ struct OprtrParameters
         //context            = NULL;
         stream             = 0;
         get_output_length  = true;
+        reduce_reset       = true;
         advance_mode       = "";
         filter_mode        = "";
         max_grid_size      = 0;

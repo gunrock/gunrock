@@ -335,6 +335,8 @@ double CPU_Reference(
             rank_current[v] = rank_new;
             rank_next   [v] = 0;
         }
+        if (iteration >= max_iter)
+            to_continue = false;
     }
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();

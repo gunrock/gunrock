@@ -177,8 +177,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
               OutKeyT  *&keys_out,
               ValueT   *&values_out,
               SizeT    * output_counter,
-        const ValueT   *&reduce_values_in,
-              ValueT   *&reduce_values_out,
+        //const ValueT   *&reduce_values_in,
+        //      ValueT   *&reduce_values_out,
         AdvanceOpT       advance_op)
     {
         __shared__ typename KernelPolicyT::SmemStorage smem_storage;
@@ -195,7 +195,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
             bool to_process = true;
             VertexT src     = util::PreDefinedValues<VertexT>::InvalidValue;
             VertexT dest    = util::PreDefinedValues<VertexT>::InvalidValue;
-            SizeT   out_pos = util::PreDefinedValues<SizeT  >::InvalidValue;
+            SizeT   out_pos = edge_id;//util::PreDefinedValues<SizeT  >::InvalidValue;
             OutKeyT out_key = util::PreDefinedValues<OutKeyT>::InvalidValue;
 
             if (edge_id < graph.edges)
@@ -253,8 +253,8 @@ void Kernel(
                            OutKeyT *keys_out,
           typename GraphT::ValueT  *values_out,
     util::CtaWorkProgress<typename GraphT::SizeT> work_progress,
-    const typename GraphT::ValueT  *reduce_values_in ,
-          typename GraphT::ValueT  *reduce_values_out,
+    //const typename GraphT::ValueT  *reduce_values_in ,
+    //      typename GraphT::ValueT  *reduce_values_out,
                    AdvanceOpT       advance_op)
 {
     typedef typename GraphT::SizeT   SizeT;
@@ -268,7 +268,8 @@ void Kernel(
         graph, keys_out, values_out,
         work_progress.template GetQueueCounter<typename GraphT::VertexT>
             (queue_index + 1),
-        reduce_values_in, reduce_values_out, advance_op);
+        //reduce_values_in, reduce_values_out, 
+        advance_op);
 }
 
 template <
@@ -312,10 +313,10 @@ cudaError_t Launch(
         (parameters.values_out == NULL) ? ((ValueT*)NULL) :
             parameters.values_out     -> GetPointer(util::DEVICE),
         parameters.frontier -> work_progress,
-        (parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
-            : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
-        (parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
-            : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
+        //(parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
+        //    : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
+        //(parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
+        //    : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
         advance_op);
 
     if (frontier_out != NULL)

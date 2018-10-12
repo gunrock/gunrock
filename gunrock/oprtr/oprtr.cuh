@@ -17,6 +17,7 @@
 #include <gunrock/oprtr/oprtr_base.cuh>
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
+#include <gunrock/oprtr/neighborreduce/kernel.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -138,6 +139,55 @@ cudaError_t Compute(
     return util::GRError(cudaErrorInvalidValue,
         "Compute Kernel undefined.", __FILE__, __LINE__);
 }
+
+template <
+    OprtrFlag FLAG,
+    typename  GraphT,
+    typename  FrontierInT,
+    typename  FrontierOutT,
+    typename  ParametersT,
+    typename  AdvanceOp,
+    typename  ReduceOp,
+    typename  ValueT>
+cudaError_t NeighborReduce(
+    const GraphT   &graph,
+    FrontierInT   * frontier_in,
+    FrontierOutT  * frontier_out,
+    ParametersT    &parameters,
+    AdvanceOp       advance_op,
+    ReduceOp        reduce_op,
+    ValueT          init_val)
+{
+    return oprtr::neighborreduce::Launch<FLAG>(
+        graph, frontier_in, frontier_out, parameters, 
+        advance_op, reduce_op, init_val); 
+}
+
+template <
+    OprtrFlag FLAG,
+    typename  GraphT,
+    typename  FrontierInT,
+    typename  FrontierOutT,
+    typename  ParametersT,
+    typename  AdvanceOp>
+cudaError_t NeighborReduce(
+    const GraphT   &graph,
+    FrontierInT   * frontier_in,
+    FrontierOutT  * frontier_out,
+    ParametersT    &parameters,
+    AdvanceOp       advance_op)
+{
+    typedef typename GraphT::ValueT ValueT;
+    cudaError_t retval = cudaSuccess;
+
+    GUARD_CU(oprtr::neighborreduce::Launch<FLAG>(
+        graph, frontier_in, frontier_out, parameters, advance_op,
+        Reduce<ValueT, FLAG & ReduceOp_Mask>::op,
+        Reduce<ValueT, FLAG & ReduceOp_Mask>::Identity));
+    
+    return retval;
+}
+
 
 template <
     OprtrFlag FLAG,

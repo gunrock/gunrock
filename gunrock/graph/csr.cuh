@@ -272,9 +272,13 @@ struct Csr :
                 const typename CooT::EdgePairT *edge_pairs,
                 const VertexT &row){
                     if (row < nodes)
-                        row_offsets[row] = util::BinarySearch(row,
+                        row_offsets[row] = util::BinarySearch_LeftMost(row,
                             edge_pairs, (SizeT)0, edges-1,
-                            row_edge_compare);
+                            row_edge_compare, 
+                            [] (const typename CooT::EdgePairT &pair, const VertexT &row)
+                            {
+                                return (pair.x == row);
+                            });
                     else row_offsets[row] = edges;
                 }, this -> nodes + 1, target, stream));
 
@@ -364,7 +368,7 @@ struct Csr :
     __device__ __host__ __forceinline__
     VertexT GetEdgeSrc(const SizeT &e) const
     {
-        return Binary_Search(row_offsets + 0, e, (SizeT)0, this -> nodes);
+        return util::BinarySearch_RightMost(e, row_offsets + 0, (SizeT)0, this -> nodes);
     }
 
     __device__ __host__ __forceinline__
@@ -377,7 +381,7 @@ struct Csr :
     __device__ __host__ __forceinline__
     void GetEdgeSrcDest(const SizeT &e, VertexT &src, VertexT &dest) const
     {
-        src = Binary_Search(row_offsets + 0, e, (SizeT)0, this -> nodes);
+        src = util::BinarySearch_RightMost(e, row_offsets + 0, (SizeT)0, this -> nodes);
         dest = column_indices[e];
     }
 
@@ -923,6 +927,14 @@ struct Csr<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
     {
         return cudaSuccess;
     }
+
+    cudaError_t Display(
+        std::string graph_prefix = "",
+        SizeT nodes_to_show = 40,
+        bool  with_edge_values = true)
+    {
+        return cudaSuccess;
+    } 
 };
 
 } // namespace graph

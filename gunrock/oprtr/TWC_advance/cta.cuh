@@ -297,7 +297,7 @@ struct Tile
                         pred_id, neighbor_id, edge_id,
                         util::PreDefinedValues<SizeT>::InvalidValue, input_item,
                         output_pos, cta -> keys_out, cta -> values_out,
-                        cta -> reduce_values_in, cta -> reduce_values_out,
+                        NULL, NULL,//cta -> reduce_values_in, cta -> reduce_values_out,
                         advance_op);
 
                     coop_offset += KernelPolicyT::THREADS;
@@ -424,7 +424,7 @@ struct Tile
                             pred_id, neighbor_id, coop_offset + lane_id,
                             util::PreDefinedValues<SizeT>::InvalidValue, input_item,
                             output_pos, cta -> keys_out, cta -> values_out,
-                            cta -> reduce_values_in, cta -> reduce_values_out,
+                            NULL, NULL, //cta -> reduce_values_in, cta -> reduce_values_out,
                             advance_op);
 
                         coop_offset += GR_WARP_THREADS(CUDA_ARCH);
@@ -696,8 +696,8 @@ struct Cta
     //gunrock::oprtr::advance::REDUCE_TYPE    r_type;
     //gunrock::oprtr::advance::REDUCE_OP      r_op;
     //Value                  *d_value_to_reduce;
-    const ValueT           *&reduce_values_in;
-    ValueT           *&reduce_values_out;
+    //const ValueT           *&reduce_values_in;
+    //ValueT           *&reduce_values_out;
     //Value                  *d_reduce_frontier;
 
     // Operational details for raking grid
@@ -727,8 +727,8 @@ struct Cta
 
         //SizeT                         max_in_frontier,
         //SizeT                         max_out_frontier,
-        const ValueT                      *&reduce_values_in,
-        ValueT                      *&reduce_values_out,
+        //const ValueT                      *&reduce_values_in,
+        //ValueT                      *&reduce_values_out,
         util::CtaWorkProgress<SizeT> &work_progress,
         SmemStorage                  &smem_storage) :
         //gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
@@ -752,8 +752,8 @@ struct Cta
         //d_data_slice            (d_data_slice),
         input_queue_length      (input_queue_length),
         //max_out_frontier        (max_out_frontier),
-        reduce_values_in        (reduce_values_in),
-        reduce_values_out       (reduce_values_out),
+        //reduce_values_in        (reduce_values_in),
+        //reduce_values_out       (reduce_values_out),
         work_progress           (work_progress),
         smem_storage            (smem_storage),
         //input_inverse_graph           (input_inverse_graph),
@@ -925,7 +925,7 @@ struct Cta
                     util::PreDefinedValues<SizeT>::InvalidValue, input_item,
                     output_pos,
                     keys_out, values_out,
-                    reduce_values_in, reduce_values_out,
+                    NULL, NULL, //reduce_values_in, reduce_values_out,
                     advance_op);
             }
 
