@@ -7,7 +7,7 @@
 
 /**
  * @file
- * hello_problem.cuh
+ * color_problem.cuh
  *
  * @brief GPU Storage management Structure for hello Problem Data
  */
@@ -18,9 +18,7 @@
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace color {
-// </DONE>
 
 
 /**
@@ -36,7 +34,6 @@ cudaError_t UseParameters_problem(
     GUARD_CU(gunrock::app::UseParameters_problem(parameters));
 
     // <DONE> Add problem specific command-line parameter usages here, e.g.:
-
     // </DONE>
 
     return retval;
@@ -76,6 +73,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, float> rand;
 	
 	curandGenerator_t gen;
+    	bool color_balance;
         // </DONE>
 
         /*
@@ -128,12 +126,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             int            gpu_idx,
             util::Location target,
             ProblemFlag    flag,
+	    int		   color_balance,
 	    int		   seed)
         {
             cudaError_t retval  = cudaSuccess;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
-
+	
+	    color_balance = color_balance_;
+	
 	    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
 	    curandSetPseudoRandomGeneratorSeed(gen, seed);
 
@@ -169,7 +170,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // Reset data
             // <DONE> reset problem specific data, e.g.:
             GUARD_CU(colors.ForEach([]__host__ __device__ (VertexT &x){
-               x = (VertexT)0;
+               x = util::PreDefinedValues<VertexT>::InvalidValue;
             }, nodes, target, this -> stream));
 
             GUARD_CU(rand.ForEach([]__host__ __device__ (float &x){
@@ -183,6 +184,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
+    int seed;
+    bool color_balance;
 
     // ----------------------------------------------------------------
     // Problem Methods
@@ -197,6 +200,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         data_slices(NULL) {
 	// <DONE>
 	seed = _parameters.Get<int>("seed");
+	color_balance = _parameters.Get<bool>("color_balance");
 	// </DONE>
     }
 
@@ -328,6 +332,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 this -> gpu_idx[gpu],
                 target,
                 this -> flag,
+		this -> color_balance,
 		this -> seed
             ));
         }
@@ -342,9 +347,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
-        // <TODO> problem specific data if necessary, eg
-        // VertexT src,
-        // </TODO>
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -357,8 +359,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
 
-        // <TODO> Additional problem specific initialization
-        // </TODO>
 
         GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
         return retval;

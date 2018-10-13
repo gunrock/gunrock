@@ -7,22 +7,22 @@
 
 /**
  * @file
- * hello_test.cu
+ * color_test.cu
  *
- * @brief Test related functions for hello
+ * @brief Test related functions for color
  */
 
 #pragma once
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
-namespace hello {
-// </TODO>
+// <DONE> change namespace
+namespace color {
+// </DONE>
 
 
 /******************************************************************************
- * Template Testing Routines
+ * Color Testing Routines
  *****************************************************************************/
 
 /**
@@ -36,9 +36,7 @@ namespace hello {
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    // <TODO> add problem specific inputs and outputs 
-    typename GraphT::ValueT *degrees,
-    // </TODO>
+    typename GraphT::VertexT *colors;
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
@@ -49,7 +47,7 @@ double CPU_Reference(
     // <TODO> 
     // implement CPU reference implementation
     for(SizeT v = 0; v < graph.nodes; ++v) {
-        degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
+        // degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
     }
     // </TODO>
     
@@ -72,8 +70,9 @@ template <typename GraphT>
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
-             typename GraphT::ValueT *h_degrees,
-             typename GraphT::ValueT *ref_degrees,
+	     bool	       color_balance,
+             typename GraphT::VertexT *h_colors,
+             typename GraphT::VertexT *ref_colors,
              bool verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
@@ -84,7 +83,7 @@ typename GraphT::SizeT Validate_Results(
 
     // <TODO> result validation and display
     for(SizeT v = 0; v < graph.nodes; ++v) {
-        printf("%d %d %d\n", v, h_degrees[v], ref_degrees[v]);
+        printf("%d %d %d\n", v, h_colors[v], ref_colors[v]);
     }
     // </TODO>
 
@@ -95,7 +94,7 @@ typename GraphT::SizeT Validate_Results(
     return num_errors;
 }
 
-} // namespace Template
+} // namespace color
 } // namespace app
 } // namespace gunrock
 

@@ -43,6 +43,13 @@ cudaError_t UseParameters(util::Parameters &parameters)
          time(NULL),   
          "seed for random number generator", 
          __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<bool>(
+         "color_balance",
+         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+         false,
+         "load balancing enabled for graph coloring (true=neighbor_reduce)",
+         __FILE__, __LINE__));
     // </DONE>
 
     return retval;
@@ -63,6 +70,7 @@ cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
     // <DONE> add problem specific reference results, e.g.:
+    bool	      color_balance,
     typename GraphT::ValueT *ref_colors,
     // </DONE>
     util::Location target)
@@ -80,7 +88,7 @@ cudaError_t RunTests(
     bool quiet_mode = parameters.Get<bool>("quiet");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    util::Info info("hello", parameters, graph);
+    util::Info info("color", parameters, graph);
     
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
@@ -91,7 +99,7 @@ cudaError_t RunTests(
     // </TODO>
 
     // <TODO> allocate problem specific host data, e.g.:
-    ValueT *h_degrees = new ValueT[graph.nodes];
+    ValueT *h_colors = new ValueT[graph.nodes];
     // </TODO>
 
     // Allocate problem and enactor on GPU, and initialize them
@@ -139,14 +147,14 @@ cudaError_t RunTests(
             
             GUARD_CU(problem.Extract(
                 // <TODO> problem specific data
-                h_degrees
+                h_colors
                 // </TODO>
             ));
             SizeT num_errors = Validate_Results(
                 parameters,
                 graph,
                 // <TODO> problem specific data
-                h_degrees, ref_degrees,
+                h_colors, ref_colors,
                 // </TODO>
                 false);
         }
@@ -156,7 +164,7 @@ cudaError_t RunTests(
     
     GUARD_CU(problem.Extract(
         // <TODO> problem specific data
-        h_degrees
+        h_colors
         // </TODO>
     ));
     if (validation == "last") {
@@ -164,7 +172,8 @@ cudaError_t RunTests(
             parameters,
             graph,
             // <TODO> problem specific data
-            h_degrees, ref_degrees,
+	    color_balance,
+            h_colors, ref_colors,
             // </TODO>
             false);
     }
@@ -181,7 +190,7 @@ cudaError_t RunTests(
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
     // <TODO> Release problem specific data, e.g.:
-    delete[] h_degrees; h_degrees   = NULL;
+    delete[] h_colors; h_colors   = NULL;
     // </TODO>
     cpu_timer.Stop(); total_timer.Stop();
 
@@ -189,7 +198,7 @@ cudaError_t RunTests(
     return retval;
 }
 
-} // namespace hello
+} // namespace color
 } // namespace app
 } // namespace gunrock
 
@@ -332,8 +341,8 @@ cudaError_t RunTests(
 //     return elapsed_time;
 // }
 
-// // Leave this at the end of the file
-// // Local Variables:
-// // mode:c++
-// // c-file-style: "NVIDIA"
-// // End:
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

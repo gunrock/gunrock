@@ -65,6 +65,8 @@ struct main_struct
         // TODO: reference result on CPU, e.e.:
         // ValueT  **ref_distances = NULL;
         bool quick = parameters.Get<bool>("quick");
+	bool walk_mode = parameters.Get<bool>("color-balance");
+
         // compute reference CPU SSSP solution for source-distance
         if (!quick)
         {
@@ -102,9 +104,12 @@ struct main_struct
         std::vector<std::string> switches{"advance-mode"};
         // TODO: add problem specific data
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [/*ref_distances*/](util::Parameters &parameters, GraphT &graph)
+            [
+		color_balance,
+		ref_colors
+	    ](util::Parameters &parameters, GraphT &graph)
             {
-                return app::color::RunTests(parameters, graph/*, ref_distances*/);
+                return app::color::RunTests(parameters, graph, color_balance, ref_colors);
             }));
 
         if (!quick)
@@ -139,7 +144,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |
-        app::VALUET_U32B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F32B | app::DIRECTED | app::UNDIRECTED>
         (parameters, main_struct());
 }
 
