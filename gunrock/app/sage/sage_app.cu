@@ -37,20 +37,47 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_enactor(parameters));
 
     GUARD_CU(parameters.Use<std::string>(
-        "src",
-        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-        "0",
-        "<Vertex-ID|random|largestdegree> The source vertices\n"
-        "\tIf random, randomly select non-zero degree vertices;\n"
-        "\tIf largestdegree, select vertices with largest degrees",
+        "w1_feat",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        "<weight matrix for W^1 matrix in algorithm 2, feature part>\n"
+        "\t dimension 64 by 128 for pokec;\n"
+        "\t It should be child feature length by a value you want for W2 layer",
         __FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<int>(
-        "src-seed",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        util::PreDefinedValues<int>::InvalidValue,
-        "seed to generate random sources",
+    GUARD_CU(parameters.Use<string>(
+        "w1_agg",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        "<weight matrix for W^1 matrix in algorithm 2, aggregation part>\n"
+        "\t dimension 64 by 128 for pokec;\n"
+        "\t It should be leaf feature length by a value you want for W2 layer",
         __FILE__, __LINE__));
+
+
+    GUARD_CU(parameters.Use<string>(
+        "w2_feat",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        "<weight matrix for W^2 matrix in algorithm 2, feature part>\n"
+        "\t dimension 256 by 128 for pokec;\n"
+        "\t It should be source_temp length by output length",
+        __FILE__, __LINE__));
+
+
+    GUARD_CU(parameters.Use<string>(
+        "w2_agg",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        "<weight matrix for W^2 matrix in algorithm 2, aggregation part>\n"
+        "\t dimension 256 by 128 for pokec;\n"
+        "\t It should be child_temp length by output length",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<string>(
+        "features",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        "<features matrix>\n"
+        "\t dimension |V| by 64 for pokec;\n"
+        __FILE__, __LINE__));
+
+ 
 
     return retval;
 }
@@ -69,7 +96,7 @@ template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
-    ValueT **ref_distances = NULL,
+    //ValueT **ref_distances = NULL,
     util::Location target = util::DEVICE)
 {
     cudaError_t retval = cudaSuccess;
@@ -82,16 +109,16 @@ cudaError_t RunTests(
 
     // parse configurations from parameters
     bool quiet_mode = parameters.Get<bool>("quiet");
-    bool mark_pred  = parameters.Get<bool>("mark-pred");
+    //bool mark_pred  = parameters.Get<bool>("mark-pred");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-    int  num_srcs   = srcs   .size();
+    //std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+    //int  num_srcs   = srcs   .size();
     util::Info info("Sage", parameters, graph); // initialize Info structure
 
     // Allocate host-side array (for both reference and GPU-computed results)
-    ValueT  *h_distances = new ValueT[graph.nodes];
-    VertexT *h_preds = (mark_pred) ? new VertexT[graph.nodes] : NULL;
+    //ValueT  *h_distances = new ValueT[graph.nodes];
+    // VertexT *h_preds = (mark_pred) ? new VertexT[graph.nodes] : NULL;
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -104,7 +131,7 @@ cudaError_t RunTests(
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
     //info.preprocess_time = cpu_timer.ElapsedMillis();
 
-    // perform SSSP
+    // perform SAGE
     VertexT src;
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
@@ -128,9 +155,11 @@ cudaError_t RunTests(
         {
             GUARD_CU(problem.Extract(h_distances, h_preds));
             SizeT num_errors = app::sage::Validate_Results(
-                parameters, graph, src, h_distances, h_preds,
-                ref_distances == NULL ? NULL : ref_distances[run_num % num_srcs],
-                NULL, false);
+                parameters, graph, 
+                //src, h_distances, h_preds,
+                //ref_distances == NULL ? NULL : ref_distances[run_num % num_srcs],
+               // NULL,
+                false);
         }
     }
 
@@ -140,12 +169,14 @@ cudaError_t RunTests(
     if (validation == "last")
     {
         SizeT num_errors = app::sage::Validate_Results(
-            parameters, graph, src, h_distances, h_preds,
-            ref_distances == NULL ? NULL : ref_distances[(num_runs -1) % num_srcs]);
+            parameters, graph,
+           // src, h_distances, h_preds,
+           // ref_distances == NULL ? NULL : ref_distances[(num_runs -1) % num_srcs],
+           true);
     }
 
     // compute running statistics
-    info.ComputeTraversalStats(enactor, h_distances);
+    info.ComputeTraversalStats(enactor, (VertexT*)NULL);
     //Display_Memory_Usage(problem);
     #ifdef ENABLE_PERFORMANCE_PROFILING
         //Display_Performance_Profiling(enactor);
@@ -154,8 +185,8 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    delete[] h_distances  ; h_distances   = NULL;
-    delete[] h_preds      ; h_preds       = NULL;
+    //delete[] h_distances  ; h_distances   = NULL;
+    //delete[] h_preds      ; h_preds       = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
@@ -180,8 +211,9 @@ template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_sage(
     gunrock::util::Parameters &parameters,
     GraphT &graph,
-    ValueT **distances,
-    typename GraphT::VertexT **preds = NULL)
+    //ValueT **distances,
+    //typename GraphT::VertexT **preds = NULL
+    )
 {
     typedef typename GraphT::VertexT VertexT;
     typedef gunrock::app::sage::Problem<GraphT  > ProblemT;
@@ -198,13 +230,13 @@ double gunrock_sage(
     problem.Init(graph  , target);
     enactor.Init(problem, target);
 
-    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+    //std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
     int num_runs = parameters.Get<int>("num-runs");
-    int num_srcs = srcs.size();
+    //int num_srcs = srcs.size();
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        int src_num = run_num % num_srcs;
-        VertexT src = srcs[src_num];
+       // int src_num = run_num % num_srcs;
+       // VertexT src = srcs[src_num];
         problem.Reset(src, target);
         enactor.Reset(src, target);
 
@@ -214,12 +246,12 @@ double gunrock_sage(
 
         total_time += cpu_timer.ElapsedMillis();
         problem.Extract(distances[src_num],
-            preds == NULL ? NULL : preds[src_num]);
+        //    preds == NULL ? NULL : preds[src_num]);
     }
 
     enactor.Release(target);
     problem.Release(target);
-    srcs.clear();
+   // srcs.clear();
     return total_time;
 }
 
@@ -249,10 +281,11 @@ double sage(
     const VertexT     *col_indices,
     const GValueT     *edge_values,
     const int          num_runs,
-          VertexT     *sources,
-    const bool         mark_pred,
-          SSSPValueT **distances,
-          VertexT    **preds = NULL)
+    //      VertexT     *sources,
+    //const bool         mark_pred,
+    //      SSSPValueT **distances,
+    //      VertexT    **preds = NULL
+    )
 {
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
         gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
@@ -268,10 +301,10 @@ double sage(
     parameters.Set("graph-type", "by-pass");
     parameters.Set("mark-pred", mark_pred);
     parameters.Set("num-runs", num_runs);
-    std::vector<VertexT> srcs;
-    for (int i = 0; i < num_runs; i ++)
-        srcs.push_back(sources[i]);
-    parameters.Set("srcs", srcs);
+    //std::vector<VertexT> srcs;
+    //for (int i = 0; i < num_runs; i ++)
+    //    srcs.push_back(sources[i]);
+    //parameters.Set("srcs", srcs);
 
     bool quiet = parameters.Get<bool>("quiet");
     GraphT graph;
@@ -288,7 +321,7 @@ double sage(
 
     // Cleanup
     graph.Release();
-    srcs.clear();
+    //srcs.clear();
 
     return elapsed_time;
 }

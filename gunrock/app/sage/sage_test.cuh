@@ -85,14 +85,19 @@ double CPU_Reference(
     int                batch_size,
     int                num_neigh1,
     int                num_neigh2,
-    typename GraphT::VertexT  src,
+    int **             features,
+    int **             W_1_f,
+    int **             W_1_a,
+    int **             W_2_f, 
+    int **             W_2_a,
+    //typename GraphT::VertexT  src,
     bool                      quiet,
     bool                      mark_preds)
 {
 
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
-    typedef std::pair<VertexT, ValueT> PairT;
+    //typedef std::pair<VertexT, ValueT> PairT;
     //struct GreaterT
     //{
     //    bool operator()(const PairT& lhs, const PairT& rhs)
@@ -105,88 +110,148 @@ double CPU_Reference(
     int num_batch = graph.nodes / batch_size ;
     int off_site = graph.nodes - num_batch * batch_size ;
     // batch of nodes
-    for (int batch = 0; batch < num_batch; batch ++)
+    for (Vertex source_start = 0; source_start < graph.nodes ; source_start += batch_size)
     {
-        vector <Vertex> B_2;
-        for (Vertex v = batch; v < batch + batch_size; v++)
-        {
-            B_2.push_back (v) ; // add node v to set B_2
-        }//get B_2 done
-        // construct set B_1
-        vector <Vertex > B_1 ;
-        for (int i = 0; i <B_2.size(); i++ ) 
-        {
-           // sample neighbours of each nodes in B_2
-            Vertex node_v = B_2[i] ;
-            SizeT num_neighbors = graph.GetNeighborListLength( node_v );
-            SizeT e_start = graph.GetNeighborListOffset (node_v);
-            for (int i2 =0; i2 < num_neigh1 ; i2 ++)
+        int num_source = (source_start + batch_size <=graph.nodes ? batch_size: graph.nodes - source_start );
+        
+        for (Vertex source = source_start; source < source_start + num_sourse; source ++ )
+        { 
+            //store edges between sources and children 
+            vector <SizeT> edges_source_child;
+            auto children_temp [256] = {0.0} ; // agg(h_B1^1)
+            auto source_temp [256] = {0.0};  // h_B2^1
+            auto source_result [256] = {0.0}; // h_B2_2, result
+            
+            for (int i =0; i < num_neigh1 ; i++)
             {
-                random_idx1 = rand() % num_neighbors ;
-                sampled_node = graph.GetEdgeDest (e_start + random_idx);
-                B_1.push_back (sampled_node);
-            } // sample number of nodes for each node in B_2
+                SizeT offset = rand() % num_neigh1;
+                SizeT pos = graph.GetNeighborListOffset(source) + offset;
+                edges_source_child.push_back (pos);
+            }// sample child (B1 nodes), save edge list. 
 
-        } //get B_1 done
-        // construct set B_0
-        vector <vector< Vertex>> B_0  ;
-        for (int i = 0; i< B_1.size(); i++ ) 
-        {
-            Vertex node_v = B_1[i];
-            SizeT = num_neighbors = graph.GetNeighborListLength( node_v );
-            SizeT e_start = graph.GetNeighborListOffset (node_v);
-            for (int i2 =0; i2 < num_neigh2 ; i2 ++)
+            // get each child's h_v^1
+            for (int i = 0; i < num_neigh1 ; i ++)
             {
-                random_idx1 = rand() % num_neighbors ;
-                sampled_node = graph.GetEdgeDest (e_start + random_idx);
-                B_0[i].push_back (sampled_node);
-            }
+                SizeT pos = edges_source_child[i];
+                Vertex child = graph.GetEdgeDest(pos); 
+                auto sums [64] = {0.0} ;
+
+                // sample leaf node for each child
+                for (int j =0; j < num_neigh2 ; j++)
+                {
+                    SizeT offset2 = rand() % num_neigh2;
+                    SizeT pos2 = graph.GetNeighborListOffset(child) + offset2;
+                    Vertex leaf = graph.GetEdgeDest (pos2); 
+                    for (int m = 0; m < 64 ; m ++) {
+                        sums[m] += features[leaf, m];
+                    }
+                    
+                }// agg feaures for leaf nodes alg2 line 11 k = 1
+                for (int m =0; m < 64 ; m++){
+                    sums [m] = sums[m]/ num_neigh2;
+                }// get mean  agg of leaf features.
+                // get ebedding vector for child node (h_{B1}^{1}) alg2 line 12
+                auto child_temp[256] = {0.0};
+                for (int idx_0 = 0; idx_0 < 128; idx_0++)
+                {
+                    for (int idx_1 =0; idx_1< 64; idx_1 ++)
+                        child_temp[idx_0] += features[child, idx_1] * W_f_1[idx_1,idx_0];
+                } // got 1st half of h_B1^1
+
+                for (int idx_0 = 128; idx_0 < 256; idx_0++)
+                {   
+                    for (int idx_1 =0; idx_1< 64; idx_1 ++)
+                        child_temp[idx_0] += sums[idx_1] * W_a_1[idx_1,idx_0 - 128];
+                } // got 2nd half of h_B!^1 
+
+                // activation and L-2 normalize 
+                auto L2_child_temp = 0.0;
+                for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+                {
+                    child_temp[idx_0] = child_temp[idx_0] > 0.0 ? child_temp[idx_0] : 0.0 ; //relu() 
+                    L2_child_temp += child_temp[idx_0] * child_temp [idx_0];
+                } //finished relu
+                for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+                {
+                    child_temp[idx_0] = child_temp[idx_0] /sqrt (L2_child_temp);
+                }//finished L-2 norm, got h_B1^1, algo2 line13
+
+                // add the h_B1^1 to children_temp, also agg it
+                for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+                {
+                    children_temp[idx_0] += child_temp[idx_0] /num_neigh1;
+                }//finished agg (h_B1^1)
+            }//for each child in B1, got h_B1^1
+
+            //////////////////////////////////////////////////////////////////////////////////////
+            //get h_B2^1, k =1 ; this time, child is like leaf, and source is like child
+            auto sums_child_feat [64] = {0.0} ; // agg(h_B1^0)
+            for (int i = 0; i < num_neigh1 ; i ++)
+            { 
+                SizeT pos = edges_source_child[i];
+                Vertex child = graph.GetEdgeDest(pos);
+                for (int m = 0; m < 64; m++)
+                {
+                    sums_child_feat [m] += features[child,m];
+                }
+                 
+            }// for each child
+            for (int m = 0 ; m < 64; m++)
+            {
+               sums_child_feat[m] = sums_child_feat[m]/ num_neigh1;
+            } // got agg(h_B1^0)
  
-        } // get B_0 done
-        //distances[v] = util::PreDefinedValues<ValueT>::MaxValue;
-        //if (mark_preds && preds != NULL)
-            //preds[v] = util::PreDefinedValues<VertexT>::InvalidValue;
-    }// get B^k done
-                  
-    // get the aggreate function
-    // k =1 agg B0 nodes to B1 agg
-    hv_k1_all = vector <vector<double>>;
-    for (int i = 0 ; i < B_1.size() ; i++ ) {
-        vector<double> agg_k1 = aggregate (B_0[i], features); //vector
-        auto v = B_1[i];        
-        vector <double> hv_k0 = features[v]; //vector
-        vector <double> agg_k1_w1 = mm(agg_k1, w1_agg); // 64 to 128
-        vector <double> hv_k0_w1 = mm (hv_k0, w1_hv); // 64 to 128  
-        vector<double> hv_k1 = hv_k0_w1;
-        hv_k1 = hv_k0_w1.insert (hv_k0_w1.end(), agg_k1_w1.begin(), agg_k1_w1.end() );
-        // activation function
-        hv_k1 = sigma (hv_k1);
-        // normalize hv_k
-        hv_k1 = L2_norm (hv_k1);     
-        hv_k1_all.push_back  (hv_k1);
-    }//for
-    // agg B1 nodes to B2; 
-    hu_k1_all = vector <vector<double>>;
-    for (int i = 0; i<B_2.size(); i ++) 
-    {   
-        auto idx_start = i * num_neigh1;
-        auto idx_end = (i+1) * num_neigh1;
-        vector <double> agg_k2 = aggregate (B_1[idx_start: idx_end], features); 
-        
-        
-             
-    }//for 
-    // K = 2
-    hv_k2_all = vector <vector<double>>;
-    for (int i = 0; i<B_2.size(); i ++) 
-    {
-        auto idx_start = i * num_neigh1;
-        auto idx_end = (i+1) * num_neigh1;
-        vector <double> agg_k2 = aggregate (B_1[idx_start: idx_end], hv_k1_all); 
-        // get hv_k1
-         
-    }//for
-}
+            // get ebedding vector for child node (h_{B2}^{1}) alg2 line 12            
+            for (int idx_0 = 0; idx_0 < 128; idx_0++)
+            {
+                for (int idx_1 =0; idx_1< 64; idx_1 ++)
+                    source_temp[idx_0] += features[source, idx_1] * W_f_1[idx_1,idx_0];
+            } // got 1st half of h_B2^1
+
+            for (int idx_0 = 128; idx_0 < 256; idx_0++)
+            {
+                for (int idx_1 =0; idx_1< 64; idx_1 ++)
+                    source_temp[idx_0] += sums_child_feat[idx_1] * W_a_1[idx_1,idx_0 - 128];
+            } // got 2nd half of h_B2^1 
+
+            auto L2_source_temp = 0.0;
+            for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+            {
+                source_temp[idx_0] = source_temp[idx_0] > 0.0 ? source_temp[idx_0] : 0.0 ; //relu() 
+                L2_source_temp += source_temp[idx_0] * soruce_temp [idx_0];
+            } //finished relu
+            for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+            {
+                source_temp[idx_0] = source_temp[idx_0] /sqrt (L2_source_temp);
+            }//finished L-2 norm for source temp
+            //////////////////////////////////////////////////////////////////////////////////////
+            // get h_B2^2 k =2.           
+            for (int idx_0 = 0; idx_0 < 128; idx_0++)
+            {
+                for (int idx_1 =0; idx_1< 256; idx_1 ++)
+                    source_result[idx_0] += source_temp [idx_1] * W_f_2[idx_1,idx_0];
+            } // got 1st half of h_B2^2
+
+            for (int idx_0 = 128; idx_0 < 256; idx_0++)
+            {
+                for (int idx_1 =0; idx_1< 256; idx_1 ++)
+                    source_result[idx_0] += children_temp[idx_1] * W_a_2[idx_1,idx_0 - 128];
+            } // got 2nd half of h_B2^2
+            auto L2_source_result = 0.0;
+            for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+            {
+                source_result[idx_0] = source_result[idx_0] > 0.0 ? source_result[idx_0] : 0.0 ; //relu() 
+                L2_source_result += source_result[idx_0] * soruce_result [idx_0];
+            } //finished relu
+            for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+            {
+                source_result[idx_0] = source_result[idx_0] /sqrt (L2_source_result);
+            }//finished L-2 norm for source result 
+           
+        } //for each source
+    } //for each batch
+    return 0;  
+} //cpu reference 
 
 /**
  * @brief Validation of SAGE results
@@ -215,6 +280,7 @@ typename GraphT::SizeT Validate_Results(
     typename GraphT::VertexT  *ref_preds     = NULL,
                      bool      verbose       = true)
 {
+/*
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::CsrT    CsrT;
@@ -357,8 +423,8 @@ typename GraphT::SizeT Validate_Results(
         }
         util::PrintMsg("");
     }
-
-    return num_errors;
+*/
+    return 0;
 }
 
 } // namespace sage

@@ -37,14 +37,16 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 }
 
 /**
- * @brief defination of SSSP iteration loop
+ * @brief defination of SAGE iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct SSSPIterationLoop : public IterationLoopBase
-    <EnactorT, Use_FullQ | Push |
-    (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-    Update_Predecessors : 0x0)>
+struct SAGEIterationLoop : public IterationLoopBase
+    <EnactorT, Use_FullQ | Push 
+   // |
+   // (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
+   //  Update_Predecessors : 0x0)
+    >
 {
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
@@ -52,11 +54,13 @@ struct SSSPIterationLoop : public IterationLoopBase
     typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
     typedef IterationLoopBase
-        <EnactorT, Use_FullQ | Push |
-        (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-         Update_Predecessors : 0x0)> BaseIterationLoop;
+        <EnactorT, Use_FullQ | Push 
+       // |
+       // (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
+       //  Update_Predecessors : 0x0)
+       > BaseIterationLoop;
 
-    SSSPIterationLoop() : BaseIterationLoop() {}
+    SAGEIterationLoop() : BaseIterationLoop() {}
 
     /**
      * @brief Core computation of sage, one iteration
@@ -72,25 +76,26 @@ struct SSSPIterationLoop : public IterationLoopBase
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
         auto         &enactor_stats      =   enactor_slice.enactor_stats;
         auto         &graph              =   data_slice.sub_graph[0];
-        auto         &distances          =   data_slice.distances;
-        auto         &labels             =   data_slice.labels;
-        auto         &preds              =   data_slice.preds;
+        //auto         &distances          =   data_slice.distances;
+        //auto         &labels             =   data_slice.labels;
+        //auto         &preds              =   data_slice.preds;
         //auto         &row_offsets        =   graph.CsrT::row_offsets;
-        auto         &weights            =   graph.CsrT::edge_values;
-        auto         &original_vertex    =   graph.GpT::original_vertex;
+        // auto         &weights            =   graph.CsrT::edge_values;
+        //auto         &original_vertex    =   graph.GpT::original_vertex;
         auto         &frontier           =   enactor_slice.frontier;
         auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
         auto         &retval             =   enactor_stats.retval;
         //auto         &stream             =   enactor_slice.stream;
-        auto         &iteration          =   enactor_stats.iteration;
+        //auto         &iteration          =   enactor_stats.iteration;
 
         // The advance operation
-        auto advance_op = [distances, weights, original_vertex, preds]
+        auto advance_op = [  ]
         __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
+            /*
             ValueT src_distance = Load<cub::LOAD_CG>(distances + src);
             ValueT edge_weight  = Load<cub::LOAD_CS>(weights + edge_id);
             ValueT new_distance = src_distance + edge_weight;
@@ -109,22 +114,23 @@ struct SSSPIterationLoop : public IterationLoopBase
                 }
                 return true;
             }
+            */
             return false;
         };
 
         // The filter operation
-        auto filter_op = [labels, iteration] __host__ __device__(
+        auto filter_op = [ ] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            if (!util::isValid(dest)) return false;
-            if (labels[dest] == iteration) return false;
-            labels[dest] = iteration;
+            //if (!util::isValid(dest)) return false;
+            //if (labels[dest] == iteration) return false;
+            //labels[dest] = iteration;
             return true;
         };
 
-        oprtr_parameters.label = iteration + 1;
+        //oprtr_parameters.label = iteration + 1;
         // Call the advance operator, using the advance operation
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
@@ -165,19 +171,20 @@ struct SSSPIterationLoop : public IterationLoopBase
             problem -> data_slices[this -> gpu_num][0];
         auto         &enactor_slice      =   this -> enactor ->
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
-        auto iteration = enactor_slice.enactor_stats.iteration;
-        auto         &distances          =   data_slice.distances;
-        auto         &labels             =   data_slice.labels;
-        auto         &preds              =   data_slice.preds;
-        auto          label              =   this -> enactor ->
-            mgpu_slices[this -> gpu_num].in_iteration[iteration % 2][peer_];
+        //auto iteration = enactor_slice.enactor_stats.iteration;
+        //auto         &distances          =   data_slice.distances;
+        //auto         &labels             =   data_slice.labels;
+        //auto         &preds              =   data_slice.preds;
+        //auto          label              =   this -> enactor ->
+        //    mgpu_slices[this -> gpu_num].in_iteration[iteration % 2][peer_];
 
-        auto expand_op = [distances, labels, label, preds]
+        auto expand_op = [ ]
         __host__ __device__(
             VertexT &key, const SizeT &in_pos,
             VertexT *vertex_associate_ins,
             ValueT  *value__associate_ins) -> bool
         {
+            /*
             ValueT in_val  = value__associate_ins[in_pos];
             ValueT old_val = atomicMin(distances + key, in_val);
             if (old_val <= in_val)
@@ -188,6 +195,7 @@ struct SSSPIterationLoop : public IterationLoopBase
             if (!preds.isEmpty())
                 preds[key] = vertex_associate_ins[in_pos];
             return true;
+            */
         };
 
         cudaError_t retval = BaseIterationLoop:: template ExpandIncomingBase
@@ -244,8 +252,7 @@ public:
         BaseEnactor("sage"),
         problem    (NULL  )
     {
-        this -> max_num_vertex_associates
-            = (Problem::FLAG & Mark_Predecessors) != 0 ? 1 : 0;
+        this -> max_num_vertex_associates = 0;
         this -> max_num_value__associates = 1;
     }
 
@@ -326,7 +333,8 @@ public:
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
-        {
+        { 
+            /*
             if ((this->num_gpus == 1) ||
                 (gpu == this->problem->org_graph->GpT::partition_table[src]))
             {
@@ -340,21 +348,21 @@ public:
                     {
                         GUARD_CU(frontier.V_Q() -> ForEach(
                             [src]__host__ __device__ (VertexT &v)
-                        {
+                        
                             v = src;
-                        }, 1, target, 0));
+                        }
                     }
                 }
             }
 
-            else {
+            else { */
                 this -> thread_slices[gpu].init_size = 0;
                 for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
                 {
                     this -> enactor_slices[gpu * this -> num_gpus + peer_]
                         .frontier.queue_length = 0;
                 }
-            }
+        //    }
         }
         GUARD_CU(BaseEnactor::Sync());
         return retval;
@@ -368,8 +376,7 @@ public:
     cudaError_t Run(ThreadSlice &thread_data)
     {
         gunrock::app::Iteration_Loop<
-            ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0,
-            1, IterationT>(
+            0, 1, IterationT>(
             thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
     }
@@ -379,11 +386,11 @@ public:
      * @param[in] src Source node to start primitive.
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Enact(VertexT src)
+    cudaError_t Enact( )
     {
         cudaError_t  retval     = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));
-        util::PrintMsg("GPU SSSP Done.", this -> flag & Debug);
+        util::PrintMsg("GPU SAGE Done.", this -> flag & Debug);
         return retval;
     }
 
