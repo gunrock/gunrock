@@ -38,7 +38,7 @@ namespace geo {
  * @param[in]   quiet         Whether to print out anything to stdout
  */
 
-/* This implementation is adapted from GT's geotagging app. */
+/* This implementation is adapted from python geotagging app. */
 const double PI = 3.141592653589793;
 
 template <typename ValueT>
@@ -47,8 +47,12 @@ ValueT radians(ValueT a){return a * PI/180;}
 template <typename ValueT>
 ValueT degrees(ValueT a){return a * 180/PI;}
 
+/**
+ * @brief Compute the mean of all latitidues and
+ * 	  and longitudes in a given set.
+ */
 template <typename ValueT, typename SizeT>
-void np_mean(
+void mean(
     ValueT *latitude,
     ValueT *longitude,
     SizeT   length,
@@ -75,6 +79,9 @@ void np_mean(
     return;
 }
 
+/**
+ * @brief Compute the midpoint of two points on a sphere.
+ */
 template <typename ValueT, typename SizeT>
 void midpoint(
     ValueT p1_lat,
@@ -99,16 +106,22 @@ void midpoint(
     by = cos(p2_lat) * sin(p2_lon - p1_lon);
 
     ValueT lat, lon;
-    lat = atan2(sin(p1_lat) + sin(p2_lat),
-		sqrt((cos(p1_lat) + bx) * (cos(p1_lat) + bx) + by*by));
+    lat = atan2(sin(p1_lat) + sin(p2_lat), \
+		sqrt((cos(p1_lat) + bx) * (cos(p1_lat) \
+		+ bx) + by*by));
+
     lon = p1_lon + atan2(by, cos(p1_lat) + bx);
 
-    latitude[v] = (ValueT) degrees(lat);
-    longitude[v] = (ValueT) degrees(lon);
+    latitude[v] = degrees(lat);
+    longitude[v] = degrees(lon);
 
     return;
 }
 
+/**
+ * @brief (approximate) distance between two points on earth's 
+ * surface in kilometers.
+ */
 template <typename ValueT>
 ValueT haversine(
     ValueT n_latitude,
@@ -117,7 +130,6 @@ ValueT haversine(
     ValueT mean_longitude,
     ValueT radius = 6371)
 {
-    // Calculate the haversine distance;
     ValueT lat, lon;
 
     // Convert degrees to radians
@@ -127,7 +139,7 @@ ValueT haversine(
     mean_longitude = radians(mean_longitude);
 
     lat = mean_latitude - n_latitude;
-    lon = mean_longitude - mean_longitude;
+    lon = mean_longitude - n_longitude;
 
     ValueT a = pow(sin(lat/2),2) + cos(n_latitude) *
 		cos(mean_latitude) * pow(sin(lon/2),2);
@@ -139,6 +151,16 @@ ValueT haversine(
     return km;
 }
 
+/**
+ * @brief Compute spatial median of a set of > 2 points.
+ *
+ *	  Spatial Median;
+ *	  That is, given a set X find the point m s.t.
+ *		sum([dist(x, m) for x in X])
+ *
+ *	  is minimized. This is a robust estimator of
+ *	  the mode of the set.
+ */
 template <typename ValueT, typename SizeT>
 void spatial_median(
     ValueT *locations_lat,
@@ -170,7 +192,7 @@ void spatial_median(
 
     // Calculate mean of all <latitude, longitude>
     // for all possible locations of v;
-    np_mean (locations_lat, locations_lon,
+    mean (locations_lat, locations_lon,
 	    length, y, offset, v); 
 
     util::PrintMsg("Mean of all neighbor locations: " + std::to_string(length)
@@ -255,6 +277,15 @@ void spatial_median(
     }
 }
 
+
+/**
+ * @brief Compute "center" of a set of points.
+ *
+ *	For set X ->
+ *	  if points == 1; center = point;
+ *	  if points == 2; center = midpoint;
+ *	  if points > 2; center = spatial median;
+ */
 template <typename ValueT, typename SizeT>
 void spatial_center(
     ValueT * locations_lat,
@@ -270,12 +301,14 @@ void spatial_center(
     // point at location (92.0, 182.0)
     if (length < 1) // && offset == 0) 
     {
+#if 0
 	latitude[v] = (ValueT) 92.0;
 	longitude[v] = (ValueT) 182.0;
 	util::PrintMsg("Valid Locations [" + std::to_string(v) + "] : " 
 			+ std::to_string(length)
                         + " < " + std::to_string(latitude[v]) + " , "
                         + std::to_string(longitude[v]) + " > ", !quiet);
+#endif
 	return;
     }
 
@@ -365,7 +398,7 @@ double CPU_Reference(
     while (!Stop_Condition) 
     {
 	// Gather operator
-	#pragma omp parallel
+	// #pragma omp parallel
 	for (SizeT v = 0; v < nodes; ++v) 
 	{
 	    
@@ -378,7 +411,7 @@ double CPU_Reference(
 	    if (!util::isValid(predicted_lat[v]) &&
 		!util::isValid(predicted_lon[v])) 
 	    {
-		#pragma omp parallel
+		// #pragma omp parallel
 	        for (SizeT k = 0; k < degree; k++) 
 		{
 		    SizeT e   = start_e + k;
@@ -400,7 +433,7 @@ double CPU_Reference(
         } // end: gather (for)
   
 	// Compute operator 
-	#pragma omp parallel
+	// #pragma omp parallel
 	for (SizeT v = 0; v < nodes; ++v) 
 	{
 	    SizeT offset  = graph.GetNeighborListLength(v);
