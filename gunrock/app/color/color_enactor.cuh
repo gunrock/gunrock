@@ -24,6 +24,9 @@
  
 // <DONE> change includes
 #include <gunrock/app/color/color_problem.cuh>
+
+#include <curand.h>
+#include <curand_kernel.h>
 // </DONE>
 
 
@@ -63,7 +66,7 @@ struct ColorIterationLoop : public IterationLoopBase
     typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
-    helloIterationLoop() : BaseIterationLoop() {}
+    ColorIterationLoop() : BaseIterationLoop() {}
 
     /**
      * @brief Core computation of hello, one iteration
@@ -92,7 +95,8 @@ struct ColorIterationLoop : public IterationLoopBase
         auto &colors 	       = data_slice.colors;
         auto &rand 	       = data_slice.rand;
 	auto &gen	       = data_slice.gen;
-	auto &color_balance     = data_slice.color_balance;
+	auto &color_balance    = data_slice.color_balance;
+	auto &colored	       = data_slice.colored;
         // </DONE>
 
 	curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
@@ -100,7 +104,7 @@ struct ColorIterationLoop : public IterationLoopBase
         // --
         // Define operations
 
-	if(data_slice.colorbalance) {
+	if(color_balance) {
 
 #if 0
         // advance operation
@@ -164,6 +168,7 @@ struct ColorIterationLoop : public IterationLoopBase
 	} else {
 
 	    auto color_op = [
+		graph,
 	    	colors,
 	    	rand,
 	    	iteration
@@ -185,21 +190,45 @@ struct ColorIterationLoop : public IterationLoopBase
 		    if (rand[e] < temp)
 			min = e;
 
+		    printf("Let's see what rand[e] = %f\n", rand[e]);
 		    temp = rand[e]; // compare against e-1
 	    	}
 
 		// Assign two colors per iteration
-		if (color[max] <= 0)
-		    color[max] = iteration*2+1;
+		if (!util::isValid(colors[max]))
+		    colors[max] = iteration*2+1;
 		
-		if (color[min] <= 0)
-		    color[min] = iteration*2+2;
+		if (!util::isValid(colors[min]))
+		    colors[min] = iteration*2+2;
+		
+		printf("iteration number = %u\n", iteration);
+		printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min], colors[max]);
 	    };
-       
+      
+	
+	    auto status_op = [
+		colors,
+		colored
+	    ] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
+
+		VertexT v	= v_q[pos];
+
+		if(util::isValid(colors[v]))
+		    atomicAdd(&colored[0], 1);
+	    };
+ 
 	    // Run --
             GUARD_CU(frontier.V_Q()->ForAll(
                  color_op, frontier.queue_length,
                  util::DEVICE, oprtr_parameters.stream));
+
+	    GUARD_CU(frontier.V_Q()->ForAll(
+                 status_op, frontier.queue_length,
+                 util::DEVICE, oprtr_parameters.stream));
+
+	    GUARD_CU(data_slice.colored .SetPointer(&data_slice.colored_, sizeof(SizeT), util::HOST));
+            GUARD_CU(data_slice.colored .Move(util::DEVICE, util::HOST));
+
 	}
  
         return retval;
@@ -208,12 +237,16 @@ struct ColorIterationLoop : public IterationLoopBase
 
     bool Stop_Condition(int gpu_num = 0)
     {
-      auto &data_slice = this -> enactor ->
+        auto &data_slice = this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
-      auto &enactor_slices = this -> enactor -> enactor_slices;
-      auto iter = enactor_slices[0].enactor_stats.iteration;
+        auto &enactor_slices = this -> enactor -> enactor_slices;
+        auto iter = enactor_slices[0].enactor_stats.iteration;
+	auto &graph = data_slice.sub_graph[0];
 
-      return false; // iter == data_slice.walk_length;
+        if(data_slice.colored_ >= graph.nodes)
+	    return true;
+
+        return false;
     }
 
     /**
@@ -398,8 +431,7 @@ public:
         // <DONE> Initialize frontiers according to the algorithm:
         // In this case, we add a single `src` to the frontier
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
-           if ((this->num_gpus == 1) ||
-                (gpu == this->problem->org_graph->GpT::partition_table[src])) {
+           if (this->num_gpus == 1) {
                this -> thread_slices[gpu].init_size = num_nodes;
                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
                    auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;

@@ -45,7 +45,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
          __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<bool>(
-         "color_balance",
+         "LBCOLOR",
          util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
          false,
          "load balancing enabled for graph coloring (true=neighbor_reduce)",
@@ -71,7 +71,7 @@ cudaError_t RunTests(
     GraphT           &graph,
     // <DONE> add problem specific reference results, e.g.:
     bool	      color_balance,
-    typename GraphT::ValueT *ref_colors,
+    typename GraphT::VertexT *ref_colors,
     // </DONE>
     util::Location target)
 {
@@ -99,7 +99,7 @@ cudaError_t RunTests(
     // </TODO>
 
     // <TODO> allocate problem specific host data, e.g.:
-    ValueT *h_colors = new ValueT[graph.nodes];
+    VertexT *h_colors = new VertexT[graph.nodes];
     // </TODO>
 
     // Allocate problem and enactor on GPU, and initialize them
@@ -172,7 +172,6 @@ cudaError_t RunTests(
             parameters,
             graph,
             // <TODO> problem specific data
-	    color_balance,
             h_colors, ref_colors,
             // </TODO>
             false);

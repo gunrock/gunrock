@@ -52,20 +52,14 @@ struct main_struct
 
         cpu_timer.Start();
         GUARD_CU(graphio::LoadGraph(parameters, graph));
-        // force edge values to be 1, don't enable this unless you really want to
-        //for (SizeT e=0; e < graph.edges; e++)
-        //    graph.CsrT::edge_values[e] = 1;
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        // TODO: get srcs if needed, e.g.:
-        // GUARD_CU(app::Set_Srcs    (parameters, graph));
-        int num_srcs = 0;
-
         // TODO: reference result on CPU, e.e.:
-        // ValueT  **ref_distances = NULL;
+        VertexT  *ref_colors = NULL;
+
         bool quick = parameters.Get<bool>("quick");
-	bool walk_mode = parameters.Get<bool>("color-balance");
+	bool color_balance = parameters.Get<bool>("LBCOLOR");
 
         // compute reference CPU SSSP solution for source-distance
         if (!quick)
@@ -74,30 +68,18 @@ struct main_struct
             std::string validation = parameters.Get<std::string>("validation");
             util::PrintMsg("Computing reference value ...", !quiet);
 
-            // TODO: get srcs if needed, e.g.:
-            // std::vector<VertexT> srcs
-            //    = parameters.Get<std::vector<VertexT> >("srcs");
-            // num_srcs = srcs.size();
-
-            // SizeT nodes = graph.nodes;
             // TODO: problem specific data, e.g.:
-            // ref_distances = new ValueT*[num_srcs];
-            for (int i = 0; i < num_srcs; i++)
-            {
-                // ref_distances[i] = new ValueT[nodes];
-                // VertexT src = srcs[i];
-                util::PrintMsg("__________________________", !quiet);
-                float elapsed = app::color::CPU_Reference(
-                    graph.csr(),
-                    // TODO: add problem specific data, e.g.:
-                    // ref_distances[i], NULL, src,
-                    quiet);
-                util::PrintMsg("--------------------------\nRun "
-                    + std::to_string(i) + " elapsed: "
-                    + std::to_string(elapsed)
-                    //+ " ms, src = " + std::to_string(src)
-                    , !quiet);
-            }
+            ref_colors = new VertexT[graph.nodes];
+                
+	    util::PrintMsg("__________________________", !quiet);
+            float elapsed = app::color::CPU_Reference(
+                graph.csr(),
+                ref_colors,
+                quiet);
+
+            util::PrintMsg("--------------------------\n Elapsed: "
+                + std::to_string(elapsed), !quiet);
+
         }
 
         // TODO: add other switching parameters, if needed
@@ -109,17 +91,16 @@ struct main_struct
 		ref_colors
 	    ](util::Parameters &parameters, GraphT &graph)
             {
-                return app::color::RunTests(parameters, graph, color_balance, ref_colors);
+                return app::color::RunTests(parameters, 
+					    graph, 
+					    color_balance, 
+					    ref_colors, 
+					    util::DEVICE);
             }));
 
         if (!quick)
         {
-            // TODO: deallocate host references, e.g.:
-            // for (int i = 0; i < num_srcs; i ++)
-            // {
-            //    delete[] ref_distances[i]; ref_distances[i] = NULL;
-            // }
-            // delete[] ref_distances; ref_distances = NULL;
+            delete[] ref_colors; ref_colors = NULL;
         }
         return retval;
     }

@@ -36,7 +36,7 @@ namespace color {
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    typename GraphT::VertexT *colors;
+    typename GraphT::VertexT *colors,
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
@@ -70,7 +70,6 @@ template <typename GraphT>
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
-	     bool	       color_balance,
              typename GraphT::VertexT *h_colors,
              typename GraphT::VertexT *ref_colors,
              bool verbose = true)

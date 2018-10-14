@@ -69,11 +69,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     struct DataSlice : BaseDataSlice
     {
         // <DONE> add problem specific storage arrays:
-        util::Array1D<SizeT, VertexT> colors;
-        util::Array1D<SizeT, float> rand;
+        util::Array1D<SizeT, VertexT> 	colors;
+        util::Array1D<SizeT, float> 	rand;
 	
-	curandGenerator_t gen;
-    	bool color_balance;
+	curandGenerator_t 		gen;
+    	bool 				color_balance;
+
+	util::Array1D<SizeT, SizeT> 	colored;
+	SizeT			    	colored_;
         // </DONE>
 
         /*
@@ -82,8 +85,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         DataSlice() : BaseDataSlice()
         {
             // <DONE> name of the problem specific arrays:
-            colors.SetName("colors");
-            rand.SetName("rand");
+            colors	.SetName("colors");
+            rand	.SetName("rand");
+	    colored	.SetName("colored");
             // </DONE>
         }
 
@@ -104,8 +108,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
             // <TODO> Release problem specific data, e.g.:
-            GUARD_CU(colors.Release(target));
-            GUARD_CU(rand.Release(target));
+            GUARD_CU(colors	.Release(target));
+            GUARD_CU(rand	.Release(target));
+	    GUARD_CU(colored	.Release(target));
             // </TODO>
 
             GUARD_CU(BaseDataSlice ::Release(target));
@@ -126,7 +131,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             int            gpu_idx,
             util::Location target,
             ProblemFlag    flag,
-	    int		   color_balance,
+	    bool	   color_balance_,
 	    int		   seed)
         {
             cudaError_t retval  = cudaSuccess;
@@ -139,8 +144,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    curandSetPseudoRandomGeneratorSeed(gen, seed);
 
             // <DONE> allocate problem specific data here, e.g.:
-            GUARD_CU(colors.Allocate(sub_graph.nodes, target));
-            GUARD_CU(rand.Allocate(sub_graph.nodes, target));
+            GUARD_CU(colors		.Allocate(sub_graph.nodes, target));
+            GUARD_CU(rand		.Allocate(sub_graph.nodes, target));
+	    GUARD_CU(colored		.Allocate(1, util::HOST|target));
             // </DONE>
 
             if (target & util::DEVICE) {
@@ -163,8 +169,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             // Ensure data are allocated
             // <DONE> ensure size of problem specific data:
-            GUARD_CU(colors.EnsureSize_(nodes, target));
-            GUARD_CU(rand.EnsureSize_(nodes, target));
+            GUARD_CU(colors		.EnsureSize_(nodes, target));
+            GUARD_CU(rand		.EnsureSize_(nodes, target));	    
+	    GUARD_CU(colored		.EnsureSize_(1, util::HOST|target));
             // </DONE>
 
             // Reset data
@@ -176,6 +183,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(rand.ForEach([]__host__ __device__ (float &x){
                x = (float)0.0f;
             }, nodes, target, this -> stream));
+
+
+	    GUARD_CU(colored.ForAll([
+	    ]__host__ __device__ (SizeT *x, const VertexT &pos){
+		x[pos] = 0;
+            }, 1, target, this -> stream));
+
+ 	    this-> colored_ = 0;
             // </TODO>
 
             return retval;
@@ -200,7 +215,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         data_slices(NULL) {
 	// <DONE>
 	seed = _parameters.Get<int>("seed");
-	color_balance = _parameters.Get<bool>("color_balance");
+	color_balance = _parameters.Get<bool>("LBCOLOR");
 	// </DONE>
     }
 
@@ -237,7 +252,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     cudaError_t Extract(
         // <DONE> problem specific data to extract
-        ValueT *h_colors,
+        VertexT *h_colors,
         // </DONE>
         util::Location target = util::DEVICE)
     {
@@ -258,7 +273,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             } else if (target == util::HOST) {
                 // <DONE> extract the results from single CPU, e.g.:
                 GUARD_CU(data_slice.colors.ForEach(h_colors,
-                   []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
+                   []__host__ __device__ (const VertexT &device_val, VertexT &host_val){
                        host_val = device_val;
                    }, nodes, util::HOST));
                 // </DONE>
