@@ -589,7 +589,7 @@ struct PRIteration : public IterationBase <
             return;*/
         //printf("Advance end.\n");fflush(stdout);
 
-        //if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
+        //if (DEBUG && (retval = util::GRError(cudaDeviceSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
         //cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
 
         /*if (Enactor::DEBUG) {
