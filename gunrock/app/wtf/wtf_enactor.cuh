@@ -501,7 +501,7 @@ public:
 
             if (this -> debug)
             {
-                if (retval = util::GRError(cudaThreadSynchronize(), 
+                if (retval = util::GRError(cudaDeviceSynchronize(), 
                     "edge_map_forward::Kernel failed", __FILE__, __LINE__)) 
                     return retval;
             }

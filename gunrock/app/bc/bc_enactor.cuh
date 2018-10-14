@@ -1012,7 +1012,7 @@ public:
         /*if (frontier_attribute.queue_reset)
             frontier_attribute.queue_reset = false; */
 
-        //if (/*DEBUG &&*/ (retval = util::GRError(cudaThreadSynchronize(), "edge_map_backward::Kernel failed", __FILE__, __LINE__))) break;
+        //if (/*DEBUG &&*/ (retval = util::GRError(cudaDeviceSynchronize(), "edge_map_backward::Kernel failed", __FILE__, __LINE__))) break;
         /*cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
         frontier_attribute.queue_index++;
         frontier_attribute.selector ^= 1;

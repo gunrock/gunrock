@@ -168,7 +168,7 @@ public:
                 // Initialize to zero
                 util::MemsetKernel<SyncFlag><<<(sweep_grid_size + 128 - 1) / 128, 128>>>(
                     d_sync, 0, sweep_grid_size);
-                if (retval = util::GRError(cudaThreadSynchronize(),
+                if (retval = util::GRError(cudaDeviceSynchronize(),
                     "GlobalBarrierLifetime MemsetKernel d_sync failed", __FILE__, __LINE__)) break;
             }
         } while (0);

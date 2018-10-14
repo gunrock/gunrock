@@ -1338,7 +1338,7 @@ public:
             {
                 if (util::SetDevice(my_gpu_idx)) return;
             }
-            cudaThreadSynchronize();
+            cudaDeviceSynchronize();
 
             for (int peer = 0; peer < num_gpus; ++peer)
             {
