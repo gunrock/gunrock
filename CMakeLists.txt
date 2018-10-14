@@ -26,6 +26,8 @@ else (WARNING_DEP_FLAG)
 endif (WARNING_DEP_FLAG)
 # end /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
+
 option(CMAKE_VERBOSE_MAKEFILE ON)
 
 # begin /* Find and set CUDA arch */
