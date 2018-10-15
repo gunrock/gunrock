@@ -113,9 +113,33 @@ cudaError_t MinCut(
     for (auto e = 0; e < graph.edges; e++)
         edge_residuals[e] = edge_capacities[e] - edge_flows[e];
 
-    VertexT *queue   = new VertexT[graph.nodes];
-    char    *markers = new char   [graph.nodes];
-    for (char t = 1; t < 3; t++)
+    /////////////////////////////////////////
+    std::queue <typename GraphT::VertexT> q;
+    q.push(source);
+    memset(vertex_reachabilities, false, graph.nodes*sizeof(vertex_reachabilities[0]));
+    vertex_reachabilities[source] = true;
+
+    // Standard BFS Loop
+    while (!q.empty()) {
+        VertexT v = q.front();
+        q.pop();
+
+        auto e_start = graph.GetNeighborListOffset(v);
+        auto num_neighbors = graph.GetNeighborListLength(v);
+        auto e_end = e_start + num_neighbors;
+
+        for (auto e = e_start; e < e_end; e++) {
+            VertexT u = graph.GetEdgeDest(e);
+
+            if (vertex_reachabilities[u] == false && abs(edge_residuals[e]) > 1e-6) {
+                q.push(u);
+                vertex_reachabilities[u] = true;
+            }
+        }
+    }
+    /////////////////////////
+    /*
+    for (char t = 1; t < 2; t++)
     {
         VertexT head = 0;
         VertexT tail = 0;
@@ -140,13 +164,12 @@ cudaError_t MinCut(
                 head ++;
                 queue[head] = u;
                 markers[u] = 1;
-                vertex_reachabilities[u] = t;
+                vertex_reachabilities[u] = bool(t);
             }
             tail ++;
         }
     }
-    delete[] queue  ; queue   = NULL;
-    delete[] markers; markers = NULL;
+    */
     return retval;
 }
 
@@ -286,7 +309,13 @@ void minCut(GraphT graph, VertexT s, VertexT t, bool *visited, ValueT *edge_resi
 
 }
 /*----------------------------------------------*/
-
+template<typename ValueT>
+void soft_thresh(ValueT *Y, const ValueT thresh, const int n){
+    for(int i = 0; i < n; i++){
+        ValueT tmp = max(Y[i] - thresh, 0.0);
+        Y[i] = tmp + min(Y[i]+thresh, 0.0);
+    }
+}
 /**
  * @brief Simple CPU-based reference GTF implementations
  *
@@ -315,6 +344,7 @@ cudaError_t CPU_Reference(
     typedef typename GraphT::ValueT  ValueT;
 
     cudaError_t retval = cudaSuccess;
+    double   lambda2          = 3;
     auto     num_nodes        = graph.nodes; // n + 2 = V
     auto     num_org_nodes    = num_nodes-2; // n
     auto     num_edges        = graph.edges; // m + n*4
@@ -521,6 +551,7 @@ cudaError_t CPU_Reference(
     cpu_timer.Stop();
     elapsed = cpu_timer.ElapsedMillis();
 
+    soft_thresh(community_accus, lambda2, num_org_nodes);
     std::ofstream out_pr( "./output_pr.txt" );
     for(int i = 0; i < num_org_nodes; i++) out_pr << (double) community_accus[curr_communities[i]] << std::endl;
     out_pr.close();
