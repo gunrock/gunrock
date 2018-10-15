@@ -396,7 +396,7 @@ cudaError_t ReadBinary(
         else GUARD_CU(retval);
     }
 
-    if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
+    if (GraphT::FLAG & graph::HAS_NODE_VALUES)
     {
         util::PrintMsg("  Reading node values from " 
             + filename + ".coo_node_values", !quiet);
@@ -446,7 +446,7 @@ cudaError_t WriteBinary(
         else GUARD_CU(retval);
     }
 
-    if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
+    if (GraphT::FLAG & graph::HAS_NODE_VALUES)
     {
         util::PrintMsg("  Writting node values in binary into "
             + filename + ".coo_node_values", !quiet);
