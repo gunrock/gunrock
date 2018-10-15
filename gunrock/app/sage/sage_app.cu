@@ -37,47 +37,126 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_enactor(parameters));
 
     GUARD_CU(parameters.Use<std::string>(
-        "w1_feat",
+        "W_f_1",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        "",
         "<weight matrix for W^1 matrix in algorithm 2, feature part>\n"
         "\t dimension 64 by 128 for pokec;\n"
         "\t It should be child feature length by a value you want for W2 layer",
         __FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<string>(
-        "w1_agg",
+    GUARD_CU(parameters.Use<std::string>(
+        "W_a_1",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        "",
         "<weight matrix for W^1 matrix in algorithm 2, aggregation part>\n"
         "\t dimension 64 by 128 for pokec;\n"
         "\t It should be leaf feature length by a value you want for W2 layer",
         __FILE__, __LINE__));
 
 
-    GUARD_CU(parameters.Use<string>(
-        "w2_feat",
+    GUARD_CU(parameters.Use<std::string>(
+        "W_f_2",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        "",
         "<weight matrix for W^2 matrix in algorithm 2, feature part>\n"
         "\t dimension 256 by 128 for pokec;\n"
         "\t It should be source_temp length by output length",
         __FILE__, __LINE__));
 
 
-    GUARD_CU(parameters.Use<string>(
-        "w2_agg",
+    GUARD_CU(parameters.Use<std::string>(
+        "W_a_2",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        "",
         "<weight matrix for W^2 matrix in algorithm 2, aggregation part>\n"
         "\t dimension 256 by 128 for pokec;\n"
         "\t It should be child_temp length by output length",
         __FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<string>(
+    GUARD_CU(parameters.Use<std::string>(
         "features",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        "",
         "<features matrix>\n"
-        "\t dimension |V| by 64 for pokec;\n"
+        "\t dimension |V| by 64 for pokec;\n",
         __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<int>(
+        "Wf1_dim_0",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        64,
+        "W_f_1 matrix row dim",
+        __FILE__, __LINE__));
  
+    GUARD_CU(parameters.Use<int>(
+        "Wa1_dim_0",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        64,
+        "W_a_1 matrix row dim",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "Wf1_dim_1",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        128,
+        "W_f_1 matrix column dim",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "Wa1_dim_1",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        128,
+        "W_a_1 matrix column dim",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "Wf2_dim_0",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        256,
+        "W_f_2 matrix row dim",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "Wa2_dim_0",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        256,
+        "W_a_2 matrix row dim",
+        __FILE__, __LINE__));
+    GUARD_CU(parameters.Use<int>(
+        "Wf2_dim_1",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        128,
+        "W_f_2 matrix column dim",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "Wa2_dim_1",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        128,
+        "W_a_2 matrix column dim",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "num_neigh1",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        10,
+        "number of sampled neighbours in k=1",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "num_neigh2",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        10,
+        "number of sampled neighbours in k=2",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "batch_size",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        512,
+        "batch size",
+        __FILE__, __LINE__));
 
     return retval;
 }
@@ -132,28 +211,29 @@ cudaError_t RunTests(
     //info.preprocess_time = cpu_timer.ElapsedMillis();
 
     // perform SAGE
-    VertexT src;
+    //VertexT src;
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        src = srcs[run_num % num_srcs];
-        GUARD_CU(problem.Reset(src, target));
-        GUARD_CU(enactor.Reset(src, target));
+        //src = srcs[run_num % num_srcs];
+        GUARD_CU(problem.Reset( target));
+        GUARD_CU(enactor.Reset( target));
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
-        GUARD_CU(enactor.Enact(src));
+        GUARD_CU(enactor.Enact(  ));
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
         util::PrintMsg("--------------------------\nRun "
             + std::to_string(run_num) + " elapsed: "
-            + std::to_string(cpu_timer.ElapsedMillis()) + " ms, src = "
-            + std::to_string(src) + ", #iterations = "
+            + std::to_string(cpu_timer.ElapsedMillis()) 
+            //+ " ms, src = "+ std::to_string(src) 
+            + ", #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
         if (validation == "each")
         {
-            GUARD_CU(problem.Extract(h_distances, h_preds));
+            GUARD_CU(problem.Extract( /*h_distances, h_preds */));
             SizeT num_errors = app::sage::Validate_Results(
                 parameters, graph, 
                 //src, h_distances, h_preds,
@@ -165,7 +245,7 @@ cudaError_t RunTests(
 
     cpu_timer.Start();
     // Copy out results
-    GUARD_CU(problem.Extract(h_distances, h_preds));
+    GUARD_CU(problem.Extract( /*h_distances, h_preds*/));
     if (validation == "last")
     {
         SizeT num_errors = app::sage::Validate_Results(
@@ -210,7 +290,7 @@ cudaError_t RunTests(
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_sage(
     gunrock::util::Parameters &parameters,
-    GraphT &graph,
+    GraphT &graph
     //ValueT **distances,
     //typename GraphT::VertexT **preds = NULL
     )
@@ -237,16 +317,16 @@ double gunrock_sage(
     {
        // int src_num = run_num % num_srcs;
        // VertexT src = srcs[src_num];
-        problem.Reset(src, target);
-        enactor.Reset(src, target);
+        problem.Reset( target);
+        enactor.Reset( target);
 
         cpu_timer.Start();
-        enactor.Enact(src);
+        enactor.Enact( );
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-        problem.Extract(distances[src_num],
-        //    preds == NULL ? NULL : preds[src_num]);
+        problem.Extract( /*distances[src_num],
+            preds == NULL ? NULL : preds[src_num]*/);
     }
 
     enactor.Release(target);
@@ -273,14 +353,14 @@ template <
     typename VertexT = int,
     typename SizeT   = int,
     typename GValueT = unsigned int,
-    typename SSSPValueT = GValueT>
+    typename SAGEValueT = GValueT>
 double sage(
     const SizeT        num_nodes,
     const SizeT        num_edges,
     const SizeT       *row_offsets,
     const VertexT     *col_indices,
     const GValueT     *edge_values,
-    const int          num_runs,
+    const int          num_runs
     //      VertexT     *sources,
     //const bool         mark_pred,
     //      SSSPValueT **distances,
@@ -299,7 +379,7 @@ double sage(
     gunrock::app::UseParameters_test(parameters);
     parameters.Parse_CommandLine(0, NULL);
     parameters.Set("graph-type", "by-pass");
-    parameters.Set("mark-pred", mark_pred);
+    //parameters.Set("mark-pred", mark_pred);
     parameters.Set("num-runs", num_runs);
     //std::vector<VertexT> srcs;
     //for (int i = 0; i < num_runs; i ++)
@@ -317,7 +397,7 @@ double sage(
     gunrock::graphio::LoadGraph(parameters, graph);
 
     // Run the SSSP
-    double elapsed_time = gunrock_sage(parameters, graph, distances, preds);
+    double elapsed_time = gunrock_sage(parameters, graph /*, distances, preds*/);
 
     // Cleanup
     graph.Release();

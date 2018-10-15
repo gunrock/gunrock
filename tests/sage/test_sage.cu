@@ -1,4 +1,4 @@
-// ----------------------------------------------------------------
+/// ----------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
 // ----------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
@@ -63,51 +63,59 @@ struct main_struct
         //    + ", sizeof(SizeT) = " + std::to_string(sizeof(SizeT))
         //    + ", sizeof(ValueT) = " + std::to_string(sizeof(ValueT)));
 
-        GUARD_CU(app::Set_Srcs    (parameters, graph));
-        ValueT  **ref_distances = NULL;
-        int num_srcs = 0;
+        //GUARD_CU(app::Set_Srcs    (parameters, graph));
+        //ValueT  **ref_distances = NULL;
+        //int num_srcs = 0;
         bool quick = parameters.Get<bool>("quick");
         // compute reference CPU Sage solution for source-distance
         if (!quick)
         {
             bool quiet = parameters.Get<bool>("quiet");
-            std::string validation = parameters.Get<std::string>("validation");
-            util::PrintMsg("Computing reference value ...", !quiet);
-            std::vector<VertexT> srcs
-                = parameters.Get<std::vector<VertexT> >("srcs");
-            num_srcs = srcs.size();
+            std::string wf1_file = parameters.Get<std::string>("W_f_1"); 
+            std::string wa1_file = parameters.Get<std::string>("W_a_1");
+            std::string wf2_file = parameters.Get<std::string>("W_f_2");
+            std::string wa2_file = parameters.Get<std::string>("W_f_1");
+            std::string feature_file = parameters.Get<std::string>("features");
+            int Wf1_dim_0 = parameters.Get<int> ("Wf1_dim_0");
+            int Wa1_dim_0 = parameters.Get<int> ("Wa1_dim_0");
+            int Wf1_dim_1 = parameters.Get<int> ("Wf1_dim_1");
+            int Wa1_dim_1 = parameters.Get<int> ("Wa1_dim_1");
+            int Wf2_dim_0 = parameters.Get<int> ("Wf2_dim_0");
+            int Wa2_dim_0 = parameters.Get<int> ("Wa2_dim_0");
+            int Wf2_dim_1 = parameters.Get<int> ("Wf2_dim_1");
+            int Wa2_dim_1 = parameters.Get<int> ("Wa2_dim_1");
+            int num_neigh1 = parameters.Get<int> ("num_neigh1");
+            int num_neigh2 = parameters.Get<int> ("num_neigh2");
+            int batch_size = parameters.Get<int> ("batch_size");
+
+            ValueT ** W_f_1 = app::sage::template ReadMatrix <ValueT,SizeT> (wf1_file, Wf1_dim_0,Wf1_dim_1); 
+            ValueT ** W_a_1 = app::sage::template ReadMatrix <ValueT,SizeT> (wa1_file, Wa1_dim_0, Wa1_dim_1);
+            ValueT ** W_f_2 = app::sage::template ReadMatrix <ValueT,SizeT> (wf2_file, Wf2_dim_0, Wf2_dim_1);
+            ValueT ** W_a_2 = app::sage::template ReadMatrix <ValueT,SizeT> (wa2_file, Wa2_dim_0, Wa2_dim_1); 
+            ValueT ** features = app::sage::template ReadMatrix<ValueT,SizeT> (feature_file, graph.nodes, Wf1_dim_0);
+            //num_srcs = srcs.size();
             SizeT nodes = graph.nodes;
-            ref_distances = new ValueT*[num_srcs];
-            for (int i = 0; i < num_srcs; i++)
-            {
-                ref_distances[i] = (ValueT*)malloc(sizeof(ValueT) * nodes);
-                VertexT src = srcs[i];
-                util::PrintMsg("__________________________", !quiet);
-                float elapsed = app::sage::CPU_Reference(
-                    graph.csr(), ref_distances[i], NULL,
-                    src, quiet, false);
-                util::PrintMsg("--------------------------\nRun "
-                    + std::to_string(i) + " elapsed: "
-                    + std::to_string(elapsed) + " ms, src = "
-                    + std::to_string(src), !quiet);
-            }
+            //ref_distances = new ValueT*[num_srcs];
+           // 
+          //      ref_distances[i] = (ValueT*)malloc(sizeof(ValueT) * nodes);
+          //      VertexT src = srcs[i];
+            util::PrintMsg("__________________________", !quiet);
+            float elapsed = 0.0;
+            app::sage::CPU_Reference(
+                graph,batch_size, num_neigh1, num_neigh2, 
+                features, W_f_1,W_a_1,W_f_2,W_a_2,  quiet, false);
+                
+            
         }
 
-        std::vector<std::string> switches{"mark-pred", "advance-mode"};
-        GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [ref_distances](util::Parameters &parameters, GraphT &graph)
-            {
-                return app::sage::RunTests(parameters, graph, ref_distances);
-            }));
+        //std::vector<std::string> switches{"mark-pred", "advance-mode"};
+       // GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
+        //    [ref_distances](util::Parameters &parameters, GraphT &graph)
+        //    {
+        //        return app::sage::RunTests(parameters, graph);
+        //    }));
 
-        if (!quick)
-        {
-            for (int i = 0; i < num_srcs; i ++)
-            {
-                free(ref_distances[i]); ref_distances[i] = NULL;
-            }
-            delete[] ref_distances; ref_distances = NULL;
-        }
+       
         return retval;
     }
 };

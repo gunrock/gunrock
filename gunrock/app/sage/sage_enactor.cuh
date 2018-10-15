@@ -218,7 +218,7 @@ template <
 class Enactor :
     public EnactorBase<
         typename _Problem::GraphT,
-        typename _Problem::LabelT,
+        typename _Problem::VertexT,
         typename _Problem::ValueT,
         ARRAY_FLAG, cudaHostRegisterFlag>
 {
@@ -234,7 +234,7 @@ public:
         BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
-    typedef SSSPIterationLoop<EnactorT> IterationT;
+    typedef SAGEIterationLoop<EnactorT> IterationT;
 
     // Members
     Problem     *problem   ;
@@ -301,13 +301,6 @@ public:
             auto &graph = problem.sub_graphs[gpu];
             GUARD_CU(enactor_slice.frontier.Allocate(
                 graph.nodes, graph.edges, this -> queue_factors));
-
-            for (int peer = 0; peer < this -> num_gpus; peer ++)
-            {
-                this -> enactor_slices[gpu * this -> num_gpus + peer]
-                    .oprtr_parameters.labels
-                    = &(problem.data_slices[gpu] -> labels);
-            }
         }
 
         iterations = new IterationT[this -> num_gpus];

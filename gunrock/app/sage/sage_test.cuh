@@ -73,23 +73,45 @@ void DisplaySolution(T *array, SizeT length)
  * @param[in]   mark_preds    Whether to compute predecessor info
  * \return      double        Time taken for the SSSP
  */
+
+
+template <typename ValueT, typename SizeT>
+ValueT ** ReadMatrix (std::string filename, SizeT dim0, SizeT dim1)
+{
+    std::FILE* fin = fopen(filename.c_str(),"r");
+    if (fin==NULL)
+    {
+        // File error
+        return NULL;
+    }
+
+   ValueT **matrix = new ValueT*[dim0];
+   for (SizeT i = 0; i < dim0; i++)
+   {
+        matrix[i] = new ValueT[dim1];
+        for (SizeT j = 0; j < dim1; j++)
+            fscanf(fin, "%f", matrix[i] + j);
+   }
+   fclose(fin);
+
+    return matrix;
+}
+
+
 template <
     typename GraphT,
     typename ValueT = typename GraphT::ValueT>
-
-
-
 double CPU_Reference(
     const    GraphT          &graph,
     //                 ValueT  *distances,
     int                batch_size,
     int                num_neigh1,
     int                num_neigh2,
-    int **             features,
-    int **             W_1_f,
-    int **             W_1_a,
-    int **             W_2_f, 
-    int **             W_2_a,
+    ValueT **             features,
+    ValueT **             W_f_1,
+    ValueT **             W_a_1,
+    ValueT **             W_f_2, 
+    ValueT **             W_a_2,
     //typename GraphT::VertexT  src,
     bool                      quiet,
     bool                      mark_preds)
@@ -110,17 +132,17 @@ double CPU_Reference(
     int num_batch = graph.nodes / batch_size ;
     int off_site = graph.nodes - num_batch * batch_size ;
     // batch of nodes
-    for (Vertex source_start = 0; source_start < graph.nodes ; source_start += batch_size)
+    for (VertexT source_start = 0; source_start < graph.nodes ; source_start += batch_size)
     {
         int num_source = (source_start + batch_size <=graph.nodes ? batch_size: graph.nodes - source_start );
         
-        for (Vertex source = source_start; source < source_start + num_sourse; source ++ )
+        for (VertexT source = source_start; source < source_start + num_source; source ++ )
         { 
             //store edges between sources and children 
-            vector <SizeT> edges_source_child;
-            auto children_temp [256] = {0.0} ; // agg(h_B1^1)
-            auto source_temp [256] = {0.0};  // h_B2^1
-            auto source_result [256] = {0.0}; // h_B2_2, result
+            std::vector <SizeT> edges_source_child;
+            float children_temp [256] = {0.0} ; // agg(h_B1^1)
+            float source_temp [256] = {0.0};  // h_B2^1
+            float source_result [256] = {0.0}; // h_B2_2, result
             
             for (int i =0; i < num_neigh1 ; i++)
             {
@@ -133,17 +155,17 @@ double CPU_Reference(
             for (int i = 0; i < num_neigh1 ; i ++)
             {
                 SizeT pos = edges_source_child[i];
-                Vertex child = graph.GetEdgeDest(pos); 
-                auto sums [64] = {0.0} ;
+                VertexT child = graph.GetEdgeDest(pos); 
+                float sums [64] = {0.0} ;
 
                 // sample leaf node for each child
                 for (int j =0; j < num_neigh2 ; j++)
                 {
                     SizeT offset2 = rand() % num_neigh2;
                     SizeT pos2 = graph.GetNeighborListOffset(child) + offset2;
-                    Vertex leaf = graph.GetEdgeDest (pos2); 
+                    VertexT leaf = graph.GetEdgeDest (pos2); 
                     for (int m = 0; m < 64 ; m ++) {
-                        sums[m] += features[leaf, m];
+                        sums[m] += features[leaf][ m];
                     }
                     
                 }// agg feaures for leaf nodes alg2 line 11 k = 1
@@ -151,17 +173,17 @@ double CPU_Reference(
                     sums [m] = sums[m]/ num_neigh2;
                 }// get mean  agg of leaf features.
                 // get ebedding vector for child node (h_{B1}^{1}) alg2 line 12
-                auto child_temp[256] = {0.0};
+                float child_temp[256] = {0.0};
                 for (int idx_0 = 0; idx_0 < 128; idx_0++)
                 {
                     for (int idx_1 =0; idx_1< 64; idx_1 ++)
-                        child_temp[idx_0] += features[child, idx_1] * W_f_1[idx_1,idx_0];
+                        child_temp[idx_0] += features[child][ idx_1] * W_f_1[idx_1][idx_0];
                 } // got 1st half of h_B1^1
 
                 for (int idx_0 = 128; idx_0 < 256; idx_0++)
                 {   
                     for (int idx_1 =0; idx_1< 64; idx_1 ++)
-                        child_temp[idx_0] += sums[idx_1] * W_a_1[idx_1,idx_0 - 128];
+                        child_temp[idx_0] += sums[idx_1] * W_a_1[idx_1][idx_0 - 128];
                 } // got 2nd half of h_B!^1 
 
                 // activation and L-2 normalize 
@@ -185,14 +207,14 @@ double CPU_Reference(
 
             //////////////////////////////////////////////////////////////////////////////////////
             //get h_B2^1, k =1 ; this time, child is like leaf, and source is like child
-            auto sums_child_feat [64] = {0.0} ; // agg(h_B1^0)
+            float sums_child_feat [64] = {0.0} ; // agg(h_B1^0)
             for (int i = 0; i < num_neigh1 ; i ++)
             { 
                 SizeT pos = edges_source_child[i];
-                Vertex child = graph.GetEdgeDest(pos);
+                VertexT child = graph.GetEdgeDest(pos);
                 for (int m = 0; m < 64; m++)
                 {
-                    sums_child_feat [m] += features[child,m];
+                    sums_child_feat [m] += features[child][m];
                 }
                  
             }// for each child
@@ -205,20 +227,20 @@ double CPU_Reference(
             for (int idx_0 = 0; idx_0 < 128; idx_0++)
             {
                 for (int idx_1 =0; idx_1< 64; idx_1 ++)
-                    source_temp[idx_0] += features[source, idx_1] * W_f_1[idx_1,idx_0];
+                    source_temp[idx_0] += features[source][ idx_1] * W_f_1[idx_1][idx_0];
             } // got 1st half of h_B2^1
 
             for (int idx_0 = 128; idx_0 < 256; idx_0++)
             {
                 for (int idx_1 =0; idx_1< 64; idx_1 ++)
-                    source_temp[idx_0] += sums_child_feat[idx_1] * W_a_1[idx_1,idx_0 - 128];
+                    source_temp[idx_0] += sums_child_feat[idx_1] * W_a_1[idx_1][idx_0 - 128];
             } // got 2nd half of h_B2^1 
 
             auto L2_source_temp = 0.0;
             for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
             {
                 source_temp[idx_0] = source_temp[idx_0] > 0.0 ? source_temp[idx_0] : 0.0 ; //relu() 
-                L2_source_temp += source_temp[idx_0] * soruce_temp [idx_0];
+                L2_source_temp += source_temp[idx_0] * source_temp [idx_0];
             } //finished relu
             for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
             {
@@ -229,19 +251,19 @@ double CPU_Reference(
             for (int idx_0 = 0; idx_0 < 128; idx_0++)
             {
                 for (int idx_1 =0; idx_1< 256; idx_1 ++)
-                    source_result[idx_0] += source_temp [idx_1] * W_f_2[idx_1,idx_0];
+                    source_result[idx_0] += source_temp [idx_1] * W_f_2[idx_1][idx_0];
             } // got 1st half of h_B2^2
 
             for (int idx_0 = 128; idx_0 < 256; idx_0++)
             {
                 for (int idx_1 =0; idx_1< 256; idx_1 ++)
-                    source_result[idx_0] += children_temp[idx_1] * W_a_2[idx_1,idx_0 - 128];
+                    source_result[idx_0] += children_temp[idx_1] * W_a_2[idx_1][idx_0 - 128];
             } // got 2nd half of h_B2^2
             auto L2_source_result = 0.0;
             for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
             {
                 source_result[idx_0] = source_result[idx_0] > 0.0 ? source_result[idx_0] : 0.0 ; //relu() 
-                L2_source_result += source_result[idx_0] * soruce_result [idx_0];
+                L2_source_result += source_result[idx_0] * source_result [idx_0];
             } //finished relu
             for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
             {
@@ -273,11 +295,11 @@ template <
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
-    typename GraphT::VertexT   src,
-                     ValueT   *h_distances,
-    typename GraphT::VertexT  *h_preds,
-                     ValueT   *ref_distances = NULL,
-    typename GraphT::VertexT  *ref_preds     = NULL,
+    //typename GraphT::VertexT   src,
+    //                 ValueT   *h_distances,
+    //typename GraphT::VertexT  *h_preds,
+    //                 ValueT   *ref_distances = NULL,
+    //typename GraphT::VertexT  *ref_preds     = NULL,
                      bool      verbose       = true)
 {
 /*
