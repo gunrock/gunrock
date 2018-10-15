@@ -145,7 +145,7 @@ struct Csc :
         cudaStream_t   stream = 0)
     {
         cudaError_t retval = cudaSuccess;
-        SizeT invalid_size = util::PreDefinedValues<SizeT>::InvalidValue;
+        //SizeT invalid_size = util::PreDefinedValues<SizeT>::InvalidValue;
         GUARD_CU(BaseGraph    ::Move(source, target, stream));
         GUARD_CU(column_offsets.Move(source, target, this -> nodes + 1, 0, stream));
         GUARD_CU(row_indices   .Move(source, target, this -> edges    , 0, stream));
@@ -220,15 +220,12 @@ struct Csc :
         typedef typename GraphT::CooT CooT;
         //typedef Coo<VertexT_in, SizeT_in, ValueT_in, FLAG_in,
         //    cudaHostRegisterFlag_in> CooT;
-        if (!quiet)
-        {
-            util::PrintMsg("  Converting " +
-                std::to_string(source.CooT::nodes) +
-                " vertices, " + std::to_string(source.CooT::edges) +
-                (source.CooT::directed ? " directed" : " undirected") +
-                " edges (" + (source.CooT::edge_order == BY_COLUMN_ASCENDING ? " ordered" : "unordered") +
-                " tuples) to CSC format...");
-        }
+        util::PrintMsg("Converting " +
+            std::to_string(source.CooT::nodes) +
+            " vertices, " + std::to_string(source.CooT::edges) +
+            (source.CooT::directed ? " directed" : " undirected") +
+            " edges (" + (source.CooT::edge_order == BY_COLUMN_ASCENDING ? " ordered" : "unordered") +
+            " tuples) to CSC format...", !quiet, false);
 
         time_t mark1 = time(NULL);
         cudaError_t retval = cudaSuccess;
@@ -305,7 +302,7 @@ struct Csc :
                 }, this -> nodes + 1, target, stream));
 
         time_t mark2 = time(NULL);
-        util::PrintMsg("Done converting (" +
+        util::PrintMsg("Done (" +
             std::to_string(mark2 - mark1) + "s).", !quiet);
 
         return retval;

@@ -119,6 +119,11 @@ struct NullArray
         return cudaSuccess;
     }
 
+    cudaError_t EnsureSize(SizeT size, bool keep = false, cudaStream_t stream = 0)
+    {
+        return cudaSuccess;
+    }
+
     template <typename ArrayT>
     cudaError_t Set(ArrayT &array_in,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
@@ -161,6 +166,16 @@ struct NullArray
         return cudaSuccess;
     }
 
+    template <typename ApplyLambda>
+    cudaError_t ForEach(
+        ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0)
+    {
+        return cudaSuccess;
+    }
+
     __host__ __device__ __forceinline__
     ValueT* GetPointer(Location target = ARRAY_DEFAULT_TARGET)
     {
@@ -175,6 +190,12 @@ struct NullArray
 
     __host__ __device__ __forceinline__
     ValueT& operator[](std::size_t idx)
+    {
+        return *((ValueT*)this);
+    }
+
+    __host__ __device__ __forceinline__
+    ValueT& operator[](std::size_t idx) const
     {
         return *((ValueT*)this);
     }
@@ -1295,7 +1316,7 @@ public:
         fin.read((char*)(tArray + 0), tLength * sizeof(T));
         fin.close();
 
-        if (retval = EnsureSize(tLength))
+        if (retval = EnsureSize_(tLength, util::HOST))
             return retval;
         if (retval = ForEach(tArray,
             [] __host__ __device__ (ValueT &element, const T &tElement){
@@ -1349,7 +1370,7 @@ public:
         tType = tType & 0xFFF;
         if (tType == util::Type2Enum<ValueT>::Id)
         {
-            if (retval = EnsureSize(tLength))
+            if (retval = EnsureSize_(tLength, util::HOST))
                 return retval;
             fin.read((char*)h_pointer, sizeof(ValueT) * tLength);
             fin.close();

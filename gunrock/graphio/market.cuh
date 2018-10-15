@@ -362,9 +362,12 @@ cudaError_t ReadMarketStream(
 template <typename GraphT>
 cudaError_t ReadBinary(
     util::Parameters &parameters,
-    GraphT &graph,
-    std::string graph_prefix = "")
+    GraphT           &graph,
+    MetaData         &meta_data,
+    std::string graph_prefix = "",
+    bool              quiet = false)
 {
+    typedef typename GraphT::CooT CooT;
     cudaError_t retval = cudaSuccess;
 
     std::string filename = "";
@@ -373,14 +376,19 @@ cudaError_t ReadBinary(
     else
         filename = parameters.Get<std::string>(graph_prefix + "binary-prefix");
 
+    util::PrintMsg("  Reading edge lists from " 
+        + filename + ".coo_edge_pairs", !quiet);
     retval = graph.CooT::edge_pairs.ReadBinary(
         filename + ".coo_edge_pairs", true);
     if (retval == cudaErrorInvalidValue)
         return retval;
     else GUARD_CU(retval);
 
-    if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
+    if ((GraphT::FLAG & graph::HAS_EDGE_VALUES) != 0 && 
+        meta_data["got_edge_values"] == "true")
     {
+        util::PrintMsg("  Reading edge values from " 
+            + filename + ".coo_edge_values", !quiet);
         retval = graph.CooT::edge_values.ReadBinary(
             filename + ".coo_edge_values", true);
         if (retval == cudaErrorInvalidValue)
@@ -390,6 +398,8 @@ cudaError_t ReadBinary(
 
     if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
     {
+        util::PrintMsg("  Reading node values from " 
+            + filename + ".coo_node_values", !quiet);
         retval = graph.CooT::node_values.ReadBinary(
             filename + ".coo_node_values", true);
         if (retval == cudaErrorInvalidValue)
@@ -402,9 +412,11 @@ cudaError_t ReadBinary(
 template <typename GraphT>
 cudaError_t WriteBinary(
     util::Parameters &parameters,
-    GraphT &graph,
+    GraphT           &graph,
+    MetaData         &meta_data,
     std::string graph_prefix = "")
 {
+    typedef typename GraphT::CooT CooT;
     cudaError_t retval = cudaSuccess;
     bool quiet = parameters.Get<bool>("quiet");
 
@@ -422,7 +434,8 @@ cudaError_t WriteBinary(
         return retval;
     else GUARD_CU(retval);
 
-    if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
+    if ((GraphT::FLAG & graph::HAS_EDGE_VALUES) != 0 && 
+        meta_data["got_edge_values"] == "true")
     {
         util::PrintMsg("  Writting edge values in binary into "
             + filename + ".coo_edge_values", !quiet);
@@ -504,9 +517,9 @@ cudaError_t ReadMeta(
             break;
         auto pos = line.find(" ");
         auto name = line.substr(0, pos);
-        auto value = line.substr(pos, line.length());
+        auto value = line.substr(pos + 1, line.length());
         meta_data[name] = value;
-        util::PrintMsg(" " + name + " <- " + value);
+        //util::PrintMsg(" " + name + " <- " + value);
     }
     fin.close();
     return retval;
@@ -518,9 +531,14 @@ cudaError_t Read(
     GraphT &graph,
     std::string graph_prefix = "")
 {
+    typedef typename GraphT::SizeT  SizeT;
+    typedef typename GraphT::ValueT ValueT;
     cudaError_t retval = cudaSuccess;
     bool quiet = parameters.Get<bool>("quiet");
     MetaData meta_data;
+    util::CpuTimer timer;
+    timer.Start();
+
     util::PrintMsg("Loading Matrix-market coordinate-formatted "
         + graph_prefix + "graph ...", !quiet);
 
@@ -531,9 +549,15 @@ cudaError_t Read(
     retval = ReadMeta(parameters, filename, meta_data);
     if (retval == cudaSuccess)
     {
-        retval = ReadBinary(parameters, graph, graph_prefix);
+        auto num_vertices = util::strtoT<SizeT>(meta_data["num_vertices"]);
+        auto num_edges    = util::strtoT<SizeT>(meta_data["num_edges"   ]);
+        GUARD_CU(graph.Allocate(num_vertices, num_edges, util::HOST));
+        retval = ReadBinary(parameters, graph, meta_data, graph_prefix, quiet);
         if (retval == cudaSuccess)
             read_done = true;
+        else {
+            GUARD_CU(graph.Release());
+        }
     }
 
     if (!read_done)
@@ -563,12 +587,50 @@ cudaError_t Read(
             else if (retval)
                 GUARD_CU2(retval, "Writting meta failed.");
 
-            retval = WriteBinary(parameters, graph, graph_prefix);
+            retval = WriteBinary(parameters, graph, meta_data, graph_prefix);
             if (retval == cudaErrorInvalidValue)
                 return cudaSuccess;
             else if (retval)
                 GUARD_CU2(retval, "Writting binary failed");
         }
+    }
+
+    if (meta_data["got_edge_values"] != "true" &&
+        (GraphT::FLAG & graph::HAS_EDGE_VALUES) != 0)
+    {
+        if (parameters.Get<bool>(graph_prefix + "random-edge-values"))
+        {
+            GUARD_CU(graph.GenerateEdgeValues(
+                parameters.Get<ValueT>(graph_prefix + "edge-value-min"),
+                parameters.Get<ValueT>(graph_prefix + "edge-value-range"),
+                parameters.Get<long  >(graph_prefix + "edge-value-seed"),
+                quiet));
+        } else {
+            util::PrintMsg("  Assigning 1 to all " + std::to_string(graph.edges)
+                + " edges", !quiet);
+            GUARD_CU(graph.edge_values.ForEach(
+                [] __host__ __device__ (ValueT &value)
+                {
+                    value = 1;
+                }, graph.edges, util::HOST));
+        }
+    }
+    //GUARD_CU(graph.Display());
+
+    if (parameters.Get<bool>(graph_prefix + "vertex-start-from-zero"))
+    {
+        util::PrintMsg("  Substracting 1 from node Ids...", !quiet);
+        GUARD_CU(graph.edge_pairs.ForEach(
+            []__host__ __device__ (typename GraphT::EdgePairT &edge_pair){
+                edge_pair.x -= 1;
+                edge_pair.y -= 1;
+            }, graph.edges, util::HOST));
+    }
+
+    if (parameters.Get<bool>(graph_prefix + "undirected") ||
+        meta_data["symmetric"] == "true")
+    {
+        GUARD_CU(graph.EdgeDouble(meta_data["skew"] == "true" ? true : false));
     }
 
     bool remove_self_loops
@@ -589,7 +651,10 @@ cudaError_t Read(
             gunrock::graph::BY_ROW_ASCENDING, util::HOST, 0, quiet));
     }
 
-    GUARD_CU(graph.Display());
+    //GUARD_CU(graph.Display());
+    timer.Stop();
+    util::PrintMsg("  " + graph_prefix + "graph loaded as COO in "
+        + std::to_string(timer.ElapsedMillis() / 1000.0) + "s.", !quiet);
     return retval;
 }
 
