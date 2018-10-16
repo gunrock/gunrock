@@ -81,7 +81,7 @@ ValueT ** ReadMatrix (std::string filename, SizeT dim0, SizeT dim1)
     std::FILE* fin = fopen(filename.c_str(),"r");
     if (fin==NULL)
     {
-        // File error
+        util::PrintMsg("Error in reading " + filename);
         return NULL;
     }
 
@@ -129,13 +129,16 @@ double CPU_Reference(
     //};
     //typedef std::priority_queue<PairT, std::vector<PairT>, GreaterT> PqT;
 
+    util::PrintMsg("CPU_Reference entered");
     int num_batch = graph.nodes / batch_size ;
     int off_site = graph.nodes - num_batch * batch_size ;
     // batch of nodes
     for (VertexT source_start = 0; source_start < graph.nodes ; source_start += batch_size)
     {
         int num_source = (source_start + batch_size <=graph.nodes ? batch_size: graph.nodes - source_start );
-        
+     
+        util::PrintMsg("Processing sources [" + std::to_string(source_start) + ", "
+            + std::to_string(source_start + num_source) + ")"); 
         for (VertexT source = source_start; source < source_start + num_source; source ++ )
         { 
             //store edges between sources and children 
@@ -245,19 +248,25 @@ double CPU_Reference(
             for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
             {
                 source_temp[idx_0] = source_temp[idx_0] /sqrt (L2_source_temp);
+                //printf("source_temp,%f", source_temp[idx_0]);
             }//finished L-2 norm for source temp
             //////////////////////////////////////////////////////////////////////////////////////
             // get h_B2^2 k =2.           
             for (int idx_0 = 0; idx_0 < 128; idx_0++)
             {
+                //printf ("source_r1_0:%f", source_result[idx_0] );
                 for (int idx_1 =0; idx_1< 256; idx_1 ++)
                     source_result[idx_0] += source_temp [idx_1] * W_f_2[idx_1][idx_0];
+                //printf ("source_r1:%f", source_result[idx_0] );
             } // got 1st half of h_B2^2
 
             for (int idx_0 = 128; idx_0 < 256; idx_0++)
             {
+                //printf ("source_r2_0:%f", source_result[idx_0] );
                 for (int idx_1 =0; idx_1< 256; idx_1 ++)
                     source_result[idx_0] += children_temp[idx_1] * W_a_2[idx_1][idx_0 - 128];
+                //printf ("source_r2_1:%f", source_result[idx_0] );
+
             } // got 2nd half of h_B2^2
             auto L2_source_result = 0.0;
             for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
@@ -268,10 +277,14 @@ double CPU_Reference(
             for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
             {
                 source_result[idx_0] = source_result[idx_0] /sqrt (L2_source_result);
-            }//finished L-2 norm for source result 
+                //printf ("source_r:%f", source_result[idx_0] );
+                //printf ("ch_t:%f", children_temp[idx_0]);
+            }//finished L-2 norm for source result          
            
         } //for each source
+        //printf ("node %d \n", source);
     } //for each batch
+    util::PrintMsg("CPU_Reference exited");
     return 0;  
 } //cpu reference 
 

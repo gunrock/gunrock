@@ -74,7 +74,7 @@ struct main_struct
             std::string wf1_file = parameters.Get<std::string>("W_f_1"); 
             std::string wa1_file = parameters.Get<std::string>("W_a_1");
             std::string wf2_file = parameters.Get<std::string>("W_f_2");
-            std::string wa2_file = parameters.Get<std::string>("W_f_1");
+            std::string wa2_file = parameters.Get<std::string>("W_f_2");
             std::string feature_file = parameters.Get<std::string>("features");
             int Wf1_dim_0 = parameters.Get<int> ("Wf1_dim_0");
             int Wa1_dim_0 = parameters.Get<int> ("Wa1_dim_0");
@@ -138,7 +138,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |
-        app::VALUET_U32B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F32B | app::DIRECTED | app::UNDIRECTED>
         (parameters, main_struct());
 }
 
