@@ -7,9 +7,9 @@
 
 /**
  * @file
- * Template_enactor.cuh
+ * geo_enactor.cuh
  *
- * @brief hello Problem Enactor
+ * @brief Geo Problem Enactor
  */
 
 #pragma once
@@ -19,19 +19,16 @@
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
  
-// <DONE> change includes
 #include <gunrock/app/geo/geo_problem.cuh>
-// </DONE>
+#include <gunrock/app/geo/geo_d_spatial.cuh>
 
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace geo {
-// </DONE>
 
 /**
- * @brief Speciflying parameters for hello Enactor
+ * @brief Speciflying parameters for Geo Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -39,15 +36,12 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
-
-    // <TODO> if needed, add command line parameters used by the enactor here
-    // </TODO>
     
     return retval;
 }
 
 /**
- * @brief defination of hello iteration loop
+ * @brief defination of Geo iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
@@ -76,7 +70,7 @@ struct GEOIterationLoop : public IterationLoopBase
     GEOIterationLoop() : BaseIterationLoop() {}
 
     /**
-     * @brief Core computation of hello, one iteration
+     * @brief Core computation of Geo, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
      * \return cudaError_t error message(s), if any
      */
@@ -97,10 +91,7 @@ struct GEOIterationLoop : public IterationLoopBase
         auto &oprtr_parameters = enactor_slice.oprtr_parameters;
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
-       
-	//auto &weights	       = graph.CsrT::edge_values; 
 
-        // <DONE> add problem specific data alias here:
         auto &locations_lat    = data_slice.locations_lat;
         auto &locations_lon    = data_slice.locations_lon;
 
@@ -109,7 +100,10 @@ struct GEOIterationLoop : public IterationLoopBase
 
 	auto &valid_locations  = data_slice.valid_locations;
 	auto &active	       = data_slice.active;
-        // </DONE>
+
+	auto &D		       = data_slice.D;
+	auto &Dinv	       = data_slice.Dinv;
+	auto &W		       = data_slice.W;
 
 	util::Location target = util::DEVICE;
  
@@ -117,10 +111,8 @@ struct GEOIterationLoop : public IterationLoopBase
         // Define operations
 
 	// Custom spatial center kernel for geolocation
-	// <TODO> Needs proper implementation for median calculation
-	// </TODO> -- median calculation.
 
-	printf("Gather operator ... \n");
+	// printf("Gather operator ... \n");
 	// compute operation, substitute for neighbor reduce,
 	// ForAll() with a for loop inside (nested forloop),
 	// visiting all the neighbors and calculating the spatial center
@@ -139,13 +131,10 @@ struct GEOIterationLoop : public IterationLoopBase
 	    SizeT start_edge 	= graph.CsrT::GetNeighborListOffset(v);
 	    SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
 
-	    // printf("Initialize per vertex location array ...\n");
-
 	    SizeT i 		= 0;
 
 	    for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
 		VertexT u = graph.CsrT::GetEdgeDest(e);
-		// printf("For each vertex, perform a gather and obtain predicted locations...\n");
 		if (util::isValid(latitude[u]) && util::isValid(longitude[u])) {
 		    // gather locations from neighbors	
 		    locations_lat[(v * num_neighbors) + i] = latitude[u];
@@ -153,14 +142,11 @@ struct GEOIterationLoop : public IterationLoopBase
 		    i++;
 		}
 	    }
-	    // printf("Number of neighbors for vertex %u is %u.\n", v, num_neighbors);
-	    // printf("Valid locations for vertex %u at %u is %u.\n", v, pos, i+1);
 	    valid_locations[v] = i;
 
 	};
 
-	printf("Spatial Median operator ... \n");
-
+	// printf("Spatial Median operator ... \n");
 	auto compute_op =  [
 	    graph,
 	    locations_lat,
@@ -169,7 +155,8 @@ struct GEOIterationLoop : public IterationLoopBase
 	    longitude,
 	    valid_locations,
             iteration,
-	    active
+	    active,
+	    D, Dinv, W
 	] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
 
 	    VertexT v 		= v_q[pos];
@@ -177,33 +164,19 @@ struct GEOIterationLoop : public IterationLoopBase
 
 	    // if no predicted location, and neighbor locations exists
 	    // Custom spatial center kernel for geolocation
-            // <TODO> Needs proper implementation for median calculation
 	    if (!util::isValid(latitude[v]) && !util::isValid(longitude[v])) {
-		
-		if (valid_locations[v] == 0) {
-                    latitude[v]  = util::PreDefinedValues<ValueT>::InvalidValue;
-                    longitude[v] = util::PreDefinedValues<ValueT>::InvalidValue;
-		} else if (valid_locations[v] == 1) {
-                    // the only location that is valid
-		    latitude[v] = locations_lat[(v * n) + 0];
-                    longitude[v] = locations_lon[(v * n) + 0];
 
-		} else if (valid_locations[v] == 2) {
-                    // mid-point of the two locations
-		    latitude[v] = (ValueT)((locations_lat[(v * n) + 0] + locations_lat[(v * n) + 1]) / 2);
-		    longitude[v] = (ValueT)((locations_lon[(v * n) + 0] + locations_lon[(v * n) + 1]) / 2);
-                } else {
-		    ValueT temp_lat = 0;
-		    ValueT temp_lon = 0;
-                    // calculate spatial median
-		    for (SizeT i = 0; i < valid_locations[v]; i++) {
-			temp_lat += locations_lat[(v * n) + i];
-			temp_lon += locations_lon[(v * n) + i];
-		    }
-		    latitude[v] = (ValueT) (temp_lat/valid_locations[v]);
-		    longitude[v] = (ValueT) (temp_lon/valid_locations[v]);
-                }
-	    } // </TODO> -- median calculation.
+		spatial_center (locations_lat,
+				locations_lon,
+				n,
+				valid_locations[v],
+				latitude,
+				longitude,			
+				v,
+				D, Dinv, W,
+				false);
+
+	    } // -- median calculation.
 	};
 
 	auto status_op = [
@@ -240,8 +213,6 @@ struct GEOIterationLoop : public IterationLoopBase
 
         GUARD_CU(data_slice.active .SetPointer(&data_slice.active_, sizeof(SizeT), util::HOST));
         GUARD_CU(data_slice.active .Move(util::DEVICE, util::HOST));
-
-	// printf("Current CPU active predictions = %u.\n", data_slice.active_);
  
         return retval;
     }
@@ -347,7 +318,7 @@ public:
     IterationT *iterations;
 
     /**
-     * @brief hello constructor
+     * @brief geo constructor
      */
     Enactor() :
         BaseEnactor("Geolocation"),
@@ -360,7 +331,7 @@ public:
     }
 
     /**
-     * @brief hello destructor
+     * @brief geo destructor
      */
     virtual ~Enactor() { /*Release();*/ }
 
@@ -417,7 +388,7 @@ public:
     }
 
     /**
-      * @brief one run of hello, to be called within GunrockThread
+      * @brief one run of geo, to be called within GunrockThread
       * @param thread_data Data for the CPU thread
       * \return cudaError_t error message(s), if any
       */
@@ -484,7 +455,7 @@ public:
     }
 
     /**
-     * @brief Enacts a hello computing on the specified graph.
+     * @brief Enacts a geo computing on the specified graph.
 ...
      * \return cudaError_t error message(s), if any
      */
