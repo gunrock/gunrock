@@ -64,7 +64,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     struct DataSlice : BaseDataSlice
     {
 
-        util::Array1D<SizeT, ValueT> projections;
+        util::Array1D<uint64_t, ValueT> projections;
 
         /*
          * @brief Default constructor
@@ -115,7 +115,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
-            GUARD_CU(projections.Allocate(sub_graph.nodes * sub_graph.nodes, target));
+            GUARD_CU(projections.Allocate((uint64_t)sub_graph.nodes * sub_graph.nodes, target));
 
             if (target & util::DEVICE) {
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));

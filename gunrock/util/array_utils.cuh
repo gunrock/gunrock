@@ -472,7 +472,8 @@ public:
             if (size!=0) {
                 retval = GRError(
                     cudaMalloc((void**)&(d_pointer), sizeof(ValueT) * size),
-                    std::string(name) + " cudaMalloc failed", __FILE__, __LINE__);
+                    std::string(name) + " cudaMalloc failed when allocating "
+                    + std::to_string(sizeof(ValueT) * size) + " bytes", __FILE__, __LINE__);
                 if (retval) return retval;
             }
             allocated = allocated | DEVICE;
