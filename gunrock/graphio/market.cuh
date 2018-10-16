@@ -85,7 +85,7 @@ cudaError_t ReadMarketStream(
         f_in = fopen(filename.c_str(), "r");
         if (f_in == NULL)
         {
-            return util::GRError("Unable to open file " + filename,
+            return util::GRError(cudaErrorUnknown, "Unable to open file " + filename,
                 __FILE__, __LINE__);
         }
         util::PrintMsg("  Reading from " + filename + ":", !quiet);
@@ -169,7 +169,7 @@ cudaError_t ReadMarketStream(
             {
                 if (ll_nodes_x != ll_nodes_y)
                 {
-                    return util::GRError(
+                    return util::GRError(cudaErrorUnknown,
                         "Error parsing MARKET graph: not square (" +
                         std::to_string(ll_nodes_x) + ", " +
                         std::to_string(ll_nodes_y) + ")",
@@ -179,7 +179,7 @@ cudaError_t ReadMarketStream(
             }
 
             else {
-                return util::GRError(
+                return util::GRError(cudaErrorUnknown,
                     "Error parsing MARKET graph:"
                     " invalid problem description.",
                     __FILE__, __LINE__);
@@ -204,7 +204,7 @@ cudaError_t ReadMarketStream(
         else { // Edge description (v -> w)
             if (edge_pairs.GetPointer(util::HOST) == NULL)
             {
-                return util::GRError(
+                return util::GRError(cudaErrorUnknown,
                     "Error parsing MARKET graph: "
                     "invalid format",
                     __FILE__, __LINE__);
@@ -212,7 +212,7 @@ cudaError_t ReadMarketStream(
             if (edges_read >= edges)
             {
                 GUARD_CU(graph.CooT::Release());
-                return util::GRError(
+                return util::GRError(cudaErrorUnknown,
                     "Error parsing MARKET graph: "
                     "encountered more than " +
                     std::to_string(edges) + " edges",
@@ -239,7 +239,7 @@ cudaError_t ReadMarketStream(
                 else if (array || num_input < 2)
                 {
                     GUARD_CU(graph.CooT::Release());
-                    return util::GRError(
+                    return util::GRError(cudaErrorUnknown,
                         "Error parsing MARKET graph: "
                         "badly formed edge",
                         __FILE__, __LINE__);
@@ -283,7 +283,7 @@ cudaError_t ReadMarketStream(
                 else if (array || (num_input != 2))
                 {
                     GUARD_CU(graph.CooT::Release());
-                    return util::GRError(
+                    return util::GRError(cudaErrorUnknown,
                         "Error parsing MARKET graph: "
                         "badly formed edge",
                         __FILE__, __LINE__);
@@ -320,13 +320,13 @@ cudaError_t ReadMarketStream(
 
     if (edge_pairs.GetPointer(util::HOST) == NULL)
     {
-        return util::GRError("No graph found", __FILE__, __LINE__);
+        return util::GRError(cudaErrorUnknown, "No graph found", __FILE__, __LINE__);
     }
 
     if (edges_read != edges)
     {
         GUARD_CU(graph.CooT::Release());
-        return util::GRError("Error parsing MARKET graph: "
+        return util::GRError(cudaErrorUnknown, "Error parsing MARKET graph: "
             "only " + std::to_string(edges_read) +
             "/" + std::to_string(edges) + " edges read",
             __FILE__, __LINE__);
@@ -565,7 +565,7 @@ cudaError_t Read(
         std::ifstream fp(filename.c_str());
         if (filename == "" || !fp.is_open())
         {
-            return util::GRError("Input graph file " + filename +
+            return util::GRError(cudaErrorUnknown, "Input graph file " + filename +
                 " does not exist.", __FILE__, __LINE__);
         }
         fp.close();
@@ -745,7 +745,7 @@ cudaError_t Write(
         }
         fout.close();
     } else {
-        return util::GRError("Unable to write file " + filename,
+        return util::GRError(cudaErrorUnknown, "Unable to write file " + filename,
             __FILE__, __LINE__);
     }
     return retval;

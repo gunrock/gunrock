@@ -223,12 +223,12 @@ cudaError_t LoadGraph(
 
     if (graph_type == "market")  // Matrix-market graph
     {
-        retval = market::Load(parameters, graph, graph_prefix);
+        GUARD_CU(market::Load(parameters, graph, graph_prefix));
     }
 
     else if (graph_type == "rmat")
     {
-        retval = rmat::Load(parameters, graph, graph_prefix);
+        GUARD_CU(rmat::Load(parameters, graph, graph_prefix));
     }
 
     /*else if (graph_type == "rmat" || graph_type == "grmat" || graph_type == "metarmat")  // R-MAT graph
@@ -380,12 +380,12 @@ cudaError_t LoadGraph(
     }*/
     else if (graph_type == "rgg")
     {
-        retval = rgg::Load(parameters, graph, graph_prefix);
+        GUARD_CU(rgg::Load(parameters, graph, graph_prefix));
     }
 
     else if (graph_type == "smallworld")
     {
-        retval = small_world::Load(parameters, graph, graph_prefix);
+        GUARD_CU(small_world::Load(parameters, graph, graph_prefix));
     }
 
     else if (graph_type == "by-pass")
@@ -394,7 +394,7 @@ cudaError_t LoadGraph(
 
     else
     {
-        retval = util::GRError("Unspecified graph type " + graph_type,
+         return util::GRError(cudaErrorUnknown, "Unspecified graph type " + graph_type,
             __FILE__, __LINE__);
     }
 
