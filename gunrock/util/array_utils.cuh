@@ -1166,12 +1166,12 @@ public:
             return retval;
 
         for (SizeT i=0; i<tLength; i++)
-            fin >> tArray.h_pointer[i];
+            fin >> tArray[i];
 
         if (retval = EnsureSize(tLength))
             return retval;
-        if (retval = ForEach(tArray,
-            [](ValueT &element, const T &tElement){
+        if (retval = this -> ForEach(tArray,
+            []__host__ __device__ (ValueT &element, const T &tElement){
                 element = tElement;
             }, tLength, HOST))
             return retval;
@@ -1228,10 +1228,10 @@ public:
                 retval = tRead<float>(filename); break;
             case Type2Enum<double>::Id :
                 retval = tRead<double>(filename); break;
-            case Type2Enum<std::string>::Id :
-                retval = tRead<std::string>(filename); break;
-            case util::Type2Enum<char*>::Id :
-                retval = tRead<char*>(filename); break;
+            //case Type2Enum<std::string>::Id :
+            //    retval = tRead<std::string>(filename); break;
+            //case util::Type2Enum<char*>::Id :
+            //    retval = tRead<char*>(filename); break;
             default:
                 retval = GRError("Unsupported type (Id = " +
                     std::to_string(tType) + ")",
