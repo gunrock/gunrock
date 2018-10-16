@@ -19,7 +19,7 @@
 
 #pragma once
 #include <cub/cub.cuh>
-#include <moderngpu.cuh>
+//#include <moderngpu.cuh>
 
 namespace gunrock {
 namespace util {
@@ -223,7 +223,7 @@ cudaError_t CUBRadixSort(
    * @brief mordern gpu segmentated sort from indices
    * using SegSortKeysFromInidices(), SegSortPairsFromIndices()
    */
-  template <
+/*  template <
     typename SizeType,
     typename KeyType,
     typename ValType>
@@ -260,6 +260,184 @@ cudaError_t CUBRadixSort(
 
     return retval;
   }
+*/
+template <typename KeyT, typename ValueT, typename SizeT>
+cudaError_t cubSortPairs(
+    util::Array1D<uint64_t, char> &temp_space,
+    util::Array1D<SizeT, KeyT  > &keys_in,
+    util::Array1D<SizeT, KeyT  > &keys_out,
+    util::Array1D<SizeT, ValueT> &values_in,
+    util::Array1D<SizeT, ValueT> &values_out,
+                         SizeT    num_items,
+                         int      begin_bit = 0,
+                         int      end_bit   = sizeof(KeyT) * 8,
+                    cudaStream_t  stream = 0,
+                         bool     debug_synchronous = false)
+{
+    cudaError_t retval = cudaSuccess;
+    cub::DoubleBuffer<KeyT  > keys(const_cast<KeyT*>(
+        keys_in.GetPointer(util::DEVICE)), keys_out.GetPointer(util::DEVICE));
+    cub::DoubleBuffer<ValueT> values(const_cast<ValueT*>(
+        values_in.GetPointer(util::DEVICE)), values_out.GetPointer(util::DEVICE));
+
+    size_t request_bytes = 0;
+    retval = cub::DispatchRadixSort<false, KeyT, ValueT, SizeT>::Dispatch(
+        NULL, request_bytes,
+        keys, values,
+        num_items, begin_bit, end_bit, false,
+        stream, debug_synchronous);
+    if (retval)
+        return retval;
+    //util::PrintMsg("num_items = " + std::to_string(num_items)
+    //    + ", request_bytes = " + std::to_string(request_bytes)); 
+ 
+    retval = temp_space.EnsureSize_(request_bytes, util::DEVICE);
+    if (retval)
+        return retval;
+
+    retval = cub::DispatchRadixSort<false, KeyT, ValueT, SizeT>::Dispatch(
+        temp_space .GetPointer(util::DEVICE), request_bytes,
+        keys, values,
+        num_items, begin_bit, end_bit, false,
+        stream, debug_synchronous);
+    if (retval)
+        return retval;
+  
+    if (keys.Current() != keys_out.GetPointer(util::DEVICE))
+    {
+        KeyT *keys_ = keys.Current();
+        GUARD_CU(keys_out.ForAll(
+            [keys_] __host__ __device__ (KeyT *keys_o, const SizeT &pos)
+            {
+                keys_o[pos] = keys_[pos];
+            }, num_items, util::DEVICE, stream));
+    }
+ 
+    if (values.Current() != values_out.GetPointer(util::DEVICE))
+    {
+        ValueT *values_ = values.Current();
+        GUARD_CU(values_out.ForAll(
+            [values_] __host__ __device__ (ValueT *values_o, const SizeT &pos)
+            {
+                values_o[pos] = values_[pos];
+            }, num_items, util::DEVICE, stream));
+    }
+    return retval; 
+}
+
+template <typename KeyT, typename ValueT, typename SizeT>
+cudaError_t cubSortPairsDescending(
+    util::Array1D<uint64_t, char  > &temp_space,
+    util::Array1D<SizeT, KeyT  > &keys_in,
+    util::Array1D<SizeT, KeyT  > &keys_out,
+    util::Array1D<SizeT, ValueT> &values_in,
+    util::Array1D<SizeT, ValueT> &values_out,
+                         SizeT    num_items,
+                         int      begin_bit = 0,
+                         int      end_bit   = sizeof(KeyT) * 8,
+                    cudaStream_t  stream = 0,
+                         bool     debug_synchronous = false)
+{
+    cudaError_t retval = cudaSuccess;
+    cub::DoubleBuffer<KeyT  > keys(const_cast<KeyT*>(
+        keys_in.GetPointer(util::DEVICE)), keys_out.GetPointer(util::DEVICE));
+    cub::DoubleBuffer<ValueT> values(const_cast<ValueT*>(
+        values_in.GetPointer(util::DEVICE)), values_out.GetPointer(util::DEVICE));
+ 
+    size_t request_bytes = 0;
+    retval = cub::DispatchRadixSort<true, KeyT, ValueT, SizeT>::Dispatch(
+        NULL, request_bytes,
+        keys, values,
+        num_items, begin_bit, end_bit, false,
+        stream, debug_synchronous);
+    if (retval)
+        return retval;
+
+    retval = temp_space.EnsureSize_(request_bytes, util::DEVICE);
+    if (retval)
+        return retval;
+
+    retval = cub::DispatchRadixSort<true, KeyT, ValueT, SizeT>::Dispatch(
+        temp_space .GetPointer(util::DEVICE), request_bytes,
+        keys, values,
+        num_items, begin_bit, end_bit, false,
+        stream, debug_synchronous);
+    if (retval)
+        return retval;
+    
+    if (keys.Current() != keys_out.GetPointer(util::DEVICE))
+    {
+        KeyT *keys_ = keys.Current();
+        GUARD_CU(keys_out.ForAll(
+            [keys_] __host__ __device__ (KeyT *keys_o, const SizeT &pos)
+            {
+                keys_o[pos] = keys_[pos];
+            }, num_items, util::DEVICE, stream));
+    }
+ 
+    if (values.Current() != values_out.GetPointer(util::DEVICE))
+    {
+        ValueT *values_ = values.Current();
+        GUARD_CU(values_out.ForAll(
+            [values_] __host__ __device__ (ValueT *values_o, const SizeT &pos)
+            {
+                values_o[pos] = values_[pos];
+            }, num_items, util::DEVICE, stream));
+    }
+  
+    return retval; 
+}
+
+
+template <typename KeyT, typename ValueT, typename SizeT>
+cudaError_t cubSegmentedSortPairs(
+    util::Array1D<uint64_t, char  > &temp_space,
+    util::Array1D<SizeT, KeyT  > &keys_in,
+    util::Array1D<SizeT, KeyT  > &keys_out,
+    util::Array1D<SizeT, ValueT> &values_in,
+    util::Array1D<SizeT, ValueT> &values_out,
+                         SizeT    num_items,
+                         SizeT    num_segments,
+    util::Array1D<SizeT, SizeT > &seg_offsets,
+                         int      begin_bit = 0,
+                         int      end_bit   = sizeof(KeyT) * 8,
+                    cudaStream_t  stream = 0,
+                         bool     debug_synchronous = false)
+{
+    cudaError_t retval = cudaSuccess;
+
+    cub::DoubleBuffer<KeyT  > keys(const_cast<KeyT*>(
+        keys_in.GetPointer(util::DEVICE)), keys_out.GetPointer(util::DEVICE));
+    cub::DoubleBuffer<ValueT> values(const_cast<ValueT*>(
+        values_in.GetPointer(util::DEVICE)), values_out.GetPointer(util::DEVICE));
+    
+    size_t request_bytes = 0;
+    retval = cub::DispatchSegmentedRadixSort<false, KeyT, ValueT, SizeT*, SizeT>::Dispatch(
+        NULL, request_bytes,
+        keys, values,
+        num_items, num_segments,
+        seg_offsets.GetPointer(util::DEVICE), seg_offsets.GetPointer(util::DEVICE) + 1,
+        begin_bit, end_bit, false,
+        stream, debug_synchronous);
+    if (retval)
+        return retval;
+
+    retval = temp_space.EnsureSize_(request_bytes, util::DEVICE);
+    if (retval)
+        return retval;
+
+    retval = cub::DispatchSegmentedRadixSort<false, KeyT, ValueT, SizeT*, SizeT>::Dispatch(
+        temp_space .GetPointer(util::DEVICE), request_bytes,
+        keys, values,
+        num_items, num_segments,
+        seg_offsets.GetPointer(util::DEVICE), seg_offsets.GetPointer(util::DEVICE) + 1,
+        begin_bit, end_bit, false,
+        stream, debug_synchronous);
+    if (retval)
+        return retval;
+   
+    return retval;
+}
 
   /** @} */
 

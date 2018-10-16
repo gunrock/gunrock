@@ -14,6 +14,8 @@
  * are not limited to C.
  */
 
+#pragma once
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>

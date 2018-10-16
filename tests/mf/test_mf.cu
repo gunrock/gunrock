@@ -7,19 +7,22 @@
 
 /**
  * @file
- * test_sssp.cu
+ * test_mf.cu
  *
- * @brief Simple test driver program for Gunrock template.
+ * @brief Simple test driver program for max-flow algorithm.
  */
 
 #include <gunrock/app/mf/mf_app.cu>
 #include <gunrock/app/test_base.cuh>
 
+#define debug_aml(a...)
+//#define debug_aml(a...) {printf(a); printf("\n");}
+
 using namespace gunrock;
 
-/******************************************************************************
+/*****************************************************************************
 * Main
-******************************************************************************/
+*****************************************************************************/
 
 /**
  * @brief Enclosure to the main function
@@ -28,7 +31,7 @@ struct main_struct
 {
     /**
      * @brief the actual main function, after type switching
-     * @tparam VertexT    Type of vertex identifier
+     * @tparam VertexT	  Type of vertex identifier
      * @tparam SizeT      Type of graph size, i.e. type of edge identifier
      * @tparam ValueT     Type of edge values
      * @param  parameters Command line parameters
@@ -39,92 +42,165 @@ struct main_struct
         typename VertexT, // Use int as the vertex identifier
         typename SizeT,   // Use int as the graph size type
         typename ValueT>  // Use int as the value type
-    cudaError_t operator()(util::Parameters &parameters,
-        VertexT v, SizeT s, ValueT val)
+    cudaError_t operator()(util::Parameters &parameters, VertexT v, SizeT s, 
+        ValueT val)
     {
-        typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-            graph::HAS_EDGE_VALUES | graph::HAS_CSR>
-            GraphT;
-
+        typedef typename app::TestGraph<VertexT, SizeT, ValueT, 
+            graph::HAS_EDGE_VALUES | graph::HAS_CSR> GraphT;
+        typedef typename GraphT::CsrT CsrT;
         cudaError_t retval = cudaSuccess;
-        util::CpuTimer cpu_timer;
-        GraphT graph; // graph we process on
-
-        cpu_timer.Start();
-        GUARD_CU(graphio::LoadGraph(parameters, graph));
-        // force edge values to be 1, don't enable this unless you really want to
-        //for (SizeT e=0; e < graph.edges; e++)
-        //    graph.CsrT::edge_values[e] = 1;
-        cpu_timer.Stop();
-        parameters.Set("load-time", cpu_timer.ElapsedMillis());
-
-        // TODO: get srcs if needed, e.g.:
-        GUARD_CU(app::Set_Srcs    (parameters, graph));
-        int num_srcs = 0;
-
-        // TODO: reference result on CPU, e.e.:
-        // ValueT  **ref_distances = NULL;
-        ValueT **ref_excess = NULL;
         bool quick = parameters.Get<bool>("quick");
-        // compute reference CPU SSSP solution for source-distance
-        if (!quick)
+        bool quiet = parameters.Get<bool>("quiet");
+	
+        //
+        // Load Graph
+        //
+        util::CpuTimer cpu_timer; cpu_timer.Start();
+        debug_aml("Start Load Graph");
+          
+        bool undirected;
+        parameters.Get("undirected", undirected);
+        if (undirected){
+            debug_aml("graph is undirected");
+        }else{
+            debug_aml("graph is directed");
+        }
+
+        GraphT d_graph;
+        if (not undirected){
+            debug_aml("Load directed graph");
+            parameters.Set<int>("remove-duplicate-edges", false);
+            GUARD_CU(graphio::LoadGraph(parameters, d_graph));
+        }
+
+        debug_aml("Load undirected graph");
+        GraphT u_graph;
+        parameters.Set<int>("undirected", 1);
+        parameters.Set<int>("remove-duplicate-edges", true);
+        GUARD_CU(graphio::LoadGraph(parameters, u_graph));
+
+        cpu_timer.Stop();
+
+        parameters.Set("load-time", cpu_timer.ElapsedMillis());
+        debug_aml("load-time is %lf",cpu_timer.ElapsedMillis());
+
+        if (parameters.Get<VertexT>("source") == 
+            util::PreDefinedValues<VertexT>::InvalidValue){
+            parameters.Set("source", 0);
+        }
+        if (parameters.Get<VertexT>("sink") == 
+            util::PreDefinedValues<VertexT>::InvalidValue){
+            parameters.Set("sink", u_graph.nodes-1);
+        }
+
+        VertexT source = parameters.Get<VertexT>("source");
+        VertexT sink = parameters.Get<VertexT>("sink");
+
+        if (not undirected){
+            debug_aml("Directed graph:");
+            debug_aml("number of edges %d", d_graph.edges);
+            debug_aml("number of nodes %d", d_graph.nodes);
+        }
+
+        debug_aml("Undirected graph:");
+        debug_aml("number of edges %d", u_graph.edges);
+        debug_aml("number of nodes %d", u_graph.nodes);
+
+        ValueT* flow_edge = (ValueT*)malloc(sizeof(ValueT)*u_graph.edges);
+        SizeT* reverse	  = (SizeT*)malloc(sizeof(SizeT)*u_graph.edges);
+
+        // Initialize reverse array.
+        for (auto u = 0; u < u_graph.nodes; ++u)
         {
-            bool quiet = parameters.Get<bool>("quiet");
-            std::string validation = parameters.Get<std::string>("validation");
-            util::PrintMsg("Computing reference value ...", !quiet);
-
-            // TODO: get srcs if needed, e.g.:
-            std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
-            num_srcs = srcs.size();
-
-            SizeT nodes = graph.nodes;
-            // TODO: problem specific data, e.g.:
-            // ref_distances = new ValueT*[num_srcs];
-            ref_excess = new ValueT*[num_srcs];
-            for (int i = 0; i < num_srcs; i++)
+            auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+            auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+            auto e_end = e_start + num_neighbors;
+            for (auto e = e_start; e < e_end; ++e)
             {
-                // ref_distances[i] = new ValueT[nodes];
-                ref_excess[i] = new ValueT[nodes];
-                VertexT src = srcs[i];
-                util::PrintMsg("__________________________", !quiet);
-                float elapsed = app::mf::CPU_Reference(
-                    graph.csr(), ref_excess[i],// NULL,
-		    src,
-                    // TODO: add problem specific data, e.g.:
-                    // ref_distances[i], NULL, src,
-                    false);
-                util::PrintMsg("--------------------------\nRun "
-                    + std::to_string(i) + " elapsed: "
-                    + std::to_string(elapsed)
-                    + " ms, src = " + std::to_string(src)
-                    , !quiet);
+                auto v = u_graph.CsrT::GetEdgeDest(e);
+                auto f_start = u_graph.CsrT::GetNeighborListOffset(v);
+                auto num_neighbors2 = u_graph.CsrT::GetNeighborListLength(v);
+                auto f_end = f_start + num_neighbors2;
+                for (auto f = f_start; f < f_end; ++f)
+                {
+                    auto z = u_graph.CsrT::GetEdgeDest(f);
+                    if (z == u)
+                    {
+                        reverse[e] = f;
+                        reverse[f] = e;
+                        break;
+                    }
+                }
             }
         }
 
-        // TODO: add other switching parameters, if needed
-        std::vector<std::string> switches{"advance-mode"};
-        // TODO: add problem specific data
-        GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [ref_excess](util::Parameters &parameters, GraphT &graph)
+        if (not undirected){
+            // Correct capacity values on reverse edges
+            for (auto u = 0; u < u_graph.nodes; ++u)
             {
-                return app::mf::RunTests(parameters, graph, ref_excess);
-            }));
-
-        if (!quick)
-        {
-            // TODO: deallocate host references, e.g.:
-             for (int i = 0; i < num_srcs; i ++)
-             {
-                delete[] ref_excess[i]; ref_excess[i] = NULL;
-             }
-             delete[] ref_excess; ref_excess = NULL;
+                auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+                auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+                auto e_end = e_start + num_neighbors;
+                debug_aml("vertex %d\nnumber of neighbors %d", u, 
+                    num_neighbors);
+                for (auto e = e_start; e < e_end; ++e)
+                {
+                    u_graph.CsrT::edge_values[e] = (ValueT)0;
+                    auto v = u_graph.CsrT::GetEdgeDest(e);
+                    // Looking for edge u->v in directed graph
+                    auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
+                    auto num_neighbors2 = 
+                    d_graph.CsrT::GetNeighborListLength(u);
+                    auto f_end = f_start + num_neighbors2;
+                    for (auto f = f_start; f < f_end; ++f)
+                    {
+                        auto z = d_graph.CsrT::GetEdgeDest(f);
+                        if (z == v and d_graph.CsrT::edge_values[f] > 0)
+                        {
+                            u_graph.CsrT::edge_values[e]  = 
+                            d_graph.CsrT::edge_values[f];
+                            debug_aml("edge (%d, %d) cap = %lf\n", u, v, \
+                                u_graph.CsrT::edge_values[e]);
+                            break;
+                        }
+                    }
+                }
+            }
         }
+
+        //
+        // Compute reference CPU max flow algorithm.
+        //
+        ValueT max_flow;
+
+        if (!quick) {
+            util::PrintMsg("______CPU reference algorithm______", true);
+            double elapsed = app::mf::CPU_Reference
+                (parameters, u_graph, source, sink, max_flow, reverse, flow_edge);
+                util::PrintMsg("-----------------------------------\nElapsed: " + 
+            std::to_string(elapsed) + " ms\n Max flow CPU = " +
+            std::to_string(max_flow), true);
+        }
+
+        std::vector<std::string> switches{"advance-mode"};
+        GUARD_CU(app::Switch_Parameters(parameters, u_graph, switches,
+        [flow_edge, reverse](util::Parameters &parameters, GraphT &u_graph)
+        {
+          debug_aml("go to RunTests");
+          return app::mf::RunTests(parameters, u_graph, reverse, flow_edge);
+        }));
+
+        // Clean up
+        free(flow_edge);
+        free(reverse);
+
         return retval;
     }
 };
 
 int main(int argc, char** argv)
 {
+    debug_aml("Main: start");
     cudaError_t retval = cudaSuccess;
     util::Parameters parameters("test mf");
     GUARD_CU(graphio::UseParameters(parameters));
@@ -137,12 +213,13 @@ int main(int argc, char** argv)
         return cudaSuccess;
     }
     GUARD_CU(parameters.Check_Required());
+    debug_aml("Main: parameters checked - ok");
 
-    // TODO: change available graph types, according to requirements
     return app::Switch_Types<
-        app::VERTEXT_U32B | app::VERTEXT_U64B |
-        app::SIZET_U32B | app::SIZET_U64B |
-        app::VALUET_U32B | app::DIRECTED | app::UNDIRECTED>
+        app::VERTEXT_U32B | 
+        app::SIZET_U32B | 
+        app::VALUET_F64B | 
+        app::DIRECTED | app::UNDIRECTED >
         (parameters, main_struct());
 }
 

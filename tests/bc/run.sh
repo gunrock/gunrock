@@ -21,7 +21,7 @@ done
 
 #put OS and Device type here
 SUFFIX="ubuntu16.04_TitanV"
-EXECUTION="./bin/test_bc_9.1_x86_64" #$exe_file
+EXECUTION="./bin/test_bc_9.2_x86_64" #$exe_file
 DATADIR="/data/gunrock_dataset/large"
 
 mkdir -p eval/$SUFFIX

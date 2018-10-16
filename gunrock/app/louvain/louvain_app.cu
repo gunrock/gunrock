@@ -6,9 +6,9 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file sssp_app.cu
+ * @file louvain_app.cu
  *
- * @brief single-source shortest path (SSSP) application
+ * @brief Community Detection (Louvain) application
  */
 
 #include <gunrock/gunrock.h>
@@ -40,13 +40,13 @@ cudaError_t UseParameters(util::Parameters &parameters)
 }
 
 /**
- * @brief Run SSSP tests
+ * @brief Run Louvain tests
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the distances
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
  * @param[in]  ref_distances Reference distances
- * @param[in]  target        Whether to perform the SSSP
+ * @param[in]  target        Whether to perform the Louvain
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
@@ -102,7 +102,7 @@ cudaError_t RunTests(
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
             
-            GUARD_CU(problem.Extract(h_communities, target));
+            GUARD_CU(problem.Extract(h_communities, NULL, target));
             SizeT num_errors = app::louvain::Validate_Results(
                 parameters, graph, h_communities, ref_communities);
         } else {
@@ -115,7 +115,7 @@ cudaError_t RunTests(
 
     cpu_timer.Start();
     // Copy out results
-    GUARD_CU(problem.Extract(h_communities, target));
+    GUARD_CU(problem.Extract(h_communities, NULL, target));
     if (validation == "last")
     {
         SizeT num_errors = app::louvain::Validate_Results(
@@ -185,7 +185,7 @@ double gunrock_louvain(
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-        problem.Extract(communities);
+        problem.Extract(communities, NULL, target);
     }
 
     enactor.Release(target);
@@ -200,7 +200,7 @@ double gunrock_louvain(
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
  * @param[in]  edge_values CSR-formatted graph input edge weights
- * @param[in]  num_runs    Number of runs to perform SSSP
+ * @param[in]  num_runs    Number of runs to perform Louvain
  * @param[in]  sources     Sources to begin traverse, one for each run
  * @param[in]  mark_preds  Whether to output predecessor info
  * @param[out] distances   Return shortest distance to source per vertex
@@ -239,9 +239,9 @@ float louvain(
 
     // Assign pointers into gunrock graph format
     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    graph.CsrT::row_offsets   .SetPointer(row_offsets, gunrock::util::HOST);
-    graph.CsrT::column_indices.SetPointer(col_indices, gunrock::util::HOST);
-    graph.CsrT::edge_values   .SetPointer(edge_values, gunrock::util::HOST);
+    graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
+    graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
+    graph.CsrT::edge_values   .SetPointer(edge_values, num_edges, gunrock::util::HOST);
     graph.FromCsr(graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, graph);
 

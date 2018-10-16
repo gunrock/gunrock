@@ -7,9 +7,9 @@
 
 /**
  * @file
- * test_sssp.cu
+ * louvain_main.cu
  *
- * @brief Simple test driver program for Gunrock template.
+ * @brief Simple test driver program for Louvain
  */
 
 #include <gunrock/app/louvain/louvain_app.cu>
@@ -54,6 +54,7 @@ struct main_struct
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
+        //GUARD_CU(graph.csr().Display());
 
         VertexT  *ref_communities = NULL;
         bool quick = parameters.Get<bool>("quick");
@@ -82,7 +83,8 @@ struct main_struct
             }
         }
 
-        std::vector<std::string> switches{"advance-mode","omp-threads", "1st-th"};
+        std::vector<std::string> switches{"unify-segments", 
+            "advance-mode","omp-threads", "1st-th", "neighborcomm-th"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [&ref_communities](util::Parameters &parameters, GraphT &graph)
             {
@@ -97,7 +99,7 @@ struct main_struct
                     {
                         util::PrintMsg("__________________________", !quiet);
                         float elapsed = app::louvain::OMP_Reference(
-                            parameters, graph.csr(), ref_communities);
+                            parameters, graph.csr(), omp_communities);
                         util::PrintMsg("--------------------------", !quiet);
 
                         if (validation == "each")
@@ -155,7 +157,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | //app::VERTEXT_U64B |
         app::SIZET_U32B | //app::SIZET_U64B |
-        app::VALUET_F64B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F64B >
         (parameters, main_struct());
 }
 

@@ -41,8 +41,8 @@ struct main_struct
         typename ValueT>  // Use int as the value type
     cudaError_t operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val)
     {
-        typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_COO> GraphT;
-        typedef typename GraphT::CooT CooT;
+        typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_COO | graph::HAS_CSC> GraphT;
+        //typedef typename GraphT::CooT CooT;
 
         cudaError_t retval = cudaSuccess;
         bool quick = parameters.Get<bool>("quick");
@@ -72,8 +72,10 @@ struct main_struct
                 GUARD_CU(gunrock::app::pr::Compensate_ZeroDegrees(graph, quiet));
             }
             GUARD_CU(parameters.Set("compensate", compensate));
-            std::vector<std::string> switches{"normalize", "delta", "threshold", "max-iter"};
-            GUARD_CU(app::Switch_Parameters(parameters, graph, switches,[quick, quiet](util::Parameters &parameters, GraphT &graph)
+            std::vector<std::string> switches{
+                "normalize", "delta", "threshold", "max-iter", "pull"};
+            GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
+                [quick, quiet](util::Parameters &parameters, GraphT &graph)
                 {
                     cudaError_t retval = cudaSuccess;
                     GUARD_CU(app::Set_Srcs(parameters, graph));
@@ -85,7 +87,8 @@ struct main_struct
                     if (!quick)
                     {
                         util::PrintMsg("Computing reference value ...", !quiet);
-                        std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
+                        std::vector<VertexT> srcs 
+                            = parameters.Get<std::vector<VertexT> >("srcs");
                         num_srcs = srcs.size();
                         SizeT nodes = graph.nodes;
                         ref_ranks    = (ValueT **)malloc(sizeof(ValueT*) * num_srcs);
@@ -96,7 +99,8 @@ struct main_struct
                             ref_vertices[i] = (VertexT*)malloc(sizeof(VertexT) * nodes);
                             VertexT src = srcs[i];
                             util::PrintMsg("__________________________", !quiet);
-                            float elapsed = app::pr::CPU_Reference(parameters, graph, src, ref_vertices[i], ref_ranks[i]);
+                            float elapsed = app::pr::CPU_Reference(
+                                parameters, graph, src, ref_vertices[i], ref_ranks[i]);
                             util::PrintMsg("--------------------------\nRun "
                                 + std::to_string(i) + " elapsed: "
                                 + std::to_string(elapsed) + " ms, src = "
@@ -149,7 +153,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | //app::VERTEXT_U64B |
         app::SIZET_U32B | //app::SIZET_U64B |
-        app::VALUET_F32B | //app::VALUET_F64B |
+        app::VALUET_F64B | //app::VALUET_F64B |
         app::DIRECTED | app::UNDIRECTED>
         (parameters, main_struct());
 }

@@ -7,7 +7,7 @@
 
 /**
  * @file
- * select_utils.cuh
+ * select_device.cuh
  *
  * @brief kenel utils used in minimum spanning tree, subgraph matching  algorithms.
  */
@@ -226,6 +226,54 @@ cudaError_t CUBSelect(
             (retval = cudaFree(d_num_selected)),
             "CUBSelect free d_num_selected failed",
             __FILE__, __LINE__)) return retval;
+
+    return retval;
+}
+
+template <
+    typename InputT, typename OutputT,
+    typename SizeT , typename SelectOp>
+cudaError_t cubSelectIf(
+    util::Array1D<uint64_t, char   > &cub_temp_space,
+    util::Array1D<SizeT, InputT > &keys_in,
+    util::Array1D<SizeT, OutputT> &keys_out,
+    util::Array1D<SizeT, SizeT  > &num_selected,
+    SizeT                          num_keys,
+    SelectOp                       select_op,
+    cudaStream_t                   stream = 0,
+    bool                           debug_synchronous = false)
+{
+    cudaError_t retval = cudaSuccess;
+
+    typedef cub::NullType* FlagIterator;
+    typedef cub::NullType  EqualityOp;
+
+    size_t request_bytes = 0;
+    retval = cub::DispatchSelectIf<InputT*, FlagIterator, OutputT*, SizeT*, 
+        SelectOp, EqualityOp, SizeT, false>::Dispatch(
+        NULL, request_bytes,
+        keys_in     .GetPointer(util::DEVICE), NULL,
+        keys_out    .GetPointer(util::DEVICE),
+        num_selected.GetPointer(util::DEVICE),
+        select_op, EqualityOp(),
+        num_keys, stream, debug_synchronous);
+    if (retval)
+        return retval;
+
+    retval = cub_temp_space.EnsureSize_(request_bytes, util::DEVICE);
+    if (retval)
+        return retval;
+
+    retval = cub::DispatchSelectIf<InputT*, FlagIterator, OutputT*, SizeT*, 
+        SelectOp, EqualityOp, SizeT, false>::Dispatch(
+        cub_temp_space.GetPointer(util::DEVICE), request_bytes,
+        keys_in     .GetPointer(util::DEVICE), NULL,
+        keys_out    .GetPointer(util::DEVICE),
+        num_selected.GetPointer(util::DEVICE),
+        select_op, EqualityOp(),
+        num_keys, stream, debug_synchronous);
+    if (retval)
+        return retval;
 
     return retval;
 }

@@ -14,10 +14,12 @@
 
 #pragma once
 
+#include <gunrock/util/binary_search.cuh>
+
 namespace gunrock {
 namespace graph {
 
-#define ENABLE_GRAPH_DEBUG
+//#define ENABLE_GRAPH_DEBUG
 
 /**
  * @brief Predefined flags for graph types
@@ -30,6 +32,8 @@ enum : GraphFlag
     GRAPH_NONE      = 0x0000,
     HAS_EDGE_VALUES = 0x0010,
     HAS_NODE_VALUES = 0x0020,
+    
+    TypeMask        = 0x0F00,
     HAS_CSR         = 0x0100,
     HAS_CSC         = 0x0200,
     HAS_COO         = 0x0400,
@@ -49,7 +53,7 @@ struct GraphType_Num
 
 static const util::Location GRAPH_DEFAULT_TARGET = util::DEVICE;
 
-template <typename T, typename SizeT>
+/*template <typename T, typename SizeT>
 __device__ __host__ __forceinline__
 SizeT Binary_Search(
     const T* data, T item_to_find, SizeT lower_bound, SizeT upper_bound)
@@ -74,7 +78,7 @@ SizeT Binary_Search(
         retval = util::PreDefinedValues<SizeT>::InvalidValue;
 
     return retval;
-}
+}*/
 
 /**
  * @brief Enum to show how the edges are ordered

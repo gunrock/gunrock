@@ -241,7 +241,7 @@ struct Block_Scan
         Warp_Scan(thread_in, thread_out, warp_sum);
         //printf("(%4d, %4d) : WARP_THREADS_MASK = %d\n",
         //    blockIdx.x, threadIdx.x, WARP_THREADS_MASK);
-        if ((threadIdx.x & WARP_THREADS_MASK) == 0)
+        if ((threadIdx.x & WARP_THREADS_MASK) == WARP_THREADS_MASK)
         {
             //printf("(%4d, %4d, %d) : warp_sum = %d\n",
             //    blockIdx.x, threadIdx.x, threadIdx.x >> LOG_WARP_THREADS, warp_sum);

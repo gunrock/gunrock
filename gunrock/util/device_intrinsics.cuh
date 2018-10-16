@@ -127,6 +127,22 @@ __device__ static long long atomicCAS(long long *addr, long long comp, long long
         (unsigned long long ) val);
 }
 
+__device__ static float atomicCAS(float *addr, float comp, float val)
+{
+    return __int_as_float(atomicCAS(
+        (int*)addr,
+        __float_as_int(comp),
+        __float_as_int(val )));
+}
+
+__device__ static double atomicCAS(double *addr, double comp, double val)
+{
+    return __longlong_as_double(atomicCAS(
+        (long long*)addr,
+        __double_as_longlong(comp),
+        __double_as_longlong(val)));
+}
+
 // TODO: verify overflow condition
 __device__ static long long atomicAdd(long long *addr, long long val)
 {
@@ -167,9 +183,49 @@ __device__ static float atomicMin(float* addr, float val)
     int expected;
     do {
         expected = old;
-        old = ::atomicCAS(addr_as_int, expected, __float_as_int(::fminf(val, __int_as_float(expected))));
+        old = ::atomicCAS(addr_as_int, expected, __float_as_int(
+            ::fminf(val, __int_as_float(expected))));
     } while (expected != old);
     return __int_as_float(old);
+}
+
+__device__ static double atomicMin(double* addr, double val)
+{
+    long long* addr_as_longlong = (long long*)addr;
+    long long old = *addr_as_longlong;
+    long long expected;
+    do {
+        expected = old;
+        old = ::atomicCAS(addr_as_longlong, expected, __double_as_longlong(
+            ::fmin(val, __longlong_as_double(expected))));
+    } while (expected != old);
+    return __longlong_as_double(old);
+}
+
+__device__ static float atomicMax(float* addr, float val)
+{
+    int* addr_as_int = (int*)addr;
+    int old = *addr_as_int;
+    int expected;
+    do {
+        expected = old;
+        old = ::atomicCAS(addr_as_int, expected, __float_as_int(
+            ::fmaxf(val, __int_as_float(expected))));
+    } while (expected != old);
+    return __int_as_float(old);
+}
+
+__device__ static double atomicMax(double* addr, double val)
+{
+    long long* addr_as_longlong = (long long*)addr;
+    long long old = *addr_as_longlong;
+    long long expected;
+    do {
+        expected = old;
+        old = ::atomicCAS(addr_as_longlong, expected, __double_as_longlong(
+            ::fmax(val, __longlong_as_double(expected))));
+    } while (expected != old);
+    return __longlong_as_double(old);
 }
 
 template <typename T>
