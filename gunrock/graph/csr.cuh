@@ -268,7 +268,9 @@ struct Csr :
                 SizeT *row_offsets,
                 const typename CooT::EdgePairT *edge_pairs,
                 const VertexT &row){
-                    if (row < nodes)
+                    if (row <= edge_pairs[0].x)
+                        row_offsets[row] = 0;
+                    else if (row < nodes)
                     {
                         auto pos = util::BinarySearch_LeftMost(row,
                             edge_pairs, (SizeT)0, edges-1,

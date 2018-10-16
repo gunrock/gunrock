@@ -286,7 +286,9 @@ struct Csc :
                 SizeT *column_offsets,
                 const typename CooT::EdgePairT *edge_pairs,
                 const VertexT &column){
-                    if (column < nodes)
+                    if (column <= edge_pairs[0].y)
+                        column_offsets[column] = 0;
+                    else if (column < nodes)
                     {
                         auto pos = util::BinarySearch_LeftMost(
                             column, edge_pairs, (SizeT)0, edges-1,
