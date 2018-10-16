@@ -72,7 +72,7 @@ struct main_struct
             for (auto e = e_start; e < e_end; ++e)
             {
                 auto v = d_graph.CsrT::GetEdgeDest(e);
-                printf("original graph (%d -> %d) = %f\n", u, v, d_graph.edge_values[e]);
+                //printf("original graph (%d -> %d) = %f\n", u, v, d_graph.edge_values[e]);
             }
         }
         printf("\n\n");
@@ -101,9 +101,7 @@ struct main_struct
         reverse_edges.SetName("reverse_edges");
         GUARD_CU(reverse_edges.Allocate(d_graph.edges, util::HOST));
 
-        printf("shen me gui ya4 \n");
     	GUARD_CU(app::mf::InitReverse(d_graph, reverse_edges));
-        printf("shen me gui ya5 \n");
 
 	    //
         // Compute reference CPU GTF algorithm.
@@ -118,9 +116,9 @@ struct main_struct
 
         std::vector<std::string> switches{"advance-mode"};
     	GUARD_CU(app::Switch_Parameters(parameters, d_graph, switches,
-    	[reverse_edges](util::Parameters &parameters, GraphT &d_graph)
+    	[](util::Parameters &parameters, GraphT &d_graph)
     	{
-    	    //return app::gtf::RunTests(parameters, graph, reverse_edges);
+    	    return app::gtf::RunTests(parameters, d_graph);
     	    return cudaSuccess;
         }));
 

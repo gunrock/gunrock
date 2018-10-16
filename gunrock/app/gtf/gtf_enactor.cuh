@@ -65,35 +65,100 @@ struct GTFIterationLoop : public IterationLoopBase
      * @param[in] peer_ Which GPU peers to work on, 0 means local
      * \return cudaError_t error message(s), if any
      */
+     int iter = 0; //!!!
     cudaError_t Core(int peer_ = 0)
     {
-	auto enactor		= this -> enactor;
-	auto gpu_num		= this -> gpu_num;
-	auto num_gpus		= enactor -> num_gpus;
-	auto gpu_offset		= num_gpus * gpu_num;
-        auto &data_slice	= enactor -> problem -> data_slices[gpu_num][0];
-        auto &enactor_slice	= enactor ->
+	     auto enactor		= this -> enactor;
+	     auto gpu_num		= this -> gpu_num;
+	     auto num_gpus		= enactor -> num_gpus;
+	     auto gpu_offset		= num_gpus * gpu_num;
+       auto &data_slice	= enactor -> problem -> data_slices[gpu_num][0];
+       auto &enactor_slice	= enactor ->
 				  enactor_slices[gpu_offset + peer_];
-        auto &enactor_stats	= enactor_slice.enactor_stats;
-        auto &graph		= data_slice.sub_graph[0];
-        auto &frontier        	= enactor_slice.frontier;
-        auto &oprtr_parameters	= enactor_slice.oprtr_parameters;
-        auto &retval          	= enactor_stats.retval;
-        auto &iteration       	= enactor_stats.iteration;
+       auto &enactor_stats	= enactor_slice.enactor_stats;
+       auto &graph		= data_slice.sub_graph[0];
+       auto &frontier        	= enactor_slice.frontier;
+       auto &oprtr_parameters	= enactor_slice.oprtr_parameters;
+       auto &retval          	= enactor_stats.retval;
+       auto &iteration       	= enactor_stats.iteration;
 
-	auto source		= data_slice.source;
-	auto sink		= data_slice.sink;
-	auto &capacity        	= graph.edge_values;
-	auto &reverse		= data_slice.reverse;
-        auto &flow            	= data_slice.flow;
-        auto &excess          	= data_slice.excess;
-        auto &height	      	= data_slice.height;
-	auto &lowest_neighbor	= data_slice.lowest_neighbor;
-	auto &local_vertices	= data_slice.local_vertices;
-	auto &active		= data_slice.active;
-	auto null_ptr		= &local_vertices;
-	null_ptr = NULL;
+	     auto source		= data_slice.source;
+       auto sink		= data_slice.sink;
 
+       auto &next_communities = graph.next_communities;
+       auto &curr_communities	= data_slice.curr_communities;
+       auto &community_sizes = data_slice.community_sizes;
+       auto &community_weights = data_slice.community_weights;
+       auto &community_active = data_slice.community_active;
+
+	     auto &community_accus = data_slice.community_accus;
+	     auto &vertex_active = data_slice.vertex_active;
+       auto &vertex_reachabilities = data_slice.vertex_reachabilities;
+       auto &edge_residuals	= data_slice.edge_residuals;
+       auto &edge_flows = data_slice.edge_flows;
+       auto &active = data_slice.active;
+
+       //!!! allowed?
+       auto     num_nodes        = graph.nodes; // n + 2 = V
+       auto     num_org_nodes    = num_nodes-2; // n
+       auto     num_edges        = graph.edges; // m + n*4
+       VertexT  num_comms        = 1;
+       auto offset = num_edges - (num_org_nodes)*2; //!!!
+       ValueT sum_weights_source_sink = 0;
+
+       /*
+       if(iter == 0){ //
+         auto avg = [sum_weights_source_sink]
+             __host__ __device__
+             (const SizeT &v, const SizeT &offset)-> bool
+         {
+           atomicAdd(&sum_weights_source_sink, graph.edge_values[offset + v]);
+           SizeT e = graph.GetNeighborListOffset(v) + graph.GetNeighborListLength(v) - 1;
+           atomicAdd(&sum_weights_source_sink, -graph.edge_values[e]);
+           return true;
+         };
+
+         auto normalize = [sum_weights_source_sink];
+             __host__ __device__
+             (const SizeT &v, const SizeT &offset, ValueT &community_accus)-> bool
+         {
+           auto avg_weights_source_sink = sum_weights_source_sink / num_org_nodes;
+           community_accus[0] = avg_weights_source_sink;
+
+           SizeT  e = graph.GetNeighborListOffset(v) + graph.GetNeighborListLength(v) - 1;
+           ValueT val = graph.edge_values[offset + v] - graph.edge_values[e]
+               - avg_weights_source_sink;
+
+           if (val > 0){
+            graph.edge_values[offset + v] = val;
+            graph.edge_values[e] = 0;
+           } else {
+            graph.edge_values[offset + v] = 0;
+            graph.edge_values[e] = -1 * val;
+           }
+           return true;
+         };
+       }
+
+       // Call mincut.
+       auto comm_resets = [sum_weights_source_sink]
+           __host__ __device__
+           (VertexT &community_sizes, ValueT &community_weights,
+             ValueT &next_communities, unsigned int comm)-> bool
+      {
+        if(comm < num_comms){
+         community_weights[comm] = 0;
+         community_sizes  [comm] = 0;
+         next_communities [comm] = 0;
+        }
+        return true;
+      };
+
+      auto pervious_num_comms = num_comms;
+
+      */
+
+  /*
 	auto advance_push_op = [capacity, flow, excess, height, reverse,
 	     source, sink, active]
 	    __host__ __device__
@@ -127,73 +192,6 @@ struct GTFIterationLoop : public IterationLoopBase
 	    }
 	    return false;
 	};
-
-	auto advance_find_lowest_op =
-	    [excess, capacity, flow, lowest_neighbor, height, iteration,
-	    source, sink, active]
-	    __host__ __device__
-	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-	    if (!util::isValid(dest) or !util::isValid(src) or
-		    src == source or src == sink)
-		return false;
-	    if (excess[src] > (ValueT)0 and
-		    capacity[edge_id] - flow[edge_id] > (ValueT)0)
-	    {
-		auto l = lowest_neighbor[src];
-		auto height_dest = height[dest];
-		while (!util::isValid(l) or height_dest < height[l]){
-		    l = atomicCAS(&lowest_neighbor[src], l, dest);
-		}
-		if (lowest_neighbor[src] == dest){
-		    return true;
-		}
-	    }
-	    return false;
-	};
-
-	auto advance_relabel_op =
-	    [excess, capacity, flow, lowest_neighbor, height, iteration,
-	    source, sink, active]
-	    __host__ __device__
-	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-	    if (!util::isValid(dest) or !util::isValid(src) or
-		    src == source or src == sink)
-		return false;
-	    if (excess[src] > (ValueT)0 and
-		    capacity[edge_id] - flow[edge_id] > (ValueT)0 and
-		    lowest_neighbor[src] == dest){
-		if (height[src] <= height[dest])
-		{
-	//	    printf("relabel src %d, dest %d, H[%d]=%d, -> %d\n",\
-			src, dest, src, height[src], height[dest]+1);
-		    height[src] = height[dest] + 1;
-		    active[0] = 1;
-		    return true;
-		}
-	    }
-	    return false;
-	};
-
-//	GUARD_CU(excess.ForAll(
-//	    [] __host__ __device__ (ValueT *excess_, const SizeT &v){
-//	      printf("excess_[%d] = %lf\n", v, excess_[v]);
-//	    }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-//
-//	GUARD_CU(height.ForAll(
-//	    [] __host__ __device__ (VertexT *h, const SizeT &v){
-//	      printf("height[%d] = %d\n", v, h[v]);
-//	    }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-//
-//	GUARD_CU(flow.ForAll(
-//	    [] __host__ __device__ (ValueT *f, const SizeT &v){
-//	      printf("flow[%d] = %lf\n", v, f[v]);
-//	    }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
 
 	oprtr_parameters.advance_mode = "ALL_EDGES";
@@ -237,7 +235,7 @@ struct GTFIterationLoop : public IterationLoopBase
 		    oprtr_parameters, advance_relabel_op));
 	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
 	    "cudaStreamSynchronize failed");
-
+  */
 //	GUARD_CU(active.ForAll(
 //	    [] __host__ __device__ (SizeT *a, const SizeT &v){
 //	      if (a[v]){

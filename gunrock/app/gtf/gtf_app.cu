@@ -40,7 +40,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_app    (parameters));
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
-    GUARD_CU(gtf::UseParameters_test   (parameters));
+	GUARD_CU(UseParameters_test   (parameters));
 
     GUARD_CU(parameters.Use<uint64_t>(
     	"source",
@@ -63,18 +63,42 @@ cudaError_t UseParameters(util::Parameters &parameters)
     return retval;
 }
 
-template <typename GraphT, typename ArrayT>
+template <typename GraphT, typename ArrayT, typename ValueT>
 cudaError_t AddSourceSink(
     GraphT &u_graph,
     ArrayT &weights,
-    GraphT &graph)
+    GraphT &graph,
+    ValueT lambda)
 {
     cudaError_t retval = cudaSuccess;
 
     GUARD_CU(graph.Allocate(u_graph.nodes + 2,
         u_graph.edges + u_graph.nodes * 4, util::HOST));
+    printf("# for nodes and edges (%d -> %d)\n", u_graph.nodes+2, u_graph.edges+u_graph.nodes*4);
 
-    #pragma omp parallel for
+    typedef typename GraphT::CsrT CsrT;
+    printf("in add source sink # of nodes %d \n", u_graph.nodes);
+
+    for(auto i = 0; i < graph.edges; i++){
+        if(i < graph.nodes)
+            graph.row_offsets[i] = 100;
+        graph.column_indices[i] = 100;
+    }
+    for (auto u = 0; u < u_graph.nodes; ++u)
+    {
+        auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+        auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+        auto e_end = e_start + num_neighbors;
+        for (auto e = e_start; e < e_end; ++e)
+        {
+            auto v = u_graph.CsrT::GetEdgeDest(e);
+            printf("flow(%d -> %d) = %lf\n", u, v, graph.edge_values[e]);
+        }
+    }
+    for (int u = 0; u < u_graph.nodes; ++u)
+        printf("in add source sink weights %f \n", weights[u]);
+
+
     for (auto v = 0; v < u_graph.nodes; v ++)
     {
         auto e_start = u_graph.GetNeighborListOffset(v);
@@ -82,6 +106,7 @@ cudaError_t AddSourceSink(
         auto e_end = e_start + num_neighbors;
 
         graph.row_offsets[v] = u_graph.row_offsets[v] + v * 2;
+        //printf("!!!!%d row_offsets %d\n", v, u_graph.row_offsets[v] + v * 2);
         for (auto e = e_start; e < e_end; e++)
         {
             graph.edge_values[e + v * 2] = u_graph.edge_values[e];
@@ -90,10 +115,24 @@ cudaError_t AddSourceSink(
         graph.edge_values   [e_end + v * 2    ] = 0;
         graph.column_indices[e_end + v * 2 + 1] = u_graph.nodes + 1;
         graph.edge_values   [e_end + v * 2 + 1] = 0;
+        printf("!!!!%d  %d, edge_values\n", v, e_end+v*2);
     }
     for (auto v = u_graph.nodes; v < u_graph.nodes + 3; v ++)
         graph.row_offsets[u_graph.nodes + v]
             = u_graph.edges + u_graph.nodes * (2 + v);
+
+    for (auto u = 0; u < graph.nodes; ++u)
+    {
+        auto e_start = graph.CsrT::GetNeighborListOffset(u);
+        auto num_neighbors = graph.CsrT::GetNeighborListLength(u);
+        auto e_end = e_start + num_neighbors;
+        for (auto e = e_start; e < e_end; ++e)
+        {
+            auto v = graph.CsrT::GetEdgeDest(e);
+            printf("intermediate graph (%d -> %d) = %lf\n", u, v, graph.edge_values[e]);
+        }
+    }
+
     auto offset = u_graph.edges + u_graph.nodes * 2;
     for (auto v = 0; v < u_graph.nodes; v ++)
     {
@@ -115,6 +154,17 @@ cudaError_t AddSourceSink(
                 = weight;
         }
     }
+    for (auto u = 0; u < graph.nodes; ++u)
+    {
+        auto e_start = graph.CsrT::GetNeighborListOffset(u);
+        auto num_neighbors = graph.CsrT::GetNeighborListLength(u);
+        auto e_end = e_start + num_neighbors;
+        for (auto e = e_start; e < e_end; ++e)
+        {
+            auto v = graph.CsrT::GetEdgeDest(e);
+            printf("new graph (%d -> %d) = %lf\n", u, v, graph.edge_values[e]);
+        }
+    }
     return retval;
 }
 
@@ -133,8 +183,7 @@ template <typename GraphT, typename ValueT, typename VertexT>
 cudaError_t RunTests(
     util::Parameters  &parameters,
     GraphT	      &graph,
-    VertexT	      *h_reverse,
-    ValueT	      *ref_flow,
+    //ArrayT &reverse_edges, 
     util::Location    target = util::DEVICE)
 {
     debug_aml("RunTests starts");
@@ -158,7 +207,7 @@ cudaError_t RunTests(
 
     // Allocate host-side array (for both reference and GPU-computed results)
     // ... for function Extract
-    ValueT *h_flow   = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
+    ValueT *community_accus = (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -172,13 +221,13 @@ cudaError_t RunTests(
     // perform the gtf algorithm
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        GUARD_CU(problem.Reset(graph, h_reverse, target));
+        GUARD_CU(problem.Reset(graph, target));
         GUARD_CU(enactor.Reset(source, target));
 
         util::PrintMsg("______GPU PushRelabel algorithm____", !quiet_mode);
 
         cpu_timer.Start();
-        GUARD_CU(enactor.Enact());
+        //GUARD_CU(enactor.Enact());
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
@@ -190,9 +239,9 @@ cudaError_t RunTests(
                 .enactor_stats.iteration), !quiet_mode);
         if (validation == "each")
         {
-            GUARD_CU(problem.Extract(h_flow));
-            int num_errors = app::gtf::Validate_Results(parameters, graph,
-		    source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
+            //GUARD_CU(problem.Extract(h_flow));
+            //int num_errors = app::gtf::Validate_Results(parameters, graph,
+		    //source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
         }
     }
 
@@ -200,19 +249,19 @@ cudaError_t RunTests(
     cpu_timer.Start();
     if (validation == "last")
     {
-	GUARD_CU(problem.Extract(h_flow));
+	//GUARD_CU(problem.Extract(h_flow)); //!!!
 	/*for (int i=0; i<graph.edges; ++i){
 	    if (ref_flow){
 		debug_aml("h_flow[%d]=%lf, ref_flow[%d] = %lf",
 			  i, h_flow[i], i, ref_flow[i]);
 	    }
 	}*/
-        int num_errors = app::gtf::Validate_Results(parameters, graph,
-		source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
+        //int num_errors = app::gtf::Validate_Results(parameters, graph,
+		//source, sink, h_flow, h_reverse, ref_flow, quiet_mode); //!!!
     }
 
     // Compute running statistics
-    //info.ComputeTraversalStats(enactor, h_flow);
+    //info.ComputeTraversalStats(enactor, h_flow);//!!!
     // Display_Memory_Usage(problem);
     #ifdef ENABLE_PERFORMANCE_PROFILING
         //Display_Performance_Profiling(enactor);
@@ -221,8 +270,8 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    delete[] h_flow;
-    h_flow = NULL;
+    //delete[] h_flow;
+    //h_flow = NULL; //!!!
 
     cpu_timer.Stop();
     total_timer.Stop();
