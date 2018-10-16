@@ -242,6 +242,23 @@ __device__ __host__ __forceinline__ T _ldg(T* addr)
 #endif
 }
 
+template <typename T>
+__device__ __host__ __forceinline__
+T _atomicAdd(T* ptr, const T &val)
+{
+#ifdef __CUDA_ARCH__
+    return atomicAdd(ptr, val);
+#else
+    T retval;
+    #pragma omp atomic capture
+    {
+        retval = ptr[0];
+        ptr[0] += val;
+    }
+    return retval;
+#endif
+}
+
 namespace gunrock {
 namespace util {
 

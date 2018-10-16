@@ -400,15 +400,12 @@ cudaError_t LoadGraph(
 
     if (!parameters.Get<bool>("quiet"))
     {
-        /*csr_ref.GetAverageDegree();
-        csr_ref.PrintHistogram();
-        if (info["algorithm"].get_str().compare("SSSP") == 0)
-        {
-            csr_ref.GetAverageEdgeValue();
-            int max_degree;
-            csr_ref.GetNodeWithHighestDegree(max_degree);
-            printf("Maximum degree: %d\n", max_degree);
-        }*/
+        typedef typename GraphT::SizeT SizeT;
+        util::Array1D<SizeT, SizeT> histogram;
+        GUARD_CU(graph::GetHistogram  (graph, histogram));
+        GUARD_CU(graph::PrintHistogram(graph, histogram));
+        GUARD_CU(histogram.Release());
+        util::PrintMsg("");
     }
     return retval;
 }
