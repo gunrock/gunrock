@@ -60,7 +60,6 @@ struct GTFIterationLoop : public IterationLoopBase
 
     GTFIterationLoop() : BaseIterationLoop() {}
     
-    printf("in core function!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 
     /**
      * @brief Core computation of gtf, one iteration
@@ -70,6 +69,7 @@ struct GTFIterationLoop : public IterationLoopBase
     cudaError_t Core(int peer_ = 0)
     {
 
+         printf("in core!!!!!!!!!!!!!!!!\n");
 	     auto enactor		= this -> enactor;
 	     auto gpu_num		= this -> gpu_num;
 	     auto num_gpus		= enactor -> num_gpus;
@@ -99,6 +99,7 @@ struct GTFIterationLoop : public IterationLoopBase
        auto &edge_residuals	= data_slice.edge_residuals;
        auto &edge_flows = data_slice.edge_flows;
        auto &active = data_slice.active;
+       printf("in core!!!!!!!!!!!!!!!!\n");
 
        //!!! allowed?
        auto     num_nodes        = graph.nodes; // n + 2 = V
@@ -107,11 +108,11 @@ struct GTFIterationLoop : public IterationLoopBase
        VertexT  num_comms        = 1;
        auto offset = num_edges - (num_org_nodes)*2; //!!!
        ValueT sum_weights_source_sink = 0;
+       printf("in core!!!!!!!!!!!!!!!!\n");
 
        
        	GUARD_CU(active.ForAll(
-       	    [] __host__ __device__ (SizeT *a, const SizeT &v){
-       	      a[v] = true;
+       	    [] __host__ __device__ (SizeT *a, const VertexT &v){
               if (a[v]){
        		       printf("there are");
        	      }else{
@@ -119,9 +120,9 @@ struct GTFIterationLoop : public IterationLoopBase
        	      }
        	        printf(" active nodes\n");
        	    }, 1, util::DEVICE, oprtr_parameters.stream));
-
-       num_nodes = 0;
-       community_active[1] = true;
+       
+       //num_nodes = 0;
+       //community_active[0] = true;
        printf("num_nodes \n");
             /*
        GUARD_CU(active.ForAll(
@@ -476,7 +477,6 @@ public:
     cudaError_t Run(ThreadSlice &thread_data)
     {
 	debug_aml("Run enact");
-        printf("in Run function !!!!!!!!! \n");
         gunrock::app::Iteration_Loop<
             0, // NUM_VERTEX_ASSOCIATES
 	    1, // NUM_VALUE__ASSOCIATES

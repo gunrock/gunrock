@@ -279,7 +279,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
       	    GUARD_CU(community_accus.Move(util::HOST, target, num_org_nodes, 0,
       			this->stream));
 
-            this->num_updated_vertices = 0;
+            this->num_updated_vertices = 1;
 
             GUARD_CU(active.ForAll([]
 	             __host__ __device__(SizeT *active_, const VertexT &pos)

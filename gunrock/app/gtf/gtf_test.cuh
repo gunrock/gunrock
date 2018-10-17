@@ -137,6 +137,9 @@ cudaError_t MinCut(
             }
         }
     }
+    for(auto i = 0; i < graph.nodes; i++){
+        printf("%d \n", vertex_reachabilities[i]);
+    }
     /////////////////////////
     /*
     for (char t = 1; t < 2; t++)
