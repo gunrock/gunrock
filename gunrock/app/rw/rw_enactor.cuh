@@ -93,7 +93,8 @@ struct RWIterationLoop : public IterationLoopBase
         auto &gen            = data_slice.gen;
         auto &neighbors_seen = data_slice.neighbors_seen;
 
-        if(walk_mode == 0) {
+        if(walk_mode == 0) { // uniform random walk
+
           curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
 
           auto uniform_rw_op = [
@@ -106,34 +107,37 @@ struct RWIterationLoop : public IterationLoopBase
               neighbors_seen
           ] __host__ __device__ (VertexT *v, const SizeT &i) {
 
-            // printf("graph.node_values[i]=%d\n", graph.node_values[i]);
-
             SizeT write_idx = (i * walk_length) + iteration; // Write location in RW array
             if(store_walks) {
               walks[write_idx] = v[i]; // record current position in walk
             }
 
-            if(!util::isValid(v[i])) return;
+            if(!util::isValid(v[i])) {
+              return;
+            }
 
             if(iteration < walk_length - 1) {
-              // Determine next neighbor to walk to
               SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
               if(num_neighbors == 0) {
                 v[i] = util::PreDefinedValues<VertexT>::InvalidValue;
                 return;
               }
 
-              SizeT offset     = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
-              VertexT neighbor = graph.GetEdgeDest(graph.GetNeighborListOffset(v[i]) + offset);
-              v[i]             = neighbor; // Replace vertex w/ neighbor in queue
-              neighbors_seen[i] += num_neighbors; // Record the number of neighbors we've seen
+              // Randomly sample neighbor
+              SizeT neighbor_list_offset = graph.GetNeighborListOffset(v[i]);
+              SizeT rand_offset          = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
+              VertexT neighbor           = graph.GetEdgeDest(neighbor_list_offset + rand_offset);
+
+              v[i] = neighbor;                    // Replace vertex w/ neighbor in queue
+              neighbors_seen[i] += num_neighbors; // Record number of neighbors we've seen
             }
           };
 
           GUARD_CU(frontier.V_Q()->ForAll(
             uniform_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+          cudaDeviceSynchronize();
 
-        } else if (walk_mode == 1) {
+        } else if (walk_mode == 1) { // greedy: walk to neighbor w/ maximum node value
           auto max_rw_op = [
               graph,
               walks,
@@ -148,10 +152,11 @@ struct RWIterationLoop : public IterationLoopBase
               walks[write_idx] = v[i]; // record current position in walk
             }
 
-            if(!util::isValid(v[i])) return;
+            if(!util::isValid(v[i])) {
+              return;
+            }
 
             if(iteration < walk_length - 1) {
-              // Walk to neighbor w/ maximum node value
               SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
               if(num_neighbors == 0) {
                 v[i] = util::PreDefinedValues<VertexT>::InvalidValue;
@@ -160,24 +165,24 @@ struct RWIterationLoop : public IterationLoopBase
 
               SizeT neighbor_list_offset = graph.GetNeighborListOffset(v[i]);
 
-              VertexT max_neighbor_id  = graph.GetEdgeDest(neighbor_list_offset + 0);
-              VertexT max_neighbor_val = graph.node_values[max_neighbor_id];
+              // Find neighbor with max value
+              VertexT max_neighbor_id = graph.GetEdgeDest(neighbor_list_offset + 0);
+              ValueT max_neighbor_val = graph.node_values[max_neighbor_id];
               for(SizeT offset = 1; offset < num_neighbors; offset++) {
-                VertexT neighbor     = graph.GetEdgeDest(neighbor_list_offset + offset);
-                ValueT  neighbor_val = graph.node_values[neighbor];
+                VertexT neighbor    = graph.GetEdgeDest(neighbor_list_offset + offset);
+                ValueT neighbor_val = graph.node_values[neighbor];
                 if(neighbor_val > max_neighbor_val) {
                   max_neighbor_id  = neighbor;
                   max_neighbor_val = neighbor_val;
                 }
               }
-              v[i] = max_neighbor_id; // Replace vertex w/ neighbor in queue
-              neighbors_seen[i] += num_neighbors; // Record the number of neighbors we've seen
+              v[i] = max_neighbor_id;             // Replace vertex w/ neighbor in queue
+              neighbors_seen[i] += num_neighbors; // Record number of neighbors we've seen
             }
           };
 
           GUARD_CU(frontier.V_Q()->ForAll(
             max_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
-
         }
 
         return retval;
@@ -185,13 +190,11 @@ struct RWIterationLoop : public IterationLoopBase
 
     cudaError_t Compute_OutputLength(int peer_)
     {
-        // No need to load balance or get output size
-        return cudaSuccess;
+        return cudaSuccess; // No need to load balance or get output size
     }
     cudaError_t Check_Queue_Size(int peer_)
     {
-        // no need to check queue size for RW
-        return cudaSuccess;
+        return cudaSuccess; // no need to check queue size for RW
     }
 
     bool Stop_Condition(int gpu_num = 0)

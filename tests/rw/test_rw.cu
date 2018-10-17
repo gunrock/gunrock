@@ -69,14 +69,11 @@ struct main_struct
         int walk_length    = parameters.Get<int>("walk-length");
         int walks_per_node = parameters.Get<int>("walks-per-node");
         int walk_mode      = parameters.Get<int>("walk-mode");
-        bool store_walks  = parameters.Get<bool>("store-walks");
+        bool store_walks   = parameters.Get<bool>("store-walks");
         VertexT *ref_walks = NULL;
 
         ValueT *node_values = NULL;
         if(walk_mode != 0) {
-            node_values = new ValueT[graph.nodes];
-            graph.CsrT::node_values.SetPointer(node_values, graph.nodes, gunrock::util::HOST);
-
             std::string node_value_path = parameters.Get<std::string>("node-value-path");
             if(node_value_path.compare("") == 0) {
                 printf("test_rw: `node-value-path` must be set if `walk-mode` != 0");
@@ -85,7 +82,8 @@ struct main_struct
 
             std::ifstream node_value_file(node_value_path, std::ios_base::in);
             for(int i = 0; i < graph.nodes; i++) {
-                node_value_file >> node_values[i];
+                node_value_file >> graph.node_values[i];
+                std::cerr << i << " " << graph.node_values[i] << std::endl;
             }
         }
 
@@ -160,7 +158,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |
-        app::VALUET_U32B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F32B | app::DIRECTED | app::UNDIRECTED>
         (parameters, main_struct());
 }
 

@@ -42,6 +42,8 @@ double CPU_Reference(
     typename GraphT::VertexT *walks,
     bool quiet)
 {
+    printf("CPU_Reference: start\n");
+
     typedef typename GraphT::SizeT SizeT;
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::ValueT ValueT;
@@ -49,6 +51,7 @@ double CPU_Reference(
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
 
+    int total_neighbors_seen = 0;
     if(walk_mode == 0) { // Random
         // <TODO> How should we implement a CPU reference?  Doesn't really make sense
         // I think we should actually be implementing a "checker" in Validate_Results
@@ -62,28 +65,37 @@ double CPU_Reference(
         for(int walk_id = 0; walk_id < graph.nodes * walks_per_node; walk_id++) {
             VertexT node_id = (VertexT)(walk_id % graph.nodes);
             for(int step = 0; step < walk_length; step++) {
+
                 if(store_walks) {
                     walks[walk_id * walk_length + step] = node_id;
                 }
+                if(step == walk_length - 1) break;
 
-                SizeT num_neighbors        = graph.GetNeighborListLength(node_id);
-                SizeT neighbor_list_offset = graph.GetNeighborListOffset(node_id);
-                VertexT max_neighbor_id    = graph.GetEdgeDest(neighbor_list_offset + 0);
-                VertexT max_neighbor_val   = graph.node_values[max_neighbor_id];
-                for(SizeT offset = 1; offset < num_neighbors; offset++) {
-                    VertexT neighbor     = graph.GetEdgeDest(neighbor_list_offset + offset);
-                    ValueT  neighbor_val = graph.node_values[neighbor];
-                    if(neighbor_val > max_neighbor_val) {
-                        max_neighbor_id  = neighbor;
-                        max_neighbor_val = neighbor_val;
+                SizeT num_neighbors = graph.GetNeighborListLength(node_id);
+                if(num_neighbors > 0) {
+                    SizeT neighbor_list_offset = graph.GetNeighborListOffset(node_id);
+
+                    VertexT max_neighbor_id = graph.GetEdgeDest(neighbor_list_offset);
+                    ValueT max_neighbor_val = graph.node_values[max_neighbor_id];
+
+                    for(SizeT offset = 1; offset < num_neighbors; offset++) {
+                        VertexT neighbor    = graph.GetEdgeDest(neighbor_list_offset + offset);
+                        ValueT neighbor_val = graph.node_values[neighbor];
+                        if(neighbor_val > max_neighbor_val) {
+                            max_neighbor_id  = neighbor;
+                            max_neighbor_val = neighbor_val;
+                        }
                     }
-                }
 
-                node_id = max_neighbor_id;
+                    node_id = max_neighbor_id;
+                    total_neighbors_seen += num_neighbors;
+                }
             }
         }
+        printf("CPU_Reference: total_neighbors_seen=%d\n", total_neighbors_seen);
     }
 
+    printf("CPU_Reference: done\n");
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
     return elapsed;
@@ -111,15 +123,21 @@ typename GraphT::SizeT Validate_Results(
             int                       walk_mode,
             bool                      store_walks,
             typename GraphT::VertexT *h_walks,
-            uint64_t                 *h_neighbors_seen,
+            int                      *h_neighbors_seen,
             typename GraphT::VertexT *ref_walks,
             bool verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
 
+    int total_neighbors_seen = 0;
+    for(SizeT v = 0; v < graph.nodes * walks_per_node; v++) {
+        total_neighbors_seen += h_neighbors_seen[v];
+    }
+    printf("Validate_Results: total_neighbors_seen=%d\n", total_neighbors_seen);
+
     SizeT num_errors = 0;
-    if(verbose && store_walks) {
+    if(verbose && store_walks && ref_walks != NULL) {
         printf("[[");
         for(SizeT v = 0; v < graph.nodes * walk_length * walks_per_node; ++v) {
             if((v > 0) && (v % walk_length == 0)) {
@@ -131,19 +149,12 @@ typename GraphT::SizeT Validate_Results(
                     num_errors++;
                 }
             }
-
         }
         printf("]]\n");
     }
 
-    uint64_t total_neighbors_seen = 0;
-    for(SizeT v = 0; v < graph.nodes * walks_per_node; ++v) {
-        total_neighbors_seen += h_neighbors_seen[v];
-    }
-    printf("total_neighbors_seen=%d\n", total_neighbors_seen);
-
     if(walk_mode == 0 || !store_walks) {
-        printf("-------- NO VALIDATION -----");
+        printf("-------- NO VALIDATION --------\n");
     } else {
         printf("%d errors occurred.", num_errors);
     }

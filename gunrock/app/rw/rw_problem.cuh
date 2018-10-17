@@ -68,7 +68,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         // problem specific storage arrays:
         util::Array1D<SizeT, VertexT> walks;
         util::Array1D<SizeT, float> rand;
-        util::Array1D<SizeT, uint64_t> neighbors_seen;
+        util::Array1D<SizeT, int> neighbors_seen;
         int walk_length;
         int walks_per_node;
         int walk_mode;
@@ -191,8 +191,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                x = (float)0.0;
             }, nodes * walks_per_node, target, this -> stream));
 
-            GUARD_CU(neighbors_seen.ForEach([]__host__ __device__ (uint64_t &x){
-               x = (uint64_t)0;
+            GUARD_CU(neighbors_seen.ForEach([]__host__ __device__ (int &x){
+               x = (int)0;
             }, nodes * walks_per_node, target, this -> stream));
 
             return retval;
@@ -259,7 +259,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     cudaError_t Extract(
         VertexT *h_walks,
-        uint64_t *h_neighbors_seen,
+        int *h_neighbors_seen,
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -289,7 +289,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 }
 
                 GUARD_CU(data_slice.neighbors_seen.ForEach(h_neighbors_seen,
-                   []__host__ __device__ (const uint64_t &device_val, uint64_t &host_val){
+                   []__host__ __device__ (const int &device_val, int &host_val){
                        host_val = device_val;
                    }, nodes * walks_per_node, util::HOST));
             }
