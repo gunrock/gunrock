@@ -46,6 +46,13 @@ cudaError_t UseParameters(util::Parameters &parameters)
          "random walk mode (0=random; 1=max)",
          __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<bool>(
+         "store-walks",
+         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+         true,
+         "store random walks?",
+         __FILE__, __LINE__));
+
     GUARD_CU(parameters.Use<std::string>(
          "node-value-path",
          util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
@@ -89,6 +96,7 @@ cudaError_t RunTests(
     int                      walk_length,
     int                      walks_per_node,
     int                      walk_mode,
+    bool                     store_walks,
     typename GraphT::VertexT *ref_walks,
     util::Location target)
 {
@@ -112,7 +120,10 @@ cudaError_t RunTests(
     cpu_timer.Start(); total_timer.Start();
 
     // Allocate problem specific host data
-    VertexT *h_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
+    VertexT *h_walks = NULL;
+    if(store_walks) {
+        h_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
+    }
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -141,8 +152,7 @@ cudaError_t RunTests(
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
 
-        if (validation == "each" && !quick) {
-
+        if (validation == "each" && !quick && store_walks) {
             GUARD_CU(problem.Extract(
                 h_walks
             ));
@@ -152,15 +162,17 @@ cudaError_t RunTests(
                 walk_length,
                 walks_per_node,
                 walk_mode,
+                store_walks,
                 h_walks,
                 ref_walks,
-                !quiet_mode);
+                !quiet_mode
+            );
         }
     }
 
     cpu_timer.Start();
 
-    if (validation == "last" && !quick) {
+    if (validation == "last" && !quiet_mode && store_walks) {
         GUARD_CU(problem.Extract(
             h_walks
         ));
@@ -170,9 +182,11 @@ cudaError_t RunTests(
             walk_length,
             walks_per_node,
             walk_mode,
+            store_walks,
             h_walks,
             ref_walks,
-            !quiet_mode);
+            !quiet_mode
+        );
     }
 
     // compute running statistics

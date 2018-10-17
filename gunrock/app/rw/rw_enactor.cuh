@@ -89,6 +89,7 @@ struct RWIterationLoop : public IterationLoopBase
         auto &walk_length    = data_slice.walk_length;
         auto &walks_per_node = data_slice.walks_per_node;
         auto &walk_mode      = data_slice.walk_mode;
+        auto &store_walks    = data_slice.store_walks;
         auto &gen            = data_slice.gen;
 
         if(walk_mode == 0) {
@@ -99,20 +100,30 @@ struct RWIterationLoop : public IterationLoopBase
               walks,
               rand,
               iteration,
-              walk_length
+              walk_length,
+              store_walks
           ] __host__ __device__ (VertexT *v, const SizeT &i) {
 
             // printf("graph.node_values[i]=%d\n", graph.node_values[i]);
 
-            SizeT write_idx  = (i * walk_length) + iteration; // Write location in RW array
-            walks[write_idx] = v[i];                          // record current position in walk
+            SizeT write_idx = (i * walk_length) + iteration; // Write location in RW array
+            if(store_walks) {
+              walks[write_idx] = v[i]; // record current position in walk
+            }
+
+            if(!util::isValid(v[i])) return;
 
             if(iteration < walk_length - 1) {
               // Determine next neighbor to walk to
               SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
-              SizeT offset        = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
-              VertexT neighbor    = graph.GetEdgeDest(graph.GetNeighborListOffset(v[i]) + offset);
-              v[i]                = neighbor; // Replace vertex w/ neighbor in queue
+              if(num_neighbors == 0) {
+                v[i] = util::PreDefinedValues<VertexT>::InvalidValue;
+                return;
+              }
+
+              SizeT offset     = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
+              VertexT neighbor = graph.GetEdgeDest(graph.GetNeighborListOffset(v[i]) + offset);
+              v[i]             = neighbor; // Replace vertex w/ neighbor in queue
             }
           };
 
@@ -124,15 +135,25 @@ struct RWIterationLoop : public IterationLoopBase
               graph,
               walks,
               iteration,
-              walk_length
+              walk_length,
+              store_walks
           ] __host__ __device__ (VertexT *v, const SizeT &i) {
 
-            SizeT write_idx  = (i * walk_length) + iteration; // Write location in RW array
-            walks[write_idx] = v[i];                          // record current position in walk
+            SizeT write_idx = (i * walk_length) + iteration; // Write location in RW array
+            if(store_walks) {
+              walks[write_idx] = v[i]; // record current position in walk
+            }
+
+            if(!util::isValid(v[i])) return;
 
             if(iteration < walk_length - 1) {
               // Walk to neighbor w/ maximum node value
-              SizeT num_neighbors        = graph.GetNeighborListLength(v[i]);
+              SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
+              if(num_neighbors == 0) {
+                v[i] = util::PreDefinedValues<VertexT>::InvalidValue;
+                return;
+              }
+
               SizeT neighbor_list_offset = graph.GetNeighborListOffset(v[i]);
 
               VertexT max_neighbor_id  = graph.GetEdgeDest(neighbor_list_offset + 0);

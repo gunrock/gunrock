@@ -71,6 +71,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         int walk_length;
         int walks_per_node;
         int walk_mode;
+        bool store_walks;
         curandGenerator_t gen;
 
         /*
@@ -122,6 +123,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             int walk_length_,
             int walks_per_node_,
             int walk_mode_,
+            bool store_walks_,
             int seed)
         {
             cudaError_t retval  = cudaSuccess;
@@ -131,10 +133,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             walk_length = walk_length_;
             walks_per_node = walks_per_node_;
             walk_mode = walk_mode_;
+            store_walks = store_walks_;
             curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
             curandSetPseudoRandomGeneratorSeed(gen, seed);
 
-            GUARD_CU(walks.Allocate(sub_graph.nodes * walk_length * walks_per_node, target));
+            if(store_walks_) {
+                GUARD_CU(walks.Allocate(sub_graph.nodes * walk_length * walks_per_node, target));
+            } else {
+                GUARD_CU(walks.Allocate(1, target));
+            }
             GUARD_CU(rand.Allocate(sub_graph.nodes * walks_per_node, target));
 
             if (target & util::DEVICE) {
@@ -154,13 +161,23 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT nodes = this -> sub_graph -> nodes;
 
             // Ensure data are allocated
-            GUARD_CU(walks.EnsureSize_(nodes * this -> walk_length * this -> walks_per_node, target));
+            if(this -> store_walks) {
+                GUARD_CU(walks.EnsureSize_(nodes * this -> walk_length * this -> walks_per_node, target));
+            } else {
+                GUARD_CU(walks.EnsureSize_(1, target));
+            }
             GUARD_CU(rand.EnsureSize_(nodes * this -> walks_per_node, target));
 
             // Reset data
-            GUARD_CU(walks.ForEach([]__host__ __device__ (VertexT &x){
-               x = util::PreDefinedValues<VertexT>::InvalidValue;
-            }, nodes * this -> walk_length * this -> walks_per_node, target, this -> stream));
+            if(this -> store_walks) {
+                GUARD_CU(walks.ForEach([]__host__ __device__ (VertexT &x){
+                   x = util::PreDefinedValues<VertexT>::InvalidValue;
+                }, nodes * this -> walk_length * this -> walks_per_node, target, this -> stream));
+            } else {
+                GUARD_CU(walks.ForEach([]__host__ __device__ (VertexT &x){
+                   x = util::PreDefinedValues<VertexT>::InvalidValue;
+                }, 1, target, this -> stream));
+            }
 
             GUARD_CU(rand.ForEach([]__host__ __device__ (float &x){
                x = (float)0.0;
@@ -175,6 +192,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     int walk_length;
     int walks_per_node;
     int walk_mode;
+    bool store_walks;
     int seed;
 
     // ----------------------------------------------------------------
@@ -192,6 +210,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         walk_length    = _parameters.Get<int>("walk-length");
         walks_per_node = _parameters.Get<int>("walks-per-node");
         walk_mode      = _parameters.Get<int>("walk-mode");
+        store_walks    = _parameters.Get<bool>("store-walks");
         seed           = _parameters.Get<int>("seed");
     }
 
@@ -315,6 +334,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 this -> walk_length,
                 this -> walks_per_node,
                 this -> walk_mode,
+                this -> store_walks,
                 this -> seed
             ));
         }

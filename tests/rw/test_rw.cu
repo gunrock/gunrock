@@ -69,9 +69,10 @@ struct main_struct
         int walk_length    = parameters.Get<int>("walk-length");
         int walks_per_node = parameters.Get<int>("walks-per-node");
         int walk_mode      = parameters.Get<int>("walk-mode");
-        VertexT *ref_walks;
+        bool store_walks  = parameters.Get<bool>("store-walks");
+        VertexT *ref_walks = NULL;
 
-        ValueT *node_values;
+        ValueT *node_values = NULL;
         if(walk_mode != 0) {
             node_values = new ValueT[graph.nodes];
             graph.CsrT::node_values.SetPointer(node_values, graph.nodes, gunrock::util::HOST);
@@ -89,7 +90,9 @@ struct main_struct
         }
 
         if (!quick) {
-            ref_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
+            if(store_walks) {
+                ref_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
+            }
 
             util::PrintMsg("__________________________", !quiet);
 
@@ -98,6 +101,7 @@ struct main_struct
                 walk_length,
                 walks_per_node,
                 walk_mode,
+                store_walks,
                 ref_walks,
                 quiet
             );
@@ -112,7 +116,8 @@ struct main_struct
                 walk_length,
                 walks_per_node,
                 walk_mode,
-                ref_walks
+                ref_walks,
+                store_walks
             ](util::Parameters &parameters, GraphT &graph)
             {
                 return APP_NAMESPACE::RunTests(
@@ -121,6 +126,7 @@ struct main_struct
                     walk_length,
                     walks_per_node,
                     walk_mode,
+                    store_walks,
                     ref_walks,
                     util::DEVICE
                 );

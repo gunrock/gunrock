@@ -38,6 +38,7 @@ double CPU_Reference(
     int walk_length,
     int walks_per_node,
     int walk_mode,
+    bool store_walks,
     typename GraphT::VertexT *walks,
     bool quiet)
 {
@@ -51,15 +52,19 @@ double CPU_Reference(
     if(walk_mode == 0) { // Random
         // <TODO> How should we implement a CPU reference?  Doesn't really make sense
         // I think we should actually be implementing a "checker" in Validate_Results
-        for(SizeT i = 0; i < graph.nodes * walk_length * walks_per_node; ++i) {
-            walks[i] = util::PreDefinedValues<VertexT>::InvalidValue;
+        if(store_walks) {
+            for(SizeT i = 0; i < graph.nodes * walk_length * walks_per_node; ++i) {
+                walks[i] = util::PreDefinedValues<VertexT>::InvalidValue;
+            }
         }
         // </TODO>
     } else if (walk_mode == 1) { // Max
         for(int walk_id = 0; walk_id < graph.nodes * walks_per_node; walk_id++) {
             VertexT node_id = (VertexT)(walk_id % graph.nodes);
             for(int step = 0; step < walk_length; step++) {
-                walks[walk_id * walk_length + step] = node_id;
+                if(store_walks) {
+                    walks[walk_id * walk_length + step] = node_id;
+                }
 
                 SizeT num_neighbors        = graph.GetNeighborListLength(node_id);
                 SizeT neighbor_list_offset = graph.GetNeighborListOffset(node_id);
@@ -104,6 +109,7 @@ typename GraphT::SizeT Validate_Results(
             int                       walk_length,
             int                       walks_per_node,
             int                       walk_mode,
+            bool                      store_walks,
             typename GraphT::VertexT *h_walks,
             typename GraphT::VertexT *ref_walks,
             bool verbose = true)
@@ -114,7 +120,7 @@ typename GraphT::SizeT Validate_Results(
     SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
 
-    if(verbose) {
+    if(verbose && store_walks) {
         printf("[[");
         for(SizeT v = 0; v < graph.nodes * walk_length * walks_per_node; ++v) {
             if((v > 0) && (v % walk_length == 0)) {
@@ -131,7 +137,7 @@ typename GraphT::SizeT Validate_Results(
         printf("]]\n");
     }
 
-    if(walk_mode == 0) {
+    if(walk_mode == 0 || !store_walks) {
         printf("-------- NO VALIDATION -----");
     } else {
         printf("%d errors occurred.", num_errors);
