@@ -91,6 +91,7 @@ struct RWIterationLoop : public IterationLoopBase
         auto &walk_mode      = data_slice.walk_mode;
         auto &store_walks    = data_slice.store_walks;
         auto &gen            = data_slice.gen;
+        auto &neighbors_seen = data_slice.neighbors_seen;
 
         if(walk_mode == 0) {
           curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
@@ -101,7 +102,8 @@ struct RWIterationLoop : public IterationLoopBase
               rand,
               iteration,
               walk_length,
-              store_walks
+              store_walks,
+              neighbors_seen
           ] __host__ __device__ (VertexT *v, const SizeT &i) {
 
             // printf("graph.node_values[i]=%d\n", graph.node_values[i]);
@@ -124,6 +126,7 @@ struct RWIterationLoop : public IterationLoopBase
               SizeT offset     = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
               VertexT neighbor = graph.GetEdgeDest(graph.GetNeighborListOffset(v[i]) + offset);
               v[i]             = neighbor; // Replace vertex w/ neighbor in queue
+              neighbors_seen[i] += num_neighbors; // Record the number of neighbors we've seen
             }
           };
 
@@ -136,7 +139,8 @@ struct RWIterationLoop : public IterationLoopBase
               walks,
               iteration,
               walk_length,
-              store_walks
+              store_walks,
+              neighbors_seen
           ] __host__ __device__ (VertexT *v, const SizeT &i) {
 
             SizeT write_idx = (i * walk_length) + iteration; // Write location in RW array
@@ -167,6 +171,7 @@ struct RWIterationLoop : public IterationLoopBase
                 }
               }
               v[i] = max_neighbor_id; // Replace vertex w/ neighbor in queue
+              neighbors_seen[i] += num_neighbors; // Record the number of neighbors we've seen
             }
           };
 
@@ -176,6 +181,17 @@ struct RWIterationLoop : public IterationLoopBase
         }
 
         return retval;
+    }
+
+    cudaError_t Compute_OutputLength(int peer_)
+    {
+        // No need to load balance or get output size
+        return cudaSuccess;
+    }
+    cudaError_t Check_Queue_Size(int peer_)
+    {
+        // no need to check queue size for RW
+        return cudaSuccess;
     }
 
     bool Stop_Condition(int gpu_num = 0)
@@ -345,10 +361,7 @@ public:
     cudaError_t Run(ThreadSlice &thread_data)
     {
         gunrock::app::Iteration_Loop<
-            // <OPEN> change to how many {VertexT, ValueT} data need to communicate
-            //       per element in the inter-GPU sub-frontiers
-            0, 1,
-            // </OPEN>
+            0, 0,
             IterationT>(
             thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;

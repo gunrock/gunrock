@@ -124,6 +124,7 @@ cudaError_t RunTests(
     if(store_walks) {
         h_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
     }
+    uint64_t *h_neighbors_seen = new uint64_t[graph.nodes * walks_per_node];
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -152,9 +153,9 @@ cudaError_t RunTests(
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
 
-        if (validation == "each" && !quick && store_walks) {
+        if (validation == "each" && !quick) {
             GUARD_CU(problem.Extract(
-                h_walks
+                h_walks, h_neighbors_seen
             ));
             SizeT num_errors = Validate_Results(
                 parameters,
@@ -164,6 +165,7 @@ cudaError_t RunTests(
                 walk_mode,
                 store_walks,
                 h_walks,
+                h_neighbors_seen,
                 ref_walks,
                 !quiet_mode
             );
@@ -172,9 +174,9 @@ cudaError_t RunTests(
 
     cpu_timer.Start();
 
-    if (validation == "last" && !quiet_mode && store_walks) {
+    if (validation == "last" && !quiet_mode) {
         GUARD_CU(problem.Extract(
-            h_walks
+            h_walks, h_neighbors_seen
         ));
         SizeT num_errors = Validate_Results(
             parameters,
@@ -184,6 +186,7 @@ cudaError_t RunTests(
             walk_mode,
             store_walks,
             h_walks,
+            h_neighbors_seen,
             ref_walks,
             !quiet_mode
         );
@@ -200,7 +203,8 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    delete[] h_walks; h_walks   = NULL;
+    delete[] h_walks; h_walks = NULL;
+    delete[] h_neighbors_seen; h_neighbors_seen = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());

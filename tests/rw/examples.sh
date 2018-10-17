@@ -2,6 +2,9 @@
 
 # examples.sh
 
+# --
+# Small datasets
+
 python random-values.py 39 > chesapeake.values
 
 # uniform random
@@ -20,3 +23,14 @@ python random-values.py 39 > chesapeake.values
 ./bin/test_rw_9.1_x86_64 --graph-type market --graph-file ../../dataset/small/chesapeake.mtx \
     --node-value-path chesapeake.values --walk-mode 1 --store-walks 0
 
+
+# --
+# Larger datasets
+
+python random-values.py 1139905 > hollywood.values
+DATAPATH="../../dataset/large/hollywood-2009/hollywood-2009.mtx"
+
+./bin/test_rw_9.1_x86_64 --graph-type market --graph-file $DATAPATH \
+    --walk-mode 0 \
+    --walk-length 3000 \
+    --quick --quiet

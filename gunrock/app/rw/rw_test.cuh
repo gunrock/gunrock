@@ -111,6 +111,7 @@ typename GraphT::SizeT Validate_Results(
             int                       walk_mode,
             bool                      store_walks,
             typename GraphT::VertexT *h_walks,
+            uint64_t                 *h_neighbors_seen,
             typename GraphT::VertexT *ref_walks,
             bool verbose = true)
 {
@@ -118,8 +119,6 @@ typename GraphT::SizeT Validate_Results(
     typedef typename GraphT::SizeT   SizeT;
 
     SizeT num_errors = 0;
-    bool quiet = parameters.Get<bool>("quiet");
-
     if(verbose && store_walks) {
         printf("[[");
         for(SizeT v = 0; v < graph.nodes * walk_length * walks_per_node; ++v) {
@@ -137,12 +136,17 @@ typename GraphT::SizeT Validate_Results(
         printf("]]\n");
     }
 
+    uint64_t total_neighbors_seen = 0;
+    for(SizeT v = 0; v < graph.nodes * walks_per_node; ++v) {
+        total_neighbors_seen += h_neighbors_seen[v];
+    }
+    printf("total_neighbors_seen=%d\n", total_neighbors_seen);
+
     if(walk_mode == 0 || !store_walks) {
         printf("-------- NO VALIDATION -----");
     } else {
         printf("%d errors occurred.", num_errors);
     }
-
 
     return num_errors;
 }
