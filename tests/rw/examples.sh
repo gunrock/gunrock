@@ -26,8 +26,30 @@ seq 39 > chesapeake.values
 # --
 # Should match reference
 
+# dummy, undirected
 ./bin/test_rw_9.1_x86_64 --graph-type market --graph-file ../../dataset/small/chesapeake.mtx \
-    --node-value-path chesapeake.values --walk-mode 1 --walk-length 10
+    --node-value-path chesapeake.values --walk-mode 1 --walk-length 5
+
+# dummy, directed
+./bin/test_rw_9.1_x86_64 --graph-type market --graph-file dir_chesapeake.mtx \
+    --node-value-path chesapeake.values --walk-mode 1 --walk-length 5 --undirected=0
+
+# real graph
+python ~/edgelist2mtx.py \
+    --inpath /home/bjohnson/projects/hive/cpp/graphsearch/dataset/gs_twitter.edgelist \
+    --outpath gs_twitter
+
+cp /home/bjohnson/projects/hive/cpp/graphsearch/dataset/gs_twitter.values gs_twitter.values 
+
+# change gs_twitter.mtx to `general`
+./bin/test_rw_9.1_x86_64 --graph-type market --graph-file gs_twitter.mtx \
+    --node-value-path gs_twitter.values \
+    --walk-mode 1 \
+    --walk-length 10000 \
+    --undirected=0 \
+    --store-walks 0 \
+    --quick \
+    --num-runs 10
 
 # --
 # Larger datasets

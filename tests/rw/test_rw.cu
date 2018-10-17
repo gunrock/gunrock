@@ -83,7 +83,6 @@ struct main_struct
             std::ifstream node_value_file(node_value_path, std::ios_base::in);
             for(int i = 0; i < graph.nodes; i++) {
                 node_value_file >> graph.node_values[i];
-                std::cerr << i << " " << graph.node_values[i] << std::endl;
             }
         }
 

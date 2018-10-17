@@ -154,7 +154,7 @@ cudaError_t RunTests(
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
 
-        if (validation == "each" && !quick) {
+        if (validation == "each") {
             GUARD_CU(problem.Extract(
                 h_walks, h_neighbors_seen
             ));
@@ -167,15 +167,14 @@ cudaError_t RunTests(
                 store_walks,
                 h_walks,
                 h_neighbors_seen,
-                ref_walks,
-                !quiet_mode
+                ref_walks
             );
         }
     }
 
     cpu_timer.Start();
 
-    if (validation == "last" && !quiet_mode) {
+    if (validation == "last") {
         GUARD_CU(problem.Extract(
             h_walks, h_neighbors_seen
         ));
@@ -188,8 +187,7 @@ cudaError_t RunTests(
             store_walks,
             h_walks,
             h_neighbors_seen,
-            ref_walks,
-            !quiet_mode
+            ref_walks
         );
     }
 
