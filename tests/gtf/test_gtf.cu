@@ -109,16 +109,18 @@ struct main_struct
     	util::PrintMsg("______CPU reference algorithm______", true);
     	double elapsed = 0;
 
-        GUARD_CU(app::gtf::CPU_Reference
-    	    (parameters, d_graph, reverse_edges, elapsed));
+      printf("CPU code not called \n");
+        //GUARD_CU(app::gtf::CPU_Reference
+    	  //  (parameters, d_graph, reverse_edges, elapsed));
         util::PrintMsg("-----------------------------------\n"
             "Elapsed: " + std::to_string(elapsed) + " ms", true);
 
         std::vector<std::string> switches{"advance-mode"};
+
     	GUARD_CU(app::Switch_Parameters(parameters, d_graph, switches,
     	[](util::Parameters &parameters, GraphT &d_graph)
     	{
-    	    return app::gtf::RunTests(parameters, d_graph);
+    	    return app::gtf::RunTests<GraphT, ValueT, VertexT, SizeT>(parameters, d_graph);
     	    return cudaSuccess;
         }));
 

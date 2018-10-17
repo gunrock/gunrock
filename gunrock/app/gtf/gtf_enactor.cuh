@@ -59,15 +59,17 @@ struct GTFIterationLoop : public IterationLoopBase
     typedef IterationLoopBase <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
     GTFIterationLoop() : BaseIterationLoop() {}
+    
+    printf("in core function!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 
     /**
      * @brief Core computation of gtf, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
      * \return cudaError_t error message(s), if any
      */
-     int iter = 0; //!!!
     cudaError_t Core(int peer_ = 0)
     {
+
 	     auto enactor		= this -> enactor;
 	     auto gpu_num		= this -> gpu_num;
 	     auto num_gpus		= enactor -> num_gpus;
@@ -85,7 +87,7 @@ struct GTFIterationLoop : public IterationLoopBase
 	     auto source		= data_slice.source;
        auto sink		= data_slice.sink;
 
-       auto &next_communities = graph.next_communities;
+       auto &next_communities = data_slice.next_communities;
        auto &curr_communities	= data_slice.curr_communities;
        auto &community_sizes = data_slice.community_sizes;
        auto &community_weights = data_slice.community_weights;
@@ -106,39 +108,30 @@ struct GTFIterationLoop : public IterationLoopBase
        auto offset = num_edges - (num_org_nodes)*2; //!!!
        ValueT sum_weights_source_sink = 0;
 
-       /*
-       if(iter == 0){ //
-         auto avg = [sum_weights_source_sink]
-             __host__ __device__
-             (const SizeT &v, const SizeT &offset)-> bool
-         {
-           atomicAdd(&sum_weights_source_sink, graph.edge_values[offset + v]);
-           SizeT e = graph.GetNeighborListOffset(v) + graph.GetNeighborListLength(v) - 1;
-           atomicAdd(&sum_weights_source_sink, -graph.edge_values[e]);
-           return true;
-         };
+       
+       	GUARD_CU(active.ForAll(
+       	    [] __host__ __device__ (SizeT *a, const SizeT &v){
+       	      a[v] = true;
+              if (a[v]){
+       		       printf("there are");
+       	      }else{
+       		       printf("there are not");
+       	      }
+       	        printf(" active nodes\n");
+       	    }, 1, util::DEVICE, oprtr_parameters.stream));
 
-         auto normalize = [sum_weights_source_sink];
-             __host__ __device__
-             (const SizeT &v, const SizeT &offset, ValueT &community_accus)-> bool
-         {
-           auto avg_weights_source_sink = sum_weights_source_sink / num_org_nodes;
-           community_accus[0] = avg_weights_source_sink;
-
-           SizeT  e = graph.GetNeighborListOffset(v) + graph.GetNeighborListLength(v) - 1;
-           ValueT val = graph.edge_values[offset + v] - graph.edge_values[e]
-               - avg_weights_source_sink;
-
-           if (val > 0){
-            graph.edge_values[offset + v] = val;
-            graph.edge_values[e] = 0;
-           } else {
-            graph.edge_values[offset + v] = 0;
-            graph.edge_values[e] = -1 * val;
-           }
-           return true;
-         };
-       }
+       num_nodes = 0;
+       community_active[1] = true;
+       printf("num_nodes \n");
+            /*
+       GUARD_CU(active.ForAll(
+            [sum_weights_source_sink] __host__ __device__ (SizeT *a, const SizeT &v){
+              if(v < num_comms){
+               community_weights[comm] = 0;
+               community_sizes  [comm] = 0;
+               next_communities [comm] = 0;
+              }
+            }, 1, util::DEVICE, oprtr_parameters.stream));
 
        // Call mincut.
        auto comm_resets = [sum_weights_source_sink]
@@ -146,17 +139,13 @@ struct GTFIterationLoop : public IterationLoopBase
            (VertexT &community_sizes, ValueT &community_weights,
              ValueT &next_communities, unsigned int comm)-> bool
       {
-        if(comm < num_comms){
-         community_weights[comm] = 0;
-         community_sizes  [comm] = 0;
-         next_communities [comm] = 0;
-        }
+
         return true;
       };
 
       auto pervious_num_comms = num_comms;
-
       */
+
 
   /*
 	auto advance_push_op = [capacity, flow, excess, height, reverse,
@@ -278,7 +267,7 @@ struct GTFIterationLoop : public IterationLoopBase
 		frontier.queue_length);\
 	fflush(stdout);
 
-	data_slice.num_updated_vertices = frontier.queue_length;
+	//data_slice.num_updated_vertices = frontier.queue_length;
 
 	return retval;
     }
@@ -312,11 +301,6 @@ struct GTFIterationLoop : public IterationLoopBase
         auto &enactor_slice = enactor -> enactor_slices[gpu_offset + peer_];
         auto iteration	    = enactor_slice.enactor_stats.iteration;
 
-        auto &capacity	    = data_slice.sub_graph[0].edge_values;
-        auto &flow  	    = data_slice.flow;
-        auto &excess	    = data_slice.excess;
-        auto &height	    = data_slice.height;
-
 	debug_aml("ExpandIncomming do nothing");
 /*	for key " +
 		    std::to_string(key) + " and for in_pos " +
@@ -324,7 +308,8 @@ struct GTFIterationLoop : public IterationLoopBase
 		    std::to_string(vertex_associate_ins[in_pos]) +
 		    " and for value ass ins " +
 		    std::to_string(value__associate_ins[in_pos]));*/
-	auto expand_op = [capacity, flow, excess, height]
+
+	auto expand_op = []
 	__host__ __device__(VertexT &key, const SizeT &in_pos,
             VertexT *vertex_associate_ins,
             ValueT  *value__associate_ins) -> bool
@@ -342,6 +327,7 @@ struct GTFIterationLoop : public IterationLoopBase
         cudaError_t retval = BaseIterationLoop:: template ExpandIncomingBase
             <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
             (received_length, peer_, expand_op);
+
 	return retval;
     }
 
@@ -490,10 +476,12 @@ public:
     cudaError_t Run(ThreadSlice &thread_data)
     {
 	debug_aml("Run enact");
+        printf("in Run function !!!!!!!!! \n");
         gunrock::app::Iteration_Loop<
             0, // NUM_VERTEX_ASSOCIATES
 	    1, // NUM_VALUE__ASSOCIATES
             IterationT>(thread_data, iterations[thread_data.thread_num]);
+        printf("in Run function !!!!!!!!! \n");
         return cudaSuccess;
     }
 
@@ -558,7 +546,8 @@ public:
     cudaError_t Enact()
     {
         cudaError_t  retval     = cudaSuccess;
-	debug_aml("enact");
+	      debug_aml("enact");
+        printf("enact calling successfully!!!!!!!!!!!\n");
         GUARD_CU(this -> Run_Threads(this));
         util::PrintMsg("GPU gtf Done.", this -> flag & Debug);
         return retval;

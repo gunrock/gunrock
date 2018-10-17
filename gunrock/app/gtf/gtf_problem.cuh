@@ -100,6 +100,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT> edge_flows;//       = new ValueT [num_edges]; // edge flows
         util::Array1D<SizeT, SizeT> active;	      // flag active vertices
         util::Array1D<SizeT, double> sum_weights_source_sink;             // moy
+        SizeT num_updated_vertices;
 
 
         VertexT	source;	// source vertex
@@ -117,6 +118,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
           num_org_nodes = util::PreDefinedValues<VertexT>::InvalidValue;
           num_edges = util::PreDefinedValues<VertexT>::InvalidValue;
           sum_weights_source_sink = 0;
+          num_updated_vertices = 1;
 
           next_communities.SetName("next_communities");
           curr_communities.SetName("curr_communities");
@@ -214,7 +216,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          * @param[in] target      Targeting device location
          * \return    cudaError_t Error message(s), if any
          */
-        cudaError_t Reset(const GraphT& graph, const VertexT source,
+        cudaError_t Reset(const GraphT& graph, ValueT *h_community_accus,
 		        util::Location target = util::DEVICE)
         {
             cudaError_t retval = cudaSuccess;
@@ -245,11 +247,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
 
             ///////////////////////////////
-            SizeT offset = num_edges - num_org_nodes * 2;
-            printf("offset is %d num edges %d \n", offset, num_edges);
+            num_org_nodes = graph.nodes - 2;
+            SizeT offset = graph.edges - num_org_nodes * 2;
+            printf("offset is %d num edges %d \n", offset, edges_size);
 
-            ValueT* h_vertex_active = (ValueT*)malloc(sizeof(bool)*graph.edges);
-      	    ValueT* h_community_active = (ValueT*)malloc(sizeof(bool)*graph.nodes);
+            bool* h_vertex_active = (bool*)malloc(sizeof(bool)*graph.edges);
+      	    bool* h_community_active = (bool*)malloc(sizeof(bool)*graph.nodes);
       	    VertexT* h_curr_communities = (VertexT*)malloc(sizeof(VertexT)*graph.nodes);
             VertexT* h_next_communities = (VertexT*)malloc(sizeof(VertexT)*graph.nodes);
             for (VertexT v = 0; v < num_org_nodes; v++)
@@ -271,6 +274,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(next_communities.SetPointer(h_next_communities, num_org_nodes, util::HOST));
       	    GUARD_CU(next_communities.Move(util::HOST, target, num_org_nodes, 0,
       			this->stream));
+
+            GUARD_CU(community_accus.SetPointer(h_community_accus, num_org_nodes, util::HOST));
+      	    GUARD_CU(community_accus.Move(util::HOST, target, num_org_nodes, 0,
+      			this->stream));
+
+            this->num_updated_vertices = 0;
 
             GUARD_CU(active.ForAll([]
 	             __host__ __device__(SizeT *active_, const VertexT &pos)
@@ -422,15 +431,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * @param[in] location Memory location to work on
      * \return cudaError_t Error message(s), if any
      */
-    cudaError_t Reset(GraphT& graph,
+    cudaError_t Reset(GraphT& graph, ValueT *h_community_accus,
 	    util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
 
 	debug_aml("Problem Reset");
 
-	auto source_vertex  = this->parameters.template Get<VertexT>("source");
-	auto sink_vertex    = this->parameters.template Get<VertexT>("sink");
+	auto source_vertex  = graph.nodes-2;
+	auto sink_vertex    = graph.nodes-1;
 
         for (int gpu = 0; gpu < this->num_gpus; ++gpu)
         {
@@ -441,7 +450,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    // Set device
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-	    GUARD_CU(data_slices[gpu]->Reset(graph, source_vertex, target));
+	    GUARD_CU(data_slices[gpu]->Reset(graph, h_community_accus, target));
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
 

@@ -384,7 +384,7 @@ cudaError_t CPU_Reference(
 
     auto avg_weights_source_sink = sum_weights_source_sink / num_org_nodes;
     community_accus[0] = avg_weights_source_sink;
-    printf("avg is %f \n", avg_weights_source_sink);
+    printf("!!!!!!!!!! avg is %f \n", avg_weights_source_sink);
     for (VertexT v = 0; v < num_org_nodes; v++)
     {
         SizeT  e = graph.GetNeighborListOffset(v) + graph.GetNeighborListLength(v) - 1;
@@ -411,9 +411,9 @@ cudaError_t CPU_Reference(
         printf("Iteration %d\n", iteration);
         iteration++;
 
-        GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
-            edge_flows, edge_residuals, vertex_reachabilities));
-        //minCut(graph, source, dest, vertex_reachabilities, edge_residuals, num_nodes);
+        //GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
+        //    edge_flows, edge_residuals, vertex_reachabilities));
+        minCut(graph, source, dest, vertex_reachabilities, edge_residuals, num_nodes);
 
         auto &edge_capacities = graph.edge_values;
 
@@ -490,6 +490,7 @@ cudaError_t CPU_Reference(
                 community_weights[comm] = 0;
             }
         }
+        printf("%d ", comm);
         for (; comm < num_comms; comm++)
         {
             community_weights[comm] /= community_sizes  [comm];

@@ -179,11 +179,10 @@ cudaError_t AddSourceSink(
  * @param[in]  target	  Whether to perform the gtf
  * \return cudaError_t error message(s), if any
  */
-template <typename GraphT, typename ValueT, typename VertexT>
+template <typename GraphT, typename ValueT, typename VertexT, typename SizeT>
 cudaError_t RunTests(
     util::Parameters  &parameters,
     GraphT	      &graph,
-    //ArrayT &reverse_edges, 
     util::Location    target = util::DEVICE)
 {
     debug_aml("RunTests starts");
@@ -191,29 +190,69 @@ cudaError_t RunTests(
     typedef Problem<GraphT>	      ProblemT;
     typedef Enactor<ProblemT>	      EnactorT;
 
+
+
     util::CpuTimer total_timer;	total_timer.Start();
     util::CpuTimer cpu_timer;	cpu_timer.Start();
 
     // parse configurations from parameters
+    printf("in side that weird function1\n");
     bool quiet_mode	    = parameters.Get<bool>("quiet");
     int  num_runs	    = parameters.Get<int >("num-runs");
     std::string validation  = parameters.Get<std::string>("validation");
-    VertexT source	    = parameters.Get<VertexT>("source");
-    VertexT sink	    = parameters.Get<VertexT>("sink");
+
+    ///////////////////////////////
+    auto     num_nodes        = graph.nodes; // n + 2 = V
+    auto     num_org_nodes    = num_nodes-2; // n
+    auto     num_edges        = graph.edges; // m + n*4
+    VertexT  source           = num_org_nodes; // originally 0
+    VertexT  sink             = num_org_nodes+1; // originally 1
+
+    SizeT offset = num_edges - num_org_nodes * 2;
+    printf("offset in GPU preprocess is %d num edges %d \n", offset, num_edges);
+    double   sum_weights_source_sink = 0;
+    for (VertexT v = 0; v < num_org_nodes; v++)
+    {
+        sum_weights_source_sink += graph.edge_values[offset + v];
+        SizeT e = graph.GetNeighborListOffset(v) + graph.GetNeighborListLength(v) - 1;
+        sum_weights_source_sink -= graph.edge_values[e];
+    }
+
+    auto avg_weights_source_sink = sum_weights_source_sink / num_org_nodes;
+    printf("avg in GPU preprocess is %f \n", avg_weights_source_sink);
+    for (VertexT v = 0; v < num_org_nodes; v++)
+    {
+        SizeT  e = graph.GetNeighborListOffset(v) + graph.GetNeighborListLength(v) - 1;
+        ValueT val = graph.edge_values[offset + v] - graph.edge_values[e]
+            - avg_weights_source_sink;
+
+        if (val > 0)
+        {
+            graph.edge_values[offset + v] = val;
+            graph.edge_values[e] = 0;
+        } else {
+            graph.edge_values[offset + v] = 0;
+            graph.edge_values[e] = -1 * val;
+        }
+
+    }
+    ///////////////////////////////
+
     debug_aml("source %d, sink %d, quite_mode %d, num-runs %d", source, sink,
 	    quiet_mode, num_runs);
-
     util::Info info("gtf", parameters, graph); // initialize Info structure
 
     // Allocate host-side array (for both reference and GPU-computed results)
     // ... for function Extract
     ValueT *community_accus = (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
+    community_accus[0] = avg_weights_source_sink;
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
     GUARD_CU(problem.Init(graph, target));
     GUARD_CU(enactor.Init(problem, target));
+    printf("in side that weird function3\n");
 
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
@@ -221,13 +260,13 @@ cudaError_t RunTests(
     // perform the gtf algorithm
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        GUARD_CU(problem.Reset(graph, target));
+        GUARD_CU(problem.Reset(graph, community_accus, target));
         GUARD_CU(enactor.Reset(source, target));
 
-        util::PrintMsg("______GPU PushRelabel algorithm____", !quiet_mode);
+        util::PrintMsg("______GPU SFL algorithm____", !quiet_mode);
 
         cpu_timer.Start();
-        //GUARD_CU(enactor.Enact());
+        GUARD_CU(enactor.Enact());
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
