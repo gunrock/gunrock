@@ -46,6 +46,9 @@ python ~/edgelist2mtx.py \
 
 cp /home/bjohnson/projects/hive/cpp/graphsearch/dataset/gs_twitter.values gs_twitter.values 
 
+# --
+# HIVE twitter graph
+
 # directed, greedy
 # change `undir_gs_twitter.mtx` header to `general` to create `dir_gs_twitter.mtx`
 # can run this for a high `--walk-length`, because the walks just go uphill and terminate
@@ -59,24 +62,24 @@ cp /home/bjohnson/projects/hive/cpp/graphsearch/dataset/gs_twitter.values gs_twi
     --quick \
     --num-runs 10
 
-# undirected, greedy
-# This is much more expensive, because the walks don't terminate
-# They actually go to the peak, and the bounce back and forth stupidly
-# `total_neighbors_seen` overflows
-./bin/test_rw_9.1_x86_64 --graph-type market --graph-file undir_gs_twitter.mtx \
-    --node-value-path gs_twitter.values \
-    --walk-mode 1 \
-    --walk-length 100 \
-    --store-walks 0 \
-    --quick \
-    --num-runs 10
+# # undirected, greedy
+# # This is much more expensive, because the walks don't terminate
+# # They actually go to the peak, and the bounce back and forth stupidly
+# # `total_neighbors_seen` overflows
+# ./bin/test_rw_9.1_x86_64 --graph-type market --graph-file undir_gs_twitter.mtx \
+#     --node-value-path gs_twitter.values \
+#     --walk-mode 1 \
+#     --walk-length 100 \
+#     --store-walks 0 \
+#     --quick \
+#     --num-runs 10
 
 # undirected, random
 # waaay faster than the CPU reference implementation
 ./bin/test_rw_9.1_x86_64 --graph-type market --graph-file undir_gs_twitter.mtx \
     --node-value-path gs_twitter.values \
     --walk-mode 0 \
-    --walk-length 100 \
+    --walk-length 128 \
     --store-walks 0 \
     --quick \
     --num-runs 10 \
@@ -86,14 +89,12 @@ cp /home/bjohnson/projects/hive/cpp/graphsearch/dataset/gs_twitter.values gs_twi
 ./bin/test_rw_9.1_x86_64 --graph-type market --graph-file dir_gs_twitter.mtx \
     --node-value-path gs_twitter.values \
     --walk-mode 0 \
-    --walk-length 100 \
+    --walk-length 128 \
     --undirected=0 \
     --store-walks 0 \
     --quick \
     --num-runs 10 \
     --seed 123
-
-
 
 # --
 # Larger datasets
