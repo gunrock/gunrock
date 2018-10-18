@@ -43,7 +43,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
          "walk-mode",
          util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
          0,
-         "random walk mode (0=random; 1=max)",
+         "random walk mode (0=uniform_random; 1=greedy, 2=stochastic_greedy)",
          __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<bool>(
@@ -124,8 +124,10 @@ cudaError_t RunTests(
     if(store_walks) {
         h_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
     }
-    int *h_neighbors_seen = new int[graph.nodes * walks_per_node];
-    memset(h_neighbors_seen, 0, graph.nodes * walks_per_node * sizeof(int));
+
+    uint64_t *h_neighbors_seen = new uint64_t[graph.nodes * walks_per_node];
+    uint64_t *h_steps_taken    = new uint64_t[graph.nodes * walks_per_node];
+
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -156,7 +158,7 @@ cudaError_t RunTests(
 
         if (validation == "each") {
             GUARD_CU(problem.Extract(
-                h_walks, h_neighbors_seen
+                h_walks, h_neighbors_seen, h_steps_taken
             ));
             SizeT num_errors = Validate_Results(
                 parameters,
@@ -167,6 +169,7 @@ cudaError_t RunTests(
                 store_walks,
                 h_walks,
                 h_neighbors_seen,
+                h_steps_taken,
                 ref_walks
             );
         }
@@ -176,7 +179,7 @@ cudaError_t RunTests(
 
     if (validation == "last") {
         GUARD_CU(problem.Extract(
-            h_walks, h_neighbors_seen
+            h_walks, h_neighbors_seen, h_steps_taken
         ));
         SizeT num_errors = Validate_Results(
             parameters,
@@ -187,6 +190,7 @@ cudaError_t RunTests(
             store_walks,
             h_walks,
             h_neighbors_seen,
+            h_steps_taken,
             ref_walks
         );
     }
@@ -204,6 +208,7 @@ cudaError_t RunTests(
     GUARD_CU(problem.Release(target));
     delete[] h_walks; h_walks = NULL;
     delete[] h_neighbors_seen; h_neighbors_seen = NULL;
+    delete[] h_steps_taken; h_steps_taken = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());

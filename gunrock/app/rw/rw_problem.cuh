@@ -68,7 +68,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         // problem specific storage arrays:
         util::Array1D<SizeT, VertexT> walks;
         util::Array1D<SizeT, float> rand;
-        util::Array1D<SizeT, int> neighbors_seen;
+        util::Array1D<SizeT, uint64_t> neighbors_seen;
+        util::Array1D<SizeT, uint64_t> steps_taken;
         int walk_length;
         int walks_per_node;
         int walk_mode;
@@ -83,6 +84,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             walks.SetName("walks");
             rand.SetName("rand");
             neighbors_seen.SetName("neighbors_seen");
+            steps_taken.SetName("steps_taken");
         }
 
         /*
@@ -104,6 +106,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(walks.Release(target));
             GUARD_CU(rand.Release(target));
             GUARD_CU(neighbors_seen.Release(target));
+            GUARD_CU(steps_taken.Release(target));
 
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
@@ -148,6 +151,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             }
             GUARD_CU(rand.Allocate(sub_graph.nodes * walks_per_node, target));
             GUARD_CU(neighbors_seen.Allocate(sub_graph.nodes * walks_per_node, target));
+            GUARD_CU(steps_taken.Allocate(sub_graph.nodes * walks_per_node, target));
 
             if (target & util::DEVICE) {
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
@@ -175,6 +179,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             }
             GUARD_CU(rand.EnsureSize_(nodes * walks_per_node, target));
             GUARD_CU(neighbors_seen.EnsureSize_(nodes * walks_per_node, target));
+            GUARD_CU(steps_taken.EnsureSize_(nodes * walks_per_node, target));
 
             // Reset data
             if(this -> store_walks) {
@@ -191,8 +196,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                x = (float)0.0;
             }, nodes * walks_per_node, target, this -> stream));
 
-            GUARD_CU(neighbors_seen.ForEach([]__host__ __device__ (int &x){
-               x = (int)0;
+            GUARD_CU(neighbors_seen.ForEach([]__host__ __device__ (uint64_t &x){
+               x = (uint64_t)0;
+            }, nodes * walks_per_node, target, this -> stream));
+            GUARD_CU(neighbors_seen.ForEach([]__host__ __device__ (uint64_t &x){
+               x = (uint64_t)0;
             }, nodes * walks_per_node, target, this -> stream));
 
             return retval;
@@ -259,7 +267,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     cudaError_t Extract(
         VertexT *h_walks,
-        int *h_neighbors_seen,
+        uint64_t *h_neighbors_seen,
+        uint64_t *h_steps_taken,
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -280,6 +289,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 }
                 GUARD_CU(data_slice.neighbors_seen.SetPointer(h_neighbors_seen, nodes * walks_per_node, util::HOST));
                 GUARD_CU(data_slice.neighbors_seen.Move(util::DEVICE, util::HOST));
+                GUARD_CU(data_slice.steps_taken.SetPointer(h_steps_taken, nodes * walks_per_node, util::HOST));
+                GUARD_CU(data_slice.steps_taken.Move(util::DEVICE, util::HOST));
+
             } else if (target == util::HOST) {
                 if(this -> store_walks) {
                     GUARD_CU(data_slice.walks.ForEach(h_walks,
@@ -289,7 +301,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 }
 
                 GUARD_CU(data_slice.neighbors_seen.ForEach(h_neighbors_seen,
-                   []__host__ __device__ (const int &device_val, int &host_val){
+                   []__host__ __device__ (const uint64_t &device_val, uint64_t &host_val){
+                       host_val = device_val;
+                   }, nodes * walks_per_node, util::HOST));
+
+                GUARD_CU(data_slice.steps_taken.ForEach(h_steps_taken,
+                   []__host__ __device__ (const uint64_t &device_val, uint64_t &host_val){
                        host_val = device_val;
                    }, nodes * walks_per_node, util::HOST));
             }

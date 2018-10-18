@@ -58,6 +58,8 @@ double CPU_Reference(
     }
 
     uint64_t total_neighbors_seen = 0;
+    uint64_t total_steps_taken = 0;
+
     if(walk_mode == 0) { // Random
         // <TODO> How should we implement a CPU reference?  Doesn't really make sense
         // I think we should actually be implementing a "checker" in Validate_Results
@@ -93,9 +95,15 @@ double CPU_Reference(
 
                 node_id = max_neighbor_id;
                 total_neighbors_seen += num_neighbors;
+                total_steps_taken++;
             }
         }
-        printf("CPU_Reference: total_neighbors_seen=%d\n", total_neighbors_seen);
+        printf("CPU_Reference: total_neighbors_seen = %d\n", total_neighbors_seen);
+        printf("CPU_Reference: total_steps_taken    = %d\n", total_steps_taken);
+    } else if (walk_mode == 2) {
+        printf("CPU_Reference: NotImplemented for walk_mode=2\n");
+    } else {
+        printf("CPU_Reference: Unkown walk_mode=%d\n", walk_mode);
     }
 
     printf("CPU_Reference: done\n");
@@ -126,7 +134,8 @@ typename GraphT::SizeT Validate_Results(
             int                       walk_mode,
             bool                      store_walks,
             typename GraphT::VertexT *h_walks,
-            int                      *h_neighbors_seen,
+            uint64_t                 *h_neighbors_seen,
+            uint64_t                 *h_steps_taken,
             typename GraphT::VertexT *ref_walks)
 {
     typedef typename GraphT::VertexT VertexT;
@@ -136,10 +145,13 @@ typename GraphT::SizeT Validate_Results(
     bool quick      = parameters.Get<bool>("quick");
 
     uint64_t total_neighbors_seen = 0;
+    uint64_t total_steps_taken = 0;
     for(SizeT v = 0; v < graph.nodes * walks_per_node; v++) {
         total_neighbors_seen += (uint64_t)h_neighbors_seen[v];
+        total_steps_taken    += (uint64_t)h_steps_taken[v];
     }
     printf("Validate_Results: total_neighbors_seen=%ld\n", total_neighbors_seen);
+    printf("Validate_Results: total_steps_taken=%ld\n", total_steps_taken);
 
     SizeT num_errors = 0;
     if(!quick && store_walks) {
@@ -155,7 +167,7 @@ typename GraphT::SizeT Validate_Results(
                 printf("%d:%d, ", h_walks[v], ref_walks[v]);
             }
 
-            if(walk_mode != 0) {
+            if(walk_mode == 1) { // Only for greedy, because it's deterministic
                 if(h_walks[v] != ref_walks[v]) {
                     num_errors++;
                 }

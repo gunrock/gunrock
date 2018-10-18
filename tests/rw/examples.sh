@@ -13,7 +13,7 @@ seq 39 > chesapeake.values
 
 # greedy
 ./bin/test_rw_9.1_x86_64 --graph-type market --graph-file ../../dataset/small/chesapeake.mtx \
-    --node-value-path chesapeake.values --walk-mode 1 --seed 123
+    --node-value-path chesapeake.values --walk-mode 1
 
 # uniform (no save path, no reference)
 ./bin/test_rw_9.1_x86_64 --graph-type market --graph-file ../../dataset/small/chesapeake.mtx \
@@ -32,7 +32,12 @@ seq 39 > chesapeake.values
 
 # dummy, directed
 ./bin/test_rw_9.1_x86_64 --graph-type market --graph-file dir_chesapeake.mtx \
-    --node-value-path chesapeake.values --walk-mode 1 --walk-length 5 --undirected=0
+    --node-value-path chesapeake.values --walk-mode 1 --walk-length 100 --undirected=0
+
+# dummy, undirected
+./bin/test_rw_9.1_x86_64 --graph-type market --graph-file ../../dataset/small/chesapeake.mtx \
+    --node-value-path chesapeake.values --walk-mode 2 --walk-length 20 --seed 123
+
 
 # real graph
 python ~/edgelist2mtx.py \
@@ -48,7 +53,7 @@ cp /home/bjohnson/projects/hive/cpp/graphsearch/dataset/gs_twitter.values gs_twi
 ./bin/test_rw_9.1_x86_64 --graph-type market --graph-file dir_gs_twitter.mtx \
     --node-value-path gs_twitter.values \
     --walk-mode 1 \
-    --walk-length 10000 \
+    --walk-length 32 \
     --undirected=0 \
     --store-walks 0 \
     --quick \
@@ -88,6 +93,8 @@ cp /home/bjohnson/projects/hive/cpp/graphsearch/dataset/gs_twitter.values gs_twi
     --num-runs 10 \
     --seed 123
 
+
+
 # --
 # Larger datasets
 
@@ -97,21 +104,5 @@ DATAPATH="../../dataset/large/hollywood-2009/hollywood-2009.mtx"
 ./bin/test_rw_9.1_x86_64 --graph-type market --graph-file $DATAPATH \
     --walk-mode 0 \
     --walk-length 3000 \
-    --seed 123 \
-    --store-walks 0 --quick
-
-# --
-# HIVE dataset
-
-cat ~/projects/hive/cpp/graphsearch/dataset/gs_twitter.scores |\
-    cut -d$'\t' -f2 > twitter.scores
-
-python ~/edgelist2mtx.py \
-    --inpath ~/projects/hive/cpp/graphsearch/dataset/gs_twitter.edgelist \
-    --outpath twitter
-
-./bin/test_rw_9.1_x86_64 --graph-type market --graph-file twitter.mtx \
-    --walk-mode 0 \
-    --walk-length 10000 \
     --seed 123 \
     --store-walks 0 --quick
