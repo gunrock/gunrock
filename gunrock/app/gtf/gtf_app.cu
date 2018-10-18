@@ -206,7 +206,6 @@ cudaError_t RunTests(
     auto     num_org_nodes    = num_nodes-2; // n
     auto     num_edges        = graph.edges; // m + n*4
     VertexT  source           = num_org_nodes; // originally 0
-    VertexT  sink             = num_org_nodes+1; // originally 1
 
     SizeT offset = num_edges - num_org_nodes * 2;
     printf("offset in GPU preprocess is %d num edges %d \n", offset, num_edges);

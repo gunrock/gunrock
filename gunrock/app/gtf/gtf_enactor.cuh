@@ -59,7 +59,7 @@ struct GTFIterationLoop : public IterationLoopBase
     typedef IterationLoopBase <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
     GTFIterationLoop() : BaseIterationLoop() {}
-    
+
 
     /**
      * @brief Core computation of gtf, one iteration
@@ -68,8 +68,6 @@ struct GTFIterationLoop : public IterationLoopBase
      */
     cudaError_t Core(int peer_ = 0)
     {
-
-         printf("in core!!!!!!!!!!!!!!!!\n");
 	     auto enactor		= this -> enactor;
 	     auto gpu_num		= this -> gpu_num;
 	     auto num_gpus		= enactor -> num_gpus;
@@ -84,6 +82,11 @@ struct GTFIterationLoop : public IterationLoopBase
        auto &retval          	= enactor_stats.retval;
        auto &iteration       	= enactor_stats.iteration;
 
+       //!!! allowed?
+       auto num_nodes        = graph.nodes; // n + 2 = V
+       auto num_org_nodes    = num_nodes-2; // n
+       auto num_edges        = graph.edges; // m + n*4
+       auto offset = num_edges - (num_org_nodes)*2; //!!!
 	     auto source		= data_slice.source;
        auto sink		= data_slice.sink;
 
@@ -92,49 +95,102 @@ struct GTFIterationLoop : public IterationLoopBase
        auto &community_sizes = data_slice.community_sizes;
        auto &community_weights = data_slice.community_weights;
        auto &community_active = data_slice.community_active;
-
 	     auto &community_accus = data_slice.community_accus;
 	     auto &vertex_active = data_slice.vertex_active;
        auto &vertex_reachabilities = data_slice.vertex_reachabilities;
+
        auto &edge_residuals	= data_slice.edge_residuals;
        auto &edge_flows = data_slice.edge_flows;
        auto &active = data_slice.active;
-       printf("in core!!!!!!!!!!!!!!!!\n");
+       auto &num_comms = data_slice.num_comms;
+       auto &previous_num_comms = data_slice.previous_num_comms;
 
-       //!!! allowed?
-       auto     num_nodes        = graph.nodes; // n + 2 = V
-       auto     num_org_nodes    = num_nodes-2; // n
-       auto     num_edges        = graph.edges; // m + n*4
-       VertexT  num_comms        = 1;
-       auto offset = num_edges - (num_org_nodes)*2; //!!!
-       ValueT sum_weights_source_sink = 0;
-       printf("in core!!!!!!!!!!!!!!!!\n");
 
-       
-       	GUARD_CU(active.ForAll(
-       	    [] __host__ __device__ (SizeT *a, const VertexT &v){
-              if (a[v]){
-       		       printf("there are");
-       	      }else{
-       		       printf("there are not");
-       	      }
-       	        printf(" active nodes\n");
-       	    }, 1, util::DEVICE, oprtr_parameters.stream));
-       
+
+       // 	GUARD_CU(active.ForAll(
+       // 	    [num_comms] __host__ __device__ (SizeT *a, const VertexT &v){
+        //       if (a[v]){
+       // 		       printf("there are");
+       // 	      }else{
+       // 		       printf("there are not");
+       // 	      }
+       // 	        printf("num_comms %d \n", num_comms[0]);
+       // 	    }, 1, util::DEVICE, oprtr_parameters.stream));
+
        //num_nodes = 0;
        //community_active[0] = true;
-       printf("num_nodes \n");
-            /*
-       GUARD_CU(active.ForAll(
-            [sum_weights_source_sink] __host__ __device__ (SizeT *a, const SizeT &v){
-              if(v < num_comms){
-               community_weights[comm] = 0;
-               community_sizes  [comm] = 0;
-               next_communities [comm] = 0;
+       //printf("num_nodes \n");
+
+       GUARD_CU(community_weights.ForAll(
+            [community_sizes, next_communities, num_comms] __host__ __device__ (ValueT *community_weight, const SizeT &pos){
+              if(pos < num_comms[0]){
+                  community_weight [pos] = 0;
+                  community_sizes  [pos] = 0;
+                  next_communities [pos] = 0;
               }
+            }, num_nodes, util::DEVICE, oprtr_parameters.stream));
+
+       GUARD_CU(previous_num_comms.ForAll(
+            [num_comms] __host__ __device__ (VertexT *previous_num_comm, const SizeT &pos){
+                previous_num_comm[pos] = num_comms[pos];
             }, 1, util::DEVICE, oprtr_parameters.stream));
 
+       printf("core runs permantly \n");
+
+       /*
+       GUARD_CU(community_weights.ForAll(
+            [vertex_active, vertex_reachabilities, num_comms, next_communities,
+            comm, curr_communities, num_comms, community_active, community_sizes,
+            community_accus, ]
+
+            __host__ __device__ (ValueT *community_weights, const VertexT &v){
+              {
+                  if (!vertex_active[v])
+                      return;
+                  if (vertex_reachabilities[v] == 1)
+                  { // reachable by source
+                      comm = next_communities[curr_communities[v]];
+                      if (comm == 0)
+                      { // not assigned yet
+                          comm = num_comms;
+                          next_communities[curr_communities[v]] = num_comms;
+                          community_active [comm] = true;
+                          num_comms ++;
+                          community_weights[comm] = 0;
+                          community_sizes  [comm] = 0;
+                          next_communities [comm] = 0;
+                          community_accus  [comm] = community_accus[curr_communities[v]];
+                      }
+                      curr_communities[v] = comm;
+                      community_weights[comm] +=
+                          edge_residuals[num_edges - num_org_nodes * 2 + v];
+                      community_sizes  [comm] ++;
+                  }
+
+                  else { // otherwise
+                      comm = curr_communities[v];
+                      SizeT e_start = graph.GetNeighborListOffset(v);
+                      SizeT num_neighbors = graph.GetNeighborListLength(v);
+                      community_weights[comm] -= edge_residuals[e_start + num_neighbors - 1];
+                      community_sizes  [comm] ++;
+
+                      auto e_end = e_start + num_neighbors - 2;
+                      for (auto e = e_start; e < e_end; e++)
+                      {
+                          VertexT u = graph.GetEdgeDest(e);
+                          if (vertex_reachabilities[u] == 1)
+                          {
+                              edge_residuals[e] = 0;
+                          }
+                      }
+                  }
+                  //printf("%d %f %f\n", comm, community_weights[comm], community_accus[comm]);
+              }
+            }, num_nodes, util::DEVICE, oprtr_parameters.stream));
+
+            */
        // Call mincut.
+       /*
        auto comm_resets = [sum_weights_source_sink]
            __host__ __device__
            (VertexT &community_sizes, ValueT &community_weights,
@@ -143,9 +199,8 @@ struct GTFIterationLoop : public IterationLoopBase
 
         return true;
       };
-
-      auto pervious_num_comms = num_comms;
       */
+
 
 
   /*

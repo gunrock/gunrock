@@ -86,8 +86,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         int num_edges;
         double error_threshold; // = parameters.Get<double>("error_threshold");
 
-        VertexT  num_comms; //        = 1; // nlab
-
         util::Array1D<SizeT, VertexT> next_communities; //= new VertexT[num_nodes]; // nextlabel
         util::Array1D<SizeT, VertexT> curr_communities; //= new VertexT[num_nodes]; // label
         util::Array1D<SizeT, VertexT> community_sizes;  //= new VertexT[num_nodes]; // nums
@@ -99,7 +97,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT> edge_residuals;//   = new ValueT [num_edges]; // graph
         util::Array1D<SizeT, ValueT> edge_flows;//       = new ValueT [num_edges]; // edge flows
         util::Array1D<SizeT, SizeT> active;	      // flag active vertices
-        util::Array1D<SizeT, double> sum_weights_source_sink;             // moy
+        util::Array1D<SizeT, VertexT> num_comms;
+        util::Array1D<SizeT, VertexT> previous_num_comms;	      // flag active vertices
+        //util::Array1D<SizeT, VertexT> num_comms;	      // flag active vertices
         SizeT num_updated_vertices;
 
 
@@ -117,7 +117,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
           num_nodes = util::PreDefinedValues<VertexT>::InvalidValue;
           num_org_nodes = util::PreDefinedValues<VertexT>::InvalidValue;
           num_edges = util::PreDefinedValues<VertexT>::InvalidValue;
-          sum_weights_source_sink = 0;
           num_updated_vertices = 1;
 
           next_communities.SetName("next_communities");
@@ -131,6 +130,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
           edge_residuals.SetName("edge_residuals");
           edge_flows.SetName("edge_flows");
           active.SetName("active");
+          num_comms.SetName("num_comms");
+          previous_num_comms.SetName("previous_num_comms");
 
         }
 
@@ -165,7 +166,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(edge_flows.Release(target));
             GUARD_CU(BaseDataSlice::Release(target));
             GUARD_CU(active.Release(target));
-            GUARD_CU(sum_weights_source_sink.Release(target));
+            GUARD_CU(num_comms.Release(target));
+            GUARD_CU(previous_num_comms.Release(target));
             return retval;
         }
 
@@ -204,7 +206,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
           GUARD_CU(edge_residuals.Allocate(nodes_size, target));
           GUARD_CU(edge_flows.Allocate(nodes_size, target));
           GUARD_CU(active.Allocate(1, util::HOST|target));
-          GUARD_CU(sum_weights_source_sink.Allocate(1, target));
+          GUARD_CU(num_comms.Allocate(1, target));
+          GUARD_CU(previous_num_comms.Allocate(1, target));
+
 
 	        GUARD_CU(util::SetDevice(gpu_idx));
 	        GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
@@ -240,7 +244,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(edge_residuals.EnsureSize_(nodes_size, target));
             GUARD_CU(edge_flows.EnsureSize_(nodes_size, target));
             GUARD_CU(active.EnsureSize_(1, target|util::HOST));
-            GUARD_CU(sum_weights_source_sink.EnsureSize_(1, target));
+            GUARD_CU(num_comms.EnsureSize_(1, target));
+            GUARD_CU(previous_num_comms.EnsureSize_(1, target));
 
 
 	          GUARD_CU(util::SetDevice(this->gpu_idx));
@@ -285,6 +290,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	             __host__ __device__(SizeT *active_, const VertexT &pos)
 	          {
 		            active_[pos] = 1;
+	          }, 1, target, this -> stream));
+
+
+            GUARD_CU(num_comms.ForAll([]
+	             __host__ __device__(SizeT *num_comm, const VertexT &pos)
+	          {
+		            num_comm[pos] = 1;
 	          }, 1, target, this -> stream));
 
             //////////////////////////////

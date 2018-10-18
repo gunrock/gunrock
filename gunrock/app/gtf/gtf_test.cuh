@@ -110,8 +110,9 @@ cudaError_t MinCut(
         source, dest, max_flow, reverse_edges, edge_flows);
     auto &edge_capacities = graph.edge_values;
 
-    for (auto e = 0; e < graph.edges; e++)
+    for (auto e = 0; e < graph.edges; e++){
         edge_residuals[e] = edge_capacities[e] - edge_flows[e];
+    }
 
     /////////////////////////////////////////
     std::queue <typename GraphT::VertexT> q;
@@ -137,9 +138,10 @@ cudaError_t MinCut(
             }
         }
     }
-    for(auto i = 0; i < graph.nodes; i++){
-        printf("%d \n", vertex_reachabilities[i]);
-    }
+    printf("In PR min-cut \n");
+    //for(auto i = 0; i < graph.nodes; i++){
+    //    printf("%d \n", vertex_reachabilities[i]);
+    //}
     /////////////////////////
     /*
     for (char t = 1; t < 2; t++)
@@ -368,6 +370,14 @@ cudaError_t CPU_Reference(
     ValueT  *edge_residuals   = new ValueT [num_edges]; // graph
     ValueT  *edge_flows       = new ValueT [num_edges]; // edge flows
     double   sum_weights_source_sink = 0;               // moy
+    
+    // use to preserve graph edge weights
+    ValueT  *original_edge_capacities = new ValueT [num_edges]; // graph
+    auto &edge_capacities = graph.edge_values;
+    for (auto e = 0; e < graph.edges; e++){
+        original_edge_capacities[e] = edge_capacities[e];
+    }
+
     util::CpuTimer cpu_timer;
 
     // Normalization and resets
@@ -414,8 +424,8 @@ cudaError_t CPU_Reference(
         printf("Iteration %d\n", iteration);
         iteration++;
 
-        //GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
-        //    edge_flows, edge_residuals, vertex_reachabilities));
+        GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
+            edge_flows, edge_residuals, vertex_reachabilities));
         minCut(graph, source, dest, vertex_reachabilities, edge_residuals, num_nodes);
 
         auto &edge_capacities = graph.edge_values;
@@ -559,6 +569,10 @@ cudaError_t CPU_Reference(
     std::ofstream out_pr( "./output_pr.txt" );
     for(int i = 0; i < num_org_nodes; i++) out_pr << (double) community_accus[curr_communities[i]] << std::endl;
     out_pr.close();
+    
+    for (auto e = 0; e < graph.edges; e++){
+         edge_capacities[e] = original_edge_capacities[e];
+    }
 
     delete[] next_communities ; next_communities  = NULL;
     delete[] curr_communities ; curr_communities  = NULL;
@@ -569,6 +583,7 @@ cudaError_t CPU_Reference(
     delete[] vertex_active    ; vertex_active     = NULL;
     delete[] vertex_reachabilities; vertex_reachabilities = NULL;
     delete[] edge_residuals   ; edge_residuals    = NULL;
+    delete[] original_edge_capacities; original_edge_capacities    = NULL;
     return retval;
 }
 

@@ -109,9 +109,8 @@ struct main_struct
     	util::PrintMsg("______CPU reference algorithm______", true);
     	double elapsed = 0;
 
-      printf("CPU code not called \n");
-        //GUARD_CU(app::gtf::CPU_Reference
-    	  //  (parameters, d_graph, reverse_edges, elapsed));
+        GUARD_CU(app::gtf::CPU_Reference
+    	    (parameters, d_graph, reverse_edges, elapsed));
         util::PrintMsg("-----------------------------------\n"
             "Elapsed: " + std::to_string(elapsed) + " ms", true);
 
