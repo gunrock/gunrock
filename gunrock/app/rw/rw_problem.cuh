@@ -199,7 +199,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(neighbors_seen.ForEach([]__host__ __device__ (uint64_t &x){
                x = (uint64_t)0;
             }, nodes * walks_per_node, target, this -> stream));
-            GUARD_CU(neighbors_seen.ForEach([]__host__ __device__ (uint64_t &x){
+            GUARD_CU(steps_taken.ForEach([]__host__ __device__ (uint64_t &x){
                x = (uint64_t)0;
             }, nodes * walks_per_node, target, this -> stream));
 

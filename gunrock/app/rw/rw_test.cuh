@@ -61,8 +61,7 @@ double CPU_Reference(
     uint64_t total_steps_taken = 0;
 
     if(walk_mode == 0) { // Random
-        // <TODO> How should we implement a CPU reference?  Doesn't really make sense
-        // I think we should actually be implementing a "checker" in Validate_Results
+        // <TODO>
         printf("CPU_Reference: NotImplemented for walk_mode=0\n");
         // </TODO>
     } else if (walk_mode == 1) { // Max
@@ -101,7 +100,9 @@ double CPU_Reference(
         printf("CPU_Reference: total_neighbors_seen = %d\n", total_neighbors_seen);
         printf("CPU_Reference: total_steps_taken    = %d\n", total_steps_taken);
     } else if (walk_mode == 2) {
+        // <TODO>
         printf("CPU_Reference: NotImplemented for walk_mode=2\n");
+        // </TODO>
     } else {
         printf("CPU_Reference: Unkown walk_mode=%d\n", walk_mode);
     }
