@@ -39,22 +39,25 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
-    // <TODO> add app specific parameters, eg:
-    // GUARD_CU(parameters.Use<std::string>(
-    //    "src",
-    //    util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-    //    "0",
-    //    "<Vertex-ID|random|largestdegree> The source vertices\n"
-    //    "\tIf random, randomly select non-zero degree vertices;\n"
-    //    "\tIf largestdegree, select vertices with largest degrees",
-    //    __FILE__, __LINE__));
-    // </TODO>
+    GUARD_CU(parameters.Use<int>(
+        "geo-iter",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        3,
+        "Number of iterations geolocation should run for (default=3).",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<bool>(
+        "geo-complete",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        false,
+        "Run geolocation application until all locations for all nodes are found, uses an atomic (default=false).",
+        __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<std::string>(
         "labels-file",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         "",
-        " labels file.",
+        "User locations label file for geolocation app.",
         __FILE__, __LINE__));
 
     return retval;
@@ -96,29 +99,11 @@ cudaError_t RunTests(
     int  num_runs   		= parameters.Get<int >("num-runs");
     std::string validation 	= parameters.Get<std::string>("validation");
 
+    int geo_iter		= parameters.Get<int>("geo-iter");
+    util::PrintMsg("Number of iterations: " + geo_iter, !quiet_mode);
+
     util::Info info("geolocation", parameters, graph);
 
-/*
-    util::PrintMsg("Labels File Input: "
-            + labels_file, !quiet_mode);   
-
- 
-    ValueT *h_latitude  = new ValueT[graph.nodes];
-    ValueT *h_longitude = new ValueT[graph.nodes];
-
-    retval = gunrock::graphio::labels::Read(parameters, h_latitude, h_longitude);
-
-
-    util::PrintMsg("Debugging Labels -------------", !quiet_mode);
-    for (int p = 0; p < graph.nodes; p++) 
-    {
-    	util::PrintMsg("    locations[ " + std::to_string(p) + 
-			    " ] = < " + std::to_string(h_latitude[p]) +
-			    " , " + std::to_string(h_longitude[p]) +
-			    " > ",
-			    !quiet_mode);
-    }
-*/
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
 
@@ -152,6 +137,7 @@ cudaError_t RunTests(
             // <DONE> problem specific data if necessary, eg:
             h_latitude,
 	    h_longitude,
+	    geo_iter,
             // </DONE>
             target
         ));

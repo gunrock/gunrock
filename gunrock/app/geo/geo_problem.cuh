@@ -78,7 +78,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT>  Dinv;
 	util::Array1D<SizeT, ValueT>  W;
 
+	bool			      geo_complete;
+
   	SizeT			      active_; 
+	int			      geo_iter;
+	
 
         /*
          * @brief Default constructor
@@ -142,7 +146,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             int            num_gpus,
             int            gpu_idx,
             util::Location target,
-            ProblemFlag    flag)
+            ProblemFlag    flag,
+	    bool	   geo_complete_)
         {
             cudaError_t retval  = cudaSuccess;
 
@@ -150,6 +155,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    SizeT nodes = this -> sub_graph -> nodes;
 
 	    printf("Number of nodes for allocation: %u\n", nodes);
+
+	    geo_complete = geo_complete_;
 
             GUARD_CU(locations_lat	.Allocate(nodes * nodes, target));
             GUARD_CU(locations_lon      .Allocate(nodes * nodes, target));
@@ -178,6 +185,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         cudaError_t Reset(
 		ValueT *h_latitude,
 		ValueT *h_longitude,
+		int     _geo_iter,
 		util::Location target = util::DEVICE)
         {
             cudaError_t retval = cudaSuccess;
@@ -196,6 +204,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    GUARD_CU(D			.EnsureSize_(nodes * nodes, target));
 	    GUARD_CU(Dinv               .EnsureSize_(nodes * nodes, target));
 	    GUARD_CU(W                  .EnsureSize_(nodes * nodes, target));
+
+	    this -> geo_iter = _geo_iter;
 
             // Reset data
 
@@ -221,7 +231,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 		x[pos] = 0;
             }, 1, target, this -> stream));
 
-	    this-> active_ = 0;
+	    this -> active_ = 0;
 
 	    // Assumes that all vertices have invalid positions, in reality
 	    // a preprocessing step is needed to assign nodes that do have
@@ -238,6 +248,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
+    bool geo_complete;
 
     // ----------------------------------------------------------------
     // Problem Methods
@@ -249,7 +260,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Parameters &_parameters,
         ProblemFlag _flag = Problem_None) :
         BaseProblem(_parameters, _flag),
-        data_slices(NULL) {}
+        data_slices(NULL) {
+
+	geo_complete = _parameters.Get<bool>("geo-complete");
+    }
 
     /**
      * @brief geolocation default destructor
@@ -379,7 +393,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 this -> num_gpus,
                 this -> gpu_idx[gpu],
                 target,
-                this -> flag
+                this -> flag,
+		this -> geo_complete
             ));
         }
 
@@ -395,6 +410,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     cudaError_t Reset(
         ValueT *h_latitude,
 	ValueT *h_longitude,
+	int     _geo_iter,
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -403,7 +419,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-            GUARD_CU(data_slices[gpu] -> Reset(h_latitude, h_longitude, target));
+            GUARD_CU(data_slices[gpu] -> Reset(h_latitude, h_longitude, _geo_iter, target));
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
 

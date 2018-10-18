@@ -100,6 +100,9 @@ struct GEOIterationLoop : public IterationLoopBase
 
 	auto &valid_locations  = data_slice.valid_locations;
 	auto &active	       = data_slice.active;
+	auto &geo_iter	       = data_slice.geo_iter;
+
+	auto &geo_complete     = data_slice.geo_complete;
 
 	auto &D		       = data_slice.D;
 	auto &Dinv	       = data_slice.Dinv;
@@ -187,10 +190,10 @@ struct GEOIterationLoop : public IterationLoopBase
 
 	    VertexT v           = v_q[pos];
 	    if (util::isValid(latitude[v]) && util::isValid(longitude[v])) {
-                // TODO: Confirm atomic usage:
-                // I don't think I need an atomic
-                // here, it doesn't matter who reaches the int
-                // first, as long as it gets to add 1 to it.
+		// TODO: Confirm atomic usage:
+		// I don't think I need an atomic
+		// here, it doesn't matter who reaches the int
+		// first, as long as it gets to add 1 to it.
 		atomicAdd(&active[0], 1);
 	    }
 	};
@@ -204,16 +207,16 @@ struct GEOIterationLoop : public IterationLoopBase
 	    compute_op, frontier.queue_length,
 	    util::DEVICE, oprtr_parameters.stream));
 
-	// GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-	//    "cudaStreamSynchronize failed");
- 
-	GUARD_CU(frontier.V_Q()->ForAll(
-            status_op, frontier.queue_length,
-            util::DEVICE, oprtr_parameters.stream));
 
-        GUARD_CU(data_slice.active .SetPointer(&data_slice.active_, sizeof(SizeT), util::HOST));
-        GUARD_CU(data_slice.active .Move(util::DEVICE, util::HOST));
- 
+	if (geo_complete) {
+	    GUARD_CU(frontier.V_Q()->ForAll(
+		status_op, frontier.queue_length,
+		util::DEVICE, oprtr_parameters.stream));
+
+            GUARD_CU(data_slice.active .SetPointer(&data_slice.active_, sizeof(SizeT), util::HOST));
+            GUARD_CU(data_slice.active .Move(util::DEVICE, util::HOST));
+	} 
+
         return retval;
     }
 
@@ -274,8 +277,13 @@ struct GEOIterationLoop : public IterationLoopBase
 
 	// Anymore work to do?
 	// printf("Predictions active in Stop: %u vs. needed %u.\n", data_slice.active_, graph.nodes);	
-	if(data_slice.active_ >= graph.nodes)
-	    return true;
+	if (data_slice.geo_complete) {
+	    if(data_slice.active_ >= graph.nodes)
+	        return true;
+	} else {
+	    if(iter >= data_slice.geo_iter)
+		return true;
+	}
 
 	// else, keep running
         return false;
