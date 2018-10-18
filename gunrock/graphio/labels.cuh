@@ -116,6 +116,11 @@ cudaError_t ReadLabelsStream(
             util::PrintMsg(" (" +
                 std::to_string(ll_nodes) + " nodes) ", !quiet);
 
+	    for (int k = 0; k < nodes; k++) {
+		labels_a[k] = util::PreDefinedValues<ValueT>::InvalidValue;
+		labels_b[k] = util::PreDefinedValues<ValueT>::InvalidValue;
+	    }
+
 	    labels_read = 0;
 	} // -> else if
 
