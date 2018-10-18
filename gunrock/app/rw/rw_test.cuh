@@ -57,7 +57,7 @@ double CPU_Reference(
         }
     }
 
-    int total_neighbors_seen = 0;
+    uint64_t total_neighbors_seen = 0;
     if(walk_mode == 0) { // Random
         // <TODO> How should we implement a CPU reference?  Doesn't really make sense
         // I think we should actually be implementing a "checker" in Validate_Results
@@ -135,11 +135,11 @@ typename GraphT::SizeT Validate_Results(
     bool quiet_mode = parameters.Get<bool>("quiet");
     bool quick      = parameters.Get<bool>("quick");
 
-    int total_neighbors_seen = 0;
+    uint64_t total_neighbors_seen = 0;
     for(SizeT v = 0; v < graph.nodes * walks_per_node; v++) {
-        total_neighbors_seen += h_neighbors_seen[v];
+        total_neighbors_seen += (uint64_t)h_neighbors_seen[v];
     }
-    printf("Validate_Results: total_neighbors_seen=%d\n", total_neighbors_seen);
+    printf("Validate_Results: total_neighbors_seen=%ld\n", total_neighbors_seen);
 
     SizeT num_errors = 0;
     if(!quick && store_walks) {

@@ -37,12 +37,15 @@ seq 39 > chesapeake.values
 # real graph
 python ~/edgelist2mtx.py \
     --inpath /home/bjohnson/projects/hive/cpp/graphsearch/dataset/gs_twitter.edgelist \
-    --outpath gs_twitter
+    --outpath undir_gs_twitter
 
 cp /home/bjohnson/projects/hive/cpp/graphsearch/dataset/gs_twitter.values gs_twitter.values 
 
-# change gs_twitter.mtx to `general`
-./bin/test_rw_9.1_x86_64 --graph-type market --graph-file gs_twitter.mtx \
+# directed, greedy
+# change `undir_gs_twitter.mtx` header to `general` to create `dir_gs_twitter.mtx`
+# can run this for a high `--walk-length`, because the walks just go uphill and terminate
+# average walk length is very short
+./bin/test_rw_9.1_x86_64 --graph-type market --graph-file dir_gs_twitter.mtx \
     --node-value-path gs_twitter.values \
     --walk-mode 1 \
     --walk-length 10000 \
@@ -50,6 +53,40 @@ cp /home/bjohnson/projects/hive/cpp/graphsearch/dataset/gs_twitter.values gs_twi
     --store-walks 0 \
     --quick \
     --num-runs 10
+
+# undirected, greedy
+# This is much more expensive, because the walks don't terminate
+# They actually go to the peak, and the bounce back and forth stupidly
+# `total_neighbors_seen` overflows
+./bin/test_rw_9.1_x86_64 --graph-type market --graph-file undir_gs_twitter.mtx \
+    --node-value-path gs_twitter.values \
+    --walk-mode 1 \
+    --walk-length 100 \
+    --store-walks 0 \
+    --quick \
+    --num-runs 10
+
+# undirected, random
+# waaay faster than the CPU reference implementation
+./bin/test_rw_9.1_x86_64 --graph-type market --graph-file undir_gs_twitter.mtx \
+    --node-value-path gs_twitter.values \
+    --walk-mode 0 \
+    --walk-length 100 \
+    --store-walks 0 \
+    --quick \
+    --num-runs 10 \
+    --seed 123
+
+# directed, random
+./bin/test_rw_9.1_x86_64 --graph-type market --graph-file dir_gs_twitter.mtx \
+    --node-value-path gs_twitter.values \
+    --walk-mode 0 \
+    --walk-length 100 \
+    --undirected=0 \
+    --store-walks 0 \
+    --quick \
+    --num-runs 10 \
+    --seed 123
 
 # --
 # Larger datasets
