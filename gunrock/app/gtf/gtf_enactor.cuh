@@ -22,6 +22,7 @@
 #include <gunrock/oprtr/oprtr.cuh>
 
 #define debug_aml(a...)
+#include <gunrock/app/mf/mf_enactor.cuh>
 //#define debug_aml(a...) \
   {printf("%s:%d ", __FILE__, __LINE__); printf(a); printf("\n");}
 
@@ -443,6 +444,7 @@ public:
 
     Problem     *problem   ;
     IterationT  *iterations;
+    mf::EnactorT mf_enactor;
 
     /**
      * @brief gtfEnactor constructor
@@ -476,6 +478,7 @@ public:
         delete []iterations; iterations = NULL;
         problem = NULL;
         return retval;
+        GUARD_CU(enactor.Reset(source, target));
     }
 
     /**
@@ -499,6 +502,7 @@ public:
 	// Lazy initialization
         GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target,
 		    false));
+        GUARD_CU(mf_enactor.Init(problem.mf_problem, target));
 
 	auto num_gpus = this->num_gpus;
 

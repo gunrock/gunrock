@@ -17,6 +17,10 @@
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/oprtr/1D_oprtr/for_all.cuh>
 
+// MF includes
+#include <gunrock/app/mf/mf_enactor.cuh>
+#include <gunrock/app/mf/mf_test.cuh>
+
 #define debug_aml(a...)
 //#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a);\
     printf("\n");}
@@ -318,6 +322,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     // Members
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
+    typedef mf::Problem<GraphT> ProblemT;
+    ProblemT mf_problem(parameters);
 
     // Methods
 
@@ -347,9 +353,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     {
         cudaError_t retval = cudaSuccess;
         if (data_slices == NULL) return retval;
-        for (int i = 0; i < this->num_gpus; i++)
+        for (int i = 0; i < this->num_gpus; i++){
             GUARD_CU(data_slices[i].Release(target));
-
+            GUARD_CU(mf_problem.data_slices[i].Release(target));
+        }
         if ((target & util::HOST) != 0 &&
             data_slices[0].GetPointer(util::DEVICE) == NULL)
         {
@@ -357,6 +364,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    data_slices = NULL;
         }
         GUARD_CU(BaseProblem::Release(target));
+        GUARD_CU(mf_problem.Release(target));
         return retval;
     }
 
@@ -413,6 +421,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         GUARD_CU(BaseProblem::Init(graph, target));
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
+        GUARD_CU(mf_problem.Init(graph, target));
 
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
@@ -449,6 +458,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         cudaError_t retval = cudaSuccess;
 
 	debug_aml("Problem Reset");
+
+  // seems to be a dummy array as I don't need it
+  SizeT* h_reverse = (SizeT*)malloc(sizeof(SizeT)*graph.edges);
+  GUARD_CU(problem.Reset(graph, h_reverse, target));
 
 	auto source_vertex  = graph.nodes-2;
 	auto sink_vertex    = graph.nodes-1;
