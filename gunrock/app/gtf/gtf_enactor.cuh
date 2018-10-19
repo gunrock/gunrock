@@ -121,6 +121,8 @@ struct GTFIterationLoop : public IterationLoopBase
        //community_active[0] = true;
        //printf("num_nodes \n");
 
+       // Call mincut.
+
        GUARD_CU(community_weights.ForAll(
             [community_sizes, next_communities, num_comms] __host__ __device__ (ValueT *community_weight, const SizeT &pos){
               if(pos < num_comms[0]){
@@ -137,11 +139,19 @@ struct GTFIterationLoop : public IterationLoopBase
 
        printf("core runs permantly \n");
 
-       /*
+
        GUARD_CU(community_weights.ForAll(
-            [vertex_active, vertex_reachabilities, num_comms, next_communities,
-            comm, curr_communities, num_comms, community_active, community_sizes,
-            community_accus, ]
+            [vertex_active, // vertex specific
+            vertex_reachabilities,
+            next_communities, //community specific
+            curr_communities,
+            community_active,
+            community_sizes,
+            community_accus,
+            edge_residuals, // intermediate output
+            // others
+            num_comms, num_edges,
+            num_org_nodes, graph]
 
             __host__ __device__ (ValueT *community_weights, const VertexT &v){
               {
@@ -149,30 +159,31 @@ struct GTFIterationLoop : public IterationLoopBase
                       return;
                   if (vertex_reachabilities[v] == 1)
                   { // reachable by source
-                      comm = next_communities[curr_communities[v]];
+                      unsigned int comm = next_communities[curr_communities[v]];
+
                       if (comm == 0)
                       { // not assigned yet
-                          comm = num_comms;
-                          next_communities[curr_communities[v]] = num_comms;
+                          VertexT prev_num_comms = atomicAdd(&num_comms[0], 1);
+                          comm = prev_num_comms;
+                          next_communities[curr_communities[v]] = prev_num_comms;
                           community_active [comm] = true;
-                          num_comms ++;
                           community_weights[comm] = 0;
                           community_sizes  [comm] = 0;
                           next_communities [comm] = 0;
                           community_accus  [comm] = community_accus[curr_communities[v]];
                       }
                       curr_communities[v] = comm;
-                      community_weights[comm] +=
-                          edge_residuals[num_edges - num_org_nodes * 2 + v];
-                      community_sizes  [comm] ++;
+                      atomicAdd(&community_weights[comm], edge_residuals[num_edges - num_org_nodes * 2 + v]);
+                      atomicAdd(&community_sizes[comm], 1);
+
                   }
 
                   else { // otherwise
-                      comm = curr_communities[v];
+                      unsigned int comm = curr_communities[v];
                       SizeT e_start = graph.GetNeighborListOffset(v);
                       SizeT num_neighbors = graph.GetNeighborListLength(v);
-                      community_weights[comm] -= edge_residuals[e_start + num_neighbors - 1];
-                      community_sizes  [comm] ++;
+                      atomicAdd(&community_weights[comm], -edge_residuals[e_start + num_neighbors - 1]);
+                      atomicAdd(&community_sizes[comm], 1);
 
                       auto e_end = e_start + num_neighbors - 2;
                       for (auto e = e_start; e < e_end; e++)
@@ -188,108 +199,57 @@ struct GTFIterationLoop : public IterationLoopBase
               }
             }, num_nodes, util::DEVICE, oprtr_parameters.stream));
 
-            */
-       // Call mincut.
-       /*
-       auto comm_resets = [sum_weights_source_sink]
-           __host__ __device__
-           (VertexT &community_sizes, ValueT &community_weights,
-             ValueT &next_communities, unsigned int comm)-> bool
-      {
+            GUARD_CU(community_weights.ForAll(
+                 [next_communities, //community specific
+                 curr_communities,
+                 community_active,
+                 community_sizes,
+                 community_accus,
+                 // others
+                 previous_num_comms]
+                 __host__ __device__ (ValueT *community_weights, unsigned int &comm){
+                   {
+                     if(comm >= previous_num_comms[0]) return;
 
-        return true;
-      };
-      */
-
-
-
-  /*
-	auto advance_push_op = [capacity, flow, excess, height, reverse,
-	     source, sink, active]
-	    __host__ __device__
-	    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
-	    const VertexT &input_item, const SizeT &input_pos,
-	    const SizeT &output_pos) -> bool
-	{
-	    if (!util::isValid(dest) or !util::isValid(src) or
-		    src == source or src == sink)
-		return false;
-	    auto e = excess[src];
-	    auto cf = capacity[edge_id] - flow[edge_id];
-	    auto f = min(cf, e);
-	    auto rev_id = reverse[edge_id];
-	    if (f > 0 && height[src] == height[dest] + 1)
-	    {
-		if (atomicAdd(&excess[src], -f) >= f)
-		{
-		    atomicAdd(&excess[dest], f);
-		    atomicAdd(&flow[edge_id], f);
-		    atomicAdd(&flow[rev_id], -f);
-//		    printf("push %d->%d, flow %lf, e[%d] %lf, e[%d] %lf\n", \
-			    src, dest, f, src, excess[src], dest, excess[dest]);
-		}else{
-		    atomicAdd(&excess[src], f);
-//		    printf("rollback push %d->%d, excess[%d] = %lf\n", \
-			    src, dest, src, excess[src]);
-		}
-		active[0] = 1;
-		return true;
-	    }
-	    return false;
-	};
+                     if (community_active[comm])
+                     {
+                         if (next_communities[comm] == 0)
+                         {
+                             community_weights[comm] = 0;
+                             community_active [comm] = false;
+                         } else if (community_sizes[comm] == 0) {
+                             community_active [comm] = false;
+                             community_active [next_communities[comm]] = false;
+                             community_weights[next_communities[comm]] = 0;
+                         } else {
+                             //printf("values: comm: %d, sizes: %d, weights: %f, accus: %f.\n", comm, community_sizes[comm], community_weights[comm], community_accus[comm]);
+                             community_weights[comm] /= community_sizes  [comm];
+                             community_accus  [comm] += community_weights[comm];
+                         }
+                     } else {
+                         community_weights[comm] = 0;
+                     }
+                   }
+                 }, num_nodes, util::DEVICE, oprtr_parameters.stream));
 
 
-	oprtr_parameters.advance_mode = "ALL_EDGES";
-	GUARD_CU(active.ForAll(
-	    [] __host__ __device__ (SizeT *a, const SizeT &v){
-	      a[v] = 0;
-	    }, 1, util::DEVICE, oprtr_parameters.stream));
-
-	// ADVANCE_PUSH_OP
-	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-		    graph.csr(), &local_vertices, null_ptr,
-		    oprtr_parameters, advance_push_op));
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-	    "cudaStreamSynchronize failed");
-
-	GUARD_CU(lowest_neighbor.ForAll(
-          [] __host__ __device__ (VertexT *el, const SizeT &v){
-	    el[v] = util::PreDefinedValues<VertexT>::InvalidValue;
-          }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-          "cudaStreamSynchronize failed");
+         GUARD_CU(community_weights.ForAll(
+            [next_communities, //community specific
+            community_sizes,
+            community_accus,
+            // others
+            previous_num_comms, num_comms]
+              __host__ __device__ (ValueT *community_weights, unsigned int &comm){
+            {
+              if(comm < num_comms[0] && comm >= previous_num_comms[0]){
+                community_weights[comm] /= community_sizes  [comm];
+                community_accus  [comm] += community_weights[comm];
+              }
+            }
+          }, num_nodes, util::DEVICE, oprtr_parameters.stream));
 
 
-	// ADVANCE_FIND_LOWEST_OP
-	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-		    graph.csr(), &local_vertices, null_ptr,
-		    oprtr_parameters, advance_find_lowest_op));
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-	    "cudaStreamSynchronize failed");
 
-//	GUARD_CU(lowest_neighbor.ForAll(
-//          [] __host__ __device__ (VertexT *el, const SizeT &v){
-//            printf("lowest_neighbor[%d] = %d\n", v, el[v]);
-//          }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-          "cudaStreamSynchronize failed");
-
-	// ADVANCE RELABEL OP
-	GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-		    graph.csr(), &local_vertices, null_ptr,
-		    oprtr_parameters, advance_relabel_op));
-	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-	    "cudaStreamSynchronize failed");
-  */
-//	GUARD_CU(active.ForAll(
-//	    [] __host__ __device__ (SizeT *a, const SizeT &v){
-//	      if (a[v]){
-//		printf("there are");
-//	      }else{
-//		printf("there are not");
-//	      }
-//	      printf(" active nodes\n");
-//	    }, 1, util::DEVICE, oprtr_parameters.stream));
 
 	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
 	    "cudaStreamSynchronize failed");
