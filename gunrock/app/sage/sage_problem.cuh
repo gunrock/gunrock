@@ -50,7 +50,7 @@ cudaError_t UseParameters_problem(
  */
 template <
     typename _GraphT,
-    typename _LabelT = typename _GraphT::VertexT,
+    //typename _LabelT = typename _GraphT::VertexT,
     typename _ValueT = typename _GraphT::ValueT,
     ProblemFlag _FLAG = Problem_None>
 struct Problem : ProblemBase<_GraphT, _FLAG>
@@ -61,7 +61,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     typedef typename GraphT::SizeT   SizeT;
   //  typedef typename GraphT::CsrT    CsrT;
     typedef typename GraphT::GpT     GpT;
-    typedef          _LabelT         LabelT;
+    //typedef          _LabelT         LabelT;
     typedef          _ValueT         ValueT;
 
     typedef ProblemBase   <GraphT, FLAG> BaseProblem;
@@ -75,22 +75,34 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     struct DataSlice : BaseDataSlice
     {
         // sage-specific storage arrays
-        //util::Array1D<SizeT, ValueT >    distances  ; // source distance
-        //util::Array1D<SizeT, LabelT >    labels     ; // labels to mark latest iteration the vertex been visited
-        //util::Array1D<SizeT, VertexT>    preds      ; // predecessors of vertices
-        //util::Array1D<SizeT, VertexT>    temp_preds ; // predecessors of vertices
+        util::Array1D<SizeT, ValueT> W_f_1_1D; // w_f_1 1D array. weight matrix for W^1 feature part 
+        util::Array1D<SizeT, ValueT> W_a_1_1D; // w_a_1 1D array. weight matrix for W^1 agg part
+        util::Array1D<SizeT, ValueT> W_f_2_1D; // w_f_2 1D array. weight matrix for W^2 feature part
+        util::Array1D<SizeT, ValueT> W_a_2_1D; // w_a_2 1D array. weight matrix for W^2 agg part 
+        util::Array1D<SizeT, ValueT> features_1D; // fature matrix 1D
+        util::Array1D<SizeT, ValueT> children_temp;//256 agg(h_B1^1)
+        util::Array1D<SizeT, ValueT> source_temp;// 256 h_B2^1
+        util::Array1D<SizeT, ValueT> source_result;// 256 h_B2^2
+        util::Array1D<SizeT, ValueT> child_temp;// 256 h_B1^1, I feel like this one could be local
+        util::Array1D<SizeT, ValueT> sums_child_feat; //64 sum of children's features, I feel like this one could be local as well
 
         /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice()
         {
-          /*
-            distances       .SetName("distances"       );
-            labels          .SetName("labels"          );
-            preds           .SetName("preds"           );
-            temp_preds      .SetName("temp_preds"      );
-          */
+          
+            W_f_1_1D.SetName("W_f_1_1D");
+            W_a_1_1D.SetName("W_a_1_1D");
+            W_f_2_1D.SetName("W_f_2_1D");
+            W_a_2_1D.SetName("W_a_2_1D");
+            features_1D.SetName("features_1D");
+            children_temp.SetName("children_temp");
+            source_temp.SetName("source_temp");
+            source_result.SetName("source_result");
+            child_temp.SetName("child_temp");
+            sums_child_feat.SetName("sums_child_feat");
+
         }
 
         /*
@@ -112,11 +124,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            //GUARD_CU(distances      .Release(target));
-            //GUARD_CU(labels         .Release(target));
-            //GUARD_CU(preds          .Release(target));
-            //GUARD_CU(temp_preds     .Release(target));
+            GUARD_CU(W_f_1_1D      .Release(target));
+            GUARD_CU(W_a_1_1D      .Release(target));
+            GUARD_CU(W_f_2_1D      .Release(target));
+            GUARD_CU(W_a_2_1D      .Release(target));
+            GUARD_CU(features_1D   .Release(target));
+            GUARD_CU(children_temp .Release(target));
+            GUARD_CU(source_temp   .Release(target));
+            GUARD_CU(source_result .Release(target));
+            GUARD_CU(child_temp    .Release(target));
+            GUARD_CU(sums_child_feat.Release(tatget));
             GUARD_CU(BaseDataSlice ::Release(target));
+
             return retval;
         }
 
@@ -140,19 +159,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(BaseDataSlice::Init(
                 sub_graph, num_gpus, gpu_idx, target, flag));
-            //GUARD_CU(distances .Allocate(sub_graph.nodes, target));
-            //GUARD_CU(labels    .Allocate(sub_graph.nodes, target));
-            if (flag & util::DEVICE)
-            {
-                //GUARD_CU(preds      .Allocate(sub_graph.nodes, target));
-                //GUARD_CU(temp_preds .Allocate(sub_graph.nodes, target));
-            }
-
-            /*if (target & util::DEVICE)
-            {
-                GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
-            }*/
-            //GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
+            GUARD_CU(W_f_1_1D .Allocate(64*128, target));
+            GUARD_CU(W_a_1_1D .Allocate(64*128, target));
+            GUARD_CU(W_f_2_1D .Allocate(256*128, target));
+            GUARD_CU(W_a_2_1D .Allocate(256*128, target));
+            GUARD_CU(fetures_1D.Allocate(sub_graph.nodes,target));
+            GUARD_CU(children_temp.Allocate(sub_graph.nodes*256, target));
+            GUARD_CU(source_temp.Allocate(sub_graph.nodes*256, target));
+            GUARD_CU(source_result.Allocate(sub_graph.nodes*256, target));
+            GUARD_CU(child_temp.Allocate(sub_graph.nodes*num_neigh1*256, target));
+            GUARD_CU(sums_child_feat.Allocate(sub_graph.nodes*64, target));
+                        
+            GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
             return retval;
         } // Init
 
@@ -164,39 +182,34 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         cudaError_t Reset(util::Location target = util::DEVICE)
         {
             cudaError_t retval = cudaSuccess;
-            /*
+            
             SizeT nodes = this -> sub_graph -> nodes;
 
-            // Ensure data are allocated
-            GUARD_CU(distances.EnsureSize_(nodes, target));
-            GUARD_CU(labels   .EnsureSize_(nodes, target));
-            if (this -> flag & Mark_Predecessors)
-            {
-                GUARD_CU(preds.EnsureSize_(nodes, target));
-                GUARD_CU(temp_preds.EnsureSize_(nodes, target));
-            }
-
             // Reset data
-            GUARD_CU(distances.ForEach([]__host__ __device__
-            (ValueT &distance){
-                distance = util::PreDefinedValues<ValueT>::MaxValue;
+            GUARD_CU(children_temp.ForEach([]__host__ __device__
+            (ValueT &children_temps){
+                children_temps = 0;
             }, nodes, target, this -> stream));
 
-            GUARD_CU(labels   .ForEach([]__host__ __device__
-            (LabelT &label){
-                label = util::PreDefinedValues<LabelT>::InvalidValue;
+            GUARD_CU(source_temp.ForEach([]__host__ __device__
+            (ValueT &source_temps){
+                source_temps = 0;
             }, nodes, target, this -> stream));
 
-            if (this -> flag & Mark_Predecessors)
-            {
-                GUARD_CU(preds.ForAll([]__host__ __device__
-                (VertexT *preds_, const SizeT &pos){
-                    preds_[pos] = pos;
-                }, nodes, target, this -> stream));
+            GUARD_CU(source_result.ForEach([]__host__ __device__
+            (ValueT &source_results){
+                source_results = 0;
+            }, nodes, target, this -> stream));
 
-                GUARD_CU(temp_preds.ForAll([]__host__ __device__
-                (VertexT *preds_, cons
-            }*/
+            GUARD_CU(child_temp.ForEach([]__host__ __device__
+            (ValueT &child_temps){
+                child_temps = 0;
+            }, nodes, target, this -> stream));
+
+            GUARD_CU(sums_child_feat.ForEach([]__host__ __device__
+            (ValueT &sums_child_feats){
+                sums_child_feats = 0;
+            }, nodes, target, this -> stream));
 
             return retval;
         }
@@ -277,28 +290,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-                //GUARD_CU(data_slice.distances.SetPointer(
-                //    h_distances, nodes, util::HOST));
-                //GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
-
-                //if (target == util::DEVICE)
-                //    return retval;
-                //GUARD_CU(data_slice.preds.SetPointer(h_preds, nodes, util::HOST));
-                //GUARD_CU(data_slice.preds.Move(util::DEVICE, util::HOST));
+                GUARD_CU(data_slice.source_result.SetPointer(
+                    h_distances, nodes, util::HOST));
+                GUARD_CU(data_slice.source_result.Move(util::DEVICE, util::HOST));
             }
-            else if (target == util::HOST) {
-            //    GUARD_CU(data_slice.distances.ForEach(h_distances,
-            //        []__host__ __device__
-            //        (const ValueT &distance, ValueT &h_distance){
-            //            h_distance = distance;
-            //        }, nodes, util::HOST));
 
-            //    if (this -> flag & Mark_Predecessors)
-            //        GUARD_CU(data_slice.preds.ForEach(h_preds,
-             //       []__host__ __device__
-            //        (const VertexT &pred, VertexT &h_pred){
-            //            h_pred = pred;
-            //        }, nodes, util::HOST));
+            else if (target == util::HOST) {
+                GUARD_CU(data_slice.source_result.ForEach(h_source_result,
+                    []__host__ __device__
+                    (const ValueT &source_results, ValueT &h_source_result){
+                        h_source_result = source_results;
+                    }, nodes, util::HOST));
             }
         }
         else 

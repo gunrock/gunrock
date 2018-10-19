@@ -51,7 +51,7 @@ struct SAGEIterationLoop : public IterationLoopBase
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
     typedef typename EnactorT::ValueT  ValueT;
-    typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
+    typedef typename EnactorT::Problem::GraphT::CooT CooT;
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
     typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push 
@@ -76,80 +76,141 @@ struct SAGEIterationLoop : public IterationLoopBase
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
         auto         &enactor_stats      =   enactor_slice.enactor_stats;
         auto         &graph              =   data_slice.sub_graph[0];
-        //auto         &distances          =   data_slice.distances;
-        //auto         &labels             =   data_slice.labels;
-        //auto         &preds              =   data_slice.preds;
-        //auto         &row_offsets        =   graph.CsrT::row_offsets;
-        // auto         &weights            =   graph.CsrT::edge_values;
-        //auto         &original_vertex    =   graph.GpT::original_vertex;
+        auto         &W_f_1_1D           =   data_slice.W_f_1_1D;
+        auto         &W_a_1_1D           =   data_slice.W_a_1_1D;
+        auto         &W_f_2_1D           =   data_slice.W_f_2_1D;
+        auto         &W_a_2_1D           =   data_slice.W_a_2_1D;
+        auto         &features_1D        =   data_slice.features_1D
+        auto         &       =   graph.CsrT::row_offsets;
+        auto         &weights            =   graph.CsrT::edge_values;
+        auto         &original_vertex    =   graph.GpT::original_vertex;
         auto         &frontier           =   enactor_slice.frontier;
         auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
         auto         &retval             =   enactor_stats.retval;
         //auto         &stream             =   enactor_slice.stream;
         //auto         &iteration          =   enactor_stats.iteration;
 
-        // The advance operation
-        auto advance_op = [  ]
-        __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
+        
+        GUARD_CU( data_slice.batch ForAll).....142 //batch
         {
-            /*
-            ValueT src_distance = Load<cub::LOAD_CG>(distances + src);
-            ValueT edge_weight  = Load<cub::LOAD_CS>(weights + edge_id);
-            ValueT new_distance = src_distance + edge_weight;
-
-            // Check if the destination node has been claimed as someone's child
-            ValueT old_distance = atomicMin(distances + dest, new_distance);
-
-            if (new_distance < old_distance)
+            int num_source = (source_start + batch_size <= graph.nodes ? batch_size : graph.nodes - source_start);
+            GUARD_CU (data_slice.vertices in batch ForAll([source_start]__host__ __device__ (ValueT * source_temp, SizeT & idx) ) ) ....145 //get source vertex
             {
-                if (!preds.isEmpty())
+                GUARD_CU ( in num_neigh1 ForAll([]__host__ _    _device__ (ValueT * num_neigh1, SizeT & idx) ) ) ....150 //get child vertex
                 {
-                    VertexT pred = src;
-                    if (!original_vertex.isEmpty())
-                        pred = original_vertex[src];
-                    Store(preds + dest, pred);
-                }
-                return true;
-            }
-            */
-            return false;
-        };
+                    SizeT offset = rand()% num_neigh1;
+                    SizeT pos = graph.GetNeighborListOffset(source) + offset;
+                    VertexT child = graph.GetEdgeDest(pos); 
+                    float sums [64] = {0.0} ; //local vector
+                    GUARD_CU () ....165 // get leaf vertex
+                    { 
+                        SizeT offset2 = rand() % num_neigh2;
+                        SizeT pos2 = graph.GetNeighborListOffset(child) + offset2;
+                        VertexT leaf = graph.GetEdgeDest (pos2); 
+                        for (int m = 0; m < 64 ; m ++) { //170
+                            sums[m] += features[leaf*64 + m]/num_neigh2;// merged line 176 171
+                    }, num_neigh2 
+                    //agg feaures for leaf nodes alg2 line 11 k = 1; 
+                
+                    for (int idx_0 = 0; idx_0 < 128; idx_0++) // 180
+                    {
+                        for (int idx_1 =0; idx_1< 64; idx_1 ++) //182
+                            child_temp[idx_0] += features[child*64 + idx_1] * W_f_1[idx_1*128 + idx_0];
+                    } // got 1st half of h_B1^1
 
-        // The filter operation
-        auto filter_op = [ ] __host__ __device__(
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            //if (!util::isValid(dest)) return false;
-            //if (labels[dest] == iteration) return false;
-            //labels[dest] = iteration;
-            return true;
-        };
+                    for (int idx_0 = 128; idx_0 < 256; idx_0++) //186
+                    {   
+                        for (int idx_1 =0; idx_1< 64; idx_1 ++)
+                            child_temp[idx_0] += sums[idx_1] * W_a_1[idx_1*128 + idx_0 - 128]; //189
+                    } // got 2nd half of h_B1^1 
+          
+                    // activation and L-2 normalize 
+                    auto L2_child_temp = 0.0;
+                    for (int idx_0 =0; idx_0 < 256; idx_0 ++ ) //194
+                    {
+                        child_temp[idx_0] = child_temp[idx_0] > 0.0 ? child_temp[idx_0] : 0.0 ; //relu() 
+                        L2_child_temp += child_temp[idx_0] * child_temp [idx_0];
+                    }  //finished relu
+                    for (int idx_0 =0; idx_0 < 256; idx_0 ++ ) //199
+                    {
+                        child_temp[idx_0] = child_temp[idx_0] /sqrt (L2_child_temp);
+                    }//finished L-2 norm, got h_B1^1, algo2 line13
 
-        //oprtr_parameters.label = iteration + 1;
-        // Call the advance operator, using the advance operation
-        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, advance_op, filter_op));
+                    // add the h_B1^1 to children_temp, also agg it
+                    for (int idx_0 =0; idx_0 < 256; idx_0 ++ ) //205
+                    {
+                        children_temp[idx_0] += child_temp[idx_0] /num_neigh1;
+                    }//finished agg (h_B1^1)
+                    
+                    for (int m = 0; m < 64; m++) //218
+                    {
+                        sums_child_feat [m] += features[child * 64 + m]/num_neigh1; //merge 220 and 226
+                    }
 
-        if (oprtr_parameters.advance_mode != "LB_CULL" &&
-            oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
-        {
-            frontier.queue_reset = false;
-            // Call the filter operator, using the filter operation
-            GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-                oprtr_parameters, filter_op));
-        }
+                }, num_neigh1 //for each child
+                
+            
+                /////////////////////////////////////////////////////////////////////////////////
+                //end of par for <source,child>
+                //start of par for <source>
+                // get ebedding vector for child node (h_{B2}^{1}) alg2 line 12            
+                for (int idx_0 = 0; idx_0 < 128; idx_0++) //230
+                {
+                    for (int idx_1 =0; idx_1< 64; idx_1 ++)
+                        source_temp[idx_0] += features[source*64 + idx_1] * W_f_1[idx_1*128 + idx_0];
+                } // got 1st half of h_B2^1
 
-        // Get back the resulted frontier length
-        GUARD_CU(frontier.work_progress.GetQueueLength(
-            frontier.queue_index, frontier.queue_length,
-            false, oprtr_parameters.stream, true));
+                for (int idx_0 = 128; idx_0 < 256; idx_0++) //236
+                {
+                    for (int idx_1 =0; idx_1< 64; idx_1 ++)
+                        source_temp[idx_0] += sums_child_feat[idx_1] * W_a_1[idx_1*128 + (idx_0 - 128)];
+                } // got 2nd half of h_B2^1         
+
+                auto L2_source_temp = 0.0;
+                for (int idx_0 =0; idx_0 < 256; idx_0 ++ ) //243
+                {
+                    source_temp[idx_0] = source_temp[idx_0] > 0.0 ? source_temp[idx_0] : 0.0 ; //relu() 
+                    L2_source_temp += source_temp[idx_0] * source_temp [idx_0];
+                } //finished relu
+                for (int idx_0 =0; idx_0 < 256; idx_0 ++ ) // 248
+                {
+                    source_temp[idx_0] = source_temp[idx_0] /sqrt (L2_source_temp);
+                }//finished L-2 norm for source temp
+
+                //////////////////////////////////////////////////////////////////////////////////////
+                // get h_B2^2 k =2.           
+                for (int idx_0 = 0; idx_0 < 128; idx_0++)
+                {
+                    //printf ("source_r1_0:%f", source_result[idx_0] );
+                    for (int idx_1 =0; idx_1< 256; idx_1 ++)
+                        source_result[idx_0] += source_temp [idx_1] * W_f_2[idx_1*128 + idx_0];
+                    //printf ("source_r1:%f", source_result[idx_0] );
+                } // got 1st half of h_B2^2
+
+                for (int idx_0 = 128; idx_0 < 256; idx_0++)
+                {
+                    //printf ("source_r2_0:%f", source_result[idx_0] );
+                    for (int idx_1 =0; idx_1< 256; idx_1 ++)
+                        source_result[idx_0] += children_temp[idx_1] * W_a_2[idx_1*128 + (idx_0 - 128)];
+         
+                } // got 2nd half of h_B2^2
+
+                auto L2_source_result = 0.0;
+                for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+                {
+                    source_result[idx_0] = source_result[idx_0] > 0.0 ? source_result[idx_0] : 0.0 ; //relu() 
+                    L2_source_result += source_result[idx_0] * source_result [idx_0];
+                } //finished relu
+                for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+                {
+                    source_result[idx_0] = source_result[idx_0] /sqrt (L2_source_result);
+                    //printf ("source_r:%f", source_result[idx_0] );
+                    //printf ("ch_t:%f", children_temp[idx_0]);
+                }//finished L-2 norm for source result   
+
+            }, num-source node.........
+
+        }, batches ..... 
 
         return retval;
     }
