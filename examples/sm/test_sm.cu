@@ -359,7 +359,7 @@ int main_Value(CommandLineArgs *args, int graph_args)
 {
 // can be disabled to reduce compile time
     if (args -> CheckCmdLineFlag("64bit-Value"))
-        return main_<VertexId, SizeT, unsigned long long      >(args, graph_args);
+        return main_<VertexId, SizeT, long long      >(args, graph_args);
     else
         return main_<VertexId, SizeT,  int      >(args, graph_args);
 }
