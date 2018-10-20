@@ -427,7 +427,7 @@ cudaError_t CPU_Reference(
 
         GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
             edge_flows, edge_residuals, vertex_reachabilities));
-        minCut(graph, source, dest, vertex_reachabilities, edge_residuals, num_nodes);
+        //minCut(graph, source, dest, vertex_reachabilities, edge_residuals, num_nodes);
 
         auto &edge_capacities = graph.edge_values;
 
