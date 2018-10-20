@@ -112,6 +112,7 @@ cudaError_t MinCut(
 
     for (auto e = 0; e < graph.edges; e++){
         edge_residuals[e] = edge_capacities[e] - edge_flows[e];
+        printf("CPU: edge idx %d, mf_flow %f, source %d\n", e, edge_flows[e], source);
     }
 
     /////////////////////////////////////////
@@ -370,7 +371,7 @@ cudaError_t CPU_Reference(
     ValueT  *edge_residuals   = new ValueT [num_edges]; // graph
     ValueT  *edge_flows       = new ValueT [num_edges]; // edge flows
     double   sum_weights_source_sink = 0;               // moy
-    
+
     // use to preserve graph edge weights
     ValueT  *original_edge_capacities = new ValueT [num_edges]; // graph
     auto &edge_capacities = graph.edge_values;
@@ -503,7 +504,7 @@ cudaError_t CPU_Reference(
                 community_weights[comm] = 0;
             }
         }
-        printf("%d ", comm);
+
         for (; comm < num_comms; comm++)
         {
             community_weights[comm] /= community_sizes  [comm];
@@ -569,7 +570,7 @@ cudaError_t CPU_Reference(
     std::ofstream out_pr( "./output_pr.txt" );
     for(int i = 0; i < num_org_nodes; i++) out_pr << (double) community_accus[curr_communities[i]] << std::endl;
     out_pr.close();
-    
+
     for (auto e = 0; e < graph.edges; e++){
          edge_capacities[e] = original_edge_capacities[e];
     }

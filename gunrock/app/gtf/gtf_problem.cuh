@@ -454,7 +454,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
-		GraphT& graph, 
+		GraphT& graph,
 		ValueT *h_community_accus,
 		VertexT *h_reverse,
 	    util::Location target = util::DEVICE)
