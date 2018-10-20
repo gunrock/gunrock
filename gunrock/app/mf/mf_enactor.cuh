@@ -267,11 +267,6 @@ struct MFIterationLoop : public IterationLoopBase
 	    return active[0] > 0;
 	  }));
     
-    GUARD_CU(flow.ForAll(
-           [graph, source] __host__ __device__ (ValueT *flow, const SizeT &e){
-               printf("mf idx %d, mf_flow %f, source %d\n", e, flow[e], source);
-           }, graph.edges, util::DEVICE, oprtr_parameters.stream));
-    
 	frontier.queue_index++;
 	// Get back the resulted frontier length
 	GUARD_CU(frontier.work_progress.GetQueueLength(

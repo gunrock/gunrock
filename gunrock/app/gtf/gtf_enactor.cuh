@@ -117,12 +117,11 @@ struct GTFIterationLoop : public IterationLoopBase
        auto &num_comms = data_slice.num_comms;
        auto &previous_num_comms = data_slice.previous_num_comms;
 
-       printf("in gtf core source is %d\n", source);
        mf_problem.parameters.Set("source", source);
        mf_problem.parameters.Set("sink", sink);
        GUARD_CU(mf_enactor.Init(mf_problem, mf_target));
        GUARD_CU(mf_problem.Reset(graph, h_reverse+0, mf_target));
-       printf("problem reseted successfully\n");
+       GUARD_CU(mf_enactor.Reset(source, mf_target));
        GUARD_CU(mf_enactor.Enact());
 
        printf("core runs permantly \n");
@@ -145,8 +144,6 @@ struct GTFIterationLoop : public IterationLoopBase
             [num_comms] __host__ __device__ (VertexT *previous_num_comm, const SizeT &pos){
                 previous_num_comm[pos] = num_comms[pos];
             }, 1, util::DEVICE, oprtr_parameters.stream));
-
-       printf("core runs permantly \n");
 
 
        GUARD_CU(community_weights.ForAll(
