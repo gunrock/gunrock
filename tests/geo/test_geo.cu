@@ -84,7 +84,6 @@ struct main_struct
 
     	retval = gunrock::graphio::labels::Read(parameters, h_latitude, h_longitude);
 
-#if 0
     	util::PrintMsg("Debugging Labels -------------", !quiet);
     	for (int p = 0; p < graph.nodes; p++)
     	{
@@ -94,7 +93,6 @@ struct main_struct
                             " > ",
                             !quiet);
     	}
-#endif     
    
         if (!quick) {
             // <DONE> init datastructures for reference result
@@ -105,6 +103,9 @@ struct main_struct
 	    memcpy(ref_predicted_lon, h_longitude, graph.nodes * sizeof(ValueT));
             // </DONE>
 
+	    bool geo_complete 	= parameters.Get<bool>("geo-complete");
+	    int geo_iter	= parameters.Get<int>("geo-iter");
+
             // If not in `quick` mode, compute CPU reference implementation
             util::PrintMsg("__________________________", !quiet);
             util::PrintMsg("______ CPU Reference _____", !quiet);
@@ -113,6 +114,8 @@ struct main_struct
                 graph.csr(),
                 ref_predicted_lat,
 		ref_predicted_lon,
+		geo_iter,
+		geo_complete,
                 quiet);
             
             util::PrintMsg("--------------------------\n Elapsed: "

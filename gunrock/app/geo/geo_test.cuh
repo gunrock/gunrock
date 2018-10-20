@@ -38,6 +38,8 @@ double CPU_Reference(
     const GraphT &graph,
     typename GraphT::ValueT *predicted_lat,
     typename GraphT::ValueT *predicted_lon,
+    int geo_iter,
+    bool geo_complete,
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
@@ -45,6 +47,7 @@ double CPU_Reference(
     typedef typename GraphT::VertexT VertexT;
 
     SizeT nodes = graph.nodes;
+    int iterations = 0;
 
     // Arrays to store neighbor locations
     ValueT * locations_lat = new ValueT[graph.nodes * graph.nodes];
@@ -119,28 +122,36 @@ double CPU_Reference(
 			        quiet);	
 	    }
 	}
-	
-	active = 0;
 
-	// Check all nodes with known location,
-	// and increment active.
-	for (SizeT v = 0; v < nodes; ++v) 
-	{
-	    if (util::isValid(predicted_lat[v]) && 
-		util::isValid(predicted_lon[v])) 
+	if (iterations >= geo_iter)
+	    Stop_Condition = true;
+
+	iterations++;
+
+	if(geo_complete) 
+	{	
+	    active = 0;
+
+	    // Check all nodes with known location,
+	    // and increment active.
+	    for (SizeT v = 0; v < nodes; ++v) 
 	    {
-		active++;
+	        if (util::isValid(predicted_lat[v]) && 
+	    	    util::isValid(predicted_lon[v])) 
+	        {
+		    active++;
+	        }
 	    }
+
+	    if(active == nodes) 
+	        Stop_Condition = true; 
+
+	    // util::PrintMsg("Current Predicted Locations: " 
+ 	    // 		+ std::to_string(active), !quiet);
 	}
 
-	if(active == nodes) 
-	    Stop_Condition = true; 
-
-	// util::PrintMsg("Current Predicted Locations: " 
-	// 		+ std::to_string(active), !quiet);
-
     } // -> while locations unknown.
-    // </TODO>
+        // </TODO>
 
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
@@ -172,11 +183,22 @@ typename GraphT::SizeT Validate_Results(
 
     SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
+    bool quick = parameters.Get<bool>("quick");
 
-    for(SizeT v = 0; v < graph.nodes; ++v) {
-        printf("Node [ %d ]: Predicted = < %f , %f > Reference = < %f , %f >\n", v, 
-		h_predicted_lat[v], h_predicted_lon[v], 
-		ref_predicted_lat[v], ref_predicted_lon[v]);
+    if (!quick) {
+
+    	for(SizeT v = 0; v < graph.nodes; ++v) {
+            printf("Node [ %d ]: Predicted = < %f , %f > Reference = < %f , %f >\n", v, 
+		    h_predicted_lat[v], h_predicted_lon[v], 
+		    ref_predicted_lat[v], ref_predicted_lon[v]);
+	}
+
+    } else {
+
+	for(SizeT v = 0; v < graph.nodes; ++v) {
+            printf("Node [ %d ]: Predicted = < %f , %f >\n", v,
+                    h_predicted_lat[v], h_predicted_lon[v]);
+	}
     }
 
     if(num_errors == 0) {
