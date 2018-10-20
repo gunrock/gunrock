@@ -430,7 +430,7 @@ struct LouvainIterationLoop : public IterationLoopBase
                  unify_segments, edge_pairs1]
                 __host__ __device__ (ValueT *w_v2c, const SizeT &pos)
                 {
-                    VertexT v = util::BinarySearch_LeftMost(
+                    VertexT v = util::BinarySearch_RightMost(
                         pos, seg_offsets0, (SizeT)0, graph.nodes, false);//,
                         //[] (const SizeT &a, const SizeT &b)
                         //{
@@ -438,6 +438,9 @@ struct LouvainIterationLoop : public IterationLoopBase
                         //});
                     //if (pos < seg_offsets0[v] && v > 0)
                     //    v--;
+                    //printf("seg %d: v = %d, seg_offsets0[v] = %d\n",
+                    //    pos, v, seg_offsets0[v]);
+
                     VertexT comm = unify_segments ? 
                         ProblemT::GetSecond(edge_pairs1[seg_offsets1[pos]]) :
                         edge_comms1[seg_offsets1[pos]];
@@ -478,7 +481,7 @@ struct LouvainIterationLoop : public IterationLoopBase
                         //});
                     //if (pos < seg_offsets0[v] && v > 0)
                     //    v--;
-                    if (abs(gain - max_gains[v]) > 1e-6)
+                    if (abs(max_gains[v] - gain) > 1e-8)
                         return;
 
                     next_communities[v] = 
@@ -506,7 +509,10 @@ struct LouvainIterationLoop : public IterationLoopBase
                         }
                     }
                     if (c_comm == n_comm)
+                    {
                         return;
+                        max_gains[v] = 0;
+                    }
                     //printf("v %d : c %d -> c %d, gain = %lf\n",
                     //    v, c_comm, n_comm, max_gains[v]);
 
@@ -721,7 +727,7 @@ struct LouvainIterationLoop : public IterationLoopBase
             new_graph.CsrT::edges = n_new_edges;
         //}
 
-        GUARD_CU(util::cubSegmentedReduce(
+        GUARD_CU(util::SegmentedReduce(
             cub_temp_space,
             edge_weights1, new_graph.CsrT::edge_values,
             n_new_edges, seg_offsets1,
