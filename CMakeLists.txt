@@ -309,7 +309,8 @@ endif (CUDA_VERBOSE_PTXAS)
 # end /* Configure GUNROCK build options */
 
 # c++11 is required
-set(CUDA_NVCC_FLAGS -std=c++11)
+# Already set above. Causes build error on Ubuntu 18.04.1 LTS 
+#set(CUDA_NVCC_FLAGS -std=c++11)
 set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_curand_LIBRARY})
 
 if(GUNROCK_BUILD_LIB)
