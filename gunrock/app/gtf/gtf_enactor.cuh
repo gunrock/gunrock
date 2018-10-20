@@ -83,6 +83,7 @@ struct GTFIterationLoop : public IterationLoopBase
        auto &mf_enactor = enactor -> mf_enactor;
        auto &mf_flow = mf_data_slice.flow;
        auto mf_target = util::DEVICE;
+       auto &h_reverse = data_slice.reverse;
 
        auto &enactor_slice	= enactor ->
 				  enactor_slices[gpu_offset + peer_];
@@ -106,8 +107,8 @@ struct GTFIterationLoop : public IterationLoopBase
        auto &community_sizes = data_slice.community_sizes;
        auto &community_weights = data_slice.community_weights;
        auto &community_active = data_slice.community_active;
-	     auto &community_accus = data_slice.community_accus;
-	     auto &vertex_active = data_slice.vertex_active;
+	   auto &community_accus = data_slice.community_accus;
+	   auto &vertex_active = data_slice.vertex_active;
        auto &vertex_reachabilities = data_slice.vertex_reachabilities;
 
        auto &edge_residuals	= data_slice.edge_residuals;
@@ -116,14 +117,20 @@ struct GTFIterationLoop : public IterationLoopBase
        auto &num_comms = data_slice.num_comms;
        auto &previous_num_comms = data_slice.previous_num_comms;
 
+       printf("in gtf core source is %d\n", source);
+       mf_problem.parameters.Set("source", source);
+       mf_problem.parameters.Set("sink", sink);
        GUARD_CU(mf_enactor.Init(mf_problem, mf_target));
-       GUARD_CU(mf_enactor.Reset(source, mf_target));
+       GUARD_CU(mf_problem.Reset(graph, h_reverse+0, mf_target));
+       printf("problem reseted successfully\n");
        GUARD_CU(mf_enactor.Enact());
 
+       printf("core runs permantly \n");
        GUARD_CU(edge_residuals.ForAll(
            [mf_flow, graph, source] __host__ __device__ (ValueT *edge_residuals, const SizeT &e){
                printf("GPU: edge idx %d, mf_flow %f, source %d\n", e, mf_flow[e], source);
            }, graph.edges, util::DEVICE, oprtr_parameters.stream));
+
 
        GUARD_CU(community_weights.ForAll(
             [community_sizes, next_communities, num_comms] __host__ __device__ (ValueT *community_weight, const SizeT &pos){
@@ -505,7 +512,6 @@ public:
             0, // NUM_VERTEX_ASSOCIATES
 	    1, // NUM_VALUE__ASSOCIATES
             IterationT>(thread_data, iterations[thread_data.thread_num]);
-        printf("in Run function !!!!!!!!! \n");
         return cudaSuccess;
     }
 

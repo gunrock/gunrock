@@ -104,6 +104,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, VertexT> num_comms;
         util::Array1D<SizeT, VertexT> previous_num_comms;	      // flag active vertices
         //util::Array1D<SizeT, VertexT> num_comms;	      // flag active vertices
+        util::Array1D<SizeT, VertexT> reverse; // for storing mf h_reverse
         SizeT num_updated_vertices;
 
 
@@ -136,6 +137,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
           active.SetName("active");
           num_comms.SetName("num_comms");
           previous_num_comms.SetName("previous_num_comms");
+          reverse.SetName("reverse");
 
         }
 
@@ -172,6 +174,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(active.Release(target));
             GUARD_CU(num_comms.Release(target));
             GUARD_CU(previous_num_comms.Release(target));
+            GUARD_CU(reverse.Release(target));
             return retval;
         }
 
@@ -212,6 +215,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
           GUARD_CU(active.Allocate(1, util::HOST|target));
           GUARD_CU(num_comms.Allocate(1, target));
           GUARD_CU(previous_num_comms.Allocate(1, target));
+          GUARD_CU(reverse.Allocate(edges_size, util::HOST));
+
 
 
 	        GUARD_CU(util::SetDevice(gpu_idx));
@@ -250,6 +255,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(active.EnsureSize_(1, target|util::HOST));
             GUARD_CU(num_comms.EnsureSize_(1, target));
             GUARD_CU(previous_num_comms.EnsureSize_(1, target));
+            GUARD_CU(reverse.EnsureSize_(edges_size, util::HOST));
 
 
 	          GUARD_CU(util::SetDevice(this->gpu_idx));
@@ -462,16 +468,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         cudaError_t retval = cudaSuccess;
 
 		debug_aml("Problem Reset");
+    auto &reverse = data_slices[0][0].reverse;
+    for(auto i = 0; i < graph.edges; i++){
+      reverse[i] = h_reverse[i];
+    }
+    GUARD_CU(mf_problem.Reset(graph, reverse+0, target));
 
-  		// seems to be a dummy array as I don't need it
-  		//SizeT* h_reverse = (SizeT*)malloc(sizeof(SizeT)*graph.edges);
-  		GUARD_CU(mf_problem.Reset(graph, h_reverse, target));
 
 	auto source_vertex  = graph.nodes-2;
 	auto sink_vertex    = graph.nodes-1;
 
         for (int gpu = 0; gpu < this->num_gpus; ++gpu)
         {
+
 	    auto &data_slice = data_slices[gpu][0];
 	    data_slice.source = source_vertex;
 	    data_slice.sink   = sink_vertex;
