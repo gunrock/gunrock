@@ -115,12 +115,10 @@ struct main_struct
             "Elapsed: " + std::to_string(elapsed) + " ms", true);
 
         std::vector<std::string> switches{"advance-mode"};
-
     	GUARD_CU(app::Switch_Parameters(parameters, d_graph, switches,
-    	[](util::Parameters &parameters, GraphT &d_graph)
+    	[reverse_edges](util::Parameters &parameters_, GraphT &d_graph)
     	{
-    	    return app::gtf::RunTests<GraphT, ValueT, VertexT, SizeT>(parameters, d_graph);
-    	    return cudaSuccess;
+    	    return app::gtf::RunTests<GraphT, ValueT, VertexT, SizeT>(parameters_, d_graph, reverse_edges+0);
         }));
 
     	// Clean up

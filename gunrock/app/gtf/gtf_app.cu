@@ -183,6 +183,7 @@ template <typename GraphT, typename ValueT, typename VertexT, typename SizeT>
 cudaError_t RunTests(
     util::Parameters  &parameters,
     GraphT	      &graph,
+    VertexT *h_reverse,
     util::Location    target = util::DEVICE)
 {
     debug_aml("RunTests starts");
@@ -251,7 +252,6 @@ cudaError_t RunTests(
     EnactorT enactor;
     GUARD_CU(problem.Init(graph, target));
     GUARD_CU(enactor.Init(problem, target));
-    printf("in side that weird function3\n");
 
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
@@ -259,7 +259,7 @@ cudaError_t RunTests(
     // perform the gtf algorithm
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        GUARD_CU(problem.Reset(graph, community_accus, target));
+        GUARD_CU(problem.Reset(graph, community_accus, h_reverse, target));
         GUARD_CU(enactor.Reset(source, target));
 
         util::PrintMsg("______GPU SFL algorithm____", !quiet_mode);

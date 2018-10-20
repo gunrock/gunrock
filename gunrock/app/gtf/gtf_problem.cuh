@@ -322,8 +322,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     // Members
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
-    typedef mf::Problem<GraphT> ProblemT;
-    ProblemT mf_problem(parameters);
+    typedef mf::Problem<GraphT, ValueT, FLAG> MfProblemT;
+    MfProblemT mf_problem;
 
     // Methods
 
@@ -332,6 +332,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     Problem(util::Parameters &_parameters, ProblemFlag _flag = Problem_None):
         BaseProblem(_parameters, _flag),
+        mf_problem(_parameters, _flag),
         data_slices(NULL)
     {
     }
@@ -363,8 +364,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             delete[] data_slices;
 	    data_slices = NULL;
         }
-        GUARD_CU(BaseProblem::Release(target));
         GUARD_CU(mf_problem.Release(target));
+        GUARD_CU(BaseProblem::Release(target));
         return retval;
     }
 
@@ -452,16 +453,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * @param[in] location Memory location to work on
      * \return cudaError_t Error message(s), if any
      */
-    cudaError_t Reset(GraphT& graph, ValueT *h_community_accus,
+    cudaError_t Reset(
+		GraphT& graph, 
+		ValueT *h_community_accus,
+		VertexT *h_reverse,
 	    util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
 
-	debug_aml("Problem Reset");
+		debug_aml("Problem Reset");
 
-  // seems to be a dummy array as I don't need it
-  SizeT* h_reverse = (SizeT*)malloc(sizeof(SizeT)*graph.edges);
-  GUARD_CU(problem.Reset(graph, h_reverse, target));
+  		// seems to be a dummy array as I don't need it
+  		//SizeT* h_reverse = (SizeT*)malloc(sizeof(SizeT)*graph.edges);
+  		GUARD_CU(mf_problem.Reset(graph, h_reverse, target));
 
 	auto source_vertex  = graph.nodes-2;
 	auto sink_vertex    = graph.nodes-1;

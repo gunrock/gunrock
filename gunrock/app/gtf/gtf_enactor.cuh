@@ -23,6 +23,8 @@
 
 #define debug_aml(a...)
 #include <gunrock/app/mf/mf_enactor.cuh>
+#include <gunrock/app/gtf/gtf_test.cuh>
+
 //#define debug_aml(a...) \
   {printf("%s:%d ", __FILE__, __LINE__); printf(a); printf("\n");}
 
@@ -74,6 +76,13 @@ struct GTFIterationLoop : public IterationLoopBase
 	     auto num_gpus		= enactor -> num_gpus;
 	     auto gpu_offset		= num_gpus * gpu_num;
        auto &data_slice	= enactor -> problem -> data_slices[gpu_num][0];
+       
+       //MF specific
+       auto &mf_data_slice = enactor -> problem -> mf_problem.data_slices[gpu_num][0];
+       auto &mf_problem = enactor -> problem -> mf_problem;
+       auto &mf_enactor = enactor -> mf_enactor;
+       auto mf_target = util::DEVICE;
+
        auto &enactor_slice	= enactor ->
 				  enactor_slices[gpu_offset + peer_];
        auto &enactor_stats	= enactor_slice.enactor_stats;
@@ -122,6 +131,10 @@ struct GTFIterationLoop : public IterationLoopBase
        //community_active[0] = true;
        //printf("num_nodes \n");
 
+       GUARD_CU(mf_enactor.Init(mf_problem, mf_target));
+       GUARD_CU(mf_enactor.Reset(source, mf_target));
+       GUARD_CU(mf_enactor.Enact());
+
        GUARD_CU(community_weights.ForAll(
             [community_sizes, next_communities, num_comms] __host__ __device__ (ValueT *community_weight, const SizeT &pos){
               if(pos < num_comms[0]){
@@ -130,7 +143,7 @@ struct GTFIterationLoop : public IterationLoopBase
                   next_communities [pos] = 0;
               }
             }, num_nodes, util::DEVICE, oprtr_parameters.stream));
-
+       
        GUARD_CU(previous_num_comms.ForAll(
             [num_comms] __host__ __device__ (VertexT *previous_num_comm, const SizeT &pos){
                 previous_num_comm[pos] = num_comms[pos];
@@ -436,6 +449,7 @@ public:
     typedef typename Problem::ValueT  ValueT;
     typedef typename Problem::SizeT   SizeT;
     typedef typename Problem::GraphT  GraphT;
+    typedef typename Problem::MfProblemT MfProblemT;
     typedef EnactorBase<GraphT, VertexT, ValueT, ARRAY_FLAG,
 	    cudaHostRegisterFlag>				BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
@@ -444,13 +458,16 @@ public:
 
     Problem     *problem   ;
     IterationT  *iterations;
-    mf::EnactorT mf_enactor;
+    //typedef mf::Problem<GraphT> MfProblemT;
+    typedef mf::Enactor<MfProblemT> MfEnactorT;
+    MfEnactorT mf_enactor;
 
     /**
      * @brief gtfEnactor constructor
      */
     Enactor() :
         BaseEnactor("gtf"),
+        mf_enactor(),
         problem    (NULL)
     {
         // TODO: change according to algorithmic needs
@@ -478,7 +495,6 @@ public:
         delete []iterations; iterations = NULL;
         problem = NULL;
         return retval;
-        GUARD_CU(enactor.Reset(source, target));
     }
 
     /**
