@@ -507,6 +507,7 @@ cudaError_t CPU_Reference(
         {
             community_weights[comm] /= community_sizes  [comm];
             community_accus  [comm] += community_weights[comm];
+            printf("comm %d, accus %f, sizes %d \n", comm, community_accus  [comm], community_sizes  [comm]);
             //printf("values: comm: %d, sizes: %d, weights: %f, accus: %f.\n", comm, community_sizes[comm], community_weights[comm], community_accus[comm]);
         }
 

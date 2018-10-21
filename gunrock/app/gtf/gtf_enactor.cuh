@@ -128,7 +128,7 @@ struct GTFIterationLoop : public IterationLoopBase
        GUARD_CU(edge_residuals.ForAll(
            [mf_flow, graph, source] __host__ __device__ (ValueT *edge_residuals, const SizeT &e){
                edge_residuals[e] = graph.edge_values[e] - mf_flow[e];
-               printf("GPU: edge idx %d, mf_flow %f, source %d\n", e, edge_residuals[e], source);
+               //printf("GPU: edge idx %d, mf_flow %f, source %d\n", e, edge_residuals[e], source);
            }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
        GUARD_CU(vertex_reachabilities.ForAll(
@@ -162,11 +162,11 @@ struct GTFIterationLoop : public IterationLoopBase
                   community_weight [pos] = 0;
                   community_sizes  [pos] = 0;
                   next_communities [pos] = 0;
-                  printf("vertext value %f \n", community_accus[0]);
+                  //printf("vertext value %f \n", community_accus[0]);
               }
               printf("%d, ", vertex_reachabilities[pos]);
             }, num_nodes, util::DEVICE, oprtr_parameters.stream));
-      printf("core runs permantly1 \n");
+      //printf("core runs permantly1 \n");
 
        GUARD_CU(previous_num_comms.ForAll(
             [num_comms] __host__ __device__ (VertexT *previous_num_comm, const SizeT &pos){
@@ -186,8 +186,9 @@ struct GTFIterationLoop : public IterationLoopBase
             // others
             num_comms, num_edges,
             num_org_nodes, graph]
-            __host__ __device__ (ValueT *community_weights, const VertexT &idx){
+            __host__ __device__ (ValueT *community_weights, const VertexT &v){
               {
+
                 VertexT comm;
                 for (VertexT v = 0; v < num_org_nodes; v++)
                 {
@@ -212,7 +213,7 @@ struct GTFIterationLoop : public IterationLoopBase
                         community_weights[comm] +=
                             edge_residuals[num_edges - num_org_nodes * 2 + v];
                         community_sizes  [comm] ++;
-                        printf("++ %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
+                        //printf("++ %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
                     }
 
                     else { // otherwise
@@ -231,13 +232,11 @@ struct GTFIterationLoop : public IterationLoopBase
                                 edge_residuals[e] = 0;
                             }
                         }
-                        printf("-- %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
+                        //printf("-- %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
                     }
 
                 }
 
-              }
-            }, 1, util::DEVICE, oprtr_parameters.stream));
                 /*
                 if (!vertex_active[v]) return;
                 printf("GPU:nodeid %d, %d %d\n", v, vertex_reachabilities[v], vertex_active[v]);
@@ -280,10 +279,10 @@ struct GTFIterationLoop : public IterationLoopBase
                       }
                   }
                   printf("%d %f %f\n", comm, community_weights[comm], community_accus[comm]);
-
+                  */
               }
-            }, num_nodes, util::DEVICE, oprtr_parameters.stream));*/
-            printf("core runs permantly2 \n");
+            }, num_org_nodes, util::DEVICE, oprtr_parameters.stream));
+
             GUARD_CU(community_weights.ForAll(
                  [next_communities, //community specific
                  curr_communities,
@@ -294,7 +293,6 @@ struct GTFIterationLoop : public IterationLoopBase
                  previous_num_comms]
                  __host__ __device__ (ValueT *community_weights, unsigned int &comm){
                    {
-                     printf("in next kernel \n");
                      if(comm >= previous_num_comms[0]) return;
 
                      if (community_active[comm])
@@ -330,11 +328,11 @@ struct GTFIterationLoop : public IterationLoopBase
               if(comm < num_comms[0] && comm >= previous_num_comms[0]){
                 community_weights[comm] /= community_sizes  [comm];
                 community_accus  [comm] += community_weights[comm];
+                printf("comm %d, accus %f, sizes %d \n", comm, community_accus  [comm], community_sizes  [comm]);
               }
               active[0] = 0;
             }
-          }, num_nodes, util::DEVICE, oprtr_parameters.stream));
-
+          }, num_org_nodes, util::DEVICE, oprtr_parameters.stream));
 
 
 

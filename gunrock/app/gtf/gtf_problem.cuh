@@ -322,9 +322,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
       	    // GUARD_CU(next_communities.Move(util::HOST, target, num_org_nodes, 0,
       			// this->stream));
             //
-            // GUARD_CU(community_accus.SetPointer(h_community_accus, num_org_nodes, util::HOST));
-      	    // GUARD_CU(community_accus.Move(util::HOST, target, num_org_nodes, 0,
-      			//      this->stream));
+            printf("h_community_accus is %f \n", h_community_accus[0]);
+            GUARD_CU(community_accus.SetPointer(h_community_accus, graph.nodes, util::HOST));
+      	    GUARD_CU(community_accus.Move(util::HOST, target, graph.nodes, 0,
+      			     this->stream));
 
             this->num_updated_vertices = 1;
 
