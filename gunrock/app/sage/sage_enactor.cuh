@@ -76,141 +76,231 @@ struct SAGEIterationLoop : public IterationLoopBase
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
         auto         &enactor_stats      =   enactor_slice.enactor_stats;
         auto         &graph              =   data_slice.sub_graph[0];
-        auto         &W_f_1_1D           =   data_slice.W_f_1_1D;
-        auto         &W_a_1_1D           =   data_slice.W_a_1_1D;
-        auto         &W_f_2_1D           =   data_slice.W_f_2_1D;
-        auto         &W_a_2_1D           =   data_slice.W_a_2_1D;
-        auto         &features_1D        =   data_slice.features_1D
-        auto         &       =   graph.CsrT::row_offsets;
-        auto         &weights            =   graph.CsrT::edge_values;
-        auto         &original_vertex    =   graph.GpT::original_vertex;
-        auto         &frontier           =   enactor_slice.frontier;
-        auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
+        auto         &W_f_1              =   data_slice.W_f_1_1D;
+        auto          Wf1_dim1           =   data_slice.Wf1_dim1;
+        auto         &W_a_1              =   data_slice.W_a_1_1D;
+        auto          Wa1_dim1           =   data_slice.Wa1_dim1;
+        auto         &W_f_2              =   data_slice.W_f_2_1D;
+        auto          Wf2_dim0           =   data_slice.Wf2_dim0;
+        auto          Wf2_dim1           =   data_slice.Wf2_dim1;
+        auto         &W_a_2              =   data_slice.W_a_2_1D;
+        auto          Wa2_dim0           =   data_slice.Wa2_dim0;
+        auto          Wa2_dim1           =   data_slice.Wa2_dim1;
+        auto         &features           =   data_slice.features_1D;
+        auto          feature_column     =   data_slice.feature_column;
+        auto         &source_result      =   data_slice.source_result;
+        auto          result_column      =   data_slice.result_column;
+        auto          num_children_per_source = data_slice.num_children_per_source;
+        auto          num_leafs_per_child =  data_slice.num_leafs_per_child;
+        auto         &sums               =   data_slice.sums;
+        auto         &sums_child_feat    =   data_slice.sums_child_feat;
+        //auto         &child_temp         =   data_slice.child_temp;
+        auto         &children_temp      =   data_slice.children_temp;
+        auto         &rand_states        =   data_slice.rand_states;
         auto         &retval             =   enactor_stats.retval;
-        //auto         &stream             =   enactor_slice.stream;
-        //auto         &iteration          =   enactor_stats.iteration;
+        auto         &stream             =   enactor_slice.stream;
+        auto         &iteration          =   enactor_stats.iteration;
+        VertexT       source_start       =   iteration * data_slice.batch_size;
+        VertexT       source_end         =  (iteration + 1) * data_slice.batch_size;
+        if (source_end >= graph.nodes)
+            source_end  = graph.nodes;
+        VertexT       num_sources        =   source_end - source_start;
+        SizeT         num_children       =   num_sources * data_slice.num_children_per_source;
 
-        
-        GUARD_CU( data_slice.batch ForAll).....142 //batch
-        {
-            int num_source = (source_start + batch_size <= graph.nodes ? batch_size : graph.nodes - source_start);
-            GUARD_CU (data_slice.vertices in batch ForAll([source_start]__host__ __device__ (ValueT * source_temp, SizeT & idx) ) ) ....145 //get source vertex
+        GUARD_CU(children_temp.ForEach(
+            [] __host__ __device__ (ValueT &val)
             {
-                GUARD_CU ( in num_neigh1 ForAll([]__host__ _    _device__ (ValueT * num_neigh1, SizeT & idx) ) ) ....150 //get child vertex
-                {
-                    SizeT offset = rand()% num_neigh1;
-                    SizeT pos = graph.GetNeighborListOffset(source) + offset;
-                    VertexT child = graph.GetEdgeDest(pos); 
-                    float sums [64] = {0.0} ; //local vector
-                    GUARD_CU () ....165 // get leaf vertex
-                    { 
-                        SizeT offset2 = rand() % num_neigh2;
-                        SizeT pos2 = graph.GetNeighborListOffset(child) + offset2;
-                        VertexT leaf = graph.GetEdgeDest (pos2); 
-                        for (int m = 0; m < 64 ; m ++) { //170
-                            sums[m] += features[leaf*64 + m]/num_neigh2;// merged line 176 171
-                    }, num_neigh2 
-                    //agg feaures for leaf nodes alg2 line 11 k = 1; 
-                
-                    for (int idx_0 = 0; idx_0 < 128; idx_0++) // 180
-                    {
-                        for (int idx_1 =0; idx_1< 64; idx_1 ++) //182
-                            child_temp[idx_0] += features[child*64 + idx_1] * W_f_1[idx_1*128 + idx_0];
-                    } // got 1st half of h_B1^1
+                val = 0;
+            }, num_sources * Wf2_dim0, util::DEVICE, stream));
+       
+        GUARD_CU(sums_child_feat.ForEach(
+            [] __host__ __device__ (ValueT &val)
+            {
+                val = 0;
+            }, num_sources * feature_column, util::DEVICE, stream));
+ 
+        GUARD_CU(data_slice.child_temp.ForAll(
+            [source_start, num_children_per_source,
+            graph, feature_column, features,
+            num_leafs_per_child, W_f_1, Wf1_dim1,
+            W_a_1, Wa1_dim1, Wf2_dim0, children_temp,
+            sums_child_feat, sums, rand_states] 
+            __host__ __device__ (ValueT *child_temp_, const SizeT &i)
+            {
+                ValueT *child_temp = child_temp_ + i * Wf2_dim0;
+                VertexT source = i / num_children_per_source + source_start;
+                SizeT   offset = curand_uniform(rand_states + i) 
+                    * graph.GetNeighborListLength(source);
+                SizeT   edge   = graph.GetNeighborListOffset(source) + offset;
+                VertexT child  = graph.GetEdgeDest(edge); 
+                //float sums [64] = {0.0} ; //local vector
 
-                    for (int idx_0 = 128; idx_0 < 256; idx_0++) //186
-                    {   
-                        for (int idx_1 =0; idx_1< 64; idx_1 ++)
-                            child_temp[idx_0] += sums[idx_1] * W_a_1[idx_1*128 + idx_0 - 128]; //189
-                    } // got 2nd half of h_B1^1 
-          
-                    // activation and L-2 normalize 
-                    auto L2_child_temp = 0.0;
-                    for (int idx_0 =0; idx_0 < 256; idx_0 ++ ) //194
-                    {
-                        child_temp[idx_0] = child_temp[idx_0] > 0.0 ? child_temp[idx_0] : 0.0 ; //relu() 
-                        L2_child_temp += child_temp[idx_0] * child_temp [idx_0];
-                    }  //finished relu
-                    for (int idx_0 =0; idx_0 < 256; idx_0 ++ ) //199
-                    {
-                        child_temp[idx_0] = child_temp[idx_0] /sqrt (L2_child_temp);
-                    }//finished L-2 norm, got h_B1^1, algo2 line13
+                for (int f = 0; f < feature_column; f++)
+                    sums[i * feature_column + f] = 0;
+                SizeT child_degree = graph.GetNeighborListLength(child);
+                for (int j = 0; j < num_leafs_per_child; j++)
+                { 
+                    //SizeT   offset2 = 0;//cuRand() * child_degree;
+                    SizeT   edge2   = graph.GetNeighborListOffset(child) 
+                        + curand_uniform(rand_states + i) * child_degree;
+                    VertexT leaf    = graph.GetEdgeDest(edge2);
+                            offset  = leaf * feature_column;
 
-                    // add the h_B1^1 to children_temp, also agg it
-                    for (int idx_0 =0; idx_0 < 256; idx_0 ++ ) //205
+                    for (int f = 0; f < feature_column; f++) 
                     {
-                        children_temp[idx_0] += child_temp[idx_0] /num_neigh1;
-                    }//finished agg (h_B1^1)
-                    
-                    for (int m = 0; m < 64; m++) //218
-                    {
-                        sums_child_feat [m] += features[child * 64 + m]/num_neigh1; //merge 220 and 226
+                        sums[i * feature_column + f] += features[offset + f]; 
+                        ///num_neigh2;// merged line 176 171
                     }
-
-                }, num_neigh1 //for each child
-                
-            
-                /////////////////////////////////////////////////////////////////////////////////
-                //end of par for <source,child>
-                //start of par for <source>
-                // get ebedding vector for child node (h_{B2}^{1}) alg2 line 12            
-                for (int idx_0 = 0; idx_0 < 128; idx_0++) //230
+                }
+                for (int f = 0; f < feature_column; f++)
+                    sums[i * feature_column + f] /= num_leafs_per_child;
+                //agg feaures for leaf nodes alg2 line 11 k = 1; 
+       
+                offset = child * feature_column; 
+                for (int x = 0; x < Wf1_dim1; x++)
                 {
-                    for (int idx_1 =0; idx_1< 64; idx_1 ++)
-                        source_temp[idx_0] += features[source*64 + idx_1] * W_f_1[idx_1*128 + idx_0];
+                    ValueT val = 0;
+                    for (int f =0; f < feature_column; f ++)
+                        val += features[offset + f] 
+                            * W_f_1[f * Wf1_dim1 + x];
+                    child_temp[x] = val;
+                } // got 1st half of h_B1^1
+
+                for (int x = 0; x < Wa1_dim1; x++)
+                {   
+                    SizeT val = 0;
+                    for (int f =0; f < feature_column; f ++)
+                        val += sums[i * feature_column + f] * W_a_1[f * Wa1_dim1 + x];
+                    child_temp[x + Wf1_dim1] = val;
+                } // got 2nd half of h_B1^1 
+      
+                // activation and L-2 normalize 
+                double L2_child_temp = 0.0;
+                for (int x =0; x < Wf2_dim0; x++)
+                {
+                    ValueT val = child_temp[x];
+                    if (val < 0) // relu()
+                        val = 0;
+                    L2_child_temp += val * val;
+                    child_temp[x] = val;
+                }  //finished relu
+                L2_child_temp = 1.0 / sqrt(L2_child_temp);
+                for (int x =0; x < Wf2_dim0; x++)
+                {
+                    //child_temp[idx_0] = child_temp[idx_0] /sqrt (L2_child_temp);
+                    child_temp[x] *= L2_child_temp;
+                }//finished L-2 norm, got h_B1^1, algo2 line13
+
+                offset = i / num_children_per_source * Wf2_dim0;
+                // add the h_B1^1 to children_temp, also agg it
+                for (int x =0; x < Wf2_dim0; x ++ ) //205
+                {
+                    atomicAdd(children_temp + (offset + x), 
+                        child_temp[x] / num_children_per_source);
+                }//finished agg (h_B1^1)
+                
+                offset = i / num_children_per_source * feature_column;
+                for (int f = 0; f < feature_column; f++)
+                {
+                    atomicAdd(sums_child_feat + offset + f, 
+                        features[child * feature_column + f] / num_children_per_source); 
+                    //merge 220 and 226
+                }
+                // end of for each child
+            }, num_children, util::DEVICE, stream));
+
+        GUARD_CU(data_slice.source_temp.ForAll(
+            [feature_column, features, source_start, 
+            W_f_1, Wf1_dim1, children_temp,
+            sums_child_feat, W_a_1, Wa1_dim1,
+            W_f_2, Wf2_dim1, Wf2_dim0, W_a_2, Wa2_dim1, Wa2_dim0,
+            source_result, result_column] 
+            __host__ __device__ (ValueT *source_temp_, const SizeT &i)
+            {
+                ValueT  *source_temp = source_temp_ + i * Wf2_dim0;
+                VertexT source = source_start + i;
+                SizeT offset = source * feature_column;
+                // get ebedding vector for child node (h_{B2}^{1}) alg2 line 12            
+                for (int x = 0; x < Wf1_dim1; x++)
+                {
+                    ValueT val = 0;
+                    for (int f =0; f < feature_column; f++)
+                        val += features[offset + f] * W_f_1[f * Wf1_dim1 + x];
+                    source_temp[x] = val;
                 } // got 1st half of h_B2^1
 
-                for (int idx_0 = 128; idx_0 < 256; idx_0++) //236
+                offset = i * feature_column;
+                for (int x = 0; x < Wa1_dim1; x++)
                 {
-                    for (int idx_1 =0; idx_1< 64; idx_1 ++)
-                        source_temp[idx_0] += sums_child_feat[idx_1] * W_a_1[idx_1*128 + (idx_0 - 128)];
+                    ValueT val = 0;
+                    for (int f=0; f < feature_column; f++)
+                        val += sums_child_feat[offset + f] * W_a_1[f * Wa1_dim1 + x];
+                    source_temp[Wf1_dim1 + x] = val;
                 } // got 2nd half of h_B2^1         
 
-                auto L2_source_temp = 0.0;
-                for (int idx_0 =0; idx_0 < 256; idx_0 ++ ) //243
+                double L2_source_temp = 0.0;
+                for (int x =0; x < Wf2_dim0; x++)
                 {
-                    source_temp[idx_0] = source_temp[idx_0] > 0.0 ? source_temp[idx_0] : 0.0 ; //relu() 
-                    L2_source_temp += source_temp[idx_0] * source_temp [idx_0];
+                    ValueT val = source_temp[x];
+                    if (val < 0)
+                        val = 0; // relu()
+                    L2_source_temp += val * val;
+                    source_temp[x] = val;
                 } //finished relu
-                for (int idx_0 =0; idx_0 < 256; idx_0 ++ ) // 248
+                L2_source_temp = 1.0 / sqrt(L2_source_temp);
+                for (int x =0; x < Wf2_dim0; x++)
                 {
-                    source_temp[idx_0] = source_temp[idx_0] /sqrt (L2_source_temp);
+                    //source_temp[idx_0] = source_temp[idx_0] /sqrt (L2_source_temp);
+                    source_temp[x] *= L2_source_temp;
                 }//finished L-2 norm for source temp
 
                 //////////////////////////////////////////////////////////////////////////////////////
-                // get h_B2^2 k =2.           
-                for (int idx_0 = 0; idx_0 < 128; idx_0++)
+                // get h_B2^2 k =2.
+                offset = i * result_column;
+                for (int x = 0; x < Wf2_dim1; x++)
                 {
+                    ValueT val = 0; //source_result[offset + x];
                     //printf ("source_r1_0:%f", source_result[idx_0] );
-                    for (int idx_1 =0; idx_1< 256; idx_1 ++)
-                        source_result[idx_0] += source_temp [idx_1] * W_f_2[idx_1*128 + idx_0];
+                    for (int y =0; y < Wf2_dim0; y ++)
+                        val += source_temp[y] * W_f_2[y * Wf2_dim1 + x];
+                    source_result[offset + x] = val;
                     //printf ("source_r1:%f", source_result[idx_0] );
                 } // got 1st half of h_B2^2
 
-                for (int idx_0 = 128; idx_0 < 256; idx_0++)
+                for (int x = 0; x < Wa2_dim1; x++)
                 {
                     //printf ("source_r2_0:%f", source_result[idx_0] );
-                    for (int idx_1 =0; idx_1< 256; idx_1 ++)
-                        source_result[idx_0] += children_temp[idx_1] * W_a_2[idx_1*128 + (idx_0 - 128)];
-         
+                    ValueT val = 0; //source_result[offset + x];
+                    for (int y = 0; y < Wa2_dim0; y ++)
+                        val += children_temp[i * Wa2_dim0 + y] * W_a_2[y * Wa2_dim1 + x];
+                    source_result[offset + Wf2_dim1 + x] = val;
                 } // got 2nd half of h_B2^2
-
-                auto L2_source_result = 0.0;
-                for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+                
+                double L2_source_result = 0.0;
+                for (int x =0; x < result_column; x ++ )
                 {
-                    source_result[idx_0] = source_result[idx_0] > 0.0 ? source_result[idx_0] : 0.0 ; //relu() 
-                    L2_source_result += source_result[idx_0] * source_result [idx_0];
+                    ValueT val = source_result[offset + x];
+                    if (val < 0) // relu()
+                        val = 0;
+                    L2_source_result += val * val;
+                    source_result[offset + x] = val;
                 } //finished relu
-                for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+                L2_source_result = 1.0 / sqrt(L2_source_result);
+                for (int x =0; x < result_column; x ++ )
                 {
-                    source_result[idx_0] = source_result[idx_0] /sqrt (L2_source_result);
+                    source_result[offset + x] *= L2_source_result;
                     //printf ("source_r:%f", source_result[idx_0] );
                     //printf ("ch_t:%f", children_temp[idx_0]);
                 }//finished L-2 norm for source result   
-
-            }, num-source node.........
-
-        }, batches ..... 
+                 
+           }, num_sources, util::DEVICE, stream));
+       
+        GUARD_CU2(cudaMemcpyAsync(
+            data_slice.host_source_result + (source_start * result_column),
+            source_result.GetPointer(util::DEVICE),
+            num_sources * result_column * sizeof(ValueT),
+            cudaMemcpyDeviceToHost, stream),
+            "source_result D2H copy failed");
 
         return retval;
     }
@@ -255,14 +345,49 @@ struct SAGEIterationLoop : public IterationLoopBase
             labels[key] = label;
             if (!preds.isEmpty())
                 preds[key] = vertex_associate_ins[in_pos];
-            return true;
             */
+            return true;
         };
 
         cudaError_t retval = BaseIterationLoop:: template ExpandIncomingBase
             <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
             (received_length, peer_, expand_op);
         return retval;
+    }
+
+    bool Stop_Condition(int gpu_num = 0)
+    {
+        int num_gpus = this -> enactor -> num_gpus;
+        auto &enactor_slices = this -> enactor -> enactor_slices;
+
+        for (int gpu = 0; gpu < num_gpus * num_gpus; gpu++)
+        {   
+            auto &retval = enactor_slices[gpu].enactor_stats.retval;
+            if (retval == cudaSuccess) continue;
+            printf("(CUDA error %d @ GPU %d: %s\n",
+                retval, gpu % num_gpus, cudaGetErrorString(retval));
+            fflush(stdout);
+            return true;
+        }   
+    
+        auto         &data_slice         =   this -> enactor ->
+            problem -> data_slices[this -> gpu_num][0]; 
+        auto         &enactor_slice      =   this -> enactor ->
+            enactor_slices[this -> gpu_num * this -> enactor -> num_gpus];
+        if (enactor_slice.enactor_stats.iteration * data_slice.batch_size
+            < data_slice.sub_graph -> nodes)
+            return false;
+        return true;
+    }
+
+    cudaError_t Compute_OutputLength(int peer_)
+    {
+        return cudaSuccess;
+    }
+
+    cudaError_t Check_Queue_Size(int peer_)
+    {
+        return cudaSuccess;
     }
 }; // end of SSSPIteration
 
@@ -353,7 +478,7 @@ public:
         this->problem = &problem;
 
         GUARD_CU(BaseEnactor::Init(
-            problem, Enactor_None, 2, NULL, target, false));
+            problem, Enactor_None, 0, NULL, target, false));
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++)
         {
             GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));

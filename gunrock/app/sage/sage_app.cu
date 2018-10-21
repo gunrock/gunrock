@@ -22,8 +22,8 @@
 #include <gunrock/app/test_base.cuh>
 
 // single-source shortest path includes
-#include <gunrock/app/sage/sage_enactor.cuh>
 #include <gunrock/app/sage/sage_test.cuh>
+#include <gunrock/app/sage/sage_enactor.cuh>
 
 namespace gunrock {
 namespace app {
@@ -37,7 +37,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_enactor(parameters));
 
     GUARD_CU(parameters.Use<std::string>(
-        "W_f_1",
+        "Wf1",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
         "",
         "<weight matrix for W^1 matrix in algorithm 2, feature part>\n"
@@ -45,8 +45,22 @@ cudaError_t UseParameters(util::Parameters &parameters)
         "\t It should be child feature length by a value you want for W2 layer",
         __FILE__, __LINE__));
 
+   //GUARD_CU(parameters.Use<int>(
+   //     "Wf1-dim0",
+   //     util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+   //     64,
+   //     "Wf1 matrix row dimension",
+   //     __FILE__, __LINE__));
+ 
+   GUARD_CU(parameters.Use<int>(
+        "Wf1-dim1",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        128,
+        "Wf1 matrix column dimension",
+        __FILE__, __LINE__));
+
     GUARD_CU(parameters.Use<std::string>(
-        "W_a_1",
+        "Wa1",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
         "",
         "<weight matrix for W^1 matrix in algorithm 2, aggregation part>\n"
@@ -54,9 +68,22 @@ cudaError_t UseParameters(util::Parameters &parameters)
         "\t It should be leaf feature length by a value you want for W2 layer",
         __FILE__, __LINE__));
 
+    //GUARD_CU(parameters.Use<int>(
+    //    "Wa1-dim0",
+    //    util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+    //    64,
+    //    "Wa1 matrix row dimension",
+    //    __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<int>(
+        "Wa1-dim1",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        128,
+        "Wa1 matrix column dimension",
+        __FILE__, __LINE__));
+ 
     GUARD_CU(parameters.Use<std::string>(
-        "W_f_2",
+        "Wf2",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
         "",
         "<weight matrix for W^2 matrix in algorithm 2, feature part>\n"
@@ -64,14 +91,41 @@ cudaError_t UseParameters(util::Parameters &parameters)
         "\t It should be source_temp length by output length",
         __FILE__, __LINE__));
 
+   //GUARD_CU(parameters.Use<int>(
+   //     "Wf2-dim0",
+   //     util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+   //     256,
+   //     "Wf2 matrix row dimension",
+   //     __FILE__, __LINE__));
+
+   GUARD_CU(parameters.Use<int>(
+        "Wf2-dim1",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        128,
+        "Wf2 matrix column dimension",
+        __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<std::string>(
-        "W_a_2",
+        "Wa2",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
         "",
         "<weight matrix for W^2 matrix in algorithm 2, aggregation part>\n"
         "\t dimension 256 by 128 for pokec;\n"
         "\t It should be child_temp length by output length",
+        __FILE__, __LINE__));
+
+    //GUARD_CU(parameters.Use<int>(
+    //    "Wa2-dim0",
+    //    util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+    //    256,
+    //    "Wa2 matrix row dimension",
+    //    __FILE__, __LINE__));
+ 
+    GUARD_CU(parameters.Use<int>(
+        "Wa2-dim1",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        128,
+        "Wa2 matrix column dimension",
         __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<std::string>(
@@ -81,81 +135,40 @@ cudaError_t UseParameters(util::Parameters &parameters)
         "<features matrix>\n"
         "\t dimension |V| by 64 for pokec;\n",
         __FILE__, __LINE__));
-
+    
     GUARD_CU(parameters.Use<int>(
-        "Wf1_dim_0",
+        "feature-column",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         64,
-        "W_f_1 matrix row dim",
-        __FILE__, __LINE__));
- 
-    GUARD_CU(parameters.Use<int>(
-        "Wa1_dim_0",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        64,
-        "W_a_1 matrix row dim",
+        "feature column dimension",
         __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<int>(
-        "Wf1_dim_1",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        128,
-        "W_f_1 matrix column dim",
-        __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<int>(
-        "Wa1_dim_1",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        128,
-        "W_a_1 matrix column dim",
-        __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<int>(
-        "Wf2_dim_0",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        256,
-        "W_f_2 matrix row dim",
-        __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<int>(
-        "Wa2_dim_0",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        256,
-        "W_a_2 matrix row dim",
-        __FILE__, __LINE__));
-    GUARD_CU(parameters.Use<int>(
-        "Wf2_dim_1",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        128,
-        "W_f_2 matrix column dim",
-        __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<int>(
-        "Wa2_dim_1",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        128,
-        "W_a_2 matrix column dim",
-        __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<int>(
-        "num_neigh1",
+        "num-children-per-source", // num_neigh1
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         10,
-        "number of sampled neighbours in k=1",
+        "number of sampled children per source",
         __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<int>(
-        "num_neigh2",
+        "num-leafs-per-child", // num_neight2
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         10,
-        "number of sampled neighbours in k=2",
+        "number of sampled leafs per child",
         __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<int>(
-        "batch_size",
+        "batch-size",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         512,
-        "batch size",
+        "number of source vertex to process in one iteration",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "rand-seed",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        util::PreDefinedValues<int>::InvalidValue,
+        "seed for random number generator; default will use time(NULL)",
         __FILE__, __LINE__));
 
     return retval;
@@ -181,6 +194,7 @@ cudaError_t RunTests(
     cudaError_t retval = cudaSuccess;
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
+    //typedef typename GraphT::ValueT  ValueT;
     typedef Problem<GraphT  > ProblemT;
     typedef Enactor<ProblemT> EnactorT;
     util::CpuTimer    cpu_timer, total_timer;
@@ -188,16 +202,11 @@ cudaError_t RunTests(
 
     // parse configurations from parameters
     bool quiet_mode = parameters.Get<bool>("quiet");
-    //bool mark_pred  = parameters.Get<bool>("mark-pred");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    //std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-    //int  num_srcs   = srcs   .size();
     util::Info info("Sage", parameters, graph); // initialize Info structure
 
     // Allocate host-side array (for both reference and GPU-computed results)
-    //ValueT  *h_distances = new ValueT[graph.nodes];
-    // VertexT *h_preds = (mark_pred) ? new VertexT[graph.nodes] : NULL;
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -205,6 +214,7 @@ cudaError_t RunTests(
     //util::PrintMsg("Before init");
     GUARD_CU(problem.Init(graph  , target));
     GUARD_CU(enactor.Init(problem, target));
+    ValueT *h_source_result = new ValueT[graph.nodes * problem.data_slices[0][0].result_column];
     //util::PrintMsg("After init");
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
@@ -220,7 +230,7 @@ cudaError_t RunTests(
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
-        GUARD_CU(enactor.Enact(  ));
+        GUARD_CU(enactor.Enact());
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
@@ -233,7 +243,7 @@ cudaError_t RunTests(
                 .enactor_stats.iteration), !quiet_mode);
         if (validation == "each")
         {
-            GUARD_CU(problem.Extract( /*h_distances, h_preds */));
+            GUARD_CU(problem.Extract(h_source_result));
             SizeT num_errors = app::sage::Validate_Results(
                 parameters, graph, 
                 //src, h_distances, h_preds,
@@ -245,7 +255,7 @@ cudaError_t RunTests(
 
     cpu_timer.Start();
     // Copy out results
-    GUARD_CU(problem.Extract( /*h_distances, h_preds*/));
+    GUARD_CU(problem.Extract(h_source_result));
     if (validation == "last")
     {
         SizeT num_errors = app::sage::Validate_Results(
@@ -265,8 +275,7 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    //delete[] h_distances  ; h_distances   = NULL;
-    //delete[] h_preds      ; h_preds       = NULL;
+    delete[] h_source_result; h_source_result = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());

@@ -71,22 +71,22 @@ struct main_struct
         if (!quick)
         {
             bool quiet = parameters.Get<bool>("quiet");
-            std::string wf1_file = parameters.Get<std::string>("W_f_1"); 
-            std::string wa1_file = parameters.Get<std::string>("W_a_1");
-            std::string wf2_file = parameters.Get<std::string>("W_f_2");
-            std::string wa2_file = parameters.Get<std::string>("W_f_2");
+            std::string wf1_file = parameters.Get<std::string>("Wf1"); 
+            std::string wa1_file = parameters.Get<std::string>("Wa1");
+            std::string wf2_file = parameters.Get<std::string>("Wf2");
+            std::string wa2_file = parameters.Get<std::string>("Wf2");
             std::string feature_file = parameters.Get<std::string>("features");
-            int Wf1_dim_0 = parameters.Get<int> ("Wf1_dim_0");
-            int Wa1_dim_0 = parameters.Get<int> ("Wa1_dim_0");
-            int Wf1_dim_1 = parameters.Get<int> ("Wf1_dim_1");
-            int Wa1_dim_1 = parameters.Get<int> ("Wa1_dim_1");
-            int Wf2_dim_0 = parameters.Get<int> ("Wf2_dim_0");
-            int Wa2_dim_0 = parameters.Get<int> ("Wa2_dim_0");
-            int Wf2_dim_1 = parameters.Get<int> ("Wf2_dim_1");
-            int Wa2_dim_1 = parameters.Get<int> ("Wa2_dim_1");
-            int num_neigh1 = parameters.Get<int> ("num_neigh1");
-            int num_neigh2 = parameters.Get<int> ("num_neigh2");
-            int batch_size = parameters.Get<int> ("batch_size");
+            int Wf1_dim_0 = parameters.Get<int> ("Wf1-dim0");
+            int Wa1_dim_0 = parameters.Get<int> ("Wa1-dim0");
+            int Wf1_dim_1 = parameters.Get<int> ("Wf1-dim1");
+            int Wa1_dim_1 = parameters.Get<int> ("Wa1-dim1");
+            int Wf2_dim_0 = parameters.Get<int> ("Wf2-dim0");
+            int Wa2_dim_0 = parameters.Get<int> ("Wa2-dim0");
+            int Wf2_dim_1 = parameters.Get<int> ("Wf2-dim1");
+            int Wa2_dim_1 = parameters.Get<int> ("Wa2-dim1");
+            int num_neigh1 = parameters.Get<int> ("num-children-per-source");
+            int num_neigh2 = parameters.Get<int> ("num-leafs-per-child");
+            int batch_size = parameters.Get<int> ("batch-size");
 
             ValueT ** W_f_1 = app::sage::template ReadMatrix <ValueT,SizeT> (wf1_file, Wf1_dim_0,Wf1_dim_1); 
             ValueT ** W_a_1 = app::sage::template ReadMatrix <ValueT,SizeT> (wa1_file, Wa1_dim_0, Wa1_dim_1);
@@ -94,26 +94,26 @@ struct main_struct
             ValueT ** W_a_2 = app::sage::template ReadMatrix <ValueT,SizeT> (wa2_file, Wa2_dim_0, Wa2_dim_1); 
             ValueT ** features = app::sage::template ReadMatrix<ValueT,SizeT> (feature_file, graph.nodes, Wf1_dim_0);
             //num_srcs = srcs.size();
-            SizeT nodes = graph.nodes;
+            //SizeT nodes = graph.nodes;
             //ref_distances = new ValueT*[num_srcs];
            // 
           //      ref_distances[i] = (ValueT*)malloc(sizeof(ValueT) * nodes);
           //      VertexT src = srcs[i];
             util::PrintMsg("__________________________", !quiet);
-            float elapsed = 0.0;
-            app::sage::CPU_Reference(
+            float elapsed = app::sage::CPU_Reference(
                 graph,batch_size, num_neigh1, num_neigh2, 
                 features, W_f_1,W_a_1,W_f_2,W_a_2,  quiet, false);
-                
-            
+            util::PrintMsg("--------------------------\n"
+                "CPU Reference elapsed: "
+                + std::to_string(elapsed) + " ms.", !quiet);  
         }
 
-        //std::vector<std::string> switches{"mark-pred", "advance-mode"};
-       // GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-        //    [ref_distances](util::Parameters &parameters, GraphT &graph)
-        //    {
-        //        return app::sage::RunTests(parameters, graph);
-        //    }));
+        std::vector<std::string> switches{"advance-mode"};
+        GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
+            [](util::Parameters &parameters, GraphT &graph)
+            {
+                return app::sage::RunTests(parameters, graph);
+            }));
 
        
         return retval;

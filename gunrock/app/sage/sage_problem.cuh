@@ -61,7 +61,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     typedef typename GraphT::SizeT   SizeT;
   //  typedef typename GraphT::CsrT    CsrT;
     typedef typename GraphT::GpT     GpT;
-    //typedef          _LabelT         LabelT;
+    typedef typename GraphT::VertexT LabelT;
     typedef          _ValueT         ValueT;
 
     typedef ProblemBase   <GraphT, FLAG> BaseProblem;
@@ -85,6 +85,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT> source_result;// 256 h_B2^2
         util::Array1D<SizeT, ValueT> child_temp;// 256 h_B1^1, I feel like this one could be local
         util::Array1D<SizeT, ValueT> sums_child_feat; //64 sum of children's features, I feel like this one could be local as well
+        util::Array1D<SizeT, ValueT> sums; // 64 per child
+        util::Array1D<SizeT, ValueT> host_source_result; // results on HOST
+
+        util::Array1D<SizeT, curandState> rand_states; // random states, one per child
+
+        VertexT batch_size;
+        int     feature_column;
+        int     num_children_per_source;
+        int     num_leafs_per_child;
+        int     Wf1_dim0, Wf1_dim1;
+        int     Wa1_dim0, Wa1_dim1;
+        int     Wf2_dim0, Wf2_dim1;
+        int     Wa2_dim0, Wa2_dim1;
+        int     result_column;
 
         /*
          * @brief Default constructor
@@ -92,17 +106,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         DataSlice() : BaseDataSlice()
         {
           
-            W_f_1_1D.SetName("W_f_1_1D");
-            W_a_1_1D.SetName("W_a_1_1D");
-            W_f_2_1D.SetName("W_f_2_1D");
-            W_a_2_1D.SetName("W_a_2_1D");
-            features_1D.SetName("features_1D");
-            children_temp.SetName("children_temp");
-            source_temp.SetName("source_temp");
-            source_result.SetName("source_result");
-            child_temp.SetName("child_temp");
+            W_f_1_1D       .SetName("W_f_1_1D");
+            W_a_1_1D       .SetName("W_a_1_1D");
+            W_f_2_1D       .SetName("W_f_2_1D");
+            W_a_2_1D       .SetName("W_a_2_1D");
+            features_1D    .SetName("features_1D");
+            children_temp  .SetName("children_temp");
+            source_temp    .SetName("source_temp");
+            source_result  .SetName("source_result");
+            child_temp     .SetName("child_temp");
             sums_child_feat.SetName("sums_child_feat");
-
+            sums           .SetName("sums");
+            host_source_result.SetName("host_source_result");
+            rand_states    .SetName("rand_states");
         }
 
         /*
@@ -133,7 +149,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(source_temp   .Release(target));
             GUARD_CU(source_result .Release(target));
             GUARD_CU(child_temp    .Release(target));
-            GUARD_CU(sums_child_feat.Release(tatget));
+            GUARD_CU(sums_child_feat.Release(target));
+            GUARD_CU(sums          .Release(target));
+            GUARD_CU(host_source_result.Release(util::HOST));
+            GUARD_CU(rand_states   .Release(target));
             GUARD_CU(BaseDataSlice ::Release(target));
 
             return retval;
@@ -156,20 +175,31 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             ProblemFlag    flag    = Problem_None)
         {
             cudaError_t retval  = cudaSuccess;
+            auto nodes      = sub_graph.nodes;
 
             GUARD_CU(BaseDataSlice::Init(
                 sub_graph, num_gpus, gpu_idx, target, flag));
-            GUARD_CU(W_f_1_1D .Allocate(64*128, target));
-            GUARD_CU(W_a_1_1D .Allocate(64*128, target));
-            GUARD_CU(W_f_2_1D .Allocate(256*128, target));
-            GUARD_CU(W_a_2_1D .Allocate(256*128, target));
-            GUARD_CU(fetures_1D.Allocate(sub_graph.nodes,target));
-            GUARD_CU(children_temp.Allocate(sub_graph.nodes*256, target));
-            GUARD_CU(source_temp.Allocate(sub_graph.nodes*256, target));
-            GUARD_CU(source_result.Allocate(sub_graph.nodes*256, target));
-            GUARD_CU(child_temp.Allocate(sub_graph.nodes*num_neigh1*256, target));
-            GUARD_CU(sums_child_feat.Allocate(sub_graph.nodes*64, target));
-                        
+            GUARD_CU(W_f_1_1D       .Allocate(//64 *128, target));
+                Wf1_dim0 * Wf1_dim1, target));
+            GUARD_CU(W_a_1_1D       .Allocate(//64 *128, target));
+                Wa1_dim0 * Wa1_dim1, target));
+            GUARD_CU(W_f_2_1D       .Allocate(//256*128, target));
+                Wf2_dim0 * Wf2_dim1, target));
+            GUARD_CU(W_a_2_1D       .Allocate(//256*128, target));
+                Wa2_dim0 * Wa2_dim1, target));
+            GUARD_CU(features_1D    .Allocate(
+                nodes * feature_column, target));
+            
+            auto num_children = num_children_per_source * batch_size;
+            GUARD_CU(child_temp     .Allocate(num_children * Wf2_dim0, target));
+            GUARD_CU(children_temp  .Allocate(batch_size   * Wf2_dim0, target));
+            GUARD_CU(source_temp    .Allocate(batch_size   * Wf2_dim0, target));
+            GUARD_CU(sums_child_feat.Allocate(batch_size   * result_column, target));
+            GUARD_CU(sums           .Allocate(num_children * feature_column, target));
+            GUARD_CU(source_result  .Allocate(batch_size   * result_column, target));
+            GUARD_CU(rand_states    .Allocate(num_children           , target));           
+ 
+            GUARD_CU(host_source_result.Allocate(nodes * result_column, util::HOST)); 
             GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
             return retval;
         } // Init
@@ -183,33 +213,36 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         {
             cudaError_t retval = cudaSuccess;
             
-            SizeT nodes = this -> sub_graph -> nodes;
-
             // Reset data
-            GUARD_CU(children_temp.ForEach([]__host__ __device__
-            (ValueT &children_temps){
-                children_temps = 0;
-            }, nodes, target, this -> stream));
+            GUARD_CU(child_temp.ForEach(
+                []__host__ __device__ (ValueT &val) {
+                    val = 0;
+                }, util::PreDefinedValues<SizeT>::InvalidValue, target, this -> stream));
 
-            GUARD_CU(source_temp.ForEach([]__host__ __device__
-            (ValueT &source_temps){
-                source_temps = 0;
-            }, nodes, target, this -> stream));
+            GUARD_CU(children_temp.ForEach(
+                []__host__ __device__ (ValueT &val) {
+                    val = 0;
+                }, util::PreDefinedValues<SizeT>::InvalidValue, target, this -> stream));
 
-            GUARD_CU(source_result.ForEach([]__host__ __device__
-            (ValueT &source_results){
-                source_results = 0;
-            }, nodes, target, this -> stream));
+            GUARD_CU(source_temp.ForEach(
+                []__host__ __device__ (ValueT &val) {
+                    val = 0;
+                }, util::PreDefinedValues<SizeT>::InvalidValue, target, this -> stream));
 
-            GUARD_CU(child_temp.ForEach([]__host__ __device__
-            (ValueT &child_temps){
-                child_temps = 0;
-            }, nodes, target, this -> stream));
+            GUARD_CU(sums_child_feat.ForEach(
+                []__host__ __device__ (ValueT &val) {
+                    val = 0;
+                }, util::PreDefinedValues<SizeT>::InvalidValue, target, this -> stream));
 
-            GUARD_CU(sums_child_feat.ForEach([]__host__ __device__
-            (ValueT &sums_child_feats){
-                sums_child_feats = 0;
-            }, nodes, target, this -> stream));
+            GUARD_CU(sums.ForEach(
+                [] __host__ __device__ (ValueT &val) {
+                    val = 0;
+                }, util::PreDefinedValues<SizeT>::InvalidValue, target, this -> stream));
+
+            GUARD_CU(source_result.ForEach(
+                []__host__ __device__ (ValueT &val) {
+                    val = 0;
+                }, util::PreDefinedValues<SizeT>::InvalidValue, target, this -> stream));
 
             return retval;
         }
@@ -274,73 +307,42 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
-        //ValueT         *h_distances,
+        ValueT         *h_source_result,
         //VertexT        *h_preds     = NULL,
         util::Location  target      = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
         SizeT nodes = this -> org_graph -> nodes;
+        auto &data_slice = data_slices[0][0];
 
-        if (this-> num_gpus == 1)
+        GUARD_CU(data_slice.host_source_result.ForEach(h_source_result,
+            []__host__ __device__
+            (const ValueT &val, ValueT &h_val){
+                h_val = val;
+            }, nodes * data_slice.result_column, util::HOST));
+
+        return retval;
+    }
+
+    template <typename ArrayT>
+    cudaError_t ReadMat(
+        ArrayT      &array,
+        std::string filename,
+        int dim0, int dim1)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        auto temp_vals_2D = gunrock::app::sage:: template ReadMatrix<ValueT, SizeT>(filename, dim0, dim1);
+        GUARD_CU(array.ForAll(
+            [temp_vals_2D, dim0] __host__ __device__ (ValueT *vals, const SizeT &pos)
+            {
+                vals[pos] = temp_vals_2D[pos / dim0][pos % dim0];
+            }, dim0 * dim1, util::HOST));
+        for (auto i = 0; i < dim0; i++)
         {
-            auto &data_slice = data_slices[0][0];
-
-            // Set device
-            if (target == util::DEVICE)
-            {
-                GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-
-                GUARD_CU(data_slice.source_result.SetPointer(
-                    h_distances, nodes, util::HOST));
-                GUARD_CU(data_slice.source_result.Move(util::DEVICE, util::HOST));
-            }
-
-            else if (target == util::HOST) {
-                GUARD_CU(data_slice.source_result.ForEach(h_source_result,
-                    []__host__ __device__
-                    (const ValueT &source_results, ValueT &h_source_result){
-                        h_source_result = source_results;
-                    }, nodes, util::HOST));
-            }
+            delete[] temp_vals_2D[i]; temp_vals_2D[i] = NULL;
         }
-        else 
-        { // num_gpus != 1
-            //util::Array1D<SizeT, ValueT *> th_distances;
-            //util::Array1D<SizeT, VertexT*> th_preds;
-            //th_distances.SetName("bfs::Problem::Extract::th_distances");
-            //th_preds    .SetName("bfs::Problem::Extract::th_preds");
-            //GUARD_CU(th_distances.Allocate(this->num_gpus, util::HOST));
-            //GUARD_CU(th_preds    .Allocate(this->num_gpus, util::HOST));
-
-            for (int gpu = 0; gpu < this->num_gpus; gpu++)
-            {
-                auto &data_slice = data_slices[gpu][0];
-                if (target == util::DEVICE)
-                {
-                    GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-                //    GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
-                //    if (this -> flag & Mark_Predecessors)
-                //        GUARD_CU(data_slice.preds.Move(util::DEVICE, util::HOST));
-                }
-                //th_distances[gpu] = data_slice.distances.GetPointer(util::HOST);
-                //th_preds    [gpu] = data_slice.preds    .GetPointer(util::HOST);
-            } //end for(gpu)
-
-            for (VertexT v = 0; v < nodes; v++)
-            {
-                int gpu = this -> org_graph -> GpT::partition_table[v];
-                VertexT v_ = v;
-                if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
-                    v_ = this -> org_graph -> GpT::convertion_table[v];
-
-                //h_distances[v] = th_distances[gpu][v_];
-                //if (this -> flag & Mark_Predecessors)
-                //    h_preds[v] = th_preds    [gpu][v_];
-            }
-
-           // GUARD_CU(th_distances.Release());
-          //  GUARD_CU(th_preds    .Release());
-        } //end if
+        delete[] temp_vals_2D; temp_vals_2D = NULL;
 
         return retval;
     }
@@ -357,6 +359,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     {
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseProblem::Init(graph, target));
+        auto &para = this -> parameters;
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
     //    if (this -> parameters.template Get<bool>("mark-pred"))
@@ -371,8 +374,42 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
 
             auto &data_slice = data_slices[gpu][0];
+            data_slice.batch_size          = para.template Get<int>("batch-size");
+            data_slice.feature_column      = para.template Get<int>("feature-column");
+            data_slice.num_children_per_source 
+                = para.template Get<int>("num-children-per-source");
+            data_slice.Wf1_dim0            = data_slice.feature_column;
+            data_slice.Wf1_dim1            = para.template Get<int>("Wf1-dim1");
+            data_slice.Wa1_dim0            = data_slice.feature_column;
+            data_slice.Wa1_dim1            = para.template Get<int>("Wa1-dim1");
+            data_slice.Wf2_dim0            = data_slice.Wf1_dim1 + data_slice.Wa1_dim1;
+            data_slice.Wf2_dim1            = para.template Get<int>("Wf2-dim1");
+            data_slice.Wa2_dim0            = data_slice.Wf1_dim1 + data_slice.Wa1_dim1;
+            data_slice.Wa2_dim1            = para.template Get<int>("Wa2-dim1");
+            data_slice.result_column       = data_slice.Wa2_dim1 + data_slice.Wf2_dim1;
+            data_slice.num_leafs_per_child = para.template Get<int>("num-leafs-per-child");
+            
             GUARD_CU(data_slice.Init(this -> sub_graphs[gpu],
                 this -> num_gpus, this -> gpu_idx[gpu], target, this -> flag));
+       
+            GUARD_CU(ReadMat(data_slice.W_f_1_1D, para.template Get<std::string>("Wf1"), 
+                data_slice.Wf1_dim0, data_slice.Wf1_dim1)); 
+            GUARD_CU(ReadMat(data_slice.W_a_1_1D, para.template Get<std::string>("Wa1"), 
+                data_slice.Wa1_dim0, data_slice.Wa1_dim1)); 
+            GUARD_CU(ReadMat(data_slice.W_f_2_1D, para.template Get<std::string>("Wf2"), 
+                data_slice.Wf2_dim0, data_slice.Wf2_dim1)); 
+            GUARD_CU(ReadMat(data_slice.W_a_2_1D, para.template Get<std::string>("Wa2"), 
+                data_slice.Wa2_dim0, data_slice.Wa2_dim1)); 
+            GUARD_CU(ReadMat(data_slice.features_1D, para.template Get<std::string>("features"),
+                graph.nodes, data_slice.feature_column)); 
+
+            GUARD_CU(data_slice.W_f_1_1D.Move(util::HOST, util::DEVICE));
+            GUARD_CU(data_slice.W_a_1_1D.Move(util::HOST, util::DEVICE));
+            GUARD_CU(data_slice.W_f_2_1D.Move(util::HOST, util::DEVICE));
+            GUARD_CU(data_slice.W_a_2_1D.Move(util::HOST, util::DEVICE));
+            GUARD_CU(data_slice.features_1D.Move(util::HOST, util::DEVICE));
+            GUARD_CU2(cudaDeviceSynchronize(),
+                "cudaDeviceSynchronize failed.");
         } // end for (gpu)
 
         return retval;
@@ -396,12 +433,26 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
             GUARD_CU(data_slices[gpu] -> Reset(target));
+            
+            int rand_seed = this -> parameters.template Get<int>("rand-seed");
+            if (!util::isValid(rand_seed))
+                rand_seed = time(NULL);
+            if (!this -> parameters.template Get<bool>("quiet"))
+                util::PrintMsg("rand-seed = " + std::to_string(rand_seed));
+            GUARD_CU(data_slices[gpu] -> rand_states.ForAll(
+                [rand_seed] 
+                __host__ __device__ (curandState *states, const SizeT &pos)
+                {
+                    curand_init(rand_seed, pos, 0, states + pos);
+                }, util::PreDefinedValues<SizeT>::InvalidValue,
+                util::DEVICE, data_slices[gpu] -> stream));
+
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
             
-            GUARD_CU2(cudaDeviceSynchronize(),
-                "cudaDeviceSynchronize failed");
-       
+        GUARD_CU2(cudaDeviceSynchronize(),
+            "cudaDeviceSynchronize failed");
+   
         return retval;
     }
 

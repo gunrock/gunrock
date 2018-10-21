@@ -130,8 +130,8 @@ double CPU_Reference(
     //typedef std::priority_queue<PairT, std::vector<PairT>, GreaterT> PqT;
 
     util::PrintMsg("CPU_Reference entered");
-    int num_batch = graph.nodes / batch_size ;
-    int off_site = graph.nodes - num_batch * batch_size ;
+    //int num_batch = graph.nodes / batch_size ;
+    //int off_site = graph.nodes - num_batch * batch_size ;
     // batch of nodes
     for (VertexT source_start = 0; source_start < graph.nodes ; source_start += batch_size)
     {
@@ -149,7 +149,7 @@ double CPU_Reference(
             
             for (int i =0; i < num_neigh1 ; i++)
             {
-                SizeT offset = rand() % num_neigh1;
+                SizeT offset = rand() % num_neigh1; // YC: Bug
                 SizeT pos = graph.GetNeighborListOffset(source) + offset;
                 edges_source_child.push_back (pos);
             }// sample child (B1 nodes), save edge list. 
@@ -164,7 +164,7 @@ double CPU_Reference(
                 // sample leaf node for each child
                 for (int j =0; j < num_neigh2 ; j++)
                 {
-                    SizeT offset2 = rand() % num_neigh2;
+                    SizeT offset2 = rand() % num_neigh2; // YC: Bug
                     SizeT pos2 = graph.GetNeighborListOffset(child) + offset2;
                     VertexT leaf = graph.GetEdgeDest (pos2); 
                     for (int m = 0; m < 64 ; m ++) {
