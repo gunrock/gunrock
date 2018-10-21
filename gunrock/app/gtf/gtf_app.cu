@@ -244,7 +244,10 @@ cudaError_t RunTests(
 
     // Allocate host-side array (for both reference and GPU-computed results)
     // ... for function Extract
-    ValueT *community_accus = (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
+    util::Array1D<SizeT, ValueT> community_accus;
+    community_accus.SetName("community_accus");
+    GUARD_CU(community_accus.Allocate(graph.nodes, util::HOST|util::DEVICE));
+
     community_accus[0] = avg_weights_source_sink;
 
     // Allocate problem and enactor on GPU, and initialize them
@@ -259,7 +262,7 @@ cudaError_t RunTests(
     // perform the gtf algorithm
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        GUARD_CU(problem.Reset(graph, community_accus, h_reverse, target));
+        GUARD_CU(problem.Reset(graph, community_accus+0, h_reverse, target));
         GUARD_CU(enactor.Reset(source, target));
 
         util::PrintMsg("______GPU SFL algorithm____", !quiet_mode);

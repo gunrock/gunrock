@@ -112,10 +112,11 @@ cudaError_t MinCut(
 
     for (auto e = 0; e < graph.edges; e++){
         edge_residuals[e] = edge_capacities[e] - edge_flows[e];
-        printf("CPU: edge idx %d, mf_flow %f, source %d\n", e, edge_flows[e], source);
+        printf("CPU: edge idx %d, mf_flow %f, source %d\n", e, edge_residuals[e], source);
     }
-
+    memset(vertex_reachabilities, false, graph.nodes*sizeof(vertex_reachabilities[0]));
     /////////////////////////////////////////
+    /*
     std::queue <typename GraphT::VertexT> q;
     q.push(source);
     memset(vertex_reachabilities, false, graph.nodes*sizeof(vertex_reachabilities[0]));
@@ -139,43 +140,37 @@ cudaError_t MinCut(
             }
         }
     }
+    */
     printf("In PR min-cut \n");
-    //for(auto i = 0; i < graph.nodes; i++){
-    //    printf("%d \n", vertex_reachabilities[i]);
-    //}
+
     /////////////////////////
-    /*
-    for (char t = 1; t < 2; t++)
+    VertexT head = 0;
+    VertexT tail = 0;
+    VertexT *queue = new VertexT[graph.nodes];
+    queue[head] = source;
+
+    while (tail <= head)
     {
-        VertexT head = 0;
-        VertexT tail = 0;
-        for (VertexT v = 0; v < graph.nodes; v++)
-            markers[v] = 0;
-        queue[head] = (t == 1) ? source : dest;
-
-        while (tail <= head)
+        VertexT v = queue[tail];
+        auto e_start = graph.GetNeighborListOffset(v);
+        auto num_neighbors = graph.GetNeighborListLength(v);
+        auto e_end = e_start + num_neighbors;
+        for (auto e = e_start; e < e_end; e++)
         {
-            VertexT v = queue[tail];
-            auto e_start = graph.GetNeighborListOffset(v);
-            auto num_neighbors = graph.GetNeighborListLength(v);
-            auto e_end = e_start + num_neighbors;
-            for (auto e = e_start; e < e_end; e++)
-            {
-                VertexT u = graph.GetEdgeDest(e);
-                if (markers[u] != 0)
-                    continue;
-                if (edge_residuals[e] < error_threshold)
-                    continue;
-
+            VertexT u = graph.GetEdgeDest(e);
+            if (vertex_reachabilities[u] == false && abs(edge_residuals[e]) > 1e-6){
                 head ++;
                 queue[head] = u;
-                markers[u] = 1;
-                vertex_reachabilities[u] = bool(t);
+                vertex_reachabilities[u] = true;
             }
-            tail ++;
         }
+        tail ++;
     }
-    */
+    for(auto i = 0; i < graph.nodes; i++){
+        printf("%d, ", vertex_reachabilities[i]);
+    }
+    printf("\n");
+
     return retval;
 }
 
@@ -461,6 +456,7 @@ cudaError_t CPU_Reference(
                 community_weights[comm] +=
                     edge_residuals[num_edges - num_org_nodes * 2 + v];
                 community_sizes  [comm] ++;
+                printf("++ %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
             }
 
             else { // otherwise
@@ -479,9 +475,11 @@ cudaError_t CPU_Reference(
                         edge_residuals[e] = 0;
                     }
                 }
+                printf("-- %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
             }
-            //printf("%d %f %f\n", comm, community_weights[comm], community_accus[comm]);
+
         } // end of for v
+        //printf("%d %f %f\n", comm, community_weights[comm], community_accus[comm]);
 
         for (comm = 0; comm < pervious_num_comms; comm ++)
         {

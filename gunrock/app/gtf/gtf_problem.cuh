@@ -210,8 +210,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
           GUARD_CU(community_accus.Allocate(nodes_size, target));
           GUARD_CU(vertex_active.Allocate(nodes_size, target));
           GUARD_CU(vertex_reachabilities.Allocate(nodes_size, target));
-          GUARD_CU(edge_residuals.Allocate(nodes_size, target));
-          GUARD_CU(edge_flows.Allocate(nodes_size, target));
+          GUARD_CU(edge_residuals.Allocate(edges_size, target));
+          GUARD_CU(edge_flows.Allocate(edges_size, target));
           GUARD_CU(active.Allocate(1, util::HOST|target));
           GUARD_CU(num_comms.Allocate(1, target));
           GUARD_CU(previous_num_comms.Allocate(1, target));
@@ -229,6 +229,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          * @param[in] target      Targeting device location
          * \return    cudaError_t Error message(s), if any
          */
+
         cudaError_t Reset(const GraphT& graph, ValueT *h_community_accus,
 		        util::Location target = util::DEVICE)
         {
@@ -250,8 +251,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(community_accus.EnsureSize_(nodes_size, target));
             GUARD_CU(vertex_active.EnsureSize_(nodes_size, target));
             GUARD_CU(vertex_reachabilities.EnsureSize_(nodes_size, target));
-            GUARD_CU(edge_residuals.EnsureSize_(nodes_size, target));
-            GUARD_CU(edge_flows.EnsureSize_(nodes_size, target));
+            GUARD_CU(edge_residuals.EnsureSize_(edges_size, target));
+            GUARD_CU(edge_flows.EnsureSize_(edges_size, target));
             GUARD_CU(active.EnsureSize_(1, target|util::HOST));
             GUARD_CU(num_comms.EnsureSize_(1, target));
             GUARD_CU(previous_num_comms.EnsureSize_(1, target));
@@ -266,33 +267,64 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT offset = graph.edges - num_org_nodes * 2;
             printf("offset is %d num edges %d \n", offset, edges_size);
 
-            bool* h_vertex_active = (bool*)malloc(sizeof(bool)*graph.edges);
-      	    bool* h_community_active = (bool*)malloc(sizeof(bool)*graph.nodes);
-      	    VertexT* h_curr_communities = (VertexT*)malloc(sizeof(VertexT)*graph.nodes);
-            VertexT* h_next_communities = (VertexT*)malloc(sizeof(VertexT)*graph.nodes);
-            for (VertexT v = 0; v < num_org_nodes; v++)
-            {
-                h_vertex_active   [v] = true;
-                h_community_active[v] = true;
-                h_curr_communities[v] = 0;
-                h_next_communities[v] = 0; //extra
-            }
-            GUARD_CU(vertex_active.SetPointer(h_vertex_active, num_org_nodes, util::HOST));
-      	    GUARD_CU(vertex_active.Move(util::HOST, target, num_org_nodes, 0,
-      			this->stream));
-            GUARD_CU(community_active.SetPointer(h_community_active, num_org_nodes, util::HOST));
-      	    GUARD_CU(community_active.Move(util::HOST, target, num_org_nodes, 0,
-      			this->stream));
-            GUARD_CU(curr_communities.SetPointer(h_curr_communities, num_org_nodes, util::HOST));
-      	    GUARD_CU(curr_communities.Move(util::HOST, target, num_org_nodes, 0,
-      			this->stream));
-            GUARD_CU(next_communities.SetPointer(h_next_communities, num_org_nodes, util::HOST));
-      	    GUARD_CU(next_communities.Move(util::HOST, target, num_org_nodes, 0,
-      			this->stream));
+            // bool* h_vertex_active = (bool*)malloc(sizeof(bool)*graph.edges);
+      	    // bool* h_community_active = (bool*)malloc(sizeof(bool)*graph.nodes);
+      	    // VertexT* h_curr_communities = (VertexT*)malloc(sizeof(VertexT)*graph.nodes);
+            // VertexT* h_next_communities = (VertexT*)malloc(sizeof(VertexT)*graph.nodes);
+            // for (VertexT v = 0; v < num_org_nodes; v++)
+            // {
+            //     h_vertex_active   [v] = true;
+            //     h_community_active[v] = true;
+            //     h_curr_communities[v] = 0;
+            //     h_next_communities[v] = 0; //extra
+            // }
 
-            GUARD_CU(community_accus.SetPointer(h_community_accus, num_org_nodes, util::HOST));
-      	    GUARD_CU(community_accus.Move(util::HOST, target, num_org_nodes, 0,
-      			this->stream));
+            GUARD_CU(vertex_active.ForAll([]
+	             __host__ __device__(bool *v_active, const SizeT &pos)
+	          {
+              v_active   [pos] = true;
+	          }, graph.nodes, target, this -> stream));
+
+            GUARD_CU(community_active.ForAll([]
+	             __host__ __device__(bool *c_active, const SizeT &pos)
+	          {
+              c_active[pos] = true;
+	          }, graph.nodes, target, this -> stream));
+
+            GUARD_CU(curr_communities.ForAll([]
+	             __host__ __device__(VertexT *c_communities, const SizeT &pos)
+	          {
+              c_communities[pos] = 0;
+	          }, graph.nodes, target, this -> stream));
+
+            GUARD_CU(next_communities.ForAll([]
+	             __host__ __device__(VertexT *n_communities, const SizeT &pos)
+	          {
+              n_communities[pos] = 0;
+	          }, graph.nodes, target, this -> stream));
+
+            // GUARD_CU(community_accus.ForAll([h_community_accus]
+	          //    __host__ __device__(ValueT *community_accus, const SizeT &pos)
+	          // {
+            //   community_accus[0] = h_community_accus[0];
+	          // }, 1, target, this -> stream));
+
+            // GUARD_CU(vertex_active.SetPointer(h_vertex_active, num_org_nodes, util::HOST));
+      	    // GUARD_CU(vertex_active.Move(util::HOST, target, num_org_nodes, 0,
+      			// this->stream));
+            // GUARD_CU(community_active.SetPointer(h_community_active, num_org_nodes, util::HOST));
+      	    // GUARD_CU(community_active.Move(util::HOST, target, num_org_nodes, 0,
+      			// this->stream));
+            // GUARD_CU(curr_communities.SetPointer(h_curr_communities, num_org_nodes, util::HOST));
+      	    // GUARD_CU(curr_communities.Move(util::HOST, target, num_org_nodes, 0,
+      			// this->stream));
+            // GUARD_CU(next_communities.SetPointer(h_next_communities, num_org_nodes, util::HOST));
+      	    // GUARD_CU(next_communities.Move(util::HOST, target, num_org_nodes, 0,
+      			// this->stream));
+            //
+            // GUARD_CU(community_accus.SetPointer(h_community_accus, num_org_nodes, util::HOST));
+      	    // GUARD_CU(community_accus.Move(util::HOST, target, num_org_nodes, 0,
+      			//      this->stream));
 
             this->num_updated_vertices = 1;
 
@@ -316,10 +348,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
 	    GUARD_CU2(cudaDeviceSynchronize(),
 	        "cudaDeviceSynchronize failed.");
-      free(h_vertex_active);
-      free(h_community_active);
-      free(h_curr_communities);
-      free(h_next_communities);
+      // free(h_vertex_active);
+      // free(h_community_active);
+      // free(h_curr_communities);
+      // free(h_next_communities);
 	    return retval;
 
         }
