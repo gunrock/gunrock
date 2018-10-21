@@ -303,6 +303,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
               n_communities[pos] = 0;
 	          }, graph.nodes, target, this -> stream));
 
+            GUARD_CU(vertex_reachabilities.ForAll([]
+	             __host__ __device__(bool *vertex_reachabilities, const SizeT &pos)
+	          {
+              vertex_reachabilities[pos] = 0;
+	          }, graph.nodes, target, this -> stream));
+
             // GUARD_CU(community_accus.ForAll([h_community_accus]
 	          //    __host__ __device__(ValueT *community_accus, const SizeT &pos)
 	          // {

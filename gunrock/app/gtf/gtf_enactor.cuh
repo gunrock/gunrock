@@ -116,6 +116,12 @@ struct GTFIterationLoop : public IterationLoopBase
        auto &active = data_slice.active;
        auto &num_comms = data_slice.num_comms;
        auto &previous_num_comms = data_slice.previous_num_comms;
+       auto &num_updated_vertices = data_slice.num_updated_vertices;
+
+      //  GUARD_CU(edge_residuals.ForAll(
+      //      [mf_flow, graph, source] __host__ __device__ (ValueT *edge_residuals, const SizeT &e){
+      //          printf("GPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
+      //      }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
        mf_problem.parameters.Set("source", source);
        mf_problem.parameters.Set("sink", sink);
@@ -128,7 +134,7 @@ struct GTFIterationLoop : public IterationLoopBase
        GUARD_CU(edge_residuals.ForAll(
            [mf_flow, graph, source] __host__ __device__ (ValueT *edge_residuals, const SizeT &e){
                edge_residuals[e] = graph.edge_values[e] - mf_flow[e];
-               //printf("GPU: edge idx %d, mf_flow %f, source %d\n", e, edge_residuals[e], source);
+               printf("GPU: e_idx %d, e_res %f \n", e, edge_residuals[e]);
            }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
        GUARD_CU(vertex_reachabilities.ForAll(
@@ -328,12 +334,80 @@ struct GTFIterationLoop : public IterationLoopBase
               if(comm < num_comms[0] && comm >= previous_num_comms[0]){
                 community_weights[comm] /= community_sizes  [comm];
                 community_accus  [comm] += community_weights[comm];
-                printf("comm %d, accus %f, sizes %d \n", comm, community_accus  [comm], community_sizes  [comm]);
+                //printf("comm %d, accus %f, sizes %d \n", comm, community_accus  [comm], community_sizes  [comm]);
               }
-              active[0] = 0;
             }
           }, num_org_nodes, util::DEVICE, oprtr_parameters.stream));
 
+          GUARD_CU(community_weights.ForAll(
+               [vertex_active, // vertex specific
+               vertex_reachabilities,
+               next_communities, //community specific
+               curr_communities,
+               community_active,
+               community_sizes,
+               community_accus,
+               edge_residuals, // intermediate output
+               // others
+               num_comms, num_edges,
+               num_org_nodes, graph,
+               active]
+               __host__ __device__ (ValueT *community_weights, const VertexT &v){
+                 {
+                   if (!vertex_active[v]) return;
+
+                   active[0] = 0;
+                   auto comm = curr_communities[v];
+                   if (!community_active[comm] ||
+                       abs(community_weights[comm]) < 1e-6)
+                   {
+                       if (vertex_reachabilities[v] == 1)
+                           edge_residuals[num_edges - num_org_nodes * 2 + v] = 0;
+                       if (vertex_reachabilities[v] != 1)
+                       {
+                           SizeT  e = graph.GetNeighborListOffset(v)
+                               + graph.GetNeighborListLength(v) - 1;
+                           edge_residuals[e] = 0;
+                       }
+                       vertex_active[v] = false;
+                       community_active[comm] = false;
+                   }
+
+                   else {
+                       active[0] = 1;
+                       SizeT e_from_src = num_edges - num_org_nodes * 2 + v;
+                       SizeT e_to_dest  = graph.GetNeighborListOffset(v)
+                           + graph.GetNeighborListLength(v) - 1;
+                       if (vertex_reachabilities[v] == 1)
+                       {
+                           edge_residuals[e_from_src] -= community_weights[comm];
+                           if (edge_residuals[e_from_src] < 0)
+                           {
+                               auto temp = -1 * edge_residuals[e_from_src];
+                               edge_residuals[e_from_src] = edge_residuals[e_to_dest];
+                               edge_residuals[e_to_dest] = temp;
+                           }
+                       } else {
+                           edge_residuals[e_to_dest] += community_weights[comm];
+                           if (edge_residuals[e_to_dest] < 0)
+                           {
+                               auto temp = -1 * edge_residuals[e_to_dest];
+                               edge_residuals[e_to_dest] = edge_residuals[e_from_src];
+                               edge_residuals[e_from_src] = temp;
+                           }
+                       }
+                   }
+                 }
+               }, num_org_nodes, util::DEVICE, oprtr_parameters.stream));
+
+          GUARD_CU(edge_residuals.ForAll(
+              [graph]
+                __host__ __device__ (ValueT *edge_residuals, SizeT &e){
+                {
+                  graph.edge_values[e] = edge_residuals[e];
+                  //printf("GPU: eidx %d, edge_v %f \n", e, graph.edge_values[e]);
+                }
+              }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
 
 	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),

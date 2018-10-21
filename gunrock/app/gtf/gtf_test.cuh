@@ -106,13 +106,16 @@ cudaError_t MinCut(
     double error_threshold = parameters.Get<double>("error_threshold");
 
     ValueT max_flow = 0;
+    // for (auto e = 0; e < graph.edges; e++){
+    //     printf("CPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
+    // }
     mf::CPU_Reference(parameters, graph,
         source, dest, max_flow, reverse_edges, edge_flows);
     auto &edge_capacities = graph.edge_values;
 
     for (auto e = 0; e < graph.edges; e++){
         edge_residuals[e] = edge_capacities[e] - edge_flows[e];
-        printf("CPU: edge idx %d, mf_flow %f, source %d\n", e, edge_residuals[e], source);
+        printf("CPU: e_idx %d, e_res %f \n", e, edge_residuals[e]);
     }
     memset(vertex_reachabilities, false, graph.nodes*sizeof(vertex_reachabilities[0]));
     /////////////////////////////////////////
@@ -456,7 +459,7 @@ cudaError_t CPU_Reference(
                 community_weights[comm] +=
                     edge_residuals[num_edges - num_org_nodes * 2 + v];
                 community_sizes  [comm] ++;
-                printf("++ %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
+                //printf("++ %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
             }
 
             else { // otherwise
@@ -475,7 +478,7 @@ cudaError_t CPU_Reference(
                         edge_residuals[e] = 0;
                     }
                 }
-                printf("-- %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
+                //printf("-- %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
             }
 
         } // end of for v
@@ -507,7 +510,7 @@ cudaError_t CPU_Reference(
         {
             community_weights[comm] /= community_sizes  [comm];
             community_accus  [comm] += community_weights[comm];
-            printf("comm %d, accus %f, sizes %d \n", comm, community_accus  [comm], community_sizes  [comm]);
+            //printf("comm %d, accus %f, sizes %d \n", comm, community_accus  [comm], community_sizes  [comm]);
             //printf("values: comm: %d, sizes: %d, weights: %f, accus: %f.\n", comm, community_sizes[comm], community_weights[comm], community_accus[comm]);
         }
 
@@ -559,8 +562,10 @@ cudaError_t CPU_Reference(
             }
         } // end of for v
 
-        for (SizeT e = 0; e < graph.edges; e ++)
+        for (SizeT e = 0; e < graph.edges; e ++){
             edge_capacities[e] = edge_residuals[e];
+            //printf("CPU: eidx %d, edge_v %f \n", e, edge_capacities[e]);
+          }
     } // end of while
     cpu_timer.Stop();
     elapsed = cpu_timer.ElapsedMillis();
