@@ -32,6 +32,11 @@ cudaError_t vn_set_srcs(
     GraphT           &graph
 )
 {
+    /*
+        Helper for randomly seeding VN
+        This is slightly different from the standard `SetSrcs` function
+        because we have to set multiple batches of multiple seeds
+    */
     cudaError_t retval = cudaSuccess;
     std::string src = parameters.Get<std::string>("src");
     std::vector<VertexT> srcs;

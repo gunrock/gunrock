@@ -96,6 +96,7 @@ cudaError_t RunTests(
     bool mark_pred  = parameters.Get<bool>("mark-pred");
     std::string validation = parameters.Get<std::string>("validation");
 
+    // Load srcs
     std::vector<VertexT> srcs_vector = parameters.Get<std::vector<VertexT> >("srcs");
     int total_num_srcs = srcs_vector.size();
     int num_runs       = parameters.Get<int>("num-runs");
@@ -115,10 +116,8 @@ cudaError_t RunTests(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    // util::PrintMsg("Before init");
     GUARD_CU(problem.Init(graph  , target));
     GUARD_CU(enactor.Init(problem, target));
-    // util::PrintMsg("After init");
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
     //info.preprocess_time = cpu_timer.ElapsedMillis();
@@ -149,6 +148,7 @@ cudaError_t RunTests(
             + src_msg + ", #iterations = " // TODO -- fix docs
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
+
         if (validation == "each")
         {
             GUARD_CU(problem.Extract(h_distances, h_preds));
@@ -180,6 +180,7 @@ cudaError_t RunTests(
     GUARD_CU(problem.Release(target));
     delete[] h_distances  ; h_distances   = NULL;
     delete[] h_preds      ; h_preds       = NULL;
+    delete[] all_srcs     ; all_srcs      = NULL;
     delete[] srcs         ; srcs          = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
