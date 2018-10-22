@@ -123,9 +123,10 @@ struct GTFIterationLoop : public IterationLoopBase
       //          printf("GPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
       //      }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
+      GUARD_CU(graph.edge_values.Move(util::DEVICE, util::HOST, graph.edges, 0, oprtr_parameters.stream));
+      GUARD_CU(cudaDeviceSynchronize());
        mf_problem.parameters.Set("source", source);
        mf_problem.parameters.Set("sink", sink);
-       GUARD_CU(mf_enactor.Init(mf_problem, mf_target));
        GUARD_CU(mf_problem.Reset(graph, h_reverse+0, mf_target));
        GUARD_CU(mf_enactor.Reset(source, mf_target));
        GUARD_CU(mf_enactor.Enact());
@@ -134,8 +135,14 @@ struct GTFIterationLoop : public IterationLoopBase
        GUARD_CU(edge_residuals.ForAll(
            [mf_flow, graph, source] __host__ __device__ (ValueT *edge_residuals, const SizeT &e){
                edge_residuals[e] = graph.edge_values[e] - mf_flow[e];
-               printf("GPU: e_idx %d, e_res %f \n", e, edge_residuals[e]);
+               mf_flow[e] = 0.;
+               //printf("GPU: e_idx %d, e_res %f \n", e, edge_residuals[e]);
            }, graph.edges, util::DEVICE, oprtr_parameters.stream));
+
+       GUARD_CU(vertex_reachabilities.ForAll(
+            [] __host__ __device__ (bool *vertex_reachabilities, const SizeT &v){
+              vertex_reachabilities[v] = false;
+            }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
 
        GUARD_CU(vertex_reachabilities.ForAll(
          [edge_residuals, graph, community_sizes, source] __host__ __device__ (bool *vertex_reachabilities, const SizeT &idx){
@@ -405,11 +412,15 @@ struct GTFIterationLoop : public IterationLoopBase
                 __host__ __device__ (ValueT *edge_residuals, SizeT &e){
                 {
                   graph.edge_values[e] = edge_residuals[e];
-                  //printf("GPU: eidx %d, edge_v %f \n", e, graph.edge_values[e]);
                 }
               }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
-
+          GUARD_CU(edge_residuals.ForAll([community_accus, curr_communities]
+                __host__ __device__ (ValueT *edge_residuals, SizeT &v){
+                {
+                  printf("%d %f \n", v, community_accus[curr_communities[v]]);
+                }
+              }, num_org_nodes, util::DEVICE, oprtr_parameters.stream));
 	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
 	    "cudaStreamSynchronize failed");
 
@@ -442,7 +453,7 @@ struct GTFIterationLoop : public IterationLoopBase
 		frontier.queue_length);\
 	fflush(stdout);
 
-	//data_slice.num_updated_vertices = frontier.queue_length;
+	data_slice.num_updated_vertices = frontier.queue_length;
 
 	return retval;
     }

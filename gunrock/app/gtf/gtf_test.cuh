@@ -115,7 +115,8 @@ cudaError_t MinCut(
 
     for (auto e = 0; e < graph.edges; e++){
         edge_residuals[e] = edge_capacities[e] - edge_flows[e];
-        printf("CPU: e_idx %d, e_res %f \n", e, edge_residuals[e]);
+        //printf("CPU: e_idx %d, e_res %f \n", e, edge_residuals[e]);
+        //printf("CPU: e_idx %d, flow %f \n", e, edge_flows[e]);
     }
     memset(vertex_reachabilities, false, graph.nodes*sizeof(vertex_reachabilities[0]));
     /////////////////////////////////////////

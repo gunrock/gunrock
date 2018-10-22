@@ -351,7 +351,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             //////////////////////////////
 	          //GUARD_CU(reverse.SetPointer(h_reverse, edges_size, util::HOST));
 	          //GUARD_CU(reverse.Move(util::HOST, target, edges_size, 0,
-			      //     this->stream));
+			           //this->stream));
 
 	    GUARD_CU2(cudaDeviceSynchronize(),
 	        "cudaDeviceSynchronize failed.");
