@@ -120,6 +120,8 @@ struct main_struct
             
             util::PrintMsg("--------------------------\n Elapsed: "
                 + std::to_string(elapsed), !quiet);
+	
+	    util::PrintMsg("__________________________", !quiet);
         }
 
         // <TODO> add other switching parameters, if needed

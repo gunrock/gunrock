@@ -65,18 +65,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     struct DataSlice : BaseDataSlice
     {
-        util::Array1D<SizeT, ValueT>  locations_lat;
-	util::Array1D<SizeT, ValueT>  locations_lon;
-
         util::Array1D<SizeT, ValueT>  latitude;
 	util::Array1D<SizeT, ValueT>  longitude;
 
 	util::Array1D<SizeT, SizeT>   valid_locations;
+
 	util::Array1D<SizeT, SizeT>   active;
 
-	util::Array1D<SizeT, ValueT>  D;
+	// util::Array1D<SizeT, ValueT>  D;
         util::Array1D<SizeT, ValueT>  Dinv;
-	util::Array1D<SizeT, ValueT>  W;
 
 	bool			      geo_complete;
 
@@ -89,15 +86,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          */
         DataSlice() : BaseDataSlice()
         {
-            locations_lat	.SetName("locations_lat");
-	    locations_lon	.SetName("locations_lon");
             latitude		.SetName("latitude");
 	    longitude		.SetName("longitude");
-	    valid_locations	.SetName("valid_locations");
 	    active		.SetName("active");
-	    D			.SetName("D");
+	    // D			.SetName("D");
 	    Dinv		.SetName("Dinv");
-	    W			.SetName("W");
         }
 
         /*
@@ -116,18 +109,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            GUARD_CU(locations_lat	.Release(target));
-	    GUARD_CU(locations_lon	.Release(target));
-
             GUARD_CU(latitude		.Release(target));
             GUARD_CU(longitude          .Release(target));
 
 	    GUARD_CU(valid_locations	.Release(target));
+
 	    GUARD_CU(active		.Release(target));
 
-	    GUARD_CU(D			.Release(target));
+	    // GUARD_CU(D		.Release(target));
 	    GUARD_CU(Dinv		.Release(target));
-	    GUARD_CU(W			.Release(target));
 
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
@@ -145,31 +135,29 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GraphT        &sub_graph,
             int            num_gpus,
             int            gpu_idx,
-            util::Location target,
             ProblemFlag    flag,
-	    bool	   geo_complete_)
+	    bool	   geo_complete_,
+	    util::Location target = util::DEVICE)
         {
             cudaError_t retval  = cudaSuccess;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 	    SizeT nodes = this -> sub_graph -> nodes;
+	    SizeT edges = this -> sub_graph -> edges + 1;
 
 	    printf("Number of nodes for allocation: %u\n", nodes);
 
 	    geo_complete = geo_complete_;
 
-            GUARD_CU(locations_lat	.Allocate(nodes * nodes, target));
-            GUARD_CU(locations_lon      .Allocate(nodes * nodes, target));
-
             GUARD_CU(latitude		.Allocate(nodes, target));
             GUARD_CU(longitude          .Allocate(nodes, target));
 
 	    GUARD_CU(valid_locations	.Allocate(nodes, target));
+
 	    GUARD_CU(active		.Allocate(1, util::HOST|target));
 
-	    GUARD_CU(D			.Allocate(nodes * nodes, target));
-	    GUARD_CU(Dinv		.Allocate(nodes * nodes, target));
-	    GUARD_CU(W			.Allocate(nodes * nodes, target));
+	    // GUARD_CU(D		.Allocate(edges, target));
+	    GUARD_CU(Dinv		.Allocate(edges, target));
 
             if (target & util::DEVICE) {
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
@@ -190,42 +178,24 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         {
             cudaError_t retval = cudaSuccess;
             SizeT nodes = this -> sub_graph -> nodes;
+	    SizeT edges = this -> sub_graph -> edges + 1;
 
             // Ensure data are allocated
-            GUARD_CU(locations_lat	.EnsureSize_(nodes * nodes, target));
-            GUARD_CU(locations_lon      .EnsureSize_(nodes * nodes, target));
-
             GUARD_CU(latitude		.EnsureSize_(nodes, target));
 	    GUARD_CU(longitude		.EnsureSize_(nodes, target));
+	
+	    GUARD_CU(valid_locations	.EnsureSize_(nodes, target));
 
-            GUARD_CU(valid_locations	.EnsureSize_(nodes, target));
 	    GUARD_CU(active		.EnsureSize_(1, util::HOST|target));
 
-	    GUARD_CU(D			.EnsureSize_(nodes * nodes, target));
-	    GUARD_CU(Dinv               .EnsureSize_(nodes * nodes, target));
-	    GUARD_CU(W                  .EnsureSize_(nodes * nodes, target));
+	    // GUARD_CU(D		.EnsureSize_(edges, target));
+	    GUARD_CU(Dinv               .EnsureSize_(edges, target));
 
 	    this -> geo_iter = _geo_iter;
 
             // Reset data
 
-	    // Set locations of neighbors to null, this needs to be populated
-	    // and using spatial center we can determine the predicted.
-	    GUARD_CU(locations_lat.ForEach([]__host__ __device__ (ValueT &x)
-	    {
-               x = util::PreDefinedValues<ValueT>::InvalidValue;
-            }, nodes * nodes, target, this -> stream));
-
-            GUARD_CU(locations_lon.ForEach([]__host__ __device__ (ValueT &x)
-            {
-               x = util::PreDefinedValues<ValueT>::InvalidValue;
-            }, nodes * nodes, target, this -> stream));
-
-            GUARD_CU(valid_locations.ForEach([]__host__ __device__ (SizeT &x)
-	    {
-               x = (SizeT)0;
-            }, nodes, target, this -> stream));
-
+	    // Using spatial center we can determine the invalid predicted locations.
 	    GUARD_CU(active.ForAll([]__host__ __device__ (SizeT *x, const VertexT &pos)
 	    {
 		x[pos] = 0;
@@ -241,7 +211,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(longitude  .SetPointer(h_longitude, nodes, util::HOST));
             GUARD_CU(longitude  .Move(util::HOST, util::DEVICE));
-	
+
             return retval;
         }
     }; // DataSlice
@@ -392,9 +362,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 this -> sub_graphs[gpu],
                 this -> num_gpus,
                 this -> gpu_idx[gpu],
-                target,
                 this -> flag,
-		this -> geo_complete
+		this -> geo_complete,
+		target
             ));
         }
 

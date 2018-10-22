@@ -100,7 +100,8 @@ cudaError_t RunTests(
     std::string validation 	= parameters.Get<std::string>("validation");
 
     int geo_iter		= parameters.Get<int>("geo-iter");
-    util::PrintMsg("Number of iterations: " + geo_iter, !quiet_mode);
+    util::PrintMsg("Number of iterations: " 
+		    + std::to_string(geo_iter), !quiet_mode);
 
     util::Info info("geolocation", parameters, graph);
 

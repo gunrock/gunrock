@@ -28,30 +28,44 @@ namespace geo {
  * @brief Compute the mean of all latitudues and
  *        and longitudes in a given set.
  */
-template <typename ValueT, typename SizeT>
+template <typename GraphT, typename ValueT, typename SizeT>
 __host__ void mean(
+    GraphT &graph,
     ValueT *latitude,
     ValueT *longitude,
     SizeT   length,
     ValueT *y,
-    SizeT   offset,
     SizeT   v)
 {
+    typedef typename GraphT::CsrT CsrT;
+    typedef typename GraphT::VertexT VertexT;
+
     // Calculate mean;
     ValueT a = 0;
     ValueT b = 0;
 
-    for(SizeT k = 0; k < length; k++)
+    SizeT start_edge    = graph.CsrT::GetNeighborListOffset(v);
+    SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+
+    SizeT len = 0;
+    for(SizeT e = start_edge; e < start_edge + num_neighbors; e++)
     {
-        a += latitude[(v * offset) + k];
-        b += longitude[(v * offset) + k];
+        VertexT dest = graph.CsrT::GetEdgeDest(e);
+        if(util::isValid(latitude[dest]) && util::isValid(longitude[dest]))
+        {
+            a += latitude[dest];
+            b += longitude[dest];
+            len++;
+        }
     }
 
-    a /= length;
-    b /= length;
+    a /= len;
+    b /= len;
 
     y[0] = a; // output latitude
     y[1] = b; // output longitude
+
+    // printf("Locations Mean[%u] = <%f, %f> with length = %u\n", v, y[0], y[1], length);
 
     return;
 }
@@ -102,19 +116,24 @@ __host__ void midpoint(
  *        is minimized. This is a robust estimator of
  *        the mode of the set.
  */
-template <typename ValueT, typename SizeT>
-__host__ void spatial_median(
-    ValueT *locations_lat,
-    ValueT *locations_lon,
-    SizeT offset,
-    SizeT length,
+template <typename GraphT, typename ValueT, typename SizeT>
+__host__ void h_spatial_median(
+    GraphT  &graph,
+    SizeT   length,
+
     ValueT *latitude,
     ValueT *longitude,
-    SizeT v,
-    bool quiet,
-    ValueT eps = 1e-3,
-    SizeT max_iter = 1000)
+
+    SizeT   v,
+
+    ValueT *Dinv,
+
+    bool    quiet = false,
+    ValueT  eps = 1e-3,
+    SizeT   max_iter = 1000)
 {
+
+    typedef typename GraphT::VertexT VertexT;
 
     // Reinitialize these to ::problem
     // ValueT * D = new ValueT[length];
@@ -125,9 +144,8 @@ __host__ void spatial_median(
     // if known locations for a node are
     // a lot! Will overflood the register
     // file.
-    ValueT * D = new ValueT[length];
-    ValueT * Dinv = new ValueT[length];
-    ValueT * W = new ValueT[length];
+    // ValueT * D = new ValueT[length];
+    // ValueT * Dinv = new ValueT[length];
     // </TODO>
 
     ValueT r, rinv;
@@ -141,10 +159,13 @@ __host__ void spatial_median(
     ValueT R[2], tmp[2], out[2], T[2];
     ValueT y[2], y1[2];
 
+    SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+    SizeT start_edge    = graph.CsrT::GetNeighborListOffset(v);
+
     // Calculate mean of all <latitude, longitude>
     // for all possible locations of v;
-    mean (locations_lat, locations_lon,
-            length, y, offset, v);
+    mean (graph, latitude, longitude,
+            length, y, v);
 
     // Calculate the spatial median;
     while (true)
@@ -154,33 +175,44 @@ __host__ void spatial_median(
         T[0] = 0; T[1] = 0; // T.lat = 0, T.lon = 0;
         nonzeros = 0;
 
-        for (SizeT k = 0; k < length; ++k)
+
+	for(SizeT e = start_edge; e < start_edge + num_neighbors; e++)
         {
-            D[k] = haversine(locations_lat[(v * offset) + k],
-                             locations_lon[(v * offset) + k],
-                             y[0], y[1]);
+            VertexT dest = graph.CsrT::GetEdgeDest(e);
+            if(util::isValid(latitude[dest]) && util::isValid(longitude[dest]))
+            {
+
+             ValueT Dist = haversine(latitude[dest],
+                              longitude[dest],
+                              y[0], y[1]);
 
 	
-	    Dinv[k] = D[k] == 0 ? 0 : 1/D[k];
-	    nonzeros = D[k] != 0 ? nonzeros + 1 : nonzeros;
-	    Dinvs += Dinv[k];
+	     Dinv[e] = Dist == 0 ? 0 : 1/Dist;
+	     nonzeros = Dist != 0 ? nonzeros + 1 : nonzeros;
+	     Dinvs += Dinv[e];
+	    }
 	}
 
-	for (SizeT k = 0; k < length; ++k)
-	{
-	    W[k] = Dinv[k]/Dinvs;
-	    T[0] += W[k] * locations_lat[(v * offset) + k];
-	    T[1] += W[k] * locations_lon[(v * offset) + k];
+	SizeT len = 0;
+        for(SizeT e = start_edge; e < start_edge + num_neighbors; e++)
+        {
+            VertexT dest = graph.CsrT::GetEdgeDest(e);
+            if(util::isValid(latitude[dest]) && util::isValid(longitude[dest]))
+            {
+	        T[0] += (Dinv[e]/Dinvs) * latitude[dest];
+	        T[1] += (Dinv[e]/Dinvs) * longitude[dest];
+		len++;
+	    }
 	}
 
-	num_zeros = length - nonzeros;
+	num_zeros = len - nonzeros;
 	if (num_zeros == 0)
 	{
 	    y1[0] = T[0];
 	    y1[1] = T[1];
 	}
 
-	else if (num_zeros == length)
+	else if (num_zeros == len)
 	{
 	    latitude[v] = y[0];
 	    longitude[v] = y[1];
@@ -212,93 +244,9 @@ __host__ void spatial_median(
 
 	y[0] = y1[0];
 	y[1] = y1[1];
-}
-}
-
-/**
- * @brief Compute "center" of a set of points.
- *
- *      For set X ->
- *        if points == 1; center = point;
- *        if points == 2; center = midpoint;
- *        if points > 2; center = spatial median;
- */
-template <typename ValueT, typename SizeT>
-__host__ void spatial_center(
-    ValueT * locations_lat,
-    ValueT * locations_lon,
-    SizeT offset,
-    SizeT length,
-    ValueT * latitude,
-    ValueT * longitude,
-    SizeT v,
-    bool quiet)
-{
-    // If no locations found and no neighbors,
-    // point at location (92.0, 182.0)
-    if (length < 1) // && offset == 0)
-    {
-#if 0
-        latitude[v] = (ValueT) 92.0;
-        longitude[v] = (ValueT) 182.0;
-        util::PrintMsg("Valid Locations [" + std::to_string(v) + "] : "
-                        + std::to_string(length)
-                        + " < " + std::to_string(latitude[v]) + " , "
-                        + std::to_string(longitude[v]) + " > ", !quiet);
-#endif
-        return;
     }
-
-    // If one location found, point at that location
-    if (length == 1)
-    {
-        latitude[v] = locations_lat[(v * offset) + 0];
-        longitude[v] = locations_lon[(v * offset) + 0];
-        /* util::PrintMsg("Valid Locations [" + std::to_string(v) + "] : "
-                        + std::to_string(length)
-                        + " < " + std::to_string(latitude[v]) + " , "
-                        + std::to_string(longitude[v]) + " > ", !quiet); */
-        return;
-    }
-
-    // If two locations found, compute a midpoint
-    else if (length == 2)
-    {
-        midpoint(locations_lat[(v * offset) + 0],
-                 locations_lon[(v * offset) + 0],
-                 locations_lat[(v * offset) + 1],
-                 locations_lon[(v * offset) + 1],
-                 latitude,
-                 longitude,
-                 v);
-                 /* util::PrintMsg("Valid Locations [" + std::to_string(v) + "] : "
-                             + std::to_string(length)
-                             + " < " + std::to_string(latitude[v]) + " , "
-                             + std::to_string(longitude[v]) + " > ", !quiet);*/
-             return;
-         }
-     
-         // if locations more than 2, compute spatial
-         // median.
-         else
-         {
-             spatial_median(locations_lat,
-                            locations_lon,
-                            offset,
-                            length,
-                            latitude,
-                            longitude,
-                            v,
-                            quiet);
-     
-             /* util::PrintMsg("Valid Locations [" + std::to_string(v) + "] : "
-                             + std::to_string(length)
-                             + " < " + std::to_string(latitude[v]) + " , "
-                             + std::to_string(longitude[v]) + " > ", !quiet);*/
-             return;
-         }
-     
 }
+
 
 } // namespace geo
 } // namespace app

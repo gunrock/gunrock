@@ -36,8 +36,8 @@ namespace geo {
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    typename GraphT::ValueT *predicted_lat,
-    typename GraphT::ValueT *predicted_lon,
+    typename GraphT::ValueT *latitude,
+    typename GraphT::ValueT *longitude,
     int geo_iter,
     bool geo_complete,
     bool quiet)
@@ -45,16 +45,14 @@ double CPU_Reference(
     typedef typename GraphT::SizeT SizeT;
     typedef typename GraphT::ValueT ValueT;
     typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::CsrT CsrT;
 
     SizeT nodes = graph.nodes;
+
+    SizeT edges = graph.edges + 1;
+    ValueT * Dinv = new ValueT[edges];
+
     int iterations = 0;
-
-    // Arrays to store neighbor locations
-    ValueT * locations_lat = new ValueT[graph.nodes * graph.nodes];
-    ValueT * locations_lon = new ValueT[graph.nodes * graph.nodes];
-
-    // Number of valid locations for specific vertex
-    SizeT * valid_locations = new SizeT[graph.nodes];
 
     // Number of nodes with known/predicted locations
     SizeT active = 0;
@@ -69,6 +67,7 @@ double CPU_Reference(
     {
 	// Gather operator
 	// #pragma omp parallel
+#if 0
 	for (SizeT v = 0; v < nodes; ++v) 
 	{
 	    
@@ -99,34 +98,80 @@ double CPU_Reference(
 		}
 		
 		valid_locations[v] = i;
+		// printf("CPU Valid Locations[%u] = %u\n", v, valid_locations[v]);
 	    }
         } // end: gather (for)
-  
+ #endif
+
 	// Compute operator 
 	// #pragma omp parallel
 	for (SizeT v = 0; v < nodes; ++v) 
 	{
 	    SizeT offset  = graph.GetNeighborListLength(v);
-	    if (!util::isValid(predicted_lat[v]) &&
-                !util::isValid(predicted_lon[v]))
+	    if (!util::isValid(latitude[v]) &&
+                !util::isValid(longitude[v]))
 	    {
 
-//		util::PrintMsg("--- Spatial Center Operator --- ", !quiet);
-		spatial_center( locations_lat, 	      // list of neigh latitudes 
-				locations_lon, 	      // list of neigh longitudes
-				offset,		      // degree of vertex v	
-				valid_locations[v],   // number of valid locations
-				predicted_lat,	      // output latitude
-				predicted_lon,	      // output longitude
-				v,		      // active vertex
-			        quiet);	
+		    ValueT neighbor_lat[2], neighbor_lon[2];
+
+		    SizeT start_edge    = graph.CsrT::GetNeighborListOffset(v);
+		    SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+
+		    SizeT i = 0;
+
+		    for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+			VertexT u = graph.CsrT::GetEdgeDest(e);
+			if (util::isValid(latitude[u]) && util::isValid(longitude[u])) {
+			    neighbor_lat[i] = latitude[u];          // last valid latitude
+			    neighbor_lon[i] = longitude[u];         // last valid longitude
+			    i++;
+			}
+		    }
+
+		    SizeT valid_neighbors = i;
+
+
+		    // If no locations found and no neighbors,
+		    // point at location (92.0, 182.0)
+		    if (valid_neighbors < 1) // && offset == 0)
+		    {
+		    }
+
+		    // If one location found, point at that location
+		    if (valid_neighbors == 1)
+		    {
+			latitude[v] = neighbor_lat[0];
+			longitude[v] = neighbor_lon[0];
+		    }
+
+		    // If two locations found, compute a midpoint
+		    else if (valid_neighbors == 2)
+		    {
+			midpoint(neighbor_lat[0],
+				 neighbor_lon[0],
+				 neighbor_lat[1],
+				 neighbor_lon[1],
+				 latitude,
+				 longitude,
+				 v);
+		    }
+
+		    // if locations more than 2, compute spatial
+		    // median.
+		    else
+		    {
+			h_spatial_median(
+				    graph,
+				    valid_neighbors,
+				    latitude,
+				    longitude,
+				    v,
+				    Dinv,
+				    quiet);
+
+	    	   }
 	    }
 	}
-
-	if (iterations >= geo_iter)
-	    Stop_Condition = true;
-
-	iterations++;
 
 	if(geo_complete) 
 	{	
@@ -136,8 +181,8 @@ double CPU_Reference(
 	    // and increment active.
 	    for (SizeT v = 0; v < nodes; ++v) 
 	    {
-	        if (util::isValid(predicted_lat[v]) && 
-	    	    util::isValid(predicted_lon[v])) 
+	        if (util::isValid(latitude[v]) && 
+	    	    util::isValid(longitude[v])) 
 	        {
 		    active++;
 	        }
@@ -149,6 +194,14 @@ double CPU_Reference(
 	    // util::PrintMsg("Current Predicted Locations: " 
  	    // 		+ std::to_string(active), !quiet);
 	}
+
+	else
+	{
+	    if (iterations >= geo_iter)
+            	Stop_Condition = true;
+	}
+
+	iterations++;
 
     } // -> while locations unknown.
         // </TODO>

@@ -92,42 +92,29 @@ struct GEOIterationLoop : public IterationLoopBase
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
 
-        auto &locations_lat    = data_slice.locations_lat;
-        auto &locations_lon    = data_slice.locations_lon;
-
         auto &latitude	       = data_slice.latitude;
 	auto &longitude	       = data_slice.longitude;
 
-	auto &valid_locations  = data_slice.valid_locations;
 	auto &active	       = data_slice.active;
 	auto &geo_iter	       = data_slice.geo_iter;
 
 	auto &geo_complete     = data_slice.geo_complete;
 
-	auto &D		       = data_slice.D;
+	/* auto &D	       = data_slice.D; */
 	auto &Dinv	       = data_slice.Dinv;
-	auto &W		       = data_slice.W;
+
+	auto &valid_locations  = data_slice.valid_locations;
 
 	util::Location target = util::DEVICE;
  
         // --
         // Define operations
 
-	// Custom spatial center kernel for geolocation
-
-	// printf("Gather operator ... \n");
-	// compute operation, substitute for neighbor reduce,
-	// ForAll() with a for loop inside (nested forloop),
-	// visiting all the neighbors and calculating the spatial center
-	// after a gather.
 	auto gather_op = [
 	    graph,
-	    locations_lat,
-	    locations_lon,
 	    latitude,
 	    longitude,
-	    valid_locations,
-	    iteration
+	    valid_locations
 	] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
 
 	    VertexT v 		= v_q[pos];
@@ -140,8 +127,6 @@ struct GEOIterationLoop : public IterationLoopBase
 		VertexT u = graph.CsrT::GetEdgeDest(e);
 		if (util::isValid(latitude[u]) && util::isValid(longitude[u])) {
 		    // gather locations from neighbors	
-		    locations_lat[(v * num_neighbors) + i] = latitude[u];
-                    locations_lon[(v * num_neighbors) + i] = longitude[u];
 		    i++;
 		}
 	    }
@@ -149,35 +134,86 @@ struct GEOIterationLoop : public IterationLoopBase
 
 	};
 
-	// printf("Spatial Median operator ... \n");
-	auto compute_op =  [
+
+	/**
+	 * @brief Compute "center" of a set of points.
+	 *
+	 *      For set X ->
+	 *        if points == 1; center = point;
+	 *        if points == 2; center = midpoint;
+	 *        if points > 2; center = spatial median;
+	 */
+	auto spatial_center_op =  [
 	    graph,
-	    locations_lat,
-	    locations_lon,
 	    latitude,
 	    longitude,
-	    valid_locations,
-            iteration,
-	    active,
-	    D, Dinv, W
+	    // valid_locations,
+	    // D, 
+	    Dinv
 	] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
-
-	    VertexT v 		= v_q[pos];
-	    SizeT n		= graph.CsrT::GetNeighborListLength(v);
+	    
+	    VertexT v               = v_q[pos];
 
 	    // if no predicted location, and neighbor locations exists
-	    // Custom spatial center kernel for geolocation
-	    if (!util::isValid(latitude[v]) && !util::isValid(longitude[v])) {
+            // Custom spatial center kernel for geolocation
+            if (!util::isValid(latitude[v]) && !util::isValid(longitude[v])) {
 
-		spatial_center (locations_lat,
-				locations_lon,
-				n,
-				valid_locations[v],
+	        SizeT start_edge    = graph.CsrT::GetNeighborListOffset(v);
+                SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+
+                SizeT i = 0;
+		ValueT neighbor_lat[2], neighbor_lon[2]; // for length <=2 use registers
+
+                for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+                    VertexT u = graph.CsrT::GetEdgeDest(e);
+                    if (util::isValid(latitude[u]) && util::isValid(longitude[u])) {
+			neighbor_lat[i] = latitude[u]; 	        // last valid latitude
+			neighbor_lon[i] = longitude[u]; 	// last valid longitude
+                        i++;
+         	    }
+                }
+
+		SizeT valid_neighbors = i;
+		// printf("Valid Lengths[%u] = %u\n", v, valid_locations[v]);
+
+		// If one location found, point at that location
+		if (valid_neighbors == 1) {
+		    latitude[v] = neighbor_lat[0];
+		    longitude[v] = neighbor_lon[0];
+		    return;
+		}
+
+	        // If two locations found, compute a midpoint
+		else if (valid_neighbors == 2) {
+		    midpoint(
+                 	neighbor_lat[0],
+			neighbor_lon[0],
+			neighbor_lat[1],
+                        neighbor_lon[1],
+			latitude,
+                 	longitude,
+                 	v);
+             	    return;
+		}
+		
+		// if locations more than 2, compute spatial
+                // median.
+		else if (valid_neighbors > 2) {
+		    spatial_median (
+				graph,
+				valid_neighbors,
 				latitude,
 				longitude,			
 				v,
-				D, Dinv, W,
+				Dinv,
 				false);
+		}
+		
+		// if no valid locations are found
+		else {
+		    latitude[v] = util::PreDefinedValues<ValueT>::InvalidValue;
+		    longitude[v] = util::PreDefinedValues<ValueT>::InvalidValue;
+		}
 
 	    } // -- median calculation.
 	};
@@ -199,12 +235,12 @@ struct GEOIterationLoop : public IterationLoopBase
 	};
 
 	// Run --
-        GUARD_CU(frontier.V_Q()->ForAll(
-            gather_op, frontier.queue_length,
-            util::DEVICE, oprtr_parameters.stream));
+        // GUARD_CU(frontier.V_Q()->ForAll(
+        //    gather_op, frontier.queue_length,
+        //    util::DEVICE, oprtr_parameters.stream));
 
 	GUARD_CU(frontier.V_Q()->ForAll(
-	    compute_op, frontier.queue_length,
+	    spatial_center_op, frontier.queue_length,
 	    util::DEVICE, oprtr_parameters.stream));
 
 
