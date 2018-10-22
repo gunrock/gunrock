@@ -212,15 +212,12 @@ struct Csr :
 
         //typedef Coo<VertexT_in, SizeT_in, ValueT_in, FLAG_in,
         //    cudaHostRegisterFlag_in> CooT;
-        if (!quiet)
-        {
-            util::PrintMsg("  Converting " +
-                std::to_string(source.CooT::nodes) +
-                " vertices, " + std::to_string(source.CooT::edges) +
-                (source.CooT::directed ? " directed" : " undirected") +
-                " edges (" + (source.CooT::edge_order == BY_ROW_ASCENDING ? " ordered" : "unordered") +
-                " tuples) to CSR format...");
-        }
+        util::PrintMsg("Converting " +
+            std::to_string(source.CooT::nodes) +
+            " vertices, " + std::to_string(source.CooT::edges) +
+            (source.CooT::directed ? " directed" : " undirected") +
+            " edges (" + (source.CooT::edge_order == BY_ROW_ASCENDING ? " ordered" : "unordered") +
+            " tuples) to CSR format...", !quiet, false);
 
         time_t mark1 = time(NULL);
         cudaError_t retval = cudaSuccess;
@@ -271,7 +268,9 @@ struct Csr :
                 SizeT *row_offsets,
                 const typename CooT::EdgePairT *edge_pairs,
                 const VertexT &row){
-                    if (row >= nodes)
+                    if (row <= edge_pairs[0].x)
+                        row_offsets[row] = 0;
+                    else if (row < nodes)
                     {
                         row_offsets[row] = edges;
                         return;
@@ -309,7 +308,7 @@ struct Csr :
                 }, this -> nodes + 1, target, stream));
 
         time_t mark2 = time(NULL);
-        util::PrintMsg("Done converting (" +
+        util::PrintMsg("Done (" +
             std::to_string(mark2 - mark1) + "s).", !quiet);
 
         /*
@@ -753,55 +752,6 @@ struct Csr :
      * \addtogroup PublicInterface
      * @{
      */
-
-    /**
-     * @brief Print log-scale degree histogram of the graph.
-     */
-    /*void PrintHistogram()
-    {
-        fflush(stdout);
-
-        // Initialize
-        SizeT log_counts[32];
-        for (int i = 0; i < 32; i++)
-        {
-            log_counts[i] = 0;
-        }
-
-        // Scan
-        SizeT max_log_length = -1;
-        for (VertexId i = 0; i < nodes; i++)
-        {
-
-            SizeT length = row_offsets[i + 1] - row_offsets[i];
-
-            int log_length = -1;
-            while (length > 0)
-            {
-                length >>= 1;
-                log_length++;
-            }
-            if (log_length > max_log_length)
-            {
-                max_log_length = log_length;
-            }
-
-            log_counts[log_length + 1]++;
-        }
-        printf("\nDegree Histogram (%lld vertices, %lld edges):\n",
-               (long long) nodes, (long long) edges);
-        printf("    Degree   0: %lld (%.2f%%)\n",
-               (long long) log_counts[0],
-               (float) log_counts[0] * 100.0 / nodes);
-        for (int i = 0; i < max_log_length + 1; i++)
-        {
-            printf("    Degree 2^%i: %lld (%.2f%%)\n",
-                i, (long long)log_counts[i + 1],
-                (float) log_counts[i + 1] * 100.0 / nodes);
-        }
-        printf("\n");
-        fflush(stdout);
-    }*/
 
     /**
      * @brief Check values.
