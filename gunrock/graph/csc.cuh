@@ -145,7 +145,7 @@ struct Csc :
         cudaStream_t   stream = 0)
     {
         cudaError_t retval = cudaSuccess;
-        SizeT invalid_size = util::PreDefinedValues<SizeT>::InvalidValue;
+        //SizeT invalid_size = util::PreDefinedValues<SizeT>::InvalidValue;
         GUARD_CU(BaseGraph    ::Move(source, target, stream));
         GUARD_CU(column_offsets.Move(source, target, this -> nodes + 1, 0, stream));
         GUARD_CU(row_indices   .Move(source, target, this -> edges    , 0, stream));
@@ -220,15 +220,12 @@ struct Csc :
         typedef typename GraphT::CooT CooT;
         //typedef Coo<VertexT_in, SizeT_in, ValueT_in, FLAG_in,
         //    cudaHostRegisterFlag_in> CooT;
-        if (!quiet)
-        {
-            util::PrintMsg("  Converting " +
-                std::to_string(source.CooT::nodes) +
-                " vertices, " + std::to_string(source.CooT::edges) +
-                (source.CooT::directed ? " directed" : " undirected") +
-                " edges (" + (source.CooT::edge_order == BY_COLUMN_ASCENDING ? " ordered" : "unordered") +
-                " tuples) to CSC format...");
-        }
+        util::PrintMsg("Converting " +
+            std::to_string(source.CooT::nodes) +
+            " vertices, " + std::to_string(source.CooT::edges) +
+            (source.CooT::directed ? " directed" : " undirected") +
+            " edges (" + (source.CooT::edge_order == BY_COLUMN_ASCENDING ? " ordered" : "unordered") +
+            " tuples) to CSC format...", !quiet, false);
 
         time_t mark1 = time(NULL);
         cudaError_t retval = cudaSuccess;
@@ -289,38 +286,25 @@ struct Csc :
                 SizeT *column_offsets,
                 const typename CooT::EdgePairT *edge_pairs,
                 const VertexT &column){
-                    if (column >= nodes)
-                    {
-                        column_offsets[column] = edges;
-                        return;
-                    }
-
                     if (column <= edge_pairs[0].y)
-                    {
                         column_offsets[column] = 0;
-                        return;
-                    }
-
-                    if (column > edge_pairs[edges - 1].y)
+                    else if (column < nodes)
                     {
-                        column_offsets[column] = edges;
-                        return;
-                    }
-
-                    auto pos = util::BinarySearch_LeftMost(
-                        column, edge_pairs, (SizeT)0, edges-1,
-                        column_edge_compare,
-                        [] (const typename CooT::EdgePairT &pair, const VertexT &column)
-                        {
-                            return (pair.y == column);
-                        });
-                    while (pos < edges && column > edge_pairs[pos].y)
-                        pos ++;
-                    column_offsets[column] = pos;
+                        auto pos = util::BinarySearch_LeftMost(
+                            column, edge_pairs, (SizeT)0, edges-1,
+                            column_edge_compare,
+                            [] (const typename CooT::EdgePairT &pair, const VertexT &column)
+                            {
+                                return (pair.y == column);
+                            });
+                        while (pos < edges && column > edge_pairs[pos].y)
+                            pos ++;
+                        column_offsets[column] = pos;
+                    } else column_offsets[column] = edges;
                 }, this -> nodes + 1, target, stream));
 
         time_t mark2 = time(NULL);
-        util::PrintMsg("Done converting (" +
+        util::PrintMsg("Done (" +
             std::to_string(mark2 - mark1) + "s).", !quiet);
 
         return retval;
