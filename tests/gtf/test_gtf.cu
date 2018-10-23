@@ -103,6 +103,7 @@ struct main_struct
 
     	GUARD_CU(app::mf::InitReverse(d_graph, reverse_edges));
 
+      printf("!!! %d ", reverse_edges[0]);
 	    //
         // Compute reference CPU GTF algorithm.
 	    //

@@ -183,10 +183,11 @@ template <typename GraphT, typename ValueT, typename VertexT, typename SizeT>
 cudaError_t RunTests(
     util::Parameters  &parameters,
     GraphT	      &graph,
-    VertexT *h_reverse,
+    SizeT *h_reverse,
     util::Location    target = util::DEVICE)
 {
     debug_aml("RunTests starts");
+    printf("!!! %d ", h_reverse[0]);
     cudaError_t retval = cudaSuccess;
     typedef Problem<GraphT>	      ProblemT;
     typedef Enactor<ProblemT>	      EnactorT;
@@ -278,12 +279,20 @@ cudaError_t RunTests(
             " ms, #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
-        if (validation == "each")
-        {
-            //GUARD_CU(problem.Extract(h_flow));
+
+        ValueT* Y = (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
+        GUARD_CU(problem.Extract(Y));
+
+        std::ofstream out_pr( "./output_pr_GPU.txt" );
+        for(int i = 0; i < num_org_nodes; i++) out_pr << Y[i] << std::endl;
+        out_pr.close();
+
+        // if (validation == "each")
+        // {
+
             //int num_errors = app::gtf::Validate_Results(parameters, graph,
 		    //source, sink, h_flow, h_reverse, ref_flow, quiet_mode);
-        }
+        // }
     }
 
     // Copy out results

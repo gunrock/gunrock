@@ -104,7 +104,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, VertexT> num_comms;
         util::Array1D<SizeT, VertexT> previous_num_comms;	      // flag active vertices
         //util::Array1D<SizeT, VertexT> num_comms;	      // flag active vertices
-        util::Array1D<SizeT, VertexT> reverse; // for storing mf h_reverse
+        util::Array1D<SizeT, SizeT> reverse; // for storing mf h_reverse
+
+        util::Array1D<SizeT, ValueT> Y; // for storing mf h_reverse
         SizeT num_updated_vertices;
 
 
@@ -138,6 +140,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
           num_comms.SetName("num_comms");
           previous_num_comms.SetName("previous_num_comms");
           reverse.SetName("reverse");
+          Y.SetName("Y");
 
         }
 
@@ -175,6 +178,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(num_comms.Release(target));
             GUARD_CU(previous_num_comms.Release(target));
             GUARD_CU(reverse.Release(target));
+            GUARD_CU(Y.Release(target));
             return retval;
         }
 
@@ -216,6 +220,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
           GUARD_CU(num_comms.Allocate(1, target));
           GUARD_CU(previous_num_comms.Allocate(1, target));
           GUARD_CU(reverse.Allocate(edges_size, util::HOST));
+
+          GUARD_CU(Y.Allocate(nodes_size, target));
 
 
 
@@ -425,29 +431,30 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
-        ValueT	       *h_flow,
+        ValueT	       *h_Y,
         util::Location  target = util::DEVICE)
     {
 	cudaError_t retval = cudaSuccess;
 
 	auto &data_slice = data_slices[0][0];
-	SizeT eN = this->org_graph->edges;
+	SizeT vN = this->org_graph->nodes;
+  printf("extract: %d \n", vN);
 
 	// Set device
 	if (target == util::DEVICE)
 	{
 	    GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-	    GUARD_CU(data_slice.flow.SetPointer(h_flow, eN, util::HOST));
-	    GUARD_CU(data_slice.flow.Move(util::DEVICE, util::HOST));
+	    GUARD_CU(data_slice.Y.SetPointer(h_Y, vN, util::HOST));
+	    GUARD_CU(data_slice.Y.Move(util::DEVICE, util::HOST));
 	}
 	else if (target == util::HOST)
 	{
-	    GUARD_CU(data_slice.flow.ForEach(h_flow,
+	    GUARD_CU(data_slice.Y.ForEach(h_Y,
 	      []__host__ __device__(const ValueT &f, ValueT &h_f){
 	      {
-		h_f = f;
+		        h_f = f;
 	      }
-	      }, eN, util::HOST));
+      }, vN, util::HOST));
 	}
         return retval;
     }
@@ -501,7 +508,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     cudaError_t Reset(
 		GraphT& graph,
 		ValueT *h_community_accus,
-		VertexT *h_reverse,
+		SizeT *h_reverse,
 	    util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -511,7 +518,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     for(auto i = 0; i < graph.edges; i++){
       reverse[i] = h_reverse[i];
     }
-    GUARD_CU(mf_problem.Reset(graph, reverse+0, target));
+    GUARD_CU(mf_problem.Reset(graph, h_reverse, target));
 
 
 	auto source_vertex  = graph.nodes-2;

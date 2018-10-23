@@ -117,12 +117,14 @@ struct GTFIterationLoop : public IterationLoopBase
        auto &num_comms = data_slice.num_comms;
        auto &previous_num_comms = data_slice.previous_num_comms;
        auto &num_updated_vertices = data_slice.num_updated_vertices;
+       auto &Y = data_slice.Y;
+       util::CpuTimer cpu_timer;	cpu_timer.Start();
 
       //  GUARD_CU(edge_residuals.ForAll(
       //      [mf_flow, graph, source] __host__ __device__ (ValueT *edge_residuals, const SizeT &e){
       //          printf("GPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
       //      }, graph.edges, util::DEVICE, oprtr_parameters.stream));
-
+      cpu_timer.Start();
       GUARD_CU(graph.edge_values.Move(util::DEVICE, util::HOST, graph.edges, 0, oprtr_parameters.stream));
       GUARD_CU(cudaDeviceSynchronize());
        mf_problem.parameters.Set("source", source);
@@ -130,10 +132,14 @@ struct GTFIterationLoop : public IterationLoopBase
        GUARD_CU(mf_problem.Reset(graph, h_reverse+0, mf_target));
        GUARD_CU(mf_enactor.Reset(source, mf_target));
        GUARD_CU(mf_enactor.Enact());
+       cpu_timer.Stop();
+       printf("mf: %f \n", cpu_timer.ElapsedMillis());
 
+       cpu_timer.Start();
        // min cut
        GUARD_CU(edge_residuals.ForAll(
            [mf_flow, graph, source] __host__ __device__ (ValueT *edge_residuals, const SizeT &e){
+               if(e == 0) printf("in residual assignment beginning of gtf\n");
                edge_residuals[e] = graph.edge_values[e] - mf_flow[e];
                mf_flow[e] = 0.;
                //printf("GPU: e_idx %d, e_res %f \n", e, edge_residuals[e]);
@@ -142,10 +148,12 @@ struct GTFIterationLoop : public IterationLoopBase
        GUARD_CU(vertex_reachabilities.ForAll(
             [] __host__ __device__ (bool *vertex_reachabilities, const SizeT &v){
               vertex_reachabilities[v] = false;
+              //if(v == 0) printf("in reach\n");
             }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
 
        GUARD_CU(vertex_reachabilities.ForAll(
          [edge_residuals, graph, community_sizes, source] __host__ __device__ (bool *vertex_reachabilities, const SizeT &idx){
+
            VertexT head = 0;
            VertexT tail = 0;
            VertexT *queue = community_sizes+0;
@@ -167,6 +175,7 @@ struct GTFIterationLoop : public IterationLoopBase
                }
                tail ++;
            }
+           //if(idx == 0) printf("in min-cut\n");
          }, 1, util::DEVICE, oprtr_parameters.stream));
 
        GUARD_CU(community_weights.ForAll(
@@ -177,7 +186,7 @@ struct GTFIterationLoop : public IterationLoopBase
                   next_communities [pos] = 0;
                   //printf("vertext value %f \n", community_accus[0]);
               }
-              printf("%d, ", vertex_reachabilities[pos]);
+              //printf("%d, ", vertex_reachabilities[pos]);
             }, num_nodes, util::DEVICE, oprtr_parameters.stream));
       //printf("core runs permantly1 \n");
 
@@ -199,10 +208,11 @@ struct GTFIterationLoop : public IterationLoopBase
             // others
             num_comms, num_edges,
             num_org_nodes, graph]
-            __host__ __device__ (ValueT *community_weights, const VertexT &v){
+            __host__ __device__ (ValueT *community_weights, const VertexT &idx){
               {
 
                 VertexT comm;
+                //if(idx == 0) printf("in 1st for loop begin\n");
                 for (VertexT v = 0; v < num_org_nodes; v++)
                 {
                     if (!vertex_active[v])
@@ -247,54 +257,10 @@ struct GTFIterationLoop : public IterationLoopBase
                         }
                         //printf("-- %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
                     }
-
                 }
-
-                /*
-                if (!vertex_active[v]) return;
-                printf("GPU:nodeid %d, %d %d\n", v, vertex_reachabilities[v], vertex_active[v]);
-                unsigned int comm;
-                  if (vertex_reachabilities[v] == true)
-                  { // reachable by source
-                      comm = atomicAdd(&next_communities[curr_communities[v]], 0);
-
-                      if (comm == 0)
-                      { // not assigned yet
-                          VertexT prev_num_comms = atomicAdd(&num_comms[0], 1);
-                          comm = prev_num_comms;
-                          next_communities[curr_communities[v]] = prev_num_comms;
-                          community_active [comm] = true;
-                          community_weights[comm] = 0;
-                          community_sizes  [comm] = 0;
-                          next_communities [comm] = 0;
-                          community_accus  [comm] = community_accus[curr_communities[v]];
-                      }
-                      curr_communities[v] = comm;
-                      atomicAdd(&community_weights[comm], edge_residuals[num_edges - num_org_nodes * 2 + v]);
-                      atomicAdd(&community_sizes[comm], 1);
-                  }
-
-                  else { // otherwise
-                      comm = atomicAdd(&curr_communities[v], 0);
-                      SizeT e_start = graph.GetNeighborListOffset(v);
-                      SizeT num_neighbors = graph.GetNeighborListLength(v);
-                      atomicAdd(&community_weights[comm], -edge_residuals[e_start + num_neighbors - 1]);
-                      atomicAdd(&community_sizes[comm], 1);
-
-                      auto e_end = e_start + num_neighbors - 2;
-                      for (auto e = e_start; e < e_end; e++)
-                      {
-                          VertexT u = graph.GetEdgeDest(e);
-                          if (vertex_reachabilities[u] == 1)
-                          {
-                              edge_residuals[e] = 0;
-                          }
-                      }
-                  }
-                  printf("%d %f %f\n", comm, community_weights[comm], community_accus[comm]);
-                  */
+                //if(idx == 0) printf("in 1st for loop end\n");
               }
-            }, num_org_nodes, util::DEVICE, oprtr_parameters.stream));
+            }, 1, util::DEVICE, oprtr_parameters.stream)); //loop only once
 
             GUARD_CU(community_weights.ForAll(
                  [next_communities, //community specific
@@ -327,6 +293,7 @@ struct GTFIterationLoop : public IterationLoopBase
                          community_weights[comm] = 0;
                      }
                    }
+                   //if(comm == 0) printf("in 2st for loop end\n");
                  }, num_nodes, util::DEVICE, oprtr_parameters.stream));
 
 
@@ -343,6 +310,7 @@ struct GTFIterationLoop : public IterationLoopBase
                 community_accus  [comm] += community_weights[comm];
                 //printf("comm %d, accus %f, sizes %d \n", comm, community_accus  [comm], community_sizes  [comm]);
               }
+              active[0] = 0;
             }
           }, num_org_nodes, util::DEVICE, oprtr_parameters.stream));
 
@@ -363,7 +331,6 @@ struct GTFIterationLoop : public IterationLoopBase
                  {
                    if (!vertex_active[v]) return;
 
-                   active[0] = 0;
                    auto comm = curr_communities[v];
                    if (!community_active[comm] ||
                        abs(community_weights[comm]) < 1e-6)
@@ -404,6 +371,8 @@ struct GTFIterationLoop : public IterationLoopBase
                            }
                        }
                    }
+                   //if(v == 0) printf("in 3st for loop end\n");
+
                  }
                }, num_org_nodes, util::DEVICE, oprtr_parameters.stream));
 
@@ -415,17 +384,34 @@ struct GTFIterationLoop : public IterationLoopBase
                 }
               }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
-          GUARD_CU(edge_residuals.ForAll([community_accus, curr_communities]
-                __host__ __device__ (ValueT *edge_residuals, SizeT &v){
+          GUARD_CU(community_accus.ForAll([active, community_accus, curr_communities]
+                __host__ __device__ (ValueT *community_accus, SizeT &v){
                 {
-                  printf("%d %f \n", v, community_accus[curr_communities[v]]);
+                  if(active[0] == 0){
+                    ValueT tmp = max(community_accus[v] - 3., 0.0);
+                    community_accus[v] = tmp + min(community_accus[v] + 3., 0.0);
+                    //printf("%d %f \n", v, community_accus[curr_communities[v]]);
+                  }
                 }
               }, num_org_nodes, util::DEVICE, oprtr_parameters.stream));
+
+          GUARD_CU(community_accus.ForAll([active, community_accus, curr_communities, Y]
+                __host__ __device__ (ValueT *community_accus, SizeT &v){
+                {
+                  if(active[0] == 0){
+                      Y[v] = community_accus[curr_communities[v]];
+                  }
+                  if(v == 0) printf("in last for loop end\n");
+                  }
+                }, num_org_nodes, util::DEVICE, oprtr_parameters.stream));
+          cpu_timer.Stop();
+          printf("gtf: %f \n", cpu_timer.ElapsedMillis());
+
 	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
 	    "cudaStreamSynchronize failed");
 
 	//printf("new updated vertices %d\n", frontier.queue_length);
-
+  cpu_timer.Start();
 	frontier.queue_reset = true;
 	oprtr_parameters.filter_mode = "BY_PASS";
 	GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
@@ -439,6 +425,8 @@ struct GTFIterationLoop : public IterationLoopBase
 	  {
 	    return active[0] > 0;
 	  }));
+    cpu_timer.Stop();
+    printf("stop condition: %f \n", cpu_timer.ElapsedMillis());
 
 	frontier.queue_index++;
 	// Get back the resulted frontier length

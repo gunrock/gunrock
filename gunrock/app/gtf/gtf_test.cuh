@@ -113,6 +113,7 @@ cudaError_t MinCut(
         source, dest, max_flow, reverse_edges, edge_flows);
     auto &edge_capacities = graph.edge_values;
 
+    printf("after maxflow \n");
     for (auto e = 0; e < graph.edges; e++){
         edge_residuals[e] = edge_capacities[e] - edge_flows[e];
         //printf("CPU: e_idx %d, e_res %f \n", e, edge_residuals[e]);
@@ -170,9 +171,9 @@ cudaError_t MinCut(
         }
         tail ++;
     }
-    for(auto i = 0; i < graph.nodes; i++){
-        printf("%d, ", vertex_reachabilities[i]);
-    }
+    //for(auto i = 0; i < graph.nodes; i++){
+    //    printf("%d, ", vertex_reachabilities[i]);
+    //}
     printf("\n");
 
     return retval;
