@@ -78,6 +78,19 @@ void DisplaySolution(T *array, SizeT length)
 template <typename ValueT, typename SizeT>
 ValueT ** ReadMatrix (std::string filename, SizeT dim0, SizeT dim1)
 {
+    if (filename == "") 
+    {
+        util::PrintMsg("random generated file");
+        ValueT **matrix = new ValueT*[dim0];
+        for (SizeT i = 0; i < dim0; i++)
+        {   
+            matrix[i] = new ValueT[dim1];
+            for (SizeT j = 0; j < dim1; j++)
+            matrix[i][j] = 1.0*rand()/RAND_MAX;
+        }
+        return matrix;      
+    }
+
     std::FILE* fin = fopen(filename.c_str(),"r");
     if (fin==NULL)
     {
@@ -85,14 +98,14 @@ ValueT ** ReadMatrix (std::string filename, SizeT dim0, SizeT dim1)
         return NULL;
     }
 
-   ValueT **matrix = new ValueT*[dim0];
-   for (SizeT i = 0; i < dim0; i++)
-   {
+    ValueT **matrix = new ValueT*[dim0];
+    for (SizeT i = 0; i < dim0; i++)
+    {
         matrix[i] = new ValueT[dim1];
         for (SizeT j = 0; j < dim1; j++)
             fscanf(fin, "%f", matrix[i] + j);
-   }
-   fclose(fin);
+    }
+    fclose(fin);
 
     return matrix;
 }
@@ -102,10 +115,11 @@ template <
     typename GraphT,
     typename ValueT = typename GraphT::ValueT>
 double CPU_Reference(
+    util::Parameters &para,
     const GraphT   &graph,
-          int       batch_size,
-          int       num_neigh1,
-          int       num_neigh2,
+          //int       batch_size,
+          //int       num_neigh1,
+          //int       num_neigh2,
           ValueT  **features,
           ValueT  **W_f_1,
           ValueT  **W_a_1,
@@ -127,6 +141,22 @@ double CPU_Reference(
     //    }
     //};
     //typedef std::priority_queue<PairT, std::vector<PairT>, GreaterT> PqT;
+    //auto &para = this -> parameters;
+
+    int batch_size          = para.template Get<int>("batch-size");
+    int feature_column      = para.template Get<int>("feature-column");
+    int num_children_per_source 
+                = para.template Get<int>("num-children-per-source");
+    int Wf1_dim0            = feature_column;
+    int Wf1_dim1            = para.template Get<int>("Wf1-dim1");
+    int Wa1_dim0            = feature_column;
+    int Wa1_dim1            = para.template Get<int>("Wa1-dim1");
+    int Wf2_dim0            = Wf1_dim1 + Wa1_dim1;
+    int Wf2_dim1            = para.template Get<int>("Wf2-dim1");
+    int Wa2_dim0            = Wf1_dim1 + Wa1_dim1;
+    int Wa2_dim1            = para.template Get<int>("Wa2-dim1");
+    int result_column       = Wa2_dim1 + Wf2_dim1;
+    int num_leafs_per_child = para.template Get<int>("num-leafs-per-child");
 
     util::PrintMsg("CPU_Reference entered", !quiet);
     //int num_batch = graph.nodes / batch_size ;
@@ -142,145 +172,156 @@ double CPU_Reference(
         { 
             //store edges between sources and children 
             std::vector <SizeT> edges_source_child;
-            float children_temp [256] = {0.0} ; // agg(h_B1^1)
-            float source_temp [256] = {0.0};  // h_B2^1
+            float children_temp [Wa2_dim0] = {0.0} ; // agg(h_B1^1)
+            float source_temp [Wf2_dim0] = {0.0};  // h_B2^1
             //float source_result [256] = {0.0}; // h_B2_2, result
-            auto  source_result = source_embedding + source * 256;
-            for (int i = 0; i < 256; i++)
+            auto  source_result = source_embedding + source * result_column;
+            for (int i = 0; i < result_column; i++)
                 source_result[i] = 0.0;
             
-            for (int i =0; i < num_neigh1 ; i++)
+            for (int i =0; i < num_children_per_source ; i++)
             {
-                SizeT offset = rand() % num_neigh1; // YC: Bug
+                SizeT num_source_neigh = graph.GetNeighborListLength(source);
+                if (num_source_neigh == 0) {
+                    util::PrintMsg("error: remove dangling nodes and please use undirected setting");
+  
+                }
+                
+                SizeT offset = rand() % graph.GetNeighborListLength(source); // 
                 SizeT pos = graph.GetNeighborListOffset(source) + offset;
                 edges_source_child.push_back (pos);
+                
             }// sample child (B1 nodes), save edge list. 
 
             // get each child's h_v^1
-            for (int i = 0; i < num_neigh1 ; i ++)
+            for (int i = 0; i < num_children_per_source ; i ++)
             {
                 SizeT pos = edges_source_child[i];
                 VertexT child = graph.GetEdgeDest(pos); 
-                float sums [64] = {0.0} ;
+                float sums [feature_column] = {0.0} ;
 
                 // sample leaf node for each child
-                for (int j =0; j < num_neigh2 ; j++)
+                for (int j =0; j < num_leafs_per_child ; j++)
                 {
-                    SizeT offset2 = rand() % num_neigh2; // YC: Bug
+                    SizeT num_child_neigh = graph.GetNeighborListLength(child);
+                    if (num_child_neigh == 0){ 
+                        util::PrintMsg("error: remove dangling nodes and please use undirected     setting");
+                     }
+
+                    SizeT offset2 = rand() % graph.GetNeighborListLength(child); 
                     SizeT pos2 = graph.GetNeighborListOffset(child) + offset2;
                     VertexT leaf = graph.GetEdgeDest (pos2); 
-                    for (int m = 0; m < 64 ; m ++) {
+                    for (int m = 0; m < feature_column ; m ++) {
                         sums[m] += features[leaf][ m];
                     }
                     
                 }// agg feaures for leaf nodes alg2 line 11 k = 1
-                for (int m =0; m < 64 ; m++){
-                    sums [m] = sums[m]/ num_neigh2;
+                for (int m =0; m < feature_column ; m++){
+                    sums [m] = sums[m]/ num_leafs_per_child;
                 }// get mean  agg of leaf features.
                 // get ebedding vector for child node (h_{B1}^{1}) alg2 line 12
-                float child_temp[256] = {0.0};
-                for (int idx_0 = 0; idx_0 < 128; idx_0++)
+                float child_temp[Wa2_dim0] = {0.0};
+                for (int idx_0 = 0; idx_0 < Wf1_dim1; idx_0++)
                 {
-                    for (int idx_1 =0; idx_1< 64; idx_1 ++)
+                    for (int idx_1 =0; idx_1< feature_column; idx_1 ++)
                         child_temp[idx_0] += features[child][ idx_1] * W_f_1[idx_1][idx_0];
                 } // got 1st half of h_B1^1
 
-                for (int idx_0 = 128; idx_0 < 256; idx_0++)
+                for (int idx_0 = 0; idx_0 < Wa1_dim1; idx_0++)
                 {   
-                    for (int idx_1 =0; idx_1< 64; idx_1 ++)
-                        child_temp[idx_0] += sums[idx_1] * W_a_1[idx_1][idx_0 - 128];
+                    for (int idx_1 =0; idx_1< feature_column; idx_1 ++)
+                        child_temp[idx_0 + Wf1_dim1] += sums[idx_1] * W_a_1[idx_1][idx_0];
                 } // got 2nd half of h_B!^1 
 
                 // activation and L-2 normalize 
                 auto L2_child_temp = 0.0;
-                for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+                for (int idx_0 =0; idx_0 < Wa2_dim0; idx_0 ++ )
                 {
                     child_temp[idx_0] = child_temp[idx_0] > 0.0 ? child_temp[idx_0] : 0.0 ; //relu() 
                     L2_child_temp += child_temp[idx_0] * child_temp [idx_0];
                 } //finished relu
-                for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+                for (int idx_0 =0; idx_0 < Wa2_dim0; idx_0 ++ )
                 {
                     child_temp[idx_0] = child_temp[idx_0] /sqrt (L2_child_temp);
                 }//finished L-2 norm, got h_B1^1, algo2 line13
 
                 // add the h_B1^1 to children_temp, also agg it
-                for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+                for (int idx_0 =0; idx_0 < Wa2_dim0; idx_0 ++ )
                 {
-                    children_temp[idx_0] += child_temp[idx_0] /num_neigh1;
+                    children_temp[idx_0] += child_temp[idx_0] /num_children_per_source;
                 }//finished agg (h_B1^1)
             }//for each child in B1, got h_B1^1
 
             //////////////////////////////////////////////////////////////////////////////////////
             //get h_B2^1, k =1 ; this time, child is like leaf, and source is like child
-            float sums_child_feat [64] = {0.0} ; // agg(h_B1^0)
-            for (int i = 0; i < num_neigh1 ; i ++)
+            float sums_child_feat [feature_column] = {0.0} ; // agg(h_B1^0)
+            for (int i = 0; i < num_children_per_source ; i ++)
             { 
                 SizeT pos = edges_source_child[i];
                 VertexT child = graph.GetEdgeDest(pos);
-                for (int m = 0; m < 64; m++)
+                for (int m = 0; m < feature_column ; m++)
                 {
                     sums_child_feat [m] += features[child][m];
                 }
                  
             }// for each child
-            for (int m = 0 ; m < 64; m++)
+            for (int m = 0 ; m < feature_column; m++)
             {
-               sums_child_feat[m] = sums_child_feat[m]/ num_neigh1;
+               sums_child_feat[m] = sums_child_feat[m]/ num_children_per_source;
             } // got agg(h_B1^0)
  
             // get ebedding vector for child node (h_{B2}^{1}) alg2 line 12            
-            for (int idx_0 = 0; idx_0 < 128; idx_0++)
+            for (int idx_0 = 0; idx_0 < Wf1_dim1; idx_0++)
             {
-                for (int idx_1 =0; idx_1< 64; idx_1 ++)
+                for (int idx_1 =0; idx_1< feature_column; idx_1 ++)
                     source_temp[idx_0] += features[source][ idx_1] * W_f_1[idx_1][idx_0];
             } // got 1st half of h_B2^1
 
-            for (int idx_0 = 128; idx_0 < 256; idx_0++)
+            for (int idx_0 = 0; idx_0 < Wa1_dim1; idx_0++)
             {
-                for (int idx_1 =0; idx_1< 64; idx_1 ++)
-                    source_temp[idx_0] += sums_child_feat[idx_1] * W_a_1[idx_1][idx_0 - 128];
+                for (int idx_1 =0; idx_1< feature_column; idx_1 ++)
+                    source_temp[Wf1_dim1 + idx_0] += sums_child_feat[idx_1] * W_a_1[idx_1][idx_0];
             } // got 2nd half of h_B2^1 
 
             auto L2_source_temp = 0.0;
-            for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+            for (int idx_0 =0; idx_0 < Wf2_dim0; idx_0 ++ )
             {
                 source_temp[idx_0] = source_temp[idx_0] > 0.0 ? source_temp[idx_0] : 0.0 ; //relu() 
                 L2_source_temp += source_temp[idx_0] * source_temp [idx_0];
             } //finished relu
-            for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+            for (int idx_0 =0; idx_0 < Wf2_dim0; idx_0 ++ )
             {
                 source_temp[idx_0] = source_temp[idx_0] /sqrt (L2_source_temp);
                 //printf("source_temp,%f", source_temp[idx_0]);
             }//finished L-2 norm for source temp
             //////////////////////////////////////////////////////////////////////////////////////
             // get h_B2^2 k =2.           
-            for (int idx_0 = 0; idx_0 < 128; idx_0++)
+            for (int idx_0 = 0; idx_0 < Wf2_dim1; idx_0++)
             {
                 //printf ("source_r1_0:%f", source_result[idx_0] );
-                for (int idx_1 =0; idx_1< 256; idx_1 ++)
+                for (int idx_1 =0; idx_1< Wf2_dim0; idx_1 ++)
                     source_result[idx_0] += source_temp [idx_1] * W_f_2[idx_1][idx_0];
                 //printf ("source_r1:%f", source_result[idx_0] );
             } // got 1st half of h_B2^2
 
-            for (int idx_0 = 128; idx_0 < 256; idx_0++)
+            for (int idx_0 = 0; idx_0 < Wa2_dim1; idx_0++)
             {
                 //printf ("source_r2_0:%f", source_result[idx_0] );
-                for (int idx_1 =0; idx_1< 256; idx_1 ++)
-                    source_result[idx_0] += children_temp[idx_1] * W_a_2[idx_1][idx_0 - 128];
+                for (int idx_1 =0; idx_1< Wa2_dim0; idx_1 ++)
+                    source_result[Wf2_dim1 + idx_0] += children_temp[idx_1] * W_a_2[idx_1][idx_0];
                 //printf ("source_r2_1:%f", source_result[idx_0] );
 
             } // got 2nd half of h_B2^2
             auto L2_source_result = 0.0;
-            for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+            for (int idx_0 =0; idx_0 < result_column; idx_0 ++ )
             {
                 source_result[idx_0] = source_result[idx_0] > 0.0 ? source_result[idx_0] : 0.0 ; //relu() 
                 L2_source_result += source_result[idx_0] * source_result [idx_0];
             } //finished relu
-            for (int idx_0 =0; idx_0 < 256; idx_0 ++ )
+            for (int idx_0 =0; idx_0 < result_column; idx_0 ++ )
             {
                 source_result[idx_0] = source_result[idx_0] /sqrt (L2_source_result);
-                //printf ("source_r:%f", source_result[idx_0] );
-                //printf ("ch_t:%f", children_temp[idx_0]);
+                
             }//finished L-2 norm for source result          
            
         } //for each source

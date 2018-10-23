@@ -125,7 +125,7 @@ struct SAGEIterationLoop : public IterationLoopBase
             [source_start, num_children_per_source,
             graph, feature_column, features,
             num_leafs_per_child, W_f_1, Wf1_dim1,
-            W_a_1, Wa1_dim1, Wf2_dim0, children_temp,
+            W_a_1, Wa1_dim1, Wf2_dim0, Wa2_dim0, children_temp,
             sums_child_feat, sums, rand_states] 
             __host__ __device__ (ValueT *child_temp_, const SizeT &i)
             {
@@ -178,7 +178,7 @@ struct SAGEIterationLoop : public IterationLoopBase
       
                 // activation and L-2 normalize 
                 double L2_child_temp = 0.0;
-                for (int x =0; x < Wf2_dim0; x++)
+                for (int x =0; x < Wa2_dim0; x++)
                 {
                     ValueT val = child_temp[x];
                     if (val < 0) // relu()
@@ -187,15 +187,15 @@ struct SAGEIterationLoop : public IterationLoopBase
                     child_temp[x] = val;
                 }  //finished relu
                 L2_child_temp = 1.0 / sqrt(L2_child_temp);
-                for (int x =0; x < Wf2_dim0; x++)
+                for (int x =0; x < Wa2_dim0; x++)
                 {
                     //child_temp[idx_0] = child_temp[idx_0] /sqrt (L2_child_temp);
                     child_temp[x] *= L2_child_temp;
                 }//finished L-2 norm, got h_B1^1, algo2 line13
 
-                offset = i / num_children_per_source * Wf2_dim0;
+                offset = i / num_children_per_source * Wa2_dim0;
                 // add the h_B1^1 to children_temp, also agg it
-                for (int x =0; x < Wf2_dim0; x ++ ) //205
+                for (int x =0; x < Wa2_dim0; x ++ ) //205
                 {
                     atomicAdd(children_temp + (offset + x), 
                         child_temp[x] / num_children_per_source);

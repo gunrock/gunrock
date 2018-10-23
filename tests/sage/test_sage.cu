@@ -103,8 +103,7 @@ struct main_struct
           //      VertexT src = srcs[i];
             util::PrintMsg("__________________________", !quiet);
             float elapsed = app::sage::CPU_Reference(
-                graph,batch_size, num_neigh1, num_neigh2, 
-                features, W_f_1,W_a_1,W_f_2,W_a_2, source_embedding, quiet);
+                parameters, graph, features, W_f_1,W_a_1,W_f_2,W_a_2, source_embedding, quiet);
             util::PrintMsg("--------------------------\n"
                 "CPU Reference elapsed: "
                 + std::to_string(elapsed) + " ms.", !quiet);

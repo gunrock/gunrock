@@ -38,7 +38,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
 
     GUARD_CU(parameters.Use<std::string>(
         "Wf1",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         "",
         "<weight matrix for W^1 matrix in algorithm 2, feature part>\n"
         "\t dimension 64 by 128 for pokec;\n"
@@ -61,7 +61,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
 
     GUARD_CU(parameters.Use<std::string>(
         "Wa1",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         "",
         "<weight matrix for W^1 matrix in algorithm 2, aggregation part>\n"
         "\t dimension 64 by 128 for pokec;\n"
@@ -84,7 +84,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
  
     GUARD_CU(parameters.Use<std::string>(
         "Wf2",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         "",
         "<weight matrix for W^2 matrix in algorithm 2, feature part>\n"
         "\t dimension 256 by 128 for pokec;\n"
@@ -107,7 +107,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
 
     GUARD_CU(parameters.Use<std::string>(
         "Wa2",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         "",
         "<weight matrix for W^2 matrix in algorithm 2, aggregation part>\n"
         "\t dimension 256 by 128 for pokec;\n"
@@ -130,7 +130,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
 
     GUARD_CU(parameters.Use<std::string>(
         "features",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         "",
         "<features matrix>\n"
         "\t dimension |V| by 64 for pokec;\n",
