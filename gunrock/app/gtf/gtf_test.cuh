@@ -116,8 +116,8 @@ cudaError_t MinCut(
     printf("after maxflow \n");
     for (auto e = 0; e < graph.edges; e++){
         edge_residuals[e] = edge_capacities[e] - edge_flows[e];
-        //printf("CPU: e_idx %d, e_res %f \n", e, edge_residuals[e]);
-        //printf("CPU: e_idx %d, flow %f \n", e, edge_flows[e]);
+        //if(e<10) printf("CPU: er_idx %d, e_res %f \n", e, edge_residuals[e]);
+        if(e<10)printf("CPU: e_idx %d, cap %f \n", e, graph.edge_values[e]);
     }
     memset(vertex_reachabilities, false, graph.nodes*sizeof(vertex_reachabilities[0]));
     /////////////////////////////////////////
@@ -424,6 +424,8 @@ cudaError_t CPU_Reference(
     {
         printf("Iteration %d\n", iteration);
         iteration++;
+        for(int e = 0; e < 10; e++)
+          printf("CPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
 
         GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
             edge_flows, edge_residuals, vertex_reachabilities));
@@ -512,7 +514,7 @@ cudaError_t CPU_Reference(
         {
             community_weights[comm] /= community_sizes  [comm];
             community_accus  [comm] += community_weights[comm];
-            //printf("comm %d, accus %f, sizes %d \n", comm, community_accus  [comm], community_sizes  [comm]);
+            printf("comm %d, accus %f, sizes %d \n", comm, community_accus  [comm], community_sizes  [comm]);
             //printf("values: comm: %d, sizes: %d, weights: %f, accus: %f.\n", comm, community_sizes[comm], community_weights[comm], community_accus[comm]);
         }
 

@@ -518,8 +518,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     for(auto i = 0; i < graph.edges; i++){
       reverse[i] = h_reverse[i];
     }
-    GUARD_CU(mf_problem.Reset(graph, h_reverse, target));
-
 
 	auto source_vertex  = graph.nodes-2;
 	auto sink_vertex    = graph.nodes-1;
