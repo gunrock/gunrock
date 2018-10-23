@@ -240,6 +240,74 @@ double GetStddevDegree(GraphT &graph)
     return sqrt(accum / (graph.nodes-1));
 }
 
+/**
+ * @brief Find log-scale degree histogram of the graph.
+ */
+template <typename GraphT, typename ArrayT>
+cudaError_t GetHistogram(
+    GraphT &graph, 
+    ArrayT &histogram,
+    util::Location target = util::HOST,
+    cudaStream_t stream = 0)
+{
+    typedef typename ArrayT::ValueT CountT;
+    typedef typename GraphT::SizeT  SizeT;
+
+    cudaError_t retval = cudaSuccess;
+    auto length = sizeof(SizeT) * 8 + 1;
+
+    GUARD_CU(histogram.EnsureSize_(length, target));
+
+    // Initialize
+    GUARD_CU(histogram.ForEach(
+        [] __host__ __device__ (CountT &count)
+        {
+            count = 0;
+        }, length, target, stream));
+
+    // Count
+    GUARD_CU(histogram.ForAll(
+        [graph] __host__ __device__ (CountT *counts, SizeT &v)
+        {
+            auto num_neighbors = graph.GetNeighborListLength(v);
+            int log_length = 0;
+            while (num_neighbors >= (1 << log_length))
+            {
+                log_length ++;
+            }
+            _atomicAdd(counts + log_length, (CountT)1);
+        }, graph.nodes, target, stream));
+
+    return retval;
+}
+
+template <typename GraphT, typename ArrayT>
+cudaError_t PrintHistogram(GraphT &graph, ArrayT &histogram)
+{
+    typedef typename GraphT::SizeT SizeT;
+    cudaError_t retval = cudaSuccess;
+
+    util::PrintMsg("Degree Histogram (" + std::to_string(graph.nodes)
+        + " vertices, " + std::to_string(graph.edges) + " edges):");
+    int max_log_length = 0;
+    for (int i = sizeof(SizeT) * 8; i >= 0; i--)
+    {
+        if (i < histogram.GetSize() && histogram[i] > 0)
+        {
+            max_log_length = i;
+            break;
+        }
+    }
+
+    for (int i = 0; i <= max_log_length; i ++)
+    {
+        util::PrintMsg("    Degree " + (i == 0 ? "0" : ("2^" + std::to_string(i - 1)))
+            + ": " + std::to_string(histogram[i]) + " ("
+            + std::to_string(histogram[i] * 100.0 / graph.nodes) + " %)");
+    }
+    return retval;
+}
+
 } // namespace graph
 } // namespace gunrock
 

@@ -234,6 +234,25 @@ struct TestGraph :
 
         return retval;
     }
+
+    template <typename ArrayT>
+    cudaError_t GetHistogram(ArrayT &histogram)
+    {
+        cudaError_t retval = cudaSuccess;
+    
+        if (FLAG & graph::HAS_CSR)
+        {
+            GUARD_CU(GetHistogram(csr(), histogram));
+        } else if (FLAG & graph::HAS_CSC)
+        {
+            GUARD_CU(GetHistogram(csc(), histogram));
+        } else if (FLAG & graph::HAS_COO)
+        {
+            GUARD_CU(GetHistogram(coo(), histogram));
+        }
+
+        return retval;
+    }
 };
 
 } // namespace app

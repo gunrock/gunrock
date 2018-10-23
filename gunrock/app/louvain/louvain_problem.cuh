@@ -421,7 +421,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             auto &data_slice = data_slices[0][0];
 
             //for (auto &pass_comm : data_slice.pass_communities)
-            for (int i = 0; i < data_slice.num_pass; i++)
+            for (int i = 0; i <= data_slice.num_pass; i++)
             {
                 auto &v2c = data_slice.pass_communities[i];
                 for (VertexT v = 0; v < nodes; v++)
