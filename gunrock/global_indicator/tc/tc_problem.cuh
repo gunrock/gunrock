@@ -13,7 +13,6 @@
 #pragma once
 
 #include <gunrock/app/problem_base.cuh>
-#include <gunrock/util/memset_kernel.cuh>
 #include <gunrock/util/array_utils.cuh>
 
 using namespace gunrock::app;
@@ -410,12 +409,12 @@ struct TCProblem : ProblemBase <_GraphT, _FLAG>
         }
         if (target & util::DEVICE)
         {
-            GUARD_CU(cudaMemcpy(
+            GUARD_CU2(cudaMemcpy(
                 data_slices[gpu]->d_src_ids.GetPointer(util::DEVICE) + src_,
                 &src_ids, sizeof(VertexT),
                 cudaMemcpyHostToDevice),
                 "TCProblem cudaMemcpy d_src_node_ids failed");
-            GUARD_CU(cudaMemcpy(
+            GUARD_CU2(cudaMemcpy(
                 data_slices[gpu]->d_edge_tc.GetPointer(util::DEVICE) + src_,
                 &edge_tc, sizeof(VertexT),
                 cudaMemcpyHostToDevice),

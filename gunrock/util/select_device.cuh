@@ -105,9 +105,9 @@ cudaError_t CUBSelect_if(
     InputT 	*d_in,
     OutputT	*d_out,
     SizeT	*d_num_selected_out,
-    SizeT 	num_elements,
-    SelectOp	select_op)
+    SizeT 	num_elements)
 {
+    GreaterThan select_op(0);
     cudaError_t retval = cudaSuccess;
 
     void *d_temp_storage = NULL;

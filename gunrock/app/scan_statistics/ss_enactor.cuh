@@ -225,7 +225,7 @@ public:
         BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
-    typedef SSSPIterationLoop<EnactorT> IterationT;
+    typedef SSIterationLoop<EnactorT> IterationT;
 
     // Members
     Problem     *problem   ;
@@ -237,7 +237,7 @@ public:
      */
 
     /**
-     * @brief SSSPEnactor constructor
+     * @brief SSEnactor constructor
      */
     Enactor() :
         BaseEnactor("ss"),
