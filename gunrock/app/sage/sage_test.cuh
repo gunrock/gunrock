@@ -102,19 +102,17 @@ template <
     typename GraphT,
     typename ValueT = typename GraphT::ValueT>
 double CPU_Reference(
-    const    GraphT          &graph,
-    //                 ValueT  *distances,
-    int                batch_size,
-    int                num_neigh1,
-    int                num_neigh2,
-    ValueT **             features,
-    ValueT **             W_f_1,
-    ValueT **             W_a_1,
-    ValueT **             W_f_2, 
-    ValueT **             W_a_2,
-    //typename GraphT::VertexT  src,
-    bool                      quiet,
-    bool                      mark_preds)
+    const GraphT   &graph,
+          int       batch_size,
+          int       num_neigh1,
+          int       num_neigh2,
+          ValueT  **features,
+          ValueT  **W_f_1,
+          ValueT  **W_a_1,
+          ValueT  **W_f_2, 
+          ValueT  **W_a_2,
+          ValueT   *source_embedding,
+          bool      quiet)
 {
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
@@ -146,7 +144,10 @@ double CPU_Reference(
             std::vector <SizeT> edges_source_child;
             float children_temp [256] = {0.0} ; // agg(h_B1^1)
             float source_temp [256] = {0.0};  // h_B2^1
-            float source_result [256] = {0.0}; // h_B2_2, result
+            //float source_result [256] = {0.0}; // h_B2_2, result
+            auto  source_result = source_embedding + source * 256;
+            for (int i = 0; i < 256; i++)
+                source_result[i] = 0.0;
             
             for (int i =0; i < num_neigh1 ; i++)
             {
@@ -310,158 +311,44 @@ template <
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
-    //typename GraphT::VertexT   src,
-    //                 ValueT   *h_distances,
-    //typename GraphT::VertexT  *h_preds,
-    //                 ValueT   *ref_distances = NULL,
-    //typename GraphT::VertexT  *ref_preds     = NULL,
+             ValueT           *embed_result,
+             int               result_column,
                      bool      verbose       = true)
 {
-/*
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
-    typedef typename GraphT::CsrT    CsrT;
 
     SizeT num_errors = 0;
-    //bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
-    bool mark_pred = parameters.Get<bool>("mark-pred");
 
+    util::PrintMsg("Embedding validation: ", !quiet, false);
     // Verify the result
-    if (ref_distances != NULL)
+    for (SizeT v =0; v < graph.nodes; v++)
     {
-        for (VertexT v = 0; v < graph.nodes; v++)
+        double L2_vec = 0.0;
+        SizeT  offset = v * result_column;
+        for (SizeT j = 0; j < result_column; j++)
         {
-            if (!util::isValid(ref_distances[v]))
-                ref_distances[v] = util::PreDefinedValues<ValueT>::MaxValue;
-        }
-
-        util::PrintMsg("Distance Validity: ", !quiet, false);
-        SizeT errors_num = util::CompareResults(
-            h_distances, ref_distances,
-            graph.nodes, true, quiet);
-        if (errors_num > 0)
+            L2_vec += embed_result[offset + j] * embed_result[offset + j] ;
+        }  
+        if (abs(L2_vec -1.0) > 0.000001)
         {
-            util::PrintMsg(
-                std::to_string(errors_num) + " errors occurred.", !quiet);
-            num_errors += errors_num;
-        }
-    }
-    else if (ref_distances == NULL)
-    {
-        util::PrintMsg("Distance Validity: ", !quiet, false);
-        SizeT errors_num = 0;
-        for (VertexT v = 0; v < graph.nodes; v++)
-        {
-            ValueT v_distance = h_distances[v];
-            if (!util::isValid(v_distance))
-                continue;
-            SizeT e_start = graph.CsrT::GetNeighborListOffset(v);
-            SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-            SizeT e_end = e_start + num_neighbors;
-            for (SizeT e = e_start; e < e_end; e++)
+            if (num_errors == 0)
             {
-                VertexT u = graph.CsrT::GetEdgeDest(e);
-                ValueT u_distance = h_distances[u];
-                ValueT e_value = graph.CsrT::edge_values[e];
-                if (v_distance + e_value >= u_distance)
-                    continue;
-                errors_num ++;
-                if (errors_num > 1)
-                    continue;
-
-                util::PrintMsg("FAIL: v[" + std::to_string(v)
-                    + "] ("    + std::to_string(v_distance)
-                    + ") + e[" + std::to_string(e)
-                    + "] ("    + std::to_string(e_value)
-                    + ") < u[" + std::to_string(u)
-                    + "] ("    + std::to_string(u_distance) + ")", !quiet);
+                util::PrintMsg("FAIL. L2(embedding[" + std::to_string(v)
+                    + "] = " + std::to_string(L2_vec) + ", should be 1", !quiet);
             }
-        }
-        if (errors_num > 0)
-        {
-            util::PrintMsg(std::to_string(errors_num) + " errors occurred.", !quiet);
-            num_errors += errors_num;
-        } else {
-            util::PrintMsg("PASS", !quiet);
+           num_errors += 1;
         }
     }
 
-    if (!quiet && verbose)
-    {
-        // Display Solution
-        util::PrintMsg("First 40 distances of the GPU result:");
-        DisplaySolution(h_distances, graph.nodes);
-        if (ref_distances != NULL)
-        {
-            util::PrintMsg("First 40 distances of the reference CPU result.");
-            DisplaySolution(ref_distances, graph.nodes);
-        }
-        util::PrintMsg("");
-    }
+    if (num_errors == 0)
+        util::PrintMsg("PASS", !quiet);
+    else 
+        util::PrintMsg(
+            std::to_string(num_errors) + " errors occurred.", !quiet);
 
-    if (mark_pred)
-    {
-        util::PrintMsg("Predecessors Validity: ", !quiet, false);
-        SizeT errors_num = 0;
-        for (VertexT v = 0; v < graph.nodes; v++)
-        {
-            VertexT pred          = h_preds[v];
-            if (!util::isValid(pred) || v == src)
-                continue;
-            ValueT  v_distance    = h_distances[v];
-            if (v_distance == util::PreDefinedValues<ValueT>::MaxValue)
-                continue;
-            ValueT  pred_distance = h_distances[pred];
-            bool edge_found = false;
-            SizeT edge_start = graph.CsrT::GetNeighborListOffset(pred);
-            SizeT num_neighbors = graph.CsrT::GetNeighborListLength(pred);
-
-            for (SizeT e = edge_start; e < edge_start + num_neighbors; e++)
-            {
-                if (v == graph.CsrT::GetEdgeDest(e) &&
-                    std::abs((pred_distance + graph.CsrT::edge_values[e]
-                    - v_distance) * 1.0) < 1e-6)
-                {
-                    edge_found = true;
-                    break;
-                }
-            }
-            if (edge_found)
-                continue;
-            errors_num ++;
-            if (errors_num > 1)
-                continue;
-
-            util::PrintMsg("FAIL: [" + std::to_string(pred)
-                + "] ("    + std::to_string(pred_distance)
-                + ") -> [" + std::to_string(v)
-                + "] ("    + std::to_string(v_distance)
-                + ") can't find the corresponding edge.", !quiet);
-        }
-        if (errors_num > 0)
-        {
-            util::PrintMsg(std::to_string(errors_num) + " errors occurred.", !quiet);
-            num_errors += errors_num;
-        } else {
-            util::PrintMsg("PASS", !quiet);
-        }
-    }
-
-    if (!quiet && mark_pred && verbose)
-    {
-        util::PrintMsg("First 40 preds of the GPU result:");
-        DisplaySolution(h_preds, graph.nodes);
-        if (ref_preds != NULL)
-        {
-            util::PrintMsg("First 40 preds of the reference CPU result "
-                "(could be different because the paths are not unique):");
-            DisplaySolution(ref_preds, graph.nodes);
-        }
-        util::PrintMsg("");
-    }
-*/
-    return 0;
+    return num_errors;
 }
 
 } // namespace sage

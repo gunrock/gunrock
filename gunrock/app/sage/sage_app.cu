@@ -246,9 +246,7 @@ cudaError_t RunTests(
             GUARD_CU(problem.Extract(h_source_result));
             SizeT num_errors = app::sage::Validate_Results(
                 parameters, graph, 
-                //src, h_distances, h_preds,
-                //ref_distances == NULL ? NULL : ref_distances[run_num % num_srcs],
-               // NULL,
+                h_source_result, problem.data_slices[0][0].result_column,
                 false);
         }
     }
@@ -260,9 +258,8 @@ cudaError_t RunTests(
     {
         SizeT num_errors = app::sage::Validate_Results(
             parameters, graph,
-           // src, h_distances, h_preds,
-           // ref_distances == NULL ? NULL : ref_distances[(num_runs -1) % num_srcs],
-           true);
+            h_source_result, problem.data_slices[0][0].result_column,
+            true);
     }
 
     // compute running statistics
