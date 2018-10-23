@@ -107,6 +107,8 @@ struct SAGEIterationLoop : public IterationLoopBase
         VertexT       num_sources        =   source_end - source_start;
         SizeT         num_children       =   num_sources * data_slice.num_children_per_source;
 
+        util::PrintMsg("Processing sources [" + std::to_string(source_start)
+            + ", " + std::to_string(source_start + num_sources) + ")");
         GUARD_CU(children_temp.ForEach(
             [] __host__ __device__ (ValueT &val)
             {
@@ -374,6 +376,9 @@ struct SAGEIterationLoop : public IterationLoopBase
             problem -> data_slices[this -> gpu_num][0]; 
         auto         &enactor_slice      =   this -> enactor ->
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus];
+        //util::PrintMsg("iter = " + std::to_string(enactor_slice.enactor_stats.iteration)
+        //    + ", batch_size = " + std::to_string(data_slice.batch_size)
+        //    + ", nodes = " + std::to_string(data_slice.sub_graph -> nodes));
         if (enactor_slice.enactor_stats.iteration * data_slice.batch_size
             < data_slice.sub_graph -> nodes)
             return false;
@@ -513,7 +518,7 @@ public:
         GUARD_CU(BaseEnactor::Reset(target));
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         { 
-            /*
+            
             if ((this->num_gpus == 1) ||
                 (gpu == this->problem->org_graph->GpT::partition_table[src]))
             {
@@ -523,25 +528,25 @@ public:
                     auto &frontier = this ->
                         enactor_slices[gpu * this -> num_gpus + peer_].frontier;
                     frontier.queue_length = (peer_ == 0) ? 1 : 0;
-                    if (peer_ == 0)
-                    {
-                        GUARD_CU(frontier.V_Q() -> ForEach(
-                            [src]__host__ __device__ (VertexT &v)
-                        
-                            v = src;
-                        }
-                    }
+                    //if (peer_ == 0)
+                    //{
+                    //    GUARD_CU(frontier.V_Q() -> ForEach(
+                    //        [src]__host__ __device__ (VertexT &v)
+                    //    
+                    //        v = src;
+                    //    }
+                    //}
                 }
             }
 
-            else { */
-                this -> thread_slices[gpu].init_size = 0;
-                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
-                {
-                    this -> enactor_slices[gpu * this -> num_gpus + peer_]
-                        .frontier.queue_length = 0;
-                }
-        //    }
+            //else {
+            //    this -> thread_slices[gpu].init_size = 0;
+            //    for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
+            //    {
+            //        this -> enactor_slices[gpu * this -> num_gpus + peer_]
+            //            .frontier.queue_length = 0;
+            //    }
+            // }
         }
         GUARD_CU(BaseEnactor::Sync());
         return retval;

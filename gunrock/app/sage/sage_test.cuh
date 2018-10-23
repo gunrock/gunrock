@@ -116,7 +116,8 @@ double CPU_Reference(
     bool                      quiet,
     bool                      mark_preds)
 {
-
+    util::CpuTimer cpu_timer;
+    cpu_timer.Start();
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     //typedef std::pair<VertexT, ValueT> PairT;
@@ -129,7 +130,7 @@ double CPU_Reference(
     //};
     //typedef std::priority_queue<PairT, std::vector<PairT>, GreaterT> PqT;
 
-    util::PrintMsg("CPU_Reference entered");
+    util::PrintMsg("CPU_Reference entered", !quiet);
     //int num_batch = graph.nodes / batch_size ;
     //int off_site = graph.nodes - num_batch * batch_size ;
     // batch of nodes
@@ -138,7 +139,7 @@ double CPU_Reference(
         int num_source = (source_start + batch_size <=graph.nodes ? batch_size: graph.nodes - source_start );
      
         util::PrintMsg("Processing sources [" + std::to_string(source_start) + ", "
-            + std::to_string(source_start + num_source) + ")"); 
+            + std::to_string(source_start + num_source) + ")", !quiet); 
         for (VertexT source = source_start; source < source_start + num_source; source ++ )
         { 
             //store edges between sources and children 
@@ -284,8 +285,9 @@ double CPU_Reference(
         } //for each source
         //printf ("node %d \n", source);
     } //for each batch
-    util::PrintMsg("CPU_Reference exited");
-    return 0;  
+    util::PrintMsg("CPU_Reference exited", !quiet);
+    cpu_timer.Stop();
+    return cpu_timer.ElapsedMillis();  
 } //cpu reference 
 
 /**

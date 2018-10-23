@@ -159,7 +159,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
 
     GUARD_CU(parameters.Use<int>(
         "batch-size",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         512,
         "number of source vertex to process in one iteration",
         __FILE__, __LINE__));
@@ -238,7 +238,7 @@ cudaError_t RunTests(
             + std::to_string(run_num) + " elapsed: "
             + std::to_string(cpu_timer.ElapsedMillis()) 
             //+ " ms, src = "+ std::to_string(src) 
-            + ", #iterations = "
+            + " ms, #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
         if (validation == "each")

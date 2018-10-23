@@ -76,12 +76,12 @@ struct main_struct
             std::string wf2_file = parameters.Get<std::string>("Wf2");
             std::string wa2_file = parameters.Get<std::string>("Wf2");
             std::string feature_file = parameters.Get<std::string>("features");
-            int Wf1_dim_0 = parameters.Get<int> ("Wf1-dim0");
-            int Wa1_dim_0 = parameters.Get<int> ("Wa1-dim0");
+            int Wf1_dim_0 = parameters.Get<int> ("feature-column");//("Wf1-dim0");
+            int Wa1_dim_0 = parameters.Get<int> ("feature-column");//("Wa1-dim0");
             int Wf1_dim_1 = parameters.Get<int> ("Wf1-dim1");
             int Wa1_dim_1 = parameters.Get<int> ("Wa1-dim1");
-            int Wf2_dim_0 = parameters.Get<int> ("Wf2-dim0");
-            int Wa2_dim_0 = parameters.Get<int> ("Wa2-dim0");
+            int Wf2_dim_0 = Wf1_dim_1 + Wa1_dim_1; //parameters.Get<int> ("Wf2-dim0");
+            int Wa2_dim_0 = Wf1_dim_1 + Wa1_dim_1; //parameters.Get<int> ("Wa2-dim0");
             int Wf2_dim_1 = parameters.Get<int> ("Wf2-dim1");
             int Wa2_dim_1 = parameters.Get<int> ("Wa2-dim1");
             int num_neigh1 = parameters.Get<int> ("num-children-per-source");
@@ -108,7 +108,7 @@ struct main_struct
                 + std::to_string(elapsed) + " ms.", !quiet);  
         }
 
-        std::vector<std::string> switches{"advance-mode"};
+        std::vector<std::string> switches{"advance-mode", "batch-size"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [](util::Parameters &parameters, GraphT &graph)
             {

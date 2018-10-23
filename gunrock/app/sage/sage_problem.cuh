@@ -333,14 +333,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         cudaError_t retval = cudaSuccess;
 
         auto temp_vals_2D = gunrock::app::sage:: template ReadMatrix<ValueT, SizeT>(filename, dim0, dim1);
+        GUARD_CU(array.Allocate(dim0 * dim1, util::HOST));
+        //for (auto pos = 0; pos < dim0 * dim1; pos++)
+        //{
+        //    array[pos] = temp_vals_2D[pos / dim1][pos % dim1];
+        //}
         GUARD_CU(array.ForAll(
-            [temp_vals_2D, dim0] __host__ __device__ (ValueT *vals, const SizeT &pos)
+            [temp_vals_2D, dim1] __host__ __device__ (ValueT *vals, const SizeT &pos)
             {
-                vals[pos] = temp_vals_2D[pos / dim0][pos % dim0];
+                vals[pos] = temp_vals_2D[pos / dim1][pos % dim1];
             }, dim0 * dim1, util::HOST));
-        for (auto i = 0; i < dim0; i++)
+        for (auto x = 0; x < dim0; x++)
         {
-            delete[] temp_vals_2D[i]; temp_vals_2D[i] = NULL;
+            delete[] temp_vals_2D[x]; temp_vals_2D[x] = NULL;
         }
         delete[] temp_vals_2D; temp_vals_2D = NULL;
 
