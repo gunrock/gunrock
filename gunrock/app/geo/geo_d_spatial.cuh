@@ -37,13 +37,15 @@ __device__ __host__ ValueT degrees(ValueT a){return a * 180/PI;}
  */
 template <typename GraphT, typename ValueT, typename SizeT, typename VertexT>
 __device__ void mean(
-    GraphT    graph,
+    GraphT   &graph,
     util::Array1D<SizeT, ValueT> latitude,
     util::Array1D<SizeT, ValueT> longitude,
     SizeT     length,
-    ValueT  * mean,
+    ValueT   *mean,
     VertexT   v)
 {
+    typedef typename GraphT::CsrT CsrT;
+
     // Calculate mean;
     ValueT a = 0;
     ValueT b = 0;
@@ -158,7 +160,7 @@ __device__ __host__ ValueT haversine(
  */
 template <typename GraphT, typename ValueT, typename SizeT, typename VertexT>
 __device__ void spatial_median(
-    GraphT graph,
+    GraphT &graph,
 
     SizeT length,
 
@@ -174,6 +176,9 @@ __device__ void spatial_median(
     ValueT eps = 1e-3,
     SizeT max_iter = 1000)
 {
+
+
+    typedef typename GraphT::CsrT CsrT;
 
     ValueT r, rinv;
     ValueT Dinvs = 0;

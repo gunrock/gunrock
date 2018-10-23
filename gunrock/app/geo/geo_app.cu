@@ -20,16 +20,12 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// <DONE> change includes
 #include <gunrock/app/geo/geo_enactor.cuh>
 #include <gunrock/app/geo/geo_test.cuh>
-// </DONE>
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace geo {
-// </DONE>
 
 
 cudaError_t UseParameters(util::Parameters &parameters)

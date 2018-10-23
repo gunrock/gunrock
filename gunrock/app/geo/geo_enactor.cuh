@@ -167,8 +167,8 @@ struct GEOIterationLoop : public IterationLoopBase
                 for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
                     VertexT u = graph.CsrT::GetEdgeDest(e);
                     if (util::isValid(latitude[u]) && util::isValid(longitude[u])) {
-			neighbor_lat[i] = latitude[u]; 	        // last valid latitude
-			neighbor_lon[i] = longitude[u]; 	// last valid longitude
+			neighbor_lat[i%2] = latitude[u]; 	        // last valid latitude
+			neighbor_lon[i%2] = longitude[u]; 	// last valid longitude
                         i++;
          	    }
                 }

@@ -60,13 +60,6 @@ struct main_struct
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
-
-        // <TODO> get srcs if needed, e.g.:
-        // GUARD_CU(app::Set_Srcs (parameters, graph));
-        // std::vector<VertexT> srcs
-        //    = parameters.Get<std::vector<VertexT> >("srcs");
-        // int num_srcs = srcs.size();
-        // </TODO>
         
         // <DONE> declare datastructures for reference result
         ValueT *ref_predicted_lat;
@@ -124,9 +117,7 @@ struct main_struct
 	    util::PrintMsg("__________________________", !quiet);
         }
 
-        // <TODO> add other switching parameters, if needed
         std::vector<std::string> switches{"advance-mode"};
-        // </TODO>
         
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
@@ -171,7 +162,6 @@ int main(int argc, char** argv)
     }
     GUARD_CU(parameters.Check_Required());
 
-    // TODO: change available graph types, according to requirements
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |

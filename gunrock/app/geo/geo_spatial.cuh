@@ -134,6 +134,7 @@ __host__ void h_spatial_median(
 {
 
     typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::CsrT CsrT;
 
     // Reinitialize these to ::problem
     // ValueT * D = new ValueT[length];
@@ -164,8 +165,12 @@ __host__ void h_spatial_median(
 
     // Calculate mean of all <latitude, longitude>
     // for all possible locations of v;
-    mean (graph, latitude, longitude,
-            length, y, v);
+    mean (graph, 
+	  latitude, 
+	  longitude,
+          length, 
+	  y, 
+	  v);
 
     // Calculate the spatial median;
     while (true)
@@ -226,10 +231,10 @@ __host__ void h_spatial_median(
 	    r = sqrt(R[0] * R[0] + R[1] * R[1]);
 	    rinv = r == 0 ? : num_zeros / r;
 
-	    y1[0] = std::max((ValueT) 0.0, (ValueT) 1-rinv) * T[0]
-	          + std::min((ValueT) 1.0, (ValueT) rinv) * y[0]; // latitude
-	    y1[1] = std::max((ValueT) 0.0, (ValueT) 1-rinv) * T[1]
-	          + std::min((ValueT) 1.0, (ValueT) rinv) * y[1]; // longitude
+	    y1[0] = std::max(0.0f, 1-rinv) * T[0]
+	          + std::min(1.0f, rinv)   * y[0]; // latitude
+	    y1[1] = std::max(0.0f, 1-rinv) * T[1]
+	          + std::min(1.0f, rinv)   * y[1]; // longitude
 	}
 
 	tmp[0] = y[0] - y1[0];

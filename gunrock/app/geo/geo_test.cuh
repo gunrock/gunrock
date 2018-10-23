@@ -61,48 +61,9 @@ double CPU_Reference(
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
     
-    // <TODO> 
     // implement CPU reference implementation
     while (!Stop_Condition) 
     {
-	// Gather operator
-	// #pragma omp parallel
-#if 0
-	for (SizeT v = 0; v < nodes; ++v) 
-	{
-	    
-            SizeT start_e = graph.GetNeighborListOffset(v);
-            SizeT degree  = graph.GetNeighborListLength(v);
-	
-	    SizeT i = 0;		
-
-	    // if location not known:
-	    if (!util::isValid(predicted_lat[v]) &&
-		!util::isValid(predicted_lon[v])) 
-	    {
-		// #pragma omp parallel
-	        for (SizeT k = 0; k < degree; k++) 
-		{
-		    SizeT e   = start_e + k;
-		    VertexT u = graph.GetEdgeDest(e);
-
-		    if (util::isValid(predicted_lat[u]) &&
-			util::isValid(predicted_lon[u])) 
-		    {
-			locations_lat[(v * degree) + i] = predicted_lat[u];
-			locations_lon[(v * degree) + i] = predicted_lon[u];
-			// printf("gather : < %lf , %lf >\n", predicted_lat[u], predicted_lon[u]);
-			i++;
-		    }
-
-		}
-		
-		valid_locations[v] = i;
-		// printf("CPU Valid Locations[%u] = %u\n", v, valid_locations[v]);
-	    }
-        } // end: gather (for)
- #endif
-
 	// Compute operator 
 	// #pragma omp parallel
 	for (SizeT v = 0; v < nodes; ++v) 
@@ -112,41 +73,45 @@ double CPU_Reference(
                 !util::isValid(longitude[v]))
 	    {
 
-		    ValueT neighbor_lat[2], neighbor_lon[2];
+		ValueT neighbor_lat[2], neighbor_lon[2];
 
-		    SizeT start_edge    = graph.CsrT::GetNeighborListOffset(v);
-		    SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+		SizeT start_edge    = graph.CsrT::GetNeighborListOffset(v);
+		SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
 
-		    SizeT i = 0;
+		SizeT i = 0;
 
-		    for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+		for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) 
+		{
 			VertexT u = graph.CsrT::GetEdgeDest(e);
-			if (util::isValid(latitude[u]) && util::isValid(longitude[u])) {
-			    neighbor_lat[i] = latitude[u];          // last valid latitude
-			    neighbor_lon[i] = longitude[u];         // last valid longitude
+			if (util::isValid(latitude[u]) && util::isValid(longitude[u])) 
+			{
+			    neighbor_lat[i%2] = latitude[u];          // last valid latitude
+			    neighbor_lon[i%2] = longitude[u];         // last valid longitude
 			    i++;
 			}
-		    }
+		}
 
-		    SizeT valid_neighbors = i;
+		SizeT valid_neighbors = i;
 
 
-		    // If no locations found and no neighbors,
-		    // point at location (92.0, 182.0)
-		    if (valid_neighbors < 1) // && offset == 0)
-		    {
-		    }
+		// If no locations found and no neighbors,
+		// point at location (92.0, 182.0)
+		if (valid_neighbors < 1) // && offset == 0)
+		{
+			// break;
+		}
 
-		    // If one location found, point at that location
-		    if (valid_neighbors == 1)
-		    {
+		// If one location found, point at that location
+		if (valid_neighbors == 1)
+		{
 			latitude[v] = neighbor_lat[0];
 			longitude[v] = neighbor_lon[0];
-		    }
+			// break;
+		}
 
-		    // If two locations found, compute a midpoint
-		    else if (valid_neighbors == 2)
-		    {
+		// If two locations found, compute a midpoint
+		else if (valid_neighbors == 2)
+		{
 			midpoint(neighbor_lat[0],
 				 neighbor_lon[0],
 				 neighbor_lat[1],
@@ -154,12 +119,13 @@ double CPU_Reference(
 				 latitude,
 				 longitude,
 				 v);
-		    }
+			// break;
+		}
 
-		    // if locations more than 2, compute spatial
-		    // median.
-		    else
-		    {
+		// if locations more than 2, compute spatial
+		// median.
+		else
+		{
 			h_spatial_median(
 				    graph,
 				    valid_neighbors,
@@ -168,8 +134,8 @@ double CPU_Reference(
 				    v,
 				    Dinv,
 				    quiet);
-
-	    	   }
+			// break;
+		}
 	    }
 	}
 
@@ -204,7 +170,6 @@ double CPU_Reference(
 	iterations++;
 
     } // -> while locations unknown.
-        // </TODO>
 
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
