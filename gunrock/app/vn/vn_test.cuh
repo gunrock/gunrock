@@ -97,18 +97,17 @@ double CPU_Reference(
         if (mark_preds && preds != NULL)
             preds[v] = util::PreDefinedValues<VertexT>::InvalidValue;
     }
-    
+
     PqT pq;
 
-    printf("CPU num_srcs=%d\n", num_srcs);
     for(int i = 0; i < num_srcs; ++i) {
-        distances[srcs[i]] = 0;    
+        distances[srcs[i]] = 0;
         if (mark_preds && preds != NULL)
             preds[srcs[i]] = srcs[i];
-        
+
         pq.push(std::make_pair(srcs[i], 0));
     }
-    
+
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
     while (!pq.empty())
@@ -180,7 +179,7 @@ typename GraphT::SizeT Validate_Results(
     bool quiet = parameters.Get<bool>("quiet");
     bool mark_pred = parameters.Get<bool>("mark-pred");
     SizeT num_srcs = sizeof(srcs) / sizeof(srcs[0]);
-    
+
     // Verify the result
     if (ref_distances != NULL)
     {
@@ -261,7 +260,7 @@ typename GraphT::SizeT Validate_Results(
         for (VertexT v = 0; v < graph.nodes; v++)
         {
             VertexT pred          = h_preds[v];
-            
+
             bool do_continue;
             do_continue = false;
             for(SizeT i = 0; i < num_srcs; ++i) {
@@ -269,10 +268,10 @@ typename GraphT::SizeT Validate_Results(
                     do_continue = true;
                 }
             }
-            
+
             if (!util::isValid(pred) || do_continue)
                 continue;
-            
+
             ValueT  v_distance    = h_distances[v];
             if (v_distance == util::PreDefinedValues<ValueT>::MaxValue)
                 continue;

@@ -274,7 +274,7 @@ struct Csr :
                     {
                         auto pos = util::BinarySearch_LeftMost(row,
                             edge_pairs, (SizeT)0, edges-1,
-                            row_edge_compare, 
+                            row_edge_compare,
                             [] (const typename CooT::EdgePairT &pair, const VertexT &row)
                             {
                                 return (pair.x == row);
@@ -692,7 +692,7 @@ struct Csr :
         if (!quiet)
         {
             printf("  Reading directly from stored binary CSR arrays ...\n");
-	    if(LOAD_NODE_VALUES)
+        if(LOAD_NODE_VALUES)
                 printf("  Reading directly from stored binary label arrays ...\n");
         }
         time_t mark1 = time(NULL);
@@ -712,7 +712,7 @@ struct Csr :
         {
             input_label.read(reinterpret_cast<char*>(node_values), v * sizeof(Value));
         }
-//	    for(int i=0; i<v; i++) printf("%lld ", (long long)node_values[i]); printf("\n");
+//      for(int i=0; i<v; i++) printf("%lld ", (long long)node_values[i]); printf("\n");
 
         time_t mark2 = time(NULL);
         if (!quiet)
@@ -813,10 +813,10 @@ struct Csr :
      */
     /*void GetNodeDegree(unsigned long long *node_degrees)
     {
-	for(SizeT node=0; node < nodes; ++node)
-	{
-		node_degrees[node] = row_offsets[node+1]-row_offsets[node];
-	}
+    for(SizeT node=0; node < nodes; ++node)
+    {
+        node_degrees[node] = row_offsets[node+1]-row_offsets[node];
+    }
     }*/
 
     /**
@@ -926,7 +926,7 @@ struct Csr<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
         bool  with_edge_values = true)
     {
         return cudaSuccess;
-    } 
+    }
 };
 
 } // namespace graph

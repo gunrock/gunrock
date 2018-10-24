@@ -95,6 +95,8 @@ struct projIterationLoop : public IterationLoopBase
             SizeT &output_pos) -> bool
         {
             SizeT num_neighbors = graph.GetNeighborListLength(src);
+            if(num_neighbors == 0) return false;
+
             SizeT src_offset    = graph.GetNeighborListOffset(src);
             for(SizeT neib_offset = 0; neib_offset < num_neighbors; neib_offset++) {
               VertexT neib = graph.GetEdgeDest(src_offset + neib_offset);
