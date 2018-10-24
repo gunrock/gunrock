@@ -18,6 +18,21 @@
 
 #pragma once
 
+#pragma once
+
+#ifdef BOOST_FOUND
+    // Boost includes for CPU Push Relabel Max Flow reference algorithms
+    #include <boost/config.hpp>
+    #include <iostream>
+    #include <string>
+    #include <boost/graph/edmonds_karp_max_flow.hpp>
+    #include <boost/graph/adjacency_list.hpp>
+    #include <boost/graph/read_dimacs.hpp>
+#endif
+
+#include<queue>
+
+
 #include <gunrock/app/mf/mf_test.cuh>
 #include <queue>
 
@@ -111,13 +126,110 @@ cudaError_t MinCut(
     // }
     mf::CPU_Reference(parameters, graph,
         source, dest, max_flow, reverse_edges, edge_flows);
+    //////////////////////////////////////
+    /*
+    typedef typename GraphT::CsrT CsrT;
+    debug_aml("boost found");
+    using namespace boost;
+
+    // Prepare Boost Datatype and Data structure
+    typedef adjacency_list_traits < vecS, vecS, directedS > Traits;
+    typedef adjacency_list < vecS, vecS, directedS,
+	    property < vertex_name_t, std::string >,
+	    property < edge_capacity_t, ValueT,
+	    property < edge_residual_capacity_t, ValueT,
+	    property < edge_reverse_t, Traits::edge_descriptor > > > > Graph;
+
+    Graph boost_graph;
+
+    typename property_map < Graph, edge_capacity_t >::type
+	capacity = get(edge_capacity, boost_graph);
+
+    typename property_map < Graph, edge_reverse_t >::type
+	rev = get(edge_reverse, boost_graph);
+
+    typename property_map < Graph, edge_residual_capacity_t >::type
+	residual_capacity = get(edge_residual_capacity, boost_graph);
+
+    std::vector<Traits::vertex_descriptor> verts;
+    for (VertexT v = 0; v < graph.nodes; ++v)
+	verts.push_back(add_vertex(boost_graph));
+
+    //Traits::vertex_descriptor source_ = verts[src];
+    Traits::vertex_descriptor sink = dest;
+    debug_aml("src = %d, sin %d", source, sink);
+
+    for (VertexT x = 0; x < graph.nodes; ++x){
+	auto e_start = graph.CsrT::GetNeighborListOffset(x);
+	auto num_neighbors = graph.CsrT::GetNeighborListLength(x);
+	auto e_end = e_start + num_neighbors;
+	for (auto e = e_start; e < e_end; ++e){
+	    VertexT y = graph.CsrT::GetEdgeDest(e);
+	    ValueT cap = graph.CsrT::edge_values[e];
+	    if (fabs(cap) <= 1e-12)
+		continue;
+	    Traits::edge_descriptor e1, e2;
+	    bool in1, in2;
+	    tie(e1, in1) = add_edge(verts[x], verts[y], boost_graph);
+	    tie(e2, in2) = add_edge(verts[y], verts[x], boost_graph);
+	    if (!in1 || !in2){
+		debug_aml("error");
+	    }
+	    capacity[e1] = cap;
+	    capacity[e2] = 0;
+	    rev[e1] = e2;
+	    rev[e2] = e1;
+	}
+    }
+
+    //
+    // Perform Boost reference
+    //
+
+    util::CpuTimer cpu_timer;
+    cpu_timer.Start();
+    double maxflow = edmonds_karp_max_flow(boost_graph, source, sink);
+    cpu_timer.Stop();
+    double elapsed = cpu_timer.ElapsedMillis();
+
+    //
+    // Extracting results on CPU
+    //
+
+    std::vector<std::vector<ValueT>> boost_flow;
+    boost_flow.resize(graph.nodes);
+    for (auto x = 0; x < graph.nodes; ++x)
+	boost_flow[x].resize(graph.nodes, 0.0);
+    typename graph_traits<Graph>::vertex_iterator u_it, u_end;
+    typename graph_traits<Graph>::out_edge_iterator e_it, e_end;
+    for (tie(u_it, u_end) = vertices(boost_graph); u_it != u_end; ++u_it){
+	for (tie(e_it, e_end) = out_edges(*u_it, boost_graph); e_it != e_end;
+		++e_it){
+	    if (capacity[*e_it] > 0){
+		ValueT e_f = capacity[*e_it] - residual_capacity[*e_it];
+	    	VertexT t = target(*e_it, boost_graph);
+	    	//debug_aml("flow on edge %d - %d = %lf", *u_it, t, e_f);
+	    	boost_flow[*u_it][t] = e_f;
+	    }
+	}
+    }
+    */
+
+
+
+
+    //////////////////////////////////////
+
+
+
+
     auto &edge_capacities = graph.edge_values;
 
     printf("after maxflow \n");
     for (auto e = 0; e < graph.edges; e++){
         edge_residuals[e] = edge_capacities[e] - edge_flows[e];
-        //if(e<10) printf("CPU: er_idx %d, e_res %f \n", e, edge_residuals[e]);
-        if(e<10)printf("CPU: e_idx %d, cap %f \n", e, graph.edge_values[e]);
+        if(e<10) printf("CPU: er_idx %d, e_res %f \n", e, edge_residuals[e]);
+        //if(e<10)printf("CPU: e_idx %d, cap %f \n", e, graph.edge_values[e]);
     }
     memset(vertex_reachabilities, false, graph.nodes*sizeof(vertex_reachabilities[0]));
     /////////////////////////////////////////
@@ -427,7 +539,7 @@ cudaError_t CPU_Reference(
         for(int e = 0; e < 10; e++)
           printf("CPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
 
-        GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
+         GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
             edge_flows, edge_residuals, vertex_reachabilities));
         //minCut(graph, source, dest, vertex_reachabilities, edge_residuals, num_nodes);
 
