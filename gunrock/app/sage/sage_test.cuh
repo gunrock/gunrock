@@ -178,8 +178,8 @@ double CPU_Reference(
             float children_temp [Wa2_dim0] = {0.0} ; // agg(h_B1^1)
             float source_temp [Wf2_dim0] = {0.0};  // h_B2^1
             //float source_result [256] = {0.0}; // h_B2_2, result
-            auto  source_result = source_embedding + source * result_column;
-            for (int i = 0; i < result_column; i++)
+            auto  source_result = source_embedding + ((uint64_t)source) * result_column;
+            for (uint64_t i = 0; i < result_column; i++)
                 source_result[i] = 0.0;
             
             for (int i =0; i < num_children_per_source ; i++)
@@ -309,7 +309,7 @@ double CPU_Reference(
             }//finished L-2 norm for source temp
             //////////////////////////////////////////////////////////////////////////////////////
             // get h_B2^2 k =2.           
-            for (int idx_0 = 0; idx_0 < Wf2_dim1; idx_0++)
+            for (uint64_t idx_0 = 0; idx_0 < Wf2_dim1; idx_0++)
             {
                 //printf ("source_r1_0:%f", source_result[idx_0] );
                 for (int idx_1 =0; idx_1< Wf2_dim0; idx_1 ++)
@@ -317,7 +317,7 @@ double CPU_Reference(
                 //printf ("source_r1:%f", source_result[idx_0] );
             } // got 1st half of h_B2^2
 
-            for (int idx_0 = 0; idx_0 < Wa2_dim1; idx_0++)
+            for (uint64_t idx_0 = 0; idx_0 < Wa2_dim1; idx_0++)
             {
                 //printf ("source_r2_0:%f", source_result[idx_0] );
                 for (int idx_1 =0; idx_1< Wa2_dim0; idx_1 ++)
@@ -326,12 +326,12 @@ double CPU_Reference(
 
             } // got 2nd half of h_B2^2
             auto L2_source_result = 0.0;
-            for (int idx_0 =0; idx_0 < result_column; idx_0 ++ )
+            for (uint64_t idx_0 =0; idx_0 < result_column; idx_0 ++ )
             {
                 source_result[idx_0] = source_result[idx_0] > 0.0 ? source_result[idx_0] : 0.0 ; //relu() 
                 L2_source_result += source_result[idx_0] * source_result [idx_0];
             } //finished relu
-            for (int idx_0 =0; idx_0 < result_column; idx_0 ++ )
+            for (uint64_t idx_0 =0; idx_0 < result_column; idx_0 ++ )
             {
                 source_result[idx_0] = source_result[idx_0] /sqrt (L2_source_result);
                 
@@ -366,7 +366,7 @@ typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
              ValueT           *embed_result,
-             int               result_column,
+             uint64_t          result_column,
                      bool      verbose       = true)
 {
     typedef typename GraphT::VertexT VertexT;
@@ -380,8 +380,8 @@ typename GraphT::SizeT Validate_Results(
     for (SizeT v =0; v < graph.nodes; v++)
     {
         double L2_vec = 0.0;
-        SizeT  offset = v * result_column;
-        for (SizeT j = 0; j < result_column; j++)
+        uint64_t  offset = v * result_column;
+        for (uint64_t j = 0; j < result_column; j++)
         {
             L2_vec += embed_result[offset + j] * embed_result[offset + j] ;
         }  
@@ -390,7 +390,7 @@ typename GraphT::SizeT Validate_Results(
             if (num_errors == 0)
             {
                 util::PrintMsg("FAIL. L2(embedding[" + std::to_string(v)
-                    + "] = " + std::to_string(L2_vec) + ", should be 1", !quiet);
+                    + "]) = " + std::to_string(L2_vec) + ", should be 1", !quiet);
             }
            num_errors += 1;
         }

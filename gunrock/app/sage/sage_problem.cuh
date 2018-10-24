@@ -79,14 +79,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT> W_a_1_1D; // w_a_1 1D array. weight matrix for W^1 agg part
         util::Array1D<SizeT, ValueT> W_f_2_1D; // w_f_2 1D array. weight matrix for W^2 feature part
         util::Array1D<SizeT, ValueT> W_a_2_1D; // w_a_2 1D array. weight matrix for W^2 agg part 
-        util::Array1D<SizeT, ValueT> features_1D; // fature matrix 1D
+        util::Array1D<uint64_t, ValueT> features_1D; // fature matrix 1D
         util::Array1D<SizeT, ValueT> children_temp;//256 agg(h_B1^1)
         util::Array1D<SizeT, ValueT> source_temp;// 256 h_B2^1
         util::Array1D<SizeT, ValueT> source_result;// 256 h_B2^2
         util::Array1D<SizeT, ValueT> child_temp;// 256 h_B1^1, I feel like this one could be local
         util::Array1D<SizeT, ValueT> sums_child_feat; //64 sum of children's features, I feel like this one could be local as well
         util::Array1D<SizeT, ValueT> sums; // 64 per child
-        util::Array1D<SizeT, ValueT, util::PINNED> host_source_result; // results on HOST
+        util::Array1D<uint64_t, ValueT, util::PINNED> host_source_result; // results on HOST
 
         util::Array1D<SizeT, curandState> rand_states; // random states, one per child
 
@@ -202,7 +202,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(W_a_2_1D       .Allocate(//256*128, target));
                 Wa2_dim0 * Wa2_dim1, target));
             GUARD_CU(features_1D    .Allocate(
-                nodes * feature_column, target));
+                ((uint64_t)nodes) * feature_column, target));
             
             auto num_children = num_children_per_source * batch_size;
             GUARD_CU(child_temp     .Allocate(num_children * Wf2_dim0, target));
@@ -215,7 +215,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 1280 * min(feature_column, 512)), target));           
             GUARD_CU(children       .Allocate(num_children           , target));
  
-            GUARD_CU(host_source_result.Allocate(nodes * result_column, util::HOST)); 
+            GUARD_CU(host_source_result.Allocate(((uint64_t)nodes) * result_column, util::HOST)); 
             GUARD_CU2(cudaStreamCreateWithFlags(
                 &d2h_stream, cudaStreamNonBlocking),
                 "cudaStreamCreateWithFlags failed.");
@@ -347,7 +347,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             []__host__ __device__
             (const ValueT &val, ValueT &h_val){
                 h_val = val;
-            }, nodes * data_slice.result_column, util::HOST));
+            }, ((uint64_t)nodes) * data_slice.result_column, util::HOST));
 
         return retval;
     }
@@ -356,7 +356,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     cudaError_t ReadMat(
         ArrayT      &array,
         std::string filename,
-        int dim0, int dim1)
+        uint64_t dim0, uint64_t dim1)
     {
         cudaError_t retval = cudaSuccess;
 
@@ -367,7 +367,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         //    array[pos] = temp_vals_2D[pos / dim1][pos % dim1];
         //}
         GUARD_CU(array.ForAll(
-            [temp_vals_2D, dim1] __host__ __device__ (ValueT *vals, const SizeT &pos)
+            [temp_vals_2D, dim1] __host__ __device__ (ValueT *vals, const uint64_t &pos)
             {
                 vals[pos] = temp_vals_2D[pos / dim1][pos % dim1];
             }, dim0 * dim1, util::HOST));

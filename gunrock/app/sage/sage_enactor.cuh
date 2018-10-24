@@ -50,7 +50,7 @@ void sage_kernel1(
     typename GraphT::VertexT  source_start,
              int              num_children_per_source,
     const    GraphT           graph,
-             int              feature_column,
+             uint64_t         feature_column,
              ValueT          *features,
              int              num_leafs_per_child,
              ValueT          *sums,
@@ -88,7 +88,7 @@ void sage_kernel1(
         }
         __syncthreads();
 
-        for (int i = threadIdx.x; i < feature_column; i += blockDim.x)
+        for (auto i = threadIdx.x; i < feature_column; i += blockDim.x)
         {
             ValueT sum = 0;
             for (int j = 0; j < num_leafs_per_child; j++)
@@ -108,7 +108,7 @@ template <int LOG_THREADS_, typename VertexT, typename SizeT, typename ValueT>
 __global__
 void sage_kernel2(
     int      num_children_per_source,
-    int      feature_column,
+    uint64_t feature_column,
     ValueT  *features,
     ValueT  *W_f_1,
     int      Wf1_dim1,
@@ -138,14 +138,14 @@ void sage_kernel2(
         ValueT val = 0;
         if (threadIdx.x < Wf1_dim1)
         {
-            SizeT f_offset = s_child * feature_column;
-            for (int f = 0; f < feature_column; f++)
+            auto f_offset = s_child * feature_column;
+            for (auto f = 0; f < feature_column; f++)
                 val += Load<F_LOAD>(features + f_offset + f)
                     * Load<W_LOAD>(W_f_1 + (f * Wf1_dim1 + threadIdx.x));
         } else if (threadIdx.x < Wf1_dim1 + Wa1_dim1)
         {
-            SizeT f_offset = child_num * feature_column;
-            for (int f = 0; f < feature_column; f++)
+            auto f_offset = child_num * feature_column;
+            for (auto f = 0; f < feature_column; f++)
                 val += Load<cub::LOAD_LDG>(sums + f_offset + f)
                     * Load<W_LOAD>(W_a_1 + (f * Wa1_dim1 + threadIdx.x - Wf1_dim1));
         }
@@ -172,7 +172,7 @@ void sage_kernel2(
 template <int LOG_THREADS_, typename SizeT, typename VertexT, typename ValueT>
 __global__
 void sage_kernel3(
-    int      feature_column,
+    uint64_t feature_column,
     ValueT  *features,
     VertexT  source_start,
     ValueT  *W_f_1,
@@ -204,14 +204,14 @@ void sage_kernel3(
         
         if (threadIdx.x < Wf1_dim1)
         {
-            SizeT f_offset = (source_start + source_num) * feature_column;
-            for (int f = 0; f < feature_column; f++)
+            auto f_offset = (source_start + source_num) * feature_column;
+            for (auto f = 0; f < feature_column; f++)
                 val += Load<F_LOAD>(features + f_offset + f)
                     * Load<W_LOAD>(W_f_1 + (f * Wf1_dim1 + threadIdx.x));
         } else if (threadIdx.x < Wf1_dim1 + Wa1_dim1)
         {
             SizeT f_offset = source_num * feature_column;
-            for (int f = 0; f < feature_column; f++)
+            for (auto f = 0; f < feature_column; f++)
                 val += Load<S_LOAD>(sums_child_feat + f_offset + f)
                     * Load<W_LOAD>(W_a_1 + (f * Wa1_dim1 + threadIdx.x - Wf1_dim1));
         }
@@ -317,7 +317,7 @@ struct SAGEIterationLoop : public IterationLoopBase
         auto          Wa2_dim0           =   data_slice.Wa2_dim0;
         auto          Wa2_dim1           =   data_slice.Wa2_dim1;
         auto         &features           =   data_slice.features_1D;
-        auto          feature_column     =   data_slice.feature_column;
+        uint64_t      feature_column     =   data_slice.feature_column;
         auto         &source_result      =   data_slice.source_result;
         auto          result_column      =   data_slice.result_column;
         auto          num_children_per_source = data_slice.num_children_per_source;
@@ -355,7 +355,7 @@ struct SAGEIterationLoop : public IterationLoopBase
         if (data_slice.custom_kernels)
         {
             sage_kernel1 
-                <<< 2560, min(feature_column, 512), num_leafs_per_child * sizeof(VertexT), stream>>>(
+                <<< 2560, min((int)feature_column, 512), num_leafs_per_child * sizeof(VertexT), stream>>>(
                 source_start, num_children_per_source,
                 graph, feature_column, features.GetPointer(util::DEVICE),
                 num_leafs_per_child, sums.GetPointer(util::DEVICE), 
@@ -380,8 +380,8 @@ struct SAGEIterationLoop : public IterationLoopBase
                 SizeT child_edge_offset = graph.GetNeighborListOffset(child);
                 //float sums [64] = {0.0} ; //local vector
 
-                SizeT f_offset = i * feature_column;
-                for (int f = 0; f < feature_column; f++)
+                auto f_offset = i * feature_column;
+                for (auto f = 0; f < feature_column; f++)
                     Store<S_STORE>(sums + (f_offset + f), (ValueT)0);
                 for (int j = 0; j < num_leafs_per_child; j++)
                 { 
@@ -391,9 +391,9 @@ struct SAGEIterationLoop : public IterationLoopBase
                     //VertexT leaf    = graph.GetEdgeDest(edge2);
                     VertexT leaf    = graph.GetEdgeDest(child_edge_offset
                         + curand_uniform(rand_states + i) * child_degree);
-                    SizeT   offset  = leaf * feature_column;
+                    auto   offset  = leaf * feature_column;
 
-                    for (int f = 0; f < feature_column; f++) 
+                    for (auto f = 0; f < feature_column; f++) 
                     {
                         Store<S_STORE>(sums + (f_offset + f),
                             Load<S_LOAD>(sums + (f_offset + f)) 
@@ -401,24 +401,26 @@ struct SAGEIterationLoop : public IterationLoopBase
                         ///num_neigh2;// merged line 176 171
                     }
                 }
-                for (int f = 0; f < feature_column; f++)
+                for (auto f = 0; f < feature_column; f++)
                     Store<S_STORE>(sums + (f_offset + f),
                         Load<S_LOAD>(sums + (f_offset + f)) 
                         / num_leafs_per_child);
                 //agg feaures for leaf nodes alg2 line 11 k = 1; 
  
-                SizeT offset = i / num_children_per_source * feature_column;
+                auto offset = i / num_children_per_source * feature_column;
                 f_offset = child * feature_column; 
                 //SizeT f_offset = children[i] * feature_column;
-                for (int f = 0; f < feature_column; f++)
+                for (auto f = 0; f < feature_column; f++)
                 {
                     atomicAdd(sums_child_feat + offset + f, 
                         Load<F_LOAD>(features + (f_offset + f)) / num_children_per_source); 
                     //merge 220 and 226
                 }  
             }, num_children, util::DEVICE, stream, 80));
-         }
-
+        }
+        //GUARD_CU2(cudaDeviceSynchronize(),
+        //    "cudaDeviceSynchronize failed.");
+ 
         if (data_slice.custom_kernels && Wa2_dim0 <= 1024)
         {
             if (Wa2_dim0 <= 128)
@@ -483,12 +485,12 @@ struct SAGEIterationLoop : public IterationLoopBase
             __host__ __device__ (ValueT *child_temp_, const SizeT &i)
             {
                 ValueT *child_temp = child_temp_ + i * Wf2_dim0;
-                SizeT f_offset = children[i] * feature_column; 
+                auto f_offset = children[i] * feature_column; 
                 double L2_child_temp = 0.0;
                 for (int x = 0; x < Wf1_dim1; x++)
                 {
                     ValueT val = 0;
-                    for (int f =0; f < feature_column; f ++)
+                    for (auto f =0; f < feature_column; f ++)
                         val += Load<F_LOAD>(features + (f_offset + f)) 
                             * Load<W_LOAD>(W_f_1 + (f * Wf1_dim1 + x));
                     if (val < 0) // relu()
@@ -497,11 +499,11 @@ struct SAGEIterationLoop : public IterationLoopBase
                     Store<T_STORE>(child_temp + x, val);
                 } // got 1st half of h_B1^1
 
-                SizeT offset = i * feature_column;
+                auto offset = i * feature_column;
                 for (int x = 0; x < Wa1_dim1; x++)
                 {   
                     ValueT val = 0;
-                    for (int f =0; f < feature_column; f ++)
+                    for (auto f =0; f < feature_column; f ++)
                         val += Load<cub::LOAD_LDG>(sums + (offset + f)) 
                             * Load<W_LOAD>(W_a_1 + (f * Wa1_dim1 + x));
                     if (val < 0) // relu()
@@ -540,7 +542,9 @@ struct SAGEIterationLoop : public IterationLoopBase
                // end of for each child
             }, num_children, util::DEVICE, stream, 80));
         }
-
+        //GUARD_CU2(cudaDeviceSynchronize(),
+        //    "cudaDeviceSynchronize failed.");
+ 
         if (iteration != 0)
         {
             GUARD_CU2(cudaStreamWaitEvent(stream, data_slice.d2h_finish, 0),
@@ -620,13 +624,13 @@ struct SAGEIterationLoop : public IterationLoopBase
             {
                 ValueT  *source_temp = source_temp_ + i * Wf2_dim0;
                 VertexT source = source_start + i;
-                SizeT offset = source * feature_column;
+                auto offset = source * feature_column;
                 // get ebedding vector for child node (h_{B2}^{1}) alg2 line 12            
                 double L2_source_temp = 0.0;
                 for (int x = 0; x < Wf1_dim1; x++)
                 {
                     ValueT val = 0;
-                    for (int f =0; f < feature_column; f++)
+                    for (auto f =0; f < feature_column; f++)
                         val += Load<F_LOAD>(features + (offset + f)) 
                             * Load<W_LOAD>(W_f_1 + (f * Wf1_dim1 + x));
                     if (val < 0)
@@ -639,7 +643,7 @@ struct SAGEIterationLoop : public IterationLoopBase
                 for (int x = 0; x < Wa1_dim1; x++)
                 {
                     ValueT val = 0;
-                    for (int f=0; f < feature_column; f++)
+                    for (auto f=0; f < feature_column; f++)
                         val += sums_child_feat[offset + f] 
                             * Load<W_LOAD>(W_a_1 + (f * Wa1_dim1 + x));
                     if (val < 0)
@@ -718,19 +722,23 @@ struct SAGEIterationLoop : public IterationLoopBase
            }, num_sources, util::DEVICE, stream, 640));
         }
 
+        //GUARD_CU2(cudaDeviceSynchronize(),
+        //    "cudaDeviceSynchronize failed.");
         GUARD_CU2(cudaEventRecord(data_slice.d2h_start, stream),
             "cudaEventRecord failed.");
         GUARD_CU2(cudaStreamWaitEvent(data_slice.d2h_stream, data_slice.d2h_start, 0),
             "cudaStreamWaitEvent failed.");
         GUARD_CU2(cudaMemcpyAsync(
-            data_slice.host_source_result + (source_start * result_column),
+            data_slice.host_source_result + (((uint64_t)source_start) * result_column),
             source_result.GetPointer(util::DEVICE),
-            num_sources * result_column * sizeof(ValueT),
+            ((uint64_t)num_sources) * result_column * sizeof(ValueT),
             cudaMemcpyDeviceToHost, data_slice.d2h_stream),
             "source_result D2H copy failed");
         GUARD_CU2(cudaEventRecord(data_slice.d2h_finish, data_slice.d2h_stream),
             "cudaEventRecord failed.");
-
+        //GUARD_CU2(cudaDeviceSynchronize(),
+        //    "cudaDeviceSynchronize failed.");
+ 
         return retval;
     }
 

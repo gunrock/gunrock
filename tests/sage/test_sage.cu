@@ -93,7 +93,7 @@ struct main_struct
             ValueT ** W_f_2 = app::sage::template ReadMatrix <ValueT,SizeT> (wf2_file, Wf2_dim_0, Wf2_dim_1);
             ValueT ** W_a_2 = app::sage::template ReadMatrix <ValueT,SizeT> (wa2_file, Wa2_dim_0, Wa2_dim_1); 
             ValueT ** features = app::sage::template ReadMatrix<ValueT,SizeT> (feature_file, graph.nodes, Wf1_dim_0);
-            ValueT  * source_embedding = new ValueT[(long long)graph.nodes 
+            ValueT  * source_embedding = new ValueT[(uint64_t)graph.nodes 
                 * (Wa2_dim_1 + Wf2_dim_1)];
             //num_srcs = srcs.size();
             //SizeT nodes = graph.nodes;
@@ -110,6 +110,12 @@ struct main_struct
                 + std::to_string(elapsed) + " ms.", !quiet);
             app::sage::Validate_Results(
                 parameters, graph, source_embedding, Wa2_dim_1 + Wf2_dim_1, true);  
+            delete[] source_embedding; source_embedding = NULL;
+            for (auto v = 0; v < graph.nodes; v++)
+            {
+                delete[] features[v]; features[v] = NULL;
+            }
+            delete[] features; features = NULL;
         }
 
         std::vector<std::string> switches{"advance-mode", "batch-size"};

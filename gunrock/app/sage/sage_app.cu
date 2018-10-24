@@ -160,7 +160,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(parameters.Use<int>(
         "batch-size",
         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-        512,
+        65536,
         "number of source vertex to process in one iteration",
         __FILE__, __LINE__));
 
@@ -174,7 +174,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(parameters.Use<bool>(
         "custom-kernels",
         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-        false,
+        true,
         "whether to use custom CUDA kernels",
         __FILE__, __LINE__));
 
@@ -228,7 +228,8 @@ cudaError_t RunTests(
     //util::PrintMsg("Before init");
     GUARD_CU(problem.Init(graph  , target));
     GUARD_CU(enactor.Init(problem, target));
-    ValueT *h_source_result = new ValueT[graph.nodes * problem.data_slices[0][0].result_column];
+    ValueT *h_source_result = new ValueT[((uint64_t)graph.nodes) 
+        * problem.data_slices[0][0].result_column];
     //util::PrintMsg("After init");
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
