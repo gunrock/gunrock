@@ -6,9 +6,9 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file hello_app.cu
+ * @file geo_app.cu
  *
- * @brief Simple Gunrock Application
+ * @brief Geolocation Application
  */
 
 #include <gunrock/gunrock.h>
@@ -20,47 +20,48 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// <DONE> change includes
 #include <gunrock/app/geo/geo_enactor.cuh>
 #include <gunrock/app/geo/geo_test.cuh>
-// </DONE>
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace geo {
-// </DONE>
 
+cudaError_t UseParameters(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
+  GUARD_CU(UseParameters_app(parameters));
+  GUARD_CU(UseParameters_problem(parameters));
+  GUARD_CU(UseParameters_enactor(parameters));
 
-cudaError_t UseParameters(util::Parameters &parameters)
-{
-    cudaError_t retval = cudaSuccess;
-    GUARD_CU(UseParameters_app(parameters));
-    GUARD_CU(UseParameters_problem(parameters));
-    GUARD_CU(UseParameters_enactor(parameters));
+  GUARD_CU(parameters.Use<int>(
+      "geo-iter",
+      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+      3, "Number of iterations geolocation should run for (default=3).",
+      __FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<int>(
-        "geo-iter",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        3,
-        "Number of iterations geolocation should run for (default=3).",
-        __FILE__, __LINE__));
+  GUARD_CU(parameters.Use<int>(
+      "spatial-iter",
+      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+      1000,
+      "Number of maximum iterations spatial median "
+      "kernel should run for (default=1000).",
+      __FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<bool>(
-        "geo-complete",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        false,
-        "Run geolocation application until all locations for all nodes are found, uses an atomic (default=false).",
-        __FILE__, __LINE__));
+  GUARD_CU(parameters.Use<bool>(
+      "geo-complete",
+      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+      false,
+      "Run geolocation application until all locations for all nodes are "
+      "found, uses an atomic (default=false).",
+      __FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<std::string>(
-        "labels-file",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        "",
-        "User locations label file for geolocation app.",
-        __FILE__, __LINE__));
+  GUARD_CU(parameters.Use<std::string>(
+      "labels-file",
+      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+      "", "User locations label file for geolocation app.", __FILE__,
+      __LINE__));
 
-    return retval;
+  return retval;
 }
 
 /**
@@ -70,169 +71,132 @@ cudaError_t UseParameters(util::Parameters &parameters)
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
 ...
- * @param[in]  target        where to perform the app 
+ * @param[in]  target        where to perform the app
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT>
-cudaError_t RunTests(
-    util::Parameters &parameters,
-    GraphT           &graph,
-    typename GraphT::ValueT *h_latitude,
-    typename GraphT::ValueT *h_longitude,
-    // <DONE> add problem specific reference results, e.g.:
-    typename GraphT::ValueT *ref_predicted_lat,
-    typename GraphT::ValueT *ref_predicted_lon,
-    // </DONE>
-    util::Location target)
-{
-    
-    cudaError_t retval = cudaSuccess;
-       
-    typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::ValueT  ValueT;
-    typedef typename GraphT::SizeT   SizeT;
-    typedef Problem<GraphT>          ProblemT;
-    typedef Enactor<ProblemT>        EnactorT;
+cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
+                     typename GraphT::ValueT *h_latitude,
+                     typename GraphT::ValueT *h_longitude,
+                     typename GraphT::ValueT *ref_predicted_lat,
+                     typename GraphT::ValueT *ref_predicted_lon,
+                     util::Location target) {
+  cudaError_t retval = cudaSuccess;
 
-    // CLI parameters
-    bool quiet_mode 		= parameters.Get<bool>("quiet");
-    int  num_runs   		= parameters.Get<int >("num-runs");
-    std::string validation 	= parameters.Get<std::string>("validation");
+  typedef typename GraphT::VertexT VertexT;
+  typedef typename GraphT::ValueT ValueT;
+  typedef typename GraphT::SizeT SizeT;
+  typedef Problem<GraphT> ProblemT;
+  typedef Enactor<ProblemT> EnactorT;
 
-    int geo_iter		= parameters.Get<int>("geo-iter");
-    util::PrintMsg("Number of iterations: " + geo_iter, !quiet_mode);
+  // CLI parameters
+  bool quiet_mode = parameters.Get<bool>("quiet");
+  int num_runs = parameters.Get<int>("num-runs");
+  std::string validation = parameters.Get<std::string>("validation");
 
-    util::Info info("geolocation", parameters, graph);
+  int geo_iter = parameters.Get<int>("geo-iter");
+  int spatial_iter = parameters.Get<int>("spatial-iter");
 
-    util::CpuTimer cpu_timer, total_timer;
-    cpu_timer.Start(); total_timer.Start();
+  util::PrintMsg("Number of iterations: " + std::to_string(geo_iter),
+                 !quiet_mode);
 
-    // <TODO> get problem specific inputs, e.g.:
-    // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-    // printf("RunTests: %d srcs: src[0]=%d\n", srcs.size(), srcs[0]);
-    // </TODO>
+  util::Info info("geolocation", parameters, graph);
 
-    // <DONE> allocate problem specific host data, e.g.:
-    ValueT *h_predicted_lat = new ValueT[graph.nodes];
-    ValueT *h_predicted_lon = new ValueT[graph.nodes];
-    // </DONE>
+  util::CpuTimer cpu_timer, total_timer;
+  cpu_timer.Start();
+  total_timer.Start();
 
-    // Allocate problem and enactor on GPU, and initialize them
-    ProblemT problem(parameters);
-    EnactorT enactor;
+  // Allocate problem specific host data
+  ValueT *h_predicted_lat = new ValueT[graph.nodes];
+  ValueT *h_predicted_lon = new ValueT[graph.nodes];
 
-    util::PrintMsg("Initializing problem ... ", !quiet_mode);
+  // Allocate problem and enactor on GPU, and initialize them
+  ProblemT problem(parameters);
+  EnactorT enactor;
 
-    GUARD_CU(problem.Init(graph, target));
+  util::PrintMsg("Initializing problem ... ", !quiet_mode);
 
-    util::PrintMsg("Initializing enactor ... ", !quiet_mode);
+  GUARD_CU(problem.Init(graph, target));
 
-    GUARD_CU(enactor.Init(problem, target));
-    
-    cpu_timer.Stop();
-    parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
-    
-    for (int run_num = 0; run_num < num_runs; ++run_num) {
-        GUARD_CU(problem.Reset(
-            // <DONE> problem specific data if necessary, eg:
-            h_latitude,
-	    h_longitude,
-	    geo_iter,
-            // </DONE>
-            target
-        ));
-        GUARD_CU(enactor.Reset(
-            // <TODO> problem specific data if necessary:
-            // srcs[run_num % srcs.size()],
-            // </TODO>
-            target
-        ));
-        
-        util::PrintMsg("__________________________", !quiet_mode);
+  util::PrintMsg("Initializing enactor ... ", !quiet_mode);
 
-        cpu_timer.Start();
-        GUARD_CU(enactor.Enact(
-            // <TODO> problem specific data if necessary:
-            // srcs[run_num % srcs.size()]
-            // </TODO>
-        ));
-        cpu_timer.Stop();
-        info.CollectSingleRun(cpu_timer.ElapsedMillis());
+  GUARD_CU(enactor.Init(problem, target));
 
-        util::PrintMsg("--------------------------\nRun "
-            + std::to_string(run_num) + " elapsed: "
-            + std::to_string(cpu_timer.ElapsedMillis()) +
-            ", #iterations = "
-            + std::to_string(enactor.enactor_slices[0]
-                .enactor_stats.iteration), !quiet_mode);
-        
-        if (validation == "each") {
-            
-            GUARD_CU(problem.Extract(
-                // <DONE> problem specific data
-                h_predicted_lat,
-		h_predicted_lon
-                // </DONE>
-            ));
-            SizeT num_errors = Validate_Results(
-                parameters,
-                graph,
-                // <DONE> problem specific data
-                h_predicted_lat, h_predicted_lon,
-		ref_predicted_lat, ref_predicted_lon,
-                // </DONE>
-                false);
-        }
-    }
+  cpu_timer.Stop();
+  parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
+
+  for (int run_num = 0; run_num < num_runs; ++run_num) {
+    GUARD_CU(
+        problem.Reset(h_latitude, h_longitude, geo_iter, spatial_iter, target));
+    GUARD_CU(enactor.Reset(target));
+
+    util::PrintMsg("__________________________", !quiet_mode);
 
     cpu_timer.Start();
-    
-    GUARD_CU(problem.Extract(
-        // <DONE> problem specific data
-        h_predicted_lat,
-	h_predicted_lon
-        // </DONE>
-    ));
-    if (validation == "last") {
-        SizeT num_errors = Validate_Results(
-            parameters,
-            graph,
-            // <DONE> problem specific data
-            h_predicted_lat, h_predicted_lon,
-	    ref_predicted_lat, ref_predicted_lon,
-            // </DONE>
-            false);
+    GUARD_CU(enactor.Enact());
+    cpu_timer.Stop();
+    info.CollectSingleRun(cpu_timer.ElapsedMillis());
+
+    util::PrintMsg(
+        "--------------------------\nRun " + std::to_string(run_num) +
+            " elapsed: " + std::to_string(cpu_timer.ElapsedMillis()) +
+            ", #iterations = " +
+            std::to_string(enactor.enactor_slices[0].enactor_stats.iteration),
+        !quiet_mode);
+
+    if (validation == "each") {
+      GUARD_CU(problem.Extract(h_predicted_lat, h_predicted_lon));
+
+      SizeT num_errors =
+          Validate_Results(parameters, graph, h_predicted_lat, h_predicted_lon,
+                           ref_predicted_lat, ref_predicted_lon, false);
     }
+  }
 
-    // compute running statistics
-    // TODO: change NULL to problem specific per-vertex visited marker, e.g. h_distances
-    info.ComputeTraversalStats(enactor, (VertexT*)NULL);
-    //Display_Memory_Usage(problem);
-    #ifdef ENABLE_PERFORMANCE_PROFILING
-        //Display_Performance_Profiling(enactor);
-    #endif
+  cpu_timer.Start();
 
-    // Clean up
-    GUARD_CU(enactor.Release(target));
-    GUARD_CU(problem.Release(target));
-    // <DONE> Release problem specific data, e.g.:
-    delete[] h_predicted_lat; h_predicted_lat   = NULL;
-    delete[] h_predicted_lon; h_predicted_lon   = NULL;
-    delete[] h_latitude; h_latitude   = NULL;
-    delete[] h_longitude; h_longitude = NULL;
-    // </DONE>
-    cpu_timer.Stop(); total_timer.Stop();
+  GUARD_CU(problem.Extract(h_predicted_lat, h_predicted_lon));
 
-    info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
-    return retval;
+  if (validation == "last") {
+    SizeT num_errors =
+        Validate_Results(parameters, graph, h_predicted_lat, h_predicted_lon,
+                         ref_predicted_lat, ref_predicted_lon, false);
+  }
+
+  // compute running statistics
+  info.ComputeTraversalStats(enactor, (VertexT *)NULL);
+// Display_Memory_Usage(problem);
+#ifdef ENABLE_PERFORMANCE_PROFILING
+  // Display_Performance_Profiling(enactor);
+#endif
+
+  // Clean up
+  GUARD_CU(enactor.Release(target));
+  GUARD_CU(problem.Release(target));
+
+  delete[] h_predicted_lat;
+  h_predicted_lat = NULL;
+  delete[] h_predicted_lon;
+  h_predicted_lon = NULL;
+  delete[] h_latitude;
+  h_latitude = NULL;
+  delete[] h_longitude;
+  h_longitude = NULL;
+
+  cpu_timer.Stop();
+  total_timer.Stop();
+
+  info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
+  return retval;
 }
 
-} // namespace geo
-} // namespace app
-} // namespace gunrock
+}  // namespace geo
+}  // namespace app
+}  // namespace gunrock
 
 // ===========================================================================================
-// ========================= CODE BELOW THIS LINE NOT NEEDED FOR TESTS =======================
+// ========================= CODE BELOW THIS LINE NOT NEEDED FOR TESTS
+// =======================
 // ===========================================================================================
 
 // /*
@@ -270,7 +234,8 @@ cudaError_t RunTests(
 
 //     int num_runs = parameters.Get<int>("num-runs");
 //     // TODO: get problem specific inputs, e.g.:
-//     // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+//     // std::vector<VertexT> srcs =
+//     parameters.Get<std::vector<VertexT>>("srcs");
 //     // int num_srcs = srcs.size();
 //     for (int run_num = 0; run_num < num_runs; ++run_num)
 //     {
@@ -296,7 +261,6 @@ cudaError_t RunTests(
 //     return total_time;
 // }
 
-
 //  * @brief Simple interface take in graph as CSR format
 //  * @param[in]  num_nodes   Number of veritces in the input graph
 //  * @param[in]  num_edges   Number of edges in the input graph
@@ -309,7 +273,7 @@ cudaError_t RunTests(
 //  * @param[out] distances   Return shortest distance to source per vertex
 //  * @param[out] preds       Return predecessors of each vertex
 //  * \return     double      Return accumulated elapsed times for all runs
- 
+
 // template <
 //     typename VertexT = int,
 //     typename SizeT   = int,
@@ -352,14 +316,15 @@ cudaError_t RunTests(
 //     // Assign pointers into gunrock graph format
 //     // TODO: change to other graph representation, if not using CSR
 //     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-//     graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
-//     graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
-//     graph.FromCsr(graph.csr(), true, quiet);
+//     graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1,
+//     gunrock::util::HOST); graph.CsrT::column_indices.SetPointer(col_indices,
+//     num_edges, gunrock::util::HOST); graph.FromCsr(graph.csr(), true, quiet);
 //     gunrock::graphio::LoadGraph(parameters, graph);
 
 //     // Run the Template
 //     // TODO: add problem specific outputs, e.g.
-//     double elapsed_time = gunrock_Template(parameters, graph /*, distances*/);
+//     double elapsed_time = gunrock_Template(parameters, graph /*,
+//     distances*/);
 
 //     // Cleanup
 //     graph.Release();
