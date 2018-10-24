@@ -96,8 +96,6 @@ struct RWIterationLoop : public IterationLoopBase
 
         if(walk_mode == 0) { // uniform random walk
 
-          curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
-
           auto uniform_rw_op = [
               graph,
               walks,
@@ -136,9 +134,11 @@ struct RWIterationLoop : public IterationLoopBase
             }
           };
 
+          curandSetStream(gen, oprtr_parameters.stream);
+          curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
           GUARD_CU(frontier.V_Q()->ForAll(
             uniform_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
-          cudaDeviceSynchronize();
+
 
         } else if (walk_mode == 1) { // greedy: walk to neighbor w/ maximum node value
           auto greedy_rw_op = [
