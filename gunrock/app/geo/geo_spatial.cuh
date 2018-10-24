@@ -21,10 +21,13 @@ namespace gunrock {
 namespace app {
 namespace geo {
 
-/* This implementation is adapted from python geotagging app. */
-
+// Value of PI
 #define PI 3.141592653589793
 
+/**
+ * @brief std::min and fminf
+ *	  std::max and fmaxf
+ */
 template <typename ValueT>
 __device__ __host__ const ValueT &max(const ValueT &a, const ValueT &b) {
   return (a < b) ? b : a;  // or: return comp(a,b)?b:a; for version (2)
@@ -35,6 +38,10 @@ __device__ __host__ const ValueT &min(const ValueT &a, const ValueT &b) {
   return !(b < a) ? a : b;  // or: return !comp(b,a)?a:b; for version (2)
 }
 
+/**
+ * @brief degrees -> radians
+ *	  radians -> degrees
+ */
 template <typename ValueT>
 __device__ __host__ ValueT radians(ValueT a) {
   return a * PI / 180;
@@ -66,6 +73,7 @@ __device__ __host__ void mean(GraphT &graph, ValueT *latitude,
   for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
     VertexT dest = graph.CsrT::GetEdgeDest(e);
     if (util::isValid(latitude[dest]) && util::isValid(longitude[dest])) {
+      // Accumulate the valid latitude and longitude values
       a += latitude[dest];
       b += longitude[dest];
       len++;
@@ -104,6 +112,7 @@ __device__ __host__ void midpoint(ValueT p1_lat, ValueT p1_lon, ValueT p2_lat,
 
   lon = p1_lon + atan2(by, cos(p1_lat) + bx);
 
+  // Convert back to degrees
   latitude[v] = degrees(lat);
   longitude[v] = degrees(lon);
 
@@ -135,7 +144,7 @@ __device__ __host__ ValueT haversine(ValueT n_latitude, ValueT n_longitude,
 
   ValueT c = 2 * asin(sqrt(a));
 
-  // haversine distance
+  // haversine distance in km
   ValueT km = radius * c;
   return km;
 }
@@ -188,8 +197,9 @@ __device__ __host__ void spatial_median(GraphT &graph, SizeT length,
     for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
       VertexT dest = graph.CsrT::GetEdgeDest(e);
       if (util::isValid(latitude[dest]) && util::isValid(longitude[dest])) {
+        // Get the haversine distance between the latitude and longitude of
+        // valid neighbor
         ValueT Dist = haversine(latitude[dest], longitude[dest], y[0], y[1]);
-
         Dinv[e] = Dist == 0 ? 0 : 1 / Dist;
         nonzeros = Dist != 0 ? nonzeros + 1 : nonzeros;
         Dinvs += Dinv[e];
@@ -198,6 +208,7 @@ __device__ __host__ void spatial_median(GraphT &graph, SizeT length,
 
     SizeT len = 0;
     for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+      // W[] array, Dinv[e] / Dinvs
       VertexT dest = graph.CsrT::GetEdgeDest(e);
       if (util::isValid(latitude[dest]) && util::isValid(longitude[dest])) {
         T[0] += (Dinv[e] / Dinvs) * latitude[dest];
@@ -206,7 +217,6 @@ __device__ __host__ void spatial_median(GraphT &graph, SizeT length,
       }
     }
 
-    // printf("Length %u vs. len %u\n", length, len);
     num_zeros = len - nonzeros;
     if (num_zeros == 0) {
       y1[0] = T[0];
@@ -214,6 +224,7 @@ __device__ __host__ void spatial_median(GraphT &graph, SizeT length,
     }
 
     else if (num_zeros == len) {
+      // Valid location found
       latitude[v] = y[0];
       longitude[v] = y[1];
       return;
@@ -237,6 +248,7 @@ __device__ __host__ void spatial_median(GraphT &graph, SizeT length,
     tmp[1] = y[1] - y1[1];
 
     if ((sqrt(tmp[0] * tmp[0] + tmp[1] * tmp[1])) < eps || (iter_ > max_iter)) {
+      // Valid location found
       latitude[v] = y1[0];
       longitude[v] = y1[1];
       return;

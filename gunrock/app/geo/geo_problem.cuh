@@ -59,19 +59,25 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @brief Data structure containing problem specific data on indivual GPU.
    */
   struct DataSlice : BaseDataSlice {
+    // Device arrays to store latitudes and longitudes
     util::Array1D<SizeT, ValueT> latitude;
     util::Array1D<SizeT, ValueT> longitude;
 
-    util::Array1D<SizeT, SizeT> valid_locations;
-
+    // Use for Stop_Condition for a complete Geo run
     util::Array1D<SizeT, SizeT> active;
+    SizeT active_;
 
+    // Store inverse of Haversine Distances
     util::Array1D<SizeT, ValueT> Dinv;
 
+    // Run as many iterations as possible to do a
+    // complete geolocation -> uses atomics()
     bool geo_complete;
 
-    SizeT active_;
+    // Number of iterations for geolocation app
     int geo_iter;
+
+    // Number of iterations for a spatial median kernel
     int spatial_iter;
 
     /*
@@ -100,12 +106,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(latitude.Release(target));
       GUARD_CU(longitude.Release(target));
-
-      GUARD_CU(valid_locations.Release(target));
-
       GUARD_CU(active.Release(target));
-
-      // GUARD_CU(D		.Release(target));
       GUARD_CU(Dinv.Release(target));
 
       GUARD_CU(BaseDataSlice ::Release(target));
@@ -135,11 +136,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(latitude.Allocate(nodes, target));
       GUARD_CU(longitude.Allocate(nodes, target));
-
-      GUARD_CU(valid_locations.Allocate(nodes, target));
-
       GUARD_CU(active.Allocate(1, util::HOST | target));
-
       GUARD_CU(Dinv.Allocate(edges, target));
 
       if (target & util::DEVICE) {
@@ -162,11 +159,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // Ensure data are allocated
       GUARD_CU(latitude.EnsureSize_(nodes, target));
       GUARD_CU(longitude.EnsureSize_(nodes, target));
-
-      GUARD_CU(valid_locations.EnsureSize_(nodes, target));
-
       GUARD_CU(active.EnsureSize_(1, util::HOST | target));
-
       GUARD_CU(Dinv.EnsureSize_(edges, target));
 
       this->geo_iter = _geo_iter;

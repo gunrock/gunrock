@@ -20,7 +20,7 @@ DEFAULT="--device=0 --geo-complete=false"
 
 OPTION[0]=${DEFAULT}" --geo-iter=3 --spatial-iter=1000"
 OPTION[1]=${DEFAULT}" --geo-iter=3 --spatial-iter=1000" 
-OPTION[2]=${DEFAULT}" --geo-iter=3 --spatial-iter=1000 --quick --quiet" 
+OPTION[2]=${DEFAULT}" --geo-iter=3 --spatial-iter=1000" 
 OPTION[3]=${DEFAULT}" --geo-iter=3 --spatial-iter=1000 --quick --quiet"
 
 EXCUTION=$exe_file

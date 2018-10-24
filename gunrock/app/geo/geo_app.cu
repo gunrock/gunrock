@@ -112,20 +112,10 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   cpu_timer.Start();
   total_timer.Start();
 
-  // Allocate problem specific host data
+  // Allocate problem specific host data array to
+  // extract device values to host
   ValueT *h_predicted_lat = new ValueT[graph.nodes];
   ValueT *h_predicted_lon = new ValueT[graph.nodes];
-
-  /*
-    util::Array1D<SizeT, ValueT> h_predicted_lat;
-    util::Array1D<SizeT, ValueT> h_predicted_lon;
-
-    h_predicted_lat.SetName("h_predicted_lat");
-    h_predicted_lon.SetName("h_predicted_lon");
-
-    GUARD_CU(h_predicted_lat.Allocate(graph.nodes, util::HOST));
-    GUARD_CU(h_predicted_lon.Allocate(graph.nodes, util::HOST));
-  */
 
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
@@ -173,6 +163,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   cpu_timer.Start();
 
+  // Extract problem data
   GUARD_CU(problem.Extract(h_predicted_lat, h_predicted_lon));
 
   if (validation == "last") {

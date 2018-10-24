@@ -74,43 +74,18 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
-    // auto &iteration = enactor_stats.iteration;
 
     auto &latitude = data_slice.latitude;
     auto &longitude = data_slice.longitude;
-
     auto &active = data_slice.active;
     auto &spatial_iter = data_slice.spatial_iter;
-
     auto &geo_complete = data_slice.geo_complete;
-
     auto &Dinv = data_slice.Dinv;
-
-    auto &valid_locations = data_slice.valid_locations;
 
     util::Location target = util::DEVICE;
 
     // --
     // Define operations
-
-    auto gather_op =
-        [graph, latitude, longitude, valid_locations] __host__ __device__(
-            VertexT * v_q, const SizeT &pos) {
-          VertexT v = v_q[pos];
-          SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
-          SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-
-          SizeT i = 0;
-
-          for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-            VertexT u = graph.CsrT::GetEdgeDest(e);
-            if (util::isValid(latitude[u]) && util::isValid(longitude[u])) {
-              // gather locations from neighbors
-              i++;
-            }
-          }
-          valid_locations[v] = i;
-        };
 
     /**
      * @brief Compute "center" of a set of points.
@@ -188,9 +163,6 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     };
 
     // Run --
-    // GUARD_CU(frontier.V_Q()->ForAll(
-    //    gather_op, frontier.queue_length,
-    //    util::DEVICE, oprtr_parameters.stream));
 
     GUARD_CU(frontier.V_Q()->ForAll(spatial_center_op, frontier.queue_length,
                                     util::DEVICE, oprtr_parameters.stream));

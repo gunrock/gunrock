@@ -56,25 +56,11 @@ struct main_struct {
 
     cpu_timer.Start();
     GUARD_CU(graphio::LoadGraph(parameters, graph));
-    cpu_timer.Stop();
-    parameters.Set("load-time", cpu_timer.ElapsedMillis());
-
-    // ValueT *ref_predicted_lat;
-    // ValueT *ref_predicted_lon;
-
-    util::Array1D<SizeT, ValueT> ref_predicted_lat;
-    util::Array1D<SizeT, ValueT> ref_predicted_lon;
-
-    ref_predicted_lat.SetName("ref_predicted_lat");
-    ref_predicted_lon.SetName("ref_predicted_lon");
 
     std::string labels_file = parameters.Get<std::string>("labels-file");
     util::PrintMsg("Labels File Input: " + labels_file, !quiet);
 
     // Input locations from a labels file
-    // ValueT *h_latitude = new ValueT[graph.nodes];
-    // ValueT *h_longitude = new ValueT[graph.nodes];
-
     util::Array1D<SizeT, ValueT> h_latitude;
     util::Array1D<SizeT, ValueT> h_longitude;
 
@@ -87,6 +73,9 @@ struct main_struct {
     retval =
         gunrock::graphio::labels::Read(parameters, h_latitude, h_longitude);
 
+    cpu_timer.Stop();
+    parameters.Set("load-time", cpu_timer.ElapsedMillis());
+
     if (!quiet && debug) {
       util::PrintMsg("Debugging Labels -------------", !quiet);
       for (int p = 0; p < graph.nodes; p++) {
@@ -96,6 +85,12 @@ struct main_struct {
                        !quiet);
       }
     }
+
+    util::Array1D<SizeT, ValueT> ref_predicted_lat;
+    util::Array1D<SizeT, ValueT> ref_predicted_lon;
+
+    ref_predicted_lat.SetName("ref_predicted_lat");
+    ref_predicted_lon.SetName("ref_predicted_lon");
 
     if (!quick) {
       // init datastructures for reference result
@@ -109,9 +104,6 @@ struct main_struct {
       GUARD_CU(ref_predicted_lon.SetPointer(h_longitude.GetPointer(util::HOST),
                                             graph.nodes, util::HOST));
       GUARD_CU(ref_predicted_lon.Move(util::HOST, util::HOST));
-
-      // memcpy(ref_predicted_lat, h_latitude, graph.nodes * sizeof(ValueT));
-      // memcpy(ref_predicted_lon, h_longitude, graph.nodes * sizeof(ValueT));
 
       bool geo_complete = parameters.Get<bool>("geo-complete");
       int geo_iter = parameters.Get<int>("geo-iter");

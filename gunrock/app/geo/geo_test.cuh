@@ -34,8 +34,6 @@ namespace geo {
  */
 template <typename GraphT, typename ArrayT>
 double CPU_Reference(const GraphT &graph, ArrayT &latitude, ArrayT &longitude,
-                     //		     typename GraphT::ValueT *latitude,
-                     //                   typename GraphT::ValueT *longitude,
                      int geo_iter, int spatial_iter, bool geo_complete,
                      bool quiet) {
   typedef typename GraphT::SizeT SizeT;
@@ -61,8 +59,8 @@ double CPU_Reference(const GraphT &graph, ArrayT &latitude, ArrayT &longitude,
 
   // implement CPU reference implementation
   while (!Stop_Condition) {
-    // Compute operator
-    // #pragma omp parallel
+// Compute operator
+#pragma omp parallel for
     for (VertexT v = 0; v < nodes; ++v) {
       SizeT offset = graph.GetNeighborListLength(v);
       if (!util::isValid(latitude[v]) && !util::isValid(longitude[v])) {
@@ -71,18 +69,18 @@ double CPU_Reference(const GraphT &graph, ArrayT &latitude, ArrayT &longitude,
         SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
         SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
 
-        SizeT i = 0;
+        SizeT valid_neighbors = 0;
 
         for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
           VertexT u = graph.CsrT::GetEdgeDest(e);
           if (util::isValid(latitude[u]) && util::isValid(longitude[u])) {
-            neighbor_lat[i % 2] = latitude[u];   // last valid latitude
-            neighbor_lon[i % 2] = longitude[u];  // last valid longitude
-            i++;
+            neighbor_lat[valid_neighbors % 2] =
+                latitude[u];  // last valid latitude
+            neighbor_lon[valid_neighbors % 2] =
+                longitude[u];  // last valid longitude
+            valid_neighbors++;
           }
         }
-
-        SizeT valid_neighbors = i;
 
         // If no locations found and no neighbors,
         // point at location (92.0, 182.0)
