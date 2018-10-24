@@ -44,6 +44,7 @@ struct main_struct {
     // CLI parameters
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
+    bool debug = parameters.Get<bool>("debug");
 
     typedef typename app::TestGraph<VertexT, SizeT, ValueT,
                                     graph::HAS_EDGE_VALUES | graph::HAS_CSR>
@@ -58,38 +59,59 @@ struct main_struct {
     cpu_timer.Stop();
     parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-    // <DONE> declare datastructures for reference result
-    ValueT *ref_predicted_lat;
-    ValueT *ref_predicted_lon;
-    // </DONE>
+    // ValueT *ref_predicted_lat;
+    // ValueT *ref_predicted_lon;
+
+    util::Array1D<SizeT, ValueT> ref_predicted_lat;
+    util::Array1D<SizeT, ValueT> ref_predicted_lon;
+
+    ref_predicted_lat.SetName("ref_predicted_lat");
+    ref_predicted_lon.SetName("ref_predicted_lon");
 
     std::string labels_file = parameters.Get<std::string>("labels-file");
-
     util::PrintMsg("Labels File Input: " + labels_file, !quiet);
 
     // Input locations from a labels file
-    ValueT *h_latitude = new ValueT[graph.nodes];
-    ValueT *h_longitude = new ValueT[graph.nodes];
+    // ValueT *h_latitude = new ValueT[graph.nodes];
+    // ValueT *h_longitude = new ValueT[graph.nodes];
+
+    util::Array1D<SizeT, ValueT> h_latitude;
+    util::Array1D<SizeT, ValueT> h_longitude;
+
+    h_latitude.SetName("h_latitude");
+    h_longitude.SetName("h_longitude");
+
+    GUARD_CU(h_latitude.Allocate(graph.nodes, util::HOST));
+    GUARD_CU(h_longitude.Allocate(graph.nodes, util::HOST));
 
     retval =
         gunrock::graphio::labels::Read(parameters, h_latitude, h_longitude);
 
-    util::PrintMsg("Debugging Labels -------------", !quiet);
-    for (int p = 0; p < graph.nodes; p++) {
-      util::PrintMsg("    locations[ " + std::to_string(p) + " ] = < " +
-                         std::to_string(h_latitude[p]) + " , " +
-                         std::to_string(h_longitude[p]) + " > ",
-                     !quiet);
+    if (!quiet && !debug) {
+      util::PrintMsg("Debugging Labels -------------", !quiet);
+      for (int p = 0; p < graph.nodes; p++) {
+        util::PrintMsg("    locations[ " + std::to_string(p) + " ] = < " +
+                           std::to_string(h_latitude[p]) + " , " +
+                           std::to_string(h_longitude[p]) + " > ",
+                       !quiet);
+      }
     }
 
     if (!quick) {
-      // <DONE> init datastructures for reference result
-      ref_predicted_lat = new ValueT[graph.nodes];
-      ref_predicted_lon = new ValueT[graph.nodes];
+      // init datastructures for reference result
+      GUARD_CU(ref_predicted_lat.Allocate(graph.nodes, util::HOST));
+      GUARD_CU(ref_predicted_lon.Allocate(graph.nodes, util::HOST));
 
-      memcpy(ref_predicted_lat, h_latitude, graph.nodes * sizeof(ValueT));
-      memcpy(ref_predicted_lon, h_longitude, graph.nodes * sizeof(ValueT));
-      // </DONE>
+      GUARD_CU(ref_predicted_lat.SetPointer(h_latitude.GetPointer(util::HOST),
+                                            graph.nodes, util::HOST));
+      GUARD_CU(ref_predicted_lat.Move(util::HOST, util::HOST));
+
+      GUARD_CU(ref_predicted_lon.SetPointer(h_longitude.GetPointer(util::HOST),
+                                            graph.nodes, util::HOST));
+      GUARD_CU(ref_predicted_lon.Move(util::HOST, util::HOST));
+
+      // memcpy(ref_predicted_lat, h_latitude, graph.nodes * sizeof(ValueT));
+      // memcpy(ref_predicted_lon, h_longitude, graph.nodes * sizeof(ValueT));
 
       bool geo_complete = parameters.Get<bool>("geo-complete");
       int geo_iter = parameters.Get<int>("geo-iter");
@@ -114,26 +136,21 @@ struct main_struct {
 
     GUARD_CU(app::Switch_Parameters(
         parameters, graph, switches,
-        [
-            // </DONE> pass necessary data to lambda
-            h_latitude, h_longitude, ref_predicted_lat, ref_predicted_lon
-            // </DONE>
-    ](util::Parameters &parameters, GraphT &graph) {
-          // <DONE> pass necessary data to app::Template::RunTests
+        [h_latitude, h_longitude, ref_predicted_lat, ref_predicted_lon](
+            util::Parameters &parameters, GraphT &graph) {
           return app::geo::RunTests(parameters, graph, h_latitude, h_longitude,
                                     ref_predicted_lat, ref_predicted_lon,
                                     util::DEVICE);
-          // </DONE>
         }));
 
     if (!quick) {
-      // <DONE> deallocate host references
-      delete[] ref_predicted_lat;
-      ref_predicted_lat = NULL;
-      delete[] ref_predicted_lon;
-      ref_predicted_lon = NULL;
-      // </DONE>
+      GUARD_CU(ref_predicted_lat.Release());
+      GUARD_CU(ref_predicted_lon.Release());
     }
+
+    GUARD_CU(h_latitude.Release());
+    GUARD_CU(h_longitude.Release());
+
     return retval;
   }
 };

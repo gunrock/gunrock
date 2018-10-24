@@ -32,18 +32,22 @@ namespace geo {
 ...
  * @param[in]   quiet         Whether to print out anything to stdout
  */
-template <typename GraphT>
-double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *latitude,
-                     typename GraphT::ValueT *longitude, int geo_iter,
-                     int spatial_iter, bool geo_complete, bool quiet) {
+template <typename GraphT, typename ArrayT>
+double CPU_Reference(const GraphT &graph, ArrayT &latitude, ArrayT &longitude,
+                     //		     typename GraphT::ValueT *latitude,
+                     //                   typename GraphT::ValueT *longitude,
+                     int geo_iter, int spatial_iter, bool geo_complete,
+                     bool quiet) {
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::ValueT ValueT;
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::CsrT CsrT;
 
-  SizeT nodes = graph.nodes;
+  util::Location target = util::HOST;
 
+  SizeT nodes = graph.nodes;
   SizeT edges = graph.edges + 1;
+
   ValueT *Dinv = new ValueT[edges];
 
   int iterations = 0;
@@ -59,7 +63,7 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *latitude,
   while (!Stop_Condition) {
     // Compute operator
     // #pragma omp parallel
-    for (SizeT v = 0; v < nodes; ++v) {
+    for (VertexT v = 0; v < nodes; ++v) {
       SizeT offset = graph.GetNeighborListLength(v);
       if (!util::isValid(latitude[v]) && !util::isValid(longitude[v])) {
         ValueT neighbor_lat[2], neighbor_lon[2];
@@ -95,14 +99,16 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *latitude,
         // If two locations found, compute a midpoint
         else if (valid_neighbors == 2) {
           midpoint(neighbor_lat[0], neighbor_lon[0], neighbor_lat[1],
-                   neighbor_lon[1], latitude, longitude, v);
+                   neighbor_lon[1], latitude.GetPointer(target),
+                   longitude.GetPointer(target), v);
         }
 
         // if locations more than 2, compute spatial
         // median.
         else {
-          h_spatial_median(graph, valid_neighbors, latitude, longitude, v, Dinv,
-                           quiet, spatial_iter);
+          spatial_median(graph, valid_neighbors, latitude.GetPointer(target),
+                         longitude.GetPointer(target), v, Dinv, quiet, target,
+                         spatial_iter);
         }
       }
     }
@@ -120,8 +126,6 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *latitude,
 
       if (active == nodes) Stop_Condition = true;
 
-      // util::PrintMsg("Current Predicted Locations: "
-      // 		+ std::to_string(active), !quiet);
     }
 
     else {
@@ -147,13 +151,12 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *latitude,
  * @param[in]  verbose       Whether to output detail comparsions
  * \return     GraphT::SizeT Number of errors
  */
-template <typename GraphT>
+template <typename GraphT, typename ArrayT>
 typename GraphT::SizeT Validate_Results(
     util::Parameters &parameters, GraphT &graph,
     typename GraphT::ValueT *h_predicted_lat,
-    typename GraphT::ValueT *h_predicted_lon,
-    typename GraphT::ValueT *ref_predicted_lat,
-    typename GraphT::ValueT *ref_predicted_lon, bool verbose = true) {
+    typename GraphT::ValueT *h_predicted_lon, ArrayT &ref_predicted_lat,
+    ArrayT &ref_predicted_lon, bool verbose = true) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::SizeT SizeT;
 
@@ -163,14 +166,14 @@ typename GraphT::SizeT Validate_Results(
 
   if (!quick) {
     for (SizeT v = 0; v < graph.nodes; ++v) {
-      printf("Node [ %d ]: Predicted = < %f , %f > Reference = < %f , %f >\n",
+      printf("Node [ %lu ]: Predicted = < %f , %f > Reference = < %f , %f >\n",
              v, h_predicted_lat[v], h_predicted_lon[v], ref_predicted_lat[v],
              ref_predicted_lon[v]);
     }
 
   } else {
     for (SizeT v = 0; v < graph.nodes; ++v) {
-      printf("Node [ %d ]: Predicted = < %f , %f >\n", v, h_predicted_lat[v],
+      printf("Node [ %lu ]: Predicted = < %f , %f >\n", v, h_predicted_lat[v],
              h_predicted_lon[v]);
     }
   }

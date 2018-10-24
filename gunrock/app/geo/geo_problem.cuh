@@ -47,6 +47,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::CsrT CsrT;
   typedef typename GraphT::GpT GpT;
+  typedef typename util::Array1D<SizeT, ValueT> ArrayT;
 
   typedef ProblemBase<GraphT, FLAG> BaseProblem;
   typedef DataSliceBase<GraphT, FLAG> BaseDataSlice;

@@ -7,9 +7,9 @@
 
 /**
  * @file
- * geo_spatial.cuh
+ * geo_d_spatial.cuh
  *
- * @brief Spatial helpers for geolocation app
+ * @brief Device Spatial helpers for geolocation app
  */
 
 #pragma once
@@ -22,17 +22,38 @@ namespace app {
 namespace geo {
 
 /* This implementation is adapted from python geotagging app. */
+
 #define PI 3.141592653589793
+
+template <typename ValueT>
+__device__ __host__ const ValueT &max(const ValueT &a, const ValueT &b) {
+  return (a < b) ? b : a;  // or: return comp(a,b)?b:a; for version (2)
+}
+
+template <typename ValueT>
+__device__ __host__ const ValueT &min(const ValueT &a, const ValueT &b) {
+  return !(b < a) ? a : b;  // or: return !comp(b,a)?a:b; for version (2)
+}
+
+template <typename ValueT>
+__device__ __host__ ValueT radians(ValueT a) {
+  return a * PI / 180;
+}
+
+template <typename ValueT>
+__device__ __host__ ValueT degrees(ValueT a) {
+  return a * 180 / PI;
+}
 
 /**
  * @brief Compute the mean of all latitudues and
  *        and longitudes in a given set.
  */
-template <typename GraphT, typename ValueT, typename SizeT>
-__host__ void mean(GraphT &graph, ValueT *latitude, ValueT *longitude,
-                   SizeT length, ValueT *y, SizeT v) {
+template <typename GraphT, typename ValueT, typename SizeT, typename VertexT>
+__device__ __host__ void mean(GraphT &graph, ValueT *latitude,
+                              ValueT *longitude, SizeT length, ValueT *mean,
+                              VertexT v) {
   typedef typename GraphT::CsrT CsrT;
-  typedef typename GraphT::VertexT VertexT;
 
   // Calculate mean;
   ValueT a = 0;
@@ -54,11 +75,8 @@ __host__ void mean(GraphT &graph, ValueT *latitude, ValueT *longitude,
   a /= len;
   b /= len;
 
-  y[0] = a;  // output latitude
-  y[1] = b;  // output longitude
-
-  // printf("Locations Mean[%u] = <%f, %f> with length = %u\n", v, y[0], y[1],
-  // length);
+  mean[0] = a;  // output latitude
+  mean[1] = b;  // output longitude
 
   return;
 }
@@ -66,10 +84,10 @@ __host__ void mean(GraphT &graph, ValueT *latitude, ValueT *longitude,
 /**
  * @brief Compute the midpoint of two points on a sphere.
  */
-template <typename ValueT, typename SizeT>
-__host__ void midpoint(ValueT p1_lat, ValueT p1_lon, ValueT p2_lat,
-                       ValueT p2_lon, ValueT *latitude, ValueT *longitude,
-                       SizeT v) {
+template <typename ValueT, typename VertexT>
+__device__ __host__ void midpoint(ValueT p1_lat, ValueT p1_lon, ValueT p2_lat,
+                                  ValueT p2_lon, ValueT *latitude,
+                                  ValueT *longitude, VertexT v) {
   // Convert to radians
   p1_lat = radians(p1_lat);
   p1_lon = radians(p1_lon);
@@ -93,6 +111,36 @@ __host__ void midpoint(ValueT p1_lat, ValueT p1_lon, ValueT p2_lat,
 }
 
 /**
+ * @brief (approximate) distance between two points on earth's
+ * surface in kilometers.
+ */
+template <typename ValueT>
+__device__ __host__ ValueT haversine(ValueT n_latitude, ValueT n_longitude,
+                                     ValueT mean_latitude,
+                                     ValueT mean_longitude,
+                                     ValueT radius = 6371) {
+  ValueT lat, lon;
+
+  // Convert degrees to radians
+  n_latitude = radians(n_latitude);
+  n_longitude = radians(n_longitude);
+  mean_latitude = radians(mean_latitude);
+  mean_longitude = radians(mean_longitude);
+
+  lat = mean_latitude - n_latitude;
+  lon = mean_longitude - n_longitude;
+
+  ValueT a = pow(sin(lat / 2), 2) +
+             cos(n_latitude) * cos(mean_latitude) * pow(sin(lon / 2), 2);
+
+  ValueT c = 2 * asin(sqrt(a));
+
+  // haversine distance
+  ValueT km = radius * c;
+  return km;
+}
+
+/**
  * @brief Compute spatial median of a set of > 2 points.
  *
  *        Spatial Median;
@@ -102,18 +150,13 @@ __host__ void midpoint(ValueT p1_lat, ValueT p1_lon, ValueT p2_lat,
  *        is minimized. This is a robust estimator of
  *        the mode of the set.
  */
-template <typename GraphT, typename ValueT, typename SizeT>
-__host__ void h_spatial_median(GraphT &graph, SizeT length,
-
-                               ValueT *latitude, ValueT *longitude,
-
-                               SizeT v,
-
-                               ValueT *Dinv,
-
-                               bool quiet = false, int max_iter = 1000,
-                               ValueT eps = 1e-3) {
-  typedef typename GraphT::VertexT VertexT;
+template <typename GraphT, typename ValueT, typename SizeT, typename VertexT>
+__device__ __host__ void spatial_median(GraphT &graph, SizeT length,
+                                        ValueT *latitude, ValueT *longitude,
+                                        VertexT v, ValueT *Dinv, bool quiet,
+                                        util::Location target,
+                                        int max_iter = 1000,
+                                        ValueT eps = 1e-3) {
   typedef typename GraphT::CsrT CsrT;
 
   ValueT r, rinv;
@@ -124,7 +167,7 @@ __host__ void h_spatial_median(GraphT &graph, SizeT length,
   SizeT num_zeros = 0;
 
   // Can be done cleaner, but storing lat and long.
-  ValueT R[2], tmp[2], out[2], T[2];
+  ValueT R[2], tmp[2], T[2];
   ValueT y[2], y1[2];
 
   SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
@@ -163,6 +206,7 @@ __host__ void h_spatial_median(GraphT &graph, SizeT length,
       }
     }
 
+    // printf("Length %u vs. len %u\n", length, len);
     num_zeros = len - nonzeros;
     if (num_zeros == 0) {
       y1[0] = T[0];
@@ -181,10 +225,12 @@ __host__ void h_spatial_median(GraphT &graph, SizeT length,
       r = sqrt(R[0] * R[0] + R[1] * R[1]);
       rinv = r == 0 ?: num_zeros / r;
 
-      y1[0] = std::max(0.0f, 1 - rinv) * T[0] +
-              std::min(1.0f, rinv) * y[0];  // latitude
-      y1[1] = std::max(0.0f, 1 - rinv) * T[1] +
-              std::min(1.0f, rinv) * y[1];  // longitude
+      y1[0] = max(0.0f, 1 - rinv) * T[0] + min(1.0f, rinv) * y[0];
+      //    fmaxf(0.0f, 1 - rinv) * T[0] + fminf(1.0f, rinv) * y[0];  //
+      //    latitude
+      y1[1] = max(0.0f, 1 - rinv) * T[1] + min(1.0f, rinv) * y[1];
+      //    fmaxf(0.0f, 1 - rinv) * T[1] + fminf(1.0f, rinv) * y[1];  //
+      //    longitude
     }
 
     tmp[0] = y[0] - y1[0];
@@ -198,7 +244,7 @@ __host__ void h_spatial_median(GraphT &graph, SizeT length,
 
     y[0] = y1[0];
     y[1] = y1[1];
-  }
+  }  // -> spatial_median while() loop
 }
 
 }  // namespace geo

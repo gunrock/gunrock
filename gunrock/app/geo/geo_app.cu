@@ -61,6 +61,14 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       "", "User locations label file for geolocation app.", __FILE__,
       __LINE__));
 
+  GUARD_CU(parameters.Use<bool>(
+      "debug",
+      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+      false,
+      "Debug label values, this prints out the entire labels array (longitude, "
+      "latitude).",
+      __FILE__, __LINE__));
+
   return retval;
 }
 
@@ -74,12 +82,10 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  * @param[in]  target        where to perform the app
  * \return cudaError_t error message(s), if any
  */
-template <typename GraphT>
+template <typename GraphT, typename ArrayT>
 cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
-                     typename GraphT::ValueT *h_latitude,
-                     typename GraphT::ValueT *h_longitude,
-                     typename GraphT::ValueT *ref_predicted_lat,
-                     typename GraphT::ValueT *ref_predicted_lon,
+                     ArrayT &h_latitude, ArrayT &h_longitude,
+                     ArrayT &ref_predicted_lat, ArrayT &ref_predicted_lon,
                      util::Location target) {
   cudaError_t retval = cudaSuccess;
 
@@ -110,6 +116,17 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   ValueT *h_predicted_lat = new ValueT[graph.nodes];
   ValueT *h_predicted_lon = new ValueT[graph.nodes];
 
+  /*
+    util::Array1D<SizeT, ValueT> h_predicted_lat;
+    util::Array1D<SizeT, ValueT> h_predicted_lon;
+
+    h_predicted_lat.SetName("h_predicted_lat");
+    h_predicted_lon.SetName("h_predicted_lon");
+
+    GUARD_CU(h_predicted_lat.Allocate(graph.nodes, util::HOST));
+    GUARD_CU(h_predicted_lon.Allocate(graph.nodes, util::HOST));
+  */
+
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
@@ -126,8 +143,9 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
   for (int run_num = 0; run_num < num_runs; ++run_num) {
-    GUARD_CU(
-        problem.Reset(h_latitude, h_longitude, geo_iter, spatial_iter, target));
+    GUARD_CU(problem.Reset(h_latitude.GetPointer(util::HOST),
+                           h_longitude.GetPointer(util::HOST), geo_iter,
+                           spatial_iter, target));
     GUARD_CU(enactor.Reset(target));
 
     util::PrintMsg("__________________________", !quiet_mode);
@@ -173,15 +191,6 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   // Clean up
   GUARD_CU(enactor.Release(target));
   GUARD_CU(problem.Release(target));
-
-  delete[] h_predicted_lat;
-  h_predicted_lat = NULL;
-  delete[] h_predicted_lon;
-  h_predicted_lon = NULL;
-  delete[] h_latitude;
-  h_latitude = NULL;
-  delete[] h_longitude;
-  h_longitude = NULL;
 
   cpu_timer.Stop();
   total_timer.Stop();

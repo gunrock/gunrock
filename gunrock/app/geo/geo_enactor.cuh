@@ -19,8 +19,8 @@
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
-#include <gunrock/app/geo/geo_d_spatial.cuh>
 #include <gunrock/app/geo/geo_problem.cuh>
+#include <gunrock/app/geo/geo_spatial.cuh>
 
 namespace gunrock {
 namespace app {
@@ -74,13 +74,12 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
-    auto &iteration = enactor_stats.iteration;
+    // auto &iteration = enactor_stats.iteration;
 
     auto &latitude = data_slice.latitude;
     auto &longitude = data_slice.longitude;
 
     auto &active = data_slice.active;
-    auto &geo_iter = data_slice.geo_iter;
     auto &spatial_iter = data_slice.spatial_iter;
 
     auto &geo_complete = data_slice.geo_complete;
@@ -122,8 +121,8 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
      *        if points > 2; center = spatial median;
      */
     auto spatial_center_op =
-        [graph, latitude, longitude, Dinv, spatial_iter] __host__ __device__(
-            VertexT * v_q, const SizeT &pos) {
+        [graph, latitude, longitude, Dinv, target, spatial_iter] __host__
+        __device__(VertexT * v_q, const SizeT &pos) {
           VertexT v = v_q[pos];
 
           // if no predicted location, and neighbor locations exists
@@ -146,7 +145,6 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             }
 
             SizeT valid_neighbors = i;
-            // printf("Valid Lengths[%u] = %u\n", v, valid_locations[v]);
 
             // If one location found, point at that location
             if (valid_neighbors == 1) {
@@ -158,15 +156,18 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             // If two locations found, compute a midpoint
             else if (valid_neighbors == 2) {
               midpoint(neighbor_lat[0], neighbor_lon[0], neighbor_lat[1],
-                       neighbor_lon[1], latitude, longitude, v);
+                       neighbor_lon[1], latitude.GetPointer(target),
+                       longitude.GetPointer(target), v);
               return;
             }
 
             // if locations more than 2, compute spatial
             // median.
             else if (valid_neighbors > 2) {
-              spatial_median(graph, valid_neighbors, latitude, longitude, v,
-                             Dinv, false, spatial_iter);
+              spatial_median(
+                  graph, valid_neighbors, latitude.GetPointer(target),
+                  longitude.GetPointer(target), v, Dinv.GetPointer(target),
+                  false, target, spatial_iter);
             }
 
             // if no valid locations are found
@@ -377,7 +378,6 @@ class Enactor
     GUARD_CU(BaseEnactor::Reset(target));
 
     SizeT nodes = this->problem->data_slices[0][0].sub_graph[0].nodes;
-    printf("nodes=%d\n", nodes);
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       if (this->num_gpus == 1) {
