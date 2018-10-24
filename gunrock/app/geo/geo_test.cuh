@@ -169,17 +169,16 @@ typename GraphT::SizeT Validate_Results(
       printf("Node [ %lu ]: Predicted = < %f , %f > Reference = < %f , %f >\n",
              v, h_predicted_lat[v], h_predicted_lon[v], ref_predicted_lat[v],
              ref_predicted_lon[v]);
+      if (!(h_predicted_lat[v] == ref_predicted_lat[v]) &&
+          !(h_predicted_lon[v] == ref_predicted_lon[v])) {
+        num_errors++;
+      }
     }
+
+    util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
 
   } else {
-    for (SizeT v = 0; v < graph.nodes; ++v) {
-      printf("Node [ %lu ]: Predicted = < %f , %f >\n", v, h_predicted_lat[v],
-             h_predicted_lon[v]);
-    }
-  }
-
-  if (num_errors == 0) {
-    util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
+    printf("-------- NO VALIDATION --------\n");
   }
 
   return num_errors;

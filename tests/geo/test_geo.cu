@@ -87,7 +87,7 @@ struct main_struct {
     retval =
         gunrock::graphio::labels::Read(parameters, h_latitude, h_longitude);
 
-    if (!quiet && !debug) {
+    if (!quiet && debug) {
       util::PrintMsg("Debugging Labels -------------", !quiet);
       for (int p = 0; p < graph.nodes; p++) {
         util::PrintMsg("    locations[ " + std::to_string(p) + " ] = < " +
