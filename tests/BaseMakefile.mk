@@ -35,7 +35,7 @@ GEN_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
 # GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 
 # SM_TARGETS = #$(GEN_SM30) #$(GEN_SM35) $(GEN_SM30) $(GEN_SM60) $(GEN_SM61)
-SM_TARGETS = $(GEN_SM60)
+SM_TARGETS = $(GEN_SM70)
 #-------------------------------------------------------------------------------
 # Libs
 #-------------------------------------------------------------------------------
