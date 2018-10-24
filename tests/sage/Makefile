@@ -9,6 +9,7 @@
 # (make test) Test driver for ALGO
 #-------------------------------------------------------------------------------
 
+#maxregisters = 32
 include ../BaseMakefile.mk
 ALGO = sage
 EXEC = bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)

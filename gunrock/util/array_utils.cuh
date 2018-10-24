@@ -298,7 +298,9 @@ public:
         ApplyLambda apply,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT,
-        cudaStream_t stream = 0);
+        cudaStream_t stream = 0,
+        int grid_size = PreDefinedValues<int>::InvalidValue,
+        int block_size = PreDefinedValues<int>::InvalidValue);
 
     template <typename ArrayT_in, typename ApplyLambda>
     cudaError_t ForAll(
@@ -468,8 +470,17 @@ public:
             if (size != 0)
             {
                 h_pointer = new ValueT[size];
+                //if (retval = util::GRError(cudaMallocHost(
+                //    (void**)&(h_pointer), sizeof(ValueT) * size),
+                //        std::string(name) + " allocation on " 
+                //        + Location_to_string(HOST) + " failed",
+                //        __FILE__, __LINE__))
+                //    return retval;
+                //for (SizeT i = 0; i < size; i++)
+                //    h_pointer[i]();
+
                 if (h_pointer == NULL)
-                    return GRError(std::string(name) + " allocation on " +
+                    return GRError(cudaErrorUnknown, std::string(name) + " allocation on " +
                         Location_to_string(HOST) + " failed",
                         __FILE__, __LINE__);
 
@@ -555,6 +566,10 @@ public:
                 ", pointer =\t " + to_string(h_pointer));
 #endif
             delete[] h_pointer; h_pointer = NULL;
+            //if (retval = GRError(cudaFreeHost(h_pointer),
+            //    std::string(name) + " cudaFreeHot failed", __FILE__, __LINE__))
+            //    return retval;
+            //h_pointer = NULL;
             allocated = allocated & (~HOST);
         } else if ((target & HOST)==HOST && (setted & HOST) == HOST) {
             UnSetPointer(HOST);
@@ -867,17 +882,17 @@ public:
         if (source == target) return retval;
         if ((source == HOST || source == DEVICE) &&
             ((source & setted) != source) && ((source & allocated) != source))
-            return GRError(std::string(name) + " movment source is not valid", __FILE__, __LINE__);
+            return GRError(cudaErrorUnknown, std::string(name) + " movment source is not valid", __FILE__, __LINE__);
         if (((target & HOST) == HOST || (target & DEVICE) == DEVICE) &&
             ((target & setted) != target) && ((target & allocated) != target))
             if (retval = Allocate(this->size, target)) return retval;
         if ((target == DISK || source == DISK) && ((setted & DISK) != DISK))
-            return GRError(std::string(name) + " filename not set", __FILE__, __LINE__);
+            return GRError(cudaErrorUnknown, std::string(name) + " filename not set", __FILE__, __LINE__);
         if (!isValid(size)) size = this->size;
         if (size > this->size)
-            return GRError(std::string(name) + " size is invalid", __FILE__, __LINE__);
+            return GRError(cudaErrorUnknown, std::string(name) + " size is invalid", __FILE__, __LINE__);
         if (size+offset > this->size)
-            return GRError(std::string(name) + " size+offset is invalid", __FILE__, __LINE__);
+            return GRError(cudaErrorUnknown, std::string(name) + " size+offset is invalid", __FILE__, __LINE__);
         if (size == 0) return retval;
 #ifdef ENABLE_ARRAY_DEBUG
         PrintMsg(std::string(name) + " Moving from " + Location_to_string(source) +

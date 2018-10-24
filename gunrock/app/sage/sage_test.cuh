@@ -14,19 +14,6 @@
 
 #pragma once
 
-#ifdef BOOST_FOUND
-    // Boost includes for CPU Dijkstra SSSP reference algorithms
-    #include <boost/config.hpp>
-    #include <boost/graph/graph_traits.hpp>
-    #include <boost/graph/adjacency_list.hpp>
-    #include <boost/graph/dijkstra_shortest_paths.hpp>
-    #include <boost/property_map/property_map.hpp>
-#else
-    #include <queue>
-    #include <vector>
-    #include <utility>
-#endif
-
 namespace gunrock {
 namespace app {
 namespace sage {
@@ -80,7 +67,7 @@ ValueT ** ReadMatrix (std::string filename, SizeT dim0, SizeT dim1)
 {
     if (filename == "") 
     {
-        util::PrintMsg("random generated file");
+        //util::PrintMsg("random generated file");
         ValueT **matrix = new ValueT*[dim0];
         for (SizeT i = 0; i < dim0; i++)
         {   
@@ -128,6 +115,9 @@ double CPU_Reference(
           ValueT   *source_embedding,
           bool      quiet)
 {
+    typedef std::mt19937 Engine;
+    typedef std::uniform_real_distribution<float> Distribution;
+
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
     typedef typename GraphT::VertexT VertexT;
@@ -157,8 +147,15 @@ double CPU_Reference(
     int Wa2_dim1            = para.template Get<int>("Wa2-dim1");
     int result_column       = Wa2_dim1 + Wf2_dim1;
     int num_leafs_per_child = para.template Get<int>("num-leafs-per-child");
+    bool debug              = para.template Get<bool>("v");
+    int num_threads         = para.template Get<int>("omp-threads");
+    int rand_seed           = para.template Get<int>("rand-seed");
 
-    util::PrintMsg("CPU_Reference entered", !quiet);
+    if (!util::isValid(rand_seed))
+        rand_seed = time(NULL);
+    util::PrintMsg("rand-seed = " + std::to_string(rand_seed), !quiet);
+
+    //util::PrintMsg("CPU_Reference entered", !quiet);
     //int num_batch = graph.nodes / batch_size ;
     //int off_site = graph.nodes - num_batch * batch_size ;
     // batch of nodes
@@ -167,11 +164,17 @@ double CPU_Reference(
         int num_source = (source_start + batch_size <=graph.nodes ? batch_size: graph.nodes - source_start );
      
         util::PrintMsg("Processing sources [" + std::to_string(source_start) + ", "
-            + std::to_string(source_start + num_source) + ")", !quiet); 
+            + std::to_string(source_start + num_source) + ")", debug);
+        #pragma omp parallel for num_threads(num_threads)
         for (VertexT source = source_start; source < source_start + num_source; source ++ )
-        { 
+        {
+            Engine engine(rand_seed + source);
+            Distribution distribution(0.0, 1.0);
+ 
             //store edges between sources and children 
-            std::vector <SizeT> edges_source_child;
+            //std::vector <SizeT> edges_source_child;
+            //SizeT edges_source_child[num_children_per_source];
+            VertexT children    [num_children_per_source];
             float children_temp [Wa2_dim0] = {0.0} ; // agg(h_B1^1)
             float source_temp [Wf2_dim0] = {0.0};  // h_B2^1
             //float source_result [256] = {0.0}; // h_B2_2, result
@@ -183,38 +186,47 @@ double CPU_Reference(
             {
                 SizeT num_source_neigh = graph.GetNeighborListLength(source);
                 if (num_source_neigh == 0) {
-                    util::PrintMsg("error: remove dangling nodes and please use undirected setting");
-  
+                    util::PrintMsg("Warning: "
+                        "Vertex " + std::to_string(source) + " has no neighbors. "
+                        "GraphSAGE is not designed to run with dangling vertices.");
+                    children[i] = source;
+                    continue;
                 }
                 
-                SizeT offset = rand() % graph.GetNeighborListLength(source); // 
+                SizeT offset = distribution(engine) * graph.GetNeighborListLength(source);
+                    //rand() % graph.GetNeighborListLength(source); // 
                 SizeT pos = graph.GetNeighborListOffset(source) + offset;
-                edges_source_child.push_back (pos);
-                
+                //edges_source_child.push_back (pos);
+                children[i] = graph.GetEdgeDest(pos);
             }// sample child (B1 nodes), save edge list. 
 
             // get each child's h_v^1
             for (int i = 0; i < num_children_per_source ; i ++)
             {
-                SizeT pos = edges_source_child[i];
-                VertexT child = graph.GetEdgeDest(pos); 
+                //SizeT pos = edges_source_child[i];
+                //VertexT child = graph.GetEdgeDest(pos); 
+                VertexT child = children[i];
                 float sums [feature_column] = {0.0} ;
 
                 // sample leaf node for each child
                 for (int j =0; j < num_leafs_per_child ; j++)
                 {
                     SizeT num_child_neigh = graph.GetNeighborListLength(child);
-                    if (num_child_neigh == 0){ 
-                        util::PrintMsg("error: remove dangling nodes and please use undirected     setting");
-                     }
-
-                    SizeT offset2 = rand() % graph.GetNeighborListLength(child); 
-                    SizeT pos2 = graph.GetNeighborListOffset(child) + offset2;
-                    VertexT leaf = graph.GetEdgeDest (pos2); 
+                    VertexT leaf = 0;
+                    if (num_child_neigh == 0) {
+                        util::PrintMsg("Warning: "
+                            "Vertex " + std::to_string(child) + " has no neighbors. "
+                            "GraphSAGE is not designed to run with dangling vertices.");
+                        leaf = child; 
+                     } else { 
+                        SizeT offset2 = distribution(engine) * graph.GetNeighborListLength(child);
+                            //rand() % graph.GetNeighborListLength(child); 
+                        SizeT pos2 = graph.GetNeighborListOffset(child) + offset2;
+                        leaf = graph.GetEdgeDest (pos2); 
+                    }
                     for (int m = 0; m < feature_column ; m ++) {
                         sums[m] += features[leaf][ m];
                     }
-                    
                 }// agg feaures for leaf nodes alg2 line 11 k = 1
                 for (int m =0; m < feature_column ; m++){
                     sums [m] = sums[m]/ num_leafs_per_child;
@@ -257,8 +269,9 @@ double CPU_Reference(
             float sums_child_feat [feature_column] = {0.0} ; // agg(h_B1^0)
             for (int i = 0; i < num_children_per_source ; i ++)
             { 
-                SizeT pos = edges_source_child[i];
-                VertexT child = graph.GetEdgeDest(pos);
+                //SizeT pos = edges_source_child[i];
+                //VertexT child = graph.GetEdgeDest(pos);
+                VertexT child = children[i];
                 for (int m = 0; m < feature_column ; m++)
                 {
                     sums_child_feat [m] += features[child][m];
@@ -327,7 +340,7 @@ double CPU_Reference(
         } //for each source
         //printf ("node %d \n", source);
     } //for each batch
-    util::PrintMsg("CPU_Reference exited", !quiet);
+    //util::PrintMsg("CPU_Reference exited", !quiet);
     cpu_timer.Stop();
     return cpu_timer.ElapsedMillis();  
 } //cpu reference 

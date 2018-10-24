@@ -36,6 +36,236 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
     return retval;
 }
 
+static const cub::CacheLoadModifier  W_LOAD  = cub::LOAD_LDG; // for Wa and Wf
+static const cub::CacheLoadModifier  F_LOAD  = cub::LOAD_LDG; // for features
+static const cub::CacheLoadModifier  S_LOAD  = cub::LOAD_CA;  // for Sums
+static const cub::CacheStoreModifier S_STORE = cub::STORE_WB; // for Sums
+static const cub::CacheLoadModifier  T_LOAD  = cub::LOAD_CA;  // for temps
+static const cub::CacheStoreModifier T_STORE = cub::STORE_WB; // for temps
+
+
+template <typename GraphT, typename ValueT>
+__global__
+void sage_kernel1(
+    typename GraphT::VertexT  source_start,
+             int              num_children_per_source,
+    const    GraphT           graph,
+             int              feature_column,
+             ValueT          *features,
+             int              num_leafs_per_child,
+             ValueT          *sums,
+             curandState     *rand_states,
+             ValueT          *sums_child_feat,
+    typename GraphT::VertexT *children,
+    typename GraphT::SizeT    num_children)
+{
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+
+    SizeT child_num = blockIdx.x;
+    extern __shared__ VertexT s_leafs[];
+    __shared__ VertexT s_child;
+    __shared__ SizeT s_child_degree, s_child_edge_offset;
+    SizeT thread_id = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+
+    while (child_num < num_children)
+    {
+        if (threadIdx.x == 0)
+        {
+            VertexT source = child_num / num_children_per_source + source_start;
+            s_child = graph.GetEdgeDest(graph.GetNeighborListOffset(source)
+                + curand_uniform(rand_states + thread_id) * graph.GetNeighborListLength(source));
+            children[child_num] = s_child;
+            s_child_degree = graph.GetNeighborListLength(s_child);
+            s_child_edge_offset = graph.GetNeighborListOffset(s_child);
+        }
+        __syncthreads();
+
+        for (int i = threadIdx.x; i < num_leafs_per_child; i+= blockDim.x)
+        {
+            s_leafs[i] = graph.GetEdgeDest(s_child_edge_offset
+                + curand_uniform(rand_states + thread_id) * s_child_degree);
+        }
+        __syncthreads();
+
+        for (int i = threadIdx.x; i < feature_column; i += blockDim.x)
+        {
+            ValueT sum = 0;
+            for (int j = 0; j < num_leafs_per_child; j++)
+                sum += Load<F_LOAD>(features + (s_leafs[j] * feature_column + i));
+            sum /= num_leafs_per_child;
+            Store<S_STORE>(sums + (child_num * feature_column + i), sum);
+
+            atomicAdd(sums_child_feat + (child_num / num_children_per_source * feature_column + i),
+                Load<F_LOAD>(features + (s_child * feature_column + i)) / num_children_per_source);
+        }
+        __syncthreads();
+        child_num += gridDim.x;
+    } 
+}
+
+template <int LOG_THREADS_, typename VertexT, typename SizeT, typename ValueT>
+__global__
+void sage_kernel2(
+    int      num_children_per_source,
+    int      feature_column,
+    ValueT  *features,
+    ValueT  *W_f_1,
+    int      Wf1_dim1,
+    VertexT *children,
+    ValueT  *W_a_1,
+    int      Wa1_dim1,
+    int      Wa2_dim0,
+    int      Wf2_dim0,
+    ValueT  *children_temp,
+    ValueT  *sums_child_feat,
+    ValueT  *sums,
+    SizeT    num_children)
+{
+    typedef util::reduce::BlockReduce<ValueT, LOG_THREADS_> BlockReduceT;
+    __shared__ VertexT s_child;
+    __shared__ typename BlockReduceT::TempSpace reduce_space;
+    SizeT child_num = blockIdx.x;
+
+    while (child_num < num_children)
+    {
+        if (threadIdx.x == 0)
+        {
+            s_child = children[child_num];
+        }
+        __syncthreads();
+
+        ValueT val = 0;
+        if (threadIdx.x < Wf1_dim1)
+        {
+            SizeT f_offset = s_child * feature_column;
+            for (int f = 0; f < feature_column; f++)
+                val += Load<F_LOAD>(features + f_offset + f)
+                    * Load<W_LOAD>(W_f_1 + (f * Wf1_dim1 + threadIdx.x));
+        } else if (threadIdx.x < Wf1_dim1 + Wa1_dim1)
+        {
+            SizeT f_offset = child_num * feature_column;
+            for (int f = 0; f < feature_column; f++)
+                val += Load<cub::LOAD_LDG>(sums + f_offset + f)
+                    * Load<W_LOAD>(W_a_1 + (f * Wa1_dim1 + threadIdx.x - Wf1_dim1));
+        }
+        if (val < 0)
+            val = 0; // relu()
+        double L2_child_temp = BlockReduceT::Reduce(val * val, 
+            [](const ValueT &a, const ValueT &b)
+            {
+                return a + b;
+            }, (ValueT)0, reduce_space);
+        if (threadIdx.x < Wa2_dim0)
+        {
+            L2_child_temp = 1.0 / sqrt(L2_child_temp);
+            val *= L2_child_temp;
+            atomicAdd(children_temp + (child_num / num_children_per_source) * Wa2_dim0 + threadIdx.x,
+                val / num_children_per_source);
+        }
+
+        __syncthreads();
+        child_num += gridDim.x;
+    }
+}
+
+template <int LOG_THREADS_, typename SizeT, typename VertexT, typename ValueT>
+__global__
+void sage_kernel3(
+    int      feature_column,
+    ValueT  *features,
+    VertexT  source_start,
+    ValueT  *W_f_1,
+    int      Wf1_dim1,
+    ValueT  *children_temp,
+    ValueT  *sums_child_feat,
+    ValueT  *W_a_1,
+    int      Wa1_dim1,
+    ValueT  *W_f_2,
+    int      Wf2_dim1,
+    int      Wf2_dim0,
+    ValueT  *W_a_2,
+    int      Wa2_dim1,
+    int      Wa2_dim0,
+    ValueT  *source_result,
+    int      result_column,
+    ValueT  *source_temp,
+    VertexT  num_sources,
+    bool     use_shared_source_temp)
+{
+    typedef util::reduce::BlockReduce<ValueT, LOG_THREADS_> BlockReduceT;
+    __shared__ typename BlockReduceT::TempSpace reduce_space;
+    extern __shared__ ValueT s_source_temp[];
+    VertexT source_num = blockIdx.x;
+ 
+    while (source_num < num_sources)
+    {
+        ValueT val = 0;
+        
+        if (threadIdx.x < Wf1_dim1)
+        {
+            SizeT f_offset = (source_start + source_num) * feature_column;
+            for (int f = 0; f < feature_column; f++)
+                val += Load<F_LOAD>(features + f_offset + f)
+                    * Load<W_LOAD>(W_f_1 + (f * Wf1_dim1 + threadIdx.x));
+        } else if (threadIdx.x < Wf1_dim1 + Wa1_dim1)
+        {
+            SizeT f_offset = source_num * feature_column;
+            for (int f = 0; f < feature_column; f++)
+                val += Load<S_LOAD>(sums_child_feat + f_offset + f)
+                    * Load<W_LOAD>(W_a_1 + (f * Wa1_dim1 + threadIdx.x - Wf1_dim1));
+        }
+        if (val < 0)
+            val = 0; // relu()
+        double L2 = BlockReduceT::Reduce(val * val,
+            [](const ValueT &a, const ValueT &b)
+            {
+                return a + b;
+            }, (ValueT)0, reduce_space);
+        if (threadIdx.x < Wf2_dim0)
+        {
+            L2 = 1.0 / sqrt(L2);
+            if (use_shared_source_temp)
+                s_source_temp[threadIdx.x] = val * L2;
+            else 
+                Store<T_STORE>(source_temp + (source_num * Wf2_dim0 + threadIdx.x),
+                    (ValueT)(val * L2)); 
+        }
+        __syncthreads();
+
+        val = 0;
+        if (threadIdx.x < Wf2_dim1)
+        {
+            SizeT offset = source_num * Wf2_dim0;
+            for (int y = 0; y < Wf2_dim0; y++)
+                val += (use_shared_source_temp ? s_source_temp[y] : 
+                    Load<T_LOAD>(source_temp + offset + y))
+                    * Load<W_LOAD>(W_f_2 + (y * Wf2_dim1 + threadIdx.x));
+        } else if (threadIdx.x < Wf2_dim1 + Wa2_dim1)
+        {
+            SizeT offset = source_num * Wa2_dim0;
+            for (int y = 0; y < Wa2_dim0; y++)
+                val += Load<cub::LOAD_LDG>(children_temp + offset + y)
+                    * Load<W_LOAD>(W_a_2 + (y * Wa2_dim1 + threadIdx.x - Wf2_dim1));
+        }
+        if (val < 0)
+            val = 0;
+        L2 = BlockReduceT::Reduce(val * val,
+            [](const ValueT &a, const ValueT &b)
+            {
+                return a + b;
+            }, (ValueT)0, reduce_space);
+        if (threadIdx.x < result_column)
+        {
+            L2 = 1.0 / sqrt(L2);
+            Store<cub::STORE_WT>(source_result + (source_num * result_column + threadIdx.x),
+                (ValueT)(val * L2));
+        }
+        __syncthreads();
+        source_num += gridDim.x;
+    }
+}
+
 /**
  * @brief defination of SAGE iteration loop
  * @tparam EnactorT Type of enactor
@@ -96,6 +326,7 @@ struct SAGEIterationLoop : public IterationLoopBase
         auto         &sums_child_feat    =   data_slice.sums_child_feat;
         //auto         &child_temp         =   data_slice.child_temp;
         auto         &children_temp      =   data_slice.children_temp;
+        auto         &children           =   data_slice.children;
         auto         &rand_states        =   data_slice.rand_states;
         auto         &retval             =   enactor_stats.retval;
         auto         &stream             =   enactor_slice.stream;
@@ -108,7 +339,7 @@ struct SAGEIterationLoop : public IterationLoopBase
         SizeT         num_children       =   num_sources * data_slice.num_children_per_source;
 
         util::PrintMsg("Processing sources [" + std::to_string(source_start)
-            + ", " + std::to_string(source_start + num_sources) + ")");
+            + ", " + std::to_string(source_start + num_sources) + ")", data_slice.debug);
         GUARD_CU(children_temp.ForEach(
             [] __host__ __device__ (ValueT &val)
             {
@@ -120,98 +351,266 @@ struct SAGEIterationLoop : public IterationLoopBase
             {
                 val = 0;
             }, num_sources * feature_column, util::DEVICE, stream));
- 
-        GUARD_CU(data_slice.child_temp.ForAll(
+
+        if (data_slice.custom_kernels)
+        {
+            sage_kernel1 
+                <<< 2560, min(feature_column, 512), num_leafs_per_child * sizeof(VertexT), stream>>>(
+                source_start, num_children_per_source,
+                graph, feature_column, features.GetPointer(util::DEVICE),
+                num_leafs_per_child, sums.GetPointer(util::DEVICE), 
+                rand_states.GetPointer(util::DEVICE), sums_child_feat.GetPointer(util::DEVICE),
+                children.GetPointer(util::DEVICE), num_children); 
+        } else { 
+            GUARD_CU(children.ForAll(
             [source_start, num_children_per_source,
             graph, feature_column, features,
-            num_leafs_per_child, W_f_1, Wf1_dim1,
-            W_a_1, Wa1_dim1, Wf2_dim0, Wa2_dim0, children_temp,
-            sums_child_feat, sums, rand_states] 
-            __host__ __device__ (ValueT *child_temp_, const SizeT &i)
+            num_leafs_per_child, sums, rand_states, sums_child_feat] 
+            __host__ __device__ (VertexT *childs, const SizeT &i)
             {
-                ValueT *child_temp = child_temp_ + i * Wf2_dim0;
                 VertexT source = i / num_children_per_source + source_start;
-                SizeT   offset = curand_uniform(rand_states + i) 
-                    * graph.GetNeighborListLength(source);
-                SizeT   edge   = graph.GetNeighborListOffset(source) + offset;
-                VertexT child  = graph.GetEdgeDest(edge); 
+                //SizeT   offset = curand_uniform(rand_states + i) 
+                //    * graph.GetNeighborListLength(source);
+                //SizeT   edge   = graph.GetNeighborListOffset(source) + offset;
+                //VertexT child  = graph.GetEdgeDest(edge);
+                VertexT child = graph.GetEdgeDest(graph.GetNeighborListOffset(source)
+                    + curand_uniform(rand_states + i) * graph.GetNeighborListLength(source));
+                childs[i]    = child; 
+                SizeT child_degree = graph.GetNeighborListLength(child);
+                SizeT child_edge_offset = graph.GetNeighborListOffset(child);
                 //float sums [64] = {0.0} ; //local vector
 
+                SizeT f_offset = i * feature_column;
                 for (int f = 0; f < feature_column; f++)
-                    sums[i * feature_column + f] = 0;
-                SizeT child_degree = graph.GetNeighborListLength(child);
+                    Store<S_STORE>(sums + (f_offset + f), (ValueT)0);
                 for (int j = 0; j < num_leafs_per_child; j++)
                 { 
                     //SizeT   offset2 = 0;//cuRand() * child_degree;
-                    SizeT   edge2   = graph.GetNeighborListOffset(child) 
-                        + curand_uniform(rand_states + i) * child_degree;
-                    VertexT leaf    = graph.GetEdgeDest(edge2);
-                            offset  = leaf * feature_column;
+                    //SizeT   edge2   = graph.GetNeighborListOffset(child) 
+                    //    + curand_uniform(rand_states + i) * child_degree;
+                    //VertexT leaf    = graph.GetEdgeDest(edge2);
+                    VertexT leaf    = graph.GetEdgeDest(child_edge_offset
+                        + curand_uniform(rand_states + i) * child_degree);
+                    SizeT   offset  = leaf * feature_column;
 
                     for (int f = 0; f < feature_column; f++) 
                     {
-                        sums[i * feature_column + f] += features[offset + f]; 
+                        Store<S_STORE>(sums + (f_offset + f),
+                            Load<S_LOAD>(sums + (f_offset + f)) 
+                            + Load<F_LOAD>(features + (offset + f))); 
                         ///num_neigh2;// merged line 176 171
                     }
                 }
                 for (int f = 0; f < feature_column; f++)
-                    sums[i * feature_column + f] /= num_leafs_per_child;
+                    Store<S_STORE>(sums + (f_offset + f),
+                        Load<S_LOAD>(sums + (f_offset + f)) 
+                        / num_leafs_per_child);
                 //agg feaures for leaf nodes alg2 line 11 k = 1; 
-       
-                offset = child * feature_column; 
+ 
+                SizeT offset = i / num_children_per_source * feature_column;
+                f_offset = child * feature_column; 
+                //SizeT f_offset = children[i] * feature_column;
+                for (int f = 0; f < feature_column; f++)
+                {
+                    atomicAdd(sums_child_feat + offset + f, 
+                        Load<F_LOAD>(features + (f_offset + f)) / num_children_per_source); 
+                    //merge 220 and 226
+                }  
+            }, num_children, util::DEVICE, stream, 80));
+         }
+
+        if (data_slice.custom_kernels && Wa2_dim0 <= 1024)
+        {
+            if (Wa2_dim0 <= 128)
+                sage_kernel2<7>
+                    <<< 1280, 128, 0, stream>>>(
+                    num_children_per_source, feature_column,
+                    features.GetPointer(util::DEVICE),
+                    W_f_1.GetPointer(util::DEVICE), Wf1_dim1,
+                    children.GetPointer(util::DEVICE),
+                    W_a_1.GetPointer(util::DEVICE), Wa1_dim1,
+                    Wa2_dim0, Wf2_dim0,
+                    children_temp.GetPointer(util::DEVICE),
+                    sums_child_feat.GetPointer(util::DEVICE),
+                    sums.GetPointer(util::DEVICE), num_children);
+            
+            else if (Wa2_dim0 <= 256)
+                sage_kernel2<8>
+                    <<< 1280, 256, 0, stream>>>(
+                    num_children_per_source, feature_column,
+                    features.GetPointer(util::DEVICE),
+                    W_f_1.GetPointer(util::DEVICE), Wf1_dim1,
+                    children.GetPointer(util::DEVICE),
+                    W_a_1.GetPointer(util::DEVICE), Wa1_dim1,
+                    Wa2_dim0, Wf2_dim0,
+                    children_temp.GetPointer(util::DEVICE),
+                    sums_child_feat.GetPointer(util::DEVICE),
+                    sums.GetPointer(util::DEVICE), num_children);
+
+            else if (Wa2_dim0 <= 512)
+                sage_kernel2<9>
+                    <<< 1280, 512, 0, stream>>>(
+                    num_children_per_source, feature_column,
+                    features.GetPointer(util::DEVICE),
+                    W_f_1.GetPointer(util::DEVICE), Wf1_dim1,
+                    children.GetPointer(util::DEVICE),
+                    W_a_1.GetPointer(util::DEVICE), Wa1_dim1,
+                    Wa2_dim0, Wf2_dim0,
+                    children_temp.GetPointer(util::DEVICE),
+                    sums_child_feat.GetPointer(util::DEVICE),
+                    sums.GetPointer(util::DEVICE), num_children);
+
+            else if (Wa2_dim0 <= 1024)
+                sage_kernel2<10>
+                    <<< 1280, 1024, 0, stream>>>(
+                    num_children_per_source, feature_column,
+                    features.GetPointer(util::DEVICE),
+                    W_f_1.GetPointer(util::DEVICE), Wf1_dim1,
+                    children.GetPointer(util::DEVICE),
+                    W_a_1.GetPointer(util::DEVICE), Wa1_dim1,
+                    Wa2_dim0, Wf2_dim0,
+                    children_temp.GetPointer(util::DEVICE),
+                    sums_child_feat.GetPointer(util::DEVICE),
+                    sums.GetPointer(util::DEVICE), num_children);
+
+        } else {
+            GUARD_CU(data_slice.child_temp.ForAll(
+            [num_children_per_source,
+            feature_column, features,
+            W_f_1, Wf1_dim1, children,
+            W_a_1, Wa1_dim1, Wa2_dim0, Wf2_dim0, children_temp,
+            sums_child_feat, sums] 
+            __host__ __device__ (ValueT *child_temp_, const SizeT &i)
+            {
+                ValueT *child_temp = child_temp_ + i * Wf2_dim0;
+                SizeT f_offset = children[i] * feature_column; 
+                double L2_child_temp = 0.0;
                 for (int x = 0; x < Wf1_dim1; x++)
                 {
                     ValueT val = 0;
                     for (int f =0; f < feature_column; f ++)
-                        val += features[offset + f] 
-                            * W_f_1[f * Wf1_dim1 + x];
-                    child_temp[x] = val;
-                } // got 1st half of h_B1^1
-
-                for (int x = 0; x < Wa1_dim1; x++)
-                {   
-                    SizeT val = 0;
-                    for (int f =0; f < feature_column; f ++)
-                        val += sums[i * feature_column + f] * W_a_1[f * Wa1_dim1 + x];
-                    child_temp[x + Wf1_dim1] = val;
-                } // got 2nd half of h_B1^1 
-      
-                // activation and L-2 normalize 
-                double L2_child_temp = 0.0;
-                for (int x =0; x < Wa2_dim0; x++)
-                {
-                    ValueT val = child_temp[x];
+                        val += Load<F_LOAD>(features + (f_offset + f)) 
+                            * Load<W_LOAD>(W_f_1 + (f * Wf1_dim1 + x));
                     if (val < 0) // relu()
                         val = 0;
                     L2_child_temp += val * val;
-                    child_temp[x] = val;
-                }  //finished relu
+                    Store<T_STORE>(child_temp + x, val);
+                } // got 1st half of h_B1^1
+
+                SizeT offset = i * feature_column;
+                for (int x = 0; x < Wa1_dim1; x++)
+                {   
+                    ValueT val = 0;
+                    for (int f =0; f < feature_column; f ++)
+                        val += Load<cub::LOAD_LDG>(sums + (offset + f)) 
+                            * Load<W_LOAD>(W_a_1 + (f * Wa1_dim1 + x));
+                    if (val < 0) // relu()
+                        val = 0;
+                    L2_child_temp += val * val; 
+                    Store<T_STORE>(child_temp + (x + Wf1_dim1), val);
+                } // got 2nd half of h_B1^1 
+      
+                // activation and L-2 normalize 
+                //double L2_child_temp = 0.0;
+                //for (int x =0; x < Wa2_dim0; x++)
+                //{
+                //    ValueT val = child_temp[x];
+                //    if (val < 0) // relu()
+                //        val = 0;
+                //    L2_child_temp += val * val;
+                //    child_temp[x] = val;
+                //}  //finished relu
                 L2_child_temp = 1.0 / sqrt(L2_child_temp);
+                offset = i / num_children_per_source * Wa2_dim0;
                 for (int x =0; x < Wa2_dim0; x++)
                 {
                     //child_temp[idx_0] = child_temp[idx_0] /sqrt (L2_child_temp);
-                    child_temp[x] *= L2_child_temp;
-                }//finished L-2 norm, got h_B1^1, algo2 line13
+                    //child_temp[x] *= L2_child_temp;
+                    ValueT val = Load<T_LOAD>(child_temp + x);
+                    val *= L2_child_temp;
+                //}//finished L-2 norm, got h_B1^1, algo2 line13
 
-                offset = i / num_children_per_source * Wa2_dim0;
                 // add the h_B1^1 to children_temp, also agg it
-                for (int x =0; x < Wa2_dim0; x ++ ) //205
-                {
+                //for (int x =0; x < Wa2_dim0; x ++ ) //205
+                //{
                     atomicAdd(children_temp + (offset + x), 
-                        child_temp[x] / num_children_per_source);
+                        val / num_children_per_source);
                 }//finished agg (h_B1^1)
                 
-                offset = i / num_children_per_source * feature_column;
-                for (int f = 0; f < feature_column; f++)
-                {
-                    atomicAdd(sums_child_feat + offset + f, 
-                        features[child * feature_column + f] / num_children_per_source); 
-                    //merge 220 and 226
-                }
-                // end of for each child
-            }, num_children, util::DEVICE, stream));
+               // end of for each child
+            }, num_children, util::DEVICE, stream, 80));
+        }
 
-        GUARD_CU(data_slice.source_temp.ForAll(
+        if (iteration != 0)
+        {
+            GUARD_CU2(cudaStreamWaitEvent(stream, data_slice.d2h_finish, 0),
+                "cudaStreamWaitEvent failed");
+        }
+        int max_dim = max(Wf1_dim1 + Wa1_dim1, Wf2_dim1 + Wa2_dim1);
+        if (data_slice.custom_kernels && max_dim <= 1024)
+        {
+            size_t shared_size = Wf2_dim0 * sizeof(ValueT);
+            bool use_shared_source_temp = (shared_size <= 24 * 1024);
+            if (!use_shared_source_temp)
+                shared_size = 0; 
+            if (max_dim <= 128)
+                sage_kernel3<7, SizeT>
+                    <<<1280, 128, shared_size, stream>>>(
+                    feature_column, features.GetPointer(util::DEVICE), source_start,
+                    W_f_1.GetPointer(util::DEVICE), Wf1_dim1,
+                    children_temp.GetPointer(util::DEVICE),
+                    sums_child_feat.GetPointer(util::DEVICE),
+                    W_a_1.GetPointer(util::DEVICE), Wa1_dim1,
+                    W_f_2.GetPointer(util::DEVICE), Wf2_dim1, Wf2_dim0,
+                    W_a_2.GetPointer(util::DEVICE), Wa2_dim1, Wa2_dim0,
+                    source_result.GetPointer(util::DEVICE), result_column,
+                    data_slice.source_temp.GetPointer(util::DEVICE), 
+                    num_sources, use_shared_source_temp);
+           
+            else if (max_dim <= 256)
+                sage_kernel3<8, SizeT>
+                    <<<1280, 256, shared_size, stream>>>(
+                    feature_column, features.GetPointer(util::DEVICE), source_start,
+                    W_f_1.GetPointer(util::DEVICE), Wf1_dim1,
+                    children_temp.GetPointer(util::DEVICE),
+                    sums_child_feat.GetPointer(util::DEVICE),
+                    W_a_1.GetPointer(util::DEVICE), Wa1_dim1,
+                    W_f_2.GetPointer(util::DEVICE), Wf2_dim1, Wf2_dim0,
+                    W_a_2.GetPointer(util::DEVICE), Wa2_dim1, Wa2_dim0,
+                    source_result.GetPointer(util::DEVICE), result_column,
+                    data_slice.source_temp.GetPointer(util::DEVICE),
+                    num_sources, use_shared_source_temp);
+
+            else if (max_dim <= 512)
+                sage_kernel3<9, SizeT>
+                    <<<1280, 512, shared_size, stream>>>(
+                    feature_column, features.GetPointer(util::DEVICE), source_start,
+                    W_f_1.GetPointer(util::DEVICE), Wf1_dim1,
+                    children_temp.GetPointer(util::DEVICE),
+                    sums_child_feat.GetPointer(util::DEVICE),
+                    W_a_1.GetPointer(util::DEVICE), Wa1_dim1,
+                    W_f_2.GetPointer(util::DEVICE), Wf2_dim1, Wf2_dim0,
+                    W_a_2.GetPointer(util::DEVICE), Wa2_dim1, Wa2_dim0,
+                    source_result.GetPointer(util::DEVICE), result_column,
+                    data_slice.source_temp.GetPointer(util::DEVICE),
+                    num_sources, use_shared_source_temp);
+
+            else if (max_dim <= 1024)
+                sage_kernel3<10, SizeT>
+                    <<<1280, 1024, shared_size, stream>>>(
+                    feature_column, features.GetPointer(util::DEVICE), source_start,
+                    W_f_1.GetPointer(util::DEVICE), Wf1_dim1,
+                    children_temp.GetPointer(util::DEVICE),
+                    sums_child_feat.GetPointer(util::DEVICE),
+                    W_a_1.GetPointer(util::DEVICE), Wa1_dim1,
+                    W_f_2.GetPointer(util::DEVICE), Wf2_dim1, Wf2_dim0,
+                    W_a_2.GetPointer(util::DEVICE), Wa2_dim1, Wa2_dim0,
+                    source_result.GetPointer(util::DEVICE), result_column,
+                    data_slice.source_temp.GetPointer(util::DEVICE),
+                    num_sources, use_shared_source_temp);
+        }
+        else {
+            GUARD_CU(data_slice.source_temp.ForAll(
             [feature_column, features, source_start, 
             W_f_1, Wf1_dim1, children_temp,
             sums_child_feat, W_a_1, Wa1_dim1,
@@ -223,12 +622,17 @@ struct SAGEIterationLoop : public IterationLoopBase
                 VertexT source = source_start + i;
                 SizeT offset = source * feature_column;
                 // get ebedding vector for child node (h_{B2}^{1}) alg2 line 12            
+                double L2_source_temp = 0.0;
                 for (int x = 0; x < Wf1_dim1; x++)
                 {
                     ValueT val = 0;
                     for (int f =0; f < feature_column; f++)
-                        val += features[offset + f] * W_f_1[f * Wf1_dim1 + x];
-                    source_temp[x] = val;
+                        val += Load<F_LOAD>(features + (offset + f)) 
+                            * Load<W_LOAD>(W_f_1 + (f * Wf1_dim1 + x));
+                    if (val < 0)
+                        val = 0; // relu()
+                    L2_source_temp += val * val;
+                    Store<T_STORE>(source_temp + x, val);
                 } // got 1st half of h_B2^1
 
                 offset = i * feature_column;
@@ -236,36 +640,46 @@ struct SAGEIterationLoop : public IterationLoopBase
                 {
                     ValueT val = 0;
                     for (int f=0; f < feature_column; f++)
-                        val += sums_child_feat[offset + f] * W_a_1[f * Wa1_dim1 + x];
-                    source_temp[Wf1_dim1 + x] = val;
-                } // got 2nd half of h_B2^1         
-
-                double L2_source_temp = 0.0;
-                for (int x =0; x < Wf2_dim0; x++)
-                {
-                    ValueT val = source_temp[x];
+                        val += sums_child_feat[offset + f] 
+                            * Load<W_LOAD>(W_a_1 + (f * Wa1_dim1 + x));
                     if (val < 0)
                         val = 0; // relu()
-                    L2_source_temp += val * val;
-                    source_temp[x] = val;
-                } //finished relu
+                    L2_source_temp += val * val; 
+                    Store<T_STORE>(source_temp + (Wf1_dim1 + x), val);
+                } // got 2nd half of h_B2^1         
+
+                //for (int x =0; x < Wf2_dim0; x++)
+                //{
+                //    ValueT val = source_temp[x];
+                //    if (val < 0)
+                //        val = 0; // relu()
+                //    L2_source_temp += val * val;
+                //    source_temp[x] = val;
+                //} //finished relu
                 L2_source_temp = 1.0 / sqrt(L2_source_temp);
                 for (int x =0; x < Wf2_dim0; x++)
                 {
                     //source_temp[idx_0] = source_temp[idx_0] /sqrt (L2_source_temp);
-                    source_temp[x] *= L2_source_temp;
+                    //source_temp[x] *= L2_source_temp;
+                    Store<T_STORE>(source_temp + x, 
+                        (ValueT)(Load<T_LOAD>(source_temp + x) * L2_source_temp));
                 }//finished L-2 norm for source temp
 
                 //////////////////////////////////////////////////////////////////////////////////////
                 // get h_B2^2 k =2.
                 offset = i * result_column;
+                double L2_source_result = 0.0;
                 for (int x = 0; x < Wf2_dim1; x++)
                 {
                     ValueT val = 0; //source_result[offset + x];
                     //printf ("source_r1_0:%f", source_result[idx_0] );
                     for (int y =0; y < Wf2_dim0; y ++)
-                        val += source_temp[y] * W_f_2[y * Wf2_dim1 + x];
-                    source_result[offset + x] = val;
+                        val += Load<T_LOAD>(source_temp + y) //source_temp[y] 
+                            * Load<W_LOAD>(W_f_2 + (y * Wf2_dim1 + x));
+                    if (val < 0)
+                        val = 0; // relu()
+                    L2_source_result += val * val; 
+                    Store<T_STORE>(source_result + (offset + x), val);
                     //printf ("source_r1:%f", source_result[idx_0] );
                 } // got 1st half of h_B2^2
 
@@ -274,35 +688,48 @@ struct SAGEIterationLoop : public IterationLoopBase
                     //printf ("source_r2_0:%f", source_result[idx_0] );
                     ValueT val = 0; //source_result[offset + x];
                     for (int y = 0; y < Wa2_dim0; y ++)
-                        val += children_temp[i * Wa2_dim0 + y] * W_a_2[y * Wa2_dim1 + x];
-                    source_result[offset + Wf2_dim1 + x] = val;
+                        val += Load<cub::LOAD_LDG>(children_temp + i * Wa2_dim0 + y)
+                            //children_temp[i * Wa2_dim0 + y] 
+                            * Load<W_LOAD>(W_a_2 + (y * Wa2_dim1 + x));
+                    if (val < 0)
+                        val = 0; // relu()
+                    L2_source_result += val * val;
+                    Store<T_STORE>(source_result + (offset + Wf2_dim1 + x), val);
                 } // got 2nd half of h_B2^2
                 
-                double L2_source_result = 0.0;
-                for (int x =0; x < result_column; x ++ )
-                {
-                    ValueT val = source_result[offset + x];
-                    if (val < 0) // relu()
-                        val = 0;
-                    L2_source_result += val * val;
-                    source_result[offset + x] = val;
-                } //finished relu
+                //for (int x =0; x < result_column; x ++ )
+                //{
+                //    ValueT val = source_result[offset + x];
+                //    if (val < 0) // relu()
+                //        val = 0;
+                //    L2_source_result += val * val;
+                //    source_result[offset + x] = val;
+                //} //finished relu
                 L2_source_result = 1.0 / sqrt(L2_source_result);
                 for (int x =0; x < result_column; x ++ )
                 {
-                    source_result[offset + x] *= L2_source_result;
+                    //source_result[offset + x] *= L2_source_result;
+                    Store<cub::STORE_WT>(source_result + (offset + x),
+                        (ValueT)(Load<T_LOAD>(source_result + (offset + x)) * L2_source_result));
                     //printf ("source_r:%f", source_result[idx_0] );
                     //printf ("ch_t:%f", children_temp[idx_0]);
                 }//finished L-2 norm for source result   
                  
-           }, num_sources, util::DEVICE, stream));
-       
+           }, num_sources, util::DEVICE, stream, 640));
+        }
+
+        GUARD_CU2(cudaEventRecord(data_slice.d2h_start, stream),
+            "cudaEventRecord failed.");
+        GUARD_CU2(cudaStreamWaitEvent(data_slice.d2h_stream, data_slice.d2h_start, 0),
+            "cudaStreamWaitEvent failed.");
         GUARD_CU2(cudaMemcpyAsync(
             data_slice.host_source_result + (source_start * result_column),
             source_result.GetPointer(util::DEVICE),
             num_sources * result_column * sizeof(ValueT),
-            cudaMemcpyDeviceToHost, stream),
+            cudaMemcpyDeviceToHost, data_slice.d2h_stream),
             "source_result D2H copy failed");
+        GUARD_CU2(cudaEventRecord(data_slice.d2h_finish, data_slice.d2h_stream),
+            "cudaEventRecord failed.");
 
         return retval;
     }

@@ -86,9 +86,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT> child_temp;// 256 h_B1^1, I feel like this one could be local
         util::Array1D<SizeT, ValueT> sums_child_feat; //64 sum of children's features, I feel like this one could be local as well
         util::Array1D<SizeT, ValueT> sums; // 64 per child
-        util::Array1D<SizeT, ValueT> host_source_result; // results on HOST
+        util::Array1D<SizeT, ValueT, util::PINNED> host_source_result; // results on HOST
 
         util::Array1D<SizeT, curandState> rand_states; // random states, one per child
+
+        util::Array1D<SizeT, VertexT> children; // children vertices
 
         VertexT batch_size;
         int     feature_column;
@@ -99,6 +101,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         int     Wf2_dim0, Wf2_dim1;
         int     Wa2_dim0, Wa2_dim1;
         int     result_column;
+        bool    custom_kernels;
+        bool    debug;
+        cudaStream_t d2h_stream;
+        cudaEvent_t  d2h_start, d2h_finish;
 
         /*
          * @brief Default constructor
@@ -119,6 +125,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             sums           .SetName("sums");
             host_source_result.SetName("host_source_result");
             rand_states    .SetName("rand_states");
+            children       .SetName("children");
         }
 
         /*
@@ -153,6 +160,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(sums          .Release(target));
             GUARD_CU(host_source_result.Release(util::HOST));
             GUARD_CU(rand_states   .Release(target));
+            GUARD_CU(children      .Release(target));
+            GUARD_CU2(cudaStreamDestroy(d2h_stream),
+                "cudaStreamDestory failed.");
+            GUARD_CU2(cudaEventDestroy(d2h_start),
+                "cudaEventDestory failed.");
+            GUARD_CU2(cudaEventDestroy(d2h_finish),
+                "cudaEventDestory failed.");
             GUARD_CU(BaseDataSlice ::Release(target));
 
             return retval;
@@ -197,9 +211,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(sums_child_feat.Allocate(batch_size   * result_column, target));
             GUARD_CU(sums           .Allocate(num_children * feature_column, target));
             GUARD_CU(source_result  .Allocate(batch_size   * result_column, target));
-            GUARD_CU(rand_states    .Allocate(num_children           , target));           
+            GUARD_CU(rand_states    .Allocate(max(num_children, 
+                1280 * min(feature_column, 512)), target));           
+            GUARD_CU(children       .Allocate(num_children           , target));
  
             GUARD_CU(host_source_result.Allocate(nodes * result_column, util::HOST)); 
+            GUARD_CU2(cudaStreamCreateWithFlags(
+                &d2h_stream, cudaStreamNonBlocking),
+                "cudaStreamCreateWithFlags failed.");
+            GUARD_CU2(cudaEventCreateWithFlags(
+                &d2h_start, cudaEventDisableTiming),
+                "cudaEventCreateWithFlags failed.");
+            GUARD_CU2(cudaEventCreateWithFlags(
+                &d2h_finish, cudaEventDisableTiming),
+                "cudaEventCreateWithFlags failed.");
+
             GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
             return retval;
         } // Init
@@ -315,6 +341,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         SizeT nodes = this -> org_graph -> nodes;
         auto &data_slice = data_slices[0][0];
 
+        GUARD_CU2(cudaDeviceSynchronize(),
+            "cudaDeviceSynchronize failed");
         GUARD_CU(data_slice.host_source_result.ForEach(h_source_result,
             []__host__ __device__
             (const ValueT &val, ValueT &h_val){
@@ -393,19 +421,40 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             data_slice.Wa2_dim1            = para.template Get<int>("Wa2-dim1");
             data_slice.result_column       = data_slice.Wa2_dim1 + data_slice.Wf2_dim1;
             data_slice.num_leafs_per_child = para.template Get<int>("num-leafs-per-child");
-            
+            data_slice.custom_kernels      = para.template Get<bool>("custom-kernels");
+            data_slice.debug               = para.template Get<bool>("v");
+ 
             GUARD_CU(data_slice.Init(this -> sub_graphs[gpu],
                 this -> num_gpus, this -> gpu_idx[gpu], target, this -> flag));
-       
-            GUARD_CU(ReadMat(data_slice.W_f_1_1D, para.template Get<std::string>("Wf1"), 
-                data_slice.Wf1_dim0, data_slice.Wf1_dim1)); 
-            GUARD_CU(ReadMat(data_slice.W_a_1_1D, para.template Get<std::string>("Wa1"), 
+      
+            std::string Wf1_filename = para.template Get<std::string>("Wf1");
+            if (Wf1_filename == "")
+                util::PrintMsg("Using randomly generated Wf1"); 
+            GUARD_CU(ReadMat(data_slice.W_f_1_1D, Wf1_filename, 
+                data_slice.Wf1_dim0, data_slice.Wf1_dim1));
+
+            std::string Wa1_filename = para.template Get<std::string>("Wa1");
+            if (Wa1_filename == "")
+                util::PrintMsg("Using randomly generated Wa1"); 
+            GUARD_CU(ReadMat(data_slice.W_a_1_1D, Wa1_filename,
                 data_slice.Wa1_dim0, data_slice.Wa1_dim1)); 
-            GUARD_CU(ReadMat(data_slice.W_f_2_1D, para.template Get<std::string>("Wf2"), 
+
+            std::string Wf2_filename = para.template Get<std::string>("Wf2");
+            if (Wf2_filename == "")
+                util::PrintMsg("Using randomly generated Wf2");  
+            GUARD_CU(ReadMat(data_slice.W_f_2_1D, Wf2_filename,
                 data_slice.Wf2_dim0, data_slice.Wf2_dim1)); 
-            GUARD_CU(ReadMat(data_slice.W_a_2_1D, para.template Get<std::string>("Wa2"), 
+
+            std::string Wa2_filename = para.template Get<std::string>("Wa2");
+            if (Wa2_filename == "")
+                util::PrintMsg("Using randomly generated Wa2");  
+            GUARD_CU(ReadMat(data_slice.W_a_2_1D, Wa2_filename,
                 data_slice.Wa2_dim0, data_slice.Wa2_dim1)); 
-            GUARD_CU(ReadMat(data_slice.features_1D, para.template Get<std::string>("features"),
+
+            std::string features_filename = para.template Get<std::string>("features");
+            if (features_filename == "")
+                util::PrintMsg("Using randomly generated features");  
+            GUARD_CU(ReadMat(data_slice.features_1D, features_filename,
                 graph.nodes, data_slice.feature_column)); 
 
             GUARD_CU(data_slice.W_f_1_1D.Move(util::HOST, util::DEVICE));

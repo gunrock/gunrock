@@ -101,6 +101,7 @@ struct main_struct
            // 
           //      ref_distances[i] = (ValueT*)malloc(sizeof(ValueT) * nodes);
           //      VertexT src = srcs[i];
+            util::PrintMsg("Computing reference value ...", !quiet);
             util::PrintMsg("__________________________", !quiet);
             float elapsed = app::sage::CPU_Reference(
                 parameters, graph, features, W_f_1,W_a_1,W_f_2,W_a_2, source_embedding, quiet);
@@ -139,8 +140,8 @@ int main(int argc, char** argv)
     GUARD_CU(parameters.Check_Required());
 
     return app::Switch_Types<
-        app::VERTEXT_U32B | app::VERTEXT_U64B |
-        app::SIZET_U32B | app::SIZET_U64B |
+        app::VERTEXT_U32B | //app::VERTEXT_U64B |
+        app::SIZET_U32B | //app::SIZET_U64B |
         app::VALUET_F32B | app::DIRECTED | app::UNDIRECTED>
         (parameters, main_struct());
 }

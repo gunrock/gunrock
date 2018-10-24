@@ -171,6 +171,20 @@ cudaError_t UseParameters(util::Parameters &parameters)
         "seed for random number generator; default will use time(NULL)",
         __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<bool>(
+        "custom-kernels",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        false,
+        "whether to use custom CUDA kernels",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "omp-threads",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        32,
+        "number of threads to run CPU reference",
+        __FILE__, __LINE__));
+
     return retval;
 }
 
