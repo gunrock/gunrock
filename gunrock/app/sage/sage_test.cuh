@@ -147,6 +147,8 @@ double CPU_Reference(
     int Wa2_dim1            = para.template Get<int>("Wa2-dim1");
     int result_column       = Wa2_dim1 + Wf2_dim1;
     int num_leafs_per_child = para.template Get<int>("num-leafs-per-child");
+    if (!util::isValid(num_leafs_per_child))
+        num_leafs_per_child = num_children_per_source;
     bool debug              = para.template Get<bool>("v");
     int num_threads         = para.template Get<int>("omp-threads");
     int rand_seed           = para.template Get<int>("rand-seed");

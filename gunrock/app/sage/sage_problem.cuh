@@ -205,14 +205,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 ((uint64_t)nodes) * feature_column, target));
             
             auto num_children = num_children_per_source * batch_size;
-            GUARD_CU(child_temp     .Allocate(num_children * Wf2_dim0, target));
+            if (!custom_kernels || Wa2_dim0 > 1024)
+            {
+                GUARD_CU(child_temp     .Allocate(num_children * Wf2_dim0, target));
+            }
             GUARD_CU(children_temp  .Allocate(batch_size   * Wf2_dim0, target));
             GUARD_CU(source_temp    .Allocate(batch_size   * Wf2_dim0, target));
             GUARD_CU(sums_child_feat.Allocate(batch_size   * result_column, target));
             GUARD_CU(sums           .Allocate(num_children * feature_column, target));
             GUARD_CU(source_result  .Allocate(batch_size   * result_column, target));
-            GUARD_CU(rand_states    .Allocate(max(num_children, 
-                1280 * min(feature_column, 512)), target));           
+            GUARD_CU(rand_states    .Allocate(max(80 * 256, 
+                2560 * min(feature_column, 512)), target));           
             GUARD_CU(children       .Allocate(num_children           , target));
  
             GUARD_CU(host_source_result.Allocate(((uint64_t)nodes) * result_column, util::HOST)); 
@@ -421,6 +424,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             data_slice.Wa2_dim1            = para.template Get<int>("Wa2-dim1");
             data_slice.result_column       = data_slice.Wa2_dim1 + data_slice.Wf2_dim1;
             data_slice.num_leafs_per_child = para.template Get<int>("num-leafs-per-child");
+            if (!util::isValid(data_slice.num_leafs_per_child))
+                data_slice.num_leafs_per_child = data_slice.num_children_per_source;
             data_slice.custom_kernels      = para.template Get<bool>("custom-kernels");
             data_slice.debug               = para.template Get<bool>("v");
  

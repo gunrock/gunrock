@@ -43,7 +43,8 @@ struct main_struct
         VertexT v, SizeT s, ValueT val)
     {
         typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-            graph::HAS_EDGE_VALUES | graph::HAS_CSR>
+            //graph::HAS_EDGE_VALUES | graph::HAS_CSR>
+            graph::HAS_CSR>
             GraphT;
         typedef typename GraphT::CsrT CsrT;
 
@@ -63,66 +64,67 @@ struct main_struct
         //    + ", sizeof(SizeT) = " + std::to_string(sizeof(SizeT))
         //    + ", sizeof(ValueT) = " + std::to_string(sizeof(ValueT)));
 
-        //GUARD_CU(app::Set_Srcs    (parameters, graph));
-        //ValueT  **ref_distances = NULL;
-        //int num_srcs = 0;
-        bool quick = parameters.Get<bool>("quick");
-        // compute reference CPU Sage solution for source-distance
-        if (!quick)
-        {
-            bool quiet = parameters.Get<bool>("quiet");
-            std::string wf1_file = parameters.Get<std::string>("Wf1"); 
-            std::string wa1_file = parameters.Get<std::string>("Wa1");
-            std::string wf2_file = parameters.Get<std::string>("Wf2");
-            std::string wa2_file = parameters.Get<std::string>("Wf2");
-            std::string feature_file = parameters.Get<std::string>("features");
-            int Wf1_dim_0 = parameters.Get<int> ("feature-column");//("Wf1-dim0");
-            int Wa1_dim_0 = parameters.Get<int> ("feature-column");//("Wa1-dim0");
-            int Wf1_dim_1 = parameters.Get<int> ("Wf1-dim1");
-            int Wa1_dim_1 = parameters.Get<int> ("Wa1-dim1");
-            int Wf2_dim_0 = Wf1_dim_1 + Wa1_dim_1; //parameters.Get<int> ("Wf2-dim0");
-            int Wa2_dim_0 = Wf1_dim_1 + Wa1_dim_1; //parameters.Get<int> ("Wa2-dim0");
-            int Wf2_dim_1 = parameters.Get<int> ("Wf2-dim1");
-            int Wa2_dim_1 = parameters.Get<int> ("Wa2-dim1");
-            int num_neigh1 = parameters.Get<int> ("num-children-per-source");
-            int num_neigh2 = parameters.Get<int> ("num-leafs-per-child");
-            int batch_size = parameters.Get<int> ("batch-size");
-
-            ValueT ** W_f_1 = app::sage::template ReadMatrix <ValueT,SizeT> (wf1_file, Wf1_dim_0,Wf1_dim_1); 
-            ValueT ** W_a_1 = app::sage::template ReadMatrix <ValueT,SizeT> (wa1_file, Wa1_dim_0, Wa1_dim_1);
-            ValueT ** W_f_2 = app::sage::template ReadMatrix <ValueT,SizeT> (wf2_file, Wf2_dim_0, Wf2_dim_1);
-            ValueT ** W_a_2 = app::sage::template ReadMatrix <ValueT,SizeT> (wa2_file, Wa2_dim_0, Wa2_dim_1); 
-            ValueT ** features = app::sage::template ReadMatrix<ValueT,SizeT> (feature_file, graph.nodes, Wf1_dim_0);
-            ValueT  * source_embedding = new ValueT[(uint64_t)graph.nodes 
-                * (Wa2_dim_1 + Wf2_dim_1)];
-            //num_srcs = srcs.size();
-            //SizeT nodes = graph.nodes;
-            //ref_distances = new ValueT*[num_srcs];
-           // 
-          //      ref_distances[i] = (ValueT*)malloc(sizeof(ValueT) * nodes);
-          //      VertexT src = srcs[i];
-            util::PrintMsg("Computing reference value ...", !quiet);
-            util::PrintMsg("__________________________", !quiet);
-            float elapsed = app::sage::CPU_Reference(
-                parameters, graph, features, W_f_1,W_a_1,W_f_2,W_a_2, source_embedding, quiet);
-            util::PrintMsg("--------------------------\n"
-                "CPU Reference elapsed: "
-                + std::to_string(elapsed) + " ms.", !quiet);
-            app::sage::Validate_Results(
-                parameters, graph, source_embedding, Wa2_dim_1 + Wf2_dim_1, true);  
-            delete[] source_embedding; source_embedding = NULL;
-            for (auto v = 0; v < graph.nodes; v++)
-            {
-                delete[] features[v]; features[v] = NULL;
-            }
-            delete[] features; features = NULL;
-        }
-
-        std::vector<std::string> switches{"advance-mode", "batch-size"};
+        std::vector<std::string> switches{"feature-column", "num-children-per-source",
+            "num-leafs-per-child"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [](util::Parameters &parameters, GraphT &graph)
             {
-                return app::sage::RunTests(parameters, graph);
+                cudaError_t retval = cudaSuccess;
+
+                bool quick = parameters.Get<bool>("quick");
+                if (!quick)
+                {
+                    bool quiet = parameters.Get<bool>("quiet");
+                    std::string wf1_file = parameters.Get<std::string>("Wf1"); 
+                    std::string wa1_file = parameters.Get<std::string>("Wa1");
+                    std::string wf2_file = parameters.Get<std::string>("Wf2");
+                    std::string wa2_file = parameters.Get<std::string>("Wf2");
+                    std::string feature_file = parameters.Get<std::string>("features");
+                    int Wf1_dim_0 = parameters.Get<int> ("feature-column");//("Wf1-dim0");
+                    int Wa1_dim_0 = parameters.Get<int> ("feature-column");//("Wa1-dim0");
+                    int Wf1_dim_1 = parameters.Get<int> ("Wf1-dim1");
+                    int Wa1_dim_1 = parameters.Get<int> ("Wa1-dim1");
+                    int Wf2_dim_0 = Wf1_dim_1 + Wa1_dim_1; //parameters.Get<int> ("Wf2-dim0");
+                    int Wa2_dim_0 = Wf1_dim_1 + Wa1_dim_1; //parameters.Get<int> ("Wa2-dim0");
+                    int Wf2_dim_1 = parameters.Get<int> ("Wf2-dim1");
+                    int Wa2_dim_1 = parameters.Get<int> ("Wa2-dim1");
+                    int num_neigh1 = parameters.Get<int> ("num-children-per-source");
+                    int num_neigh2 = parameters.Get<int> ("num-leafs-per-child");
+                    if (!util::isValid(num_neigh2))
+                        num_neigh2 = num_neigh1;
+                    int batch_size = parameters.Get<int> ("batch-size");
+
+                    ValueT ** W_f_1 = app::sage::template ReadMatrix <ValueT,SizeT> (wf1_file, Wf1_dim_0,Wf1_dim_1); 
+                    ValueT ** W_a_1 = app::sage::template ReadMatrix <ValueT,SizeT> (wa1_file, Wa1_dim_0, Wa1_dim_1);
+                    ValueT ** W_f_2 = app::sage::template ReadMatrix <ValueT,SizeT> (wf2_file, Wf2_dim_0, Wf2_dim_1);
+                    ValueT ** W_a_2 = app::sage::template ReadMatrix <ValueT,SizeT> (wa2_file, Wa2_dim_0, Wa2_dim_1); 
+                    ValueT ** features = app::sage::template ReadMatrix<ValueT,SizeT> (feature_file, graph.nodes, Wf1_dim_0);
+                    ValueT  * source_embedding = new ValueT[(uint64_t)graph.nodes 
+                        * (Wa2_dim_1 + Wf2_dim_1)];
+                    util::PrintMsg("Computing reference value ...", !quiet);
+                    util::PrintMsg("__________________________", !quiet);
+                    float elapsed = app::sage::CPU_Reference(
+                        parameters, graph, features, W_f_1,W_a_1,W_f_2,W_a_2, source_embedding, quiet);
+                    util::PrintMsg("--------------------------\n"
+                        "CPU Reference elapsed: "
+                        + std::to_string(elapsed) + " ms.", !quiet);
+                    app::sage::Validate_Results(
+                        parameters, graph, source_embedding, Wa2_dim_1 + Wf2_dim_1, true);  
+                    delete[] source_embedding; source_embedding = NULL;
+                    for (auto v = 0; v < graph.nodes; v++)
+                    {
+                        delete[] features[v]; features[v] = NULL;
+                    }
+                    delete[] features; features = NULL;
+                }
+
+                std::vector<std::string> switches2{"batch-size"};
+                GUARD_CU(app::Switch_Parameters(parameters, graph, switches2,
+                    [](util::Parameters &parameters, GraphT &graph)
+                    {
+                        return app::sage::RunTests(parameters, graph);
+                    }));
+                return retval;
             }));
 
        

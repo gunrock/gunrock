@@ -361,11 +361,14 @@ struct SAGEIterationLoop : public IterationLoopBase
                 num_leafs_per_child, sums.GetPointer(util::DEVICE), 
                 rand_states.GetPointer(util::DEVICE), sums_child_feat.GetPointer(util::DEVICE),
                 children.GetPointer(util::DEVICE), num_children); 
-        } else { 
+        } else {
+            int grid_size = 80;
+            int block_size = 256; 
             GUARD_CU(children.ForAll(
             [source_start, num_children_per_source,
             graph, feature_column, features,
-            num_leafs_per_child, sums, rand_states, sums_child_feat] 
+            num_leafs_per_child, sums, rand_states, sums_child_feat,
+            grid_size, block_size] 
             __host__ __device__ (VertexT *childs, const SizeT &i)
             {
                 VertexT source = i / num_children_per_source + source_start;
@@ -374,7 +377,8 @@ struct SAGEIterationLoop : public IterationLoopBase
                 //SizeT   edge   = graph.GetNeighborListOffset(source) + offset;
                 //VertexT child  = graph.GetEdgeDest(edge);
                 VertexT child = graph.GetEdgeDest(graph.GetNeighborListOffset(source)
-                    + curand_uniform(rand_states + i) * graph.GetNeighborListLength(source));
+                    + curand_uniform(rand_states + (i % (grid_size * block_size)))
+                        * graph.GetNeighborListLength(source));
                 childs[i]    = child; 
                 SizeT child_degree = graph.GetNeighborListLength(child);
                 SizeT child_edge_offset = graph.GetNeighborListOffset(child);
@@ -390,7 +394,8 @@ struct SAGEIterationLoop : public IterationLoopBase
                     //    + curand_uniform(rand_states + i) * child_degree;
                     //VertexT leaf    = graph.GetEdgeDest(edge2);
                     VertexT leaf    = graph.GetEdgeDest(child_edge_offset
-                        + curand_uniform(rand_states + i) * child_degree);
+                        + curand_uniform(rand_states + (i % (grid_size * block_size))) 
+                            * child_degree);
                     auto   offset  = leaf * feature_column;
 
                     for (auto f = 0; f < feature_column; f++) 
@@ -416,7 +421,7 @@ struct SAGEIterationLoop : public IterationLoopBase
                         Load<F_LOAD>(features + (f_offset + f)) / num_children_per_source); 
                     //merge 220 and 226
                 }  
-            }, num_children, util::DEVICE, stream, 80));
+            }, num_children, util::DEVICE, stream, 80, 256));
         }
         //GUARD_CU2(cudaDeviceSynchronize(),
         //    "cudaDeviceSynchronize failed.");

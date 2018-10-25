@@ -138,23 +138,23 @@ cudaError_t UseParameters(util::Parameters &parameters)
     
     GUARD_CU(parameters.Use<int>(
         "feature-column",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         64,
         "feature column dimension",
         __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<int>(
         "num-children-per-source", // num_neigh1
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         10,
         "number of sampled children per source",
         __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<int>(
         "num-leafs-per-child", // num_neight2
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        10,
-        "number of sampled leafs per child",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        util::PreDefinedValues<int>::InvalidValue,
+        "number of sampled leafs per child; default is the same as num-children-per-source",
         __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<int>(
