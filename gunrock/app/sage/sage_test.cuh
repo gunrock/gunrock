@@ -161,6 +161,7 @@ double CPU_Reference(
     //int num_batch = graph.nodes / batch_size ;
     //int off_site = graph.nodes - num_batch * batch_size ;
     // batch of nodes
+    SizeT num_dangling_vertices = 0;
     for (VertexT source_start = 0; source_start < graph.nodes ; source_start += batch_size)
     {
         int num_source = (source_start + batch_size <=graph.nodes ? batch_size: graph.nodes - source_start );
@@ -188,9 +189,16 @@ double CPU_Reference(
             {
                 SizeT num_source_neigh = graph.GetNeighborListLength(source);
                 if (num_source_neigh == 0) {
+                    SizeT old_counter = 0;
+                    #pragma omp atomic capture
+                    {
+                        old_counter = num_dangling_vertices;
+                        num_dangling_vertices++;
+                    }
                     util::PrintMsg("Warning: "
                         "Vertex " + std::to_string(source) + " has no neighbors. "
-                        "GraphSAGE is not designed to run with dangling vertices.");
+                        "GraphSAGE is not designed to run with dangling vertices.",
+                        !quiet && old_counter == 0);
                     children[i] = source;
                     continue;
                 }
@@ -216,9 +224,9 @@ double CPU_Reference(
                     SizeT num_child_neigh = graph.GetNeighborListLength(child);
                     VertexT leaf = 0;
                     if (num_child_neigh == 0) {
-                        util::PrintMsg("Warning: "
-                            "Vertex " + std::to_string(child) + " has no neighbors. "
-                            "GraphSAGE is not designed to run with dangling vertices.");
+                        //util::PrintMsg("Warning: "
+                        //    "Vertex " + std::to_string(child) + " has no neighbors. "
+                        //    "GraphSAGE is not designed to run with dangling vertices.");
                         leaf = child; 
                      } else { 
                         SizeT offset2 = distribution(engine) * graph.GetNeighborListLength(child);

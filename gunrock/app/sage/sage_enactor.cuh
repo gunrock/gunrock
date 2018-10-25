@@ -139,13 +139,13 @@ void sage_kernel2(
         if (threadIdx.x < Wf1_dim1)
         {
             auto f_offset = s_child * feature_column;
-            for (auto f = 0; f < feature_column; f++)
+            for (int f = 0; f < feature_column; f++)
                 val += Load<F_LOAD>(features + f_offset + f)
                     * Load<W_LOAD>(W_f_1 + (f * Wf1_dim1 + threadIdx.x));
         } else if (threadIdx.x < Wf1_dim1 + Wa1_dim1)
         {
             auto f_offset = child_num * feature_column;
-            for (auto f = 0; f < feature_column; f++)
+            for (int f = 0; f < feature_column; f++)
                 val += Load<cub::LOAD_LDG>(sums + f_offset + f)
                     * Load<W_LOAD>(W_a_1 + (f * Wa1_dim1 + threadIdx.x - Wf1_dim1));
         }
@@ -195,6 +195,7 @@ void sage_kernel3(
 {
     typedef util::reduce::BlockReduce<ValueT, LOG_THREADS_> BlockReduceT;
     __shared__ typename BlockReduceT::TempSpace reduce_space;
+    __shared__ double s_L2;
     extern __shared__ ValueT s_source_temp[];
     VertexT source_num = blockIdx.x;
  
@@ -205,13 +206,13 @@ void sage_kernel3(
         if (threadIdx.x < Wf1_dim1)
         {
             auto f_offset = (source_start + source_num) * feature_column;
-            for (auto f = 0; f < feature_column; f++)
+            for (int f = 0; f < feature_column; f++)
                 val += Load<F_LOAD>(features + f_offset + f)
                     * Load<W_LOAD>(W_f_1 + (f * Wf1_dim1 + threadIdx.x));
-        } else if (threadIdx.x < Wf1_dim1 + Wa1_dim1)
+        } else if (threadIdx.x < Wf2_dim0)
         {
-            SizeT f_offset = source_num * feature_column;
-            for (auto f = 0; f < feature_column; f++)
+            auto f_offset = source_num * feature_column;
+            for (int f = 0; f < feature_column; f++)
                 val += Load<S_LOAD>(sums_child_feat + f_offset + f)
                     * Load<W_LOAD>(W_a_1 + (f * Wa1_dim1 + threadIdx.x - Wf1_dim1));
         }
@@ -222,14 +223,18 @@ void sage_kernel3(
             {
                 return a + b;
             }, (ValueT)0, reduce_space);
+        if (threadIdx.x == 0)
+            s_L2 = 1.0 / sqrt(L2);
+        __syncthreads();
+
         if (threadIdx.x < Wf2_dim0)
         {
-            L2 = 1.0 / sqrt(L2);
+            //L2 = 1.0 / sqrt(L2);
             if (use_shared_source_temp)
-                s_source_temp[threadIdx.x] = val * L2;
+                s_source_temp[threadIdx.x] = val * s_L2;
             else 
                 Store<T_STORE>(source_temp + (source_num * Wf2_dim0 + threadIdx.x),
-                    (ValueT)(val * L2)); 
+                    (ValueT)(val * s_L2)); 
         }
         __syncthreads();
 
@@ -241,7 +246,7 @@ void sage_kernel3(
                 val += (use_shared_source_temp ? s_source_temp[y] : 
                     Load<T_LOAD>(source_temp + offset + y))
                     * Load<W_LOAD>(W_f_2 + (y * Wf2_dim1 + threadIdx.x));
-        } else if (threadIdx.x < Wf2_dim1 + Wa2_dim1)
+        } else if (threadIdx.x < result_column)
         {
             SizeT offset = source_num * Wa2_dim0;
             for (int y = 0; y < Wa2_dim0; y++)
@@ -255,11 +260,14 @@ void sage_kernel3(
             {
                 return a + b;
             }, (ValueT)0, reduce_space);
+        if (threadIdx.x == 0)
+            s_L2 = 1.0 / sqrt(L2);
+        __syncthreads();
         if (threadIdx.x < result_column)
         {
-            L2 = 1.0 / sqrt(L2);
+            //L2 = 1.0 / sqrt(L2);
             Store<cub::STORE_WT>(source_result + (source_num * result_column + threadIdx.x),
-                (ValueT)(val * L2));
+                (ValueT)(val * s_L2));
         }
         __syncthreads();
         source_num += gridDim.x;

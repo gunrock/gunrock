@@ -18,9 +18,9 @@ done
 
 OPTIONS="--device=2"
 OPTIONS="$OPTIONS --omp-threads=32 --num-runs=10"
-OPTIONS="$OPTIONS --feature-column=64,128,3000"
-OPTIONS="$OPTIONS --num-children-per-source=10,25,100,400"
-OPTIONS="$OPTIONS --batch-size=512,1024,2048,4096,8192,16384,32768,65536"
+OPTIONS="$OPTIONS --feature-column=64,128"
+OPTIONS="$OPTIONS --num-children-per-source=10,25,100"
+OPTIONS="$OPTIONS --batch-size=512,1024,2048,4096,8192,16384"
 
 OPTION[0]="$OPTIONS"
 OPTION[1]="${OPTION[0]} --undirected" #undirected"
