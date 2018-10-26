@@ -12,8 +12,8 @@
  * @brief Test related functions for Max Flow algorithm.
  */
 
-#define debug_aml(a...)
-//#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a); \
+//#define debug_aml(a...)
+#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a); \
     printf("\n");}
 
 #pragma once

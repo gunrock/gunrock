@@ -50,6 +50,7 @@ cudaError_t UseParameters_problem(
 
     return retval;
 }
+
 template <typename GraphT, typename VertexT>
 void relabeling(GraphT graph, VertexT sink, VertexT* h_height){
     typedef typename GraphT::CsrT CsrT;
