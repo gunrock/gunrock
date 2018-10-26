@@ -52,9 +52,7 @@ using namespace gunrock::app;
  */
 template <typename EnactorT>
 struct TCIterationLoop : puplic IterationLoopBase
-    <EanctorT, Use_FullQ | Push |
-    (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-    Update_Predecessors : 0x0)>
+    <EanctorT, Use_FullQ | Push>
 {
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
@@ -62,9 +60,7 @@ struct TCIterationLoop : puplic IterationLoopBase
     typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
     typedef IterationLoopBase
-        <EnactorT, Use_FullQ | Push |
-        (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-         Update_Predecessors : 0x0)> BaseIterationLoop;
+        <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
     TCIterationLoop() : BaseIterationLoop() {}    
     /**
@@ -139,30 +135,30 @@ struct TCIterationLoop : puplic IterationLoopBase
             false, oprtr_parameters.stream, true));
 
         GUARD_CU(util::CUBSelect_if(queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
-                                    graph_slice->column_indices.GetPointer(util::DEVICE),
-                                    graph_slice->column_indices.GetPointer(util::DEVICE) + graph.edges / 2,
+                                    CsrT::column_indices.GetPointer(util::DEVICE),
+                                    CsrT::column_indices.GetPointer(util::DEVICE) + graph.edges / 2,
                                     graph.edges));
 
         GUARD_CU(util::CUBSegReduce_sum(data_slice->d_src_node_ids.GetPointer(util::DEVICE),
                                         data_slice->d_edge_list.GetPointer(util::DEVICE),
-                                        graph_slice->row_offsets.GetPointer(util::DEVICE),
+                                        CsrT::row_offsets.GetPointer(util::DEVICE),
                                         graph.nodes));
 
         mgpu::Scan<mgpu::MgpuScanTypeExc>(
             data_slice->d_edge_list.GetPointer(util::DEVICE),
-            graph_slice->nodes+1,
+            graph.nodes+1,
             (int)0,
             mgpu::plus<int>(),
             (int*)0,
             (int*)0,
-            graph_slice->row_offsets.GetPointer(util::DEVICE),
+            CsrT::row_offsets.GetPointer(util::DEVICE),
             context[0]);
 
         mgpu::IntervalExpand(
-            graph_slice->edges/2,
-            graph_slice->row_offsets.GetPointer(util::DEVICE),
+            graph.edges/2,
+            CsrT::row_offsets.GetPointer(util::DEVICE),
             queue->keys[attributes->selector].GetPointer(util::DEVICE),
-            graph_slice->nodes,
+            graph.nodes,
             data_slice->d_src_node_ids.GetPointer(util::DEVICE),
             context[0]);
 
@@ -173,7 +169,7 @@ struct TCIterationLoop : puplic IterationLoopBase
 
         // Reuse d_scanned_edges
         SizeT *d_output_triplets = d_scanned_edges;
-        util::MemsetKernel<<<256, 1024>>>(d_output_triplets, (SizeT)0, graph_slice->edges);
+        util::MemsetKernel<<<256, 1024>>>(d_output_triplets, (SizeT)0, graph.edges);
 
         // Should make tc_count a member var to TCProblem
         float cc = gunrock::oprtr::intersection::LaunchKernel
@@ -181,16 +177,16 @@ struct TCIterationLoop : puplic IterationLoopBase
             statistics[0],
             attributes[0],
             d_data_slice,
-            graph_slice->row_offsets.GetPointer(util::DEVICE),
-            graph_slice->column_indices.GetPointer(util::DEVICE),
+            CsrT::row_offsets.GetPointer(util::DEVICE),
+            CsrT::column_indices.GetPointer(util::DEVICE),
             data_slice->d_src_node_ids.GetPointer(util::DEVICE),
-            graph_slice->column_indices.GetPointer(util::DEVICE),
+            CsrT::column_indices.GetPointer(util::DEVICE),
             data_slice->d_degrees.GetPointer(util::DEVICE),
             data_slice->d_edge_tc.GetPointer(util::DEVICE),
             d_output_triplets,
-            graph_slice->edges/2,
-            graph_slice->nodes,
-            graph_slice->edges/2,
+            graph.edges/2,
+            graph.nodes,
+            graph.edges/2,
             work_progress[0],
             context[0],
             stream);
@@ -215,32 +211,17 @@ struct TCIterationLoop : puplic IterationLoopBase
             problem -> data_slices[this -> gpu_num][0];
         auto         &enactor_slice      =   this -> enactor ->
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
-        auto iteration = enactor_slice.enactor_stats.iteration;
-        auto         &distances          =   data_slice.distances;
-        auto         &labels             =   data_slice.labels;
-        auto         &preds              =   data_slice.preds;
-        auto          label              =   this -> enactor ->
-            mgpu_slices[this -> gpu_num].in_iteration[iteration % 2][peer_];
 
-        auto expand_op = [distances, labels, label, preds]
-        __host__ __device__(
+        auto expand_op = [
+        ]__host__ __device__(
             VertexT &key, const SizeT &in_pos,
             VertexT *vertex_associate_ins,
             ValueT  *value__associate_ins) -> bool
         {
-            ValueT in_val  = value__associate_ins[in_pos];
-            ValueT old_val = atomicMin(distances + key, in_val);
-            if (old_val <= in_val)
-                return false;
-            if (labels[key] == label)
-                return false;
-            labels[key] = label;
-            if (!preds.isEmpty())
-                preds[key] = vertex_associate_ins[in_pos];
             return true;
         };
 
-        cudaError_t retval = BaseIterationLoop:: template ExpandIncomingBase
+        cudaError_t retval = TCIterationLoop:: template ExpandIncomingBase
             <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
             (received_length, peer_, expand_op);
         return retval;

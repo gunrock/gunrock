@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <gunrock/util/sort_device.cuh>
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
@@ -23,8 +24,9 @@
 namespace gunrock {
 namespace app {
 namespace ss {
+
 /**
- * @brief Speciflying parameters for SS Enactor
+ * @brief Speciflying parameters for Scan Statistics Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -41,19 +43,17 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
  */
 template <typename EnactorT>
 struct SSIterationLoop : public IterationLoopBase
-    <EnactorT, Use_FullQ | Push |
-    (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-    Update_Predecessors : 0x0)>
+    <EnactorT, Use_FullQ | Push>
 {
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
     typedef typename EnactorT::ValueT  ValueT;
+
+    typedef typename EnactorT::Problem::GraphT       GraphT;
     typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
     typedef IterationLoopBase
-        <EnactorT, Use_FullQ | Push |
-        (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-         Update_Predecessors : 0x0)> BaseIterationLoop;
+        <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
     SSIterationLoop() : BaseIterationLoop() {}
 
@@ -64,85 +64,31 @@ struct SSIterationLoop : public IterationLoopBase
      */
     cudaError_t Core(int peer_ = 0)
     {
-        // Data ss that works on
+        // Data ss works on
+        auto         &enactor            =   this -> enactor[0];
         auto         &data_slice         =   this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
         auto         &enactor_slice      =   this -> enactor ->
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
         auto         &enactor_stats      =   enactor_slice.enactor_stats;
         auto         &graph              =   data_slice.sub_graph[0];
-        auto         &distances          =   data_slice.distances;
-        auto         &labels             =   data_slice.labels;
-        auto         &preds              =   data_slice.preds;
-        //auto         &row_offsets        =   graph.CsrT::row_offsets;
-        auto         &weights            =   graph.CsrT::edge_values;
-        auto         &original_vertex    =   graph.GpT::original_vertex;
+        auto         &scan_stats         =   data_slice.scan_stats;
+        auto         &row_offsets        =   graph.CsrT::row_offsets;
         auto         &frontier           =   enactor_slice.frontier;
         auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
         auto         &retval             =   enactor_stats.retval;
-        //auto         &stream             =   enactor_slice.stream;
+        auto         &stream             =   oprtr_parameters.stream;
         auto         &iteration          =   enactor_stats.iteration;
+        auto          target             =   util::DEVICE;
 
-        // The advance operation
-        auto advance_op = [distances, weights, original_vertex, preds]
-        __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            ValueT src_distance = Load<cub::LOAD_CG>(distances + src);
-            ValueT edge_weight  = Load<cub::LOAD_CS>(weights + edge_id);
-            ValueT new_distance = src_distance + edge_weight;
-
-            // Check if the destination node has been claimed as someone's child
-            ValueT old_distance = atomicMin(distances + dest, new_distance);
-
-            if (new_distance < old_distance)
+        // First add degrees to scan statistics
+        GUARD_CU(scan_stats.ForAll([scan_stats, row_offsets]
+            __host__ __device__ (ValueT *scan_stats_, const SizeT & v)
             {
-                if (!preds.isEmpty())
-                {
-                    VertexT pred = src;
-                    if (!original_vertex.isEmpty())
-                        pred = original_vertex[src];
-                    Store(preds + dest, pred);
-                }
-                return true;
-            }
-            return false;
-        };
+                scan_stats_[v] = row_offsets[v + 1] - row_offsets[v];
+            }, graph.nodes, target, stream));
 
-        // The filter operation
-        auto filter_op = [labels, iteration] __host__ __device__(
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            if (!util::isValid(dest)) return false;
-            if (labels[dest] == iteration) return false;
-            labels[dest] = iteration;
-            return true;
-        };
-
-        oprtr_parameters.label = iteration + 1;
-        // Call the advance operator, using the advance operation
-        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, advance_op, filter_op));
-
-        if (oprtr_parameters.advance_mode != "LB_CULL" &&
-            oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
-        {
-            frontier.queue_reset = false;
-            // Call the filter operator, using the filter operation
-            GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-                oprtr_parameters, filter_op));
-        }
-
-        // Get back the resulted frontier length
-        GUARD_CU(frontier.work_progress.GetQueueLength(
-            frontier.queue_index, frontier.queue_length,
-            false, oprtr_parameters.stream, true));
+        // Compute number of triangles for each edge of each node divided by 2
 
         return retval;
     }
@@ -164,28 +110,13 @@ struct SSIterationLoop : public IterationLoopBase
             problem -> data_slices[this -> gpu_num][0];
         auto         &enactor_slice      =   this -> enactor ->
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
-        auto iteration = enactor_slice.enactor_stats.iteration;
-        auto         &distances          =   data_slice.distances;
-        auto         &labels             =   data_slice.labels;
-        auto         &preds              =   data_slice.preds;
-        auto          label              =   this -> enactor ->
-            mgpu_slices[this -> gpu_num].in_iteration[iteration % 2][peer_];
 
-        auto expand_op = [distances, labels, label, preds]
+        auto expand_op = []
         __host__ __device__(
             VertexT &key, const SizeT &in_pos,
             VertexT *vertex_associate_ins,
             ValueT  *value__associate_ins) -> bool
         {
-            ValueT in_val  = value__associate_ins[in_pos];
-            ValueT old_val = atomicMin(distances + key, in_val);
-            if (old_val <= in_val)
-                return false;
-            if (labels[key] == label)
-                return false;
-            labels[key] = label;
-            if (!preds.isEmpty())
-                preds[key] = vertex_associate_ins[in_pos];
             return true;
         };
 
@@ -243,8 +174,7 @@ public:
         BaseEnactor("ss"),
         problem    (NULL  )
     {
-        this -> max_num_vertex_associates
-            = (Problem::FLAG & Mark_Predecessors) != 0 ? 1 : 0;
+        this -> max_num_vertex_associates = 0;
         this -> max_num_value__associates = 1;
     }
 
@@ -293,13 +223,6 @@ public:
             auto &graph = problem.sub_graphs[gpu];
             GUARD_CU(enactor_slice.frontier.Allocate(
                 graph.nodes, graph.edges, this -> queue_factors));
-
-            for (int peer = 0; peer < this -> num_gpus; peer ++)
-            {
-                this -> enactor_slices[gpu * this -> num_gpus + peer]
-                    .oprtr_parameters.labels
-                    = &(problem.data_slices[gpu] -> labels);
-            }
         }
 
         iterations = new IterationT[this -> num_gpus];
@@ -311,6 +234,22 @@ public:
         GUARD_CU(this -> Init_Threads(this,
             (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
         return retval;
+    }
+
+    /**
+      * @brief one run of ss, to be called within GunrockThread
+      * @param thread_data Data for the CPU thread
+      * \return cudaError_t error message(s), if any
+      */
+    cudaError_t Run(ThreadSlice &thread_data)
+    {
+        gunrock::app::Iteration_Loop<
+            // TODO: change to how many {VertexT, ValueT} data need to communicate
+            //       per element in the inter-GPU sub-frontiers
+            0, 1,
+            IterationT>(
+            thread_data, iterations[thread_data.thread_num]);
+        return cudaSuccess;
     }
 
     /**
@@ -326,50 +265,15 @@ public:
         GUARD_CU(BaseEnactor::Reset(target));
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
-            if ((this->num_gpus == 1) ||
-                (gpu == this->problem->org_graph->GpT::partition_table[src]))
-            {
-                this -> thread_slices[gpu].init_size = 1;
-                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
-                {
-                    auto &frontier = this ->
-                        enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                    frontier.queue_length = (peer_ == 0) ? 1 : 0;
-                    if (peer_ == 0)
-                    {
-                        GUARD_CU(frontier.V_Q() -> ForEach(
-                            [src]__host__ __device__ (VertexT &v)
-                        {
-                            v = src;
-                        }, 1, target, 0));
-                    }
-                }
-            }
-
-            else {
-                this -> thread_slices[gpu].init_size = 0;
-                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
-                {
-                    this -> enactor_slices[gpu * this -> num_gpus + peer_]
-                        .frontier.queue_length = 0;
-                }
-            }
+	    this -> thread_slices[gpu].init_size = 1;
+	    for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
+	    {
+		this -> enactor_slices[gpu * this -> num_gpus + peer_]
+		    .frontier.queue_length = 1;
+	    }
         }
         GUARD_CU(BaseEnactor::Sync());
         return retval;
-    }
-    /**
-      * @brief one run of ss, to be called within GunrockThread
-      * @param thread_data Data for the CPU thread
-      * \return cudaError_t error message(s), if any
-      */
-    cudaError_t Run(ThreadSlice &thread_data)
-    {
-        gunrock::app::Iteration_Loop<
-            ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0,
-            1, IterationT>(
-            thread_data, iterations[thread_data.thread_num]);
-        return cudaSuccess;
     }
 
     /**
@@ -377,7 +281,7 @@ public:
      * @param[in] src Source node to start primitive.
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Enact(VertexT src)
+    cudaError_t Enact()
     {
         cudaError_t  retval     = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));

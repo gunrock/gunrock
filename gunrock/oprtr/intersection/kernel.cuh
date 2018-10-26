@@ -572,6 +572,61 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     //return total_counts[0];
 }
 
+template <
+    OprtrFlag FLAG,
+    typename GraphT,
+    typename FrontierInT,
+    typename FrontierOutT,
+    typename ParametersT,
+    typename AdvanceOpT,
+    typename FilterOpT>
+cudaError_t Launch(
+    const GraphT         &graph,
+    const FrontierInT   * frontier_in,
+          FrontierOutT  * frontier_out,
+          ParametersT    &parameters,
+          AdvanceOpT      advance_op,
+          FilterOpT       filter_op)
+{
+    if (parameters.filter_mode == "CULL")
+        return CULL::Launch<FLAG>(graph, frontier_in, frontier_out,
+            parameters, advance_op, filter_op);
+    if (parameters.filter_mode == "BY_PASS")
+        return BP::Launch<FLAG>(graph, frontier_in, frontier_out,
+            parameters, advance_op, filter_op);
+
+    return util::GRError(cudaErrorInvalidValue,
+        "FilterMode " + parameters.filter_mode + " undefined.", __FILE__, __LINE__);
+}
+
+template <
+    OprtrFlag FLAG,
+    typename GraphT,
+    typename FrontierInT,
+    typename FrontierOutT,
+    typename ParametersT,
+    typename OpT>
+cudaError_t Launch(
+    const GraphT         &graph,
+    const FrontierInT   * frontier_in,
+          FrontierOutT  * frontier_out,
+          ParametersT    &parameters,
+          OpT             op)
+{
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    typedef typename FrontierInT::ValueT InKeyT;
+
+    auto dummy_advance = []__host__ __device__ (
+        const VertexT &src   , VertexT &dest, const SizeT &edge_id,
+        const InKeyT  &key_in, const SizeT &input_pos, SizeT &output_pos) -> bool{
+            return true;
+        };
+
+    return Launch<FLAG>(graph, frontier_in, frontier_out,
+        parameters, dummy_advance, op);
+}
+
 }  // intersection
 }  // oprtr
 }  // gunrock

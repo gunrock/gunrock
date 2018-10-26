@@ -35,22 +35,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_app    (parameters));
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
-
-    GUARD_CU(parameters.Use<std::string>(
-        "src",
-        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-        "0",
-        "<Vertex-ID|random|largestdegree> The source vertices\n"
-        "\tIf random, randomly select non-zero degree vertices;\n"
-        "\tIf largestdegree, select vertices with largest degrees",
-        __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<int>(
-        "src-seed",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        util::PreDefinedValues<int>::InvalidValue,
-        "seed to generate random sources",
-        __FILE__, __LINE__));
+    GUARD_CU(UseParameters_test   (parameters));
 
     return retval;
 }
@@ -69,7 +54,6 @@ template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
-    ValueT **ref_distances = NULL,
     util::Location target = util::DEVICE)
 {
     cudaError_t retval = cudaSuccess;
@@ -82,17 +66,13 @@ cudaError_t RunTests(
 
     // parse configurations from parameters
     bool quiet_mode = parameters.Get<bool>("quiet");
-    bool mark_pred  = parameters.Get<bool>("mark-pred");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-    int  num_srcs   = srcs   .size();
     util::Info info("SS", parameters, graph); // initialize Info structure
 
     // Allocate host-side array (for both reference and GPU-computed results)
-    ValueT  *h_distances = new ValueT[graph.nodes];
-    VertexT *h_preds = (mark_pred) ? new VertexT[graph.nodes] : NULL;
-
+    VertexT *h_node       = new VertexT[1];
+    ValueT  *h_scan_stat  = new ValueT [1];
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
@@ -105,47 +85,44 @@ cudaError_t RunTests(
     //info.preprocess_time = cpu_timer.ElapsedMillis();
 
     // perform SS
-    VertexT src;
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        src = srcs[run_num % num_srcs];
-        GUARD_CU(problem.Reset(src, target));
-        GUARD_CU(enactor.Reset(src, target));
+        GUARD_CU(problem.Reset(target));
+        GUARD_CU(enactor.Reset(target));
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
-        GUARD_CU(enactor.Enact(src));
+        GUARD_CU(enactor.Enact());
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
         util::PrintMsg("--------------------------\nRun "
             + std::to_string(run_num) + " elapsed: "
-            + std::to_string(cpu_timer.ElapsedMillis()) + " ms, src = "
-            + std::to_string(src) + ", #iterations = "
+            + std::to_string(cpu_timer.ElapsedMillis()) + " ms, #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
-        if (validation == "each")
+/*        if (validation == "each")
         {
             GUARD_CU(problem.Extract(h_distances, h_preds));
-            SizeT num_errors = app::sssp::Validate_Results(
+            SizeT num_errors = app::ss::Validate_Results(
                 parameters, graph, src, h_distances, h_preds,
                 ref_distances == NULL ? NULL : ref_distances[run_num % num_srcs],
                 NULL, false);
-        }
+        }*/
     }
 
     cpu_timer.Start();
     // Copy out results
-    GUARD_CU(problem.Extract(h_distances, h_preds));
-    if (validation == "last")
+    GUARD_CU(problem.Extract(h_scan_stat, h_node, target));
+/*    if (validation == "last")
     {
         SizeT num_errors = app::sssp::Validate_Results(
             parameters, graph, src, h_distances, h_preds,
             ref_distances == NULL ? NULL : ref_distances[(num_runs -1) % num_srcs]);
-    }
+    }*/
 
     // compute running statistics
-    info.ComputeTraversalStats(enactor, h_distances);
+    info.ComputeTraversalStats(enactor, (VertexT*)NULL);
     //Display_Memory_Usage(problem);
     #ifdef ENABLE_PERFORMANCE_PROFILING
         //Display_Performance_Profiling(enactor);
@@ -153,8 +130,8 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    delete[] h_distances  ; h_distances   = NULL;
-    delete[] h_preds      ; h_preds       = NULL;
+    delete[] h_node       ; h_node        = NULL;
+    delete[] h_scan_stat  ; h_scan_stat   = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
@@ -179,12 +156,12 @@ template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_ss(
     gunrock::util::Parameters &parameters,
     GraphT &graph,
-    ValueT **distances,
-    typename GraphT::VertexT **preds = NULL)
+    typename GraphT::VertexT *node,
+    ValueT *scan_stat)
 {
     typedef typename GraphT::VertexT VertexT;
-    typedef gunrock::app::sssp::Problem<GraphT  > ProblemT;
-    typedef gunrock::app::sssp::Enactor<ProblemT> EnactorT;
+    typedef gunrock::app::ss::Problem<GraphT  > ProblemT;
+    typedef gunrock::app::ss::Enactor<ProblemT> EnactorT;
     gunrock::util::CpuTimer cpu_timer;
     gunrock::util::Location target = gunrock::util::DEVICE;
     double total_time = 0;
@@ -197,28 +174,22 @@ double gunrock_ss(
     problem.Init(graph  , target);
     enactor.Init(problem, target);
 
-    std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
     int num_runs = parameters.Get<int>("num-runs");
-    int num_srcs = srcs.size();
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
-        int src_num = run_num % num_srcs;
-        VertexT src = srcs[src_num];
-        problem.Reset(src, target);
-        enactor.Reset(src, target);
+        problem.Reset(target);
+        enactor.Reset(target);
 
         cpu_timer.Start();
-        enactor.Enact(src);
+        enactor.Enact();
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-        problem.Extract(distances[src_num],
-            preds == NULL ? NULL : preds[src_num]);
+        problem.Extract(node, scan_stat, NULL, target);
     }
 
     enactor.Release(target);
     problem.Release(target);
-    srcs.clear();
     return total_time;
 }
 
@@ -239,7 +210,7 @@ double gunrock_ss(
 template <
     typename VertexT = int,
     typename SizeT   = int,
-    typename GValueT = unsigned int,
+    typename GValueT = unsigned long,
     typename SSValueT = GValueT>
 double ss(
     const SizeT        num_nodes,
@@ -248,10 +219,8 @@ double ss(
     const VertexT     *col_indices,
     const GValueT     *edge_values,
     const int          num_runs,
-          VertexT     *sources,
-    const bool         mark_pred,
-          SSValueT **distances,
-          VertexT    **preds = NULL)
+          VertexT     *nodes,
+          SSValueT    *scan_stats)
 {
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
         gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
@@ -265,13 +234,7 @@ double ss(
     gunrock::app::UseParameters_test(parameters);
     parameters.Parse_CommandLine(0, NULL);
     parameters.Set("graph-type", "by-pass");
-    parameters.Set("mark-pred", mark_pred);
     parameters.Set("num-runs", num_runs);
-    std::vector<VertexT> srcs;
-    for (int i = 0; i < num_runs; i ++)
-        srcs.push_back(sources[i]);
-    parameters.Set("srcs", srcs);
-
     bool quiet = parameters.Get<bool>("quiet");
     GraphT graph;
     // Assign pointers into gunrock graph format
@@ -279,14 +242,13 @@ double ss(
     graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
     graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
     graph.CsrT::edge_values   .SetPointer(edge_values, num_edges, gunrock::util::HOST);
-    // graph.FromCsr(graph.csr(), true, quiet);
+    graph.FromCsr(graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, graph);
 
     // Run the SS
-    double elapsed_time = gunrock_ss(parameters, graph, distances, preds);
+    double elapsed_time = gunrock_ss(parameters, graph, nodes, scan_stats);
     // Cleanup
     graph.Release();
-    srcs.clear();
 
     return elapsed_time;
 }
