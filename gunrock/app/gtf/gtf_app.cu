@@ -281,11 +281,16 @@ cudaError_t RunTests(
                 .enactor_stats.iteration), !quiet_mode);
 
         ValueT* Y = (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
-        GUARD_CU(problem.Extract(Y));
+        ValueT* edge_values = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
+        GUARD_CU(problem.Extract(Y, edge_values));
 
         std::ofstream out_pr( "./output_pr_GPU.txt" );
         for(int i = 0; i < num_org_nodes; i++) out_pr << Y[i] << std::endl;
         out_pr.close();
+
+        std::ofstream out_graph( "./wrong_graph_GPU.mtx" );
+        for(int i = 0; i < graph.edges; i++) out_pr << graph.edge_values[i] << std::endl;
+        out_graph.close();
 
         // if (validation == "each")
         // {

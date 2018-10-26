@@ -432,20 +432,27 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     cudaError_t Extract(
         ValueT	       *h_Y,
+        ValueT	       *edge_values,
         util::Location  target = util::DEVICE)
     {
 	cudaError_t retval = cudaSuccess;
 
 	auto &data_slice = data_slices[0][0];
 	SizeT vN = this->org_graph->nodes;
-  printf("extract: %d \n", vN);
+  SizeT vE = this->org_graph->edges;
+
 
 	// Set device
 	if (target == util::DEVICE)
 	{
+      printf("transfering to host!!!: %d \n", vN);
 	    GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 	    GUARD_CU(data_slice.Y.SetPointer(h_Y, vN, util::HOST));
 	    GUARD_CU(data_slice.Y.Move(util::DEVICE, util::HOST));
+
+      GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+	    GUARD_CU(data_slice.edge_residuals.SetPointer(edge_values, vE, util::HOST));
+	    GUARD_CU(data_slice.edge_residuals.Move(util::DEVICE, util::HOST));
 	}
 	else if (target == util::HOST)
 	{

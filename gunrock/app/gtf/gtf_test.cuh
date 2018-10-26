@@ -76,7 +76,7 @@ cudaError_t UseParameters_test(util::Parameters &parameters)
     GUARD_CU(parameters.Use<double>(
         "error_threshold",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        1e-6,
+        1e-12,
         "Error threshold to compare floating point values",
         __FILE__, __LINE__));
 
@@ -539,9 +539,9 @@ cudaError_t CPU_Reference(
         for(int e = 0; e < 10; e++)
           printf("CPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
 
-         GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
+        GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
             edge_flows, edge_residuals, vertex_reachabilities));
-        //minCut(graph, source, dest, vertex_reachabilities, edge_residuals, num_nodes);
+        // minCut(graph, source, dest, vertex_reachabilities, edge_residuals, num_nodes);
 
         auto &edge_capacities = graph.edge_values;
 
@@ -638,7 +638,7 @@ cudaError_t CPU_Reference(
 
             auto comm = curr_communities[v];
             if (!community_active[comm] ||
-                abs(community_weights[comm]) < error_threshold)
+                abs(community_weights[comm]) <= 0.0)
             {
                 if (vertex_reachabilities[v] == 1)
                     edge_residuals[num_edges - num_org_nodes * 2 + v] = 0;

@@ -120,6 +120,7 @@ struct main_struct
     	[reverse_edges](util::Parameters &parameters_, GraphT &d_graph)
     	{
     	    return app::gtf::RunTests<GraphT, ValueT, VertexT, SizeT>(parameters_, d_graph, reverse_edges+0);
+            //return cudaSuccess;
         }));
 
     	// Clean up
