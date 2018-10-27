@@ -18,6 +18,7 @@
 #define debug_aml(a...)
 //#define debug_aml(a...) {printf(a); printf("\n");}
 
+
 using namespace gunrock;
 
 /*****************************************************************************
@@ -109,65 +110,65 @@ struct main_struct
 	ValueT* flow_edge = (ValueT*)malloc(sizeof(ValueT)*u_graph.edges);
 	SizeT* reverse	  = (SizeT*)malloc(sizeof(SizeT)*u_graph.edges);
 
-	// Initialize reverse array.
-	for (auto u = 0; u < u_graph.nodes; ++u)
-	{
-	    auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
-	    auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
-	    auto e_end = e_start + num_neighbors;
-	    for (auto e = e_start; e < e_end; ++e)
-	    {
-		auto v = u_graph.CsrT::GetEdgeDest(e);
-		auto f_start = u_graph.CsrT::GetNeighborListOffset(v);
-		auto num_neighbors2 = u_graph.CsrT::GetNeighborListLength(v);
-		auto f_end = f_start + num_neighbors2;
-		for (auto f = f_start; f < f_end; ++f)
-		{
-		    auto z = u_graph.CsrT::GetEdgeDest(f);
-		    if (z == u)
-		    {
-			reverse[e] = f;
-			reverse[f] = e;
-			break;
-		    }
-		}
-	    }
-	}
+    // Initialize reverse array.
+    for (auto u = 0; u < u_graph.nodes; ++u)
+    {
+        auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+        auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+        auto e_end = e_start + num_neighbors;
+        for (auto e = e_start; e < e_end; ++e)
+        {
+            auto v = u_graph.CsrT::GetEdgeDest(e);
+            auto f_start = u_graph.CsrT::GetNeighborListOffset(v);
+            auto num_neighbors2 = u_graph.CsrT::GetNeighborListLength(v);
+            auto f_end = f_start + num_neighbors2;
+            for (auto f = f_start; f < f_end; ++f)
+            {
+                auto z = u_graph.CsrT::GetEdgeDest(f);
+                if (z == u)
+                {
+                    reverse[e] = f;
+                    reverse[f] = e;
+                    break;
+                }
+            }
+        }
+    }
 
-	if (not undirected){
-	    // Correct capacity values on reverse edges
-	    for (auto u = 0; u < u_graph.nodes; ++u)
-	    {
-		auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
-		auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
-		auto e_end = e_start + num_neighbors;
-		debug_aml("vertex %d\nnumber of neighbors %d", u, 
-			num_neighbors);
-		for (auto e = e_start; e < e_end; ++e)
-		{
-		    u_graph.CsrT::edge_values[e] = (ValueT)0;
-		    auto v = u_graph.CsrT::GetEdgeDest(e);
-		    // Looking for edge u->v in directed graph
-		    auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
-		    auto num_neighbors2 = 
-			d_graph.CsrT::GetNeighborListLength(u);
-		    auto f_end = f_start + num_neighbors2;
-		    for (auto f = f_start; f < f_end; ++f)
-		    {
-			auto z = d_graph.CsrT::GetEdgeDest(f);
-			if (z == v and d_graph.CsrT::edge_values[f] > 0)
-			{
-			    u_graph.CsrT::edge_values[e]  = 
-				d_graph.CsrT::edge_values[f];
-			    debug_aml("edge (%d, %d) cap = %lf\n", u, v, \
-				    u_graph.CsrT::edge_values[e]);
-			    break;
-			}
-		    }
-		}
-	    }
-	}
-/*
+    if (not undirected){
+        // Correct capacity values on reverse edges
+        for (auto u = 0; u < u_graph.nodes; ++u)
+        {
+            auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
+            auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
+            auto e_end = e_start + num_neighbors;
+            debug_aml("vertex %d\nnumber of neighbors %d", u, 
+                    num_neighbors);
+            for (auto e = e_start; e < e_end; ++e)
+            {
+                u_graph.CsrT::edge_values[e] = (ValueT)0;
+                auto v = u_graph.CsrT::GetEdgeDest(e);
+                // Looking for edge u->v in directed graph
+                auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
+                auto num_neighbors2 = 
+                    d_graph.CsrT::GetNeighborListLength(u);
+                auto f_end = f_start + num_neighbors2;
+                for (auto f = f_start; f < f_end; ++f)
+                {
+                    auto z = d_graph.CsrT::GetEdgeDest(f);
+                    if (z == v and d_graph.CsrT::edge_values[f] > 0)
+                    {
+                        u_graph.CsrT::edge_values[e]  = 
+                            d_graph.CsrT::edge_values[f];
+                        debug_aml("edge (%d, %d) cap = %lf\n", u, v, \
+                                u_graph.CsrT::edge_values[e]);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    /*
 	ValueT** rGraph = (ValueT**)malloc(sizeof(ValueT*)*u_graph.nodes);
 	for (auto x = 0; x < u_graph.nodes; ++x){
 	    rGraph[x] = (ValueT*)malloc(sizeof(ValueT)*u_graph.nodes);
@@ -207,18 +208,20 @@ struct main_struct
 */
 
 	//
-        // Compute reference CPU max flow algorithm.
+    // Compute reference CPU max flow algorithm.
 	//
-        ValueT max_flow;
+    ValueT max_flow = (ValueT)0;
 	
-	util::PrintMsg("______CPU reference algorithm______", true);
-	double elapsed = app::mf::CPU_Reference
-	    (parameters, u_graph, source, sink, max_flow, reverse, flow_edge);
-        util::PrintMsg("-----------------------------------\nElapsed: " + 
-		std::to_string(elapsed) + " ms\nMax flow CPU = " +
+	if (!quick) {
+	    util::PrintMsg("______CPU reference algorithm______", true);
+	    double elapsed = app::mf::CPU_Reference
+	        (parameters, u_graph, source, sink, max_flow, reverse, flow_edge);
+            util::PrintMsg("-----------------------------------\nElapsed: " + 
+		std::to_string(elapsed) + " ms\n Max flow CPU = " +
 		std::to_string(max_flow), true);
-	
-        std::vector<std::string> switches{"advance-mode"};
+	}
+
+    std::vector<std::string> switches{"advance-mode"};
 	GUARD_CU(app::Switch_Parameters(parameters, u_graph, switches,
 	[flow_edge, reverse](util::Parameters &parameters, GraphT &u_graph)
 	{

@@ -25,6 +25,9 @@
 //#define debug_aml(a...) \
   {printf("%s:%d ", __FILE__, __LINE__); printf(a); printf("\n");}
 
+//#define debug_aml2(a...) printf(a);
+#define debug_aml2(a...)
+
 namespace gunrock {
 namespace app {
 namespace mf {
@@ -41,7 +44,13 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
     GUARD_CU(app::UseParameters_enactor(parameters));
     return retval;
 }
-
+template <typename ValueT>
+__device__ bool almost_eql(ValueT A, ValueT B, ValueT maxRelDiff = MF_EPSILON)
+{
+    if (fabs(A - B) < maxRelDiff)
+        return true;
+    return false;
+}
 /**
  * @brief defination of MF iteration loop
  * @tparam EnactorT Type of enactor
@@ -68,66 +77,69 @@ struct MFIterationLoop : public IterationLoopBase
      */
     cudaError_t Core(int peer_ = 0)
     {
-	auto enactor		= this -> enactor;
-	auto gpu_num		= this -> gpu_num;
-	auto num_gpus		= enactor -> num_gpus;
-	auto gpu_offset		= num_gpus * gpu_num;
+        auto enactor		= this -> enactor;
+        auto gpu_num		= this -> gpu_num;
+        auto num_gpus		= enactor -> num_gpus;
+        auto gpu_offset		= num_gpus * gpu_num;
         auto &data_slice	= enactor -> problem -> data_slices[gpu_num][0];
         auto &enactor_slice	= enactor -> 
-				  enactor_slices[gpu_offset + peer_];
+            enactor_slices[gpu_offset + peer_];
         auto &enactor_stats	= enactor_slice.enactor_stats;
         auto &graph		= data_slice.sub_graph[0];
         auto &frontier        	= enactor_slice.frontier;
         auto &oprtr_parameters	= enactor_slice.oprtr_parameters;
         auto &retval          	= enactor_stats.retval;
         auto &iteration       	= enactor_stats.iteration;
-      
-	auto source		= data_slice.source;
-	auto sink		= data_slice.sink;
-	auto &capacity        	= graph.edge_values;
-	auto &reverse		= data_slice.reverse;
+
+        auto source		= data_slice.source;
+        auto sink		= data_slice.sink;
+        auto &capacity        	= graph.edge_values;
+        auto &reverse		= data_slice.reverse;
         auto &flow            	= data_slice.flow;
         auto &excess          	= data_slice.excess;
         auto &height	      	= data_slice.height;
-	auto &lowest_neighbor	= data_slice.lowest_neighbor;
-	auto &local_vertices	= data_slice.local_vertices;
-	auto &active		= data_slice.active;
-	auto null_ptr		= &local_vertices;
-	null_ptr = NULL;
+        auto &lowest_neighbor	= data_slice.lowest_neighbor;
+        auto &local_vertices	= data_slice.local_vertices;
+        auto &active		= data_slice.active;
+        auto null_ptr		= &local_vertices;
+        null_ptr = NULL;
 
-	auto advance_push_op = [capacity, flow, excess, height, reverse, 
-	     source, sink, active]
-	    __host__ __device__
-	    (const VertexT &src, VertexT &dest, const SizeT &edge_id, 
-	    const VertexT &input_item, const SizeT &input_pos,
-	    const SizeT &output_pos) -> bool
-	{
-	    if (!util::isValid(dest) or !util::isValid(src) or 
-		    src == source or src == sink)
-		return false;
-	    auto e = excess[src];
-	    auto cf = capacity[edge_id] - flow[edge_id];
-	    auto f = min(cf, e);
-	    auto rev_id = reverse[edge_id];
-	    if (f > 0 && height[src] > height[dest])
-	    {
-		if (atomicAdd(&excess[src], -f) >= f)
-		{
-		    atomicAdd(&excess[dest], f);
-		    atomicAdd(&flow[edge_id], f);
-		    atomicAdd(&flow[rev_id], -f);
-//		    printf("push %d->%d, flow %lf, e[%d] %lf, e[%d] %lf\n", \
-			    src, dest, f, src, excess[src], dest, excess[dest]);
-		    active[0] = 1;
-		}else{
-		    atomicAdd(&excess[src], f);
-//		    printf("rollback push %d->%d, excess[%d] = %lf\n", \
-			    src, dest, src, excess[src]);
-		} 
-		return true;
-	    }
-	    return false;
-	};
+        auto advance_push_op = [capacity, flow, excess, height, reverse, 
+             source, sink, active]
+             __host__ __device__
+             (const VertexT &src, VertexT &dest, const SizeT &edge_id, 
+              const VertexT &input_item, const SizeT &input_pos,
+              const SizeT &output_pos) -> bool
+             {
+                 if (!util::isValid(dest) or !util::isValid(src) or 
+                         src == source or src == sink)
+                     return false;
+                 ValueT c = capacity[edge_id];
+                 ValueT fl = flow[edge_id];
+                 //printf("flt epsilon %lf\n", FLT_EPSILON);
+                 if (almost_eql(c, fl) || almost_eql(excess[src], 0.0))
+                     return false;
+                 ValueT f = fminf(c - fl, excess[src]);
+                 VertexT rev_id = reverse[edge_id];
+                 if (height[src] > height[dest])
+                 {
+                     ValueT old = atomicAdd(&excess[src], -f);
+                     if (old >= f || almost_eql(old, f))
+                     {
+                         atomicAdd(&excess[dest], f);
+                         atomicAdd(&flow[edge_id], f);
+                         atomicAdd(&flow[rev_id], -f);
+                         debug_aml2("push %d->%d, c = %lf, fl = %lf, f = %lf, e[%d] = %lf, e[%d] = %lf\n", 
+                                 src, dest, c, fl, f, src, excess[src], dest, excess[dest]);
+                         active[0] = 1;
+                     }else{
+                         atomicAdd(&excess[src], f);
+                         debug_aml2("rollback push %d->%d, becuase %lf < %lf, c = %lf, fl = %lf, f = %lf, excess[%d] = %lf\n", src, dest, old, f, c, fl, f, src, excess[src]);
+                     } 
+                     return true;
+                 }
+                 return false;
+             };
 
 	auto advance_find_lowest_op = 
 	    [excess, capacity, flow, lowest_neighbor, height, iteration,
@@ -137,23 +149,24 @@ struct MFIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-	    if (!util::isValid(dest) or !util::isValid(src) or 
-		    src == source or src == sink)
-		return false;
-	    if (excess[src] > (ValueT)0 and 
-		    capacity[edge_id] - flow[edge_id] > (ValueT)0)
-	    {
-		auto l = lowest_neighbor[src];
-		auto height_dest = height[dest];
-		while (!util::isValid(l) or height_dest < height[l]){
-		    l = atomicCAS(&lowest_neighbor[src], l, dest);
-		}
-		if (lowest_neighbor[src] == dest){
-		    return true;
-		}
-	    }
-	    return false;
-	};
+            if (!util::isValid(dest) or !util::isValid(src) or 
+                    src == source or src == sink)
+                return false;
+
+            if (almost_eql(excess[src], 0.0) || 
+                    almost_eql(capacity[edge_id], flow[edge_id]))
+                return false;
+
+            auto l = lowest_neighbor[src];
+            auto height_dest = height[dest];
+            while (!util::isValid(l) or height_dest < height[l]){
+                l = atomicCAS(&lowest_neighbor[src], l, dest);
+            }
+            if (lowest_neighbor[src] == dest){
+                return true;
+            }
+            return false;
+        };
 
 	auto advance_relabel_op = 
 	    [excess, capacity, flow, lowest_neighbor, height, iteration, 
@@ -163,22 +176,24 @@ struct MFIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-	    if (!util::isValid(dest) or !util::isValid(src) or 
-		    src == source or src == sink)
-		return false;
-	    if (excess[src] > (ValueT)0 and 
-		    capacity[edge_id] - flow[edge_id] > (ValueT)0 and
-		    lowest_neighbor[src] == dest){ 
-		if (height[src] <= height[dest])
-		{
-	//	    printf("relabel src %d, dest %d, H[%d]=%d, -> %d\n",\
-			src, dest, src, height[src], height[dest]+1);
-		    height[src] = height[dest] + 1;
-		    active[0] = 1;
-		    return true;
-		}
-	    }
-	    return false;
+            if (!util::isValid(dest) or !util::isValid(src) or 
+                    src == source or src == sink)
+                return false;
+            if (almost_eql(excess[src], 0.0) or 
+                    almost_eql(capacity[edge_id], flow[edge_id]))
+                return false;
+            if (lowest_neighbor[src] == dest)
+            {
+                if (height[src] <= height[dest])
+                {
+                    debug_aml2("relabel src %d, dest %d, H[%d]=%d, -> %d\n",\
+                            src, dest, src, height[src], height[dest]+1);
+                    height[src] = height[dest] + 1;
+                    active[0] = 1;
+                    return true;
+                }
+            }
+            return false;
 	};
 	
 //	GUARD_CU(excess.ForAll(

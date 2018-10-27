@@ -22,6 +22,9 @@
 //#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a);\
     printf("\n");}
 
+
+#define MF_EPSILON 1e-6
+
 namespace gunrock {
 namespace app {
 namespace mf {
@@ -50,6 +53,7 @@ cudaError_t UseParameters_problem(
 
     return retval;
 }
+
 template <typename GraphT, typename VertexT>
 void relabeling(GraphT graph, VertexT sink, VertexT* h_height){
     typedef typename GraphT::CsrT CsrT;
