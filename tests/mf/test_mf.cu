@@ -18,6 +18,7 @@
 #define debug_aml(a...)
 //#define debug_aml(a...) {printf(a); printf("\n");}
 
+
 using namespace gunrock;
 
 /*****************************************************************************

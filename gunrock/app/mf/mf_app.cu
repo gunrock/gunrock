@@ -26,9 +26,9 @@
 #include <gunrock/app/mf/mf_enactor.cuh>
 #include <gunrock/app/mf/mf_test.cuh>
 
-#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a);\
+//#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a);\
     printf("\n");}
-//#define debug_aml(a...)
+#define debug_aml(a...)
 
 namespace gunrock {
 namespace app {

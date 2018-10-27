@@ -22,6 +22,9 @@
 //#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a);\
     printf("\n");}
 
+
+#define MF_EPSILON 1e-6
+
 namespace gunrock {
 namespace app {
 namespace mf {
