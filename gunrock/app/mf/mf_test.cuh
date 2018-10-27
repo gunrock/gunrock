@@ -397,17 +397,19 @@ double CPU_Reference(
     ValueT*   excess =  (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
     VertexT*  height = (VertexT*)malloc(sizeof(VertexT)*graph.nodes);
     for (VertexT v = 0; v < graph.nodes; ++v){
-	excess[v] = (ValueT)0;
-	height[v] = (VertexT)0;
+        excess[v] = (ValueT)0;
+        height[v] = (VertexT)0;
     }
-    relabeling(graph, sin, height);
+     
+    for (SizeT e = 0; e < graph.edges; ++e){
+        flow[e] = (ValueT) 0;
+    }
+
+    relabeling(graph, sin, height, reverse, flow);
     if (height[src] < graph.nodes)
-	height[src] = graph.nodes;
+        height[src] = graph.nodes;
     //printf("height[source] = %d, should be %d\n", height[src], graph.nodes);
 
-    for (SizeT e = 0; e < graph.edges; ++e){
-	flow[e] = (ValueT) 0;
-    }
 
     auto e_start = graph.CsrT::GetNeighborListOffset(src);
     auto num_neighbors = graph.CsrT::GetNeighborListLength(src);
@@ -416,12 +418,12 @@ double CPU_Reference(
     ValueT preflow = (ValueT) 0;
     for (SizeT e = e_start; e < e_end; ++e)
     {
-	auto y = graph.CsrT::GetEdgeDest(e);
-	auto c = graph.CsrT::edge_values[e];
-	excess[y] += c;
-	flow[e] = c;
-	flow[reverse[e]] = -c;
-	preflow += c;
+        auto y = graph.CsrT::GetEdgeDest(e);
+        auto c = graph.CsrT::edge_values[e];
+        excess[y] += c;
+        flow[e] = c;
+        flow[reverse[e]] = -c;
+        preflow += c;
     }
 
     //
