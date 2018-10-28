@@ -124,16 +124,29 @@ struct GTFIterationLoop : public IterationLoopBase
        GUARD_CU(edge_residuals.ForAll(
            [mf_flow, graph, source] __host__ __device__ (ValueT *edge_residuals, const SizeT &e){
                if(e < 10) printf("GPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
+               //edge_residuals[e] = graph.edge_values[e]; // just for debugging purposes #!!!
            }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
-
+      cpu_timer.Start();
       GUARD_CU(graph.edge_values.Move(util::DEVICE, util::HOST, graph.edges, 0, oprtr_parameters.stream));
       GUARD_CU(cudaDeviceSynchronize());
+      cpu_timer.Stop();
+      printf("move: %f \n", cpu_timer.ElapsedMillis());
+
        mf_problem.parameters.Set("source", source);
        mf_problem.parameters.Set("sink", sink);
+       cpu_timer.Start();
        GUARD_CU(mf_problem.Reset(graph, h_reverse+0, mf_target));
+       GUARD_CU(cudaDeviceSynchronize());
+       cpu_timer.Stop();
+       printf("problem reset: %f \n", cpu_timer.ElapsedMillis());
+
+       cpu_timer.Start();
        GUARD_CU(mf_enactor.Reset(source, mf_target));
        GUARD_CU(cudaDeviceSynchronize());
+       cpu_timer.Stop();
+       printf("enact reset: %f \n", cpu_timer.ElapsedMillis());
+
        cpu_timer.Start();
        GUARD_CU(mf_enactor.Enact());
        GUARD_CU(cudaDeviceSynchronize());
@@ -597,7 +610,7 @@ struct GTFIterationLoop : public IterationLoopBase
               [graph, iteration, active]
                 __host__ __device__ (ValueT *edge_residuals, SizeT &e){
                 {
-                  if(false){ //(iteration == 2){
+                  if(false){ //iteration == 0){
                     active[0] = 0;
                     edge_residuals[e] = graph.edge_values[e]; // just for debugging purposes #!!!
                   }
@@ -627,6 +640,7 @@ struct GTFIterationLoop : public IterationLoopBase
                   if(v == 0) printf("in last for loop end\n");
                   }
                 }, num_org_nodes, util::DEVICE, oprtr_parameters.stream));
+          GUARD_CU(cudaDeviceSynchronize());
           cpu_timer.Stop();
           printf("gtf: %f \n", cpu_timer.ElapsedMillis());
 

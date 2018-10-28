@@ -103,6 +103,48 @@ void DisplaySolution(GraphT graph, ValueT* h_flow, VertexT* reverse,
  * GTF Testing Routines
  ***************************************************************************/
 
+ /**
+  * @brief Min Cut algorithm
+  *
+  * @tparam ValueT      Type of capacity/flow/excess
+  * @tparam VertxeT     Type of vertex
+  * @tparam GraphT      Type of graph
+  * @param[in] graph    Graph
+  * @param[in] source   Source vertex
+  * @param[in] sink     Sink vertex
+  * @param[in] flow     Function of flow on edges
+  * @param[out] min_cut Function on nodes, 1 = connected to source, 0 = sink
+  *
+  */
+ template <typename VertexT, typename ValueT, typename GraphT>
+ void minCut_sub(GraphT &graph, VertexT src, ValueT *flow, bool * vertex_reachabilities, ValueT * residuals)
+ {
+    typedef typename GraphT::CsrT CsrT;
+    // std::vector<bool> flag; flag.resize(graph.nodes, true);
+    std::queue<VertexT> que;
+    que.push(src);
+
+    for (auto e = 0; e < graph.edges; e++) {
+        residuals[e] = graph.CsrT::edge_values[e] - flow[e];
+    }
+
+    while (! que.empty()){
+        auto v = que.front(); que.pop();
+
+        auto e_start = graph.CsrT::GetNeighborListOffset(v);
+        auto num_neighbors = graph.CsrT::GetNeighborListLength(v);
+        auto e_end = e_start + num_neighbors;
+        for (auto e = e_start; e < e_end; ++e){
+            auto u = graph.CsrT::GetEdgeDest(e);
+            if (vertex_reachabilities[u] == false and abs(graph.CsrT::edge_values[e] - flow[e]) > 1e-6){
+                vertex_reachabilities[u] = true;
+                que.push(u);
+            }
+        }
+    }
+ }
+
+
 template <typename GraphT>
 cudaError_t MinCut(
     util::Parameters         &parameters,
@@ -126,6 +168,7 @@ cudaError_t MinCut(
     // }
     mf::CPU_Reference(parameters, graph,
         source, dest, max_flow, reverse_edges, edge_flows);
+    memset(vertex_reachabilities, false, graph.nodes*sizeof(vertex_reachabilities[0]));
     //////////////////////////////////////
     /*
     typedef typename GraphT::CsrT CsrT;
@@ -215,8 +258,8 @@ cudaError_t MinCut(
     }
     */
 
-
-
+    /////////////////////////////////
+    minCut_sub(graph, source, edge_flows, vertex_reachabilities, edge_residuals);
 
     //////////////////////////////////////
 
@@ -231,7 +274,7 @@ cudaError_t MinCut(
         if(e<10) printf("CPU: er_idx %d, e_res %f \n", e, edge_residuals[e]);
         //if(e<10)printf("CPU: e_idx %d, cap %f \n", e, graph.edge_values[e]);
     }
-    memset(vertex_reachabilities, false, graph.nodes*sizeof(vertex_reachabilities[0]));
+
     /////////////////////////////////////////
     /*
     std::queue <typename GraphT::VertexT> q;
@@ -261,6 +304,7 @@ cudaError_t MinCut(
     printf("In PR min-cut \n");
 
     /////////////////////////
+    /*
     VertexT head = 0;
     VertexT tail = 0;
     VertexT *queue = new VertexT[graph.nodes];
@@ -287,7 +331,7 @@ cudaError_t MinCut(
     //    printf("%d, ", vertex_reachabilities[i]);
     //}
     printf("\n");
-
+    */
     return retval;
 }
 
@@ -638,7 +682,7 @@ cudaError_t CPU_Reference(
 
             auto comm = curr_communities[v];
             if (!community_active[comm] ||
-                abs(community_weights[comm]) <= 0.0)
+                abs(community_weights[comm]) <= 1e-6)
             {
                 if (vertex_reachabilities[v] == 1)
                     edge_residuals[num_edges - num_org_nodes * 2 + v] = 0;

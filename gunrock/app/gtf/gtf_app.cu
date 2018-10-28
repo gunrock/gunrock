@@ -288,8 +288,20 @@ cudaError_t RunTests(
         for(int i = 0; i < num_org_nodes; i++) out_pr << Y[i] << std::endl;
         out_pr.close();
 
+
         std::ofstream out_graph( "./wrong_graph_GPU.mtx" );
-        for(int i = 0; i < graph.edges; i++) out_pr << graph.edge_values[i] << std::endl;
+        out_graph << graph.nodes << ' ' << graph.nodes << ' ' << graph.edges << std::endl;
+        for (VertexT v = 0; v < graph.nodes; v++){
+          auto e_start = graph.GraphT::CsrT::GetNeighborListOffset(v);
+          auto num_neighbors = graph.GraphT::CsrT::GetNeighborListLength(v);
+          auto e_end = e_start + num_neighbors;
+          for (auto e = e_start; e < e_end; ++e){
+            VertexT u = graph.GetEdgeDest(e);
+            out_graph << v+1 << ' ' << u+1 << ' ' << graph.edge_values[e] << std::endl;
+          }
+        }
+
+
         out_graph.close();
 
         // if (validation == "each")
