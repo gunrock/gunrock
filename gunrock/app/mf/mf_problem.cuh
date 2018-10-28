@@ -75,6 +75,7 @@ void relabeling(GraphT graph, VertexT sink, VertexT* height,
     mark[sink] = true;
     auto H = (VertexT)0;
     height[sink] = H;
+    int changed = 0;
     while (first < last){
         auto v = que[first++];
         auto e_start = graph.CsrT::GetNeighborListOffset(v);
@@ -87,12 +88,15 @@ void relabeling(GraphT graph, VertexT sink, VertexT* height,
             auto f = flow[reverse[e]];
             if (mark[neighbor] || almost_eql(c, f))
                 continue;
+            if (height[neighbor] != H)
+                changed++;
             height[neighbor] = H;
             //printf("h[%d] = %d\n", neighbor, H);
             mark[neighbor] = true;
             que[last++] = neighbor;
         }
     }
+    //printf("-----> relabeling %d was changed\n", changed);
     for (VertexT x=0; x<graph.nodes; ++x){
         if (not mark[x]){
             height[x] = 2*graph.nodes + 1;
