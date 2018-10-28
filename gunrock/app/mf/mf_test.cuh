@@ -197,19 +197,23 @@ bool push(GraphT& graph, VertexT x, ValueT* excess, VertexT* height,
   */
 template<typename ValueT, typename VertexT, typename GraphT>
 ValueT max_flow(GraphT& graph, ValueT* flow, ValueT* excess, VertexT* height, 
-	VertexT source, VertexT sink, VertexT* reverse){
+        VertexT source, VertexT sink, VertexT* reverse){
     bool update = true;
+    int iter = 0;
     while (update){
-	update = false;
-	for (VertexT x = 0; x < graph.nodes; ++x){
-	    if (x != sink and x != source and excess[x] > (ValueT)0){
-		if (push(graph, x, excess, height, flow, reverse) or 
-			relabel(graph, x, height, flow, source))
-		{
-		    update = true;
-		}
-	    }
-	}
+        ++iter;
+        update = false;
+        for (VertexT x = 0; x < graph.nodes; ++x){
+            if (x != sink and x != source and excess[x] > (ValueT)0){
+                if (push(graph, x, excess, height, flow, reverse) or 
+                        relabel(graph, x, height, flow, source))
+                {
+                    update = true;
+                    if (iter > 0 && iter % 100 == 0)
+                        relabeling(graph, sink, height, reverse, flow); 
+                }
+            }
+        }
     }
     return excess[sink];
 }

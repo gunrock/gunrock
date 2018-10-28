@@ -97,7 +97,7 @@ struct MFIterationLoop : public IterationLoopBase
         null_ptr = NULL;
 
         auto advance_push_op = [capacity, flow, excess, height, reverse, 
-             source, sink, active]
+             source, sink, active, iteration]
              __host__ __device__
              (const VertexT &src, VertexT &dest, const SizeT &edge_id, 
               const VertexT &input_item, const SizeT &input_pos,
@@ -108,11 +108,31 @@ struct MFIterationLoop : public IterationLoopBase
                      return false;
                  ValueT c = capacity[edge_id];
                  ValueT fl = flow[edge_id];
-                 //printf("flt epsilon %lf\n", FLT_EPSILON);
-                 if (almost_eql(c, fl) || almost_eql(excess[src], 0.0))
-                     return false;
                  ValueT f = fminf(c - fl, excess[src]);
+                 if (f < 0 || almost_eql(c, fl) || almost_eql(excess[src], 0.0))
+                     return false;
                  VertexT rev_id = reverse[edge_id];
+                 if (isnan(excess[src]) or isinf(excess[src])){
+                     printf("[%d] excess[%d] = %lf\n", 
+                             iteration, src, excess[src]);
+                     exit(1);
+                 }
+                 if (isnan(c) or isinf(c)){
+                     printf("[%d] capacity = %lf\n", 
+                             iteration, c);
+                     exit(1);
+                 }
+                 if (isnan(fl) or isinf(fl)){
+                     printf("[%d] flow = %lf\n", 
+                             iteration, fl);
+                     exit(1);
+                 }
+                 if (isnan(f) or isinf(f)){
+                     printf("[%d] f (min) = %lf\n", 
+                             iteration, f);
+                     exit(1);
+                 }
+
                  if (height[src] > height[dest])
                  {
                      ValueT old = atomicAdd(&excess[src], -f);
@@ -121,11 +141,11 @@ struct MFIterationLoop : public IterationLoopBase
                          atomicAdd(&excess[dest], f);
                          atomicAdd(&flow[edge_id], f);
                          atomicAdd(&flow[rev_id], -f);
-                         debug_aml2("push %d->%d, c = %lf, fl = %lf, f = %lf, e[%d] = %lf, e[%d] = %lf\n", src, dest, c, fl, f, src, excess[src], dest, excess[dest]);
+                         debug_aml2("push, %lf, %lf-%lf\n", f, excess[src], excess[dest]);
                          active[0] = 1;
                      }else{
                          atomicAdd(&excess[src], f);
-                         debug_aml2("rollback push %d->%d, becuase %lf < %lf, c = %lf, fl = %lf, f = %lf, excess[%d] = %lf\n", src, dest, old, f, c, fl, f, src, excess[src]);
+                         debug_aml2("push back, %lf, %lf\n", f, excess[src]);
                      } 
                      return true;
                  }
