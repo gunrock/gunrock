@@ -127,6 +127,8 @@ struct GTFIterationLoop : public IterationLoopBase
                //edge_residuals[e] = graph.edge_values[e]; // just for debugging purposes #!!!
            }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
+
+
       cpu_timer.Start();
       GUARD_CU(graph.edge_values.Move(util::DEVICE, util::HOST, graph.edges, 0, oprtr_parameters.stream));
       GUARD_CU(cudaDeviceSynchronize());
@@ -610,7 +612,8 @@ struct GTFIterationLoop : public IterationLoopBase
               [graph, iteration, active]
                 __host__ __device__ (ValueT *edge_residuals, SizeT &e){
                 {
-                  if(false){ //iteration == 0){
+                  if(false){
+                  //if(iteration == 0){
                     active[0] = 0;
                     edge_residuals[e] = graph.edge_values[e]; // just for debugging purposes #!!!
                   }

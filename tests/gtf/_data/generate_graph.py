@@ -1,7 +1,7 @@
 import numpy as np
 np.set_printoptions(threshold=np.nan)
-nodes = np.loadtxt('./_data/n')
-edges = np.loadtxt('./_data/e')
+nodes = np.loadtxt('./n')
+edges = np.loadtxt('./e')
 
 lambda1 = 6
 

@@ -77,15 +77,6 @@ struct main_struct
         }
         printf("\n\n");
 
-        //printf("\n #of nodes and edges %d %d\n", u_graph.nodes, u_graph.edges);
-
-
-        util::Array1D<SizeT, ValueT> weights;
-        GUARD_CU(weights.Allocate(d_graph.nodes, util::HOST));
-        std::string weights_filename = parameters.Get<std::string>("weights");
-        printf("%s \n", weights_filename.c_str());//, weights[v]);
-        GUARD_CU(weights.Read(weights_filename));
-
         cpu_timer.Stop();
     	parameters.Set("load-time", cpu_timer.ElapsedMillis());
     	debug_aml("load-time is %lf",cpu_timer.ElapsedMillis());
