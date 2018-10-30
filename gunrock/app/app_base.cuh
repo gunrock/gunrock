@@ -189,6 +189,7 @@ struct TestGraph :
         return retval;
     }
 
+    __host__ __device__
     SizeT GetNeighborListLength(const VertexT &v) const
     {
         SizeT retval = 0;
