@@ -19,6 +19,8 @@
 namespace gunrock {
 namespace oprtr {
 
+#define FORALL_BLOCKSIZE 256
+#define FORALL_GRIDSIZE 256
 /*template <
     typename T,
     typename SizeT,
@@ -262,7 +264,7 @@ cudaError_t ForAll(
     if ((target & util::DEVICE) == util::DEVICE)
     {
         ForAll_Kernel
-            <<<256, 256, 0, stream>>>(
+            <<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, stream>>>(
             elements, apply, length);
     }
     return retval;
@@ -292,7 +294,7 @@ cudaError_t ForAll(
     if ((target & util::DEVICE) == util::DEVICE)
     {
         ForAll_Kernel
-            <<<256, 256, 0, stream>>>(
+            <<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, stream>>>(
             elements_out, elements_in, apply, length);
     }
     return retval;
@@ -324,7 +326,7 @@ cudaError_t ForAll(
     if ((target & util::DEVICE) == util::DEVICE)
     {
         ForAll_Kernel
-            <<<256, 256, 0, stream>>>(
+            <<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, stream>>>(
             elements_out, elements_in1, elements_in2, apply, length);
     }
     return retval;
@@ -355,7 +357,7 @@ cudaError_t ForAllCond(
     if ((target & util::DEVICE) == util::DEVICE)
     {
         ForAllCond_Kernel
-            <<<256, 256, 0, stream>>>(
+            <<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, stream>>>(
             elements, cond, apply, length);
     }
     return retval;
@@ -388,7 +390,7 @@ cudaError_t ForAllCond(
     if ((target & util::DEVICE) == util::DEVICE)
     {
         ForAllCond_Kernel
-            <<<256, 256, 0, stream>>>(
+            <<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, stream>>>(
             elements_out, elements_in, cond, apply, length);
     }
     return retval;
@@ -423,7 +425,7 @@ cudaError_t ForAllCond(
     if ((target & util::DEVICE) == util::DEVICE)
     {
         ForAllCond_Kernel
-            <<<256, 256, 0, stream>>>(
+            <<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, stream>>>(
             elements_out, elements_in1, elements_in2, cond, apply, length);
     }
     return retval;
@@ -447,7 +449,9 @@ cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     ApplyLambda  apply,
     SizeT        length, //= PreDefinedValues<SizeT>::InvalidValue,
     Location     target, // = util::LOCATION_DEFAULT,
-    cudaStream_t stream)// = 0)
+    cudaStream_t stream,// = 0,
+    int          grid_size, // = util::PreDefinedValues<int>::InvalidValue
+    int          block_size) // = util::PreDefinedValues<int>::InvalidValue
 {
     cudaError_t retval = cudaSuccess;
     if (length == PreDefinedValues<SizeT>::InvalidValue)
@@ -464,8 +468,12 @@ cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
 
     if ((target & DEVICE) == DEVICE)
     {
+        if (!util::isValid(grid_size))
+            grid_size = FORALL_GRIDSIZE;
+        if (!util::isValid(block_size))
+            block_size = FORALL_BLOCKSIZE;
         oprtr::ForAll_Kernel
-            <<<256, 256, 0, stream>>>(
+            <<<grid_size, block_size, 0, stream>>>(
             (*this), apply, length);
     }
     return retval;
@@ -506,7 +514,7 @@ cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     {
         //printf("Launch kernel, length = %d\n", length);
         oprtr::ForAll_Kernel
-            <<<256, 256, 0, stream>>>(
+            <<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, stream>>>(
             (*this), array_in, apply, length);
     }
     return retval;
@@ -553,7 +561,7 @@ cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     {
         //util::PrintMsg("Launching on DEVICE, length = " + std::to_string(length));
         oprtr::ForAll_Kernel
-            <<<256, 256, 0, stream>>>(
+            <<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, stream>>>(
             (*this), array_in1, array_in2, apply, length);
     }
     return retval;
@@ -594,7 +602,7 @@ cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     if ((target & DEVICE) == DEVICE)
     {
         oprtr::ForAllCond_Kernel
-            <<<256, 256, 0, stream>>>(
+            <<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, stream>>>(
             (*this), cond, apply, length);
     }
     return retval;
@@ -637,7 +645,7 @@ cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     if ((target & DEVICE) == DEVICE)
     {
         oprtr::ForAllCond_Kernel
-            <<<256, 256, 0, stream>>>(
+            <<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, stream>>>(
             (*this), array_in, cond, apply, length);
     }
     return retval;
@@ -682,7 +690,7 @@ cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
     if ((target & DEVICE) == DEVICE)
     {
         oprtr::ForAllCond_Kernel
-            <<<256, 256, 0, stream>>>(
+            <<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, stream>>>(
             (*this), array_in1, array_in2, cond, apply, length);
     }
     return retval;

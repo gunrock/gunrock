@@ -10,10 +10,9 @@
 #-------------------------------------------------------------------------------
 
 include ../BaseMakefile.mk
-ALGO = rw
+ALGO = geo
 EXEC = bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
-NVCCFLAGS += -lcurand
 test: $(EXEC)
 
 $(EXEC) : test_$(ALGO).cu $(DEPS)

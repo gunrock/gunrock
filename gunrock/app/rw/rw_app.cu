@@ -43,7 +43,14 @@ cudaError_t UseParameters(util::Parameters &parameters)
          "walk-mode",
          util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
          0,
-         "random walk mode (0=random; 1=max)",
+         "random walk mode (0=uniform_random; 1=greedy, 2=stochastic_greedy)",
+         __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<bool>(
+         "store-walks",
+         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+         true,
+         "store random walks?",
          __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<std::string>(
@@ -56,7 +63,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(parameters.Use<int>(
          "walks-per-node",
          util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
-         2,
+         1,
          "number of random walks per source node",
          __FILE__, __LINE__));
 
@@ -89,6 +96,7 @@ cudaError_t RunTests(
     int                      walk_length,
     int                      walks_per_node,
     int                      walk_mode,
+    bool                     store_walks,
     typename GraphT::VertexT *ref_walks,
     util::Location target)
 {
@@ -112,7 +120,14 @@ cudaError_t RunTests(
     cpu_timer.Start(); total_timer.Start();
 
     // Allocate problem specific host data
-    VertexT *h_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
+    VertexT *h_walks = NULL;
+    if(store_walks) {
+        h_walks = new VertexT[graph.nodes * walk_length * walks_per_node];
+    }
+
+    uint64_t *h_neighbors_seen = new uint64_t[graph.nodes * walks_per_node];
+    uint64_t *h_steps_taken    = new uint64_t[graph.nodes * walks_per_node];
+
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -141,10 +156,9 @@ cudaError_t RunTests(
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
 
-        if (validation == "each" && !quick) {
-
+        if (validation == "each") {
             GUARD_CU(problem.Extract(
-                h_walks
+                h_walks, h_neighbors_seen, h_steps_taken
             ));
             SizeT num_errors = Validate_Results(
                 parameters,
@@ -152,17 +166,20 @@ cudaError_t RunTests(
                 walk_length,
                 walks_per_node,
                 walk_mode,
+                store_walks,
                 h_walks,
-                ref_walks,
-                !quiet_mode);
+                h_neighbors_seen,
+                h_steps_taken,
+                ref_walks
+            );
         }
     }
 
     cpu_timer.Start();
 
-    if (validation == "last" && !quick) {
+    if (validation == "last") {
         GUARD_CU(problem.Extract(
-            h_walks
+            h_walks, h_neighbors_seen, h_steps_taken
         ));
         SizeT num_errors = Validate_Results(
             parameters,
@@ -170,9 +187,12 @@ cudaError_t RunTests(
             walk_length,
             walks_per_node,
             walk_mode,
+            store_walks,
             h_walks,
-            ref_walks,
-            !quiet_mode);
+            h_neighbors_seen,
+            h_steps_taken,
+            ref_walks
+        );
     }
 
     // compute running statistics
@@ -186,7 +206,9 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    delete[] h_walks; h_walks   = NULL;
+    delete[] h_walks; h_walks = NULL;
+    delete[] h_neighbors_seen; h_neighbors_seen = NULL;
+    delete[] h_steps_taken; h_steps_taken = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());

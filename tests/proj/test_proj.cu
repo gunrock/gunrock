@@ -66,7 +66,6 @@ struct main_struct
         if (!quick) {
             ref_projections = new ValueT[graph.nodes * graph.nodes];
 
-            // If not in `quick` mode, compute CPU reference implementation
             util::PrintMsg("__________________________", !quiet);
 
             float elapsed = app::proj::CPU_Reference(

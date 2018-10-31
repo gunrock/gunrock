@@ -75,14 +75,14 @@ struct Csc :
     //typename util::If<(FLAG & HAS_EDGE_VALUES) != 0,
     //    Array_ValueT, Array_NValueT >::Type edge_values;
     util::Array1D<SizeT, EdgeValueT,
-        ARRAY_FLAG, cudaHostRegisterFlag> edge_values;    
+        ARRAY_FLAG, cudaHostRegisterFlag> edge_values;
 
     // List of values attached to nodes in the graph
     //typename util::If<(FLAG & HAS_NODE_VALUES) != 0,
     //    Array_ValueT, Array_NValueT >::Type node_values;
     //Array_ValueT node_values;
     util::Array1D<SizeT, NodeValueT,
-        ARRAY_FLAG, cudaHostRegisterFlag> node_values;    
+        ARRAY_FLAG, cudaHostRegisterFlag> node_values;
 
     /**
      * @brief CSC Constructor
@@ -470,7 +470,7 @@ struct Csc<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
         bool  with_edge_values = true)
     {
         return cudaSuccess;
-    } 
+    }
 };
 
 } // namespace graph
