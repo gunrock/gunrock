@@ -80,6 +80,7 @@ struct SSIterationLoop : public IterationLoopBase
         auto         &stream             =   oprtr_parameters.stream;
         auto         &iteration          =   enactor_stats.iteration;
         auto          target             =   util::DEVICE;
+        util::PrintMsg("=====iterations: " + std::to_string(iteration));
         // First add degrees to scan statistics
         GUARD_CU(scan_stats.ForAll([scan_stats, row_offsets]
             __host__ __device__ (ValueT *scan_stats_, const SizeT & v)
@@ -124,6 +125,17 @@ struct SSIterationLoop : public IterationLoopBase
             (received_length, peer_, expand_op);
         return retval;
     }
+    bool Stop_Condition(int gpu_num = 0) 
+    {
+	auto &enactor_slice = this->enactor->enactor_slices[0];
+	auto &enactor_stats = enactor_slice.enactor_stats;
+	auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+	auto &graph = data_slice.sub_graph[0];
+
+	auto &iter = enactor_stats.iteration;
+	if (iter == 1) return true;
+	else return false;
+  }
 }; // end of SSIteration
 
 /**
