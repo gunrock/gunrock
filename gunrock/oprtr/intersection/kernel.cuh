@@ -488,6 +488,59 @@ void Inspect(
             num_edge);
 }
 
+template <
+    OprtrFlag FLAG,
+    typename  GraphT,
+    typename  FrontierInT,
+    typename  FrontierOutT,
+    typename  ParametersT,
+    typename  AdvanceOpT,
+    typename  FilterOpT>
+cudaError_t Launch(
+    const GraphT           graph,
+    const FrontierInT    * frontier_in,
+          FrontierOutT   * frontier_out,
+          ParametersT     &parameters,
+          AdvanceOpT       advance_op,
+          FilterOpT        filter_op)
+{
+    typedef typename FrontierInT ::ValueT InKeyT;
+    typedef typename FrontierOutT::ValueT OutKeyT;
+    typedef typename ParametersT ::SizeT  SizeT;
+    typedef typename ParametersT ::ValueT ValueT;
+    typedef typename ParametersT ::LabelT LabelT;
+    typedef typename Dispatch<FLAG, InKeyT, OutKeyT,
+        SizeT, ValueT, LabelT, FilterOpT, true>
+        ::KernelPolicyT KernelPolicyT;
+
+    SizeT grid_size = (parameters.frontier -> queue_reset) ?
+        (parameters.frontier -> queue_length / KernelPolicyT::THREADS + 1) :
+        (parameters.cuda_props -> device_props.multiProcessorCount * KernelPolicyT::CTA_OCCUPANCY);
+    Kernel<FLAG, InKeyT, OutKeyT, SizeT, ValueT, LabelT, FilterOpT>        <<<grid_size, KernelPolicyT::THREADS, 0, parameters.stream>>>(
+        parameters.frontier -> queue_reset,
+        (SizeT)(parameters.frontier -> queue_index),
+        (frontier_in == NULL) ? ((InKeyT*)NULL)
+            : (frontier_in -> GetPointer(util::DEVICE)),
+        (parameters.values_in == NULL) ? ((ValueT*)NULL)
+            : (parameters.values_in -> GetPointer(util::DEVICE)),
+        parameters.frontier -> queue_length,
+        parameters.label,
+        (parameters.labels == NULL) ? ((LabelT*)NULL)
+            : (parameters.labels -> GetPointer(util::DEVICE)),
+        (parameters.visited_masks == NULL) ? ((unsigned char*)NULL)
+            : (parameters.visited_masks -> GetPointer(util::DEVICE)),
+        (frontier_out == NULL) ? ((OutKeyT*)NULL)
+            : (frontier_out -> GetPointer(util::DEVICE)),
+        parameters.frontier -> work_progress,
+        filter_op);
+
+    if (frontier_out != NULL)
+    {
+        parameters.frontier -> queue_index ++;
+    }
+    return cudaSuccess;
+}
+
 // Kernel Entry point for performing batch intersection computation
 template <typename KernelPolicy, typename ProblemData, typename Functor>
     float LaunchKernel(

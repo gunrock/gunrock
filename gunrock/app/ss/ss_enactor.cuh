@@ -80,7 +80,6 @@ struct SSIterationLoop : public IterationLoopBase
         auto         &stream             =   oprtr_parameters.stream;
         auto         &iteration          =   enactor_stats.iteration;
         auto          target             =   util::DEVICE;
-
         // First add degrees to scan statistics
         GUARD_CU(scan_stats.ForAll([scan_stats, row_offsets]
             __host__ __device__ (ValueT *scan_stats_, const SizeT & v)
@@ -265,15 +264,29 @@ public:
         GUARD_CU(BaseEnactor::Reset(target));
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
-	    this -> thread_slices[gpu].init_size = 1;
-	    for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
-	    {
-		this -> enactor_slices[gpu * this -> num_gpus + peer_]
-		    .frontier.queue_length = 1;
-	    }
+           if ((this->num_gpus == 1) ||
+                (gpu == this->problem->org_graph->GpT::partition_table[src])) {
+               this -> thread_slices[gpu].init_size = 1;
+               for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
+                   auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
+                   frontier.queue_length = (peer_ == 0) ? 1 : 0;
+                   if (peer_ == 0) {
+                       GUARD_CU(frontier.V_Q() -> ForEach(
+                           [src]__host__ __device__ (VertexT &v) {
+                           v = src;
+                       }, 1, target, 0));
+                   }
+               }
+           } else {
+                this -> thread_slices[gpu].init_size = 0;
+                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
+                    this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier.queue_length = 0;
+                }
+           }
         }
         GUARD_CU(BaseEnactor::Sync());
         return retval;
+
     }
 
     /**
@@ -281,7 +294,7 @@ public:
      * @param[in] src Source node to start primitive.
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Enact()
+    cudaError_t Enact(VertexT src = 0)
     {
         cudaError_t  retval     = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));
@@ -301,4 +314,3 @@ public:
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-

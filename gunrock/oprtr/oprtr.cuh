@@ -196,6 +196,24 @@ template <
     typename FrontierOutT,
     typename ParametersT,
     typename OpT>
+cudaError_t Intersect(
+    const GraphT    graph,
+    FrontierInT   * frontier_in,
+    FrontierOutT  * frontier_out,
+    ParametersT    &parameters,
+    OpT             op)
+{
+    return oprtr::filter::Launch<FLAG>(
+        graph, frontier_in, frontier_out, parameters, op);
+}
+
+template <
+    OprtrFlag FLAG,
+    typename GraphT,
+    typename FrontierInT,
+    typename FrontierOutT,
+    typename ParametersT,
+    typename OpT>
 cudaError_t Launch(
     const GraphT    graph,
     FrontierInT   * frontier_in,
@@ -210,6 +228,9 @@ cudaError_t Launch(
     if (parameters.oprtr_type == "Filter")
         return oprtr::filter ::Launch<FLAG>(
             graph, frontier_in, frontier_out, parameters, op);
+//    if (parameters.oprtr_type == "Intersect")
+//        return oprtr::intersect ::Launch<FLAG>(
+//            graph, frontier_in, frontier_out, parameters, op);
     //if (parameters.oprtr_type == "Compute")
     //    return oprtr::compute::Launch<FLAG>(
     //        graph, frontier_in, frontier_out, parameters, op);

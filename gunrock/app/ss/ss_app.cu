@@ -52,8 +52,10 @@ cudaError_t UseParameters(util::Parameters &parameters)
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 cudaError_t RunTests(
-    util::Parameters &parameters,
-    GraphT           &graph,
+    util::Parameters         &parameters,
+    GraphT                   &graph,
+    typename GraphT::ValueT  *ref_scan_stat = NULL,
+    typename GraphT::VertexT *ref_node = NULL,
     util::Location target = util::DEVICE)
 {
     cudaError_t retval = cudaSuccess;
@@ -101,25 +103,24 @@ cudaError_t RunTests(
             + std::to_string(cpu_timer.ElapsedMillis()) + " ms, #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
-/*        if (validation == "each")
+        if (validation == "each")
         {
-            GUARD_CU(problem.Extract(h_distances, h_preds));
+            GUARD_CU(problem.Extract(h_scan_stat, h_node));
             SizeT num_errors = app::ss::Validate_Results(
-                parameters, graph, src, h_distances, h_preds,
-                ref_distances == NULL ? NULL : ref_distances[run_num % num_srcs],
-                NULL, false);
-        }*/
+                parameters, graph, h_scan_stat, h_node,
+                ref_scan_stat, ref_node, false);
+        }
     }
 
     cpu_timer.Start();
     // Copy out results
     GUARD_CU(problem.Extract(h_scan_stat, h_node, target));
-/*    if (validation == "last")
+    if (validation == "last")
     {
-        SizeT num_errors = app::sssp::Validate_Results(
-            parameters, graph, src, h_distances, h_preds,
-            ref_distances == NULL ? NULL : ref_distances[(num_runs -1) % num_srcs]);
-    }*/
+        SizeT num_errors = app::ss::Validate_Results(
+            parameters, graph, h_scan_stat, h_node,
+            ref_scan_stat, ref_node, false);
+    }
 
     // compute running statistics
     info.ComputeTraversalStats(enactor, (VertexT*)NULL);

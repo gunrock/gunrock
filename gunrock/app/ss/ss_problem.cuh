@@ -136,7 +136,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             }*/
             if (target & util::DEVICE)
             {
-                GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
+                GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
             }
             return retval;
         } // Init
@@ -157,8 +157,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             // Reset data
             GUARD_CU(scan_stats.ForEach([]__host__ __device__
-            (ValueT &scan_stat){
-                scan_stat = util::PreDefinedValues<ValueT>::MinValue;
+            (ValueT &x){
+                x = (ValueT)0;
             }, num_nodes, target, this -> stream));
 
             GUARD_CU(nodes   .ForEach([]__host__ __device__
@@ -246,7 +246,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
                 GUARD_CU(data_slice.scan_stats.SetPointer(
-                    h_scan_stat, nodes, util::HOST));
+                    h_scan_stat, 1, util::HOST));
                 GUARD_CU(data_slice.scan_stats.Move(util::DEVICE, util::HOST));
 
                 GUARD_CU(data_slice.nodes.SetPointer(h_node, 1, util::HOST));
@@ -257,7 +257,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     []__host__ __device__
                     (const ValueT &scan_stat, ValueT &h_scan_stat_){
                         h_scan_stat_ = scan_stat;
-                    }, nodes, util::HOST));
+                    }, 1, util::HOST));
 
                 GUARD_CU(data_slice.nodes.ForEach(h_node,
                     []__host__ __device__
@@ -318,9 +318,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseProblem::Init(graph, target));
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
-
-        if (this -> parameters.template Get<bool>("mark-pred"))
-            this -> flag = this -> flag | Mark_Predecessors;
 
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
