@@ -82,6 +82,12 @@ cudaError_t UseParameters(util::Parameters &parameters)
         "how many times to repeat the testing",
         __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<bool>(
+        "use-UVM",
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+        false,
+        "Whether to include UVM test",
+        __FILE__, __LINE__));
     return retval;
 }
 
@@ -130,6 +136,7 @@ cudaError_t Test_BWL(
     std::string operation_str = parameters.template Get<std::string>("operation");
     std::string access_str    = parameters.template Get<std::string>("access-type");
     std::string bl_str        = parameters.template Get<std::string>("bandwidth-latency");
+    bool use_UVM = parameters.template Get<bool>("use-UVM");
     uint32_t num_elements = parameters.template Get<uint32_t>("num-elements");
     if (operation_str == "Read")
         operation_flag = READ; 
@@ -165,11 +172,13 @@ cudaError_t Test_BWL(
             auto &all_result   = all_results [thread_num];
             float elapsed = -1;
             #pragma omp barrier
-            if (peer_accessables[thread_num][peer] == 0)
-                break;
-
             if (peer_offset >= num_devices)
                 peer = peer_offset;
+            else if (peer_accessables[thread_num][peer] == 0)
+                break;
+            if (peer_offset == num_devices && !use_UVM)
+                break;
+
             util::CpuTimer cpu_timer;
             cpu_timer.Start();
 
@@ -315,7 +324,8 @@ cudaError_t Test_BWL(
         for (int peer = 0; peer <= num_devices + 1; peer++)
         {
             std::cout << "\t";
-            if (peer_accessables[gpu][peer] == 0)
+            if (peer_accessables[gpu][peer] == 0 ||
+                (!use_UVM && peer == num_devices))
             {
                 std::cout << "--";
                 continue;
@@ -542,6 +552,12 @@ struct main_struct
             
             for (int i = 0; i < num_devices; i++)
             {
+                if (peer_accessables[thread_num][i] == 0)
+                {
+                    all_element[i] = gpu_elements[thread_num].GetPointer(util::DEVICE);
+                    all_result [i] = gpu_results [thread_num].GetPointer(util::DEVICE);    
+                    continue;
+                }
                 all_element[i] = gpu_elements[i].GetPointer(util::DEVICE);
                 all_result [i] = gpu_results [i].GetPointer(util::DEVICE);
             }
