@@ -59,7 +59,7 @@ INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS
 # Defines
 #-------------------------------------------------------------------------------
 
-DEFINES =
+DEFINES = -DGIT_SHA1="\"$(shell git rev-parse HEAD)\""
 
 #-------------------------------------------------------------------------------
 # Compiler Flags
@@ -96,9 +96,20 @@ endif
 #-------------------------------------------------------------------------------
 # Dependency Lists
 #-------------------------------------------------------------------------------
-EXTRA_SOURCE = ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp ../../gunrock/util/gitsha1.c
-      
-DEPS = 	./Makefile \
+EXTRA_SOURCE =  ../../gunrock/util/test_utils.cu \
+		../../gunrock/util/error_utils.cu \
+		../../externals/moderngpu/src/mgpucontext.cu \
+		../../externals/moderngpu/src/mgpuutil.cpp \
+		../../gunrock/util/gitsha1make.c
+
+ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
+    EXTRA_SOURCE = $(EXTRA_SOURCE_) \
+	    ../../gunrock/util/misc_utils.cu
+else
+    EXTRA_SOURCE = $(EXTRA_SOURCE_)
+endif
+
+DEPS = ./Makefile \
     ../BaseMakefile.mk \
     $(EXTRA_SOURCE) \
     $(wildcard ../../gunrock/util/*.cuh) \
