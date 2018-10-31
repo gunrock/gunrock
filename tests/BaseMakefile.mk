@@ -83,7 +83,7 @@ INC = $(CUDA_INC) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(BOOST_INC) -I.. -I../.. $(
 # Defines
 #-------------------------------------------------------------------------------
 
-DEFINES =
+DEFINES = -DGIT_SHA1="\"$(shell git rev-parse HEAD)\""
 
 #-------------------------------------------------------------------------------
 # Compiler Flags
@@ -125,7 +125,7 @@ EXTRA_SOURCE_ = ../../gunrock/util/str_to_T.cu \
 	../../gunrock/util/error_utils.cu \
 	../../externals/moderngpu/src/mgpucontext.cu \
 	../../externals/moderngpu/src/mgpuutil.cpp \
-	../../gunrock/util/gitsha1.c
+	../../gunrock/util/gitsha1make.c
 
 ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
     EXTRA_SOURCE = $(EXTRA_SOURCE_) \
