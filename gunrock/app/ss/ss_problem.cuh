@@ -71,15 +71,23 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     {
         // ss-specific storage arrays
         util::Array1D<SizeT, ValueT >    scan_stats  ; // scan statistis values
-        util::Array1D<SizeT, VertexT>    nodes      ; // node ids corresponding to sorted values
-
+        util::Array1D<SizeT, ValueT >    scan_stats1 ; // scan statistis values
+        util::Array1D<SizeT, VertexT>    nodes       ; // node ids corresponding to sorted values
+        util::Array1D<SizeT, VertexT>    nodes1      ; // node ids corresponding to sorted values
+        util::Array1D<SizeT, VertexT>    src_node_ids; // node ids corresponding to sorted values
+        // temp space for cub
+        util::Array1D<SizeT, char   >   cub_temp_space;
         /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice()
         {
-            scan_stats       .SetName("scan_stats");
-            nodes            .SetName("nodes"     );
+            scan_stats       .SetName("scan_stats"  	);
+            scan_stats1      .SetName("scan_stats1" 	);
+            nodes            .SetName("nodes"       	);
+            nodes1           .SetName("nodes1"      	);
+            src_node_ids     .SetName("src_node_ids"	);
+            cub_temp_space   .SetName("cub_temp_space"	);
         }
 
         /*
@@ -102,7 +110,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
             GUARD_CU(scan_stats      .Release(target));
+            GUARD_CU(scan_stats1     .Release(target));
             GUARD_CU(nodes           .Release(target));
+            GUARD_CU(nodes1	     .Release(target));
+            GUARD_CU(src_node_ids    .Release(target));
+	    GUARD_CU(cub_temp_space  .Release(target));
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
         }
@@ -127,8 +139,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(BaseDataSlice::Init(
                 sub_graph, num_gpus, gpu_idx, target, flag));
-            GUARD_CU(scan_stats.Allocate(sub_graph.nodes, target));
-            GUARD_CU(nodes     .Allocate(sub_graph.nodes, target));
+            GUARD_CU(scan_stats  	.Allocate(sub_graph.nodes, target));
+            GUARD_CU(scan_stats1 	.Allocate(sub_graph.nodes, target));
+            GUARD_CU(nodes       	.Allocate(sub_graph.nodes, target));
+            GUARD_CU(nodes1      	.Allocate(sub_graph.nodes, target));
+            GUARD_CU(src_node_ids.Allocate(sub_graph.edges, target));
+            GUARD_CU(cub_temp_space	.Allocate(1              , target));
 
             /*if (target & util::DEVICE)
             {
@@ -150,9 +166,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         {
             cudaError_t retval = cudaSuccess;
             SizeT num_nodes = this -> sub_graph -> nodes;
+            SizeT num_edges = this -> sub_graph -> edges;
 
             // Ensure data are allocated
-            GUARD_CU(scan_stats.EnsureSize_(num_nodes, target));
+            GUARD_CU(scan_stats.EnsureSize_(num_edges, target));
+            GUARD_CU(nodes     .EnsureSize_(num_nodes, target));
             GUARD_CU(nodes     .EnsureSize_(num_nodes, target));
 
             // Reset data
@@ -245,21 +263,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-                GUARD_CU(data_slice.scan_stats.SetPointer(
+                GUARD_CU(data_slice.scan_stats1.SetPointer(
                     h_scan_stat, 1, util::HOST));
-                GUARD_CU(data_slice.scan_stats.Move(util::DEVICE, util::HOST));
+                GUARD_CU(data_slice.scan_stats1.Move(util::DEVICE, util::HOST));
 
-                GUARD_CU(data_slice.nodes.SetPointer(h_node, 1, util::HOST));
-                GUARD_CU(data_slice.nodes.Move(util::DEVICE, util::HOST));
+                GUARD_CU(data_slice.nodes1.SetPointer(h_node, 1, util::HOST));
+                GUARD_CU(data_slice.nodes1.Move(util::DEVICE, util::HOST));
             }
             else if (target == util::HOST) {
-                GUARD_CU(data_slice.scan_stats.ForEach(h_scan_stat,
+                GUARD_CU(data_slice.scan_stats1.ForEach(h_scan_stat,
                     []__host__ __device__
                     (const ValueT &scan_stat, ValueT &h_scan_stat_){
                         h_scan_stat_ = scan_stat;
                     }, 1, util::HOST));
 
-                GUARD_CU(data_slice.nodes.ForEach(h_node,
+                GUARD_CU(data_slice.nodes1.ForEach(h_node,
                     []__host__ __device__
                     (const VertexT &node, VertexT &h_node_){
                         h_node_ = node;
