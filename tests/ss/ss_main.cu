@@ -79,7 +79,7 @@ struct main_struct
                     + " ms", !quiet);
             // }
         }
-        return retval;
+//        return retval;
 
         std::vector<std::string> switches{"advance-mode"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,

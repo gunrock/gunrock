@@ -53,6 +53,33 @@ namespace intersection {
 
 /**
  * Not valid for this arch (default)
+ * @tparam FLAG Operator flags
+ * @tparam GraphT Graph type
+ * @tparam InKeyT Input keys type
+ * @tparam OutKeyT Output keys type
+ * @tparam VALID
+ */
+template<
+    OprtrFlag FLAG,
+    typename  GraphT,
+    typename  InKeyT,
+    typename  OutKeyT,
+    bool      VALID =
+        #ifndef __CUDA_ARCH__
+             false
+        #else
+            (__CUDA_ARCH__ >= CUDA_ARCH)
+        #endif
+        >
+struct Dispatch
+{};
+
+/**
+ * Arch dispatch
+ */
+
+/**
+ * Not valid for this arch (default)
  *
  * @tparam KernelPolicy Kernel policy type for partitioned edge mapping.
  * @tparam ProblemData Problem data type for partitioned edge mapping.
@@ -627,29 +654,36 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
 
 template <
     OprtrFlag FLAG,
-    typename GraphT,
-    typename FrontierInT,
-    typename FrontierOutT,
-    typename ParametersT,
-    typename AdvanceOpT,
-    typename FilterOpT>
+    typename  GraphT,
+    typename  FrontierInT,
+    typename  FrontierOutT,
+    typename  ParametersT,
+    typename  AdvanceOpT,
+    typename  FilterOpT>
 cudaError_t Launch(
-    const GraphT         &graph,
-    const FrontierInT   * frontier_in,
-          FrontierOutT  * frontier_out,
-          ParametersT    &parameters,
-          AdvanceOpT      advance_op,
-          FilterOpT       filter_op)
+    const GraphT          &graph,
+    const FrontierInT    * frontier_in,
+          FrontierOutT   * frontier_out,
+          ParametersT     &parameters,
+          AdvanceOpT       advance_op,
+          FilterOpT        filter_op)
 {
-    if (parameters.filter_mode == "CULL")
-        return CULL::Launch<FLAG>(graph, frontier_in, frontier_out,
-            parameters, advance_op, filter_op);
-    if (parameters.filter_mode == "BY_PASS")
-        return BP::Launch<FLAG>(graph, frontier_in, frontier_out,
-            parameters, advance_op, filter_op);
+    cudaError_t retval = cudaSuccess;
+    if (GraphT::FLAG & gunrock::graph::HAS_CSR)
+        retval = GraphT_Switch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSR) != 0>
+            ::template Launch_Csr_Csc<FLAG> (graph, frontier_in, frontier_out,
+                parameters, advance_op, filter_op);
 
-    return util::GRError(cudaErrorInvalidValue,
-        "FilterMode " + parameters.filter_mode + " undefined.", __FILE__, __LINE__);
+    else if (GraphT::FLAG & gunrock::graph::HAS_CSC)
+        retval = GraphT_Switch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSC) != 0>
+            ::template Launch_Csr_Csc<FLAG> (graph, frontier_in, frontier_out,
+                parameters, advance_op, filter_op);
+
+    else
+        retval = util::GRError(cudaErrorInvalidDeviceFunction,
+        "Intersection is not implemented for given graph representation.");
+
+    return retval;
 }
 
 template <
@@ -670,14 +704,14 @@ cudaError_t Launch(
     typedef typename GraphT::SizeT   SizeT;
     typedef typename FrontierInT::ValueT InKeyT;
 
-    auto dummy_advance = []__host__ __device__ (
+    auto dummy_intersect = []__host__ __device__ (
         const VertexT &src   , VertexT &dest, const SizeT &edge_id,
         const InKeyT  &key_in, const SizeT &input_pos, SizeT &output_pos) -> bool{
             return true;
         };
 
     return Launch<FLAG>(graph, frontier_in, frontier_out,
-        parameters, dummy_advance, op);
+        parameters, dummy_intersect, op);
 }
 
 }  // intersection

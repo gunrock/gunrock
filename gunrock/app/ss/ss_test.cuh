@@ -203,13 +203,13 @@ typename GraphT::SizeT Validate_Results(
     typedef typename GraphT::CsrT    CsrT;
 
 
-// >>
+/*
     for(int i = 0; i < graph.nodes; i++) {
         std::cerr << "ref_scan_stat[" << i << "]" << ref_scan_stat[i] << std::endl;
         std::cerr << "h_scan_stat[" << i << "]" << h_scan_stat[i] << std::endl;
     }
 
-// <<
+*/
 
 
     SizeT num_errors = 0;
