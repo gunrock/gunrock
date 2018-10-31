@@ -48,41 +48,39 @@ struct main_struct
 
         cudaError_t retval = cudaSuccess;
         util::CpuTimer cpu_timer;
-        GraphT graph; // graph we process on
+        GraphT graph;
 
         cpu_timer.Start();
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
-        //GUARD_CU(graph.csr().Display());
 
-        VertexT  *ref_communities = NULL;
-        bool quick = parameters.Get<bool>("quick");
-        // compute reference CPU SS solution
-/*        if (!quick)
-        {
-            bool quiet = parameters.Get<bool>("quiet");
-            std::string validation = parameters.Get<std::string>("validation");
-            util::PrintMsg("Computing reference value ...", !quiet);
+        bool quick   = parameters.Get<bool>("quick");
+        bool quiet   = parameters.Get<bool>("quiet");
+        int num_runs = parameters.Get<int>("num-runs");
 
+        VertexT *ref_scan_stats = NULL;
+        if (!quick) {
             SizeT nodes = graph.nodes;
-            ref_communities = new VertexT[nodes];
-            //int num_runs = parameters.Get<int>("omp-runs");
-            //for (int i = 0; i < num_runs; i++)
-            {
-                int i = 0;
+            ref_scan_stats = new VertexT[nodes];
+
+            // for(int i = 0; i < num_runs; i++) {
                 util::PrintMsg("__________________________", !quiet);
+
                 float elapsed = app::ss::CPU_Reference(
-                    parameters, graph.csr(), ref_communities);
-                util::PrintMsg("--------------------------\nRun "
-                    + std::to_string(i) + " elapsed: "
+                    parameters,
+                    graph.csr(),
+                    ref_scan_stats
+                );
+
+                util::PrintMsg("__________________________\nRun "
+                    + std::to_string(0) + " elapsed: "
                     + std::to_string(elapsed)
-                    + " ms, q = " + std::to_string(app::ss::Get_Modularity(
-                        graph, ref_communities))
-                    , !quiet);
-            }
+                    + " ms", !quiet);
+            // }
         }
-*/
+        return retval;
+
         std::vector<std::string> switches{"advance-mode"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [](util::Parameters &parameters, GraphT &graph)
@@ -106,22 +104,22 @@ struct main_struct
                         {
                             util::PrintMsg("Run " + std::to_string(i) + " elapsed: "
                                 + std::to_string(elapsed) + " ms", !quiet);
-                            
-                            app::ss::Validate_Results(parameters, graph, 
-                                omp_communities, ref_communities);
+
+                            app::ss::Validate_Results(parameters, graph,
+                                omp_communities, ref_scan_stats);
                         } else {
                             util::PrintMsg("Run " + std::to_string(i) + " elapsed: "
-                                + std::to_string(elapsed) + " ms, q = " 
+                                + std::to_string(elapsed) + " ms, q = "
                                 + std::to_string(app::ss::Get_Modularity(
                                     graph, omp_communities)), !quiet);
                         }
                     }
                     if (validation == "last")
                         app::ss::Validate_Results(parameters, graph,
-                            omp_communities, ref_communities);
+                            omp_communities, ref_scan_stats);
 
-                    if (ref_communities == NULL)
-                        ref_communities = omp_communities;
+                    if (ref_scan_stats == NULL)
+                        ref_scan_stats = omp_communities;
                     else
                     {
                         delete[] omp_communities; omp_communities = NULL;
@@ -131,9 +129,9 @@ struct main_struct
                 return app::ss::RunTests(parameters, graph);
             }));
 
-        if (ref_communities != NULL)
+        if (ref_scan_stats != NULL)
         {
-            delete[] ref_communities; ref_communities = NULL;
+            delete[] ref_scan_stats; ref_scan_stats = NULL;
         }
         return retval;
     }
@@ -157,7 +155,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | //app::VERTEXT_U64B |
         app::SIZET_U32B | //app::SIZET_U64B |
-        app::VALUET_F64B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F64B | app::UNDIRECTED | app::DIRECTED>
         (parameters, main_struct());
 }
 

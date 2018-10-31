@@ -18,7 +18,7 @@ test: $(EXEC)
 
 $(EXEC) : $(SRC) $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) $(SRC) $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3
+	$(NVCC) -w $(DEFINES) $(SM_TARGETS) -o $(EXEC) $(SRC) $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 a : $(SRC) $(DEPS)
 	mkdir -p bin

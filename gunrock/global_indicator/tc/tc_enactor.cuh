@@ -17,14 +17,14 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-#include <gunrock/global_indicator/tc/tc_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
+
+#include <gunrock/global_indicator/tc/tc_problem.cuh>
 
 #include <moderngpu.cuh>
 #include <cub/cub.cuh>
 
 #include <fstream>
-
 
 using namespace gunrock::app;
 
@@ -51,8 +51,8 @@ using namespace gunrock::app;
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct TCIterationLoop : puplic IterationLoopBase
-    <EanctorT, Use_FullQ | Push>
+struct TCIterationLoop : public IterationLoopBase
+    <EnactorT, Use_FullQ | Push>
 {
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
@@ -62,7 +62,7 @@ struct TCIterationLoop : puplic IterationLoopBase
     typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
-    TCIterationLoop() : BaseIterationLoop() {}    
+    TCIterationLoop() : BaseIterationLoop() {}
     /**
      * @brief Core computation of tc, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
