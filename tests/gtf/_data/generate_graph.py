@@ -48,7 +48,7 @@ temp2[:,1] = index # to all nodes
 edges_list = np.concatenate([edges, source, sink, temp1, temp2], 0).tolist()
 edges = sorted(edges_list,key=lambda x: (x[0],x[1]))
 
-with open('./_data/std_added.mtx', 'w') as f:
+with open('./std_added.mtx', 'w') as f:
     f.write("%d %d %d\n" % (num_nodes+2,num_nodes+2,num_edges+4*num_nodes))
     for (u,v,w) in edges:
         f.write("%d %d %.3f\n" % (u+1, v+1, w))

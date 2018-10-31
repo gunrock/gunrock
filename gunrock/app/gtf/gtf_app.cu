@@ -187,7 +187,6 @@ cudaError_t RunTests(
     util::Location    target = util::DEVICE)
 {
     debug_aml("RunTests starts");
-    printf("!!! %d ", h_reverse[0]);
     cudaError_t retval = cudaSuccess;
     typedef Problem<GraphT>	      ProblemT;
     typedef Enactor<ProblemT>	      EnactorT;

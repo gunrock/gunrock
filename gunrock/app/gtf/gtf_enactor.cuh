@@ -120,20 +120,21 @@ struct GTFIterationLoop : public IterationLoopBase
        auto &Y = data_slice.Y;
        util::CpuTimer cpu_timer;	cpu_timer.Start();
 
+       /*
        printf("iteration %d \n", iteration);
        GUARD_CU(edge_residuals.ForAll(
            [mf_flow, graph, source] __host__ __device__ (ValueT *edge_residuals, const SizeT &e){
                if(e < 10) printf("GPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
                //edge_residuals[e] = graph.edge_values[e]; // just for debugging purposes #!!!
            }, graph.edges, util::DEVICE, oprtr_parameters.stream));
-
+       */
 
 
       cpu_timer.Start();
       GUARD_CU(graph.edge_values.Move(util::DEVICE, util::HOST, graph.edges, 0, oprtr_parameters.stream));
       GUARD_CU(cudaDeviceSynchronize());
       cpu_timer.Stop();
-      printf("move: %f \n", cpu_timer.ElapsedMillis());
+      //printf("move: %f \n", cpu_timer.ElapsedMillis());
 
        mf_problem.parameters.Set("source", source);
        mf_problem.parameters.Set("sink", sink);
@@ -141,28 +142,28 @@ struct GTFIterationLoop : public IterationLoopBase
        GUARD_CU(mf_problem.Reset(graph, h_reverse+0, mf_target));
        GUARD_CU(cudaDeviceSynchronize());
        cpu_timer.Stop();
-       printf("problem reset: %f \n", cpu_timer.ElapsedMillis());
+       //printf("problem reset: %f \n", cpu_timer.ElapsedMillis());
 
        cpu_timer.Start();
        GUARD_CU(mf_enactor.Reset(source, mf_target));
        GUARD_CU(cudaDeviceSynchronize());
        cpu_timer.Stop();
-       printf("enact reset: %f \n", cpu_timer.ElapsedMillis());
+       //printf("enact reset: %f \n", cpu_timer.ElapsedMillis());
 
        cpu_timer.Start();
        GUARD_CU(mf_enactor.Enact());
        GUARD_CU(cudaDeviceSynchronize());
        cpu_timer.Stop();
-       printf("mf: %f \n", cpu_timer.ElapsedMillis());
+       //printf("mf: %f \n", cpu_timer.ElapsedMillis());
 
        cpu_timer.Start();
        // min cut
        GUARD_CU(edge_residuals.ForAll(
            [mf_flow, graph, source] __host__ __device__ (ValueT *edge_residuals, const SizeT &e){
-               if(e == 0) printf("in residual assignment beginning of gtf\n");
+               //if(e == 0) printf("in residual assignment beginning of gtf\n");
                edge_residuals[e] = graph.edge_values[e] - mf_flow[e];
                mf_flow[e] = 0.;
-               if(e < 10)printf("GPU: er_idx %d, e_res %f \n", e, edge_residuals[e]);
+               //if(e < 10)printf("GPU: er_idx %d, e_res %f \n", e, edge_residuals[e]);
            }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
        GUARD_CU(vertex_reachabilities.ForAll(
@@ -295,7 +296,7 @@ struct GTFIterationLoop : public IterationLoopBase
                     {
                       community_weights[comm] /= community_sizes  [comm];
                       community_accus  [comm] += community_weights[comm];
-                      printf("comm %d, accus %f, sizes %d \n", comm, community_accus  [comm], community_sizes  [comm]);
+                      //printf("comm %d, accus %f, sizes %d \n", comm, community_accus  [comm], community_sizes  [comm]);
                       //printf("values: comm: %d, sizes: %d, weights: %f, accus: %f.\n", comm, community_sizes[comm], community_weights[comm], community_accus[comm]);
                     }
 
@@ -640,12 +641,12 @@ struct GTFIterationLoop : public IterationLoopBase
                   if(active[0] == 0){
                       Y[v] = community_accus[curr_communities[v]];
                   }
-                  if(v == 0) printf("in last for loop end\n");
+                  //if(v == 0) printf("in last for loop end\n");
                   }
                 }, num_org_nodes, util::DEVICE, oprtr_parameters.stream));
           GUARD_CU(cudaDeviceSynchronize());
           cpu_timer.Stop();
-          printf("gtf: %f \n", cpu_timer.ElapsedMillis());
+          //printf("gtf: %f \n", cpu_timer.ElapsedMillis());
 
 	GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
 	    "cudaStreamSynchronize failed");
@@ -666,7 +667,6 @@ struct GTFIterationLoop : public IterationLoopBase
 	    return active[0] > 0;
 	  }));
     cpu_timer.Stop();
-    printf("stop condition: %f \n", cpu_timer.ElapsedMillis());
 
 	frontier.queue_index++;
 	// Get back the resulted frontier length
