@@ -96,6 +96,23 @@ struct MFIterationLoop : public IterationLoopBase
         auto null_ptr		    = &local_vertices;
         null_ptr = NULL;
 
+        auto advance_preflow_op = [capacity, flow, excess, height, reverse, 
+             source]
+             __host__ __device__
+             (const VertexT &src, VertexT &dest, const SizeT &edge_id, 
+              const VertexT &input_item, const SizeT &input_pos,
+              const SizeT &output_pos) -> bool
+             {
+                 if (!util::isValid(dest) or !util::isValid(src) or 
+                         src != source)
+                     return false;
+                 flow[edge_id] = capacity[edge_id];
+                 flow[reverse[edge_id]] = ((ValueT)0) - capacity[edge_id];
+                 atomicAdd(&excess[dest], capacity[edge_id]);
+                 debug_aml("flow[%d->%d] = %lf\n", src, dest, capacity[edge_id]);
+                 return true;
+             };
+         
         auto advance_push_op = [capacity, flow, excess, height, reverse, 
              source, sink, active, iteration]
              __host__ __device__
@@ -106,37 +123,44 @@ struct MFIterationLoop : public IterationLoopBase
                  if (!util::isValid(dest) or !util::isValid(src) or 
                          src == source or src == sink)
                      return false;
-                 ValueT c = capacity[edge_id];
-                 ValueT fl = flow[edge_id];
-                 ValueT f = fminf(c - fl, excess[src]);
-                 if (f < 0 || almost_eql(c, fl) || almost_eql(excess[src], 0.0))
+                 //ValueT c = capacity[edge_id];
+                 //ValueT fl = flow[edge_id];
+                 ValueT f = fminf(capacity[edge_id] - flow[edge_id], excess[src]);
+                 if (f <= MF_EPSILON || 
+                         almost_eql(capacity[edge_id], flow[edge_id]) || 
+                         almost_eql(excess[src], MF_EPSILON))
                      return false;
                  VertexT rev_id = reverse[edge_id];
+                 /*
+                    ValueT c = capacity[edge_id];
+                    ValueT fl = flow[edge_id];
+
                  if (isnan(excess[src]) or isinf(excess[src])){
-                     printf("[%d] excess[%d] = %lf\n", 
+                     debug_aml("[%d] excess[%d] = %lf\n", 
                              iteration, src, excess[src]);
                      exit(1);
                  }
                  if (isnan(c) or isinf(c)){
-                     printf("[%d] capacity = %lf\n", 
+                     debug_aml("[%d] capacity = %lf\n", 
                              iteration, c);
                      exit(1);
                  }
                  if (isnan(fl) or isinf(fl)){
-                     printf("[%d] flow = %lf\n", 
+                     debug_aml("[%d] flow = %lf\n", 
                              iteration, fl);
                      exit(1);
                  }
                  if (isnan(f) or isinf(f)){
-                     printf("[%d] f (min) = %lf\n", 
+                     debug_aml("[%d] f (min) = %lf\n", 
                              iteration, f);
                      exit(1);
-                 }
+                 }*/
 
                  if (height[src] > height[dest])
                  {
                      ValueT old = atomicAdd(&excess[src], -f);
-                     if (old >= f || almost_eql(old, f))
+                     if ((old - f) >= MF_EPSILON || almost_eql(old, f))
+                     //if (old >= f || almost_eql(old, f))
                      {
                          atomicAdd(&excess[dest], f);
                          atomicAdd(&flow[edge_id], f);
@@ -165,7 +189,7 @@ struct MFIterationLoop : public IterationLoopBase
                         src == source or src == sink)
                     return false;
 
-                if (almost_eql(excess[src], 0.0) || 
+                if (almost_eql(excess[src], MF_EPSILON) || 
                         almost_eql(capacity[edge_id], flow[edge_id]))
                     return false;
 
@@ -191,7 +215,7 @@ struct MFIterationLoop : public IterationLoopBase
                 if (!util::isValid(dest) or !util::isValid(src) or 
                         src == source or src == sink)
                     return false;
-                if (almost_eql(excess[src], 0.0) or 
+                if (almost_eql(excess[src], MF_EPSILON) or 
                         almost_eql(capacity[edge_id], flow[edge_id]))
                     return false;
                 if (lowest_neighbor[src] == dest)
@@ -207,7 +231,7 @@ struct MFIterationLoop : public IterationLoopBase
                 }
                 return false;
             };
-	
+
 //	GUARD_CU(excess.ForAll(
 //	    [] __host__ __device__ (ValueT *excess_, const SizeT &v){
 //	      printf("excess_[%d] = %lf\n", v, excess_[v]);
@@ -223,14 +247,59 @@ struct MFIterationLoop : public IterationLoopBase
 //	      printf("flow[%d] = %lf\n", v, f[v]);
 //	    }, graph.edges, util::DEVICE, oprtr_parameters.stream));
 
+        oprtr_parameters.advance_mode = "ALL_EDGES";
+
+        if (iteration == 0){
+            debug_aml("iteration 0, preflow operator is comming\n");
+            GUARD_CU(excess.ForAll(
+                        [] __host__ __device__ (ValueT *e, const SizeT &v){
+                        debug_aml("excess[%d] = %lf\n", v, e[v]);
+                        }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+
+            GUARD_CU(height.ForAll(
+                        [] __host__ __device__ (VertexT *h, const SizeT &v){
+                        debug_aml("height[%d] = %d\n", v, h[v]);
+                        }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+
+            GUARD_CU(flow.ForAll(
+                        [] __host__ __device__ (ValueT *f, const SizeT &v){
+                        debug_aml("flow[%d] = %lf\n", v, f[v]);
+                        }, graph.edges, util::DEVICE, oprtr_parameters.stream));
+
+            // ADVANCE_PREFLOW_OP
+            GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                    graph.csr(), &local_vertices, null_ptr,
+                    oprtr_parameters, advance_preflow_op));
+            GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+                "cudaStreamSynchronize failed");
+
+            debug_aml("iteration 0, preflow ends, results:\n");
+            
+            GUARD_CU(excess.ForAll(
+                        [] __host__ __device__ (ValueT *e, const SizeT &v){
+                        debug_aml("excess[%d] = %lf\n", v, e[v]);
+                        }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+
+            GUARD_CU(height.ForAll(
+                        [] __host__ __device__ (VertexT *h, const SizeT &v){
+                        debug_aml("height[%d] = %d\n", v, h[v]);
+                        }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+
+            GUARD_CU(flow.ForAll(
+                        [] __host__ __device__ (ValueT *f, const SizeT &v){
+                        debug_aml("flow[%d] = %lf\n", v, f[v]);
+                        }, graph.edges, util::DEVICE, oprtr_parameters.stream));
+        }
+
         //Global relabeling
-        if (iteration > 0 && iteration % 100 == 0){
+        if (iteration % 100 == 0){
             GUARD_CU(height.Move(util::DEVICE, util::HOST, graph.nodes, 0,
                         oprtr_parameters.stream));
             GUARD_CU(flow.Move(util::DEVICE, util::HOST, graph.edges, 0, 
                         oprtr_parameters.stream));
             GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
-            relabeling(graph, sink, height + 0, reverse + 0, flow + 0);
+            relabeling(graph, source, sink, height.GetPointer(util::HOST), 
+                    reverse.GetPointer(util::HOST), flow.GetPointer(util::HOST));
             GUARD_CU(height.Move(util::HOST, util::DEVICE, graph.nodes, 0, 
                       oprtr_parameters.stream));
             GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
@@ -241,7 +310,6 @@ struct MFIterationLoop : public IterationLoopBase
 //	      printf("height2[%d] = %d\n", v, h[v]);
 //	    }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
 
-        oprtr_parameters.advance_mode = "ALL_EDGES";
         GUARD_CU(active.ForAll(
                     [] __host__ __device__ (SizeT *a, const SizeT &v)
                     {
