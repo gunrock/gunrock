@@ -7,9 +7,9 @@
 
 /**
  * @file
- * geo_d_spatial.cuh
+ * mf_helpers.cuh
  *
- * @brief Device Spatial helpers for geolocation app
+ * @brief Helper functions for MF algorithm.
  */
 
 //#define debug_aml(a...) printf(a)
@@ -17,13 +17,64 @@
 
 #pragma once
 
+#define MF_EPSILON 1e-6
+#define MF_EPSILON_VALIDATE 1e-4
+
 namespace gunrock {
 namespace app {
 namespace mf {
 
+template <typename ValueT>
+__host__ __device__ bool almost_eql(ValueT A, ValueT B,
+        ValueT maxRelDiff = MF_EPSILON)
+{
+    if (fabs(A - B) < maxRelDiff)
+        return true;
+    return false;
+}
+
+template <typename GraphT, typename VertexT, typename ValueT>
+void relabeling(GraphT graph, VertexT source, VertexT sink, VertexT* height,
+        VertexT* reverse, ValueT* flow){
+    typedef typename GraphT::CsrT CsrT;
+
+    bool mark[graph.nodes];
+    for (VertexT x=0; x<graph.nodes; ++x) mark[x] = false;
+    // memset(mark, false, graph.nodes * sizeof(mark[0]));
+    VertexT que[graph.nodes];
+    int first = 0, last = 0;
+    que[last++] = sink;
+    mark[sink] = true;
+    auto H = (VertexT)0;
+    height[sink] = H;
+    int changed = 0;
+
+    while (first < last){
+        auto v = que[first++];
+        auto e_start = graph.CsrT::GetNeighborListOffset(v);
+        auto num_neighbors = graph.CsrT::GetNeighborListLength(v);
+        auto e_end = e_start + num_neighbors;
+        ++H;
+        for (auto e = e_start; e < e_end; ++e){
+            auto neighbor = graph.CsrT::GetEdgeDest(e);
+            auto c = graph.CsrT::edge_values[reverse[e]];
+            auto f = flow[reverse[e]];
+            if (mark[neighbor] || almost_eql(c, f))
+                continue;
+            if (height[neighbor] != H)
+                changed++;
+
+            height[neighbor] = H;
+            mark[neighbor] = true;
+            que[last++] = neighbor;
+        }
+    }
+    height[source] = graph.nodes;
+    return;
+}
 
 template <typename GraphT, typename VertexT>
-__device__ __host__ void init_reverse(GraphT &graph, VertexT* reverse)
+__device__ __host__ void InitReverse(GraphT &graph, VertexT* reverse)
 {
     typedef typename GraphT::CsrT CsrT;
 
@@ -55,7 +106,7 @@ __device__ __host__ void init_reverse(GraphT &graph, VertexT* reverse)
 
 
 template <typename GraphT>
-__device__ __host__ void correct_capacity_for_undirected_graph(
+__device__ __host__ void CorrectCapacity(
         GraphT &undirected_graph, 
         GraphT &directed_graph)
 {
@@ -95,8 +146,14 @@ __device__ __host__ void correct_capacity_for_undirected_graph(
     }
 }
 
-}
-}
-}
+} // namespace mf
+} // namespace app
+} // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:
 
 

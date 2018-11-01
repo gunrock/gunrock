@@ -28,6 +28,7 @@
     #include <boost/graph/read_dimacs.hpp>
 #endif
 
+#include <gunrock/app/mf/mf_helpers.cuh>
 #include <queue>
 
 namespace gunrock {
@@ -130,8 +131,8 @@ bool relabel(GraphT graph, VertexT x, VertexT* height, ValueT* flow,
     if (util::isValid(e)) {
         VertexT y = graph.CsrT::GetEdgeDest(e);
         if (height[y] >= height[x]){
-    //	    printf("relabel %d H: %d->%d, res-cap %d-%d: %lf\n", x, height[x], 
-    //		    height[y]+1, x, y, graph.CsrT::edge_values[e]-flow[e]);
+    	    debug_aml("relabel %d H: %d->%d, res-cap %d-%d: %lf\n", x, height[x], 
+    		    height[y]+1, x, y, graph.CsrT::edge_values[e]-flow[e]);
             height[x] = height[y] + 1;
             return true;
         }
@@ -420,6 +421,7 @@ double CPU_Reference(
         flow[e] = (ValueT) 0;
     }
 
+#if MF_DEBUG
     debug_aml("before relabeling");
     for (SizeT v = 0; v < graph.nodes; ++v){
         debug_aml("height[%d] = %d", v, height[v]);
@@ -433,7 +435,10 @@ double CPU_Reference(
     for (SizeT v = 0; v < graph.edges; ++v){
         debug_aml("capacity[%d] = %lf", v, graph.CsrT::edge_values[v]);
     }
+#endif
     relabeling(graph, src, sin, height, reverse, flow);
+
+#if MF_DEBUG
     debug_aml("after relabeling");
     for (SizeT v = 0; v < graph.nodes; ++v){
         debug_aml("height[%d] = %d", v, height[v]);
@@ -447,6 +452,11 @@ double CPU_Reference(
     for (SizeT v = 0; v < graph.edges; ++v){
         debug_aml("capacity[%d] = %lf", v, graph.CsrT::edge_values[v]);
     }
+#endif
+
+    //
+    // Compute the preflow
+    //
     auto e_start = graph.CsrT::GetNeighborListOffset(src);
     auto num_neighbors = graph.CsrT::GetNeighborListLength(src);
     auto e_end = e_start + num_neighbors;
@@ -462,6 +472,7 @@ double CPU_Reference(
         preflow += c;
     }
 
+#if MF_DEBUG
     debug_aml("after preflow");
     for (SizeT v = 0; v < graph.nodes; ++v){
         debug_aml("height[%d] = %d", v, height[v]);
@@ -489,6 +500,7 @@ double CPU_Reference(
             debug_aml("excess[%d] = %lf\n", i, excess[i]);
         }
     }
+#endif
 
     //
     // Perform simple max flow reference
@@ -503,19 +515,6 @@ double CPU_Reference(
     cpu_timer.Start();
 
     maxflow = max_flow(graph, flow, excess, height, src, sin, reverse);
-
-//    for (auto u = 0; u < graph.nodes; ++u){
-//	auto e_start = graph.CsrT::GetNeighborListOffset(u);
-//	auto num_neighbors = graph.CsrT::GetNeighborListLength(u);
-//	auto e_end = e_start + num_neighbors;
-//	for (auto e = e_start; e < e_end; ++e){
-//	    auto v = graph.CsrT::GetEdgeDest(e);
-//	    auto f = flow[e];
-//	    if (v == sin){
-//		printf("flow(%d->%d) = %lf (incoming sink CPU)\n", u, v, f);
-//	    }
-//	}
-//    }
     
     cpu_timer.Stop();
     elapsed = cpu_timer.ElapsedMillis();

@@ -13,7 +13,7 @@
  */
 
 #include <gunrock/app/mf/mf_app.cu>
-#include <gunrock/app/mf/mf_init.cuh>
+#include <gunrock/app/mf/mf_helpers.cuh>
 #include <gunrock/app/test_base.cuh>
 
 #define debug_aml(a...)
@@ -112,11 +112,11 @@ struct main_struct
 
     util::Array1D<SizeT, VertexT> reverse;
     GUARD_CU(reverse.Allocate(u_graph.edges, util::HOST));
-    app::mf::init_reverse(u_graph, reverse.GetPointer(util::HOST));
+    app::mf::InitReverse(u_graph, reverse.GetPointer(util::HOST));
 
     if (not undirected){
         // Correct capacity values on reverse edges
-        app::mf::correct_capacity_for_undirected_graph(u_graph, d_graph);
+        app::mf::CorrectCapacity(u_graph, d_graph);
     }
 
 	//
@@ -145,7 +145,7 @@ struct main_struct
 
 	// Clean up
 	free(flow_edge);
-    //GUARD_CU(reverse.Release());
+        // GUARD_CU(reverse.Release());
 	
         return retval;
     }

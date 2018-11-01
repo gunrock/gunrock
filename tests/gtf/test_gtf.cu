@@ -13,7 +13,7 @@
  */
 
 #include <gunrock/app/mf/mf_app.cu>
-#include <gunrock/app/mf/mf_init.cuh>
+#include <gunrock/app/mf/mf_helpers.cuh>
 #include <gunrock/app/gtf/gtf_app.cu>
 #include <gunrock/app/test_base.cuh>
 
@@ -94,7 +94,7 @@ struct main_struct
         reverse_edges.SetName("reverse_edges");
         GUARD_CU(reverse_edges.Allocate(d_graph.edges, util::HOST));
 
-        app::mf::init_reverse(d_graph, reverse_edges.GetPointer(util::HOST));
+        app::mf::InitReverse(d_graph, reverse_edges.GetPointer(util::HOST));
 
         // Compute reference CPU GTF algorithm.
     	util::PrintMsg("______CPU reference algorithm______", true);

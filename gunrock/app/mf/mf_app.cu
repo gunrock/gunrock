@@ -138,8 +138,6 @@ cudaError_t RunTests(
 
         cpu_timer.Start();
         GUARD_CU(enactor.Enact());
-        GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
-
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
@@ -152,10 +150,7 @@ cudaError_t RunTests(
         if (validation == "each")
         {
             GUARD_CU(problem.Extract(h_flow));
-	    GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
-
 	    app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities, h_residuals);
-	    GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
 
             int num_errors = app::mf::Validate_Results(parameters, graph, 
 		        source, sink, h_flow, h_reverse, min_cut, ref_flow, 
@@ -168,10 +163,7 @@ cudaError_t RunTests(
     if (validation == "last")
     {
 	GUARD_CU(problem.Extract(h_flow));
-	GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
-
  	app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities, h_residuals);
-	GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
 
         int num_errors = app::mf::Validate_Results(parameters, graph, 
 		source, sink, h_flow, h_reverse, min_cut, ref_flow, quiet_mode);
