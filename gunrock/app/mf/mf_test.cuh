@@ -28,7 +28,7 @@
     #include <boost/graph/read_dimacs.hpp>
 #endif
 
-#include<queue>
+#include <queue>
 
 namespace gunrock {
 namespace app {
@@ -200,11 +200,11 @@ bool push(GraphT& graph, VertexT x, ValueT* excess, VertexT* height,
   */
 template<typename ValueT, typename VertexT, typename GraphT>
 ValueT max_flow(GraphT& graph, ValueT* flow, ValueT* excess, VertexT* height, 
-        VertexT source, VertexT sink, VertexT* reverse){
+	VertexT source, VertexT sink, VertexT* reverse){
     bool update = true;
 
     int iter = 0;
-    while (update){
+    while (update) {
         ++iter;
         update = false;
         for (VertexT x = 0; x < graph.nodes; ++x){
@@ -220,6 +220,7 @@ ValueT max_flow(GraphT& graph, ValueT* flow, ValueT* excess, VertexT* height,
             }
         }
     }
+
     return excess[sink];
 }
 
@@ -237,13 +238,18 @@ ValueT max_flow(GraphT& graph, ValueT* flow, ValueT* excess, VertexT* height,
   *
   */
 template <typename VertexT, typename ValueT, typename GraphT>
-void minCut(GraphT &graph, VertexT src, ValueT *flow, int *min_cut)
+void minCut(GraphT& graph, VertexT  src, ValueT* flow, int* min_cut, 
+	    bool* vertex_reachabilities, ValueT* residuals)
 {
     typedef typename GraphT::CsrT CsrT;
-    std::vector<bool> flag; flag.resize(graph.nodes, true);
+    memset(vertex_reachabilities, true, graph.nodes * sizeof(vertex_reachabilities[0]));
     std::queue<VertexT> que;
     que.push(src);
     min_cut[src] = 1;
+
+    for (auto e = 0; e < graph.edges; e++) {
+	residuals[e] = graph.CsrT::edge_values[e] - flow[e];
+    }
 
     while (! que.empty()){
         auto v = que.front(); que.pop();
@@ -253,8 +259,8 @@ void minCut(GraphT &graph, VertexT src, ValueT *flow, int *min_cut)
         auto e_end = e_start + num_neighbors;
         for (auto e = e_start; e < e_end; ++e){
             auto u = graph.CsrT::GetEdgeDest(e);
-            if (flag[u] and graph.CsrT::edge_values[e] - flow[e] > MF_EPSILON){
-                flag[u] = false;
+            if (vertex_reachabilities[u] and abs(residuals[e]) > MF_EPSILON){
+                vertex_reachabilities[u] = false;
                 que.push(u);
                 min_cut[u] = 1;
             }
@@ -546,7 +552,7 @@ int Validate_Results(
         VertexT		  sink,
         ValueT		  *h_flow,
         VertexT		  *reverse,
-        int           *min_cut,
+        int               *min_cut,
         ValueT		  *ref_flow = NULL,
         bool		  verbose = true)
 {
@@ -586,7 +592,6 @@ int Validate_Results(
                 auto v = graph.CsrT::GetEdgeDest(e);
                 if (min_cut[v] == 0){
                     auto f = graph.CsrT::edge_values[e];
-                    //printf("flow(%d->%d) = %lf (mincut)\n", u, v, f);
                     mincut_flow += f;
                 }
             }

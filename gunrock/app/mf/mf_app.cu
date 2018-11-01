@@ -112,7 +112,12 @@ cudaError_t RunTests(
 
     ValueT *h_flow  = new ValueT[graph.edges];
     int *min_cut    = new int   [graph.nodes];
-    for (auto u = 0; u < graph.nodes; ++u) min_cut[u] = 0;
+    // for (auto u = 0; u < graph.nodes; ++u) min_cut[u] = 0;
+    memset(min_cut, 0, graph.nodes * sizeof(min_cut[0]));
+
+    bool * vertex_reachabilities = new bool[graph.nodes];
+
+    ValueT * h_residuals = new ValueT[graph.edges];
     
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -147,9 +152,11 @@ cudaError_t RunTests(
         if (validation == "each")
         {
             GUARD_CU(problem.Extract(h_flow));
-            GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
-	        app::mf::minCut(graph, source, h_flow, min_cut);
-            GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+	    GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+
+	    app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities, h_residuals);
+	    GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+
             int num_errors = app::mf::Validate_Results(parameters, graph, 
 		        source, sink, h_flow, h_reverse, min_cut, ref_flow, 
 		        quiet_mode);
@@ -160,12 +167,14 @@ cudaError_t RunTests(
     cpu_timer.Start();
     if (validation == "last")
     {
-        GUARD_CU(problem.Extract(h_flow));
-        GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
-        app::mf::minCut(graph, source, h_flow, min_cut);
-        GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+	GUARD_CU(problem.Extract(h_flow));
+	GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+
+ 	app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities, h_residuals);
+	GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+
         int num_errors = app::mf::Validate_Results(parameters, graph, 
-                source, sink, h_flow, h_reverse, min_cut, ref_flow, quiet_mode);
+		source, sink, h_flow, h_reverse, min_cut, ref_flow, quiet_mode);
     }
 
     // Compute running statistics
@@ -207,6 +216,7 @@ cudaError_t RunTests(
  * @param[out] min_cut	  Return partition into two sets of nodes
  * \return     double     Return accumulated elapsed times for all runs
  */
+#if 0
 template <typename GraphT, typename VertexT = typename GraphT::VertexT,
     typename ValueT = typename GraphT::ValueT>
 
@@ -216,7 +226,9 @@ double gunrock_mf(
     VertexT *reverse,
     ValueT  *flow,
     int	    *min_cut,
-    ValueT  &maxflow)
+    ValueT  &maxflow,
+    bool   *vertex_reachabilities,
+    ValueT *h_residuals)
 {
     typedef gunrock::app::mf::Problem<GraphT>	ProblemT;
     typedef gunrock::app::mf::Enactor<ProblemT> EnactorT;
@@ -249,13 +261,14 @@ double gunrock_mf(
 
         total_time += cpu_timer.ElapsedMillis();
         problem.Extract(flow);
-	gunrock::app::mf::minCut(graph, source, flow, min_cut);
+	gunrock::app::mf::minCut(graph, source, flow, min_cut, vertex_reachabilities, h_residuals);
     }
 
     enactor.Release(target);
     problem.Release(target);
     return total_time;
 }
+#endif
 
 /*
  * @brief Simple interface  take in graph as CSR format
