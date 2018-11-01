@@ -100,11 +100,13 @@ struct main_struct
     	util::PrintMsg("______CPU reference algorithm______", true);
     	double elapsed = 0;
 
-        GUARD_CU(app::gtf::CPU_Reference
-    	    (parameters, d_graph, reverse_edges, elapsed));
-        util::PrintMsg("-----------------------------------\n"
-            "Elapsed: " + std::to_string(elapsed) + " ms", true);
-
+        if (!quick)
+        {
+            GUARD_CU(app::gtf::CPU_Reference
+    	        (parameters, d_graph, reverse_edges, elapsed));
+            util::PrintMsg("-----------------------------------\n"
+                "Elapsed: " + std::to_string(elapsed) + " ms", true);
+        }
         std::vector<std::string> switches{"advance-mode"};
     	GUARD_CU(app::Switch_Parameters(parameters, d_graph, switches,
     	[reverse_edges](util::Parameters &parameters_, GraphT &d_graph)
