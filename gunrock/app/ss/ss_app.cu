@@ -72,10 +72,6 @@ cudaError_t RunTests(
     util::Info info("SS", parameters, graph); // initialize Info structure
 
     ValueT *h_scan_stats = new ValueT[graph.nodes];
-    for(int i = 0; i < graph.nodes; i++) {
-        h_scan_stats[i] = -1;
-    }
-
 
     ProblemT problem(parameters);
     EnactorT enactor;
