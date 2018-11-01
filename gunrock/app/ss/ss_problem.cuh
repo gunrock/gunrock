@@ -114,7 +114,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(nodes           .Release(target));
             GUARD_CU(nodes1	     .Release(target));
             GUARD_CU(src_node_ids    .Release(target));
-	    GUARD_CU(cub_temp_space  .Release(target));
+            GUARD_CU(cub_temp_space  .Release(target));
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
         }
@@ -169,8 +169,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT num_edges = this -> sub_graph -> edges;
 
             // Ensure data are allocated
-            GUARD_CU(scan_stats.EnsureSize_(num_edges, target));
-            GUARD_CU(nodes     .EnsureSize_(num_nodes, target));
+            GUARD_CU(scan_stats.EnsureSize_(num_nodes, target));
             GUARD_CU(nodes     .EnsureSize_(num_nodes, target));
 
             // Reset data
@@ -179,7 +178,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 x = (ValueT)0;
             }, num_nodes, target, this -> stream));
 
-            GUARD_CU(nodes   .ForEach([]__host__ __device__
+            GUARD_CU(nodes.ForEach([]__host__ __device__
             (VertexT & node){
                 node = util::PreDefinedValues<VertexT>::InvalidValue;
             }, num_nodes, target, this -> stream));
@@ -247,8 +246,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
-        ValueT         *h_scan_stat,
-        VertexT        *h_node     = NULL,
+        ValueT         *h_scan_stats,
         util::Location  target      = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -263,61 +261,72 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-                GUARD_CU(data_slice.scan_stats1.SetPointer(
-                    h_scan_stat, 1, util::HOST));
-                GUARD_CU(data_slice.scan_stats1.Move(util::DEVICE, util::HOST));
+                GUARD_CU(data_slice.scan_stats.SetPointer(h_scan_stats, nodes, util::HOST));
+                GUARD_CU(data_slice.scan_stats.Move(util::DEVICE, util::HOST));
 
-                GUARD_CU(data_slice.nodes1.SetPointer(h_node, 1, util::HOST));
-                GUARD_CU(data_slice.nodes1.Move(util::DEVICE, util::HOST));
+                // GUARD_CU(data_slice.scan_stats1.SetPointer(h_scan_stat, 1, util::HOST));
+                // GUARD_CU(data_slice.scan_stats1.Move(util::DEVICE, util::HOST));
+
+                // GUARD_CU(data_slice.nodes1.SetPointer(h_node, 1, util::HOST));
+                // GUARD_CU(data_slice.nodes1.Move(util::DEVICE, util::HOST));
             }
             else if (target == util::HOST) {
-                GUARD_CU(data_slice.scan_stats1.ForEach(h_scan_stat,
+                GUARD_CU(data_slice.scan_stats.ForEach(h_scan_stats,
                     []__host__ __device__
-                    (const ValueT &scan_stat, ValueT &h_scan_stat_){
-                        h_scan_stat_ = scan_stat;
-                    }, 1, util::HOST));
+                    (const ValueT &d_x, ValueT &h_x){
+                        h_x = d_x;
+                    }, nodes, util::HOST));
 
-                GUARD_CU(data_slice.nodes1.ForEach(h_node,
-                    []__host__ __device__
-                    (const VertexT &node, VertexT &h_node_){
-                        h_node_ = node;
-                    }, 1, util::HOST));
+                // GUARD_CU(data_slice.scan_stats1.ForEach(h_scan_stat,
+                //     []__host__ __device__
+                //     (const ValueT &scan_stat, ValueT &h_scan_stat_){
+                //         h_scan_stat_ = scan_stat;
+                //     }, 1, util::HOST));
+
+                // GUARD_CU(data_slice.nodes1.ForEach(h_node,
+                //     []__host__ __device__
+                //     (const VertexT &node, VertexT &h_node_){
+                //         h_node_ = node;
+                //     }, 1, util::HOST));
             }
         }
         else { // num_gpus != 1
-            util::Array1D<SizeT, ValueT *> th_scan_stats;
-            util::Array1D<SizeT, VertexT*> th_nodes;
-            th_scan_stats.SetName("bfs::Problem::Extract::th_scan_stats");
-            th_nodes     .SetName("bfs::Problem::Extract::th_nodes");
-            GUARD_CU(th_scan_stats.Allocate(this->num_gpus, util::HOST));
-            GUARD_CU(th_nodes    .Allocate(this->num_gpus, util::HOST));
 
-            for (int gpu = 0; gpu < this->num_gpus; gpu++)
-            {
-                auto &data_slice = data_slices[gpu][0];
-                if (target == util::DEVICE)
-                {
-                    GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-                    GUARD_CU(data_slice.scan_stats.Move(util::DEVICE, util::HOST));
-                    GUARD_CU(data_slice.nodes.Move(util::DEVICE, util::HOST));
-                }
-                th_scan_stats[gpu] = data_slice.scan_stats.GetPointer(util::HOST);
-                th_nodes    [gpu] = data_slice.nodes    .GetPointer(util::HOST);
-            } //end for(gpu)
+            // !! MultiGPU not implemented
 
-            for (VertexT v = 0; v < nodes; v++)
-            {
-                int gpu = this -> org_graph -> GpT::partition_table[v];
-                VertexT v_ = v;
-                if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
-                    v_ = this -> org_graph -> GpT::convertion_table[v];
+            // util::Array1D<SizeT, ValueT *> th_scan_stats;
+            // util::Array1D<SizeT, VertexT*> th_nodes;
+            // th_scan_stats.SetName("bfs::Problem::Extract::th_scan_stats");
+            // th_nodes     .SetName("bfs::Problem::Extract::th_nodes");
+            // GUARD_CU(th_scan_stats.Allocate(this->num_gpus, util::HOST));
+            // GUARD_CU(th_nodes    .Allocate(this->num_gpus, util::HOST));
 
-                h_scan_stat[v] = th_scan_stats[gpu][v_];
-                h_node      [v] = th_nodes     [gpu][v_];
-            }
+            // for (int gpu = 0; gpu < this->num_gpus; gpu++)
+            // {
+            //     auto &data_slice = data_slices[gpu][0];
+            //     if (target == util::DEVICE)
+            //     {
+            //         GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+            //         GUARD_CU(data_slice.scan_stats.Move(util::DEVICE, util::HOST));
+            //         GUARD_CU(data_slice.nodes.Move(util::DEVICE, util::HOST));
+            //     }
+            //     th_scan_stats[gpu] = data_slice.scan_stats.GetPointer(util::HOST);
+            //     th_nodes    [gpu] = data_slice.nodes    .GetPointer(util::HOST);
+            // } //end for(gpu)
 
-            GUARD_CU(th_scan_stats.Release());
-            GUARD_CU(th_nodes     .Release());
+            // for (VertexT v = 0; v < nodes; v++)
+            // {
+            //     int gpu = this -> org_graph -> GpT::partition_table[v];
+            //     VertexT v_ = v;
+            //     if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
+            //         v_ = this -> org_graph -> GpT::convertion_table[v];
+
+            //     h_scan_stat[v] = th_scan_stats[gpu][v_];
+            //     h_node      [v] = th_nodes     [gpu][v_];
+            // }
+
+            // GUARD_CU(th_scan_stats.Release());
+            // GUARD_CU(th_nodes     .Release());
         } //end if
 
         return retval;

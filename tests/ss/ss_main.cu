@@ -59,74 +59,28 @@ struct main_struct
         bool quiet   = parameters.Get<bool>("quiet");
         int num_runs = parameters.Get<int>("num-runs");
 
-        VertexT *ref_scan_stats = NULL;
+        SizeT nodes = graph.nodes;
+        ValueT *ref_scan_stats = new ValueT[nodes];
         if (!quick) {
-            SizeT nodes = graph.nodes;
-            ref_scan_stats = new VertexT[nodes];
+            util::PrintMsg("__________________________", !quiet);
 
-            // for(int i = 0; i < num_runs; i++) {
-                util::PrintMsg("__________________________", !quiet);
+            float elapsed = app::ss::CPU_Reference(
+                parameters,
+                graph.csr(),
+                ref_scan_stats
+            );
 
-                float elapsed = app::ss::CPU_Reference(
-                    parameters,
-                    graph.csr(),
-                    ref_scan_stats
-                );
-
-                util::PrintMsg("__________________________\nRun "
-                    + std::to_string(0) + " elapsed: "
-                    + std::to_string(elapsed)
-                    + " ms", !quiet);
-            // }
+            util::PrintMsg("__________________________\nRun "
+                + std::to_string(0) + " elapsed: "
+                + std::to_string(elapsed)
+                + " ms", !quiet);
         }
-//        return retval;
 
         std::vector<std::string> switches{"advance-mode"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [](util::Parameters &parameters, GraphT &graph)
+            [ref_scan_stats](util::Parameters &parameters, GraphT &graph)
             {
-                bool quiet = parameters.Get<bool>("quiet");
-                //bool quick = parameters.Get<bool>("quick");
-                int num_runs = parameters.Get<int>("omp-runs");
-                util::PrintMsg("num_runs: " + std::to_string(num_runs));
-                std::string validation = parameters.Get<std::string>("validation");
-/*                if (num_runs > 0)
-                {
-                    VertexT *omp_communities = new VertexT[graph.nodes];
-                    for (int i = 0; i < num_runs; i++)
-                    {
-                        util::PrintMsg("__________________________", !quiet);
-                        float elapsed = app::ss::OMP_Reference(
-                            parameters, graph.csr(), omp_communities);
-                        util::PrintMsg("--------------------------", !quiet);
-
-                        if (validation == "each")
-                        {
-                            util::PrintMsg("Run " + std::to_string(i) + " elapsed: "
-                                + std::to_string(elapsed) + " ms", !quiet);
-
-                            app::ss::Validate_Results(parameters, graph,
-                                omp_communities, ref_scan_stats);
-                        } else {
-                            util::PrintMsg("Run " + std::to_string(i) + " elapsed: "
-                                + std::to_string(elapsed) + " ms, q = "
-                                + std::to_string(app::ss::Get_Modularity(
-                                    graph, omp_communities)), !quiet);
-                        }
-                    }
-                    if (validation == "last")
-                        app::ss::Validate_Results(parameters, graph,
-                            omp_communities, ref_scan_stats);
-
-                    if (ref_scan_stats == NULL)
-                        ref_scan_stats = omp_communities;
-                    else
-                    {
-                        delete[] omp_communities; omp_communities = NULL;
-                    }
-                }*/
-
-                return app::ss::RunTests(parameters, graph);
+                return app::ss::RunTests(parameters, graph, ref_scan_stats);
             }));
 
         if (ref_scan_stats != NULL)

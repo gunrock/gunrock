@@ -77,7 +77,7 @@ struct SSIterationLoop : public IterationLoopBase
         auto         &nodes              =   data_slice.nodes;
         auto         &nodes1             =   data_slice.nodes1;
         auto         &src_node_ids       =   data_slice.src_node_ids;
-	auto         &cub_temp_space     =   data_slice.cub_temp_space;
+        auto         &cub_temp_space     =   data_slice.cub_temp_space;
         auto         &row_offsets        =   graph.CsrT::row_offsets;
         auto         &frontier           =   enactor_slice.frontier;
         auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
@@ -85,6 +85,7 @@ struct SSIterationLoop : public IterationLoopBase
         auto         &stream             =   oprtr_parameters.stream;
         auto         &iteration          =   enactor_stats.iteration;
         auto         target              =   util::DEVICE;
+
         // First add degrees to scan statistics
         GUARD_CU(scan_stats.ForAll([scan_stats, row_offsets]
             __host__ __device__ (ValueT *scan_stats_, const SizeT & v)
@@ -92,43 +93,43 @@ struct SSIterationLoop : public IterationLoopBase
                 scan_stats_[v] = row_offsets[v + 1] - row_offsets[v];
             }, graph.nodes, target, stream));
 
-        // Prune edges where src_id > dest_id to avoid visiting the same edge twice later
-        // The advance operation
-        auto advance_op = [src_node_ids]
-        __host__ __device__ (
-            const VertexT &src, VertexT &dest, 
-            const SizeT &edge_id,
-            const VertexT &input_item, 
-            const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            bool res = src < dest;
-            VertexT id = (res) ? 1 : 0;
-            Store(src_node_ids + edge_id, id);
-            return res;
-        };
+ //        // Prune edges where src_id > dest_id to avoid visiting the same edge twice later
+ //        // The advance operation
+ //        auto advance_op = [src_node_ids]
+ //        __host__ __device__ (
+ //            const VertexT &src, VertexT &dest,
+ //            const SizeT &edge_id,
+ //            const VertexT &input_item,
+ //            const SizeT &input_pos,
+ //            SizeT &output_pos) -> bool
+ //        {
+ //            bool res = src < dest;
+ //            VertexT id = (res) ? 1 : 0;
+ //            Store(src_node_ids + edge_id, id);
+ //            return res;
+ //        };
 
-        // The filter operation
-        auto filter_op = [] __host__ __device__(
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            if (!util::isValid(dest)) return false;
-            return true;
-        };
+ //        // The filter operation
+ //        auto filter_op = [] __host__ __device__(
+ //            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+ //            const VertexT &input_item, const SizeT &input_pos,
+ //            SizeT &output_pos) -> bool
+ //        {
+ //            if (!util::isValid(dest)) return false;
+ //            return true;
+ //        };
 
-        // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
-	// The intersection operation
+ //        // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
+	// // The intersection operation
 
-	// Sort the scan statistics values for each node in descending order
-        GUARD_CU(util::cubSortPairs(
-            cub_temp_space,
-            scan_stats, scan_stats1,
-            nodes,      nodes1,
-            graph.nodes, 0, sizeof(ValueT) * 8, stream));
+	// // Sort the scan statistics values for each node in descending order
+ //        GUARD_CU(util::cubSortPairs(
+ //            cub_temp_space,
+ //            scan_stats, scan_stats1,
+ //            nodes,      nodes1,
+ //            graph.nodes, 0, sizeof(ValueT) * 8, stream));
 
-        return retval;
+ //        return retval;
     }
 
     /**
@@ -163,17 +164,16 @@ struct SSIterationLoop : public IterationLoopBase
             (received_length, peer_, expand_op);
         return retval;
     }
-    bool Stop_Condition(int gpu_num = 0) 
+    bool Stop_Condition(int gpu_num = 0)
     {
-	auto &enactor_slice = this->enactor->enactor_slices[0];
-	auto &enactor_stats = enactor_slice.enactor_stats;
-	auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
-	auto &graph = data_slice.sub_graph[0];
+      auto &enactor_slice = this->enactor->enactor_slices[0];
+      auto &enactor_stats = enactor_slice.enactor_stats;
+      auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
 
-	auto &iter = enactor_stats.iteration;
-	if (iter == 1) return true;
-	else return false;
-  }
+      auto &iter = enactor_stats.iteration;
+      if (iter == 1) return true;
+      else return false;
+    }
 }; // end of SSIteration
 
 /**

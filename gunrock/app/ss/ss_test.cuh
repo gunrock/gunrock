@@ -193,51 +193,36 @@ typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
                      ValueT   *h_scan_stat,
-    typename GraphT::VertexT  *h_node,
-                     ValueT   *ref_scan_stat = NULL,
-    typename GraphT::VertexT  *ref_node      = NULL,
+                     ValueT   *ref_scan_stat,
                      bool      verbose       = true)
 {
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::CsrT    CsrT;
 
-
-/*
+    std::cerr << "Validate_Results" << std::endl;
     for(int i = 0; i < graph.nodes; i++) {
-        std::cerr << "ref_scan_stat[" << i << "]" << ref_scan_stat[i] << std::endl;
-        std::cerr << "h_scan_stat[" << i << "]" << h_scan_stat[i] << std::endl;
+        std::cerr << i << " " << ref_scan_stat[i] << " " << h_scan_stat[i] << std::endl;
     }
 
-*/
-
-
     SizeT num_errors = 0;
-    //bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
 
     // Verify the result
     util::PrintMsg("Scan statistics Validity: ", !quiet, false);
-    if (ref_scan_stat != NULL && ref_node != NULL)
-        num_errors = util::CompareResults(
-            h_scan_stat, ref_scan_stat,
-            1, true, quiet) + util::CompareResults(
-            h_node, ref_node, 1, true, quiet);
-    if (num_errors > 0)
-    {
+    num_errors = util::CompareResults(h_scan_stat, ref_scan_stat, graph.nodes, true, quiet);
+
+    if (num_errors > 0) {
         util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
-        return  num_errors;
+        return num_errors;
     } else {
         util::PrintMsg("PASS", !quiet);
     }
 
     if (!quiet && verbose)
     {
-        // Display Solution
-        util::PrintMsg("node: ");
-        DisplaySolution(h_node, 1);
         util::PrintMsg("scan_statistics: ");
-        DisplaySolution(h_scan_stat, 1);
+        DisplaySolution(h_scan_stat, graph.nodes);
     }
 
     return num_errors;

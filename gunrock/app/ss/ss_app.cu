@@ -54,8 +54,7 @@ template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 cudaError_t RunTests(
     util::Parameters         &parameters,
     GraphT                   &graph,
-    typename GraphT::ValueT  *ref_scan_stat = NULL,
-    typename GraphT::VertexT *ref_node = NULL,
+    typename GraphT::ValueT  *ref_scan_stats,
     util::Location target = util::DEVICE)
 {
     cudaError_t retval = cudaSuccess;
@@ -72,19 +71,18 @@ cudaError_t RunTests(
     std::string validation = parameters.Get<std::string>("validation");
     util::Info info("SS", parameters, graph); // initialize Info structure
 
-    // Allocate host-side array (for both reference and GPU-computed results)
-    VertexT *h_node       = new VertexT[1];
-    ValueT  *h_scan_stat  = new ValueT [1];
-    // Allocate problem and enactor on GPU, and initialize them
+    ValueT *h_scan_stats = new ValueT[graph.nodes];
+    for(int i = 0; i < graph.nodes; i++) {
+        h_scan_stats[i] = -1;
+    }
+
+
     ProblemT problem(parameters);
     EnactorT enactor;
-    //util::PrintMsg("Before init");
     GUARD_CU(problem.Init(graph  , target));
     GUARD_CU(enactor.Init(problem, target));
-    //util::PrintMsg("After init");
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
-    //info.preprocess_time = cpu_timer.ElapsedMillis();
 
     // perform SS
     for (int run_num = 0; run_num < num_runs; ++run_num)
@@ -103,23 +101,24 @@ cudaError_t RunTests(
             + std::to_string(cpu_timer.ElapsedMillis()) + " ms, #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
+
         if (validation == "each")
         {
-            GUARD_CU(problem.Extract(h_scan_stat, h_node));
+            GUARD_CU(problem.Extract(h_scan_stats));
             SizeT num_errors = app::ss::Validate_Results(
-                parameters, graph, h_scan_stat, h_node,
-                ref_scan_stat, ref_node, false);
+                parameters, graph, h_scan_stats,
+                ref_scan_stats, false);
         }
     }
 
     cpu_timer.Start();
     // Copy out results
-    GUARD_CU(problem.Extract(h_scan_stat, h_node, target));
+    GUARD_CU(problem.Extract(h_scan_stats));
     if (validation == "last")
     {
         SizeT num_errors = app::ss::Validate_Results(
-            parameters, graph, h_scan_stat, h_node,
-            ref_scan_stat, ref_node, false);
+            parameters, graph, h_scan_stats,
+            ref_scan_stats, false);
     }
 
     // compute running statistics
@@ -131,8 +130,7 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    delete[] h_node       ; h_node        = NULL;
-    delete[] h_scan_stat  ; h_scan_stat   = NULL;
+    delete[] h_scan_stats  ; h_scan_stats   = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
