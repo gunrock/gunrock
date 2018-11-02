@@ -583,13 +583,15 @@ cudaError_t Read(
         {
             retval = WriteMeta(parameters, filename, meta_data);
             if (retval == cudaErrorUnknown)
-                return cudaSuccess;
+                //return cudaSuccess;
+                retval = cudaSuccess;
             else if (retval)
                 GUARD_CU2(retval, "Writting meta failed.");
 
             retval = WriteBinary(parameters, graph, meta_data, graph_prefix);
             if (retval == cudaErrorInvalidValue)
-                return cudaSuccess;
+                //return cudaSuccess;
+                retval = cudaSuccess;
             else if (retval)
                 GUARD_CU2(retval, "Writting binary failed");
         }

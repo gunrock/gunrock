@@ -13,6 +13,7 @@
  */
 
 #include <gunrock/app/mf/mf_app.cu>
+#include <gunrock/app/mf/mf_helpers.cuh>
 #include <gunrock/app/test_base.cuh>
 
 #define debug_aml(a...)
@@ -77,8 +78,8 @@ struct main_struct
         GraphT u_graph;
         parameters.Set<int>("undirected", 1);
         parameters.Set<int>("remove-duplicate-edges", true);
-        GUARD_CU(graphio::LoadGraph(parameters, u_graph));
-
+            GUARD_CU(graphio::LoadGraph(parameters, u_graph));
+        
         cpu_timer.Stop();
 
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
@@ -107,76 +108,26 @@ struct main_struct
         debug_aml("number of nodes %d", u_graph.nodes);
 
         ValueT* flow_edge = (ValueT*)malloc(sizeof(ValueT)*u_graph.edges);
-        SizeT* reverse	  = (SizeT*)malloc(sizeof(SizeT)*u_graph.edges);
 
-        // Initialize reverse array.
-        for (auto u = 0; u < u_graph.nodes; ++u)
-        {
-            auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
-            auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
-            auto e_end = e_start + num_neighbors;
-            for (auto e = e_start; e < e_end; ++e)
-            {
-                auto v = u_graph.CsrT::GetEdgeDest(e);
-                auto f_start = u_graph.CsrT::GetNeighborListOffset(v);
-                auto num_neighbors2 = u_graph.CsrT::GetNeighborListLength(v);
-                auto f_end = f_start + num_neighbors2;
-                for (auto f = f_start; f < f_end; ++f)
-                {
-                    auto z = u_graph.CsrT::GetEdgeDest(f);
-                    if (z == u)
-                    {
-                        reverse[e] = f;
-                        reverse[f] = e;
-                        break;
-                    }
-                }
-            }
-        }
+        util::Array1D<SizeT, VertexT> reverse;
+        GUARD_CU(reverse.Allocate(u_graph.edges, util::HOST));
+        app::mf::InitReverse(u_graph, reverse.GetPointer(util::HOST));
 
         if (not undirected){
             // Correct capacity values on reverse edges
-            for (auto u = 0; u < u_graph.nodes; ++u)
-            {
-                auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
-                auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
-                auto e_end = e_start + num_neighbors;
-                debug_aml("vertex %d\nnumber of neighbors %d", u, 
-                    num_neighbors);
-                for (auto e = e_start; e < e_end; ++e)
-                {
-                    u_graph.CsrT::edge_values[e] = (ValueT)0;
-                    auto v = u_graph.CsrT::GetEdgeDest(e);
-                    // Looking for edge u->v in directed graph
-                    auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
-                    auto num_neighbors2 = 
-                    d_graph.CsrT::GetNeighborListLength(u);
-                    auto f_end = f_start + num_neighbors2;
-                    for (auto f = f_start; f < f_end; ++f)
-                    {
-                        auto z = d_graph.CsrT::GetEdgeDest(f);
-                        if (z == v and d_graph.CsrT::edge_values[f] > 0)
-                        {
-                            u_graph.CsrT::edge_values[e]  = 
-                            d_graph.CsrT::edge_values[f];
-                            debug_aml("edge (%d, %d) cap = %lf\n", u, v, \
-                                u_graph.CsrT::edge_values[e]);
-                            break;
-                        }
-                    }
-                }
-            }
+            app::mf::CorrectCapacity(u_graph, d_graph);
         }
 
         //
         // Compute reference CPU max flow algorithm.
         //
-        ValueT max_flow;
-
+        ValueT max_flow = (ValueT)0;
+        
         if (!quick) {
             util::PrintMsg("______CPU reference algorithm______", true);
             double elapsed = app::mf::CPU_Reference
-                (parameters, u_graph, source, sink, max_flow, reverse, flow_edge);
+                (parameters, u_graph, source, sink, max_flow, 
+                 reverse.GetPointer(util::HOST), flow_edge);
                 util::PrintMsg("-----------------------------------\nElapsed: " + 
             std::to_string(elapsed) + " ms\n Max flow CPU = " +
             std::to_string(max_flow), true);
@@ -187,13 +138,14 @@ struct main_struct
         [flow_edge, reverse](util::Parameters &parameters, GraphT &u_graph)
         {
           debug_aml("go to RunTests");
-          return app::mf::RunTests(parameters, u_graph, reverse, flow_edge);
+          return app::mf::RunTests(parameters, u_graph, 
+                  reverse.GetPointer(util::HOST), flow_edge);
         }));
 
         // Clean up
         free(flow_edge);
-        free(reverse);
-
+        // GUARD_CU(reverse.Release());
+        
         return retval;
     }
 };
