@@ -15,6 +15,9 @@
 
 
 #pragma once
+#include <gunrock/util/srts_grid.cuh>
+#include <gunrock/util/srts_details.cuh>
+/*
 #include <gunrock/util/basic_utils.h>
 #include <gunrock/util/cuda_properties.cuh>
 #include <gunrock/util/cta_work_distribution.cuh>
@@ -26,7 +29,7 @@
 #include <gunrock/util/operators.cuh>
 
 #include <gunrock/app/problem_base.cuh>
-
+*/
 namespace gunrock {
 namespace oprtr {
 namespace intersection {
@@ -54,9 +57,13 @@ namespace intersection {
  * @tparam _NL_SIZE_THRESHOLD           Threshold of neighbor list size when doing intersection operation.
  */
 template <
-    typename _ProblemData,
+    OprtrFlag _FLAG,
+    //typename _VertexT,      // Data types
+    typename _SizeT,
+    typename _ValueT,
+    typename _VertexT,
+    typename _InterOpT,
     // Machine parameters
-    size_t  _CUDA_ARCH,
     // Tunable parameters
     size_t  _MIN_CTA_OCCUPANCY,
     size_t  _LOG_THREADS,
@@ -69,15 +76,15 @@ struct KernelPolicy
     //---------------------------------------------------------------------
     // Constants and typedefs
     //---------------------------------------------------------------------
+    static const OprtrFlag FLAG = _FLAG;
 
-    typedef _ProblemData                    ProblemData;
-    typedef typename ProblemData::VertexId  VertexId;
-    typedef typename ProblemData::SizeT     SizeT;
-    typedef typename ProblemData::Value     Value;
+    typedef _SizeT    SizeT;
+    typedef _ValueT   ValueT;
+    typedef _LabelT   VertexT;
+    typedef _InterOpT InterOpT;
 
     enum {
 
-        CUDA_ARCH                       = _CUDA_ARCH,
         MIN_CTA_OCCUPANCY               = _MIN_CTA_OCCUPANCY,
         LOG_THREADS                     = _LOG_THREADS,
         THREADS                         = 1 << LOG_THREADS,

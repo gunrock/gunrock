@@ -74,6 +74,79 @@ template<
 struct Dispatch
 {};
 
+template <
+    OprtrFlag FLAG,
+    typename  SizeT,
+    typename  ValueT,
+    typename  VertexT,
+    typename  InterOpT>
+struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true>
+{
+    typedef KernelPolicy
+        <FLAG, SizeT, ValueT, VertexT, InterOpT,
+        1,
+        10,
+        8,
+        30>
+        KernelPolicyT;
+
+    static __device__ void IntersectTwoSmallNL(
+                            SizeT       *&d_row_offsets,
+                            VertexT     *&d_column_indices,
+                            VertexT     *&d_src_node_ids,
+                            VertexT     *&d_dst_node_ids,
+                            SizeT       *&d_degrees,
+                            DataSlice   *&problem,
+                            SizeT       *&d_output_counts,
+                            SizeT       *&d_output_total,
+                            SizeT       &input_length,
+                            SizeT       &stride,
+                            SizeT       &num_vertex,
+                            SizeT       &num_edge)
+    {
+        VertexT start = threadIdx.x + blockIdx.x * blockDim.x;
+        for (VertexT idx = start; idx < input_length; idx += KernelPolicy::BLOCKS*KernelPolicy::THREADS) {
+            SizeT count = 0;
+            // get nls start and end index for two ids
+            VertexT sid = __ldg(d_src_node_ids+idx);
+            VertexT did = __ldg(d_dst_node_ids+idx);
+            SizeT src_it = __ldg(d_row_offsets+sid);
+            SizeT src_end = __ldg(d_row_offsets+sid+1);
+            SizeT dst_it = __ldg(d_row_offsets+did);
+            SizeT dst_end = __ldg(d_row_offsets+did+1);
+            if (src_it == src_end || dst_it == dst_end) continue;
+            SizeT src_nl_size = src_end - src_it;
+            SizeT dst_nl_size = dst_end - dst_it;
+            SizeT min_nl = (src_nl_size > dst_nl_size) ? dst_nl_size : src_nl_size;
+            SizeT max_nl = (src_nl_size < dst_nl_size) ? dst_nl_size : src_nl_size;
+            SizeT total = min_nl + max_nl;
+            if ( min_nl * ilog2((unsigned int)(max_nl)) * 10 < min_nl + max_nl ) {
+                // search
+                SizeT min_it = (src_nl_size < dst_nl_size) ? src_it : dst_it;
+                SizeT min_end = min_it + min_nl;
+                SizeT max_it = (src_nl_size < dst_nl_size) ? dst_it : src_it;
+                VertexId *keys = &d_column_indices[max_it];
+                //printf("src:%d,dst:%d, src_it:%d, dst_it:%d, min_it:%d max_it:%d, min max nl size: %d, %d\n",sid, did, src_it, dst_it, min_it, max_it, min_nl, max_nl);
+                while ( min_it < min_end) {
+                    VertexId small_edge = d_column_indices[min_it++];
+                    count += BinarySearch(keys, max_nl, small_edge);
+                }
+            } else {
+                VertexId src_edge = __ldg(d_column_indices+src_it);
+                VertexId dst_edge = __ldg(d_column_indices+dst_it);
+                while (src_it < src_end && dst_it < dst_end) {
+                    VertexId diff = src_edge - dst_edge;
+                    src_edge = (diff <= 0) ? __ldg(d_column_indices+(++src_it)) : src_edge;
+                    dst_edge = (diff >= 0) ? __ldg(d_column_indices+(++dst_it)) : dst_edge;
+                    count += (diff == 0);
+                }
+            }
+            d_output_total[idx] += total;
+            d_output_counts[idx] += count;
+        }
+
+    } // IntersectTwoSmallNL
+}
 /**
  * Arch dispatch
  */
@@ -429,25 +502,35 @@ void Inspect(
  * @param[in] num_edge          Maximum number of elements we can place into the outgoing frontier
  *
  */
-
-  template<typename KernelPolicy, typename ProblemData, typename Functor>
-  __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
+template <
+    OprtrFlag FLAG,
+    typename  InKeyT,
+    typename  OutKeyT,
+    typename  SizeT,
+    typename  ValueT,
+    typename  VertexT,
+    typename  InterOpT>
+  __launch_bounds__ (
+	Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true>
+	    ::KernelPolicyT::THREADS, 
+	Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true>
+	    ::KernelPolicyT::CTA_OCCUPANCY)
   __global__
   void IntersectTwoSmallNL(
-            typename KernelPolicy::SizeT        *d_row_offsets,
-            typename KernelPolicy::VertexId     *d_column_indices,
-            typename KernelPolicy::VertexId     *d_src_node_ids,
-            typename KernelPolicy::VertexId     *d_dst_node_ids,
-            typename KernelPolicy::SizeT        *d_degrees,
-            typename ProblemData::DataSlice     *problem,
-            typename KernelPolicy::SizeT        *d_output_counts,
-            typename KernelPolicy::SizeT        *d_output_total,
-            typename KernelPolicy::SizeT        input_length,
-            typename KernelPolicy::SizeT        stride,
-            typename KernelPolicy::SizeT        num_vertex,
-            typename KernelPolicy::SizeT        num_edge)
+            const SizeT        *d_row_offsets,
+            const VertexT      *d_column_indices,
+            const VertexT      *d_src_node_ids,
+            const VertexT      *d_dst_node_ids,
+            const SizeT        *d_degrees,
+            	  SizeT        *d_output_counts,
+            	  SizeT        *d_output_total,
+            const SizeT        input_length,
+            const SizeT        stride,
+            const SizeT        num_vertex,
+            const SizeT        num_edge)
 {
-    Dispatch<KernelPolicy, ProblemData, Functor>::IntersectTwoSmallNL(
+    Dispatch<<FLAG, GraphT, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
+	::IntersectTwoSmallNL(
             d_row_offsets,
             d_column_indices,
             d_src_node_ids,
@@ -483,7 +566,7 @@ void Inspect(
  *
  */
 
-  template<typename KernelPolicy, typename ProblemData, typename Functor>
+/*  template<typename KernelPolicy, typename ProblemData, typename Functor>
   __launch_bounds__ (KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY)
   __global__
   void IntersectTwoLargeNL(
@@ -515,7 +598,7 @@ void Inspect(
             num_edge);
 }
 
-
+*/
 // Kernel Entry point for performing batch intersection computation
 template <typename KernelPolicy, typename ProblemData, typename Functor>
     float LaunchKernel(
@@ -593,6 +676,7 @@ template <typename KernelPolicy, typename ProblemData, typename Functor>
     __LINE__);*/
 
 
+    CudaContext                             &context,
     long total = mgpu::Reduce(d_output_total, input_length, context);
     long tc_count = mgpu::Reduce(d_output_counts, input_length, context);
     printf("tc_total:%ld\n, tc_count:%ld\n", total, tc_count);
@@ -606,33 +690,51 @@ template <
     typename FrontierInT,
     typename FrontierOutT,
     typename ParametersT,
-    typename OpT>
+    typename InterOpT>
 cudaError_t Launch(
     const GraphT         &graph,
     const FrontierInT   * frontier_in,
           FrontierOutT  * frontier_out,
           ParametersT    &parameters,
-          OpT             op)
+          InterOpT       inter_op)
 {
     typedef typename FrontierInT ::ValueT InKeyT;
     typedef typename FrontierOutT::ValueT OutKeyT;
-    typedef typename ParametersT ::SizeT  SizeT;
-    typedef typename ParametersT ::ValueT ValueT;
+    typedef typename ParametersT ::SizeT   SizeT;
+    typedef typename ParametersT ::ValueT  ValueT;
+    typedef typename ParametersT ::VertexT VertexT;
     typedef typename ParametersT ::LabelT LabelT;
-    typedef typename Dispatch<FLAG, InKeyT, OutKeyT,
-        SizeT, ValueT, LabelT, FilterOpT, true>
-        ::KernelPolicyT KernelPolicyT;
-    typedef typename Dispatch<FLAG, InKeyT, OutKeyT,
-        SizeT, ValueT, LabelT, FilterOpT, true>
+    typedef typename Dispatch<FLAG, SizeT, ValueT, 
+        VertexT, InterOpT, true>
         ::KernelPolicyT KernelPolicyT;
 
-    SizeT grid_size = (parameters.frontier -> queue_reset) ?
-        (parameters.frontier -> queue_length / KernelPolicyT::THREADS + 1) :
-        (parameters.cuda_props -> device_props.multiProcessorCount * KernelPolicyT::CTA_OCCUPANCY);
+//    SizeT grid_size = (parameters.frontier -> queue_reset) ?
+//        (parameters.frontier -> queue_length / KernelPolicyT::THREADS + 1) :
+//        (parameters.cuda_props -> device_props.multiProcessorCount * KernelPolicyT::CTA_OCCUPANCY);
 
+    size_t stride = (parameters.input_length + KernelPolicyT::BLOCKS * KernelPolicyT::THREADS - 1)
+                        >> (KernelPolicyT::LOG_THREADS + KernelPolicyT::LOG_BLOCKS);
+    
+    IntersectTwoSmallNL<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
+    <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS>>>(
+            parameters.d_row_offsets,
+            parameters.d_column_indices,
+            parameters.d_src_node_ids,
+            parameters.d_dst_node_ids,
+            parameters.d_degrees,
+            parameters.data_slice,
+            parameters.d_output_counts,
+            parameters.d_output_total,
+            parameters.input_length,
+            stride,
+            parameters.max_vertex,
+            parameters.max_edge);
+
+    long total = mgpu::Reduce(parameters.d_output_total, parameters.input_length, context);
+    long tc_count = mgpu::Reduce(d_output_counts, input_length, context);
+    printf("tc_total:%ld\n, tc_count:%ld\n", total, tc_count);
+    return (float)tc_count / (float)total;
 }
-
-
 
 }  // intersection
 }  // oprtr
