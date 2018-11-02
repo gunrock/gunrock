@@ -13,8 +13,10 @@
  */
 
 #include <gunrock/app/mf/mf_app.cu>
+#include <gunrock/app/mf/mf_helpers.cuh>
 #include <gunrock/app/gtf/gtf_app.cu>
 #include <gunrock/app/test_base.cuh>
+
 #define debug_aml(a...)
 //#define debug_aml(a...) {printf(a); printf("\n");}
 
@@ -72,19 +74,10 @@ struct main_struct
             for (auto e = e_start; e < e_end; ++e)
             {
                 auto v = d_graph.CsrT::GetEdgeDest(e);
-                printf("original graph (%d -> %d) = %f\n", u, v, d_graph.edge_values[e]);
+                //printf("original graph (%d -> %d) = %f\n", u, v, d_graph.edge_values[e]);
             }
         }
         printf("\n\n");
-
-        //printf("\n #of nodes and edges %d %d\n", u_graph.nodes, u_graph.edges);
-
-
-        util::Array1D<SizeT, ValueT> weights;
-        GUARD_CU(weights.Allocate(d_graph.nodes, util::HOST));
-        std::string weights_filename = parameters.Get<std::string>("weights");
-        printf("%s \n", weights_filename.c_str());//, weights[v]);
-        GUARD_CU(weights.Read(weights_filename));
 
         cpu_timer.Stop();
     	parameters.Set("load-time", cpu_timer.ElapsedMillis());
@@ -101,27 +94,25 @@ struct main_struct
         reverse_edges.SetName("reverse_edges");
         GUARD_CU(reverse_edges.Allocate(d_graph.edges, util::HOST));
 
-        printf("shen me gui ya4 \n");
-    	GUARD_CU(app::mf::InitReverse(d_graph, reverse_edges));
-        printf("shen me gui ya5 \n");
+        app::mf::InitReverse(d_graph, reverse_edges.GetPointer(util::HOST));
 
-	    //
         // Compute reference CPU GTF algorithm.
-	    //
     	util::PrintMsg("______CPU reference algorithm______", true);
     	double elapsed = 0;
 
-        GUARD_CU(app::gtf::CPU_Reference
-    	    (parameters, d_graph, reverse_edges, elapsed));
-        util::PrintMsg("-----------------------------------\n"
-            "Elapsed: " + std::to_string(elapsed) + " ms", true);
-
+        if (!quick)
+        {
+            GUARD_CU(app::gtf::CPU_Reference
+    	        (parameters, d_graph, reverse_edges, elapsed));
+            util::PrintMsg("-----------------------------------\n"
+                "Elapsed: " + std::to_string(elapsed) + " ms", true);
+        }
         std::vector<std::string> switches{"advance-mode"};
     	GUARD_CU(app::Switch_Parameters(parameters, d_graph, switches,
-    	[reverse_edges](util::Parameters &parameters, GraphT &d_graph)
+    	[reverse_edges](util::Parameters &parameters_, GraphT &d_graph)
     	{
-    	    //return app::gtf::RunTests(parameters, graph, reverse_edges);
-    	    return cudaSuccess;
+    	    return app::gtf::RunTests<GraphT, ValueT, VertexT, SizeT>(parameters_, d_graph, reverse_edges+0);
+            //return cudaSuccess;
         }));
 
     	// Clean up

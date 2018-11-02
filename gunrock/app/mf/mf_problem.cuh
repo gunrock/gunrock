@@ -16,11 +16,16 @@
 
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/oprtr/1D_oprtr/for_all.cuh>
+#include <gunrock/app/mf/mf_helpers.cuh>
 #include <queue>
 
 #define debug_aml(a...)
 //#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a);\
     printf("\n");}
+
+
+// #define MF_EPSILON 1e-6
+// #define MF_EPSILON_VALIDATE 1e-4
 
 namespace gunrock {
 namespace app {
@@ -36,17 +41,7 @@ cudaError_t UseParameters_problem(
     util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
-
     GUARD_CU(gunrock::app::UseParameters_problem(parameters));
-
-    // TODO: Add problem specific command-line parameter usages here, e.g.:
-    GUARD_CU(parameters.Use<bool>(
-        "mark-pred",
-        util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | 
-	util::OPTIONAL_PARAMETER,
-        false,
-        "Whether to mark predecessor info.",
-        __FILE__, __LINE__));
 
     return retval;
 }
@@ -91,12 +86,12 @@ template <
     ProblemFlag _FLAG = Problem_None>
 struct Problem : ProblemBase<_GraphT, _FLAG>
 {
-    typedef	    _GraphT	      GraphT;
+    typedef	        _GraphT	      GraphT;
     static const     ProblemFlag FLAG = _FLAG;
     typedef typename GraphT::VertexT  VertexT;
     typedef typename GraphT::SizeT    SizeT;
     typedef typename GraphT::GpT      GpT;
-    typedef	    _ValueT	      ValueT;
+    typedef	         _ValueT	      ValueT;
     typedef ProblemBase	 <GraphT, FLAG>	BaseProblem;
     typedef DataSliceBase<GraphT, FLAG>	BaseDataSlice;
 
@@ -108,13 +103,23 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     struct DataSlice : BaseDataSlice
     {
         // MF-specific storage arrays:
-        util::Array1D<SizeT, ValueT>  flow;	      // edge flow 
-        util::Array1D<SizeT, ValueT>  excess; 	      // vertex excess
-        util::Array1D<SizeT, VertexT> height; 	      // vertex height
-        util::Array1D<SizeT, SizeT>   reverse;	      // id reverse edge
-        util::Array1D<SizeT, SizeT>   lowest_neighbor;// id lowest neighbor
-        util::Array1D<SizeT, VertexT> local_vertices; // set of vertices
-        util::Array1D<SizeT, SizeT>   active;	      // flag active vertices
+        util::Array1D<SizeT, ValueT>    flow;	      // edge flow 
+        util::Array1D<SizeT, ValueT>    excess; 	      // vertex excess
+        util::Array1D<SizeT, VertexT>   height; 	      // vertex height
+        util::Array1D<SizeT, VertexT>   reverse;	      // id reverse edge
+        util::Array1D<SizeT, SizeT>     lowest_neighbor;// id lowest neighbor
+        util::Array1D<SizeT, VertexT>   local_vertices; // set of vertices
+        util::Array1D<SizeT, SizeT>     active;	      // flag active vertices
+
+        util::Array1D<SizeT, bool>      mark;
+        
+        util::Array1D<SizeT, VertexT>   head;
+        util::Array1D<SizeT, VertexT>   tail;
+        VertexT head_;
+        VertexT tail_;
+
+        util::Array1D<SizeT, bool>      reachabilities;
+        util::Array1D<SizeT, VertexT>   queue;        	
 
         VertexT	source;	// source vertex
         VertexT sink;	// sink vertex
@@ -134,7 +139,16 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             height 	    .SetName("height"	      );
             lowest_neighbor .SetName("lowest_neighbor");
             local_vertices  .SetName("local_vertices" );
-            active	    .SetName("active"      );
+            active	    .SetName("active"         );
+
+            head	    .SetName("head"	      );
+            tail	    .SetName("tail"	      );
+
+            reachabilities  .SetName("reachabilities" );
+            queue	    .SetName("queue"	      );
+        
+            mark	    .SetName("mark"	      );
+
         }
 
         /*
@@ -156,17 +170,24 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            GUARD_CU(excess	    .Release(target));
-            GUARD_CU(flow    	    .Release(target));
-            GUARD_CU(height  	    .Release(target));
-            GUARD_CU(reverse	    .Release(target));
-            GUARD_CU(lowest_neighbor.Release(target));
-            GUARD_CU(local_vertices .Release(target));
-            GUARD_CU(active	    .Release(target));
+            GUARD_CU(excess	        .Release(target));
+            GUARD_CU(flow    	        .Release(target));
+            GUARD_CU(height  	        .Release(target));
+            GUARD_CU(reverse	        .Release(target));
+            GUARD_CU(lowest_neighbor    .Release(target));
+            GUARD_CU(local_vertices     .Release(target));
+            GUARD_CU(active	        .Release(target));
+
+            GUARD_CU(head               .Release(target));
+	        GUARD_CU(tail               .Release(target));
+
+	        GUARD_CU(reachabilities     .Release(target));
+            GUARD_CU(queue              .Release(target));
+            GUARD_CU(mark               .Release(target));
+
+            GUARD_CU(BaseDataSlice::Release(target));
             
-	        GUARD_CU(BaseDataSlice::Release(target));
-            
-	        return retval;
+	    return retval;
         }
 
         /**
@@ -178,32 +199,39 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          * \return    cudaError_t Error message(s), if any
          */
         cudaError_t Init(
-            GraphT        &sub_graph,
-	        int		       num_gpus = 1,
-            int            gpu_idx  = 0,
-            util::Location target   = util::DEVICE,
-            ProblemFlag    flag     = Problem_None)
+            GraphT          &sub_graph,
+            int             num_gpus = 1,
+            int             gpu_idx  = 0,
+            util::Location  target   = util::DEVICE,
+            ProblemFlag     flag     = Problem_None)
         {
-	        debug_aml("DataSlice Init");
+            debug_aml("DataSlice Init");
 
             cudaError_t retval  = cudaSuccess;
             SizeT nodes_size = sub_graph.nodes;
             SizeT edges_size = sub_graph.edges;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, 
-                                                flag));
+                        flag));
 
             // 
             // Allocate data on Gpu
             //
-            GUARD_CU(flow	    .Allocate(edges_size, target));
-            GUARD_CU(reverse 	    .Allocate(edges_size, util::HOST|target));
+            GUARD_CU(flow	        .Allocate(edges_size, util::HOST));
+            GUARD_CU(reverse 	    .Allocate(edges_size, target));
             GUARD_CU(excess  	    .Allocate(nodes_size, target));
-            GUARD_CU(height  	    .Allocate(nodes_size, target));
+            GUARD_CU(height  	    .Allocate(nodes_size, util::HOST|target));
             GUARD_CU(lowest_neighbor.Allocate(nodes_size, target));
             GUARD_CU(local_vertices .Allocate(nodes_size, target));
             GUARD_CU(active	    .Allocate(1, util::HOST|target));
 
+	        GUARD_CU(head           .Allocate(1, target));
+            GUARD_CU(tail           .Allocate(1, target));
+
+	        GUARD_CU(reachabilities .Allocate(nodes_size, target));
+	        GUARD_CU(queue 	    .Allocate(nodes_size, target));	    
+
+            GUARD_CU(mark           .Allocate(nodes_size, target));
 
             GUARD_CU(util::SetDevice(gpu_idx));
             GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
@@ -217,7 +245,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          * \return    cudaError_t Error message(s), if any
          */
         cudaError_t Reset(const GraphT& graph, const VertexT source, 
-		VertexT* h_reverse, util::Location target = util::DEVICE)
+                VertexT* h_reverse, util::Location target = util::DEVICE)
         {
             cudaError_t retval = cudaSuccess;
             typedef typename GraphT::CsrT CsrT;
@@ -232,95 +260,86 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(flow	      .EnsureSize_(edges_size, target));
             GUARD_CU(reverse 	      .EnsureSize_(edges_size, target));
             GUARD_CU(excess  	      .EnsureSize_(nodes_size, target));
-            GUARD_CU(height  	      .EnsureSize_(nodes_size, target));
+            GUARD_CU(height  	      .EnsureSize_(nodes_size, target|util::HOST));
             GUARD_CU(lowest_neighbor  .EnsureSize_(nodes_size, target));
             GUARD_CU(local_vertices   .EnsureSize_(nodes_size, target));
+
+	        GUARD_CU(head  	       .EnsureSize_(1, target));
+            GUARD_CU(tail 	       .EnsureSize_(1, target));
+
+            GUARD_CU(reachabilities    .EnsureSize_(nodes_size, target));
+            GUARD_CU(queue     	       .EnsureSize_(nodes_size, target));
+
+            GUARD_CU(mark              .EnsureSize_(nodes_size, target));
 
             GUARD_CU(util::SetDevice(this->gpu_idx));
             GUARD_CU(reverse.SetPointer(h_reverse, edges_size, util::HOST));
             GUARD_CU(reverse.Move(util::HOST, target, edges_size, 0, 
-                this->stream));
-                
-            ValueT* h_flow = (ValueT*)malloc(sizeof(ValueT)*graph.edges);
-            ValueT* h_excess = (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
-            VertexT* h_height = (VertexT*)malloc(sizeof(VertexT)*graph.nodes);
-            for (auto i = 0; i < graph.edges; ++i) h_flow[i] = (ValueT)0;
-            for (auto i = 0; i < graph.nodes; ++i) h_excess[i] = (ValueT)0;
-            for (auto i = 0; i < graph.nodes; ++i) h_height[i] = (VertexT)0;
+                        this->stream));
 
-            h_height[sink] = 0;
-            relabeling(graph, sink, h_height);
-            if (h_height[source] < nodes_size)
-                h_height[source] = nodes_size;
+#if MF_DEBUG
+            debug_aml("reverse on CPU\n");
+            for (int i=0; i<edges_size; ++i)
+                debug_aml("reverse[%d] = %d\n", i, h_reverse[i]);
 
-            SizeT e_start = graph.CsrT::GetNeighborListOffset(source);
-            SizeT num_neighbors = graph.CsrT::GetNeighborListLength(source);
-            SizeT e_end = e_start + num_neighbors;
-            ValueT preflow = (ValueT) 0; 
-            for (auto e = e_start; e < e_end; ++e)
-            {
-                VertexT v = graph.CsrT::GetEdgeDest(e);
-                ValueT f = graph.CsrT::edge_values[e];
-                h_excess[v] += f;
-                h_flow[e] = f;
-                h_flow[h_reverse[e]] = -f;
-                preflow += f;
-            }
-            debug_aml("preflow = %lf\n", preflow);
+            debug_aml("reverse after coping to device\n");
+            GUARD_CU(reverse.ForAll([]
+                        __host__ __device__(VertexT *r, const VertexT &pos)
+                        {
+                            debug_aml("reverse[%d] = %d\n", pos, r[pos]);
+                        }, edges_size, target, this -> stream));
+#endif
 
-            GUARD_CU(height.SetPointer(h_height, nodes_size, util::HOST));
-            GUARD_CU(height.Move(util::HOST, target, nodes_size, 0,
-                this->stream));
-
-            GUARD_CU(excess.SetPointer(h_excess, nodes_size, util::HOST));
-            GUARD_CU(excess.Move(util::HOST, target, nodes_size, 0, 
-                this->stream));
-                
-            GUARD_CU(flow.SetPointer(h_flow, edges_size, util::HOST));
-            GUARD_CU(flow.Move(util::HOST, target, edges_size, 0, 
-                this->stream));
-
-            this->num_updated_vertices = num_neighbors + 1;
-
+            this->num_updated_vertices = 1;
             // Reset data
-            GUARD_CU(active.ForAll([]
-                __host__ __device__(SizeT *active_, const VertexT &pos)
-                {
-                    active_[pos] = 1;
-                }, 1, target, this -> stream));
+            GUARD_CU(height.ForAll([]
+                        __host__ __device__(VertexT *h, const VertexT &pos)
+                        {
+                            h[pos] = 0;
+                        }, nodes_size, target, this -> stream));
+            
+            GUARD_CU(flow.ForAll([]
+                        __host__ __device__(ValueT *f, const VertexT &pos)
+                        {
+                            f[pos] = (ValueT)0;
+                        }, edges_size, target, this -> stream));
 
-            /*
-            GUARD_CU(height.ForAll([source, nodes_size]
-              __host__ __device__(VertexT *height, const VertexT pos)
-              {
-            if (pos != source){
-              height[pos] = 0;
-            }else{
-              height[pos] = nodes_size;
-            }
-              }, nodes_size, target, this -> stream));
-              */
+            GUARD_CU(excess.ForAll([]
+                        __host__ __device__(ValueT *e, const VertexT &pos)
+                        {
+                            e[pos] = (ValueT)0;
+                        }, nodes_size, target, this -> stream));
+
+            GUARD_CU(active.ForAll([]
+                        __host__ __device__(SizeT *active_, const VertexT &pos)
+                        {
+                            active_[pos] = 1;
+                        }, 1, target, this -> stream));
 
             GUARD_CU(lowest_neighbor.ForAll([graph, source]
-                __host__ __device__(VertexT *lowest_neighbor, const VertexT pos)
-                {
-                    lowest_neighbor[pos] = 
-                        util::PreDefinedValues<VertexT>::InvalidValue;
-                }, nodes_size, target, this -> stream));
+                       __host__ __device__(VertexT *lowest_neighbor, const VertexT pos)
+                       {
+            		    lowest_neighbor[pos] = 
+                                util::PreDefinedValues<VertexT>::InvalidValue;
+                       }, nodes_size, target, this -> stream));
 
             GUARD_CU(local_vertices.ForAll([]
-                __host__ __device__(VertexT *local_vertex, const VertexT pos)
-                {
-                    local_vertex[pos] = pos;
-                }, nodes_size, target));
+                       __host__ __device__(VertexT *local_vertex, const VertexT pos)
+                       {
+                           local_vertex[pos] = pos;
+                       }, nodes_size, target));
+
+            GUARD_CU(mark.ForAll([]
+                        __host__ __device__(bool *mark_, const VertexT &pos)
+                        {
+                            mark_[pos] = false;
+                        }, nodes_size, target, this -> stream));
 
             GUARD_CU2(cudaDeviceSynchronize(),
-                "cudaDeviceSynchronize failed.");
-
-            free(h_flow);
-            free(h_excess);
+                    "cudaDeviceSynchronize failed.");
             return retval;
         }
+
     }; // DataSlice
 
     // Members
@@ -397,9 +416,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         else if (target == util::HOST)
         {
             GUARD_CU(data_slice.flow.ForEach(h_flow,
-                []__host__ __device__(const ValueT &f, ValueT &h_f){
-                    h_f = f;
-                }, eN, util::HOST));
+              []__host__ __device__(const ValueT &f, ValueT &h_f){
+              {
+            h_f = f;
+              }
+              }, eN, util::HOST));
         }
         GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
 
@@ -416,7 +437,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GraphT	    &graph,
             util::Location  target = util::DEVICE)
     {
-	    debug_aml("Problem Init");
+        debug_aml("Problem Init");
         cudaError_t retval = cudaSuccess;
 
         GUARD_CU(BaseProblem::Init(graph, target));
@@ -424,7 +445,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
-	        auto gpu_name = std::to_string(gpu);
+            auto gpu_name = std::to_string(gpu);
             data_slices[gpu].SetName("data_slices[" + gpu_name + "]");
 
             if (target & util::DEVICE)
@@ -459,24 +480,24 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
 	    debug_aml("Problem Reset");
 
-	    auto source_vertex  = this->parameters.template Get<VertexT>("source");
-	    auto sink_vertex    = this->parameters.template Get<VertexT>("sink");
+        auto source_vertex  = this->parameters.template Get<VertexT>("source");
+        auto sink_vertex    = this->parameters.template Get<VertexT>("sink");
 
         for (int gpu = 0; gpu < this->num_gpus; ++gpu)
         {
             auto &data_slice = data_slices[gpu][0];
             data_slice.source = source_vertex;
             data_slice.sink   = sink_vertex; 
-            
-	        // Set device
+                
+            // Set device
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-	        GUARD_CU(data_slices[gpu]->Reset(graph, source_vertex, h_reverse, 
-			    target));
-            GUARD_CU(data_slices[gpu].Move(util::HOST, target));
+            GUARD_CU(data_slices[gpu]->Reset(graph, source_vertex, h_reverse, 
+                target));
+                GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
-        
-	    // Filling the initial input_queue for MF problem
+            
+        // Filling the initial input_queue for MF problem
 
         int gpu;
         VertexT src_;
@@ -498,7 +519,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         return retval;
     }
-
+    
     /** @} */
 };
 

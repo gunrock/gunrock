@@ -68,87 +68,6 @@ cudaError_t UseParameters(util::Parameters &parameters)
     return retval;
 }
 
-template <typename GraphT>
-cudaError_t CorrectReverseCapacities(
-    GraphT &d_graph,
-    GraphT &u_graph)
-{
-    typedef typename GraphT::CsrT CsrT;
-    cudaError_t retval = cudaSuccess;
-
-    // Correct capacity values on reverse edges
-    #pragma omp parallel for
-    for (auto u = 0; u < u_graph.nodes; ++u)
-    {
-        auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
-        auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
-        auto e_end = e_start + num_neighbors;
-        debug_aml("vertex %d\nnumber of neighbors %d", u,
-            num_neighbors);
-        for (auto e = e_start; e < e_end; ++e)
-        {
-            u_graph.CsrT::edge_values[e] = 0;
-            auto v = u_graph.CsrT::GetEdgeDest(e);
-            // Looking for edge u->v in directed graph
-            auto f_start = d_graph.CsrT::GetNeighborListOffset(u);
-            auto num_neighbors2 =
-            d_graph.CsrT::GetNeighborListLength(u);
-            auto f_end = f_start + num_neighbors2;
-            for (auto f = f_start; f < f_end; ++f)
-            {
-                auto z = d_graph.CsrT::GetEdgeDest(f);
-                if (z == v and d_graph.CsrT::edge_values[f] > 0)
-                {
-                    u_graph.CsrT::edge_values[e]  =
-                    d_graph.CsrT::edge_values[f];
-                    debug_aml("edge (%d, %d) cap = %lf\n", u, v, \
-                        u_graph.CsrT::edge_values[e]);
-                    break;
-                }
-            }
-        }
-    }
-
-    return retval;
-}
-
-template <typename GraphT, typename ArrayT>
-cudaError_t InitReverse(
-    GraphT &u_graph,
-    ArrayT &reverse)
-{
-    typedef typename GraphT::CsrT CsrT;
-    cudaError_t retval = cudaSuccess;
-
-    // Initialize reverse array.
-    #pragma omp parallel for
-    for (auto u = 0; u < u_graph.nodes; ++u)
-    {
-        auto e_start = u_graph.CsrT::GetNeighborListOffset(u);
-        auto num_neighbors = u_graph.CsrT::GetNeighborListLength(u);
-        auto e_end = e_start + num_neighbors;
-        for (auto e = e_start; e < e_end; ++e)
-        {
-            auto v = u_graph.CsrT::GetEdgeDest(e);
-            auto f_start = u_graph.CsrT::GetNeighborListOffset(v);
-            auto num_neighbors2 = u_graph.CsrT::GetNeighborListLength(v);
-            auto f_end = f_start + num_neighbors2;
-            for (auto f = f_start; f < f_end; ++f)
-            {
-                auto z = u_graph.CsrT::GetEdgeDest(f);
-                if (z == u)
-                {
-                    reverse[e] = f;
-                    reverse[f] = e;
-                    break;
-                }
-            }
-        }
-    }
-
-    return retval;
-}
-
 /**
  * @brief Run mf tests
  * @tparam     GraphT	  Type of the graph
@@ -193,7 +112,12 @@ cudaError_t RunTests(
 
     ValueT *h_flow  = new ValueT[graph.edges];
     int *min_cut    = new int   [graph.nodes];
-    for (auto u = 0; u < graph.nodes; ++u) min_cut[u] = 0;
+    // for (auto u = 0; u < graph.nodes; ++u) min_cut[u] = 0;
+    memset(min_cut, 0, graph.nodes * sizeof(min_cut[0]));
+
+    bool * vertex_reachabilities = new bool[graph.nodes];
+
+    ValueT * h_residuals = new ValueT[graph.edges];
     
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
@@ -214,7 +138,6 @@ cudaError_t RunTests(
 
         cpu_timer.Start();
         GUARD_CU(enactor.Enact());
-
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
@@ -227,7 +150,8 @@ cudaError_t RunTests(
         if (validation == "each")
         {
             GUARD_CU(problem.Extract(h_flow));
-	        app::mf::minCut(graph, source, h_flow, min_cut);
+	        app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities, h_residuals);
+
             int num_errors = app::mf::Validate_Results(parameters, graph, 
 		        source, sink, h_flow, h_reverse, min_cut, ref_flow, 
 		        quiet_mode);
@@ -239,7 +163,8 @@ cudaError_t RunTests(
     if (validation == "last")
     {
         GUARD_CU(problem.Extract(h_flow));
-        app::mf::minCut(graph, source, h_flow, min_cut);
+        app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities, h_residuals);
+
         int num_errors = app::mf::Validate_Results(parameters, graph, 
             source, sink, h_flow, h_reverse, min_cut, ref_flow, quiet_mode);
     }
@@ -283,6 +208,7 @@ cudaError_t RunTests(
  * @param[out] min_cut	  Return partition into two sets of nodes
  * \return     double     Return accumulated elapsed times for all runs
  */
+#if 0
 template <typename GraphT, typename VertexT = typename GraphT::VertexT,
     typename ValueT = typename GraphT::ValueT>
 
@@ -292,7 +218,9 @@ double gunrock_mf(
     VertexT *reverse,
     ValueT  *flow,
     int	    *min_cut,
-    ValueT  &maxflow)
+    ValueT  &maxflow,
+    bool   *vertex_reachabilities,
+    ValueT *h_residuals)
 {
     typedef gunrock::app::mf::Problem<GraphT>	ProblemT;
     typedef gunrock::app::mf::Enactor<ProblemT> EnactorT;
@@ -325,13 +253,14 @@ double gunrock_mf(
 
         total_time += cpu_timer.ElapsedMillis();
         problem.Extract(flow);
-	    gunrock::app::mf::minCut(graph, source, flow, min_cut);
+	    gunrock::app::mf::minCut(graph, source, flow, min_cut, vertex_reachabilities, h_residuals);
     }
 
     enactor.Release(target);
     problem.Release(target);
     return total_time;
 }
+#endif
 
 /*
  * @brief Simple interface  take in graph as CSR format
