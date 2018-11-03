@@ -71,9 +71,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         // <DONE> add problem specific storage arrays:
         util::Array1D<SizeT, VertexT> 	colors;
         util::Array1D<SizeT, float> 	rand;
-	
+
 	curandGenerator_t 		gen;
     	bool 				color_balance;
+      int         usr_iter;
 
 	util::Array1D<SizeT, SizeT> 	colored;
 	SizeT			    	colored_;
@@ -132,14 +133,16 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             util::Location target,
             ProblemFlag    flag,
 	    bool	   color_balance_,
-	    int		   seed)
+	    int		   seed,
+      int      usr_iter_)
         {
             cudaError_t retval  = cudaSuccess;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
-	
+
 	    color_balance = color_balance_;
-	
+      usr_iter      = usr_iter_;
+
 	    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
 	    curandSetPseudoRandomGeneratorSeed(gen, seed);
 
@@ -170,7 +173,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // Ensure data are allocated
             // <DONE> ensure size of problem specific data:
             GUARD_CU(colors		.EnsureSize_(nodes, target));
-            GUARD_CU(rand		.EnsureSize_(nodes, target));	    
+            GUARD_CU(rand		.EnsureSize_(nodes, target));
 	    GUARD_CU(colored		.EnsureSize_(1, util::HOST|target));
             // </DONE>
 
@@ -200,6 +203,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
     int seed;
+    int usr_iter;
     bool color_balance;
 
     // ----------------------------------------------------------------
@@ -216,6 +220,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	// <DONE>
 	seed = _parameters.Get<int>("seed");
 	color_balance = _parameters.Get<bool>("LBCOLOR");
+  usr_iter = _parameters.Get<int>("usr_iter");
 	// </DONE>
     }
 
@@ -244,7 +249,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         GUARD_CU(BaseProblem::Release(target));
         return retval;
     }
-    
+
     /**
      * @brief Copy result distancess computed on GPUs back to host-side arrays.
 ...
@@ -279,9 +284,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 // </DONE>
             }
         } else { // num_gpus != 1
-            
+
             // ============ INCOMPLETE TEMPLATE - MULTIGPU ============
-            
+
             // // TODO: extract the results from multiple GPUs, e.g.:
             // // util::Array1D<SizeT, ValueT *> th_distances;
             // // th_distances.SetName("bfs::Problem::Extract::th_distances");
@@ -348,7 +353,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 target,
                 this -> flag,
 		this -> color_balance,
-		this -> seed
+		this -> seed,
+    this -> usr_iter
             ));
         }
 

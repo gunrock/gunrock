@@ -21,7 +21,7 @@
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
- 
+
 // <DONE> change includes
 #include <gunrock/app/color/color_problem.cuh>
 
@@ -45,7 +45,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
-    
+
     return retval;
 }
 
@@ -62,7 +62,7 @@ struct ColorIterationLoop : public IterationLoopBase
     typedef typename EnactorT::ValueT  ValueT;
     typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
-    
+
     typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
@@ -77,20 +77,20 @@ struct ColorIterationLoop : public IterationLoopBase
     {
         // --
         // Alias variables
-        
+
         auto &data_slice = this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
-        
+
         auto &enactor_slice = this -> enactor ->
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
-        
+
         auto &enactor_stats    = enactor_slice.enactor_stats;
         auto &graph            = data_slice.sub_graph[0];
         auto &frontier         = enactor_slice.frontier;
         auto &oprtr_parameters = enactor_slice.oprtr_parameters;
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
-        
+
         // <DONE> add problem specific data alias here:
         auto &colors 	       = data_slice.colors;
         auto &rand 	       = data_slice.rand;
@@ -100,7 +100,7 @@ struct ColorIterationLoop : public IterationLoopBase
         // </DONE>
 
 	curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
-        
+
         // --
         // Define operations
 
@@ -117,21 +117,21 @@ struct ColorIterationLoop : public IterationLoopBase
             SizeT &output_pos) -> bool
         {
             // <TODO> Implement advance operation
-                        
+
             // Mark src and dest as visited
             atomicMax(visited + src, 1);
             auto dest_visited = atomicMax(visited + dest, 1);
-            
+
             // Increment degree of src
             atomicAdd(degrees + src, 1);
-            
+
             // Add dest to queue if previously unsen
             return dest_visited == 0;
-            
+
             // </TODO>
         };
 
-       
+
 	oprtr_parameters.reduce_values_out   = &rand_max;
 	oprtr_parameters.reduce_reset        = true;
         oprtr_parameters.reduce_values_temp  = &color_temp;
@@ -140,10 +140,10 @@ struct ColorIterationLoop : public IterationLoopBase
         frontier.queue_length = graph.nodes;
         frontier.queue_reset  = true;
 
-        GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V | 
+        GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
                 oprtr::OprtrMode_REDUCE_TO_SRC | oprtr::ReduceOp_Maximum>(
                 graph, null_ptr, null_ptr,
-                oprtr_parameters, advance_op, 
+                oprtr_parameters, advance_op,
                 []__host__ __device__ (const ValueT &a, const ValueT &b)
                 {
                     return (a < b) ? b : a;
@@ -151,15 +151,15 @@ struct ColorIterationLoop : public IterationLoopBase
 
         // --
         // Run
-        
+
         // <TODO> some of this may need to be edited depending on algorithmic needs
         // !! How much variation between apps is there in these calls?
-        
+
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
             oprtr_parameters, advance_op, filter_op));
 #endif
-        
+
         // Get back the resulted frontier length
         // GUARD_CU(frontier.work_progress.GetQueueLength(
         //    frontier.queue_index, frontier.queue_length,
@@ -183,29 +183,29 @@ struct ColorIterationLoop : public IterationLoopBase
 	    	ValueT temp = rand[v];
 
 	    	for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-		    VertexT u = graph.CsrT::GetEdgeDest(e);	
-		    if (rand[e] > temp)
-		    	max = e;
-		
-		    if (rand[e] < temp)
-			min = e;
+		    VertexT u = graph.CsrT::GetEdgeDest(e);
+		    if (rand[u] > temp)
+		    	max = u;
 
-		    printf("Let's see what rand[e] = %f\n", rand[e]);
-		    temp = rand[e]; // compare against e-1
+		    if (rand[u] < temp)
+			min = u;
+
+		    printf("Let's see what rand[u] = %f\n", rand[e]);
+		    temp = rand[u]; // compare against e-1
 	    	}
 
 		// Assign two colors per iteration
 		if (!util::isValid(colors[max]))
 		    colors[max] = iteration*2+1;
-		
+
 		if (!util::isValid(colors[min]))
 		    colors[min] = iteration*2+2;
-		
+
 		printf("iteration number = %u\n", iteration);
 		printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min], colors[max]);
 	    };
-      
-	
+
+
 	    auto status_op = [
 		colors,
 		colored
@@ -216,7 +216,7 @@ struct ColorIterationLoop : public IterationLoopBase
 		if(util::isValid(colors[v]))
 		    atomicAdd(&colored[0], 1);
 	    };
- 
+
 	    // Run --
             GUARD_CU(frontier.V_Q()->ForAll(
                  color_op, frontier.queue_length,
@@ -230,7 +230,7 @@ struct ColorIterationLoop : public IterationLoopBase
             GUARD_CU(data_slice.colored .Move(util::DEVICE, util::HOST));
 
 	}
- 
+
         return retval;
     }
 
@@ -241,10 +241,20 @@ struct ColorIterationLoop : public IterationLoopBase
             problem -> data_slices[this -> gpu_num][0];
         auto &enactor_slices = this -> enactor -> enactor_slices;
         auto iter = enactor_slices[0].enactor_stats.iteration;
-	auto &graph = data_slice.sub_graph[0];
+        auto usr_iter = data_slice.usr_iter;
+	      auto &graph = data_slice.sub_graph[0];
+        printf("Max Iteration: %d\n",usr_iter);
+        printf("Iteration: %d\n",iter);
+        printf("colored_: %d\n", data_slice.colored_);
+        printf("Num Nodes: %d\n", graph.nodes);
 
-        if(data_slice.colored_ >= graph.nodes)
-	    return true;
+        //old stop condition
+        //if(data_slice.colored_ >= graph.nodes)
+	      //   return true;
+
+        //user defined stop condition
+        if(iter == usr_iter)
+             return true;
 
         return false;
     }
@@ -262,9 +272,9 @@ struct ColorIterationLoop : public IterationLoopBase
         int NUM_VALUE__ASSOCIATES>
     cudaError_t ExpandIncoming(SizeT &received_length, int peer_)
     {
-        
+
         // ================ INCOMPLETE TEMPLATE - MULTIGPU ====================
-        
+
         auto &data_slice    = this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
         auto &enactor_slice = this -> enactor ->
@@ -322,9 +332,9 @@ public:
     typedef typename GraphT::ValueT    ValueT  ;
     typedef EnactorBase<GraphT, LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
         BaseEnactor;
-    typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> 
+    typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
-    typedef ColorIterationLoop<EnactorT> 
+    typedef ColorIterationLoop<EnactorT>
         IterationT;
 
     Problem *problem;
@@ -457,7 +467,7 @@ public:
            }
         }
         // </DONE>
-        
+
         GUARD_CU(BaseEnactor::Sync());
         return retval;
     }

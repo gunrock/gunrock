@@ -40,17 +40,17 @@ double CPU_Reference(
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
-    
+
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
-    
-    // <TODO> 
+
+    // <TODO>
     // implement CPU reference implementation
     for(SizeT v = 0; v < graph.nodes; ++v) {
         // degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
     }
     // </TODO>
-    
+
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
     return elapsed;
@@ -81,8 +81,9 @@ typename GraphT::SizeT Validate_Results(
     bool quiet = parameters.Get<bool>("quiet");
 
     // <TODO> result validation and display
+    printf("Comparison: <node idx, gunrock, cpu>\n");
     for(SizeT v = 0; v < graph.nodes; ++v) {
-        printf("%d %d %d\n", v, h_colors[v], ref_colors[v]);
+        printf(" %d %d %d\n", v, h_colors[v], ref_colors[v]);
     }
     // </TODO>
 
