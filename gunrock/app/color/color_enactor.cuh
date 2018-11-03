@@ -190,7 +190,7 @@ struct ColorIterationLoop : public IterationLoopBase
 		    if (rand[u] < temp)
 			min = u;
 
-		    printf("__GPU__ Let's see what rand[u] = %f\n", rand[e]);
+		    printf("Let's see what rand[u] = %f\n", rand[u]);
 		    temp = rand[u]; // compare against e-1
 	    	}
 

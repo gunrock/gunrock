@@ -22,6 +22,8 @@
 #include <curand.h>
 #include <curand_kernel.h>
 
+#include <omp.h>
+
 namespace gunrock {
 namespace app {
 // <DONE> change namespace
@@ -66,8 +68,36 @@ auto seed     = parameters.Get<int>("seed");
     curandSetPseudoRandomGeneratorSeed(gen, seed);
     curandGenerateUniform(gen, rand.GetPointer(util::HOST), graph.nodes);
 
-    for(SizeT v = 0; v < graph.nodes; ++v) {
-        // degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
+    for (int iteration = 0; iteration < usr_iter; iteration++) {
+        for (VertexT v = 0; v < graph.nodes; v++) {
+            SizeT start_edge 	= graph.GetNeighborListOffset(v);
+            SizeT num_neighbors = graph.GetNeighborListLength(v);
+            
+            VertexT max = v;
+            VertexT min = v;
+            float temp  = rand[v];
+            
+            for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+                VertexT u = graph.GetEdgeDest(e);
+                if (rand[u] > temp)
+                    max = u;
+                
+                if (rand[u] < temp)
+                    min = u;
+                
+                printf("Let's see what rand[u] = %f\n", rand[u]);
+                temp = rand[u];
+            }
+            
+            if (colors[max] == -1)
+                colors[max] = iteration*2+1;
+
+            if (colors[min] == -1)
+                colors[min] = iteration*2+2;
+
+            printf("iteration number = %u\n", iteration);
+            printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min], colors[max]);
+        }
     }
 
     cpu_timer.Stop();
