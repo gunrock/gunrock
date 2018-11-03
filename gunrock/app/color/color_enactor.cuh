@@ -179,7 +179,7 @@ struct ColorIterationLoop : public IterationLoopBase
 	    	SizeT num_neighbors 	= graph.CsrT::GetNeighborListLength(v);
 
 	    	VertexT max = v;    // active max vertex
-		VertexT min = v;    // active min vertex
+		    VertexT min = v;    // active min vertex
 	    	ValueT temp = rand[v];
 
 	    	for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
@@ -190,7 +190,7 @@ struct ColorIterationLoop : public IterationLoopBase
 		    if (rand[u] < temp)
 			min = u;
 
-		    printf("Let's see what rand[u] = %f\n", rand[e]);
+		    printf("__GPU__ Let's see what rand[u] = %f\n", rand[e]);
 		    temp = rand[u]; // compare against e-1
 	    	}
 

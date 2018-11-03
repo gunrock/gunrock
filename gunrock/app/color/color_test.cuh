@@ -14,6 +14,14 @@
 
 #pragma once
 
+#include <gunrock/util/basic_utils.h>
+#include <gunrock/util/error_utils.cuh>
+#include <gunrock/util/type_limits.cuh>
+#include <gunrock/util/type_enum.cuh>
+
+#include <curand.h>
+#include <curand_kernel.h>
+
 namespace gunrock {
 namespace app {
 // <DONE> change namespace
@@ -35,21 +43,32 @@ namespace color {
  */
 template <typename GraphT>
 double CPU_Reference(
+    util::Parameters &parameters,
     const GraphT &graph,
     typename GraphT::VertexT *colors,
     bool quiet)
 {
-    typedef typename GraphT::SizeT SizeT;
+    typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::VertexT VertexT;
+    curandGenerator_t 		gen;
+auto usr_iter = parameters.Get<int>("usr_iter");
+auto seed     = parameters.Get<int>("seed");
 
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
 
-    // <TODO>
-    // implement CPU reference implementation
+    //initialize cpu with same condition, use same variable names as on GPU
+    memset(colors, -1, graph.nodes * sizeof(VertexT));
+
+    util::Array1D<SizeT, float> rand;
+    rand.Allocate(graph.nodes,util::HOST);
+    curandCreateGeneratorHost(&gen,CURAND_RNG_PSEUDO_DEFAULT);
+    curandSetPseudoRandomGeneratorSeed(gen, seed);
+    curandGenerateUniform(gen, rand.GetPointer(util::HOST), graph.nodes);
+
     for(SizeT v = 0; v < graph.nodes; ++v) {
         // degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
     }
-    // </TODO>
 
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();

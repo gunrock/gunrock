@@ -73,6 +73,7 @@ struct main_struct
 
 	    util::PrintMsg("__________________________", !quiet);
             float elapsed = app::color::CPU_Reference(
+                parameters,
                 graph.csr(),
                 ref_colors,
                 quiet);
