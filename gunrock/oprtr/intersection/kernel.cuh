@@ -204,7 +204,7 @@ template <
     typename FrontierOutT,
     typename ParametersT,
     typename InterOpT>
-float Launch(
+cudaError_t Launch(
     const GraphT         &graph,
     const FrontierInT   * frontier_in,
           FrontierOutT  * frontier_out,
@@ -246,7 +246,7 @@ float Launch(
     long total = mgpu::Reduce(parameters.d_output_total, parameters.input_length, parameters.context[0]);
     long tc_count = mgpu::Reduce(parameters.d_output_counts, parameters.input_length, parameters.context[0]);
     printf("tc_total:%ld\n, tc_count:%ld\n", total, tc_count);
-    return (float)tc_count / (float)total;
+    return cudaSuccess;//(float)tc_count / (float)total;
 }
 
 }  // intersection

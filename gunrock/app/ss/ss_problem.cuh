@@ -143,7 +143,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(scan_stats1 	.Allocate(sub_graph.nodes, target));
             GUARD_CU(nodes       	.Allocate(sub_graph.nodes, target));
             GUARD_CU(nodes1      	.Allocate(sub_graph.nodes, target));
-            GUARD_CU(src_node_ids.Allocate(sub_graph.edges, target));
+            GUARD_CU(src_node_ids       .Allocate(sub_graph.edges, target));
             GUARD_CU(cub_temp_space	.Allocate(1              , target));
 
             /*if (target & util::DEVICE)

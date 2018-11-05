@@ -79,12 +79,14 @@ struct SSIterationLoop : public IterationLoopBase
         auto         &src_node_ids       =   data_slice.src_node_ids;
         auto         &cub_temp_space     =   data_slice.cub_temp_space;
         auto         &row_offsets        =   graph.CsrT::row_offsets;
+        auto         &col_indices        =   graph.CsrT::column_indices;
         auto         &frontier           =   enactor_slice.frontier;
         auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
         auto         &retval             =   enactor_stats.retval;
         auto         &stream             =   oprtr_parameters.stream;
         auto         &iteration          =   enactor_stats.iteration;
         auto         target              =   util::DEVICE;
+        util::Array1D<SizeT, VertexT>* null_frontier = NULL;
 
         // First add degrees to scan statistics
         GUARD_CU(scan_stats.ForAll([scan_stats, row_offsets]
@@ -93,6 +95,7 @@ struct SSIterationLoop : public IterationLoopBase
                 scan_stats_[v] = row_offsets[v + 1] - row_offsets[v];
             }, graph.nodes, target, stream));
 
+        scan_stats.Print();
         // Prune edges where src_id > dest_id to avoid visiting the same edge twice later
         // The advance operation
         auto advance_op = [src_node_ids]
@@ -105,6 +108,7 @@ struct SSIterationLoop : public IterationLoopBase
         {
             bool res = src < dest;
             VertexT id = (res) ? 1 : 0;
+//            src_node_ids[edge_id] = id;
             Store(src_node_ids + edge_id, id);
             return res;
         };
@@ -126,9 +130,23 @@ struct SSIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> float
         {
-            float tc_count;
-            return tc_count;
+            return true;
         };
+        frontier.queue_length = graph.nodes;
+        frontier.queue_reset  = true;
+        frontier.V_Q()->Print();
+        frontier.Next_V_Q()->Print();
+        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+            oprtr_parameters, advance_op, filter_op));
+
+        util::PrintMsg("============After advance ============");
+        src_node_ids.Print();
+        col_indices.Print();
+        frontier.V_Q()->Print();
+        frontier.Next_V_Q()->Print();
+
+
 
 	// // Sort the scan statistics values for each node in descending order
  //        GUARD_CU(util::cubSortPairs(
