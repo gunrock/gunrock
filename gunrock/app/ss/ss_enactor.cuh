@@ -93,34 +93,42 @@ struct SSIterationLoop : public IterationLoopBase
                 scan_stats_[v] = row_offsets[v + 1] - row_offsets[v];
             }, graph.nodes, target, stream));
 
- //        // Prune edges where src_id > dest_id to avoid visiting the same edge twice later
- //        // The advance operation
- //        auto advance_op = [src_node_ids]
- //        __host__ __device__ (
- //            const VertexT &src, VertexT &dest,
- //            const SizeT &edge_id,
- //            const VertexT &input_item,
- //            const SizeT &input_pos,
- //            SizeT &output_pos) -> bool
- //        {
- //            bool res = src < dest;
- //            VertexT id = (res) ? 1 : 0;
- //            Store(src_node_ids + edge_id, id);
- //            return res;
- //        };
+        // Prune edges where src_id > dest_id to avoid visiting the same edge twice later
+        // The advance operation
+        auto advance_op = [src_node_ids]
+        __host__ __device__ (
+            const VertexT &src, VertexT &dest,
+            const SizeT &edge_id,
+            const VertexT &input_item,
+            const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            bool res = src < dest;
+            VertexT id = (res) ? 1 : 0;
+            Store(src_node_ids + edge_id, id);
+            return res;
+        };
 
- //        // The filter operation
- //        auto filter_op = [] __host__ __device__(
- //            const VertexT &src, VertexT &dest, const SizeT &edge_id,
- //            const VertexT &input_item, const SizeT &input_pos,
- //            SizeT &output_pos) -> bool
- //        {
- //            if (!util::isValid(dest)) return false;
- //            return true;
- //        };
+        // The filter operation
+        auto filter_op = [] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            if (!util::isValid(dest)) return false;
+            return true;
+        };
 
- //        // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
-	// // The intersection operation
+        // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
+        // The intersection operation
+        auto intersect_op = [] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> float
+        {
+            float tc_count;
+            return tc_count;
+        };
 
 	// // Sort the scan statistics values for each node in descending order
  //        GUARD_CU(util::cubSortPairs(

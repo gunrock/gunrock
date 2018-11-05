@@ -80,7 +80,7 @@ struct KernelPolicy
 
     typedef _SizeT    SizeT;
     typedef _ValueT   ValueT;
-    typedef _LabelT   VertexT;
+    typedef _VertexT   VertexT;
     typedef _InterOpT InterOpT;
 
     enum {

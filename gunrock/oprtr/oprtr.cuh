@@ -17,6 +17,7 @@
 #include <gunrock/oprtr/oprtr_base.cuh>
 #include <gunrock/oprtr/advance/kernel.cuh>
 #include <gunrock/oprtr/filter/kernel.cuh>
+#include <gunrock/oprtr/intersection/kernel.cuh>
 #include <gunrock/oprtr/neighborreduce/kernel.cuh>
 
 namespace gunrock {
@@ -203,7 +204,7 @@ cudaError_t Intersect(
     ParametersT    &parameters,
     OpT             op)
 {
-    return oprtr::filter::Launch<FLAG>(
+    return oprtr::intersection::Launch<FLAG>(
         graph, frontier_in, frontier_out, parameters, op);
 }
 
@@ -228,9 +229,9 @@ cudaError_t Launch(
     if (parameters.oprtr_type == "Filter")
         return oprtr::filter ::Launch<FLAG>(
             graph, frontier_in, frontier_out, parameters, op);
-//    if (parameters.oprtr_type == "Intersect")
-//        return oprtr::intersect ::Launch<FLAG>(
-//            graph, frontier_in, frontier_out, parameters, op);
+    if (parameters.oprtr_type == "Intersect")
+        return oprtr::intersection ::Launch<FLAG>(
+            graph, frontier_in, frontier_out, parameters, op);
     //if (parameters.oprtr_type == "Compute")
     //    return oprtr::compute::Launch<FLAG>(
     //        graph, frontier_in, frontier_out, parameters, op);
