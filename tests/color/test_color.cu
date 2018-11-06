@@ -59,7 +59,7 @@ struct main_struct
         VertexT  *ref_colors = NULL;
 
         bool quick = parameters.Get<bool>("quick");
-	bool color_balance = parameters.Get<bool>("LBCOLOR");
+	      bool color_balance = parameters.Get<bool>("LBCOLOR");
 
         // compute reference CPU SSSP solution for source-distance
         if (!quick)
@@ -70,9 +70,10 @@ struct main_struct
 
             // TODO: problem specific data, e.g.:
             ref_colors = new VertexT[graph.nodes];
-                
+
 	    util::PrintMsg("__________________________", !quiet);
             float elapsed = app::color::CPU_Reference(
+                parameters,
                 graph.csr(),
                 ref_colors,
                 quiet);
@@ -91,10 +92,10 @@ struct main_struct
 		ref_colors
 	    ](util::Parameters &parameters, GraphT &graph)
             {
-                return app::color::RunTests(parameters, 
-					    graph, 
-					    color_balance, 
-					    ref_colors, 
+                return app::color::RunTests(parameters,
+					    graph,
+					    color_balance,
+					    ref_colors,
 					    util::DEVICE);
             }));
 

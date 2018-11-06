@@ -37,11 +37,18 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_enactor(parameters));
 
     // <DONE> add app specific parameters, eg:
-    GUARD_CU(parameters.Use<int>(    
-         "seed",   
-         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,  
-         time(NULL),   
-         "seed for random number generator", 
+
+    GUARD_CU(parameters.Use<int>(
+      "usr_iter",
+      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+      3, "Number of iterations color should run for (default=3).",
+      __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+         "seed",
+         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+         time(NULL),
+         "seed for random number generator",
          __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<bool>(
@@ -50,6 +57,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
          false,
          "load balancing enabled for graph coloring (true=neighbor_reduce)",
          __FILE__, __LINE__));
+
     // </DONE>
 
     return retval;
@@ -62,7 +70,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
 ...
- * @param[in]  target        where to perform the app 
+ * @param[in]  target        where to perform the app
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT>
@@ -75,9 +83,9 @@ cudaError_t RunTests(
     // </DONE>
     util::Location target)
 {
-    
+
     cudaError_t retval = cudaSuccess;
-       
+
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::SizeT   SizeT;
@@ -89,7 +97,7 @@ cudaError_t RunTests(
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
     util::Info info("color", parameters, graph);
-    
+
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
 
@@ -107,10 +115,10 @@ cudaError_t RunTests(
     EnactorT enactor;
     GUARD_CU(problem.Init(graph, target));
     GUARD_CU(enactor.Init(problem, target));
-    
+
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
-    
+
     for (int run_num = 0; run_num < num_runs; ++run_num) {
         GUARD_CU(problem.Reset(
             // <TODO> problem specific data if necessary, eg:
@@ -124,7 +132,7 @@ cudaError_t RunTests(
             // </TODO>
             target
         ));
-        
+
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
@@ -142,9 +150,9 @@ cudaError_t RunTests(
             ", #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
-        
+
         if (validation == "each") {
-            
+
             GUARD_CU(problem.Extract(
                 // <TODO> problem specific data
                 h_colors
@@ -161,7 +169,7 @@ cudaError_t RunTests(
     }
 
     cpu_timer.Start();
-    
+
     GUARD_CU(problem.Extract(
         // <TODO> problem specific data
         h_colors
@@ -279,7 +287,7 @@ cudaError_t RunTests(
 //  * @param[out] distances   Return shortest distance to source per vertex
 //  * @param[out] preds       Return predecessors of each vertex
 //  * \return     double      Return accumulated elapsed times for all runs
- 
+
 // template <
 //     typename VertexT = int,
 //     typename SizeT   = int,

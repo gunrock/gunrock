@@ -14,6 +14,16 @@
 
 #pragma once
 
+#include <gunrock/util/basic_utils.h>
+#include <gunrock/util/error_utils.cuh>
+#include <gunrock/util/type_limits.cuh>
+#include <gunrock/util/type_enum.cuh>
+
+#include <curand.h>
+#include <curand_kernel.h>
+
+#include <omp.h>
+
 namespace gunrock {
 namespace app {
 // <DONE> change namespace
@@ -35,22 +45,61 @@ namespace color {
  */
 template <typename GraphT>
 double CPU_Reference(
+    util::Parameters &parameters,
     const GraphT &graph,
     typename GraphT::VertexT *colors,
     bool quiet)
 {
-    typedef typename GraphT::SizeT SizeT;
-    
+    typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::VertexT VertexT;
+    curandGenerator_t 		gen;
+auto usr_iter = parameters.Get<int>("usr_iter");
+auto seed     = parameters.Get<int>("seed");
+
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
-    
-    // <TODO> 
-    // implement CPU reference implementation
-    for(SizeT v = 0; v < graph.nodes; ++v) {
-        // degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
+
+    //initialize cpu with same condition, use same variable names as on GPU
+    memset(colors, -1, graph.nodes * sizeof(VertexT));
+
+    util::Array1D<SizeT, float> rand;
+    rand.Allocate(graph.nodes,util::HOST);
+    curandCreateGeneratorHost(&gen,CURAND_RNG_PSEUDO_DEFAULT);
+    curandSetPseudoRandomGeneratorSeed(gen, seed);
+    curandGenerateUniform(gen, rand.GetPointer(util::HOST), graph.nodes);
+
+    for (int iteration = 0; iteration < usr_iter; iteration++) {
+        for (VertexT v = 0; v < graph.nodes; v++) {
+            SizeT start_edge 	= graph.GetNeighborListOffset(v);
+            SizeT num_neighbors = graph.GetNeighborListLength(v);
+            
+            VertexT max = v;
+            VertexT min = v;
+            float temp  = rand[v];
+            
+            for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+                VertexT u = graph.GetEdgeDest(e);
+                if (rand[u] > temp)
+                    max = u;
+                
+                if (rand[u] < temp)
+                    min = u;
+                
+                printf("Let's see what rand[u] = %f\n", rand[u]);
+                temp = rand[u];
+            }
+            
+            if (colors[max] == -1)
+                colors[max] = iteration*2+1;
+
+            if (colors[min] == -1)
+                colors[min] = iteration*2+2;
+
+            printf("iteration number = %u\n", iteration);
+            printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min], colors[max]);
+        }
     }
-    // </TODO>
-    
+
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
     return elapsed;
@@ -81,8 +130,9 @@ typename GraphT::SizeT Validate_Results(
     bool quiet = parameters.Get<bool>("quiet");
 
     // <TODO> result validation and display
+    printf("Comparison: <node idx, gunrock, cpu>\n");
     for(SizeT v = 0; v < graph.nodes; ++v) {
-        printf("%d %d %d\n", v, h_colors[v], ref_colors[v]);
+        printf(" %d %d %d\n", v, h_colors[v], ref_colors[v]);
     }
     // </TODO>
 
