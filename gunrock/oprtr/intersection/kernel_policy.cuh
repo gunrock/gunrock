@@ -59,6 +59,8 @@ namespace intersection {
 template <
     OprtrFlag _FLAG,
     //typename _VertexT,      // Data types
+    typename _InKeyT,
+    typename _OutKeyT,
     typename _SizeT,
     typename _ValueT,
     typename _VertexT,

@@ -49,6 +49,8 @@ namespace intersection {
  */
 template<
     OprtrFlag FLAG,
+    typename  InKeyT,
+    typename  OutKeyT,
     typename  SizeT,
     typename  ValueT,
     typename  VertexT,
@@ -65,14 +67,16 @@ struct Dispatch
 
 template <
     OprtrFlag FLAG,
+    typename  InKeyT,
+    typename  OutKeyT,
     typename  SizeT,
     typename  ValueT,
     typename  VertexT,
     typename  InterOpT>
-struct Dispatch<FLAG, SizeT, ValueT, VertexT, InterOpT, true>
+struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true>
 {
     typedef KernelPolicy
-        <FLAG, SizeT, ValueT, VertexT, InterOpT,
+        <FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT,
         1,
         10,
         8,
@@ -80,17 +84,17 @@ struct Dispatch<FLAG, SizeT, ValueT, VertexT, InterOpT, true>
         KernelPolicyT;
 
     static __device__ void IntersectTwoSmallNL(
-                            const SizeT       *&d_row_offsets,
-                            const VertexT     *&d_column_indices,
-                            const VertexT     *&d_src_node_ids,
-                            const VertexT     *&d_dst_node_ids,
-                            const SizeT       *&d_degrees,
-                                  SizeT       *&d_output_counts,
-                                  SizeT       *&d_output_total,
-                                  SizeT       &input_length,
-                                  SizeT       &stride,
-                                  SizeT       &num_vertex,
-                                  SizeT       &num_edge)
+                            const SizeT        *&d_row_offsets,
+                                  VertexT      *&d_column_indices,
+                            const InKeyT       *&d_src_node_ids,
+                            const VertexT      *&d_dst_node_ids,
+                            const ValueT       *&d_degrees,
+                                  ValueT        *&d_output_counts,
+                                  OutKeyT      *&d_output_total,
+                                  SizeT        &input_length,
+                                  SizeT        &stride,
+                                  SizeT        &num_vertex,
+                                  SizeT        &num_edge)
     {
         VertexT start = threadIdx.x + blockIdx.x * blockDim.x;
         for (VertexT idx = start; idx < input_length; idx += KernelPolicyT::BLOCKS*KernelPolicyT::THREADS) {
@@ -159,30 +163,34 @@ struct Dispatch<FLAG, SizeT, ValueT, VertexT, InterOpT, true>
  */
 template <
     OprtrFlag FLAG,
+    typename  InKeyT,
+    typename  OutKeyT,
     typename  SizeT,
     typename  ValueT,
     typename  VertexT,
     typename  InterOpT>
   __launch_bounds__ (
-	Dispatch<FLAG, SizeT, ValueT, VertexT, InterOpT, true>
+	Dispatch<FLAG, InKeyT, OutKeyT, SizeT, 
+        ValueT, VertexT, InterOpT, true>
 	    ::KernelPolicyT::THREADS, 
-	Dispatch<FLAG, SizeT, ValueT, VertexT, InterOpT, true>
+	Dispatch<FLAG, InKeyT, OutKeyT, SizeT, 
+        ValueT, VertexT, InterOpT, true>
 	    ::KernelPolicyT::CTA_OCCUPANCY)
   __global__
   void IntersectTwoSmallNL(
             const SizeT        *d_row_offsets,
-            const VertexT      *d_column_indices,
-            const VertexT      *d_src_node_ids,
+                  VertexT      *d_column_indices,
+            const InKeyT       *d_src_node_ids,
             const VertexT      *d_dst_node_ids,
-            const SizeT        *d_degrees,
-            	  SizeT        *d_output_counts,
-            	  SizeT        *d_output_total,
-            const SizeT        input_length,
-            const SizeT        stride,
-            const SizeT        num_vertex,
-            const SizeT        num_edge)
+            const ValueT       *d_degrees,
+            	  ValueT       *d_output_counts,
+            	  OutKeyT      *d_output_total,
+                  SizeT        input_length,
+                  SizeT        stride,
+                  SizeT        num_vertex,
+                  SizeT        num_edge)
 {
-    Dispatch<FLAG, SizeT, ValueT, VertexT, InterOpT>
+    Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
 	::IntersectTwoSmallNL(
             d_row_offsets,
             d_column_indices,
@@ -205,11 +213,13 @@ template <
     typename ParametersT,
     typename InterOpT>
 cudaError_t Launch(
-    const GraphT         &graph,
-    const FrontierInT   * frontier_in,
-          FrontierOutT  * frontier_out,
-          ParametersT    &parameters,
-          InterOpT       inter_op)
+    const GraphT                &graph,
+          typename ParametersT :: SizeT  *&row_offsets,
+          typename ParametersT :: SizeT  *&col_indices,
+    const FrontierInT           * frontier_in,
+          FrontierOutT          * frontier_out,
+          ParametersT           &parameters,
+          InterOpT              inter_op)
 {
     typedef typename FrontierInT ::ValueT InKeyT;
     typedef typename FrontierOutT::ValueT OutKeyT;
@@ -217,35 +227,37 @@ cudaError_t Launch(
     typedef typename ParametersT ::ValueT  ValueT;
     typedef typename ParametersT ::VertexT VertexT;
     typedef typename ParametersT ::LabelT LabelT;
-    typedef typename Dispatch<FLAG, SizeT, ValueT, 
-        VertexT, InterOpT, true>
-        ::KernelPolicyT KernelPolicyT;
+    typedef typename Dispatch<FLAG, InKeyT, 
+        OutKeyT, SizeT, ValueT, VertexT, InterOpT, 
+	true>::KernelPolicyT KernelPolicyT;
 
 //    SizeT grid_size = (parameters.frontier -> queue_reset) ?
 //        (parameters.frontier -> queue_length / KernelPolicyT::THREADS + 1) :
 //        (parameters.cuda_props -> device_props.multiProcessorCount * KernelPolicyT::CTA_OCCUPANCY);
 
-    size_t stride = (parameters.input_length + KernelPolicyT::BLOCKS * KernelPolicyT::THREADS - 1)
+    size_t input_length = graph.edges / 2;
+    size_t stride = (input_length + KernelPolicyT::BLOCKS * KernelPolicyT::THREADS - 1)
                         >> (KernelPolicyT::LOG_THREADS + KernelPolicyT::LOG_BLOCKS);
+    SizeT num_vertex = graph.nodes;
+    SizeT num_edges  = graph.edges / 2;
     
     IntersectTwoSmallNL<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
-    <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS>>>(
-            parameters.d_row_offsets,
-            parameters.d_column_indices,
-            parameters.d_src_node_ids,
-            parameters.d_dst_node_ids,
-            parameters.d_degrees,
-            parameters.data_slice,
-            parameters.d_output_counts,
-            parameters.d_output_total,
-            parameters.input_length,
+    <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS, 0, parameters.stream>>>(
+            row_offsets,
+            col_indices,
+            frontier_in -> GetPointer(util::DEVICE),
+            col_indices,
+            parameters.values_in -> GetPointer(util::DEVICE), //degrees
+	    parameters.values_out -> GetPointer(util::DEVICE),
+            frontier_out -> GetPointer(util::DEVICE),
+            input_length,
             stride,
-            parameters.max_vertex,
-            parameters.max_edge);
+            num_vertex,
+            num_edges);
 
-    long total = mgpu::Reduce(parameters.d_output_total, parameters.input_length, parameters.context[0]);
-    long tc_count = mgpu::Reduce(parameters.d_output_counts, parameters.input_length, parameters.context[0]);
-    printf("tc_total:%ld\n, tc_count:%ld\n", total, tc_count);
+    //long total = mgpu::Reduce(frontier_out->GetPointer(util::DEVICE), input_length, parameters.context[0]);
+    //long tc_count = mgpu::Reduce(parameters.values_out, input_length, parameters.context[0]);
+    //printf("tc_total:%ld\n, tc_count:%ld\n", total, tc_count);
     return cudaSuccess;//(float)tc_count / (float)total;
 }
 

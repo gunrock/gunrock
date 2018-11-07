@@ -198,14 +198,16 @@ template <
     typename ParametersT,
     typename OpT>
 cudaError_t Intersect(
-    const GraphT    graph,
-    FrontierInT   * frontier_in,
-    FrontierOutT  * frontier_out,
-    ParametersT    &parameters,
-    OpT             op)
+    const GraphT                graph,
+    FrontierInT                 * frontier_in,
+    FrontierOutT                * frontier_out,
+    ParametersT                 &parameters,
+    OpT                         op,
+    typename ParametersT::SizeT * row_offsets,
+    typename ParametersT::SizeT * col_indices)
 {
     return oprtr::intersection::Launch<FLAG>(
-        graph, frontier_in, frontier_out, parameters, op);
+        graph, row_offsets, col_indices, frontier_in, frontier_out, parameters, op);
 }
 
 template <

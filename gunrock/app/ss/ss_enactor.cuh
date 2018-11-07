@@ -136,9 +136,11 @@ struct SSIterationLoop : public IterationLoopBase
         frontier.queue_reset  = true;
         frontier.V_Q()->Print();
         frontier.Next_V_Q()->Print();
-        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, advance_op, filter_op));
+        GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
+            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
+            oprtr_parameters, intersect_op,
+            row_offsets.GetPointer(util::DEVICE),
+            col_indices.GetPointer(util::DEVICE)));
 
         util::PrintMsg("============After advance ============");
         src_node_ids.Print();
@@ -333,7 +335,7 @@ public:
      * @param[in] target Target location of data
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Reset(VertexT src, util::Location target = util::DEVICE)
+    cudaError_t Reset(VertexT src, SizeT num_srcs, util::Location target = util::DEVICE)
     {
         typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
@@ -342,7 +344,7 @@ public:
         {
            if ((this->num_gpus == 1) ||
                 (gpu == this->problem->org_graph->GpT::partition_table[src])) {
-               this -> thread_slices[gpu].init_size = 1;
+               this -> thread_slices[gpu].init_size = num_srcs;
                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
                    auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
                    frontier.queue_length = (peer_ == 0) ? 1 : 0;
