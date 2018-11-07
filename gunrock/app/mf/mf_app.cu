@@ -81,11 +81,12 @@ cudaError_t UseParameters(util::Parameters &parameters)
  */
 template <typename GraphT, typename ValueT, typename VertexT>
 cudaError_t RunTests(
-    util::Parameters  &parameters,
-    GraphT	      &graph,
-    VertexT	      *h_reverse,
-    ValueT	      *ref_flow,
-    util::Location    target = util::DEVICE)
+    util::Parameters    &parameters,
+    GraphT              &graph,
+    VertexT             *h_reverse,
+    ValueT              *ref_flow,
+    ValueT              ref_max_flow,
+    util::Location      target = util::DEVICE)
 {
     debug_aml("RunTests starts");
     cudaError_t retval = cudaSuccess;
@@ -152,14 +153,13 @@ cudaError_t RunTests(
         if (validation == "each")
         {
             GUARD_CU(problem.Extract(h_flow));
-	    GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
-
-	    app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities, h_residuals);
-	    GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
-
+            GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+            app::mf::minCut(graph, source, h_flow, min_cut, 
+                    vertex_reachabilities, h_residuals);
+            GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
             int num_errors = app::mf::Validate_Results(parameters, graph, 
-		        source, sink, h_flow, h_reverse, min_cut, ref_flow, 
-		        quiet_mode);
+                    source, sink, h_flow, h_reverse, min_cut, ref_max_flow, 
+                    ref_flow, quiet_mode);
         }
     }
 
@@ -167,14 +167,16 @@ cudaError_t RunTests(
     cpu_timer.Start();
     if (validation == "last")
     {
-	GUARD_CU(problem.Extract(h_flow));
-	GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+        GUARD_CU(problem.Extract(h_flow));
+        GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
 
- 	app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities, h_residuals);
-	GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+        app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities, 
+                h_residuals);
+        GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
 
-        int num_errors = app::mf::Validate_Results(parameters, graph, 
-		source, sink, h_flow, h_reverse, min_cut, ref_flow, quiet_mode);
+        int num_errors = app::mf::Validate_Results(parameters, graph, source, 
+                sink, h_flow, h_reverse, min_cut, ref_max_flow, ref_flow, 
+                quiet_mode);
     }
 
     // Compute running statistics

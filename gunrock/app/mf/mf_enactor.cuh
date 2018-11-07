@@ -83,17 +83,18 @@ struct MFIterationLoop : public IterationLoopBase
         auto &retval          	= enactor_stats.retval;
         auto &iteration       	= enactor_stats.iteration;
 
-        auto source		= data_slice.source;
-        auto sink		= data_slice.sink;
+        auto source	           	= data_slice.source;
+        auto sink	        	= data_slice.sink;
+        bool &was_changed       = data_slice.was_changed;
         auto &capacity        	= graph.edge_values;
-        auto &reverse		= data_slice.reverse;
+        auto &reverse		    = data_slice.reverse;
         auto &flow            	= data_slice.flow;
         auto &excess          	= data_slice.excess;
         auto &height	      	= data_slice.height;
         auto &lowest_neighbor	= data_slice.lowest_neighbor;
         auto &local_vertices	= data_slice.local_vertices;
-        auto &active		= data_slice.active;
-        auto null_ptr		= &local_vertices;
+        auto &active	    	= data_slice.active;
+        auto null_ptr	    	= &local_vertices;
         null_ptr = NULL;
 
         auto advance_preflow_op = [capacity, flow, excess, height, reverse, 
@@ -254,6 +255,7 @@ struct MFIterationLoop : public IterationLoopBase
 
         if (iteration == 0){
             debug_aml("iteration 0, preflow operator is comming\n");
+            was_changed = true;
             GUARD_CU(excess.ForAll(
                         [] __host__ __device__ (ValueT *e, const SizeT &v){
                         debug_aml("excess[%d] = %lf\n", v, e[v]);
@@ -273,7 +275,7 @@ struct MFIterationLoop : public IterationLoopBase
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                     graph.csr(), &local_vertices, null_ptr,
                     oprtr_parameters, advance_preflow_op));
-            GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+         //   GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),\
                 "cudaStreamSynchronize failed");
 
             debug_aml("iteration 0, preflow ends, results:\n");
@@ -295,19 +297,24 @@ struct MFIterationLoop : public IterationLoopBase
         }
 
         //Global relabeling
-        if (iteration % 100 == 0){
+        if (was_changed == true and (iteration % 50 == 0)){
             GUARD_CU(height.Move(util::DEVICE, util::HOST, graph.nodes, 0,
                         oprtr_parameters.stream));
-	    GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+	   //GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
 
             GUARD_CU(flow.Move(util::DEVICE, util::HOST, graph.edges, 0, 
                         oprtr_parameters.stream));
-            GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
-            relabeling(graph, source, sink, height.GetPointer(util::HOST), 
-                    reverse.GetPointer(util::HOST), flow.GetPointer(util::HOST));
+            GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), 
+                    "cudaStreamSynchronize failed.");
+            int num_changes = relabeling(graph, source, sink, 
+                    height.GetPointer(util::HOST), 
+                    reverse.GetPointer(util::HOST), 
+                    flow.GetPointer(util::HOST));
             GUARD_CU(height.Move(util::HOST, util::DEVICE, graph.nodes, 0, 
                       oprtr_parameters.stream));
-            GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+            if (num_changes > 0)
+                was_changed = true;
+        //GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
         }
 
 //        GUARD_CU(height.ForAll(
@@ -325,7 +332,7 @@ struct MFIterationLoop : public IterationLoopBase
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                     graph.csr(), &local_vertices, null_ptr,
                     oprtr_parameters, advance_push_op));
-        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+        //GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),\
                   "cudaStreamSynchronize failed");
 
         GUARD_CU(lowest_neighbor.ForAll(
@@ -333,7 +340,7 @@ struct MFIterationLoop : public IterationLoopBase
                     {
                         el[v] = util::PreDefinedValues<VertexT>::InvalidValue;
                     }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
-        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+//        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),\
                   "cudaStreamSynchronize failed");
 
 
@@ -341,7 +348,7 @@ struct MFIterationLoop : public IterationLoopBase
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                     graph.csr(), &local_vertices, null_ptr,
                     oprtr_parameters, advance_find_lowest_op)); 
-        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+ //       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),\
                   "cudaStreamSynchronize failed");
 
         //	GUARD_CU(lowest_neighbor.ForAll(
@@ -355,7 +362,7 @@ struct MFIterationLoop : public IterationLoopBase
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                     graph.csr(), &local_vertices, null_ptr,
                     oprtr_parameters, advance_relabel_op));
-        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+//        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),\
                   "cudaStreamSynchronize failed");
 
 //	GUARD_CU(active.ForAll(

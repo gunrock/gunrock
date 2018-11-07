@@ -65,7 +65,7 @@ __host__ __device__ bool almost_eql(ValueT A, ValueT B,
 }
 
 template <typename GraphT, typename VertexT, typename ValueT>
-void relabeling(GraphT graph, VertexT source, VertexT sink, VertexT* height, 
+int relabeling(GraphT graph, VertexT source, VertexT sink, VertexT* height, 
         VertexT* reverse, ValueT* flow){
     typedef typename GraphT::CsrT CsrT;
     bool mark[graph.nodes];
@@ -90,16 +90,16 @@ void relabeling(GraphT graph, VertexT source, VertexT sink, VertexT* height,
             auto f = flow[reverse[e]];
             if (mark[neighbor] || almost_eql(c, f))
                 continue;
-	    if (height[neighbor] != H)
+            if (height[neighbor] != H)
                 changed++;
-		
+
             height[neighbor] = H;
             mark[neighbor] = true;
             que[last++] = neighbor;
         }
     }
     height[source] = graph.nodes;
-    return;
+    return changed;
 }
 /**
  * @brief Max Flow Problem structure stores device-side arrays
@@ -138,18 +138,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, SizeT>   lowest_neighbor;// id lowest neighbor
         util::Array1D<SizeT, VertexT> local_vertices; // set of vertices
         util::Array1D<SizeT, SizeT>   active;	      // flag active vertices
-	
-	util::Array1D<SizeT, VertexT>   head;
-	util::Array1D<SizeT, VertexT>   tail;
-	VertexT head_;
-	VertexT tail_;
 
-	util::Array1D<SizeT, bool> reachabilities;
+        util::Array1D<SizeT, VertexT>   head;
+        util::Array1D<SizeT, VertexT>   tail;
+        VertexT head_;
+        VertexT tail_;
+
+        util::Array1D<SizeT, bool> reachabilities;
         util::Array1D<SizeT, VertexT>   queue;        	
 
         VertexT	source;	// source vertex
         VertexT sink;	// sink vertex
         SizeT num_updated_vertices;
+        bool was_changed; // flag relabeling
 
         /*
          * @brief Default constructor
@@ -159,20 +160,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             source = util::PreDefinedValues<VertexT>::InvalidValue;
             sink = util::PreDefinedValues<VertexT>::InvalidValue;
             num_updated_vertices = 1;
-            reverse	    .SetName("reverse"	      );
-            excess	    .SetName("excess"	      );
-            flow   	    .SetName("flow"  	      );
-            height 	    .SetName("height"	      );
+            was_changed = false;
+            reverse	    .SetName("reverse"	    );
+            excess	    .SetName("excess"	    );
+            flow   	    .SetName("flow"  	    );
+            height 	    .SetName("height"	    );
             lowest_neighbor .SetName("lowest_neighbor");
             local_vertices  .SetName("local_vertices" );
-            active	    .SetName("active"         );
+            active	    .SetName("active"       );
 
-	    head	    .SetName("head"	      );
-	    tail	    .SetName("tail"	      );
+            head	    .SetName("head"	      );
+            tail	    .SetName("tail"	      );
 
-	    reachabilities  .SetName("reachabilities" );
-	    queue	    .SetName("queue"	      );
-
+            reachabilities  .SetName("reachabilities" );
+            queue	    .SetName("queue"	      );
         }
 
         /*
@@ -195,22 +196,22 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
             GUARD_CU(excess	        .Release(target));
-            GUARD_CU(flow    	        .Release(target));
-            GUARD_CU(height  	        .Release(target));
-            GUARD_CU(reverse	        .Release(target));
-            GUARD_CU(lowest_neighbor    .Release(target));
-            GUARD_CU(local_vertices     .Release(target));
+            GUARD_CU(flow    	    .Release(target));
+            GUARD_CU(height  	    .Release(target));
+            GUARD_CU(reverse	    .Release(target));
+            GUARD_CU(lowest_neighbor.Release(target));
+            GUARD_CU(local_vertices .Release(target));
             GUARD_CU(active	        .Release(target));
 
             GUARD_CU(head               .Release(target));
-	    GUARD_CU(tail               .Release(target));
+            GUARD_CU(tail               .Release(target));
 
-	    GUARD_CU(reachabilities     .Release(target));
+            GUARD_CU(reachabilities     .Release(target));
             GUARD_CU(queue              .Release(target));
 
             GUARD_CU(BaseDataSlice::Release(target));
-            
-	    return retval;
+
+            return retval;
         }
 
         /**
@@ -233,6 +234,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             cudaError_t retval  = cudaSuccess;
             SizeT nodes_size = sub_graph.nodes;
             SizeT edges_size = sub_graph.edges;
+            was_changed = false;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, 
                         flag));
@@ -240,19 +242,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // 
             // Allocate data on Gpu
             //
-            GUARD_CU(flow	        .Allocate(edges_size, util::HOST));
+            GUARD_CU(flow	        .Allocate(edges_size, util::HOST|target));
             GUARD_CU(reverse 	    .Allocate(edges_size, target));
             GUARD_CU(excess  	    .Allocate(nodes_size, target));
             GUARD_CU(height  	    .Allocate(nodes_size, util::HOST|target));
             GUARD_CU(lowest_neighbor.Allocate(nodes_size, target));
             GUARD_CU(local_vertices .Allocate(nodes_size, target));
-            GUARD_CU(active	    .Allocate(1, util::HOST|target));
+            GUARD_CU(active	        .Allocate(1, util::HOST|target));
 
-	    GUARD_CU(head           .Allocate(1, target));
+            GUARD_CU(head           .Allocate(1, target));
             GUARD_CU(tail           .Allocate(1, target));
 
-	    GUARD_CU(reachabilities .Allocate(nodes_size, target));
-	    GUARD_CU(queue 	    .Allocate(nodes_size, target));	    
+            GUARD_CU(reachabilities .Allocate(nodes_size, target));
+            GUARD_CU(queue 	    .Allocate(nodes_size, target));	    
 
             GUARD_CU(util::SetDevice(gpu_idx));
             GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
@@ -285,10 +287,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(lowest_neighbor  .EnsureSize_(nodes_size, target));
             GUARD_CU(local_vertices   .EnsureSize_(nodes_size, target));
 
-	    GUARD_CU(head  		.EnsureSize_(1, target));
+            GUARD_CU(head  		.EnsureSize_(1, target));
             GUARD_CU(tail 		.EnsureSize_(1, target));
 
-            GUARD_CU(reachabilities  	.EnsureSize_(nodes_size, target));
+            GUARD_CU(reachabilities .EnsureSize_(nodes_size, target));
             GUARD_CU(queue   		.EnsureSize_(nodes_size, target));
 
             GUARD_CU(util::SetDevice(this->gpu_idx));

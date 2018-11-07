@@ -16,6 +16,9 @@
 //#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a); \
     printf("\n");}
 
+#define debug_aml_VK(a...)
+//#define debug_aml(a...) printf(a)
+
 #pragma once
 
 #ifdef BOOST_FOUND
@@ -29,6 +32,8 @@
 #endif
 
 #include <queue>
+#include <algorithm>
+#include "maxflow-v3.04.src/graph.h"
 
 namespace gunrock {
 namespace app {
@@ -415,38 +420,14 @@ double CPU_Reference(
         excess[v] = (ValueT)0;
         height[v] = (VertexT)0;
     }
+    height[src] = graph.nodes;
      
     for (SizeT e = 0; e < graph.edges; ++e){
         flow[e] = (ValueT) 0;
     }
 
-    debug_aml("before relabeling");
-    for (SizeT v = 0; v < graph.nodes; ++v){
-        debug_aml("height[%d] = %d", v, height[v]);
-    }
-    for (SizeT v = 0; v < graph.nodes; ++v){
-        debug_aml("excess[%d] = %lf", v, excess[v]);
-    }
-    for (SizeT v = 0; v < graph.edges; ++v){
-        debug_aml("flow[%d] = %lf", v, flow[v]);
-    }
-    for (SizeT v = 0; v < graph.edges; ++v){
-        debug_aml("capacity[%d] = %lf", v, graph.CsrT::edge_values[v]);
-    }
     relabeling(graph, src, sin, height, reverse, flow);
-    debug_aml("after relabeling");
-    for (SizeT v = 0; v < graph.nodes; ++v){
-        debug_aml("height[%d] = %d", v, height[v]);
-    }
-    for (SizeT v = 0; v < graph.nodes; ++v){
-        debug_aml("excess[%d] = %lf", v, excess[v]);
-    }
-    for (SizeT v = 0; v < graph.edges; ++v){
-        debug_aml("flow[%d] = %lf", v, flow[v]);
-    }
-    for (SizeT v = 0; v < graph.edges; ++v){
-        debug_aml("capacity[%d] = %lf", v, graph.CsrT::edge_values[v]);
-    }
+    
     auto e_start = graph.CsrT::GetNeighborListOffset(src);
     auto num_neighbors = graph.CsrT::GetNeighborListLength(src);
     auto e_end = e_start + num_neighbors;
@@ -460,34 +441,6 @@ double CPU_Reference(
         flow[e] = c;
         flow[reverse[e]] = -c;
         preflow += c;
-    }
-
-    debug_aml("after preflow");
-    for (SizeT v = 0; v < graph.nodes; ++v){
-        debug_aml("height[%d] = %d", v, height[v]);
-    }
-    for (SizeT v = 0; v < graph.nodes; ++v){
-        debug_aml("excess[%d] = %lf", v, excess[v]);
-    }
-    for (SizeT v = 0; v < graph.edges; ++v){
-        debug_aml("flow[%d] = %lf", v, flow[v]);
-    }
-    for (SizeT v = 0; v < graph.edges; ++v){
-        debug_aml("capacity[%d] = %lf", v, graph.CsrT::edge_values[v]);
-    }
-
-    {
-        auto e_start = graph.CsrT::GetNeighborListOffset(src);
-        auto num_neighbors = graph.CsrT::GetNeighborListLength(src);
-        auto e_end = e_start + num_neighbors;
-        for (SizeT e = e_start; e < e_end; ++e)
-        {
-            auto y = graph.CsrT::GetEdgeDest(e);
-            debug_aml("height[%d] = %d", y, height[y]);
-        }
-        for (int i=0; i<graph.nodes; ++i){
-            debug_aml("excess[%d] = %lf\n", i, excess[i]);
-        }
     }
 
     //
@@ -504,6 +457,9 @@ double CPU_Reference(
 
     maxflow = max_flow(graph, flow, excess, height, src, sin, reverse);
 
+    cpu_timer.Stop();
+    elapsed = cpu_timer.ElapsedMillis();
+
 //    for (auto u = 0; u < graph.nodes; ++u){
 //	auto e_start = graph.CsrT::GetNeighborListOffset(u);
 //	auto num_neighbors = graph.CsrT::GetNeighborListLength(u);
@@ -517,9 +473,6 @@ double CPU_Reference(
 //	}
 //    }
     
-    cpu_timer.Stop();
-    elapsed = cpu_timer.ElapsedMillis();
-
     free(excess);
     free(height);
 
@@ -528,6 +481,87 @@ double CPU_Reference(
     return elapsed;
 }
 
+/**
+  * @brief Vladimir Kolmogorov algorithm
+  *
+  */
+template <typename GraphT, typename ValueT, typename VertexT>
+double compute_parametric_max_flow(
+        GraphT  &graph,
+        VertexT* reverse, 
+        ValueT  &maxflow,
+        VertexT source,
+        VertexT sink)
+{
+    typedef typename GraphT::CsrT CsrT;
+    auto nodes = graph.nodes - 2;
+    std::vector<VertexT> new_id; new_id.resize(nodes);
+    VertexT id_counter = 0;
+    for (VertexT v = 0; v < graph.nodes; ++v){
+        if (v == source or v == sink)
+            continue;
+        new_id[v] = id_counter;
+        debug_aml_VK("new id [%d] = %d\n", v, new_id[v]);
+        ++id_counter;
+    }
+    typedef Graph<ValueT, ValueT, ValueT> GraphType;
+    int source_sink_edges = 0;
+    auto source_edges = graph.CsrT::GetNeighborListLength(source);
+    auto sink_edges = graph.CsrT::GetNeighborListLength(sink);
+    source_sink_edges += (sink_edges + source_edges);
+    auto edges = (graph.edges/2) - source_sink_edges;
+    GraphType *g = new GraphType(nodes, edges);
+    g->add_node(nodes);
+    std::vector<bool> visited; visited.resize(graph.edges, false);
+    for (VertexT v = 0; v < graph.nodes; ++v){
+        auto e_start = graph.CsrT::GetNeighborListOffset(v);
+        auto num_neighbors = graph.CsrT::GetNeighborListLength(v);
+        auto e_end = e_start + num_neighbors;
+        for (auto e = e_start; e < e_end; ++e){
+            auto u = graph.CsrT::GetEdgeDest(e);
+            auto cap = graph.CsrT::edge_values[e];
+            auto rev_cap = graph.CsrT::edge_values[reverse[e]];
+            debug_aml_VK("edge %d %d\n", v, u);
+            if (v == source and (!visited[e])){
+                visited[e] = true;
+                visited[reverse[e]] = true;
+                if (u == sink){
+                    g->add_tweights(0/*source*/, 0, cap);
+                    g->add_tweights(1/*sink*/, cap, 0);
+                    debug_aml_VK("added source->sink, cap %lf\n", cap);
+                    continue;
+                }
+                g->add_tweights(new_id[u], cap, 0);
+                debug_aml_VK("added source -> %d, cap %lf\n", new_id[u], cap);
+            }
+            if (u == sink and (!visited[e])){
+                if (v == source){
+                    continue;
+                }
+                visited[e] = true;
+                visited[reverse[e]] = true;
+                g->add_tweights(new_id[v], 0, cap);
+                debug_aml_VK("added %d -> sink, cap %lf\n", new_id[v], cap);
+            }
+            if (v != source and u != sink and 
+                u != source and v != sink and (!visited[e])){
+                visited[e] = true;
+                visited[reverse[e]] = true;
+                g->add_edge(new_id[v], new_id[u], cap, rev_cap);
+                debug_aml_VK("added %d -> %d, cap %lf, revcap %lf\n", 
+                        new_id[v], new_id[u], cap, rev_cap);
+            }
+        }
+    }
+    debug_aml_VK("create Kolmogorov graph of %d nodes and %d edges\n",
+            g->get_node_num(), g->get_arc_num());
+    util::CpuTimer cpu_timer;
+    cpu_timer.Start();
+    maxflow = g->maxflow();
+    cpu_timer.Stop();
+    double elapsed = cpu_timer.ElapsedMillis();
+    return elapsed;
+}
 /**
  * @brief Validation of MF results
  *
@@ -539,6 +573,9 @@ double CPU_Reference(
  * @param[in]  source	      The source vertex
  * @param[in]  sink           The sink vertex
  * @param[in]  h_flow	      Computed flow on edges 
+ * @param[in]  reverse	      Reverse array on edges 
+ * @param[in]  min_cut	      Array on nodes, 0 - source set, 1 - sink set
+ * @param[in]  ref_max_flow	  Value of max flow for reference solution
  * @param[in]  ref_flow	      Reference flow on edges
  * @param[in]  verbose	      Whether to output detail comparsions
  *
@@ -546,15 +583,16 @@ double CPU_Reference(
  */
 template <typename GraphT, typename ValueT, typename VertexT>
 int Validate_Results(
-        util::Parameters  &parameters,
-        GraphT		  &graph,
-        VertexT		  source,
-        VertexT		  sink,
-        ValueT		  *h_flow,
-        VertexT		  *reverse,
-        int               *min_cut,
-        ValueT		  *ref_flow = NULL,
-        bool		  verbose = true)
+        util::Parameters    &parameters,
+        GraphT              &graph,
+        VertexT		        source,
+        VertexT		        sink,
+        ValueT		        *h_flow,
+        VertexT		        *reverse,
+        int                 *min_cut,
+        ValueT              ref_max_flow,
+        ValueT		        *ref_flow = NULL,
+        bool		        verbose = true)
 {
     typedef typename GraphT::CsrT   CsrT;
     typedef typename GraphT::SizeT  SizeT;  
@@ -607,7 +645,7 @@ int Validate_Results(
     }
 
     // Verify the result
-    if (!quick)
+    if (!quick and ref_flow != NULL)
     {
         util::PrintMsg("Flow Validity (compare results):\n", !quiet, false);
 
@@ -626,7 +664,8 @@ int Validate_Results(
             }
         }
 
-        if (fabs(flow_incoming_sink-ref_flow_incoming_sink) > MF_EPSILON_VALIDATE)
+        if (fabs(flow_incoming_sink-ref_flow_incoming_sink) > 
+                MF_EPSILON_VALIDATE)
         {
             ++num_errors;
             debug_aml("flow_incoming_sink %lf, ref_flow_incoming_sink %lf", \
@@ -645,6 +684,13 @@ int Validate_Results(
     else
     {
         util::PrintMsg("Flow Validity:\n", !quiet, false);
+
+        if (util::isValid(ref_max_flow) and
+            fabs(flow_incoming_sink - ref_max_flow) > MF_EPSILON_VALIDATE){
+            ++num_errors;
+            debug_aml("flow_incoming_sink %lf, ref_max_flow %lf", \
+                    flow_incoming_sink, ref_max_flow);
+        }
 
         for (VertexT v = 0; v < nodes; ++v)
         {
