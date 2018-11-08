@@ -26,13 +26,15 @@ Gunrock is featured on NVIDIA's list of [GPU Accelerated Libraries](https://deve
 <tr>
   <td><a href="https://jenkins.io/">Jenkins</a></td>
   <td>Ubuntu 16.04.4 LTS</td>
-  <td>CUDA 9.1, GCC/G++ 5.4</td>
-  <td><a href="http://mario.ece.ucdavis.edu:8080/job/gunrock/job/dev/"><img src="http://mario.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/dev" alt="Build Status"></a></td>
+  <td>CUDA 10.0, GCC/G++ 5.4, Boost 1.58.0</td>
+  <td><a href="http://mario.ece.ucdavis.edu:8080/blue/organizations/jenkins/gunrock/activity"><img src="http://mario.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/dev" alt="Build Status"></a></td>
 </tr>
 </tbody></table>
 
 ## Quickstart
-```
+
+<pre class="highlight mid-column-code shell tab-shell">
+<code>
 git clone --recursive https://github.com/gunrock/gunrock/
 cd gunrock
 mkdir build
@@ -40,7 +42,8 @@ cd build
 cmake ..
 make -j$(nproc)
 make test
-```
+</code>
+</pre>
 
 ## Gunrock Source Code
 
