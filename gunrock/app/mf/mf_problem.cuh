@@ -23,7 +23,7 @@
     printf("\n");}
 
 
-#define MF_EPSILON 1e-6
+#define MF_EPSILON 0.000002
 #define MF_EPSILON_VALIDATE 1e-4
 
 namespace gunrock {
