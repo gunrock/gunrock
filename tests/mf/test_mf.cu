@@ -123,39 +123,27 @@ struct main_struct
     // Compute reference CPU max flow algorithm.
 	//
     ValueT max_flow = util::PreDefinedValues<ValueT>::InvalidValue;
-    ValueT parametric_max_flow = util::PreDefinedValues<ValueT>::InvalidValue;
 	
     if (!quick) 
     {
-        // To validate result we are using only the cpu reference algorithm,
-        // not parametric algorithm
-        util::PrintMsg("______CPU parametric algorithm_____", true);
-        double elapsed_parametric = app::mf::compute_parametric_max_flow(
-                u_graph, reverse.GetPointer(util::HOST), parametric_max_flow, 
-                source, sink);
-        util::PrintMsg("-----------------------------------\nElapsed: " + 
-                std::to_string(elapsed_parametric) + 
-                " ms\n Parametric Max flow CPU = " 
-                + std::to_string(parametric_max_flow), true);
-
-        /*util::PrintMsg("______CPU reference algorithm______", true);
+        util::PrintMsg("______CPU reference algorithm______", true);
 	    flow_edge = (ValueT*)malloc(sizeof(ValueT)*u_graph.edges);
         double elapsed = app::mf::CPU_Reference
             (parameters, u_graph, source, sink, max_flow, 
              reverse.GetPointer(util::HOST), flow_edge);
         util::PrintMsg("-----------------------------------\nElapsed: " + 
                 std::to_string(elapsed) + " ms\n Max flow CPU = " +
-                std::to_string(max_flow), true);*/
+                std::to_string(max_flow), true);
     }
 
     std::vector<std::string> switches{"advance-mode"};
 	GUARD_CU(app::Switch_Parameters(parameters, u_graph, switches,
-	[flow_edge, reverse, parametric_max_flow]
+	[flow_edge, reverse, max_flow]
     (util::Parameters &parameters, GraphT &u_graph)
 	{
 	  debug_aml("go to RunTests");
 	  return app::mf::RunTests(parameters, u_graph, 
-              reverse.GetPointer(util::HOST), flow_edge, parametric_max_flow);
+              reverse.GetPointer(util::HOST), flow_edge, max_flow);
 	}));
 
 	// Clean up
