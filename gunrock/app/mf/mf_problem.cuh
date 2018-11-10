@@ -146,11 +146,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         util::Array1D<SizeT, bool> reachabilities;
         util::Array1D<SizeT, VertexT>   queue;        	
+        util::Array1D<SizeT, bool>      mark;
+
 
         VertexT	source;	// source vertex
         VertexT sink;	// sink vertex
         SizeT num_updated_vertices;
         bool was_changed; // flag relabeling
+	util::Array1D<SizeT, SizeT> changed;
 
         /*
          * @brief Default constructor
@@ -174,6 +177,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             reachabilities  .SetName("reachabilities" );
             queue	    .SetName("queue"	      );
+            mark	    .SetName("mark"	      );
+	    changed          .SetName("changed"       );
+
         }
 
         /*
@@ -208,6 +214,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(reachabilities     .Release(target));
             GUARD_CU(queue              .Release(target));
+            GUARD_CU(mark               .Release(target));
 
             GUARD_CU(BaseDataSlice::Release(target));
 
@@ -234,6 +241,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             cudaError_t retval  = cudaSuccess;
             SizeT nodes_size = sub_graph.nodes;
             SizeT edges_size = sub_graph.edges;
+
             was_changed = false;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, 
@@ -255,6 +263,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(reachabilities .Allocate(nodes_size, target));
             GUARD_CU(queue 	    .Allocate(nodes_size, target));	    
+            GUARD_CU(mark           .Allocate(nodes_size, target));
+
+	    GUARD_CU(changed             .Allocate(1, util::HOST|target));
 
             GUARD_CU(util::SetDevice(gpu_idx));
             GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
@@ -292,6 +303,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(reachabilities .EnsureSize_(nodes_size, target));
             GUARD_CU(queue   		.EnsureSize_(nodes_size, target));
+            GUARD_CU(mark              .EnsureSize_(nodes_size, target));
+	    
+	    GUARD_CU(changed           .EnsureSize_(1, target|util::HOST));
 
             GUARD_CU(util::SetDevice(this->gpu_idx));
             GUARD_CU(reverse.SetPointer(h_reverse, edges_size, util::HOST));
@@ -332,7 +346,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                         __host__ __device__(SizeT *active_, const VertexT &pos)
                         {
                             active_[pos] = 1;
-                        }, 1, target, this -> stream));
+                        }, 1, target|util::HOST, this -> stream));
 
             GUARD_CU(lowest_neighbor.ForAll([graph, source]
             __host__ __device__(VertexT *lowest_neighbor, const VertexT pos)
@@ -346,6 +360,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             {
             local_vertex[pos] = pos;
             }, nodes_size, target));
+
+            GUARD_CU(mark.ForAll([]
+                        __host__ __device__(bool *mark_, const VertexT &pos)
+                        {
+                            mark_[pos] = false;
+                        }, nodes_size, target, this -> stream));
 
             GUARD_CU2(cudaDeviceSynchronize(),
                     "cudaDeviceSynchronize failed.");
