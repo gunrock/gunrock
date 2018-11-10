@@ -180,7 +180,7 @@ struct MFIterationLoop : public IterationLoopBase
                 VertexT neighbor_num = graph.CsrT::GetNeighborListLength(v);
                 VertexT e_end = e_start + neighbor_num;
                 int iter = 0;
-                while (excess[v] > MF_EPSILON)
+                if (excess[v] > (ValueT)0)
                 {
                         debug_aml2("active vertex: %d\n", v);
                         debug_aml2("excess[%d] = %lf\n", v, excess[v]);
@@ -193,7 +193,7 @@ struct MFIterationLoop : public IterationLoopBase
                         for (VertexT e_id = e_start; e_id < e_end; ++e_id) {
                             VertexT n = graph.CsrT::GetEdgeDest(e_id);
                             debug_aml2("try neighbor %d\n", n);
-                            if ((capacity[e_id] - flow[e_id] > MF_EPSILON/*0*/) &&
+                            if ((capacity[e_id] - flow[e_id] > (ValueT)0) &&
                                     (!util::isValid(lowest_id) ||
                                      height[n] < lowest_h)){
                                 lowest_id = e_id;
