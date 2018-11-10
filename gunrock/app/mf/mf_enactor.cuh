@@ -27,6 +27,9 @@
 //#define debug_aml2(a...) printf(a);
 #define debug_aml2(a...)
 
+//#define ADVANCE_MF 1
+#define COMPUTE_MF 1
+
 namespace gunrock {
 namespace app {
 namespace mf {
@@ -121,13 +124,13 @@ struct MFIterationLoop : public IterationLoopBase
              const VertexT &input_item, const SizeT &input_pos,
              SizeT &output_pos) -> bool
             {
-                if (util::isValid(src) && src != source && src != sink)
-                {
-                    SizeT e_id = graph.GetNeighborListOffset(src);
-                    SizeT neighbor_num = graph.GetNeighborListLength(src);
+//                if (util::isValid(src) && src != source && src != sink)
+//                {
+                    SizeT e_id = graph.CsrT::GetNeighborListOffset(src);
+                    SizeT neighbor_num = graph.CsrT::GetNeighborListLength(src);
                     SizeT e_end = e_id + neighbor_num;
                     int iter = 0;
-                    while (e_id == edge_id && neighbor_num > 0 && 
+                    while (/*e_id == edge_id && neighbor_num > 0 && */
                             excess[src] > 0)
                     {
                         debug_aml2("src %d\n", src);
@@ -136,7 +139,7 @@ struct MFIterationLoop : public IterationLoopBase
                             util::PreDefinedValues<VertexT>::InvalidValue;
                         VertexT lowest_h;
                         while (e_id < e_end){
-                            VertexT v = graph.GetEdgeDest(e_id);
+                            VertexT v = graph.CsrT::GetEdgeDest(e_id);
                             if ((capacity[e_id] - flow[e_id] > 0) &&
                                     (!util::isValid(lowest_id) ||
                                      height[v] < lowest_h)){
@@ -145,8 +148,9 @@ struct MFIterationLoop : public IterationLoopBase
                             }
                             ++e_id;
                         }
+                        if (util::isValid(lowest_id)){
                         debug_aml2("lowest for %d is %d\n",
-                                src, graph.GetEdgeDest(lowest_id));
+                                src, graph.CsrT::GetEdgeDest(lowest_id));
                         if (lowest_h < height[src])
                         {
                             //push
@@ -156,7 +160,7 @@ struct MFIterationLoop : public IterationLoopBase
                             ValueT old = atomicAdd(&excess[src], -f);
                             if (f > 0 && (old > f || almost_eql(old, f)))
                             {
-                                VertexT l_dest = graph.GetEdgeDest(lowest_id);
+                                VertexT l_dest = graph.CsrT::GetEdgeDest(lowest_id);
                                 atomicAdd(&excess[l_dest], f);
                                 atomicAdd(&flow[lowest_id], f);
                                 atomicAdd(&flow[reverse[lowest_id]], -f);
@@ -175,7 +179,87 @@ struct MFIterationLoop : public IterationLoopBase
                                     src, lowest_h + 1);
                             active[0] = 1;
                         }
+                        }
+                   // }
+                }
+            };
+
+
+        auto compute_lockfree_op = 
+	        [graph, excess, capacity, flow, reverse, height, iteration, source, 
+            sink, active] 
+            __host__ __device__
+           /* (const VertexT &src, VertexT &dest, const SizeT &edge_id,
+             const VertexT &input_item, const SizeT &input_pos,
+             SizeT &output_pos) -> bool*/
+            (VertexT* v_q, const SizeT& pos)
+            {
+                if (util::isValid(pos)){
+                VertexT src = v_q[pos];
+                if (util::isValid(src)){
+                VertexT e_start = graph.CsrT::GetNeighborListOffset(src);
+                VertexT neighbor_num = graph.CsrT::GetNeighborListLength(src);
+                // debug_aml2("neighbor # %d\n", neighbor_num);
+                if (neighbor_num > 0 && src != source && src != sink)
+                {
+                    VertexT e_end = e_start + neighbor_num;
+                    int iter = 0;
+                    while (excess[src] > 0)
+                    {
+                        debug_aml2("src %d\n", src);
+                        debug_aml2("excess[%d] = %lf\n", src, excess[src]);
+                        VertexT lowest_id = 
+                            util::PreDefinedValues<VertexT>::InvalidValue;
+                        VertexT lowest_h;
+                        for (VertexT e_id = e_start; e_id < e_end; ++e_id){
+                            //debug_aml2("edge id %d\n", e_id);
+                            VertexT v = graph.CsrT::GetEdgeDest(e_id);
+                            debug_aml2("try neighbor %d\n", v);
+                            if ((capacity[e_id] - flow[e_id] > 0) &&
+                                    (!util::isValid(lowest_id) ||
+                                     height[v] < lowest_h)){
+                                lowest_id = e_id;
+                                lowest_h = height[v];
+                            }
+                        }
+                        if (util::isValid(lowest_id))
+                        {
+                            debug_aml2("lowest for %d is %d\n",
+                                    src, graph.CsrT::GetEdgeDest(lowest_id));
+                            if (lowest_h < height[src])
+                            {
+                                //push
+                                ValueT f = 
+                                    fminf(capacity[lowest_id] - flow[lowest_id], 
+                                            excess[src]);
+                                ValueT old = atomicAdd(&excess[src], -f);
+                                if (f > 0 && (old > f || almost_eql(old, f)))
+                                {
+                                    VertexT l_dest = graph.CsrT::GetEdgeDest(lowest_id);
+                                    atomicAdd(&excess[l_dest], f);
+                                    atomicAdd(&flow[lowest_id], f);
+                                    atomicAdd(&flow[reverse[lowest_id]], -f);
+                                    debug_aml2("push, %lf, %d->%d, e[%d] = %lf\n", 
+                                            f, src, l_dest, l_dest, excess[l_dest]);
+                                    active[0] = 1; 
+                                }else{
+                                    atomicAdd(&excess[src], f);
+                                    debug_aml2("push back, %lf, %lf\n", 
+                                            f, excess[src]);
+                                } 
+                            }else{
+                                //relabel
+                                height[src] = lowest_h + 1;
+                                debug_aml2("relabel, %d new height %d\n", 
+                                        src, lowest_h + 1);
+                                active[0] = 1;
+                            }
+                        }else{
+                            debug_aml2("there is no lower neighbor\n");
+                        }
                     }
+                }
+                }
                 }
             };
 
@@ -189,6 +273,9 @@ struct MFIterationLoop : public IterationLoopBase
                     graph.csr(), &local_vertices, null_ptr,
                     oprtr_parameters, advance_preflow_op));
 
+            GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), 
+                    "cudaStreamSynchronize failed.");
+            
             debug_aml("iteration 0, preflow ends, results:\n");
         }
 
@@ -217,17 +304,72 @@ struct MFIterationLoop : public IterationLoopBase
             {
                 a[v] = 0;
             }, 1, util::DEVICE, oprtr_parameters.stream));
+        
+        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), 
+                    "cudaStreamSynchronize failed.");
 
-        // ADVANCE_LOCKFREE_OP
-        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-                    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+        oprtr_parameters.filter_mode = "BY_PASS";
+        GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+                    graph.csr(), &local_vertices, frontier.Next_V_Q(),
+                    oprtr_parameters, 
+                    [excess, graph, source, sink] __host__ __device__
+                    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                     const VertexT &input_item, const SizeT &input_pos,
+                     SizeT &output_pos) -> bool
+                    {
+                        return (!util::isValid(src) || src == source || 
+                                src == sink || excess[src] <= 0 || 
+                                graph.CsrT::GetNeighborListLength(src) == 0);
+                    }));
+
+       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+                "cudaStreamSynchronize failed");
+       
+       debug_aml("[%d]frontier que length after advance op is %d\n", 
+                iteration, frontier.queue_length);
+
+
+#if ADVANCE_MF
+       // ADVANCE_LOCKFREE_OP
+       oprtr_parameters.advance_mode = "LB";
+       GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                    graph.csr(), frontier.Next_V_Q(), frontier.V_Q(),
                     //graph.csr(), &local_vertices, null_ptr,
                     oprtr_parameters, advance_lockfree_op));
+
+       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+                "cudaStreamSynchronize failed");
+
+
+       frontier.queue_reset = true;
+       oprtr_parameters.filter_mode = "BY_PASS";
+       GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+                   graph.csr(), frontier.Next_V_Q(), frontier.V_Q(),
+                   oprtr_parameters, 
+                   [active] __host__ __device__
+                   (const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                    const VertexT &input_item, const SizeT &input_pos,
+                    SizeT &output_pos) -> bool
+                   {
+                   return active[0] > 0;
+                   }));
+#endif
+
+
+#if COMPUTE_MF
+        debug_aml("[%d]frontier que length before advance op is %d\n", 
+                iteration, frontier.queue_length);
+        GUARD_CU(frontier.Next_V_Q()->ForAll(compute_lockfree_op, 
+                    graph.nodes, util::DEVICE, oprtr_parameters.stream));
+        debug_aml("[%d]frontier que length after advance op is %d\n", 
+                iteration, frontier.queue_length);
+        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+                "cudaStreamSynchronize failed");
 
         frontier.queue_reset = true;
         oprtr_parameters.filter_mode = "BY_PASS";
         GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                    graph.csr(), frontier.Next_V_Q(), frontier.V_Q(),
                     oprtr_parameters, 
                     [active] __host__ __device__
                     (const VertexT &src, VertexT &dest, const SizeT &edge_id,
@@ -236,6 +378,7 @@ struct MFIterationLoop : public IterationLoopBase
                     {
                         return active[0] > 0;
                     }));
+#endif
 
         frontier.queue_index++;
 
@@ -252,7 +395,7 @@ struct MFIterationLoop : public IterationLoopBase
             fflush(stdout);
 
         data_slice.num_updated_vertices = frontier.queue_length;
-
+            
         return retval;
     }
 
@@ -324,12 +467,14 @@ struct MFIterationLoop : public IterationLoopBase
         auto &enactor_slice = enactor -> enactor_slices[0];
         auto &retval        = enactor_slice.enactor_stats.retval;
         auto &oprtr_parameters	= enactor_slice.oprtr_parameters;
+        
         if (retval != cudaSuccess){
             printf("(CUDA error %d @ GPU %d: %s\n", retval, 0 % num_gpus,
                     cudaGetErrorString(retval));
             fflush(stdout);
             return true;
         }
+
         if (data_slice.num_updated_vertices == 0) return true;
         return false;
     }
@@ -469,49 +614,46 @@ class Enactor :
     cudaError_t Reset(const VertexT& src, util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
-	debug_aml("Enactor Reset, src %d\n", src);
-       
-	typedef typename EnactorT::Problem::GraphT::GpT GpT;
-	auto num_gpus = this->num_gpus;
+        debug_aml("Enactor Reset, src %d\n", src);
 
-	GUARD_CU(BaseEnactor::Reset(target));
+        typedef typename GraphT::GpT GpT;
 
-        // Initialize frontiers according to the algorithm MF
-	for (int gpu = 0; gpu < num_gpus; gpu++)
-	{
-	    auto gpu_offset = gpu * num_gpus;
-	    if (num_gpus == 1 ||
-		(gpu == this->problem->org_graph->GpT::partition_table[src]))
-	    {
-		this -> thread_slices[gpu].init_size = 1;
-		for (int peer_ = 0; peer_ < num_gpus; ++peer_)
-		{
-		    auto &frontier = 
-			this -> enactor_slices[gpu_offset + peer_].frontier;
-		    frontier.queue_length = (peer_ == 0) ? 1 : 0;
-		    if (peer_ == 0)
-		    {
-			GUARD_CU(frontier.V_Q() -> ForEach(
-			    [src]__host__ __device__ (VertexT &v){v = src;}, 
-			    1, target, 0));
-		    }
-		}
-	    }
-            else 
-	    {
-		this -> thread_slices[gpu].init_size = 0;
-                for (int peer_ = 0; peer_ < num_gpus; peer_++)
-                {
-		    auto &frontier = 
-			this -> enactor_slices[gpu_offset + peer_].frontier;
-		    frontier.queue_length = 0;
+        GUARD_CU(BaseEnactor::Reset(target));
+
+        SizeT nodes = this->problem->data_slices[0][0].sub_graph[0].nodes;
+
+        for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+            if (this->num_gpus == 1) {
+                this->thread_slices[gpu].init_size = nodes;
+                for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
+                    auto &frontier =
+                        this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
+                    frontier.queue_length = (peer_ == 0) ? nodes : 0;
+                    if (peer_ == 0) {
+                        util::Array1D<SizeT, VertexT> tmp;
+                        tmp.Allocate(nodes, target | util::HOST);
+                        for (SizeT i = 0; i < nodes; ++i) {
+                            tmp[i] = (VertexT)i % nodes;
+                        }
+                        GUARD_CU(tmp.Move(util::HOST, target));
+
+                        GUARD_CU(frontier.V_Q()->ForEach(
+                                    tmp,
+                                    [] __host__ __device__(VertexT & v, VertexT & i) { v = i; },
+                                    nodes, target, 0));
+
+                        tmp.Release();
+                    }
                 }
-	    }
+            } else {
+                // MULTIGPU INCOMPLETE
+            }
         }
-        GUARD_CU(BaseEnactor::Sync());
-	debug_aml("Enactor Reset end\n");
+        debug_aml("Enactor Reset end\n");
+        GUARD_CU(BaseEnactor::Sync())
         return retval;
     }
+
 
     /**
      * @brief Enacts a MF computing on the specified graph.

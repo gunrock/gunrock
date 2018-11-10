@@ -482,6 +482,8 @@ int Validate_Results(
         util::PrintMsg("FAIL: Min cut " + std::to_string(mincut_flow) +
                 " and max flow " + std::to_string(flow_incoming_sink) + 
                 " are not equal", !quiet);
+        fprintf(stderr, "FAIL: Min cut %lf and max flow %lf are not equal\n", 
+                mincut_flow, flow_incoming_sink);
     }
 
     // Verify the result
@@ -519,6 +521,7 @@ int Validate_Results(
         }else
         {
             util::PrintMsg("PASS", !quiet);
+            fprintf(stderr, "PASS\n");
         }
     }
     else
@@ -558,6 +561,8 @@ int Validate_Results(
             util::PrintMsg("FAIL: for vertex " + std::to_string(v) +
                     " summary flow " + std::to_string(flow_v) + 
                     " is not equal 0", !quiet);
+            fprintf(stderr, "FAIL: for vertex %d summary flow %lf is not equal 0\n", 
+                v, flow_v);
         }
         if (num_errors > 0)
         {
@@ -565,6 +570,7 @@ int Validate_Results(
                     !quiet);
         } else {
             util::PrintMsg("PASS", !quiet);
+            fprintf(stderr, "PASS\n");
         }
     }
 

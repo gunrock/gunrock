@@ -86,19 +86,21 @@ struct main_struct
 	parameters.Set("load-time", cpu_timer.ElapsedMillis());
 	debug_aml("load-time is %lf",cpu_timer.ElapsedMillis());
 
-	if (parameters.Get<VertexT>("source") == 
-		util::PreDefinedValues<VertexT>::InvalidValue){
-	    parameters.Set("source", 0);
-	}
-	if (parameters.Get<VertexT>("sink") == 
-		util::PreDefinedValues<VertexT>::InvalidValue){
-	    parameters.Set("sink", u_graph.nodes-1);
-	}
-
-	VertexT source = parameters.Get<VertexT>("source");
+    VertexT source = parameters.Get<VertexT>("source");
 	VertexT sink = parameters.Get<VertexT>("sink");
 
-	if (not undirected){
+	if (source == util::PreDefinedValues<VertexT>::InvalidValue ||
+            source >= u_graph.nodes){
+        source = u_graph.nodes-2;
+	    parameters.Set("source", source);
+	}
+	if (sink == util::PreDefinedValues<VertexT>::InvalidValue ||
+            sink >= u_graph.nodes){
+        sink = u_graph.nodes-1;
+	    parameters.Set("sink", sink);
+	}
+
+    if (not undirected){
 	    debug_aml("Directed graph:");
 	    debug_aml("number of edges %d", d_graph.edges);
 	    debug_aml("number of nodes %d", d_graph.nodes);
