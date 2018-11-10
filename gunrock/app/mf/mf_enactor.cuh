@@ -21,14 +21,16 @@
 #include <gunrock/app/mf/mf_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
-#define debug_aml(a...) 
-//#define debug_aml(a...) printf(a);
+// uncoment for debug output
+// #define MF_DEBUG 1
 
-//#define debug_aml2(a...) printf(a);
-#define debug_aml2(a...)
-
-//#define ADVANCE_MF 1
-#define COMPUTE_MF 1
+#if MF_DEBUG
+  #define debug_aml(a...) printf(a);
+  #define debug_aml2(a...) printf(a);
+#else
+  #define debug_aml(a...) 
+  #define debug_aml2(a...)
+#endif
 
 namespace gunrock {
 namespace app {
@@ -116,123 +118,60 @@ struct MFIterationLoop : public IterationLoopBase
                  return true;
              };
 
-        auto advance_lockfree_op = 
-	        [graph, excess, capacity, flow, reverse, height, iteration, source, 
-            sink, active] 
-            __host__ __device__
-            (const VertexT &src, VertexT &dest, const SizeT &edge_id,
-             const VertexT &input_item, const SizeT &input_pos,
-             SizeT &output_pos) -> bool
-            {
-//                if (util::isValid(src) && src != source && src != sink)
-//                {
-                    SizeT e_id = graph.CsrT::GetNeighborListOffset(src);
-                    SizeT neighbor_num = graph.CsrT::GetNeighborListLength(src);
-                    SizeT e_end = e_id + neighbor_num;
-                    int iter = 0;
-                    while (/*e_id == edge_id && neighbor_num > 0 && */
-                            excess[src] > 0)
-                    {
-                        debug_aml2("src %d\n", src);
-                        debug_aml2("excess[%d] = %lf\n", src, excess[src]);
-                        VertexT lowest_id = 
-                            util::PreDefinedValues<VertexT>::InvalidValue;
-                        VertexT lowest_h;
-                        while (e_id < e_end){
-                            VertexT v = graph.CsrT::GetEdgeDest(e_id);
-                            if ((capacity[e_id] - flow[e_id] > 0) &&
-                                    (!util::isValid(lowest_id) ||
-                                     height[v] < lowest_h)){
-                                lowest_id = e_id;
-                                lowest_h = height[v];
-                            }
-                            ++e_id;
-                        }
-                        if (util::isValid(lowest_id)){
-                        debug_aml2("lowest for %d is %d\n",
-                                src, graph.CsrT::GetEdgeDest(lowest_id));
-                        if (lowest_h < height[src])
-                        {
-                            //push
-                            ValueT f = 
-                                fminf(capacity[lowest_id] - flow[lowest_id], 
-                                        excess[src]);
-                            ValueT old = atomicAdd(&excess[src], -f);
-                            if (f > 0 && (old > f || almost_eql(old, f)))
-                            {
-                                VertexT l_dest = graph.CsrT::GetEdgeDest(lowest_id);
-                                atomicAdd(&excess[l_dest], f);
-                                atomicAdd(&flow[lowest_id], f);
-                                atomicAdd(&flow[reverse[lowest_id]], -f);
-                                debug_aml2("push, %lf, %d->%d, e[%d] = %lf\n", 
-                                        f, src, l_dest, l_dest, excess[l_dest]);
-                                active[0] = 1; 
-                            }else{
-                                atomicAdd(&excess[src], f);
-                                debug_aml2("push back, %lf, %lf\n", 
-                                        f, excess[src]);
-                            } 
-                        }else{
-                            //relabel
-                            height[src] = lowest_h + 1;
-                            debug_aml2("relabel, %d new height %d\n", 
-                                    src, lowest_h + 1);
-                            active[0] = 1;
-                        }
-                        }
-                   // }
-                }
-            };
-
 
         auto compute_lockfree_op = 
 	        [graph, excess, capacity, flow, reverse, height, iteration, source, 
             sink, active] 
-            __host__ __device__
-           /* (const VertexT &src, VertexT &dest, const SizeT &edge_id,
-             const VertexT &input_item, const SizeT &input_pos,
-             SizeT &output_pos) -> bool*/
-            (VertexT* v_q, const SizeT& pos)
+            __host__ __device__ (VertexT* v_q, const SizeT& pos)
             {
-                if (util::isValid(pos)){
-                VertexT src = v_q[pos];
-                if (util::isValid(src)){
-                VertexT e_start = graph.CsrT::GetNeighborListOffset(src);
-                VertexT neighbor_num = graph.CsrT::GetNeighborListLength(src);
-                // debug_aml2("neighbor # %d\n", neighbor_num);
-                if (neighbor_num > 0 && src != source && src != sink)
+
+		VertexT v = v_q[pos];
+		debug_aml2("active vertex: %d\n", v);
+
+		// if not a valid vertex, do not apply compute:
+		if (!util::isValid(v) || 
+		      v == source ||
+                      v == sink || 
+		      excess[v] <= 0 ||
+                      graph.CsrT::GetNeighborListLength(v) == 0) return;
+
+		// else, try push-relable:
+                VertexT e_start = graph.CsrT::GetNeighborListOffset(v);
+                VertexT neighbor_num = graph.CsrT::GetNeighborListLength(v);
+                VertexT e_end = e_start + neighbor_num;
+                int iter = 0;
+                while (excess[v] > 0)
                 {
-                    VertexT e_end = e_start + neighbor_num;
-                    int iter = 0;
-                    while (excess[src] > 0)
-                    {
-                        debug_aml2("src %d\n", src);
-                        debug_aml2("excess[%d] = %lf\n", src, excess[src]);
+                        debug_aml2("active vertex: %d\n", v);
+                        debug_aml2("excess[%d] = %lf\n", v, excess[v]);
+
                         VertexT lowest_id = 
                             util::PreDefinedValues<VertexT>::InvalidValue;
                         VertexT lowest_h;
-                        for (VertexT e_id = e_start; e_id < e_end; ++e_id){
-                            //debug_aml2("edge id %d\n", e_id);
-                            VertexT v = graph.CsrT::GetEdgeDest(e_id);
-                            debug_aml2("try neighbor %d\n", v);
+			
+			// look for lowest height among neighbors
+                        for (VertexT e_id = e_start; e_id < e_end; ++e_id) {
+                            VertexT n = graph.CsrT::GetEdgeDest(e_id);
+                            debug_aml2("try neighbor %d\n", n);
                             if ((capacity[e_id] - flow[e_id] > 0) &&
                                     (!util::isValid(lowest_id) ||
-                                     height[v] < lowest_h)){
+                                     height[n] < lowest_h)){
                                 lowest_id = e_id;
-                                lowest_h = height[v];
+                                lowest_h = height[n];
                             }
                         }
+
+			// if a valid lowest h was found:
                         if (util::isValid(lowest_id))
                         {
                             debug_aml2("lowest for %d is %d\n",
-                                    src, graph.CsrT::GetEdgeDest(lowest_id));
-                            if (lowest_h < height[src])
+                                    v, graph.CsrT::GetEdgeDest(lowest_id));
+                            if (lowest_h < height[v])
                             {
                                 //push
                                 ValueT f = 
-                                    fminf(capacity[lowest_id] - flow[lowest_id], 
-                                            excess[src]);
-                                ValueT old = atomicAdd(&excess[src], -f);
+                                    fminf(capacity[lowest_id] - flow[lowest_id], excess[v]);
+                                ValueT old = atomicAdd(&excess[v], -f);
                                 if (f > 0 && (old > f || almost_eql(old, f)))
                                 {
                                     VertexT l_dest = graph.CsrT::GetEdgeDest(lowest_id);
@@ -240,27 +179,22 @@ struct MFIterationLoop : public IterationLoopBase
                                     atomicAdd(&flow[lowest_id], f);
                                     atomicAdd(&flow[reverse[lowest_id]], -f);
                                     debug_aml2("push, %lf, %d->%d, e[%d] = %lf\n", 
-                                            f, src, l_dest, l_dest, excess[l_dest]);
+                                            f, v, l_dest, l_dest, excess[l_dest]);
                                     active[0] = 1; 
                                 }else{
-                                    atomicAdd(&excess[src], f);
+                                    atomicAdd(&excess[v], f);
                                     debug_aml2("push back, %lf, %lf\n", 
-                                            f, excess[src]);
+                                            f, excess[v]);
                                 } 
                             }else{
                                 //relabel
-                                height[src] = lowest_h + 1;
+                                height[v] = lowest_h + 1;
                                 debug_aml2("relabel, %d new height %d\n", 
-                                        src, lowest_h + 1);
+                                        v, lowest_h + 1);
                                 active[0] = 1;
                             }
-                        }else{
-                            debug_aml2("there is no lower neighbor\n");
                         }
-                    }
-                }
-                }
-                }
+                 }
             };
 
             
@@ -279,7 +213,7 @@ struct MFIterationLoop : public IterationLoopBase
             debug_aml("iteration 0, preflow ends, results:\n");
         }
 
-        //Global relabeling
+        // Global relabeling
         if (was_changed == true and (iteration % 50 == 0)){
             debug_aml("iteration %d, relabeling\n", iteration);
             GUARD_CU(height.Move(util::DEVICE, util::HOST, graph.nodes, 0,
@@ -308,93 +242,22 @@ struct MFIterationLoop : public IterationLoopBase
         GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), 
                     "cudaStreamSynchronize failed.");
 
-        oprtr_parameters.filter_mode = "BY_PASS";
-        GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                    graph.csr(), &local_vertices, frontier.Next_V_Q(),
-                    oprtr_parameters, 
-                    [excess, graph, source, sink] __host__ __device__
-                    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
-                     const VertexT &input_item, const SizeT &input_pos,
-                     SizeT &output_pos) -> bool
-                    {
-                        return (!util::isValid(src) || src == source || 
-                                src == sink || excess[src] <= 0 || 
-                                graph.CsrT::GetNeighborListLength(src) == 0);
-                    }));
-
-       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-                "cudaStreamSynchronize failed");
-       
-       debug_aml("[%d]frontier que length after advance op is %d\n", 
+        debug_aml("[%d]frontier que length before compute op is %d\n", 
                 iteration, frontier.queue_length);
 
-
-#if ADVANCE_MF
-       // ADVANCE_LOCKFREE_OP
-       oprtr_parameters.advance_mode = "LB";
-       GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-                    graph.csr(), frontier.Next_V_Q(), frontier.V_Q(),
-                    //graph.csr(), &local_vertices, null_ptr,
-                    oprtr_parameters, advance_lockfree_op));
-
-       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-                "cudaStreamSynchronize failed");
-
-
-       frontier.queue_reset = true;
-       oprtr_parameters.filter_mode = "BY_PASS";
-       GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                   graph.csr(), frontier.Next_V_Q(), frontier.V_Q(),
-                   oprtr_parameters, 
-                   [active] __host__ __device__
-                   (const VertexT &src, VertexT &dest, const SizeT &edge_id,
-                    const VertexT &input_item, const SizeT &input_pos,
-                    SizeT &output_pos) -> bool
-                   {
-                   return active[0] > 0;
-                   }));
-#endif
-
-
-#if COMPUTE_MF
-        debug_aml("[%d]frontier que length before advance op is %d\n", 
-                iteration, frontier.queue_length);
-        GUARD_CU(frontier.Next_V_Q()->ForAll(compute_lockfree_op, 
+	// Run Lockfree Push-Relable
+        GUARD_CU(frontier.V_Q()->ForAll(compute_lockfree_op, 
                     graph.nodes, util::DEVICE, oprtr_parameters.stream));
-        debug_aml("[%d]frontier que length after advance op is %d\n", 
+
+        debug_aml("[%d]frontier que length after compute op is %d\n", 
                 iteration, frontier.queue_length);
         GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
                 "cudaStreamSynchronize failed");
 
-        frontier.queue_reset = true;
-        oprtr_parameters.filter_mode = "BY_PASS";
-        GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                    graph.csr(), frontier.Next_V_Q(), frontier.V_Q(),
-                    oprtr_parameters, 
-                    [active] __host__ __device__
-                    (const VertexT &src, VertexT &dest, const SizeT &edge_id,
-                     const VertexT &input_item, const SizeT &input_pos,
-                     SizeT &output_pos) -> bool
-                    {
-                        return active[0] > 0;
-                    }));
-#endif
-
-        frontier.queue_index++;
-
-        // Get back the resulted frontier length
-        GUARD_CU(frontier.work_progress.GetQueueLength(
-                    frontier.queue_index, frontier.queue_length,
-                    false, oprtr_parameters.stream, true));
+	active.Move(util::DEVICE, util::HOST, 1, 0, oprtr_parameters.stream); 
 
         GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
                 "cudaStreamSynchronize failed");
-
-        debug_aml2("new updated vertices %d (version after filter)\n", \
-                frontier.queue_length);\
-            fflush(stdout);
-
-        data_slice.num_updated_vertices = frontier.queue_length;
             
         return retval;
     }
@@ -475,7 +338,7 @@ struct MFIterationLoop : public IterationLoopBase
             return true;
         }
 
-        if (data_slice.num_updated_vertices == 0) return true;
+        if (data_slice.active[0] == 0) return true;
         return false;
     }
 
