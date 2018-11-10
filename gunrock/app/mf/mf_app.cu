@@ -81,11 +81,12 @@ cudaError_t UseParameters(util::Parameters &parameters)
  */
 template <typename GraphT, typename ValueT, typename VertexT>
 cudaError_t RunTests(
-    util::Parameters  &parameters,
-    GraphT	      &graph,
-    VertexT	      *h_reverse,
-    ValueT	      *ref_flow,
-    util::Location    target = util::DEVICE)
+    util::Parameters    &parameters,
+    GraphT              &graph,
+    VertexT             *h_reverse,
+    ValueT              *ref_flow,
+    ValueT              ref_max_flow,
+    util::Location      target = util::DEVICE)
 {
     debug_aml("RunTests starts");
     cudaError_t retval = cudaSuccess;
@@ -118,7 +119,7 @@ cudaError_t RunTests(
     bool * vertex_reachabilities = new bool[graph.nodes];
 
     ValueT * h_residuals = new ValueT[graph.edges];
-    
+
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
@@ -150,11 +151,13 @@ cudaError_t RunTests(
         if (validation == "each")
         {
             GUARD_CU(problem.Extract(h_flow));
-	        app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities, h_residuals);
-
-            int num_errors = app::mf::Validate_Results(parameters, graph, 
-		        source, sink, h_flow, h_reverse, min_cut, ref_flow, 
-		        quiet_mode);
+            GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+            app::mf::minCut(graph, source, h_flow, min_cut,
+                    vertex_reachabilities, h_residuals);
+            GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+            int num_errors = app::mf::Validate_Results(parameters, graph,
+                    source, sink, h_flow, h_reverse, min_cut, ref_max_flow,
+                    ref_flow, quiet_mode);
         }
     }
 
@@ -163,10 +166,15 @@ cudaError_t RunTests(
     if (validation == "last")
     {
         GUARD_CU(problem.Extract(h_flow));
-        app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities, h_residuals);
+        GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
 
-        int num_errors = app::mf::Validate_Results(parameters, graph, 
-            source, sink, h_flow, h_reverse, min_cut, ref_flow, quiet_mode);
+        app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities,
+                h_residuals);
+        GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
+
+        int num_errors = app::mf::Validate_Results(parameters, graph, source,
+                sink, h_flow, h_reverse, min_cut, ref_max_flow, ref_flow,
+                quiet_mode);
     }
 
     // Compute running statistics
@@ -315,11 +323,11 @@ double mf(
     debug_aml("Load undirected graph");
     gunrock::graphio::LoadGraph(parameters, u_graph);
 
-    if (parameters.Get<VertexT>("source") == 
+    if (parameters.Get<VertexT>("source") ==
 	    gunrock::util::PreDefinedValues<VertexT>::InvalidValue){
 	parameters.Set("source", 0);
     }
-    if (parameters.Get<VertexT>("sink") == 
+    if (parameters.Get<VertexT>("sink") ==
 	    gunrock::util::PreDefinedValues<VertexT>::InvalidValue){
 	parameters.Set("sink", u_graph.nodes-1);
     }
@@ -371,7 +379,7 @@ double mf(
 		    auto z = d_graph.CsrT::GetEdgeDest(f);
 		    if (z == v and d_graph.CsrT::edge_values[f] > 0)
 		    {
-			u_graph.CsrT::edge_values[e]  = 
+			u_graph.CsrT::edge_values[e]  =
 			    d_graph.CsrT::edge_values[f];
 			break;
 		    }
@@ -379,11 +387,11 @@ double mf(
 	    }
 	}
     }
-    
+
     gunrock::util::Location target = gunrock::util::HOST;
 
     // Run the MF
-    double elapsed_time = gunrock_mf(parameters, u_graph, reverse, flow, 
+    double elapsed_time = gunrock_mf(parameters, u_graph, reverse, flow,
 	    min_cut, maxflow);
 
     // Cleanup
