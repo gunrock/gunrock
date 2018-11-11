@@ -45,14 +45,14 @@ namespace mf {
  * @brief Displays the MF result
  *
  * @tparam ValueT     Type of capacity/flow/excess
- * @tparam VertxeT    Type of vertex 
- * 
- * @param[in] h_flow  Flow calculated on edges 
+ * @tparam VertxeT    Type of vertex
+ *
+ * @param[in] h_flow  Flow calculated on edges
  * @param[in] source  Index of source vertex
  * @param[in] nodes   Number of nodes
  */
 template<typename GraphT, typename ValueT, typename VertexT>
-void DisplaySolution(GraphT graph, ValueT* h_flow, VertexT* reverse, 
+void DisplaySolution(GraphT graph, ValueT* h_flow, VertexT* reverse,
 	VertexT sink, VertexT nodes)
 {
     typedef typename GraphT::CsrT CsrT;
@@ -69,7 +69,7 @@ void DisplaySolution(GraphT graph, ValueT* h_flow, VertexT* reverse,
     }
 
     util::PrintMsg("The maximum amount of flow that is feasible to reach \
-	    from source to sink is " + std::to_string(flow_incoming_sink), 
+	    from source to sink is " + std::to_string(flow_incoming_sink),
 	    true, false);
 }
 
@@ -91,8 +91,8 @@ void DisplaySolution(GraphT graph, ValueT* h_flow, VertexT* reverse,
   * return Value of computed max flow
   */
 template<typename ValueT, typename VertexT, typename GraphT>
-ValueT max_flow(GraphT& graph, std::queue<VertexT>& que, ValueT* flow, 
-        ValueT* excess, VertexT* height, VertexT source, VertexT sink, 
+ValueT max_flow(GraphT& graph, std::queue<VertexT>& que, ValueT* flow,
+        ValueT* excess, VertexT* height, VertexT source, VertexT sink,
         VertexT* reverse){
     typedef typename GraphT::CsrT CsrT;
     typedef typename GraphT::SizeT SizeT;
@@ -107,13 +107,13 @@ ValueT max_flow(GraphT& graph, std::queue<VertexT>& que, ValueT* flow,
             auto num_neighbors = graph.CsrT::GetNeighborListLength(x);
             auto e_end = e_start + num_neighbors;
             VertexT lowest_h;
-            SizeT lowest_id = util::PreDefinedValues<SizeT>::InvalidValue; 
+            SizeT lowest_id = util::PreDefinedValues<SizeT>::InvalidValue;
             VertexT lowest_y;
             for (auto e = e_start; e < e_end; ++e){
                 auto y = graph.CsrT::GetEdgeDest(e);
                 auto c = graph.CsrT::edge_values[e];
                 auto move = std::min(c - flow[e], excess[x]);
-                if (move > MF_EPSILON && 
+                if (move > MF_EPSILON &&
                         (!util::isValid(lowest_id) || height[y] < lowest_h)){
                     lowest_h = height[y];
                     lowest_id = e;
@@ -160,7 +160,7 @@ ValueT max_flow(GraphT& graph, std::queue<VertexT>& que, ValueT* flow,
   *
   */
 template <typename VertexT, typename ValueT, typename GraphT>
-void minCut(GraphT& graph, VertexT  src, ValueT* flow, int* min_cut, 
+void minCut(GraphT& graph, VertexT  src, ValueT* flow, int* min_cut,
 	    bool* vertex_reachabilities, ValueT* residuals)
 {
     typedef typename GraphT::CsrT CsrT;
@@ -228,68 +228,68 @@ double CPU_Reference(
     double elapsed = 0;
 
 #if (BOOST_FOUND==1)
-    
+
     debug_aml("boost found\n");
     using namespace boost;
 
     // Prepare Boost Datatype and Data structure
     typedef adjacency_list_traits < vecS, vecS, directedS > Traits;
-    typedef adjacency_list < vecS, vecS, directedS, 
+    typedef adjacency_list < vecS, vecS, directedS,
 	    property < vertex_name_t, std::string >,
 	    property < edge_capacity_t, ValueT,
 	    property < edge_residual_capacity_t, ValueT,
 	    property < edge_reverse_t, Traits::edge_descriptor > > > > Graph;
-    
+
     Graph boost_graph;
 
-    typename property_map < Graph, edge_capacity_t >::type 
+    typename property_map < Graph, edge_capacity_t >::type
 	capacity = get(edge_capacity, boost_graph);
 
-    typename property_map < Graph, edge_reverse_t >::type 
+    typename property_map < Graph, edge_reverse_t >::type
 	rev = get(edge_reverse, boost_graph);
 
-    typename property_map < Graph, edge_residual_capacity_t >::type 
+    typename property_map < Graph, edge_residual_capacity_t >::type
 	residual_capacity = get(edge_residual_capacity, boost_graph);
 
     std::vector<Traits::vertex_descriptor> verts;
     for (VertexT v = 0; v < graph.nodes; ++v)
 	verts.push_back(add_vertex(boost_graph));
-    
+
     Traits::vertex_descriptor source = verts[src];
     Traits::vertex_descriptor sink = verts[sin];
     debug_aml("src = %d, sin %d\n", source, sink);
 
     for (VertexT x = 0; x < graph.nodes; ++x){
-	auto e_start = graph.CsrT::GetNeighborListOffset(x);
-	auto num_neighbors = graph.CsrT::GetNeighborListLength(x);
-	auto e_end = e_start + num_neighbors;
-	for (auto e = e_start; e < e_end; ++e){
-	    VertexT y = graph.CsrT::GetEdgeDest(e);
-	    ValueT cap = graph.CsrT::edge_values[e];
-	    if (fabs(cap) <= 1e-12)
-		continue;
-	    Traits::edge_descriptor e1, e2;
-	    bool in1, in2;
-	    tie(e1, in1) = add_edge(verts[x], verts[y], boost_graph);
-	    tie(e2, in2) = add_edge(verts[y], verts[x], boost_graph);
-	    if (!in1 || !in2){
-		debug_aml("error\n");
-		return -1;
-	    }
-	    capacity[e1] = cap;
-	    capacity[e2] = 0;
-	    rev[e1] = e2;
-	    rev[e2] = e1;
-	}
+    	auto e_start = graph.CsrT::GetNeighborListOffset(x);
+    	auto num_neighbors = graph.CsrT::GetNeighborListLength(x);
+    	auto e_end = e_start + num_neighbors;
+    	for (auto e = e_start; e < e_end; ++e){
+    	    VertexT y = graph.CsrT::GetEdgeDest(e);
+    	    ValueT cap = graph.CsrT::edge_values[e];
+    	    if (fabs(cap) <= 1e-12)
+    		continue;
+    	    Traits::edge_descriptor e1, e2;
+    	    bool in1, in2;
+    	    tie(e1, in1) = add_edge(verts[x], verts[y], boost_graph);
+    	    tie(e2, in2) = add_edge(verts[y], verts[x], boost_graph);
+    	    if (!in1 || !in2){
+    		debug_aml("error\n");
+    		return -1;
+    	    }
+    	    capacity[e1] = cap;
+    	    capacity[e2] = 0;
+    	    rev[e1] = e2;
+    	    rev[e2] = e1;
+    	}
     }
-  
+
     //
     // Perform Boost reference
     //
 
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
-    maxflow = edmonds_karp_max_flow(boost_graph, source, sink); 
+    maxflow = edmonds_karp_max_flow(boost_graph, source, sink);
     cpu_timer.Stop();
     elapsed = cpu_timer.ElapsedMillis();
 
@@ -297,38 +297,38 @@ double CPU_Reference(
     // Extracting results on CPU
     //
 
-    std::vector<std::vector<ValueT>> boost_flow; 
+    std::vector<std::vector<ValueT>> boost_flow;
     boost_flow.resize(graph.nodes);
-    for (auto x = 0; x < graph.nodes; ++x) 
+    for (auto x = 0; x < graph.nodes; ++x)
 	boost_flow[x].resize(graph.nodes, 0.0);
     typename graph_traits<Graph>::vertex_iterator u_it, u_end;
     typename graph_traits<Graph>::out_edge_iterator e_it, e_end;
     for (tie(u_it, u_end) = vertices(boost_graph); u_it != u_end; ++u_it){
-	for (tie(e_it, e_end) = out_edges(*u_it, boost_graph); e_it != e_end; 
-		++e_it){
-	    if (capacity[*e_it] > 0){
-		ValueT e_f = capacity[*e_it] - residual_capacity[*e_it];
-	    	VertexT t = target(*e_it, boost_graph);
-	    	//debug_aml("flow on edge %d - %d = %lf\n", *u_it, t, e_f);
-	    	boost_flow[*u_it][t] = e_f;
-	    }
-	}
+    	for (tie(e_it, e_end) = out_edges(*u_it, boost_graph); e_it != e_end;
+    		++e_it){
+    	    if (capacity[*e_it] > 0){
+    		ValueT e_f = capacity[*e_it] - residual_capacity[*e_it];
+    	    	VertexT t = target(*e_it, boost_graph);
+    	    	//debug_aml("flow on edge %d - %d = %lf\n", *u_it, t, e_f);
+    	    	boost_flow[*u_it][t] = e_f;
+    	    }
+    	}
     }
     for (auto x = 0; x < graph.nodes; ++x){
-	auto e_start = graph.CsrT::GetNeighborListOffset(x);
-	auto num_neighbors = graph.CsrT::GetNeighborListLength(x);
-	auto e_end = e_start + num_neighbors;
-	for (auto e = e_start; e < e_end; ++e){
-	    VertexT y = graph.CsrT::GetEdgeDest(e);
-	    flow[e] = boost_flow[x][y];
-	}
+    	auto e_start = graph.CsrT::GetNeighborListOffset(x);
+    	auto num_neighbors = graph.CsrT::GetNeighborListLength(x);
+    	auto e_end = e_start + num_neighbors;
+    	for (auto e = e_start; e < e_end; ++e){
+    	    VertexT y = graph.CsrT::GetEdgeDest(e);
+    	    flow[e] = boost_flow[x][y];
+        }
     }
 
 #else
 
     debug_aml("no boost\n");
 
-    debug_aml("graph nodes %d, edges %d source %d sink %d src %d\n", 
+    debug_aml("graph nodes %d, edges %d source %d sink %d src %d\n",
 	    graph.nodes, graph.edges, src, sin);
 
     ValueT*   excess =  (ValueT*)malloc(sizeof(ValueT)*graph.nodes);
@@ -338,13 +338,13 @@ double CPU_Reference(
         height[v] = (VertexT)0;
     }
     height[src] = graph.nodes;
-     
+
     for (SizeT e = 0; e < graph.edges; ++e){
         flow[e] = (ValueT) 0;
     }
 
     relabeling(graph, src, sin, height, reverse, flow);
-    
+
     auto e_start = graph.CsrT::GetNeighborListOffset(src);
     auto num_neighbors = graph.CsrT::GetNeighborListLength(src);
     auto e_end = e_start + num_neighbors;
@@ -371,7 +371,7 @@ double CPU_Reference(
     debug_aml("source excess %lf, sink excess %lf\n", excess[src], excess[sin]);
     debug_aml("pre flow push from source %lf\n", preflow);
     debug_aml("source height %d, sink height %d\n", height[src], height[sin]);
-    
+
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
 
@@ -381,24 +381,24 @@ double CPU_Reference(
     cpu_timer.Stop();
     elapsed = cpu_timer.ElapsedMillis();
 
-//    for (auto u = 0; u < graph.nodes; ++u){
-//	auto e_start = graph.CsrT::GetNeighborListOffset(u);
-//	auto num_neighbors = graph.CsrT::GetNeighborListLength(u);
-//	auto e_end = e_start + num_neighbors;
-//	for (auto e = e_start; e < e_end; ++e){
-//	    auto v = graph.CsrT::GetEdgeDest(e);
-//	    auto f = flow[e];
-//	    if (v == sin){
-//		printf("flow(%d->%d) = %lf (incoming sink CPU)\n", u, v, f);
-//	    }
-//	}
-//    }
-    
+    // for (auto u = 0; u < graph.nodes; ++u){
+    //     auto e_start = graph.CsrT::GetNeighborListOffset(u);
+    //     auto num_neighbors = graph.CsrT::GetNeighborListLength(u);
+    //     auto e_end = e_start + num_neighbors;
+    //     for (auto e = e_start; e < e_end; ++e){
+    //         auto v = graph.CsrT::GetEdgeDest(e);
+    //         auto f = flow[e];
+    //         if (v == sin){
+    //     	    printf("flow(%d->%d) = %lf (incoming sink CPU)\n", u, v, f);
+    //         }
+    //     }
+    // }
+
     free(excess);
     free(height);
 
 #endif
-    
+
     return elapsed;
 }
 
@@ -412,8 +412,8 @@ double CPU_Reference(
  * @param[in]  graph	      Input graph
  * @param[in]  source	      The source vertex
  * @param[in]  sink           The sink vertex
- * @param[in]  h_flow	      Computed flow on edges 
- * @param[in]  reverse	      Reverse array on edges 
+ * @param[in]  h_flow	      Computed flow on edges
+ * @param[in]  reverse	      Reverse array on edges
  * @param[in]  min_cut	      Array on nodes, 0 - source set, 1 - sink set
  * @param[in]  ref_max_flow	  Value of max flow for reference solution
  * @param[in]  ref_flow	      Reference flow on edges
@@ -423,19 +423,19 @@ double CPU_Reference(
  */
 template <typename GraphT, typename ValueT, typename VertexT>
 int Validate_Results(
-        util::Parameters    &parameters,
-        GraphT              &graph,
-        VertexT		        source,
-        VertexT		        sink,
-        ValueT		        *h_flow,
-        VertexT		        *reverse,
-        int                 *min_cut,
-        ValueT              ref_max_flow,
-        ValueT		        *ref_flow = NULL,
-        bool		        verbose = true)
+    util::Parameters    &parameters,
+    GraphT              &graph,
+    VertexT		        source,
+    VertexT		        sink,
+    ValueT		        *h_flow,
+    VertexT		        *reverse,
+    int                 *min_cut,
+    ValueT              ref_max_flow,
+    ValueT		        *ref_flow = NULL,
+    bool		        verbose = true)
 {
     typedef typename GraphT::CsrT   CsrT;
-    typedef typename GraphT::SizeT  SizeT;  
+    typedef typename GraphT::SizeT  SizeT;
 
     int num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
@@ -480,9 +480,9 @@ int Validate_Results(
     {
         ++num_errors;
         util::PrintMsg("FAIL: Min cut " + std::to_string(mincut_flow) +
-                " and max flow " + std::to_string(flow_incoming_sink) + 
+                " and max flow " + std::to_string(flow_incoming_sink) +
                 " are not equal", !quiet);
-        fprintf(stderr, "FAIL: Min cut %lf and max flow %lf are not equal\n", 
+        fprintf(stderr, "FAIL: Min cut %lf and max flow %lf are not equal\n",
                 mincut_flow, flow_incoming_sink);
     }
 
@@ -506,7 +506,7 @@ int Validate_Results(
             }
         }
 
-        if (fabs(flow_incoming_sink-ref_flow_incoming_sink) > 
+        if (fabs(flow_incoming_sink-ref_flow_incoming_sink) >
                 MF_EPSILON_VALIDATE)
         {
             ++num_errors;
@@ -516,7 +516,7 @@ int Validate_Results(
 
         if (num_errors > 0)
         {
-            util::PrintMsg(std::to_string(num_errors) + " errors occurred.", 
+            util::PrintMsg(std::to_string(num_errors) + " errors occurred.",
                     !quiet);
         }else
         {
@@ -553,20 +553,20 @@ int Validate_Results(
                 }
             }
             if (fabs(flow_v) > MF_EPSILON_VALIDATE){
-                debug_aml("summary flow for vertex %d is %lf > %llf\n", 
+                debug_aml("summary flow for vertex %d is %lf > %llf\n",
                         v, fabs(flow_v), MF_EPSILON);
             }else
                 continue;
             ++num_errors;
             util::PrintMsg("FAIL: for vertex " + std::to_string(v) +
-                    " summary flow " + std::to_string(flow_v) + 
+                    " summary flow " + std::to_string(flow_v) +
                     " is not equal 0", !quiet);
-            fprintf(stderr, "FAIL: for vertex %d summary flow %lf is not equal 0\n", 
+            fprintf(stderr, "FAIL: for vertex %d summary flow %lf is not equal 0\n",
                 v, flow_v);
         }
         if (num_errors > 0)
         {
-            util::PrintMsg(std::to_string(num_errors) + " errors occurred.", 
+            util::PrintMsg(std::to_string(num_errors) + " errors occurred.",
                     !quiet);
         } else {
             util::PrintMsg("PASS", !quiet);
@@ -599,4 +599,3 @@ int Validate_Results(
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-

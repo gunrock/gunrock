@@ -89,73 +89,182 @@ struct RWIterationLoop : public IterationLoopBase
         auto &walk_length    = data_slice.walk_length;
         auto &walks_per_node = data_slice.walks_per_node;
         auto &walk_mode      = data_slice.walk_mode;
+        auto &store_walks    = data_slice.store_walks;
         auto &gen            = data_slice.gen;
+        auto &neighbors_seen = data_slice.neighbors_seen;
+        auto &steps_taken    = data_slice.steps_taken;
 
-        curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
+        if(walk_mode == 0) { // uniform random walk
 
-        if(walk_mode == 0) {
           auto uniform_rw_op = [
               graph,
               walks,
               rand,
               iteration,
-              walk_length
+              walk_length,
+              store_walks,
+              neighbors_seen,
+              steps_taken
           ] __host__ __device__ (VertexT *v, const SizeT &i) {
 
-            // printf("graph.node_values[i]=%d\n", graph.node_values[i]);
+            SizeT write_idx = (i * walk_length) + iteration; // Write location in RW array
+            if(store_walks) {
+              walks[write_idx] = v[i]; // record current position in walk
+            }
 
-            SizeT write_idx  = (i * walk_length) + iteration; // Write location in RW array
-            walks[write_idx] = v[i];                          // record current position in walk
+            if(!util::isValid(v[i])) {
+              return;
+            }
 
             if(iteration < walk_length - 1) {
-              // Determine next neighbor to walk to
               SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
-              SizeT offset        = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
-              VertexT neighbor    = graph.GetEdgeDest(graph.GetNeighborListOffset(v[i]) + offset);
-              v[i]                = neighbor; // Replace vertex w/ neighbor in queue
+              if(num_neighbors == 0) {
+                v[i] = util::PreDefinedValues<VertexT>::InvalidValue;
+                return;
+              }
+
+              // Randomly sample neighbor
+              SizeT neighbor_list_offset = graph.GetNeighborListOffset(v[i]);
+              SizeT rand_offset          = (SizeT)round(0.5 + num_neighbors * rand[i]) - 1;
+              VertexT neighbor           = graph.GetEdgeDest(neighbor_list_offset + rand_offset);
+
+              v[i] = neighbor;                    // Replace vertex w/ neighbor in queue
+              steps_taken[i]++;
+              neighbors_seen[i] += (uint64_t)num_neighbors; // Record number of neighbors we've seen
             }
           };
 
+          curandSetStream(gen, oprtr_parameters.stream);
+          curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
           GUARD_CU(frontier.V_Q()->ForAll(
             uniform_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
 
-        } else if (walk_mode == 1) {
-          auto max_rw_op = [
+
+        } else if (walk_mode == 1) { // greedy: walk to neighbor w/ maximum node value
+          auto greedy_rw_op = [
               graph,
               walks,
-              rand,
               iteration,
-              walk_length
+              walk_length,
+              store_walks,
+              neighbors_seen,
+              steps_taken
           ] __host__ __device__ (VertexT *v, const SizeT &i) {
 
-            SizeT write_idx  = (i * walk_length) + iteration; // Write location in RW array
-            walks[write_idx] = v[i];                          // record current position in walk
+            SizeT write_idx = (i * walk_length) + iteration; // Write location in RW array
+            if(store_walks) {
+              walks[write_idx] = v[i]; // record current position in walk
+            }
+
+            if(!util::isValid(v[i])) {
+              return;
+            }
 
             if(iteration < walk_length - 1) {
-              // Walk to neighbor w/ maximum node value
-              SizeT num_neighbors        = graph.GetNeighborListLength(v[i]);
+              SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
+              if(num_neighbors == 0) {
+                v[i] = util::PreDefinedValues<VertexT>::InvalidValue;
+                return;
+              }
+
               SizeT neighbor_list_offset = graph.GetNeighborListOffset(v[i]);
 
-              VertexT max_neighbor_id  = graph.GetEdgeDest(neighbor_list_offset + 0);
-              VertexT max_neighbor_val = graph.node_values[max_neighbor_id];
+              // Find neighbor with max value
+              VertexT max_neighbor_id = graph.GetEdgeDest(neighbor_list_offset + 0);
+              ValueT max_neighbor_val = graph.node_values[max_neighbor_id];
               for(SizeT offset = 1; offset < num_neighbors; offset++) {
-                VertexT neighbor     = graph.GetEdgeDest(neighbor_list_offset + offset);
-                ValueT  neighbor_val = graph.node_values[neighbor];
+                VertexT neighbor    = graph.GetEdgeDest(neighbor_list_offset + offset);
+                ValueT neighbor_val = graph.node_values[neighbor];
                 if(neighbor_val > max_neighbor_val) {
                   max_neighbor_id  = neighbor;
                   max_neighbor_val = neighbor_val;
                 }
               }
-              v[i] = max_neighbor_id; // Replace vertex w/ neighbor in queue
+              v[i] = max_neighbor_id;             // Replace vertex w/ neighbor in queue
+              steps_taken[i]++;
+              neighbors_seen[i] += (uint64_t)num_neighbors; // Record number of neighbors we've seen
             }
           };
 
           GUARD_CU(frontier.V_Q()->ForAll(
-            max_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+            greedy_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
 
+        } else if(walk_mode == 2) {
+
+          curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes * walks_per_node);
+
+          auto stochastic_greedy_rw_op = [
+              graph,
+              walks,
+              rand,
+              iteration,
+              walk_length,
+              store_walks,
+              neighbors_seen,
+              steps_taken
+          ] __host__ __device__ (VertexT *v, const SizeT &i) {
+
+            SizeT write_idx = (i * walk_length) + iteration; // Write location in RW array
+            if(store_walks) {
+              walks[write_idx] = v[i]; // record current position in walk
+            }
+
+            if(!util::isValid(v[i])) {
+              return;
+            }
+
+            if(iteration < walk_length - 1) {
+              SizeT num_neighbors = graph.GetNeighborListLength(v[i]);
+              if(num_neighbors == 0) {
+                v[i] = util::PreDefinedValues<VertexT>::InvalidValue;
+                return;
+              }
+
+              SizeT neighbor_list_offset = graph.GetNeighborListOffset(v[i]);
+
+              VertexT neighbor, next_neighbor;
+
+              ValueT sum_neighbor_scores = 0;
+              for(SizeT offset = 0; offset < num_neighbors; offset++) {
+                neighbor = graph.GetEdgeDest(neighbor_list_offset + offset);
+                sum_neighbor_scores += graph.node_values[neighbor];
+               }
+
+              ValueT r = rand[i] * sum_neighbor_scores;
+
+              ValueT acc = 0;
+              for(SizeT offset = 0; offset < num_neighbors; offset++) {
+                neighbor = graph.GetEdgeDest(neighbor_list_offset + offset);
+                ValueT neighbor_score = graph.node_values[neighbor];
+                acc += neighbor_score;
+                if(r < acc) {
+                  next_neighbor = neighbor;
+                  break;
+                }
+              }
+              v[i] = next_neighbor; // Replace vertex w/ neighbor in queue
+              steps_taken[i]++;
+              neighbors_seen[i] += (uint64_t)num_neighbors; // Record number of neighbors we've seen
+            }
+          };
+
+          GUARD_CU(frontier.V_Q()->ForAll(
+            stochastic_greedy_rw_op, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+
+        } else {
+          printf("ERROR: unknown walk_mode=%d\n", walk_mode);
         }
 
         return retval;
+    }
+
+    cudaError_t Compute_OutputLength(int peer_)
+    {
+        return cudaSuccess; // No need to load balance or get output size
+    }
+    cudaError_t Check_Queue_Size(int peer_)
+    {
+        return cudaSuccess; // no need to check queue size for RW
     }
 
     bool Stop_Condition(int gpu_num = 0)
@@ -325,10 +434,7 @@ public:
     cudaError_t Run(ThreadSlice &thread_data)
     {
         gunrock::app::Iteration_Loop<
-            // <OPEN> change to how many {VertexT, ValueT} data need to communicate
-            //       per element in the inter-GPU sub-frontiers
-            0, 1,
-            // </OPEN>
+            0, 0,
             IterationT>(
             thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
@@ -346,7 +452,6 @@ public:
         GUARD_CU(BaseEnactor::Reset(target));
 
         SizeT num_nodes = this -> problem -> data_slices[0][0].sub_graph[0].nodes;
-        printf("num_nodes=%d\n", num_nodes);
 
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
            if (this->num_gpus == 1) {

@@ -14,8 +14,8 @@
 
 #pragma once
 
+#include <gunrock/util/track_utils.cuh>
 #include <gunrock/util/sort_device.cuh>
-
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
@@ -35,6 +35,14 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
+    
+    GUARD_CU(parameters.Use<bool>(
+        "pull",
+        util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        false,
+        "Whether to use pull direction PageRank.",
+        __FILE__, __LINE__));
+
     return retval;
 }
 
@@ -70,6 +78,8 @@ struct PRIterationLoop : public IterationLoopBase
         auto         &graph              =   data_slice.sub_graph[0];
         auto         &rank_curr          =   data_slice.rank_curr;
         auto         &rank_next          =   data_slice.rank_next;
+        auto         &rank_temp          =   data_slice.rank_temp;
+        auto         &rank_temp2         =   data_slice.rank_temp2;
         auto         &degrees            =   data_slice.degrees;
         auto         &local_vertices     =   data_slice.local_vertices;
         auto         &delta              =   data_slice.delta;
@@ -100,7 +110,7 @@ struct PRIterationLoop : public IterationLoopBase
                 if (!isfinite(new_value))
                     new_value = 0;
                 rank_curr[dest] = new_value;
-                //if (dest == 42029)
+                //if (util::isTracking(dest))
                 //    printf("rank[%d] = %f -> %f = (%f + %f * %f) / %d\n",
                 //        dest, old_value, new_value, reset_value,
                 //        delta, rank_next[dest], degrees[dest]);
@@ -127,46 +137,83 @@ struct PRIterationLoop : public IterationLoopBase
                 frontier.queue_index, frontier.queue_length,
                 false, oprtr_parameters.stream, true));
 
-            GUARD_CU(rank_next.ForEach(
-                []__host__ __device__(ValueT &rank)
-                {
-                    rank = 0.0;
-                }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+            if (!data_slice.pull)
+            {
+                GUARD_CU(rank_next.ForEach(
+                    []__host__ __device__(ValueT &rank)
+                    {
+                        rank = 0.0;
+                    }, graph.nodes, util::DEVICE, oprtr_parameters.stream));
+            }
 
             GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
                 "cudaStreamSynchronize failed");
             data_slice.num_updated_vertices = frontier.queue_length;
         }
 
-        if (enactor.flag & Debug)
-            util::cpu_mt::PrintMessage("Advance start.",
-                gpu_num, iteration, peer_);
-
-        auto advance_op = [rank_curr, rank_next] __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
+        if (data_slice.pull)
         {
-            //printf("%d -> %d\n", src, dest);
-            ValueT add_value = rank_curr[src];
-            if (isfinite(add_value))
-            {
-                atomicAdd(rank_next + dest, add_value);
-                //ValueT old_val = atomicAdd(rank_next + dest, add_value);
-                //if (dest == 42029)
-                //    printf("rank[%d] = %f = %f (rank[%d]) + %f\n",
-                //        dest, old_val + add_value, add_value, src, old_val);
-            }
-            return true;
-        };
+            if (enactor.flag & Debug)
+                util::cpu_mt::PrintMessage("NeighborReduce start.",
+                    gpu_num, iteration, peer_);
 
-        // Edge Map
-        frontier.queue_length = local_vertices.GetSize();
-        frontier.queue_reset  = true;
-        oprtr_parameters.advance_mode = "ALL_EDGES";
-        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.coo(), &local_vertices, null_ptr,
-            oprtr_parameters, advance_op));
+            auto advance_op = [rank_curr, graph] 
+            __host__ __device__ (
+                const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                const VertexT &input_item, const SizeT &input_pos,
+                SizeT &output_pos) -> ValueT
+            {
+                return rank_curr[dest];
+            };
+           
+            oprtr_parameters.reduce_values_out   = &rank_next;
+            oprtr_parameters.reduce_reset        = true;
+            oprtr_parameters.reduce_values_temp  = &rank_temp;
+            oprtr_parameters.reduce_values_temp2 = &rank_temp2;
+            oprtr_parameters.advance_mode        = "ALL_EDGES";
+            frontier.queue_length = graph.nodes;
+            frontier.queue_reset  = true;
+            GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V | 
+                oprtr::OprtrMode_REDUCE_TO_SRC | oprtr::ReduceOp_Plus>(
+                graph.csc(), null_ptr, null_ptr,
+                oprtr_parameters, advance_op, 
+                []__host__ __device__ (const ValueT &a, const ValueT &b)
+                {
+                    return a+b;
+                }, (ValueT)0));
+        }
+
+        else {
+            if (enactor.flag & Debug)
+                util::cpu_mt::PrintMessage("Advance start.",
+                    gpu_num, iteration, peer_);
+
+            auto advance_op = [rank_curr, rank_next] __host__ __device__ (
+                const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                const VertexT &input_item, const SizeT &input_pos,
+                SizeT &output_pos) -> bool
+            {
+                //printf("%d -> %d\n", src, dest);
+                ValueT add_value = rank_curr[src];
+                if (isfinite(add_value))
+                {
+                    atomicAdd(rank_next + dest, add_value);
+                    //ValueT old_val = atomicAdd(rank_next + dest, add_value);
+                    //if (dest == 42029)
+                    //    printf("rank[%d] = %f = %f (rank[%d]) + %f\n",
+                    //        dest, old_val + add_value, add_value, src, old_val);
+                }
+                return true;
+            };
+
+            // Edge Map
+            frontier.queue_length = local_vertices.GetSize();
+            frontier.queue_reset  = true;
+            oprtr_parameters.advance_mode = "ALL_EDGES";
+            GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                graph.coo(), &local_vertices, null_ptr,
+                oprtr_parameters, advance_op));
+        }
 
         enactor_stats.edges_queued[0] += graph.edges;
         return retval;
@@ -663,8 +710,9 @@ public:
         }
 
         SizeT nodes = data_slice.org_nodes;
-        GUARD_CU(data_slice.node_ids   .Allocate(nodes, util::DEVICE));
-        GUARD_CU(data_slice.temp_vertex.Allocate(nodes, util::DEVICE));
+        GUARD_CU(data_slice.node_ids   .EnsureSize_(nodes, util::DEVICE));
+        GUARD_CU(data_slice.temp_vertex.EnsureSize_(nodes, util::DEVICE));
+        
         GUARD_CU(data_slice.node_ids.ForAll(
             []__host__ __device__ (VertexT *ids, const SizeT &pos)
             {
@@ -672,9 +720,9 @@ public:
             }, nodes, util::DEVICE, this -> enactor_slices[0].stream));
 
         //util::PrintMsg("#nodes = " + std::to_string(nodes));
-        //size_t cub_required_size = 0;
-        //void* temp_storage = NULL;
-        /*cub::DoubleBuffer<ValueT > key_buffer(
+        /*size_t cub_required_size = 0;
+        void* temp_storage = NULL;
+        cub::DoubleBuffer<ValueT > key_buffer(
             data_slice.rank_curr.GetPointer(util::DEVICE),
             data_slice.rank_next.GetPointer(util::DEVICE));
         cub::DoubleBuffer<VertexT> value_buffer(
@@ -682,17 +730,29 @@ public:
             data_slice.temp_vertex.GetPointer(util::DEVICE));
         GUARD_CU2(cub::DeviceRadixSort::SortPairsDescending(
             temp_storage, cub_required_size,
-            key_buffer, value_buffer, nodes),
-            "cubDeviceRadixSort failed");
-        GUARD_CU(data_slice.cub_sort_storage.Allocate(
-            cub_required_size, util::DEVICE));
-
-        // sort according to the rank of nodes
-        GUARD_CU2(cub::DeviceRadixSort::SortPairsDescending(
-            temp_storage, cub_required_size,
             key_buffer, value_buffer, nodes,
             0, sizeof(ValueT) * 8, this -> enactor_slices[0].stream),
             "cubDeviceRadixSort failed");
+        GUARD_CU(data_slice.cub_sort_storage.EnsureSize_(
+            cub_required_size, util::DEVICE));
+
+        GUARD_CU2(cudaDeviceSynchronize(),
+            "cudaDeviceSynchronize failed.");
+
+        printf("cub_sort_stoarge = %p, size = %d\n",
+            data_slice.cub_sort_storage.GetPointer(util::DEVICE),
+            data_slice.cub_sort_storage.GetSize());
+
+        // sort according to the rank of nodes
+        GUARD_CU2(cub::DeviceRadixSort::SortPairsDescending(
+            data_slice.cub_sort_storage.GetPointer(util::DEVICE), 
+            cub_required_size,
+            key_buffer, value_buffer, nodes,
+            0, sizeof(ValueT) * 8, this -> enactor_slices[0].stream),
+            "cubDeviceRadixSort failed");
+
+        GUARD_CU2(cudaDeviceSynchronize(),
+            "cudaDeviceSynchronize failed.");
 
         if (key_buffer.Current() != data_slice.rank_curr.GetPointer(util::DEVICE))
         {
@@ -714,18 +774,26 @@ public:
                 }, nodes, util::DEVICE, this -> enactor_slices[0].stream));
         }*/
 
-        util::Array1D<SizeT, char> cub_temp_space;
-        GUARD_CU(util::cubSortPairs(
-            cub_temp_space,
+        //util::Array1D<SizeT, char> cub_temp_space;
+        GUARD_CU(util::cubSortPairsDescending(
+            data_slice.cub_sort_storage,
             data_slice.rank_curr, data_slice.rank_next,
             data_slice.node_ids , data_slice.temp_vertex,
             nodes, 0, sizeof(ValueT) * 8, this -> enactor_slices[0].stream));
 
-        //GUARD_CU(data_slice.rank_curr.ForAll(data_slice.node_ids,
-        //    []__host__ __device__(ValueT *ranks, VertexT *ids, const SizeT &pos)
-        //    {
-        //        printf("%d : rank = %f, id = %d\n", pos, ranks[pos], ids[pos]);
-        //    }, (nodes < 10) ? nodes : 10, util::DEVICE, this -> enactor_slices[0].stream));
+        //GUARD_CU2(cudaDeviceSynchronize(),
+        //    "cudaDeviceSynchronize failed.");
+
+        auto &temp_vertex = data_slice.temp_vertex;
+        //auto &rank_curr   = data_slice.rank_curr;
+        auto &rank_next   = data_slice.rank_next;
+        GUARD_CU(data_slice.node_ids.ForAll(
+            [temp_vertex, rank_curr, rank_next] 
+            __host__ __device__ (VertexT *ids, const SizeT &v)
+            {
+                ids[v] = temp_vertex[v];
+                rank_curr[v] = rank_next[v];
+            }, nodes, util::DEVICE, this -> enactor_slices[0].stream));
 
         if (data_slice.scale)
         {

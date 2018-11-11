@@ -18,8 +18,17 @@
 
 #pragma once
 
+#ifdef BOOST_FOUND
+    // Boost includes for CPU Push Relabel Max Flow reference algorithms
+    #include <boost/config.hpp>
+    #include <iostream>
+    #include <string>
+    #include <boost/graph/edmonds_karp_max_flow.hpp>
+    #include <boost/graph/adjacency_list.hpp>
+    #include <boost/graph/read_dimacs.hpp>
+#endif
+
 #include <gunrock/app/mf/mf_test.cuh>
-#include <queue>
 
 namespace gunrock {
 namespace app {
@@ -33,21 +42,10 @@ cudaError_t UseParameters_test(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
 
-    GUARD_CU(parameters.Use<std::string>(
-        "weights",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
-        "",
-        "Filename of edge weights from the source or to the sink, "
-        "with #nodes elements in floating point. The first line are two numbers: "
-        "#nodes and 20, with 20 indicating the type of elements is double. "
-        "Elements larger than 0 indicating capacities from the source, "
-        "and elements less than 0 indicating capacities to the sink.",
-        __FILE__, __LINE__));
-
     GUARD_CU(parameters.Use<double>(
-        "lambda",
+        "lambda2",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        6,
+        3,
         "Parameter controlling how heavily non-connected solutions are penalized.",
         __FILE__, __LINE__));
 
@@ -61,7 +59,7 @@ cudaError_t UseParameters_test(util::Parameters &parameters)
     GUARD_CU(parameters.Use<double>(
         "error_threshold",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        1e-6,
+        1e-12,
         "Error threshold to compare floating point values",
         __FILE__, __LINE__));
 
@@ -88,6 +86,48 @@ void DisplaySolution(GraphT graph, ValueT* h_flow, VertexT* reverse,
  * GTF Testing Routines
  ***************************************************************************/
 
+ /**
+  * @brief Min Cut algorithm
+  *
+  * @tparam ValueT      Type of capacity/flow/excess
+  * @tparam VertxeT     Type of vertex
+  * @tparam GraphT      Type of graph
+  * @param[in] graph    Graph
+  * @param[in] source   Source vertex
+  * @param[in] sink     Sink vertex
+  * @param[in] flow     Function of flow on edges
+  * @param[out] min_cut Function on nodes, 1 = connected to source, 0 = sink
+  *
+  */
+ template <typename VertexT, typename ValueT, typename GraphT>
+ void minCut_sub(GraphT &graph, VertexT src, ValueT *flow, bool * vertex_reachabilities, ValueT * residuals)
+ {
+    typedef typename GraphT::CsrT CsrT;
+    // std::vector<bool> flag; flag.resize(graph.nodes, true);
+    std::queue<VertexT> que;
+    que.push(src);
+
+    for (auto e = 0; e < graph.edges; e++) {
+        residuals[e] = graph.CsrT::edge_values[e] - flow[e];
+    }
+
+    while (! que.empty()){
+        auto v = que.front(); que.pop();
+
+        auto e_start = graph.CsrT::GetNeighborListOffset(v);
+        auto num_neighbors = graph.CsrT::GetNeighborListLength(v);
+        auto e_end = e_start + num_neighbors;
+        for (auto e = e_start; e < e_end; ++e){
+            auto u = graph.CsrT::GetEdgeDest(e);
+            if (vertex_reachabilities[u] == false and abs(graph.CsrT::edge_values[e] - flow[e]) > 1e-6){
+                vertex_reachabilities[u] = true;
+                que.push(u);
+            }
+        }
+    }
+ }
+
+
 template <typename GraphT>
 cudaError_t MinCut(
     util::Parameters         &parameters,
@@ -106,47 +146,79 @@ cudaError_t MinCut(
     double error_threshold = parameters.Get<double>("error_threshold");
 
     ValueT max_flow = 0;
+    // for (auto e = 0; e < graph.edges; e++){
+    //     printf("CPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
+    // }
     mf::CPU_Reference(parameters, graph,
         source, dest, max_flow, reverse_edges, edge_flows);
+    memset(vertex_reachabilities, false, graph.nodes*sizeof(vertex_reachabilities[0]));
+    
+    minCut_sub(graph, source, edge_flows, vertex_reachabilities, edge_residuals);
+
     auto &edge_capacities = graph.edge_values;
 
-    for (auto e = 0; e < graph.edges; e++)
+    //printf("after maxflow \n");
+    for (auto e = 0; e < graph.edges; e++){
         edge_residuals[e] = edge_capacities[e] - edge_flows[e];
+        //if(e<10) printf("CPU: er_idx %d, e_res %f \n", e, edge_residuals[e]);
+    }
 
-    VertexT *queue   = new VertexT[graph.nodes];
-    char    *markers = new char   [graph.nodes];
-    for (char t = 1; t < 3; t++)
-    {
-        VertexT head = 0;
-        VertexT tail = 0;
-        for (VertexT v = 0; v < graph.nodes; v++)
-            markers[v] = 0;
-        queue[head] = (t == 1) ? source : dest;
+    /*
+    std::queue <typename GraphT::VertexT> q;
+    q.push(source);
+    memset(vertex_reachabilities, false, graph.nodes*sizeof(vertex_reachabilities[0]));
+    vertex_reachabilities[source] = true;
 
-        while (tail <= head)
-        {
-            VertexT v = queue[tail];
-            auto e_start = graph.GetNeighborListOffset(v);
-            auto num_neighbors = graph.GetNeighborListLength(v);
-            auto e_end = e_start + num_neighbors;
-            for (auto e = e_start; e < e_end; e++)
-            {
-                VertexT u = graph.GetEdgeDest(e);
-                if (markers[u] != 0)
-                    continue;
-                if (edge_residuals[e] < error_threshold)
-                    continue;
+    // Standard BFS Loop
+    while (!q.empty()) {
+        VertexT v = q.front();
+        q.pop();
 
-                head ++;
-                queue[head] = u;
-                markers[u] = 1;
-                vertex_reachabilities[u] = t;
+        auto e_start = graph.GetNeighborListOffset(v);
+        auto num_neighbors = graph.GetNeighborListLength(v);
+        auto e_end = e_start + num_neighbors;
+
+        for (auto e = e_start; e < e_end; e++) {
+            VertexT u = graph.GetEdgeDest(e);
+
+            if (vertex_reachabilities[u] == false && abs(edge_residuals[e]) > 1e-6) {
+                q.push(u);
+                vertex_reachabilities[u] = true;
             }
-            tail ++;
         }
     }
-    delete[] queue  ; queue   = NULL;
-    delete[] markers; markers = NULL;
+    */
+    //printf("In PR min-cut \n");
+
+    /////////////////////////
+    /*
+    VertexT head = 0;
+    VertexT tail = 0;
+    VertexT *queue = new VertexT[graph.nodes];
+    queue[head] = source;
+
+    while (tail <= head)
+    {
+        VertexT v = queue[tail];
+        auto e_start = graph.GetNeighborListOffset(v);
+        auto num_neighbors = graph.GetNeighborListLength(v);
+        auto e_end = e_start + num_neighbors;
+        for (auto e = e_start; e < e_end; e++)
+        {
+            VertexT u = graph.GetEdgeDest(e);
+            if (vertex_reachabilities[u] == false && abs(edge_residuals[e]) > 1e-6){
+                head ++;
+                queue[head] = u;
+                vertex_reachabilities[u] = true;
+            }
+        }
+        tail ++;
+    }
+    //for(auto i = 0; i < graph.nodes; i++){
+    //    printf("%d, ", vertex_reachabilities[i]);
+    //}
+    printf("\n");
+    */
     return retval;
 }
 
@@ -287,6 +359,14 @@ void minCut(GraphT graph, VertexT s, VertexT t, bool *visited, ValueT *edge_resi
 }
 /*----------------------------------------------*/
 
+template<typename ValueT>
+void soft_thresh(ValueT *Y, const ValueT thresh, const int n){
+    for(int i = 0; i < n; i++){
+        ValueT tmp = max(Y[i] - thresh, 0.0);
+        Y[i] = tmp + min(Y[i]+thresh, 0.0);
+    }
+}
+
 /**
  * @brief Simple CPU-based reference GTF implementations
  *
@@ -320,7 +400,7 @@ cudaError_t CPU_Reference(
     auto     num_edges        = graph.edges; // m + n*4
     VertexT  source           = num_org_nodes; // originally 0
     VertexT  dest             = num_org_nodes+1; // originally 1
-    double   lambda           = parameters.Get<double>("lambda");
+    double   lambda2          = parameters.Get<double>("lambda2");
     double   error_threshold  = parameters.Get<double>("error_threshold");
     VertexT  num_comms        = 1; // nlab
     VertexT *next_communities = new VertexT[num_nodes]; // nextlabel
@@ -335,6 +415,14 @@ cudaError_t CPU_Reference(
     ValueT  *edge_residuals   = new ValueT [num_edges]; // graph
     ValueT  *edge_flows       = new ValueT [num_edges]; // edge flows
     double   sum_weights_source_sink = 0;               // moy
+
+    // use to preserve graph edge weights
+    ValueT  *original_edge_capacities = new ValueT [num_edges]; // graph
+    auto &edge_capacities = graph.edge_values;
+    for (auto e = 0; e < graph.edges; e++){
+        original_edge_capacities[e] = edge_capacities[e];
+    }
+
     util::CpuTimer cpu_timer;
 
     // Normalization and resets
@@ -354,7 +442,7 @@ cudaError_t CPU_Reference(
 
     auto avg_weights_source_sink = sum_weights_source_sink / num_org_nodes;
     community_accus[0] = avg_weights_source_sink;
-    printf("avg is %f \n", avg_weights_source_sink);
+    printf("!!!!!!!!!! avg is %f \n", avg_weights_source_sink);
     for (VertexT v = 0; v < num_org_nodes; v++)
     {
         SizeT  e = graph.GetNeighborListOffset(v) + graph.GetNeighborListLength(v) - 1;
@@ -380,10 +468,12 @@ cudaError_t CPU_Reference(
     {
         printf("Iteration %d\n", iteration);
         iteration++;
+        //for(int e = 0; e < 10; e++)
+        //  printf("CPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
 
         GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
             edge_flows, edge_residuals, vertex_reachabilities));
-        //minCut(graph, source, dest, vertex_reachabilities, edge_residuals, num_nodes);
+        // minCut(graph, source, dest, vertex_reachabilities, edge_residuals, num_nodes);
 
         auto &edge_capacities = graph.edge_values;
 
@@ -417,6 +507,7 @@ cudaError_t CPU_Reference(
                 community_weights[comm] +=
                     edge_residuals[num_edges - num_org_nodes * 2 + v];
                 community_sizes  [comm] ++;
+                //printf("++ %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
             }
 
             else { // otherwise
@@ -435,9 +526,11 @@ cudaError_t CPU_Reference(
                         edge_residuals[e] = 0;
                     }
                 }
+                //printf("-- %d %f %f\n", comm, community_weights[comm], community_accus[comm]);
             }
-            //printf("%d %f %f\n", comm, community_weights[comm], community_accus[comm]);
+
         } // end of for v
+        //printf("%d %f %f\n", comm, community_weights[comm], community_accus[comm]);
 
         for (comm = 0; comm < pervious_num_comms; comm ++)
         {
@@ -460,10 +553,12 @@ cudaError_t CPU_Reference(
                 community_weights[comm] = 0;
             }
         }
+
         for (; comm < num_comms; comm++)
         {
             community_weights[comm] /= community_sizes  [comm];
             community_accus  [comm] += community_weights[comm];
+            //printf("comm %d, accus %f, sizes %d \n", comm, community_accus  [comm], community_sizes  [comm]);
             //printf("values: comm: %d, sizes: %d, weights: %f, accus: %f.\n", comm, community_sizes[comm], community_weights[comm], community_accus[comm]);
         }
 
@@ -475,7 +570,7 @@ cudaError_t CPU_Reference(
 
             auto comm = curr_communities[v];
             if (!community_active[comm] ||
-                abs(community_weights[comm]) < error_threshold)
+                abs(community_weights[comm]) <= 1e-6)
             {
                 if (vertex_reachabilities[v] == 1)
                     edge_residuals[num_edges - num_org_nodes * 2 + v] = 0;
@@ -515,15 +610,22 @@ cudaError_t CPU_Reference(
             }
         } // end of for v
 
-        for (SizeT e = 0; e < graph.edges; e ++)
+        for (SizeT e = 0; e < graph.edges; e ++){
             edge_capacities[e] = edge_residuals[e];
+            //printf("CPU: eidx %d, edge_v %f \n", e, edge_capacities[e]);
+          }
     } // end of while
     cpu_timer.Stop();
     elapsed = cpu_timer.ElapsedMillis();
 
+    soft_thresh(community_accus, lambda2, num_org_nodes);
     std::ofstream out_pr( "./output_pr.txt" );
     for(int i = 0; i < num_org_nodes; i++) out_pr << (double) community_accus[curr_communities[i]] << std::endl;
     out_pr.close();
+
+    for (auto e = 0; e < graph.edges; e++){
+         edge_capacities[e] = original_edge_capacities[e];
+    }
 
     delete[] next_communities ; next_communities  = NULL;
     delete[] curr_communities ; curr_communities  = NULL;
@@ -534,6 +636,7 @@ cudaError_t CPU_Reference(
     delete[] vertex_active    ; vertex_active     = NULL;
     delete[] vertex_reachabilities; vertex_reachabilities = NULL;
     delete[] edge_residuals   ; edge_residuals    = NULL;
+    delete[] original_edge_capacities; original_edge_capacities    = NULL;
     return retval;
 }
 

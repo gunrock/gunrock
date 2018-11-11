@@ -311,8 +311,8 @@ double pagerank(
 {
 
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, ValueT,
-        gunrock::graph::HAS_COO>
-        Graph_CooT;
+        gunrock::graph::HAS_COO | gunrock::graph::HAS_CSC>
+        GraphT;
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, ValueT,
         gunrock::graph::HAS_CSR>
         Graph_CsrT;
@@ -350,7 +350,7 @@ double pagerank(
 
     gunrock::util::Location target = gunrock::util::HOST;    
 
-    Graph_CooT graph;
+    GraphT graph;
     graph.FromCsr(csr, target, 0, quiet, true);
     csr.Release();
     gunrock::graphio::LoadGraph(parameters, graph);

@@ -160,6 +160,13 @@ T strtoT(const std::string str, std::string &str_end, int base = 0)
 }
 
 template <typename T>
+T strtoT(const std::string str, int base = 0)
+{
+    char *char_str_end;
+    return strtoT<T>(str.c_str(), &char_str_end, base);
+}
+
+template <typename T>
 bool isValidString(const char *str, int base = 0)
 {
     char *str_end;

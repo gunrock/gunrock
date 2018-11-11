@@ -119,7 +119,7 @@ cudaError_t RunTests(
     bool * vertex_reachabilities = new bool[graph.nodes];
 
     ValueT * h_residuals = new ValueT[graph.edges];
-    
+
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
@@ -139,8 +139,6 @@ cudaError_t RunTests(
 
         cpu_timer.Start();
         GUARD_CU(enactor.Enact());
-        GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
-
         cpu_timer.Stop();
         info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
@@ -154,11 +152,11 @@ cudaError_t RunTests(
         {
             GUARD_CU(problem.Extract(h_flow));
             GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
-            app::mf::minCut(graph, source, h_flow, min_cut, 
+            app::mf::minCut(graph, source, h_flow, min_cut,
                     vertex_reachabilities, h_residuals);
             GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
-            int num_errors = app::mf::Validate_Results(parameters, graph, 
-                    source, sink, h_flow, h_reverse, min_cut, ref_max_flow, 
+            int num_errors = app::mf::Validate_Results(parameters, graph,
+                    source, sink, h_flow, h_reverse, min_cut, ref_max_flow,
                     ref_flow, quiet_mode);
         }
     }
@@ -170,12 +168,12 @@ cudaError_t RunTests(
         GUARD_CU(problem.Extract(h_flow));
         GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
 
-        app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities, 
+        app::mf::minCut(graph, source, h_flow, min_cut, vertex_reachabilities,
                 h_residuals);
         GUARD_CU2(cudaDeviceSynchronize(),"cudaDeviceSynchronize failed.");
 
-        int num_errors = app::mf::Validate_Results(parameters, graph, source, 
-                sink, h_flow, h_reverse, min_cut, ref_max_flow, ref_flow, 
+        int num_errors = app::mf::Validate_Results(parameters, graph, source,
+                sink, h_flow, h_reverse, min_cut, ref_max_flow, ref_flow,
                 quiet_mode);
     }
 
@@ -263,7 +261,7 @@ double gunrock_mf(
 
         total_time += cpu_timer.ElapsedMillis();
         problem.Extract(flow);
-	gunrock::app::mf::minCut(graph, source, flow, min_cut, vertex_reachabilities, h_residuals);
+	    gunrock::app::mf::minCut(graph, source, flow, min_cut, vertex_reachabilities, h_residuals);
     }
 
     enactor.Release(target);
@@ -325,11 +323,11 @@ double mf(
     debug_aml("Load undirected graph");
     gunrock::graphio::LoadGraph(parameters, u_graph);
 
-    if (parameters.Get<VertexT>("source") == 
+    if (parameters.Get<VertexT>("source") ==
 	    gunrock::util::PreDefinedValues<VertexT>::InvalidValue){
 	parameters.Set("source", 0);
     }
-    if (parameters.Get<VertexT>("sink") == 
+    if (parameters.Get<VertexT>("sink") ==
 	    gunrock::util::PreDefinedValues<VertexT>::InvalidValue){
 	parameters.Set("sink", u_graph.nodes-1);
     }
@@ -381,7 +379,7 @@ double mf(
 		    auto z = d_graph.CsrT::GetEdgeDest(f);
 		    if (z == v and d_graph.CsrT::edge_values[f] > 0)
 		    {
-			u_graph.CsrT::edge_values[e]  = 
+			u_graph.CsrT::edge_values[e]  =
 			    d_graph.CsrT::edge_values[f];
 			break;
 		    }
@@ -389,11 +387,11 @@ double mf(
 	    }
 	}
     }
-    
+
     gunrock::util::Location target = gunrock::util::HOST;
 
     // Run the MF
-    double elapsed_time = gunrock_mf(parameters, u_graph, reverse, flow, 
+    double elapsed_time = gunrock_mf(parameters, u_graph, reverse, flow,
 	    min_cut, maxflow);
 
     // Cleanup

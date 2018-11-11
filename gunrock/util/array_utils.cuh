@@ -21,6 +21,7 @@
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/type_limits.cuh>
 #include <gunrock/util/type_enum.cuh>
+#include <gunrock/util/vector_utils.cuh>
 //#include <gunrock/util/memset_kernel.cuh>
 
 namespace gunrock {
@@ -101,6 +102,7 @@ struct NullArray
     typedef _ValueT ValueT;
 
     void SetName(const char* const name) {}
+
     cudaError_t Allocate(SizeT size, Location target = ARRAY_DEFAULT_TARGET)
     {
         return cudaSuccess;
@@ -113,6 +115,11 @@ struct NullArray
     }
 
     cudaError_t Release(Location target = LOCATION_ALL)
+    {
+        return cudaSuccess;
+    }
+
+    cudaError_t EnsureSize(SizeT size, bool keep = false, cudaStream_t stream = 0)
     {
         return cudaSuccess;
     }
@@ -135,9 +142,33 @@ struct NullArray
         return cudaSuccess;
     }
 
+    cudaError_t WriteBinary(
+        std::string filename,
+        bool ignore_file_error = false)
+    {
+        return cudaSuccess;
+    }
+
+    cudaError_t ReadBinary(
+        std::string filename,
+        bool ignore_file_error = false)
+    {
+        return cudaSuccess;
+    }
+
     template <typename ArrayT_in, typename ApplyLambda>
     cudaError_t ForEach(
         ArrayT_in &array_in, ApplyLambda apply,
+        SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+        Location target = LOCATION_DEFAULT,
+        cudaStream_t stream = 0)
+    {
+        return cudaSuccess;
+    }
+
+    template <typename ApplyLambda>
+    cudaError_t ForEach(
+        ApplyLambda apply,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT,
         cudaStream_t stream = 0)
@@ -159,6 +190,12 @@ struct NullArray
 
     __host__ __device__ __forceinline__
     ValueT& operator[](std::size_t idx)
+    {
+        return *((ValueT*)this);
+    }
+
+    __host__ __device__ __forceinline__
+    ValueT& operator[](std::size_t idx) const
     {
         return *((ValueT*)this);
     }
@@ -261,7 +298,9 @@ public:
         ApplyLambda apply,
         SizeT length = PreDefinedValues<SizeT>::InvalidValue,
         Location target = LOCATION_DEFAULT,
-        cudaStream_t stream = 0);
+        cudaStream_t stream = 0,
+        int grid_size = PreDefinedValues<int>::InvalidValue,
+        int block_size = PreDefinedValues<int>::InvalidValue);
 
     template <typename ArrayT_in, typename ApplyLambda>
     cudaError_t ForAll(
@@ -431,8 +470,17 @@ public:
             if (size != 0)
             {
                 h_pointer = new ValueT[size];
+                //if (retval = util::GRError(cudaMallocHost(
+                //    (void**)&(h_pointer), sizeof(ValueT) * size),
+                //        std::string(name) + " allocation on " 
+                //        + Location_to_string(HOST) + " failed",
+                //        __FILE__, __LINE__))
+                //    return retval;
+                //for (SizeT i = 0; i < size; i++)
+                //    h_pointer[i]();
+
                 if (h_pointer == NULL)
-                    return GRError(std::string(name) + " allocation on " +
+                    return GRError(cudaErrorUnknown, std::string(name) + " allocation on " +
                         Location_to_string(HOST) + " failed",
                         __FILE__, __LINE__);
 
@@ -518,6 +566,10 @@ public:
                 ", pointer =\t " + to_string(h_pointer));
 #endif
             delete[] h_pointer; h_pointer = NULL;
+            //if (retval = GRError(cudaFreeHost(h_pointer),
+            //    std::string(name) + " cudaFreeHot failed", __FILE__, __LINE__))
+            //    return retval;
+            //h_pointer = NULL;
             allocated = allocated & (~HOST);
         } else if ((target & HOST)==HOST && (setted & HOST) == HOST) {
             UnSetPointer(HOST);
@@ -570,7 +622,7 @@ public:
 
         if (GetSize() < size)
         {
-            retval = Allocate(size, target & allocated);
+            retval = Allocate(size, target | allocated);
             return retval;
         } else size = GetSize();
 
@@ -830,17 +882,17 @@ public:
         if (source == target) return retval;
         if ((source == HOST || source == DEVICE) &&
             ((source & setted) != source) && ((source & allocated) != source))
-            return GRError(std::string(name) + " movment source is not valid", __FILE__, __LINE__);
+            return GRError(cudaErrorUnknown, std::string(name) + " movment source is not valid", __FILE__, __LINE__);
         if (((target & HOST) == HOST || (target & DEVICE) == DEVICE) &&
             ((target & setted) != target) && ((target & allocated) != target))
             if (retval = Allocate(this->size, target)) return retval;
         if ((target == DISK || source == DISK) && ((setted & DISK) != DISK))
-            return GRError(std::string(name) + " filename not set", __FILE__, __LINE__);
+            return GRError(cudaErrorUnknown, std::string(name) + " filename not set", __FILE__, __LINE__);
         if (!isValid(size)) size = this->size;
         if (size > this->size)
-            return GRError(std::string(name) + " size is invalid", __FILE__, __LINE__);
+            return GRError(cudaErrorUnknown, std::string(name) + " size is invalid", __FILE__, __LINE__);
         if (size+offset > this->size)
-            return GRError(std::string(name) + " size+offset is invalid", __FILE__, __LINE__);
+            return GRError(cudaErrorUnknown, std::string(name) + " size+offset is invalid", __FILE__, __LINE__);
         if (size == 0) return retval;
 #ifdef ENABLE_ARRAY_DEBUG
         PrintMsg(std::string(name) + " Moving from " + Location_to_string(source) +
@@ -1260,7 +1312,7 @@ public:
     }
 
     template <typename T>
-    cudaError_t tRead_Binary(std::string filename)
+    cudaError_t tReadBinary(std::string filename)
     {
         Array1D<SizeT, T> tArray;
         cudaError_t retval = cudaSuccess;
@@ -1276,14 +1328,14 @@ public:
         if (retval = tArray.Allocate(tLength, HOST))
             return retval;
 
-        fin.read(tArray.h_pointer, tLength * sizeof(T));
+        fin.read((char*)(tArray + 0), tLength * sizeof(T));
         fin.close();
 
-        if (retval = EnsureSize(tLength))
+        if (retval = EnsureSize_(tLength, util::HOST))
             return retval;
         if (retval = ForEach(tArray,
-            [](ValueT &element, const T &tElement){
-                element = tElement;
+            [] __host__ __device__ (ValueT &element, const T &tElement){
+                CrossAssign(element, tElement);
             }, tLength, HOST))
             return retval;
         if (retval = tArray.Release())
@@ -1291,84 +1343,118 @@ public:
         return retval;
     }
 
-    cudaError_t Read_Binary(
-        std::string filename)
+    // struct ReadStruct
+    // {
+    //     Array1DT &array;
+    //     std::string filename;
+    //
+    //     ReadStruct(Array1DT &a, std::string f) :
+    //         array(a),
+    //         filename(f)
+    //     {
+    //
+    //     }
+    //
+    //     template <typename T>
+    //     cudaError_t operator()(T &t)
+    //     {
+    //         return array.tReadBinary<T>(filename);
+    //     }
+    // };
+
+    cudaError_t ReadBinary(
+        std::string filename,
+        bool ignore_file_error = false)
     {
         cudaError_t retval = cudaSuccess;
         int64_t tLength, tType;
         std::ifstream fin;
         fin.open(filename.c_str(), std::ios::in | std::ios::binary);
         if (!fin.is_open())
-            return GRError("Unable to read file " + filename,
+        {
+            if (ignore_file_error)
+            {
+                return cudaErrorInvalidValue;
+            } else
+                return GRError("Unable to read file " + filename,
                 __FILE__, __LINE__);
+        }
 
         fin.read((char*)(&tLength), 8);
         fin.read((char*)(&tType), 8);
-        tType = tType & 0xFF;
+        tType = tType & 0xFFF;
         if (tType == util::Type2Enum<ValueT>::Id)
         {
-            if (retval = EnsureSize(tLength))
+            if (retval = EnsureSize_(tLength, util::HOST))
                 return retval;
-            fin.read(h_pointer, sizeof(ValueT) * tLength);
+            fin.read((char*)h_pointer, sizeof(ValueT) * tLength);
             fin.close();
         } else {
             fin.close();
             switch(tType)
             {
-            case Type2Enum<char>::Id :
-                retval = tRead_Binary<char>(filename); break;
-            case Type2Enum<unsigned char>::Id :
-                retval = tRead_Binary<unsigned char>(filename); break;
-            case Type2Enum<short>::Id :
-                retval = tRead_Binary<short>(filename); break;
-            case Type2Enum<unsigned short>::Id :
-                retval = tRead_Binary<unsigned short>(filename); break;
-            case Type2Enum<int>::Id :
-                retval = tRead_Binary<int>(filename); break;
-            case Type2Enum<unsigned int>::Id :
-                retval = tRead_Binary<unsigned int>(filename); break;
-            case Type2Enum<long>::Id :
-                retval = tRead_Binary<long>(filename); break;
-            case Type2Enum<unsigned long>::Id :
-                retval = tRead_Binary<unsigned long>(filename); break;
-            case Type2Enum<long long>::Id :
-                retval = tRead_Binary<long long>(filename); break;
-            case Type2Enum<unsigned long long>::Id :
-                retval = tRead_Binary<unsigned long long>(filename); break;
-            case Type2Enum<float>::Id :
-                retval = tRead_Binary<float>(filename); break;
-            case Type2Enum<double>::Id :
-                retval = tRead_Binary<double>(filename); break;
+            case Type2Enum<                   char     >::Id :
+                retval = tReadBinary<         char     >(filename); break;
+            case Type2Enum<          unsigned char     >::Id :
+                retval = tReadBinary<unsigned char     >(filename); break;
+            case Type2Enum<                    short    >::Id :
+                retval = tReadBinary<         short    >(filename); break;
+            case Type2Enum<          unsigned short    >::Id :
+                retval = tReadBinary<unsigned short    >(filename); break;
+            case Type2Enum<                   int      >::Id :
+                retval = tReadBinary<         int      >(filename); break;
+            case Type2Enum<          unsigned int      >::Id :
+                retval = tReadBinary<unsigned int      >(filename); break;
+            case Type2Enum<                   long     >::Id :
+                retval = tReadBinary<         long     >(filename); break;
+            case Type2Enum<          unsigned long     >::Id :
+                retval = tReadBinary<unsigned long     >(filename); break;
+            case Type2Enum<                   long long>::Id :
+                retval = tReadBinary<         long long>(filename); break;
+            case Type2Enum<          unsigned long long>::Id :
+                retval = tReadBinary<unsigned long long>(filename); break;
+            case Type2Enum<                   float    >::Id :
+                retval = tReadBinary<         float    >(filename); break;
+            case Type2Enum<                   double   >::Id :
+                retval = tReadBinary<         double   >(filename); break;
             //case Type2Enum<std::string>::Id :
-            //    retval = tRead_Binary<std::string>(filename); break;
+            //    retval = tReadBinary<std::string>(filename); break;
             //case util::Type2Enum<char*>::Id :
-            //    retval = tRead_Binary<char*>(filename); break;
+            //    retval = tReadBinary<char*>(filename); break;
             default:
                 retval = GRError("Unsupported type (Id = " +
                     std::to_string(tType) + ")",
                     __FILE__, __LINE__);
             }
+
             //if (tType == util::Type2Enum<char>::Id)
             //    retval = tRead<char>(fin);
         }
         return retval;
     }
 
-    cudaError_t Write_Binary(
-        std::string filename)
+    cudaError_t WriteBinary(
+        std::string filename,
+        bool ignore_file_error = false)
     {
         cudaError_t retval = cudaSuccess;
         std::ofstream fout;
         fout.open(filename.c_str(), std::ios::out | std::ios::binary);
         if (!fout.is_open())
-            return GRError("Unable to write file " + filename,
-                __FILE__, __LINE__);
+        {
+            if (ignore_file_error)
+            {
+                return cudaErrorInvalidValue;
+            } else
+                return GRError("Unable to write file " + filename,
+                    __FILE__, __LINE__);
+        }
 
         int64_t tLength = size;
         int64_t tType = util::Type2Enum<ValueT>::Id;
         fout.write((char*)(&tLength), 8);
         fout.write((char*)(&tType), 8);
-        fout.write(h_pointer, sizeof(ValueT) * size);
+        fout.write((char*)h_pointer, sizeof(ValueT) * size);
         fout.close();
         return retval;
     }

@@ -87,7 +87,7 @@ typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
              typename GraphT::ValueT *h_projections,
-             typename GraphT::ValueT *ref_projections,
+             typename GraphT::ValueT *ref_projections = NULL,
              bool verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
@@ -96,20 +96,30 @@ typename GraphT::SizeT Validate_Results(
     SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
 
+    SizeT edge_counter = 0;
     for(SizeT v = 0; v < graph.nodes * graph.nodes; ++v) {
-        if(ref_projections[v] != 0) {
-            int row = (int)(v/graph.nodes);
-            int col = v % graph.nodes;
-            printf("%d->%d | GPU=%f CPU=%f\n", row, col, h_projections[v], ref_projections[v]);
-            num_errors += (int)(h_projections[v] != ref_projections[v]);
+        if(h_projections[v] != 0) {
+            edge_counter++;
         }
     }
+    printf("edge_counter=%d\n", edge_counter);
 
-    if(num_errors == 0) {
-        printf("======= PASSED ======\n");
-    } else {
-        printf("======= FAILED ======\n");
-        util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
+
+    if(ref_projections != NULL) {
+        for(SizeT v = 0; v < graph.nodes * graph.nodes; ++v) {
+            if(ref_projections[v] != 0) {
+                int row = (int)(v/graph.nodes);
+                int col = v % graph.nodes;
+                printf("%d->%d | GPU=%f CPU=%f\n", row, col, h_projections[v], ref_projections[v]);
+                num_errors += (int)(h_projections[v] != ref_projections[v]);
+            }
+        }
+        if(num_errors == 0) {
+            printf("======= PASSED ======\n");
+        } else {
+            printf("======= FAILED ======\n");
+            util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
+        }
     }
 
     return num_errors;

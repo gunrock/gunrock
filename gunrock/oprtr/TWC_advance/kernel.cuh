@@ -99,8 +99,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
               ValueT   *&values_out,
         const SizeT     &num_outputs,
         util::CtaWorkProgress<SizeT> &work_progress,
-        const ValueT   *&reduce_values_in,
-              ValueT   *&reduce_values_out,
+        //const ValueT   *&reduce_values_in,
+        //      ValueT   *&reduce_values_out,
               AdvanceOpT advance_op)
     {
         // Shared storage for the kernel
@@ -156,7 +156,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
         CtaT cta(
             graph, keys_in, num_inputs,
             keys_out, values_out, queue_index,
-            reduce_values_in, reduce_values_out,
+            //reduce_values_in, reduce_values_out,
             work_progress, smem_storage);
 
         // Process full tiles
@@ -224,8 +224,8 @@ void Kernel(
           typename GraphT::SizeT   *num_outputs,
     util::CtaWorkProgress<typename GraphT::SizeT> work_progress,
     //util::KernelRuntimeStats        kernel_stats,
-    const typename GraphT::ValueT  *reduce_values_in ,
-          typename GraphT::ValueT  *reduce_values_out,
+    //const typename GraphT::ValueT  *reduce_values_in ,
+    //      typename GraphT::ValueT  *reduce_values_out,
                    AdvanceOpT       advance_op)
 {
     PrepareQueue(
@@ -236,7 +236,7 @@ void Kernel(
             graph, keys_in, num_inputs, queue_index,//output_offsets,
             //block_input_starts, //partition_size, //num_partitions,
             keys_out, values_out, num_outputs[0], work_progress,
-            reduce_values_in, reduce_values_out,
+            //reduce_values_in, reduce_values_out,
             advance_op);
 }
 
@@ -297,10 +297,10 @@ cudaError_t Launch_CSR_CSC(
             : parameters.values_out     -> GetPointer(util::DEVICE),
         parameters.frontier -> output_length .GetPointer(util::DEVICE),
         parameters.frontier -> work_progress,
-        (parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
-            : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
-        (parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
-            : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
+        //(parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
+        //    : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
+        //(parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
+        //    : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
         advance_op);
 
     if (frontier_out != NULL)

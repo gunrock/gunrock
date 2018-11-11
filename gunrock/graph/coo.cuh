@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <math.h>
 #include <gunrock/util/basic_utils.h>
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/vector_types.cuh>
@@ -410,6 +411,62 @@ struct Coo :
         return retval;
     }
 
+    cudaError_t GenerateEdgeValues(
+        ValueT edge_value_min,
+        ValueT edge_value_range,
+        long   edge_value_seed,
+        bool   quiet = false)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        if (!util::isValid(edge_value_seed))
+            edge_value_seed = time(NULL);
+        srand(edge_value_seed);
+        util::PrintMsg("  Generating edge values in ["
+            + std::to_string(edge_value_min) + ", "
+            + std::to_string(edge_value_min + edge_value_range) 
+            + "), seed = " + std::to_string(edge_value_seed), !quiet);
+
+        for (SizeT e = 0; e < this -> edges; e++)
+        {
+            auto x = rand();
+            double int_x = 0;
+            std::modf(x * 1.0 / edge_value_range, &int_x);
+            auto val = x - int_x * edge_value_range;
+            edge_values[e] = val + edge_value_min;
+        }
+        return retval;
+    }
+
+    cudaError_t EdgeDouble(
+        bool skew = false,
+        bool quiet = false)
+    {
+        cudaError_t retval = cudaSuccess;
+        auto &e_values = this -> edge_values;
+        auto  edges    = this -> edges; 
+        bool has_edge_values = FLAG & graph::HAS_EDGE_VALUES;
+ 
+        util::PrintMsg("  Edge doubleing: " + std::to_string(edges)
+            + " -> " + std::to_string(edges * 2) + " edges", !quiet);
+        GUARD_CU(edge_pairs .EnsureSize(this -> edges * 2, true));
+        GUARD_CU(edge_values.EnsureSize(this -> edges * 2, true));
+      
+        GUARD_CU(edge_pairs.ForAll(
+            [e_values, skew, has_edge_values, edges] 
+            __host__ __device__ (EdgePairT *pairs, const SizeT &e)
+            {
+                pairs[e + edges].x = pairs[e].y;
+                pairs[e + edges].y = pairs[e].x;
+                if (has_edge_values)
+                {
+                    e_values[e + edges] = (skew ? (e_values[e] * -1) : e_values[e]);
+                }    
+            }, edges, util::HOST)); 
+        this -> edges *= 2;
+        return retval;
+    }
+
     template <typename EdgeCondT>
     cudaError_t RemoveEdges(
         EdgeCondT      edge_cond,
@@ -560,7 +617,7 @@ struct Coo :
             }, new_order, target, stream));
 
         if (old_num_edges != this -> edges)
-            util::PrintMsg("Removed " + std::to_string(old_num_edges - this -> edges)
+            util::PrintMsg(" Removed " + std::to_string(old_num_edges - this -> edges)
                 + " self circles.", !quiet);
         return retval;
     }
@@ -588,7 +645,7 @@ struct Coo :
             }, new_order, target, stream));
 
         if (old_num_edges != this -> edges)
-            util::PrintMsg("Removed " + std::to_string(old_num_edges - this -> edges)
+            util::PrintMsg("  Removed " + std::to_string(old_num_edges - this -> edges)
                 + " duplicate edges.", !quiet);
         return retval;
     }
@@ -618,7 +675,7 @@ struct Coo :
             }, new_order, target, stream));
 
         if (old_num_edges != this -> edges)
-            util::PrintMsg("Removed " + std::to_string(old_num_edges - this -> edges)
+            util::PrintMsg("  Removed " + std::to_string(old_num_edges - this -> edges)
                 + " duplicate edges and self circles.", !quiet);
         return retval;
     }
@@ -708,6 +765,14 @@ struct Coo<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
     {
         return cudaSuccess;
     }
+
+    cudaError_t Display(
+        std::string graph_prefix = "",
+        SizeT nodes_to_show = 40,
+        bool  with_edge_values = true)
+    {
+        return cudaSuccess;
+    } 
 };
 
 } // namespace graph

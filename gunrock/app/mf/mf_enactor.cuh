@@ -28,7 +28,7 @@
   #define debug_aml(a...) printf(a);
   #define debug_aml2(a...) printf(a);
 #else
-  #define debug_aml(a...) 
+  #define debug_aml(a...)
   #define debug_aml2(a...)
 #endif
 
@@ -38,7 +38,7 @@ namespace mf {
 
 /**
  * @brief Speciflying parameters for MF Enactor
- * @param parameters The util::Parameter<...> structure holding all parameter 
+ * @param parameters The util::Parameter<...> structure holding all parameter
  *		      info
  * \return cudaError_t error message(s), if any
  */
@@ -100,20 +100,18 @@ struct MFIterationLoop : public IterationLoopBase
         auto &active	    	= data_slice.active;
         auto null_ptr	    	= &local_vertices;
         null_ptr = NULL;
-
-	auto &mark		= data_slice.mark;
-	auto &queue		= data_slice.queue;
-
-	auto &changed 		= data_slice.changed;
+        auto &mark		= data_slice.mark;
+        auto &queue		= data_slice.queue;
+        auto &changed 		= data_slice.changed;
 
         auto advance_preflow_op = [capacity, flow, excess, height, reverse, 
              source]
              __host__ __device__
-             (const VertexT &src, VertexT &dest, const SizeT &edge_id, 
+             (const VertexT &src, VertexT &dest, const SizeT &edge_id,
               const VertexT &input_item, const SizeT &input_pos,
               const SizeT &output_pos) -> bool
              {
-                 if (!util::isValid(dest) or !util::isValid(src) or 
+                 if (!util::isValid(dest) or !util::isValid(src) or
                          src != source)
                      return false;
                  flow[edge_id] = capacity[edge_id];
@@ -124,58 +122,23 @@ struct MFIterationLoop : public IterationLoopBase
              };
 
 
-	auto global_relabeling_op =
-            [graph, source, sink, height, reverse, flow, queue, mark, changed] 
-                __host__ __device__
-                (VertexT * v_q, const SizeT &pos) {
-                    VertexT v = v_q[pos];
-		    VertexT first = 0, last = 0;
-		    queue[last++] = sink;
-		    mark[sink] = true;
-		    auto H = (VertexT) 0;
-		    height[sink] = H;
-
-		    changed[0] = 0;
-		
-		    while (first < last) {
-			auto v = queue[first++];
-			auto e_start = graph.CsrT::GetNeighborListOffset(v);
-			auto num_neighbors = graph.CsrT::GetNeighborListLength(v);
-			auto e_end = e_start + num_neighbors;
-			++H;
-			for (auto e = e_start; e < e_end; ++e){
-			    auto neighbor = graph.CsrT::GetEdgeDest(e);
-			    if (mark[neighbor] || 
-				almost_eql(graph.CsrT::edge_values[reverse[e]], flow[reverse[e]]))
-				continue;
-			    if (height[neighbor] != H)
-				changed[0]++;
-				
-			    height[neighbor] = H;
-			    mark[neighbor] = true;
-			    queue[last++] = neighbor;
-			}
-		    }
-		    height[source] = graph.nodes;
-	};
-
-        auto compute_lockfree_op = 
-	        [graph, excess, capacity, flow, reverse, height, iteration, source, 
-            sink, active] 
+        auto compute_lockfree_op =
+	        [graph, excess, capacity, flow, reverse, height, iteration, source,
+            sink, active]
             __host__ __device__ (VertexT* v_q, const SizeT& pos)
             {
 
-		VertexT v = v_q[pos];
-		debug_aml2("active vertex: %d\n", v);
+                VertexT v = v_q[pos];
+                debug_aml2("active vertex: %d\n", v);
 
-		// if not a valid vertex, do not apply compute:
-		if (!util::isValid(v) || 
-		      v == source ||
-                      v == sink || 
-		      excess[v] <= 0 ||
-                      graph.CsrT::GetNeighborListLength(v) == 0) return;
+                // if not a valid vertex, do not apply compute:
+                if (!util::isValid(v) ||
+                    v == source ||
+                    v == sink ||
+		                excess[v] <= 0 ||
+                    graph.CsrT::GetNeighborListLength(v) == 0) return;
 
-		// else, try push-relable:
+		            // else, try push-relable:
                 VertexT e_start = graph.CsrT::GetNeighborListOffset(v);
                 VertexT neighbor_num = graph.CsrT::GetNeighborListLength(v);
                 VertexT e_end = e_start + neighbor_num;
@@ -185,11 +148,11 @@ struct MFIterationLoop : public IterationLoopBase
                         debug_aml2("active vertex: %d\n", v);
                         debug_aml2("excess[%d] = %lf\n", v, excess[v]);
 
-                        VertexT lowest_id = 
+                        VertexT lowest_id =
                             util::PreDefinedValues<VertexT>::InvalidValue;
                         VertexT lowest_h;
-			
-			// look for lowest height among neighbors
+
+			                  // look for lowest height among neighbors
                         for (VertexT e_id = e_start; e_id < e_end; ++e_id) {
                             VertexT n = graph.CsrT::GetEdgeDest(e_id);
                             debug_aml2("try neighbor %d\n", n);
@@ -201,7 +164,7 @@ struct MFIterationLoop : public IterationLoopBase
                             }
                         }
 
-			// if a valid lowest h was found:
+			                  // if a valid lowest h was found:
                         if (util::isValid(lowest_id))
                         {
                             debug_aml2("lowest for %d is %d\n",
@@ -209,7 +172,7 @@ struct MFIterationLoop : public IterationLoopBase
                             if (lowest_h < height[v])
                             {
                                 //push
-                                ValueT f = 
+                                ValueT f =
                                     fminf(capacity[lowest_id] - flow[lowest_id], excess[v]);
                                 ValueT old = atomicAdd(&excess[v], -f);
                                 if (f > 0 && (old > f || almost_eql(old, f)))
@@ -218,18 +181,18 @@ struct MFIterationLoop : public IterationLoopBase
                                     atomicAdd(&excess[l_dest], f);
                                     atomicAdd(&flow[lowest_id], f);
                                     atomicAdd(&flow[reverse[lowest_id]], -f);
-                                    debug_aml2("push, %lf, %d->%d, e[%d] = %lf\n", 
+                                    debug_aml2("push, %lf, %d->%d, e[%d] = %lf\n",
                                             f, v, l_dest, l_dest, excess[l_dest]);
-                                    active[0] = 1; 
-                                }else{
+                                    active[0] = 1;
+                                } else{
                                     atomicAdd(&excess[v], f);
-                                    debug_aml2("push back, %lf, %lf\n", 
+                                    debug_aml2("push back, %lf, %lf\n",
                                             f, excess[v]);
-                                } 
-                            }else{
+                                }
+                            } else{
                                 //relabel
                                 height[v] = lowest_h + 1;
-                                debug_aml2("relabel, %d new height %d\n", 
+                                debug_aml2("relabel, %d new height %d\n",
                                         v, lowest_h + 1);
                                 active[0] = 1;
                             }
@@ -237,7 +200,7 @@ struct MFIterationLoop : public IterationLoopBase
                  }
             };
 
-            
+
         if (iteration == 0){
             debug_aml("iteration 0, preflow operator is comming\n");
             was_changed = true;
@@ -258,26 +221,26 @@ struct MFIterationLoop : public IterationLoopBase
         if (was_changed == true and (iteration % 50 == 0)){
             debug_aml("iteration %d, relabeling\n", iteration);
 
-	    // Serial relabeling on the GPU (ignores moves)
-            GUARD_CU(frontier.V_Q()->ForAll(global_relabeling_op, 1,
+	      // Serial relabeling on the GPU (ignores moves)
+        GUARD_CU(frontier.V_Q()->ForAll(global_relabeling_op, 1,
                            util::DEVICE, oprtr_parameters.stream));
-	    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+	      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
 
 #if 0
             GUARD_CU(height.Move(util::DEVICE, util::HOST, graph.nodes, 0,
                         oprtr_parameters.stream));
-            GUARD_CU(flow.Move(util::DEVICE, util::HOST, graph.edges, 0, 
+            GUARD_CU(flow.Move(util::DEVICE, util::HOST, graph.edges, 0,
                         oprtr_parameters.stream));
-            GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), 
+            GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
                     "cudaStreamSynchronize failed.");
-            int num_changes = relabeling(graph, source, sink, 
-                    height.GetPointer(util::HOST), 
-                    reverse.GetPointer(util::HOST), 
+            int num_changes = relabeling(graph, source, sink,
+                    height.GetPointer(util::HOST),
+                    reverse.GetPointer(util::HOST),
                     flow.GetPointer(util::HOST));
-            GUARD_CU(height.Move(util::HOST, util::DEVICE, graph.nodes, 0, 
+            GUARD_CU(height.Move(util::HOST, util::DEVICE, graph.nodes, 0,
                       oprtr_parameters.stream));
 #endif
-	    changed.Move(util::DEVICE, util::HOST, 1, 0, oprtr_parameters.stream);
+	      changed.Move(util::DEVICE, util::HOST, 1, 0, oprtr_parameters.stream);
             if (changed[0] > 0)
                 was_changed = true;
             debug_aml("iteration %d, relabeling finished\n", iteration);
@@ -288,49 +251,39 @@ struct MFIterationLoop : public IterationLoopBase
             {
                 a[v] = 0;
             }, 1, util::DEVICE, oprtr_parameters.stream));
-       
 
-	GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed."); 
+	      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed."); 
         // GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), 
         //            "cudaStreamSynchronize failed.");
 
-        debug_aml("[%d]frontier que length before compute op is %d\n", 
+        debug_aml("[%d]frontier que length before compute op is %d\n",
                 iteration, frontier.queue_length);
 
-	// Run Lockfree Push-Relable
-        GUARD_CU(frontier.V_Q()->ForAll(compute_lockfree_op, 
+	      // Run Lockfree Push-Relable
+        GUARD_CU(frontier.V_Q()->ForAll(compute_lockfree_op,
                     graph.nodes, util::DEVICE, oprtr_parameters.stream));
 
-        debug_aml("[%d]frontier que length after compute op is %d\n", 
+        debug_aml("[%d]frontier que length after compute op is %d\n",
                 iteration, frontier.queue_length);
 
         // GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
         //        "cudaStreamSynchronize failed");
 
-	GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+        active.Move(util::DEVICE, util::HOST, 1, 0, oprtr_parameters.stream);
 
-	active.Move(util::DEVICE, util::HOST, 1, 0, oprtr_parameters.stream); 
-
-	GUARD_CU2(cudaDeviceSynchronize(),
-            "cudaDeviceSynchronize failed.");
+        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
 
         //GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
         //        "cudaStreamSynchronize failed");
-            
         return retval;
     }
 
-    /* cudaError_t Compute_OutputLength(int peer_)
-    {   
-        // No need to load balance or get output size
-        return cudaSuccess;
-    }*/
-
     /**
      * @brief Routine to combine received data and local data
-     * @tparam NUM_VERTEX_ASSOCIATES  Number of data associated with each 
+     * @tparam NUM_VERTEX_ASSOCIATES  Number of data associated with each
      *				      transmition item, typed VertexT
-     * @tparam NUM_VALUE__ASSOCIATES  Number of data associated with each 
+     * @tparam NUM_VALUE__ASSOCIATES  Number of data associated with each
 				      transmition item, typed ValueT
      * @param[in] received_length     The number of transmition items received
      * @param[in] peer_		      which peer GPU the data came from
@@ -349,19 +302,19 @@ struct MFIterationLoop : public IterationLoopBase
         auto &enactor_slice = enactor -> enactor_slices[gpu_offset + peer_];
         auto iteration	    = enactor_slice.enactor_stats.iteration;
 
-        auto &capacity	    = data_slice.sub_graph[0].edge_values; 
+        auto &capacity	    = data_slice.sub_graph[0].edge_values;
         auto &flow  	    = data_slice.flow;
         auto &excess	    = data_slice.excess;
         auto &height	    = data_slice.height;
 
-/*	for key " + 
+/*	for key " +
 		    std::to_string(key) + " and for in_pos " +
 		    std::to_string(in_pos) + " and for vertex ass ins " +
 		    std::to_string(vertex_associate_ins[in_pos]) +
 		    " and for value ass ins " +
 		    std::to_string(value__associate_ins[in_pos]));*/
-    
-        auto expand_op = [capacity, flow, excess, height] 
+
+        auto expand_op = [capacity, flow, excess, height]
         __host__ __device__(VertexT &key, const SizeT &in_pos,
         VertexT *vertex_associate_ins, ValueT  *value__associate_ins) -> bool
         {
@@ -377,7 +330,7 @@ struct MFIterationLoop : public IterationLoopBase
         cudaError_t retval = BaseIterationLoop::template ExpandIncomingBase
             <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
             (received_length, peer_, expand_op);
-        return retval; 
+        return retval;
     }
 
     bool Stop_Condition(int gpu_num = 0)
@@ -388,7 +341,7 @@ struct MFIterationLoop : public IterationLoopBase
         auto &enactor_slice = enactor -> enactor_slices[0];
         auto &retval        = enactor_slice.enactor_stats.retval;
         auto &oprtr_parameters	= enactor_slice.oprtr_parameters;
-        
+
         if (retval != cudaSuccess){
             printf("(CUDA error %d @ GPU %d: %s\n", retval, 0 % num_gpus,
                     cudaGetErrorString(retval));
@@ -420,38 +373,37 @@ class Enactor :
         typename _Problem::ValueT,
         ARRAY_FLAG, cudaHostRegisterFlag>
 {
-    public:
-        typedef _Problem                  Problem;
-        typedef typename Problem::VertexT VertexT;
-        typedef typename Problem::ValueT  ValueT;
-        typedef typename Problem::SizeT   SizeT;
-        typedef typename Problem::GraphT  GraphT;
-        typedef EnactorBase<GraphT, VertexT, ValueT, ARRAY_FLAG, 
-                cudaHostRegisterFlag> BaseEnactor;
-        typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> EnactorT;
+public:
+    typedef _Problem                  Problem;
+    typedef typename Problem::VertexT VertexT;
+    typedef typename Problem::ValueT  ValueT;
+    typedef typename Problem::SizeT   SizeT;
+    typedef typename Problem::GraphT  GraphT;
+    typedef EnactorBase<GraphT, VertexT, ValueT, ARRAY_FLAG,
+            cudaHostRegisterFlag> BaseEnactor;
+    typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> EnactorT;
 
-        typedef MFIterationLoop<EnactorT> IterationT;
+    typedef MFIterationLoop<EnactorT> IterationT;
 
-        Problem     *problem   ;
-        IterationT  *iterations;
+    Problem     *problem   ;
+    IterationT  *iterations;
 
-        /**
-         * @brief MFEnactor constructor
-         */
-        Enactor(): BaseEnactor("mf"), problem(NULL)
-        {
-            // TODO: change according to algorithmic needs
-            this -> max_num_vertex_associates = 0;
-            this -> max_num_value__associates = 1;
-        }
+    /**
+     * @brief MFEnactor constructor
+     */
+    Enactor(): BaseEnactor("mf"), problem(NULL)
+    {
+        this -> max_num_vertex_associates = 0;
+        this -> max_num_value__associates = 1;
+    }
 
-        /**
-         * @brief MFEnactor destructor
-         */
-        virtual ~Enactor()
-        {
-            //Release();
-        }
+    /**
+     * @brief MFEnactor destructor
+     */
+    virtual ~Enactor()
+    {
+        //Release();
+    }
 
     /*
      * @brief Releasing allocated memory space
@@ -484,34 +436,34 @@ class Enactor :
     {
         cudaError_t retval = cudaSuccess;
         this->problem = &problem;
-        
-	// Lazy initialization
-        GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target, 
+
+	    // Lazy initialization
+        GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target,
 		    false));
 
-	auto num_gpus = this->num_gpus;
+        auto num_gpus = this->num_gpus;
 
-	for (int gpu = 0; gpu < num_gpus; ++gpu)
-	{
-	    GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-	    auto gpu_offset = gpu * num_gpus;
-	    auto &enactor_slice = this->enactor_slices[gpu_offset + 0];
-	    auto &graph = problem.sub_graphs[gpu];
-	    auto nodes = graph.nodes;
-	    auto edges = graph.edges;
-	    GUARD_CU(enactor_slice.frontier.Allocate(nodes, edges, 
-			this->queue_factors));
-	}
-
-	iterations = new IterationT[num_gpus];
-        for (int gpu = 0; gpu < num_gpus; gpu ++)
+        for (int gpu = 0; gpu < num_gpus; ++gpu)
         {
-            GUARD_CU(iterations[gpu].Init(this, gpu));
+            GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+            auto gpu_offset = gpu * num_gpus;
+            auto &enactor_slice = this->enactor_slices[gpu_offset + 0];
+            auto &graph = problem.sub_graphs[gpu];
+            auto nodes = graph.nodes;
+            auto edges = graph.edges;
+            GUARD_CU(enactor_slice.frontier.Allocate(nodes, edges,
+                this->queue_factors));
         }
 
-	GUARD_CU(this -> Init_Threads(this, 
-		    (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
-	return retval;
+        iterations = new IterationT[num_gpus];
+            for (int gpu = 0; gpu < num_gpus; gpu ++)
+            {
+                GUARD_CU(iterations[gpu].Init(this, gpu));
+            }
+
+        GUARD_CU(this -> Init_Threads(this,
+                (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
+        return retval;
     }
 
     /**
@@ -524,7 +476,7 @@ class Enactor :
 	    debug_aml("Run enact\n");
         gunrock::app::Iteration_Loop<0,1, IterationT>(
 		thread_data, iterations[thread_data.thread_num]);
-        
+
         return cudaSuccess;
     }
 
@@ -586,7 +538,7 @@ class Enactor :
     cudaError_t Enact()
     {
         cudaError_t  retval     = cudaSuccess;
-	debug_aml("enact\n");
+	    debug_aml("enact\n");
         GUARD_CU(this -> Run_Threads(this));
         util::PrintMsg("GPU MF Done.", this -> flag & Debug);
         return retval;

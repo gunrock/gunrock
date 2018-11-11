@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <gunrock/util/track_utils.cuh>
 #include <gunrock/app/problem_base.cuh>
 #include <gunrock/oprtr/1D_oprtr/for_all.cuh>
 
@@ -93,6 +94,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     static const ProblemFlag FLAG = _FLAG;
     typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::CscT    CscT;
+    typedef typename GraphT::CooT    CooT;
     typedef typename GraphT::GpT     GpT;
     typedef          _ValueT         ValueT;
 
@@ -109,6 +112,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         // PR-specific storage arrays
         util::Array1D<SizeT, ValueT >  rank_curr; // Ping-pong ranking values
         util::Array1D<SizeT, ValueT >  rank_next; // Ping-pong ranking values
+        util::Array1D<SizeT, ValueT >  rank_temp; // Temp ranking values for neighborreduce
+        util::Array1D<SizeT, ValueT >  rank_temp2; // Another temp ranking values
         util::Array1D<SizeT, SizeT  >  degrees  ; // Out-degree for each vertex
         util::Array1D<SizeT, VertexT>  node_ids;
         util::Array1D<SizeT, VertexT>  local_vertices;
@@ -119,7 +124,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         bool     normalize  ; // Whether to normalize the ranking value
         bool     compensate ; // Whether to compensate for zero-degree vertices
         bool     scale      ; // Whether to scale the ranking values during computation
-        
+        bool     pull       ; // Whether to use pull direction PR       
+ 
         ValueT   threshold  ; // Threshold for ranking errors
         ValueT   delta      ; // Damping factor
         SizeT    max_iter   ; // Maximum number of PR iterations
@@ -135,7 +141,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         util::Array1D<int  , SizeT  > in_counters;
         util::Array1D<int  , SizeT  > out_counters;
-        util::Array1D<SizeT, unsigned char> cub_sort_storage;
+        util::Array1D<uint64_t, char> cub_sort_storage;
         util::Array1D<SizeT, VertexT> temp_vertex;
 
         /*
@@ -146,6 +152,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             normalize          (true),
             compensate         (true),
             scale              (false),
+            pull               (false),
             threshold          (0),
             delta              (0),
             init_value         (0),
@@ -160,6 +167,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
        {
             rank_curr       .SetName("rank_curr"   );
             rank_next       .SetName("rank_next"   );
+            rank_temp       .SetName("rank_temp"   );
+            rank_temp2      .SetName("rank_temp2"   );
             degrees         .SetName("degrees"     );
             node_ids        .SetName("node_ids"    );
             local_vertices  .SetName("local_vertices");
@@ -191,6 +200,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(rank_curr   .Release(target));
             GUARD_CU(rank_next   .Release(target));
+            GUARD_CU(rank_temp   .Release(target));
+            GUARD_CU(rank_temp2  .Release(target));
             GUARD_CU(degrees     .Release(target));
             GUARD_CU(node_ids    .Release(target));
             GUARD_CU(in_counters .Release(target));
@@ -237,13 +248,22 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         {
             cudaError_t retval   = cudaSuccess;
             SizeT       nodes    = sub_graph.nodes;
+            SizeT       edges    = sub_graph.edges;
             this -> org_nodes    = org_nodes;
 
+            util::PrintMsg("nodes = " + std::to_string(nodes));
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
             GUARD_CU(rank_curr   .Allocate(nodes  , target));
             GUARD_CU(rank_next   .Allocate(nodes  , target));
+            if (pull)
+            {
+                GUARD_CU(rank_temp   .Allocate(edges  , target));
+                GUARD_CU(rank_temp2  .Allocate(nodes  , target));
+            }
             GUARD_CU(degrees     .Allocate(nodes+1, target));
+            GUARD_CU2(cudaDeviceSynchronize(),
+                "cudaDeviceSynchronize failed.");
 
             // Compute degrees
             //auto &sub_graph = this -> sub_graph[0];
@@ -255,7 +275,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     (VertexT *l_vertices, const SizeT &pos)
                     {
                         l_vertices[pos] = pos;
-                    }, nodes, target));
+                    }, nodes, target, this -> stream));
             }
             else {
                 GUARD_CU(out_counters.Allocate(num_gpus, util::HOST));
@@ -298,8 +318,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     out_counters[0], target));
             }
 
-            GUARD_CU(sub_graph.Move(util::HOST, target, this -> stream));
-            GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
+            if (pull)
+            {
+                GUARD_CU(sub_graph.CscT::Move(util::HOST, target, this -> stream));
+            } else {
+                GUARD_CU(sub_graph.CooT::Move(util::HOST, target, this -> stream));
+            }
+            GUARD_CU2(cudaDeviceSynchronize(),
+                "cudaDeviceSynchronize failed.");
 
             if (GraphT::FLAG & gunrock::graph::HAS_CSR)
             {
@@ -308,26 +334,35 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                         SizeT *degrees, const SizeT &pos)
                 {
                     degrees[pos] = sub_graph.GetNeighborListLength(pos);
-                }, nodes, target, this -> stream));
-            } else if (GraphT::FLAG & gunrock::graph::HAS_COO)
+                }, sub_graph.nodes, target, this -> stream));
+            } else if (GraphT::FLAG & (gunrock::graph::HAS_COO | gunrock::graph::HAS_CSC))
             {
-                auto &degrees = this -> degrees;
+                bool pull = this -> pull;
                 GUARD_CU(degrees.ForEach(
                     []__host__ __device__ (SizeT &degree)
                     {
                         degree = 0;
                     }, nodes + 1, target, this -> stream));
 
-                GUARD_CU(oprtr::ForAll((VertexT*)NULL,
-                    [sub_graph, degrees]
-                    __host__ __device__ (VertexT *dummy, const SizeT &e)
+                GUARD_CU(degrees.ForAll(
+                    [sub_graph, nodes, pull]
+                    __host__ __device__ (SizeT *degrees, const SizeT &e)
                 {
                     VertexT src, dest;
-                    sub_graph.GetEdgeSrcDest(e, src, dest);
-                    SizeT old_val = atomicAdd(degrees + src, 1);
-                    //if (src == 42029)
-                    //    printf("degree[%d] -> %d, dest = %d\n",
-                    //        src, old_val + 1, dest);
+                    if (pull)
+                    {
+                        sub_graph.CscT::GetEdgeSrcDest(e, src, dest);
+                        SizeT old_val = atomicAdd(degrees + dest, 1);
+                        //if (util::isTracking(dest))
+                        //    printf("degree[%d] <- %d, edge %d : %d -> %d\n",
+                        //        dest, old_val + 1, e, src, dest);
+                    } else { 
+                        sub_graph.CooT::GetEdgeSrcDest(e, src, dest);
+                        SizeT old_val = atomicAdd(degrees + src, 1);
+                        //if (util::isTracking(src))
+                        //    printf("degree[%d] <- %d, edge %d : %d -> %d\n",
+                        //        src, old_val + 1, e, src, dest);
+                    }
                 }, sub_graph.edges, target, this -> stream));
 
                 //GUARD_CU(oprtr::ForAll((VertexT*)NULL,
@@ -523,7 +558,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
             auto &data_slice = data_slices[gpu][0];
-
+            data_slice.normalize
+                = this -> parameters.template Get<bool  >("normalize" );
+            data_slice.compensate
+                = this -> parameters.template Get<bool  >("compensate");
+            data_slice.scale
+                = this -> parameters.template Get<bool  >("scale");
+            data_slice.pull
+                = this -> parameters.template Get<bool  >("pull");
+            data_slice.threshold
+                = this -> parameters.template Get<ValueT>("threshold");
+            data_slice.delta
+                = this -> parameters.template Get<ValueT>("delta");
+            data_slice.max_iter
+                = this -> parameters.template Get<SizeT >("max-iter");
+ 
             GUARD_CU(data_slice.Init(
                 this -> sub_graphs[gpu],
                 graph.nodes,
@@ -561,18 +610,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
             auto &data_slice = data_slices[gpu][0];
-            data_slice.normalize
-                = this -> parameters.template Get<bool  >("normalize" );
-            data_slice.compensate
-                = this -> parameters.template Get<bool  >("compensate");
-            data_slice.scale
-                = this -> parameters.template Get<bool  >("scale");
-            data_slice.threshold
-                = this -> parameters.template Get<ValueT>("threshold");
-            data_slice.delta
-                = this -> parameters.template Get<ValueT>("delta");
-            data_slice.max_iter
-                = this -> parameters.template Get<SizeT >("max-iter");
             data_slice.src_node   = src;
 
             // Set device

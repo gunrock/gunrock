@@ -14,12 +14,12 @@
 
 #pragma once
 
-#include <gunrock/util/device_intrinsics.cuh>
+#include <gunrock/util/binary_search.cuh>
 
 namespace gunrock {
 namespace graph {
 
-#define ENABLE_GRAPH_DEBUG
+//#define ENABLE_GRAPH_DEBUG
 
 /**
  * @brief Predefined flags for graph types
@@ -32,6 +32,8 @@ enum : GraphFlag
     GRAPH_NONE      = 0x0000,
     HAS_EDGE_VALUES = 0x0010,
     HAS_NODE_VALUES = 0x0020,
+    
+    TypeMask        = 0x0F00,
     HAS_CSR         = 0x0100,
     HAS_CSC         = 0x0200,
     HAS_COO         = 0x0400,
@@ -51,7 +53,7 @@ struct GraphType_Num
 
 static const util::Location GRAPH_DEFAULT_TARGET = util::DEVICE;
 
-template <typename T, typename SizeT>
+/*template <typename T, typename SizeT>
 __device__ __host__ __forceinline__
 SizeT Binary_Search(
     const T* data, T item_to_find, SizeT lower_bound, SizeT upper_bound)
@@ -76,7 +78,7 @@ SizeT Binary_Search(
         retval = util::PreDefinedValues<SizeT>::InvalidValue;
 
     return retval;
-}
+}*/
 
 /**
  * @brief Enum to show how the edges are ordered
@@ -236,6 +238,74 @@ double GetStddevDegree(GraphT &graph)
         accum += (d - average_degree) * (d - average_degree);
     }
     return sqrt(accum / (graph.nodes-1));
+}
+
+/**
+ * @brief Find log-scale degree histogram of the graph.
+ */
+template <typename GraphT, typename ArrayT>
+cudaError_t GetHistogram(
+    GraphT &graph, 
+    ArrayT &histogram,
+    util::Location target = util::HOST,
+    cudaStream_t stream = 0)
+{
+    typedef typename ArrayT::ValueT CountT;
+    typedef typename GraphT::SizeT  SizeT;
+
+    cudaError_t retval = cudaSuccess;
+    auto length = sizeof(SizeT) * 8 + 1;
+
+    GUARD_CU(histogram.EnsureSize_(length, target));
+
+    // Initialize
+    GUARD_CU(histogram.ForEach(
+        [] __host__ __device__ (CountT &count)
+        {
+            count = 0;
+        }, length, target, stream));
+
+    // Count
+    GUARD_CU(histogram.ForAll(
+        [graph] __host__ __device__ (CountT *counts, SizeT &v)
+        {
+            auto num_neighbors = graph.GetNeighborListLength(v);
+            int log_length = 0;
+            while (num_neighbors >= (1 << log_length))
+            {
+                log_length ++;
+            }
+            _atomicAdd(counts + log_length, (CountT)1);
+        }, graph.nodes, target, stream));
+
+    return retval;
+}
+
+template <typename GraphT, typename ArrayT>
+cudaError_t PrintHistogram(GraphT &graph, ArrayT &histogram)
+{
+    typedef typename GraphT::SizeT SizeT;
+    cudaError_t retval = cudaSuccess;
+
+    util::PrintMsg("Degree Histogram (" + std::to_string(graph.nodes)
+        + " vertices, " + std::to_string(graph.edges) + " edges):");
+    int max_log_length = 0;
+    for (int i = sizeof(SizeT) * 8; i >= 0; i--)
+    {
+        if (i < histogram.GetSize() && histogram[i] > 0)
+        {
+            max_log_length = i;
+            break;
+        }
+    }
+
+    for (int i = 0; i <= max_log_length; i ++)
+    {
+        util::PrintMsg("    Degree " + (i == 0 ? "0" : ("2^" + std::to_string(i - 1)))
+            + ": " + std::to_string(histogram[i]) + " ("
+            + std::to_string(histogram[i] * 100.0 / graph.nodes) + " %)");
+    }
+    return retval;
 }
 
 } // namespace graph

@@ -55,22 +55,22 @@ OutKeyT ProcessNeighbor(
     if (op(src, dest, edge_id, input_item,
         input_pos, output_pos))
     {
-        if (reduce_values_in != NULL)
-        {
-            ValueT reduce_value;
-            if ((FLAG & ReduceType_Vertex))
-            {
-                reduce_value = reduce_values_in[dest];
-            } else if ((FLAG & ReduceType_Edge))
-            {
-                reduce_value = reduce_values_in[edge_id];
-            } else if ((FLAG & ReduceType_Mask))
-            {
-                // use user-specified function to generate value to reduce
-            }
-            util::io::ModifiedStore<QUEUE_WRITE_MODIFIER>::St(
-                reduce_value, reduce_values_out + output_pos);
-        }
+        //if (reduce_values_in != NULL)
+        //{
+        //    ValueT reduce_value;
+        //    if ((FLAG & ReduceType_Vertex))
+        //    {
+        //        reduce_value = reduce_values_in[dest];
+        //    } else if ((FLAG & ReduceType_Edge))
+        //    {
+        //        reduce_value = reduce_values_in[edge_id];
+        //    } else if ((FLAG & ReduceType_Mask))
+        //    {
+        //        // use user-specified function to generate value to reduce
+        //    }
+        //    util::io::ModifiedStore<QUEUE_WRITE_MODIFIER>::St(
+        //        reduce_value, reduce_values_out + output_pos);
+        //}
 
         if ((FLAG & OprtrType_V2E) != 0 ||
             (FLAG & OprtrType_E2E) != 0)
@@ -90,10 +90,10 @@ OutKeyT ProcessNeighbor(
     else {
         out_key = util::PreDefinedValues<OutKeyT>::InvalidValue;
 
-        if (reduce_values_in != NULL)
-            util::io::ModifiedStore<QUEUE_WRITE_MODIFIER>::St(
-                Identity<ValueT, FLAG & ReduceOp_Mask>::Val,
-                reduce_values_out + output_pos);
+        //if (reduce_values_in != NULL)
+        //    util::io::ModifiedStore<QUEUE_WRITE_MODIFIER>::St(
+        //        Reduce<ValueT, FLAG & ReduceOp_Mask>::Identity,
+        //        reduce_values_out + output_pos);
     }
 
     if (keys_out != NULL)

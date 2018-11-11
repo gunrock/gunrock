@@ -66,7 +66,7 @@ struct Frontier
     util::Array1D<SizeT, SizeT        , FLAG, cudaHostRegisterFlag>  output_offsets; // length / offsets for offsets of the frontier queues
     util::Array1D<SizeT, SizeT        , FLAG, cudaHostRegisterFlag>  block_input_starts;
     util::Array1D<SizeT, SizeT        , FLAG, cudaHostRegisterFlag>  block_output_starts;
-    util::Array1D<SizeT, unsigned char, FLAG, cudaHostRegisterFlag>  cub_scan_space;
+    util::Array1D<uint64_t, char      , FLAG, cudaHostRegisterFlag>  cub_temp_space;
 
     //Frontier queues. Used to track working frontier.
     VertexQT *vertex_queues; // vertex queues
@@ -93,7 +93,7 @@ struct Frontier
         GUARD_CU(num_segments  .SetName(name + "num_segments"  ));
         GUARD_CU(queue_offsets .SetName(name + "queue_offsets" ));
         GUARD_CU(output_offsets.SetName(name + "output_offsets"));
-        GUARD_CU(cub_scan_space.SetName(name + "cub_scan_space"));
+        GUARD_CU(cub_temp_space.SetName(name + "cub_temp_space"));
         return retval;
     }
 
@@ -212,7 +212,7 @@ struct Frontier
         GUARD_CU(num_segments  .Release(target));
         GUARD_CU(queue_offsets .Release(target));
         GUARD_CU(output_offsets.Release(target));
-        GUARD_CU(cub_scan_space.Release(target));
+        GUARD_CU(cub_temp_space.Release(target));
         delete[] segment_offsets; segment_offsets = NULL;
         delete[] vertex_queues  ; vertex_queues   = NULL;
         delete[] edge_queues    ; edge_queues     = NULL;

@@ -98,8 +98,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
               OutKeyT  *&keys_out,
               ValueT   *&values_out,
         const SizeT     &num_outputs,
-        const ValueT   *&reduce_values_in,
-              ValueT   *&reduce_values_out,
+        //const ValueT   *&reduce_values_in,
+        //      ValueT   *&reduce_values_out,
               AdvanceOpT advance_op)
    {
         __shared__ typename KernelPolicyT::SmemStorage smem_storage;
@@ -239,7 +239,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
                     iter_input_start + v_index, input_item,
                     block_output_start + thread_output_offset,
                     keys_out, values_out,
-                    reduce_values_in, reduce_values_out,
+                    NULL, NULL,//reduce_values_in, reduce_values_out,
                     advance_op);
 
             } // end of for thread_output_offset
@@ -260,8 +260,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
               OutKeyT  *&keys_out,
               ValueT   *&values_out,
         const SizeT     &num_outputs,
-        const ValueT   *&reduce_values_in,
-              ValueT   *&reduce_values_out,
+        //const ValueT   *&reduce_values_in,
+        //      ValueT   *&reduce_values_out,
             AdvanceOpT   advance_op)
     {
         __shared__ typename KernelPolicyT::SmemStorage smem_storage;
@@ -369,7 +369,7 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
                         block_input_start + v_index, input_item,
                         block_output_start + thread_output,
                         keys_out, values_out,
-                        reduce_values_in, reduce_values_out,
+                        NULL, NULL, //reduce_values_in, reduce_values_out,
                         advance_op);
                 }
             } // end of for thread_output
@@ -428,8 +428,8 @@ void RelaxPartitionedEdges2(
           typename GraphT::SizeT   *num_outputs,
     util::CtaWorkProgress<typename GraphT::SizeT> work_progress,
     //util::KernelRuntimeStats        kernel_stats,
-    const typename GraphT::ValueT  *reduce_values_in ,
-          typename GraphT::ValueT  *reduce_values_out,
+    //const typename GraphT::ValueT  *reduce_values_in ,
+    //      typename GraphT::ValueT  *reduce_values_out,
                    AdvanceOpT       advance_op)
 {
     PrepareQueue(
@@ -440,7 +440,7 @@ void RelaxPartitionedEdges2(
         graph, keys_in, num_inputs, output_offsets,
         block_input_starts, //partition_size, //num_partitions,
         keys_out, values_out, num_outputs[0],
-        reduce_values_in, reduce_values_out,
+        //reduce_values_in, reduce_values_out,
         advance_op);
 }
 
@@ -486,8 +486,8 @@ void RelaxLightEdges(
           typename GraphT::SizeT   *num_outputs,
     util::CtaWorkProgress<typename GraphT::SizeT> work_progress,
     //util::KernelRuntimeStats        kernel_stats,
-    const typename GraphT::ValueT  *reduce_values_in,
-          typename GraphT::ValueT  *reduce_values_out,
+    //const typename GraphT::ValueT  *reduce_values_in,
+    //      typename GraphT::ValueT  *reduce_values_out,
                    AdvanceOpT       advance_op)
 {
     PrepareQueue(
@@ -497,7 +497,7 @@ void RelaxLightEdges(
         ::RelaxLightEdges(
         graph, keys_in, num_inputs, output_offsets,
         keys_out, values_out, num_outputs[0],
-        reduce_values_in, reduce_values_out,
+        //reduce_values_in, reduce_values_out,
         advance_op);
 }
 
@@ -526,8 +526,8 @@ void RelaxEdges(
           typename GraphT::SizeT   *num_outputs,
     util::CtaWorkProgress<typename GraphT::SizeT> work_progress,
     //util::KernelRuntimeStats        kernel_stats,
-    const typename GraphT::ValueT  *reduce_values_in,
-          typename GraphT::ValueT  *reduce_values_out,
+    //const typename GraphT::ValueT  *reduce_values_in,
+    //      typename GraphT::ValueT  *reduce_values_out,
                    AdvanceOpT       advance_op)
 {
     PrepareQueue(queue_reset, queue_index,
@@ -540,7 +540,7 @@ void RelaxEdges(
             ::RelaxLightEdges(
             graph, keys_in, num_inputs, output_offsets,
             keys_out, values_out, num_outputs[0],
-            reduce_values_in, reduce_values_out,
+            //reduce_values_in, reduce_values_out,
             advance_op);
     } else {
         Dispatch<FLAG, GraphT, InKeyT, OutKeyT>
@@ -548,7 +548,7 @@ void RelaxEdges(
             graph, keys_in, num_inputs, output_offsets,
             partition_starts, //partition_size, //num_partitions,
             keys_out, values_out, num_outputs[0],
-            reduce_values_in, reduce_values_out,
+            //reduce_values_in, reduce_values_out,
             advance_op);
     }
 }
@@ -582,7 +582,8 @@ cudaError_t Launch_CSR_CSC(
     {
         //util::PrintMsg("getting output length");
         GUARD_CU (ComputeOutputLength<FLAG>(graph, frontier_in, parameters));
-        GUARD_CU (parameters.frontier -> output_length.Move(util::DEVICE, util::HOST, 1, 0, parameters.stream));
+        GUARD_CU (parameters.frontier -> output_length.Move(
+            util::DEVICE, util::HOST, 1, 0, parameters.stream));
         GUARD_CU2(cudaStreamSynchronize(parameters.stream),
             "cudaStreamSynchronize failed");
         //GUARD_CU2(cudaDeviceSynchronize(),
@@ -614,10 +615,10 @@ cudaError_t Launch_CSR_CSC(
                 : parameters.values_out     -> GetPointer(util::DEVICE),
             parameters.frontier -> output_length .GetPointer(util::DEVICE),
             parameters.frontier -> work_progress,
-            (parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
-                : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
-            (parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
-                : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
+            //(parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
+            //    : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
+            //(parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
+            //    : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
             advance_op);
     }
     else  {
@@ -661,10 +662,10 @@ cudaError_t Launch_CSR_CSC(
                 : parameters.values_out     -> GetPointer(util::DEVICE),
             parameters.frontier -> output_length.GetPointer(util::DEVICE),
             parameters.frontier -> work_progress,
-            (parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
-                : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
-            (parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
-                : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
+            //(parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
+            //    : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
+            //(parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
+            //    : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
             advance_op);
     }
     // TODO: switch REDUCE_OP for different reduce operators
@@ -757,10 +758,10 @@ cudaError_t Launch_Light_CSR_CSC(
             parameters.values_out     -> GetPointer(util::DEVICE),
         parameters.frontier -> output_length.GetPointer(util::DEVICE),
         parameters.frontier -> work_progress,
-        (parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
-            : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
-        (parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
-            : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
+        //(parameters.reduce_values_in  == NULL) ? ((ValueT*)NULL)
+        //    : (parameters.reduce_values_in  -> GetPointer(util::DEVICE)),
+        //(parameters.reduce_values_out == NULL) ? ((ValueT*)NULL)
+        //    : (parameters.reduce_values_out -> GetPointer(util::DEVICE)),
         advance_op);
 
     if (frontier_out != NULL)

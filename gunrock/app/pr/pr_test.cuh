@@ -335,6 +335,8 @@ double CPU_Reference(
             rank_current[v] = rank_new;
             rank_next   [v] = 0;
         }
+        if (iteration >= max_iter)
+            to_continue = false;
     }
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
@@ -438,76 +440,86 @@ typename GraphT::SizeT Validate_Results(
     }
     free(v_counts); v_counts = NULL;
 
-    double  ref_total_rank = 0;
-    double  max_diff       = 0;
-    VertexT max_diff_pos   = nodes;
-    double  max_rdiff      = 0;
-    VertexT max_rdiff_pos  = nodes;
-    for (VertexT v_ = 0; v_ < nodes; v_++)
+    if (ref_node_ids != NULL && ref_ranks != NULL)
     {
-        VertexT v = ref_node_ids[v_];
-        if (util::lessThanZero(v) || v >= nodes)
+        double  ref_total_rank = 0;
+        double  max_diff       = 0;
+        VertexT max_diff_pos   = nodes;
+        double  max_rdiff      = 0;
+        VertexT max_rdiff_pos  = nodes;
+        for (VertexT v_ = 0; v_ < nodes; v_++)
         {
-            util::PrintMsg("FAIL: ref_node_id["
-                + std::to_string(v_) + "] ("
-                + std::to_string(v ) + ") is out of bound.",
-                error_count == 0 && !quiet);
-            error_count ++;
-            continue;
-        }
-
-        auto &ref_rank = ref_ranks[v_];
-        ref_total_rank += ref_rank;
-        ValueT diff = fabs(ref_rank - unorder_ranks[v]);
-        if ((ref_rank > 1e-12  && diff > threshold * ref_rank) ||
-            (ref_rank <= 1e-12 && diff > threshold))
-        {
-            util::PrintMsg("FAIL: rank["
-                + std::to_string(v) + "] ("
-                + std::to_string(unorder_ranks[v]) + ") != "
-                + std::to_string(ref_rank),
-                error_count == 0 && !quiet);
-            error_count ++;
-        }
-        if (diff > max_diff)
-        {
-            max_diff = diff;
-            max_diff_pos = v_;
-        }
-        if (ref_rank > 1e-12)
-        {
-            ValueT rdiff = diff / ref_rank;
-            if (rdiff > max_rdiff)
+            VertexT v = ref_node_ids[v_];
+            if (util::lessThanZero(v) || v >= nodes)
             {
-                max_rdiff = rdiff;
-                max_rdiff_pos = v_;
+                util::PrintMsg("FAIL: ref_node_id["
+                    + std::to_string(v_) + "] ("
+                    + std::to_string(v ) + ") is out of bound.",
+                    error_count == 0 && !quiet);
+                error_count ++;
+                continue;
+            }
+
+            auto &ref_rank = ref_ranks[v_];
+            ref_total_rank += ref_rank;
+            ValueT diff = fabs(ref_rank - unorder_ranks[v]);
+            if ((ref_rank > 1e-12  && diff > threshold * ref_rank) ||
+                (ref_rank <= 1e-12 && diff > threshold))
+            {
+                util::PrintMsg("FAIL: rank["
+                    + std::to_string(v) + "] ("
+                    + std::to_string(unorder_ranks[v]) + ") != "
+                    + std::to_string(ref_rank),
+                    error_count == 0 && !quiet);
+                error_count ++;
+            }
+            if (diff > max_diff)
+            {
+                max_diff = diff;
+                max_diff_pos = v_;
+            }
+            if (ref_rank > 1e-12)
+            {
+                ValueT rdiff = diff / ref_rank;
+                if (rdiff > max_rdiff)
+                {
+                    max_rdiff = rdiff;
+                    max_rdiff_pos = v_;
+                }
             }
         }
+        if (error_count == 0)
+            util::PrintMsg("PASS", !quiet);
+        else
+            util::PrintMsg("number of errors : "
+                + std::to_string(error_count), !quiet);
+
+        util::PrintMsg("Reference total rank : "
+            + std::to_string(ref_total_rank), !quiet);
+
+        util::PrintMsg("Maximum difference : ", !quiet, false);
+        util::PrintMsg("rank["
+            + std::to_string(ref_node_ids[max_diff_pos]) + "] "
+            + std::to_string(unorder_ranks[ref_node_ids[max_diff_pos]]) + " vs. "
+            + std::to_string(ref_ranks[max_diff_pos]) + ", ",
+            max_diff_pos < nodes && !quiet, false);
+        util::PrintMsg(std::to_string(max_diff), !quiet);
+
+        util::PrintMsg("Maximum relative difference :", !quiet, false);
+        util::PrintMsg("rank["
+            + std::to_string(ref_node_ids[max_rdiff_pos]) + "] "
+            + std::to_string(unorder_ranks[ref_node_ids[max_rdiff_pos]]) + " vs. "
+            + std::to_string(ref_ranks[max_rdiff_pos]) + ", ",
+            max_rdiff_pos < nodes && !quiet, false);
+        util::PrintMsg(std::to_string(max_rdiff * 100), !quiet);
+    } else {
+        if (error_count == 0)
+            util::PrintMsg("PASS", !quiet);
+        else
+            util::PrintMsg("number of errors : "
+                + std::to_string(error_count), !quiet);
     }
-    if (error_count == 0)
-        util::PrintMsg("PASS", !quiet);
-    else
-        util::PrintMsg("number of errors : "
-            + std::to_string(error_count), !quiet);
 
-    util::PrintMsg("Reference total rank : "
-        + std::to_string(ref_total_rank), !quiet);
-
-    util::PrintMsg("Maximum difference : ", !quiet, false);
-    util::PrintMsg("rank["
-        + std::to_string(ref_node_ids[max_diff_pos]) + "] "
-        + std::to_string(unorder_ranks[ref_node_ids[max_diff_pos]]) + " vs. "
-        + std::to_string(ref_ranks[max_diff_pos]) + ", ",
-        max_diff_pos < nodes && !quiet, false);
-    util::PrintMsg(std::to_string(max_diff), !quiet);
-
-    util::PrintMsg("Maximum relative difference :", !quiet, false);
-    util::PrintMsg("rank["
-        + std::to_string(ref_node_ids[max_rdiff_pos]) + "] "
-        + std::to_string(unorder_ranks[ref_node_ids[max_rdiff_pos]]) + " vs. "
-        + std::to_string(ref_ranks[max_rdiff_pos]) + ", ",
-        max_rdiff_pos < nodes && !quiet, false);
-    util::PrintMsg(std::to_string(max_rdiff * 100), !quiet);
 
     util::PrintMsg("Order Validity: ", !quiet, false);
     error_count = 0;

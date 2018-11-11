@@ -36,7 +36,7 @@ __device__ __host__ void init_reverse(GraphT &graph, VertexT* reverse)
         {
             auto v = graph.CsrT::GetEdgeDest(e);
             auto f_start = graph.CsrT::GetNeighborListOffset(v);
-            auto num_neighbors2 = 
+            auto num_neighbors2 =
                 graph.CsrT::GetNeighborListLength(v);
             auto f_end = f_start + num_neighbors2;
             for (auto f = f_start; f < f_end; ++f)
@@ -56,7 +56,7 @@ __device__ __host__ void init_reverse(GraphT &graph, VertexT* reverse)
 
 template <typename GraphT>
 __device__ __host__ void correct_capacity_for_undirected_graph(
-        GraphT &undirected_graph, 
+        GraphT &undirected_graph,
         GraphT &directed_graph)
 {
     typedef typename GraphT::CsrT CsrT;
@@ -68,7 +68,7 @@ __device__ __host__ void correct_capacity_for_undirected_graph(
         auto e_start = undirected_graph.CsrT::GetNeighborListOffset(u);
         auto num_neighbors = undirected_graph.CsrT::GetNeighborListLength(u);
         auto e_end = e_start + num_neighbors;
-        debug_aml("vertex %d\nnumber of neighbors %d", u, 
+        debug_aml("vertex %d\nnumber of neighbors %d", u,
                 num_neighbors);
         for (auto e = e_start; e < e_end; ++e)
         {
@@ -76,7 +76,7 @@ __device__ __host__ void correct_capacity_for_undirected_graph(
             auto v = undirected_graph.CsrT::GetEdgeDest(e);
             // Looking for edge u->v in directed graph
             auto f_start = directed_graph.CsrT::GetNeighborListOffset(u);
-            auto num_neighbors2 = 
+            auto num_neighbors2 =
                 directed_graph.CsrT::GetNeighborListLength(u);
             auto f_end = f_start + num_neighbors2;
             for (auto f = f_start; f < f_end; ++f)
@@ -84,7 +84,7 @@ __device__ __host__ void correct_capacity_for_undirected_graph(
                 auto z = directed_graph.CsrT::GetEdgeDest(f);
                 if (z == v and directed_graph.CsrT::edge_values[f] > 0)
                 {
-                    undirected_graph.CsrT::edge_values[e]  = 
+                    undirected_graph.CsrT::edge_values[e]  =
                         directed_graph.CsrT::edge_values[f];
                     debug_aml("edge (%d, %d) cap = %lf\n", u, v, \
                             undirected_graph.CsrT::edge_values[e]);
@@ -98,5 +98,3 @@ __device__ __host__ void correct_capacity_for_undirected_graph(
 }
 }
 }
-
-

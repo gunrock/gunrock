@@ -212,15 +212,12 @@ struct Csr :
 
         //typedef Coo<VertexT_in, SizeT_in, ValueT_in, FLAG_in,
         //    cudaHostRegisterFlag_in> CooT;
-        if (!quiet)
-        {
-            util::PrintMsg("  Converting " +
-                std::to_string(source.CooT::nodes) +
-                " vertices, " + std::to_string(source.CooT::edges) +
-                (source.CooT::directed ? " directed" : " undirected") +
-                " edges (" + (source.CooT::edge_order == BY_ROW_ASCENDING ? " ordered" : "unordered") +
-                " tuples) to CSR format...");
-        }
+        util::PrintMsg("Converting " +
+            std::to_string(source.CooT::nodes) +
+            " vertices, " + std::to_string(source.CooT::edges) +
+            (source.CooT::directed ? " directed" : " undirected") +
+            " edges (" + (source.CooT::edge_order == BY_ROW_ASCENDING ? " ordered" : "unordered") +
+            " tuples) to CSR format...", !quiet, false);
 
         time_t mark1 = time(NULL);
         cudaError_t retval = cudaSuccess;
@@ -271,17 +268,65 @@ struct Csr :
                 SizeT *row_offsets,
                 const typename CooT::EdgePairT *edge_pairs,
                 const VertexT &row){
-                    if (row < nodes)
-                        row_offsets[row] = util::BinarySearch(row,
+                    if (row <= edge_pairs[0].x)
+                        row_offsets[row] = 0;
+                    else if (row < nodes)
+                    {
+                        auto pos = util::BinarySearch_LeftMost(row,
                             edge_pairs, (SizeT)0, edges-1,
-                            row_edge_compare);
-                    else row_offsets[row] = edges;
+                            row_edge_compare,
+                            [] (const typename CooT::EdgePairT &pair, const VertexT &row)
+                            {
+                                return (pair.x == row);
+                            });
+                        //if (row > edge_pairs[edges-1].x)
+                        //    pos = edges;
+                        //else {
+                            while (pos < edges && row > edge_pairs[pos].x)
+                                pos ++;
+                        //}
+                        //if (pos > edges || row >= edge_pairs[edges-1].x)
+                        //    printf("Error row_offsets[%d] = %d\n",
+                        //        row, pos);
+                        row_offsets[row] = pos;
+                    } else row_offsets[row] = edges;
                 }, this -> nodes + 1, target, stream));
 
         time_t mark2 = time(NULL);
-        util::PrintMsg("Done converting (" +
+        util::PrintMsg("Done (" +
             std::to_string(mark2 - mark1) + "s).", !quiet);
 
+        //for (SizeT v = 0; v < nodes; v++)
+        //{
+        //    if (row_offsets [v] > row_offsets[v+1])
+        //    {
+        //        util::PrintMsg("Error: row_offsets["
+        //            + std::to_string(v) + "] = " + std::to_string(row_offsets[v])
+        //            + " > row_offsets[" + std::to_string(v+1)
+        //            + "] = " + std::to_string(row_offsets[v+1]));
+        //        continue;
+        //    }
+        //
+        //    if (row_offsets[v] < 0 || row_offsets[v] > edges)
+        //    {
+        //        util::PrintMsg("Error: row_offsets["
+        //            + std::to_string(v) + "] = " + std::to_string(row_offsets[v])
+        //            + " > edges = " + std::to_string(edges));
+        //        continue;
+        //    }
+        //
+        //    SizeT e_start = row_offsets[v];
+        //    SizeT e_end = row_offsets[v+1];
+        //    SizeT degree = e_end - e_start;
+        //    for (SizeT e = e_start; e < e_end; e++)
+        //    {
+        //        if (source.CooT::edge_pairs[e].x != v)
+        //            util::PrintMsg("Error: edge_pairs[" + std::to_string(e)
+        //                + "] = (" + std::to_string(source.CooT::edge_pairs[e].x)
+        //                + ", " + std::to_string(source.CooT::edge_pairs[e].y)
+        //                + ") != v " + std::to_string(v));
+        //    }
+        //}
         return retval;
     }
 
@@ -364,7 +409,7 @@ struct Csr :
     __device__ __host__ __forceinline__
     VertexT GetEdgeSrc(const SizeT &e) const
     {
-        return Binary_Search(row_offsets + 0, e, (SizeT)0, this -> nodes);
+        return util::BinarySearch_RightMost(e, row_offsets + 0, (SizeT)0, this -> nodes);
     }
 
     __device__ __host__ __forceinline__
@@ -377,7 +422,7 @@ struct Csr :
     __device__ __host__ __forceinline__
     void GetEdgeSrcDest(const SizeT &e, VertexT &src, VertexT &dest) const
     {
-        src = Binary_Search(row_offsets + 0, e, (SizeT)0, this -> nodes);
+        src = util::BinarySearch_RightMost(e, row_offsets + 0, (SizeT)0, this -> nodes);
         dest = column_indices[e];
     }
 
@@ -647,7 +692,7 @@ struct Csr :
         if (!quiet)
         {
             printf("  Reading directly from stored binary CSR arrays ...\n");
-	    if(LOAD_NODE_VALUES)
+        if(LOAD_NODE_VALUES)
                 printf("  Reading directly from stored binary label arrays ...\n");
         }
         time_t mark1 = time(NULL);
@@ -667,7 +712,7 @@ struct Csr :
         {
             input_label.read(reinterpret_cast<char*>(node_values), v * sizeof(Value));
         }
-//	    for(int i=0; i<v; i++) printf("%lld ", (long long)node_values[i]); printf("\n");
+//      for(int i=0; i<v; i++) printf("%lld ", (long long)node_values[i]); printf("\n");
 
         time_t mark2 = time(NULL);
         if (!quiet)
@@ -691,55 +736,6 @@ struct Csr :
      * \addtogroup PublicInterface
      * @{
      */
-
-    /**
-     * @brief Print log-scale degree histogram of the graph.
-     */
-    /*void PrintHistogram()
-    {
-        fflush(stdout);
-
-        // Initialize
-        SizeT log_counts[32];
-        for (int i = 0; i < 32; i++)
-        {
-            log_counts[i] = 0;
-        }
-
-        // Scan
-        SizeT max_log_length = -1;
-        for (VertexId i = 0; i < nodes; i++)
-        {
-
-            SizeT length = row_offsets[i + 1] - row_offsets[i];
-
-            int log_length = -1;
-            while (length > 0)
-            {
-                length >>= 1;
-                log_length++;
-            }
-            if (log_length > max_log_length)
-            {
-                max_log_length = log_length;
-            }
-
-            log_counts[log_length + 1]++;
-        }
-        printf("\nDegree Histogram (%lld vertices, %lld edges):\n",
-               (long long) nodes, (long long) edges);
-        printf("    Degree   0: %lld (%.2f%%)\n",
-               (long long) log_counts[0],
-               (float) log_counts[0] * 100.0 / nodes);
-        for (int i = 0; i < max_log_length + 1; i++)
-        {
-            printf("    Degree 2^%i: %lld (%.2f%%)\n",
-                i, (long long)log_counts[i + 1],
-                (float) log_counts[i + 1] * 100.0 / nodes);
-        }
-        printf("\n");
-        fflush(stdout);
-    }*/
 
     /**
      * @brief Check values.
@@ -817,10 +813,10 @@ struct Csr :
      */
     /*void GetNodeDegree(unsigned long long *node_degrees)
     {
-	for(SizeT node=0; node < nodes; ++node)
-	{
-		node_degrees[node] = row_offsets[node+1]-row_offsets[node];
-	}
+    for(SizeT node=0; node < nodes; ++node)
+    {
+        node_degrees[node] = row_offsets[node+1]-row_offsets[node];
+    }
     }*/
 
     /**
@@ -920,6 +916,14 @@ struct Csr<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
         util::Location source,
         util::Location target,
         cudaStream_t   stream = 0)
+    {
+        return cudaSuccess;
+    }
+
+    cudaError_t Display(
+        std::string graph_prefix = "",
+        SizeT nodes_to_show = 40,
+        bool  with_edge_values = true)
     {
         return cudaSuccess;
     }
