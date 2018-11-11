@@ -246,7 +246,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(height  	    .Allocate(nodes_size, util::HOST|target));
             GUARD_CU(lowest_neighbor.Allocate(nodes_size, target));
             GUARD_CU(local_vertices .Allocate(nodes_size, target));
-            GUARD_CU(active	        .Allocate(1, util::HOST|target));
+            GUARD_CU(active	        .Allocate(2, util::HOST|target));
 
             GUARD_CU(head           .Allocate(1, target));
             GUARD_CU(tail           .Allocate(1, target));
@@ -282,7 +282,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT edges_size = graph.edges;
 
             // Ensure data are allocated
-            GUARD_CU(active	      .EnsureSize_(1, target|util::HOST));
+            GUARD_CU(active	      .EnsureSize_(2, target|util::HOST));
             GUARD_CU(flow	      .EnsureSize_(edges_size, target));
             GUARD_CU(reverse 	      .EnsureSize_(edges_size, target));
             GUARD_CU(excess  	      .EnsureSize_(nodes_size, target));
@@ -341,7 +341,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                         __host__ __device__(SizeT *active_, const VertexT &pos)
                         {
                             active_[pos] = 1;
-                        }, 1, target|util::HOST, this -> stream));
+                        }, 2, target|util::HOST, this -> stream));
 
             GUARD_CU(lowest_neighbor.ForAll([graph, source]
                        __host__ __device__(VertexT *lowest_neighbor, const VertexT pos)

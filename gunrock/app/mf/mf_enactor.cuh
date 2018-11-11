@@ -20,6 +20,8 @@
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/app/mf/mf_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
+#include <gunrock/oprtr/1D_oprtr/for.cuh>
+
 
 // uncoment for debug output
 // #define MF_DEBUG 1
@@ -161,10 +163,12 @@ struct MFIterationLoop : public IterationLoopBase
         auto compute_lockfree_op =
 	        [graph, excess, capacity, flow, reverse, height, iteration, source,
             sink, active]
-            __host__ __device__ (VertexT* v_q, const SizeT& pos)
+            __host__ __device__ (const int &counter, const VertexT& v)
             {
 
-                VertexT v = v_q[pos];
+                // VertexT v = v_q[pos];
+		if (v == 0) active[(counter + 1) % 2] = 0;
+
                 debug_aml2("active vertex: %d\n", v);
 
                 // if not a valid vertex, do not apply compute:
@@ -219,8 +223,11 @@ struct MFIterationLoop : public IterationLoopBase
                                     atomicAdd(&flow[reverse[lowest_id]], -f);
                                     debug_aml2("push, %lf, %d->%d, e[%d] = %lf\n",
                                             f, v, l_dest, l_dest, excess[l_dest]);
-                                    active[0] = 1;
-                                } else{
+
+				    // active[0] = 1;
+				    active[(counter) % 2] = 1;
+
+				} else{
                                     atomicAdd(&excess[v], f);
                                     debug_aml2("push back, %lf, %lf\n",
                                             f, excess[v]);
@@ -230,7 +237,9 @@ struct MFIterationLoop : public IterationLoopBase
                                 height[v] = lowest_h + 1;
                                 debug_aml2("relabel, %d new height %d\n",
                                         v, lowest_h + 1);
-                                active[0] = 1;
+
+				active[(counter) % 2] = 1;
+                                // active[0] = 1;
                             }
                         }
                  }
@@ -281,7 +290,7 @@ struct MFIterationLoop : public IterationLoopBase
                 was_changed = true;
             debug_aml("iteration %d, relabeling finished\n", iteration);
         }
-
+#if 0
         GUARD_CU(active.ForAll(
             [] __host__ __device__ (SizeT *a, const SizeT &v)
             {
@@ -291,13 +300,26 @@ struct MFIterationLoop : public IterationLoopBase
 	      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed."); 
         // GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), 
         //            "cudaStreamSynchronize failed.");
+#endif
 
         debug_aml("[%d]frontier que length before compute op is %d\n",
                 iteration, frontier.queue_length);
 
-	      // Run Lockfree Push-Relable
-        GUARD_CU(frontier.V_Q()->ForAll(compute_lockfree_op,
-                    graph.nodes, util::DEVICE, oprtr_parameters.stream));
+	// Run Lockfree Push-Relable
+        // GUARD_CU(frontier.V_Q()->ForAll(compute_lockfree_op,
+        //            graph.nodes, util::DEVICE, oprtr_parameters.stream));
+
+	SizeT loop_size = graph.nodes;
+	int num_repeats = 10000;
+	gunrock::oprtr::RepeatFor(compute_lockfree_op, /* lambda */ 
+			num_repeats, /* num_repeats (int) */
+			graph.nodes, /* ForIterT loop_size */
+			util::DEVICE, /* target */
+			oprtr_parameters.stream, /* stream */
+			util::PreDefinedValues<int>::InvalidValue, /* grid_size */
+			util::PreDefinedValues<int>::InvalidValue, /* block_size */
+			2 /* mode: stacked kernels */);
+
 
         debug_aml("[%d]frontier que length after compute op is %d\n",
                 iteration, frontier.queue_length);
@@ -306,7 +328,7 @@ struct MFIterationLoop : public IterationLoopBase
         //        "cudaStreamSynchronize failed");
 
         GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
-        active.Move(util::DEVICE, util::HOST, 1, 0, oprtr_parameters.stream);
+        active.Move(util::DEVICE, util::HOST, 2, 0, oprtr_parameters.stream);
 
         GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
 
@@ -387,8 +409,8 @@ struct MFIterationLoop : public IterationLoopBase
 
 	debug_aml2("[STOP CONDITION] updated vertices: %d\n", data_slice.active[0]);
 
-        if (data_slice.active[0] == 0) return true;
-        return false;
+        if (data_slice.active[0] > 0 || data_slice.active[1] > 0) return false;
+        return true;
     }
 
 }; // end of MFIteration
