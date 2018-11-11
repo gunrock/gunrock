@@ -17,8 +17,8 @@
 
 #pragma once
 
-#define MF_EPSILON 1e-6
-#define MF_EPSILON_VALIDATE 1e-4
+#define MF_EPSILON 0.000002
+#define MF_EPSILON_VALIDATE 1e-3
 
 namespace gunrock {
 namespace app {
@@ -32,7 +32,7 @@ __host__ __device__ bool almost_eql(ValueT A, ValueT B,
 }
 
 template <typename GraphT, typename VertexT, typename ValueT>
-void relabeling(GraphT graph, VertexT source, VertexT sink, VertexT* height,
+int relabeling(GraphT graph, VertexT source, VertexT sink, VertexT* height,
                 VertexT* reverse, ValueT* flow) {
   typedef typename GraphT::CsrT CsrT;
 
@@ -66,7 +66,7 @@ void relabeling(GraphT graph, VertexT source, VertexT sink, VertexT* height,
     }
   }
   height[source] = graph.nodes;
-  return;
+  return changed;
 }
 
 template <typename GraphT, typename VertexT>

@@ -13,7 +13,7 @@
  */
 
 #include <gunrock/app/mf/mf_app.cu>
-#include <gunrock/app/mf/mf_init.cuh>
+#include <gunrock/app/mf/mf_helpers.cuh>
 #include <gunrock/app/test_base.cuh>
 
 #define debug_aml(a...)
@@ -56,15 +56,9 @@ struct main_struct {
     //
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
-    debug_aml("Start Load Graph");
 
     bool undirected;
     parameters.Get("undirected", undirected);
-    if (undirected) {
-      debug_aml("graph is undirected");
-    } else {
-      debug_aml("graph is directed");
-    }
 
     GraphT d_graph;
     if (not undirected) {
@@ -82,12 +76,14 @@ struct main_struct {
     cpu_timer.Stop();
 
     parameters.Set("load-time", cpu_timer.ElapsedMillis());
-    debug_aml("load-time is %lf", cpu_timer.ElapsedMillis());
 
     VertexT source = parameters.Get<VertexT>("source");
     VertexT sink = parameters.Get<VertexT>("sink");
     int num_repeats = parameters.Get<int>("num-repeats");
-    debug_aml("number of repeats is %d\n", num_repeats);
+
+    util::PrintMsg("Number of ForAll() repeats per iteration: " +
+                       std::to_string(num_repeats),
+                   !quiet);
 
     if (source == util::PreDefinedValues<VertexT>::InvalidValue ||
         source >= u_graph.nodes) {
@@ -114,11 +110,11 @@ struct main_struct {
 
     util::Array1D<SizeT, VertexT> reverse;
     GUARD_CU(reverse.Allocate(u_graph.edges, util::HOST));
-    app::mf::init_reverse(u_graph, reverse.GetPointer(util::HOST));
+    app::mf::InitReverse(u_graph, reverse.GetPointer(util::HOST));
 
     if (not undirected) {
       // Correct capacity values on reverse edges
-      app::mf::correct_capacity_for_undirected_graph(u_graph, d_graph);
+      app::mf::CorrectCapacity(u_graph, d_graph);
     }
 
     //
@@ -143,7 +139,6 @@ struct main_struct {
         parameters, u_graph, switches,
         [flow_edge, reverse, max_flow](util::Parameters &parameters,
                                        GraphT &u_graph) {
-          debug_aml("go to RunTests");
           return app::mf::RunTests(parameters, u_graph,
                                    reverse.GetPointer(util::HOST), flow_edge,
                                    max_flow);
@@ -151,14 +146,13 @@ struct main_struct {
 
     // Clean up
     free(flow_edge);
-    // GUARD_CU(reverse.Release());
+    GUARD_CU(reverse.Release());
 
     return retval;
   }
 };
 
 int main(int argc, char **argv) {
-  debug_aml("Main: start");
   cudaError_t retval = cudaSuccess;
   util::Parameters parameters("test mf");
   GUARD_CU(graphio::UseParameters(parameters));
@@ -170,7 +164,6 @@ int main(int argc, char **argv) {
     return cudaSuccess;
   }
   GUARD_CU(parameters.Check_Required());
-  debug_aml("Main: parameters checked - ok");
 
   return app::Switch_Types<app::VERTEXT_U32B | app::SIZET_U32B |
                            app::VALUET_F64B | app::DIRECTED | app::UNDIRECTED>(

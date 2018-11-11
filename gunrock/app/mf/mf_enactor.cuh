@@ -18,7 +18,10 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
+
 #include <gunrock/app/mf/mf_problem.cuh>
+#include <gunrock/app/mf/mf_helpers.cuh>
+
 #include <gunrock/oprtr/1D_oprtr/for.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 

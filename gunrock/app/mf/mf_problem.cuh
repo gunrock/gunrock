@@ -22,9 +22,6 @@
 //#define debug_aml(a...) {printf("%s:%d ", __FILE__, __LINE__); printf(a);\
     printf("\n");}
 
-#define MF_EPSILON 0.000002
-#define MF_EPSILON_VALIDATE 1e-3
-
 namespace gunrock {
 namespace app {
 namespace mf {
@@ -40,49 +37,6 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
   GUARD_CU(gunrock::app::UseParameters_problem(parameters));
 
   return retval;
-}
-
-template <typename ValueT>
-__host__ __device__ bool almost_eql(ValueT A, ValueT B,
-                                    ValueT maxRelDiff = MF_EPSILON) {
-  if (fabs(A - B) < maxRelDiff) return true;
-  return false;
-}
-
-template <typename GraphT, typename VertexT, typename ValueT>
-int relabeling(GraphT graph, VertexT source, VertexT sink, VertexT *height,
-               VertexT *reverse, ValueT *flow) {
-  typedef typename GraphT::CsrT CsrT;
-  bool mark[graph.nodes];
-  for (VertexT x = 0; x < graph.nodes; ++x) mark[x] = false;
-  VertexT que[graph.nodes];
-  int first = 0, last = 0;
-  que[last++] = sink;
-  mark[sink] = true;
-  auto H = (VertexT)0;
-  height[sink] = H;
-  int changed = 0;
-
-  while (first < last) {
-    auto v = que[first++];
-    auto e_start = graph.CsrT::GetNeighborListOffset(v);
-    auto num_neighbors = graph.CsrT::GetNeighborListLength(v);
-    auto e_end = e_start + num_neighbors;
-    ++H;
-    for (auto e = e_start; e < e_end; ++e) {
-      auto neighbor = graph.CsrT::GetEdgeDest(e);
-      auto c = graph.CsrT::edge_values[reverse[e]];
-      auto f = flow[reverse[e]];
-      if (mark[neighbor] || almost_eql(c, f)) continue;
-      if (height[neighbor] != H) changed++;
-
-      height[neighbor] = H;
-      mark[neighbor] = true;
-      que[last++] = neighbor;
-    }
-  }
-  height[source] = graph.nodes;
-  return changed;
 }
 
 /**
