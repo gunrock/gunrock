@@ -60,6 +60,13 @@ cudaError_t UseParameters(util::Parameters &parameters)
     	__FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<int>(
+    	"num-repeats",
+    	util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+    	10000,
+    	"Number of repeats for ReapetFor operator",
+    	__FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
     	"seed",
     	util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
     	util::PreDefinedValues<int>::InvalidValue,
@@ -103,6 +110,7 @@ cudaError_t RunTests(
     std::string validation  = parameters.Get<std::string>("validation");
     VertexT source	    = parameters.Get<VertexT>("source");
     VertexT sink	    = parameters.Get<VertexT>("sink");
+    int num_repeats     = parameters.Get<int>("num-repeats");
     debug_aml("source %d, sink %d, quite_mode %d, num-runs %d", source, sink,
 	    quiet_mode, num_runs);
 

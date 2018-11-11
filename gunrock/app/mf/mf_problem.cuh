@@ -24,7 +24,7 @@
 
 
 #define MF_EPSILON 0.000002
-#define MF_EPSILON_VALIDATE 1e-4
+#define MF_EPSILON_VALIDATE 1e-3
 
 namespace gunrock {
 namespace app {
@@ -141,6 +141,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         VertexT	source;	// source vertex
         VertexT sink;	// sink vertex
+        int num_repeats;
         SizeT num_updated_vertices;
         bool was_changed; // flag relabeling
 	      util::Array1D<SizeT, SizeT> changed;
@@ -152,6 +153,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         {
             source = util::PreDefinedValues<VertexT>::InvalidValue;
             sink = util::PreDefinedValues<VertexT>::InvalidValue;
+            num_repeats = 10000;
             num_updated_vertices = 1;
             was_changed = false;
             reverse	    .SetName("reverse"	    );
@@ -509,17 +511,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
         auto source_vertex  = this->parameters.template Get<VertexT>("source");
         auto sink_vertex    = this->parameters.template Get<VertexT>("sink");
+        auto num_repeats    = this->parameters.template Get<int>("num-repeats");
 
         for (int gpu = 0; gpu < this->num_gpus; ++gpu)
         {
             auto &data_slice = data_slices[gpu][0];
             data_slice.source = source_vertex;
             data_slice.sink   = sink_vertex;
+            data_slice.num_repeats = num_repeats;
 
             // Set device
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-            GUARD_CU(data_slices[gpu]->Reset(graph, source_vertex, h_reverse,
+                GUARD_CU(data_slices[gpu]->Reset(graph, source_vertex, h_reverse,
                 target));
                 GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }

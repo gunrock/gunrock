@@ -91,6 +91,7 @@ struct MFIterationLoop : public IterationLoopBase
 
         auto source	           	= data_slice.source;
         auto sink	        	= data_slice.sink;
+        auto num_repeats        = data_slice.num_repeats;
         bool &was_changed       = data_slice.was_changed;
         auto &capacity        	= graph.edge_values;
         auto &reverse		    = data_slice.reverse;
@@ -310,7 +311,7 @@ struct MFIterationLoop : public IterationLoopBase
         //            graph.nodes, util::DEVICE, oprtr_parameters.stream));
 
 	SizeT loop_size = graph.nodes;
-	int num_repeats = 10000;
+	//int num_repeats = 10000;
 	gunrock::oprtr::RepeatFor(compute_lockfree_op, /* lambda */ 
 			num_repeats, /* num_repeats (int) */
 			graph.nodes, /* ForIterT loop_size */

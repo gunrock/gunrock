@@ -59,6 +59,7 @@ struct main_struct
         util::CpuTimer cpu_timer; cpu_timer.Start();
     	debug_aml("Start Load Graph");
 
+
     	bool undirected;
     	parameters.Get("undirected", undirected);
     	if (undirected){
@@ -87,6 +88,8 @@ struct main_struct
 
         VertexT source = parameters.Get<VertexT>("source");
     	VertexT sink = parameters.Get<VertexT>("sink");
+        int num_repeats = parameters.Get<int>("num-repeats");
+        debug_aml("number of repeats is %d\n", num_repeats);
 
     	if (source == util::PreDefinedValues<VertexT>::InvalidValue ||
                 source >= u_graph.nodes){
