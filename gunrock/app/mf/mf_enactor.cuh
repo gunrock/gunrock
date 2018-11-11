@@ -100,8 +100,11 @@ struct MFIterationLoop : public IterationLoopBase
         auto &active	    	= data_slice.active;
         auto null_ptr	    	= &local_vertices;
         null_ptr = NULL;
+        auto &mark		= data_slice.mark;
+        auto &queue		= data_slice.queue;
+        auto &changed 		= data_slice.changed;
 
-        auto advance_preflow_op = [capacity, flow, excess, height, reverse,
+        auto advance_preflow_op = [capacity, flow, excess, height, reverse, 
              source]
              __host__ __device__
              (const VertexT &src, VertexT &dest, const SizeT &edge_id,
@@ -125,22 +128,22 @@ struct MFIterationLoop : public IterationLoopBase
             __host__ __device__ (VertexT* v_q, const SizeT& pos)
             {
 
-		VertexT v = v_q[pos];
-		debug_aml2("active vertex: %d\n", v);
+                VertexT v = v_q[pos];
+                debug_aml2("active vertex: %d\n", v);
 
-		// if not a valid vertex, do not apply compute:
-		if (!util::isValid(v) ||
-		      v == source ||
-                      v == sink ||
-		      excess[v] <= 0 ||
-                      graph.CsrT::GetNeighborListLength(v) == 0) return;
+                // if not a valid vertex, do not apply compute:
+                if (!util::isValid(v) ||
+                    v == source ||
+                    v == sink ||
+		                excess[v] <= 0 ||
+                    graph.CsrT::GetNeighborListLength(v) == 0) return;
 
-		// else, try push-relable:
+		            // else, try push-relable:
                 VertexT e_start = graph.CsrT::GetNeighborListOffset(v);
                 VertexT neighbor_num = graph.CsrT::GetNeighborListLength(v);
                 VertexT e_end = e_start + neighbor_num;
                 int iter = 0;
-                while (excess[v] > 0)
+                if (excess[v] > (ValueT)0)
                 {
                         debug_aml2("active vertex: %d\n", v);
                         debug_aml2("excess[%d] = %lf\n", v, excess[v]);
@@ -149,11 +152,11 @@ struct MFIterationLoop : public IterationLoopBase
                             util::PreDefinedValues<VertexT>::InvalidValue;
                         VertexT lowest_h;
 
-			// look for lowest height among neighbors
+			                  // look for lowest height among neighbors
                         for (VertexT e_id = e_start; e_id < e_end; ++e_id) {
                             VertexT n = graph.CsrT::GetEdgeDest(e_id);
                             debug_aml2("try neighbor %d\n", n);
-                            if ((capacity[e_id] - flow[e_id] > 0) &&
+                            if ((capacity[e_id] - flow[e_id] > (ValueT)0) &&
                                     (!util::isValid(lowest_id) ||
                                      height[n] < lowest_h)){
                                 lowest_id = e_id;
@@ -161,7 +164,7 @@ struct MFIterationLoop : public IterationLoopBase
                             }
                         }
 
-			// if a valid lowest h was found:
+			                  // if a valid lowest h was found:
                         if (util::isValid(lowest_id))
                         {
                             debug_aml2("lowest for %d is %d\n",
@@ -181,12 +184,12 @@ struct MFIterationLoop : public IterationLoopBase
                                     debug_aml2("push, %lf, %d->%d, e[%d] = %lf\n",
                                             f, v, l_dest, l_dest, excess[l_dest]);
                                     active[0] = 1;
-                                }else{
+                                } else{
                                     atomicAdd(&excess[v], f);
                                     debug_aml2("push back, %lf, %lf\n",
                                             f, excess[v]);
                                 }
-                            }else{
+                            } else{
                                 //relabel
                                 height[v] = lowest_h + 1;
                                 debug_aml2("relabel, %d new height %d\n",
@@ -207,15 +210,23 @@ struct MFIterationLoop : public IterationLoopBase
                     graph.csr(), &local_vertices, null_ptr,
                     oprtr_parameters, advance_preflow_op));
 
-            GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-                    "cudaStreamSynchronize failed.");
-
+	    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+            // GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), 
+            //        "cudaStreamSynchronize failed.");
+            
             debug_aml("iteration 0, preflow ends, results:\n");
         }
 
         // Global relabeling
         if (was_changed == true and (iteration % 50 == 0)){
             debug_aml("iteration %d, relabeling\n", iteration);
+
+	      // Serial relabeling on the GPU (ignores moves)
+        GUARD_CU(frontier.V_Q()->ForAll(global_relabeling_op, 1,
+                           util::DEVICE, oprtr_parameters.stream));
+	      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+
+#if 0
             GUARD_CU(height.Move(util::DEVICE, util::HOST, graph.nodes, 0,
                         oprtr_parameters.stream));
             GUARD_CU(flow.Move(util::DEVICE, util::HOST, graph.edges, 0,
@@ -228,7 +239,9 @@ struct MFIterationLoop : public IterationLoopBase
                     flow.GetPointer(util::HOST));
             GUARD_CU(height.Move(util::HOST, util::DEVICE, graph.nodes, 0,
                       oprtr_parameters.stream));
-            if (num_changes > 0)
+#endif
+	      changed.Move(util::DEVICE, util::HOST, 1, 0, oprtr_parameters.stream);
+            if (changed[0] > 0)
                 was_changed = true;
             debug_aml("iteration %d, relabeling finished\n", iteration);
         }
@@ -239,26 +252,30 @@ struct MFIterationLoop : public IterationLoopBase
                 a[v] = 0;
             }, 1, util::DEVICE, oprtr_parameters.stream));
 
-        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-                    "cudaStreamSynchronize failed.");
+	      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed."); 
+        // GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), 
+        //            "cudaStreamSynchronize failed.");
 
         debug_aml("[%d]frontier que length before compute op is %d\n",
                 iteration, frontier.queue_length);
 
-	// Run Lockfree Push-Relable
+	      // Run Lockfree Push-Relable
         GUARD_CU(frontier.V_Q()->ForAll(compute_lockfree_op,
                     graph.nodes, util::DEVICE, oprtr_parameters.stream));
 
         debug_aml("[%d]frontier que length after compute op is %d\n",
                 iteration, frontier.queue_length);
-        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-                "cudaStreamSynchronize failed");
 
-	    active.Move(util::DEVICE, util::HOST, 1, 0, oprtr_parameters.stream);
+        // GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+        //        "cudaStreamSynchronize failed");
 
-        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-                "cudaStreamSynchronize failed");
+        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+        active.Move(util::DEVICE, util::HOST, 1, 0, oprtr_parameters.stream);
 
+        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+
+        //GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+        //        "cudaStreamSynchronize failed");
         return retval;
     }
 
@@ -331,6 +348,8 @@ struct MFIterationLoop : public IterationLoopBase
             fflush(stdout);
             return true;
         }
+
+	debug_aml2("[STOP CONDITION] updated vertices: %d\n", data_slice.active[0]);
 
         if (data_slice.active[0] == 0) return true;
         return false;
