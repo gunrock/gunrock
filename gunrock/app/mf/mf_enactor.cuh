@@ -121,6 +121,42 @@ struct MFIterationLoop : public IterationLoopBase
                  return true;
              };
 
+        auto global_relabeling_op =
+            [graph, source, sink, height, reverse, flow, queue, mark, changed] 
+                __host__ __device__
+                (VertexT * v_q, const SizeT &pos) {
+                    VertexT v = v_q[pos];
+		    VertexT first = 0, last = 0;
+		    queue[last++] = sink;
+		    mark[sink] = true;
+		    auto H = (VertexT) 0;
+		    height[sink] = H;
+
+		    changed[0] = 0;
+		
+		    while (first < last) {
+			auto v = queue[first++];
+			auto e_start = graph.CsrT::GetNeighborListOffset(v);
+			auto num_neighbors = graph.CsrT::GetNeighborListLength(v);
+			auto e_end = e_start + num_neighbors;
+			++H;
+			for (auto e = e_start; e < e_end; ++e){
+			    auto neighbor = graph.CsrT::GetEdgeDest(e);
+			    if (mark[neighbor] || 
+				almost_eql(graph.CsrT::edge_values[reverse[e]], flow[reverse[e]]))
+				continue;
+			    if (height[neighbor] != H)
+				changed[0]++;
+				
+			    height[neighbor] = H;
+			    mark[neighbor] = true;
+			    queue[last++] = neighbor;
+			}
+		    }
+		    height[source] = graph.nodes;
+	};
+
+
 
         auto compute_lockfree_op =
 	        [graph, excess, capacity, flow, reverse, height, iteration, source,
