@@ -88,13 +88,13 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true>
                                   VertexT      *&d_column_indices,
                             const InKeyT       *&d_src_node_ids,
                             const VertexT      *&d_dst_node_ids,
-                            const ValueT       *&d_degrees,
-                                  ValueT        *&d_output_counts,
+                           //       ValueT        *&d_output_counts,
                                   OutKeyT      *&d_output_total,
                                   SizeT        &input_length,
                                   SizeT        &stride,
                                   SizeT        &num_vertex,
-                                  SizeT        &num_edge)
+                                  SizeT        &num_edge,
+                                  InterOpT     &inter_op)
     {
         VertexT start = threadIdx.x + blockIdx.x * blockDim.x;
         for (VertexT idx = start; idx < input_length; idx += KernelPolicyT::BLOCKS*KernelPolicyT::THREADS) {
@@ -121,7 +121,12 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true>
                 //printf("src:%d,dst:%d, src_it:%d, dst_it:%d, min_it:%d max_it:%d, min max nl size: %d, %d\n",sid, did, src_it, dst_it, min_it, max_it, min_nl, max_nl);
                 while (min_it < min_end) {
                     VertexT small_edge = d_column_indices[min_it++];
-                    count += BinarySearch(keys, max_nl, small_edge);
+                    //count += BinarySearch(keys, max_nl, small_edge);
+                    if (BinarySearch(keys, max_nl, small_edge) == 1)
+                    {
+                        printf("%d, %d\n", max_nl, small_edge);
+                        inter_op(max_nl, small_edge);
+                    }
                 }
             } else {
                 VertexT src_edge = __ldg(d_column_indices+src_it);
@@ -130,11 +135,16 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true>
                     VertexT diff = src_edge - dst_edge;
                     src_edge = (diff <= 0) ? __ldg(d_column_indices+(++src_it)) : src_edge;
                     dst_edge = (diff >= 0) ? __ldg(d_column_indices+(++dst_it)) : dst_edge;
-                    count += (diff == 0);
+                    //count += (diff == 0);
+                    if (diff == 0) 
+                    {
+                        printf("%d, %d\n", src_edge, dst_edge);
+                        inter_op(src_edge, dst_edge);
+                    }
                 }
             }
-            d_output_total[idx] += total;
-            d_output_counts[idx] += count;
+            //d_output_total[idx] += total;
+            //d_output_counts[idx] += count;
         }
 
     } // IntersectTwoSmallNL
@@ -182,13 +192,13 @@ template <
                   VertexT      *d_column_indices,
             const InKeyT       *d_src_node_ids,
             const VertexT      *d_dst_node_ids,
-            const ValueT       *d_degrees,
-            	  ValueT       *d_output_counts,
+      //      	  ValueT       *d_output_counts,
             	  OutKeyT      *d_output_total,
                   SizeT        input_length,
                   SizeT        stride,
                   SizeT        num_vertex,
-                  SizeT        num_edge)
+                  SizeT        num_edge,
+                  InterOpT     inter_op)
 {
     Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
 	::IntersectTwoSmallNL(
@@ -196,13 +206,13 @@ template <
             d_column_indices,
             d_src_node_ids,
             d_dst_node_ids,
-            d_degrees,
-            d_output_counts,
+      //      d_output_counts,
             d_output_total,
             input_length,
             stride,
             num_vertex,
-            num_edge);
+            num_edge,
+            inter_op);
 }
 
 template <
@@ -214,13 +224,12 @@ template <
     typename InterOpT>
 cudaError_t Launch(
     const GraphT                &graph,
-          typename ParametersT :: SizeT  *&row_offsets,
-          typename ParametersT :: SizeT  *&col_indices,
     const FrontierInT           * frontier_in,
           FrontierOutT          * frontier_out,
           ParametersT           &parameters,
           InterOpT              inter_op)
 {
+    typedef typename GraphT      ::CsrT   CsrT;
     typedef typename FrontierInT ::ValueT InKeyT;
     typedef typename FrontierOutT::ValueT OutKeyT;
     typedef typename ParametersT ::SizeT   SizeT;
@@ -243,17 +252,18 @@ cudaError_t Launch(
     
     IntersectTwoSmallNL<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
     <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS, 0, parameters.stream>>>(
-            row_offsets,
-            col_indices,
+            graph.CsrT::row_offsets.GetPointer(util::DEVICE),
+            graph.CsrT::column_indices.GetPointer(util::DEVICE),
             frontier_in -> GetPointer(util::DEVICE),
-            col_indices,
-            parameters.values_in -> GetPointer(util::DEVICE), //degrees
-	    parameters.values_out -> GetPointer(util::DEVICE),
+            graph.CsrT::column_indices.GetPointer(util::DEVICE),
+//            parameters.values_in -> GetPointer(util::DEVICE), //degrees
+//	    parameters.values_out -> GetPointer(util::DEVICE),
             frontier_out -> GetPointer(util::DEVICE),
             input_length,
             stride,
             num_vertex,
-            num_edges);
+            num_edges,
+            inter_op);
 
     //long total = mgpu::Reduce(frontier_out->GetPointer(util::DEVICE), input_length, parameters.context[0]);
     //long tc_count = mgpu::Reduce(parameters.values_out, input_length, parameters.context[0]);

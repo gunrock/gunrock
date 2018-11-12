@@ -125,29 +125,30 @@ struct SSIterationLoop : public IterationLoopBase
 
         // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
         // The intersection operation
-        auto intersect_op = [] __host__ __device__(
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> float
+        auto intersect_op = [scan_stats] __host__ __device__(
+            const VertexT &src, VertexT &dest) -> bool
         {
+            atomicAdd(scan_stats + src,  1);
+            atomicAdd(scan_stats + dest, 1);
+            
             return true;
         };
         frontier.queue_length = graph.nodes;
         frontier.queue_reset  = true;
-        frontier.V_Q()->Print();
-        frontier.Next_V_Q()->Print();
+//        frontier.V_Q()->Print();
+//        frontier.Next_V_Q()->Print();
         GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
-            oprtr_parameters, intersect_op,
-            row_offsets.GetPointer(util::DEVICE),
-            col_indices.GetPointer(util::DEVICE)));
+            oprtr_parameters, intersect_op));
 
-        util::PrintMsg("============After advance ============");
-        src_node_ids.Print();
+        util::PrintMsg("============After intersect ============");
+        scan_stats.Print();
+ /*       src_node_ids.Print();
+        row_offsets.Print();
         col_indices.Print();
         frontier.V_Q()->Print();
         frontier.Next_V_Q()->Print();
-
+*/
 
 
 	// // Sort the scan statistics values for each node in descending order

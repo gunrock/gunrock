@@ -202,12 +202,10 @@ cudaError_t Intersect(
     FrontierInT                 * frontier_in,
     FrontierOutT                * frontier_out,
     ParametersT                 &parameters,
-    OpT                         op,
-    typename ParametersT::SizeT * row_offsets,
-    typename ParametersT::SizeT * col_indices)
+    OpT                         op)
 {
     return oprtr::intersection::Launch<FLAG>(
-        graph, row_offsets, col_indices, frontier_in, frontier_out, parameters, op);
+        graph, frontier_in, frontier_out, parameters, op);
 }
 
 template <
