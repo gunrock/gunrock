@@ -92,6 +92,7 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &capacity = graph.edge_values;
     auto &reverse = data_slice.reverse;
     auto &flow = data_slice.flow;
+    auto &residuals = data_slice.residuals;
     auto &excess = data_slice.excess;
     auto &height = data_slice.height;
     auto &lowest_neighbor = data_slice.lowest_neighbor;
@@ -104,20 +105,29 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &changed = data_slice.changed;
 
     auto advance_preflow_op =
-        [capacity, flow, excess, height, reverse, source] __host__ __device__(
+        [capacity, flow, excess, height, reverse, source, residuals] 
+        __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             const SizeT &output_pos) -> bool {
-      if (!util::isValid(dest) or !util::isValid(src) or src != source)
+      if (!util::isValid(dest) or !util::isValid(src))
         return false;
-      flow[edge_id] = capacity[edge_id];
-      flow[reverse[edge_id]] = ((ValueT)0) - capacity[edge_id];
-      atomicAdd(&excess[dest], capacity[edge_id]);
+      if (dest != source)
+        residuals[edge_id] = capacity[edge_id];
+      if (src != source)
+        return false;
+      auto c = capacity[edge_id];
+      //flow[edge_id] = capacity[edge_id];
+      //flow[reverse[edge_id]] = ((ValueT)0) - capacity[edge_id];
+      //atomicAdd(&excess[dest], capacity[edge_id]);
+      residuals[edge_id] = 0;
+      residuals[reverse[edge_id]] = capacity[reverse[edge_id]] + c;
+      atomicAdd(excess + dest, c);
       return true;
     };
 
     auto global_relabeling_op =
-        [graph, source, sink, height, reverse, flow, queue, mark,
+        [graph, source, sink, height, reverse, queue, mark, residuals, //flow,
          changed] __host__
         __device__(VertexT * v_q, const SizeT &pos) {
           VertexT v = v_q[pos];
@@ -138,8 +148,9 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             for (auto e = e_start; e < e_end; ++e) {
               auto neighbor = graph.CsrT::GetEdgeDest(e);
               if (mark[neighbor] ||
-                  almost_eql(graph.CsrT::edge_values[reverse[e]],
-                             flow[reverse[e]]))
+                  //almost_eql(graph.CsrT::edge_values[reverse[e]],
+                  //           flow[reverse[e]]))
+                residuals[reverse[e]] < MF_EPSILON)
                 continue;
               if (height[neighbor] != H) changed[0]++;
 
@@ -152,68 +163,88 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         };
 
     auto compute_lockfree_op =
-        [graph, excess, capacity, flow, reverse, height, iteration, source,
+        [graph, excess, /*capacity, flow,*/ residuals, reverse, height, iteration, source,
          sink, active] __host__
         __device__(const int &counter, const VertexT &v) {
           // VertexT v = v_q[pos];
           if (v == 0) active[(counter + 1) % 2] = 0;
 
           // if not a valid vertex, do not apply compute:
-          if (!util::isValid(v) || v == source || v == sink || excess[v] <= 0 ||
-              graph.CsrT::GetNeighborListLength(v) == 0)
+          if (!util::isValid(v) || v == source || v == sink)
+            return; 
+
+          VertexT neighbor_num = graph.CsrT::GetNeighborListLength(v);
+          ValueT  excess_v = excess[v];
+          if (excess_v < MF_EPSILON || neighbor_num == 0)
             return;
 
           // else, try push-relable:
           VertexT e_start = graph.CsrT::GetNeighborListOffset(v);
-          VertexT neighbor_num = graph.CsrT::GetNeighborListLength(v);
           VertexT e_end = e_start + neighbor_num;
-          int iter = 0;
-          if (excess[v] > (ValueT)0) {
+          //int iter = 0;
+          //if (excess[v] > (ValueT)0) {
             debug_aml("excess[%d] = %lf\n", v, excess[v]);
 
             VertexT lowest_id = util::PreDefinedValues<VertexT>::InvalidValue;
-            VertexT lowest_h;
-
+            VertexT lowest_h  = util::PreDefinedValues<VertexT>::MaxValue;;
+            ValueT  lowest_r  = 0;
+            VertexT lowest_n  = 0;
             // look for lowest height among neighbors
             for (VertexT e_id = e_start; e_id < e_end; ++e_id) {
+              ValueT  r = residuals[e_id];//capacity[e_id] - flow[e_id];
+              if (r < MF_EPSILON)
+                continue;
               VertexT n = graph.CsrT::GetEdgeDest(e_id);
-              if ((capacity[e_id] - flow[e_id] > (ValueT)0) &&
-                  (!util::isValid(lowest_id) || height[n] < lowest_h)) {
+              VertexT h = height[n];
+              if //((r > MF_EPSILON) &&
+                  (h < lowest_h) {
                 lowest_id = e_id;
-                lowest_h = height[n];
+                lowest_h = h;
+                lowest_r = r;
+                lowest_n = n;
               }
             }
 
             // if a valid lowest h was found:
-            if (util::isValid(lowest_id)) {
+            //if (util::isValid(lowest_id)) {
+              if (!util::isValid(lowest_id))
+                return;
+              active[counter % 2] = 1;
               if (lowest_h < height[v]) {
                 // push
-                ValueT f =
-                    fminf(capacity[lowest_id] - flow[lowest_id], excess[v]);
-                ValueT old = atomicAdd(&excess[v], -f);
-                if (f > 0 && (old > f || almost_eql(old, f))) {
-                  VertexT l_dest = graph.CsrT::GetEdgeDest(lowest_id);
-                  atomicAdd(&excess[l_dest], f);
-                  atomicAdd(&flow[lowest_id], f);
-                  atomicAdd(&flow[reverse[lowest_id]], -f);
+                //ValueT f =
+                //    fminf(capacity[lowest_id] - flow[lowest_id], excess[v]);
+                //ValueT old = atomicAdd(excess + v, -f);
+                //if (f > 0 && (old > f || almost_eql(old, f))) {
+                  ValueT f = fminf(lowest_r, excess_v);
+                  atomicAdd(excess + v, -f);
+                  //VertexT l_dest = graph.CsrT::GetEdgeDest(lowest_id);
+                  //atomicAdd(excess + l_dest, f);
+                  atomicAdd(excess + lowest_n, f);
+                  //atomicAdd(&flow[lowest_id], f);
+                  //flow[lowest_id] += f;
+                  residuals[lowest_id] -= f;
+                  //atomicAdd(&flow[reverse[lowest_id]], -f);
+                  //flow[reverse[lowest_id]] -= f;
+                  residuals[reverse[lowest_id]] += f;
                   debug_aml("push, %lf, %d->%d, e[%d] = %lf\n", f, v, l_dest,
                              l_dest, excess[l_dest]);
 
-                  active[(counter) % 2] = 1;
+                  //active[(counter) % 2] = 1;
 
-                } else {
-                  atomicAdd(&excess[v], f);
-                  debug_aml("push back, %lf, %lf\n", f, excess[v]);
-                }
+                //} else {
+                //  atomicAdd(excess + v, f);
+                //  debug_aml("push back, %lf, %lf\n", f, excess[v]);
+                //}
               } else {
                 // relabel
                 height[v] = lowest_h + 1;
                 debug_aml("relabel, %d new height %d\n", v, lowest_h + 1);
 
-                active[(counter) % 2] = 1;
+                //active[(counter) % 2] = 1;
               }
-            }
-          }
+            //}
+          //}
         };
 
     if (iteration == 0) {
@@ -233,15 +264,17 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     }
 
     // Global relabeling
-    if (was_changed == true and (iteration % 50 == 0)) {
+    if (was_changed == true) {// and (iteration % 50 == 0)) {
       debug_aml("iteration %d, relabeling\n", iteration);
 
       // Serial relabeling on the GPU (ignores moves)
       GUARD_CU(frontier.V_Q()->ForAll(global_relabeling_op, 1, util::DEVICE,
                                       oprtr_parameters.stream));
-      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      //GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
 
       changed.Move(util::DEVICE, util::HOST, 1, 0, oprtr_parameters.stream);
+      GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+            "cudaStreamSynchronize failed");
       if (changed[0] > 0) was_changed = true;
       debug_aml("iteration %d, relabeling finished\n", iteration);
     }
@@ -270,13 +303,25 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
     //        "cudaStreamSynchronize failed");
 
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+    //GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
     active.Move(util::DEVICE, util::HOST, 2, 0, oprtr_parameters.stream);
 
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+    //GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
 
-    // GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-    //        "cudaStreamSynchronize failed");
+    GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+        "cudaStreamSynchronize failed");
+   
+    if (active[0] == 0 && active[1] == 0)
+    {
+        GUARD_CU(oprtr::For(
+            [residuals, capacity, flow] __host__ __device__ (const SizeT &e)
+            {
+                flow[e] = capacity[e] - residuals[e];
+            }, graph.edges, util::DEVICE, oprtr_parameters.stream));
+
+        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+            "cudaStreamSynchronize failed");
+    } 
     return retval;
   }
 
@@ -346,6 +391,8 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
       return true;
     }
 
+    //if (enactor_slice.enactor_stats.iteration > 1)
+    //    return true;
     if (data_slice.active[0] > 0 || data_slice.active[1] > 0) return false;
     return true;
   }
