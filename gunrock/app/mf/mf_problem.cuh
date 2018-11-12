@@ -66,12 +66,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   struct DataSlice : BaseDataSlice {
     // MF-specific storage arrays:
     util::Array1D<SizeT, ValueT> flow;             // edge flow
+    util::Array1D<SizeT, ValueT> residuals;        // edge residuals
     util::Array1D<SizeT, ValueT> excess;           // vertex excess
     util::Array1D<SizeT, VertexT> height;          // vertex height
     util::Array1D<SizeT, VertexT> reverse;         // id reverse edge
     util::Array1D<SizeT, SizeT> lowest_neighbor;   // id lowest neighbor
     util::Array1D<SizeT, VertexT> local_vertices;  // set of vertices
-    util::Array1D<SizeT, SizeT> active;            // flag active vertices
+    util::Array1D<SizeT, SizeT, util::PINNED> active;            // flag active vertices
 
     util::Array1D<SizeT, VertexT> head;
     util::Array1D<SizeT, VertexT> tail;
@@ -87,7 +88,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     int num_repeats;
     SizeT num_updated_vertices;
     bool was_changed;  // flag relabeling
-    util::Array1D<SizeT, SizeT> changed;
+    util::Array1D<SizeT, SizeT, util::PINNED> changed;
 
     /*
      * @brief Default constructor
@@ -101,6 +102,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       reverse.SetName("reverse");
       excess.SetName("excess");
       flow.SetName("flow");
+      residuals.SetName("residuals");
       height.SetName("height");
       lowest_neighbor.SetName("lowest_neighbor");
       local_vertices.SetName("local_vertices");
@@ -131,6 +133,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(excess.Release(target));
       GUARD_CU(flow.Release(target));
+      GUARD_CU(residuals.Release(target));
       GUARD_CU(height.Release(target));
       GUARD_CU(reverse.Release(target));
       GUARD_CU(lowest_neighbor.Release(target));
@@ -174,6 +177,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // Allocate data on Gpu
       //
       GUARD_CU(flow.Allocate(edges_size, util::HOST | target));
+      GUARD_CU(residuals.Allocate(edges_size, target));
       GUARD_CU(reverse.Allocate(edges_size, target));
       GUARD_CU(excess.Allocate(nodes_size, target));
       GUARD_CU(height.Allocate(nodes_size, util::HOST | target));
@@ -216,6 +220,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // Ensure data are allocated
       GUARD_CU(active.EnsureSize_(2, target | util::HOST));
       GUARD_CU(flow.EnsureSize_(edges_size, target));
+      GUARD_CU(residuals.EnsureSize_(edges_size, target));
       GUARD_CU(reverse.EnsureSize_(edges_size, target));
       GUARD_CU(excess.EnsureSize_(nodes_size, target));
       GUARD_CU(height.EnsureSize_(nodes_size, target | util::HOST));

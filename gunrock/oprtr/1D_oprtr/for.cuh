@@ -243,7 +243,7 @@ cudaError_t RepeatFor2(
         retval = For([op, r] __host__ __device__ (const ForIterT &i)
         {
             op(r, i);
-        }, loop_size, target, stream);
+        }, loop_size, target, stream, grid_size, block_size);
         if (retval)
             return retval;
     }
