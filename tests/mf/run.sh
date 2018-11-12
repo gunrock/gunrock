@@ -16,7 +16,20 @@ do
     fi
 done
 
-DEFAULT="--device=0 --quick=true"
+DEVICE=0
+for i in "$@"
+do
+	case $i in
+		--device=*)
+		DEVICE="${1#*=}"
+		shift
+		;;
+		*)
+		;;
+esac
+done
+
+DEFAULT="--device=${DEVICE} --quick=true"
 
 OPTION[0]=${DEFAULT}" --source=0 --sink=3"
 OPTION[1]=${DEFAULT}" --source=3 --sink=0"
