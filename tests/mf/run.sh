@@ -17,11 +17,16 @@ do
 done
 
 DEVICE=0
+OUTPUTDIR="eval"
 for i in "$@"
 do
 	case $i in
-		--device=*)
+	--device=*)
 		DEVICE="${1#*=}"
+		shift
+		;;
+	--output-dir=*)
+		OUTPUTDIR="${1#*=}"
 		shift
 		;;
 		*)
@@ -69,29 +74,29 @@ NAME[8]="file" #0 -> 13
 for k in {0..4}
 do
     SUFFIX="bowser_ubuntu18.04_GV100"
-    mkdir -p eval/$SUFFIX
+    mkdir -p $OUTPUTDIR/$SUFFIX
 
-    echo $EXCUTION market $DATADIR/${NAME[$k]}.mtx ${OPTION[$k]} "> eval/$SUFFIX/${NAME[$k]}_$SUFFIX.txt"
-    $EXCUTION market $DATADIR/${NAME[$k]}.mtx ${OPTION[$k]} > eval/$SUFFIX/${NAME[$k]}_$SUFFIX.txt
+    echo $EXCUTION market $DATADIR/${NAME[$k]}.mtx ${OPTION[$k]} "> $OUTPUTDIR/$SUFFIX/${NAME[$k]}_$SUFFIX.txt"
+    $EXCUTION market $DATADIR/${NAME[$k]}.mtx ${OPTION[$k]} > $OUTPUTDIR/$SUFFIX/${NAME[$k]}_$SUFFIX.txt
     sleep 1
 done
 
 for k in {5..7}
 do
     SUFFIX="bowser_ubuntu18.04_GV100"
-    mkdir -p eval/$SUFFIX
+    mkdir -p $OUTPUTDIR/$SUFFIX
 
-    echo $EXCUTION market $LARGEDIR/${SUBDIR[$k]}/${NAME[$k]}.mtx ${OPTION[$k]} "> eval/$SUFFIX/${SUBDIR[$k]}_${NAME[$k]}_$SUFFIX.txt"
-	$EXCUTION market $LARGEDIR/${SUBDIR[$k]}/${NAME[$k]}.mtx ${OPTION[$k]} > eval/$SUFFIX/${SUBDIR[$k]}_${NAME[$k]}_$SUFFIX.txt
+    echo $EXCUTION market $LARGEDIR/${SUBDIR[$k]}/${NAME[$k]}.mtx ${OPTION[$k]} "> $OUTPUTDIR/$SUFFIX/${SUBDIR[$k]}_${NAME[$k]}_$SUFFIX.txt"
+	$EXCUTION market $LARGEDIR/${SUBDIR[$k]}/${NAME[$k]}.mtx ${OPTION[$k]} > $OUTPUTDIR/$SUFFIX/${SUBDIR[$k]}_${NAME[$k]}_$SUFFIX.txt
     sleep 1
 done
 
 for k in {0..13}
 do
     SUFFIX="bowser_ubuntu18.04_GV100"
-    mkdir -p eval/$SUFFIX
+    mkdir -p $OUTPUTDIR/$SUFFIX
 
-    echo $EXCUTION market $LARGEDIR/largest/${NAME[8]}${k}.mtx ${OPTION[8]} "> eval/$SUFFIX/${NAME[8]}${k}_$SUFFIX.txt"
-	$EXCUTION market $LARGEDIR/largest/${NAME[8]}${k}.mtx ${OPTION[8]} > eval/$SUFFIX/${NAME[8]}${k}_$SUFFIX.txt
+    echo $EXCUTION market $LARGEDIR/largest/${NAME[8]}${k}.mtx ${OPTION[8]} "> $OUTPUTDIR/$SUFFIX/${NAME[8]}${k}_$SUFFIX.txt"
+	$EXCUTION market $LARGEDIR/largest/${NAME[8]}${k}.mtx ${OPTION[8]} > $OUTPUTDIR/$SUFFIX/${NAME[8]}${k}_$SUFFIX.txt
     sleep 1
 done
