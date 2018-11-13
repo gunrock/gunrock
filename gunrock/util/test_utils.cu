@@ -40,7 +40,7 @@ void DeviceInit(CommandLineArgs &args)
             devs[0] = deviceCount - 1;
         }
     }
-    for (int i=0;i<devs.size();i++)
+    for (unsigned long i=0;i<devs.size();i++)
     {
         cudaDeviceProp deviceProp;
         cudaGetDeviceProperties(&deviceProp, devs[i]);
