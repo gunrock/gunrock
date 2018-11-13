@@ -98,15 +98,15 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true>
     {
         VertexT start = threadIdx.x + blockIdx.x * blockDim.x;
         for (VertexT idx = start; idx < input_length; idx += KernelPolicyT::BLOCKS*KernelPolicyT::THREADS) {
-            SizeT count = 0;
             // get nls start and end index for two ids
             VertexT sid = __ldg(d_src_node_ids+idx);
             VertexT did = __ldg(d_dst_node_ids+idx);
+            if (sid >= did) continue;
             SizeT src_it = __ldg(d_row_offsets+sid);
             SizeT src_end = __ldg(d_row_offsets+sid+1);
             SizeT dst_it = __ldg(d_row_offsets+did);
             SizeT dst_end = __ldg(d_row_offsets+did+1);
-            if (src_it == src_end || dst_it == dst_end) continue;
+            if (src_it >= src_end || dst_it >= dst_end) continue;
             SizeT src_nl_size = src_end - src_it;
             SizeT dst_nl_size = dst_end - dst_it;
             SizeT min_nl = (src_nl_size > dst_nl_size) ? dst_nl_size : src_nl_size;
@@ -118,33 +118,26 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true>
                 SizeT min_end = min_it + min_nl;
                 SizeT max_it = (src_nl_size < dst_nl_size) ? dst_it : src_it;
                 VertexT *keys = &d_column_indices[max_it];
-                //printf("src:%d,dst:%d, src_it:%d, dst_it:%d, min_it:%d max_it:%d, min max nl size: %d, %d\n",sid, did, src_it, dst_it, min_it, max_it, min_nl, max_nl);
                 while (min_it < min_end) {
                     VertexT small_edge = d_column_indices[min_it++];
-                    //count += BinarySearch(keys, max_nl, small_edge);
                     if (BinarySearch(keys, max_nl, small_edge) == 1)
                     {
-                        printf("%d, %d\n", max_nl, small_edge);
-                        inter_op(max_nl, small_edge);
+                        inter_op(small_edge);
                     }
                 }
             } else {
                 VertexT src_edge = __ldg(d_column_indices+src_it);
                 VertexT dst_edge = __ldg(d_column_indices+dst_it);
                 while (src_it < src_end && dst_it < dst_end) {
-                    VertexT diff = src_edge - dst_edge;
-                    src_edge = (diff <= 0) ? __ldg(d_column_indices+(++src_it)) : src_edge;
-                    dst_edge = (diff >= 0) ? __ldg(d_column_indices+(++dst_it)) : dst_edge;
-                    //count += (diff == 0);
+                    int diff = src_edge - dst_edge;
                     if (diff == 0) 
                     {
-                        printf("%d, %d\n", src_edge, dst_edge);
-                        inter_op(src_edge, dst_edge);
+                        inter_op(src_edge);
                     }
+                    src_edge = (diff <= 0) ? __ldg(d_column_indices+(++src_it)) : src_edge;
+                    dst_edge = (diff >= 0) ? __ldg(d_column_indices+(++dst_it)) : dst_edge;
                 }
             }
-            //d_output_total[idx] += total;
-            //d_output_counts[idx] += count;
         }
 
     } // IntersectTwoSmallNL
@@ -240,15 +233,12 @@ cudaError_t Launch(
         OutKeyT, SizeT, ValueT, VertexT, InterOpT, 
 	true>::KernelPolicyT KernelPolicyT;
 
-//    SizeT grid_size = (parameters.frontier -> queue_reset) ?
-//        (parameters.frontier -> queue_length / KernelPolicyT::THREADS + 1) :
-//        (parameters.cuda_props -> device_props.multiProcessorCount * KernelPolicyT::CTA_OCCUPANCY);
 
-    size_t input_length = graph.edges / 2;
+    size_t input_length = graph.edges;
     size_t stride = (input_length + KernelPolicyT::BLOCKS * KernelPolicyT::THREADS - 1)
                         >> (KernelPolicyT::LOG_THREADS + KernelPolicyT::LOG_BLOCKS);
     SizeT num_vertex = graph.nodes;
-    SizeT num_edges  = graph.edges / 2;
+    SizeT num_edges  = graph.edges;
     
     IntersectTwoSmallNL<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
     <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS, 0, parameters.stream>>>(
@@ -256,8 +246,6 @@ cudaError_t Launch(
             graph.CsrT::column_indices.GetPointer(util::DEVICE),
             frontier_in -> GetPointer(util::DEVICE),
             graph.CsrT::column_indices.GetPointer(util::DEVICE),
-//            parameters.values_in -> GetPointer(util::DEVICE), //degrees
-//	    parameters.values_out -> GetPointer(util::DEVICE),
             frontier_out -> GetPointer(util::DEVICE),
             input_length,
             stride,
@@ -265,9 +253,6 @@ cudaError_t Launch(
             num_edges,
             inter_op);
 
-    //long total = mgpu::Reduce(frontier_out->GetPointer(util::DEVICE), input_length, parameters.context[0]);
-    //long tc_count = mgpu::Reduce(parameters.values_out, input_length, parameters.context[0]);
-    //printf("tc_total:%ld\n, tc_count:%ld\n", total, tc_count);
     return cudaSuccess;//(float)tc_count / (float)total;
 }
 

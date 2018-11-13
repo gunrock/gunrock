@@ -204,8 +204,11 @@ cudaError_t Intersect(
     ParametersT                 &parameters,
     OpT                         op)
 {
-    return oprtr::intersection::Launch<FLAG>(
-        graph, frontier_in, frontier_out, parameters, op);
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(oprtr::intersection::Launch<FLAG>(
+        graph, frontier_in, frontier_out, parameters, op));
+
+    return retval;
 }
 
 template <

@@ -96,61 +96,24 @@ struct SSIterationLoop : public IterationLoopBase
             }, graph.nodes, target, stream));
 
         scan_stats.Print();
-        // Prune edges where src_id > dest_id to avoid visiting the same edge twice later
-        // The advance operation
-        auto advance_op = [src_node_ids]
-        __host__ __device__ (
-            const VertexT &src, VertexT &dest,
-            const SizeT &edge_id,
-            const VertexT &input_item,
-            const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            bool res = src < dest;
-            VertexT id = (res) ? 1 : 0;
-//            src_node_ids[edge_id] = id;
-            Store(src_node_ids + edge_id, id);
-            return res;
-        };
-
-        // The filter operation
-        auto filter_op = [] __host__ __device__(
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            if (!util::isValid(dest)) return false;
-            return true;
-        };
-
         // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
         // The intersection operation
         auto intersect_op = [scan_stats] __host__ __device__(
-            const VertexT &src, VertexT &dest) -> bool
+            VertexT &src) -> bool
         {
-            atomicAdd(scan_stats + src,  1);
-            atomicAdd(scan_stats + dest, 1);
+            atomicAdd(scan_stats + src,  (VertexT)1);
             
             return true;
         };
-        frontier.queue_length = graph.nodes;
+        frontier.queue_length = graph.edges;
         frontier.queue_reset  = true;
 //        frontier.V_Q()->Print();
-//        frontier.Next_V_Q()->Print();
         GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
             oprtr_parameters, intersect_op));
 
         util::PrintMsg("============After intersect ============");
         scan_stats.Print();
- /*       src_node_ids.Print();
-        row_offsets.Print();
-        col_indices.Print();
-        frontier.V_Q()->Print();
-        frontier.Next_V_Q()->Print();
-*/
-
-
 	// // Sort the scan statistics values for each node in descending order
  //        GUARD_CU(util::cubSortPairs(
  //            cub_temp_space,
@@ -158,7 +121,7 @@ struct SSIterationLoop : public IterationLoopBase
  //            nodes,      nodes1,
  //            graph.nodes, 0, sizeof(ValueT) * 8, stream));
 
- //        return retval;
+        return retval;
     }
 
     /**
@@ -336,24 +299,38 @@ public:
      * @param[in] target Target location of data
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Reset(VertexT src, SizeT num_srcs, util::Location target = util::DEVICE)
+    cudaError_t Reset(SizeT num_srcs, util::Location target = util::DEVICE)
     {
         typedef typename GraphT::GpT GpT;
+        typedef typename GraphT::CsrT CsrT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
-           if ((this->num_gpus == 1) ||
-                (gpu == this->problem->org_graph->GpT::partition_table[src])) {
+           if ((this->num_gpus == 1)) 
+            //|| (gpu == this->problem->org_graph->GpT::partition_table[src])) 
+           {
                this -> thread_slices[gpu].init_size = num_srcs;
                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
                    auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                   frontier.queue_length = (peer_ == 0) ? 1 : 0;
+                   frontier.queue_length = (peer_ == 0) ? num_srcs : 0;
                    if (peer_ == 0) {
-                       GUARD_CU(frontier.V_Q() -> ForEach(
-                           [src]__host__ __device__ (VertexT &v) {
+                        auto &graph = this->problem->sub_graphs[gpu];
+                        util::Array1D<SizeT, VertexT> tmp_srcs;
+                        tmp_srcs.Allocate(num_srcs, target | util::HOST);
+                        int count = 0, pos = 0;
+                        for(SizeT i = 0; i < graph.nodes; ++i) {
+                            for (SizeT j = graph.CsrT::row_offsets[i]; j < graph.CsrT::row_offsets[i+1]; ++j) {
+                                tmp_srcs[pos++] = count;
+                            }
+                            count++;
+                        }
+                        GUARD_CU(tmp_srcs.Move(util::HOST, target));
+
+                       GUARD_CU(frontier.V_Q() -> ForEach(tmp_srcs,
+                           []__host__ __device__ (VertexT &v, VertexT &src) {
                            v = src;
-                       }, 1, target, 0));
+                       }, num_srcs, target, 0));
                    }
                }
            } else {

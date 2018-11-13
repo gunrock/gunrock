@@ -84,7 +84,8 @@ cudaError_t RunTests(
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
         GUARD_CU(problem.Reset(target));
-        GUARD_CU(enactor.Reset(graph.nodes, target));
+        printf("edges:%d\n", graph.edges);
+        GUARD_CU(enactor.Reset(graph.edges, target));
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
