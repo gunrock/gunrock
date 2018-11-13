@@ -57,9 +57,12 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
-      "num-repeats",
+      "num-repeats", 
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-      10000, "Number of repeats for ReapetFor operator", __FILE__, __LINE__));
+      util::PreDefinedValues<int>::InvalidValue,
+      "Number of repeats for ReapetFor operator\n"
+      "\tDefault num-repeats is linear from number of vertices", 
+      __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
       "seed",

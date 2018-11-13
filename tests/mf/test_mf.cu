@@ -81,6 +81,11 @@ struct main_struct {
     VertexT sink = parameters.Get<VertexT>("sink");
     int num_repeats = parameters.Get<int>("num-repeats");
 
+    if (num_repeats == util::PreDefinedValues<int>::InvalidValue){
+	    num_repeats = max(10, static_cast<int>(pow(10, floor(log10(u_graph.nodes)))));
+	    parameters.Set<int>("num-repeats", num_repeats);
+   }
+
     util::PrintMsg("Number of ForAll() repeats per iteration: " +
                        std::to_string(num_repeats),
                    !quiet);
