@@ -106,6 +106,7 @@ struct SSIterationLoop : public IterationLoopBase
             return true;
         };
         frontier.queue_length = graph.edges;
+//        row_offsets.Print();
         frontier.queue_reset  = true;
 //        frontier.V_Q()->Print();
         GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
@@ -318,16 +319,17 @@ public:
                         auto &graph = this->problem->sub_graphs[gpu];
                         util::Array1D<SizeT, VertexT> tmp_srcs;
                         tmp_srcs.Allocate(num_srcs, target | util::HOST);
-                        int count = 0, pos = 0;
+                        int pos = 0;
+                        printf("edges:%d, num_srcs:%d, nodes:%d\n", graph.edges, num_srcs, graph.nodes);
                         for(SizeT i = 0; i < graph.nodes; ++i) {
                             for (SizeT j = graph.CsrT::row_offsets[i]; j < graph.CsrT::row_offsets[i+1]; ++j) {
-                                tmp_srcs[pos++] = count;
+                                tmp_srcs[pos++] = i;
                             }
-                            count++;
                         }
                         GUARD_CU(tmp_srcs.Move(util::HOST, target));
+                        GUARD_CU(frontier.V_Q() -> EnsureSize_(graph.edges, target));
 
-                       GUARD_CU(frontier.V_Q() -> ForEach(tmp_srcs,
+                        GUARD_CU(frontier.V_Q() -> ForEach(tmp_srcs,
                            []__host__ __device__ (VertexT &v, VertexT &src) {
                            v = src;
                        }, num_srcs, target, 0));
