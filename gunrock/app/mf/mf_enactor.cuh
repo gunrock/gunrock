@@ -88,7 +88,6 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto source = data_slice.source;
     auto sink = data_slice.sink;
     auto num_repeats = data_slice.num_repeats;
-    bool &was_changed = data_slice.was_changed;
     auto &capacity = graph.edge_values;
     auto &reverse = data_slice.reverse;
     auto &flow = data_slice.flow;
@@ -102,7 +101,6 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     null_ptr = NULL;
     auto &mark = data_slice.mark;
     auto &queue = data_slice.queue;
-    auto &changed = data_slice.changed;
 
     auto advance_preflow_op =
         [capacity, flow, excess, height, reverse, source, residuals] __host__
@@ -120,13 +118,11 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     };
 
     auto global_relabeling_op =
-        [graph, source, sink, height, reverse, queue, residuals,
-         changed] __host__
+        [graph, source, sink, height, reverse, queue, residuals] __host__
         __device__(VertexT * v_q, const SizeT &pos) {
           VertexT first = 0, last = 0;
           queue[last++] = sink;
           auto H = (VertexT)0;
-          changed[0] = 0;
           height[sink] = 0;
           while (first < last) {
             auto v = queue[first++];
@@ -139,7 +135,6 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
               if (residuals[reverse[e]] < MF_EPSILON) continue;
               if (height[neighbor] > H + 1) {
                 height[neighbor] = H + 1;
-                changed[0]++;
                 queue[last++] = neighbor;
               }
             }
@@ -159,7 +154,6 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
               auto neighbor = graph.CsrT::GetEdgeDest(e);
               if (residuals[reverse[e]] < MF_EPSILON) continue;
               if (height[neighbor] > H + 1) {
-                changed[0]++;
                 height[neighbor] = H + 1;
                 queue[last++] = neighbor;
               }
@@ -222,7 +216,6 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         };
 
     if (iteration == 0) {
-      was_changed = true;
       // ADVANCE_PREFLOW_OP
       oprtr_parameters.advance_mode = "ALL_EDGES";
       GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
@@ -235,7 +228,6 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     }
 
     // Global relabeling
-    if (was_changed == true) {
       // Height reset
       GUARD_CU(height.ForAll(
           [source, sink, graph] __host__ __device__(VertexT * h,
@@ -252,7 +244,6 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
       // Serial relabeling on the GPU (ignores moves)
       GUARD_CU(frontier.V_Q()->ForAll(global_relabeling_op, 1, util::DEVICE,
                                       oprtr_parameters.stream));
-    }
 
     debug_aml("[%d]frontier que length before compute op is %d\n", iteration,
               frontier.queue_length);
