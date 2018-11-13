@@ -17,7 +17,7 @@
 
 #pragma once
 
-#define MF_EPSILON 0.000002
+#define MF_EPSILON 0.000001
 #define MF_EPSILON_VALIDATE 1e-3
 
 namespace gunrock {

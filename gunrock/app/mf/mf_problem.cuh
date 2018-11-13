@@ -207,7 +207,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * \return    cudaError_t Error message(s), if any
      */
     cudaError_t Reset(const GraphT &graph, const VertexT source,
-                      VertexT *h_reverse,
+                      const VertexT sink, VertexT *h_reverse,
                       util::Location target = util::DEVICE) {
       cudaError_t retval = cudaSuccess;
       typedef typename GraphT::CsrT CsrT;
@@ -255,10 +255,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       this->num_updated_vertices = 1;
       // Reset data
-      GUARD_CU(
-          height.ForAll([] __host__ __device__(
-                            VertexT * h, const VertexT &pos) { h[pos] = 0; },
-                        nodes_size, target, this->stream));
+      GUARD_CU(height.ForAll(
+					[source, sink, nodes_size] 
+					__host__ __device__( VertexT * h, const VertexT &pos) { 
+						if (pos == source)
+	    				h[pos] = nodes_size; 
+	    			else //if (pos == sink)
+	    				h[pos] = 0;
+	    			//else
+	    			 // h[pos] = 2 * nodes_size + 1;
+					},
+					nodes_size, target, this->stream));
 
       GUARD_CU(flow.ForAll(
           [] __host__ __device__(ValueT * f, const VertexT &pos) {
@@ -431,7 +438,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // Set device
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       GUARD_CU(
-          data_slices[gpu]->Reset(graph, source_vertex, h_reverse, target));
+          data_slices[gpu]->Reset(graph, source_vertex, sink_vertex, h_reverse, target));
       GUARD_CU(data_slices[gpu].Move(util::HOST, target));
     }
 
