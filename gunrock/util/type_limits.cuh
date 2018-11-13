@@ -14,6 +14,7 @@
 
 #pragma once
 #include <limits>
+#include <cfloat>
 
 namespace gunrock {
 namespace util {

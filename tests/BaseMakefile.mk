@@ -35,7 +35,7 @@ GEN_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
 # GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 
 # SM_TARGETS = #$(GEN_SM30) #$(GEN_SM35) $(GEN_SM30) $(GEN_SM60) $(GEN_SM61)
-SM_TARGETS = $(GEN_SM70)
+SM_TARGETS = $(GEN_SM70) $(GEN_SM60)
 #-------------------------------------------------------------------------------
 # Libs
 #-------------------------------------------------------------------------------
@@ -98,7 +98,7 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -lineinfo --std=c++11 --expt-extended-lambda #-ccbin=g++-4.8
+NVCCFLAGS = -lineinfo --std=c++11 --expt-extended-lambda -rdc=true #-ccbin=g++-4.8
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
