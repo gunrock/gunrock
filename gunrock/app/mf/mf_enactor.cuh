@@ -280,7 +280,7 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     active.Move(util::DEVICE, util::HOST, 2, 0, oprtr_parameters.stream);
 
-//    GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),\
+    GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
               "cudaStreamSynchronize failed");
 
     if (active[0] == 0 && active[1] == 0) {
@@ -289,7 +289,7 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             flow[e] = capacity[e] - residuals[e];
           },
           graph.edges, util::DEVICE, oprtr_parameters.stream));
-      //GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),\
+      GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
                 "cudaStreamSynchronize failed");
     }
     return retval;
