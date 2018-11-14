@@ -70,8 +70,8 @@ struct main_struct
                 ref_scan_stats
             );
 
-            util::PrintMsg("__________________________\nRun CPU Reference "
-                + std::to_string(0) + " elapsed: "
+            util::PrintMsg("__________________________\nRun CPU Reference Avg. in "
+                + std::to_string(num_runs) + " iterations elapsed: "
                 + std::to_string(elapsed)
                 + " ms", !quiet);
         }
