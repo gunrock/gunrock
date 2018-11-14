@@ -23,6 +23,7 @@ namespace knn {
  * KNN Testing Routines
  *****************************************************************************/
 
+
 /**
  * @brief Simple CPU-based reference knn ranking implementations
  * @tparam      GraphT        Type of the graph
@@ -34,22 +35,50 @@ namespace knn {
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    // <TODO> add problem specific inputs and outputs 
+    int k, // number of nearest neighbor
+    typename GraphT::VertexT point_x, // index of reference point
+    typename GraphT::VertexT point_y, // index of reference point
     typename GraphT::ValueT *degrees,
-    // </TODO>
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
+    typedef typename GraphT::ValueT ValueT;
+    typedef typename GraphT::VertexT VertexT;
     
+struct Point{
+   VertexT x;
+   VertexT y;
+   VertexT dist;
+   Point(){}
+   Point(VertexT X, VertexT Y, VertexT Dist):x(X),y(Y),dist(Dist){}
+};   
+
+struct comp{
+ inline bool operator()(const Point& p1, const Point& p2){
+   return (p1.dist < p2.dist);
+}
+};
+ 
+    Point* distance = (Point*)malloc(sizeof(Point)*graph.edges); 
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
-    
-    // <TODO> 
+   
     // implement CPU reference implementation
-    for(SizeT v = 0; v < graph.nodes; ++v) {
-        degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
+    for (VertexT x = 0; x < graph.nodes; ++x) {
+	for (SizeT i = graph.row_offsets[x]; i < graph.row_offsets[x + 1]; ++i) {
+    	    VertexT y = graph.column_indices[i];		
+	    VertexT dist = (x-point_x) * (x-point_x) + (y-point_y) * (y-point_y);
+	    distance[i] = Point(x, y, dist);
+	}
     }
-    // </TODO>
+
+    std::sort(distance, distance + graph.edges, comp());
+
+    for (int i = 0; i < k; ++i){
+	// k nearest points to (point_x, pointy)
+	fprintf(stderr, "(%d, %d), ", distance[i].x, distance[i].y);
+    }
+    printf("\n");
     
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
@@ -83,9 +112,9 @@ typename GraphT::SizeT Validate_Results(
     bool quiet = parameters.Get<bool>("quiet");
 
     // <TODO> result validation and display
-    for(SizeT v = 0; v < graph.nodes; ++v) {
+    /*for(SizeT v = 0; v < graph.nodes; ++v) {
         printf("%d %d %d\n", v, h_degrees[v], ref_degrees[v]);
-    }
+    }*/
     // </TODO>
 
     if(num_errors == 0) {

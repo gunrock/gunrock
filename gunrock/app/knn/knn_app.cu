@@ -35,9 +35,24 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(parameters.Use<int>(
         "k",
         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-        "10",
+        10,
         "Numbers of k neighbors.",
         __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "x",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        0,
+        "Index of reference point.",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "y",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        0,
+        "Index of reference point.",
+        __FILE__, __LINE__));
+
 
     return retval;
 }

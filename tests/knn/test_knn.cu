@@ -48,8 +48,15 @@ struct main_struct
         bool quick = parameters.Get<bool>("quick");
         bool quiet = parameters.Get<bool>("quiet");
 
-        typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-            graph::HAS_EDGE_VALUES | graph::HAS_CSR>
+	// Get number of nearest neighbors, default k = 10
+	int k = parameters.Get<int>("k"); 
+	// Get x reference point, default point_id = 0
+	VertexT point_x = parameters.Get<VertexT>("x");
+
+	// Get y reference point, default point_id = 0
+	VertexT point_y = parameters.Get<VertexT>("y");
+
+        typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_CSR>
             GraphT;
 
         cudaError_t retval = cudaSuccess;
@@ -82,6 +89,9 @@ struct main_struct
             
             float elapsed = app::knn::CPU_Reference(
                 graph.csr(),
+		k,
+		point_x, 
+		point_y, 
                 ref_degrees,
                 quiet);
             
