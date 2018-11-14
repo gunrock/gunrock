@@ -112,7 +112,7 @@ double CPU_Reference(
   typedef typename GraphT::SizeT   SizeT;
 
   util::CpuTimer cpu_timer;
-  double total_time = 0.0;
+  float total_time = 0.0;
   int  num_iter   = parameters.Get<int >("num-runs");
   // Run 10 iterations
   for (int iter = 0; iter < num_iter; ++iter) {
@@ -165,7 +165,7 @@ double CPU_Reference(
   cpu_timer.Stop();
   total_time += cpu_timer.ElapsedMillis();
   }
-  float elapsed = cpu_timer.ElapsedMillis() / num_iter;
+  float elapsed = total_time / num_iter;
 
   printf("CPU_Reference: done\n");
 
