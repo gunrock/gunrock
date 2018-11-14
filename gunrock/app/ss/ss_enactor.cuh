@@ -147,6 +147,16 @@ struct SSIterationLoop : public IterationLoopBase
             (received_length, peer_, expand_op);
         return retval;
     }
+
+    cudaError_t Compute_OutputLength(int peer_)
+    {
+        return cudaSuccess; // No need to load balance or get output size
+    }
+    cudaError_t Check_Queue_Size(int peer_)
+    {
+        return cudaSuccess; // no need to check queue size for RW
+    }
+
     bool Stop_Condition(int gpu_num = 0)
     {
       auto &enactor_slice = this->enactor->enactor_slices[0];
