@@ -71,23 +71,23 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     {
         // ss-specific storage arrays
         util::Array1D<SizeT, ValueT >    scan_stats  ; // scan statistis values
-        util::Array1D<SizeT, ValueT >    scan_stats1 ; // scan statistis values
-        util::Array1D<SizeT, VertexT>    nodes       ; // node ids corresponding to sorted values
-        util::Array1D<SizeT, VertexT>    nodes1      ; // node ids corresponding to sorted values
-        util::Array1D<SizeT, VertexT>    src_node_ids; // node ids corresponding to sorted values
+//        util::Array1D<SizeT, ValueT >    scan_stats1 ; // scan statistis values
+//        util::Array1D<SizeT, VertexT>    nodes       ; // node ids corresponding to sorted values
+//        util::Array1D<SizeT, VertexT>    nodes1      ; // node ids corresponding to sorted values
+//        util::Array1D<SizeT, VertexT>    src_node_ids; // node ids corresponding to sorted values
         // temp space for cub
-        util::Array1D<SizeT, char   >   cub_temp_space;
+//        util::Array1D<SizeT, char   >   cub_temp_space;
         /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice()
         {
             scan_stats       .SetName("scan_stats"  	);
-            scan_stats1      .SetName("scan_stats1" 	);
-            nodes            .SetName("nodes"       	);
-            nodes1           .SetName("nodes1"      	);
-            src_node_ids     .SetName("src_node_ids"	);
-            cub_temp_space   .SetName("cub_temp_space"	);
+//            scan_stats1      .SetName("scan_stats1" 	);
+//            nodes            .SetName("nodes"       	);
+//            nodes1           .SetName("nodes1"      	);
+//            src_node_ids     .SetName("src_node_ids"	);
+//            cub_temp_space   .SetName("cub_temp_space"	);
         }
 
         /*
@@ -110,11 +110,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
             GUARD_CU(scan_stats      .Release(target));
-            GUARD_CU(scan_stats1     .Release(target));
+/*            GUARD_CU(scan_stats1     .Release(target));
             GUARD_CU(nodes           .Release(target));
             GUARD_CU(nodes1	     .Release(target));
             GUARD_CU(src_node_ids    .Release(target));
-            GUARD_CU(cub_temp_space  .Release(target));
+            GUARD_CU(cub_temp_space  .Release(target));*/
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
         }
@@ -140,11 +140,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(BaseDataSlice::Init(
                 sub_graph, num_gpus, gpu_idx, target, flag));
             GUARD_CU(scan_stats  	.Allocate(sub_graph.nodes, target));
-            GUARD_CU(scan_stats1 	.Allocate(sub_graph.nodes, target));
+/*            GUARD_CU(scan_stats1 	.Allocate(sub_graph.nodes, target));
             GUARD_CU(nodes       	.Allocate(sub_graph.nodes, target));
             GUARD_CU(nodes1      	.Allocate(sub_graph.nodes, target));
             GUARD_CU(src_node_ids       .Allocate(sub_graph.edges, target));
-            GUARD_CU(cub_temp_space	.Allocate(1              , target));
+            GUARD_CU(cub_temp_space	.Allocate(1              , target));*/
 
             /*if (target & util::DEVICE)
             {
@@ -170,7 +170,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             // Ensure data are allocated
             GUARD_CU(scan_stats.EnsureSize_(num_nodes, target));
-            GUARD_CU(nodes     .EnsureSize_(num_nodes, target));
+//            GUARD_CU(nodes     .EnsureSize_(num_nodes, target));
 
             // Reset data
             GUARD_CU(scan_stats.ForEach([]__host__ __device__
@@ -178,10 +178,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 x = (ValueT)0;
             }, num_nodes, target, this -> stream));
 
-            GUARD_CU(nodes.ForEach([]__host__ __device__
+/*            GUARD_CU(nodes.ForEach([]__host__ __device__
             (VertexT & node){
                 node = util::PreDefinedValues<VertexT>::InvalidValue;
-            }, num_nodes, target, this -> stream));
+            }, num_nodes, target, this -> stream));*/
 
             return retval;
         }

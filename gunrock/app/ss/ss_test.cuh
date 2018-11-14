@@ -112,60 +112,60 @@ double CPU_Reference(
   typedef typename GraphT::SizeT   SizeT;
 
   util::CpuTimer cpu_timer;
-  cpu_timer.Start();
-  cpu_timer.Stop();
-  float elapsed = cpu_timer.ElapsedMillis();
+  double total_time = 0.0;
+  int  num_iter   = parameters.Get<int >("num-runs");
+  // Run 10 iterations
+  for (int iter = 0; iter < num_iter; ++iter) {
+      cpu_timer.Start();
+      // Initialize scan stat as degree of nodes
+      for(VertexT i = 0; i < graph.nodes; i++) {
+        scan_stats[i] = graph.GetNeighborListLength(i);
+      }
 
-  // Initialize scan stat as degree of nodes
-  for(VertexT i = 0; i < graph.nodes; i++) {
-    scan_stats[i] = graph.GetNeighborListLength(i);
-  }
+      // For each node
+      for(VertexT src = 0; src < graph.nodes; src++) {
+        SizeT src_num_neighbors = graph.GetNeighborListLength(src);
+        if(src_num_neighbors > 0) {
+          SizeT src_edge_start = graph.GetNeighborListOffset(src);
+          SizeT src_edge_end   = src_edge_start + src_num_neighbors;
 
-  // For each node
-  for(VertexT src = 0; src < graph.nodes; src++) {
-    SizeT src_num_neighbors = graph.GetNeighborListLength(src);
-    if(src_num_neighbors > 0) {
-      SizeT src_edge_start = graph.GetNeighborListOffset(src);
-      SizeT src_edge_end   = src_edge_start + src_num_neighbors;
+          // Iterate over outgoing edges
+          for(SizeT src_edge_idx = src_edge_start; src_edge_idx < src_edge_end; src_edge_idx++) {
 
-      // Iterate over outgoing edges
-      for(SizeT src_edge_idx = src_edge_start; src_edge_idx < src_edge_end; src_edge_idx++) {
+            VertexT dst = graph.GetEdgeDest(src_edge_idx);
+            if(src < dst) { // Avoid double counting.  This also implies we only support undirected graphs.
 
-        VertexT dst = graph.GetEdgeDest(src_edge_idx);
-        if(src < dst) { // Avoid double counting.  This also implies we only support undirected graphs.
+              SizeT dst_num_neighbors = graph.GetNeighborListLength(dst);
+              if(dst_num_neighbors > 0) {
+                SizeT dst_edge_start = graph.GetNeighborListOffset(dst);
+                SizeT dst_edge_end   = dst_edge_start + dst_num_neighbors;
 
-          SizeT dst_num_neighbors = graph.GetNeighborListLength(dst);
-          if(dst_num_neighbors > 0) {
-            SizeT dst_edge_start = graph.GetNeighborListOffset(dst);
-            SizeT dst_edge_end   = dst_edge_start + dst_num_neighbors;
-
-            // Find nodes that are neighbors of both `src` and `dst`
-            // Note: This assumes that neighbor lists are sorted
-            int src_offset = src_edge_start;
-            int dst_offset = dst_edge_start;
-            while(dst_offset < dst_edge_end && src_offset < src_edge_end) {
-              VertexT dst_neib = graph.GetEdgeDest(dst_offset);
-              VertexT src_neib = graph.GetEdgeDest(src_offset);
-              if(dst_neib == src_neib) {
-                scan_stats[src_neib]++;
-                dst_offset++;
-                src_offset++;
-              } else if(dst_neib < src_neib) {
-                dst_offset++;
-              } else if(src_neib < dst_neib) {
-                src_offset++;
+                // Find nodes that are neighbors of both `src` and `dst`
+                // Note: This assumes that neighbor lists are sorted
+                int src_offset = src_edge_start;
+                int dst_offset = dst_edge_start;
+                while(dst_offset < dst_edge_end && src_offset < src_edge_end) {
+                  VertexT dst_neib = graph.GetEdgeDest(dst_offset);
+                  VertexT src_neib = graph.GetEdgeDest(src_offset);
+                  if(dst_neib == src_neib) {
+                    scan_stats[src_neib]++;
+                    dst_offset++;
+                    src_offset++;
+                  } else if(dst_neib < src_neib) {
+                    dst_offset++;
+                  } else if(src_neib < dst_neib) {
+                    src_offset++;
+                  }
+                }
               }
             }
           }
         }
       }
-    }
+  cpu_timer.Stop();
+  total_time += cpu_timer.ElapsedMillis();
   }
-
-  // for(VertexT i = 0; i < graph.nodes; i++) {
-  //   if(scan_stats[i] > 0)
-  //     std::cout << i + 1 << " " << scan_stats[i] << std::endl;
-  // }
+  float elapsed = cpu_timer.ElapsedMillis() / num_iter;
 
   printf("CPU_Reference: done\n");
 
@@ -201,12 +201,14 @@ typename GraphT::SizeT Validate_Results(
     typedef typename GraphT::CsrT    CsrT;
 
     std::cerr << "Validate_Results" << std::endl;
-    for(int i = 0; i < graph.nodes; i++) {
-        std::cerr << i << " " << ref_scan_stat[i] << " " << h_scan_stat[i] << std::endl;
+    bool quiet = parameters.Get<bool>("quiet");
+    if (!quiet && verbose) {
+        for(int i = 0; i < graph.nodes; i++) {
+            std::cerr << i << " " << ref_scan_stat[i] << " " << h_scan_stat[i] << std::endl;
+        }
     }
 
     SizeT num_errors = 0;
-    bool quiet = parameters.Get<bool>("quiet");
 
     // Verify the result
     util::PrintMsg("Scan statistics Validity: ", !quiet, false);

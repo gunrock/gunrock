@@ -70,7 +70,7 @@ struct main_struct
                 ref_scan_stats
             );
 
-            util::PrintMsg("__________________________\nRun "
+            util::PrintMsg("__________________________\nRun CPU Reference "
                 + std::to_string(0) + " elapsed: "
                 + std::to_string(elapsed)
                 + " ms", !quiet);

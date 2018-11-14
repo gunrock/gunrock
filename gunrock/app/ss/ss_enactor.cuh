@@ -73,11 +73,6 @@ struct SSIterationLoop : public IterationLoopBase
         auto         &enactor_stats      =   enactor_slice.enactor_stats;
         auto         &graph              =   data_slice.sub_graph[0];
         auto         &scan_stats         =   data_slice.scan_stats;
-        auto         &scan_stats1        =   data_slice.scan_stats1;
-        auto         &nodes              =   data_slice.nodes;
-        auto         &nodes1             =   data_slice.nodes1;
-        auto         &src_node_ids       =   data_slice.src_node_ids;
-        auto         &cub_temp_space     =   data_slice.cub_temp_space;
         auto         &row_offsets        =   graph.CsrT::row_offsets;
         auto         &col_indices        =   graph.CsrT::column_indices;
         auto         &frontier           =   enactor_slice.frontier;
@@ -95,7 +90,6 @@ struct SSIterationLoop : public IterationLoopBase
                 scan_stats_[v] = row_offsets[v + 1] - row_offsets[v];
             }, graph.nodes, target, stream));
 
-        scan_stats.Print();
         // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
         // The intersection operation
         auto intersect_op = [scan_stats] __host__ __device__(
@@ -106,15 +100,11 @@ struct SSIterationLoop : public IterationLoopBase
             return true;
         };
         frontier.queue_length = graph.edges;
-//        row_offsets.Print();
         frontier.queue_reset  = true;
-//        frontier.V_Q()->Print();
         GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
             oprtr_parameters, intersect_op));
 
-        util::PrintMsg("============After intersect ============");
-        scan_stats.Print();
 	// // Sort the scan statistics values for each node in descending order
  //        GUARD_CU(util::cubSortPairs(
  //            cub_temp_space,
@@ -320,7 +310,6 @@ public:
                         util::Array1D<SizeT, VertexT> tmp_srcs;
                         tmp_srcs.Allocate(num_srcs, target | util::HOST);
                         int pos = 0;
-                        printf("edges:%d, num_srcs:%d, nodes:%d\n", graph.edges, num_srcs, graph.nodes);
                         for(SizeT i = 0; i < graph.nodes; ++i) {
                             for (SizeT j = graph.CsrT::row_offsets[i]; j < graph.CsrT::row_offsets[i+1]; ++j) {
                                 tmp_srcs[pos++] = i;
