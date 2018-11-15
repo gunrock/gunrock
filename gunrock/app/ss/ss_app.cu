@@ -54,7 +54,7 @@ template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 cudaError_t RunTests(
     util::Parameters         &parameters,
     GraphT                   &graph,
-    typename GraphT::ValueT  *ref_scan_stats,
+    typename GraphT::VertexT  *ref_scan_stats,
     util::Location target = util::DEVICE)
 {
     cudaError_t retval = cudaSuccess;
@@ -71,7 +71,7 @@ cudaError_t RunTests(
     std::string validation = parameters.Get<std::string>("validation");
     util::Info info("SS", parameters, graph); // initialize Info structure
 
-    ValueT *h_scan_stats = new ValueT[graph.nodes];
+    VertexT *h_scan_stats = new VertexT[graph.nodes];
 
     ProblemT problem(parameters);
     EnactorT enactor;
@@ -84,7 +84,6 @@ cudaError_t RunTests(
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
         GUARD_CU(problem.Reset(target));
-        printf("edges:%d\n", graph.edges);
         GUARD_CU(enactor.Reset(graph.edges, target));
         util::PrintMsg("__________________________", !quiet_mode);
 
@@ -152,8 +151,8 @@ template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_ss(
     gunrock::util::Parameters &parameters,
     GraphT &graph,
-    typename GraphT::VertexT *node,
-    ValueT *scan_stat)
+//    typename GraphT::VertexT *node,
+    typename GraphT::VertexT *scan_stat)
 {
     typedef typename GraphT::VertexT VertexT;
     typedef gunrock::app::ss::Problem<GraphT  > ProblemT;
@@ -181,7 +180,8 @@ double gunrock_ss(
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-        problem.Extract(node, scan_stat, NULL, target);
+//        problem.Extract(node, scan_stat, NULL, target);
+        problem.Extract(scan_stat, target);
     }
 
     enactor.Release(target);
@@ -206,8 +206,7 @@ double gunrock_ss(
 template <
     typename VertexT = int,
     typename SizeT   = int,
-    typename GValueT = unsigned long,
-    typename SSValueT = GValueT>
+    typename GValueT = unsigned long>
 double ss(
     const SizeT        num_nodes,
     const SizeT        num_edges,
@@ -215,8 +214,8 @@ double ss(
     const VertexT     *col_indices,
     const GValueT     *edge_values,
     const int          num_runs,
-          VertexT     *nodes,
-          SSValueT    *scan_stats)
+//          VertexT     *nodes,
+          VertexT    *scan_stats)
 {
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
         gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
@@ -242,7 +241,7 @@ double ss(
     gunrock::graphio::LoadGraph(parameters, graph);
 
     // Run the SS
-    double elapsed_time = gunrock_ss(parameters, graph, nodes, scan_stats);
+    double elapsed_time = gunrock_ss(parameters, graph, scan_stats);
     // Cleanup
     graph.Release();
 

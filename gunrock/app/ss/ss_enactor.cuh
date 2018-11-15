@@ -85,7 +85,7 @@ struct SSIterationLoop : public IterationLoopBase
 
         // First add degrees to scan statistics
         GUARD_CU(scan_stats.ForAll([scan_stats, row_offsets]
-            __host__ __device__ (ValueT *scan_stats_, const SizeT & v)
+            __host__ __device__ (VertexT *scan_stats_, const SizeT & v)
             {
                 scan_stats_[v] = row_offsets[v + 1] - row_offsets[v];
             }, graph.nodes, target, stream));
@@ -95,7 +95,7 @@ struct SSIterationLoop : public IterationLoopBase
         auto intersect_op = [scan_stats] __host__ __device__(
             VertexT &src) -> bool
         {
-            atomicAdd(scan_stats + src,  (VertexT)1);
+            atomicAdd(scan_stats + src,  1);
             
             return true;
         };

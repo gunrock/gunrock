@@ -60,7 +60,7 @@ struct main_struct
         int num_runs = parameters.Get<int>("num-runs");
 
         SizeT nodes = graph.nodes;
-        ValueT *ref_scan_stats = new ValueT[nodes];
+        VertexT *ref_scan_stats = new VertexT[nodes];
         if (!quick) {
             util::PrintMsg("__________________________", !quiet);
 
