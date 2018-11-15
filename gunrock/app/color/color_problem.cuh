@@ -74,6 +74,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
 	curandGenerator_t 		gen;
     	bool 				color_balance;
+      bool        use_jpl;
       int         usr_iter;
 
 	util::Array1D<SizeT, SizeT> 	colored;
@@ -134,7 +135,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             ProblemFlag    flag,
 	    bool	   color_balance_,
 	    int		   seed,
-      int      usr_iter_)
+      int      usr_iter_,
+      bool     use_jpl_)
         {
             cudaError_t retval  = cudaSuccess;
 
@@ -142,6 +144,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
 	    color_balance = color_balance_;
       usr_iter      = usr_iter_;
+      use_jpl       = use_jpl_;
 
 	    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
 	    curandSetPseudoRandomGeneratorSeed(gen, seed);
@@ -204,6 +207,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     util::Array1D<SizeT, DataSlice> *data_slices;
     int seed;
     int usr_iter;
+    bool use_jpl;
     bool color_balance;
 
     // ----------------------------------------------------------------
@@ -221,6 +225,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	seed = _parameters.Get<int>("seed");
 	color_balance = _parameters.Get<bool>("LBCOLOR");
   usr_iter = _parameters.Get<int>("usr_iter");
+  use_jpl  = _parameters.Get<bool>("JPL");
 	// </DONE>
     }
 
@@ -354,7 +359,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 this -> flag,
 		this -> color_balance,
 		this -> seed,
-    this -> usr_iter
+    this -> usr_iter,
+    this -> use_jpl
             ));
         }
 

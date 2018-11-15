@@ -44,6 +44,12 @@ cudaError_t UseParameters(util::Parameters &parameters)
       3, "Number of iterations color should run for (default=3).",
       __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<bool>(
+      "JPL",
+      util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+      false, "Use JPL exact coloring method (true=use JPL).",
+      __FILE__, __LINE__));
+
     GUARD_CU(parameters.Use<int>(
          "seed",
          util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
