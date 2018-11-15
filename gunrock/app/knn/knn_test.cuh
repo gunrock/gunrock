@@ -14,15 +14,21 @@
 
 #pragma once
 
+#define KNN_DEBUG 1
+
+#ifdef KNN_DEBUG
+#define debug(a...) fprintf(stderr, a)
+#else
+#define debug(a...)
+#endif
+
 namespace gunrock {
 namespace app {
 namespace knn {
 
-
 /******************************************************************************
  * KNN Testing Routines
  *****************************************************************************/
-
 
 /**
  * @brief Simple CPU-based reference knn ranking implementations
@@ -35,54 +41,60 @@ namespace knn {
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    int k, // number of nearest neighbor
-    typename GraphT::VertexT point_x, // index of reference point
-    typename GraphT::VertexT point_y, // index of reference point
-    typename GraphT::ValueT *degrees,
-    bool quiet)
-{
-    typedef typename GraphT::SizeT SizeT;
-    typedef typename GraphT::ValueT ValueT;
-    typedef typename GraphT::VertexT VertexT;
-    
-struct Point{
-   VertexT x;
-   VertexT y;
-   VertexT dist;
-   Point(){}
-   Point(VertexT X, VertexT Y, VertexT Dist):x(X),y(Y),dist(Dist){}
-};   
+    int k,                             // number of nearest neighbor
+    typename GraphT::VertexT point_x,  // index of reference point
+    typename GraphT::VertexT point_y,  // index of reference point
+    typename GraphT::SizeT* k_nearest_neighbors, // edge indecies of k nearest neighbors
+    bool quiet) {
+  typedef typename GraphT::SizeT SizeT;
+  typedef typename GraphT::ValueT ValueT;
+  typedef typename GraphT::VertexT VertexT;
 
-struct comp{
- inline bool operator()(const Point& p1, const Point& p2){
-   return (p1.dist < p2.dist);
-}
-};
- 
-    Point* distance = (Point*)malloc(sizeof(Point)*graph.edges); 
-    util::CpuTimer cpu_timer;
-    cpu_timer.Start();
-   
-    // implement CPU reference implementation
-    for (VertexT x = 0; x < graph.nodes; ++x) {
-	for (SizeT i = graph.row_offsets[x]; i < graph.row_offsets[x + 1]; ++i) {
-    	    VertexT y = graph.column_indices[i];		
-	    VertexT dist = (x-point_x) * (x-point_x) + (y-point_y) * (y-point_y);
-	    distance[i] = Point(x, y, dist);
-	}
+  struct Point {
+    VertexT x;
+    SizeT e_id;
+    VertexT dist;
+
+    Point() {}
+    Point(VertexT X, SizeT E_id, VertexT Dist) : x(X), e_id(E_id), dist(Dist) {}
+  };
+
+  struct comp {
+    inline bool operator()(const Point &p1, const Point &p2) {
+      return (p1.dist < p2.dist);
     }
+  };
 
-    std::sort(distance, distance + graph.edges, comp());
+  Point *distance = (Point *)malloc(sizeof(Point) * graph.edges);
+  util::CpuTimer cpu_timer;
+  cpu_timer.Start();
 
-    for (int i = 0; i < k; ++i){
-	// k nearest points to (point_x, pointy)
-	fprintf(stderr, "(%d, %d), ", distance[i].x, distance[i].y);
+  // implement CPU reference implementation
+  for (VertexT x = 0; x < graph.nodes; ++x) {
+    for (SizeT i = graph.row_offsets[x]; i < graph.row_offsets[x + 1]; ++i) {
+      VertexT y = graph.column_indices[i];
+      VertexT dist =
+          (x - point_x) * (x - point_x) + (y - point_y) * (y - point_y);
+      debug("distance (%d, %d) from (%d, %d) is %d\n", 
+		      x, y, point_x, point_y, dist);
+      distance[i] = Point(x, i, dist);
     }
-    printf("\n");
-    
-    cpu_timer.Stop();
-    float elapsed = cpu_timer.ElapsedMillis();
-    return elapsed;
+  }
+
+  std::sort(distance, distance + graph.edges, comp());
+
+  debug("%d nearest neighbors\n", k);
+  for (int i = 0; i < k; ++i) {
+    // k nearest points to (point_x, pointy)
+    k_nearest_neighbors[i] = distance[i].e_id; 
+    debug("(%d, %d), ", distance[i].x, graph.column_indices[distance[i].e_id]);
+  }
+  debug("\n");
+
+  cpu_timer.Stop();
+  float elapsed = cpu_timer.ElapsedMillis();
+  delete[] distance; distance = NULL;
+  return elapsed;
 }
 
 /**
@@ -96,37 +108,36 @@ struct comp{
  * \return     GraphT::SizeT Number of errors
  */
 template <typename GraphT>
-typename GraphT::SizeT Validate_Results(
-             util::Parameters &parameters,
-             GraphT           &graph,
-             // <TODO>
-             typename GraphT::ValueT *h_degrees,
-             typename GraphT::ValueT *ref_degrees,
-             // </TODO>
-             bool verbose = true)
-{
-    typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::SizeT   SizeT;
+typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
+                                        GraphT &graph,
+					typename GraphT::SizeT k, 
+                                        typename GraphT::SizeT *h_k_nearest_neighbors,
+                                        typename GraphT::SizeT *ref_k_nearest_neighbors,
+                                        bool verbose = true) {
+  typedef typename GraphT::VertexT VertexT;
+  typedef typename GraphT::SizeT SizeT;
 
-    SizeT num_errors = 0;
-    bool quiet = parameters.Get<bool>("quiet");
+  SizeT num_errors = 0;
+  bool quiet = parameters.Get<bool>("quiet");
 
-    // <TODO> result validation and display
-    /*for(SizeT v = 0; v < graph.nodes; ++v) {
-        printf("%d %d %d\n", v, h_degrees[v], ref_degrees[v]);
-    }*/
-    // </TODO>
+  for(SizeT i = 0; i < k; ++i) {
+	  if (h_k_nearest_neighbors[i] != ref_k_nearest_neighbors[i]){
+      		debug("[%d/%d] %d != %d\n", 
+				i, k, h_k_nearest_neighbors[i], ref_k_nearest_neighbors[i]);
+		++num_errors;
+	  }
+  }
 
-    if(num_errors == 0) {
-       util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
-    }
+  if (num_errors == 0) {
+    util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
+  }
 
-    return num_errors;
+  return num_errors;
 }
 
-} // namespace knn
-} // namespace app
-} // namespace gunrock
+}  // namespace knn
+}  // namespace app
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

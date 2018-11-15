@@ -75,14 +75,12 @@ struct main_struct
         // int num_srcs = srcs.size();
         // </TODO>
         
-        // <TODO> declare datastructures for reference result on GPU
-        ValueT *ref_degrees;
-        // </TODO>
+	// Reference result on GPU
+        SizeT* ref_k_nearest_neighbors = NULL;
         
         if (!quick) {
-            // <TODO> init datastructures for reference result on GPU
-            ref_degrees = new ValueT[graph.nodes];
-            // </TODO>
+            // Init datastructures for reference result on GPU
+	    ref_k_nearest_neighbors = new SizeT[k];
 
             // If not in `quick` mode, compute CPU reference implementation
             util::PrintMsg("__________________________", !quiet);
@@ -92,7 +90,7 @@ struct main_struct
 		k,
 		point_x, 
 		point_y, 
-                ref_degrees,
+                ref_k_nearest_neighbors,
                 quiet);
             
             util::PrintMsg("--------------------------\n Elapsed: "
@@ -104,21 +102,16 @@ struct main_struct
         // </TODO>
         
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [
-                // </TODO> pass necessary data to lambda
-                ref_degrees
-                // </TODO>
+            [k, ref_k_nearest_neighbors
             ](util::Parameters &parameters, GraphT &graph)
             {
                 // <TODO> pass necessary data to app::Template::RunTests
-                return app::knn::RunTests(parameters, graph, ref_degrees, util::DEVICE);
+                return app::knn::RunTests(parameters, graph, k, ref_k_nearest_neighbors, util::DEVICE);
                 // </TODO>
             }));
 
         if (!quick) {
-            // <TODO> deallocate host references
-            delete[] ref_degrees; ref_degrees = NULL;
-            // </TODO>
+            delete[] ref_k_nearest_neighbors; ref_k_nearest_neighbors = NULL;
         }
         return retval;
     }
