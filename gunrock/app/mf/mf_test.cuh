@@ -25,6 +25,7 @@
 #include <boost/config.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/edmonds_karp_max_flow.hpp>
+#include <boost/graph/boykov_kolmogorov_max_flow.hpp>
 #include <boost/graph/read_dimacs.hpp>
 #include <iostream>
 #include <string>
@@ -281,9 +282,12 @@ double CPU_Reference(util::Parameters& parameters, GraphT& graph, VertexT src,
   util::CpuTimer cpu_timer;
   cpu_timer.Start();
   maxflow = edmonds_karp_max_flow(boost_graph, source, sink);
+  //maxflow = boykov_kolmogorov_max_flow(boost_graph, source, sink);
   cpu_timer.Stop();
   elapsed = cpu_timer.ElapsedMillis();
 
+  fprintf(stderr, "CPU Elapsed: %lf ms, cpu_reference result %lf\n", elapsed, maxflow);
+  printf("CPU Elapsed: %lf ms, maxflow result %lf\n", elapsed, maxflow);
   //
   // Extracting results on CPU
   //
@@ -437,6 +441,7 @@ int Validate_Results(util::Parameters& parameters, GraphT& graph,
     }
   }
   util::PrintMsg("Max Flow GPU = " + std::to_string(flow_incoming_sink));
+  fprintf(stderr, "lockfree maxflow %lf\n", flow_incoming_sink);
 
   // Verify min cut h_flow
   ValueT mincut_flow = (ValueT)0;
@@ -493,7 +498,7 @@ int Validate_Results(util::Parameters& parameters, GraphT& graph,
       util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
     } else {
       util::PrintMsg("PASS", !quiet);
-      fprintf(stderr, "PASS\n");
+      //fprintf(stderr, "PASS\n");
     }
   } else {
     util::PrintMsg("Flow Validity:\n", !quiet, false);
@@ -536,7 +541,7 @@ int Validate_Results(util::Parameters& parameters, GraphT& graph,
       util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
     } else {
       util::PrintMsg("PASS", !quiet);
-      fprintf(stderr, "PASS\n");
+      //fprintf(stderr, "PASS\n");
     }
   }
 

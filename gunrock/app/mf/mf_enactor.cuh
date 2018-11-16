@@ -100,7 +100,9 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto null_ptr = &local_vertices;
     null_ptr = NULL;
     auto &mark = data_slice.mark;
-    auto &queue = data_slice.queue;
+    auto &queue = data_slice.queue0;
+    auto &queue0 = data_slice.queue0;
+    auto &queue1 = data_slice.queue1;
 
     auto advance_preflow_op =
         [capacity, flow, excess, height, reverse, source, residuals] __host__
@@ -116,6 +118,33 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
       atomicAdd(excess + dest, c);
       return true;
     };
+
+    auto par_global_relabeling_op =
+        [graph, source, sink, height, reverse, queue0, queue1, residuals] 
+	__host__ __device__(VertexT * v_q, const SizeT &pos) {
+          VertexT first = 0, last = 0;
+	  auto &queue = (pos == 0 ? queue0 : queue1);
+	  auto &start = (pos == 0 ? source : sink);
+	  height[start] = (pos == 0 ? graph.nodes : 0);
+          auto H      = height[start];
+          queue[last++] = start;
+          while (first < last) {
+            auto v = queue[first++];
+            auto e_start = graph.CsrT::GetNeighborListOffset(v);
+            auto num_neighbors = graph.CsrT::GetNeighborListLength(v);
+            auto e_end = e_start + num_neighbors;
+            ++H;
+            for (auto e = e_start; e < e_end; ++e) {
+              auto neighbor = graph.CsrT::GetEdgeDest(e);
+              if (residuals[reverse[e]] < MF_EPSILON) continue;
+	      if (height[neighbor] > H + 1){
+		   height[neighbor] = H + 1;
+		   queue[last++] = neighbor;
+	      }
+	    }
+          }
+        };
+
 
     auto global_relabeling_op =
         [graph, source, sink, height, reverse, queue, residuals] __host__
@@ -175,6 +204,8 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           ValueT excess_v = excess[v];
           if (excess_v < MF_EPSILON || neighbor_num == 0) return;
 
+	  // turn off vertices which relabeling drop out from graph
+
           // else, try push-relable:
           VertexT e_start = graph.CsrT::GetNeighborListOffset(v);
           VertexT e_end = e_start + neighbor_num;
@@ -229,22 +260,19 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // Global relabeling
       // Height reset
+//    if (iteration == 0){
+//    fprintf(stderr, "global relabeling in iteration %d\n", iteration);
       GUARD_CU(height.ForAll(
-          [source, sink, graph] __host__ __device__(VertexT * h,
-                                                    const VertexT &pos) {
-            if (pos == source)
-              h[pos] = graph.nodes;
-            else if (pos == sink)
-              h[pos] = 0;
-            else
-              h[pos] = 2 * graph.nodes + 1;
+          [graph] __host__ __device__(VertexT * h, const VertexT &pos) {
+             h[pos] = 2 * graph.nodes + 1;
           },
           graph.nodes, util::DEVICE, oprtr_parameters.stream));
 
       // Serial relabeling on the GPU (ignores moves)
       GUARD_CU(frontier.V_Q()->ForAll(global_relabeling_op, 1, util::DEVICE,
+//      GUARD_CU(frontier.V_Q()->ForAll(par_global_relabeling_op, 2, util::DEVICE,
                                       oprtr_parameters.stream));
-
+ //   }
     debug_aml("[%d]frontier que length before compute op is %d\n", iteration,
               frontier.queue_length);
 

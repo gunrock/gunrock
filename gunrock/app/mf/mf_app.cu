@@ -143,6 +143,10 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
     cpu_timer.Stop();
     info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
+//    fprintf(stderr, "-----------------------------------\nRun %d, elapsed: %lf ms, #iterations = %d\n", \
+		    run_num, cpu_timer.ElapsedMillis(), enactor.enactor_slices[0].enactor_stats.iteration);
+
+    fprintf(stderr, "GPU Elapsed: %lf ms, ", cpu_timer.ElapsedMillis());
     util::PrintMsg(
         "-----------------------------------\nRun " + std::to_string(run_num) +
             ", elapsed: " + std::to_string(cpu_timer.ElapsedMillis()) +
