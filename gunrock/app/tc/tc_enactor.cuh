@@ -151,7 +151,7 @@ struct TCIterationLoop : public IterationLoopBase
 
 /**
  * @brief TC enactor class.
- * @tparam _Problem Problem type we procetc on
+ * @tparam _Problem Problem type we process on
  * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
  * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
  */

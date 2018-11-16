@@ -285,7 +285,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     /**
      * @brief initialization function.
-     * @param     graph       The graph that TC procetces on
+     * @param     graph       The graph that TC processes on
      * @param[in] Location    Memory location to work on
      * \return    cudaError_t Error metcage(s), if any
      */

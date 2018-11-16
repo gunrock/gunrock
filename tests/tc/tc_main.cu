@@ -7,7 +7,7 @@
 
 /**
  * @file
- * test_sssp.cu
+ * test_tcsp.cu
  *
  * @brief Simple test driver program for Gunrock template.
  */
@@ -33,7 +33,7 @@ struct main_struct
      * @tparam ValueT     Type of edge values
      * @param  parameters Command line parameters
      * @param  v,s,val    Place holders for type deduction
-     * \return cudaError_t error message(s), if any
+     * \return cudaError_t error metcage(s), if any
      */
     template <
         typename VertexT, // Use int as the vertex identifier
@@ -48,28 +48,28 @@ struct main_struct
 
         cudaError_t retval = cudaSuccess;
         util::CpuTimer cpu_timer;
-        GraphT graph; // graph we process on
+        GraphT graph;
 
         cpu_timer.Start();
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        bool quick = parameters.Get<bool>("quick");
+        bool quick   = parameters.Get<bool>("quick");
         bool quiet   = parameters.Get<bool>("quiet");
         int num_runs = parameters.Get<int>("num-runs");
-        SizeT edges = graph.edges;
-        VertexT *ref_tc_counts = new VertexT[edges];
-        // compute reference CPU TC solution
-        if (!quick)
-        {
-            bool quiet = parameters.Get<bool>("quiet");
+
+        SizeT nodes = graph.nodes;
+        VertexT *ref_tc_counts = new VertexT[nodes];
+        if (!quick) {
             util::PrintMsg("__________________________", !quiet);
+
             float elapsed = app::tc::CPU_Reference(
                 parameters,
                 graph.csr(),
                 ref_tc_counts
             );
+
             util::PrintMsg("__________________________\nRun CPU Reference Avg. in "
                 + std::to_string(num_runs) + " iterations elapsed: "
                 + std::to_string(elapsed)
@@ -87,7 +87,6 @@ struct main_struct
         {
             delete[] ref_tc_counts; ref_tc_counts = NULL;
         }
-
         return retval;
     }
 };
@@ -95,7 +94,7 @@ struct main_struct
 int main(int argc, char** argv)
 {
     cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test Triangle Counting)");
+    util::Parameters parameters("test Triangle Counting");
     GUARD_CU(graphio::UseParameters(parameters));
     GUARD_CU(app::tc::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
@@ -110,7 +109,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | //app::VERTEXT_U64B |
         app::SIZET_U32B | //app::SIZET_U64B |
-        app::VALUET_F64B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F64B | app::UNDIRECTED | app::DIRECTED>
         (parameters, main_struct());
 }
 

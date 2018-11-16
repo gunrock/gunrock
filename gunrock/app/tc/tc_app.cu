@@ -8,12 +8,12 @@
 /**
  * @file tc_app.cu
  *
- * @brief single-source shortest path (TC) application
+ * @brief triangle counting (TC) application
  */
 
 #include <gunrock/gunrock.h>
 
-// Utilities and correctness-checking
+// Utilities and correctnetc-checking
 #include <gunrock/util/test_utils.cuh>
 
 // Graph definations
@@ -47,14 +47,14 @@ cudaError_t UseParameters(util::Parameters &parameters)
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
  * @param[in]  ref_distances Reference distances
- * @param[in]  target        Whether to perform the SSSP
- * \return cudaError_t error message(s), if any
+ * @param[in]  target        Whether to perform the TC
+ * \return cudaError_t error metcage(s), if any
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 cudaError_t RunTests(
-    util::Parameters &parameters,
-    GraphT           &graph,
-    typename GraphT::VertexT *ref_tc = NULL,
+    util::Parameters         &parameters,
+    GraphT                   &graph,
+    typename GraphT::VertexT  *ref_tc_counts,
     util::Location target = util::DEVICE)
 {
     cudaError_t retval = cudaSuccess;
@@ -71,17 +71,14 @@ cudaError_t RunTests(
     std::string validation = parameters.Get<std::string>("validation");
     util::Info info("TC", parameters, graph); // initialize Info structure
 
-    // Allocate host-side array (for both reference and GPU-computed results)
-    VertexT  *h_tc_count = new VertexT[graph.edges];
+    VertexT *h_tc_counts = new VertexT[graph.nodes];
 
-    // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
     GUARD_CU(problem.Init(graph  , target));
     GUARD_CU(enactor.Init(problem, target));
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
-    //info.preprocess_time = cpu_timer.ElapsedMillis();
 
     // perform TC
     for (int run_num = 0; run_num < num_runs; ++run_num)
@@ -97,27 +94,27 @@ cudaError_t RunTests(
 
         util::PrintMsg("--------------------------\nRun "
             + std::to_string(run_num) + " elapsed: "
-            + std::to_string(cpu_timer.ElapsedMillis()) + " ms, src = "
-            + ", #iterations = "
+            + std::to_string(cpu_timer.ElapsedMillis()) + " ms, #iterations = "
             + std::to_string(enactor.enactor_slices[0]
                 .enactor_stats.iteration), !quiet_mode);
+
         if (validation == "each")
         {
-            GUARD_CU(problem.Extract(source_ids, dest_ids, edge_tc));
+            GUARD_CU(problem.Extract(h_tc_counts));
             SizeT num_errors = app::tc::Validate_Results(
-                parameters, graph, h_tc_count,
-                ref_tc, false);
+                parameters, graph, h_tc_counts,
+                ref_tc_counts, false);
         }
     }
 
     cpu_timer.Start();
     // Copy out results
-    GUARD_CU(problem.Extract(h_tc_count));
+    GUARD_CU(problem.Extract(h_tc_counts));
     if (validation == "last")
     {
         SizeT num_errors = app::tc::Validate_Results(
-            parameters, graph, h_tc_count,
-            ref_tc, false);
+            parameters, graph, h_tc_counts,
+            ref_tc_counts, false);
     }
 
     // compute running statistics
@@ -126,11 +123,10 @@ cudaError_t RunTests(
     #ifdef ENABLE_PERFORMANCE_PROFILING
         //Display_Performance_Profiling(enactor);
     #endif
-
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    delete[] h_tc_count ; h_tc_count  = NULL;
+    delete[] h_tc_counts  ; h_tc_counts   = NULL;
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
@@ -141,7 +137,6 @@ cudaError_t RunTests(
 } // namespace app
 } // namespace gunrock
 
-
 /*
  * @brief Entry of gunrock_tc function
  * @tparam     GraphT     Type of the graph
@@ -149,14 +144,14 @@ cudaError_t RunTests(
  * @param[in]  parameters Excution parameters
  * @param[in]  graph      Input graph
  * @param[out] distances  Return shortest distance to source per vertex
- * @param[out] preds      Return predecessors of each vertex
+ * @param[out] preds      Return predecetcors of each vertex
  * \return     double     Return accumulated elapsed times for all runs
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_tc(
     gunrock::util::Parameters &parameters,
     GraphT &graph,
-    typename GraphT::VertexT *count)
+    typename GraphT::VertexT *tc_counts)
 {
     typedef typename GraphT::VertexT VertexT;
     typedef gunrock::app::tc::Problem<GraphT  > ProblemT;
@@ -184,7 +179,8 @@ double gunrock_tc(
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-        problem.Extract(count, target);
+//        problem.Extract(node, tc_counts, NULL, target);
+        problem.Extract(tc_counts, target);
     }
 
     enactor.Release(target);
@@ -199,17 +195,17 @@ double gunrock_tc(
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
  * @param[in]  edge_values CSR-formatted graph input edge weights
- * @param[in]  num_runs    Number of runs to perform SSSP
+ * @param[in]  num_runs    Number of runs to perform TC
  * @param[in]  sources     Sources to begin traverse, one for each run
- * @param[in]  mark_preds  Whether to output predecessor info
+ * @param[in]  mark_preds  Whether to output predecetcor info
  * @param[out] distances   Return shortest distance to source per vertex
- * @param[out] preds       Return predecessors of each vertex
+ * @param[out] preds       Return predecetcors of each vertex
  * \return     double      Return accumulated elapsed times for all runs
  */
 template <
     typename VertexT = int,
     typename SizeT   = int,
-    typename GValueT = unsigned int>
+    typename GValueT = unsigned long>
 double tc(
     const SizeT        num_nodes,
     const SizeT        num_edges,
@@ -217,7 +213,7 @@ double tc(
     const VertexT     *col_indices,
     const GValueT     *edge_values,
     const int          num_runs,
-          VertexT     *tc_count)
+          VertexT     *tc_counts)
 {
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
         gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
@@ -230,12 +226,11 @@ double tc(
     gunrock::app::tc::UseParameters(parameters);
     gunrock::app::UseParameters_test(parameters);
     parameters.Parse_CommandLine(0, NULL);
-    parameters.Set("graph-type", "by-pass");
-    parameters.Set("mark-pred", mark_pred);
+    parameters.Set("graph-type", "by-patc");
     parameters.Set("num-runs", num_runs);
     bool quiet = parameters.Get<bool>("quiet");
     GraphT graph;
-    // Assign pointers into gunrock graph format
+    // Atcign pointers into gunrock graph format
     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
     graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
     graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
@@ -243,9 +238,8 @@ double tc(
     graph.FromCsr(graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, graph);
 
-    // Run the SSSP
-    double elapsed_time = gunrock_tc(parameters, graph, tc_count);
-
+    // Run the TC
+    double elapsed_time = gunrock_tc(parameters, graph, tc_counts);
     // Cleanup
     graph.Release();
 
