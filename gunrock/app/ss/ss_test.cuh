@@ -90,11 +90,11 @@ void DisplaySolution(T *array, SizeT length)
  */
 template <
     typename GraphT,
-    typename ValueT = typename GraphT::ValueT>
+    typename VertexT = typename GraphT::VertexT>
 double CPU_Reference(
   util::Parameters         &parameters,
            GraphT          &graph,
-           ValueT          *scan_stats)
+           VertexT          *scan_stats)
 {
 
   printf("CPU_Reference: start\n");
@@ -108,7 +108,6 @@ double CPU_Reference(
   //   For n in intersect(u_neibs, v_neibs):
   //     scan_stats[n] += 1
 
-  typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::SizeT   SizeT;
 
   util::CpuTimer cpu_timer;
@@ -188,15 +187,14 @@ double CPU_Reference(
  */
 template <
     typename GraphT,
-    typename ValueT = typename GraphT::ValueT>
+    typename VertexT = typename GraphT::VertexT>
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
-                     ValueT   *h_scan_stat,
-                     ValueT   *ref_scan_stat,
+                     VertexT  *h_scan_stat,
+                     VertexT  *ref_scan_stat,
                      bool      verbose       = true)
 {
-    typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::CsrT    CsrT;
 

@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include <gunrock/util/sort_device.cuh>
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
@@ -49,9 +48,7 @@ struct SSIterationLoop : public IterationLoopBase
     typedef typename EnactorT::SizeT   SizeT;
     typedef typename EnactorT::ValueT  ValueT;
 
-    typedef typename EnactorT::Problem::GraphT       GraphT;
     typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
-    typedef typename EnactorT::Problem::GraphT::GpT  GpT;
     typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
@@ -81,7 +78,6 @@ struct SSIterationLoop : public IterationLoopBase
         auto         &stream             =   oprtr_parameters.stream;
         auto         &iteration          =   enactor_stats.iteration;
         auto         target              =   util::DEVICE;
-        util::Array1D<SizeT, VertexT>* null_frontier = NULL;
 
         // First add degrees to scan statistics
         GUARD_CU(scan_stats.ForAll([scan_stats, row_offsets]
@@ -93,9 +89,9 @@ struct SSIterationLoop : public IterationLoopBase
         // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
         // The intersection operation
         auto intersect_op = [scan_stats] __host__ __device__(
-            VertexT &src) -> bool
+            VertexT &comm_node, VertexT &edge) -> bool
         {
-            atomicAdd(scan_stats + src,  1);
+            atomicAdd(scan_stats + comm_node,  1);
             
             return true;
         };
@@ -351,7 +347,7 @@ public:
      * @param[in] src Source node to start primitive.
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Enact(VertexT src = 0)
+    cudaError_t Enact()
     {
         cudaError_t  retval     = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));

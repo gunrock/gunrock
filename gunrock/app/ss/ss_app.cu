@@ -151,7 +151,6 @@ template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_ss(
     gunrock::util::Parameters &parameters,
     GraphT &graph,
-//    typename GraphT::VertexT *node,
     typename GraphT::VertexT *scan_stat)
 {
     typedef typename GraphT::VertexT VertexT;
@@ -214,7 +213,6 @@ double ss(
     const VertexT     *col_indices,
     const GValueT     *edge_values,
     const int          num_runs,
-//          VertexT     *nodes,
           VertexT    *scan_stats)
 {
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,

@@ -17,19 +17,11 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
+#include <gunrock/app/tc/tc_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
-#include <gunrock/global_indicator/tc/tc_problem.cuh>
-
-#include <moderngpu.cuh>
-#include <cub/cub.cuh>
-
-#include <fstream>
-
-using namespace gunrock::app;
-
 namespace gunrock {
-namespace global_indicator {
+namespace app {
 namespace tc {
 
 /**
@@ -44,25 +36,22 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
     return retval;
 }
 
-using namespace gunrock::app;
-
 /**
  * @brief definition of TC iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct TCIterationLoop : public IterationLoopBase
-    <EnactorT, Use_FullQ | Push>
+struct TCIterationLoop : puplic IterationLoopBase
+    <EanctorT, Use_FullQ | Push>
 {
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
     typedef typename EnactorT::ValueT  ValueT;
     typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
-    typedef typename EnactorT::Problem::GraphT::GpT  GpT;
     typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
-    TCIterationLoop() : BaseIterationLoop() {}
+    TCIterationLoop() : BaseIterationLoop() {}    
     /**
      * @brief Core computation of tc, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
@@ -78,118 +67,30 @@ struct TCIterationLoop : public IterationLoopBase
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
         auto         &enactor_stats      =   enactor_slice.enactor_stats;
         auto         &graph              =   data_slice.sub_graph[0];
-        auto         &labels             =   data_slice.labels;
+        auto         &tc_counts          =   data_slice.tc_counts;
+        auto         &row_offsets        =   graph.CsrT::row_offsets;
+        auto         &col_indices        =   graph.CsrT::column_indices;
         auto         &frontier           =   enactor_slice.frontier;
         auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
 	auto         &cub_temp_space     =   data_slice.cub_temp_space;
         auto         &retval             =   enactor_stats.retval;
-        //auto         &stream             =   enactor_slice.stream;
+        auto         &stream             =   enactor_slice.stream;
         auto         &iteration          =   enactor_stats.iteration;
-        auto          graph_ptr          =   data_slice.sub_graph;
-        if (enactor_stats.iteration != 0)
-            graph_ptr = &(data_slice.new_graphs[enactor_stats.iteration % 2]);
-        auto         &graph              =   graph_ptr[0];
+	auto         target              =   util::DEVICE;
 
-        // The advance operation
-        auto advance_op = [src_node_ids]
-        __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
+        auto intersect_op = [tc_counts] __host__ __device__(
+            VertexT &comm_node, VertexT &edge) -> bool
         {
-            bool res = src < dest;
-            VertexT id = (res) ? 1 : 0;
-            Store(src_node_ids + edge_id, id);
-            return res;
-        };
+            atomicAdd(tc_counts + edge,  1);
 
-        // The filter operation
-        auto filter_op = [] __host__ __device__(
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            if (!util::isValid(dest)) return false;
             return true;
         };
 
-        oprtr_parameters.label = iteration + 1;
-        // Call the advance operator, using the advance operation
-        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+        frontier.queue_length = graph.edges;
+        frontier.queue_reset  = true;
+        GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, advance_op, filter_op));
-
-        if (oprtr_parameters.advance_mode != "LB_CULL" &&
-            oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
-        {
-            frontier.queue_reset = false;
-            // Call the filter operator, using the filter operation
-            GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-                oprtr_parameters, filter_op));
-        }
-
-        // Get back the resulted frontier length
-        GUARD_CU(frontier.work_progress.GetQueueLength(
-            frontier.queue_index, frontier.queue_length,
-            false, oprtr_parameters.stream, true));
-
-        GUARD_CU(util::CUBSelect_if(queue->keys[attributes->selector^1].GetPointer(util::DEVICE),
-                                    CsrT::column_indices.GetPointer(util::DEVICE),
-                                    CsrT::column_indices.GetPointer(util::DEVICE) + graph.edges / 2,
-                                    graph.edges));
-
-        GUARD_CU(util::CUBSegReduce_sum(data_slice->d_src_node_ids.GetPointer(util::DEVICE),
-                                        data_slice->d_edge_list.GetPointer(util::DEVICE),
-                                        CsrT::row_offsets.GetPointer(util::DEVICE),
-                                        graph.nodes));
-
-        mgpu::Scan<mgpu::MgpuScanTypeExc>(
-            data_slice->d_edge_list.GetPointer(util::DEVICE),
-            graph.nodes+1,
-            (int)0,
-            mgpu::plus<int>(),
-            (int*)0,
-            (int*)0,
-            CsrT::row_offsets.GetPointer(util::DEVICE),
-            context[0]);
-
-        mgpu::IntervalExpand(
-            graph.edges/2,
-            CsrT::row_offsets.GetPointer(util::DEVICE),
-            queue->keys[attributes->selector].GetPointer(util::DEVICE),
-            graph.nodes,
-            data_slice->d_src_node_ids.GetPointer(util::DEVICE),
-            context[0]);
-
-        // 2) Do intersection using generated edge lists from the previous step.
-        //gunrock::oprtr::intersection::LaunchKernel
-        //<IntersectionKernelPolicy, TCProblem, TCFunctor>(
-        //);
-
-        // Reuse d_scanned_edges
-        SizeT *d_output_triplets = d_scanned_edges;
-        util::MemsetKernel<<<256, 1024>>>(d_output_triplets, (SizeT)0, graph.edges);
-
-        // Should make tc_count a member var to TCProblem
-        float cc = gunrock::oprtr::intersection::LaunchKernel
-            <IntersectionKernelPolicy, Problem, TCFunctor>(
-            statistics[0],
-            attributes[0],
-            d_data_slice,
-            CsrT::row_offsets.GetPointer(util::DEVICE),
-            CsrT::column_indices.GetPointer(util::DEVICE),
-            data_slice->d_src_node_ids.GetPointer(util::DEVICE),
-            CsrT::column_indices.GetPointer(util::DEVICE),
-            data_slice->d_degrees.GetPointer(util::DEVICE),
-            data_slice->d_edge_tc.GetPointer(util::DEVICE),
-            d_output_triplets,
-            graph.edges/2,
-            graph.nodes,
-            graph.edges/2,
-            work_progress[0],
-            context[0],
-            stream);
+            oprtr_parameters, intersect_op));
 
         return retval;
     }
@@ -221,10 +122,30 @@ struct TCIterationLoop : public IterationLoopBase
             return true;
         };
 
-        cudaError_t retval = TCIterationLoop:: template ExpandIncomingBase
+        cudaError_t retval = BaseIterationLoop:: template ExpandIncomingBase
             <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
             (received_length, peer_, expand_op);
         return retval;
+    }
+
+    cudaError_t Compute_OutputLength(int peer_)
+    {
+        return cudaSuccess; // No need to load balance or get output size
+    }
+    cudaError_t Check_Queue_Size(int peer_)
+    {
+        return cudaSuccess; // no need to check queue size for RW
+    }
+
+    bool Stop_Condition(int gpu_num = 0)
+    {
+      auto &enactor_slice = this->enactor->enactor_slices[0];
+      auto &enactor_stats = enactor_slice.enactor_stats;
+      auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+
+      auto &iter = enactor_stats.iteration;
+      if (iter == 1) return true;
+      else return false;
     }
 }; // end of TCIteration
 
@@ -240,39 +161,44 @@ template <
     util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 class TCEnactor :
-    public EnactorBase<typename _Problem::SizeT,
-		       ARRAY_FLAG, cudaHostRegisterFlag>
+    public EnactorBase<
+        typename _Problem::GraphT,
+        typename _Problem::LabelT,
+        typename _Problem::ValueT,
+        ARRAY_FLAG, cudaHostRegisterFlag>
 {
 public:
     typedef _Problem                    Problem;
     typedef typename Problem::SizeT     SizeT;
-    typedef typename Problem::VertexId  VertexId;
-    typedef typename Problem::Value     Value;
-    typedef EnactorBase<SizeT, ARRAY_FLAG, cudaHostRegisterFlag>
+    typedef typename Problem::VertexT  VertexT ;
+    typedef typename Problem::ValueT   ValueT  ;
+    typedef typename Problem::GraphT   GraphT  ;
+    typedef typename Problem::LabelT   LabelT  ;
+    typedef EnactorBase<GraphT , LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
         BaseEnactor;
     typedef TCEnactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
         EnactorT;
     typedef TCIterationLoop<EnactorT> IterationT;
 
-    Problem                            *problem;
-    ContextPtr                         *context;
+    Problem     *problem;
+    IterationT  *iterations;
+    ContextPtr  *context;
 
     /**
      * @brief TCEnactor constructor.
      */
-    TCEnactor() :
+    Enactor() :
         BaseEnactor("tc"),
         problem    (NULL)
     {
-        this -> max_num_vertex_associates
-            = (Problem::FLAG & Mark_Predecessors) != 0 ? 1 : 0;
+        this -> max_num_vertex_associates = 0;
         this -> max_num_value__associates = 1;
     }
 
     /**
      * @brief TCEnactor destructor
      */
-    virtual ~TCEnactor()
+    virtual ~Enactor()
     {
         //Release();
     }
@@ -297,7 +223,7 @@ public:
      * @param[in] target Target location of data
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t InitTC(
+    cudaError_t Init(
         ContextPtr  &context,
         Problem     &problem,
 	util::Location    target = util::DEVICE)
@@ -317,12 +243,6 @@ public:
             GUARD_CU(enactor_slice.frontier.Allocate(
                 graph.nodes, graph.edges, this -> queue_factors));
 
-            for (int peer = 0; peer < this -> num_gpus; peer ++)
-            {
-                this -> enactor_slices[gpu * this -> num_gpus + peer]
-                    .oprtr_parameters.labels
-                    = &(problem.data_slices[gpu] -> labels);
-            }
         }
 
         iterations = new IterationT[this -> num_gpus];
@@ -343,34 +263,42 @@ public:
      * @param[in] target Target location of data
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Reset(VertexT src, util::Location target = util::DEVICE)
+    cudaError_t Reset(SizeT num_srcs, util::Location target = util::DEVICE)
     {
         typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
         for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
-            if ((this->num_gpus == 1) ||
-                (gpu == this->problem->org_graph->GpT::partition_table[src]))
+            if ((this->num_gpus == 1))
             {
-                this -> thread_slices[gpu].init_size = 1;
+                this -> thread_slices[gpu].init_size = num_srcs;
                 for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
                 {
                     auto &frontier = this ->
                         enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                    frontier.queue_length = (peer_ == 0) ? 1 : 0;
+                    frontier.queue_length = (peer_ == 0) ? num_srcs : 0;
                     if (peer_ == 0)
                     {
-                        GUARD_CU(frontier.V_Q() -> ForEach(
-                            [src]__host__ __device__ (VertexT &v)
-                        {
-                            v = src;
-                        }, 1, target, 0));
+                        auto &graph = this->problem->sub_graphs[gpu];
+                        util::Array1D<SizeT, VertexT> tmp_srcs;
+                        tmp_srcs.Allocate(num_srcs, target | util::HOST);
+                        int pos = 0;
+                        for(SizeT i = 0; i < graph.nodes; ++i) {
+                            for (SizeT j = graph.CsrT::row_offsets[i]; j < graph.CsrT::row_offsets[i+1]; ++j) {
+                                tmp_srcs[pos++] = i;
+                            }
+                        }
+                        GUARD_CU(tmp_srcs.Move(util::HOST, target));
+                        GUARD_CU(frontier.V_Q() -> EnsureSize_(graph.edges, target));
+
+                        GUARD_CU(frontier.V_Q() -> ForEach(tmp_srcs,
+                           []__host__ __device__ (VertexT &v, VertexT &src) {
+                           v = src;
+                       }, num_srcs, target, 0));
                     }
                 }
-            }
-
-            else {
+            } else {
                 this -> thread_slices[gpu].init_size = 0;
                 for (int peer_ = 0; peer_ < this -> num_gpus; peer_++)
                 {
@@ -391,8 +319,7 @@ public:
     cudaError_t Run(ThreadSlice &thread_data)
     {
         gunrock::app::Iteration_Loop<
-            ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0,
-            1, IterationT>(
+            0, 1, IterationT>(
             thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
     }
@@ -402,7 +329,7 @@ public:
      * @param[in] src Source node to start primitive.
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Enact(VertexT src)
+    cudaError_t Enact()
     {
         cudaError_t  retval     = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));

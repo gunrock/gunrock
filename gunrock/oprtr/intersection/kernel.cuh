@@ -122,7 +122,7 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true>
                     VertexT small_edge = d_column_indices[min_it++];
                     if (BinarySearch(keys, max_nl, small_edge) == 1)
                     {
-                        inter_op(small_edge);
+                        inter_op(small_edge, idx);
                     }
                 }
             } else {
@@ -132,7 +132,7 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true>
                     int diff = src_edge - dst_edge;
                     if (diff == 0) 
                     {
-                        inter_op(src_edge);
+                        inter_op(src_edge, idx);
                     }
                     src_edge = (diff <= 0) ? __ldg(d_column_indices+(++src_it)) : src_edge;
                     dst_edge = (diff >= 0) ? __ldg(d_column_indices+(++dst_it)) : dst_edge;
