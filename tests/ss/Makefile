@@ -10,7 +10,7 @@
 #-------------------------------------------------------------------------------
 
 include ../BaseMakefile.mk
-ALGO = tc
+ALGO = ss
 EXEC = bin/$(ALGO)_main_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 SRC = $(ALGO)_main.cu
 
