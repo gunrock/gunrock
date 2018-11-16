@@ -12,7 +12,7 @@
  * @brief Simple test driver program for Gunrock template.
  */
 
-#include <gunrock/global_indicator/tc/tc_app.cu>
+#include <gunrock/app/tc/tc_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
@@ -54,10 +54,10 @@ struct main_struct
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
-        //GUARD_CU(graph.csr().Display());
 
-        VertexT  *ref_communities = NULL;
         bool quick = parameters.Get<bool>("quick");
+        bool quiet   = parameters.Get<bool>("quiet");
+        int num_runs = parameters.Get<int>("num-runs");
         // compute reference CPU TC solution
 /*        if (!quick)
         {
@@ -87,9 +87,6 @@ struct main_struct
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [](util::Parameters &parameters, GraphT &graph)
             {
-                bool quiet = parameters.Get<bool>("quiet");
-                //bool quick = parameters.Get<bool>("quick");
-
                 return app::tc::RunTests(parameters, graph);
             }));
 
@@ -100,7 +97,7 @@ struct main_struct
 int main(int argc, char** argv)
 {
     cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test Louvain (community detection)");
+    util::Parameters parameters("test Triangle Counting)");
     GUARD_CU(graphio::UseParameters(parameters));
     GUARD_CU(app::tc::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
