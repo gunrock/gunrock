@@ -58,37 +58,35 @@ struct main_struct
         bool quick = parameters.Get<bool>("quick");
         bool quiet   = parameters.Get<bool>("quiet");
         int num_runs = parameters.Get<int>("num-runs");
+        SizeT edges = graph.edges;
+        VertexT *ref_tc_counts = new VertexT[edges];
         // compute reference CPU TC solution
-/*        if (!quick)
+        if (!quick)
         {
             bool quiet = parameters.Get<bool>("quiet");
-            std::string validation = parameters.Get<std::string>("validation");
-            util::PrintMsg("Computing reference value ...", !quiet);
-
-            SizeT nodes = graph.nodes;
-            ref_communities = new VertexT[nodes];
-            //int num_runs = parameters.Get<int>("omp-runs");
-            //for (int i = 0; i < num_runs; i++)
-            {
-                int i = 0;
-                util::PrintMsg("__________________________", !quiet);
-                float elapsed = app::louvain::CPU_Reference(
-                    parameters, graph.csr(), ref_communities);
-                util::PrintMsg("--------------------------\nRun "
-                    + std::to_string(i) + " elapsed: "
-                    + std::to_string(elapsed)
-                    + " ms, q = " + std::to_string(app::louvain::Get_Modularity(
-                        graph, ref_communities))
-                    , !quiet);
-            }
-        }*/
+            util::PrintMsg("__________________________", !quiet);
+            float elapsed = app::tc::CPU_Reference(
+                parameters,
+                graph.csr(),
+                ref_tc_counts
+            );
+            util::PrintMsg("__________________________\nRun CPU Reference Avg. in "
+                + std::to_string(num_runs) + " iterations elapsed: "
+                + std::to_string(elapsed)
+                + " ms", !quiet);
+        }
 
         std::vector<std::string> switches{"advance-mode"};
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [](util::Parameters &parameters, GraphT &graph)
+            [ref_tc_counts](util::Parameters &parameters, GraphT &graph)
             {
-                return app::tc::RunTests(parameters, graph);
+                return app::tc::RunTests(parameters, graph, ref_tc_counts);
             }));
+
+        if (ref_tc_counts != NULL)
+        {
+            delete[] ref_tc_counts; ref_tc_counts = NULL;
+        }
 
         return retval;
     }

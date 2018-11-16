@@ -1,13 +1,15 @@
-// ----------------------------------------------------------------------------
-// Gunrock -- High-Performance Graph Primitives on GPU
-// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------
+// Gunrock -- Fast and Efficient GPU Graph Library
+// ----------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------
 
 /**
- * @file tc_problem.cuh
- * @brief GPU storage management structure
+ * @file
+ * tc_problem.cuh
+ *
+ * @brief GPU Storage management Structure for TC Problem Data
  */
 
 #pragma once
@@ -20,9 +22,9 @@ namespace app {
 namespace tc {
 
 /**
- * @brief Specifying parameters for TC Problem
+ * @brief Speciflying parameters for TC Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter info
- * \return cudaError_t error message(s), if any
+ * \return cudaError_t error metcage(s), if any
  */
 cudaError_t UseParameters_problem(
     util::Parameters &parameters)
@@ -37,7 +39,7 @@ cudaError_t UseParameters_problem(
 /**
  * @brief Triangle Counting Problem structure.
  * @tparam _GraphT  Type of the graph
- * @tparam _LabelT  Type of labels used in sssp
+ * @tparam _LabelT  Type of labels used in tc
  * @tparam _ValueT  Type of per-vertex distance values
  * @tparam _FLAG    Problem flags
  */
@@ -46,8 +48,8 @@ template <
     typename _LabelT = typename _GraphT::VertexT,
     typename _ValueT = typename _GraphT::ValueT,
     ProblemFlag _FLAG = Problem_None>
-struct TCProblem : ProblemBase <_GraphT, _FLAG>
-{   
+struct Problem : ProblemBase<_GraphT, _FLAG>
+{
     typedef _GraphT GraphT;
     static const ProblemFlag FLAG = _FLAG;
     typedef typename GraphT::VertexT VertexT;
@@ -63,24 +65,21 @@ struct TCProblem : ProblemBase <_GraphT, _FLAG>
     //Helper structures
 
     /**
-     * @brief Data slice structure which contains problem specific data.
-     *
+     * @brief Data structure containing TC-specific data on indivual GPU.
      */
-     
-    struct DataSlice : BaseDataSlice 
+    struct DataSlice : BaseDataSlice
     {
-        // device storage arrays
-	util::Array1D<SizeT, VertexT> 	tc_counts;
-
-	/*
+        // tc-specific storage arrays
+        util::Array1D<SizeT, VertexT >    tc_counts  ; // triangle counting values
+        /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice()
         {
-            tc_counts.SetName("tc_counts");
-	}
+            tc_counts       .SetName("tc_counts"  	);
+        }
 
-	/*
+        /*
          * @brief Default destructor
          */
         virtual ~DataSlice()
@@ -91,7 +90,7 @@ struct TCProblem : ProblemBase <_GraphT, _FLAG>
         /*
          * @brief Releasing allocated memory space
          * @param[in] target      The location to release memory from
-         * \return    cudaError_t Error message(s), if any
+         * \return    cudaError_t Error metcage(s), if any
          */
         cudaError_t Release(util::Location target = util::LOCATION_ALL)
         {
@@ -111,7 +110,7 @@ struct TCProblem : ProblemBase <_GraphT, _FLAG>
          * @param[in] gpu_idx     GPU device index
          * @param[in] target      Targeting device location
          * @param[in] flag        Problem flag containling options
-         * \return    cudaError_t Error message(s), if any
+         * \return    cudaError_t Error metcage(s), if any
          */
         cudaError_t Init(
             GraphT        &sub_graph,
@@ -124,9 +123,8 @@ struct TCProblem : ProblemBase <_GraphT, _FLAG>
 
             GUARD_CU(BaseDataSlice::Init(
                 sub_graph, num_gpus, gpu_idx, target, flag));
-            GUARD_CU(tc_counts.Allocate(sub_graph.edges, target));
-
-            if (target & util::DEVICE) 
+            GUARD_CU(tc_counts  	.Allocate(sub_graph.nodes, target));
+            if (target & util::DEVICE)
             {
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
             }
@@ -136,22 +134,23 @@ struct TCProblem : ProblemBase <_GraphT, _FLAG>
         /**
          * @brief Reset problem function. Must be called prior to each run.
          * @param[in] target      Targeting device location
-         * \return    cudaError_t Error message(s), if any
+         * \return    cudaError_t Error metcage(s), if any
          */
         cudaError_t Reset(util::Location target = util::DEVICE)
         {
             cudaError_t retval = cudaSuccess;
-            SizeT nodes = this -> sub_graph -> nodes;
-            SizeT edges = this -> sub_graph -> edges;
+            SizeT num_nodes = this -> sub_graph -> nodes;
+            SizeT num_edges = this -> sub_graph -> edges;
 
             // Ensure data are allocated
-            GUARD_CU(tc_counts.EnsureSize_(edges, target));
+            GUARD_CU(tc_counts.EnsureSize_(num_edges, target));
+//            GUARD_CU(nodes     .EnsureSize_(num_nodes, target));
 
             // Reset data
             GUARD_CU(tc_counts.ForEach([]__host__ __device__
             (VertexT &x){
                 x = (VertexT)0;
-            }, edges, target, this -> stream));
+            }, num_edges, target, this -> stream));
 
             return retval;
         }
@@ -161,8 +160,10 @@ struct TCProblem : ProblemBase <_GraphT, _FLAG>
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
 
+    // Methods
+
     /**
-     * @brief Default constructor
+     * @brief TCProblem default constructor
      */
     Problem(
         util::Parameters &_parameters,
@@ -171,10 +172,11 @@ struct TCProblem : ProblemBase <_GraphT, _FLAG>
         data_slices(NULL)
     {
     }
+
     /**
-     * @brief Default destructor
+     * @brief TCProblem default destructor
      */
-    virtual ~Problem() 
+    virtual ~Problem()
     {
         Release();
     }
@@ -182,7 +184,7 @@ struct TCProblem : ProblemBase <_GraphT, _FLAG>
     /*
      * @brief Releasing allocated memory space
      * @param[in] target      The location to release memory from
-     * \return    cudaError_t Error message(s), if any
+     * \return    cudaError_t Error metcage(s), if any
      */
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
@@ -206,75 +208,86 @@ struct TCProblem : ProblemBase <_GraphT, _FLAG>
      */
 
     /**
-     * @brief Copy results computed on the GPU back to host-side vectors.
-     * @param[out] h_labels
-     *\return cudaError_t object indicates the success of all CUDA functions.
+     * @brief Copy result distancetc computed on GPUs back to host-side arrays.
+     * @param[out] h_distances Host array to store computed vertex distances from the source.
+     * @param[out] h_preds     Host array to store computed vertex predecetcors.
+     * @param[in]  target where the results are stored
+     * \return     cudaError_t Error metcage(s), if any
      */
     cudaError_t Extract(
-	VertexT 	*h_tc_counts, 
-        util::Location  target      = util::DEVICE) 
+        VertexT         *h_tc_counts,
+        util::Location  target      = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
         SizeT edges = this -> org_graph -> edges;
 
-	if (this -> num_gpus == 1) {
+        if (this-> num_gpus == 1)
+        {
             auto &data_slice = data_slices[0][0];
 
             // Set device
-            if (target == util::DEVICE) 
+            if (target == util::DEVICE)
             {
-		GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+                GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+
                 GUARD_CU(data_slice.tc_counts.SetPointer(h_tc_counts, edges, util::HOST));
                 GUARD_CU(data_slice.tc_counts.Move(util::DEVICE, util::HOST));
-            } else if (target == util::HOST) {
-                GUARD_CU(data_slice.scan_stats.ForEach(h_tc_counts,
+            }
+            else if (target == util::HOST) {
+                GUARD_CU(data_slice.tc_counts.ForEach(h_tc_counts,
                     []__host__ __device__
                     (const VertexT &d_x, VertexT &h_x){
                         h_x = d_x;
                     }, edges, util::HOST));
             }
+        }
+        else { // num_gpus != 1
 
-        } else {
-/*            util::Array1D<SizeT, VertexT *> th_src_ids;
-            util::Array1D<SizeT, SizeT *> th_edge_tc;
-            th_src_ids.SetName("tc::TCProblem::Extract::th_src_ids");
-            th_edge_tc.SetName("tc::TCProblem::Extract::th_edge_tc");
-            GUARD_CU(th_src_ids.Allocate(this->num_gpus, util::HOST));
-            GUARD_CU(th_edge_tc.Allocate(this->num_gpus, util::HOST));
+            // !! MultiGPU not implemented
 
-            for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
-                auto &data_slice = data_slices[gpu][0];
-                if (target == util::DEVICE) {
-                    GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-                    GUARD_CU(data_slice.d_src_node_ids.Move(util::DEVICE, util::HOST));
-                    GUARD_CU(data_slice.d_edge_tc.Move(util::DEVICE, util::HOST));
-                }
-                th_src_ids[gpu] = data_slice.d_src_ids.GetPointer(util::HOST);
-                th_edge_tc[gpu] = data_slice.d_edge_tc.GetPointer(util::HOST);
-            } // end for (gpu)
-            for (VertexT v = 0; v < nodes; ++v) {
-                int gpu = this -> org_graph -> GpT:: partition_table[v];
-                VertexT v_ = v;
-                if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
-                    v_ = this -> org_graph -> GpT::convertion_table[v];
+            // util::Array1D<SizeT, ValueT *> th_tc_counts;
+            // util::Array1D<SizeT, VertexT*> th_nodes;
+            // th_tc_counts.SetName("bfs::Problem::Extract::th_tc_counts");
+            // th_nodes     .SetName("bfs::Problem::Extract::th_nodes");
+            // GUARD_CU(th_tc_counts.Allocate(this->num_gpus, util::HOST));
+            // GUARD_CU(th_nodes    .Allocate(this->num_gpus, util::HOST));
 
-                source_ids[v] = th_src_ids[gpu][v_];
-		edge_tc   [v] = th_edge_tc[gpu][v_];
-            }
+            // for (int gpu = 0; gpu < this->num_gpus; gpu++)
+            // {
+            //     auto &data_slice = data_slices[gpu][0];
+            //     if (target == util::DEVICE)
+            //     {
+            //         GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+            //         GUARD_CU(data_slice.tc_counts.Move(util::DEVICE, util::HOST));
+            //         GUARD_CU(data_slice.nodes.Move(util::DEVICE, util::HOST));
+            //     }
+            //     th_tc_counts[gpu] = data_slice.scan_stats.GetPointer(util::HOST);
+            //     th_nodes    [gpu] = data_slice.nodes    .GetPointer(util::HOST);
+            // } //end for(gpu)
 
-            GUARD_CU(th_src_ids.Release());
-            GUARD_CU(th_edge_tc.Release());
-*/
-        } // end if
+            // for (VertexT v = 0; v < nodes; v++)
+            // {
+            //     int gpu = this -> org_graph -> GpT::partition_table[v];
+            //     VertexT v_ = v;
+            //     if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
+            //         v_ = this -> org_graph -> GpT::convertion_table[v];
+
+            //     h_tc_counts[v] = th_tc_counts[gpu][v_];
+            //     h_node      [v] = th_nodes     [gpu][v_];
+            // }
+
+            // GUARD_CU(th_tc_counts.Release());
+            // GUARD_CU(th_nodes     .Release());
+        } //end if
 
         return retval;
     }
 
     /**
      * @brief initialization function.
-     * @param     graph       The graph that SSSP processes on
+     * @param     graph       The graph that TC procetces on
      * @param[in] Location    Memory location to work on
-     * \return    cudaError_t Error message(s), if any
+     * \return    cudaError_t Error metcage(s), if any
      */
     cudaError_t Init(
         GraphT           &graph,
@@ -304,7 +317,7 @@ struct TCProblem : ProblemBase <_GraphT, _FLAG>
      * @brief Reset problem function. Must be called prior to each run.
      * @param[in] src      Source vertex to start.
      * @param[in] location Memory location to work on
-     * \return cudaError_t Error message(s), if any
+     * \return cudaError_t Error metcage(s), if any
      */
     cudaError_t Reset(
         util::Location target = util::DEVICE)
@@ -320,18 +333,17 @@ struct TCProblem : ProblemBase <_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
 
-	GUARD_CU2(cudaDeviceSynchronize(),
-	    "cudaDeviceSynchronize failed");
-
-	return retval;
+        GUARD_CU2(cudaDeviceSynchronize(),
+            "cudaDeviceSynchronize failed");
+        return retval;
     }
 
     /** @} */
 };
 
-}  // namespace tc
-}  // namespace app
-}  // namespace gunrock
+} //namespace tc
+} //namespace app
+} //namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

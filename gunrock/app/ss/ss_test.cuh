@@ -37,21 +37,21 @@ namespace ss {
          "omp-threads",
          util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
          0,
-         "Number of threads for parallel omp louvain implementation; 0 for default.",
+         "Number of threads for parallel omp scan statistics implementation; 0 for default.",
          __FILE__, __LINE__));
 
      GUARD_CU(parameters.Use<int>(
          "omp-runs",
          util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
          1,
-         "Number of runs for parallel omp louvain implementation.",
+         "Number of runs for parallel omp scan statistics implementation.",
          __FILE__, __LINE__));
 
      return retval;
  }
 
 /**
- * @brief Displays the SS result (i.e., distance from source)
+ * @brief Displays the SS result (i.e., statistic values for each node)
  * @tparam T Type of values to display
  * @tparam SizeT Type of size counters
  * @param[in] preds Search depth from the source for each node.
