@@ -35,9 +35,24 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(parameters.Use<int>(
         "k",
         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-        "10",
+        10,
         "Numbers of k neighbors.",
         __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "x",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        0,
+        "Index of reference point.",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+        "y",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        0,
+        "Index of reference point.",
+        __FILE__, __LINE__));
+
 
     return retval;
 }
@@ -56,9 +71,8 @@ template <typename GraphT>
 cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
-    // <TODO> add problem specific reference results, e.g.:
-    typename GraphT::ValueT *ref_degrees,
-    // </TODO>
+    typename GraphT::SizeT k,
+    typename GraphT::SizeT *ref_k_nearest_neighbors,
     util::Location target)
 {
     
@@ -85,7 +99,7 @@ cudaError_t RunTests(
     // </TODO>
 
     // <TODO> allocate problem specific host data, e.g.:
-    ValueT *h_degrees = new ValueT[graph.nodes];
+    SizeT *h_k_nearest_neighbors = new SizeT[k];
     // </TODO>
 
     // Allocate problem and enactor on GPU, and initialize them
@@ -117,20 +131,22 @@ cudaError_t RunTests(
         
         if (validation == "each") {
             
-            GUARD_CU(problem.Extract(h_degrees));
+            GUARD_CU(problem.Extract(h_k_nearest_neighbors));
             SizeT num_errors = Validate_Results(
-                parameters, graph, h_degrees, ref_degrees, false);
+                parameters, graph, k, h_k_nearest_neighbors, ref_k_nearest_neighbors, false);
         }
     }
 
     cpu_timer.Start();
     
-    GUARD_CU(problem.Extract(h_degrees));
+    GUARD_CU(problem.Extract(h_k_nearest_neighbors));
     if (validation == "last") {
         SizeT num_errors = Validate_Results(
             parameters,
             graph,
-            h_degrees, ref_degrees,
+	    k,
+	    h_k_nearest_neighbors,
+	    ref_k_nearest_neighbors,
             false);
     }
 
@@ -147,7 +163,7 @@ cudaError_t RunTests(
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
     // <TODO> Release problem specific data, e.g.:
-    delete[] h_degrees; h_degrees   = NULL;
+    delete[] h_k_nearest_neighbors; h_k_nearest_neighbors = NULL;
     // </TODO>
     cpu_timer.Stop(); total_timer.Stop();
 

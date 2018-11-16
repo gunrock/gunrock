@@ -216,7 +216,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     cudaError_t Extract(
         // <TODO> problem specific data to extract
-        ValueT *h_degrees,
+	SizeT *h_k_nearest_neighbors,
         // </TODO>
         util::Location target = util::DEVICE)
     {
@@ -229,7 +229,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // Set device
             if (target == util::DEVICE) {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-
+/*
                 // <TODO> extract the results from single GPU, e.g.:
                 GUARD_CU(data_slice.degrees.SetPointer(h_degrees, nodes, util::HOST));
                 GUARD_CU(data_slice.degrees.Move(util::DEVICE, util::HOST));
@@ -241,6 +241,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                        host_val = device_val;
                    }, nodes, util::HOST));
                 // </TODO>
+		*/
             }
         } else { // num_gpus != 1
             
