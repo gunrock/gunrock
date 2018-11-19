@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <queue>
+#include <map>
 
 namespace gunrock {
 namespace app {
@@ -210,12 +211,15 @@ void minCut(GraphT& graph, VertexT src, ValueT* flow, int* min_cut,
  *
  * \return     double      Time taken for the MF
  */
-template <typename VertexT, typename ValueT, typename GraphT>
-double CPU_Reference(util::Parameters& parameters, GraphT& graph, VertexT src,
-                     VertexT sin, ValueT& maxflow, VertexT* reverse,
-                     ValueT* flow) {
+template <typename VertexT, 
+	 typename ValueT, 
+	 typename GraphT,
+	 typename SizeT>
+double CPU_Reference(util::Parameters& parameters, GraphT& graph, 
+		std::map<std::pair<VertexT, VertexT>, SizeT>& edge_id,
+		VertexT src, VertexT sin, ValueT& maxflow, VertexT* reverse,
+                ValueT* flow) {
   debug_aml("CPU_Reference start\n");
-  typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::CsrT CsrT;
 
   double elapsed = 0;
@@ -266,7 +270,6 @@ double CPU_Reference(util::Parameters& parameters, GraphT& graph, VertexT src,
     for (auto e = e_start; e < e_end; ++e) {
       VertexT y = graph.CsrT::GetEdgeDest(e);
       ValueT cap = graph.CsrT::edge_values[e];
-      if (fabs(cap) <= 1e-12) continue;
       Traits::edge_descriptor e1, e2;
       bool in1, in2;
       tie(e1, in1) = add_edge(verts[x], verts[y], boost_graph);
@@ -300,16 +303,7 @@ double CPU_Reference(util::Parameters& parameters, GraphT& graph, VertexT src,
   //
   // Extracting results on CPU
   //
-  std::map<std::pair<VertexT, VertexT>, VertexT> edge_id;
-  for (VertexT x = 0; x < graph.nodes; ++x) {
-	  auto e_start = graph.CsrT::GetNeighborListOffset(x);
-	  auto num_neighbors = graph.CsrT::GetNeighborListLength(x);
-	  auto e_end = e_start + num_neighbors;
-	  for (VertexT e = e_start; e < e_end; ++e) {
-		  VertexT y = graph.CsrT::GetEdgeDest(e);
-		  edge_id[std::make_pair(x, y)] = e;
-	  }
-  }
+
   typename graph_traits<Graph>::vertex_iterator u_it, u_end;
   typename graph_traits<Graph>::out_edge_iterator e_it, e_end;
   for (tie(u_it, u_end) = vertices(boost_graph); u_it != u_end; ++u_it) {

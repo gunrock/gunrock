@@ -20,6 +20,8 @@
 #define MF_EPSILON 0.000001
 #define MF_EPSILON_VALIDATE 1e-3
 
+#include<map>
+
 namespace gunrock {
 namespace app {
 namespace mf {
@@ -69,8 +71,13 @@ int relabeling(GraphT graph, VertexT source, VertexT sink, VertexT* height,
   return changed;
 }
 
-template <typename GraphT, typename VertexT>
-__device__ __host__ void InitReverse(GraphT& graph, VertexT* reverse) {
+template <typename GraphT, 
+	 typename VertexT,
+	 typename SizeT = typename GraphT::SizeT>
+__host__ void InitReverse(
+		GraphT& graph, 
+		std::map<std::pair<VertexT, VertexT>, SizeT>& edge_id,
+		VertexT* reverse){
   typedef typename GraphT::CsrT CsrT;
 
   for (auto u = 0; u < graph.nodes; ++u) {
@@ -79,24 +86,35 @@ __device__ __host__ void InitReverse(GraphT& graph, VertexT* reverse) {
     auto e_end = e_start + num_neighbors;
     for (auto e = e_start; e < e_end; ++e) {
       auto v = graph.CsrT::GetEdgeDest(e);
-      auto f_start = graph.CsrT::GetNeighborListOffset(v);
-      auto num_neighbors2 = graph.CsrT::GetNeighborListLength(v);
-      auto f_end = f_start + num_neighbors2;
-      for (auto f = f_start; f < f_end; ++f) {
-        auto z = graph.CsrT::GetEdgeDest(f);
-        if (z == u) {
-          reverse[e] = f;
-          reverse[f] = e;
-          break;
-        }
-      }
+      auto f = edge_id[std::make_pair(v, u)];
+      reverse[e] = f;
+      reverse[f] = e;
     }
   }
 }
-
-template <typename GraphT>
-__device__ __host__ void CorrectCapacity(GraphT& undirected_graph,
-                                         GraphT& directed_graph) {
+template <typename GraphT, 
+	 typename VertexT = typename GraphT::VertexT, 
+	 typename SizeT = typename GraphT::SizeT>
+__host__ void GetEdgesIds(GraphT& graph, 
+		std::map<std::pair<VertexT, VertexT>, SizeT>& edge_id){
+  typedef typename GraphT::CsrT CsrT;
+  for (VertexT u = 0; u < graph.nodes; ++u){
+    auto f_start = graph.CsrT::GetNeighborListOffset(u);
+    auto num_neighbors2 = graph.CsrT::GetNeighborListLength(u);
+    auto f_end = f_start + num_neighbors2;
+    for (auto f = f_start; f < f_end; ++f) {
+      auto v = graph.CsrT::GetEdgeDest(f);
+      edge_id[std::make_pair(u, v)] = f;
+    }
+  }
+}
+template <typename GraphT, 
+	 typename VertexT = typename GraphT::VertexT, 
+	 typename SizeT = typename GraphT::SizeT>
+__host__ void CorrectCapacity(
+		GraphT& undirected_graph,
+		GraphT& directed_graph,
+		std::map<std::pair<VertexT, VertexT>, SizeT>& d_edge_id) {
   typedef typename GraphT::CsrT CsrT;
   typedef typename GraphT::ValueT ValueT;
 
@@ -110,19 +128,10 @@ __device__ __host__ void CorrectCapacity(GraphT& undirected_graph,
       undirected_graph.CsrT::edge_values[e] = (ValueT)0;
       auto v = undirected_graph.CsrT::GetEdgeDest(e);
       // Looking for edge u->v in directed graph
-      auto f_start = directed_graph.CsrT::GetNeighborListOffset(u);
-      auto num_neighbors2 = directed_graph.CsrT::GetNeighborListLength(u);
-      auto f_end = f_start + num_neighbors2;
-      for (auto f = f_start; f < f_end; ++f) {
-        auto z = directed_graph.CsrT::GetEdgeDest(f);
-        if (z == v and directed_graph.CsrT::edge_values[f] > 0) {
-          undirected_graph.CsrT::edge_values[e] =
-              directed_graph.CsrT::edge_values[f];
-          debug_aml("edge (%d, %d) cap = %lf\n", u, v,
-                    undirected_graph.CsrT::edge_values[e]);
-          break;
-        }
-      }
+      auto f = d_edge_id[std::make_pair(u, v)];
+      auto cap_f = directed_graph.CsrT::edge_values[f];
+      if (cap_f > (ValueT)0)
+          undirected_graph.CsrT::edge_values[e] = cap_f;
     }
   }
 }

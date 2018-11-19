@@ -111,15 +111,20 @@ struct main_struct {
     debug_aml("number of edges %d", u_graph.edges);
     debug_aml("number of nodes %d", u_graph.nodes);
 
+    std::map<std::pair<VertexT, VertexT>, SizeT> d_edge_id;
+    std::map<std::pair<VertexT, VertexT>, SizeT> u_edge_id;
+    app::mf::GetEdgesIds(d_graph, d_edge_id);
+    app::mf::GetEdgesIds(u_graph, u_edge_id);
+
     ValueT *flow_edge = NULL;
 
     util::Array1D<SizeT, VertexT> reverse;
     GUARD_CU(reverse.Allocate(u_graph.edges, util::HOST));
-    app::mf::InitReverse(u_graph, reverse.GetPointer(util::HOST));
+    app::mf::InitReverse(u_graph, u_edge_id, reverse.GetPointer(util::HOST));
 
     if (not undirected) {
       // Correct capacity values on reverse edges
-      app::mf::CorrectCapacity(u_graph, d_graph);
+      app::mf::CorrectCapacity(u_graph, d_graph, d_edge_id);
     }
 
     //
@@ -131,7 +136,7 @@ struct main_struct {
       util::PrintMsg("______CPU reference algorithm______", true);
       flow_edge = (ValueT *)malloc(sizeof(ValueT) * u_graph.edges);
       double elapsed =
-          app::mf::CPU_Reference(parameters, u_graph, source, sink, max_flow,
+          app::mf::CPU_Reference(parameters, u_graph, u_edge_id, source, sink, max_flow,
                                  reverse.GetPointer(util::HOST), flow_edge);
       util::PrintMsg("-----------------------------------\nElapsed: " +
                          std::to_string(elapsed) +
