@@ -72,6 +72,7 @@ cudaError_t RunTests(
     util::Parameters &parameters,
     GraphT           &graph,
     typename GraphT::SizeT k,
+    typename GraphT::SizeT *h_knns,
     typename GraphT::SizeT *ref_k_nearest_neighbors,
     util::Location target)
 {
@@ -89,30 +90,24 @@ cudaError_t RunTests(
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
     util::Info info("knn", parameters, graph);
-    
+
+    VertexT point_x = parameters.Get<int>("x");
+    VertexT point_y = parameters.Get<int>("y");
+
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
-
-    // <TODO> get problem specific inputs, e.g.:
-    // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-    // printf("RunTests: %d srcs: src[0]=%d\n", srcs.size(), srcs[0]);
-    // </TODO>
-
-    // <TODO> allocate problem specific host data, e.g.:
-    SizeT *h_k_nearest_neighbors = new SizeT[k];
-    // </TODO>
 
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    GUARD_CU(problem.Init(graph, target));
+    GUARD_CU(problem.Init(graph, k, target));
     GUARD_CU(enactor.Init(problem, target));
     
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
     
     for (int run_num = 0; run_num < num_runs; ++run_num) {
-        GUARD_CU(problem.Reset(target));
+        GUARD_CU(problem.Reset(point_x, point_y, k, target));
         GUARD_CU(enactor.Reset(target));
         
         util::PrintMsg("__________________________", !quiet_mode);
@@ -131,21 +126,21 @@ cudaError_t RunTests(
         
         if (validation == "each") {
             
-            GUARD_CU(problem.Extract(h_k_nearest_neighbors));
+            GUARD_CU(problem.Extract(k, h_knns));
             SizeT num_errors = Validate_Results(
-                parameters, graph, k, h_k_nearest_neighbors, ref_k_nearest_neighbors, false);
+                parameters, graph, k, h_knns, ref_k_nearest_neighbors, false);
         }
     }
 
     cpu_timer.Start();
     
-    GUARD_CU(problem.Extract(h_k_nearest_neighbors));
+    GUARD_CU(problem.Extract(k, h_knns));
     if (validation == "last") {
         SizeT num_errors = Validate_Results(
             parameters,
             graph,
 	    k,
-	    h_k_nearest_neighbors,
+	    h_knns,
 	    ref_k_nearest_neighbors,
             false);
     }
@@ -162,9 +157,6 @@ cudaError_t RunTests(
     // Clean up
     GUARD_CU(enactor.Release(target));
     GUARD_CU(problem.Release(target));
-    // <TODO> Release problem specific data, e.g.:
-    delete[] h_k_nearest_neighbors; h_k_nearest_neighbors = NULL;
-    // </TODO>
     cpu_timer.Stop(); total_timer.Stop();
 
     info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());

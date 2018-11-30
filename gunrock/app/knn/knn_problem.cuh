@@ -64,20 +64,43 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     struct DataSlice : BaseDataSlice
     {
-        // <TODO> add problem specific storage arrays:
-        util::Array1D<SizeT, ValueT> degrees;
-        util::Array1D<SizeT, int> visited;
-        // </TODO>
+	// struct Point()
+	util::Array1D<SizeT, VertexT>   srcs;
+	util::Array1D<SizeT, SizeT>     keys;
+	util::Array1D<SizeT, VertexT>   distances;
+
+	// Nearest Neighbors
+	util::Array1D<SizeT, SizeT> knns;
+
+	// Number of neighbors
+	SizeT k;
+
+	// Reference Point
+	VertexT point_x;
+	VertexT point_y;
+
+	// CUB Related storage
+	util::Array1D<uint64_t, char> cub_temp_storage;
+	
+	// Sorted
+	util::Array1D<SizeT, SizeT>     keys_out;
+        util::Array1D<SizeT, VertexT>   distances_out;
 
         /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice()
         {
-            // <TODO> name of the problem specific arrays:
-            degrees.SetName("degrees");
-            visited.SetName("visited");
-            // </TODO>
+            srcs.SetName("srcs");
+            keys.SetName("keys");
+	    distances.SetName("distances");
+
+	    knns.SetName("knns");
+	
+	    cub_temp_storage.SetName("cub_temp_storage");
+	    keys_out.SetName("keys_out");
+	    distances_out.SetName("distances_out");
+
         }
 
         /*
@@ -96,10 +119,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            // <TODO> Release problem specific data, e.g.:
-            GUARD_CU(degrees.Release(target));
-            GUARD_CU(visited.Release(target));
-            // </TODO>
+            GUARD_CU(srcs.Release(target));
+            GUARD_CU(keys.Release(target));
+	    GUARD_CU(distances.Release(target));
+
+	    GUARD_CU(knns.Release(target));
+
+	    GUARD_CU(cub_temp_storage.Release(target));
+            GUARD_CU(keys_out.Release(target));
+            GUARD_CU(distances_out.Release(target));
 
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
@@ -117,6 +145,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GraphT        &sub_graph,
             int            num_gpus,
             int            gpu_idx,
+	    SizeT	   k,
             util::Location target,
             ProblemFlag    flag)
         {
@@ -124,15 +153,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
-            // <TODO> allocate problem specific data here, e.g.:
-            GUARD_CU(degrees.Allocate(sub_graph.nodes, target));
-            GUARD_CU(visited.Allocate(sub_graph.nodes, target));
-            // </TODO>
+	    // Point ()
+            GUARD_CU(srcs.Allocate(sub_graph.edges, target));
+            GUARD_CU(keys.Allocate(sub_graph.edges, target));
+	    GUARD_CU(distances.Allocate(sub_graph.edges, target));
+
+	    // k-nearest neighbors
+	    GUARD_CU(knns.Allocate(k, target));
+
+	    GUARD_CU(cub_temp_storage.Allocate(1, target));
+	    
+            GUARD_CU(keys_out.Allocate(sub_graph.edges, target));
+            GUARD_CU(distances_out.Allocate(sub_graph.edges, target));
 
             if (target & util::DEVICE) {
-                // <TODO> move sub-graph used by the problem onto GPU,
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
-                // </TODO>
             }
             return retval;
         }
@@ -142,27 +177,30 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          * @param[in] target      Targeting device location
          * \return    cudaError_t Error message(s), if any
          */
-        cudaError_t Reset(util::Location target = util::DEVICE)
+        cudaError_t Reset(
+		VertexT point_x_,
+		VertexT point_y_,
+		SizeT k_,
+		util::Location target = util::DEVICE)
         {
             cudaError_t retval = cudaSuccess;
             SizeT nodes = this -> sub_graph -> nodes;
+	    SizeT edges = this -> sub_graph -> edges;
+
+	    // Number of knns
+	    this -> k = k_;
+
+	    // Reference point
+	    this -> point_x = point_x_;
+	    this -> point_y = point_y_;
 
             // Ensure data are allocated
-            // <TODO> ensure size of problem specific data:
-            GUARD_CU(degrees.EnsureSize_(nodes, target));
-            GUARD_CU(visited.EnsureSize_(nodes, target));
-            // </TODO>
+            GUARD_CU(srcs.EnsureSize_(edges, target));
+            GUARD_CU(keys.EnsureSize_(edges, target));
+	    GUARD_CU(distances.EnsureSize_(edges, target));
 
-            // Reset data
-            // <TODO> reset problem specific data, e.g.:
-            GUARD_CU(degrees.ForEach([]__host__ __device__ (ValueT &x){
-               x = (ValueT)0;
-            }, nodes, target, this -> stream));
-
-            GUARD_CU(visited.ForEach([]__host__ __device__ (int &x){
-               x = (int)0;
-            }, nodes, target, this -> stream));
-            // </TODO>
+	    // K-Nearest Neighbors
+	    GUARD_CU(knns.EnsureSize_(k, target));
 
             return retval;
         }
@@ -170,6 +208,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
+    SizeT k;
+
 
     // ----------------------------------------------------------------
     // Problem Methods
@@ -181,7 +221,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Parameters &_parameters,
         ProblemFlag _flag = Problem_None) :
         BaseProblem(_parameters, _flag),
-        data_slices(NULL) {}
+        data_slices(NULL) {
+        k = _parameters.Get<int>("k");
+    }
 
     /**
      * @brief knn default destructor
@@ -215,9 +257,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
-        // <TODO> problem specific data to extract
+	SizeT k,
 	SizeT *h_k_nearest_neighbors,
-        // </TODO>
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -229,51 +270,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // Set device
             if (target == util::DEVICE) {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-/*
-                // <TODO> extract the results from single GPU, e.g.:
-                GUARD_CU(data_slice.degrees.SetPointer(h_degrees, nodes, util::HOST));
-                GUARD_CU(data_slice.degrees.Move(util::DEVICE, util::HOST));
-                // </TODO>
+                // extract the results from single GPU, e.g.:
+                GUARD_CU(data_slice.knns.SetPointer(h_k_nearest_neighbors, k, util::HOST));
+                GUARD_CU(data_slice.knns.Move(util::DEVICE, util::HOST));
             } else if (target == util::HOST) {
-                // <TODO> extract the results from single CPU, e.g.:
-                GUARD_CU(data_slice.degrees.ForEach(h_degrees,
-                   []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
+                // extract the results from single CPU, e.g.:
+                GUARD_CU(data_slice.knns.ForEach(h_k_nearest_neighbors,
+                   []__host__ __device__ (const SizeT &device_val, SizeT &host_val){
                        host_val = device_val;
-                   }, nodes, util::HOST));
-                // </TODO>
-		*/
+                   }, k, util::HOST));
             }
         } else { // num_gpus != 1
             
             // ============ INCOMPLETE TEMPLATE - MULTIGPU ============
-            
-            // // TODO: extract the results from multiple GPUs, e.g.:
-            // // util::Array1D<SizeT, ValueT *> th_distances;
-            // // th_distances.SetName("bfs::Problem::Extract::th_distances");
-            // // GUARD_CU(th_distances.Allocate(this->num_gpus, util::HOST));
-
-            // for (int gpu = 0; gpu < this->num_gpus; gpu++)
-            // {
-            //     auto &data_slice = data_slices[gpu][0];
-            //     if (target == util::DEVICE)
-            //     {
-            //         GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-            //         // GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
-            //     }
-            //     // th_distances[gpu] = data_slice.distances.GetPointer(util::HOST);
-            // } //end for(gpu)
-
-            // for (VertexT v = 0; v < nodes; v++)
-            // {
-            //     int gpu = this -> org_graph -> GpT::partition_table[v];
-            //     VertexT v_ = v;
-            //     if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
-            //         v_ = this -> org_graph -> GpT::convertion_table[v];
-
-            //     // h_distances[v] = th_distances[gpu][v_];
-            // }
-
-            // // GUARD_CU(th_distances.Release());
         }
 
         return retval;
@@ -287,6 +296,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     cudaError_t Init(
             GraphT           &graph,
+	    SizeT	      k,
             util::Location    target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -310,6 +320,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 this -> sub_graphs[gpu],
                 this -> num_gpus,
                 this -> gpu_idx[gpu],
+		k,
                 target,
                 this -> flag
             ));
@@ -325,9 +336,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
-        // <TODO> problem specific data if necessary, eg
-        // VertexT src,
-        // </TODO>
+	VertexT point_x,
+	VertexT point_y,
+	SizeT k,
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -336,12 +347,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-            GUARD_CU(data_slices[gpu] -> Reset(target));
+            GUARD_CU(data_slices[gpu] -> Reset(point_x, point_y, k, target));
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
-
-        // <TODO> Additional problem specific initialization
-        // </TODO>
 
         GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
         return retval;

@@ -20,6 +20,7 @@
 #include <gunrock/oprtr/oprtr.cuh>
  
 #include <gunrock/app/knn/knn_problem.cuh>
+#include <gunrock/util/sort_device.cuh>
 
 
 namespace gunrock {
@@ -35,9 +36,6 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
-
-    // <TODO> if needed, add command line parameters used by the enactor here
-    // </TODO>
     
     return retval;
 }
@@ -48,12 +46,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
  */
 template <typename EnactorT>
 struct knnIterationLoop : public IterationLoopBase
-    <EnactorT, Use_FullQ | Push
-    // <TODO>if needed, stack more option, e.g.:
-    // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-    // Update_Predecessors : 0x0)
-    // </TODO>
-    >
+    <EnactorT, Use_FullQ | Push>
 {
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
@@ -62,12 +55,7 @@ struct knnIterationLoop : public IterationLoopBase
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
     
     typedef IterationLoopBase
-        <EnactorT, Use_FullQ | Push
-        // <TODO> add the same options as in template parameters here, e.g.:
-        // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-        // Update_Predecessors : 0x0)
-        // </TODO>
-        > BaseIterationLoop;
+        <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
     knnIterationLoop() : BaseIterationLoop() {}
 
@@ -93,81 +81,84 @@ struct knnIterationLoop : public IterationLoopBase
         auto &oprtr_parameters = enactor_slice.oprtr_parameters;
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
-        
-        // <TODO> add problem specific data alias here:
-        auto &degrees = data_slice.degrees;
-        auto &visited = data_slice.visited;
-        // </TODO>
-        
+    
+	// struct Point()    
+        auto &srcs = data_slice.srcs;
+        auto &keys = data_slice.keys;
+	auto &distances = data_slice.distances;
+	
+	// K-Nearest Neighbors
+	auto &knns = data_slice.knns;
+	
+	// Number of KNNs 
+	auto k = data_slice.k; 
+	
+	// Reference Point
+	auto ref_src = data_slice.point_x;
+	auto ref_dest = data_slice.point_y;
+
+	// CUB Related storage
+	auto &cub_temp_storage = data_slice.cub_temp_storage;
+
+	// Sorted arrays
+        auto &keys_out = data_slice.keys_out;
+	auto &distances_out = data_slice.distances;
+
+	cudaStream_t  stream    =   oprtr_parameters.stream;
+        auto target             =   util::DEVICE;
+        util::Array1D<SizeT, VertexT>* null_frontier = NULL;
+
         // --
         // Define operations
 
         // advance operation
-        auto advance_op = [
-            // <TODO> pass data to lambda
-            degrees,
-            visited
-            // </TODO>
+        auto distance_op = [
+            srcs, keys, distances,
+            knns, k,
+	    ref_src, ref_dest
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // <TODO> Implement advance operation
-                        
-            // Mark src and dest as visited
-            atomicMax(visited + src, 1);
-            auto dest_visited = atomicMax(visited + dest, 1);
-            
-            // Increment degree of src
-            atomicAdd(degrees + src, 1);
-            
-            // Add dest to queue if previously unsen
-            return dest_visited == 0;
-            
-            // </TODO>
+	    // Calculate distance between src to edge vertex ref: (x,y)
+            VertexT distance = (src - ref_src) * (src - ref_src)\
+			     + (dest - ref_dest) * (dest - ref_dest);
+	    
+	    // struct Point()
+	    srcs[edge_id] = src;
+	    keys[edge_id] = edge_id; // shouldn't this be like this
+	    distances[edge_id] = distance;
+
+	    // <TODO>	
+            return;
+	    // </TODO>
         };
 
-        // filter operation
-        auto filter_op = [
-            // <TODO> pass data to lambda
-            // </TODO>
-        ] __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            // <TODO> implement filter operation
-            return true;
-            // </TODO>
-        };
         
         // --
         // Run
         
-        // <TODO> some of this may need to be edited depending on algorithmic needs
-        // !! How much variation between apps is there in these calls?
-        
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, advance_op, filter_op));
-        
-        if (oprtr_parameters.advance_mode != "LB_CULL" &&
-            oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
-        {
-            frontier.queue_reset = false;
-            GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-                oprtr_parameters, filter_op));
-        }
+            graph.csr(), null_frontier, null_frontier,
+            oprtr_parameters, distance_op));
+
+
+	// Sort all the distances using CUB
+	GUARD_CU(util::cubSegmentedSortPairs(
+					cub_temp_storage, 
+					keys, keys_out,
+					distances, distances_out,
+					graph.edges, graph.nodes,
+					graph.CsrT::row_offsets,
+					0, std::ceil(std::log2(graph.nodes)), 
+					stream));
 
         // Get back the resulted frontier length
         GUARD_CU(frontier.work_progress.GetQueueLength(
             frontier.queue_index, frontier.queue_length,
-            false, oprtr_parameters.stream, true));
-
-        // </TODO>
-        
+            false, stream, true));
+ 
         return retval;
     }
 

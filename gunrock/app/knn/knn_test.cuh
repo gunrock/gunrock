@@ -41,7 +41,7 @@ namespace knn {
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    int k,                             // number of nearest neighbor
+    typename GraphT::SizeT k,          // number of nearest neighbor
     typename GraphT::VertexT point_x,  // index of reference point
     typename GraphT::VertexT point_y,  // index of reference point
     typename GraphT::SizeT* k_nearest_neighbors, // edge indecies of k nearest neighbors

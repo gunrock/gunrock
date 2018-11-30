@@ -49,7 +49,7 @@ struct main_struct
         bool quiet = parameters.Get<bool>("quiet");
 
 	// Get number of nearest neighbors, default k = 10
-	int k = parameters.Get<int>("k"); 
+	SizeT k = parameters.Get<int>("k"); 
 	// Get x reference point, default point_id = 0
 	VertexT point_x = parameters.Get<VertexT>("x");
 
@@ -75,16 +75,19 @@ struct main_struct
         // int num_srcs = srcs.size();
         // </TODO>
         
-	// Reference result on GPU
+	// Reference result on CPU
         SizeT* ref_k_nearest_neighbors = NULL;
-        
+	SizeT* h_knns = NULL;       
+	h_knns = new SizeT[k]; 
+
         if (!quick) {
             // Init datastructures for reference result on GPU
 	    ref_k_nearest_neighbors = new SizeT[k];
 
             // If not in `quick` mode, compute CPU reference implementation
             util::PrintMsg("__________________________", !quiet);
-            
+     	    util::PrintMsg("______ CPU Reference _____", !quiet);
+ 
             float elapsed = app::knn::CPU_Reference(
                 graph.csr(),
 		k,
@@ -95,24 +98,26 @@ struct main_struct
             
             util::PrintMsg("--------------------------\n Elapsed: "
                 + std::to_string(elapsed), !quiet);
+	    util::PrintMsg("__________________________", !quiet);
         }
 
-        // <TODO> add other switching parameters, if needed
         std::vector<std::string> switches{"advance-mode"};
-        // </TODO>
         
-        GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [k, ref_k_nearest_neighbors
-            ](util::Parameters &parameters, GraphT &graph)
-            {
-                // <TODO> pass necessary data to app::Template::RunTests
-                return app::knn::RunTests(parameters, graph, k, ref_k_nearest_neighbors, util::DEVICE);
-                // </TODO>
+        GUARD_CU(app::Switch_Parameters(
+	    parameters, graph, switches,
+            [k, h_knns, ref_k_nearest_neighbors](
+		util::Parameters &parameters, GraphT &graph) {
+                return app::knn::RunTests(parameters, graph, 
+					  k, h_knns, ref_k_nearest_neighbors, 
+					  util::DEVICE);
             }));
 
         if (!quick) {
             delete[] ref_k_nearest_neighbors; ref_k_nearest_neighbors = NULL;
         }
+
+	delete[] h_knns; h_knns = NULL;
+
         return retval;
     }
 };
@@ -132,7 +137,6 @@ int main(int argc, char** argv)
     }
     GUARD_CU(parameters.Check_Required());
 
-    // TODO: change available graph types, according to requirements
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |
