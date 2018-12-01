@@ -183,32 +183,6 @@ struct ColorIterationLoop : public IterationLoopBase
         SizeT num_neighbors 	= graph.CsrT::GetNeighborListLength(v);
         ValueT temp = rand[v];
 
-        if(use_jpl) {
-
-          if(!util::isValid(colors[v])) {
-              bool colormax = true;
-              bool colormin = true;
-              for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-                VertexT u = graph.CsrT::GetEdgeDest(e);
-                if(!util::isValid(colors[u]) && rand[u] >= temp) {
-                  printf("Max: Node %d with %f defeated by node %d with %f\n",
-                  v,rand[v],u,rand[u]);
-                  colormax = false;
-                }
-                if(!util::isValid(colors[u]) && rand[u] <= temp) {
-                  printf("Min: Node %d with %f defeated by node %d with %f\n",
-                  v,rand[v],u,rand[u]);
-                  colormin = false;
-                }
-              }
-
-              if(colormax)
-                colors[v] = iteration*2+1;
-              if(colormin)
-                colors[v] = iteration*2+2;
-            }
-        }
-        else {
           VertexT max = v;    // active max vertex
   		    VertexT min = v;    // active min vertex
 
@@ -233,8 +207,40 @@ struct ColorIterationLoop : public IterationLoopBase
 
       		printf("iteration number = %u\n", iteration);
       		printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min], colors[max]);
-        }
 	  };
+
+
+    auto color_op_jpl = [
+      use_jpl,
+      graph,
+      colors,
+      rand,
+      iteration
+    ] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
+
+      VertexT v 		= v_q[pos];
+      SizeT start_edge 	= graph.CsrT::GetNeighborListOffset(v);
+      SizeT num_neighbors 	= graph.CsrT::GetNeighborListLength(v);
+      ValueT temp = rand[v];
+
+      if(!util::isValid(colors[v])) {
+          bool colormax = true;
+          bool colormin = true;
+          for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+            VertexT u = graph.CsrT::GetEdgeDest(e);
+            if(!util::isValid(colors[u]) && rand[u] >= temp)
+              colormax = false;
+            if(!util::isValid(colors[u]) && rand[u] <= temp)
+              colormin = false;
+
+          }
+
+          if(colormax)
+            colors[v] = iteration*2+1;
+          if(colormin)
+            colors[v] = iteration*2+2;
+        }
+    };
 
 
 	  auto status_op = [
@@ -249,9 +255,14 @@ struct ColorIterationLoop : public IterationLoopBase
     	 };
 
 	    // Run --
-      GUARD_CU(frontier.V_Q()->ForAll(
-           color_op, frontier.queue_length,
-           util::DEVICE, oprtr_parameters.stream));
+      if(use_jpl) {
+        GUARD_CU(frontier.V_Q()->ForAll(
+             color_op_jpl, frontier.queue_length,
+             util::DEVICE, oprtr_parameters.stream));}
+      else {
+        GUARD_CU(frontier.V_Q()->ForAll(
+             color_op, frontier.queue_length,
+             util::DEVICE, oprtr_parameters.stream));}
 
 	    GUARD_CU(frontier.V_Q()->ForAll(
                  status_op, frontier.queue_length,
