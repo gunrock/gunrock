@@ -98,6 +98,7 @@ struct ColorIterationLoop : public IterationLoopBase
 	auto &color_balance  = data_slice.color_balance;
 	auto &colored	       = data_slice.colored;
   auto &use_jpl        = data_slice.use_jpl;
+  auto &no_conflict    = data_slice.no_conflict;
         // </DONE>
 
 	curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
@@ -171,8 +172,7 @@ struct ColorIterationLoop : public IterationLoopBase
   else {
 
 	    auto color_op = [
-        use_jpl,
-		    graph,
+        graph,
 	    	colors,
 	    	rand,
 	    	iteration
@@ -209,9 +209,31 @@ struct ColorIterationLoop : public IterationLoopBase
       		printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min], colors[max]);
 	  };
 
+      auto resolve_iter = [
+        graph,
+        colors,
+        rand,
+        iteration
+      ] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
+
+        VertexT v = v_q[pos];
+        SizeT start_edge 	= graph.CsrT::GetNeighborListOffset(v);
+        SizeT num_neighbors 	= graph.CsrT::GetNeighborListLength(v);
+
+        if(!util::isValid(colors[v])) {
+          for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+            VertexT u = graph.CsrT::GetEdgeDest(e);
+            if(!util::isValid(colors[u]) && rand[u] >= rand[v]) {
+              colors[v] = util::PreDefinedValues<VertexT>::InvalidValue;
+              break;
+            }
+            if(!util::isValid(colors[u]) && rand[u] <= rand[v])
+              colors[u] = util::PreDefinedValues<VertexT>::InvalidValue;
+          }
+        }
+      };
 
     auto color_op_jpl = [
-      use_jpl,
       graph,
       colors,
       rand,
@@ -242,7 +264,6 @@ struct ColorIterationLoop : public IterationLoopBase
         }
     };
 
-
 	  auto status_op = [
 		  colors,
 		  colored
@@ -262,7 +283,13 @@ struct ColorIterationLoop : public IterationLoopBase
       else {
         GUARD_CU(frontier.V_Q()->ForAll(
              color_op, frontier.queue_length,
-             util::DEVICE, oprtr_parameters.stream));}
+             util::DEVICE, oprtr_parameters.stream));
+         if(no_conflict == 1) {
+           GUARD_CU(frontier.V_Q()->ForAll(
+                resolve_iter, frontier.queue_length,
+                util::DEVICE, oprtr_parameters.stream));
+         }
+           }
 
 	    GUARD_CU(frontier.V_Q()->ForAll(
                  status_op, frontier.queue_length,

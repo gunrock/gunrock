@@ -51,6 +51,13 @@ cudaError_t UseParameters(util::Parameters &parameters)
       __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<int>(
+      "no_conflict",
+      util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+      false, "Resolve color conflict, 0 to skip check, 1 to check at end of
+      every iteration, 2 to check at the end of loop (default=0).",
+      __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
          "seed",
          util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
          time(NULL),

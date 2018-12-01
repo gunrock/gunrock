@@ -56,6 +56,7 @@ double CPU_Reference(
 auto usr_iter = parameters.Get<int>("usr_iter");
 auto seed     = parameters.Get<int>("seed");
 auto use_jpl  = parameters.Get<bool>("JPL");
+auto no_conflict = parameters.Get<int>("no_conflict");
 
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
