@@ -54,7 +54,8 @@ cudaError_t UseParameters(util::Parameters &parameters)
       "no_conflict",
       util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
       false, "Resolve color conflict, 0 to skip check, 1 to check at end of
-      every iteration, 2 to check at the end of loop (default=0).",
+      every iteration with random, 2 to check at end of every iteration with
+       degree, 3 to check at the end of the loop (default=0).",
       __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<int>(
