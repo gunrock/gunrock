@@ -12,11 +12,13 @@
  */
 
 #include <gunrock/gunrock.h>
-#include <gunrock/app/app_base.cuh>
-#include <gunrock/app/test_base.cuh>
-#include <gunrock/graphio/graphio.cuh>
 #include <gunrock/util/test_utils.cuh>
 
+#include <gunrock/graphio/graphio.cuh>
+
+
+#include <gunrock/app/app_base.cuh>
+#include <gunrock/app/test_base.cuh>
 #include <gunrock/app/knn/knn_enactor.cuh>
 #include <gunrock/app/knn/knn_test.cuh>
 

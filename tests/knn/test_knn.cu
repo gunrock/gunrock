@@ -66,13 +66,13 @@ struct main_struct {
         GraphT;
 
     cudaError_t retval = cudaSuccess;
-    util::CpuTimer cpu_timer;
+    //util::CpuTimer cpu_timer;
     GraphT graph;
 
-    cpu_timer.Start();
+    //cpu_timer.Start();
     GUARD_CU(graphio::LoadGraph(parameters, graph));
-    cpu_timer.Stop();
-    parameters.Set("load-time", cpu_timer.ElapsedMillis());
+    //cpu_timer.Stop();
+    //parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
     // <TODO> get srcs if needed, e.g.:
     // GUARD_CU(app::Set_Srcs (parameters, graph));
