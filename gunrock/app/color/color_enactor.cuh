@@ -194,26 +194,70 @@ struct ColorIterationLoop : public IterationLoopBase
     		    if (rand[u] < temp)
     			    min = u;
 
-    		    printf("Let's see what rand[u] = %f\n", rand[u]);
+    		    //printf("Let's see what rand[u] = %f\n", rand[u]);
     		    temp = rand[u]; // compare against e-1
   	    	}
 
-          // Assign two colors per iteration
+          //hash coloring
+          //max hash coloring
+          // if (!util::isValid(colors[max])) {
+          //   int* max_forbidden = new int[graph.nodes];
+          //   SizeT max_start_edge = graph.CsrT::GetNeighborListOffset(max);
+          //   SizeT max_neighbors  = graph.CsrT::GetNeighborListLength(max);
+          //
+          //   for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+          //     VertexT u = graph.CsrT::GetEdgeDest(e);
+          //       if(!util::isValid(colors[u]))
+          //         max_forbidden[colors[u]] = max;
+          //   }
+          //
+          //   for (int c = 0; c < graph.nodes; c++) {
+          //     if(max_forbidden[c] != max) {
+          //       colors[max] = c;
+          //       break;
+          //     }
+          //   }
+          //
+          //   delete[] max_forbidden;
+          // }
+          //
+          // //min hash coloring
+          // if (!util::isValid(colors[min])) {
+          //   int* min_forbidden = new int[graph.nodes];
+          //   SizeT min_start_edge = graph.CsrT::GetNeighborListOffset(min);
+          //   SizeT min_neighbors  = graph.CsrT::GetNeighborListLength(min);
+          //
+          //   for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+          //     VertexT u = graph.CsrT::GetEdgeDest(e);
+          //       if(!util::isValid(colors[u]))
+          //         min_forbidden[colors[u]] = min;
+          //   }
+          //
+          //   for (int c = 0; c < graph.nodes; c++) {
+          //     if(min_forbidden[c] != min) {
+          //       colors[min] = c;
+          //       break;
+          //     }
+          //   }
+          //
+          //   delete[] min_forbidden;
+          // }
+          Assign two colors per iteration
       		if (!util::isValid(colors[max]))
       		    colors[max] = iteration*2+1;
 
       		if (!util::isValid(colors[min]))
       		    colors[min] = iteration*2+2;
 
-      		printf("iteration number = %u\n", iteration);
-      		printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min], colors[max]);
+      		// printf("iteration number = %u\n", iteration);
+      		// printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min], colors[max]);
 	  };
 
       auto resolve_iter = [
         graph,
         colors,
         rand,
-        iteration
+        no_conflict
       ] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
 
         VertexT v = v_q[pos];
@@ -223,12 +267,21 @@ struct ColorIterationLoop : public IterationLoopBase
         if(!util::isValid(colors[v])) {
           for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
             VertexT u = graph.CsrT::GetEdgeDest(e);
-            if(!util::isValid(colors[u]) && rand[u] >= rand[v]) {
-              colors[v] = util::PreDefinedValues<VertexT>::InvalidValue;
-              break;
+            if(!util::isValid(colors[u]) && colors[u] == colors[v]) {
+
+              //decide by random number
+              if(rand[u] >= rand[v] && no_conflict == 1) {
+                colors[v] = util::PreDefinedValues<VertexT>::InvalidValue;
+                break;
+              }
+
+              //decide by degree heuristic
+              else if (graph.CsrT::GetNeighborListLength(u) >= num_neighbors &&
+              no_conflict == 2) {
+                colors[v] = util::PreDefinedValues<VertexT>::InvalidValue;
+                break;
+              }
             }
-            if(!util::isValid(colors[u]) && rand[u] <= rand[v])
-              colors[u] = util::PreDefinedValues<VertexT>::InvalidValue;
           }
         }
       };
@@ -284,7 +337,7 @@ struct ColorIterationLoop : public IterationLoopBase
         GUARD_CU(frontier.V_Q()->ForAll(
              color_op, frontier.queue_length,
              util::DEVICE, oprtr_parameters.stream));
-         if(no_conflict == 1) {
+         if(no_conflict == 1 || no_conflict == 2) {
            GUARD_CU(frontier.V_Q()->ForAll(
                 resolve_iter, frontier.queue_length,
                 util::DEVICE, oprtr_parameters.stream));
