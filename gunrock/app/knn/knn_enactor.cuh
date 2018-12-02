@@ -147,12 +147,15 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                    SizeT &output_pos) -> bool {
       auto nodes = graph.nodes;
       int snn_density = 0;
+      auto src_num_neighbors = graph.CsrT::GetNeighborListLength(src);
+      if (src_num_neighbors < k)
+          return false;
       for (auto i = 0; i < k; ++i) {
         // chose i nearest neighbor
         auto neighbor = knns[src * k + i];
         // go over neighbors of the nearest neighbor
         auto f_start = graph.CsrT::GetNeighborListOffset(neighbor);
-        auto num_neighbors2 = graph.CsrT::GetNeighborListOffset(neighbor);
+        auto num_neighbors2 = graph.CsrT::GetNeighborListLength(neighbor);
         int num_shared_neighbors = 0;
         for (int same = f_start; same < f_start + num_neighbors2; ++same) {
           if (adj[src * nodes + same] == 1) ++num_shared_neighbors;
@@ -161,9 +164,8 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         // density
         if (num_shared_neighbors >= eps) ++snn_density;
       }
-      debug("snn density of %d is %d ? %d\n", src, snn_density, min_pts);
       if (snn_density >= min_pts) {
-        debug("%d is core point\n", src);
+        debug("snn density of %d is %d >= %d, it is core point\n", src, snn_density, min_pts);
         core_point[src] = 1;
       }
       // <TODO>
@@ -207,141 +209,98 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         graph.csr(), null_frontier, null_frontier, oprtr_parameters,
         distance_op));
 
-    // Debug list neighbors from nearest one
-    // GUARD_CU(distances_out.ForAll(
-    //[graph, keys, keys_out, k, knns]
-    //__host__ __device__ (VertexT *d, const VertexT &pos){
-    //    for (auto n = 0; n < graph.nodes; ++n){
-    //        debug("%d nearest neighbors of %d: ", k, n);
-    //        auto e_start = graph.CsrT::GetNeighborListOffset(n);
-    //        auto num_neighbors = graph.CsrT::GetNeighborListLength(n);
-    //        for (auto e = e_start; e < e_start+num_neighbors; ++e){
-    //            auto m = graph.CsrT::GetEdgeDest(keys_out[e]);
-    //            debug("%d: dist[%d] = %d ", m, keys_out[e], d[keys_out[e]]);
-    //        }
-    //        debug("\n");
-    //    }
-    //}, 1, util::DEVICE, oprtr_parameters.stream));
-
     // Sort all the distances using CUB
     GUARD_CU(util::cubSegmentedSortPairs(
         cub_temp_storage, distances, distances_out, keys, keys_out, graph.edges,
         graph.nodes, graph.CsrT::row_offsets, 0,
         std::ceil(std::log2(graph.nodes)), stream));
 
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSync failed");
-    /*
-            // Get inverse key
-            GUARD_CU(keys.ForAll(
-            [keys_out] __host__ __device__ (SizeT *k, const SizeT &pos){
-                k[keys_out[pos]] = pos;
-            }, graph.edges, util::DEVICE, oprtr_parameters.stream));
-    */
+    // Debug 
     GUARD_CU(keys.ForAll(
-        [keys_out, keys, distances, distances_out, graph] __host__ __device__(
-            SizeT * k, const SizeT &pos) {
+        [keys_out, keys, distances, distances_out, graph] 
+        __host__ __device__(SizeT * k, const SizeT &pos) {
           printf("after sorting:\n");
           for (int i = 0; i < graph.edges; ++i)
             printf(
                 "keys[%d] = %d, keys_out[%d] = %d, dist[%d] = %d, dist_out[%d] "
                 "= %d\n",
-                i, keys[i], i, keys_out[i], i, distances[i], i,
-                distances_out[i]);
+                i, keys[i], i, keys_out[i], keys[i], distances[keys[i]], keys_out[i],
+                distances_out[keys_out[i]]);
         },
         1, util::DEVICE, oprtr_parameters.stream));
 
-    // Debug list neighbors from nearest one
-    GUARD_CU(distances_out.ForAll(
-        [graph, keys, keys_out, k, knns] __host__ __device__(
-            VertexT * d, const VertexT &pos) {
-          for (auto n = 0; n < graph.nodes; ++n) {
-            debug("%d nearest neighbors of %d: ", k, n);
-            auto e_start = graph.CsrT::GetNeighborListOffset(n);
-            auto num_neighbors = graph.CsrT::GetNeighborListLength(n);
-            for (auto e = e_start; e < e_start + num_neighbors; ++e) {
-              auto m = graph.CsrT::GetEdgeDest(keys_out[e]);
-              debug("%d: dist[%d] = %d ", m, keys_out[e], d[keys_out[e]]);
-            }
-            debug("\n");
-          }
-        },
-        1, util::DEVICE, oprtr_parameters.stream));
-
+    // get reverse keys_out array
+    GUARD_CU(keys.ForAll(
+        [keys_out]
+        __host__ __device__ (SizeT *k, const SizeT &pos){
+            k[keys_out[pos]] = pos;
+        }, graph.edges, util::DEVICE, oprtr_parameters.stream));
+    
     // Choose k nearest neighbors for each node
     GUARD_CU(knns.ForAll(
-        [graph, keys, k, distances_out] __host__ __device__(SizeT * knns_,
-                                                            const SizeT &pos) {
+        [graph, k, keys, keys_out, distances_out] 
+        __host__ __device__ (SizeT * knns_, const SizeT &pos) {
           // go to first nearest neighbor
           auto e_start = graph.CsrT::GetNeighborListOffset(pos);
           auto num_neighbors = graph.CsrT::GetNeighborListLength(pos);
           int i = 0;
           for (auto e = e_start; e < e_start + num_neighbors && i < k;
                ++e, ++i) {
-            auto m = graph.CsrT::GetEdgeDest(keys[e]);
-            debug("nearest neighbor[%d] is %d(%d)\n", pos, m,
-                  distances_out[keys[e]]);
+            auto m = graph.CsrT::GetEdgeDest(keys_out[keys[e]]);
             knns_[k * pos + i] = m;
           }
         },
         graph.nodes, util::DEVICE, oprtr_parameters.stream));
 
+    // Debug 
+    GUARD_CU(knns.ForAll(
+        [graph, k]
+        __host__ __device__(SizeT * knns_, const SizeT &pos) {
+          printf("knns:\n");
+          for (int i = 0; i < graph.nodes; ++i){
+            printf("%d: ", i);
+            auto num_neighbors = graph.CsrT::GetNeighborListLength(i);
+            if (num_neighbors < k){
+                printf(" # neigh is %d < %d\n", num_neighbors, k);
+                continue;
+            }
+            for (int j = 0; j < k; ++j){
+                printf("%d ", knns_[i*k + j]);
+            }
+            printf("\n");
+            }
+        }, 1, util::DEVICE, oprtr_parameters.stream));
+
+    // Find density of each point and core points
     GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
         graph.csr(), null_frontier, null_frontier, oprtr_parameters,
         density_op));
 
+    // Assign core points to clusters
     GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
         graph.csr(), null_frontier, null_frontier, oprtr_parameters,
         cluster_op));
 
+    // Assign other non-core and non-noise points to clusters
     GUARD_CU(distances_out.ForAll(
-        [graph, keys, k, knns, cluster, core_point] __host__ __device__(
+        [graph, keys, keys_out, k, knns, cluster, core_point] __host__ __device__(
             VertexT * d, const VertexT &pos) {
-          if (core_point[pos] != 1) {
-            auto e_start = graph.CsrT::GetNeighborListOffset(pos);
-            auto num_neighbors = graph.CsrT::GetNeighborListLength(pos);
-            for (auto e = e_start; e < e_start + num_neighbors; ++e) {
-              auto m = graph.CsrT::GetEdgeDest(keys[e]);
-              if (core_point[m] == 1) {
-                cluster[pos] = cluster[m];
-                return;
-              }
+          if (core_point[pos] == 1)
+            return;
+          auto num_neighbors = graph.CsrT::GetNeighborListLength(pos);
+          if (num_neighbors < k)
+            return;
+          auto e_start = graph.CsrT::GetNeighborListOffset(pos);
+          for (auto e = e_start; e < e_start + num_neighbors; ++e) {
+            auto m = graph.CsrT::GetEdgeDest(keys_out[keys[e]]);
+            if (core_point[m] == 1) {
+              cluster[pos] = cluster[m];
+              return;
             }
           }
         },
         graph.nodes, util::DEVICE, oprtr_parameters.stream));
 
-    /*
-    debug("it %d\n", iteration);
-
-    GUARD_CU(distances_out.ForAll(
-    [graph] __host__ __device__ (VertexT *d, const VertexT &pos){
-        debug("csr graph: \n");
-        for (auto n = 0; n < graph.nodes; ++n){
-            auto e_start = graph.CsrT::GetNeighborListOffset(n);
-            auto num_neighbors = graph.CsrT::GetNeighborListLength(n);
-            for (auto e = e_start; e < e_start+num_neighbors; ++e){
-                auto m = graph.CsrT::GetEdgeDest(e);
-                debug("%d ", m);
-                //debug("dist[%d] = %d ", e, d[e]);
-            }
-            debug("\n");
-        }
-    }, 1, util::DEVICE, oprtr_parameters.stream));
-
-    GUARD_CU(distances_out.ForAll(
-    [adj, graph] __host__ __device__ (VertexT *d, const VertexT &pos){
-        debug("coo graph: \n");
-        for (auto n = 0; n < graph.nodes; ++n){
-            debug("%d: ", n);
-            for (auto m = 0; m < graph.nodes; ++m){
-                if (adj[n*graph.nodes + m] == 1){
-                    debug("%d ", m);
-                }
-            }
-            debug("\n");
-        }
-    }, 1, util::DEVICE, oprtr_parameters.stream));
-*/
     // Get back the resulted frontier length
     GUARD_CU(frontier.work_progress.GetQueueLength(
         frontier.queue_index, frontier.queue_length, false, stream, true));

@@ -11,14 +11,20 @@
  * @brief Simple Gunrock Application
  */
 
+// Gunrock api
 #include <gunrock/gunrock.h>
+
+// Test utils
 #include <gunrock/util/test_utils.cuh>
 
+// Graphio include
 #include <gunrock/graphio/graphio.cuh>
 
-
+// App and test base includes
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
+
+// KNN includes
 #include <gunrock/app/knn/knn_enactor.cuh>
 #include <gunrock/app/knn/knn_test.cuh>
 
