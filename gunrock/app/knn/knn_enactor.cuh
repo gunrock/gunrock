@@ -197,6 +197,8 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           auto cluster_id = min(cluster[src], cluster[i]);
           cluster[src] = cluster_id;
           cluster[i] = cluster_id;
+          printf("cluster[%d] = %d\n", src, cluster[src]);
+          printf("cluster[%d] = %d\n", i, cluster[i]);
         }
       }
       return true;
@@ -295,6 +297,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             auto m = graph.CsrT::GetEdgeDest(keys_out[keys[e]]);
             if (core_point[m] == 1) {
               cluster[pos] = cluster[m];
+              printf("cluster[%d] = %d\n", pos, cluster[pos]);
               return;
             }
           }
