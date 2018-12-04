@@ -84,8 +84,8 @@ template <typename GraphT>
 cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
                      typename GraphT::SizeT k, typename GraphT::SizeT eps,
                      typename GraphT::SizeT min_pts,
-                     typename GraphT::SizeT *h_knns,
-                     typename GraphT::SizeT *ref_k_nearest_neighbors,
+                     typename GraphT::SizeT *h_cluster,
+                     typename GraphT::SizeT *ref_cluster,
                      util::Location target) {
   cudaError_t retval = cudaSuccess;
 
@@ -136,18 +136,18 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
         !quiet_mode);
 
     if (validation == "each") {
-      GUARD_CU(problem.Extract(k, h_knns));
-      SizeT num_errors = Validate_Results(parameters, graph, k, h_knns,
-                                          ref_k_nearest_neighbors, false);
+      GUARD_CU(problem.Extract(graph.nodes, h_cluster));
+      SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
+                                          ref_cluster, false);
     }
   }
 
   cpu_timer.Start();
 
-  GUARD_CU(problem.Extract(k, h_knns));
+  GUARD_CU(problem.Extract(graph.nodes, h_cluster));
   if (validation == "last") {
-    SizeT num_errors = Validate_Results(parameters, graph, k, h_knns,
-                                        ref_k_nearest_neighbors, false);
+    SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
+                                        ref_cluster, false);
   }
 
   // compute running statistics

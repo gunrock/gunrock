@@ -344,8 +344,9 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             ->ForAll(clustering_op, nodes, util::DEVICE, stream));
 
     GUARD_CU(cluster.ForAll(
-            [] __host__ __device__ (SizeT **c, const SizeT &p){
-                printf("cluster [%d] = %d\n", p, *c[p]);
+            [cluster_id] __host__ __device__ (SizeT **c, const SizeT &p){
+                cluster_id[p] = *c[p];
+                debug("cluster [%d] = %d\n", p, cluster_id[p]);
             }, nodes, util::DEVICE, stream));
 
     GUARD_CU(frontier.work_progress.GetQueueLength(

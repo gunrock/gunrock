@@ -82,20 +82,20 @@ struct main_struct {
     // </TODO>
 
     // Reference result on CPU
-    SizeT* ref_k_nearest_neighbors = NULL;
-    SizeT* h_knns = NULL;
-    h_knns = new SizeT[k];
+    SizeT* ref_cluster = NULL;
+    SizeT* h_cluster = (SizeT*)malloc(sizeof(SizeT)*graph.nodes);
 
     if (!quick) {
       // Init datastructures for reference result on GPU
-      ref_k_nearest_neighbors = new SizeT[k];
+      ref_cluster = (SizeT*)malloc(sizeof(SizeT)*graph.nodes);
+      for (auto i=0; i<graph.nodes; ++i) 
+          ref_cluster[i] = i;
 
       // If not in `quick` mode, compute CPU reference implementation
       util::PrintMsg("__________________________", !quiet);
       util::PrintMsg("______ CPU Reference _____", !quiet);
 
-      float elapsed = app::knn::CPU_Reference(graph.csr(), k, point_x, point_y,
-                                              ref_k_nearest_neighbors, quiet);
+      float elapsed = app::knn::CPU_Reference(graph.csr(), k, eps, min_pts, point_x, point_y, ref_cluster, quiet);
 
       util::PrintMsg(
           "--------------------------\n Elapsed: " + std::to_string(elapsed),
@@ -107,19 +107,17 @@ struct main_struct {
 
     GUARD_CU(app::Switch_Parameters(
         parameters, graph, switches,
-        [k, eps, min_pts, h_knns, ref_k_nearest_neighbors](
+        [k, eps, min_pts, h_cluster, ref_cluster](
             util::Parameters& parameters, GraphT& graph) {
-          return app::knn::RunTests(parameters, graph, k, eps, min_pts, h_knns,
-                                    ref_k_nearest_neighbors, util::DEVICE);
+          return app::knn::RunTests(parameters, graph, k, eps, min_pts, 
+                  h_cluster, ref_cluster, util::DEVICE);
         }));
 
     if (!quick) {
-      delete[] ref_k_nearest_neighbors;
-      ref_k_nearest_neighbors = NULL;
+        delete[] ref_cluster;
     }
 
-    delete[] h_knns;
-    h_knns = NULL;
+    delete[] h_cluster;
 
     return retval;
   }

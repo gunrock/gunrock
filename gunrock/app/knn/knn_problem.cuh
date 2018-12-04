@@ -155,7 +155,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(adj.Allocate(nodes * nodes, target));
       GUARD_CU(core_point.Allocate(nodes, target));
       GUARD_CU(cluster.Allocate(nodes, target));
-      GUARD_CU(cluster_id.Allocate(nodes * nodes, target));
+      GUARD_CU(cluster_id.Allocate(nodes * nodes, target|util::HOST));
 
       // k-nearest neighbors
       GUARD_CU(knns.Allocate(k * nodes, target));
@@ -280,7 +280,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 ...
    * \return     cudaError_t Error message(s), if any
    */
-  cudaError_t Extract(SizeT k, SizeT *h_k_nearest_neighbors,
+  cudaError_t Extract(SizeT n, SizeT *h_cluster,
                       util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
 
@@ -290,22 +290,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // Set device
       if (target == util::DEVICE) {
         GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-        // extract the results from single GPU, e.g.:
-        GUARD_CU(
-            data_slice.knns.SetPointer(h_k_nearest_neighbors, k, util::HOST));
-        GUARD_CU(data_slice.knns.Move(util::DEVICE, util::HOST));
-      } else if (target == util::HOST) {
-        // extract the results from single CPU, e.g.:
-        GUARD_CU(data_slice.knns.ForEach(
-            h_k_nearest_neighbors,
-            [] __host__ __device__(const SizeT &device_val, SizeT &host_val) {
-              host_val = device_val;
-            },
-            k, util::HOST));
+        GUARD_CU(data_slice.cluster_id.Move(util::DEVICE, util::HOST));
+        for (int i=0; i<n; ++i){
+            h_cluster[i] = data_slice.cluster_id[i];
+        }
       }
-    } else {  // num_gpus != 1
-
-      // ============ INCOMPLETE TEMPLATE - MULTIGPU ============
+    } else if (target == util::HOST){
     }
 
     return retval;
