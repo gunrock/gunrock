@@ -58,12 +58,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   struct DataSlice : BaseDataSlice {
     // struct Point()
-    util::Array1D<SizeT, VertexT> srcs;
     util::Array1D<SizeT, SizeT> keys;
     util::Array1D<SizeT, VertexT> distances;
     util::Array1D<SizeT, SizeT> adj;
     util::Array1D<SizeT, SizeT> core_point;
-    util::Array1D<SizeT, SizeT> cluster;
+    util::Array1D<SizeT, SizeT*> cluster;
+    util::Array1D<SizeT, SizeT> cluster_id;
 
     // Nearest Neighbors
     util::Array1D<SizeT, SizeT> knns;
@@ -88,12 +88,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * @brief Default constructor
      */
     DataSlice() : BaseDataSlice() {
-      srcs.SetName("srcs");
       keys.SetName("keys");
       distances.SetName("distances");
       adj.SetName("adj");
       core_point.SetName("core_point");
       cluster.SetName("cluster");
+      cluster_id.SetName("cluster_id");
 
       knns.SetName("knns");
 
@@ -116,11 +116,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cudaError_t retval = cudaSuccess;
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx));
 
-      GUARD_CU(srcs.Release(target));
       GUARD_CU(keys.Release(target));
       GUARD_CU(distances.Release(target));
       GUARD_CU(adj.Release(target));
       GUARD_CU(core_point.Release(target));
+      GUARD_CU(cluster_id.Release(target));
       GUARD_CU(cluster.Release(target));
 
       GUARD_CU(knns.Release(target));
@@ -150,12 +150,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       SizeT nodes = sub_graph.nodes;
       SizeT edges = sub_graph.edges;
       // Point ()
-      GUARD_CU(srcs.Allocate(edges, target));
       GUARD_CU(keys.Allocate(edges, target));
       GUARD_CU(distances.Allocate(edges, target));
       GUARD_CU(adj.Allocate(nodes * nodes, target));
       GUARD_CU(core_point.Allocate(nodes, target));
       GUARD_CU(cluster.Allocate(nodes, target));
+      GUARD_CU(cluster_id.Allocate(nodes * nodes, target));
 
       // k-nearest neighbors
       GUARD_CU(knns.Allocate(k * nodes, target));
@@ -181,6 +181,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cudaError_t retval = cudaSuccess;
       SizeT nodes = this->sub_graph->nodes;
       SizeT edges = this->sub_graph->edges;
+      auto &cluster_id = this->cluster_id;
       auto &graph = this->sub_graph[0];
       typedef typename GraphT::CsrT CsrT;
 
@@ -194,13 +195,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       this->point_y = point_y_;
 
       // Ensure data are allocated
-      GUARD_CU(srcs.EnsureSize_(edges, target));
       GUARD_CU(keys.EnsureSize_(edges, target));
       GUARD_CU(distances.EnsureSize_(edges, target));
+      GUARD_CU(cluster_id.EnsureSize_(nodes * nodes, target));
+      GUARD_CU(cluster_id.ForAll(
+            [nodes] __host__ __device__(SizeT * c, const SizeT &p) { 
+                if (p < nodes)
+                    c[p] = p;
+                else
+                    c[p] = util::PreDefinedValues<SizeT>::InvalidValue; 
+            }, nodes*nodes, util::DEVICE, this->stream));
       GUARD_CU(cluster.EnsureSize_(nodes, target));
       GUARD_CU(cluster.ForAll(
-          [] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = p; },
-          nodes, util::DEVICE, this->stream));
+            [cluster_id, nodes] __host__ __device__(SizeT** c, const SizeT &p){
+                c[p] = &cluster_id[p];
+            }, nodes, util::DEVICE, this->stream));
       GUARD_CU(core_point.EnsureSize_(nodes, target));
       GUARD_CU(core_point.ForAll(
           [] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = 0; },
