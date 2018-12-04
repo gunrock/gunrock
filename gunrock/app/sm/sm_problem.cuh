@@ -1,393 +1,205 @@
-// Gunrock -- High-Performance Graph Primitives on GPU
-// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------
+// Gunrock -- Fast and Efficient GPU Graph Library
+// ----------------------------------------------------------------
 // This source code is distributed under the terms of LICENSE.TXT
 // in the root directory of this source distribution.
-// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------
 
 /**
- * @file sm_problem.cuh
- * @brief GPU storage management structure
+ * @file
+ * sm_problem.cuh
+ *
+ * @brief GPU Storage management Structure for SM Problem Data
  */
 
 #pragma once
 
 #include <gunrock/app/problem_base.cuh>
-#include <gunrock/util/memset_kernel.cuh>
-#include <gunrock/util/array_utils.cuh>
-
-
+#include <gunrock/app/sm/sm_test.cuh>
 
 namespace gunrock {
 namespace app {
 namespace sm {
 
+/**
+ * @brief Speciflying parameters for SM Problem
+ * @param  parameters  The util::Parameter<...> structure holding all parameter info
+ * \return cudaError_t error message(s), if any
+ */
+cudaError_t UseParameters_problem(
+    util::Parameters &parameters)
+{
+    cudaError_t retval = cudaSuccess;
+
+    GUARD_CU(gunrock::app::UseParameters_problem(parameters));
+
+    return retval;
+}
 
 /**
- * @brief Problem structure stores device-side vectors
- * @tparam VertexId Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam SizeT    Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam Value    Type of float or double to use for computing value.
- * @tparam _MARK_PREDECESSORS   Boolean type parameter which defines whether to mark predecessor value for each node.
- * @tparam _ENABLE_IDEMPOTENCE  Boolean type parameter which defines whether to enable idempotence operation for graph traverse.
- * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer.
+ * @brief Subgraph Matching Problem structure.
+ * @tparam _GraphT  Type of the graph
+ * @tparam _LabelT  Type of labels used in sm
+ * @tparam _ValueT  Type of per-vertex distance values
+ * @tparam _FLAG    Problem flags
  */
-template<typename VertexId, 
-	 typename SizeT, 
-	 typename Value>
-	 //bool _MARK_PREDECESSORS,
-	 //bool _ENABLE_IDEMPOTENCE>
-	 //bool _USE_DOUBLE_BUFFER>
-struct SMProblem : ProblemBase<VertexId, SizeT, Value,
-	true, //_MARK_PREDECESSORS,
-	false>//_ENABLE_IDEMPOTENCE>
-	//_USE_DOUBLE_BUFFER,
-	//false, // _ENABLE_BACKWARD
-	//false, // _KEEP_ORDER
-	//false>  // _KEEP_NODE_NUM
+template <
+    typename _GraphT,
+    typename _LabelT = typename _GraphT::VertexT,
+    typename _ValueT = typename _GraphT::ValueT,
+    ProblemFlag _FLAG = Problem_None>
+struct Problem : ProblemBase<_GraphT, _FLAG>
 {
-    static const bool MARK_PREDECESSORS  = true;
-    static const bool ENABLE_IDEMPOTENCE = false;
-    static const int  MAX_NUM_VERTEX_ASSOCIATES = 0;  
-    static const int  MAX_NUM_VALUE__ASSOCIATES = 0;
-    typedef ProblemBase  <VertexId, SizeT, Value, 
-        MARK_PREDECESSORS, ENABLE_IDEMPOTENCE> BaseProblem; 
-    typedef DataSliceBase<VertexId, SizeT, Value,
-        MAX_NUM_VERTEX_ASSOCIATES, MAX_NUM_VALUE__ASSOCIATES> BaseDataSlice;
-    typedef unsigned char MaskT;
+    typedef _GraphT GraphT;
+    static const ProblemFlag FLAG = _FLAG;
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::CsrT    CsrT;
+    typedef typename GraphT::GpT     GpT;
+    typedef          _LabelT         LabelT;
+    typedef          _ValueT         ValueT;
+
+    typedef ProblemBase   <GraphT, FLAG> BaseProblem;
+    typedef DataSliceBase <GraphT, FLAG> BaseDataSlice;
+
+    //Helper structures
 
     /**
-     * @brief Data slice structure which contains problem specific data.
-     *
-     * @tparam VertexId Type of signed integer to use as vertex IDs.
-     * @tparam SizeT    Type of int / uint to use for array indexing.
-     * @tparam Value    Type of float or double to use for attributes.
-     */     
+     * @brief Data structure containing SM-specific data on indivual GPU.
+     */
     struct DataSlice : BaseDataSlice
     {
-        // device storage arrays
-	util::Array1D<SizeT, unsigned long long> counts;
-        util::Array1D<SizeT, SizeT   > d_query_row;    /** < Used for query row offsets     */
-        util::Array1D<SizeT, Value   > d_query_col;    /** < Used for query column indices  */ 
-        util::Array1D<SizeT, SizeT   > d_row_offsets;  /** < Used for query row offsets     */
-        util::Array1D<SizeT, VertexId> d_col_indices;  /** < Used for query column indices  */ 
-        //util::Array1D<SizeT, Value   > edge_weights; /** < Used for storing query edge weights  */
-        util::Array1D<SizeT, VertexId> d_c_set;        /** < Used for candidate set boolean matrix */
-        util::Array1D<SizeT, VertexId> froms_query;    /** < query graph edge list: source vertex */
-        util::Array1D<SizeT, VertexId> tos_query;      /** < query graph edge list: dest vertex */
-        util::Array1D<SizeT, VertexId> flag;           /** < query graph intersection rules */
-	util::Array1D<SizeT, Value> d_in;           /** < indices for cub select */
-        SizeT    nodes_data;       /** < Used for number of data nodes  */
-        SizeT	 nodes_query;      /** < Used for number of query nodes */
-        SizeT 	 edges_data;	   /** < Used for number of data edges   */
-        SizeT 	 edges_query;      /** < Used for number of query edges  */
-        SizeT    num_matches;      /** < Used for number of matches in the result */
-
-	    /*
+        // sm-specific storage arrays
+        util::Array1D<SizeT, VertexT >    subgraphs  ; // number of subgraphs
+        /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice()
         {
-	    counts	    .SetName("counts");
-            d_query_row     .SetName("d_query_row");
-            d_query_col     .SetName("d_query_col");
-            d_row_offsets   .SetName("d_row_offsets");
-            d_col_indices   .SetName("d_col_indices");
-            //d_edge_weights.SetName("d_edge_weights");
-            d_c_set         .SetName("d_c_set");
-            froms_query     .SetName("froms_query");
-            tos_query       .SetName("tos_query");
-            flag            .SetName("flag");
-	    d_in	    .SetName("d_in");
-            nodes_data		= 0;
-            nodes_query		= 0;	   
-            edges_data 		= 0;
-            edges_query 	= 0;
-            num_matches	  	= 0; 
+            subgraphs       .SetName("subgraphs"  	);
         }
 
-	 /*
+        /*
          * @brief Default destructor
          */
-        ~DataSlice()
+        virtual ~DataSlice()
         {
-            if (util::SetDevice(this->gpu_idx)) return;
-	    counts	      .Release();
-            d_query_row       .Release();
-            d_query_col       .Release();
-            //d_edge_weights.Release();
-            d_c_set           .Release();
-            froms_query       .Release();
-            tos_query         .Release();   
-            flag              .Release();
-	    d_in	      .Release();
+            Release();
         }
 
+        /*
+         * @brief Releasing allocated memory space
+         * @param[in] target      The location to release memory from
+         * \return    cudaError_t Error message(s), if any
+         */
+        cudaError_t Release(util::Location target = util::LOCATION_ALL)
+        {
+            cudaError_t retval = cudaSuccess;
+            if (target & util::DEVICE)
+                GUARD_CU(util::SetDevice(this->gpu_idx));
+
+            GUARD_CU(subgraphs      .Release(target));
+            GUARD_CU(BaseDataSlice ::Release(target));
+            return retval;
+        }
+
+        /**
+         * @brief initializing sm-specific data on each gpu
+         * @param     sub_graph   Sub graph on the GPU.
+         * @param[in] num_gpus    Number of GPUs
+         * @param[in] gpu_idx     GPU device index
+         * @param[in] target      Targeting device location
+         * @param[in] flag        Problem flag containling options
+         * \return    cudaError_t Error message(s), if any
+         */
         cudaError_t Init(
-            int   num_gpus,
-            int   gpu_idx,
-            bool  use_double_buffer,
-            Csr<VertexId, SizeT, Value> *graph_query,
-            Csr<VertexId, SizeT, Value> *graph_data,
-            SizeT *num_in_nodes,
-            SizeT *num_out_nodes,
-            float queue_sizing = 2.0,
-            float in_sizing = 1.0)
+            GraphT        &sub_graph,
+            int            num_gpus = 1,
+            int            gpu_idx = 0,
+            util::Location target  = util::DEVICE,
+            ProblemFlag    flag    = Problem_None)
+        {
+            cudaError_t retval  = cudaSuccess;
+
+            GUARD_CU(BaseDataSlice::Init(
+                sub_graph, num_gpus, gpu_idx, target, flag));
+            GUARD_CU(subgraphs  	.Allocate(sub_graph.nodes, target));
+            if (target & util::DEVICE)
+            {
+                GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
+            }
+            return retval;
+        } // Init
+
+        /**
+         * @brief Reset problem function. Must be called prior to each run.
+         * @param[in] target      Targeting device location
+         * \return    cudaError_t Error message(s), if any
+         */
+        cudaError_t Reset(util::Location target = util::DEVICE)
         {
             cudaError_t retval = cudaSuccess;
+            SizeT num_nodes = this -> sub_graph -> nodes;
+            SizeT num_edges = this -> sub_graph -> edges;
 
-            if (retval = BaseDataSlice::Init(
-                num_gpus,
-                gpu_idx,
-                use_double_buffer,
-                graph_data,
-                num_in_nodes,
-                num_out_nodes,
-                in_sizing)) return retval;
-	    if(retval = counts         .Allocate(1, util::HOST | util::DEVICE))
-                return retval;
-            if(retval = d_query_row    .Allocate(graph_query -> nodes+1, util::DEVICE)) 
-                return retval;
-            if(retval = d_query_col    .Allocate(graph_query -> edges/2, util::DEVICE)) 
-                return retval;
-            //if(retval = data_slices[gpu]->d_edge_weights.Allocate(edges_query, util::DEVICE)) 
-            //	return retval;
-            if(retval = d_c_set        .Allocate(graph_data->edges * graph_query->edges/4,
-						util::DEVICE))
-                return retval;
-            if(retval = froms_query    .Allocate(graph_query -> edges/2, util::HOST | util::DEVICE)) 
-                return retval;
-            if(retval = tos_query      .Allocate(graph_query -> edges/2, util::HOST | util::DEVICE)) 
-                return retval;
-            if(retval = flag           .Allocate(graph_query -> edges/2 * 
-						(graph_query -> edges/2 -1), 
-						util::HOST | util::DEVICE)) 
-                return retval;
+            // Ensure data are allocated
+            GUARD_CU(subgraphs.EnsureSize_(num_nodes, target));
+//            GUARD_CU(nodes     .EnsureSize_(num_nodes, target));
 
-//bool enough = util::EnoughDeviceMemory(sizeof(VertexId)*graph_data->nodes * graph_data -> nodes * graph_data ->edges/2 );
-            if(retval = d_in           .Allocate(graph_data->edges * graph_query->edges/4,
-						util::DEVICE)) 
-                return retval;
-            // Initialize query graph labels by given query_labels
-	    // Move doesn't work if host array has different size from device array
-	    Value *query_labels = new Value[graph_query->edges/2];
-	    for(int i=0; i<graph_query->nodes; i++)
-                query_labels[i] = graph_query->node_values[i];
-            d_query_col.SetPointer(query_labels);
-            //d_query_col.SetPointer((VertexId*)graph_query -> node_values);
-            if (retval = d_query_col.Move(util::HOST, util::DEVICE))
-                return retval;
-//util::DisplayDeviceResults(d_query_col.GetPointer(util::DEVICE), graph_query -> nodes);
+            // Reset data
+            GUARD_CU(subgraphs.ForEach([]__host__ __device__
+            (VertexT &x){
+                x = (VertexT)0;
+            }, num_nodes, target, this -> stream));
 
-            Value *data_labels = new Value[graph_data->edges * graph_query->edges/4];
-            for(int i=0; i<graph_data->nodes; i++)
-                data_labels[i] = graph_data->node_values[i];
-            d_in.SetPointer(data_labels);
-            if(retval = d_in.Move(util::HOST, util::DEVICE)) return retval;
-//util::DisplayDeviceResults(d_in.GetPointer(util::DEVICE), graph_data -> nodes);
-
-	    util::MemsetKernel<<<128,128>>>(counts.GetPointer(util::DEVICE),
-                (unsigned long long)0,
-                1);
-
-            // Initialize query row offsets with graph_query.row_offsets
-            d_query_row.SetPointer(graph_query -> row_offsets);
-            if (retval = d_query_row.Move(util::HOST, util::DEVICE))
-                return retval;
-
-            // Initialize query edge weights to a vector of zeros
-            //util::MemsetKernel<<<128, 128>>>(
-            //    edge_weights.GetPointer(util::DEVICE),
-            //    0, edges_query);
-
-            // Initialize candidate set boolean matrix to false
-            util::MemsetKernel<<<128, 128>>>(
-                d_c_set.GetPointer(util::DEVICE),
-                (VertexId)0,
-		graph_data->edges * graph_query->edges/4 
-		);
-
-            // Initialize intersection flag positions to 0
-            util::MemsetKernel<<<128, 128>>>(
-                flag.GetPointer(util::DEVICE),
-                (VertexId)0, graph_query -> edges/2 * (graph_query -> edges/2 -1));
-
-            // Construct coo from/to edge list from query graph's row_offsets and column_indices
-            // Undirected graph each edge only store the one with from index < to index
-            // Store a flag to note the intersections between edges
-  	    int count = 0;
-            for (int node = 0; node < graph_query -> nodes; node++)
-            {
-	        int start_edge = graph_query -> row_offsets[node], 
-	        end_edge = graph_query -> row_offsets[node+1];
-
-                for (int edge = start_edge; edge < end_edge; ++edge)
-		{
-		    if(node < graph_query -> column_indices[edge]){
-	             	froms_query[count] = node;
-                    	tos_query[count] = graph_query -> column_indices[edge];   
-			// flag the intersection nodes
-			// edges count has 0~count-1 possible intersected edges
- 			// each edge after edge 0 has (count-1)*2 possible intersection nodes
-			for(int i=0; i < count; i++)
-			{
-			    if(froms_query[count] == froms_query[i])
-				flag[(count-1+i)*2] = i*2+1;
-			    
-  			    else if(froms_query[count] == tos_query[i])
-				flag[(count-1+i)*2] = i*2+2;
-			  
-			    if(tos_query[count] == froms_query[i])
-				flag[(count-1+i)*2+1] = i*2+1;
-				    
-			    else if(tos_query[count] == tos_query[i])
-				flag[(count-1+i)*2+1] = i*2+2;
-			}
-			count++;
-		    }
-
-	         }
-	    }
-	
-
-            if(retval = froms_query.Move(util::HOST, util::DEVICE)) return retval;
-            if(retval = tos_query  .Move(util::HOST, util::DEVICE)) return retval;
-            if(retval = flag       .Move(util::HOST, util::DEVICE)) return retval;
-            if(retval = counts     .Move(util::HOST, util::DEVICE)) return retval;
-
-            if(retval = froms_query.Release(util::HOST)) return retval;
-            if(retval = tos_query  .Release(util::HOST)) return retval;
-            if(retval = flag       .Release(util::HOST)) return retval;
-
-            nodes_data   = graph_data  -> nodes;
-            nodes_query  = graph_query -> nodes;
-            edges_data   = graph_data  -> edges;
-            edges_query  = graph_query -> edges/2;
-
-            
             return retval;
         }
-
-        cudaError_t Reset(
-            FrontierType
-                    frontier_type,
-            GraphSlice<VertexId, SizeT, Value>
-                   *graph_slice,
-            double  queue_sizing       = 2.0,
-            bool    use_double_buffer  = false,
-            double  queue_sizing1      = -1.0,
-            bool    skip_scanned_edges = false)
-        {
-            cudaError_t retval = cudaSuccess;
-            if (retval = BaseDataSlice::Reset(
-                frontier_type,
-                graph_slice,
-                queue_sizing,
-                use_double_buffer,
-                queue_sizing1,
-                skip_scanned_edges))
-                return retval;
-            SizeT nodes = graph_slice -> nodes;
-            SizeT edges = graph_slice -> edges;
-
-            if (d_c_set.GetPointer(util::DEVICE) == NULL) 
-                if (retval = d_c_set.Allocate(edges * edges_query/2,
-					util::DEVICE))
-                    return retval;
-            
-            if (froms_query.GetPointer(util::DEVICE) == NULL) 
-                if (retval = froms_query.Allocate(edges_query, util::DEVICE))
-                    return retval;
-
-            if (tos_query.GetPointer(util::DEVICE) == NULL) 
-                if (retval = tos_query.Allocate(edges_query, util::DEVICE))
-                    return retval;
-
-            if (d_query_row.GetPointer(util::DEVICE) == NULL) 
-                if (retval = d_query_row.Allocate(nodes_query+1,util::DEVICE))
-                    return retval;
-
-            if (d_query_col.GetPointer(util::DEVICE) == NULL) 
-                if (retval = d_query_col.Allocate(edges_query,util::DEVICE))
-                    return retval;
-
-            if (flag.GetPointer(util::DEVICE) == NULL) 
-                if (retval = flag.Allocate(edges_query*(edges_query-1),util::DEVICE))
-                    return retval;
-
-	    if (d_in.GetPointer(util::DEVICE) == NULL)
-                if(retval = d_in.Allocate(edges * edges_query/2,util::DEVICE))
-                    return retval;
-
-            if (counts.GetPointer(util::DEVICE) == NULL)
-                if (retval = counts.Allocate(1,util::DEVICE))
-                    return retval;
-
-            d_row_offsets.SetPointer((SizeT*)graph_slice -> row_offsets.GetPointer(util::DEVICE), nodes+1, util::DEVICE);
-            d_col_indices.SetPointer((VertexId*)graph_slice -> column_indices.GetPointer(util::DEVICE), edges, util::DEVICE);
-
-            // TODO: code to for other allocations here
-	    util::MemsetKernel<<<128, 128>>>(
-		d_c_set.GetPointer(util::DEVICE),
-		(VertexId)0, 
-		edges * edges_query/2
-		);
-
-            // Initialize vertex frontier queue used for mappings
-            //util::MemsetIdxKernel<<<128, 128>>>(
-            //    this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE), nodes);
-            
-            // Initialized edge frontier queue used for mappings
-            //util::MemsetIdxKernel<<<128, 128>>>(
-            //    this -> frontier_queues[0].values[0].GetPointer(util::DEVICE), edges);
-
-            return retval;
-        } 
     }; // DataSlice
 
-
+    // Members
+    // Set of data slices (one for each GPU)
     util::Array1D<SizeT, DataSlice> *data_slices;
 
+    // Methods
+
     /**
-     * @brief SMProblem Default constructor
+     * @brief SMProblem default constructor
      */
-    SMProblem(bool use_double_buffer) :
-        BaseProblem(
-            use_double_buffer,
-            false, // enable_backward
-            false, // keep_order
-            false), // keep_node_num
+    Problem(
+        util::Parameters &_parameters,
+        ProblemFlag _flag = Problem_None) :
+        BaseProblem(_parameters, _flag),
         data_slices(NULL)
     {
     }
 
     /**
-     * @brief SMProblem constructor
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph_query Reference to the query CSR graph object we process on.
-     * @param[in] graph_data  Reference to the data  CSR graph object we process on.
-     * @param[in] num_gpus Number of the GPUs used.
+     * @brief SMProblem default destructor
      */
-    /*SMProblem(bool  stream_from_host,  // only meaningful for single-GPU
-                  const Csr<VertexId, Value, SizeT> &graph_query,
-                  const Csr<VertexId, Value, SizeT> &graph_data,
-                  int   num_gpus) :
-        num_gpus(num_gpus) {
-	Init(stream_from_host, graph_query, graph_data, num_gpus);
-    }*/
-
-    /**
-     * @brief Default destructor
-     */
-    ~SMProblem() 
+    virtual ~Problem()
     {
-        if (data_slices == NULL) return;
-        for (int i = 0; i < this -> num_gpus; ++i)
+        Release();
+    }
+
+    /*
+     * @brief Releasing allocated memory space
+     * @param[in] target      The location to release memory from
+     * \return    cudaError_t Error message(s), if any
+     */
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
+    {
+        cudaError_t retval = cudaSuccess;
+        if (data_slices == NULL) return retval;
+        for (int i = 0; i < this->num_gpus; i++)
+            GUARD_CU(data_slices[i].Release(target));
+
+        if ((target & util::HOST) != 0 &&
+            data_slices[0].GetPointer(util::DEVICE) == NULL)
         {
-            util::SetDevice(this -> gpu_idx[i]);
-            data_slices[i].Release();
+            delete[] data_slices; data_slices=NULL;
         }
-        if(data_slices) {delete[] data_slices; data_slices = NULL;}
+        GUARD_CU(BaseProblem::Release(target));
+        return retval;
     }
 
     /**
@@ -396,153 +208,142 @@ struct SMProblem : ProblemBase<VertexId, SizeT, Value,
      */
 
     /**
-     * @brief Copy result labels computed on the GPU back to host-side vectors.
-     * @param[out] h_froms
-     * @param[out] h_tos
-     *\return cudaError_t object indicates the success of all CUDA functions.
+     * @brief Copy result distancess computed on GPUs back to host-side arrays.
+     * @param[out] h_distances Host array to store computed vertex distances from the source.
+     * @param[out] h_preds     Host array to store computed vertex predecessors.
+     * @param[in]  target where the results are stored
+     * \return     cudaError_t Error message(s), if any
      */
-    cudaError_t Extract(VertexId *h_froms)
+    cudaError_t Extract(
+        VertexT         *h_subgraphs,
+        util::Location  target      = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
+        SizeT nodes = this -> org_graph -> nodes;
 
-        if (this -> num_gpus == 1) 
+        if (this-> num_gpus == 1)
         {
-            int gpu = 0;
-		    // Set device
-            if (retval = util::SetDevice( this -> gpu_idx[gpu]))
-                return retval;
+            auto &data_slice = data_slices[0][0];
 
-	    //unsigned long long *num_matches = new unsigned long long[1];
+            // Set device
+            if (target == util::DEVICE)
+            {
+                GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-//            data_slices[gpu] -> d_in.SetPointer(h_froms);
-//            if(retval = data_slices[gpu] -> d_in.Move(util::DEVICE, util::HOST))
-//        	    return retval;
-
-            //data_slices[gpu] -> counts.SetPointer(num_matches);
-            //if(retval = data_slices[gpu] -> counts.Move(util::DEVICE, util::HOST))
-            //    return retval;
-
-            // TODO: code to extract other results here
-	   // data_slices[gpu] -> num_matches = num_matches[0];
-	   // data_slices[gpu] -> num_matches = data_slices[gpu] -> counts[0];
-            //if(num_matches) {delete[] num_matches; num_matches = NULL;}
-
-        } else {
-                // multi-GPU extension code
+                GUARD_CU(data_slice.subgraphs.SetPointer(h_subgraphs, nodes, util::HOST));
+                GUARD_CU(data_slice.subgraphs.Move(util::DEVICE, util::HOST));
+            }
+            else if (target == util::HOST) {
+                GUARD_CU(data_slice.subgraphs.ForEach(h_subgraphs,
+                    []__host__ __device__
+                    (const VertexT &d_x, VertexT &h_x){
+                        h_x = d_x;
+                    }, nodes, util::HOST));
+            }
         }
+        else { // num_gpus != 1
+
+            // !! MultiGPU not implemented
+
+            // util::Array1D<SizeT, ValueT *> th_subgraphs;
+            // util::Array1D<SizeT, VertexT*> th_nodes;
+            // th_subgraphs.SetName("bfs::Problem::Extract::th_subgraphs");
+            // th_nodes     .SetName("bfs::Problem::Extract::th_nodes");
+            // GUARD_CU(th_subgraphs.Allocate(this->num_gpus, util::HOST));
+            // GUARD_CU(th_nodes    .Allocate(this->num_gpus, util::HOST));
+
+            // for (int gpu = 0; gpu < this->num_gpus; gpu++)
+            // {
+            //     auto &data_slice = data_slices[gpu][0];
+            //     if (target == util::DEVICE)
+            //     {
+            //         GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+            //         GUARD_CU(data_slice.subgraphs.Move(util::DEVICE, util::HOST));
+            //         GUARD_CU(data_slice.nodes.Move(util::DEVICE, util::HOST));
+            //     }
+            //     th_subgraphs[gpu] = data_slice.subgraphs.GetPointer(util::HOST);
+            //     th_nodes    [gpu] = data_slice.nodes    .GetPointer(util::HOST);
+            // } //end for(gpu)
+
+            // for (VertexT v = 0; v < nodes; v++)
+            // {
+            //     int gpu = this -> org_graph -> GpT::partition_table[v];
+            //     VertexT v_ = v;
+            //     if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
+            //         v_ = this -> org_graph -> GpT::convertion_table[v];
+
+            //     h_subgraphs[v] = th_subgraphs[gpu][v_];
+            //     h_node      [v] = th_nodes     [gpu][v_];
+            // }
+
+            // GUARD_CU(th_subgraphs.Release());
+            // GUARD_CU(th_nodes     .Release());
+        } //end if
 
         return retval;
     }
 
     /**
-     * @brief SMProblem initialization
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on.
-     * @param[in] _num_gpus Number of the GPUs used.
-     *
-     * \return cudaError_t object indicates the success of all CUDA functions.
+     * @brief initialization function.
+     * @param     graph       The graph that SM processes on
+     * @param[in] Location    Memory location to work on
+     * \return    cudaError_t Error message(s), if any
      */
     cudaError_t Init(
-        bool  			     stream_from_host,  // only meaningful for single-GPU
-        Csr<VertexId, SizeT, Value> *graph_query,
-        Csr<VertexId, SizeT, Value> *graph_data,
-        int         num_gpus         = 1,
-        int*        gpu_idx          = NULL,
-        std::string partition_method ="random",
-        cudaStream_t* streams        = NULL,
-        float       queue_sizing     = 2.0f,
-        float       in_sizing        = 1.0f,
-        float       partition_factor = -1.0f,
-        int         partition_seed   = -1)
+        GraphT           &graph,
+        util::Location    target = util::DEVICE)
     {
-
-        BaseProblem::Init(
-            stream_from_host,
-            graph_data,
-            NULL,
-            num_gpus,
-            gpu_idx,
-            partition_method,
-            queue_sizing,
-            partition_factor,
-            partition_seed);
-
-
-	
-        // No data in DataSlice needs to be copied form host
-
         cudaError_t retval = cudaSuccess;
-        data_slices = new util::Array1D<SizeT,DataSlice>[this->num_gpus];
+        GUARD_CU(BaseProblem::Init(graph, target));
+        data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
-        for (int gpu = 0; gpu < this -> num_gpus; gpu++)
+        for (int gpu = 0; gpu < this->num_gpus; gpu++)
         {
-            data_slices[gpu].SetName("data_slices[]");
-            if (retval = util::SetDevice(this -> gpu_idx[gpu]))
-                return retval;
-            if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST))
-                return retval;
-            DataSlice *data_slice
-                = data_slices[gpu].GetPointer(util::HOST);
-            GraphSlice<VertexId, SizeT, Value> *graph_slice
-                = this->graph_slices[gpu];
-            data_slice -> streams.SetPointer(streams + gpu * num_gpus * 2, num_gpus * 2);
+            data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
+            if (target & util::DEVICE)
+                GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
 
-            if (retval = data_slice->Init(
-                this -> num_gpus,
-                this -> gpu_idx[gpu],
-                this -> use_double_buffer,
-                graph_query,
-                graph_data,
-                this -> num_gpus > 1? graph_slice -> in_counter     .GetPointer(util::HOST) : NULL,
-                this -> num_gpus > 1? graph_slice -> out_counter    .GetPointer(util::HOST) : NULL,
-                in_sizing))
-                return retval;
-        }
+            GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
+
+            auto &data_slice = data_slices[gpu][0];
+            GUARD_CU(data_slice.Init(this -> sub_graphs[gpu],
+                this -> num_gpus, this -> gpu_idx[gpu], target, this -> flag));
+        } // end for (gpu)
 
         return retval;
     }
 
     /**
-     *  @brief Performs any initialization work needed for primitive
-     *  @param[in] frontier_type Frontier type (i.e., edge / vertex / mixed)
-     *  @param[in] queue_sizing Size scaling factor for work queue allocation
-     *  \return cudaError_t object indicates the success of all CUDA functions.
+     * @brief Reset problem function. Must be called prior to each run.
+     * @param[in] src      Source vertex to start.
+     * @param[in] location Memory location to work on
+     * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
-        FrontierType frontier_type,  // type (i.e., edge / vertex / mixed)
-        double queue_sizing,
-        double queue_sizing1 = -1.0) 
+        util::Location target = util::DEVICE)
     {
-        // size scaling factor for work queue allocation (e.g., 1.0 creates
-        // n-element and m-element vertex and edge frontiers, respectively).
-        // 0.0 is unspecified.
         cudaError_t retval = cudaSuccess;
-        if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
         for (int gpu = 0; gpu < this->num_gpus; ++gpu)
         {
             // Set device
-            if (retval = util::SetDevice(this->gpu_idx[gpu]))
-                return retval;
-            if (retval = data_slices[gpu]->Reset(
-                frontier_type,
-                this->graph_slices[gpu],
-                queue_sizing,
-                queue_sizing1))
-                return retval;
-            if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) 
-                return retval;
+            if (target & util::DEVICE)
+                GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+            GUARD_CU(data_slices[gpu] -> Reset(target));
+            GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
 
+        GUARD_CU2(cudaDeviceSynchronize(),
+            "cudaDeviceSynchronize failed");
         return retval;
     }
-    /** @} */
-}; // SM Problem
 
-}  // namespace sm
-}  // namespace app
-}  // namespace gunrock
+    /** @} */
+};
+
+} //namespace sm
+} //namespace app
+} //namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:
