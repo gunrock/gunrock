@@ -155,7 +155,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(adj.Allocate(nodes * nodes, target));
       GUARD_CU(core_point.Allocate(nodes, target));
       GUARD_CU(cluster.Allocate(nodes, target));
-      GUARD_CU(cluster_id.Allocate(nodes * nodes, target|util::HOST));
+      GUARD_CU(cluster_id.Allocate(nodes * nodes, target));
 
       // k-nearest neighbors
       GUARD_CU(knns.Allocate(k * nodes, target));
