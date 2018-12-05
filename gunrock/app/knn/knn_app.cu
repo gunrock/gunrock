@@ -137,8 +137,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
     if (validation == "each") {
       GUARD_CU(problem.Extract(graph.nodes, h_cluster));
-      SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
-                                          ref_cluster, false);
+      SizeT num_errors =
+          Validate_Results(parameters, graph, h_cluster, ref_cluster, false);
     }
   }
 
@@ -146,8 +146,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   GUARD_CU(problem.Extract(graph.nodes, h_cluster));
   if (validation == "last") {
-    SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
-                                        ref_cluster, false);
+    SizeT num_errors =
+        Validate_Results(parameters, graph, h_cluster, ref_cluster, false);
   }
 
   // compute running statistics

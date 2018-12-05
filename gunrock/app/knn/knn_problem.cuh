@@ -62,7 +62,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, VertexT> distances;
     util::Array1D<SizeT, SizeT> adj;
     util::Array1D<SizeT, SizeT> core_point;
-    util::Array1D<SizeT, SizeT*> cluster;
+    util::Array1D<SizeT, SizeT *> cluster;
     util::Array1D<SizeT, SizeT> cluster_id;
 
     // Nearest Neighbors
@@ -199,17 +199,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(distances.EnsureSize_(edges, target));
       GUARD_CU(cluster_id.EnsureSize_(nodes * nodes, target));
       GUARD_CU(cluster_id.ForAll(
-            [nodes] __host__ __device__(SizeT * c, const SizeT &p) { 
-                if (p < nodes)
-                    c[p] = p;
-                else
-                    c[p] = util::PreDefinedValues<SizeT>::InvalidValue; 
-            }, nodes*nodes, util::DEVICE, this->stream));
+          [nodes] __host__ __device__(SizeT * c, const SizeT &p) {
+            if (p < nodes)
+              c[p] = p;
+            else
+              c[p] = util::PreDefinedValues<SizeT>::InvalidValue;
+          },
+          nodes * nodes, util::DEVICE, this->stream));
       GUARD_CU(cluster.EnsureSize_(nodes, target));
       GUARD_CU(cluster.ForAll(
-            [cluster_id, nodes] __host__ __device__(SizeT** c, const SizeT &p){
-                c[p] = &cluster_id[p];
-            }, nodes, util::DEVICE, this->stream));
+          [cluster_id, nodes] __host__ __device__(SizeT * *c, const SizeT &p) {
+            c[p] = &cluster_id[p];
+          },
+          nodes, util::DEVICE, this->stream));
       GUARD_CU(core_point.EnsureSize_(nodes, target));
       GUARD_CU(core_point.ForAll(
           [] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = 0; },
@@ -291,11 +293,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       if (target == util::DEVICE) {
         GUARD_CU(util::SetDevice(this->gpu_idx[0]));
         GUARD_CU(data_slice.cluster_id.Move(util::DEVICE, util::HOST));
-        for (int i=0; i<n; ++i){
-            h_cluster[i] = data_slice.cluster_id[i];
+        for (int i = 0; i < n; ++i) {
+          h_cluster[i] = data_slice.cluster_id[i];
         }
       }
-    } else if (target == util::HOST){
+    } else if (target == util::HOST) {
     }
 
     return retval;
