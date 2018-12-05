@@ -88,7 +88,8 @@ double CPU_Reference(
         auto num = graph.CsrT::GetNeighborListLength(x);
         auto x_end = x_start+num;
         for (auto y = x_start; y < x_end; ++y){
-            adj[x].insert(y);
+            auto neighbor = graph.CsrT::GetEdgeDest(y);
+            adj[x].insert(neighbor);
         }
     }
     
@@ -166,7 +167,8 @@ double CPU_Reference(
             auto y_start = graph.CsrT::GetNeighborListOffset(near_neighbor->x);
             auto y_num = graph.CsrT::GetNeighborListLength(near_neighbor->x);
             for (int z = y_start; z < y_start + y_num; ++z){
-                if (adj[x].find(z) != adj[x].end()){
+                auto y = graph.CsrT::GetEdgeDest(z);
+                if (adj[x].find(y) != adj[x].end()){
                     ++counter;
                 }
             }
