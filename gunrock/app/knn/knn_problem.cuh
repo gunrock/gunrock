@@ -60,7 +60,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     // struct Point()
     util::Array1D<SizeT, SizeT> keys;
     util::Array1D<SizeT, VertexT> distances;
-    util::Array1D<SizeT, SizeT> adj;
     util::Array1D<SizeT, SizeT> core_point;
     util::Array1D<SizeT, SizeT *> cluster;
     util::Array1D<SizeT, SizeT> cluster_id;
@@ -90,7 +89,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     DataSlice() : BaseDataSlice() {
       keys.SetName("keys");
       distances.SetName("distances");
-      adj.SetName("adj");
       core_point.SetName("core_point");
       cluster.SetName("cluster");
       cluster_id.SetName("cluster_id");
@@ -118,7 +116,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(keys.Release(target));
       GUARD_CU(distances.Release(target));
-      GUARD_CU(adj.Release(target));
       GUARD_CU(core_point.Release(target));
       GUARD_CU(cluster_id.Release(target));
       GUARD_CU(cluster.Release(target));
@@ -152,7 +149,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // Point ()
       GUARD_CU(keys.Allocate(edges, target));
       GUARD_CU(distances.Allocate(edges, target));
-      GUARD_CU(adj.Allocate(nodes * nodes, target));
       GUARD_CU(core_point.Allocate(nodes, target));
       GUARD_CU(cluster.Allocate(nodes, target));
       GUARD_CU(cluster_id.Allocate(nodes * nodes, target));
@@ -216,19 +212,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(core_point.ForAll(
           [] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = 0; },
           nodes, util::DEVICE, this->stream));
-      GUARD_CU(adj.EnsureSize_(nodes * nodes, target));
-      GUARD_CU(adj.ForAll(
-          [graph] __host__ __device__(SizeT * a, const SizeT &pos) {
-            auto nodes = graph.nodes;
-            for (auto n = 0; n < nodes; ++n) a[nodes * pos + n] = 0;
-            auto e_start = graph.CsrT::GetNeighborListOffset(pos);
-            auto num_neighbors = graph.CsrT::GetNeighborListLength(pos);
-            for (auto e = e_start; e < e_start + num_neighbors; ++e) {
-              auto n = graph.CsrT::GetEdgeDest(e);
-              a[nodes * pos + n] = 1;
-            }
-          },
-          nodes, target, this->stream));
 
       // K-Nearest Neighbors
       GUARD_CU(knns.EnsureSize_(k, target));

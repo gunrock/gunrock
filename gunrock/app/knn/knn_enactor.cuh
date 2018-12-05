@@ -22,7 +22,7 @@
 #include <gunrock/app/knn/knn_problem.cuh>
 #include <gunrock/util/sort_device.cuh>
 
-#define KNN_DEBUG 1
+// #define KNN_DEBUG 1
 
 #ifdef KNN_DEBUG
 #define debug(a...) printf(a)
@@ -81,7 +81,6 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &graph = data_slice.sub_graph[0];
     auto nodes = graph.nodes;
     auto edges = graph.edges;
-    auto &adj = data_slice.adj;
     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
@@ -151,20 +150,21 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // Get reverse keys_out array
     GUARD_CU(keys.ForAll(
         [keys_out] __host__ __device__(SizeT * k, const SizeT &pos) {
-          k[pos] = keys_out[k[pos]];
+          k[keys_out[pos]] = pos;
         },
         edges, target, stream));
 
     // Choose k nearest neighbors for each node
     GUARD_CU(knns.ForAll(
-        [graph, k, keys] __host__ __device__(SizeT * knns_, const SizeT &pos) {
+        [graph, k, keys, keys_out] __host__ __device__(SizeT * knns_,
+                                                       const SizeT &pos) {
           // go to first nearest neighbor
           auto e_start = graph.CsrT::GetNeighborListOffset(pos);
           auto num_neighbors = graph.CsrT::GetNeighborListLength(pos);
           int i = 0;
           for (auto e = e_start; e < e_start + num_neighbors && i < k;
                ++e, ++i) {
-            auto m = graph.CsrT::GetEdgeDest(keys[e]);
+            auto m = graph.CsrT::GetEdgeDest(keys_out[keys[e]]);
             knns_[k * pos + i] = m;
           }
         },
@@ -172,7 +172,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // SNN density of each point
     auto density_op =
-        [graph, nodes, adj, knns, k, eps, min_pts, core_point] __host__
+        [graph, nodes, knns, k, eps, min_pts, core_point] __host__
         __device__(VertexT * v_q, const SizeT &src) {
           int snn_density = 0;
           auto src_num_neighbors = graph.CsrT::GetNeighborListLength(src);
@@ -193,18 +193,16 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             for (auto j = knn_start; j < knn_end; ++j) {
               // Get the neighbor of active k from the edge:
               auto m = graph.CsrT::GetEdgeDest(j);
-              if (adj[src * nodes + m] == 1) ++num_shared_neighbors;
-
-#if 0
-		// Instead of using N*N adj list, loop over num_neighbors and search
-		auto m_start = graph.CsrT::GetNeighborListOffset(m);
-		auto m_neighbors = graph.CsrT::GetNeighborListLength(m);
-		auto m_end = m_start + m_neighbors;
-		for (auto v = m_start; v < m_end; ++m) {
-		    auto possible_src = graph.CsrT::GetEdgeDest(m);
-		    if (src == possible_src) ++num_shared_neighbors;
-		}
-#endif
+              // if (adj[src * nodes + m] == 1) ++num_shared_neighbors;
+              // Instead of using N*N adj list, loop over num_neighbors and
+              // search
+              auto m_start = graph.CsrT::GetNeighborListOffset(m);
+              auto m_neighbors = graph.CsrT::GetNeighborListLength(m);
+              auto m_end = m_start + m_neighbors;
+              for (auto v = m_start; v < m_end; ++v) {
+                auto possible_src = graph.CsrT::GetEdgeDest(v);
+                if (src == possible_src) ++num_shared_neighbors;
+              }
             }
 
             // if src and neighbor share eps or more neighbors then increase
@@ -224,7 +222,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // Core points merging
     auto merging_op =
-        [graph, nodes, adj, eps, core_point, cluster_id] __host__ __device__(
+        [graph, nodes, eps, core_point, cluster_id] __host__ __device__(
             VertexT * v_q, const SizeT &src) {
           // only core points
           if (core_point[src] != 1) return;
@@ -240,17 +238,16 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             int num_shared_neighbors = 0;
             for (auto j = core_start; j < core_end; ++j) {
               auto m = graph.CsrT::GetEdgeDest(j);
-              if (adj[src * nodes + m] == 1) ++num_shared_neighbors;
-#if 0
-		// Instead of using N*N adj list, loop over num_neighbors and search
-		auto m_start = graph.CsrT::GetNeighborListOffset(m);
-		auto m_neighbors = graph.CsrT::GetNeighborListLength(m);
-		auto m_end = m_start + m_neighbors;
-		for (auto v = m_start; v < m_end; ++m)  {
-		    auto possible_src = graph.CsrT::GetEdgeDest(m);
-		    if (src == possible_src) ++num_shared_neighbors;
-		}
-#endif
+              // if (adj[src * nodes + m] == 1) ++num_shared_neighbors;
+              // Instead of using N*N adj list, loop over num_neighbors and
+              // search
+              auto m_start = graph.CsrT::GetNeighborListOffset(m);
+              auto m_neighbors = graph.CsrT::GetNeighborListLength(m);
+              auto m_end = m_start + m_neighbors;
+              for (auto v = m_start; v < m_end; ++v) {
+                auto possible_src = graph.CsrT::GetEdgeDest(v);
+                if (src == possible_src) ++num_shared_neighbors;
+              }
             }
             // if src and neighbor share eps or more neighbors then they are
             // in the same cluster
@@ -289,7 +286,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // Assign other non-core and non-noise points to clusters
     auto clustering_op =
-        [graph, core_point, keys, k, cluster] __host__ __device__(
+        [graph, core_point, keys, keys_out, k, cluster] __host__ __device__(
             VertexT * v_q, const SizeT &src) {
           // only non-core points
           if (core_point[src] == 1) return;
@@ -298,7 +295,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           if (num_neighbors < k) return;
           auto e_start = graph.CsrT::GetNeighborListOffset(src);
           for (auto e = e_start; e < e_start + num_neighbors; ++e) {
-            auto m = graph.CsrT::GetEdgeDest(keys[e]);
+            auto m = graph.CsrT::GetEdgeDest(keys_out[keys[e]]);
             if (core_point[m] == 1) {
               cluster[src] = cluster[m];
               break;
@@ -309,20 +306,21 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // Assign other non-core and non-noise points to clusters
     GUARD_CU(frontier.V_Q()->ForAll(clustering_op, nodes, target, stream));
 
+#ifdef KNN_DEBUG
     // Debug
-    // GUARD_CU(keys.ForAll(
-    //     [keys_out, keys, distances, distances_out, graph, edges]
-    //     __host__ __device__(SizeT * k, const SizeT &pos) {
-    //       debug("after sorting:\n");
-    //       for (int i = 0; i < edges; ++i)
-    //         debug(
-    //             "keys[%d] = %d, keys_out[%d] = %d, dist[%d] = %d,
-    //             dist_out[%d] "
-    //             "= %d\n",
-    //             i, keys[i], i, keys_out[i], keys[i], distances[keys[i]],
-    //             keys_out[i], distances_out[keys_out[i]]);
-    //     },
-    //     1, target, stream));
+    GUARD_CU(keys.ForAll(
+        [keys_out, keys, distances, distances_out, graph,
+         edges] __host__ __device__(SizeT * k, const SizeT &pos) {
+          debug("after sorting:\n");
+          for (int i = 0; i < edges; ++i)
+            debug(
+                 "keys[%d] = %d, keys_out[%d] = %d, dist[%d] = %d,
+                 dist_out[%d] "
+                 "= %d\n",
+                 i, keys[i], i, keys_out[i], keys[i], distances[keys[i]],
+                 keys_out[i], distances_out[keys_out[i]]);
+        },
+        1, target, stream));
 
     // Debug
     GUARD_CU(knns.ForAll(
@@ -344,22 +342,14 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         1, target, stream));
 
     // Debug
-    // GUARD_CU(cluster_id.ForAll(
-    //        [nodes] __host__ __device__(SizeT * c, const SizeT &p) {
-    //            for (int i=0; i<nodes; ++i){
-    //                debug("cluster ids [%d+%d*%d] = %d\n", p, nodes, i,
-    //                c[p+nodes*i]);
-    //            }
-    //        }, nodes, target, stream));
-
-    // Debug
-    // GUARD_CU(cluster_id.ForAll(
-    //        [nodes] __host__ __device__(SizeT * c, const SizeT &p) {
-    //            for (int i=0; i<nodes; ++i){
-    //                debug("cluster ids [%d+%d*%d] = %d\n", p, nodes, i,
-    //                c[p+nodes*i]);
-    //            }
-    //        }, nodes, target, stream));
+    GUARD_CU(cluster_id.ForAll(
+        [nodes] __host__ __device__(SizeT * c, const SizeT &p) {
+          for (int i = 0; i < nodes; ++i) {
+            debug("cluster ids [%d+%d*%d] = %d\n", p, nodes, i,
+                  c[p + nodes * i]);
+          }
+        },
+        nodes, target, stream));
 
     GUARD_CU(cluster.ForAll(
         [cluster_id] __host__ __device__(SizeT * *c, const SizeT &p) {
@@ -367,6 +357,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           debug("cluster [%d] = %d\n", p, cluster_id[p]);
         },
         nodes, target, stream));
+#endif /* end: KNN_DEBUG */
 
     GUARD_CU(frontier.work_progress.GetQueueLength(
         frontier.queue_index, frontier.queue_length, false, stream, true));
@@ -539,40 +530,41 @@ class Enactor
    * @param[in] target Target location of data
    * \return cudaError_t error message(s), if any
    */
-  cudaError_t Reset(
-      // <TODO> problem specific data if necessary, eg
-      VertexT src = 0,
-      // </TODO>
-      util::Location target = util::DEVICE) {
+  cudaError_t Reset(util::Location target = util::DEVICE) {
     typedef typename GraphT::GpT GpT;
     cudaError_t retval = cudaSuccess;
+
     GUARD_CU(BaseEnactor::Reset(target));
 
-    // <TODO> Initialize frontiers according to the algorithm:
-    // In this case, we add a single `src` to the frontier
+    SizeT nodes = this->problem->data_slices[0][0].sub_graph[0].nodes;
+
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
-      if ((this->num_gpus == 1) ||
-          (gpu == this->problem->org_graph->GpT::partition_table[src])) {
-        this->thread_slices[gpu].init_size = 1;
+      if (this->num_gpus == 1) {
+        this->thread_slices[gpu].init_size = nodes;
         for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
           auto &frontier =
               this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
-          frontier.queue_length = (peer_ == 0) ? 1 : 0;
+          frontier.queue_length = (peer_ == 0) ? nodes : 0;
           if (peer_ == 0) {
+            util::Array1D<SizeT, VertexT> tmp;
+            tmp.Allocate(nodes, target | util::HOST);
+            for (SizeT i = 0; i < nodes; ++i) {
+              tmp[i] = (VertexT)i % nodes;
+            }
+            GUARD_CU(tmp.Move(util::HOST, target));
+
             GUARD_CU(frontier.V_Q()->ForEach(
-                [src] __host__ __device__(VertexT & v) { v = src; }, 1, target,
-                0));
+                tmp,
+                [] __host__ __device__(VertexT & v, VertexT & i) { v = i; },
+                nodes, target, 0));
+
+            tmp.Release();
           }
         }
       } else {
-        this->thread_slices[gpu].init_size = 0;
-        for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
-          this->enactor_slices[gpu * this->num_gpus + peer_]
-              .frontier.queue_length = 0;
-        }
+        // MULTIGPU INCOMPLETE
       }
     }
-    // </TODO>
 
     GUARD_CU(BaseEnactor::Sync());
     return retval;
