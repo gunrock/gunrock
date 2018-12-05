@@ -95,6 +95,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &core_point = data_slice.core_point;
     auto &cluster = data_slice.cluster;
     auto &cluster_id = data_slice.cluster_id;
+    auto &snn_density = data_slice.snn_density;
 
     // Number of KNNs
     auto k = data_slice.k;
@@ -156,61 +157,23 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // Choose k nearest neighbors for each node
     GUARD_CU(knns.ForAll(
-        [graph, k, keys, keys_out] __host__ __device__(SizeT * knns_,
-                                                       const SizeT &pos) {
+        [graph, k, keys, keys_out, nodes] 
+        __host__ __device__(SizeT * knns_, const SizeT &src) {
+          auto pos = src/nodes;
+          auto i = src%nodes;
           // go to first nearest neighbor
           auto e_start = graph.CsrT::GetNeighborListOffset(pos);
           auto num_neighbors = graph.CsrT::GetNeighborListLength(pos);
-          int i = 0;
-          for (auto e = e_start; e < e_start + num_neighbors && i < k;
-               ++e, ++i) {
+          if (i < k && i < num_neighbors){
+            auto e = e_start + i;
             auto m = graph.CsrT::GetEdgeDest(keys_out[keys[e]]);
             knns_[k * pos + i] = m;
           }
-        },
-        nodes, target, stream));
+        }, nodes*nodes, target, stream));
 
-    // SNN density of each point
-    auto density_op =
-        [graph, nodes, knns, k, eps, min_pts, core_point] 
-        __host__ __device__(VertexT * v_q, const SizeT &src) {
-            int snn_density = 0;
-            auto src_neighbors = graph.CsrT::GetNeighborListLength(src);
-            if (src_neighbors < k) return;
-            auto src_start = graph.CsrT::GetNeighborListOffset(src);
-            auto src_end = src_start + src_neighbors;
-            // Loop over k-nearest neighbors of (src)
-            for (auto i = 0; i < k; ++i) {
-                // chose i nearest neighbor
-                auto neighbor = knns[src * k + i];
-                // go over neighbors of the nearest neighbor
-                auto knn_start = graph.CsrT::GetNeighborListOffset(neighbor);
-                auto knn_neighbors = graph.CsrT::GetNeighborListLength(neighbor);
-                auto knn_end = knn_start + knn_neighbors;
-                int num_shared_neighbors = 0;
-                // Loop over k's neighbors
-                for (auto j = knn_start; j < knn_end; ++j) {
-                    // Get the neighbor of active k from the edge:
-                    auto m = graph.CsrT::GetEdgeDest(j);
-                    // if (adj[src * nodes + m] == 1) ++num_shared_neighbors;
-                    // Instead of using N*N adj list, loop over num_neighbors and
-                    // search
-                    for (auto v = src_start; v < src_end; ++v) {
-                        auto possible_src = graph.CsrT::GetEdgeDest(v);
-                        if (m == possible_src) ++num_shared_neighbors;
-                    }
-                }
-                // if src and neighbor share eps or more neighbors then increase
-                // snn density
-                if (num_shared_neighbors >= eps) ++snn_density;
-            }
-            if (snn_density >= min_pts) {
-                debug("snn density of %d is %d\n", src, snn_density);
-                core_point[src] = 1;
-            }
-        };
 
         // Debug
+    /*
     GUARD_CU(knns.ForAll(
         [graph, k] __host__ __device__(SizeT * knns_, const SizeT &pos) {
           debug("knns:\n");
@@ -228,20 +191,64 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           }
         },
         1, target, stream));
+*/
 
-    // Find density of each point and core points
-    GUARD_CU(frontier.V_Q()->ForAll(density_op, nodes, target, stream));
+    // SNN density of each point
+    auto density_op =
+        [graph, nodes, knns, k, eps, snn_density, min_pts, core_point] 
+        __host__ __device__(VertexT * v_q, const SizeT &pos) {
+            auto src = pos/nodes;
+            auto i = pos%nodes;
+            auto src_neighbors = graph.CsrT::GetNeighborListLength(src);
+            auto src_start = graph.CsrT::GetNeighborListOffset(src);
+            auto src_end = src_start + src_neighbors;
+            if (src_neighbors < k) return;
+            if (i >= k ) return;
 
-    // Debug
-    GUARD_CU(core_point.ForAll(
-        [graph] __host__ __device__(SizeT * cp, const SizeT &pos) {
-            debug("core points:\n");
-            for (int i = 0; i < graph.nodes; ++i) {
-                if (cp[pos] == 1)
-                    debug("%d ", i);
+            // chose i nearest neighbor
+            auto neighbor = knns[src * k + i];
+                
+            // go over neighbors of the nearest neighbor
+            auto knn_start = graph.CsrT::GetNeighborListOffset(neighbor);
+            auto knn_neighbors = graph.CsrT::GetNeighborListLength(neighbor);
+            auto knn_end = knn_start + knn_neighbors;
+            int num_shared_neighbors = 0;
+            
+            // Loop over k's neighbors
+            for (auto j = knn_start; j < knn_end; ++j) {
+                // Get the neighbor of active k from the edge:
+                auto m = graph.CsrT::GetEdgeDest(j);
+                for (auto v = src_start; v < src_end; ++v) {
+                    auto possible_src = graph.CsrT::GetEdgeDest(v);
+                    if (m == possible_src) ++num_shared_neighbors;
+                }
             }
-            debug("\n");
-            }, 1, target, stream));
+            // if src and neighbor share eps or more neighbors then increase
+            // snn density
+            if (num_shared_neighbors >= eps){
+                atomicAdd(&snn_density[src], 1);
+            }
+        };
+
+    // Find density of each point 
+    GUARD_CU(frontier.V_Q()->ForAll(density_op, nodes*nodes, target, stream));
+
+    // Find core points
+    GUARD_CU(core_point.ForAll(
+        [graph, snn_density, min_pts] 
+        __host__ __device__(SizeT * cp, const SizeT &pos) {
+            /*
+            if (pos == 0){
+                debug("core points:\n");
+                for (int i = 0; i < graph.nodes; ++i) {
+                    if (cp[pos] == 1)
+                        debug("%d ", i);
+                }
+                debug("\n");
+            }*/
+            if (snn_density[pos] >= min_pts)
+                cp[pos] = 1;
+        }, nodes, target, stream));
 
     // Core points merging
     auto merging_op =

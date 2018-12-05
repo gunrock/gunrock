@@ -61,8 +61,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, SizeT> keys;
     util::Array1D<SizeT, VertexT> distances;
     util::Array1D<SizeT, SizeT> core_point;
-    util::Array1D<SizeT, SizeT *> cluster;
+    util::Array1D<SizeT, SizeT*> cluster;
     util::Array1D<SizeT, SizeT> cluster_id;
+    util::Array1D<SizeT, SizeT> snn_density;
 
     // Nearest Neighbors
     util::Array1D<SizeT, SizeT> knns;
@@ -92,6 +93,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       core_point.SetName("core_point");
       cluster.SetName("cluster");
       cluster_id.SetName("cluster_id");
+      snn_density.SetName("snn_density");
 
       knns.SetName("knns");
 
@@ -119,6 +121,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(core_point.Release(target));
       GUARD_CU(cluster_id.Release(target));
       GUARD_CU(cluster.Release(target));
+      GUARD_CU(snn_density.Release(target));
 
       GUARD_CU(knns.Release(target));
 
@@ -152,6 +155,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(core_point.Allocate(nodes, target));
       GUARD_CU(cluster.Allocate(nodes, target));
       GUARD_CU(cluster_id.Allocate(nodes * nodes, target));
+      GUARD_CU(snn_density.Allocate(nodes, target));
 
       // k-nearest neighbors
       GUARD_CU(knns.Allocate(k * nodes, target));
@@ -191,6 +195,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       this->point_y = point_y_;
 
       // Ensure data are allocated
+      GUARD_CU(snn_density.EnsureSize_(nodes, target));
+      GUARD_CU(snn_density.ForAll(
+         [nodes] __host__ __device__ (SizeT *s, const SizeT &p){
+            s[p] = 0;
+         }, nodes, util::DEVICE, this->stream));
       GUARD_CU(keys.EnsureSize_(edges, target));
       GUARD_CU(distances.EnsureSize_(edges, target));
       GUARD_CU(cluster_id.EnsureSize_(nodes * nodes, target));
