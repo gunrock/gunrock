@@ -14,7 +14,7 @@
 
 #pragma once
 
-//#define KNN_DEBUG 1
+#define KNN_DEBUG 1
 
 #ifdef KNN_DEBUG
 #define debug(a...) fprintf(stderr, a)
@@ -149,8 +149,7 @@ double CPU_Reference(
     for (int neighbor = x_start; neighbor < x_end && i < k; ++neighbor, ++i) {
       // k nearest points to (point_x, pointy)
       knns[x * k + i] = graph.CsrT::GetEdgeDest(distance[neighbor].e_id);
-      debug("(%d, %d) ", distance[neighbor].x,
-            graph.CsrT::GetEdgeDest(distance[neighbor].e_id));
+      debug("%d ", graph.CsrT::GetEdgeDest(distance[neighbor].e_id));
     }
     debug("\n");
   }
@@ -163,22 +162,19 @@ double CPU_Reference(
     if (num < k) continue;
     auto x_end = x_start + num;
     int snn_density = 0;
-    debug("try neighbors of %d\n", x);
     for (int i = 0; i < k; ++i) {
       auto near_neighbor = knns[x * k + i];
       int counter = 0;
       auto y_start = graph.CsrT::GetNeighborListOffset(near_neighbor);
       auto y_num = graph.CsrT::GetNeighborListLength(near_neighbor);
-      debug("let try neighbors of near neighbor %d:\n", near_neighbor);
       for (int z = y_start; z < y_start + y_num; ++z) {
         auto y = graph.CsrT::GetEdgeDest(z);
-        debug("neighbor of near neighbor: %d\n", y);
         if (adj[x].find(y) != adj[x].end()) {
-            debug("%d is neighbor of %d and %d\n", y, near_neighbor, x);
           ++counter;
         }
       }
       if (counter >= eps) ++snn_density;
+      debug("density of %d is %d\n", x, snn_density);
     }
     if (snn_density >= min_pts) {
       core_points.insert(x);
@@ -194,7 +190,7 @@ double CPU_Reference(
   for (SizeT x = 0; x < nodes; ++x) {
     if (core_points.find(x) != core_points.end()) {
       for (SizeT y = 0; y < nodes; ++y) {
-        if (core_points.find(y) != core_points.end()) {
+        if (x != y && core_points.find(y) != core_points.end()) {
           int counter = 0;
           auto y_start = graph.CsrT::GetNeighborListOffset(y);
           auto y_num = graph.CsrT::GetNeighborListLength(y);
@@ -214,7 +210,25 @@ double CPU_Reference(
       }
     }
   }
-  for (int i = 0; i < nodes; ++i) debug("cluster[%d] = %d\n", i, cluster[i]);
+  for (int i = 0; i < nodes; ++i){
+      // only non-core points
+      if (core_points.find(i) == core_points.end()){
+          auto num_neighbors = graph.CsrT::GetNeighborListLength(i);
+          // only non-noise points
+          if (num_neighbors >= k){
+              auto e_start = graph.CsrT::GetNeighborListOffset(i);
+              for (auto e = e_start; e < e_start + num_neighbors; ++e){
+                  auto m = graph.CsrT::GetEdgeDest(distance[e].e_id);
+                  if (core_points.find(m) != core_points.end()){
+                      cluster[i] = cluster[m];
+                      break;
+                  }
+              }
+          }
+      }
+  }
+  for (int i = 0; i < nodes; ++i) 
+      debug("cluster[%d] = %d\n", i, cluster[i]);
 
   cpu_timer.Stop();
   float elapsed = cpu_timer.ElapsedMillis();
