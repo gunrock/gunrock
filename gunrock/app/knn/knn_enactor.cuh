@@ -22,7 +22,7 @@
 #include <gunrock/app/knn/knn_problem.cuh>
 #include <gunrock/util/sort_device.cuh>
 
-// #define KNN_DEBUG 1
+#define KNN_DEBUG 1
 
 #ifdef KNN_DEBUG
 #define debug(a...) printf(a)
@@ -211,14 +211,43 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           }
 
           if (snn_density >= min_pts) {
-            debug("snn density of %d is %d >= %d, it is core point\n", src,
-                  snn_density, min_pts);
+            debug("snn density of %d is %d\n", src, snn_density);
             core_point[src] = 1;
           }
         };
 
+        // Debug
+    GUARD_CU(knns.ForAll(
+        [graph, k] __host__ __device__(SizeT * knns_, const SizeT &pos) {
+          debug("knns:\n");
+          for (int i = 0; i < graph.nodes; ++i) {
+            debug("%d: ", i);
+            auto num_neighbors = graph.CsrT::GetNeighborListLength(i);
+            if (num_neighbors < k) {
+              debug(" # neigh is %d < %d\n", num_neighbors, k);
+              continue;
+            }
+            for (int j = 0; j < k; ++j) {
+              debug("%d ", knns_[i * k + j]);
+            }
+            debug("\n");
+          }
+        },
+        1, target, stream));
+
     // Find density of each point and core points
     GUARD_CU(frontier.V_Q()->ForAll(density_op, nodes, target, stream));
+
+    // Debug
+    GUARD_CU(core_point.ForAll(
+        [graph] __host__ __device__(SizeT * cp, const SizeT &pos) {
+            debug("core points:\n");
+            for (int i = 0; i < graph.nodes; ++i) {
+                if (cp[pos] == 1)
+                    debug("%d ", i);
+            }
+            debug("\n");
+            }, 1, target, stream));
 
     // Core points merging
     auto merging_op =
@@ -241,21 +270,18 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
               // if (adj[src * nodes + m] == 1) ++num_shared_neighbors;
               // Instead of using N*N adj list, loop over num_neighbors and
               // search
-              auto m_start = graph.CsrT::GetNeighborListOffset(m);
-              auto m_neighbors = graph.CsrT::GetNeighborListLength(m);
-              auto m_end = m_start + m_neighbors;
-              for (auto v = m_start; v < m_end; ++v) {
+              auto src_start = graph.CsrT::GetNeighborListOffset(src);
+              auto src_neighbors = graph.CsrT::GetNeighborListLength(src);
+              auto src_end = src_start + src_neighbors;
+              for (auto v = src_start; v < src_end; ++v) {
                 auto possible_src = graph.CsrT::GetEdgeDest(v);
-                if (src == possible_src) ++num_shared_neighbors;
+                if (m == possible_src) ++num_shared_neighbors;
               }
             }
             // if src and neighbor share eps or more neighbors then they are
             // in the same cluster
             if (num_shared_neighbors >= eps) {
               cluster_id[src + nodes * cluster_counter] = i;
-              debug(
-                  "core points to merge %d (cluster %d) and %d (cluster %d)\n",
-                  src, cluster_id[src], i, cluster_id[i]);
               ++cluster_counter;
             }
           }
@@ -273,13 +299,13 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           SizeT min_cluster_id = cluster_id[src];
           for (auto i = 1; i < nodes; ++i) {
             auto new_id = cluster_id[src + nodes * i];
-            debug("for %d, lets try %d\n", src, new_id);
             if (!util::isValid(new_id)) break;
+            //debug("for %d, lets try %d\n", src, new_id);
             if (min_cluster_id > new_id) min_cluster_id = new_id;
           }
-          debug("minimum for cluster %d is %d\n", src, min_cluster_id);
-          cluster[src] = cluster[min_cluster_id];
-          debug("cluster id candidate[%d] = %d\n", src, *cluster[src]);
+          auto min_id = min(src, min_cluster_id);
+          cluster[src] = cluster[min_id];
+          cluster[min_cluster_id] = cluster[min_id];
         };
 
     GUARD_CU(frontier.V_Q()->ForAll(merging_end_op, nodes, target, stream));
@@ -308,7 +334,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
 #ifdef KNN_DEBUG
     // Debug
-    GUARD_CU(keys.ForAll(
+    /*GUARD_CU(keys.ForAll(
         [keys_out, keys, distances, distances_out, graph,
          edges] __host__ __device__(SizeT * k, const SizeT &pos) {
           debug("after sorting:\n");
@@ -340,17 +366,8 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           }
         },
         1, target, stream));
-
+*/
     // Debug
-    GUARD_CU(cluster_id.ForAll(
-        [nodes] __host__ __device__(SizeT * c, const SizeT &p) {
-          for (int i = 0; i < nodes; ++i) {
-            debug("cluster ids [%d+%d*%d] = %d\n", p, nodes, i,
-                  c[p + nodes * i]);
-          }
-        },
-        nodes, target, stream));
-
     GUARD_CU(cluster.ForAll(
         [cluster_id] __host__ __device__(SizeT * *c, const SizeT &p) {
           cluster_id[p] = *c[p];
