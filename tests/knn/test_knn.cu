@@ -56,6 +56,11 @@ struct main_struct {
     // Get the min density
     SizeT min_pts = parameters.Get<SizeT>("min-pts");
 
+    if (min_pts >= k){
+        util::PrintMsg("Min pts should be smaller than k", true);
+        return (cudaError_t)1;
+    }
+
     util::PrintMsg("Reference point is (" + std::to_string(point_x) + ", " +
                        std::to_string(point_y) + "), k = " + std::to_string(k) +
                        ", eps = " + std::to_string(eps) +
