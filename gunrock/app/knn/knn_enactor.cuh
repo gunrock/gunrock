@@ -172,40 +172,35 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // SNN density of each point
     auto density_op =
-        [graph, nodes, knns, k, eps, min_pts, core_point] __host__
-        __device__(VertexT * v_q, const SizeT &src) {
-          int snn_density = 0;
-          auto src_num_neighbors = graph.CsrT::GetNeighborListLength(src);
-          if (src_num_neighbors < k) return;
-
-          // Loop over k-nearest neighbors of (src)
-          for (auto i = 0; i < k; ++i) {
-            // chose i nearest neighbor
-            auto neighbor = knns[src * k + i];
-
-            // go over neighbors of the nearest neighbor
-            auto knn_start = graph.CsrT::GetNeighborListOffset(neighbor);
-            auto knn_neighbors = graph.CsrT::GetNeighborListLength(neighbor);
-            auto knn_end = knn_start + knn_neighbors;
-            int num_shared_neighbors = 0;
-
-            // Loop over k's neighbors
-            for (auto j = knn_start; j < knn_end; ++j) {
-              // Get the neighbor of active k from the edge:
-              auto m = graph.CsrT::GetEdgeDest(j);
-              // if (adj[src * nodes + m] == 1) ++num_shared_neighbors;
-              // Instead of using N*N adj list, loop over num_neighbors and
-              // search
-              auto m_start = graph.CsrT::GetNeighborListOffset(m);
-              auto m_neighbors = graph.CsrT::GetNeighborListLength(m);
-              auto m_end = m_start + m_neighbors;
-              for (auto v = m_start; v < m_end; ++v) {
-                auto possible_src = graph.CsrT::GetEdgeDest(v);
-                if (src == possible_src) ++num_shared_neighbors;
-              }
-            }
-
-            // if src and neighbor share eps or more neighbors then increase
+        [graph, nodes, knns, k, eps, min_pts, core_point] 
+        __host__ __device__(VertexT * v_q, const SizeT &src) {
+            int snn_density = 0;
+            auto src_neighbors = graph.CsrT::GetNeighborListLength(src);
+            if (src_neighbors < k) return;
+            auto src_start = graph.CsrT::GetNeighborListOffset(src);
+            auto src_end = src_start + src_neighbors;
+            // Loop over k-nearest neighbors of (src)
+            for (auto i = 0; i < k; ++i) {
+                // chose i nearest neighbor
+                auto neighbor = knns[src * k + i];
+                // go over neighbors of the nearest neighbor
+                auto knn_start = graph.CsrT::GetNeighborListOffset(neighbor);
+                auto knn_neighbors = graph.CsrT::GetNeighborListLength(neighbor);
+                auto knn_end = knn_start + knn_neighbors;
+                int num_shared_neighbors = 0;
+                // Loop over k's neighbors
+                for (auto j = knn_start; j < knn_end; ++j) {
+                    // Get the neighbor of active k from the edge:
+                    auto m = graph.CsrT::GetEdgeDest(j);
+                    // if (adj[src * nodes + m] == 1) ++num_shared_neighbors;
+                    // Instead of using N*N adj list, loop over num_neighbors and
+                    // search
+                    for (auto v = src_start; v < src_end; ++v) {
+                        auto possible_src = graph.CsrT::GetEdgeDest(v);
+                        if (m == possible_src) ++num_shared_neighbors;
+                    }
+                }
+                // if src and neighbor share eps or more neighbors then increase
             // snn density
             if (num_shared_neighbors >= eps) ++snn_density;
           }
@@ -251,44 +246,41 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // Core points merging
     auto merging_op =
-        [graph, nodes, eps, core_point, cluster_id] __host__ __device__(
-            VertexT * v_q, const SizeT &src) {
-          // only core points
-          if (core_point[src] != 1) return;
-          int cluster_counter = 1;
-          // cluster_id[src * nodes + 0] = src;
-          for (SizeT i = 0; i < nodes; ++i) {
-            if (i == src || core_point[i] != 1) continue;
-
+        [graph, nodes, eps, core_point, cluster_id] 
+        __host__ __device__(VertexT * v_q, const SizeT &pos) {
+            auto src = pos%nodes;
+            auto i = pos/nodes;
+            // only core points
+            if (i <= src || core_point[i] != 1 || core_point[src] != 1) return;
+            
             // go over neighbors of core point i
-            auto core_start = graph.CsrT::GetNeighborListOffset(i);
-            auto num_neighbors = graph.CsrT::GetNeighborListLength(i);
-            auto core_end = core_start + num_neighbors;
+            auto i_start = graph.CsrT::GetNeighborListOffset(i);
+            auto i_neighbors = graph.CsrT::GetNeighborListLength(i);
+            auto i_end = i_start + i_neighbors;
+
+            // go over neighbors of core point src
+            auto src_start = graph.CsrT::GetNeighborListOffset(src);
+            auto src_neighbors = graph.CsrT::GetNeighborListLength(src);
+            auto src_end = src_start + src_neighbors;
+                
             int num_shared_neighbors = 0;
-            for (auto j = core_start; j < core_end; ++j) {
-              auto m = graph.CsrT::GetEdgeDest(j);
-              // if (adj[src * nodes + m] == 1) ++num_shared_neighbors;
-              // Instead of using N*N adj list, loop over num_neighbors and
-              // search
-              auto src_start = graph.CsrT::GetNeighborListOffset(src);
-              auto src_neighbors = graph.CsrT::GetNeighborListLength(src);
-              auto src_end = src_start + src_neighbors;
-              for (auto v = src_start; v < src_end; ++v) {
-                auto possible_src = graph.CsrT::GetEdgeDest(v);
-                if (m == possible_src) ++num_shared_neighbors;
-              }
+            for (auto j = i_start; j < i_end; ++j) {
+                auto m = graph.CsrT::GetEdgeDest(j);
+                for (auto v = src_start; v < src_end; ++v) {
+                    auto possible_src = graph.CsrT::GetEdgeDest(v);
+                    if (m == possible_src) ++num_shared_neighbors;
+                }
             }
             // if src and neighbor share eps or more neighbors then they are
             // in the same cluster
             if (num_shared_neighbors >= eps) {
-              cluster_id[src + nodes * cluster_counter] = i;
-              ++cluster_counter;
+                cluster_id[src + nodes * i] = 1;
+                cluster_id[i   + nodes * src] = 1;
             }
-          }
         };
 
     // Assign core points to clusters
-    GUARD_CU(frontier.V_Q()->ForAll(merging_op, nodes, target, stream));
+    GUARD_CU(frontier.V_Q()->ForAll(merging_op, nodes*nodes, target, stream));
 
     // Merging confirmation
     auto merging_end_op =
@@ -296,12 +288,12 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             VertexT * v_q, const SizeT &src) {
           // only core points
           if (core_point[src] != 1) return;
-          SizeT min_cluster_id = cluster_id[src];
-          for (auto i = 1; i < nodes; ++i) {
+          SizeT min_cluster_id = src;
+          for (auto i = 0; i < nodes; ++i) {
             auto new_id = cluster_id[src + nodes * i];
-            if (!util::isValid(new_id)) break;
+            if (!util::isValid(new_id)) continue;
             //debug("for %d, lets try %d\n", src, new_id);
-            if (min_cluster_id > new_id) min_cluster_id = new_id;
+            if (min_cluster_id > i) min_cluster_id = i;
           }
           auto min_id = min(src, min_cluster_id);
           cluster[src] = cluster[min_id];
