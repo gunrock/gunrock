@@ -22,7 +22,7 @@
 #include <gunrock/app/knn/knn_problem.cuh>
 #include <gunrock/util/sort_device.cuh>
 
-#define KNN_DEBUG 1
+//#define KNN_DEBUG 1
 
 #ifdef KNN_DEBUG
 #define debug(a...) printf(a)
@@ -201,14 +201,13 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                     }
                 }
                 // if src and neighbor share eps or more neighbors then increase
-            // snn density
-            if (num_shared_neighbors >= eps) ++snn_density;
-          }
-
-          if (snn_density >= min_pts) {
-            debug("snn density of %d is %d\n", src, snn_density);
-            core_point[src] = 1;
-          }
+                // snn density
+                if (num_shared_neighbors >= eps) ++snn_density;
+            }
+            if (snn_density >= min_pts) {
+                debug("snn density of %d is %d\n", src, snn_density);
+                core_point[src] = 1;
+            }
         };
 
         // Debug
@@ -359,14 +358,13 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         },
         1, target, stream));
 */
-    // Debug
+#endif /* end: KNN_DEBUG */
+
     GUARD_CU(cluster.ForAll(
         [cluster_id] __host__ __device__(SizeT * *c, const SizeT &p) {
           cluster_id[p] = *c[p];
-          debug("cluster [%d] = %d\n", p, cluster_id[p]);
         },
         nodes, target, stream));
-#endif /* end: KNN_DEBUG */
 
     GUARD_CU(frontier.work_progress.GetQueueLength(
         frontier.queue_index, frontier.queue_length, false, stream, true));

@@ -14,7 +14,7 @@
 
 #pragma once
 
-#define KNN_DEBUG 1
+//#define KNN_DEBUG 1
 
 #ifdef KNN_DEBUG
 #define debug(a...) fprintf(stderr, a)
