@@ -262,7 +262,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
             // go over neighbors of core point i
             auto core_start = graph.CsrT::GetNeighborListOffset(i);
-            auto num_neighbors = graph.CsrT::GetNeighborListOffset(i);
+            auto num_neighbors = graph.CsrT::GetNeighborListLength(i);
             auto core_end = core_start + num_neighbors;
             int num_shared_neighbors = 0;
             for (auto j = core_start; j < core_end; ++j) {
