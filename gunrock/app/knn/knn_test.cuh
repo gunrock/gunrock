@@ -94,7 +94,7 @@ double CPU_Reference(
   }
 
   Point *distance = (Point *)malloc(sizeof(Point) * edges);
-  Point **knns = (Point **)malloc(sizeof(Point *) * nodes * k);
+  SizeT *knns = (SizeT*)malloc(sizeof(SizeT) * nodes * k);
   util::CpuTimer cpu_timer;
   cpu_timer.Start();
 
@@ -142,13 +142,13 @@ double CPU_Reference(
   for (SizeT x = 0; x < graph.nodes; ++x) {
     auto x_start = graph.CsrT::GetNeighborListOffset(x);
     auto num = graph.CsrT::GetNeighborListLength(x);
-    auto x_end = x_start + num;
     if (num < k) continue;
+    auto x_end = x_start + num;
     debug("%d nearest neighbors\n", k);
     int i = 0;
     for (int neighbor = x_start; neighbor < x_end && i < k; ++neighbor, ++i) {
       // k nearest points to (point_x, pointy)
-      knns[x * k + i] = &distance[neighbor];
+      knns[x * k + i] = graph.CsrT::GetEdgeDest(distance[neighbor].e_id);
       debug("(%d, %d) ", distance[neighbor].x,
             graph.CsrT::GetEdgeDest(distance[neighbor].e_id));
     }
@@ -160,17 +160,21 @@ double CPU_Reference(
   for (SizeT x = 0; x < graph.nodes; ++x) {
     auto x_start = graph.CsrT::GetNeighborListOffset(x);
     auto num = graph.CsrT::GetNeighborListLength(x);
-    auto x_end = x_start + num;
     if (num < k) continue;
+    auto x_end = x_start + num;
     int snn_density = 0;
+    debug("try neighbors of %d\n", x);
     for (int i = 0; i < k; ++i) {
       auto near_neighbor = knns[x * k + i];
       int counter = 0;
-      auto y_start = graph.CsrT::GetNeighborListOffset(near_neighbor->x);
-      auto y_num = graph.CsrT::GetNeighborListLength(near_neighbor->x);
+      auto y_start = graph.CsrT::GetNeighborListOffset(near_neighbor);
+      auto y_num = graph.CsrT::GetNeighborListLength(near_neighbor);
+      debug("let try neighbors of near neighbor %d:\n", near_neighbor);
       for (int z = y_start; z < y_start + y_num; ++z) {
         auto y = graph.CsrT::GetEdgeDest(z);
+        debug("neighbor of near neighbor: %d\n", y);
         if (adj[x].find(y) != adj[x].end()) {
+            debug("%d is neighbor of %d and %d\n", y, near_neighbor, x);
           ++counter;
         }
       }
