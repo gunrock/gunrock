@@ -94,6 +94,7 @@ struct ColorIterationLoop : public IterationLoopBase
         // <DONE> add problem specific data alias here:
         auto &colors 	 = data_slice.colors;
         auto &rand 	   = data_slice.rand;
+        auto &prohibit = data_slice.prohibit;
 	auto &gen	           = data_slice.gen;
 	auto &color_balance  = data_slice.color_balance;
 	auto &colored	       = data_slice.colored;
@@ -330,14 +331,18 @@ struct ColorIterationLoop : public IterationLoopBase
 
 	    // Run --
       if(use_jpl) {
+
         GUARD_CU(frontier.V_Q()->ForAll(
              color_op_jpl, frontier.queue_length,
              util::DEVICE, oprtr_parameters.stream));}
       else {
+
         GUARD_CU(frontier.V_Q()->ForAll(
              color_op, frontier.queue_length,
              util::DEVICE, oprtr_parameters.stream));
+
          if(no_conflict == 1 || no_conflict == 2) {
+
            GUARD_CU(frontier.V_Q()->ForAll(
                 resolve_iter, frontier.queue_length,
                 util::DEVICE, oprtr_parameters.stream));

@@ -71,6 +71,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         // <DONE> add problem specific storage arrays:
         util::Array1D<SizeT, VertexT> 	colors;
         util::Array1D<SizeT, float> 	rand;
+        util::Array1D<SizeT, VertexT> prohibit;
 
 	curandGenerator_t 		gen;
     	bool 				color_balance;
@@ -88,6 +89,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         DataSlice() : BaseDataSlice()
         {
             // <DONE> name of the problem specific arrays:
+            prohibit  .SetName("prohibit");
             colors	.SetName("colors");
             rand	.SetName("rand");
 	    colored	.SetName("colored");
@@ -111,6 +113,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
             // <TODO> Release problem specific data, e.g.:
+            GUARD_CU(prohibit  .Release(target));
             GUARD_CU(colors	.Release(target));
             GUARD_CU(rand	.Release(target));
 	    GUARD_CU(colored	.Release(target));
@@ -153,6 +156,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    curandSetPseudoRandomGeneratorSeed(gen, seed);
 
             // <DONE> allocate problem specific data here, e.g.:
+            GUARD_CU(prohibit   .Allocate(sub_graph.edges, target));
             GUARD_CU(colors		.Allocate(sub_graph.nodes, target));
             GUARD_CU(rand		.Allocate(sub_graph.nodes, target));
 	    GUARD_CU(colored		.Allocate(1, util::HOST|target));
@@ -178,6 +182,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             // Ensure data are allocated
             // <DONE> ensure size of problem specific data:
+            GUARD_CU(prohibit   .EnsureSize_(nodes, target));
             GUARD_CU(colors		.EnsureSize_(nodes, target));
             GUARD_CU(rand		.EnsureSize_(nodes, target));
 	    GUARD_CU(colored		.EnsureSize_(1, util::HOST|target));
@@ -185,6 +190,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             // Reset data
             // <DONE> reset problem specific data, e.g.:
+            GUARD_CU(prohibit.ForEach([]__host__ __device__ (VertexT &x){
+               x = util::PreDefinedValues<VertexT>::InvalidValue;
+            }, nodes, target, this -> stream));
+
             GUARD_CU(colors.ForEach([]__host__ __device__ (VertexT &x){
                x = util::PreDefinedValues<VertexT>::InvalidValue;
             }, nodes, target, this -> stream));
