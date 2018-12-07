@@ -44,6 +44,27 @@ cudaError_t UseParameters(util::Parameters &parameters)
       3, "Number of iterations color should run for (default=3).",
       __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<bool>(
+      "JPL",
+      util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+      false, "Use JPL exact coloring method (true=use JPL).",
+      __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+      "no_conflict",
+      util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+      false, "Resolve color conflict, 0 to skip check, 1 to check at end of
+      every iteration with random, 2 to check at end of every iteration with
+       degree, 3 to check at the end of the loop (default=0).",
+      __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<int>(
+      "hash_size",
+      util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
+      false, "Needed to allocate memory for hash function, if parameter is
+      positive, hash coloring is used instead of random coloring (default=0)",
+      __FILE__, __LINE__));
+
     GUARD_CU(parameters.Use<int>(
          "seed",
          util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,

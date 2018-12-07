@@ -71,9 +71,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         // <DONE> add problem specific storage arrays:
         util::Array1D<SizeT, VertexT> 	colors;
         util::Array1D<SizeT, float> 	rand;
+        util::Array1D<SizeT, VertexT> prohibit;
 
 	curandGenerator_t 		gen;
     	bool 				color_balance;
+      bool        use_jpl;
+      int         no_conflict;
       int         usr_iter;
 
 	util::Array1D<SizeT, SizeT> 	colored;
@@ -86,6 +89,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         DataSlice() : BaseDataSlice()
         {
             // <DONE> name of the problem specific arrays:
+            prohibit  .SetName("prohibit");
             colors	.SetName("colors");
             rand	.SetName("rand");
 	    colored	.SetName("colored");
@@ -109,6 +113,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
             // <TODO> Release problem specific data, e.g.:
+            GUARD_CU(prohibit  .Release(target));
             GUARD_CU(colors	.Release(target));
             GUARD_CU(rand	.Release(target));
 	    GUARD_CU(colored	.Release(target));
@@ -134,7 +139,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             ProblemFlag    flag,
 	    bool	   color_balance_,
 	    int		   seed,
-      int      usr_iter_)
+      int      usr_iter_,
+      bool     use_jpl_,
+      int      no_conflict_)
         {
             cudaError_t retval  = cudaSuccess;
 
@@ -142,11 +149,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
 	    color_balance = color_balance_;
       usr_iter      = usr_iter_;
+      use_jpl       = use_jpl_;
+      no_conflict   = no_conflict_;
 
 	    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
 	    curandSetPseudoRandomGeneratorSeed(gen, seed);
 
             // <DONE> allocate problem specific data here, e.g.:
+            GUARD_CU(prohibit   .Allocate(sub_graph.edges, target));
             GUARD_CU(colors		.Allocate(sub_graph.nodes, target));
             GUARD_CU(rand		.Allocate(sub_graph.nodes, target));
 	    GUARD_CU(colored		.Allocate(1, util::HOST|target));
@@ -172,6 +182,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             // Ensure data are allocated
             // <DONE> ensure size of problem specific data:
+            GUARD_CU(prohibit   .EnsureSize_(nodes, target));
             GUARD_CU(colors		.EnsureSize_(nodes, target));
             GUARD_CU(rand		.EnsureSize_(nodes, target));
 	    GUARD_CU(colored		.EnsureSize_(1, util::HOST|target));
@@ -179,6 +190,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             // Reset data
             // <DONE> reset problem specific data, e.g.:
+            GUARD_CU(prohibit.ForEach([]__host__ __device__ (VertexT &x){
+               x = util::PreDefinedValues<VertexT>::InvalidValue;
+            }, nodes, target, this -> stream));
+
             GUARD_CU(colors.ForEach([]__host__ __device__ (VertexT &x){
                x = util::PreDefinedValues<VertexT>::InvalidValue;
             }, nodes, target, this -> stream));
@@ -204,7 +219,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     util::Array1D<SizeT, DataSlice> *data_slices;
     int seed;
     int usr_iter;
+    bool use_jpl;
     bool color_balance;
+    int  no_conflict;
 
     // ----------------------------------------------------------------
     // Problem Methods
@@ -221,6 +238,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	seed = _parameters.Get<int>("seed");
 	color_balance = _parameters.Get<bool>("LBCOLOR");
   usr_iter = _parameters.Get<int>("usr_iter");
+  use_jpl  = _parameters.Get<bool>("JPL");
+  no_conflict = _parameters.Get<int>("no_conflict");
 	// </DONE>
     }
 
@@ -354,7 +373,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 this -> flag,
 		this -> color_balance,
 		this -> seed,
-    this -> usr_iter
+    this -> usr_iter,
+    this -> use_jpl,
+    this -> no_conflict
             ));
         }
 
