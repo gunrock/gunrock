@@ -14,13 +14,12 @@
 
 #pragma once
 
-
-#include <gunrock/util/track_utils.cuh>
-#include <gunrock/util/sort_device.cuh>
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
+#include <gunrock/util/sort_device.cuh>
+#include <gunrock/util/track_utils.cuh>
 
 // <DONE> change includes
 #include <gunrock/app/color/color_problem.cuh>
@@ -28,7 +27,6 @@
 #include <curand.h>
 #include <curand_kernel.h>
 // </DONE>
-
 
 namespace gunrock {
 namespace app {
@@ -38,15 +36,14 @@ namespace color {
 
 /**
  * @brief Speciflying parameters for hello Enactor
- * @param parameters The util::Parameter<...> structure holding all parameter info
- * \return cudaError_t error message(s), if any
+ * @param parameters The util::Parameter<...> structure holding all parameter
+ * info \return cudaError_t error message(s), if any
  */
-cudaError_t UseParameters_enactor(util::Parameters &parameters)
-{
-    cudaError_t retval = cudaSuccess;
-    GUARD_CU(app::UseParameters_enactor(parameters));
+cudaError_t UseParameters_enactor(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
+  GUARD_CU(app::UseParameters_enactor(parameters));
 
-    return retval;
+  return retval;
 }
 
 /**
@@ -54,60 +51,58 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct ColorIterationLoop : public IterationLoopBase
-    <EnactorT, Use_FullQ | Push>
-{
-    typedef typename EnactorT::VertexT VertexT;
-    typedef typename EnactorT::SizeT   SizeT;
-    typedef typename EnactorT::ValueT  ValueT;
-    typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
-    typedef typename EnactorT::Problem::GraphT::GpT  GpT;
+struct ColorIterationLoop
+    : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
+  typedef typename EnactorT::VertexT VertexT;
+  typedef typename EnactorT::SizeT SizeT;
+  typedef typename EnactorT::ValueT ValueT;
+  typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
+  typedef typename EnactorT::Problem::GraphT::GpT GpT;
 
-    typedef IterationLoopBase
-        <EnactorT, Use_FullQ | Push> BaseIterationLoop;
+  typedef IterationLoopBase<EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
-    ColorIterationLoop() : BaseIterationLoop() {}
+  ColorIterationLoop() : BaseIterationLoop() {}
 
-    /**
-     * @brief Core computation of hello, one iteration
-     * @param[in] peer_ Which GPU peers to work on, 0 means local
-     * \return cudaError_t error message(s), if any
-     */
-    cudaError_t Core(int peer_ = 0)
-    {
-        // --
-        // Alias variables
+  /**
+   * @brief Core computation of hello, one iteration
+   * @param[in] peer_ Which GPU peers to work on, 0 means local
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Core(int peer_ = 0) {
+    // --
+    // Alias variables
 
-        auto &data_slice = this -> enactor ->
-            problem -> data_slices[this -> gpu_num][0];
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
 
-        auto &enactor_slice = this -> enactor ->
-            enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
+    auto &enactor_slice =
+        this->enactor
+            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
 
-        auto &enactor_stats    = enactor_slice.enactor_stats;
-        auto &graph            = data_slice.sub_graph[0];
-        auto &frontier         = enactor_slice.frontier;
-        auto &oprtr_parameters = enactor_slice.oprtr_parameters;
-        auto &retval           = enactor_stats.retval;
-        auto &iteration        = enactor_stats.iteration;
+    auto &enactor_stats = enactor_slice.enactor_stats;
+    auto &graph = data_slice.sub_graph[0];
+    auto &frontier = enactor_slice.frontier;
+    auto &oprtr_parameters = enactor_slice.oprtr_parameters;
+    auto &retval = enactor_stats.retval;
+    auto &iteration = enactor_stats.iteration;
 
-        // <DONE> add problem specific data alias here:
-        auto &colors 	 = data_slice.colors;
-        auto &rand 	   = data_slice.rand;
-        auto &prohibit = data_slice.prohibit;
-	auto &gen	           = data_slice.gen;
-	auto &color_balance  = data_slice.color_balance;
-	auto &colored	       = data_slice.colored;
-  auto &use_jpl        = data_slice.use_jpl;
-  auto &no_conflict    = data_slice.no_conflict;
-        // </DONE>
+    // <DONE> add problem specific data alias here:
+    auto &colors = data_slice.colors;
+    auto &rand = data_slice.rand;
+    auto &prohibit = data_slice.prohibit;
+    auto &gen = data_slice.gen;
+    auto &color_balance = data_slice.color_balance;
+    auto &colored = data_slice.colored;
+    auto &use_jpl = data_slice.use_jpl;
+    auto &no_conflict = data_slice.no_conflict;
+    auto &hash_size = data_slice.hash_size;
+    // </DONE>
 
-	curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
+    curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
 
-        // --
-        // Define operations
+    // --
+    // Define operations
 
-	if(color_balance) {
+    if (color_balance) {
 
 #if 0
         // advance operation
@@ -163,122 +158,115 @@ struct ColorIterationLoop : public IterationLoopBase
             oprtr_parameters, advance_op, filter_op));
 #endif
 
-        // Get back the resulted frontier length
-        // GUARD_CU(frontier.work_progress.GetQueueLength(
-        //    frontier.queue_index, frontier.queue_length,
-        //    false, oprtr_parameters.stream, true));
+      // Get back the resulted frontier length
+      // GUARD_CU(frontier.work_progress.GetQueueLength(
+      //    frontier.queue_index, frontier.queue_length,
+      //    false, oprtr_parameters.stream, true));
 
-	}
+    }
 
-  else {
+    else {
 
-	    auto color_op = [
-        graph,
-	    	colors,
-	    	rand,
-	    	iteration
-	    ] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
-
-        VertexT v 		= v_q[pos];
-        SizeT start_edge 	= graph.CsrT::GetNeighborListOffset(v);
-        SizeT num_neighbors 	= graph.CsrT::GetNeighborListLength(v);
+      // =======================================================================
+      /* color_op
+      @Description: non-jpl vertex coloring operation. Based on parameter
+      choices, different type of coloring is utilized. Max and min independent
+      sets are generated prior to coloring. Coloring can either be from hash
+      funtion or iteration.
+      */
+      // =======================================================================
+      auto color_op = [graph, colors, rand, iteration, hash_size, prohibit] __host__ __device__(
+                          VertexT * v_q, const SizeT &pos) {
+        VertexT v = v_q[pos];
+        SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
+        SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
         ValueT temp = rand[v];
 
-          VertexT max = v;    // active max vertex
-  		    VertexT min = v;    // active min vertex
+        VertexT max = v; // active max vertex
+        VertexT min = v; // active min vertex
 
-  	    	for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-    		    VertexT u = graph.CsrT::GetEdgeDest(e);
-    		      if (rand[u] > temp)
-    		    	max = u;
+        for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+          VertexT u = graph.CsrT::GetEdgeDest(e);
+          if (rand[u] > temp)
+            max = u;
 
-    		    if (rand[u] < temp)
-    			    min = u;
+          if (rand[u] < temp)
+            min = u;
 
-    		    //printf("Let's see what rand[u] = %f\n", rand[u]);
-    		    temp = rand[u]; // compare against e-1
-  	    	}
+          // printf("Let's see what rand[u] = %f\n", rand[u]);
+          temp = rand[u]; // compare against e-1
+        }
 
-          //hash coloring
-          //max hash coloring
-          // if (!util::isValid(colors[max])) {
-          //   int* max_forbidden = new int[graph.nodes];
-          //   SizeT max_start_edge = graph.CsrT::GetNeighborListOffset(max);
-          //   SizeT max_neighbors  = graph.CsrT::GetNeighborListLength(max);
-          //
-          //   for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-          //     VertexT u = graph.CsrT::GetEdgeDest(e);
-          //       if(!util::isValid(colors[u]))
-          //         max_forbidden[colors[u]] = max;
-          //   }
-          //
-          //   for (int c = 0; c < graph.nodes; c++) {
-          //     if(max_forbidden[c] != max) {
-          //       colors[max] = c;
-          //       break;
-          //     }
-          //   }
-          //
-          //   delete[] max_forbidden;
-          // }
-          //
-          // //min hash coloring
-          // if (!util::isValid(colors[min])) {
-          //   int* min_forbidden = new int[graph.nodes];
-          //   SizeT min_start_edge = graph.CsrT::GetNeighborListOffset(min);
-          //   SizeT min_neighbors  = graph.CsrT::GetNeighborListLength(min);
-          //
-          //   for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-          //     VertexT u = graph.CsrT::GetEdgeDest(e);
-          //       if(!util::isValid(colors[u]))
-          //         min_forbidden[colors[u]] = min;
-          //   }
-          //
-          //   for (int c = 0; c < graph.nodes; c++) {
-          //     if(min_forbidden[c] != min) {
-          //       colors[min] = c;
-          //       break;
-          //     }
-          //   }
-          //
-          //   delete[] min_forbidden;
-          // }
-          Assign two colors per iteration
-      		if (!util::isValid(colors[max]))
-      		    colors[max] = iteration*2+1;
+        //max hash coloring
+        SizeT prohibit_offset = max * hash_size;
+        for(int c = 1, n = 0; (c < iteration * 2 + 1) || (n < hash_size) ; c++, n++) {
+          if(prohibit[prohibit_offset + n] != c) {
+            colors[max] = c;
+            break;
+          }
+        }
 
-      		if (!util::isValid(colors[min]))
-      		    colors[min] = iteration*2+2;
+        //min hash coloring
+        prohibit_offset = min * hash_size;
+        for(int c = 1, n = 0; (c < iteration * 2 + 1) || (n < hash_size) ; c++, n++) {
+          if(prohibit[prohibit_offset + n] != c) {
+            colors[min] = c;
+            break;
+          }
+        }
 
-      		// printf("iteration number = %u\n", iteration);
-      		// printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min], colors[max]);
-	  };
+        // if hash coloring fail because not enough space, fall back to color by iteration
+        if (!util::isValid(colors[max]))
+          colors[max] = iteration * 2 + 1;
 
-      auto resolve_iter = [
-        graph,
-        colors,
-        rand,
-        no_conflict
-      ] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
+        if (!util::isValid(colors[min]))
+          colors[min] = iteration * 2 + 2;
+      };
 
+      // =======================================================================
+      /* gen_op
+      @Description: populate @prohibit list with first @hash_size^th neighbor colors
+      TODO: test if there is error if the degree of a vertex is less than @hash_size.
+      Each thread handle one element inside @prohibit, no thread divergence.
+      */
+      // =======================================================================
+      auto gen_op = [graph, colors, hash_size] __host__ __device__(
+                        VertexT * prohibit_, const SizeT &pos) {
+        VertexT v = pos / hash_size;
+        SizeT a_idx = pos % hash_size;
+        SizeT e  = graph.CsrT::GetNeighborListOffset(v) + a_idx;
+
+        VertexT u = graph.CsrT::GetEdgeDest(e);
+        prohibit_[pos] = colors[u];
+      };
+
+      // =======================================================================
+      /* resolve_op
+      @Description: resolve conflicts after non-jpl coloring. This operation is
+      called only when @no_conflict != 0. @no_conflict == 1 means resolve by
+      comparing @rand. @no_conflict == 2 means resolve by comparing node degree
+      */
+      // =======================================================================
+      auto resolve_op = [graph, colors, rand, no_conflict] __host__ __device__(
+                            VertexT * v_q, const SizeT &pos) {
         VertexT v = v_q[pos];
-        SizeT start_edge 	= graph.CsrT::GetNeighborListOffset(v);
-        SizeT num_neighbors 	= graph.CsrT::GetNeighborListLength(v);
+        SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
+        SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
 
-        if(!util::isValid(colors[v])) {
+        if (!util::isValid(colors[v])) {
           for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
             VertexT u = graph.CsrT::GetEdgeDest(e);
-            if(!util::isValid(colors[u]) && colors[u] == colors[v]) {
+            if (!util::isValid(colors[u]) && colors[u] == colors[v]) {
 
-              //decide by random number
-              if(rand[u] >= rand[v] && no_conflict == 1) {
+              // decide by random number
+              if (rand[u] >= rand[v] && no_conflict == 1) {
                 colors[v] = util::PreDefinedValues<VertexT>::InvalidValue;
                 break;
               }
 
-              //decide by degree heuristic
+              // decide by degree heuristic
               else if (graph.CsrT::GetNeighborListLength(u) >= num_neighbors &&
-              no_conflict == 2) {
+                       no_conflict == 2) {
                 colors[v] = util::PreDefinedValues<VertexT>::InvalidValue;
                 break;
               }
@@ -287,150 +275,159 @@ struct ColorIterationLoop : public IterationLoopBase
         }
       };
 
-    auto color_op_jpl = [
-      graph,
-      colors,
-      rand,
-      iteration
-    ] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
+      // =======================================================================
+      /* jpl_color_op
+      @Description: jpl vertex coloring operation. No conflict resolution is needed
+      */
+      // =======================================================================
+      auto jpl_color_op = [graph, colors, rand, iteration] __host__ __device__(
+                              VertexT * v_q, const SizeT &pos) {
+        VertexT v = v_q[pos];
+        SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
+        SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+        ValueT temp = rand[v];
 
-      VertexT v 		= v_q[pos];
-      SizeT start_edge 	= graph.CsrT::GetNeighborListOffset(v);
-      SizeT num_neighbors 	= graph.CsrT::GetNeighborListLength(v);
-      ValueT temp = rand[v];
-
-      if(!util::isValid(colors[v])) {
+        if (!util::isValid(colors[v])) {
           bool colormax = true;
           bool colormin = true;
           for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
             VertexT u = graph.CsrT::GetEdgeDest(e);
-            if(!util::isValid(colors[u]) && rand[u] >= temp)
+            if (!util::isValid(colors[u]) && rand[u] >= temp)
               colormax = false;
-            if(!util::isValid(colors[u]) && rand[u] <= temp)
+            if (!util::isValid(colors[u]) && rand[u] <= temp)
               colormin = false;
-
           }
 
-          if(colormax)
-            colors[v] = iteration*2+1;
-          if(colormin)
-            colors[v] = iteration*2+2;
+          if (colormax)
+            colors[v] = iteration * 2 + 1;
+          if (colormin)
+            colors[v] = iteration * 2 + 2;
         }
+      };
+
+      // =======================================================================
+      /* status_op
+      @Description: check coloring status.
+      */
+      // =======================================================================
+      auto status_op = [colors, colored] __host__ __device__(VertexT * v_q,
+                                                             const SizeT &pos) {
+        VertexT v = v_q[pos];
+
+        if (util::isValid(colors[v]))
+          atomicAdd(&colored[0], 1);
+      };
+
+      //======================================================================//
+      // Run --                                                               //
+      //======================================================================//
+
+      // JPL exact method
+      if (use_jpl) {
+
+        GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
+                                        util::DEVICE, oprtr_parameters.stream));
+      }
+
+      // Current method in development
+      else {
+        // color by max and min independent set, non-exactsolution
+        GUARD_CU(frontier.V_Q()->ForAll(color_op, frontier.queue_length,
+                                        util::DEVICE, oprtr_parameters.stream));
+
+        // optional resolution to make method exact solution
+        if (no_conflict == 1 || no_conflict == 2) {
+
+          // optinal coloring by hash function n * hash_size (non-exact)
+          if(hash_size != 0)
+            GUARD_CU(prohibit.ForAll(gen_op, graph.nodes * hash_size,
+                                     util::DEVICE, oprtr_parameters.stream));
+
+          // optional coloring by hash function e (non-exact)
+          // TODO
+
+          GUARD_CU(frontier.V_Q()->ForAll(resolve_op, frontier.queue_length,
+                                          util::DEVICE,
+                                          oprtr_parameters.stream));
+        }
+      }
+
+      GUARD_CU(frontier.V_Q()->ForAll(status_op, frontier.queue_length,
+                                      util::DEVICE, oprtr_parameters.stream));
+
+      GUARD_CU(data_slice.colored.SetPointer(&data_slice.colored_,
+                                             sizeof(SizeT), util::HOST));
+      GUARD_CU(data_slice.colored.Move(util::DEVICE, util::HOST));
+    }
+
+    return retval;
+  }
+
+  bool Stop_Condition(int gpu_num = 0) {
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+    auto &enactor_slices = this->enactor->enactor_slices;
+    auto iter = enactor_slices[0].enactor_stats.iteration;
+    auto usr_iter = data_slice.usr_iter;
+    auto &graph = data_slice.sub_graph[0];
+    printf("Max Iteration: %d\n", usr_iter);
+    printf("Iteration: %d\n", iter);
+    printf("colored_: %d\n", data_slice.colored_);
+    printf("Num Nodes: %d\n", graph.nodes);
+
+    // old stop condition
+    // if(data_slice.colored_ >= graph.nodes)
+    //   return true;
+
+    // user defined stop condition
+    if (iter == usr_iter)
+      return true;
+
+    return false;
+  }
+
+  /**
+   * @brief Routine to combine received data and local data
+   * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each
+   * transmition item, typed VertexT
+   * @tparam NUM_VALUE__ASSOCIATES Number of data associated with each
+   * transmition item, typed ValueT
+   * @param  received_length The numver of transmition items received
+   * @param[in] peer_ which peer GPU the data came from
+   * \return cudaError_t error message(s), if any
+   */
+  template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
+  cudaError_t ExpandIncoming(SizeT &received_length, int peer_) {
+
+    // ================ INCOMPLETE TEMPLATE - MULTIGPU ====================
+
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+    auto &enactor_slice =
+        this->enactor
+            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
+    // auto iteration = enactor_slice.enactor_stats.iteration;
+    // TODO: add problem specific data alias here, e.g.:
+    // auto         &distances          =   data_slice.distances;
+
+    auto expand_op = [
+                         // TODO: pass data used by the lambda, e.g.:
+                         // distances
+    ] __host__ __device__(VertexT & key, const SizeT &in_pos,
+                          VertexT *vertex_associate_ins,
+                          ValueT *value__associate_ins) -> bool {
+      // TODO: fill in the lambda to combine received and local data, e.g.:
+      // ValueT in_val  = value__associate_ins[in_pos];
+      // ValueT old_val = atomicMin(distances + key, in_val);
+      // if (old_val <= in_val)
+      //     return false;
+      return true;
     };
 
-	  auto status_op = [
-		  colors,
-		  colored
-	    ] __host__ __device__ (VertexT *v_q, const SizeT &pos) {
-
-		   VertexT v	= v_q[pos];
-
-		     if(util::isValid(colors[v]))
-    		    atomicAdd(&colored[0], 1);
-    	 };
-
-	    // Run --
-      if(use_jpl) {
-
-        GUARD_CU(frontier.V_Q()->ForAll(
-             color_op_jpl, frontier.queue_length,
-             util::DEVICE, oprtr_parameters.stream));}
-      else {
-
-        GUARD_CU(frontier.V_Q()->ForAll(
-             color_op, frontier.queue_length,
-             util::DEVICE, oprtr_parameters.stream));
-
-         if(no_conflict == 1 || no_conflict == 2) {
-
-           GUARD_CU(frontier.V_Q()->ForAll(
-                resolve_iter, frontier.queue_length,
-                util::DEVICE, oprtr_parameters.stream));
-         }
-           }
-
-	    GUARD_CU(frontier.V_Q()->ForAll(
-                 status_op, frontier.queue_length,
-                 util::DEVICE, oprtr_parameters.stream));
-
-	    GUARD_CU(data_slice.colored .SetPointer(&data_slice.colored_, sizeof(SizeT), util::HOST));
-            GUARD_CU(data_slice.colored .Move(util::DEVICE, util::HOST));
-
-	}
-
-        return retval;
-}
-
-
-    bool Stop_Condition(int gpu_num = 0)
-    {
-        auto &data_slice = this -> enactor ->
-            problem -> data_slices[this -> gpu_num][0];
-        auto &enactor_slices = this -> enactor -> enactor_slices;
-        auto iter = enactor_slices[0].enactor_stats.iteration;
-        auto usr_iter = data_slice.usr_iter;
-	      auto &graph = data_slice.sub_graph[0];
-        printf("Max Iteration: %d\n",usr_iter);
-        printf("Iteration: %d\n",iter);
-        printf("colored_: %d\n", data_slice.colored_);
-        printf("Num Nodes: %d\n", graph.nodes);
-
-        //old stop condition
-        //if(data_slice.colored_ >= graph.nodes)
-	      //   return true;
-
-        //user defined stop condition
-        if(iter == usr_iter)
-             return true;
-
-        return false;
-    }
-
-    /**
-     * @brief Routine to combine received data and local data
-     * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each transmition item, typed VertexT
-     * @tparam NUM_VALUE__ASSOCIATES Number of data associated with each transmition item, typed ValueT
-     * @param  received_length The numver of transmition items received
-     * @param[in] peer_ which peer GPU the data came from
-     * \return cudaError_t error message(s), if any
-     */
-    template <
-        int NUM_VERTEX_ASSOCIATES,
-        int NUM_VALUE__ASSOCIATES>
-    cudaError_t ExpandIncoming(SizeT &received_length, int peer_)
-    {
-
-        // ================ INCOMPLETE TEMPLATE - MULTIGPU ====================
-
-        auto &data_slice    = this -> enactor ->
-            problem -> data_slices[this -> gpu_num][0];
-        auto &enactor_slice = this -> enactor ->
-            enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
-        //auto iteration = enactor_slice.enactor_stats.iteration;
-        // TODO: add problem specific data alias here, e.g.:
-        // auto         &distances          =   data_slice.distances;
-
-        auto expand_op = [
-        // TODO: pass data used by the lambda, e.g.:
-        // distances
-        ] __host__ __device__(
-            VertexT &key, const SizeT &in_pos,
-            VertexT *vertex_associate_ins,
-            ValueT  *value__associate_ins) -> bool
-        {
-            // TODO: fill in the lambda to combine received and local data, e.g.:
-            // ValueT in_val  = value__associate_ins[in_pos];
-            // ValueT old_val = atomicMin(distances + key, in_val);
-            // if (old_val <= in_val)
-            //     return false;
-            return true;
-        };
-
-        cudaError_t retval = BaseIterationLoop:: template ExpandIncomingBase
-            <NUM_VERTEX_ASSOCIATES, NUM_VALUE__ASSOCIATES>
-            (received_length, peer_, expand_op);
-        return retval;
-    }
+    cudaError_t retval =
+        BaseIterationLoop::template ExpandIncomingBase<NUM_VERTEX_ASSOCIATES,
+                                                       NUM_VALUE__ASSOCIATES>(
+            received_length, peer_, expand_op);
+    return retval;
+  }
 }; // end of colorIteration
 
 /**
@@ -439,181 +436,172 @@ struct ColorIterationLoop : public IterationLoopBase
  * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
  * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
  */
-template <
-    typename _Problem,
-    util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
-    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
-class Enactor :
-    public EnactorBase<
-        typename _Problem::GraphT,
-        typename _Problem::GraphT::VertexT, // TODO: change to other label types used for the operators, e.g.: typename _Problem::LabelT,
-        typename _Problem::GraphT::ValueT, // TODO: change to other value types used for inter GPU communication, e.g.: typename _Problem::ValueT,
-        ARRAY_FLAG, cudaHostRegisterFlag>
-{
+template <typename _Problem, util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
+          unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
+class Enactor
+    : public EnactorBase<
+          typename _Problem::GraphT,
+          typename _Problem::GraphT::VertexT, // TODO: change to other label
+                                              // types used for the operators,
+                                              // e.g.: typename
+                                              // _Problem::LabelT,
+          typename _Problem::GraphT::ValueT,  // TODO: change to other value
+                                              // types used for inter GPU
+                                              // communication, e.g.: typename
+                                              // _Problem::ValueT,
+          ARRAY_FLAG, cudaHostRegisterFlag> {
 public:
-    typedef _Problem                   Problem ;
-    typedef typename Problem::SizeT    SizeT   ;
-    typedef typename Problem::VertexT  VertexT ;
-    typedef typename Problem::GraphT   GraphT  ;
-    typedef typename GraphT::VertexT   LabelT  ;
-    typedef typename GraphT::ValueT    ValueT  ;
-    typedef EnactorBase<GraphT, LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
-        BaseEnactor;
-    typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
-        EnactorT;
-    typedef ColorIterationLoop<EnactorT>
-        IterationT;
+  typedef _Problem Problem;
+  typedef typename Problem::SizeT SizeT;
+  typedef typename Problem::VertexT VertexT;
+  typedef typename Problem::GraphT GraphT;
+  typedef typename GraphT::VertexT LabelT;
+  typedef typename GraphT::ValueT ValueT;
+  typedef EnactorBase<GraphT, LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
+      BaseEnactor;
+  typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> EnactorT;
+  typedef ColorIterationLoop<EnactorT> IterationT;
 
-    Problem *problem;
-    IterationT *iterations;
+  Problem *problem;
+  IterationT *iterations;
 
-    /**
-     * @brief color constructor
-     */
-    Enactor() :
-        BaseEnactor("Color"),
-        problem    (NULL  )
-    {
-        // <TODO> change according to algorithmic needs
-        this -> max_num_vertex_associates = 0;
-        this -> max_num_value__associates = 1;
-        // </TODO>
+  /**
+   * @brief color constructor
+   */
+  Enactor() : BaseEnactor("Color"), problem(NULL) {
+    // <TODO> change according to algorithmic needs
+    this->max_num_vertex_associates = 0;
+    this->max_num_value__associates = 1;
+    // </TODO>
+  }
+
+  /**
+   * @brief hello destructor
+   */
+  virtual ~Enactor() { /*Release();*/
+  }
+
+  /*
+   * @brief Releasing allocated memory space
+   * @param target The location to release memory from
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Release(util::Location target = util::LOCATION_ALL) {
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(BaseEnactor::Release(target));
+    delete[] iterations;
+    iterations = NULL;
+    problem = NULL;
+    return retval;
+  }
+
+  /**
+   * @brief Initialize the problem.
+   * @param[in] problem The problem object.
+   * @param[in] target Target location of data
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Init(Problem &problem, util::Location target = util::DEVICE) {
+    cudaError_t retval = cudaSuccess;
+    this->problem = &problem;
+
+    // Lazy initialization
+    GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target, false));
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+      auto &enactor_slice = this->enactor_slices[gpu * this->num_gpus + 0];
+      auto &graph = problem.sub_graphs[gpu];
+      GUARD_CU(enactor_slice.frontier.Allocate(graph.nodes, graph.edges,
+                                               this->queue_factors));
     }
 
-    /**
-     * @brief hello destructor
-     */
-    virtual ~Enactor() { /*Release();*/ }
-
-    /*
-     * @brief Releasing allocated memory space
-     * @param target The location to release memory from
-     * \return cudaError_t error message(s), if any
-     */
-    cudaError_t Release(util::Location target = util::LOCATION_ALL)
-    {
-        cudaError_t retval = cudaSuccess;
-        GUARD_CU(BaseEnactor::Release(target));
-        delete []iterations; iterations = NULL;
-        problem = NULL;
-        return retval;
+    iterations = new IterationT[this->num_gpus];
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      GUARD_CU(iterations[gpu].Init(this, gpu));
     }
 
-    /**
-     * @brief Initialize the problem.
-     * @param[in] problem The problem object.
-     * @param[in] target Target location of data
-     * \return cudaError_t error message(s), if any
-     */
-    cudaError_t Init(
-        Problem          &problem,
-        util::Location    target = util::DEVICE)
-    {
-        cudaError_t retval = cudaSuccess;
-        this->problem = &problem;
+    GUARD_CU(this->Init_Threads(this, (CUT_THREADROUTINE) &
+                                          (GunrockThread<EnactorT>)));
+    return retval;
+  }
 
-        // Lazy initialization
-        GUARD_CU(BaseEnactor::Init(
-            problem, Enactor_None, 2, NULL, target, false));
-        for (int gpu = 0; gpu < this -> num_gpus; gpu ++) {
-            GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
-            auto &enactor_slice = this -> enactor_slices[gpu * this -> num_gpus + 0];
-            auto &graph = problem.sub_graphs[gpu];
-            GUARD_CU(enactor_slice.frontier.Allocate(
-                graph.nodes, graph.edges, this -> queue_factors));
-        }
-
-        iterations = new IterationT[this -> num_gpus];
-        for (int gpu = 0; gpu < this -> num_gpus; gpu ++) {
-            GUARD_CU(iterations[gpu].Init(this, gpu));
-        }
-
-        GUARD_CU(this -> Init_Threads(this,
-            (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
-        return retval;
-    }
-
-    /**
-      * @brief one run of hello, to be called within GunrockThread
-      * @param thread_data Data for the CPU thread
-      * \return cudaError_t error message(s), if any
-      */
-    cudaError_t Run(ThreadSlice &thread_data)
-    {
-        gunrock::app::Iteration_Loop<
-            // <DONE> change to how many {VertexT, ValueT} data need to communicate
-            //       per element in the inter-GPU sub-frontiers
-            0, 1,
-            // </DONE>
-            IterationT>(
-            thread_data, iterations[thread_data.thread_num]);
-        return cudaSuccess;
-    }
-
-    /**
-     * @brief Reset enactor
-...
-     * @param[in] target Target location of data
-     * \return cudaError_t error message(s), if any
-     */
-    cudaError_t Reset(
-        util::Location target = util::DEVICE)
-    {
-        typedef typename GraphT::GpT GpT;
-        cudaError_t retval = cudaSuccess;
-        GUARD_CU(BaseEnactor::Reset(target));
-
-	SizeT num_nodes = this -> problem -> data_slices[0][0].sub_graph[0].nodes;
-
-        // <DONE> Initialize frontiers according to the algorithm:
-        // In this case, we add a single `src` to the frontier
-        for (int gpu = 0; gpu < this->num_gpus; gpu++) {
-           if (this->num_gpus == 1) {
-               this -> thread_slices[gpu].init_size = num_nodes;
-               for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
-                   auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                   frontier.queue_length = (peer_ == 0) ? num_nodes : 0;
-                   if (peer_ == 0) {
-
-                      util::Array1D<SizeT, VertexT> tmp;
-                      tmp.Allocate(num_nodes, target | util::HOST);
-                      for(SizeT i = 0; i < num_nodes; ++i) {
-                          tmp[i] = (VertexT)i % num_nodes;
-                      }
-                      GUARD_CU(tmp.Move(util::HOST, target));
-
-                      GUARD_CU(frontier.V_Q() -> ForEach(tmp,
-                          []__host__ __device__ (VertexT &v, VertexT &i) {
-                          v = i;
-                      }, num_nodes, target, 0));
-
-                      tmp.Release();
-		   }
-               }
-           } else {
-           }
-        }
+  /**
+   * @brief one run of hello, to be called within GunrockThread
+   * @param thread_data Data for the CPU thread
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Run(ThreadSlice &thread_data) {
+    gunrock::app::Iteration_Loop<
+        // <DONE> change to how many {VertexT, ValueT} data need to communicate
+        //       per element in the inter-GPU sub-frontiers
+        0, 1,
         // </DONE>
+        IterationT>(thread_data, iterations[thread_data.thread_num]);
+    return cudaSuccess;
+  }
 
-        GUARD_CU(BaseEnactor::Sync());
-        return retval;
-    }
-
-    /**
-     * @brief Enacts a hello computing on the specified graph.
+  /**
+   * @brief Reset enactor
 ...
-     * \return cudaError_t error message(s), if any
-     */
-    cudaError_t Enact()
-    {
-        cudaError_t retval = cudaSuccess;
-        GUARD_CU(this -> Run_Threads(this));
-        util::PrintMsg("GPU Color Done.", this -> flag & Debug);
-        return retval;
+   * @param[in] target Target location of data
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Reset(util::Location target = util::DEVICE) {
+    typedef typename GraphT::GpT GpT;
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(BaseEnactor::Reset(target));
+
+    SizeT num_nodes = this->problem->data_slices[0][0].sub_graph[0].nodes;
+
+    // <DONE> Initialize frontiers according to the algorithm:
+    // In this case, we add a single `src` to the frontier
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      if (this->num_gpus == 1) {
+        this->thread_slices[gpu].init_size = num_nodes;
+        for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
+          auto &frontier =
+              this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
+          frontier.queue_length = (peer_ == 0) ? num_nodes : 0;
+          if (peer_ == 0) {
+
+            util::Array1D<SizeT, VertexT> tmp;
+            tmp.Allocate(num_nodes, target | util::HOST);
+            for (SizeT i = 0; i < num_nodes; ++i) {
+              tmp[i] = (VertexT)i % num_nodes;
+            }
+            GUARD_CU(tmp.Move(util::HOST, target));
+
+            GUARD_CU(frontier.V_Q()->ForEach(
+                tmp,
+                [] __host__ __device__(VertexT & v, VertexT & i) { v = i; },
+                num_nodes, target, 0));
+
+            tmp.Release();
+          }
+        }
+      } else {
+      }
     }
+    // </DONE>
+
+    GUARD_CU(BaseEnactor::Sync());
+    return retval;
+  }
+
+  /**
+   * @brief Enacts a hello computing on the specified graph.
+...
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Enact() {
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(this->Run_Threads(this));
+    util::PrintMsg("GPU Color Done.", this->flag & Debug);
+    return retval;
+  }
 };
 
-} // namespace Template
+} // namespace color
 } // namespace app
 } // namespace gunrock
 

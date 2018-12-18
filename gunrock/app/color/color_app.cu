@@ -11,11 +11,11 @@
  * @brief Graph Coloring Gunrock Application
  */
 
-#include <gunrock/gunrock.h>
-#include <gunrock/util/test_utils.cuh>
-#include <gunrock/graphio/graphio.cuh>
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
+#include <gunrock/graphio/graphio.cuh>
+#include <gunrock/gunrock.h>
+#include <gunrock/util/test_utils.cuh>
 
 // <DONE> change includes
 #include <gunrock/app/color/color_enactor.cuh>
@@ -28,60 +28,53 @@ namespace app {
 namespace color {
 // </DONE>
 
+cudaError_t UseParameters(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
+  GUARD_CU(UseParameters_app(parameters));
+  GUARD_CU(UseParameters_problem(parameters));
+  GUARD_CU(UseParameters_enactor(parameters));
 
-cudaError_t UseParameters(util::Parameters &parameters)
-{
-    cudaError_t retval = cudaSuccess;
-    GUARD_CU(UseParameters_app(parameters));
-    GUARD_CU(UseParameters_problem(parameters));
-    GUARD_CU(UseParameters_enactor(parameters));
+  // <DONE> add app specific parameters, eg:
 
-    // <DONE> add app specific parameters, eg:
-
-    GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.Use<int>(
       "usr_iter",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-      3, "Number of iterations color should run for (default=3).",
+      3, "Number of iterations color should run for (default=3).", __FILE__,
+      __LINE__));
+
+  GUARD_CU(parameters.Use<bool>(
+      "JPL", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
+      "Use JPL exact coloring method (true=use JPL).", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<int>(
+      "no_conflict", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
+      "Resolve color conflict, 0 to skip check, 1 to check at end of
+      every iteration with random,
+      2 to check at end of every iteration with degree (default = 0)
+          .",
+      __FILE__,
+      __LINE__));
+
+  GUARD_CU(parameters.Use<int>(
+      "hash_size", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
+      "Needed to allocate memory for hash function, if parameter is
+      positive,
+      hash coloring is used instead of random coloring(default = 0) ",
+      __FILE__,
+      __LINE__));
+
+  GUARD_CU(parameters.Use<int>(
+      "seed", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, time(NULL),
+      "seed for random number generator", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<bool>(
+      "LBCOLOR", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
+      "load balancing enabled for graph coloring (true=neighbor_reduce)",
       __FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<bool>(
-      "JPL",
-      util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
-      false, "Use JPL exact coloring method (true=use JPL).",
-      __FILE__, __LINE__));
+  // </DONE>
 
-    GUARD_CU(parameters.Use<int>(
-      "no_conflict",
-      util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
-      false, "Resolve color conflict, 0 to skip check, 1 to check at end of
-      every iteration with random, 2 to check at end of every iteration with
-       degree, 3 to check at the end of the loop (default=0).",
-      __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<int>(
-      "hash_size",
-      util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
-      false, "Needed to allocate memory for hash function, if parameter is
-      positive, hash coloring is used instead of random coloring (default=0)",
-      __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<int>(
-         "seed",
-         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
-         time(NULL),
-         "seed for random number generator",
-         __FILE__, __LINE__));
-
-    GUARD_CU(parameters.Use<bool>(
-         "LBCOLOR",
-         util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER,
-         false,
-         "load balancing enabled for graph coloring (true=neighbor_reduce)",
-         __FILE__, __LINE__));
-
-    // </DONE>
-
-    return retval;
+  return retval;
 }
 
 /**
@@ -95,135 +88,129 @@ cudaError_t UseParameters(util::Parameters &parameters)
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT>
-cudaError_t RunTests(
-    util::Parameters &parameters,
-    GraphT           &graph,
-    // <DONE> add problem specific reference results, e.g.:
-    bool	      color_balance,
-    typename GraphT::VertexT *ref_colors,
-    // </DONE>
-    util::Location target)
-{
+cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
+                     // <DONE> add problem specific reference results, e.g.:
+                     bool color_balance, typename GraphT::VertexT *ref_colors,
+                     // </DONE>
+                     util::Location target) {
 
-    cudaError_t retval = cudaSuccess;
+  cudaError_t retval = cudaSuccess;
 
-    typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::ValueT  ValueT;
-    typedef typename GraphT::SizeT   SizeT;
-    typedef Problem<GraphT>          ProblemT;
-    typedef Enactor<ProblemT>        EnactorT;
+  typedef typename GraphT::VertexT VertexT;
+  typedef typename GraphT::ValueT ValueT;
+  typedef typename GraphT::SizeT SizeT;
+  typedef Problem<GraphT> ProblemT;
+  typedef Enactor<ProblemT> EnactorT;
 
-    // CLI parameters
-    bool quiet_mode = parameters.Get<bool>("quiet");
-    int  num_runs   = parameters.Get<int >("num-runs");
-    std::string validation = parameters.Get<std::string>("validation");
-    util::Info info("color", parameters, graph);
+  // CLI parameters
+  bool quiet_mode = parameters.Get<bool>("quiet");
+  int num_runs = parameters.Get<int>("num-runs");
+  std::string validation = parameters.Get<std::string>("validation");
+  util::Info info("color", parameters, graph);
 
-    util::CpuTimer cpu_timer, total_timer;
-    cpu_timer.Start(); total_timer.Start();
+  util::CpuTimer cpu_timer, total_timer;
+  cpu_timer.Start();
+  total_timer.Start();
 
-    // <TODO> get problem specific inputs, e.g.:
-    // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
-    // printf("RunTests: %d srcs: src[0]=%d\n", srcs.size(), srcs[0]);
-    // </TODO>
+  // <TODO> get problem specific inputs, e.g.:
+  // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+  // printf("RunTests: %d srcs: src[0]=%d\n", srcs.size(), srcs[0]);
+  // </TODO>
 
-    // <TODO> allocate problem specific host data, e.g.:
-    VertexT *h_colors = new VertexT[graph.nodes];
-    // </TODO>
+  // <TODO> allocate problem specific host data, e.g.:
+  VertexT *h_colors = new VertexT[graph.nodes];
+  // </TODO>
 
-    // Allocate problem and enactor on GPU, and initialize them
-    ProblemT problem(parameters);
-    EnactorT enactor;
-    GUARD_CU(problem.Init(graph, target));
-    GUARD_CU(enactor.Init(problem, target));
+  // Allocate problem and enactor on GPU, and initialize them
+  ProblemT problem(parameters);
+  EnactorT enactor;
+  GUARD_CU(problem.Init(graph, target));
+  GUARD_CU(enactor.Init(problem, target));
 
-    cpu_timer.Stop();
-    parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
+  cpu_timer.Stop();
+  parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
-    for (int run_num = 0; run_num < num_runs; ++run_num) {
-        GUARD_CU(problem.Reset(
-            // <TODO> problem specific data if necessary, eg:
-            // src,
-            // </TODO>
-            target
-        ));
-        GUARD_CU(enactor.Reset(
-            // <TODO> problem specific data if necessary:
-            // srcs[run_num % srcs.size()],
-            // </TODO>
-            target
-        ));
+  for (int run_num = 0; run_num < num_runs; ++run_num) {
+    GUARD_CU(problem.Reset(
+        // <TODO> problem specific data if necessary, eg:
+        // src,
+        // </TODO>
+        target));
+    GUARD_CU(enactor.Reset(
+        // <TODO> problem specific data if necessary:
+        // srcs[run_num % srcs.size()],
+        // </TODO>
+        target));
 
-        util::PrintMsg("__________________________", !quiet_mode);
-
-        cpu_timer.Start();
-        GUARD_CU(enactor.Enact(
-            // <TODO> problem specific data if necessary:
-            // srcs[run_num % srcs.size()]
-            // </TODO>
-        ));
-        cpu_timer.Stop();
-        info.CollectSingleRun(cpu_timer.ElapsedMillis());
-
-        util::PrintMsg("--------------------------\nRun "
-            + std::to_string(run_num) + " elapsed: "
-            + std::to_string(cpu_timer.ElapsedMillis()) +
-            ", #iterations = "
-            + std::to_string(enactor.enactor_slices[0]
-                .enactor_stats.iteration), !quiet_mode);
-
-        if (validation == "each") {
-
-            GUARD_CU(problem.Extract(
-                // <TODO> problem specific data
-                h_colors
-                // </TODO>
-            ));
-            SizeT num_errors = Validate_Results(
-                parameters,
-                graph,
-                // <TODO> problem specific data
-                h_colors, ref_colors,
-                // </TODO>
-                false);
-        }
-    }
+    util::PrintMsg("__________________________", !quiet_mode);
 
     cpu_timer.Start();
-
-    GUARD_CU(problem.Extract(
-        // <TODO> problem specific data
-        h_colors
+    GUARD_CU(enactor.Enact(
+        // <TODO> problem specific data if necessary:
+        // srcs[run_num % srcs.size()]
         // </TODO>
-    ));
-    if (validation == "last") {
-        SizeT num_errors = Validate_Results(
-            parameters,
-            graph,
-            // <TODO> problem specific data
-            h_colors, ref_colors,
-            // </TODO>
-            false);
+        ));
+    cpu_timer.Stop();
+    info.CollectSingleRun(cpu_timer.ElapsedMillis());
+
+    util::PrintMsg(
+        "--------------------------\nRun " + std::to_string(run_num) +
+            " elapsed: " + std::to_string(cpu_timer.ElapsedMillis()) +
+            ", #iterations = " +
+            std::to_string(enactor.enactor_slices[0].enactor_stats.iteration),
+        !quiet_mode);
+
+    if (validation == "each") {
+
+      GUARD_CU(problem.Extract(
+          // <TODO> problem specific data
+          h_colors
+          // </TODO>
+          ));
+      SizeT num_errors = Validate_Results(parameters, graph,
+                                          // <TODO> problem specific data
+                                          h_colors, ref_colors,
+                                          // </TODO>
+                                          false);
     }
+  }
 
-    // compute running statistics
-    // TODO: change NULL to problem specific per-vertex visited marker, e.g. h_distances
-    info.ComputeTraversalStats(enactor, (VertexT*)NULL);
-    //Display_Memory_Usage(problem);
-    #ifdef ENABLE_PERFORMANCE_PROFILING
-        //Display_Performance_Profiling(enactor);
-    #endif
+  cpu_timer.Start();
 
-    // Clean up
-    GUARD_CU(enactor.Release(target));
-    GUARD_CU(problem.Release(target));
-    // <TODO> Release problem specific data, e.g.:
-    delete[] h_colors; h_colors   = NULL;
-    // </TODO>
-    cpu_timer.Stop(); total_timer.Stop();
+  GUARD_CU(problem.Extract(
+      // <TODO> problem specific data
+      h_colors
+      // </TODO>
+      ));
+  if (validation == "last") {
+    SizeT num_errors = Validate_Results(parameters, graph,
+                                        // <TODO> problem specific data
+                                        h_colors, ref_colors,
+                                        // </TODO>
+                                        false);
+  }
 
-    info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
-    return retval;
+  // compute running statistics
+  // TODO: change NULL to problem specific per-vertex visited marker, e.g.
+  // h_distances
+  info.ComputeTraversalStats(enactor, (VertexT *)NULL);
+// Display_Memory_Usage(problem);
+#ifdef ENABLE_PERFORMANCE_PROFILING
+  // Display_Performance_Profiling(enactor);
+#endif
+
+  // Clean up
+  GUARD_CU(enactor.Release(target));
+  GUARD_CU(problem.Release(target));
+  // <TODO> Release problem specific data, e.g.:
+  delete[] h_colors;
+  h_colors = NULL;
+  // </TODO>
+  cpu_timer.Stop();
+  total_timer.Stop();
+
+  info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
+  return retval;
 }
 
 } // namespace color
@@ -231,7 +218,8 @@ cudaError_t RunTests(
 } // namespace gunrock
 
 // ===========================================================================================
-// ========================= CODE BELOW THIS LINE NOT NEEDED FOR TESTS =======================
+// ========================= CODE BELOW THIS LINE NOT NEEDED FOR TESTS
+// =======================
 // ===========================================================================================
 
 // /*
@@ -269,7 +257,8 @@ cudaError_t RunTests(
 
 //     int num_runs = parameters.Get<int>("num-runs");
 //     // TODO: get problem specific inputs, e.g.:
-//     // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+//     // std::vector<VertexT> srcs =
+//     parameters.Get<std::vector<VertexT>>("srcs");
 //     // int num_srcs = srcs.size();
 //     for (int run_num = 0; run_num < num_runs; ++run_num)
 //     {
@@ -294,7 +283,6 @@ cudaError_t RunTests(
 //     // srcs.clear();
 //     return total_time;
 // }
-
 
 //  * @brief Simple interface take in graph as CSR format
 //  * @param[in]  num_nodes   Number of veritces in the input graph
@@ -359,7 +347,8 @@ cudaError_t RunTests(
 
 //     // Run the Template
 //     // TODO: add problem specific outputs, e.g.
-//     double elapsed_time = gunrock_Template(parameters, graph /*, distances*/);
+//     double elapsed_time = gunrock_Template(parameters, graph /*,
+//     distances*/);
 
 //     // Cleanup
 //     graph.Release();
