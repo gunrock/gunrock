@@ -369,10 +369,10 @@ struct ColorIterationLoop
     auto iter = enactor_slices[0].enactor_stats.iteration;
     auto usr_iter = data_slice.usr_iter;
     auto &graph = data_slice.sub_graph[0];
-    printf("Max Iteration: %d\n", usr_iter);
-    printf("Iteration: %d\n", iter);
-    printf("colored_: %d\n", data_slice.colored_);
-    printf("Num Nodes: %d\n", graph.nodes);
+    //printf("Max Iteration: %d\n", usr_iter);
+    //printf("Iteration: %d\n", iter);
+    //printf("colored_: %d\n", data_slice.colored_);
+    //printf("Num Nodes: %d\n", graph.nodes);
 
     // old stop condition
     // if(data_slice.colored_ >= graph.nodes)

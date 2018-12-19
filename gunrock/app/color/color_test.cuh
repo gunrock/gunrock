@@ -156,13 +156,15 @@ Validate_Results(util::Parameters &parameters, GraphT &graph,
 
   SizeT num_errors = 0;
   bool quiet = parameters.Get<bool>("quiet");
-
+  bool quick = parameters.Get<bool>("quick");
   // <TODO> result validation and display
+  if(!quick){
   printf("Comparison: <node idx, gunrock, cpu>\n");
   for (SizeT v = 0; v < graph.nodes; ++v) {
     printf(" %d %d %d\n", v, h_colors[v], ref_colors[v]);
   }
   // </TODO>
+}
 
   if (num_errors == 0) {
     util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);

@@ -18,7 +18,7 @@ test: $(EXEC)
 
 $(EXEC) : test_$(ALGO).cu $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O0 -g -G
 
 a : test_$(ALGO).cu $(DEPS)
 	mkdir -p bin
