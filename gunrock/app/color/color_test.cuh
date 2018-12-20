@@ -22,6 +22,7 @@
 #include <curand.h>
 #include <curand_kernel.h>
 
+#include <bits/stdc++.h>
 #include <omp.h>
 
 namespace gunrock {
@@ -78,14 +79,14 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
         for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
           VertexT u = graph.GetEdgeDest(e);
           if ((colors[u] == -1) && (rand[u] >= temp)) {
-            printf("Max: Node %d with %f defeated by node %d with %f\n", v,
-                   rand[v], u, rand[u]);
+            //  printf("Max: Node %d with %f defeated by node %d with %f\n", v,
+            // rand[v], u, rand[u]);
             colormax = false;
           }
 
           if ((colors[u] == -1) && (rand[u] <= temp)) {
-            printf("Min: Node %d with %f defeated by node %d with %f\n", v,
-                   rand[v], u, rand[u]);
+            // printf("Min: Node %d with %f defeated by node %d with %f\n", v,
+            // rand[v], u, rand[u]);
             colormin = false;
           }
         }
@@ -114,7 +115,7 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
           if (rand[u] < temp)
             min = u;
 
-          printf("Let's see what rand[u] = %f\n", rand[u]);
+          // printf("Let's see what rand[u] = %f\n", rand[u]);
           temp = rand[u];
         }
 
@@ -124,9 +125,9 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
         if (colors[min] == -1)
           colors[min] = iteration * 2 + 2;
 
-        printf("iteration number = %u\n", iteration);
-        printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min],
-               colors[max]);
+        // printf("iteration number = %u\n", iteration);
+        // printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min],
+        //       colors[max]);
       }
     }
   }
@@ -157,14 +158,37 @@ Validate_Results(util::Parameters &parameters, GraphT &graph,
   SizeT num_errors = 0;
   bool quiet = parameters.Get<bool>("quiet");
   bool quick = parameters.Get<bool>("quick");
-  // <TODO> result validation and display
-  if(!quick){
-  printf("Comparison: <node idx, gunrock, cpu>\n");
-  for (SizeT v = 0; v < graph.nodes; ++v) {
-    printf(" %d %d %d\n", v, h_colors[v], ref_colors[v]);
+
+  // validating result with cpu and check for conflict
+  if (!quick) {
+    printf("Comparison: <node idx, gunrock, cpu>\n");
+    for (SizeT v = 0; v < graph.nodes; v++) {
+      printf(" \t \t %d \t %d \t %d\n", v, h_colors[v], ref_colors[v]);
+
+      SizeT start_edge = graph.GetNeighborListOffset(v);
+      SizeT num_neighbors = graph.GetNeighborListLength(v);
+
+      for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+        VertexT u = graph.GetEdgeDest(e);
+        if (h_colors[u] == h_colors[v] || h_colors[v] == 0) {
+          num_errors += 1;
+        }
+      }
+    }
   }
-  // </TODO>
-}
+
+  // count number of colors
+  int num_colors = 0;
+  std::unordered_set<int> set;
+  for (SizeT v = 0; v < graph.nodes; v++) {
+    int c = h_colors[v];
+    if (set.find(c) == set.end()) {
+      set.insert(c);
+      num_colors++;
+    }
+  }
+
+  printf("Number of colors needed for GPU implementation: %d\n", num_colors);
 
   if (num_errors == 0) {
     util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);

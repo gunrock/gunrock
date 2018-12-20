@@ -36,8 +36,12 @@ cudaError_t UseParameters(util::Parameters &parameters) {
 
   // <DONE> add app specific parameters, eg:
 
+  GUARD_CU(parameters.Use<bool>(
+      "test-run", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
+      "Perform test run to atomically generate max iteration", __FILE__, __LINE__));
+
   GUARD_CU(parameters.Use<int>(
-      "usr_iter",
+      "user-iter",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       3, "Number of iterations color should run for (default=3).", __FILE__,
       __LINE__));
@@ -47,16 +51,16 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       "Use JPL exact coloring method (true=use JPL).", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
-      "no_conflict", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
+      "no-conflict", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
       "Resolve color conflict, 0 to skip check, 1 to check at end of
       every iteration with random,
-      2 to check at end of every iteration with degree (default = 0)
+      2 to check at end of every iteration with degree(default = 0)
           .",
       __FILE__,
       __LINE__));
 
   GUARD_CU(parameters.Use<int>(
-      "hash_size", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
+      "hash-size", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
       "Needed to allocate memory for hash function, if parameter is
       positive,
       hash coloring is used instead of random coloring(default = 0) ",

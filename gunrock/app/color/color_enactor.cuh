@@ -95,6 +95,7 @@ struct ColorIterationLoop
     auto &use_jpl = data_slice.use_jpl;
     auto &no_conflict = data_slice.no_conflict;
     auto &hash_size = data_slice.hash_size;
+    auto &test_run = data_slice.test_run;
     // </DONE>
 
     curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
@@ -175,66 +176,72 @@ struct ColorIterationLoop
       funtion or iteration.
       */
       // =======================================================================
-      auto color_op = [graph, colors, rand, iteration, hash_size, prohibit] __host__ __device__(
-                          VertexT * v_q, const SizeT &pos) {
-        VertexT v = v_q[pos];
-        SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
-        SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-        ValueT temp = rand[v];
+      auto color_op =
+          [graph, colors, rand, iteration, hash_size, prohibit] __host__
+          __device__(VertexT * v_q, const SizeT &pos) {
+            VertexT v = v_q[pos];
+            SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
+            SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+            ValueT temp = rand[v];
 
-        VertexT max = v; // active max vertex
-        VertexT min = v; // active min vertex
+            VertexT max = v; // active max vertex
+            VertexT min = v; // active min vertex
 
-        for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-          VertexT u = graph.CsrT::GetEdgeDest(e);
-          if (rand[u] > temp)
-            max = u;
+            for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+              VertexT u = graph.CsrT::GetEdgeDest(e);
+              if (rand[u] > temp)
+                max = u;
 
-          if (rand[u] < temp)
-            min = u;
+              if (rand[u] < temp)
+                min = u;
 
-          // printf("Let's see what rand[u] = %f\n", rand[u]);
-          temp = rand[u]; // compare against e-1
-        }
+              // printf("Let's see what rand[u] = %f\n", rand[u]);
+              temp = rand[u]; // compare against e-1
+            }
 
-        //max hash coloring
-        SizeT prohibit_offset = max * hash_size;
-        for(int c = 1, n = 0; (c < iteration * 2 + 1) || (n < hash_size) ; c++, n++) {
-          if(prohibit[prohibit_offset + n] != c) {
-            colors[max] = c;
-            break;
-          }
-        }
+            // max hash coloring
+            SizeT prohibit_offset = max * hash_size;
+            for (int c = 1, n = 0; (c < iteration * 2 + 1) || (n < hash_size);
+                 c++, n++) {
+              if (prohibit[prohibit_offset + n] != c) {
+                colors[max] = c;
+                break;
+              }
+            }
 
-        //min hash coloring
-        prohibit_offset = min * hash_size;
-        for(int c = 1, n = 0; (c < iteration * 2 + 1) || (n < hash_size) ; c++, n++) {
-          if(prohibit[prohibit_offset + n] != c) {
-            colors[min] = c;
-            break;
-          }
-        }
+            // min hash coloring
+            prohibit_offset = min * hash_size;
+            for (int c = 1, n = 0; (c < iteration * 2 + 1) || (n < hash_size);
+                 c++, n++) {
+              if (prohibit[prohibit_offset + n] != c) {
+                colors[min] = c;
+                break;
+              }
+            }
 
-        // if hash coloring fail because not enough space, fall back to color by iteration
-        if (!util::isValid(colors[max]))
-          colors[max] = iteration * 2 + 1;
+            // if hash coloring fail because not enough space, fall back to
+            // color by iteration
+            if (!util::isValid(colors[max]))
+              colors[max] = iteration * 2 + 1;
 
-        if (!util::isValid(colors[min]))
-          colors[min] = iteration * 2 + 2;
-      };
+            if (!util::isValid(colors[min]))
+              colors[min] = iteration * 2 + 2;
+          };
 
       // =======================================================================
       /* gen_op
-      @Description: populate @prohibit list with first @hash_size^th neighbor colors
-      TODO: test if there is error if the degree of a vertex is less than @hash_size.
-      Each thread handle one element inside @prohibit, no thread divergence.
+      @Description: populate @prohibit list with first @hash_size^th neighbor
+      colors
+      TODO: test if there is error if the degree of a vertex is less than
+      @hash_size. Each thread handle one element inside @prohibit, no thread
+      divergence.
       */
       // =======================================================================
       auto gen_op = [graph, colors, hash_size] __host__ __device__(
                         VertexT * prohibit_, const SizeT &pos) {
         VertexT v = pos / hash_size;
         SizeT a_idx = pos % hash_size;
-        SizeT e  = graph.CsrT::GetNeighborListOffset(v) + a_idx;
+        SizeT e = graph.CsrT::GetNeighborListOffset(v) + a_idx;
 
         VertexT u = graph.CsrT::GetEdgeDest(e);
         prohibit_[pos] = colors[u];
@@ -277,7 +284,8 @@ struct ColorIterationLoop
 
       // =======================================================================
       /* jpl_color_op
-      @Description: jpl vertex coloring operation. No conflict resolution is needed
+      @Description: jpl vertex coloring operation. No conflict resolution is
+      needed
       */
       // =======================================================================
       auto jpl_color_op = [graph, colors, rand, iteration] __host__ __device__(
@@ -339,12 +347,9 @@ struct ColorIterationLoop
         if (no_conflict == 1 || no_conflict == 2) {
 
           // optinal coloring by hash function n * hash_size (non-exact)
-          if(hash_size != 0)
+          if (hash_size != 0)
             GUARD_CU(prohibit.ForAll(gen_op, graph.nodes * hash_size,
                                      util::DEVICE, oprtr_parameters.stream));
-
-          // optional coloring by hash function e (non-exact)
-          // TODO
 
           GUARD_CU(frontier.V_Q()->ForAll(resolve_op, frontier.queue_length,
                                           util::DEVICE,
@@ -352,12 +357,16 @@ struct ColorIterationLoop
         }
       }
 
-      GUARD_CU(frontier.V_Q()->ForAll(status_op, frontier.queue_length,
-                                      util::DEVICE, oprtr_parameters.stream));
+      if(test_run) {
 
-      GUARD_CU(data_slice.colored.SetPointer(&data_slice.colored_,
-                                             sizeof(SizeT), util::HOST));
-      GUARD_CU(data_slice.colored.Move(util::DEVICE, util::HOST));
+        GUARD_CU(frontier.V_Q()->ForAll(status_op, frontier.queue_length,
+                                        util::DEVICE, oprtr_parameters.stream));
+
+        GUARD_CU(data_slice.colored.SetPointer(&data_slice.colored_,
+                                               sizeof(SizeT), util::HOST));
+
+        GUARD_CU(data_slice.colored.Move(util::DEVICE, util::HOST));
+      }
     }
 
     return retval;
@@ -367,20 +376,18 @@ struct ColorIterationLoop
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
     auto &enactor_slices = this->enactor->enactor_slices;
     auto iter = enactor_slices[0].enactor_stats.iteration;
-    auto usr_iter = data_slice.usr_iter;
+    auto user_iter = data_slice.user_iter;
     auto &graph = data_slice.sub_graph[0];
-    //printf("Max Iteration: %d\n", usr_iter);
-    //printf("Iteration: %d\n", iter);
-    //printf("colored_: %d\n", data_slice.colored_);
-    //printf("Num Nodes: %d\n", graph.nodes);
+    auto test_run = data_slice.test_run;
 
-    // old stop condition
-    // if(data_slice.colored_ >= graph.nodes)
-    //   return true;
-
-    // user defined stop condition
-    if (iter == usr_iter)
+    if (test_run && data_slice.colored_ >= graph.nodes) {
+      printf("Max iteration: %d\n", iter);
       return true;
+    }
+    // user defined stop condition
+    else if (!test_run && iter == user_iter)
+      return true;
+
 
     return false;
   }
