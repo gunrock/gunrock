@@ -10,9 +10,9 @@ read -p "--test-run: " test_run
 ./bin/test_color_10.0_x86_64 --graph-type=market \
 --graph-file=../../dataset/small/test_cc.mtx \
 --JPL=$JPL \
---no_conflict=$no_conflict \
+--no-conflict=$no_conflict \
 --seed=$seed \
---usr_iter=$usr_iter \
---hash_size=$hash_size \
+--usr-iter=$usr_iter \
+--hash-size=$hash_size \
 --quick=$quick \
 --test-run=$test_run

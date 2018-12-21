@@ -378,7 +378,7 @@ struct ColorIterationLoop
     auto user_iter = data_slice.user_iter;
     auto &graph = data_slice.sub_graph[0];
     auto test_run = data_slice.test_run;
-    printf("DEBUG: iteration number %d, colored: %d\n", iter, data_slice.colored_);
+    //printf("DEBUG: iteration number %d, colored: %d\n", iter, data_slice.colored_);
     if (test_run && (data_slice.colored_ >= graph.nodes)) {
       printf("Max iteration: %d\n", iter);
       return true;
@@ -616,3 +616,4 @@ public:
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
+
