@@ -321,9 +321,9 @@ struct ColorIterationLoop
       auto status_op = [colors, colored] __host__ __device__(VertexT * v_q,
                                                              const SizeT &pos) {
         VertexT v = v_q[pos];
-
-        if (util::isValid(colors[v]))
+        if (util::isValid(colors[v])) {
           atomicAdd(&colored[0], 1);
+        }
       };
 
       //======================================================================//
@@ -358,7 +358,6 @@ struct ColorIterationLoop
       }
 
       if(test_run) {
-
         GUARD_CU(frontier.V_Q()->ForAll(status_op, frontier.queue_length,
                                         util::DEVICE, oprtr_parameters.stream));
 
@@ -379,13 +378,13 @@ struct ColorIterationLoop
     auto user_iter = data_slice.user_iter;
     auto &graph = data_slice.sub_graph[0];
     auto test_run = data_slice.test_run;
-
-    if (test_run && data_slice.colored_ >= graph.nodes) {
+    printf("DEBUG: iteration number %d, colored: %d\n", iter, data_slice.colored_);
+    if (test_run && (data_slice.colored_ >= graph.nodes)) {
       printf("Max iteration: %d\n", iter);
       return true;
     }
     // user defined stop condition
-    else if (!test_run && iter == user_iter)
+    else if (!test_run && (iter == user_iter))
       return true;
 
 

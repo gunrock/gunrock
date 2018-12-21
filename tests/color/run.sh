@@ -8,7 +8,7 @@ read -p "--graph-file:" graph_file
 read -p "--quick:" quick
 read -p "--test-run: " test_run
 ./bin/test_color_10.0_x86_64 --graph-type=market \
---graph-file=graph_file  \
+--graph-file=../../dataset/small/test_cc.mtx \
 --JPL=$JPL \
 --no_conflict=$no_conflict \
 --seed=$seed \
