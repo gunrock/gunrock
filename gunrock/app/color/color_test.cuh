@@ -49,10 +49,10 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::VertexT VertexT;
   curandGenerator_t gen;
-  auto usr_iter = parameters.Get<int>("usr_iter");
+  auto usr_iter = parameters.Get<int>("user-iter");
   auto seed = parameters.Get<int>("seed");
   auto use_jpl = parameters.Get<bool>("JPL");
-  auto no_conflict = parameters.Get<int>("no_conflict");
+  auto no_conflict = parameters.Get<int>("no-conflict");
 
   util::CpuTimer cpu_timer;
   cpu_timer.Start();
@@ -161,17 +161,19 @@ Validate_Results(util::Parameters &parameters, GraphT &graph,
 
   // validating result with cpu and check for conflict
   if (!quick) {
+    printf("Validating result ...  \n");
     printf("Comparison: <node idx, gunrock, cpu>\n");
     for (SizeT v = 0; v < graph.nodes; v++) {
-      printf(" \t \t %d \t %d \t %d\n", v, h_colors[v], ref_colors[v]);
+      //printf(" \t \t %d \t %d \t %d\n", v, h_colors[v], ref_colors[v]);
 
       SizeT start_edge = graph.GetNeighborListOffset(v);
       SizeT num_neighbors = graph.GetNeighborListLength(v);
 
       for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
         VertexT u = graph.GetEdgeDest(e);
-        if (h_colors[u] == h_colors[v] || h_colors[v] == 0) {
+        if (h_colors[u] == h_colors[v] || h_colors[v] == -1) {
           num_errors += 1;
+          printf("neighbor id  %d, neighbor color %d, my id %d,  my color %d\n", u, h_colors[u], v, h_colors[v]);
         }
       }
     }

@@ -99,7 +99,6 @@ struct ColorIterationLoop
     // </DONE>
 
     curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
-
     // --
     // Define operations
 
@@ -294,18 +293,20 @@ struct ColorIterationLoop
         SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
         SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
         ValueT temp = rand[v];
-
+        //printf("DEBUG: iteration: %d, pos: %d, node: %d, rand: %f \n", iteration, pos, v, temp);
         if (!util::isValid(colors[v])) {
           bool colormax = true;
           bool colormin = true;
           for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
             VertexT u = graph.CsrT::GetEdgeDest(e);
-            if (!util::isValid(colors[u]) && rand[u] >= temp)
-              colormax = false;
-            if (!util::isValid(colors[u]) && rand[u] <= temp)
+            // printf("DEBUG: node %d, neighbor %d\n",v,u);
+            //printf("DEBUG: node %d, color: %d\n", v, colors[v]);
+            if (!util::isValid(colors[u]) && (rand[u] > temp)){
+            //printf("DEBUG: u: %d, v: %d\n", u, v);
+              colormax = false;}
+            if (!util::isValid(colors[u]) && (rand[u] < temp))
               colormin = false;
           }
-
           if (colormax)
             colors[v] = iteration * 2 + 1;
           if (colormin)
@@ -332,13 +333,14 @@ struct ColorIterationLoop
 
       // JPL exact method
       if (use_jpl) {
-
+        //printf("DEBUG: frontier length %d\n", frontier.queue_length);
         GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
                                         util::DEVICE, oprtr_parameters.stream));
       }
 
       // Current method in development
       else {
+        //printf("DEBUG: Using Developed Method\n");
         // color by max and min independent set, non-exactsolution
         GUARD_CU(frontier.V_Q()->ForAll(color_op, frontier.queue_length,
                                         util::DEVICE, oprtr_parameters.stream));
@@ -358,6 +360,13 @@ struct ColorIterationLoop
       }
 
       if(test_run) {
+        //printf("DEBUG: determining number of iteration\n");
+        GUARD_CU(data_slice.colored.ForAll(
+          [] __host__ __device__ (SizeT * x, const VertexT &pos) { x[pos] = 0; },
+          1, util::DEVICE, oprtr_parameters.stream));
+
+        cudaStreamSynchronize(oprtr_parameters.stream);
+
         GUARD_CU(frontier.V_Q()->ForAll(status_op, frontier.queue_length,
                                         util::DEVICE, oprtr_parameters.stream));
 
