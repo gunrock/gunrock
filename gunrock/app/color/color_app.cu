@@ -38,7 +38,8 @@ cudaError_t UseParameters(util::Parameters &parameters) {
 
   GUARD_CU(parameters.Use<bool>(
       "test-run", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
-      "Perform test run to atomically generate max iteration", __FILE__, __LINE__));
+      "Perform test run to atomically generate max iteration", __FILE__,
+      __LINE__));
 
   GUARD_CU(parameters.Use<int>(
       "user-iter",

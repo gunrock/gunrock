@@ -85,7 +85,6 @@ struct ColorIterationLoop
     auto &retval = enactor_stats.retval;
     auto &iteration = enactor_stats.iteration;
 
-    // <DONE> add problem specific data alias here:
     auto &colors = data_slice.colors;
     auto &rand = data_slice.rand;
     auto &prohibit = data_slice.prohibit;
@@ -96,67 +95,14 @@ struct ColorIterationLoop
     auto &no_conflict = data_slice.no_conflict;
     auto &hash_size = data_slice.hash_size;
     auto &test_run = data_slice.test_run;
-    // </DONE>
+
+    auto stream = oprtr_parameters.stream;
 
     curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
     // --
     // Define operations
 
     if (color_balance) {
-
-#if 0
-        // advance operation
-        auto advance_op = [
-            colors,
-            rand
-        ] __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            // <TODO> Implement advance operation
-
-            // Mark src and dest as visited
-            atomicMax(visited + src, 1);
-            auto dest_visited = atomicMax(visited + dest, 1);
-
-            // Increment degree of src
-            atomicAdd(degrees + src, 1);
-
-            // Add dest to queue if previously unsen
-            return dest_visited == 0;
-
-            // </TODO>
-        };
-
-
-	oprtr_parameters.reduce_values_out   = &rand_max;
-	oprtr_parameters.reduce_reset        = true;
-        oprtr_parameters.reduce_values_temp  = &color_temp;
- 	oprtr_parameters.reduce_values_temp2 = &color_temp2;
-
-        frontier.queue_length = graph.nodes;
-        frontier.queue_reset  = true;
-
-        GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
-                oprtr::OprtrMode_REDUCE_TO_SRC | oprtr::ReduceOp_Maximum>(
-                graph, null_ptr, null_ptr,
-                oprtr_parameters, advance_op,
-                []__host__ __device__ (const ValueT &a, const ValueT &b)
-                {
-                    return (a < b) ? b : a;
-         }, (ValueT)0));
-
-        // --
-        // Run
-
-        // <TODO> some of this may need to be edited depending on algorithmic needs
-        // !! How much variation between apps is there in these calls?
-
-        GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-            oprtr_parameters, advance_op, filter_op));
-#endif
 
       // Get back the resulted frontier length
       // GUARD_CU(frontier.work_progress.GetQueueLength(
@@ -290,28 +236,31 @@ struct ColorIterationLoop
       auto jpl_color_op = [graph, colors, rand, iteration] __host__ __device__(
                               VertexT * v_q, const SizeT &pos) {
         VertexT v = v_q[pos];
+        if (util::isValid(colors[v]))
+          return;
+
         SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
         SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-        ValueT temp = rand[v];
-        //printf("DEBUG: iteration: %d, pos: %d, node: %d, rand: %f \n", iteration, pos, v, temp);
-        if (!util::isValid(colors[v])) {
-          bool colormax = true;
-          bool colormin = true;
-          for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-            VertexT u = graph.CsrT::GetEdgeDest(e);
-            // printf("DEBUG: node %d, neighbor %d\n",v,u);
-            //printf("DEBUG: node %d, color: %d\n", v, colors[v]);
-            if (!util::isValid(colors[u]) && (rand[u] > temp)){
-            //printf("DEBUG: u: %d, v: %d\n", u, v);
-              colormax = false;}
-            if (!util::isValid(colors[u]) && (rand[u] < temp))
-              colormin = false;
-          }
-          if (colormax)
-            colors[v] = iteration * 2 + 1;
-          if (colormin)
-            colors[v] = iteration * 2 + 2;
+
+        bool colormax = true;
+        bool colormin = true;
+
+        for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+          VertexT u = graph.CsrT::GetEdgeDest(e);
+
+          if ((util::isValid(colors[v])) && (colors[u] != iteration) ||
+              (v == u))
+            continue;
+          if (rand[v] <= rand[u])
+            colormax = false;
+          if (rand[v] >= rand[u])
+            colormin = false;
         }
+
+        if (colormax)
+          colors[v] = iteration * 2 + 1;
+        if (colormin)
+          colors[v] = iteration * 2 + 2;
       };
 
       // =======================================================================
@@ -333,47 +282,50 @@ struct ColorIterationLoop
 
       // JPL exact method
       if (use_jpl) {
-        //printf("DEBUG: frontier length %d\n", frontier.queue_length);
+        // printf("DEBUG: frontier length %d\n", frontier.queue_length);
         GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
-                                        util::DEVICE, oprtr_parameters.stream));
+                                        util::DEVICE, stream));
       }
 
       // Current method in development
       else {
-        //printf("DEBUG: Using Developed Method\n");
+        // printf("DEBUG: Using Developed Method\n");
         // color by max and min independent set, non-exactsolution
         GUARD_CU(frontier.V_Q()->ForAll(color_op, frontier.queue_length,
-                                        util::DEVICE, oprtr_parameters.stream));
-
-        // optional resolution to make method exact solution
-        if (no_conflict == 1 || no_conflict == 2) {
-
-          // optinal coloring by hash function n * hash_size (non-exact)
-          if (hash_size != 0)
-            GUARD_CU(prohibit.ForAll(gen_op, graph.nodes * hash_size,
-                                     util::DEVICE, oprtr_parameters.stream));
-
-          GUARD_CU(frontier.V_Q()->ForAll(resolve_op, frontier.queue_length,
-                                          util::DEVICE,
-                                          oprtr_parameters.stream));
-        }
+                                        util::DEVICE, stream));
       }
 
-      if(test_run) {
-        //printf("DEBUG: determining number of iteration\n");
-        GUARD_CU(data_slice.colored.ForAll(
-          [] __host__ __device__ (SizeT * x, const VertexT &pos) { x[pos] = 0; },
-          1, util::DEVICE, oprtr_parameters.stream));
+      // optional resolution to make method exact solution
+      if (no_conflict == 1 || no_conflict == 2) {
 
-        cudaStreamSynchronize(oprtr_parameters.stream);
+        // optinal coloring by hash function n * hash_size (non-exact)
+        if (hash_size != 0)
+          GUARD_CU(prohibit.ForAll(gen_op, graph.nodes * hash_size,
+                                   util::DEVICE, stream));
+
+        GUARD_CU(frontier.V_Q()->ForAll(resolve_op, frontier.queue_length,
+                                        util::DEVICE, stream));
+      }
+
+      if (test_run) {
+        // printf("DEBUG: determining number of iteration\n");
+        GUARD_CU(data_slice.colored.ForAll(
+            [] __host__ __device__(SizeT * x, const VertexT &pos) {
+              x[pos] = 0;
+            },
+            1, util::DEVICE, stream));
+
+        GUARD_CU2(cudaStreamSynchronize(stream),
+                  "cudaStreamSynchronize failed");
 
         GUARD_CU(frontier.V_Q()->ForAll(status_op, frontier.queue_length,
-                                        util::DEVICE, oprtr_parameters.stream));
+                                        util::DEVICE, stream));
 
-        GUARD_CU(data_slice.colored.SetPointer(&data_slice.colored_,
-                                               sizeof(SizeT), util::HOST));
-
+        GUARD_CU2(cudaStreamSynchronize(stream),
+                  "cudaStreamSynchronize failed");
         GUARD_CU(data_slice.colored.Move(util::DEVICE, util::HOST));
+        GUARD_CU2(cudaStreamSynchronize(stream),
+                  "cudaStreamSynchronize failed");
       }
     }
 
@@ -387,17 +339,17 @@ struct ColorIterationLoop
     auto user_iter = data_slice.user_iter;
     auto &graph = data_slice.sub_graph[0];
     auto test_run = data_slice.test_run;
-    //printf("DEBUG: iteration number %d, colored: %d\n", iter, data_slice.colored_);
-    if (test_run && (data_slice.colored_ >= graph.nodes)) {
-      printf("Max iteration: %d\n", iter);
-      return true;
-    }
-    // user defined stop condition
-    else if (!test_run && (iter == user_iter))
-      return true;
+    // printf("DEBUG: iteration number %d, colored: %d\n", iter,
+           data_slice.colored[0]);
+           if (test_run && (data_slice.colored[0] >= graph.nodes)) {
+             printf("Max iteration: %d\n", iter);
+             return true;
+           }
+           // user defined stop condition
+           else if (!test_run && (iter == user_iter))
+             return true;
 
-
-    return false;
+           return false;
   }
 
   /**
@@ -625,4 +577,3 @@ public:
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-

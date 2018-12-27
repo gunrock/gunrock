@@ -27,9 +27,7 @@
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace color {
-// </DONE>
 
 /******************************************************************************
  * Color Testing Routines
@@ -164,7 +162,7 @@ Validate_Results(util::Parameters &parameters, GraphT &graph,
     printf("Validating result ...  \n");
     printf("Comparison: <node idx, gunrock, cpu>\n");
     for (SizeT v = 0; v < graph.nodes; v++) {
-      //printf(" \t \t %d \t %d \t %d\n", v, h_colors[v], ref_colors[v]);
+      // printf(" \t \t %d \t %d \t %d\n", v, h_colors[v], ref_colors[v]);
 
       SizeT start_edge = graph.GetNeighborListOffset(v);
       SizeT num_neighbors = graph.GetNeighborListLength(v);
@@ -173,7 +171,8 @@ Validate_Results(util::Parameters &parameters, GraphT &graph,
         VertexT u = graph.GetEdgeDest(e);
         if (h_colors[u] == h_colors[v] || h_colors[v] == -1) {
           num_errors += 1;
-          printf("neighbor id  %d, neighbor color %d, my id %d,  my color %d\n", u, h_colors[u], v, h_colors[v]);
+          printf("neighbor id  %d, neighbor color %d, my id %d,  my color %d\n",
+                 u, h_colors[u], v, h_colors[v]);
         }
       }
     }

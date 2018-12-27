@@ -200,7 +200,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(colored.ForAll(
           [] __host__ __device__(SizeT * x, const VertexT &pos) { x[pos] = 0; },
-          1, target, this->stream));
+          1, util::HOST | target, this->stream));
 
       this->colored_ = 0;
       // </TODO>
@@ -232,7 +232,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     color_balance = _parameters.Get<bool>("LBCOLOR");
     user_iter = _parameters.Get<int>("user-iter");
     test_run = _parameters.Get<bool>("test-run");
-    use_jpl =  _parameters.Get<bool>("JPL");
+    use_jpl = _parameters.Get<bool>("JPL");
     no_conflict = _parameters.Get<int>("no-conflict");
     hash_size = _parameters.Get<int>("hash-size");
     // </DONE>
