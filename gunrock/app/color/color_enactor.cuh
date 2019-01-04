@@ -98,7 +98,7 @@ struct ColorIterationLoop
 
     auto stream = oprtr_parameters.stream;
 
-    curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
+    // curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
     // --
     // Define operations
 
@@ -248,19 +248,19 @@ struct ColorIterationLoop
         for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
           VertexT u = graph.CsrT::GetEdgeDest(e);
 
-          if ((util::isValid(colors[v])) && (colors[u] != iteration) ||
+          if ((util::isValid(colors[u])) && (colors[u] != iteration) ||
               (v == u))
             continue;
           if (rand[v] <= rand[u])
             colormax = false;
-          if (rand[v] >= rand[u])
-            colormin = false;
+          //if (rand[v] >= rand[u])
+          //  colormin = false;
         }
 
         if (colormax)
-          colors[v] = iteration * 2 + 1;
-        if (colormin)
-          colors[v] = iteration * 2 + 2;
+          colors[v] = iteration;
+        //if (colormin)
+        //  colors[v] = iteration * 2 + 2;
       };
 
       // =======================================================================
@@ -340,7 +340,7 @@ struct ColorIterationLoop
     auto &graph = data_slice.sub_graph[0];
     auto test_run = data_slice.test_run;
     // printf("DEBUG: iteration number %d, colored: %d\n", iter,
-           data_slice.colored[0]);
+    //       data_slice.colored[0]);
            if (test_run && (data_slice.colored[0] >= graph.nodes)) {
              printf("Max iteration: %d\n", iter);
              return true;

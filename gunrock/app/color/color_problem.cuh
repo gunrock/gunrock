@@ -16,6 +16,9 @@
 
 #include <gunrock/app/problem_base.cuh>
 
+#include <curand.h>
+#include <curand_kernel.h>
+
 namespace gunrock {
 namespace app {
 namespace color {
@@ -198,12 +201,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           rand.ForEach([] __host__ __device__(float &x) { x = (float)0.0f; },
                        nodes, target, this->stream));
 
+	curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), nodes);
+
       GUARD_CU(colored.ForAll(
           [] __host__ __device__(SizeT * x, const VertexT &pos) { x[pos] = 0; },
           1, util::HOST | target, this->stream));
 
       this->colored_ = 0;
-      // </TODO>
 
       return retval;
     }
