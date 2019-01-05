@@ -21,18 +21,14 @@
 #include <gunrock/util/sort_device.cuh>
 #include <gunrock/util/track_utils.cuh>
 
-// <DONE> change includes
 #include <gunrock/app/color/color_problem.cuh>
 
 #include <curand.h>
 #include <curand_kernel.h>
-// </DONE>
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace color {
-// </DONE>
 
 /**
  * @brief Speciflying parameters for hello Enactor
@@ -95,6 +91,7 @@ struct ColorIterationLoop
     auto &no_conflict = data_slice.no_conflict;
     auto &hash_size = data_slice.hash_size;
     auto &test_run = data_slice.test_run;
+    auto &min_color = data_slice.min_color;
 
     auto stream = oprtr_parameters.stream;
 
@@ -177,7 +174,6 @@ struct ColorIterationLoop
       /* gen_op
       @Description: populate @prohibit list with first @hash_size^th neighbor
       colors
-      TODO: test if there is error if the degree of a vertex is less than
       @hash_size. Each thread handle one element inside @prohibit, no thread
       divergence.
       */
@@ -205,10 +201,10 @@ struct ColorIterationLoop
         SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
         SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
 
-        if (!util::isValid(colors[v])) {
+        if (util::isValid(colors[v])) {
           for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
             VertexT u = graph.CsrT::GetEdgeDest(e);
-            if (!util::isValid(colors[u]) && colors[u] == colors[v]) {
+            if (colors[u] == colors[v]) {
 
               // decide by random number
               if (rand[u] >= rand[v] && no_conflict == 1) {
@@ -233,7 +229,7 @@ struct ColorIterationLoop
       needed
       */
       // =======================================================================
-      auto jpl_color_op = [graph, colors, rand, iteration] __host__ __device__(
+      auto jpl_color_op = [graph, colors, rand, iteration, min_color] __host__ __device__(
                               VertexT * v_q, const SizeT &pos) {
         VertexT v = v_q[pos];
         if (util::isValid(colors[v]))
@@ -244,23 +240,28 @@ struct ColorIterationLoop
 
         bool colormax = true;
         bool colormin = true;
-
+        int  color = iteration * 2;
         for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
           VertexT u = graph.CsrT::GetEdgeDest(e);
-
-          if ((util::isValid(colors[u])) && (colors[u] != iteration) ||
-              (v == u))
+          
+          if ((util::isValid(colors[u])) && (colors[u] != color + 1) && (colors[u] != color + 2) || 
+	      (v == u))
             continue;
           if (rand[v] <= rand[u])
             colormax = false;
-          //if (rand[v] >= rand[u])
-          //  colormin = false;
+	  if (min_color) {
+            if (rand[v] >= rand[u])
+              colormin = false;
+  	  }
         }
 
         if (colormax)
-          colors[v] = iteration;
-        //if (colormin)
-        //  colors[v] = iteration * 2 + 2;
+          colors[v] = color + 1;
+	if (min_color) {
+          if (colormin)
+            //printf("DEBUG: coloring with min\n");
+            colors[v] = color + 2;
+         }
       };
 
       // =======================================================================
@@ -285,6 +286,10 @@ struct ColorIterationLoop
         // printf("DEBUG: frontier length %d\n", frontier.queue_length);
         GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
                                         util::DEVICE, stream));
+        if (min_color) {
+	  //GUARD_CU(frontier.V_Q()->ForAll(resolve_op, frontier.queue_length,
+		//			   util::DEVICE, stream));
+        }
       }
 
       // Current method in development
@@ -372,16 +377,11 @@ struct ColorIterationLoop
         this->enactor
             ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
     // auto iteration = enactor_slice.enactor_stats.iteration;
-    // TODO: add problem specific data alias here, e.g.:
     // auto         &distances          =   data_slice.distances;
 
-    auto expand_op = [
-                         // TODO: pass data used by the lambda, e.g.:
-                         // distances
-    ] __host__ __device__(VertexT & key, const SizeT &in_pos,
+    auto expand_op = []  __host__ __device__(VertexT & key, const SizeT &in_pos,
                           VertexT *vertex_associate_ins,
                           ValueT *value__associate_ins) -> bool {
-      // TODO: fill in the lambda to combine received and local data, e.g.:
       // ValueT in_val  = value__associate_ins[in_pos];
       // ValueT old_val = atomicMin(distances + key, in_val);
       // if (old_val <= in_val)
@@ -408,11 +408,11 @@ template <typename _Problem, util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
 class Enactor
     : public EnactorBase<
           typename _Problem::GraphT,
-          typename _Problem::GraphT::VertexT, // TODO: change to other label
+          typename _Problem::GraphT::VertexT, 
                                               // types used for the operators,
                                               // e.g.: typename
                                               // _Problem::LabelT,
-          typename _Problem::GraphT::ValueT,  // TODO: change to other value
+          typename _Problem::GraphT::ValueT,  
                                               // types used for inter GPU
                                               // communication, e.g.: typename
                                               // _Problem::ValueT,
@@ -436,10 +436,8 @@ public:
    * @brief color constructor
    */
   Enactor() : BaseEnactor("Color"), problem(NULL) {
-    // <TODO> change according to algorithmic needs
     this->max_num_vertex_associates = 0;
     this->max_num_value__associates = 1;
-    // </TODO>
   }
 
   /**
@@ -499,10 +497,8 @@ public:
    */
   cudaError_t Run(ThreadSlice &thread_data) {
     gunrock::app::Iteration_Loop<
-        // <DONE> change to how many {VertexT, ValueT} data need to communicate
         //       per element in the inter-GPU sub-frontiers
         0, 1,
-        // </DONE>
         IterationT>(thread_data, iterations[thread_data.thread_num]);
     return cudaSuccess;
   }
@@ -520,7 +516,6 @@ public:
 
     SizeT num_nodes = this->problem->data_slices[0][0].sub_graph[0].nodes;
 
-    // <DONE> Initialize frontiers according to the algorithm:
     // In this case, we add a single `src` to the frontier
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       if (this->num_gpus == 1) {
@@ -549,7 +544,6 @@ public:
       } else {
       }
     }
-    // </DONE>
 
     GUARD_CU(BaseEnactor::Sync());
     return retval;

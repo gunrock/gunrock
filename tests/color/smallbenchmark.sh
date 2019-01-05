@@ -15,11 +15,13 @@ fi
 ./bin/test_color_10.0_x86_64 --graph-type=market \
     --graph-file=$address \
     --JPL=true \
-    --no-conflict=0 \
+    --no-conflict=2 \
     --seed=123 \
     --user-iter=0 \
     --hash-size=0 \
     --quick=false \
     --test-run=true \
-    --undirected
+    --undirected \
+    --device=3 \
+    --min-color=true
 

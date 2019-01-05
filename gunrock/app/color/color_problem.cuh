@@ -33,8 +33,6 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
 
   GUARD_CU(gunrock::app::UseParameters_problem(parameters));
 
-  // <DONE> Add problem specific command-line parameter usages here, e.g.:
-  // </DONE>
 
   return retval;
 }
@@ -64,7 +62,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @brief Data structure containing problem specific data on indivual GPU.
    */
   struct DataSlice : BaseDataSlice {
-    // <DONE> add problem specific storage arrays:
     util::Array1D<SizeT, VertexT> colors;
     util::Array1D<SizeT, float> rand;
     util::Array1D<SizeT, VertexT> prohibit;
@@ -75,23 +72,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     bool test_run;
     int no_conflict;
     int user_iter;
+    bool min_color;
     int hash_size;
 
     util::Array1D<SizeT, SizeT> colored;
     SizeT colored_;
-    // </DONE>
 
     /*
      * @brief Default constructor
      */
     DataSlice() : BaseDataSlice() {
-      // <DONE> name of the problem specific arrays:
       if (hash_size != 0)
         prohibit.SetName("prohibit");
       colors.SetName("colors");
       rand.SetName("rand");
       colored.SetName("colored");
-      // </DONE>
     }
 
     /*
@@ -109,13 +104,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       if (target & util::DEVICE)
         GUARD_CU(util::SetDevice(this->gpu_idx));
 
-      // <TODO> Release problem specific data, e.g.:
       if (hash_size != 0)
         GUARD_CU(prohibit.Release(target));
       GUARD_CU(colors.Release(target));
       GUARD_CU(rand.Release(target));
       GUARD_CU(colored.Release(target));
-      // </TODO>
 
       GUARD_CU(BaseDataSlice ::Release(target));
       return retval;
@@ -131,7 +124,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      */
     cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,
                      util::Location target, ProblemFlag flag,
-                     bool color_balance_, int seed, int user_iter_,
+                     bool color_balance_, int seed, int user_iter_, bool min_color_,
                      bool test_run_, bool use_jpl_, int no_conflict_,
                      int hash_size_) {
       cudaError_t retval = cudaSuccess;
@@ -140,6 +133,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       color_balance = color_balance_;
       user_iter = user_iter_;
+      min_color = min_color_;
       test_run = test_run_;
       use_jpl = use_jpl_;
       no_conflict = no_conflict_;
@@ -148,18 +142,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
       curandSetPseudoRandomGeneratorSeed(gen, seed);
 
-      // <DONE> allocate problem specific data here, e.g.:
       if (hash_size != 0)
         GUARD_CU(prohibit.Allocate(sub_graph.nodes * hash_size, target));
       GUARD_CU(colors.Allocate(sub_graph.nodes, target));
       GUARD_CU(rand.Allocate(sub_graph.nodes, target));
       GUARD_CU(colored.Allocate(1, util::HOST | target));
-      // </DONE>
 
       if (target & util::DEVICE) {
-        // <DONE> move sub-graph used by the problem onto GPU,
         GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
-        // </DONE>
       }
       return retval;
     }
@@ -174,16 +164,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       SizeT nodes = this->sub_graph->nodes;
 
       // Ensure data are allocated
-      // <DONE> ensure size of problem specific data:
       if (hash_size != 0)
         GUARD_CU(prohibit.EnsureSize_(nodes * hash_size, target));
       GUARD_CU(colors.EnsureSize_(nodes, target));
       GUARD_CU(rand.EnsureSize_(nodes, target));
       GUARD_CU(colored.EnsureSize_(1, util::HOST | target));
-      // </DONE>
 
       // Reset data
-      // <DONE> reset problem specific data, e.g.:
       if (hash_size != 0)
         GUARD_CU(prohibit.ForEach(
             [] __host__ __device__(VertexT & x) {
@@ -217,6 +204,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   util::Array1D<SizeT, DataSlice> *data_slices;
   int seed;
   int user_iter;
+  bool min_color;
   bool test_run;
   bool use_jpl;
   bool color_balance;
@@ -231,15 +219,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   Problem(util::Parameters &_parameters, ProblemFlag _flag = Problem_None)
       : BaseProblem(_parameters, _flag), data_slices(NULL) {
-    // <DONE>
     seed = _parameters.Get<int>("seed");
     color_balance = _parameters.Get<bool>("LBCOLOR");
+    min_color = _parameters.Get<bool>("min-color");
     user_iter = _parameters.Get<int>("user-iter");
     test_run = _parameters.Get<bool>("test-run");
     use_jpl = _parameters.Get<bool>("JPL");
     no_conflict = _parameters.Get<int>("no-conflict");
     hash_size = _parameters.Get<int>("hash-size");
-    // </DONE>
   }
 
   /**
@@ -274,9 +261,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * \return     cudaError_t Error message(s), if any
    */
   cudaError_t Extract(
-      // <DONE> problem specific data to extract
       VertexT *h_colors,
-      // </DONE>
       util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     SizeT nodes = this->org_graph->nodes;
@@ -288,12 +273,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       if (target == util::DEVICE) {
         GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-        // <DONE> extract the results from single GPU, e.g.:
         GUARD_CU(data_slice.colors.SetPointer(h_colors, nodes, util::HOST));
         GUARD_CU(data_slice.colors.Move(util::DEVICE, util::HOST));
-        // </DONE>
       } else if (target == util::HOST) {
-        // <DONE> extract the results from single CPU, e.g.:
         GUARD_CU(data_slice.colors.ForEach(
             h_colors,
             [] __host__ __device__(const VertexT &device_val,
@@ -301,13 +283,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
               host_val = device_val;
             },
             nodes, util::HOST));
-        // </DONE>
       }
     } else { // num_gpus != 1
 
       // ============ INCOMPLETE TEMPLATE - MULTIGPU ============
 
-      // // TODO: extract the results from multiple GPUs, e.g.:
       // // util::Array1D<SizeT, ValueT *> th_distances;
       // // th_distances.SetName("bfs::Problem::Extract::th_distances");
       // // GUARD_CU(th_distances.Allocate(this->num_gpus, util::HOST));
@@ -351,10 +331,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
-    // <TODO> get problem specific flags from parameters, e.g.:
     // if (this -> parameters.template Get<bool>("mark-pred"))
     //    this -> flag = this -> flag | Mark_Predecessors;
-    // </TODO>
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
@@ -366,7 +344,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       auto &data_slice = data_slices[gpu][0];
       GUARD_CU(data_slice.Init(
           this->sub_graphs[gpu], this->num_gpus, this->gpu_idx[gpu], target,
-          this->flag, this->color_balance, this->seed, this->user_iter,
+          this->flag, this->color_balance, this->seed, this->user_iter, this->min_color,
           this->test_run, this->use_jpl, this->no_conflict, this->hash_size));
     }
 
