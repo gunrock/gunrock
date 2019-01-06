@@ -124,9 +124,10 @@ int main(int argc, char** argv)
 
     // TODO: change available graph types, according to requirements
     return app::Switch_Types<
-        app::VERTEXT_U32B | app::VERTEXT_U64B |
-        app::SIZET_U32B | app::SIZET_U64B |
-        app::VALUET_F32B | app::UNDIRECTED>
+        app::VERTEXT_U32B |
+        app::SIZET_U32B |
+        app::VALUET_F32B | 
+	app::UNDIRECTED>
         (parameters, main_struct());
 }
 

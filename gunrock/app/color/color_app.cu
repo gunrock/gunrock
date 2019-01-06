@@ -30,14 +30,20 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_problem(parameters));
   GUARD_CU(UseParameters_enactor(parameters));
 
+
+ GUARD_CU(parameters.Use<bool>(
+      "loop-neighbor", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false, 
+      "Serially compare rand to all node neighbor, disable to use advance neighbor reduce (default=false)",
+      __FILE__, __LINE__));
+
   GUARD_CU(parameters.Use<bool>(
-      "min-color", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
-      "Enable coloring with minimum independent set as well as maximum", __FILE__,
+      "min-color", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
+      "Enable coloring with minimum independent set as well as maximum(default=true)", __FILE__,
       __LINE__));
 
   GUARD_CU(parameters.Use<bool>(
       "test-run", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
-      "Perform test run to atomically generate max iteration", __FILE__,
+      "Perform test run to atomically generate max iteration (default=true)", __FILE__,
       __LINE__));
 
   GUARD_CU(parameters.Use<int>(

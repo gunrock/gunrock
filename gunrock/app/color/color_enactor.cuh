@@ -83,6 +83,9 @@ struct ColorIterationLoop
 
     auto &colors = data_slice.colors;
     auto &rand = data_slice.rand;
+    auto &color_predicate = data_slice.color_predicate;
+    auto &color_temp = data_slice.color_temp;
+    auto &color_temp2 = data_slice.color_temp2;
     auto &prohibit = data_slice.prohibit;
     auto &gen = data_slice.gen;
     auto &color_balance = data_slice.color_balance;
@@ -92,9 +95,9 @@ struct ColorIterationLoop
     auto &hash_size = data_slice.hash_size;
     auto &test_run = data_slice.test_run;
     auto &min_color = data_slice.min_color;
-
+    auto &loop_neighbor = data_slice.loop_neighbor;
     auto stream = oprtr_parameters.stream;
-
+    auto null_ptr = NULL;
     // curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
     // --
     // Define operations
@@ -241,6 +244,7 @@ struct ColorIterationLoop
         bool colormax = true;
         bool colormin = true;
         int  color = iteration * 2;
+        
         for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
           VertexT u = graph.CsrT::GetEdgeDest(e);
           
@@ -265,6 +269,30 @@ struct ColorIterationLoop
       };
 
       // =======================================================================
+      /* advance_op
+      @Description: advance to neighbor random number for coloring comparison
+      */
+      //========================================================================
+      auto advance_op = [graph] __host__ __device__ (
+		const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                const VertexT &input_item, const SizeT &input_pos,
+                SizeT &output_pos) -> ValueT 
+      {
+	return dest;
+      };
+
+      // =======================================================================
+      /* reduce_op
+      @Description: coloring comparison
+      */
+      //========================================================================
+      auto reduce_op = [rand] __host__ __device__ (
+	const ValueT &a, const ValueT &b) -> ValueT
+      {
+	return (rand[a] < rand[b]) ? b : a;
+      };     
+
+      // =======================================================================
       /* status_op
       @Description: check coloring status.
       */
@@ -283,18 +311,32 @@ struct ColorIterationLoop
 
       // JPL exact method
       if (use_jpl) {
-        // printf("DEBUG: frontier length %d\n", frontier.queue_length);
-        GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
+	if (loop_neighbor) {
+        	GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
                                         util::DEVICE, stream));
-        if (min_color) {
-	  //GUARD_CU(frontier.V_Q()->ForAll(resolve_op, frontier.queue_length,
-		//			   util::DEVICE, stream));
-        }
+	}
+
+      	else {
+		oprtr_parameters.reduce_values_out   = & color_predicate;
+                oprtr_parameters.reduce_values_temp  = & color_temp;
+		oprtr_parameters.reduce_values_temp2 = & color_temp2;
+            	oprtr_parameters.reduce_reset        = true;
+            	oprtr_parameters.advance_mode        = "ALL_EDGES";
+		
+		GUARD_CU(oprtr::NeighborReduce
+		<oprtr::OprtrType_V2V | oprtr::OprtrMode_REDUCE_TO_SRC | oprtr::ReduceOp_Max>
+		(graph.csr(),
+		 null_ptr,
+		 null_ptr,
+		 oprtr_parameters,
+		 advance_op,
+                 reduce_op,
+		 (ValueT)-1));
+	}
       }
 
       // Current method in development
       else {
-        // printf("DEBUG: Using Developed Method\n");
         // color by max and min independent set, non-exactsolution
         GUARD_CU(frontier.V_Q()->ForAll(color_op, frontier.queue_length,
                                         util::DEVICE, stream));
@@ -313,7 +355,6 @@ struct ColorIterationLoop
       }
 
       if (test_run) {
-        // printf("DEBUG: determining number of iteration\n");
         GUARD_CU(data_slice.colored.ForAll(
             [] __host__ __device__(SizeT * x, const VertexT &pos) {
               x[pos] = 0;
