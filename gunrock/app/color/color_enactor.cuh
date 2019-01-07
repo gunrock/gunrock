@@ -97,7 +97,8 @@ struct ColorIterationLoop
     auto &min_color = data_slice.min_color;
     auto &loop_neighbor = data_slice.loop_neighbor;
     auto stream = oprtr_parameters.stream;
-    auto null_ptr = NULL;
+    auto null_ptr = colored;
+    null_ptr = NULL;
     // curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
     // --
     // Define operations
@@ -283,10 +284,10 @@ struct ColorIterationLoop
 
       // =======================================================================
       /* reduce_op
-      @Description: coloring comparison
+      @Description: coloring comparison for max rand
       */
       //========================================================================
-      auto reduce_op = [rand] __host__ __device__ (
+      auto max_reduce_op = [rand] __host__ __device__ (
 	const ValueT &a, const ValueT &b) -> ValueT
       {
 	return (rand[a] < rand[b]) ? b : a;
@@ -323,15 +324,11 @@ struct ColorIterationLoop
             	oprtr_parameters.reduce_reset        = true;
             	oprtr_parameters.advance_mode        = "ALL_EDGES";
 		
-		GUARD_CU(oprtr::NeighborReduce
-		<oprtr::OprtrType_V2V | oprtr::OprtrMode_REDUCE_TO_SRC | oprtr::ReduceOp_Max>
-		(graph.csr(),
-		 null_ptr,
-		 null_ptr,
-		 oprtr_parameters,
-		 advance_op,
-                 reduce_op,
-		 (ValueT)-1));
+		GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
+			 oprtr::OprtrMode_REDUCE_TO_SRC>(
+			 graph.csr(), null_ptr, null_ptr,
+			 oprtr_parameters, advance_op,
+                 	 max_reduce_op, (ValueT) 0));
 	}
       }
 
