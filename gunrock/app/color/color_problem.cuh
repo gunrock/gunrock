@@ -202,20 +202,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       if (!loop_neighbor) {
 	GUARD_CU(color_temp.ForEach(
-          [] __host__ __device__(VertexT & x) {
-            x = util::PreDefinedValues<VertexT>::InvalidValue;
-          },
-          nodes, target, this->stream));
+            [] __host__ __device__(ValueT & x) {
+              x = util::PreDefinedValues<ValueT>::InvalidValue;
+            },
+            edges, target, this->stream));
 	GUARD_CU(color_temp2.ForEach(
-          [] __host__ __device__(VertexT & x) {
-            x = util::PreDefinedValues<VertexT>::InvalidValue;
-          },
-          nodes, target, this->stream));
+            [] __host__ __device__(ValueT & x) {
+              x = util::PreDefinedValues<ValueT>::InvalidValue;
+            },
+            edges, target, this->stream));
         GUARD_CU(color_predicate.ForEach(
-          [] __host__ __device__(VertexT & x) {
-            x = util::PreDefinedValues<VertexT>::InvalidValue;
-          },
-          nodes, target, this->stream));
+            [] __host__ __device__(ValueT & x) {
+              x = util::PreDefinedValues<ValueT>::InvalidValue;
+            },
+            nodes, target, this->stream));
       }
 
       GUARD_CU(colors.ForEach(
