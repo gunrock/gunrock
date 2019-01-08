@@ -297,8 +297,25 @@ struct ColorIterationLoop
 	const ValueT * color_predicate_, const SizeT &pos) {
 		SizeT id = (SizeT) color_predicate[pos];
 		colors[id] = iteration;
-		rand[id] = -1.0; 		
       };
+
+      // =======================================================================
+      /* filter_op
+      @Description: filter colored node from frontier
+      */
+      //========================================================================
+
+	auto filter_op = [iteration, colors] __host__ __device__ (
+		const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            	const VertexT &input_item, const SizeT &input_pos,
+            	SizeT &output_pos) -> bool
+	{
+		if (util::isValid(colors[src]))
+			return false;
+		if (util::isValid(colors[dest]) && colors[dest] != iteration)
+			return false;
+		return true;
+	};
 
       // =======================================================================
       /* status_op
@@ -321,28 +338,33 @@ struct ColorIterationLoop
       //printf("DEBUG: =====Start Iteration====\n");
       if (use_jpl) {
 	printf("DEBUG: predicate %d \n", loop_color);
-	if (!loop_color) {
+	if (loop_color) {
 		//printf("DEBUG: using for loop \n");
         	GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
                                         util::DEVICE, stream));
 	}
 
-      	//else {
-	//	printf("DEBUG: using advance neighbor reduce\n");
-	//	oprtr_parameters.reduce_values_out   = & color_predicate;
-        //        oprtr_parameters.reduce_values_temp  = & color_temp;
-	//	oprtr_parameters.reduce_values_temp2 = & color_temp2;
-        //    	oprtr_parameters.reduce_reset        = true;
-        //    	oprtr_parameters.advance_mode        = "ALL_EDGES";
-	//	
-	//	GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
-	//		 oprtr::OprtrMode_REDUCE_TO_SRC>(
-	//		 graph.csr(), null_ptr, null_ptr,
-	//		 oprtr_parameters, advance_op,
-        //         	 max_reduce_op, (ValueT) 0));
-	//	GUARD_CU(color_predicate.ForAll(max_color_op, graph.nodes,
-	//					util::DEVICE, stream));
-	//}
+      	else {
+		printf("DEBUG: using advance neighbor reduce\n");
+
+               //GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+               //         graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+               //         oprtr_parameters, filter_op));
+
+		oprtr_parameters.reduce_values_out   = & color_predicate;
+                oprtr_parameters.reduce_values_temp  = & color_temp;
+		oprtr_parameters.reduce_values_temp2 = & color_temp2;
+            	oprtr_parameters.reduce_reset        = true;
+            	oprtr_parameters.advance_mode        = "ALL_EDGES";
+
+		GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
+			 oprtr::OprtrMode_REDUCE_TO_SRC>(
+			 graph.csr(), null_ptr, null_ptr,
+			 oprtr_parameters, advance_op,
+                 	 max_reduce_op, (ValueT) 0));
+		GUARD_CU(color_predicate.ForAll(max_color_op, graph.nodes,
+						util::DEVICE, stream));
+	}
       }
 
       // Current method in development
