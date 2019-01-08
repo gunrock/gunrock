@@ -76,7 +76,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     int no_conflict;
     int user_iter;
     bool min_color;
-    bool loop_neighbor;
+    bool loop_color;
     int hash_size;
 
     util::Array1D<SizeT, SizeT> colored;
@@ -109,10 +109,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cudaError_t retval = cudaSuccess;
       if (target & util::DEVICE)
         GUARD_CU(util::SetDevice(this->gpu_idx));
-
       if (hash_size != 0)
         GUARD_CU(prohibit.Release(target));
-      if (!loop_neighbor) {
+      if (!loop_color) {
       	GUARD_CU(color_temp.Release(target));
       	GUARD_CU(color_temp2.Release(target));
       	GUARD_CU(color_predicate.Release(target));
@@ -136,7 +135,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,
                      util::Location target, ProblemFlag flag,
                      bool color_balance_, int seed, int user_iter_, bool min_color_,
-                     bool loop_neighbor_, bool test_run_, bool use_jpl_, int no_conflict_,
+                     bool test_run_, bool use_jpl_, int no_conflict_, bool loop_color_,
                      int hash_size_) {
       cudaError_t retval = cudaSuccess;
 
@@ -145,21 +144,22 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       color_balance = color_balance_;
       user_iter = user_iter_;
       min_color = min_color_;
-      loop_neighbor = loop_neighbor_;
+      loop_color = loop_color_;
       test_run = test_run_;
       use_jpl = use_jpl_;
       no_conflict = no_conflict_;
       hash_size = hash_size_;
-
+      printf("DEBUG: problem %s\n", loop_color ? "true" : "false");
       curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
       curandSetPseudoRandomGeneratorSeed(gen, seed);
-
+      
       if (hash_size != 0)
         GUARD_CU(prohibit.Allocate(sub_graph.nodes * hash_size, target));
-      if (!loop_neighbor) {
-	GUARD_CU(color_temp.Allocate(sub_graph.edges, target));
-	GUARD_CU(color_temp2.Allocate(sub_graph.edges, target));
-	GUARD_CU(color_predicate.Allocate(sub_graph.nodes, target));
+      if (!loop_color) {
+      	printf("DEBUG: allocating for advance \n");
+      	GUARD_CU(color_temp.Allocate(sub_graph.edges, target));
+      	GUARD_CU(color_temp2.Allocate(sub_graph.edges, target));
+       	GUARD_CU(color_predicate.Allocate(sub_graph.nodes, target));
       }
       GUARD_CU(colors.Allocate(sub_graph.nodes, target));
       GUARD_CU(rand.Allocate(sub_graph.nodes, target));
@@ -183,10 +183,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // Ensure data are allocated
       if (hash_size != 0)
         GUARD_CU(prohibit.EnsureSize_(nodes * hash_size, target));
-      if (!loop_neighbor) {
-	GUARD_CU(color_temp.EnsureSize_(edges, target));
-	GUARD_CU(color_temp2.EnsureSize_(edges, target));
-	GUARD_CU(color_predicate.EnsureSize_(nodes, target));
+      if (!loop_color) {
+      	GUARD_CU(color_temp.EnsureSize_(edges, target));
+      	GUARD_CU(color_temp2.EnsureSize_(edges, target));
+      	GUARD_CU(color_predicate.EnsureSize_(nodes, target));
       }
       GUARD_CU(colors.EnsureSize_(nodes, target));
       GUARD_CU(rand.EnsureSize_(nodes, target));
@@ -200,7 +200,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             },
             nodes, target, this->stream));
 
-      if (!loop_neighbor) {
+      if (!loop_color) {
 	GUARD_CU(color_temp.ForEach(
             [] __host__ __device__(ValueT & x) {
               x = util::PreDefinedValues<ValueT>::InvalidValue;
@@ -245,7 +245,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   int seed;
   int user_iter;
   bool min_color;
-  bool loop_neighbor;
+  bool loop_color;
   bool test_run;
   bool use_jpl;
   bool color_balance;
@@ -263,7 +263,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     seed = _parameters.Get<int>("seed");
     color_balance = _parameters.Get<bool>("LBCOLOR");
     min_color = _parameters.Get<bool>("min-color");
-    loop_neighbor = _parameters.Get<bool>("loop-neighbor");
+    loop_color = _parameters.Get<bool>("loop-color");
     user_iter = _parameters.Get<int>("user-iter");
     test_run = _parameters.Get<bool>("test-run");
     use_jpl = _parameters.Get<bool>("JPL");
@@ -387,7 +387,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(data_slice.Init(
           this->sub_graphs[gpu], this->num_gpus, this->gpu_idx[gpu], target,
           this->flag, this->color_balance, this->seed, this->user_iter, this->min_color,
-          this->test_run, this->use_jpl, this->no_conflict, this->hash_size, this->loop_neighbor));
+          this->test_run, this->use_jpl, this->no_conflict, this->hash_size, this->loop_color));
     }
 
     return retval;

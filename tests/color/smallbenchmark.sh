@@ -15,7 +15,7 @@ fi
 ./bin/test_color_10.0_x86_64 --graph-type=market \
     --graph-file=$address \
     --JPL=true \
-    --no-conflict=2 \
+    --no-conflict=0 \
     --seed=123 \
     --user-iter=0 \
     --hash-size=0 \
@@ -23,5 +23,6 @@ fi
     --test-run=true \
     --undirected \
     --device=3 \
-    --min-color=true
+    --min-color=true \
+#    --loop-neighbor=false
 

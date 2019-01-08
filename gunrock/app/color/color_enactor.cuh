@@ -95,10 +95,10 @@ struct ColorIterationLoop
     auto &hash_size = data_slice.hash_size;
     auto &test_run = data_slice.test_run;
     auto &min_color = data_slice.min_color;
-    auto &loop_neighbor = data_slice.loop_neighbor;
+    auto &loop_color = data_slice.loop_color;
     auto stream = oprtr_parameters.stream;
-    auto null_ptr = colored;
-    null_ptr = NULL;
+    util::Array1D<SizeT, VertexT>* null_frontier = NULL;
+    auto null_ptr = null_frontier;
     // curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
     // --
     // Define operations
@@ -287,11 +287,18 @@ struct ColorIterationLoop
       @Description: coloring comparison for max rand
       */
       //========================================================================
-      auto max_reduce_op = [rand] __host__ __device__ (
+      auto max_reduce_op = [rand, colors] __host__ __device__ (
 	const ValueT &a, const ValueT &b) -> ValueT
       {
 	return (rand[a] < rand[b]) ? b : a;
       };     
+
+      auto max_color_op = [colors, iteration, color_predicate, rand] __host__ __device__ (
+	const ValueT * color_predicate_, const SizeT &pos) {
+		SizeT id = (SizeT) color_predicate[pos];
+		colors[id] = iteration;
+		rand[id] = -1.0; 		
+      };
 
       // =======================================================================
       /* status_op
@@ -311,25 +318,31 @@ struct ColorIterationLoop
       //======================================================================//
 
       // JPL exact method
+      //printf("DEBUG: =====Start Iteration====\n");
       if (use_jpl) {
-	if (loop_neighbor) {
+	printf("DEBUG: predicate %d \n", loop_color);
+	if (!loop_color) {
+		//printf("DEBUG: using for loop \n");
         	GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
                                         util::DEVICE, stream));
 	}
 
-      	else {
-		oprtr_parameters.reduce_values_out   = & color_predicate;
-                oprtr_parameters.reduce_values_temp  = & color_temp;
-		oprtr_parameters.reduce_values_temp2 = & color_temp2;
-            	oprtr_parameters.reduce_reset        = true;
-            	oprtr_parameters.advance_mode        = "ALL_EDGES";
-		
-		GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
-			 oprtr::OprtrMode_REDUCE_TO_SRC>(
-			 graph.csr(), null_ptr, null_ptr,
-			 oprtr_parameters, advance_op,
-                 	 max_reduce_op, (ValueT) 0));
-	}
+      	//else {
+	//	printf("DEBUG: using advance neighbor reduce\n");
+	//	oprtr_parameters.reduce_values_out   = & color_predicate;
+        //        oprtr_parameters.reduce_values_temp  = & color_temp;
+	//	oprtr_parameters.reduce_values_temp2 = & color_temp2;
+        //    	oprtr_parameters.reduce_reset        = true;
+        //    	oprtr_parameters.advance_mode        = "ALL_EDGES";
+	//	
+	//	GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
+	//		 oprtr::OprtrMode_REDUCE_TO_SRC>(
+	//		 graph.csr(), null_ptr, null_ptr,
+	//		 oprtr_parameters, advance_op,
+        //         	 max_reduce_op, (ValueT) 0));
+	//	GUARD_CU(color_predicate.ForAll(max_color_op, graph.nodes,
+	//					util::DEVICE, stream));
+	//}
       }
 
       // Current method in development
