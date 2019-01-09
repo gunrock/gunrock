@@ -293,27 +293,22 @@ struct ColorIterationLoop
 	return (rand[a] < rand[b]) ? b : a;
       };     
 
-      auto max_color_op = [colors, iteration, color_predicate, rand] __host__ __device__ (
-	const ValueT * color_predicate_, const SizeT &pos) {
-		SizeT id = (SizeT) color_predicate[pos];
-		colors[id] = iteration;
-      };
-
       // =======================================================================
       /* filter_op
       @Description: filter colored node from frontier
       */
       //========================================================================
 
-	auto filter_op = [iteration, colors] __host__ __device__ (
+	auto filterAndColor_op = [color_predicate, iteration, colors] __host__ __device__ (
 		const VertexT &src, VertexT &dest, const SizeT &edge_id,
             	const VertexT &input_item, const SizeT &input_pos,
             	SizeT &output_pos) -> bool
 	{
 		if (util::isValid(colors[src]))
 			return false;
-		if (util::isValid(colors[dest]) && colors[dest] != iteration)
-			return false;
+		SizeT id = (SizeT) color_predicate[src];
+		if (id != -1) 
+			colors[id] = iteration;
 		return true;
 	};
 
@@ -345,11 +340,7 @@ struct ColorIterationLoop
 	}
 
       	else {
-		printf("DEBUG: using advance neighbor reduce\n");
-
-               //GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-               //         graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-               //         oprtr_parameters, filter_op));
+	        printf("DEBUG: using advance neighbor reduce\n");
 
 		oprtr_parameters.reduce_values_out   = & color_predicate;
                 oprtr_parameters.reduce_values_temp  = & color_temp;
@@ -359,11 +350,33 @@ struct ColorIterationLoop
 
 		GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
 			 oprtr::OprtrMode_REDUCE_TO_SRC>(
-			 graph.csr(), null_ptr, null_ptr,
+			 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
 			 oprtr_parameters, advance_op,
-                 	 max_reduce_op, (ValueT) 0));
-		GUARD_CU(color_predicate.ForAll(max_color_op, graph.nodes,
-						util::DEVICE, stream));
+                 	 max_reduce_op, (ValueT) -1));
+
+		GUARD_CU2(cudaStreamSynchronize(stream),
+                  "cudaStreamSynchronize failed");
+
+		printf("DEBUG: after reduce %d \n",frontier.queue_length);
+
+                oprtr_parameters.filter_mode = "BY_PASS";
+                frontier.queue_reset = false;
+
+                GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+                        graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                        oprtr_parameters, filterAndColor_op));
+		
+		frontier.queue_index++;		
+		
+		printf("DEBUG: after filter %d \n",frontier.queue_length);
+		
+		// Get back the resulted frontier length
+	        GUARD_CU(frontier.work_progress.GetQueueLength(
+        	    frontier.queue_index, frontier.queue_length,
+            	    false, oprtr_parameters.stream, true));
+
+		GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+                	"cudaStreamSynchronize failed");
 	}
       }
 
@@ -387,6 +400,8 @@ struct ColorIterationLoop
       }
 
       if (test_run) {
+	
+	//reset atomic count
         GUARD_CU(data_slice.colored.ForAll(
             [] __host__ __device__(SizeT * x, const VertexT &pos) {
               x[pos] = 0;
