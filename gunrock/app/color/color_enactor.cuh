@@ -294,8 +294,8 @@ struct ColorIterationLoop
       };     
 
       // =======================================================================
-      /* filter_op
-      @Description: filter colored node from frontier
+      /* filterAndColor_op
+      @Description: color selected node then remove it from frontier.
       */
       //========================================================================
 
@@ -304,24 +304,34 @@ struct ColorIterationLoop
             	const VertexT &input_item, const SizeT &input_pos,
             	SizeT &output_pos) -> bool
 	{	
-		//printf("DEBUG: src = %d \n",src);
-		//printf("DEBUG: dest = %d \n",dest);
-		//printf("DEBUG: edge_id = %d \n",edge_id);
-		//printf("DEBUG: input_item = %d \n", input_item);
-		//printf("DEBUG: input_pos = %d \n", input_pos);
-		//printf("DEBUG: output_pos = %d \n", output_pos);
-		//printf("DEBUG: 6 = %f \n",color_predicate[6]);
-		//printf("DEBUG: 7 = %f \n",color_predicate[7]);
-		//printf("DEBUG: 8 = %f \n",color_predicate[8]);
-		//printf("DEBUG: 9 = %f \n",color_predicate[9]);
-		//printf("DEBUG: 10 = %f \n",color_predicate[10]);
+		printf("DEBUG: src = %d \n",src);
+		printf("DEBUG: dest = %d \n",dest);
+		printf("DEBUG: edge_id = %d \n",edge_id);
+		printf("DEBUG: input_item = %d \n", input_item);
+		printf("DEBUG: input_pos = %d \n", input_pos);
+		printf("DEBUG: output_pos = %d \n", output_pos);	
+			
 		VertexT id = (VertexT) color_predicate[input_item];
+
+		printf("color_predicate[0] = %d\n", (VertexT) color_predicate[0]);
+		printf("color_predicate[1] = %d\n", (VertexT) color_predicate[1]);
+		printf("color_predicate[2] = %d\n", (VertexT) color_predicate[2]);
+		printf("color_predicate[3] = %d\n", (VertexT) color_predicate[3]);
+		printf("color_predicate[4] = %d\n", (VertexT) color_predicate[4]);
+		printf("color_predicate[5] = %d\n", (VertexT) color_predicate[5]);
+		printf("color_predicate[6] = %d\n", (VertexT) color_predicate[6]);
+		printf("color_predicate[7] = %d\n", (VertexT) color_predicate[7]);
+		printf("color_predicate[8] = %d\n", (VertexT) color_predicate[8]);
+		printf("color_predicate[9] = %d\n", (VertexT) color_predicate[9]);
+		printf("color_predicate[10] = %d\n", (VertexT) color_predicate[10]);
+
+		//if the node is not selected to be colored, keep it in frontier
 		if (id == -1)
 			return true;
-		if (util::isValid(colors[id]))
-			return false;
+		//after color the node, drop it from frontier
+		printf("DEBUG: coloring node %d\n", id);
 		colors[id] = iteration;
-		return true;
+		return false;
 	};
 
       // =======================================================================
@@ -354,7 +364,7 @@ struct ColorIterationLoop
       	else {
 	        printf("DEBUG: using advance neighbor reduce\n");
 
-		frontier.queue_reset = true;
+		frontier.queue_reset = false;
 
 		oprtr_parameters.reduce_values_out   = & color_predicate;
                 oprtr_parameters.reduce_values_temp  = & color_temp;
@@ -381,7 +391,7 @@ struct ColorIterationLoop
 		GUARD_CU2(cudaStreamSynchronize(stream),
                   "cudaStreamSynchronize failed");
                 
-		//oprtr_parameters.filter_mode = "BY_PASS";
+		oprtr_parameters.filter_mode = "BY_PASS";
                 frontier.queue_reset = false;
 
                 GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
@@ -402,11 +412,11 @@ struct ColorIterationLoop
                 	"cudaStreamSynchronize failed");
 
 		// === DEBUG operation to print out color ====
-		GUARD_CU(frontier.V_Q()->ForAll([colors] __host__ __device__
-		(VertexT* v_q, SizeT pos){
-			VertexT v = v_q[pos];
-			printf("Node %d has color %d\n",v,colors[v]);
-		},frontier.queue_length, util::DEVICE, stream));
+		//GUARD_CU(frontier.V_Q()->ForAll([colors] __host__ __device__
+		//(VertexT* v_q, SizeT pos){
+		//	VertexT v = v_q[pos];
+		//	printf("Node %d has color %d\n",v,colors[v]);
+		//},frontier.queue_length, util::DEVICE, stream));
 	}
       }
 
