@@ -97,7 +97,7 @@ struct ColorIterationLoop
     auto &min_color = data_slice.min_color;
     auto &loop_color = data_slice.loop_color;
     auto stream = oprtr_parameters.stream;
-    util::Array1D<SizeT, VertexT>* null_frontier = NULL;
+    util::Array1D<SizeT, ValueT>* null_frontier = NULL;
     auto null_ptr = null_frontier;
     // curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
     // --
@@ -290,7 +290,7 @@ struct ColorIterationLoop
       auto max_reduce_op = [rand, colors] __host__ __device__ (
 	const ValueT &a, const ValueT &b) -> ValueT
       {
-	return (rand[a] < rand[b]) ? b : a;
+	return (rand[(VertexT) a] < rand[(VertexT) b]) ? b : a;
       };     
 
       // =======================================================================
@@ -299,16 +299,28 @@ struct ColorIterationLoop
       */
       //========================================================================
 
-	auto filterAndColor_op = [color_predicate, iteration, colors] __host__ __device__ (
+	auto filterAndColor_op = [iteration, colors, color_predicate] __host__ __device__ (
 		const VertexT &src, VertexT &dest, const SizeT &edge_id,
             	const VertexT &input_item, const SizeT &input_pos,
             	SizeT &output_pos) -> bool
-	{
-		if (util::isValid(colors[src]))
+	{	
+		printf("DEBUG: src = %d \n",src);
+		printf("DEBUG: dest = %d \n",dest);
+		printf("DEBUG: edge_id = %d \n",edge_id);
+		printf("DEBUG: input_item = %d \n", input_item);
+		printf("DEBUG: input_pos = %d \n", input_pos);
+		printf("DEBUG: output_pos = %d \n", output_pos);
+		//printf("DEBUG: 6 = %f \n",color_predicate[6]);
+		//printf("DEBUG: 7 = %f \n",color_predicate[7]);
+		//printf("DEBUG: 8 = %f \n",color_predicate[8]);
+		//printf("DEBUG: 9 = %f \n",color_predicate[9]);
+		//printf("DEBUG: 10 = %f \n",color_predicate[10]);
+		//VertexT id = (VertexT) color_predicate[dest];
+		if (id == -1)
+			return true;
+		if (util::isValid(colors[id]))
 			return false;
-		SizeT id = (SizeT) color_predicate[src];
-		if (id != -1) 
-			colors[id] = iteration;
+		colors[id] = iteration;
 		return true;
 	};
 
@@ -358,8 +370,8 @@ struct ColorIterationLoop
                   "cudaStreamSynchronize failed");
 
 		printf("DEBUG: after reduce %d \n",frontier.queue_length);
-
-                oprtr_parameters.filter_mode = "BY_PASS";
+                
+		//oprtr_parameters.filter_mode = "BY_PASS";
                 frontier.queue_reset = false;
 
                 GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
@@ -416,8 +428,10 @@ struct ColorIterationLoop
 
         GUARD_CU2(cudaStreamSynchronize(stream),
                   "cudaStreamSynchronize failed");
-        GUARD_CU(data_slice.colored.Move(util::DEVICE, util::HOST));
-        GUARD_CU2(cudaStreamSynchronize(stream),
+        
+	GUARD_CU(data_slice.colored.Move(util::DEVICE, util::HOST));
+        
+	GUARD_CU2(cudaStreamSynchronize(stream),
                   "cudaStreamSynchronize failed");
       }
     }
