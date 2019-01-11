@@ -103,17 +103,6 @@ struct ColorIterationLoop
     // --
     // Define operations
 
-    if (color_balance) {
-
-      // Get back the resulted frontier length
-      // GUARD_CU(frontier.work_progress.GetQueueLength(
-      //    frontier.queue_index, frontier.queue_length,
-      //    false, oprtr_parameters.stream, true));
-
-    }
-
-    else {
-
       // =======================================================================
       /* color_op
       @Description: non-jpl vertex coloring operation. Based on parameter
@@ -128,7 +117,7 @@ struct ColorIterationLoop
             VertexT v = v_q[pos];
             SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
             SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-            ValueT temp = rand[v];
+            auto temp = rand[v];
 
             VertexT max = v; // active max vertex
             VertexT min = v; // active min vertex
@@ -277,9 +266,11 @@ struct ColorIterationLoop
       auto advance_op = [graph] __host__ __device__ (
 		const VertexT &src, VertexT &dest, const SizeT &edge_id,
                 const VertexT &input_item, const SizeT &input_pos,
-                SizeT &output_pos) -> ValueT 
+                SizeT &output_pos) -> VertexT 
       {
+	// if(util::isValid(src) && util::isValid(dest)) 
 	return dest;
+	//else printf("src and dest in advance %d and %d\n", src, dest);
       };
 
       // =======================================================================
@@ -288,9 +279,9 @@ struct ColorIterationLoop
       */
       //========================================================================
       auto max_reduce_op = [rand, colors] __host__ __device__ (
-	const ValueT &a, const ValueT &b) -> ValueT
+	const VertexT &a, const VertexT &b) -> VertexT
       {
-	return (rand[(VertexT) a] < rand[(VertexT) b]) ? b : a;
+	return (rand[a] < rand[b]) ? b : a;
       };     
 
       // =======================================================================
@@ -326,8 +317,9 @@ struct ColorIterationLoop
 		printf("color_predicate[10] = %d\n", (VertexT) color_predicate[10]);
 
 		//if the node is not selected to be colored, keep it in frontier
-		if (id == -1)
-			return true;
+		if (!util::isValid(id)) return true;
+	        if (!util::isValid(colors[input_item])) return true;
+
 		//after color the node, drop it from frontier
 		printf("DEBUG: coloring node %d\n", id);
 		colors[id] = iteration;
@@ -354,8 +346,7 @@ struct ColorIterationLoop
       // JPL exact method
       //printf("DEBUG: =====Start Iteration====\n");
       if (use_jpl) {
-	printf("DEBUG: predicate %d \n", loop_color);
-	if (loop_color) {
+	if (!color_balance) {
 		//printf("DEBUG: using for loop \n");
         	GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
                                         util::DEVICE, stream));
@@ -376,7 +367,7 @@ struct ColorIterationLoop
 			 oprtr::OprtrMode_REDUCE_TO_SRC>(
 			 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
 			 oprtr_parameters, advance_op,
-                 	 max_reduce_op, (ValueT) -1));
+                 	 max_reduce_op, util::PreDefinedValues<ValueT>::InvalidValue));
 
 		frontier.queue_index++;                
 
@@ -391,7 +382,7 @@ struct ColorIterationLoop
 		GUARD_CU2(cudaStreamSynchronize(stream),
                   "cudaStreamSynchronize failed");
                 
-		oprtr_parameters.filter_mode = "BY_PASS";
+		// oprtr_parameters.filter_mode = "BY_PASS";
                 frontier.queue_reset = false;
 
                 GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
@@ -468,7 +459,6 @@ struct ColorIterationLoop
 	GUARD_CU2(cudaStreamSynchronize(stream),
                   "cudaStreamSynchronize failed");
       }
-    }
 
     return retval;
   }
@@ -481,17 +471,17 @@ struct ColorIterationLoop
     auto &graph = data_slice.sub_graph[0];
     auto test_run = data_slice.test_run;
     auto frontier = enactor_slices[0].frontier;
-    auto loop_color = data_slice.loop_color;
+    auto color_balance = data_slice.color_balance;
     // printf("DEBUG: iteration number %d, colored: %d\n", iter,
     //       data_slice.colored[0]);
-           if (test_run && (data_slice.colored[0] >= graph.nodes) && loop_color) {
+           if (test_run && (data_slice.colored[0] >= graph.nodes) && !color_balance) {
              printf("Max iteration: %d\n", iter);
              return true;
            }
            // user defined stop condition
            else if (!test_run && (iter == user_iter))
              return true;
-	   else if (!loop_color && (frontier.queue_length == 0)) {
+	   else if (color_balance && (frontier.queue_length == 0)) {
 		printf("DEBUG: frontier queue is empty, return now \n");
 		return true;
 	   }

@@ -111,7 +111,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         GUARD_CU(util::SetDevice(this->gpu_idx));
       if (hash_size != 0)
         GUARD_CU(prohibit.Release(target));
-      if (!loop_color) {
+      if (color_balance) {
       	GUARD_CU(color_temp.Release(target));
       	GUARD_CU(color_temp2.Release(target));
       	GUARD_CU(color_predicate.Release(target));
@@ -155,7 +155,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       
       if (hash_size != 0)
         GUARD_CU(prohibit.Allocate(sub_graph.nodes * hash_size, target));
-      if (!loop_color) {
+      if (color_balance) {
       	printf("DEBUG: allocating for advance \n");
       	GUARD_CU(color_temp.Allocate(sub_graph.edges, target));
       	GUARD_CU(color_temp2.Allocate(sub_graph.edges, target));
@@ -183,7 +183,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // Ensure data are allocated
       if (hash_size != 0)
         GUARD_CU(prohibit.EnsureSize_(nodes * hash_size, target));
-      if (!loop_color) {
+      if (color_balance) {
       	GUARD_CU(color_temp.EnsureSize_(edges, target));
       	GUARD_CU(color_temp2.EnsureSize_(edges, target));
       	GUARD_CU(color_predicate.EnsureSize_(nodes, target));
@@ -200,7 +200,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             },
             nodes, target, this->stream));
 
-      if (!loop_color) {
+      if (color_balance) {
 	GUARD_CU(color_temp.ForEach(
             [] __host__ __device__(ValueT & x) {
               x = util::PreDefinedValues<ValueT>::InvalidValue;
