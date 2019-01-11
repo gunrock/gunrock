@@ -263,14 +263,21 @@ struct ColorIterationLoop
       @Description: advance to neighbor random number for coloring comparison
       */
       //========================================================================
-      auto advance_op = [graph] __host__ __device__ (
+      auto advance_op = [graph,iteration,colors] __host__ __device__ (
 		const VertexT &src, VertexT &dest, const SizeT &edge_id,
                 const VertexT &input_item, const SizeT &input_pos,
                 SizeT &output_pos) -> VertexT 
       {
-	// if(util::isValid(src) && util::isValid(dest)) 
-	return dest;
-	//else printf("src and dest in advance %d and %d\n", src, dest);
+	printf("At iteration: %d\n",iteration);
+	printf("src: %d\n", src);
+	printf("input_item: %d\n", input_item);
+	printf("input_pos: %d\n", input_pos);
+	printf("dest: %d \n", dest); 
+	if(util::isValid(colors[src])) 
+		return false;
+	if(util::isValid(src) && util::isValid(dest)) 
+		return dest;
+	else printf("src and dest in advance %d and %d\n", src, dest);
       };
 
       // =======================================================================
@@ -304,21 +311,9 @@ struct ColorIterationLoop
 			
 		VertexT id = (VertexT) color_predicate[input_item];
 
-		printf("color_predicate[0] = %d\n", (VertexT) color_predicate[0]);
-		printf("color_predicate[1] = %d\n", (VertexT) color_predicate[1]);
-		printf("color_predicate[2] = %d\n", (VertexT) color_predicate[2]);
-		printf("color_predicate[3] = %d\n", (VertexT) color_predicate[3]);
-		printf("color_predicate[4] = %d\n", (VertexT) color_predicate[4]);
-		printf("color_predicate[5] = %d\n", (VertexT) color_predicate[5]);
-		printf("color_predicate[6] = %d\n", (VertexT) color_predicate[6]);
-		printf("color_predicate[7] = %d\n", (VertexT) color_predicate[7]);
-		printf("color_predicate[8] = %d\n", (VertexT) color_predicate[8]);
-		printf("color_predicate[9] = %d\n", (VertexT) color_predicate[9]);
-		printf("color_predicate[10] = %d\n", (VertexT) color_predicate[10]);
-
 		//if the node is not selected to be colored, keep it in frontier
 		if (!util::isValid(id)) return true;
-	        if (!util::isValid(colors[input_item])) return true;
+	        //if (!util::isValid(colors[input_item])) return true;
 
 		//after color the node, drop it from frontier
 		printf("DEBUG: coloring node %d\n", id);
@@ -353,8 +348,6 @@ struct ColorIterationLoop
 	}
 
       	else {
-	        printf("DEBUG: using advance neighbor reduce\n");
-
 		frontier.queue_reset = false;
 
 		oprtr_parameters.reduce_values_out   = & color_predicate;
@@ -364,25 +357,21 @@ struct ColorIterationLoop
             	oprtr_parameters.advance_mode        = "ALL_EDGES";
 
 		GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
-			 oprtr::OprtrMode_REDUCE_TO_SRC>(
+			 oprtr::OprtrMode_REDUCE_TO_SRC | oprtr::ReduceOp_Max>(
 			 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
 			 oprtr_parameters, advance_op,
                  	 max_reduce_op, util::PreDefinedValues<ValueT>::InvalidValue));
 
 		frontier.queue_index++;                
-
-		printf("DEBUG: after reduce %d \n",frontier.queue_length);
-
+		printf("DEBUG: queue length after advance reduce %d \n", frontier.queue_length);
 		GUARD_CU(frontier.work_progress.GetQueueLength(
                     frontier.queue_index, frontier.queue_length,
                     false, oprtr_parameters.stream, true));
 
-		printf("DEBUG: after work progress 1\n");
-
 		GUARD_CU2(cudaStreamSynchronize(stream),
                   "cudaStreamSynchronize failed");
                 
-		// oprtr_parameters.filter_mode = "BY_PASS";
+		oprtr_parameters.filter_mode = "BY_PASS";
                 frontier.queue_reset = false;
 
                 GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
@@ -390,24 +379,14 @@ struct ColorIterationLoop
                         oprtr_parameters, filterAndColor_op));
 		
 		frontier.queue_index++;		
-		
-		printf("DEBUG: after filter %d \n",frontier.queue_length);
-		
+		printf("DEBUG: queue length after filter %d \n", frontier.queue_length);
 	        GUARD_CU(frontier.work_progress.GetQueueLength(
         	    frontier.queue_index, frontier.queue_length,
             	    false, oprtr_parameters.stream, true));
 	
-		printf("DEBUG: after work progress 2\n");
-	
 		GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
                 	"cudaStreamSynchronize failed");
 
-		// === DEBUG operation to print out color ====
-		//GUARD_CU(frontier.V_Q()->ForAll([colors] __host__ __device__
-		//(VertexT* v_q, SizeT pos){
-		//	VertexT v = v_q[pos];
-		//	printf("Node %d has color %d\n",v,colors[v]);
-		//},frontier.queue_length, util::DEVICE, stream));
 	}
       }
 
@@ -430,7 +409,7 @@ struct ColorIterationLoop
                                         util::DEVICE, stream));
       }
 
-      if (test_run) {
+      if (test_run && !color_balance) {
 		
 	//reset atomic count
         GUARD_CU(data_slice.colored.ForAll(
