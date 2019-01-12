@@ -58,18 +58,17 @@ cudaError_t UseParameters(util::Parameters &parameters) {
 
   GUARD_CU(parameters.Use<int>(
       "no-conflict", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
-      "Resolve color conflict, 0 to skip check, 1 to check at end of
-      every iteration with random,
-      2 to check at end of every iteration with degree(default = 0)
-          .",
+      "Resolve color conflict, 0 to skip check, 1 to check at end of\
+      every iteration with random,\
+      2 to check at end of every iteration with degree(default = 0).",
       __FILE__,
       __LINE__));
 
   GUARD_CU(parameters.Use<int>(
       "hash-size", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
-      "Needed to allocate memory for hash function, if parameter is
-      positive,
-      hash coloring is used instead of random coloring(default = 0) ",
+      "Needed to allocate memory for hash function, if parameter is\
+      positive,\
+      hash coloring is used instead of random coloring (default = 0).",
       __FILE__,
       __LINE__));
 

@@ -97,7 +97,7 @@ struct ColorIterationLoop
     auto &min_color = data_slice.min_color;
     auto &loop_color = data_slice.loop_color;
     auto stream = oprtr_parameters.stream;
-    util::Array1D<SizeT, ValueT>* null_frontier = NULL;
+    util::Array1D<SizeT, VertexT>* null_frontier = NULL;
     auto null_ptr = null_frontier;
     // curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
     // --
@@ -263,21 +263,17 @@ struct ColorIterationLoop
       @Description: advance to neighbor random number for coloring comparison
       */
       //========================================================================
-      auto advance_op = [graph,iteration,colors] __host__ __device__ (
+      auto advance_op = [graph, iteration, colors] __host__ __device__ (
 		const VertexT &src, VertexT &dest, const SizeT &edge_id,
                 const VertexT &input_item, const SizeT &input_pos,
                 SizeT &output_pos) -> VertexT 
       {
-	printf("At iteration: %d\n",iteration);
-	printf("src: %d\n", src);
-	printf("input_item: %d\n", input_item);
-	printf("input_pos: %d\n", input_pos);
-	printf("dest: %d \n", dest); 
-	if(util::isValid(colors[src])) 
-		return false;
-	if(util::isValid(src) && util::isValid(dest)) 
-		return dest;
-	else printf("src and dest in advance %d and %d\n", src, dest);
+	printf("ADVANCE: At iteration = %d\n",iteration);
+	printf("ADVANCE: src = %d\n", src);
+	printf("ADVANCE: input_item = %d\n", input_item);
+	printf("ADVANCE: input_pos = %d\n", input_pos);
+	printf("ADVANCE: dest = %d \n", dest); 
+	return dest;
       };
 
       // =======================================================================
@@ -302,23 +298,24 @@ struct ColorIterationLoop
             	const VertexT &input_item, const SizeT &input_pos,
             	SizeT &output_pos) -> bool
 	{	
-		printf("DEBUG: src = %d \n",src);
-		printf("DEBUG: dest = %d \n",dest);
-		printf("DEBUG: edge_id = %d \n",edge_id);
-		printf("DEBUG: input_item = %d \n", input_item);
-		printf("DEBUG: input_pos = %d \n", input_pos);
-		printf("DEBUG: output_pos = %d \n", output_pos);	
+		printf("FILTER: src = %d \n",src);
+		printf("FILTER: dest = %d \n",dest);
+		printf("FILTER: edge_id = %d \n",edge_id);
+		printf("FILTER: input_item = %d \n", input_item);
+		printf("FILTER: input_pos = %d \n", input_pos);
+		printf("FILTER: output_pos = %d \n", output_pos);	
 			
 		VertexT id = (VertexT) color_predicate[input_item];
 
 		//if the node is not selected to be colored, keep it in frontier
 		if (!util::isValid(id)) return true;
-	        //if (!util::isValid(colors[input_item])) return true;
 
 		//after color the node, drop it from frontier
-		printf("DEBUG: coloring node %d\n", id);
+		printf("FILTER: coloring node %d, to color = %d\n", id, iteration);
 		colors[id] = iteration;
 		return false;
+
+	        if (!util::isValid(colors[input_item])) return true;
 	};
 
       // =======================================================================
@@ -348,44 +345,49 @@ struct ColorIterationLoop
 	}
 
       	else {
-		frontier.queue_reset = false;
 
-		oprtr_parameters.reduce_values_out   = & color_predicate;
-                oprtr_parameters.reduce_values_temp  = & color_temp;
-		oprtr_parameters.reduce_values_temp2 = & color_temp2;
-            	oprtr_parameters.reduce_reset        = true;
-            	oprtr_parameters.advance_mode        = "ALL_EDGES";
 
-		GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
-			 oprtr::OprtrMode_REDUCE_TO_SRC | oprtr::ReduceOp_Max>(
-			 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-			 oprtr_parameters, advance_op,
-                 	 max_reduce_op, util::PreDefinedValues<ValueT>::InvalidValue));
-
-		frontier.queue_index++;                
-		printf("DEBUG: queue length after advance reduce %d \n", frontier.queue_length);
-		GUARD_CU(frontier.work_progress.GetQueueLength(
-                    frontier.queue_index, frontier.queue_length,
-                    false, oprtr_parameters.stream, true));
-
-		GUARD_CU2(cudaStreamSynchronize(stream),
-                  "cudaStreamSynchronize failed");
-                
 		oprtr_parameters.filter_mode = "BY_PASS";
                 frontier.queue_reset = false;
 
                 GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                        graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                        graph.csr(), frontier.V_Q(), null_ptr,
                         oprtr_parameters, filterAndColor_op));
 		
-		frontier.queue_index++;		
-		printf("DEBUG: queue length after filter %d \n", frontier.queue_length);
+		frontier.queue_index++;	
+	
 	        GUARD_CU(frontier.work_progress.GetQueueLength(
         	    frontier.queue_index, frontier.queue_length,
-            	    false, oprtr_parameters.stream, true));
-	
-		GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-                	"cudaStreamSynchronize failed");
+            	    true, oprtr_parameters.stream, false));
+
+		printf("AFTER FILTER: queue length = %d \n queue index = %d\n", 
+				frontier.queue_length, frontier.queue_index);
+
+		frontier.queue_reset = false;
+		oprtr_parameters.reduce_values_out   = &color_predicate;
+                oprtr_parameters.reduce_values_temp  = &color_temp;
+		oprtr_parameters.reduce_values_temp2 = &color_temp2;
+            	oprtr_parameters.reduce_reset        = true;
+            	oprtr_parameters.advance_mode        = "ALL_EDGES";
+
+		static ValueT Identity = util::PreDefinedValues<ValueT>::MinValue;
+
+		GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
+			 oprtr::OprtrMode_REDUCE_TO_SRC | oprtr::ReduceOp_None>(
+			 graph.csr(), 
+			 frontier.V_Q(), 
+			 null_ptr,
+			 oprtr_parameters, 
+			 advance_op,
+                 	 max_reduce_op, 
+			 Identity)); 
+
+	        GUARD_CU(frontier.work_progress.GetQueueLength(
+        	    frontier.queue_index, frontier.queue_length,
+            	    true, oprtr_parameters.stream, false));
+
+		printf("AFTER ADV: queue length = %d \n queue index = %d\n", 
+				frontier.queue_length, frontier.queue_index);
 
 	}
       }
