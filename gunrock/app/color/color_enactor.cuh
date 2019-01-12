@@ -358,7 +358,7 @@ struct ColorIterationLoop
 	
 	        GUARD_CU(frontier.work_progress.GetQueueLength(
         	    frontier.queue_index, frontier.queue_length,
-            	    true, oprtr_parameters.stream, false));
+            	    false, oprtr_parameters.stream, false));
 
 		printf("AFTER FILTER: queue length = %d \n queue index = %d\n", 
 				frontier.queue_length, frontier.queue_index);
@@ -384,7 +384,7 @@ struct ColorIterationLoop
 
 	        GUARD_CU(frontier.work_progress.GetQueueLength(
         	    frontier.queue_index, frontier.queue_length,
-            	    true, oprtr_parameters.stream, false));
+            	    false, oprtr_parameters.stream, false));
 
 		printf("AFTER ADV: queue length = %d \n queue index = %d\n", 
 				frontier.queue_length, frontier.queue_index);
