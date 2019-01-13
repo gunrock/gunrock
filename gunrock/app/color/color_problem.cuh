@@ -109,8 +109,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cudaError_t retval = cudaSuccess;
       if (target & util::DEVICE)
         GUARD_CU(util::SetDevice(this->gpu_idx));
-      if (hash_size != 0)
+      if (hash_size != 0) {
         GUARD_CU(prohibit.Release(target));
+      }
       if (color_balance) {
       	GUARD_CU(color_temp.Release(target));
       	GUARD_CU(color_temp2.Release(target));
