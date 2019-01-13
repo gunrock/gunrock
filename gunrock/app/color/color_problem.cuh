@@ -33,7 +33,6 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
 
   GUARD_CU(gunrock::app::UseParameters_problem(parameters));
 
-
   return retval;
 }
 
@@ -113,9 +112,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         GUARD_CU(prohibit.Release(target));
       }
       if (color_balance) {
-      	GUARD_CU(color_temp.Release(target));
-      	GUARD_CU(color_temp2.Release(target));
-      	GUARD_CU(color_predicate.Release(target));
+        GUARD_CU(color_temp.Release(target));
+        GUARD_CU(color_temp2.Release(target));
+        GUARD_CU(color_predicate.Release(target));
       }
       GUARD_CU(colors.Release(target));
       GUARD_CU(rand.Release(target));
@@ -135,9 +134,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      */
     cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,
                      util::Location target, ProblemFlag flag,
-                     bool color_balance_, int seed, int user_iter_, bool min_color_,
-                     bool test_run_, bool use_jpl_, int no_conflict_, bool loop_color_,
-                     int hash_size_) {
+                     bool color_balance_, int seed, int user_iter_,
+                     bool min_color_, bool test_run_, bool use_jpl_,
+                     int no_conflict_, bool loop_color_, int hash_size_) {
       cudaError_t retval = cudaSuccess;
 
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
@@ -153,14 +152,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       printf("DEBUG: problem %s\n", loop_color ? "true" : "false");
       curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
       curandSetPseudoRandomGeneratorSeed(gen, seed);
-      
+
       if (hash_size != 0)
         GUARD_CU(prohibit.Allocate(sub_graph.nodes * hash_size, target));
       if (color_balance) {
-      	printf("DEBUG: allocating for advance \n");
-      	GUARD_CU(color_temp.Allocate(sub_graph.edges, target));
-      	GUARD_CU(color_temp2.Allocate(sub_graph.edges, target));
-       	GUARD_CU(color_predicate.Allocate(sub_graph.nodes, target));
+        printf("DEBUG: allocating for advance \n");
+        GUARD_CU(color_temp.Allocate(sub_graph.edges, target));
+        GUARD_CU(color_temp2.Allocate(sub_graph.edges, target));
+        GUARD_CU(color_predicate.Allocate(sub_graph.nodes, target));
       }
       GUARD_CU(colors.Allocate(sub_graph.nodes, target));
       GUARD_CU(rand.Allocate(sub_graph.nodes, target));
@@ -185,9 +184,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       if (hash_size != 0)
         GUARD_CU(prohibit.EnsureSize_(nodes * hash_size, target));
       if (color_balance) {
-      	GUARD_CU(color_temp.EnsureSize_(edges, target));
-      	GUARD_CU(color_temp2.EnsureSize_(edges, target));
-      	GUARD_CU(color_predicate.EnsureSize_(nodes, target));
+        GUARD_CU(color_temp.EnsureSize_(edges, target));
+        GUARD_CU(color_temp2.EnsureSize_(edges, target));
+        GUARD_CU(color_predicate.EnsureSize_(nodes, target));
       }
       GUARD_CU(colors.EnsureSize_(nodes, target));
       GUARD_CU(rand.EnsureSize_(nodes, target));
@@ -202,12 +201,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             nodes, target, this->stream));
 
       if (color_balance) {
-	GUARD_CU(color_temp.ForEach(
+        GUARD_CU(color_temp.ForEach(
             [] __host__ __device__(ValueT & x) {
               x = util::PreDefinedValues<ValueT>::InvalidValue;
             },
             edges, target, this->stream));
-	GUARD_CU(color_temp2.ForEach(
+        GUARD_CU(color_temp2.ForEach(
             [] __host__ __device__(ValueT & x) {
               x = util::PreDefinedValues<ValueT>::InvalidValue;
             },
@@ -229,7 +228,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           rand.ForEach([] __host__ __device__(float &x) { x = (float)0.0f; },
                        nodes, target, this->stream));
 
-	curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), nodes);
+      curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), nodes);
 
       GUARD_CU(colored.ForAll(
           [] __host__ __device__(SizeT * x, const VertexT &pos) { x[pos] = 0; },
@@ -303,9 +302,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 ...
    * \return     cudaError_t Error message(s), if any
    */
-  cudaError_t Extract(
-      VertexT *h_colors,
-      util::Location target = util::DEVICE) {
+  cudaError_t Extract(VertexT *h_colors, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     SizeT nodes = this->org_graph->nodes;
 
@@ -387,8 +384,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       auto &data_slice = data_slices[gpu][0];
       GUARD_CU(data_slice.Init(
           this->sub_graphs[gpu], this->num_gpus, this->gpu_idx[gpu], target,
-          this->flag, this->color_balance, this->seed, this->user_iter, this->min_color,
-          this->test_run, this->use_jpl, this->no_conflict, this->hash_size, this->loop_color));
+          this->flag, this->color_balance, this->seed, this->user_iter,
+          this->min_color, this->test_run, this->use_jpl, this->no_conflict,
+          this->hash_size, this->loop_color));
     }
 
     return retval;

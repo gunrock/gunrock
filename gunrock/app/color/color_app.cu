@@ -30,21 +30,22 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_problem(parameters));
   GUARD_CU(UseParameters_enactor(parameters));
 
-
   GUARD_CU(parameters.Use<bool>(
-      "loop-color", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true, 
-      "Serially compare rand to all node neighbor, disable to use advance neighbor reduce (default=false)",
+      "loop-color", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
+      "Serially compare rand to all node neighbor, disable to use advance "
+      "neighbor reduce (default=false)",
       __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<bool>(
       "min-color", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
-      "Enable coloring with minimum independent set as well as maximum(default=true)", __FILE__,
-      __LINE__));
+      "Enable coloring with minimum independent set as well as "
+      "maximum(default=true)",
+      __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<bool>(
       "test-run", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
-      "Perform test run to atomically generate max iteration (default=true)", __FILE__,
-      __LINE__));
+      "Perform test run to atomically generate max iteration (default=true)",
+      __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
       "user-iter",
@@ -61,16 +62,14 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       "Resolve color conflict, 0 to skip check, 1 to check at end of\
       every iteration with random,\
       2 to check at end of every iteration with degree(default = 0).",
-      __FILE__,
-      __LINE__));
+      __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
       "hash-size", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0,
       "Needed to allocate memory for hash function, if parameter is\
       positive,\
       hash coloring is used instead of random coloring (default = 0).",
-      __FILE__,
-      __LINE__));
+      __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
       "seed", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, time(NULL),
@@ -80,7 +79,6 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       "LBCOLOR", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
       "load balancing enabled for graph coloring (true=neighbor_reduce)",
       __FILE__, __LINE__));
-
 
   return retval;
 }
@@ -149,8 +147,9 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
     if (validation == "each") {
 
-      GUARD_CU(problem.Extract(h_colors ));
-      SizeT num_errors = Validate_Results(parameters, graph, h_colors, ref_colors,false);
+      GUARD_CU(problem.Extract(h_colors));
+      SizeT num_errors =
+          Validate_Results(parameters, graph, h_colors, ref_colors, false);
     }
   }
 
@@ -158,7 +157,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   GUARD_CU(problem.Extract(h_colors));
   if (validation == "last") {
-    SizeT num_errors = Validate_Results(parameters, graph, h_colors, ref_colors, false);
+    SizeT num_errors =
+        Validate_Results(parameters, graph, h_colors, ref_colors, false);
   }
 
   // compute running statistics
