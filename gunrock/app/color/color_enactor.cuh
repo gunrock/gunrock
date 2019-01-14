@@ -145,14 +145,14 @@ struct ColorIterationLoop
 		     !util::isValid(colors[max]))
 			c_max ++;
 		if ((prohibit[min_offset + counter] == c_min) &&
-		     !util::isValid(colors[min])
+		     !util::isValid(colors[min]))
 			c_min++;
 	}
 
 	if (c_max <= prohibit_size)
-		colors[max] = c_max
+		colors[max] = c_max;
 	if (c_min <= prohibit_size) 
-		colors[min] = c_min 	
+		colors[min] = c_min; 	
 
           // if hash coloring fail because not enough space, fall back to
           // color by iteration
