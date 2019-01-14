@@ -269,10 +269,12 @@ struct ColorIterationLoop
                           const VertexT &src, VertexT &dest,
                           const SizeT &edge_id, const VertexT &input_item,
                           const SizeT &input_pos, SizeT &output_pos) -> ValueT {
+#if 0
       printf("ADVANCE: At iteration = %d\n", iteration);
       printf("ADVANCE: src = %d\n", src);
       // printf("ADVANCE: input_item = %d\n", input_item);
       // printf("ADVANCE: input_pos = %d\n", input_pos);
+#endif
       printf("ADVANCE: dest = %d and %f\n", dest, (ValueT)dest);
       return (ValueT)dest;
     };
@@ -285,20 +287,17 @@ struct ColorIterationLoop
     auto max_reduce_op = [rand, colors, iteration] __host__ __device__(
                              const ValueT &a, const ValueT &b) -> ValueT {
       printf("REDUCE: (a, b) = (%f, %f)\n", a, b);
-      printf("REDUCE: rand(a, b) = (%f, %f)\n", rand[a], rand[b]);
+      // printf("REDUCE: rand(a, b) = (%f, %f)\n", rand[a], rand[b]);
 
       VertexT v = (VertexT)a;
       VertexT u = (VertexT)b;
 
-      ValueT randa = rand[v];
-      ValueT randb = rand[u];
+      printf("REDUCE: (v, u) = (%f, %f)\n", v, u);
 
-      if ((util::isValid(colors[u])) && (colors[u] != iteration) || (v == u)) {
-        randb = (ValueT)-1;
-        printf("REDUCE: vertex was colored. \n");
+      if ((util::isValid(colors[u])) && (colors[u] == iteration) || (v == u)) {
+        return (rand[v] < rand[u]) ? u : v;
       }
-
-      return (randa < randb) ? u : v;
+      return util::PreDefinedValues<ValueT>::InvalidValue;
     };
 
     // =======================================================================
@@ -382,30 +381,19 @@ struct ColorIterationLoop
         auto reduce_color_op =
             [colors, color_predicate, iteration] __host__ __device__(
                 VertexT * v_q, const SizeT &pos) {
-              // VertexT v = v_q[pos];
-
-              if (!util::isValid(color_predicate[pos]))
+              VertexT v = v_q[pos];
+              if (util::isValid(colors[v]))
                 return;
-              VertexT id = color_predicate[pos];
+
+              if (!util::isValid(color_predicate[v]))
+                return;
+              VertexT id = color_predicate[v];
               colors[id] = iteration;
               return;
             };
 
         GUARD_CU(frontier.V_Q()->ForAll(reduce_color_op, frontier.queue_length,
                                         util::DEVICE, stream));
-
-#if 0
-		printf("AFTER RED: queue length = %d \n queue index = %d\n",
-                                frontier.queue_length, frontier.queue_index);
-
-		frontier.queue_index++;	
-	        GUARD_CU(frontier.work_progress.GetQueueLength(
-        	    frontier.queue_index, frontier.queue_length,
-            	    false, oprtr_parameters.stream, false));
-
-		printf("AFTER ADV: queue length = %d \n queue index = %d\n", 
-				frontier.queue_length, frontier.queue_index);
-#endif
       }
     }
 
@@ -428,7 +416,7 @@ struct ColorIterationLoop
                                       util::DEVICE, stream));
     }
 
-    if (test_run && !color_balance) {
+    if (test_run) {
 
       // reset atomic count
       GUARD_CU(data_slice.colored.ForAll(
@@ -464,7 +452,6 @@ struct ColorIterationLoop
     auto &graph = data_slice.sub_graph[0];
     auto test_run = data_slice.test_run;
     auto frontier = enactor_slices[0].frontier;
-    auto color_balance = data_slice.color_balance;
     // printf("DEBUG: iteration number %d, colored: %d\n", iter,
     //       data_slice.colored[0]);
 
