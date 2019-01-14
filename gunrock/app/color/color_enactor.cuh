@@ -135,29 +135,29 @@ struct ColorIterationLoop
           }
 
           // max hash coloring
-	  auto max_color = iteration * 2 + 1;
+          auto max_color = iteration * 2 + 1;
           SizeT prohibit_offset = max * hash_size;
-	if ((hash_size != 0) && (!util::isValid(colors[max]))) {
-          for (int c = 1, n = 0; (c < max_color) || (n < hash_size);
-               c++, n++) {
-            if (prohibit[prohibit_offset + n] != c) {
-              colors[max] = c;
-              break;
+          if ((hash_size != 0) && (!util::isValid(colors[max]))) {
+            for (int c = 1, n = 0; (c < max_color) || (n < hash_size);
+                 c++, n++) {
+              if (prohibit[prohibit_offset + n] != c) {
+                colors[max] = c;
+                break;
+              }
             }
           }
-	}
           // min hash coloring
-	  auto min_color = iteration * 2 + 2;
+          auto min_color = iteration * 2 + 2;
           prohibit_offset = min * hash_size;
-	if ((hash_size != 0) && (!util::isValid(colors[min]))) {
-          for (int c = 1, n = 0; (c < iteration * 2 + 1) || (n < hash_size);
-               c++, n++) {
-            if (prohibit[prohibit_offset + n] != c) {
-              colors[min] = c;
-              break;
+          if ((hash_size != 0) && (!util::isValid(colors[min]))) {
+            for (int c = 1, n = 0; (c < iteration * 2 + 1) || (n < hash_size);
+                 c++, n++) {
+              if (prohibit[prohibit_offset + n] != c) {
+                colors[min] = c;
+                break;
+              }
             }
           }
-	}
           // if hash coloring fail because not enough space, fall back to
           // color by iteration
           if (!util::isValid(colors[max]))
@@ -269,18 +269,14 @@ struct ColorIterationLoop
     @Description: advance to neighbor random number for coloring comparison
     */
     //========================================================================
-    auto advance_op = [graph, iteration, colors] __host__ __device__(
+    auto advance_op = [graph, iteration, colors, rand] __host__ __device__(
                           const VertexT &src, VertexT &dest,
                           const SizeT &edge_id, const VertexT &input_item,
                           const SizeT &input_pos, SizeT &output_pos) -> ValueT {
-#if 0
-      printf("ADVANCE: At iteration = %d\n", iteration);
-      printf("ADVANCE: src = %d\n", src);
-      // printf("ADVANCE: input_item = %d\n", input_item);
-      // printf("ADVANCE: input_pos = %d\n", input_pos);
-#endif
-      printf("ADVANCE: dest = %d and %f\n", dest, (ValueT)dest);
-      return (ValueT)dest;
+      // printf("ADVANCE: dest = %d and %f\n", dest, rand[dest]);
+
+      if (util::isValid(colors[dest])) return (ValueT) -1;
+      return rand[dest];
     };
 
     // =======================================================================
@@ -289,53 +285,8 @@ struct ColorIterationLoop
     */
     //========================================================================
     auto reduce_op = [rand, colors, iteration] __host__ __device__(
-                             const ValueT &a, const ValueT &b) -> ValueT {
-      printf("REDUCE: (a, b) = (%f, %f)\n", a, b);
-      // printf("REDUCE: rand(a, b) = (%f, %f)\n", rand[a], rand[b]);
-
-      VertexT v = (VertexT)a;
-      VertexT u = (VertexT)b;
-
-      printf("REDUCE: (v, u) = (%f, %f)\n", v, u);
-
-      if ((util::isValid(colors[u])) && (colors[u] == iteration) || (v == u)) {
-        return (rand[v] < rand[u]) ? u : v;
-      }
-      return util::PreDefinedValues<ValueT>::InvalidValue;
-    };
-
-    // =======================================================================
-    /* filterAndColor_op
-    @Description: color selected node then remove it from frontier.
-    */
-    //========================================================================
-
-    auto filterAndColor_op =
-        [iteration, colors, color_predicate] __host__ __device__(
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool {
-      printf("FILTER: src = %d \n", src);
-      printf("FILTER: dest = %d \n", dest);
-      // printf("FILTER: edge_id = %d \n", edge_id);
-      // printf("FILTER: input_item = %d \n", input_item);
-      // printf("FILTER: input_pos = %d \n", input_pos);
-      // printf("FILTER: output_pos = %d \n", output_pos);
-      printf("FILTER: color_predicate[] = %f and (vertext) %u \n",
-             color_predicate[dest], (VertexT)color_predicate[dest]);
-
-      // if the node is not selected to be colored, keep it in frontier
-      if (!util::isValid(color_predicate[dest]))
-        return true;
-      VertexT id = (VertexT)color_predicate[dest];
-
-      // after color the node, drop it from frontier
-      printf("FILTER: coloring node %d, to color = %d\n", id, iteration);
-      colors[id] = iteration;
-      return false;
-
-      if (!util::isValid(colors[input_item]))
-        return true;
+                         const ValueT &a, const ValueT &b) -> ValueT {
+      return (a < b) ? b : a;
     };
 
     // =======================================================================
@@ -378,25 +329,44 @@ struct ColorIterationLoop
 
         GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
                                        oprtr::OprtrMode_REDUCE_TO_SRC |
-                                       oprtr::ReduceOp_None>(
+                                       oprtr::ReduceOp_Max>(
             graph.csr(), null_ptr, null_ptr, oprtr_parameters, advance_op,
-            reduce_op, (ValueT)-1));
+            reduce_op, Identity));
 
         auto reduce_color_op =
-            [colors, color_predicate, iteration] __host__ __device__(
-                VertexT * v_q, const SizeT &pos) {
+            [graph, rand, colors, color_predicate, iteration] __host__
+            __device__(VertexT * v_q, const SizeT &pos) {
               VertexT v = v_q[pos];
-              if (util::isValid(colors[v]))
-                return;
+	      if (util::isValid(colors[v])) return;
 
-              if (!util::isValid(color_predicate[v]))
-                return;
-              VertexT id = color_predicate[v];
-              colors[id] = iteration;
-              return;
+#if 0
+              if (pos == 0) {
+                for (auto j = 0; j < graph.nodes; j++) {
+                  SizeT start_edge = graph.CsrT::GetNeighborListOffset(j);
+                  SizeT num_neighbors = graph.CsrT::GetNeighborListLength(j);
+                  printf("COLOR: src = %u and neighbor list = [", j);
+                  for (SizeT e = start_edge; e < start_edge + num_neighbors;
+                       e++) {
+                    VertexT u = graph.CsrT::GetEdgeDest(e);
+                    printf(" %u,", u);
+                  }
+                  printf("]\n");
+                }
+              }
+#endif
+
+	      if (color_predicate[v] < rand[v])
+	      	colors[v] = iteration;
+
+              // printf("COLOR: rand[%u] = %f \n", v, rand[v]);
+              // printf("COLOR: color_predicate[%u] = %f \n", v,
+              //       color_predicate[v]);
+
+              // printf("COLOR: colors[%u] = %u \n", v, colors[v]);
+	      return;
             };
 
-        GUARD_CU(frontier.V_Q()->ForAll(reduce_color_op, frontier.queue_length,
+        GUARD_CU(frontier.V_Q()->ForAll(reduce_color_op, graph.nodes,
                                         util::DEVICE, stream));
       }
     }
@@ -408,20 +378,22 @@ struct ColorIterationLoop
                                       util::DEVICE, stream));
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
 
-    // optional resolution to make method exact solution
-    if (no_conflict == 1 || no_conflict == 2) {
+      // optional resolution to make method exact solution
+      if (no_conflict == 1 || no_conflict == 2) {
 
-      // optinal coloring by hash function n * hash_size (non-exact)
-      if (hash_size != 0) {
-         GUARD_CU(frontier.V_Q()->ForAll(gen_op, graph.nodes * hash_size, util::DEVICE,
-                                 stream));
-	 GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
-	}
-	
-	GUARD_CU(frontier.V_Q()->ForAll(resolve_op, frontier.queue_length,
-                                      util::DEVICE, stream));
-	GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
-     }
+        // optinal coloring by hash function n * hash_size (non-exact)
+        if (hash_size != 0) {
+          GUARD_CU(frontier.V_Q()->ForAll(gen_op, graph.nodes * hash_size,
+                                          util::DEVICE, stream));
+          GUARD_CU2(cudaStreamSynchronize(stream),
+                    "cudaStreamSynchronize failed");
+        }
+
+        GUARD_CU(frontier.V_Q()->ForAll(resolve_op, frontier.queue_length,
+                                        util::DEVICE, stream));
+        GUARD_CU2(cudaStreamSynchronize(stream),
+                  "cudaStreamSynchronize failed");
+      }
     }
 
     if (test_run) {
