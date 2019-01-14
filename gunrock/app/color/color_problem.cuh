@@ -67,6 +67,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, ValueT> color_predicate;
     util::Array1D<SizeT, float> rand;
     util::Array1D<SizeT, VertexT> prohibit;
+    util::Array1D<SizeT, bool> visited;
 
     curandGenerator_t gen;
     bool color_balance;
@@ -85,6 +86,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      */
     DataSlice() : BaseDataSlice() {
       prohibit.SetName("prohibit");
+      visited.SetName("visited");
       colors.SetName("colors");
       color_temp.SetName("color_temp");
       color_temp2.SetName("color_temp2");
@@ -108,6 +110,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       if (target & util::DEVICE)
         GUARD_CU(util::SetDevice(this->gpu_idx));
       if (prohibit_size != 0) {
+	GUARD_CU(visited.Release(target));
         GUARD_CU(prohibit.Release(target));
       }
       if (color_balance) {
@@ -150,8 +153,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
       curandSetPseudoRandomGeneratorSeed(gen, seed);
 
-      if (prohibit_size != 0)
+      if (prohibit_size != 0) {
+	GUARD_CU(visited.Allocate(sub_graph.nodes, target));
         GUARD_CU(prohibit.Allocate(sub_graph.nodes * prohibit_size, target));
+      }
       if (color_balance) {
         printf("DEBUG: allocating for advance \n");
         GUARD_CU(color_temp.Allocate(sub_graph.edges, target));
@@ -178,8 +183,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       SizeT nodes = this->sub_graph->nodes;
       SizeT edges = this->sub_graph->edges;
       // Ensure data are allocated
-      if (prohibit_size != 0)
-        GUARD_CU(prohibit.EnsureSize_(nodes * prohibit_size, target));
+      if (prohibit_size != 0) {
+       	GUARD_CU(visited.EnsureSize_(nodes, target));
+	GUARD_CU(prohibit.EnsureSize_(nodes * prohibit_size, target));
+      }
       if (color_balance) {
         GUARD_CU(color_temp.EnsureSize_(edges, target));
         GUARD_CU(color_temp2.EnsureSize_(edges, target));
@@ -190,13 +197,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(colored.EnsureSize_(1, util::HOST | target));
 
       // Reset data
-      if (prohibit_size != 0)
-        GUARD_CU(prohibit.ForEach(
+      if (prohibit_size != 0) {
+        GUARD_CU(visited.ForEach(
+	[] __host__ __device__ (bool & x) {
+	  x = false;
+	},
+	nodes, target, this->stream));
+
+	GUARD_CU(prohibit.ForEach(
             [] __host__ __device__(VertexT & x) {
               x = util::PreDefinedValues<VertexT>::InvalidValue;
             },
             nodes, target, this->stream));
-
+      }
       if (color_balance) {
         GUARD_CU(color_temp.ForEach(
             [] __host__ __device__(ValueT & x) {

@@ -18,7 +18,7 @@ fi
     --no-conflict=1 \
     --seed=123 \
     --user-iter=0 \
-    --hash-size=0 \
+    --hash-size=40 \
     --quick=false \
     --test-run=true \
     --undirected \

@@ -82,6 +82,7 @@ struct ColorIterationLoop
     auto &iteration = enactor_stats.iteration;
 
     auto &colors = data_slice.colors;
+    auto &visited = data_slice.visited;
     auto &rand = data_slice.rand;
     auto &color_predicate = data_slice.color_predicate;
     auto &color_temp = data_slice.color_temp;
@@ -103,8 +104,7 @@ struct ColorIterationLoop
     // Run --                                                               //
     //======================================================================//
 
-    // JPL exact method
-    // printf("DEBUG: =====Start Iteration====\n");
+    // JPL method
     if (use_jpl) {
       if (!color_balance) {
 
@@ -224,11 +224,11 @@ struct ColorIterationLoop
       }
     }
 
-    // Current method in development
+    // Hash method
     else {
       auto color_op =
-          [graph, colors, rand, iteration, prohibit_size, prohibit] __host__
-          __device__(VertexT * v_q, const SizeT &pos) {
+          [graph, colors, rand, iteration, prohibit_size, visited, prohibit] 
+	  __host__ __device__(VertexT * v_q, const SizeT &pos) {
             VertexT v = v_q[pos];
             SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
             SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
@@ -249,27 +249,30 @@ struct ColorIterationLoop
               temp = rand[u]; // compare against e-1
             }
 
-            // hash coloring
+            //max hash coloring
             auto max_color = iteration * 2 + 1;
-            auto min_color = iteration * 2 + 2;
+	    auto min_color = iteration * 2 + 2;
             auto max_offset = max * prohibit_size;
-            auto min_offset = min * prohibit_size;
-            int c_max = 1;
-            int c_min = 1;
-            for (int counter = 0; counter < prohibit_size; counter++) {
-              // max hash
-              if ((prohibit[max_offset + counter] == c_max) &&
-                  !util::isValid(colors[max]))
-                c_max++;
-              if ((prohibit[min_offset + counter] == c_min) &&
-                  !util::isValid(colors[min]))
-                c_min++;
-            }
+	    int hash_max_color = -1;
 
-            if (c_max <= prohibit_size)
-              colors[max] = c_max;
-            if (c_min <= prohibit_size)
-              colors[min] = c_min;
+	    if (prohibit_size != 0) {
+   
+	    for (int c_max = 0; c_max < max_color && !visited[max] && !util::isValid(colors[max]); c_max++) {
+            	for (int i = 0; i < prohibit_size; i++) {
+              	  if (prohibit[max_offset + i] == c_max) {
+	    		hash_max_color = -1; //if any element in prohibit list conflict, reset to -1
+                	continue;
+	    	  }  
+	    	  else 
+	    		hash_max_color = c_max;
+            	}
+	        if (hash_max_color != -1) {
+	    	  colors[max] = hash_max_color;
+	    	  break;
+	    	}
+	    }
+
+	  }
 
             // if hash coloring fail because not enough space, fall back to
             // color by iteration
@@ -305,8 +308,8 @@ struct ColorIterationLoop
         }
 
         auto resolve_op =
-            [graph, colors, rand, no_conflict] __host__ __device__(
-                VertexT * v_q, const SizeT &pos) {
+            [graph, colors, rand, no_conflict, visited, prohibit_size] __host__ 
+	        __device__( VertexT * v_q, const SizeT &pos) {
               VertexT v = v_q[pos];
               SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
               SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
@@ -319,6 +322,8 @@ struct ColorIterationLoop
 
                     // decide by random number
                     if (rand[u] >= rand[v] && no_conflict == 1) {
+		      if (prohibit_size != 0)
+		      	visited[v] = true;
                       colors[v] = util::PreDefinedValues<VertexT>::InvalidValue;
                       break;
                     }
