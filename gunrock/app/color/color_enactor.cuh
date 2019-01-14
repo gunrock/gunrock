@@ -124,10 +124,10 @@ struct ColorIterationLoop
 
           for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
             VertexT u = graph.CsrT::GetEdgeDest(e);
-            if (rand[u] > temp)
+            if ((rand[u] > temp) && !util::isValid(colors[u]))
               max = u;
 
-            if (rand[u] < temp)
+            if ((rand[u] < temp) && !util::isValid(colors[u]))
               min = u;
 
             // printf("Let's see what rand[u] = %f\n", rand[u]);
@@ -135,17 +135,21 @@ struct ColorIterationLoop
           }
 
           // max hash coloring
+	  auto max_color = iteration * 2 + 1;
           SizeT prohibit_offset = max * hash_size;
-          for (int c = 1, n = 0; (c < iteration * 2 + 1) || (n < hash_size);
+	if ((hash_size != 0) && (!util::isValid(colors[max]))) {
+          for (int c = 1, n = 0; (c < max_color) || (n < hash_size);
                c++, n++) {
             if (prohibit[prohibit_offset + n] != c) {
               colors[max] = c;
               break;
             }
           }
-
+	}
           // min hash coloring
+	  auto min_color = iteration * 2 + 2;
           prohibit_offset = min * hash_size;
+	if ((hash_size != 0) && (!util::isValid(colors[min]))) {
           for (int c = 1, n = 0; (c < iteration * 2 + 1) || (n < hash_size);
                c++, n++) {
             if (prohibit[prohibit_offset + n] != c) {
@@ -153,14 +157,14 @@ struct ColorIterationLoop
               break;
             }
           }
-
+	}
           // if hash coloring fail because not enough space, fall back to
           // color by iteration
           if (!util::isValid(colors[max]))
-            colors[max] = iteration * 2 + 1;
+            colors[max] = max_color;
 
           if (!util::isValid(colors[min]))
-            colors[min] = iteration * 2 + 2;
+            colors[min] = min_color;
         };
 
     // =======================================================================
@@ -171,14 +175,14 @@ struct ColorIterationLoop
     divergence.
     */
     // =======================================================================
-    auto gen_op = [graph, colors, hash_size] __host__ __device__(
-                      VertexT * prohibit_, const SizeT &pos) {
-      VertexT v = pos / hash_size;
-      SizeT a_idx = pos % hash_size;
+    auto gen_op = [graph, colors, hash_size, prohibit] __host__ __device__(
+                      VertexT * v_q, const SizeT &pos) {
+      VertexT v = v_q[pos];
+      SizeT a_idx = (v * hash_size) % hash_size;
       SizeT e = graph.CsrT::GetNeighborListOffset(v) + a_idx;
 
       VertexT u = graph.CsrT::GetEdgeDest(e);
-      prohibit_[pos] = colors[u];
+      prohibit[pos] = colors[u];
     };
 
     // =======================================================================
@@ -284,7 +288,7 @@ struct ColorIterationLoop
     @Description: coloring comparison for max rand
     */
     //========================================================================
-    auto max_reduce_op = [rand, colors, iteration] __host__ __device__(
+    auto reduce_op = [rand, colors, iteration] __host__ __device__(
                              const ValueT &a, const ValueT &b) -> ValueT {
       printf("REDUCE: (a, b) = (%f, %f)\n", a, b);
       // printf("REDUCE: rand(a, b) = (%f, %f)\n", rand[a], rand[b]);
@@ -376,7 +380,7 @@ struct ColorIterationLoop
                                        oprtr::OprtrMode_REDUCE_TO_SRC |
                                        oprtr::ReduceOp_None>(
             graph.csr(), null_ptr, null_ptr, oprtr_parameters, advance_op,
-            max_reduce_op, (ValueT)-1));
+            reduce_op, (ValueT)-1));
 
         auto reduce_color_op =
             [colors, color_predicate, iteration] __host__ __device__(
@@ -402,18 +406,22 @@ struct ColorIterationLoop
       // color by max and min independent set, non-exactsolution
       GUARD_CU(frontier.V_Q()->ForAll(color_op, frontier.queue_length,
                                       util::DEVICE, stream));
-    }
+      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
 
     // optional resolution to make method exact solution
     if (no_conflict == 1 || no_conflict == 2) {
 
       // optinal coloring by hash function n * hash_size (non-exact)
-      if (hash_size != 0)
-        GUARD_CU(prohibit.ForAll(gen_op, graph.nodes * hash_size, util::DEVICE,
+      if (hash_size != 0) {
+         GUARD_CU(frontier.V_Q()->ForAll(gen_op, graph.nodes * hash_size, util::DEVICE,
                                  stream));
-
-      GUARD_CU(frontier.V_Q()->ForAll(resolve_op, frontier.queue_length,
+	 GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+	}
+	
+	GUARD_CU(frontier.V_Q()->ForAll(resolve_op, frontier.queue_length,
                                       util::DEVICE, stream));
+	GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+     }
     }
 
     if (test_run) {

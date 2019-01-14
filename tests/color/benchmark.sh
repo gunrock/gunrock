@@ -30,6 +30,7 @@ echo "[0] Run JPL with atomic"
 echo "[1] Run JPL with user-defined iteration"
 echo "[2] Run JPL atomic with min and max coloring"
 echo "[3] Run JPL with min and max and user-defined iteration"
+echo "[4] Run Hash implementation with atomic"
 read -p "Option: " option
 
 if [[ $option == "0" ]]
@@ -147,6 +148,36 @@ then
     --device=3 \
     --min-color=true \
     --test-run=false > ./$logsFolder/$i.log
+    grep -F "Max iteration" ./$logsFolder/$i.log
+    grep -F "Number of colors" ./$logsFolder/$i.log
+    grep -F "avg. elapsed" ./$logsFolder/$i.log
+    echo "=================================================="
+    printf "\n"
+  done
+fi
+
+
+
+if [[ $option == "4" ]]
+then
+  logsFolder="logsHashAtomic"
+  mkdir $logsFolder
+  for i in `seq 0 11`;
+  do
+    echo "=================================================="
+    echo "Testing Dataset $i: ${ADDR_ARRAY[$i]}"
+    rm ./$logsFolder/$i.log
+    touch ./$logsFolder/$i.log
+    ./bin/test_color_10.0_x86_64 --graph-type=market \
+    --graph-file=${ADDR_ARRAY[$i]} \
+    --JPL=false \
+    --no-conflict=1 \
+    --user-iter=0 \
+    --hash-size=0 \
+    --quick=false \
+    --device=3 \
+    --undirected \
+    --test-run=true > ./$logsFolder/$i.log
     grep -F "Max iteration" ./$logsFolder/$i.log
     grep -F "Number of colors" ./$logsFolder/$i.log
     grep -F "avg. elapsed" ./$logsFolder/$i.log
