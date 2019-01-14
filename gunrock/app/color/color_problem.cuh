@@ -377,11 +377,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
 
       auto &data_slice = data_slices[gpu][0];
-      GUARD_CU(data_slice.Init(
-          this->sub_graphs[gpu], this->num_gpus, this->gpu_idx[gpu], target,
-          this->flag, this->color_balance, this->seed, this->user_iter,
-          this->min_color, this->test_run, this->use_jpl, this->no_conflict,
-          this->prohibit_size));
+      GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
+                               this->gpu_idx[gpu], target, this->flag,
+                               this->color_balance, this->seed, this->user_iter,
+                               this->min_color, this->test_run, this->use_jpl,
+                               this->no_conflict, this->prohibit_size));
     }
 
     return retval;
