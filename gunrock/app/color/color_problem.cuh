@@ -76,7 +76,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     int user_iter;
     bool min_color;
     bool loop_color;
-    int hash_size;
+    int prohibit_size;
 
     util::Array1D<SizeT, SizeT> colored;
     SizeT colored_;
@@ -108,7 +108,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cudaError_t retval = cudaSuccess;
       if (target & util::DEVICE)
         GUARD_CU(util::SetDevice(this->gpu_idx));
-      if (hash_size != 0) {
+      if (prohibit_size != 0) {
         GUARD_CU(prohibit.Release(target));
       }
       if (color_balance) {
@@ -136,7 +136,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
                      util::Location target, ProblemFlag flag,
                      bool color_balance_, int seed, int user_iter_,
                      bool min_color_, bool test_run_, bool use_jpl_,
-                     int no_conflict_, bool loop_color_, int hash_size_) {
+                     int no_conflict_, bool loop_color_, int prohibit_size_) {
       cudaError_t retval = cudaSuccess;
 
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
@@ -148,13 +148,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       test_run = test_run_;
       use_jpl = use_jpl_;
       no_conflict = no_conflict_;
-      hash_size = hash_size_;
+      prohibit_size = prohibit_size_;
       printf("DEBUG: problem %s\n", loop_color ? "true" : "false");
       curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
       curandSetPseudoRandomGeneratorSeed(gen, seed);
 
-      if (hash_size != 0)
-        GUARD_CU(prohibit.Allocate(sub_graph.nodes * hash_size, target));
+      if (prohibit_size != 0)
+        GUARD_CU(prohibit.Allocate(sub_graph.nodes * prohibit_size, target));
       if (color_balance) {
         printf("DEBUG: allocating for advance \n");
         GUARD_CU(color_temp.Allocate(sub_graph.edges, target));
@@ -181,8 +181,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       SizeT nodes = this->sub_graph->nodes;
       SizeT edges = this->sub_graph->edges;
       // Ensure data are allocated
-      if (hash_size != 0)
-        GUARD_CU(prohibit.EnsureSize_(nodes * hash_size, target));
+      if (prohibit_size != 0)
+        GUARD_CU(prohibit.EnsureSize_(nodes * prohibit_size, target));
       if (color_balance) {
         GUARD_CU(color_temp.EnsureSize_(edges, target));
         GUARD_CU(color_temp2.EnsureSize_(edges, target));
@@ -193,7 +193,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(colored.EnsureSize_(1, util::HOST | target));
 
       // Reset data
-      if (hash_size != 0)
+      if (prohibit_size != 0)
         GUARD_CU(prohibit.ForEach(
             [] __host__ __device__(VertexT & x) {
               x = util::PreDefinedValues<VertexT>::InvalidValue;
@@ -250,7 +250,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   bool use_jpl;
   bool color_balance;
   int no_conflict;
-  int hash_size;
+  int prohibit_size;
 
   // ----------------------------------------------------------------
   // Problem Methods
@@ -268,7 +268,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     test_run = _parameters.Get<bool>("test-run");
     use_jpl = _parameters.Get<bool>("JPL");
     no_conflict = _parameters.Get<int>("no-conflict");
-    hash_size = _parameters.Get<int>("hash-size");
+    prohibit_size = _parameters.Get<int>("prohibit-size");
   }
 
   /**
@@ -386,7 +386,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           this->sub_graphs[gpu], this->num_gpus, this->gpu_idx[gpu], target,
           this->flag, this->color_balance, this->seed, this->user_iter,
           this->min_color, this->test_run, this->use_jpl, this->no_conflict,
-          this->hash_size, this->loop_color));
+          this->prohibit_size, this->prohibit_size));
     }
 
     return retval;
