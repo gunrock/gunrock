@@ -65,7 +65,7 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
-      "hash-size", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0,
+      "prohibit-size", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0,
       "Needed to allocate memory for hash function, if parameter is\
       positive,\
       hash coloring is used instead of random coloring (default = 0).",
