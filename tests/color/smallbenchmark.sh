@@ -15,10 +15,8 @@ fi
 ./bin/test_color_10.0_x86_64 --graph-type=market \
     --graph-file=$address \
     --JPL=false \
-    --no-conflict=1 \
-    --seed=123 \
     --user-iter=0 \
-    --hash-size=40 \
+    --hash-size=300 \
     --quick=false \
     --test-run=true \
     --undirected \
