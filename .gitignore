@@ -43,3 +43,8 @@ gunrock/util/gitsha1.c
 
 # Ignore build directory
 build
+
+# Ignore Eclipse files
+.cproject
+.project
+.settings
