@@ -19,6 +19,7 @@
 
 #include <gunrock/app/color/color_enactor.cuh>
 #include <gunrock/app/color/color_test.cuh>
+#include <cstdio>
 
 namespace gunrock {
 namespace app {
@@ -29,17 +30,29 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_app(parameters));
   GUARD_CU(UseParameters_problem(parameters));
   GUARD_CU(UseParameters_enactor(parameters));
+  GUARD_CU(UseParameters_test(parameters));
+
+
+GUARD_CU(parameters.Use<int>(
+      "num-colors", util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER, 0,
+      "number of output colors",
+      __FILE__, __LINE__));
+
+   GUARD_CU(parameters.Use<std::string>(
+      "tag", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, "",
+      "tag info for json string",
+      __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<bool>(
       "loop-color", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
-      "Serially compare rand to all node neighbor, disable to use advance "
-      "neighbor reduce (default=false)",
+      "Serially compare rand to all node neighbor, disable to use advance \
+      neighbor reduce (default=false)",
       __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<bool>(
       "min-color", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
-      "Enable coloring with minimum independent set as well as "
-      "maximum(default=true)",
+      "Enable coloring with minimum independent set as well as \
+      maximum(default=true)",
       __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<bool>(
@@ -126,7 +139,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   cpu_timer.Stop();
   parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
-
+  int num_colors = 0;
   for (int run_num = 0; run_num < num_runs; ++run_num) {
     GUARD_CU(problem.Reset(target));
     GUARD_CU(enactor.Reset(target));
@@ -144,12 +157,11 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
             ", #iterations = " +
             std::to_string(enactor.enactor_slices[0].enactor_stats.iteration),
         !quiet_mode);
-
     if (validation == "each") {
 
       GUARD_CU(problem.Extract(h_colors));
       SizeT num_errors =
-          Validate_Results(parameters, graph, h_colors, ref_colors, false);
+          Validate_Results(parameters, graph, h_colors, ref_colors, &num_colors, false);
     }
   }
 
@@ -158,8 +170,12 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   GUARD_CU(problem.Extract(h_colors));
   if (validation == "last") {
     SizeT num_errors =
-        Validate_Results(parameters, graph, h_colors, ref_colors, false);
+        Validate_Results(parameters, graph, h_colors, ref_colors, &num_colors, false);
   }
+  printf("Number of colors needed: %d\n", num_colors);
+    
+  UseParameters_test(parameters);
+  parameters.Set("num-colors", num_colors);
 
   // compute running statistics
   // h_distances

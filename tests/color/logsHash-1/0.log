@@ -1,0 +1,71 @@
+Loading Matrix-market coordinate-formatted graph ...
+Reading from /data-2/topc-datasets/gc-data/offshore/offshore.mtx:
+  Parsing MARKET COO format edge-value-seed = 1547731464
+ (259789 nodes, 4502462 directed edges)... 
+Done parsing (1 s).
+Removed 519578 duplicate edges and self circles.
+  Converting 259789 vertices, 3982884 directed edges ( ordered tuples) to CSR format...
+Done converting (0s).
+Computing reference value ...
+__________________________
+--------------------------
+ Elapsed: 31.639814
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+0	 0	 0	 queue3 	 oversize :	 1558734 ->	 3982886
+0	 0	 0	 queue3 	 oversize :	 1558734 ->	 3982886
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+Max iteration: 12
+--------------------------
+Run 0 elapsed: 38.846016, #iterations = 12
+Validating result ...  
+Comparison: <node idx, gunrock, cpu>
+0 errors occurred.
+Number of colors needed: 23
+[color] finished.
+ avg. elapsed: 38.846016 ms
+ iterations: 12
+ min. elapsed: 38.846016 ms
+ max. elapsed: 38.846016 ms
+ load time: 0 ms
+ preprocess time: 189.828000 ms
+ postprocess time: 14.879942 ms
+ total time: 258.478880 ms

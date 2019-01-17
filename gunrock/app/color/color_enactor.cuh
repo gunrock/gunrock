@@ -251,16 +251,18 @@ struct ColorIterationLoop
 
             //hash coloring
             auto max_color = iteration * 2 + 1;
+	    auto max_neighbors = graph.CsrT::GetNeighborListLength(max);
 	    auto min_color = iteration * 2 + 2;
+	    auto min_neighbors = graph.CsrT::GetNeighborListLength(min);
             auto max_offset = max * prohibit_size;
 	    auto min_offset = min * prohibit_size;
 	    int hash_color = -1;
 
 	    if (prohibit_size != 0) {
    
-	    for (int c_max = 0; c_max < max_color && !util::isValid(colors[max]); c_max++) {
-            	for (int i = 0; i < prohibit_size; i++) {
-              	  if (prohibit[max_offset + i] == c_max) {
+	    for (int c_max = 0; 2*c_max+1 <= max_color && !util::isValid(colors[max]) && !visited[max]; c_max++) {
+            	for (int i = 0; (i < prohibit_size) || (i < max_neighbors); i++) {
+              	  if (prohibit[max_offset + i] == 2*c_max+1) {
 	    		hash_color = -1; //if any element in prohibit list conflict, reset to -1
                 	continue;
 	    	  }  
@@ -274,9 +276,9 @@ struct ColorIterationLoop
 	    }
 
 	   
-            for (int c_min = 0; c_min < min_color && !util::isValid(colors[min]); c_min++) {
-                for (int i = 0; i < prohibit_size; i++) {
-                  if (prohibit[min_offset + i] == c_min) {
+            for (int c_min = 0; 2*c_min+2 <= min_color && !util::isValid(colors[min]) && !visited[min]; c_min++) {
+                for (int i = 0; (i < prohibit_size) || (i < min_neighbors); i++) {
+                  if (prohibit[min_offset + i] == 2*c_min+2) {
                         hash_color = -1; //if any element in prohibit list conflict, reset to -1
                         continue;
                   }
@@ -310,10 +312,11 @@ struct ColorIterationLoop
             VertexT v = pos / prohibit_size;
             SizeT a_idx = pos % prohibit_size;
             SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-	    if (a_idx < num_neighbors) {
+	    if ((a_idx < num_neighbors)) {
 	    	SizeT e = graph.CsrT::GetNeighborListOffset(v) + a_idx;
             	VertexT u = graph.CsrT::GetEdgeDest(e);
-            	prohibit_[pos] = colors[u];
+		if (util::isValid(colors[u]))
+            		prohibit_[pos] = colors[u];
 	    }
           };
           GUARD_CU(prohibit.ForAll(gen_op, graph.nodes * prohibit_size,
@@ -334,8 +337,8 @@ struct ColorIterationLoop
                      e++) {
                   VertexT u = graph.CsrT::GetEdgeDest(e);
                   if ((colors[u] == colors[v]) && (rand[u] >= rand[v])) {
-		      //if (prohibit_size != 0)
-		      	//visited[v] = true;
+		      if (prohibit_size != 0)
+		      	visited[v] = true;
                       colors[v] = util::PreDefinedValues<VertexT>::InvalidValue;
 		      //colors[v] = v + graph.nodes;
                       break;

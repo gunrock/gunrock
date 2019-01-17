@@ -149,7 +149,7 @@ template <typename GraphT>
 typename GraphT::SizeT
 Validate_Results(util::Parameters &parameters, GraphT &graph,
                  typename GraphT::VertexT *h_colors,
-                 typename GraphT::VertexT *ref_colors, bool verbose = true) {
+                 typename GraphT::VertexT *ref_colors, int* num_colors, bool verbose = true) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::SizeT SizeT;
 
@@ -179,17 +179,14 @@ Validate_Results(util::Parameters &parameters, GraphT &graph,
   }
 
   // count number of colors
-  int num_colors = 0;
   std::unordered_set<int> set;
   for (SizeT v = 0; v < graph.nodes; v++) {
     int c = h_colors[v];
     if (set.find(c) == set.end()) {
       set.insert(c);
-      num_colors++;
+      (*num_colors)++;
     }
   }
-
-  printf("Number of colors needed for GPU implementation: %d\n", num_colors);
 
   if (num_errors == 0) {
     util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
