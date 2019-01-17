@@ -1,0 +1,54 @@
+Loading Matrix-market coordinate-formatted graph ...
+Reading from /data-2/topc-datasets/gc-data/ecology2/ecology2.mtx:
+  Parsing MARKET COO format edge-value-seed = 1547731476
+ (999999 nodes, 5995990 directed edges)... 
+Done parsing (2 s).
+Removed 1999998 duplicate edges and self circles.
+  Converting 999999 vertices, 3995992 directed edges ( ordered tuples) to CSR format...
+Done converting (0s).
+Computing reference value ...
+__________________________
+--------------------------
+ Elapsed: 37.538052
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+Max iteration: 7
+--------------------------
+Run 0 elapsed: 10.941029, #iterations = 7
+Validating result ...  
+Comparison: <node idx, gunrock, cpu>
+0 errors occurred.
+Number of colors needed: 13
+[color] finished.
+ avg. elapsed: 10.941029 ms
+ iterations: 7
+ min. elapsed: 10.941029 ms
+ max. elapsed: 10.941029 ms
+ load time: 0 ms
+ preprocess time: 190.133000 ms
+ postprocess time: 24.930954 ms
+ total time: 252.511978 ms

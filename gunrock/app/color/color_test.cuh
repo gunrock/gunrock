@@ -22,13 +22,12 @@
 #include <curand.h>
 #include <curand_kernel.h>
 
+#include <bits/stdc++.h>
 #include <omp.h>
 
 namespace gunrock {
 namespace app {
-// <DONE> change namespace
 namespace color {
-// </DONE>
 
 /******************************************************************************
  * Color Testing Routines
@@ -48,10 +47,10 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::VertexT VertexT;
   curandGenerator_t gen;
-  auto usr_iter = parameters.Get<int>("usr_iter");
+  auto usr_iter = parameters.Get<int>("user-iter");
   auto seed = parameters.Get<int>("seed");
   auto use_jpl = parameters.Get<bool>("JPL");
-  auto no_conflict = parameters.Get<int>("no_conflict");
+  auto no_conflict = parameters.Get<int>("no-conflict");
 
   util::CpuTimer cpu_timer;
   cpu_timer.Start();
@@ -78,14 +77,14 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
         for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
           VertexT u = graph.GetEdgeDest(e);
           if ((colors[u] == -1) && (rand[u] >= temp)) {
-            printf("Max: Node %d with %f defeated by node %d with %f\n", v,
-                   rand[v], u, rand[u]);
+            //  printf("Max: Node %d with %f defeated by node %d with %f\n", v,
+            // rand[v], u, rand[u]);
             colormax = false;
           }
 
           if ((colors[u] == -1) && (rand[u] <= temp)) {
-            printf("Min: Node %d with %f defeated by node %d with %f\n", v,
-                   rand[v], u, rand[u]);
+            // printf("Min: Node %d with %f defeated by node %d with %f\n", v,
+            // rand[v], u, rand[u]);
             colormin = false;
           }
         }
@@ -114,7 +113,7 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
           if (rand[u] < temp)
             min = u;
 
-          printf("Let's see what rand[u] = %f\n", rand[u]);
+          // printf("Let's see what rand[u] = %f\n", rand[u]);
           temp = rand[u];
         }
 
@@ -124,9 +123,9 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
         if (colors[min] == -1)
           colors[min] = iteration * 2 + 2;
 
-        printf("iteration number = %u\n", iteration);
-        printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min],
-               colors[max]);
+        // printf("iteration number = %u\n", iteration);
+        // printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min],
+        //       colors[max]);
       }
     }
   }
@@ -150,19 +149,44 @@ template <typename GraphT>
 typename GraphT::SizeT
 Validate_Results(util::Parameters &parameters, GraphT &graph,
                  typename GraphT::VertexT *h_colors,
-                 typename GraphT::VertexT *ref_colors, bool verbose = true) {
+                 typename GraphT::VertexT *ref_colors, int* num_colors, bool verbose = true) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::SizeT SizeT;
 
   SizeT num_errors = 0;
   bool quiet = parameters.Get<bool>("quiet");
+  bool quick = parameters.Get<bool>("quick");
 
-  // <TODO> result validation and display
-  printf("Comparison: <node idx, gunrock, cpu>\n");
-  for (SizeT v = 0; v < graph.nodes; ++v) {
-    printf(" %d %d %d\n", v, h_colors[v], ref_colors[v]);
+  // validating result with cpu and check for conflict
+  if (!quick) {
+    printf("Validating result ...  \n");
+    printf("Comparison: <node idx, gunrock, cpu>\n");
+    for (SizeT v = 0; v < graph.nodes; v++) {
+      // printf(" \t \t %d \t %d \t %d\n", v, h_colors[v], ref_colors[v]);
+
+      SizeT start_edge = graph.GetNeighborListOffset(v);
+      SizeT num_neighbors = graph.GetNeighborListLength(v);
+
+      for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+        VertexT u = graph.GetEdgeDest(e);
+        if (h_colors[u] == h_colors[v] || h_colors[v] == -1) {
+          num_errors += 1;
+          printf("neighbor id  %d, neighbor color %d, my id %d,  my color %d\n",
+                 u, h_colors[u], v, h_colors[v]);
+        }
+      }
+    }
   }
-  // </TODO>
+
+  // count number of colors
+  std::unordered_set<int> set;
+  for (SizeT v = 0; v < graph.nodes; v++) {
+    int c = h_colors[v];
+    if (set.find(c) == set.end()) {
+      set.insert(c);
+      (*num_colors)++;
+    }
+  }
 
   if (num_errors == 0) {
     util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);

@@ -1,0 +1,32 @@
+Loading Matrix-market coordinate-formatted graph ...
+Reading from /data-2/topc-datasets/gc-data/parabolic_fem/parabolic_fem.mtx:
+  Parsing MARKET COO format edge-value-seed = 1547730730
+ (525825 nodes, 4200450 directed edges)... 
+Done parsing (1 s).
+Removed 1051650 duplicate edges and self circles.
+  Converting 525825 vertices, 3148800 directed edges ( ordered tuples) to CSR format...
+Done converting (0s).
+Computing reference value ...
+__________________________
+--------------------------
+ Elapsed: 60.249092
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+--------------------------
+Run 0 elapsed: 4.199982, #iterations = 10
+Validating result ...  
+Comparison: <node idx, gunrock, cpu>
+0 errors occurred.
+Number of colors needed: 20
+[color] finished.
+ avg. elapsed: 4.199982 ms
+ iterations: 10
+ min. elapsed: 4.199982 ms
+ max. elapsed: 4.199982 ms
+ load time: 0 ms
+ preprocess time: 174.392000 ms
+ postprocess time: 15.185118 ms
+ total time: 210.350990 ms

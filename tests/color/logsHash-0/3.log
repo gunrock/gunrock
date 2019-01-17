@@ -1,0 +1,60 @@
+Loading Matrix-market coordinate-formatted graph ...
+Reading from /data-2/topc-datasets/gc-data/apache2/apache2.mtx:
+  Parsing MARKET COO format edge-value-seed = 1547731244
+ (715176 nodes, 5533046 directed edges)... 
+Done parsing (1 s).
+Removed 1430352 duplicate edges and self circles.
+  Converting 715176 vertices, 4102694 directed edges ( ordered tuples) to CSR format...
+Done converting (0s).
+Computing reference value ...
+__________________________
+--------------------------
+ Elapsed: 35.045860
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+Max iteration: 9
+--------------------------
+Run 0 elapsed: 12.254000, #iterations = 9
+Validating result ...  
+Comparison: <node idx, gunrock, cpu>
+0 errors occurred.
+Number of colors needed: 17
+[color] finished.
+ avg. elapsed: 12.254000 ms
+ iterations: 9
+ min. elapsed: 12.254000 ms
+ max. elapsed: 12.254000 ms
+ load time: 0 ms
+ preprocess time: 182.498000 ms
+ postprocess time: 19.808054 ms
+ total time: 232.141972 ms

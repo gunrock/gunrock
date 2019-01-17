@@ -32,10 +32,10 @@ GEN_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
 # GEN_SM50 = -gencode=arch=compute_50,code=\"sm_50,compute_50\"
 # GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
 # GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
-# GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
+GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 
 # SM_TARGETS = #$(GEN_SM30) #$(GEN_SM35) $(GEN_SM30) $(GEN_SM60) $(GEN_SM61)
-SM_TARGETS = $(GEN_SM60)
+SM_TARGETS = $(GEN_SM70) $(GEN_SM60) $(GEN_SM30)
 #-------------------------------------------------------------------------------
 # Libs
 #-------------------------------------------------------------------------------

@@ -1,0 +1,65 @@
+Loading Matrix-market coordinate-formatted graph ...
+Reading from /data-2/topc-datasets/gc-data/thermomech_dK/thermomech_dK.mtx:
+  Parsing MARKET COO format edge-value-seed = 1547731258
+ (204316 nodes, 5692456 directed edges)... 
+Done parsing (2 s).
+Removed 3050544 duplicate edges and self circles.
+  Converting 204316 vertices, 2641912 directed edges ( ordered tuples) to CSR format...
+Done converting (0s).
+Computing reference value ...
+__________________________
+--------------------------
+ Elapsed: 31.294107
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+0	 0	 0	 queue3 	 oversize :	 1225896 ->	 2641914
+0	 0	 0	 queue3 	 oversize :	 1225896 ->	 2641914
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+Max iteration: 10
+--------------------------
+Run 0 elapsed: 18.261194, #iterations = 10
+Validating result ...  
+Comparison: <node idx, gunrock, cpu>
+0 errors occurred.
+Number of colors needed: 20
+[color] finished.
+ avg. elapsed: 18.261194 ms
+ iterations: 10
+ min. elapsed: 18.261194 ms
+ max. elapsed: 18.261194 ms
+ load time: 0 ms
+ preprocess time: 150.968000 ms
+ postprocess time: 11.222839 ms
+ total time: 195.346832 ms
