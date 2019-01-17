@@ -85,7 +85,7 @@ then
     --user-iter=0 \
     --prohibit-size=$size \
     --jsondir="/home/mstruong/gunrock/tests/color/$jsonFolder" \
-    --tag="K40-JPL-GRAPL" \
+    --tag="K40-HASH-GRAPL" \
     --quick=false \
     --test-run=true > ./$logsFolder/$i.log
     grep -F "Max iteration" ./$logsFolder/$i.log
@@ -123,7 +123,7 @@ then
     --user-iter=${ITR_ARRAY[$i]} \
     --prohibit-size=0 \
     --jsondir="/home/mstruong/gunrock/tests/color/$jsonFolder" \
-    --tag="K40-JPL-GRAPL" \
+    --tag="K40-AR-GRAPL" \
     --quick=false \
     --test-run=true > ./$logsFolder/$i.log
     grep -F "Max iteration" ./$logsFolder/$i.log
