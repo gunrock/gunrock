@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <gunrock/util/device_intrinsics.cuh>
 #include <gunrock/util/track_utils.cuh>
 #include <gunrock/util/sort_device.cuh>
 #include <gunrock/app/enactor_base.cuh>
