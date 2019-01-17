@@ -75,14 +75,14 @@ struct Csc :
     //typename util::If<(FLAG & HAS_EDGE_VALUES) != 0,
     //    Array_ValueT, Array_NValueT >::Type edge_values;
     util::Array1D<SizeT, EdgeValueT,
-        ARRAY_FLAG, cudaHostRegisterFlag> edge_values;    
+        ARRAY_FLAG, cudaHostRegisterFlag> edge_values;
 
     // List of values attached to nodes in the graph
     //typename util::If<(FLAG & HAS_NODE_VALUES) != 0,
     //    Array_ValueT, Array_NValueT >::Type node_values;
     //Array_ValueT node_values;
     util::Array1D<SizeT, NodeValueT,
-        ARRAY_FLAG, cudaHostRegisterFlag> node_values;    
+        ARRAY_FLAG, cudaHostRegisterFlag> node_values;
 
     /**
      * @brief CSC Constructor
@@ -145,7 +145,7 @@ struct Csc :
         cudaStream_t   stream = 0)
     {
         cudaError_t retval = cudaSuccess;
-        SizeT invalid_size = util::PreDefinedValues<SizeT>::InvalidValue;
+        //SizeT invalid_size = util::PreDefinedValues<SizeT>::InvalidValue;
         GUARD_CU(BaseGraph    ::Move(source, target, stream));
         GUARD_CU(column_offsets.Move(source, target, this -> nodes + 1, 0, stream));
         GUARD_CU(row_indices   .Move(source, target, this -> edges    , 0, stream));
@@ -220,15 +220,12 @@ struct Csc :
         typedef typename GraphT::CooT CooT;
         //typedef Coo<VertexT_in, SizeT_in, ValueT_in, FLAG_in,
         //    cudaHostRegisterFlag_in> CooT;
-        if (!quiet)
-        {
-            util::PrintMsg("  Converting " +
-                std::to_string(source.CooT::nodes) +
-                " vertices, " + std::to_string(source.CooT::edges) +
-                (source.CooT::directed ? " directed" : " undirected") +
-                " edges (" + (source.CooT::edge_order == BY_COLUMN_ASCENDING ? " ordered" : "unordered") +
-                " tuples) to CSC format...");
-        }
+        util::PrintMsg("Converting " +
+            std::to_string(source.CooT::nodes) +
+            " vertices, " + std::to_string(source.CooT::edges) +
+            (source.CooT::directed ? " directed" : " undirected") +
+            " edges (" + (source.CooT::edge_order == BY_COLUMN_ASCENDING ? " ordered" : "unordered") +
+            " tuples) to CSC format...", !quiet, false);
 
         time_t mark1 = time(NULL);
         cudaError_t retval = cudaSuccess;
@@ -289,7 +286,9 @@ struct Csc :
                 SizeT *column_offsets,
                 const typename CooT::EdgePairT *edge_pairs,
                 const VertexT &column){
-                    if (column < nodes)
+                    if (column <= edge_pairs[0].y)
+                        column_offsets[column] = 0;
+                    else if (column < nodes)
                     {
                         auto pos = util::BinarySearch_LeftMost(
                             column, edge_pairs, (SizeT)0, edges-1,
@@ -305,7 +304,7 @@ struct Csc :
                 }, this -> nodes + 1, target, stream));
 
         time_t mark2 = time(NULL);
-        util::PrintMsg("Done converting (" +
+        util::PrintMsg("Done (" +
             std::to_string(mark2 - mark1) + "s).", !quiet);
 
         return retval;
@@ -471,7 +470,7 @@ struct Csc<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
         bool  with_edge_values = true)
     {
         return cudaSuccess;
-    } 
+    }
 };
 
 } // namespace graph

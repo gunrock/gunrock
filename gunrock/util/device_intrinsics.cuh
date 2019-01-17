@@ -103,7 +103,7 @@ int _all(int predicate, unsigned mask=MEMBERMASK)
 #endif
 }
 
-#if __CUDACC_VER_MAJOR__ < 8
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
 // atomic addition from Jon Cohen at NVIDIA
 __device__ static double atomicAdd(double *addr, double val)
 {
@@ -117,6 +117,7 @@ __device__ static double atomicAdd(double *addr, double val)
     } while( assumed!=old );
     return old;
 }
+#else
 #endif
 
 __device__ static long long atomicCAS(long long *addr, long long comp, long long val)
@@ -239,6 +240,23 @@ __device__ __host__ __forceinline__ T _ldg(T* addr)
     #endif
 #else
     return *addr;
+#endif
+}
+
+template <typename T>
+__device__ __host__ __forceinline__
+T _atomicAdd(T* ptr, const T &val)
+{
+#ifdef __CUDA_ARCH__
+    return atomicAdd(ptr, val);
+#else
+    T retval;
+    #pragma omp atomic capture
+    {
+        retval = ptr[0];
+        ptr[0] += val;
+    }
+    return retval;
 #endif
 }
 

@@ -189,6 +189,7 @@ struct TestGraph :
         return retval;
     }
 
+    __host__ __device__
     SizeT GetNeighborListLength(const VertexT &v) const
     {
         SizeT retval = 0;
@@ -231,6 +232,25 @@ struct TestGraph :
             GUARD_CU(CscT::Display(graph_prefix, nodes_to_show, with_edge_values));
         if (FLAG & graph::HAS_COO)
             GUARD_CU(CooT::Display(graph_prefix, nodes_to_show, with_edge_values));
+
+        return retval;
+    }
+
+    template <typename ArrayT>
+    cudaError_t GetHistogram(ArrayT &histogram)
+    {
+        cudaError_t retval = cudaSuccess;
+    
+        if (FLAG & graph::HAS_CSR)
+        {
+            GUARD_CU(GetHistogram(csr(), histogram));
+        } else if (FLAG & graph::HAS_CSC)
+        {
+            GUARD_CU(GetHistogram(csc(), histogram));
+        } else if (FLAG & graph::HAS_COO)
+        {
+            GUARD_CU(GetHistogram(coo(), histogram));
+        }
 
         return retval;
     }
