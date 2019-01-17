@@ -1,0 +1,57 @@
+Loading Matrix-market coordinate-formatted graph ...
+Reading from /data-2/topc-datasets/gc-data/parabolic_fem/parabolic_fem.mtx:
+  Parsing MARKET COO format edge-value-seed = 1547731242
+ (525825 nodes, 4200450 directed edges)... 
+Done parsing (1 s).
+Removed 1051650 duplicate edges and self circles.
+  Converting 525825 vertices, 3148800 directed edges ( ordered tuples) to CSR format...
+Done converting (0s).
+Computing reference value ...
+__________________________
+--------------------------
+ Elapsed: 33.210991
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+Max iteration: 8
+--------------------------
+Run 0 elapsed: 10.160923, #iterations = 8
+Validating result ...  
+Comparison: <node idx, gunrock, cpu>
+0 errors occurred.
+Number of colors needed: 15
+[color] finished.
+ avg. elapsed: 10.160923 ms
+ iterations: 8
+ min. elapsed: 10.160923 ms
+ max. elapsed: 10.160923 ms
+ load time: 0 ms
+ preprocess time: 155.115000 ms
+ postprocess time: 14.758825 ms
+ total time: 197.402000 ms

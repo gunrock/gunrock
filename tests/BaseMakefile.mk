@@ -24,18 +24,19 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 # Gen targets
 #-------------------------------------------------------------------------------
 
-# GEN_SM71 = -gencode=arch=compute_71,code=\"sm_71,compute_71\"
-GEN_SM70 = -gencode=arch=compute_70,code=\"sm_70,compute_70\"
-# GEN_SM61 = -gencode=arch=compute_61,code=\"sm_61,compute_61\"
-GEN_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
-# GEN_SM52 = -gencode=arch=compute_52,code=\"sm_52,compute_52\"
-# GEN_SM50 = -gencode=arch=compute_50,code=\"sm_50,compute_50\"
-# GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
-# GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
-# GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
+GEN_SM75 = -gencode=arch=compute_75,code=\"sm_75,compute_75\" # Turing RTX20XX
+GEN_SM70 = -gencode=arch=compute_70,code=\"sm_70,compute_70\" # Volta V100
+GEN_SM61 = -gencode=arch=compute_61,code=\"sm_61,compute_61\" # Pascal GTX10XX
+GEN_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\" # Pascal P100
+GEN_SM52 = -gencode=arch=compute_52,code=\"sm_52,compute_52\" # Maxwell M40, M60, GTX9XX
+GEN_SM50 = -gencode=arch=compute_50,code=\"sm_50,compute_50\" # Maxwell M10
+GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\" # Kepler K80
+GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" # Kepler K20, K40
+GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" # Kepler K10
 
-# SM_TARGETS = #$(GEN_SM30) #$(GEN_SM35) $(GEN_SM30) $(GEN_SM60) $(GEN_SM61)
-SM_TARGETS = $(GEN_SM70) $(GEN_SM60)
+# Add your own SM target (default: V100, P100, K40):
+SM_TARGETS = $(GEN_SM70) $(GEN_SM60) $(GEN_SM35)
+
 #-------------------------------------------------------------------------------
 # Libs
 #-------------------------------------------------------------------------------

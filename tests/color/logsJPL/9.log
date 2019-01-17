@@ -1,0 +1,32 @@
+Loading Matrix-market coordinate-formatted graph ...
+Reading from /data-2/topc-datasets/gc-data/ASIC_320ks/ASIC_320ks.mtx:
+  Parsing MARKET COO format edge-value-seed = 1547730748
+ (321671 nodes, 3655614 directed edges)... 
+Done parsing (1 s).
+Removed 2149478 duplicate edges and self circles.
+  Converting 321671 vertices, 1506136 directed edges ( ordered tuples) to CSR format...
+Done converting (0s).
+Computing reference value ...
+__________________________
+--------------------------
+ Elapsed: 48.573017
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+--------------------------
+Run 0 elapsed: 9.894848, #iterations = 11
+Validating result ...  
+Comparison: <node idx, gunrock, cpu>
+0 errors occurred.
+Number of colors needed: 22
+[color] finished.
+ avg. elapsed: 9.894848 ms
+ iterations: 11
+ min. elapsed: 9.894848 ms
+ max. elapsed: 9.894848 ms
+ load time: 0 ms
+ preprocess time: 168.625000 ms
+ postprocess time: 10.383129 ms
+ total time: 204.234123 ms

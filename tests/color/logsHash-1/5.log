@@ -1,0 +1,17 @@
+Loading Matrix-market coordinate-formatted graph ...
+Reading from /data-2/topc-datasets/gc-data/thermal2/thermal2.mtx:
+  Parsing MARKET COO format edge-value-seed = 1547731478
+ (1228045 nodes, 9808358 directed edges)... 
+Done parsing (3 s).
+Removed 2456090 duplicate edges and self circles.
+  Converting 1228045 vertices, 7352268 directed edges ( ordered tuples) to CSR format...
+Done converting (0s).
+Computing reference value ...
+__________________________
+--------------------------
+ Elapsed: 41.811943
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________

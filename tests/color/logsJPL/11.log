@@ -1,0 +1,32 @@
+Loading Matrix-market coordinate-formatted graph ...
+Reading from /data-2/topc-datasets/gc-data/atmosmodd/atmosmodd.mtx:
+  Parsing MARKET COO format edge-value-seed = 1547730755
+ (1270432 nodes, 17629760 directed edges)... 
+Done parsing (6 s).
+Removed 10085312 duplicate edges and self circles.
+  Converting 1270432 vertices, 7544448 directed edges ( ordered tuples) to CSR format...
+Done converting (0s).
+Computing reference value ...
+__________________________
+--------------------------
+ Elapsed: 114.037033
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+--------------------------
+Run 0 elapsed: 7.980108, #iterations = 10
+Validating result ...  
+Comparison: <node idx, gunrock, cpu>
+0 errors occurred.
+Number of colors needed: 19
+[color] finished.
+ avg. elapsed: 7.980108 ms
+ iterations: 10
+ min. elapsed: 7.980108 ms
+ max. elapsed: 7.980108 ms
+ load time: 0 ms
+ preprocess time: 194.397000 ms
+ postprocess time: 34.581900 ms
+ total time: 257.689953 ms

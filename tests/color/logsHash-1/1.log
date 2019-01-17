@@ -1,0 +1,98 @@
+Loading Matrix-market coordinate-formatted graph ...
+Reading from /data-2/topc-datasets/gc-data/af_shell3/af_shell3.mtx:
+  Parsing MARKET COO format edge-value-seed = 1547731466
+ (504855 nodes, 18093730 directed edges)... 
+Done parsing (5 s).
+Removed 1009710 duplicate edges and self circles.
+  Converting 504855 vertices, 17084020 directed edges ( ordered tuples) to CSR format...
+Done converting (0s).
+Computing reference value ...
+__________________________
+--------------------------
+ Elapsed: 31.235933
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+0	 0	 0	 queue3 	 oversize :	 3029130 ->	 17084022
+0	 0	 0	 queue3 	 oversize :	 3029130 ->	 17084022
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+Max iteration: 21
+--------------------------
+Run 0 elapsed: 248.332977, #iterations = 21
+Validating result ...  
+Comparison: <node idx, gunrock, cpu>
+0 errors occurred.
+Number of colors needed: 40
+[color] finished.
+ avg. elapsed: 248.332977 ms
+ iterations: 21
+ min. elapsed: 248.332977 ms
+ max. elapsed: 248.332977 ms
+ load time: 0 ms
+ preprocess time: 223.439000 ms
+ postprocess time: 45.958996 ms
+ total time: 534.415007 ms

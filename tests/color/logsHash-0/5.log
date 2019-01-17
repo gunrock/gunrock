@@ -1,0 +1,57 @@
+Loading Matrix-market coordinate-formatted graph ...
+Reading from /data-2/topc-datasets/gc-data/thermal2/thermal2.mtx:
+  Parsing MARKET COO format edge-value-seed = 1547731248
+ (1228045 nodes, 9808358 directed edges)... 
+Done parsing (3 s).
+Removed 2456090 duplicate edges and self circles.
+  Converting 1228045 vertices, 7352268 directed edges ( ordered tuples) to CSR format...
+Done converting (0s).
+Computing reference value ...
+__________________________
+--------------------------
+ Elapsed: 40.004967
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+Max iteration: 8
+--------------------------
+Run 0 elapsed: 36.664009, #iterations = 8
+Validating result ...  
+Comparison: <node idx, gunrock, cpu>
+0 errors occurred.
+Number of colors needed: 15
+[color] finished.
+ avg. elapsed: 36.664009 ms
+ iterations: 8
+ min. elapsed: 36.664009 ms
+ max. elapsed: 36.664009 ms
+ load time: 0 ms
+ preprocess time: 184.584000 ms
+ postprocess time: 42.210817 ms
+ total time: 284.003973 ms

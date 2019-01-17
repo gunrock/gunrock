@@ -1,0 +1,57 @@
+Loading Matrix-market coordinate-formatted graph ...
+Reading from /data-2/topc-datasets/gc-data/atmosmodd/atmosmodd.mtx:
+  Parsing MARKET COO format edge-value-seed = 1547731268
+ (1270432 nodes, 17629760 directed edges)... 
+Done parsing (5 s).
+Removed 10085312 duplicate edges and self circles.
+  Converting 1270432 vertices, 7544448 directed edges ( ordered tuples) to CSR format...
+Done converting (0s).
+Computing reference value ...
+__________________________
+--------------------------
+ Elapsed: 39.386032
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+DEBUG: after reseting colored
+DEBUG: after update colored
+DEBUG: after move colored to HOST 
+Max iteration: 8
+--------------------------
+Run 0 elapsed: 19.329071, #iterations = 8
+Validating result ...  
+Comparison: <node idx, gunrock, cpu>
+0 errors occurred.
+Number of colors needed: 16
+[color] finished.
+ avg. elapsed: 19.329071 ms
+ iterations: 8
+ min. elapsed: 19.329071 ms
+ max. elapsed: 19.329071 ms
+ load time: 0 ms
+ preprocess time: 191.023000 ms
+ postprocess time: 34.680128 ms
+ total time: 265.984058 ms
