@@ -192,6 +192,26 @@ void ReferenceHITS(
     CpuTimer cpu_timer;
     cpu_timer.Start();
 
+    // Initialize all hub and authority scores to 1
+    for (int i = 0; i < graph.nodes; i++)
+    {
+        hrank[i] = 1;
+        arank[i] = 1;
+    }
+
+    // Iterate so that the hub and authority scores converge
+    for (int iterCount = 0; iterCount < max_iter; iterCount++)
+    {
+        int norm = 0;
+
+        // Update values from incoming neighbors
+        for (int colCounter = 0; colCounter < inv_graph.nodes-1; colCounter++)
+        {
+            int numIncomingPages = inv_graph.row_offsets[colCounter+1] - inv_graph.row_offsets[colCounter];
+            printf("Incoming Pages: %d\n", numIncomingPages);
+        }
+    }
+
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
 
@@ -363,7 +383,7 @@ int main_(CommandLineArgs *args)
 
     // TODO: add a CPU Reference algorithm,
     // before that, quick_mode always on.
-    info->info["quick_mode"] = true;
+    info->info["quick_mode"] = false;
     RunTests<VertexId, SizeT, Value>(info);
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
