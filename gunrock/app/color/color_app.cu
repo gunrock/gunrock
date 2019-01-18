@@ -11,14 +11,21 @@
  * @brief Graph Coloring Gunrock Application
  */
 
+#include <gunrock/gunrock.h>
+
+// Utilities and correctness-checking
+#include <gunrock/util/test_utils.cuh>
+
+// Graph definitions
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 #include <gunrock/graphio/graphio.cuh>
-#include <gunrock/gunrock.h>
-#include <gunrock/util/test_utils.cuh>
 
+// Graph Coloring
 #include <gunrock/app/color/color_enactor.cuh>
 #include <gunrock/app/color/color_test.cuh>
+
+// Others
 #include <cstdio>
 
 namespace gunrock {
@@ -32,16 +39,14 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_enactor(parameters));
   GUARD_CU(UseParameters_test(parameters));
 
+  GUARD_CU(parameters.Use<unsigned int>(
+      "num-colors",
+      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
+      0, "number of output colors", __FILE__, __LINE__));
 
-GUARD_CU(parameters.Use<int>(
-      "num-colors", util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER, 0,
-      "number of output colors",
-      __FILE__, __LINE__));
-
-   GUARD_CU(parameters.Use<std::string>(
+  GUARD_CU(parameters.Use<std::string>(
       "tag", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, "",
-      "tag info for json string",
-      __FILE__, __LINE__));
+      "tag info for json string", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<bool>(
       "loop-color", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
@@ -110,7 +115,6 @@ template <typename GraphT>
 cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
                      bool color_balance, typename GraphT::VertexT *ref_colors,
                      util::Location target) {
-
   cudaError_t retval = cudaSuccess;
 
   typedef typename GraphT::VertexT VertexT;
@@ -158,10 +162,9 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
             std::to_string(enactor.enactor_slices[0].enactor_stats.iteration),
         !quiet_mode);
     if (validation == "each") {
-
       GUARD_CU(problem.Extract(h_colors));
-      SizeT num_errors =
-          Validate_Results(parameters, graph, h_colors, ref_colors, &num_colors, false);
+      SizeT num_errors = Validate_Results(parameters, graph, h_colors,
+                                          ref_colors, &num_colors, false);
     }
   }
 
@@ -169,11 +172,11 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   GUARD_CU(problem.Extract(h_colors));
   if (validation == "last") {
-    SizeT num_errors =
-        Validate_Results(parameters, graph, h_colors, ref_colors, &num_colors, false);
+    SizeT num_errors = Validate_Results(parameters, graph, h_colors, ref_colors,
+                                        &num_colors, false);
   }
   printf("Number of colors needed: %d\n", num_colors);
-    
+
   UseParameters_test(parameters);
   parameters.Set("num-colors", num_colors);
 
@@ -197,9 +200,9 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   return retval;
 }
 
-} // namespace color
-} // namespace app
-} // namespace gunrock
+}  // namespace color
+}  // namespace app
+}  // namespace gunrock
 
 // ===========================================================================================
 // ========================= CODE BELOW THIS LINE NOT NEEDED FOR TESTS

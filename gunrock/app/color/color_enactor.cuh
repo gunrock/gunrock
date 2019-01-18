@@ -18,20 +18,16 @@
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
-#include <gunrock/util/sort_device.cuh>
-#include <gunrock/util/track_utils.cuh>
 
 #include <gunrock/app/color/color_problem.cuh>
-
-#include <curand.h>
-#include <curand_kernel.h>
+#include <gunrock/util/sort_device.cuh>
 
 namespace gunrock {
 namespace app {
 namespace color {
 
 /**
- * @brief Speciflying parameters for hello Enactor
+ * @brief Speciflying parameters for color Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter
  * info \return cudaError_t error message(s), if any
  */
@@ -43,7 +39,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
 }
 
 /**
- * @brief defination of hello iteration loop
+ * @brief defination of color iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
@@ -60,7 +56,7 @@ struct ColorIterationLoop
   ColorIterationLoop() : BaseIterationLoop() {}
 
   /**
-   * @brief Core computation of hello, one iteration
+   * @brief Core computation of color, one iteration
    * @param[in] peer_ Which GPU peers to work on, 0 means local
    * \return cudaError_t error message(s), if any
    */
@@ -88,7 +84,6 @@ struct ColorIterationLoop
     auto &color_temp = data_slice.color_temp;
     auto &color_temp2 = data_slice.color_temp2;
     auto &prohibit = data_slice.prohibit;
-    auto &gen = data_slice.gen;
     auto &color_balance = data_slice.color_balance;
     auto &colored = data_slice.colored;
     auto &use_jpl = data_slice.use_jpl;
@@ -101,19 +96,15 @@ struct ColorIterationLoop
     auto null_ptr = null_frontier;
 
     //======================================================================//
-    // Run --                                                               //
+    // Jones-Plassman-Luby Graph Coloring: Compute Operator                 //
     //======================================================================//
-
-    // JPL method
     if (use_jpl) {
       if (!color_balance) {
-
         auto jpl_color_op =
             [graph, colors, rand, iteration, min_color] __host__ __device__(
                 VertexT * v_q, const SizeT &pos) {
               VertexT v = v_q[pos];
-              if (util::isValid(colors[v]))
-                return;
+              if (util::isValid(colors[v])) return;
 
               SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
               SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
@@ -129,20 +120,15 @@ struct ColorIterationLoop
                         (colors[u] != color + 2) ||
                     (v == u))
                   continue;
-                if (rand[v] <= rand[u])
-                  colormax = false;
+                if (rand[v] <= rand[u]) colormax = false;
                 if (min_color) {
-                  if (rand[v] >= rand[u])
-                    colormin = false;
+                  if (rand[v] >= rand[u]) colormin = false;
                 }
               }
 
-              if (colormax)
-                colors[v] = color + 1;
+              if (colormax) colors[v] = color + 1;
               if (min_color) {
-                if (colormin)
-                  // printf("DEBUG: coloring with min\n");
-                  colors[v] = color + 2;
+                if (colormin) colors[v] = color + 2;
               }
             };
 
@@ -151,16 +137,15 @@ struct ColorIterationLoop
       }
 
       else {
-
+        //======================================================================//
+        // Jones-Plassman-Luby Graph Coloring: NeighborReduce + Compute Op //
+        //======================================================================//
         auto advance_op = [graph, iteration, colors, rand] __host__ __device__(
                               const VertexT &src, VertexT &dest,
                               const SizeT &edge_id, const VertexT &input_item,
                               const SizeT &input_pos,
                               SizeT &output_pos) -> ValueT {
-          // printf("ADVANCE: dest = %d and %f\n", dest, rand[dest]);
-
-          if (util::isValid(colors[dest]))
-            return (ValueT)-1;
+          if (util::isValid(colors[dest])) return (ValueT)-1;
           return rand[dest];
         };
 
@@ -189,33 +174,10 @@ struct ColorIterationLoop
             [graph, rand, colors, color_predicate, iteration] __host__
             __device__(VertexT * v_q, const SizeT &pos) {
               VertexT v = v_q[pos];
-              if (util::isValid(colors[v]))
-                return;
+              if (util::isValid(colors[v])) return;
 
-#if 0
-              if (pos == 0) {
-                for (auto j = 0; j < graph.nodes; j++) {
-                  SizeT start_edge = graph.CsrT::GetNeighborListOffset(j);
-                  SizeT num_neighbors = graph.CsrT::GetNeighborListLength(j);
-                  printf("COLOR: src = %u and neighbor list = [", j);
-                  for (SizeT e = start_edge; e < start_edge + num_neighbors;
-                       e++) {
-                    VertexT u = graph.CsrT::GetEdgeDest(e);
-                    printf(" %u,", u);
-                  }
-                  printf("]\n");
-                }
-              }
-#endif
+              if (color_predicate[v] < rand[v]) colors[v] = iteration;
 
-              if (color_predicate[v] < rand[v])
-                colors[v] = iteration;
-
-              // printf("COLOR: rand[%u] = %f \n", v, rand[v]);
-              // printf("COLOR: color_predicate[%u] = %f \n", v,
-              //       color_predicate[v]);
-
-              // printf("COLOR: colors[%u] = %u \n", v, colors[v]);
               return;
             };
 
@@ -224,143 +186,137 @@ struct ColorIterationLoop
       }
     }
 
-    // Hash method
+    //======================================================================//
+    // Min-Max Hash Graph Coloring: Compute Operator                        //
+    //======================================================================//
     else {
       auto color_op =
-          [graph, colors, rand, iteration, prohibit_size, visited, prohibit] 
-	  __host__ __device__(VertexT * v_q, const SizeT &pos) {
+          [graph, colors, rand, iteration, prohibit_size, visited,
+           prohibit] __host__
+          __device__(VertexT * v_q, const SizeT &pos) {
             VertexT v = v_q[pos];
             SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
             SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
             auto temp = rand[v];
 
-            VertexT max = v; // active max vertex
-            VertexT min = v; // active min vertex
+            VertexT max = v;  // active max vertex
+            VertexT min = v;  // active min vertex
 
             for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
               VertexT u = graph.CsrT::GetEdgeDest(e);
-              if ((rand[u] > temp) && !util::isValid(colors[u]))
-                max = u;
+              if ((rand[u] > temp) && !util::isValid(colors[u])) max = u;
 
-              if ((rand[u] < temp) && !util::isValid(colors[u]))
-                min = u;
+              if ((rand[u] < temp) && !util::isValid(colors[u])) min = u;
 
-              // printf("Let's see what rand[u] = %f\n", rand[u]);
-              temp = rand[u]; // compare against e-1
+              temp = rand[u];  // compare against e-1
             }
 
-            //hash coloring
+            // hash coloring
             auto max_color = iteration * 2 + 1;
-	    auto max_neighbors = graph.CsrT::GetNeighborListLength(max);
-	    auto min_color = iteration * 2 + 2;
-	    auto min_neighbors = graph.CsrT::GetNeighborListLength(min);
+            auto max_neighbors = graph.CsrT::GetNeighborListLength(max);
+            auto min_color = iteration * 2 + 2;
+            auto min_neighbors = graph.CsrT::GetNeighborListLength(min);
             auto max_offset = max * prohibit_size;
-	    auto min_offset = min * prohibit_size;
-	    int hash_color = -1;
+            auto min_offset = min * prohibit_size;
+            int hash_color = -1;
 
-	    if (prohibit_size != 0) {
-   
-	    for (int c_max = 0; 2*c_max+1 <= max_color && !util::isValid(colors[max]) && !visited[max]; c_max++) {
-            	for (int i = 0; (i < prohibit_size) || (i < max_neighbors); i++) {
-              	  if (prohibit[max_offset + i] == 2*c_max+1) {
-	    		hash_color = -1; //if any element in prohibit list conflict, reset to -1
-                	continue;
-	    	  }  
-	    	  else 
-	    		hash_color = c_max;
-            	}
-	        if (hash_color != -1) {
-	    	  colors[max] = hash_color;
-	    	  break;
-	    	}
-	    }
+            if (prohibit_size != 0) {
+              for (int c_max = 0; 2 * c_max + 1 <= max_color &&
+                                  !util::isValid(colors[max]) && !visited[max];
+                   c_max++) {
+                for (int i = 0; (i < prohibit_size) || (i < max_neighbors);
+                     i++) {
+                  if (prohibit[max_offset + i] == 2 * c_max + 1) {
+                    hash_color = -1;  // if any element in prohibit list
+                                      // conflict, reset to -1
+                    continue;
+                  } else
+                    hash_color = c_max;
+                }
+                if (hash_color != -1) {
+                  colors[max] = hash_color;
+                  break;
+                }
+              }
 
-	   
-            for (int c_min = 0; 2*c_min+2 <= min_color && !util::isValid(colors[min]) && !visited[min]; c_min++) {
-                for (int i = 0; (i < prohibit_size) || (i < min_neighbors); i++) {
-                  if (prohibit[min_offset + i] == 2*c_min+2) {
-                        hash_color = -1; //if any element in prohibit list conflict, reset to -1
-                        continue;
-                  }
-                  else
-                        hash_color = c_min;
+              for (int c_min = 0; 2 * c_min + 2 <= min_color &&
+                                  !util::isValid(colors[min]) && !visited[min];
+                   c_min++) {
+                for (int i = 0; (i < prohibit_size) || (i < min_neighbors);
+                     i++) {
+                  if (prohibit[min_offset + i] == 2 * c_min + 2) {
+                    hash_color = -1;  // if any element in prohibit list
+                                      // conflict, reset to -1
+                    continue;
+                  } else
+                    hash_color = c_min;
                 }
                 if (hash_color != -1) {
                   colors[min] = hash_color;
                   break;
                 }
+              }
             }
-	}
-	    // if hash c loring fail because not enough space, fall back to
+            // if hash c loring fail because not enough space, fall back to
             // color by iteration
-            if (!util::isValid(colors[max]))
-              colors[max] = max_color;
+            if (!util::isValid(colors[max])) colors[max] = max_color;
 
-            if (!util::isValid(colors[min]))
-              colors[min] = min_color;
+            if (!util::isValid(colors[min])) colors[min] = min_color;
           };
       // color by max and min independent set, non-exactsolution
       GUARD_CU(frontier.V_Q()->ForAll(color_op, frontier.queue_length,
                                       util::DEVICE, stream));
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
 
-
-        // optinal coloring by hash function n * prohibit_size (non-exact)
-        if (prohibit_size != 0) {
-          auto gen_op = [graph, colors, prohibit_size] __host__ __device__(
-                            VertexT * prohibit_, const SizeT &pos) {
-            VertexT v = pos / prohibit_size;
-            SizeT a_idx = pos % prohibit_size;
-            SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-	    if ((a_idx < num_neighbors)) {
-	    	SizeT e = graph.CsrT::GetNeighborListOffset(v) + a_idx;
-            	VertexT u = graph.CsrT::GetEdgeDest(e);
-		if (util::isValid(colors[u]))
-            		prohibit_[pos] = colors[u];
-	    }
-          };
-          GUARD_CU(prohibit.ForAll(gen_op, graph.nodes * prohibit_size,
-                                   util::DEVICE, stream));
-          GUARD_CU2(cudaStreamSynchronize(stream),
-                    "cudaStreamSynchronize failed");
-        }
-
-        auto resolve_op =
-            [graph, rand, no_conflict, colors, visited, prohibit_size] __host__ 
-	        __device__( VertexT * v_q, const SizeT &pos) {
-              VertexT v = v_q[pos];
-              SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
-              SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-
-              if (util::isValid(colors[v])) {
-                for (SizeT e = start_edge; e < start_edge + num_neighbors;
-                     e++) {
-                  VertexT u = graph.CsrT::GetEdgeDest(e);
-                  if ((colors[u] == colors[v]) && (rand[u] >= rand[v])) {
-		      if (prohibit_size != 0)
-		      	visited[v] = true;
-                      colors[v] = util::PreDefinedValues<VertexT>::InvalidValue;
-		      //colors[v] = v + graph.nodes;
-                      break;
-		  }
-                }
-              }
-            };
-
-        GUARD_CU(frontier.V_Q()->ForAll(resolve_op, frontier.queue_length,
-                                        util::DEVICE, stream));
+      // optinal coloring by hash function n * prohibit_size (non-exact)
+      if (prohibit_size != 0) {
+        auto gen_op = [graph, colors, prohibit_size] __host__ __device__(
+                          VertexT * prohibit_, const SizeT &pos) {
+          VertexT v = pos / prohibit_size;
+          SizeT a_idx = pos % prohibit_size;
+          SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+          if ((a_idx < num_neighbors)) {
+            SizeT e = graph.CsrT::GetNeighborListOffset(v) + a_idx;
+            VertexT u = graph.CsrT::GetEdgeDest(e);
+            if (util::isValid(colors[u])) prohibit_[pos] = colors[u];
+          }
+        };
+        GUARD_CU(prohibit.ForAll(gen_op, graph.nodes * prohibit_size,
+                                 util::DEVICE, stream));
         GUARD_CU2(cudaStreamSynchronize(stream),
                   "cudaStreamSynchronize failed");
       }
 
-    if (test_run) {
+      auto resolve_op =
+          [graph, rand, no_conflict, colors, visited, prohibit_size] __host__
+          __device__(VertexT * v_q, const SizeT &pos) {
+            VertexT v = v_q[pos];
+            SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
+            SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
 
+            if (util::isValid(colors[v])) {
+              for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+                VertexT u = graph.CsrT::GetEdgeDest(e);
+                if ((colors[u] == colors[v]) && (rand[u] >= rand[v])) {
+                  if (prohibit_size != 0) visited[v] = true;
+                  colors[v] = util::PreDefinedValues<VertexT>::InvalidValue;
+                  // colors[v] = v + graph.nodes;
+                  break;
+                }
+              }
+            }
+          };
+
+      GUARD_CU(frontier.V_Q()->ForAll(resolve_op, frontier.queue_length,
+                                      util::DEVICE, stream));
+      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+    }
+
+    if (test_run) {
       // reset atomic count
       GUARD_CU(data_slice.colored.ForAll(
           [] __host__ __device__(SizeT * x, const VertexT &pos) { x[pos] = 0; },
           1, util::DEVICE, stream));
-
-      printf("DEBUG: after reseting colored\n");
 
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
 
@@ -375,14 +331,8 @@ struct ColorIterationLoop
       GUARD_CU(frontier.V_Q()->ForAll(status_op, frontier.queue_length,
                                       util::DEVICE, stream));
 
-      printf("DEBUG: after update colored\n");
-
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
-
       GUARD_CU(data_slice.colored.Move(util::DEVICE, util::HOST));
-
-      printf("DEBUG: after move colored to HOST \n");
-
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
     }
 
@@ -397,8 +347,6 @@ struct ColorIterationLoop
     auto &graph = data_slice.sub_graph[0];
     auto test_run = data_slice.test_run;
     auto frontier = enactor_slices[0].frontier;
-    // printf("DEBUG: iteration number %d, colored: %d\n", iter,
-    //       data_slice.colored[0]);
 
     // atomic based stop condition
     if (test_run && (data_slice.colored[0] >= graph.nodes)) {
@@ -407,8 +355,7 @@ struct ColorIterationLoop
     }
 
     // user defined stop condition
-    if (!test_run && (iter == user_iter))
-      return true;
+    if (!test_run && (iter == user_iter)) return true;
 
     return false;
   }
@@ -425,7 +372,6 @@ struct ColorIterationLoop
    */
   template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
   cudaError_t ExpandIncoming(SizeT &received_length, int peer_) {
-
     // ================ INCOMPLETE TEMPLATE - MULTIGPU ====================
 
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
@@ -435,10 +381,10 @@ struct ColorIterationLoop
     // auto iteration = enactor_slice.enactor_stats.iteration;
     // auto         &distances          =   data_slice.distances;
 
-    auto expand_op =
-        [] __host__ __device__(VertexT & key, const SizeT &in_pos,
-                               VertexT *vertex_associate_ins,
-                               ValueT *value__associate_ins) -> bool {
+    auto expand_op = [] __host__ __device__(
+                         VertexT & key, const SizeT &in_pos,
+                         VertexT *vertex_associate_ins,
+                         ValueT *value__associate_ins) -> bool {
       // ValueT in_val  = value__associate_ins[in_pos];
       // ValueT old_val = atomicMin(distances + key, in_val);
       // if (old_val <= in_val)
@@ -452,7 +398,7 @@ struct ColorIterationLoop
             received_length, peer_, expand_op);
     return retval;
   }
-}; // end of colorIteration
+};  // end of colorIteration
 
 /**
  * @brief Color enactor class.
@@ -472,7 +418,7 @@ class Enactor : public EnactorBase<typename _Problem::GraphT,
                                    // communication, e.g.: typename
                                    // _Problem::ValueT,
                                    ARRAY_FLAG, cudaHostRegisterFlag> {
-public:
+ public:
   typedef _Problem Problem;
   typedef typename Problem::SizeT SizeT;
   typedef typename Problem::VertexT VertexT;
@@ -496,7 +442,7 @@ public:
   }
 
   /**
-   * @brief hello destructor
+   * @brief color destructor
    */
   virtual ~Enactor() { /*Release();*/
   }
@@ -540,13 +486,13 @@ public:
       GUARD_CU(iterations[gpu].Init(this, gpu));
     }
 
-    GUARD_CU(this->Init_Threads(this, (CUT_THREADROUTINE) &
-                                          (GunrockThread<EnactorT>)));
+    GUARD_CU(this->Init_Threads(
+        this, (CUT_THREADROUTINE) & (GunrockThread<EnactorT>)));
     return retval;
   }
 
   /**
-   * @brief one run of hello, to be called within GunrockThread
+   * @brief one run of color, to be called within GunrockThread
    * @param thread_data Data for the CPU thread
    * \return cudaError_t error message(s), if any
    */
@@ -579,7 +525,6 @@ public:
               this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
           frontier.queue_length = (peer_ == 0) ? num_nodes : 0;
           if (peer_ == 0) {
-
             util::Array1D<SizeT, VertexT> tmp;
             tmp.Allocate(num_nodes, target | util::HOST);
             for (SizeT i = 0; i < num_nodes; ++i) {
@@ -604,7 +549,7 @@ public:
   }
 
   /**
-   * @brief Enacts a hello computing on the specified graph.
+   * @brief Enacts a color computing on the specified graph.
 ...
    * \return cudaError_t error message(s), if any
    */
@@ -616,9 +561,9 @@ public:
   }
 };
 
-} // namespace color
-} // namespace app
-} // namespace gunrock
+}  // namespace color
+}  // namespace app
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

@@ -14,10 +14,12 @@
 
 #pragma once
 
+#if 0
 #include <gunrock/util/basic_utils.h>
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/type_enum.cuh>
 #include <gunrock/util/type_limits.cuh>
+#endif
 
 #include <curand.h>
 #include <curand_kernel.h>
@@ -34,7 +36,7 @@ namespace color {
  *****************************************************************************/
 
 /**
- * @brief Simple CPU-based reference hello ranking implementations
+ * @brief Simple CPU-based reference color ranking implementations
  * @tparam      GraphT        Type of the graph
  * @tparam      ValueT        Type of the values
  * @param[in]   graph         Input graph
@@ -67,8 +69,7 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
   if (use_jpl) {
     for (int iteration = 0; iteration < usr_iter; iteration++) {
       for (VertexT v = 0; v < graph.nodes; v++) {
-        if (colors[v] != -1)
-          continue;
+        if (colors[v] != -1) continue;
         SizeT start_edge = graph.GetNeighborListOffset(v);
         SizeT num_neighbors = graph.GetNeighborListLength(v);
         float temp = rand[v];
@@ -89,10 +90,8 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
           }
         }
 
-        if (colormax)
-          colors[v] = iteration * 2 + 1;
-        if (colormin)
-          colors[v] = iteration * 2 + 2;
+        if (colormax) colors[v] = iteration * 2 + 1;
+        if (colormin) colors[v] = iteration * 2 + 2;
       }
     }
   } else {
@@ -107,21 +106,17 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
 
         for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
           VertexT u = graph.GetEdgeDest(e);
-          if (rand[u] > temp)
-            max = u;
+          if (rand[u] > temp) max = u;
 
-          if (rand[u] < temp)
-            min = u;
+          if (rand[u] < temp) min = u;
 
           // printf("Let's see what rand[u] = %f\n", rand[u]);
           temp = rand[u];
         }
 
-        if (colors[max] == -1)
-          colors[max] = iteration * 2 + 1;
+        if (colors[max] == -1) colors[max] = iteration * 2 + 1;
 
-        if (colors[min] == -1)
-          colors[min] = iteration * 2 + 2;
+        if (colors[min] == -1) colors[min] = iteration * 2 + 2;
 
         // printf("iteration number = %u\n", iteration);
         // printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min],
@@ -136,7 +131,7 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
 }
 
 /**
- * @brief Validation of hello results
+ * @brief Validation of color results
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the values
  * @param[in]  parameters    Excution parameters
@@ -146,10 +141,11 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
  * \return     GraphT::SizeT Number of errors
  */
 template <typename GraphT>
-typename GraphT::SizeT
-Validate_Results(util::Parameters &parameters, GraphT &graph,
-                 typename GraphT::VertexT *h_colors,
-                 typename GraphT::VertexT *ref_colors, int* num_colors, bool verbose = true) {
+typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
+                                        GraphT &graph,
+                                        typename GraphT::VertexT *h_colors,
+                                        typename GraphT::VertexT *ref_colors,
+                                        int *num_colors, bool verbose = true) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::SizeT SizeT;
 
@@ -162,7 +158,6 @@ Validate_Results(util::Parameters &parameters, GraphT &graph,
     printf("Validating result ...  \n");
     printf("Comparison: <node idx, gunrock, cpu>\n");
     for (SizeT v = 0; v < graph.nodes; v++) {
-      // printf(" \t \t %d \t %d \t %d\n", v, h_colors[v], ref_colors[v]);
 
       SizeT start_edge = graph.GetNeighborListOffset(v);
       SizeT num_neighbors = graph.GetNeighborListLength(v);
@@ -195,9 +190,9 @@ Validate_Results(util::Parameters &parameters, GraphT &graph,
   return num_errors;
 }
 
-} // namespace color
-} // namespace app
-} // namespace gunrock
+}  // namespace color
+}  // namespace app
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:
