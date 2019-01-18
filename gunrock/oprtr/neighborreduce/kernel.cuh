@@ -149,13 +149,13 @@ cudaError_t Launch(
         if (parameters.advance_mode == "ALL_EDGES")
         {
             offsets = const_cast<typeof(offsets)>(&(GraphSwitchT::GetOffsets(graph)));
-            GUARD_CU(util::cubSegmentedReduce(
+            GUARD_CU(util::SegmentedReduce(
                 frontier.cub_temp_space,
                 values_temp, values_temp2_,
                 (SizeT)graph.nodes, offsets[0],
                 reduce_op, init_value, parameters.stream));
         }  else {
-            GUARD_CU(util::cubSegmentedReduce(
+            GUARD_CU(util::SegmentedReduce(
                 frontier.cub_temp_space,
                 values_temp, values_temp2_,
                 frontier.queue_length, frontier.segment_offsets[0],

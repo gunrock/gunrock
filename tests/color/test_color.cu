@@ -7,9 +7,9 @@
 
 /**
  * @file
- * test_sssp.cu
+ * test_color.cu
  *
- * @brief Simple test driver program for Gunrock template.
+ * @brief Color driver program for Gunrock.
  */
 
 #include <gunrock/app/color/color_app.cu>
@@ -55,7 +55,7 @@ struct main_struct
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-        // TODO: reference result on CPU, e.e.:
+        // reference result on CPU:
         VertexT  *ref_colors = NULL;
 
         bool quick = parameters.Get<bool>("quick");
@@ -68,7 +68,7 @@ struct main_struct
             std::string validation = parameters.Get<std::string>("validation");
             util::PrintMsg("Computing reference value ...", !quiet);
 
-            // TODO: problem specific data, e.g.:
+            // problem specific data:
             ref_colors = new VertexT[graph.nodes];
 
 	    util::PrintMsg("__________________________", !quiet);
@@ -83,9 +83,7 @@ struct main_struct
 
         }
 
-        // TODO: add other switching parameters, if needed
         std::vector<std::string> switches{"advance-mode"};
-        // TODO: add problem specific data
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
 		color_balance,
@@ -122,7 +120,6 @@ int main(int argc, char** argv)
     }
     GUARD_CU(parameters.Check_Required());
 
-    // TODO: change available graph types, according to requirements
     return app::Switch_Types<
         app::VERTEXT_U32B |
         app::SIZET_U32B |

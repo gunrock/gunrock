@@ -9,7 +9,7 @@
  * @file
  * color_problem.cuh
  *
- * @brief GPU Storage management Structure for hello Problem Data
+ * @brief GPU Storage management Structure for color Problem Data
  */
 
 #pragma once
@@ -24,7 +24,7 @@ namespace app {
 namespace color {
 
 /**
- * @brief Speciflying parameters for hello Problem
+ * @brief Speciflying parameters for color Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter
  * info \return cudaError_t error message(s), if any
  */
@@ -107,10 +107,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      */
     cudaError_t Release(util::Location target = util::LOCATION_ALL) {
       cudaError_t retval = cudaSuccess;
-      if (target & util::DEVICE)
-        GUARD_CU(util::SetDevice(this->gpu_idx));
+      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx));
       if (prohibit_size != 0) {
-	GUARD_CU(visited.Release(target));
+        GUARD_CU(visited.Release(target));
         GUARD_CU(prohibit.Release(target));
       }
       if (color_balance) {
@@ -154,7 +153,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       curandSetPseudoRandomGeneratorSeed(gen, seed);
 
       if (prohibit_size != 0) {
-	GUARD_CU(visited.Allocate(sub_graph.nodes, target));
+        GUARD_CU(visited.Allocate(sub_graph.nodes, target));
         GUARD_CU(prohibit.Allocate(sub_graph.nodes * prohibit_size, target));
       }
       if (color_balance) {
@@ -184,8 +183,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       SizeT edges = this->sub_graph->edges;
       // Ensure data are allocated
       if (prohibit_size != 0) {
-       	GUARD_CU(visited.EnsureSize_(nodes, target));
-	GUARD_CU(prohibit.EnsureSize_(nodes * prohibit_size, target));
+        GUARD_CU(visited.EnsureSize_(nodes, target));
+        GUARD_CU(prohibit.EnsureSize_(nodes * prohibit_size, target));
       }
       if (color_balance) {
         GUARD_CU(color_temp.EnsureSize_(edges, target));
@@ -198,13 +197,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       // Reset data
       if (prohibit_size != 0) {
-        GUARD_CU(visited.ForEach(
-	[] __host__ __device__ (bool & x) {
-	  x = false;
-	},
-	nodes, target, this->stream));
+        GUARD_CU(visited.ForEach([] __host__ __device__(bool &x) { x = false; },
+                                 nodes, target, this->stream));
 
-	GUARD_CU(prohibit.ForEach(
+        GUARD_CU(prohibit.ForEach(
             [] __host__ __device__(VertexT & x) {
               x = util::PreDefinedValues<VertexT>::InvalidValue;
             },
@@ -248,7 +244,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       return retval;
     }
-  }; // DataSlice
+  };  // DataSlice
 
   // Set of data slices (one for each GPU)
   util::Array1D<SizeT, DataSlice> *data_slices;
@@ -265,7 +261,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   // Problem Methods
 
   /**
-   * @brief hello default constructor
+   * @brief color default constructor
    */
   Problem(util::Parameters &_parameters, ProblemFlag _flag = Problem_None)
       : BaseProblem(_parameters, _flag), data_slices(NULL) {
@@ -280,7 +276,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   }
 
   /**
-   * @brief hello default destructor
+   * @brief color default destructor
    */
   virtual ~Problem() { Release(); }
 
@@ -291,8 +287,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   cudaError_t Release(util::Location target = util::LOCATION_ALL) {
     cudaError_t retval = cudaSuccess;
-    if (data_slices == NULL)
-      return retval;
+    if (data_slices == NULL) return retval;
     for (int i = 0; i < this->num_gpus; i++)
       GUARD_CU(data_slices[i].Release(target));
 
@@ -332,7 +327,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             },
             nodes, util::HOST));
       }
-    } else { // num_gpus != 1
+    } else {  // num_gpus != 1
 
       // ============ INCOMPLETE TEMPLATE - MULTIGPU ============
 
@@ -384,8 +379,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
-      if (target & util::DEVICE)
-        GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
 
       GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
 
@@ -411,8 +405,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
     // Reset data slices
     for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
-      if (target & util::DEVICE)
-        GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       GUARD_CU(data_slices[gpu]->Reset(target));
       GUARD_CU(data_slices[gpu].Move(util::HOST, target));
     }
@@ -422,9 +415,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   }
 };
 
-} // namespace color
-} // namespace app
-} // namespace gunrock
+}  // namespace color
+}  // namespace app
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:
