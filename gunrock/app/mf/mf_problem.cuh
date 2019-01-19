@@ -80,7 +80,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     VertexT tail_;
 
     util::Array1D<SizeT, bool> reachabilities;
-    util::Array1D<SizeT, VertexT> queue;
+    util::Array1D<SizeT, VertexT> queue0;
+    util::Array1D<SizeT, VertexT> queue1;
     util::Array1D<SizeT, bool> mark;
 
     VertexT source;  // source vertex
@@ -112,7 +113,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       tail.SetName("tail");
 
       reachabilities.SetName("reachabilities");
-      queue.SetName("queue");
+      queue0.SetName("queue0");
+      queue1.SetName("queue1");
       mark.SetName("mark");
       changed.SetName("changed");
     }
@@ -144,7 +146,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(tail.Release(target));
 
       GUARD_CU(reachabilities.Release(target));
-      GUARD_CU(queue.Release(target));
+      GUARD_CU(queue0.Release(target));
+      GUARD_CU(queue1.Release(target));
       GUARD_CU(mark.Release(target));
 
       GUARD_CU(BaseDataSlice::Release(target));
@@ -190,7 +193,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(reachabilities.Allocate(nodes_size, target));
 
-      GUARD_CU(queue.Allocate(nodes_size, target));
+      GUARD_CU(queue0.Allocate(nodes_size, target));
+      GUARD_CU(queue1.Allocate(nodes_size, target));
       GUARD_CU(mark.Allocate(nodes_size, target));
 
       GUARD_CU(changed.Allocate(1, util::HOST | target));
@@ -231,7 +235,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(tail.EnsureSize_(1, target));
 
       GUARD_CU(reachabilities.EnsureSize_(nodes_size, target));
-      GUARD_CU(queue.EnsureSize_(nodes_size, target));
+      GUARD_CU(queue0.EnsureSize_(nodes_size, target));
+      GUARD_CU(queue1.EnsureSize_(nodes_size, target));
       GUARD_CU(mark.EnsureSize_(nodes_size, target));
 
       GUARD_CU(changed.EnsureSize_(1, target | util::HOST));
