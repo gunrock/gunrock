@@ -186,30 +186,108 @@ void ReferenceHITS(
     bool                                    quiet = false)
 {
     //
-    // compute HITS rank
+    // Compute HITS rank
     //
+
+    // Note: the inv_graph matrix is the same as the graph matrix except that it is a
+    // CSC graph, meaning it uses row indices with column offsets rather than
+    // column indices and row offsets.
 
     CpuTimer cpu_timer;
     cpu_timer.Start();
 
+    printf("Max Iter: %d\n", max_iter);
+
     // Initialize all hub and authority scores to 1
-    for (int i = 0; i < graph.nodes; i++)
+    for (SizeT i = 0; i < graph.nodes; i++)
     {
         hrank[i] = 1;
         arank[i] = 1;
     }
 
     // Iterate so that the hub and authority scores converge
-    for (int iterCount = 0; iterCount < max_iter; iterCount++)
+    for (SizeT iterCount = 0; iterCount < max_iter; iterCount++)
     {
-        int norm = 0;
+        Value norm = 0;
+       
+        // Used to track position in offset vector
+        SizeT idxStart = 0;
 
-        // Update values from incoming neighbors
-        for (int colCounter = 0; colCounter < inv_graph.nodes-1; colCounter++)
+        // Iterate through all pages p, where p are nodes
+        for (SizeT p = 0; p < inv_graph.nodes; p++)
         {
-            int numIncomingPages = inv_graph.row_offsets[colCounter+1] - inv_graph.row_offsets[colCounter];
-            printf("Incoming Pages: %d\n", numIncomingPages);
+            arank[p] = 0;  // Initialize the node's authority rank to 0
+
+            // Get the number of sites that connect to the current page
+            SizeT numIncomingConnections = inv_graph.row_offsets[p+1] -
+                                            inv_graph.row_offsets[p];
+
+            // Get the indices of the incoming connections and update the authority value
+            // "for each page q in p.incomingNeighbors do..."
+            for (SizeT i = idxStart; i < idxStart+numIncomingConnections; i++)
+            {
+                //printf("Page = %d, InConnection = %d\n", p, inv_graph.column_indices[i]);
+
+                // Update the node's authority rank
+                arank[p] += hrank[inv_graph.column_indices[i]];
+            }
+
+            norm += pow(arank[p], 2.0);
+
+            idxStart += numIncomingConnections;
         }
+
+        norm = sqrt(norm);
+
+        // Normalize the authority scores
+        for (SizeT page = 0; page < graph.nodes; page++)
+        {
+            arank[page] = arank[page]/norm;
+            //printf("arank %d: %f\n", page, arank[page]);
+        }
+
+        // Reset the norm
+        norm = 0.0;
+
+        // Reset offset start index
+        idxStart = 0;
+
+        // Similar to the last step, iterate through all pages
+        for (SizeT p = 0; p < graph.nodes; p++)
+        {
+            hrank[p] = 0;
+
+            // Get the number of sites that the current page connects to
+            SizeT numOutgoingConnections = graph.row_offsets[p+1] - 
+                                            graph.row_offsets[p];
+
+            // Get the indices of the outgoing connections and update the hub value
+            for (SizeT i = idxStart; i < idxStart+numOutgoingConnections; i++)
+            {
+                //printf("Page = %d, OutConnection = %d\n", p, graph.column_indices[i]);
+
+                // Update the node's hub rank
+                hrank[p] += arank[graph.column_indices[i]];
+            }
+
+            norm += pow(hrank[p], 2.0);
+
+            idxStart += numOutgoingConnections;
+        }
+
+        norm = sqrt(norm);
+
+        // Normalize the hub scores
+        for (SizeT page = 0; page < graph.nodes; page++)
+        {
+            hrank[page] = hrank[page]/norm;
+            //printf("hrank %d: %f\n", page, hrank[page]);
+        }
+    }
+
+    for (SizeT page = 0; page < graph.nodes; page++)
+    {
+        printf("arank %d: %5f, hrank %d, %5f\n", page, arank[page], page, hrank[page]);
     }
 
     cpu_timer.Stop();
@@ -313,7 +391,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     //
     if (reference_check_h != NULL)
     {
-        if (!quiet_mode) printf("compute reference value...\n");
+        if (!quiet_mode) printf("Computing reference value...\n");
         ReferenceHITS(
             *csr,
             *csc,
@@ -322,6 +400,11 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
             max_iter);
         if (!quiet_mode) printf("\n");
     }
+
+    // Display CPU solution
+    if (!quiet_mode) printf("CPU Algorithm Results:\n");
+    if (!quiet_mode) DisplaySolution(reference_check_h, reference_check_a, csr->nodes);
+    if (!quiet_mode) printf("\n");
 
     // Perform HITS
     util::GRError(
@@ -341,7 +424,8 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         problem->Extract(h_hrank, h_arank),
         "HITS Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    // Display Solution
+    // Display GPU Solution
+    if (!quiet_mode) printf("GPU Algorithm Results:\n");
     if (!quiet_mode) DisplaySolution(h_hrank, h_arank, csr->nodes);
 
     info->ComputeCommonStats(enactor -> enactor_stats.GetPointer(), elapsed, (VertexId*) NULL);
@@ -384,6 +468,7 @@ int main_(CommandLineArgs *args)
     // TODO: add a CPU Reference algorithm,
     // before that, quick_mode always on.
     info->info["quick_mode"] = false;
+    info->info["max_iteration"] = 1; // Increased by Jonathan
     RunTests<VertexId, SizeT, Value>(info);
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
