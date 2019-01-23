@@ -468,7 +468,7 @@ int main_(CommandLineArgs *args)
     // TODO: add a CPU Reference algorithm,
     // before that, quick_mode always on.
     info->info["quick_mode"] = false;
-    info->info["max_iteration"] = 1; // Increased by Jonathan
+    info->info["max_iteration"] = 1000; // Increased by Jonathan
     RunTests<VertexId, SizeT, Value>(info);
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
