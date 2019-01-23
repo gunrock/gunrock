@@ -232,12 +232,13 @@ void ReferenceHITS(
                 arank[p] += hrank[inv_graph.column_indices[i]];
             }
 
-            norm += pow(arank[p], 2.0);
+            //norm += pow(arank[p], 2.0);
+            norm += pow(arank[p], 1.0);
 
             idxStart += numIncomingConnections;
         }
 
-        norm = sqrt(norm);
+        //norm = sqrt(norm);
 
         // Normalize the authority scores
         for (SizeT page = 0; page < graph.nodes; page++)
@@ -270,12 +271,13 @@ void ReferenceHITS(
                 hrank[p] += arank[graph.column_indices[i]];
             }
 
-            norm += pow(hrank[p], 2.0);
+            //norm += pow(hrank[p], 2.0);
+            norm += pow(hrank[p], 1.0);
 
             idxStart += numOutgoingConnections;
         }
 
-        norm = sqrt(norm);
+        //norm = sqrt(norm);
 
         // Normalize the hub scores
         for (SizeT page = 0; page < graph.nodes; page++)
@@ -468,7 +470,7 @@ int main_(CommandLineArgs *args)
     // TODO: add a CPU Reference algorithm,
     // before that, quick_mode always on.
     info->info["quick_mode"] = false;
-    info->info["max_iteration"] = 1000; // Increased by Jonathan
+    info->info["max_iteration"] = 10000; // Increased by Jonathan
     RunTests<VertexId, SizeT, Value>(info);
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
