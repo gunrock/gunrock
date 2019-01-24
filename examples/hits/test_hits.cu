@@ -197,8 +197,6 @@ void ReferenceHITS(
     edges, while MATLAB does not.
     */
 
-    // Note: the inv_graph matrix is a transpose of graph.
-
     CpuTimer cpu_timer;
     cpu_timer.Start();
 
@@ -283,7 +281,6 @@ void ReferenceHITS(
 
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
-
     if (!quiet) { printf("CPU HITS finished in %lf msec.\n", elapsed); }
 }
 
