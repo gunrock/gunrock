@@ -186,9 +186,16 @@ void ReferenceHITS(
     SizeT                                   max_iter,
     bool                                    quiet = false)
 {
-    //
-    // Compute HITS rank
-    //
+    /*
+    This CPU reference implementation was validated against
+    MATLAB's centrality() function. One important note is that
+    MATLAB by default uses the 1-norm rather than the 2-norm
+    when computing hub and authority scores, so the result
+    of this function should be normalized again by the 2-norm
+    to get identical rank values. Additionally, graphs should
+    not have a node that links to itself. Gunrock ignores these
+    edges, while MATLAB does not.
+    */
 
     // Note: the inv_graph matrix is a transpose of graph.
 
