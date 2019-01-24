@@ -103,7 +103,8 @@ void Usage()
         "[--queue-sizing=<factor>] Allocates a frontier queue sized at: \n"
         "                          (graph-edges * <factor>). (Default: 1.0)\n"
         "[--v]                     Print verbose per iteration debug info.\n"
-        "[--iteration-num=<num>]   Number of runs to perform the test.\n"
+        "[--max-iter=<num>]        Number of runs to perform the test.\n"
+        "[--quick]                 Does not run CPU reference.\n"
         "[--quiet]                 No output (unless --json is specified).\n"
         "[--json]                  Output JSON-format statistics to STDOUT.\n"
         "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"
@@ -156,7 +157,7 @@ void DisplaySolution(Value *hrank, Value *arank, SizeT nodes)
 }
 
 /******************************************************************************
- * BFS Testing Routines
+ * HITS Testing Routines
  *****************************************************************************/
 
 /**
@@ -275,11 +276,6 @@ void ReferenceHITS(
         }
     }
 
-    for (SizeT page = 0; page < graph.nodes; page++)
-    {
-        printf("arank %d: %5f, hrank %d, %5f\n", page, arank[page], page, hrank[page]);
-    }
-
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
 
@@ -387,7 +383,8 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
             *csc,
             reference_check_h,
             reference_check_a,
-            max_iter);
+            max_iter,
+            quiet_mode);
         if (!quiet_mode) printf("\n");
 
         // Display CPU solution
@@ -455,10 +452,7 @@ int main_(CommandLineArgs *args)
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
-    // TODO: add a CPU Reference algorithm,
-    // before that, quick_mode always on.
-    info->info["quick_mode"] = false;
-    info->info["max_iteration"] = 100000; // Increased by Jonathan
+    //info->info["max_iteration"] = 100;
     RunTests<VertexId, SizeT, Value>(info);
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
