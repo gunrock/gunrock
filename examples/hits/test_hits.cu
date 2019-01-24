@@ -216,7 +216,7 @@ void ReferenceHITS(
         Value norm = 0; 
        
         // Used to track position in the row offset vector
-        SizeT idxStart = 0;
+        SizeT rowStartIdx = 0;
 
         // Iterate through all pages p
         for (SizeT page = 0; page < inv_graph.nodes; page++)
@@ -229,14 +229,14 @@ void ReferenceHITS(
 
             // Get the indices of the incoming connections and update the
             // authority value of the current page
-            for (SizeT i = idxStart; i < idxStart+numIncomingConnections; i++)
+            for (SizeT i = rowStartIdx; i < rowStartIdx+numIncomingConnections; i++)
             {
                 arank[page] += hrank[inv_graph.column_indices[i]];
             }
 
             norm += pow(arank[page], 2.0);
 
-            idxStart += numIncomingConnections;
+            rowStartIdx += numIncomingConnections;
         }
 
         norm = sqrt(norm);
@@ -247,11 +247,9 @@ void ReferenceHITS(
             arank[page] = arank[page]/norm;
         }
 
-        // Reset the norm to compute hub scores
+        // Reset
         norm = 0.0;
-
-        // Reset offset start index
-        idxStart = 0;
+        rowStartIdx = 0;
 
         // Similar to the last step, iterate through all pages
         for (SizeT page = 0; page < graph.nodes; page++)
@@ -264,14 +262,14 @@ void ReferenceHITS(
 
             // Get the indices of the outgoing connections and update the hub
             // value
-            for (SizeT i = idxStart; i < idxStart+numOutgoingConnections; i++)
+            for (SizeT i = rowStartIdx; i < rowStartIdx+numOutgoingConnections; i++)
             {
                 hrank[page] += arank[graph.column_indices[i]];
             }
 
             norm += pow(hrank[page], 2.0);
 
-            idxStart += numOutgoingConnections;
+            rowStartIdx += numOutgoingConnections;
         }
 
         norm = sqrt(norm);
