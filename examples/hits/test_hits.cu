@@ -189,14 +189,10 @@ void ReferenceHITS(
     // Compute HITS rank
     //
 
-    // Note: the inv_graph matrix is the same as the graph matrix except that it is a
-    // CSC graph, meaning it uses row indices with column offsets rather than
-    // column indices and row offsets.
+    // Note: the inv_graph matrix is a transpose of graph.
 
     CpuTimer cpu_timer;
     cpu_timer.Start();
-
-    printf("Max Iter: %d\n", max_iter);
 
     // Initialize all hub and authority scores to 1
     for (SizeT i = 0; i < graph.nodes; i++)
@@ -205,30 +201,28 @@ void ReferenceHITS(
         arank[i] = 1;
     }
 
-    // Iterate so that the hub and authority scores converge
+    // Iterate so the hub and authority scores converge
     for (SizeT iterCount = 0; iterCount < max_iter; iterCount++)
     {
-        Value norm = 0;
+        // Used to normalize the hub and authority score vectors
+        Value norm = 0; 
        
-        // Used to track position in offset vector
+        // Used to track position in the row offset vector
         SizeT idxStart = 0;
 
-        // Iterate through all pages p, where p are nodes
+        // Iterate through all pages p
         for (SizeT p = 0; p < inv_graph.nodes; p++)
         {
-            arank[p] = 0;  // Initialize the node's authority rank to 0
+            arank[p] = 0;  // Initialize the current node's authority rank to 0
 
             // Get the number of sites that connect to the current page
             SizeT numIncomingConnections = inv_graph.row_offsets[p+1] -
                                             inv_graph.row_offsets[p];
 
-            // Get the indices of the incoming connections and update the authority value
-            // "for each page q in p.incomingNeighbors do..."
+            // Get the indices of the incoming connections and update the
+            // authority value of the current page
             for (SizeT i = idxStart; i < idxStart+numIncomingConnections; i++)
             {
-                //printf("Page = %d, InConnection = %d\n", p, inv_graph.column_indices[i]);
-
-                // Update the node's authority rank
                 arank[p] += hrank[inv_graph.column_indices[i]];
             }
 
@@ -244,10 +238,9 @@ void ReferenceHITS(
         for (SizeT page = 0; page < graph.nodes; page++)
         {
             arank[page] = arank[page]/norm;
-            //printf("arank %d: %f\n", page, arank[page]);
         }
 
-        // Reset the norm
+        // Reset the norm to compute hub scores
         norm = 0.0;
 
         // Reset offset start index
@@ -262,12 +255,10 @@ void ReferenceHITS(
             SizeT numOutgoingConnections = graph.row_offsets[p+1] - 
                                             graph.row_offsets[p];
 
-            // Get the indices of the outgoing connections and update the hub value
+            // Get the indices of the outgoing connections and update the hub
+            // value
             for (SizeT i = idxStart; i < idxStart+numOutgoingConnections; i++)
             {
-                //printf("Page = %d, OutConnection = %d\n", p, graph.column_indices[i]);
-
-                // Update the node's hub rank
                 hrank[p] += arank[graph.column_indices[i]];
             }
 
@@ -283,7 +274,6 @@ void ReferenceHITS(
         for (SizeT page = 0; page < graph.nodes; page++)
         {
             hrank[page] = hrank[page]/norm;
-            //printf("hrank %d: %f\n", page, hrank[page]);
         }
     }
 
