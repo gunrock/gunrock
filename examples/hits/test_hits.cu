@@ -195,10 +195,10 @@ void ReferenceHITS(
     cpu_timer.Start();
 
     // Initialize all hub and authority scores to 1
-    for (SizeT i = 0; i < graph.nodes; i++)
+    for (SizeT page = 0; page < graph.nodes; page++)
     {
-        hrank[i] = 1;
-        arank[i] = 1;
+        hrank[page] = 1;
+        arank[page] = 1;
     }
 
     // Iterate so the hub and authority scores converge
@@ -211,22 +211,22 @@ void ReferenceHITS(
         SizeT idxStart = 0;
 
         // Iterate through all pages p
-        for (SizeT p = 0; p < inv_graph.nodes; p++)
+        for (SizeT page = 0; page < inv_graph.nodes; page++)
         {
-            arank[p] = 0;  // Initialize the current node's authority rank to 0
+            arank[page] = 0;  // Initialize the current node's authority rank to 0
 
             // Get the number of sites that connect to the current page
-            SizeT numIncomingConnections = inv_graph.row_offsets[p+1] -
-                                            inv_graph.row_offsets[p];
+            SizeT numIncomingConnections = inv_graph.row_offsets[page+1] -
+                                            inv_graph.row_offsets[page];
 
             // Get the indices of the incoming connections and update the
             // authority value of the current page
             for (SizeT i = idxStart; i < idxStart+numIncomingConnections; i++)
             {
-                arank[p] += hrank[inv_graph.column_indices[i]];
+                arank[page] += hrank[inv_graph.column_indices[i]];
             }
 
-            norm += pow(arank[p], 2.0);
+            norm += pow(arank[page], 2.0);
 
             idxStart += numIncomingConnections;
         }
@@ -246,22 +246,22 @@ void ReferenceHITS(
         idxStart = 0;
 
         // Similar to the last step, iterate through all pages
-        for (SizeT p = 0; p < graph.nodes; p++)
+        for (SizeT page = 0; page < graph.nodes; page++)
         {
-            hrank[p] = 0;
+            hrank[page] = 0;
 
             // Get the number of sites that the current page connects to
-            SizeT numOutgoingConnections = graph.row_offsets[p+1] - 
-                                            graph.row_offsets[p];
+            SizeT numOutgoingConnections = graph.row_offsets[page+1] - 
+                                            graph.row_offsets[page];
 
             // Get the indices of the outgoing connections and update the hub
             // value
             for (SizeT i = idxStart; i < idxStart+numOutgoingConnections; i++)
             {
-                hrank[p] += arank[graph.column_indices[i]];
+                hrank[page] += arank[graph.column_indices[i]];
             }
 
-            norm += pow(hrank[p], 2.0);
+            norm += pow(hrank[page], 2.0);
 
             idxStart += numOutgoingConnections;
         }
