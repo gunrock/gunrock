@@ -226,13 +226,12 @@ void ReferenceHITS(
                 arank[p] += hrank[inv_graph.column_indices[i]];
             }
 
-            //norm += pow(arank[p], 2.0);
-            norm += pow(arank[p], 1.0);
+            norm += pow(arank[p], 2.0);
 
             idxStart += numIncomingConnections;
         }
 
-        //norm = sqrt(norm);
+        norm = sqrt(norm);
 
         // Normalize the authority scores
         for (SizeT page = 0; page < graph.nodes; page++)
@@ -262,13 +261,12 @@ void ReferenceHITS(
                 hrank[p] += arank[graph.column_indices[i]];
             }
 
-            //norm += pow(hrank[p], 2.0);
-            norm += pow(hrank[p], 1.0);
+            norm += pow(hrank[p], 2.0);
 
             idxStart += numOutgoingConnections;
         }
 
-        //norm = sqrt(norm);
+        norm = sqrt(norm);
 
         // Normalize the hub scores
         for (SizeT page = 0; page < graph.nodes; page++)
