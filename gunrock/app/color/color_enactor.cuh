@@ -14,13 +14,19 @@
 
 #pragma once
 
+#include <gunrock/util/sort_device.cuh>
+
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-#include <gunrock/oprtr/oprtr.cuh>
 
 #include <gunrock/app/color/color_problem.cuh>
-#include <gunrock/util/sort_device.cuh>
+
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600
+ #include <gunrock/oprtr/1D_oprtr/for.cuh>
+#endif
+
+#include <gunrock/oprtr/oprtr.cuh>
 
 namespace gunrock {
 namespace app {
@@ -94,6 +100,7 @@ struct ColorIterationLoop
     auto stream = oprtr_parameters.stream;
     util::Array1D<SizeT, VertexT> *null_frontier = NULL;
     auto null_ptr = null_frontier;
+    auto user_iter = data_slice.user_iter;
 
     //======================================================================//
     // Jones-Plassman-Luby Graph Coloring: Compute Operator                 //
@@ -102,8 +109,13 @@ struct ColorIterationLoop
       if (!color_balance) {
         auto jpl_color_op =
             [graph, colors, rand, iteration, min_color] __host__ __device__(
-                VertexT * v_q, const SizeT &pos) {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600
+		const int &counter, const VertexT &v) {
+#else
+		VertexT * v_q, const SizeT &pos) {
               VertexT v = v_q[pos];
+#endif
+
               if (util::isValid(colors[v])) return;
 
               SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
@@ -132,8 +144,23 @@ struct ColorIterationLoop
               }
             };
 
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600
+       SizeT loop_size = frontier.queue_length;
+       gunrock::oprtr::RepeatFor(
+	jpl_color_op,	   	                   /* lambda */
+	user_iter,                                 /* num_repeats (int) */
+	loop_size  ,                               /* ForIterT loop_size */
+	util::DEVICE,                              /* target */
+	oprtr_parameters.stream,                   /* stream */
+	util::PreDefinedValues<int>::InvalidValue, /* grid_size */
+	util::PreDefinedValues<int>::InvalidValue, /* block_size */
+	2 /* mode: stacked kernels */);
+#else
+
         GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
                                         util::DEVICE, stream));
+#endif
+
       }
 
       else {
