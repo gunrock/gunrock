@@ -108,7 +108,7 @@ struct ColorIterationLoop
     //======================================================================//
     if (use_jpl) {
       if (!color_balance) {
-	if (iteration % 2)
+        if (iteration % 2)
 	   curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
 
         auto jpl_color_op =
@@ -117,7 +117,7 @@ struct ColorIterationLoop
 //                const int &counter, const VertexT &v) {
 // #else
                 VertexT * v_q, const SizeT &pos) {
-              VertexT v = v_q[pos];
+              VertexT v = pos; // v_q[pos];
 // #endif
 	      if (pos == 0) colored[0] = 0; // reset colored ahead-of-time
               if (util::isValid(colors[v])) return;
@@ -349,34 +349,14 @@ struct ColorIterationLoop
 
     if (test_run) {
       // reset atomic count
-#if 0
-      GUARD_CU(data_slice.colored.ForAll(
-          [] __host__ __device__(SizeT * x, const VertexT &pos) { x[pos] = 0; },
-          1, util::DEVICE, stream));
-#endif
-
-      // reset atomic count
       GUARD_CU(colors.ForAll(
           [colored] __host__ __device__(VertexT * x, const VertexT &pos) {
             if (util::isValid(x[pos])) atomicAdd(&colored[0], 1);
           },
           graph.nodes, util::DEVICE, stream));
 
-#if 0
-      auto status_op = [colors, colored] __host__ __device__(VertexT * v_q,
-                                                             const SizeT &pos) {
-        VertexT v = v_q[pos];
-        if (util::isValid(colors[v])) {
-          atomicAdd(&colored[0], 1);
-        }
-      };
-
-      // GUARD_CU(frontier.V_Q()->ForAll(status_op, frontier.queue_length,\
-                                      util::DEVICE, stream));
-#endif
-
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
-      GUARD_CU(data_slice.colored.Move(util::DEVICE, util::HOST));
+      GUARD_CU(colored.Move(util::DEVICE, util::HOST));
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
     }
 
