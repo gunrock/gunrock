@@ -7,24 +7,23 @@
 
 /**
  * @file
- * hello_problem.cuh
+ * hits_problem.cuh
  *
- * @brief GPU Storage management Structure for hello Problem Data
+ * @brief GPU Storage management Structure for HITS Problem Data
  */
 
 #pragma once
 
 #include <gunrock/app/problem_base.cuh>
+#include <gunrock/app/problem_base.cuh>
+#include <gunrock/util/memset_kernel.cuh> // TODO: Check if these are needed
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
-namespace hello {
-// </TODO>
-
+namespace hits {
 
 /**
- * @brief Speciflying parameters for hello Problem
+ * @brief Speciflying parameters for hits Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -72,24 +71,32 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     // Dataslice structure
 
     /**
-     * @brief Data structure containing problem specific data on indivual GPU.
+     * @brief Data structure containing problem specific data on an indivual GPU.
      */
     struct DataSlice : BaseDataSlice
     {
-        // <TODO> add problem specific storage arrays:
-        util::Array1D<SizeT, ValueT> degrees;
-        util::Array1D<SizeT, int> visited;
-        // </TODO>
+        // device storage arrays
+        util::Array1D<SizeT, Value   > hrank_curr;           /**< Used for ping-pong hub rank value */
+        util::Array1D<SizeT, Value   > arank_curr;           /**< Used for ping-pong authority rank value */
+        util::Array1D<SizeT, Value   > hrank_next;           /**< Used for ping-pong page rank value */       
+        util::Array1D<SizeT, Value   > arank_next;           /**< Used for ping-pong page rank value */       
+        util::Array1D<SizeT, SizeT   > in_degrees;          /**< Used for keeping in-degree for each vertex */
+        util::Array1D<SizeT, SizeT   > out_degrees;         /**< Used for keeping out-degree for each vertex */
+        Value                          delta;
+        VertexId                       src_node;
 
         /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice()
         {
-            // <TODO> name of the problem specific arrays:
-            degrees.SetName("degrees");
-            visited.SetName("visited");
-            // </TODO>
+            // Name of the problem specific arrays:
+            hrank_curr.SetName("hrank_curr");
+            arank_curr.SetName("arank_curr");
+            hrank_next.SetName("hrank_next");
+            arank_next.SetName("arank_next");
+            in_degrees.SetName("in_degrees");
+            out_degrees.SetName("out_degrees");
         }
 
         /*
@@ -108,10 +115,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            // <TODO> Release problem specific data, e.g.:
-            GUARD_CU(degrees.Release(target));
-            GUARD_CU(visited.Release(target));
-            // </TODO>
+            // Release problem specific data, e.g.:
+            GUARD_CU(hrank_curr.Release(target));
+            GUARD_CU(arank_curr.Release(target));
+            GUARD_CU(hrank_next.Release(target));
+            GUARD_CU(arank_next.Release(target));
+            GUARD_CU(in_degrees.Release(target));
+            GUARD_CU(out_degrees.Release(target));
 
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
