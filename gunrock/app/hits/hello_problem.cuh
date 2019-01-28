@@ -18,7 +18,9 @@
 
 namespace gunrock {
 namespace app {
+// <TODO> change namespace
 namespace hello {
+// </TODO>
 
 
 /**
