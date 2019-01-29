@@ -7,14 +7,14 @@
 
 /**
  * @file
- * knn_test.cu
+ * knn_test.cuh
  *
  * @brief Test related functions for knn
  */
 
 #pragma once
 
-//#define KNN_DEBUG 1
+// #define KNN_DEBUG 1
 
 #ifdef KNN_DEBUG
 #define debug(a...) fprintf(stderr, a)
@@ -50,6 +50,7 @@ double CPU_Reference(
     typename GraphT::SizeT min_pts,    // mininum snn-density to be core point
     typename GraphT::VertexT point_x,  // index of reference point
     typename GraphT::VertexT point_y,  // index of reference point
+    typename GraphT::SizeT *knns,      // knns
     typename GraphT::SizeT *cluster,   // cluster id
     bool quiet) {
   typedef typename GraphT::SizeT SizeT;
@@ -76,8 +77,8 @@ double CPU_Reference(
   auto edges = graph.edges;
 
   //#pragma omp parallel for
-  for (auto x = 0; x < nodes; ++x){
-      cluster[x] = x;
+  for (auto x = 0; x < nodes; ++x) {
+    cluster[x] = x;
   }
 
   std::set<SizeT> core_points;
@@ -96,7 +97,7 @@ double CPU_Reference(
   }
 
   Point *distance = (Point *)malloc(sizeof(Point) * edges);
-  SizeT *knns = (SizeT*)malloc(sizeof(SizeT) * nodes * k);
+  // SizeT *knns = (SizeT*)malloc(sizeof(SizeT) * nodes * k);
   util::CpuTimer cpu_timer;
   cpu_timer.Start();
 
@@ -215,35 +216,33 @@ double CPU_Reference(
       }
     }
   }
-  
+
   //#pragma omp parallel for
-  for (int i = 0; i < nodes; ++i){
-      // only non-core points
-      if (core_points.find(i) == core_points.end()){
-          auto num_neighbors = graph.CsrT::GetNeighborListLength(i);
-          // only non-noise points
-          if (num_neighbors >= k){
-              auto e_start = graph.CsrT::GetNeighborListOffset(i);
-              for (auto e = e_start; e < e_start + num_neighbors; ++e){
-                  auto m = graph.CsrT::GetEdgeDest(distance[e].e_id);
-                  if (core_points.find(m) != core_points.end()){
-                      cluster[i] = cluster[m];
-                      break;
-                  }
-              }
+  for (int i = 0; i < nodes; ++i) {
+    // only non-core points
+    if (core_points.find(i) == core_points.end()) {
+      auto num_neighbors = graph.CsrT::GetNeighborListLength(i);
+      // only non-noise points
+      if (num_neighbors >= k) {
+        auto e_start = graph.CsrT::GetNeighborListOffset(i);
+        for (auto e = e_start; e < e_start + num_neighbors; ++e) {
+          auto m = graph.CsrT::GetEdgeDest(distance[e].e_id);
+          if (core_points.find(m) != core_points.end()) {
+            cluster[i] = cluster[m];
+            break;
           }
+        }
       }
+    }
   }
 
 #if KNN_DEBUG
-  for (int i = 0; i < nodes; ++i) 
-      debug("cluster[%d] = %d\n", i, cluster[i]);
+  for (int i = 0; i < nodes; ++i) debug("cluster[%d] = %d\n", i, cluster[i]);
 #endif
 
   cpu_timer.Stop();
   float elapsed = cpu_timer.ElapsedMillis();
   delete[] distance;
-  delete[] knns;
   return elapsed;
 }
 
@@ -262,30 +261,60 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
                                         GraphT &graph,
                                         typename GraphT::SizeT *h_cluster,
                                         typename GraphT::SizeT *ref_cluster,
+                                        typename GraphT::SizeT *h_knns,
+                                        typename GraphT::SizeT *ref_knns,
                                         bool verbose = true) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::SizeT SizeT;
+  typedef typename GraphT::CsrT CsrT;
 
   SizeT num_errors = 0;
   bool quiet = parameters.Get<bool>("quiet");
   bool quick = parameters.Get<bool>("quick");
-  if (quick)
-      return num_errors;
+  bool snn = parameters.Get<bool>("snn");
+  SizeT k = parameters.Get<int>("k");
+
+  if (quick) return num_errors;
+
+  for (SizeT v = 0; v < graph.nodes; ++v) {
+    auto v_start = graph.CsrT::GetNeighborListOffset(v);
+    auto num = graph.CsrT::GetNeighborListLength(v);
+    if (num < k) continue;
+    auto v_end = v_start + num;
+    int i = 0;
+    for (SizeT neighbor = v_start; neighbor < v_end && i < k; ++neighbor, ++i) {
+      if (h_knns[v * k + i] != ref_knns[v * k + i]) {
+        debug("[%d] %d != %d\n", i, h_knns[i], ref_knns[i]);
+        ++num_errors;
+      }
+    }
+  }
+
+  if (num_errors > 0) {
+    util::PrintMsg(std::to_string(num_errors) + " errors occurred in KNN.",
+                   !quiet);
+  } else {
+    util::PrintMsg("PASSED KNN", !quiet);
+  }
+
+  SizeT knn_errors = num_errors;
+  num_errors = 0;
 
   for (SizeT i = 0; i < graph.nodes; ++i) {
-    if (h_cluster[i] != ref_cluster[i]) {
+    if (snn && (h_cluster[i] != ref_cluster[i])) {
       debug("[%d] %d != %d\n", i, h_cluster[i], ref_cluster[i]);
       ++num_errors;
     }
   }
 
   if (num_errors > 0) {
-    util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
+    util::PrintMsg(std::to_string(num_errors) + " errors occurred in SNN.",
+                   !quiet);
   } else {
-    util::PrintMsg("PASS", !quiet);
+    util::PrintMsg("PASSED SNN", !quiet);
   }
 
-  return num_errors;
+  return num_errors + knn_errors;
 }
 
 }  // namespace knn
