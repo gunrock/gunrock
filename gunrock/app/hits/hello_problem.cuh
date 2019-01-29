@@ -46,7 +46,7 @@ cudaError_t UseParameters_problem(
 }
 
 /**
- * @brief Template Problem structure.
+ * @brief HITS Problem structure.
  * @tparam _GraphT  Type of the graph
  * @tparam _FLAG    Problem flags
  */
@@ -149,15 +149,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
-            // <TODO> allocate problem specific data here, e.g.:
+            // Allocate problem specific data here.
+            // I think this is done? Ask Mohammad. Only works with one GPU for now
+            GUARD_CU(hrank_curr.Allocate(sub_graph.nodes, target));
+            GUARD_CU(arank_curr.Allocate(sub_graph.nodes, target));
+            GUARD_CU(hrank_next.Allocate(sub_graph.nodes, target));
+            GUARD_CU(arank_next.Allocate(sub_graph.nodes, target));
+            GUARD_CU(in_degrees.Allocate(sub_graph.nodes, target));
+            GUARD_CU(out_degrees.Allocate(sub_graph.nodes, target));
+
             GUARD_CU(degrees.Allocate(sub_graph.nodes, target));
             GUARD_CU(visited.Allocate(sub_graph.nodes, target));
-            // </TODO>
 
             if (target & util::DEVICE) {
-                // <TODO> move sub-graph used by the problem onto GPU,
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
-                // </TODO>
             }
             return retval;
         }
@@ -173,21 +178,43 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT nodes = this -> sub_graph -> nodes;
 
             // Ensure data are allocated
-            // <TODO> ensure size of problem specific data:
-            GUARD_CU(degrees.EnsureSize_(nodes, target));
-            GUARD_CU(visited.EnsureSize_(nodes, target));
-            // </TODO>
+            // Ensure size of problem specific data:
+            GUARD_CU(hrank_curr.EnsureSize_(nodes, target));
+            GUARD_CU(arank_curr.EnsureSize_(nodes, target));
+            GUARD_CU(hrank_next.EnsureSize_(nodes, target));
+            GUARD_CU(arank_next.EnsureSize_(nodes, target));
+            GUARD_CU(in_degrees.EnsureSize_(nodes, target));
+            GUARD_CU(out_degrees.EnsureSize_(nodes, target));
+
 
             // Reset data
-            // <TODO> reset problem specific data, e.g.:
-            GUARD_CU(degrees.ForEach([]__host__ __device__ (ValueT &x){
-               x = (ValueT)0;
-            }, nodes, target, this -> stream));
+            // For HITS, all authority and hub scores are initialized to 1.
+            // Set next scores to 0 (will be updated) and degrees to 0 (also updated)
 
-            GUARD_CU(visited.ForEach([]__host__ __device__ (int &x){
-               x = (int)0;
-            }, nodes, target, this -> stream));
-            // </TODO>
+            GUARD_CU(hrank_curr.ForEach([]__host__ __device__ (ValueT &x){
+                x = (ValueT)1;
+             }, nodes, target, this -> stream));
+
+             GUARD_CU(arank_curr.ForEach([]__host__ __device__ (ValueT &x){
+                x = (ValueT)1;
+             }, nodes, target, this -> stream));
+
+             GUARD_CU(hrank_next.ForEach([]__host__ __device__ (ValueT &x){
+                x = (ValueT)0;
+             }, nodes, target, this -> stream));
+
+             GUARD_CU(arank_next.ForEach([]__host__ __device__ (ValueT &x){
+                x = (ValueT)0;
+             }, nodes, target, this -> stream));
+
+             GUARD_CU(in_degrees.ForEach([]__host__ __device__ (ValueT &x){
+                x = (ValueT)0;
+             }, nodes, target, this -> stream));
+
+             GUARD_CU(out_degrees.ForEach([]__host__ __device__ (ValueT &x){
+                x = (ValueT)0;
+             }, nodes, target, this -> stream));
+
 
             return retval;
         }
@@ -200,7 +227,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     // Problem Methods
 
     /**
-     * @brief hello default constructor
+     * @brief HITS default constructor
      */
     Problem(
         util::Parameters &_parameters,
@@ -209,7 +236,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         data_slices(NULL) {}
 
     /**
-     * @brief hello default destructor
+     * @brief HITS default destructor
      */
     virtual ~Problem() { Release(); }
 
