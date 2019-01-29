@@ -95,6 +95,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             arank_next.SetName("arank_next");
             in_degrees.SetName("in_degrees");
             out_degrees.SetName("out_degrees")         
+
+            SizeT max_iter; // Maximum number of HITS iterations
         }
 
         /*
