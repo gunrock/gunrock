@@ -7,9 +7,9 @@
 
 /**
  * @file
- * hello_problem.cuh
+ * hits_problem.cuh
  *
- * @brief GPU Storage management Structure for hello Problem Data
+ * @brief GPU Storage management Structure for HITS Problem Data
  */
 
 #pragma once
@@ -18,13 +18,11 @@
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
-namespace hello {
-// </TODO>
+namespace hits {
 
 
 /**
- * @brief Speciflying parameters for hello Problem
+ * @brief Speciflying parameters for HITS Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -76,20 +74,27 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     struct DataSlice : BaseDataSlice
     {
-        // <TODO> add problem specific storage arrays:
-        util::Array1D<SizeT, ValueT> degrees;
-        util::Array1D<SizeT, int> visited;
-        // </TODO>
+        // device storage arrays
+        util::Array1D<SizeT, Value   > hrank_curr;           /**< Used for ping-pong hub rank value */
+        util::Array1D<SizeT, Value   > arank_curr;           /**< Used for ping-pong authority rank value */
+        util::Array1D<SizeT, Value   > hrank_next;           /**< Used for ping-pong page rank value */       
+        util::Array1D<SizeT, Value   > arank_next;           /**< Used for ping-pong page rank value */       
+        util::Array1D<SizeT, SizeT   > in_degrees;          /**< Used for keeping in-degree for each vertex */
+        util::Array1D<SizeT, SizeT   > out_degrees;         /**< Used for keeping out-degree for each vertex */
+        Value                          delta;
+        VertexId                       src_node;
 
         /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice()
         {
-            // <TODO> name of the problem specific arrays:
-            degrees.SetName("degrees");
-            visited.SetName("visited");
-            // </TODO>
+            hrank_curr.SetName("hrank_curr");
+            arank_curr.SetName("arank_curr");
+            hrank_next.SetName("hrank_next");
+            arank_next.SetName("arank_next");
+            in_degrees.SetName("in_degrees");
+            out_degrees.SetName("out_degrees")         
         }
 
         /*
