@@ -83,7 +83,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, SizeT   > in_degrees;          /**< Used for keeping in-degree for each vertex */
         util::Array1D<SizeT, SizeT   > out_degrees;         /**< Used for keeping out-degree for each vertex */
         ValueT                         delta;
-        VertexId                       src_node;
+        VertexT                       src_node;
         SizeT max_iter; // Maximum number of HITS iterations
 
         /*
