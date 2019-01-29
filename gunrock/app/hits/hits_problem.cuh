@@ -192,13 +192,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT nodes = this -> sub_graph -> nodes;
 
             // Ensure data are allocated
-            // <TODO> ensure size of problem specific data:
             GUARD_CU(degrees.EnsureSize_(nodes, target));
             GUARD_CU(visited.EnsureSize_(nodes, target));
-            // </TODO>
+
+            GUARD_CU(hrank_curr.EnsureSize_(nodes, target));
+            GUARD_CU(arank_curr.EnsureSize_(nodes, target));
+            GUARD_CU(hrank_next.EnsureSize_(nodes, target));
+            GUARD_CU(arank_next.EnsureSize_(nodes, target));
+            GUARD_CU(in_degrees.EnsureSize_(nodes, target));
+            GUARD_CU(out_degrees.EnsureSize_(nodes, target));
 
             // Reset data
-            // <TODO> reset problem specific data, e.g.:
             GUARD_CU(degrees.ForEach([]__host__ __device__ (ValueT &x){
                x = (ValueT)0;
             }, nodes, target, this -> stream));
@@ -206,7 +210,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(visited.ForEach([]__host__ __device__ (int &x){
                x = (int)0;
             }, nodes, target, this -> stream));
-            // </TODO>
 
             // Initialize current hrank and arank to 1.
             // Initialize next ranks to 0 (will be updated).
