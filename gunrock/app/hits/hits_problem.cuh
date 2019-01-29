@@ -74,10 +74,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     struct DataSlice : BaseDataSlice
     {
-        // <TODO> add problem specific storage arrays:
         util::Array1D<SizeT, ValueT> degrees;
         util::Array1D<SizeT, int> visited;
-        // </TODO>
 
         // HITS problem-specific storage arrays
         util::Array1D<SizeT, ValueT> hrank_curr;    // Holds hub rank value
@@ -94,7 +92,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
          */
         DataSlice() : BaseDataSlice()
         {
-            // <TODO> name of the problem specific arrays:
+            // Name of the problem specific arrays:
             degrees.SetName("degrees");
             visited.SetName("visited");
 
@@ -104,7 +102,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             arank_next.SetName("arank_next");
             in_degrees.SetName("in_degrees");
             out_degrees.SetName("out_degrees");
-            // </TODO>
         }
 
         /*
@@ -157,11 +154,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
-            // <TODO> allocate problem specific data here, e.g.:
+            // Allocate problem specific data here
             GUARD_CU(degrees.Allocate(sub_graph.nodes, target));
             GUARD_CU(visited.Allocate(sub_graph.nodes, target));
-
-
 
             GUARD_CU(hrank_curr.Allocate(sub_graph.nodes, target));
             GUARD_CU(arank_curr.Allocate(sub_graph.nodes, target));
@@ -170,13 +165,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(in_degrees.Allocate(sub_graph.nodes, target));
             GUARD_CU(out_degrees.Allocate(sub_graph.nodes, target));
 
-
-            // </TODO>
-
             if (target & util::DEVICE) {
                 // <TODO> move sub-graph used by the problem onto GPU,
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
-                // </TODO>
             }
             return retval;
         }
