@@ -76,7 +76,9 @@ double CPU_Reference(
   auto edges = graph.edges;
 
   //#pragma omp parallel for
-  for (auto x = 0; x < nodes; ++x) cluster[x] = x;
+  for (auto x = 0; x < nodes; ++x){
+      cluster[x] = x;
+  }
 
   std::set<SizeT> core_points;
   std::vector<std::set<SizeT>> adj;
@@ -108,8 +110,6 @@ double CPU_Reference(
       VertexT y = graph.column_indices[i];
       VertexT dist =
           (x - point_x) * (x - point_x) + (y - point_y) * (y - point_y);
-      //            debug("distance[%d](%d, %d) from (%d, %d) is %d\n", i, x, y,
-      //            point_x, point_y, dist);
       distance[i] = Point(x, i, dist);
     }
   }
@@ -124,6 +124,7 @@ double CPU_Reference(
   }
 
   // Debug
+#if KNN_DEBUG
   for (SizeT x = 0; x < graph.nodes; ++x) {
     auto x_start = graph.CsrT::GetNeighborListOffset(x);
     auto num = graph.CsrT::GetNeighborListLength(x);
@@ -136,6 +137,7 @@ double CPU_Reference(
     }
     debug("\n");
   }
+#endif
 
   // Find k nearest neighbors
   //#pragma omp parallel for
@@ -155,7 +157,7 @@ double CPU_Reference(
   }
 
   // Find snn-density
-  //#pragma omp parallel for
+  ////#pragma omp parallel
   for (SizeT x = 0; x < graph.nodes; ++x) {
     auto x_start = graph.CsrT::GetNeighborListOffset(x);
     auto num = graph.CsrT::GetNeighborListLength(x);
@@ -181,12 +183,15 @@ double CPU_Reference(
     }
   }
 
+#if KNN_DEBUG
   debug("core points: ");
   for (auto cpb = core_points.begin(); cpb != core_points.end(); ++cpb) {
     debug("%d ", *cpb);
   }
   debug("\n");
+#endif
 
+  //#pragma omp parallel for
   for (SizeT x = 0; x < nodes; ++x) {
     if (core_points.find(x) != core_points.end()) {
       for (SizeT y = 0; y < nodes; ++y) {
@@ -210,6 +215,8 @@ double CPU_Reference(
       }
     }
   }
+  
+  //#pragma omp parallel for
   for (int i = 0; i < nodes; ++i){
       // only non-core points
       if (core_points.find(i) == core_points.end()){
@@ -227,8 +234,11 @@ double CPU_Reference(
           }
       }
   }
+
+#if KNN_DEBUG
   for (int i = 0; i < nodes; ++i) 
       debug("cluster[%d] = %d\n", i, cluster[i]);
+#endif
 
   cpu_timer.Stop();
   float elapsed = cpu_timer.ElapsedMillis();
@@ -258,6 +268,9 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
 
   SizeT num_errors = 0;
   bool quiet = parameters.Get<bool>("quiet");
+  bool quick = parameters.Get<bool>("quick");
+  if (quick)
+      return num_errors;
 
   for (SizeT i = 0; i < graph.nodes; ++i) {
     if (h_cluster[i] != ref_cluster[i]) {
