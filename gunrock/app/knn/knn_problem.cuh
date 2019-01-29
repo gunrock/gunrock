@@ -86,6 +86,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, SizeT> keys_out;
     util::Array1D<SizeT, VertexT> distances_out;
 
+    // Perform SNN if enabled
+    bool snn;
+
     /*
      * @brief Default constructor
      */
@@ -124,7 +127,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(distances.Release(target));
       GUARD_CU(core_point_mark_0.Release(target));
       GUARD_CU(core_point_mark.Release(target));
-      GUARD_CU(core_points_counter.Release(target|util::HOST));
+      GUARD_CU(core_points_counter.Release(target | util::HOST));
       GUARD_CU(cluster_id.Release(target));
       GUARD_CU(snn_density.Release(target));
 
@@ -147,13 +150,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * \return    cudaError_t Error message(s), if any
      */
     cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx, SizeT k,
-                     util::Location target, ProblemFlag flag) {
+                     bool snn_, util::Location target, ProblemFlag flag) {
       cudaError_t retval = cudaSuccess;
 
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
       SizeT nodes = sub_graph.nodes;
       SizeT edges = sub_graph.edges;
+
+      // Perform SNN
+      snn = snn_;
+
       // Point ()
       GUARD_CU(keys.Allocate(edges, target));
       GUARD_CU(distances.Allocate(edges, target));
@@ -166,7 +173,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(knns.Allocate(k * nodes, target));
 
       GUARD_CU(cub_temp_storage.Allocate(1, target));
-      GUARD_CU(core_points_counter.Allocate(1, target|util::HOST));
+      GUARD_CU(core_points_counter.Allocate(1, target | util::HOST));
 
       GUARD_CU(keys_out.Allocate(edges, target));
       GUARD_CU(distances_out.Allocate(edges, target));
@@ -203,42 +210,37 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // Ensure data are allocated
       GUARD_CU(snn_density.EnsureSize_(nodes, target));
       GUARD_CU(snn_density.ForAll(
-         [nodes] __host__ __device__ (SizeT *s, const SizeT &p){
-            s[p] = 0;
-         }, nodes, util::DEVICE, this->stream));
+          [nodes] __host__ __device__(SizeT * s, const SizeT &p) { s[p] = 0; },
+          nodes, util::DEVICE, this->stream));
       GUARD_CU(keys.EnsureSize_(edges, target));
       GUARD_CU(distances.EnsureSize_(edges, target));
-      
+
       GUARD_CU(cluster_id.EnsureSize_(nodes, target));
       GUARD_CU(cluster_id.ForAll(
-          [nodes] __host__ __device__(SizeT * c, const SizeT &p) {
-              c[p] = p;
-          },
+          [nodes] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = p; },
           nodes, util::DEVICE, this->stream));
-      
+
       GUARD_CU(core_point_mark_0.EnsureSize_(nodes, target));
       GUARD_CU(core_point_mark_0.ForAll(
-          [] __host__ __device__(SizeT * c, const SizeT &p) { 
-            c[p] = 0; 
-          }, nodes, util::DEVICE, this->stream));
+          [] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = 0; },
+          nodes, util::DEVICE, this->stream));
 
       GUARD_CU(core_point_mark.EnsureSize_(nodes, target));
       GUARD_CU(core_point_mark.ForAll(
-          [] __host__ __device__(SizeT * c, const SizeT &p) { 
-            c[p] = 0; 
-          }, nodes, util::DEVICE, this->stream));
+          [] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = 0; },
+          nodes, util::DEVICE, this->stream));
 
       GUARD_CU(core_points.EnsureSize_(nodes, target));
       GUARD_CU(core_points.ForAll(
-          [] __host__ __device__(SizeT * c, const SizeT &p) { 
+          [] __host__ __device__(SizeT * c, const SizeT &p) {
             c[p] = util::PreDefinedValues<SizeT>::InvalidValue;
-          }, nodes, util::DEVICE, this->stream));
+          },
+          nodes, util::DEVICE, this->stream));
 
-      GUARD_CU(core_points_counter.EnsureSize_(1, target|util::HOST));
+      GUARD_CU(core_points_counter.EnsureSize_(1, target | util::HOST));
       GUARD_CU(core_points_counter.ForAll(
-          [] __host__ __device__(SizeT * c, const SizeT &p) { 
-            c[p] = 0;
-          }, 1, util::DEVICE, this->stream));
+          [] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = 0; }, 1,
+          util::DEVICE, this->stream));
 
       // K-Nearest Neighbors
       GUARD_CU(knns.EnsureSize_(k, target));
@@ -250,6 +252,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   // Set of data slices (one for each GPU)
   util::Array1D<SizeT, DataSlice> *data_slices;
   SizeT k;
+  bool snn;
 
   // ----------------------------------------------------------------
   // Problem Methods
@@ -260,6 +263,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   Problem(util::Parameters &_parameters, ProblemFlag _flag = Problem_None)
       : BaseProblem(_parameters, _flag), data_slices(NULL) {
     k = _parameters.Get<int>("k");
+    snn = _parameters.Get<bool>("snn");
   }
 
   /**
@@ -292,8 +296,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 ...
    * \return     cudaError_t Error message(s), if any
    */
-  cudaError_t Extract(SizeT n, SizeT *h_cluster,
-                      util::Location target = util::DEVICE) {
+  cudaError_t Extract(SizeT nodes, SizeT k, SizeT *h_knns, SizeT *h_cluster,
+                      bool snn = true, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
 
     if (this->num_gpus == 1) {
@@ -301,13 +305,38 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       // Set device
       if (target == util::DEVICE) {
+        // Extract SNN clusters
         GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-        GUARD_CU(data_slice.cluster_id.Move(util::DEVICE, util::HOST));
-        for (int i = 0; i < n; ++i) {
-          h_cluster[i] = data_slice.cluster_id[i];
+
+        if (snn) {
+          GUARD_CU(data_slice.cluster_id.Move(util::DEVICE, util::HOST));
+          for (int i = 0; i < nodes; ++i) {
+            h_cluster[i] = data_slice.cluster_id[i];
+          }
+        }
+
+        // Extract KNNs
+        GUARD_CU(data_slice.knns.Move(util::DEVICE, util::HOST));
+        for (int i = 0; i < nodes * k; ++i) {
+          h_knns[i] = data_slice.knns[i];
         }
       }
+
     } else if (target == util::HOST) {
+      auto &data_slice = data_slices[0][0];
+      GUARD_CU(data_slice.cluster_id.ForEach(
+          h_cluster,
+          [] __host__ __device__(const SizeT &device_val, SizeT &host_val) {
+            host_val = device_val;
+          },
+          nodes, util::HOST));
+
+      GUARD_CU(data_slice.knns.ForEach(
+          h_knns,
+          [] __host__ __device__(const SizeT &device_val, SizeT &host_val) {
+            host_val = device_val;
+          },
+          nodes * k, util::HOST));
     }
 
     return retval;
@@ -325,11 +354,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
-    // <TODO> get problem specific flags from parameters, e.g.:
-    // if (this -> parameters.template Get<bool>("mark-pred"))
-    //    this -> flag = this -> flag | Mark_Predecessors;
-    // </TODO>
-
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
@@ -338,7 +362,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       auto &data_slice = data_slices[gpu][0];
       GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
-                               this->gpu_idx[gpu], k, target, this->flag));
+                               this->gpu_idx[gpu], k, this->snn, target,
+                               this->flag));
     }
 
     return retval;
