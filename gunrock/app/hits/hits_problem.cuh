@@ -208,6 +208,33 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             }, nodes, target, this -> stream));
             // </TODO>
 
+            // Initialize current hrank and arank to 1.
+            // Initialize next ranks to 0 (will be updated).
+            GUARD_CU(hrank_curr.ForEach([]__host__ __device__ (ValueT &x){
+               x = (ValueT)1.0;
+            }, nodes, target, this -> stream));
+
+            GUARD_CU(arank_curr.ForEach([]__host__ __device__ (ValueT &x){
+               x = (ValueT)1.0;
+            }, nodes, target, this -> stream));
+
+            GUARD_CU(hrank_next.ForEach([]__host__ __device__ (ValueT &x){
+               x = (ValueT)0.0;
+            }, nodes, target, this -> stream));
+
+            GUARD_CU(arank_next.ForEach([]__host__ __device__ (ValueT &x){
+               x = (ValueT)0.0;
+            }, nodes, target, this -> stream));
+
+            // Initialize number of degrees to zero. May not be needed
+            GUARD_CU(in_degrees.ForEach([]__host__ __device__ (ValueT &x){
+               x = (ValueT)0;
+            }, nodes, target, this -> stream));
+
+            GUARD_CU(out_degrees.ForEach([]__host__ __device__ (ValueT &x){
+               x = (ValueT)0;
+            }, nodes, target, this -> stream));
+
             return retval;
         }
     }; // DataSlice
