@@ -7,9 +7,9 @@
 
 /**
  * @file
- * Template_enactor.cuh
+ * hits_enactor.cuh
  *
- * @brief hello Problem Enactor
+ * @brief hits Problem Enactor
  */
 
 #pragma once
@@ -19,19 +19,15 @@
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
  
-// <TODO> change includes
-#include <gunrock/app/hello/hello_problem.cuh>
-// </TODO>
+#include <gunrock/app/hits/hits_problem.cuh>
 
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
-namespace hello {
-// </TODO>
+namespace hits {
 
 /**
- * @brief Speciflying parameters for hello Enactor
+ * @brief Speciflying parameters for hits Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -47,11 +43,11 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 }
 
 /**
- * @brief defination of hello iteration loop
+ * @brief defination of hits iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct helloIterationLoop : public IterationLoopBase
+struct hitsIterationLoop : public IterationLoopBase
     <EnactorT, Use_FullQ | Push
     // <TODO>if needed, stack more option, e.g.:
     // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
@@ -73,10 +69,10 @@ struct helloIterationLoop : public IterationLoopBase
         // </TODO>
         > BaseIterationLoop;
 
-    helloIterationLoop() : BaseIterationLoop() {}
+    hitsIterationLoop() : BaseIterationLoop() {}
 
     /**
-     * @brief Core computation of hello, one iteration
+     * @brief Core computation of hits, one iteration
      * @param[in] peer_ Which GPU peers to work on, 0 means local
      * \return cudaError_t error message(s), if any
      */
@@ -220,7 +216,7 @@ struct helloIterationLoop : public IterationLoopBase
             (received_length, peer_, expand_op);
         return retval;
     }
-}; // end of helloIteration
+}; // end of hitsIteration
 
 /**
  * @brief Template enactor class.
@@ -250,14 +246,14 @@ public:
         BaseEnactor;
     typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> 
         EnactorT;
-    typedef helloIterationLoop<EnactorT> 
+    typedef hitsIterationLoop<EnactorT> 
         IterationT;
 
     Problem *problem;
     IterationT *iterations;
 
     /**
-     * @brief hello constructor
+     * @brief hits constructor
      */
     Enactor() :
         BaseEnactor("Template"),
@@ -270,7 +266,7 @@ public:
     }
 
     /**
-     * @brief hello destructor
+     * @brief hits destructor
      */
     virtual ~Enactor() { /*Release();*/ }
 
@@ -327,7 +323,7 @@ public:
     }
 
     /**
-      * @brief one run of hello, to be called within GunrockThread
+      * @brief one run of hits, to be called within GunrockThread
       * @param thread_data Data for the CPU thread
       * \return cudaError_t error message(s), if any
       */
@@ -389,7 +385,7 @@ public:
     }
 
     /**
-     * @brief Enacts a hello computing on the specified graph.
+     * @brief Enacts a hits computing on the specified graph.
 ...
      * \return cudaError_t error message(s), if any
      */

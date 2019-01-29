@@ -7,9 +7,9 @@
 
 /**
  * @file
- * hello_problem.cuh
+ * hits_problem.cuh
  *
- * @brief GPU Storage management Structure for hello Problem Data
+ * @brief GPU Storage management Structure for hits Problem Data
  */
 
 #pragma once
@@ -18,13 +18,11 @@
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
-namespace hello {
-// </TODO>
+namespace hits {
 
 
 /**
- * @brief Speciflying parameters for hello Problem
+ * @brief Speciflying parameters for hits Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter info
  * \return cudaError_t error message(s), if any
  */
@@ -187,7 +185,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     // Problem Methods
 
     /**
-     * @brief hello default constructor
+     * @brief hits default constructor
      */
     Problem(
         util::Parameters &_parameters,
@@ -196,7 +194,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         data_slices(NULL) {}
 
     /**
-     * @brief hello default destructor
+     * @brief hits default destructor
      */
     virtual ~Problem() { Release(); }
 

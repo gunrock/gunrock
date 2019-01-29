@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file hello_app.cu
+ * @file hits_app.cu
  *
  * @brief Simple Gunrock Application
  */
@@ -17,16 +17,12 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// <TODO> change includes
-#include <gunrock/app/hello/hello_enactor.cuh>
-#include <gunrock/app/hello/hello_test.cuh>
-// </TODO>
+#include <gunrock/app/hits/hits_enactor.cuh>
+#include <gunrock/app/hits/hits_test.cuh>
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
-namespace hello {
-// </TODO>
+namespace hits {
 
 
 cudaError_t UseParameters(util::Parameters &parameters)
@@ -51,7 +47,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
 }
 
 /**
- * @brief Run hello tests
+ * @brief Run hits tests
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the distances
  * @param[in]  parameters    Excution parameters
@@ -82,7 +78,7 @@ cudaError_t RunTests(
     bool quiet_mode = parameters.Get<bool>("quiet");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    util::Info info("hello", parameters, graph);
+    util::Info info("hits", parameters, graph);
     
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
@@ -192,7 +188,7 @@ cudaError_t RunTests(
     return retval;
 }
 
-} // namespace hello
+} // namespace hits
 } // namespace app
 } // namespace gunrock
 

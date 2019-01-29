@@ -7,17 +7,17 @@
 
 /**
  * @file
- * test_hello.cu
+ * test_hits.cu
  *
  * @brief Simple test driver program for Gunrock template.
  */
 
-#include <gunrock/app/hello/hello_app.cu>
+#include <gunrock/app/hits/hits_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
 
-namespace APP_NAMESPACE = app::hello;
+namespace APP_NAMESPACE = app::hits;
 
 /******************************************************************************
 * Main
@@ -80,7 +80,7 @@ struct main_struct
             // If not in `quick` mode, compute CPU reference implementation
             util::PrintMsg("__________________________", !quiet);
             
-            float elapsed = app::hello::CPU_Reference(
+            float elapsed = app::hits::CPU_Reference(
                 graph.csr(),
                 ref_degrees,
                 quiet);
@@ -101,7 +101,7 @@ struct main_struct
             ](util::Parameters &parameters, GraphT &graph)
             {
                 // <TODO> pass necessary data to app::Template::RunTests
-                return app::hello::RunTests(parameters, graph, ref_degrees, util::DEVICE);
+                return app::hits::RunTests(parameters, graph, ref_degrees, util::DEVICE);
                 // </TODO>
             }));
 
@@ -117,9 +117,9 @@ struct main_struct
 int main(int argc, char** argv)
 {
     cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test hello");
+    util::Parameters parameters("test hits");
     GUARD_CU(graphio::UseParameters(parameters));
-    GUARD_CU(app::hello::UseParameters(parameters));
+    GUARD_CU(app::hits::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
     GUARD_CU(parameters.Parse_CommandLine(argc, argv));
     if (parameters.Get<bool>("help"))
