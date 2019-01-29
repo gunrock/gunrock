@@ -357,10 +357,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         GUARD_CU(BaseProblem::Init(graph, target));
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
+        // MOHAMMAD: DO I NEED THIS?
         // <TODO> get problem specific flags from parameters, e.g.:
         // if (this -> parameters.template Get<bool>("mark-pred"))
         //    this -> flag = this -> flag | Mark_Predecessors;
         // </TODO>
+
+        
 
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
             data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
@@ -389,9 +392,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return cudaError_t Error message(s), if any
      */
     cudaError_t Reset(
-        // <TODO> problem specific data if necessary, eg
-        // VertexT src,
-        // </TODO>
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -404,15 +404,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_slices[gpu].Move(util::HOST, target));
         }
 
-        // <TODO> Additional problem specific initialization
-        // </TODO>
-
         GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
         return retval;
     }
 };
 
-} //namespace Template
+} //namespace hits
 } //namespace app
 } //namespace gunrock
 
