@@ -140,7 +140,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         }
 
         /**
-         * @brief initializing sssp-specific data on each gpu
+         * @brief initializing hits-specific data on each gpu
          * @param     sub_graph   Sub graph on the GPU.
          * @param[in] gpu_idx     GPU device index
          * @param[in] target      Targeting device location
@@ -161,6 +161,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // <TODO> allocate problem specific data here, e.g.:
             GUARD_CU(degrees.Allocate(sub_graph.nodes, target));
             GUARD_CU(visited.Allocate(sub_graph.nodes, target));
+
+
+
+            GUARD_CU(hrank_curr.Allocate(sub_graph.nodes, target));
+            GUARD_CU(arank_curr.Allocate(sub_graph.nodes, target));
+            GUARD_CU(hrank_next.Allocate(sub_graph.nodes, target));
+            GUARD_CU(arank_next.Allocate(sub_graph.nodes, target));
+            GUARD_CU(in_degrees.Allocate(sub_graph.nodes, target));
+            GUARD_CU(out_degrees.Allocate(sub_graph.nodes, target));
+
+
             // </TODO>
 
             if (target & util::DEVICE) {
