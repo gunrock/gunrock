@@ -51,7 +51,7 @@ cudaError_t UseParameters_problem(
  * @tparam _FLAG    Problem flags
  */
 template <
-    typename _GraphT,
+    typename _GraphT,  // MOHAMMAD: What is GraphT? Does it contain both CSC and CSR?
     ProblemFlag _FLAG = Problem_None>
 struct Problem : ProblemBase<_GraphT, _FLAG>
 {
