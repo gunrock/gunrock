@@ -61,7 +61,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::CsrT    CsrT;
-    typedef typename GraphT::CscT    CscT;
     typedef typename GraphT::GpT     GpT;
 
     typedef ProblemBase   <GraphT, FLAG> BaseProblem;
