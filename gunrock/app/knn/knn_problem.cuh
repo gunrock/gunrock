@@ -60,10 +60,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     // struct Point()
     util::Array1D<SizeT, SizeT> keys;
     util::Array1D<SizeT, VertexT> distances;
-    util::Array1D<SizeT, SizeT> core_point;
-    util::Array1D<SizeT, SizeT*> cluster;
+    util::Array1D<SizeT, SizeT> core_point_mark_0;
+    util::Array1D<SizeT, SizeT> core_point_mark;
+    util::Array1D<SizeT, SizeT> core_points;
     util::Array1D<SizeT, SizeT> cluster_id;
     util::Array1D<SizeT, SizeT> snn_density;
+    util::Array1D<SizeT, SizeT, util::PINNED> core_points_counter;
 
     // Nearest Neighbors
     util::Array1D<SizeT, SizeT> knns;
@@ -90,12 +92,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     DataSlice() : BaseDataSlice() {
       keys.SetName("keys");
       distances.SetName("distances");
-      core_point.SetName("core_point");
-      cluster.SetName("cluster");
+      core_point_mark.SetName("core_point_mark");
+      core_point_mark_0.SetName("core_point_mark_0");
+      core_points.SetName("core_points");
       cluster_id.SetName("cluster_id");
       snn_density.SetName("snn_density");
 
       knns.SetName("knns");
+      core_points_counter.SetName("core_points_counter");
 
       cub_temp_storage.SetName("cub_temp_storage");
       keys_out.SetName("keys_out");
@@ -118,9 +122,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(keys.Release(target));
       GUARD_CU(distances.Release(target));
-      GUARD_CU(core_point.Release(target));
+      GUARD_CU(core_point_mark_0.Release(target));
+      GUARD_CU(core_point_mark.Release(target));
+      GUARD_CU(core_points_counter.Release(target|util::HOST));
       GUARD_CU(cluster_id.Release(target));
-      GUARD_CU(cluster.Release(target));
       GUARD_CU(snn_density.Release(target));
 
       GUARD_CU(knns.Release(target));
@@ -152,15 +157,16 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // Point ()
       GUARD_CU(keys.Allocate(edges, target));
       GUARD_CU(distances.Allocate(edges, target));
-      GUARD_CU(core_point.Allocate(nodes, target));
-      GUARD_CU(cluster.Allocate(nodes, target));
-      GUARD_CU(cluster_id.Allocate(nodes * nodes, target));
+      GUARD_CU(core_point_mark_0.Allocate(nodes, target));
+      GUARD_CU(core_point_mark.Allocate(nodes, target));
+      GUARD_CU(cluster_id.Allocate(nodes, target));
       GUARD_CU(snn_density.Allocate(nodes, target));
 
       // k-nearest neighbors
       GUARD_CU(knns.Allocate(k * nodes, target));
 
       GUARD_CU(cub_temp_storage.Allocate(1, target));
+      GUARD_CU(core_points_counter.Allocate(1, target|util::HOST));
 
       GUARD_CU(keys_out.Allocate(edges, target));
       GUARD_CU(distances_out.Allocate(edges, target));
@@ -202,25 +208,37 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
          }, nodes, util::DEVICE, this->stream));
       GUARD_CU(keys.EnsureSize_(edges, target));
       GUARD_CU(distances.EnsureSize_(edges, target));
-      GUARD_CU(cluster_id.EnsureSize_(nodes * nodes, target));
+      
+      GUARD_CU(cluster_id.EnsureSize_(nodes, target));
       GUARD_CU(cluster_id.ForAll(
           [nodes] __host__ __device__(SizeT * c, const SizeT &p) {
-            if (p < nodes)
               c[p] = p;
-            else
-              c[p] = util::PreDefinedValues<SizeT>::InvalidValue;
-          },
-          nodes * nodes, util::DEVICE, this->stream));
-      GUARD_CU(cluster.EnsureSize_(nodes, target));
-      GUARD_CU(cluster.ForAll(
-          [cluster_id, nodes] __host__ __device__(SizeT * *c, const SizeT &p) {
-            c[p] = &cluster_id[p];
           },
           nodes, util::DEVICE, this->stream));
-      GUARD_CU(core_point.EnsureSize_(nodes, target));
-      GUARD_CU(core_point.ForAll(
-          [] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = 0; },
-          nodes, util::DEVICE, this->stream));
+      
+      GUARD_CU(core_point_mark_0.EnsureSize_(nodes, target));
+      GUARD_CU(core_point_mark_0.ForAll(
+          [] __host__ __device__(SizeT * c, const SizeT &p) { 
+            c[p] = 0; 
+          }, nodes, util::DEVICE, this->stream));
+
+      GUARD_CU(core_point_mark.EnsureSize_(nodes, target));
+      GUARD_CU(core_point_mark.ForAll(
+          [] __host__ __device__(SizeT * c, const SizeT &p) { 
+            c[p] = 0; 
+          }, nodes, util::DEVICE, this->stream));
+
+      GUARD_CU(core_points.EnsureSize_(nodes, target));
+      GUARD_CU(core_points.ForAll(
+          [] __host__ __device__(SizeT * c, const SizeT &p) { 
+            c[p] = util::PreDefinedValues<SizeT>::InvalidValue;
+          }, nodes, util::DEVICE, this->stream));
+
+      GUARD_CU(core_points_counter.EnsureSize_(1, target|util::HOST));
+      GUARD_CU(core_points_counter.ForAll(
+          [] __host__ __device__(SizeT * c, const SizeT &p) { 
+            c[p] = 0;
+          }, 1, util::DEVICE, this->stream));
 
       // K-Nearest Neighbors
       GUARD_CU(knns.EnsureSize_(k, target));

@@ -100,7 +100,8 @@ struct main_struct {
       util::PrintMsg("__________________________", !quiet);
       util::PrintMsg("______ CPU Reference _____", !quiet);
 
-      float elapsed = app::knn::CPU_Reference(graph.csr(), k, eps, min_pts, point_x, point_y, ref_cluster, quiet);
+      float elapsed = app::knn::CPU_Reference(graph.csr(), k, eps, min_pts, 
+              point_x, point_y, ref_cluster, quiet);
 
       util::PrintMsg(
           "--------------------------\n Elapsed: " + std::to_string(elapsed),

@@ -177,6 +177,18 @@ __device__ static unsigned long atomicAdd(unsigned long *addr, unsigned long val
 }*/
 #endif
 
+__device__ static uint64_t atomicMin(uint64_t* addr, uint64_t val)
+{
+    unsigned long long int pre_value = (unsigned long long int)val;
+    unsigned long long int old = (unsigned long long int)val;
+    unsigned long long int expected;
+    do {
+        expected = old;
+        old = atomicCAS((unsigned long long int*)addr, val, (unsigned long long int)val);
+    } while (expected != old);
+    return old;
+}
+
 __device__ static float atomicMin(float* addr, float val)
 {
     int* addr_as_int = (int*)addr;

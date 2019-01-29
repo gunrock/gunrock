@@ -22,7 +22,14 @@
 #include <gunrock/app/knn/knn_problem.cuh>
 #include <gunrock/util/sort_device.cuh>
 
+#include <gunrock/oprtr/1D_oprtr/for.cuh>
+#include <gunrock/oprtr/oprtr.cuh>
+
+
 //#define KNN_DEBUG 1
+
+#define debug2(a...)
+//#define debug2(a...) printf(a)
 
 #ifdef KNN_DEBUG
 #define debug(a...) printf(a)
@@ -92,8 +99,10 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // K-Nearest Neighbors
     auto &knns = data_slice.knns;
-    auto &core_point = data_slice.core_point;
-    auto &cluster = data_slice.cluster;
+    auto &core_point_mark_0 = data_slice.core_point_mark_0;
+    auto &core_point_mark = data_slice.core_point_mark;
+    auto &core_points = data_slice.core_points;
+    auto &core_points_counter = data_slice.core_points_counter;
     auto &cluster_id = data_slice.cluster_id;
     auto &snn_density = data_slice.snn_density;
 
@@ -105,7 +114,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // Reference Point
     auto ref_src = data_slice.point_x;
     auto ref_dest = data_slice.point_y;
-
+   
     // CUB Related storage
     auto &cub_temp_storage = data_slice.cub_temp_storage;
 
@@ -117,7 +126,6 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto target = util::DEVICE;
     util::Array1D<SizeT, VertexT> *null_frontier = NULL;
 
-    // --
     // Define operations
 
     // advance operation
@@ -170,32 +178,10 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             knns_[k * pos + i] = m;
           }
         }, nodes*nodes, target, stream));
-
-
-        // Debug
-    /*
-    GUARD_CU(knns.ForAll(
-        [graph, k] __host__ __device__(SizeT * knns_, const SizeT &pos) {
-          debug("knns:\n");
-          for (int i = 0; i < graph.nodes; ++i) {
-            debug("%d: ", i);
-            auto num_neighbors = graph.CsrT::GetNeighborListLength(i);
-            if (num_neighbors < k) {
-              debug(" # neigh is %d < %d\n", num_neighbors, k);
-              continue;
-            }
-            for (int j = 0; j < k; ++j) {
-              debug("%d ", knns_[i * k + j]);
-            }
-            debug("\n");
-          }
-        },
-        1, target, stream));
-*/
-
+   
     // SNN density of each point
     auto density_op =
-        [graph, nodes, knns, k, eps, snn_density, min_pts, core_point] 
+        [graph, nodes, knns, k, eps, snn_density, min_pts] 
         __host__ __device__(VertexT * v_q, const SizeT &pos) {
             auto src = pos/nodes;
             auto i = pos%nodes;
@@ -234,94 +220,160 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     GUARD_CU(frontier.V_Q()->ForAll(density_op, nodes*nodes, target, stream));
 
     // Find core points
-    GUARD_CU(core_point.ForAll(
+    GUARD_CU(core_point_mark_0.ForAll(
         [graph, snn_density, min_pts] 
         __host__ __device__(SizeT * cp, const SizeT &pos) {
-            /*
-            if (pos == 0){
-                debug("core points:\n");
-                for (int i = 0; i < graph.nodes; ++i) {
-                    if (cp[pos] == 1)
-                        debug("%d ", i);
-                }
-                debug("\n");
-            }*/
-            if (snn_density[pos] >= min_pts)
+            if (snn_density[pos] >= min_pts){
                 cp[pos] = 1;
+            }
         }, nodes, target, stream));
 
+#if KNN_DEBUG
+    GUARD_CU(core_point_mark_0.ForAll(
+        [nodes]
+        __host__ __device__(SizeT * cp, const SizeT &pos) {
+            for (auto v = 1; v < nodes; ++v){
+            debug2("cp[%d] = %d\n", v, cp[v]);
+            }
+        }, 1, target, stream));
+#endif
+
+    size_t temp_storage_bytes = 0;
+    cub::DeviceScan::InclusiveSum(NULL, temp_storage_bytes, 
+            core_point_mark_0.GetPointer(util::DEVICE), core_point_mark.GetPointer(util::DEVICE), 
+            nodes, stream);
+    retval = cub_temp_storage.EnsureSize_(temp_storage_bytes, util::DEVICE);
+    if (retval){
+        printf("retval = %d, size %d\n", retval, temp_storage_bytes);
+        return retval;
+    }
+    cub::DeviceScan::InclusiveSum(cub_temp_storage.GetPointer(util::DEVICE), temp_storage_bytes, 
+            core_point_mark_0.GetPointer(util::DEVICE), core_point_mark.GetPointer(util::DEVICE), 
+            nodes, stream);
+
+
+#if KNN_DEBUG
+    // Replaced with DeviceScan
+    GUARD_CU(core_point_mark_0.ForAll(
+        [nodes]
+        __host__ __device__(SizeT * cp, const SizeT &pos) {
+            for (auto v = 1; v < nodes; ++v){
+                cp[v] += cp[v-1];
+            }
+        }, 1, target, stream));
+
+    GUARD_CU(core_point_mark.ForAll(
+        [nodes, core_point_mark_0, temp_storage_bytes]
+        __host__ __device__(SizeT * cp, const SizeT &pos) {
+            debug2("size of storage is %d\n", temp_storage_bytes);
+            for (auto v = 1; v < nodes; ++v){
+                debug2("cp[%d] = %d, should be %d\n", v, cp[v], core_point_mark_0[v]);
+            }
+        }, 1, target, stream));
+#endif
+
+    GUARD_CU(core_points.ForAll(
+        [nodes, core_point_mark, core_points_counter]
+        __host__ __device__(SizeT * cps, const SizeT &pos) {
+            if ((pos == 0 && core_point_mark[pos] != 0) || 
+                    (pos > 0 && core_point_mark[pos] != core_point_mark[pos-1])){
+                cps[core_point_mark[pos]-1] = pos;
+            }
+            if (pos == nodes-1)
+                core_points_counter[0] = core_point_mark[pos];
+        }, nodes, target, stream));
+    
     // Core points merging
     auto merging_op =
-        [graph, nodes, eps, core_point, cluster_id] 
-        __host__ __device__(VertexT * v_q, const SizeT &pos) {
-            auto src = pos%nodes;
-            auto i = pos/nodes;
-            // only core points
-            if (i <= src || core_point[i] != 1 || core_point[src] != 1) return;
-            
-            // go over neighbors of core point i
-            auto i_start = graph.CsrT::GetNeighborListOffset(i);
-            auto i_neighbors = graph.CsrT::GetNeighborListLength(i);
-            auto i_end = i_start + i_neighbors;
-
-            // go over neighbors of core point src
-            auto src_start = graph.CsrT::GetNeighborListOffset(src);
-            auto src_neighbors = graph.CsrT::GetNeighborListLength(src);
-            auto src_end = src_start + src_neighbors;
-                
-            int num_shared_neighbors = 0;
-            for (auto j = i_start; j < i_end; ++j) {
-                auto m = graph.CsrT::GetEdgeDest(j);
-                for (auto v = src_start; v < src_end; ++v) {
-                    auto possible_src = graph.CsrT::GetEdgeDest(v);
-                    if (m == possible_src) ++num_shared_neighbors;
-                }
+        [graph, nodes, eps, core_point_mark, core_points, core_points_counter, cluster_id] 
+        __host__ __device__(const int &counter, const VertexT &p) {
+            auto cp_counter = core_points_counter[0];
+            auto x = core_points[p/cp_counter];
+            auto y = core_points[p%cp_counter];
+            if (x >= nodes || y >= nodes){
+                debug2("sth wrong x=%d, y=%d, cp_counter = %d\n", x, y,
+                        cp_counter);
+                return;
             }
-            // if src and neighbor share eps or more neighbors then they are
-            // in the same cluster
-            if (num_shared_neighbors >= eps) {
-                cluster_id[src + nodes * i] = 1;
-                cluster_id[i   + nodes * src] = 1;
+            if ((x == 0 && core_point_mark[x] != 1) ||
+                    (x > 0 && core_point_mark[x] == core_point_mark[x - 1])){
+                debug2("x %d, if you see this, algo is really wrong..\n", x);
+                return;
+            }
+            if ((y == 0 && core_point_mark[y] != 1) ||
+                    (y > 0 && core_point_mark[y] == core_point_mark[y - 1])){
+                debug2("y %d if you see this, algo is really wrong..\n", y);
+                return;
+            }
+            // go over neighbors of core point x
+            auto x_start = graph.CsrT::GetNeighborListOffset(x);
+            auto x_neighbors = graph.CsrT::GetNeighborListLength(x);
+            auto x_end = x_start + x_neighbors;
+            // go over neighbors of core point src
+            auto y_start = graph.CsrT::GetNeighborListOffset(y);
+            auto y_neighbors = graph.CsrT::GetNeighborListLength(y);
+            auto y_end = y_start + y_neighbors;
+            int num_shared_neighbors = 0;
+            for (auto xn = x_start; xn < x_end; ++xn) {
+                auto m = graph.CsrT::GetEdgeDest(xn);
+                for (auto yn = y_start; yn < y_end; ++yn){
+                    auto k = graph.CsrT::GetEdgeDest(yn);
+                    if (m == k) ++num_shared_neighbors;
+                    if (num_shared_neighbors >= eps)
+                        break;
+                }
+                if (num_shared_neighbors >= eps)
+                    break;
+            }
+            // if src and neighbor share eps or more neighbors then merge
+            if (num_shared_neighbors >= eps){
+                auto cluster_id_x = cluster_id[x];
+                auto cluster_id_y = cluster_id[y];
+                auto cluster_min = min(cluster_id_x, cluster_id_y);
+                atomicMin(cluster_id + x, cluster_min);
+                atomicMin(cluster_id + y, cluster_min);
             }
         };
+
+    GUARD_CU(core_points_counter.Move(util::DEVICE, util::HOST, 1, 0, stream));
+    GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+    
+#ifdef KNN_DEBUG
+    GUARD_CU(core_points_counter.ForAll(
+                []__host__ __device__ (SizeT *c, const SizeT &pos){
+                    debug2("core points counter %d\n", c[pos]);
+                }, 1, target, stream));
+#endif
 
     // Assign core points to clusters
-    GUARD_CU(frontier.V_Q()->ForAll(merging_op, nodes*nodes, target, stream));
-
-    // Merging confirmation
-    auto merging_end_op =
-        [graph, nodes, core_point, cluster, cluster_id] __host__ __device__(
-            VertexT * v_q, const SizeT &src) {
-          // only core points
-          if (core_point[src] != 1) return;
-          SizeT min_cluster_id = src;
-          for (auto i = 0; i < nodes; ++i) {
-            auto new_id = cluster_id[src + nodes * i];
-            if (!util::isValid(new_id)) continue;
-            //debug("for %d, lets try %d\n", src, new_id);
-            if (min_cluster_id > i) min_cluster_id = i;
-          }
-          auto min_id = min(src, min_cluster_id);
-          cluster[src] = cluster[min_id];
-          cluster[min_cluster_id] = cluster[min_id];
-        };
-
-    GUARD_CU(frontier.V_Q()->ForAll(merging_end_op, nodes, target, stream));
+    SizeT loop_size = core_points_counter[0]*core_points_counter[0];
+    SizeT num_repeats = log2(core_points_counter[0]);
+    gunrock::oprtr::RepeatFor(
+            merging_op,
+            num_repeats,
+            loop_size,
+            util::DEVICE,
+            stream,
+            util::PreDefinedValues<int>::InvalidValue, // grid_size 
+            util::PreDefinedValues<int>::InvalidValue, // block_size
+            2);
 
     // Assign other non-core and non-noise points to clusters
     auto clustering_op =
-        [graph, core_point, keys, keys_out, k, cluster] __host__ __device__(
+        [graph, core_point_mark, keys, keys_out, k, cluster_id] __host__ __device__(
             VertexT * v_q, const SizeT &src) {
           // only non-core points
-          if (core_point[src] == 1) return;
+          if (src == 0 && core_point_mark[src] == 1) return;
+          if (src > 0 && core_point_mark[src-1] != core_point_mark[src]) return;
           // only non-noise points
           auto num_neighbors = graph.CsrT::GetNeighborListLength(src);
           if (num_neighbors < k) return;
           auto e_start = graph.CsrT::GetNeighborListOffset(src);
           for (auto e = e_start; e < e_start + num_neighbors; ++e) {
             auto m = graph.CsrT::GetEdgeDest(keys_out[keys[e]]);
-            if (core_point[m] == 1) {
-              cluster[src] = cluster[m];
+            if ((m == 0 && core_point_mark[m] == 1) ||
+                (m > 0 && core_point_mark[m] != core_point_mark[m-1])) {
+              cluster_id[src] = cluster_id[m];
               break;
             }
           }
@@ -329,50 +381,6 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // Assign other non-core and non-noise points to clusters
     GUARD_CU(frontier.V_Q()->ForAll(clustering_op, nodes, target, stream));
-
-#ifdef KNN_DEBUG
-    // Debug
-    /*GUARD_CU(keys.ForAll(
-        [keys_out, keys, distances, distances_out, graph,
-         edges] __host__ __device__(SizeT * k, const SizeT &pos) {
-          debug("after sorting:\n");
-          for (int i = 0; i < edges; ++i)
-            debug(
-                 "keys[%d] = %d, keys_out[%d] = %d, dist[%d] = %d,
-                 dist_out[%d] "
-                 "= %d\n",
-                 i, keys[i], i, keys_out[i], keys[i], distances[keys[i]],
-                 keys_out[i], distances_out[keys_out[i]]);
-        },
-        1, target, stream));
-
-    // Debug
-    GUARD_CU(knns.ForAll(
-        [graph, k] __host__ __device__(SizeT * knns_, const SizeT &pos) {
-          debug("knns:\n");
-          for (int i = 0; i < graph.nodes; ++i) {
-            debug("%d: ", i);
-            auto num_neighbors = graph.CsrT::GetNeighborListLength(i);
-            if (num_neighbors < k) {
-              debug(" # neigh is %d < %d\n", num_neighbors, k);
-              continue;
-            }
-            for (int j = 0; j < k; ++j) {
-              debug("%d ", knns_[i * k + j]);
-            }
-            debug("\n");
-          }
-        },
-        1, target, stream));
-*/
-#endif /* end: KNN_DEBUG */
-
-    GUARD_CU(cluster.ForAll(
-        [cluster_id] __host__ __device__(SizeT * *c, const SizeT &p) {
-          cluster_id[p] = *c[p];
-        },
-        nodes, target, stream));
-
     GUARD_CU(frontier.work_progress.GetQueueLength(
         frontier.queue_index, frontier.queue_length, false, stream, true));
 
