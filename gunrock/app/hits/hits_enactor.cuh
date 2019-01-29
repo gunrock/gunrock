@@ -94,10 +94,16 @@ struct hitsIterationLoop : public IterationLoopBase
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
         
-        // <TODO> add problem specific data alias here:
+        // Problem specific data aliases:
         auto &degrees = data_slice.degrees;
         auto &visited = data_slice.visited;
-        // </TODO>
+
+        auto &hrank_curr = data_slice.hrank_curr;
+        auto &arank_curr = data_slice.arank_curr;
+        auto &hrank_next = data_slice.hrank_next;
+        auto &arank_next = data_slice.arank_next;
+        auto &in_degrees = data_slice.in_degrees;
+        auto &out_degrees = data_slice.out_degrees;
         
         // --
         // Define operations
