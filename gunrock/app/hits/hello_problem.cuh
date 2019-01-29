@@ -76,13 +76,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     struct DataSlice : BaseDataSlice
     {
         // device storage arrays
-        util::Array1D<SizeT, Value   > hrank_curr;           /**< Used for ping-pong hub rank value */
-        util::Array1D<SizeT, Value   > arank_curr;           /**< Used for ping-pong authority rank value */
-        util::Array1D<SizeT, Value   > hrank_next;           /**< Used for ping-pong page rank value */       
-        util::Array1D<SizeT, Value   > arank_next;           /**< Used for ping-pong page rank value */       
+        util::Array1D<SizeT, ValueT   > hrank_curr;           /**< Used for ping-pong hub rank value */
+        util::Array1D<SizeT, ValueT   > arank_curr;           /**< Used for ping-pong authority rank value */
+        util::Array1D<SizeT, ValueT   > hrank_next;           /**< Used for ping-pong page rank value */       
+        util::Array1D<SizeT, ValueT   > arank_next;           /**< Used for ping-pong page rank value */       
         util::Array1D<SizeT, SizeT   > in_degrees;          /**< Used for keeping in-degree for each vertex */
         util::Array1D<SizeT, SizeT   > out_degrees;         /**< Used for keeping out-degree for each vertex */
-        Value                          delta;
+        ValueT                         delta;
         VertexId                       src_node;
         SizeT max_iter; // Maximum number of HITS iterations
 
