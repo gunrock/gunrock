@@ -61,6 +61,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     typedef typename GraphT::ValueT  ValueT;
     typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::CsrT    CsrT;
+    typedef typename GraphT::CscT    CscT;
     typedef typename GraphT::GpT     GpT;
 
     typedef ProblemBase   <GraphT, FLAG> BaseProblem;
@@ -83,11 +84,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, SizeT   > out_degrees;         /**< Used for keeping out-degree for each vertex */
         Value                          delta;
         VertexId                       src_node;
+        SizeT max_iter; // Maximum number of HITS iterations
 
         /*
-         * @brief Default constructor
+         * @brief Default constructor. TODO: Update with additional initializations
          */
-        DataSlice() : BaseDataSlice()
+        DataSlice() : BaseDataSlice(),
+            max_iter(0),
+            src_node(0),
+            delta(0)
         {
             hrank_curr.SetName("hrank_curr");
             arank_curr.SetName("arank_curr");
@@ -96,7 +101,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             in_degrees.SetName("in_degrees");
             out_degrees.SetName("out_degrees")         
 
-            SizeT max_iter; // Maximum number of HITS iterations
+            
         }
 
         /*
