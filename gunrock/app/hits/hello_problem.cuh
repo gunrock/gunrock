@@ -80,11 +80,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT   > arank_curr;           /**< Used for ping-pong authority rank value */
         util::Array1D<SizeT, ValueT   > hrank_next;           /**< Used for ping-pong page rank value */       
         util::Array1D<SizeT, ValueT   > arank_next;           /**< Used for ping-pong page rank value */       
-        util::Array1D<SizeT, SizeT   > in_degrees;          /**< Used for keeping in-degree for each vertex */
-        util::Array1D<SizeT, SizeT   > out_degrees;         /**< Used for keeping out-degree for each vertex */
-        ValueT                         delta;
-        VertexT                       src_node;
-        SizeT max_iter; // Maximum number of HITS iterations
+        util::Array1D<SizeT, SizeT    > in_degrees;           /**< Used for keeping in-degree for each vertex */
+        util::Array1D<SizeT, SizeT    > out_degrees;          /**< Used for keeping out-degree for each vertex */
+        ValueT                          delta;
+        VertexT                         src_node;
+        SizeT                           max_iter;             /**< Maximum number of HITS iterations */
 
         /*
          * @brief Default constructor. TODO: Update with additional initializations
@@ -99,9 +99,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             hrank_next.SetName("hrank_next");
             arank_next.SetName("arank_next");
             in_degrees.SetName("in_degrees");
-            out_degrees.SetName("out_degrees")         
-
-            
+            out_degrees.SetName("out_degrees");
         }
 
         /*
@@ -120,10 +118,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            // <TODO> Release problem specific data, e.g.:
-            GUARD_CU(degrees.Release(target));
-            GUARD_CU(visited.Release(target));
-            // </TODO>
+            // Release problem specific data, e.g.:
+            GUARD_CU(hrank_curr.Release(target));
+            GUARD_CU(arank_curr.Release(target));
+            GUARD_CU(hrank_next.Release(target));
+            GUARD_CU(arank_next.Release(target));
+            GUARD_CU(in_degrees.Release(target));
+            GUARD_CU(out_degrees.Release(target));
 
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
