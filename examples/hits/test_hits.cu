@@ -104,6 +104,7 @@ void Usage()
         "                          (graph-edges * <factor>). (Default: 1.0)\n"
         "[--v]                     Print verbose per iteration debug info.\n"
         "[--iteration-num=<num>]   Number of runs to perform the test.\n"
+        "[--quick]                 Skip the CPU reference validation process.\n"
         "[--quiet]                 No output (unless --json is specified).\n"
         "[--json]                  Output JSON-format statistics to STDOUT.\n"
         "[--jsonfile=<name>]       Output JSON-format statistics to file <name>\n"
@@ -156,7 +157,7 @@ void DisplaySolution(Value *hrank, Value *arank, SizeT nodes)
 }
 
 /******************************************************************************
- * BFS Testing Routines
+ * HITS Testing Routines
  *****************************************************************************/
 
 /**
@@ -185,16 +186,101 @@ void ReferenceHITS(
     SizeT                                   max_iter,
     bool                                    quiet = false)
 {
-    //
-    // compute HITS rank
-    //
+    /*
+    This CPU reference implementation was validated against
+    MATLAB's centrality() function. One important note is that
+    MATLAB by default uses the 1-norm rather than the 2-norm
+    when computing hub and authority scores, so the result
+    of this function should be normalized again by the 2-norm
+    to get identical rank values. Additionally, graphs should
+    not have a node that links to itself. Gunrock ignores these
+    edges, while MATLAB does not.
+    */
 
     CpuTimer cpu_timer;
     cpu_timer.Start();
 
+    // Initialize all hub and authority scores to 1
+    for (SizeT page = 0; page < graph.nodes; page++)
+    {
+        hrank[page] = 1;
+        arank[page] = 1;
+    }
+
+    // Iterate so the hub and authority scores converge
+    for (SizeT iterCount = 0; iterCount < max_iter; iterCount++)
+    {
+        // Used to normalize the hub and authority score vectors
+        Value norm = 0; 
+       
+        // Used to track position in the row offset vector
+        SizeT rowStartIdx = 0;
+
+        // Iterate through all pages p
+        for (SizeT page = 0; page < inv_graph.nodes; page++)
+        {
+            arank[page] = 0;  // Initialize the current node's authority rank to 0
+
+            // Get the number of sites that connect to the current page
+            SizeT numIncomingConnections = inv_graph.row_offsets[page+1] -
+                                            inv_graph.row_offsets[page];
+
+            // Get the indices of the incoming connections and update the
+            // authority value of the current page
+            for (SizeT i = rowStartIdx; i < rowStartIdx+numIncomingConnections; i++)
+            {
+                arank[page] += hrank[inv_graph.column_indices[i]];
+            }
+
+            norm += pow(arank[page], 2.0);
+
+            rowStartIdx += numIncomingConnections;
+        }
+
+        norm = sqrt(norm);
+
+        // Normalize the authority scores
+        for (SizeT page = 0; page < graph.nodes; page++)
+        {
+            arank[page] = arank[page]/norm;
+        }
+
+        // Reset
+        norm = 0.0;
+        rowStartIdx = 0;
+
+        // Similar to the last step, iterate through all pages
+        for (SizeT page = 0; page < graph.nodes; page++)
+        {
+            hrank[page] = 0;
+
+            // Get the number of sites that the current page connects to
+            SizeT numOutgoingConnections = graph.row_offsets[page+1] - 
+                                            graph.row_offsets[page];
+
+            // Get the indices of the outgoing connections and update the hub
+            // value
+            for (SizeT i = rowStartIdx; i < rowStartIdx+numOutgoingConnections; i++)
+            {
+                hrank[page] += arank[graph.column_indices[i]];
+            }
+
+            norm += pow(hrank[page], 2.0);
+
+            rowStartIdx += numOutgoingConnections;
+        }
+
+        norm = sqrt(norm);
+
+        // Normalize the hub scores
+        for (SizeT page = 0; page < graph.nodes; page++)
+        {
+            hrank[page] = hrank[page]/norm;
+        }
+    }
+
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
-
     if (!quiet) { printf("CPU HITS finished in %lf msec.\n", elapsed); }
 }
 
@@ -293,13 +379,19 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     //
     if (reference_check_h != NULL)
     {
-        if (!quiet_mode) printf("compute reference value...\n");
+        if (!quiet_mode) printf("Computing reference value...\n");
         ReferenceHITS(
             *csr,
             *csc,
             reference_check_h,
             reference_check_a,
-            max_iter);
+            max_iter,
+            quiet_mode);
+        if (!quiet_mode) printf("\n");
+
+        // Display CPU solution
+        if (!quiet_mode) printf("CPU Algorithm Results:\n");
+        if (!quiet_mode) DisplaySolution(reference_check_h, reference_check_a, csr->nodes);
         if (!quiet_mode) printf("\n");
     }
 
@@ -321,7 +413,8 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
         problem->Extract(h_hrank, h_arank),
         "HITS Problem Data Extraction Failed", __FILE__, __LINE__);
 
-    // Display Solution
+    // Display GPU Solution
+    if (!quiet_mode) printf("GPU Algorithm Results:\n");
     if (!quiet_mode) DisplaySolution(h_hrank, h_arank, csr->nodes);
 
     info->ComputeCommonStats(enactor -> enactor_stats.GetPointer(), elapsed, (VertexId*) NULL);
@@ -361,9 +454,7 @@ int main_(CommandLineArgs *args)
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
-    // TODO: add a CPU Reference algorithm,
-    // before that, quick_mode always on.
-    info->info["quick_mode"] = true;
+    //info->info["max_iteration"] = 100;
     RunTests<VertexId, SizeT, Value>(info);
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
