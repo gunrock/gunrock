@@ -79,6 +79,16 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, int> visited;
         // </TODO>
 
+        // HITS problem-specific storage arrays
+        util::Array1D<SizeT, ValueT> hrank_curr;    // Holds hub rank value
+        util::Array1D<SizeT, ValueT> arank_curr;    // Holds authority rank value
+        util::Array1D<SizeT, ValueT> hrank_next;    
+        util::Array1D<SizeT, ValueT> arank_next;    
+        util::Array1D<SizeT, ValueT> in_degrees;    // Number of nodes that link to given node
+        util::Array1D<SizeT, ValueT> out_degrees;   // Number of nodes given node links to
+
+        SizeT maxIter;                              // Maximum number of HITS iterations
+
         /*
          * @brief Default constructor
          */
@@ -87,6 +97,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // <TODO> name of the problem specific arrays:
             degrees.SetName("degrees");
             visited.SetName("visited");
+
+            hrank_curr.SetName("hrank_curr");
+            arank_curr.SetName("arank_curr");
+            hrank_next.SetName("hrank_next");
+            arank_next.SetName("arank_next");
+            in_degrees.SetName("in_degrees");
+            out_degrees.SetName("out_degrees");
             // </TODO>
         }
 
