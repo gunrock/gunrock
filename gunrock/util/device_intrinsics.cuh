@@ -102,7 +102,7 @@ int _all(int predicate, unsigned int mask=MEMBERMASK)
 #endif
 }
 
-#if __CUDACC_VER_MAJOR__ < 8
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
 // atomic addition from Jon Cohen at NVIDIA
 __device__ static __forceinline__ double atomicAdd(double *addr, double val)
 {
@@ -116,6 +116,7 @@ __device__ static __forceinline__ double atomicAdd(double *addr, double val)
     } while( assumed!=old );
     return old;
 }
+#else
 #endif
 
 __device__ static __forceinline__ long long atomicCAS(long long *addr, long long comp, long long val)
