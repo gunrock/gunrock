@@ -91,7 +91,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         /*
          * @brief Default constructor
          */
-        DataSlice() : BaseDataSlice()
+        DataSlice() : BaseDataSlice(),
+            max_iter(0)
         {
             // Name of the problem specific arrays:
             degrees.SetName("degrees");
