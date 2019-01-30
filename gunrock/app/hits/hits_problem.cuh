@@ -85,6 +85,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT> in_degrees;    // Number of nodes that link to given node
         util::Array1D<SizeT, ValueT> out_degrees;   // Number of nodes given node links to
 
+	    SizeT max_iter;                             // Maximum number of HITS iterations to perform
+		
+
         /*
          * @brief Default constructor
          */
