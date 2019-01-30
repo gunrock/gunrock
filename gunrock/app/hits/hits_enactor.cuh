@@ -104,7 +104,7 @@ struct hitsIterationLoop : public IterationLoopBase
         auto &arank_next = data_slice.arank_next;
         auto &in_degrees = data_slice.in_degrees;
         auto &out_degrees = data_slice.out_degrees;
-        
+
         // --
         // Define operations
 
@@ -262,7 +262,7 @@ public:
      * @brief hits constructor
      */
     Enactor() :
-        BaseEnactor("Template"),
+        BaseEnactor("hits"),
         problem    (NULL  )
     {
         // <TODO> change according to algorithmic needs
