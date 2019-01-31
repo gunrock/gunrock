@@ -373,6 +373,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
 
             GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
+            auto &data_slice = data_slices[gpu][0];
+
+            data_slice.max_iter
+                = this -> parameters.template Get<SizeT >("max-iter");
 
             auto &data_slice = data_slices[gpu][0];
             GUARD_CU(data_slice.Init(
