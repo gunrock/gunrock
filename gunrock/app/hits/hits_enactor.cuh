@@ -107,10 +107,11 @@ struct hitsIterationLoop : public IterationLoopBase
 
         auto max_iter = data_slice.max_iter;
 
-        printf("Max Iterations: %d\n", max_iter);
-
         // --
         // Define operations
+
+        printf("Frontier Size: %d\n", frontier.queue_length);
+        printf("Iteration: %d\n", enactor_stats.iteration);
 
         // advance operation
         auto advance_op = [
@@ -124,16 +125,20 @@ struct hitsIterationLoop : public IterationLoopBase
             SizeT &output_pos) -> bool
         {
             // <TODO> Implement advance operation
+            printf("Adv Src: %d\n", src);
+            printf("Adv Dest: %d\n", dest);
                         
             // Mark src and dest as visited
-            atomicMax(visited + src, 1);
-            auto dest_visited = atomicMax(visited + dest, 1);
+            // atomicMax(visited + src, 1);
+            // auto dest_visited = atomicMax(visited + dest, 1);
             
-            // Increment degree of src
-            atomicAdd(degrees + src, 1);
+            // // Increment degree of src
+            // atomicAdd(degrees + src, 1);
             
-            // Add dest to queue if previously unsen
-            return dest_visited == 0;
+            // // Add dest to queue if previously unsen
+            // return dest_visited == 0;
+
+            return true;
             
             // </TODO>
         };
@@ -148,6 +153,9 @@ struct hitsIterationLoop : public IterationLoopBase
             SizeT &output_pos) -> bool
         {
             // <TODO> implement filter operation
+            //return true;
+            printf("Filt Src: %d\n", src);
+            printf("Filt Dest: %d\n", dest);
             return true;
             // </TODO>
         };
@@ -179,6 +187,32 @@ struct hitsIterationLoop : public IterationLoopBase
         // </TODO>
         
         return retval;
+    }
+
+    bool Stop_Condition(int gpu_num = 0)
+    {
+        auto &enactor_slices = this -> enactor -> enactor_slices;
+        int num_gpus = this -> enactor -> num_gpus;
+        for (int gpu = 0; gpu < num_gpus * num_gpus; gpu++)
+        {
+            auto &retval = enactor_slices[gpu].enactor_stats.retval;
+            if (retval == cudaSuccess) continue;
+            printf("(CUDA error %d @ GPU %d: %s\n",
+                retval, gpu % num_gpus, cudaGetErrorString(retval));
+            fflush(stdout);
+            return true;
+        }
+
+        auto &data_slices = this -> enactor -> problem -> data_slices;
+
+        for (int gpu = 0; gpu < num_gpus; gpu++)
+        if (enactor_slices[gpu * num_gpus].enactor_stats.iteration
+            < data_slices[0] -> max_iter)
+        {
+            //printf("enactor_stats[%d].iteration = %lld\n", gpu, enactor_stats[gpu * num_gpus].iteration);
+            return false;
+        }
+        return true;
     }
 
     /**
