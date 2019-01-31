@@ -33,6 +33,13 @@ cudaError_t UseParameters_problem(
 
     GUARD_CU(gunrock::app::UseParameters_problem(parameters));
 
+    GUARD_CU(parameters.Use<int64_t>(
+        "max-iter",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        50,
+        "Maximum number of HITS iterations.",
+        __FILE__, __LINE__));
+
     // <TODO> Add problem specific command-line parameter usages here, e.g.:
     // GUARD_CU(parameters.Use<bool>(
     //    "mark-pred",
@@ -378,7 +385,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             data_slice.max_iter
                 = this -> parameters.template Get<SizeT >("max-iter");
 
-            auto &data_slice = data_slices[gpu][0];
             GUARD_CU(data_slice.Init(
                 this -> sub_graphs[gpu],
                 this -> num_gpus,

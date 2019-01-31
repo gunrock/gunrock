@@ -105,6 +105,10 @@ struct hitsIterationLoop : public IterationLoopBase
         auto &in_degrees = data_slice.in_degrees;
         auto &out_degrees = data_slice.out_degrees;
 
+        auto max_iter = data_slice.max_iter;
+
+        printf("Max Iterations: %d\n", max_iter);
+
         // --
         // Define operations
 
