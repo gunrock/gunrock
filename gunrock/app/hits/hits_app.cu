@@ -90,6 +90,7 @@ cudaError_t RunTests(
 
     // <TODO> allocate problem specific host data, e.g.:
     ValueT *h_degrees = new ValueT[graph.nodes];
+    ValueT *h_hrank_curr = new ValueT[graph.nodes];
     // </TODO>
 
     // Allocate problem and enactor on GPU, and initialize them
@@ -137,7 +138,8 @@ cudaError_t RunTests(
             
             GUARD_CU(problem.Extract(
                 // <TODO> problem specific data
-                h_degrees
+                h_degrees,
+                h_hrank_curr
                 // </TODO>
             ));
             SizeT num_errors = Validate_Results(
@@ -154,9 +156,13 @@ cudaError_t RunTests(
     
     GUARD_CU(problem.Extract(
         // <TODO> problem specific data
-        h_degrees
+        h_degrees,
+        h_hrank_curr
         // </TODO>
     ));
+
+printf("Rank: %f\n", h_hrank_curr[1]);
+
     if (validation == "last") {
         SizeT num_errors = Validate_Results(
             parameters,

@@ -121,20 +121,6 @@ struct hitsIterationLoop : public IterationLoopBase
         frontier.queue_length = graph.nodes;
         frontier.queue_reset = true;
 
-        if (iteration == 0)
-        {
-            printf("Here\n");
-            GUARD_CU(hrank_curr.ForAll(
-                                [] __host__ __device__
-                                (ValueT *hscore, const SizeT &pos)
-                                {
-                                    hscore[pos] = 1.0;
-
-                                    printf("Pos: %d, Score: %f\n", pos, hscore[pos]);
-                                    
-                                }, graph.nodes, util::DEVICE, stream));
-        }
-
         // advance operation
         auto advance_op = [
             // <TODO> pass data to lambda

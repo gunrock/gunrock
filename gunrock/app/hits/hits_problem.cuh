@@ -216,7 +216,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(hrank_curr.ForEach([]__host__ __device__ (ValueT &x){
                x = (ValueT)1.0;
             }, nodes, target, this -> stream));
-
+            
             GUARD_CU(arank_curr.ForEach([]__host__ __device__ (ValueT &x){
                x = (ValueT)1.0;
             }, nodes, target, this -> stream));
@@ -291,6 +291,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     cudaError_t Extract(
         // <TODO> problem specific data to extract
         ValueT *h_degrees,
+        ValueT *h_hrank_curr,
         // </TODO>
         util::Location target = util::DEVICE)
     {
@@ -307,10 +308,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 // <TODO> extract the results from single GPU, e.g.:
                 GUARD_CU(data_slice.degrees.SetPointer(h_degrees, nodes, util::HOST));
                 GUARD_CU(data_slice.degrees.Move(util::DEVICE, util::HOST));
+
+
+                GUARD_CU(data_slice.hrank_curr.SetPointer(h_hrank_curr, nodes, util::HOST));
+                GUARD_CU(data_slice.hrank_curr.Move(util::DEVICE, util::HOST));
+
                 // </TODO>
             } else if (target == util::HOST) {
                 // <TODO> extract the results from single CPU, e.g.:
                 GUARD_CU(data_slice.degrees.ForEach(h_degrees,
+                   []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
+                       host_val = device_val;
+                   }, nodes, util::HOST));
+
+
+                GUARD_CU(data_slice.hrank_curr.ForEach(h_hrank_curr,
                    []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
                        host_val = device_val;
                    }, nodes, util::HOST));
