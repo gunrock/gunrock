@@ -48,6 +48,9 @@ double CPU_Reference(
     
     // <TODO> 
     // implement CPU reference implementation
+    for(SizeT v = 0; v < graph.nodes; ++v) {
+        degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
+    }
     // </TODO>
     
     cpu_timer.Stop();
@@ -83,7 +86,7 @@ typename GraphT::SizeT Validate_Results(
 
     // <TODO> result validation and display
     for(SizeT v = 0; v < graph.nodes; ++v) {
-        printf("%d %d %d\n", v, h_degrees[v], ref_degrees[v]);
+        printf("%d %f %f\n", v, h_degrees[v], ref_degrees[v]);
     }
     // </TODO>
 

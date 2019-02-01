@@ -133,7 +133,7 @@ int main(int argc, char** argv)
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |
-        app::VALUET_U32B | app::DIRECTED | app::UNDIRECTED>
+        app::VALUET_F32B | app::DIRECTED | app::UNDIRECTED>
         (parameters, main_struct());
 }
 

@@ -161,8 +161,6 @@ cudaError_t RunTests(
         // </TODO>
     ));
 
-printf("Rank: %f\n", h_hrank_curr[1]);
-
     if (validation == "last") {
         SizeT num_errors = Validate_Results(
             parameters,
