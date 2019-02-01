@@ -38,6 +38,10 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_problem(parameters));
   GUARD_CU(UseParameters_enactor(parameters));
 
+  GUARD_CU(parameters.Use<std::string>(
+      "tag", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, "",
+      "tag info for json string", __FILE__, __LINE__));
+
   GUARD_CU(parameters.Use<int>(
       "k",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
