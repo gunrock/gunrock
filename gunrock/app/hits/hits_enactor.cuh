@@ -93,6 +93,8 @@ struct hitsIterationLoop : public IterationLoopBase
         auto &oprtr_parameters = enactor_slice.oprtr_parameters;
         auto &retval           = enactor_stats.retval;
         auto &iteration        = enactor_stats.iteration;
+
+        cudaStream_t stream = enactor_slice.stream;
         
         // Problem specific data aliases:
         auto &degrees = data_slice.degrees;
@@ -116,11 +118,32 @@ struct hitsIterationLoop : public IterationLoopBase
         printf("Frontier Size: %d\n", frontier.queue_length);
         printf("Iteration: %d\n", iteration);
 
+        frontier.queue_length = graph.nodes;
+        frontier.queue_reset = true;
+
+        if (iteration == 0)
+        {
+            printf("Here\n");
+            GUARD_CU(hrank_curr.ForAll(
+                                [] __host__ __device__
+                                (ValueT *hscore, const SizeT &pos)
+                                {
+                                    hscore[pos] = 1.0;
+
+                                    printf("Pos: %d, Score: %f\n", pos, hscore[pos]);
+                                    
+                                }, graph.nodes, util::DEVICE, stream));
+        }
+
         // advance operation
         auto advance_op = [
             // <TODO> pass data to lambda
             degrees,
-            visited
+            visited,
+            hrank_curr,
+            arank_curr,
+            hrank_next,
+            arank_next
             // </TODO>
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
@@ -128,49 +151,14 @@ struct hitsIterationLoop : public IterationLoopBase
             SizeT &output_pos) -> bool
         {
             // <TODO> Implement advance operation
-            printf("Adv Src: %d\n", src);
+            printf("Adv Src: %d, %f, %f\n", src, hrank_curr[src], hrank_next[src]);
             printf("Adv Dest: %d\n", dest);
-                        
-            // Mark src and dest as visited
-            // atomicMax(visited + src, 1);
-            // auto dest_visited = atomicMax(visited + dest, 1);
-            
-            // // Increment degree of src
-            // atomicAdd(degrees + src, 1);
-            
-            // // Add dest to queue if previously unsen
-            // return dest_visited == 0;
 
             return true;
             
             // </TODO>
         };
 
-        // filter operation
-        auto filter_op = [
-            // <TODO> pass data to lambda
-            // </TODO>
-        ] __host__ __device__ (
-            const VertexT &src, VertexT &dest, const SizeT &edge_id,
-            const VertexT &input_item, const SizeT &input_pos,
-            SizeT &output_pos) -> bool
-        {
-            // <TODO> implement filter operation
-            //return true;
-            printf("Filt Src: %d\n", src);
-            printf("Filt Dest: %d\n", dest);
-            return true;
-            // </TODO>
-        };
-        
-        // --
-        // Run
-        
-        // <TODO> some of this may need to be edited depending on algorithmic needs
-        // !! How much variation between apps is there in these calls?
-       
-        frontier.queue_length = graph.nodes;
-        frontier.queue_reset = true;
 
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), null_ptr, null_ptr,
