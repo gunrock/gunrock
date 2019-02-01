@@ -168,26 +168,13 @@ struct hitsIterationLoop : public IterationLoopBase
         
         // <TODO> some of this may need to be edited depending on algorithmic needs
         // !! How much variation between apps is there in these calls?
-        
+       
+        frontier.queue_length = graph.nodes;
+        frontier.queue_reset = true;
+
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), null_ptr, null_ptr,
-            oprtr_parameters, advance_op, filter_op));
-        
-        if (oprtr_parameters.advance_mode != "LB_CULL" &&
-            oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
-        {
-            frontier.queue_reset = false;
-            GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                graph.csr(), null_ptr, null_ptr,
-                oprtr_parameters, filter_op));
-        }
-
-        // Get back the resulted frontier length
-        GUARD_CU(frontier.work_progress.GetQueueLength(
-            frontier.queue_index, frontier.queue_length,
-            false, oprtr_parameters.stream, true));
-
-        // </TODO>
+            oprtr_parameters, advance_op));
         
         return retval;
     }
@@ -197,7 +184,6 @@ struct hitsIterationLoop : public IterationLoopBase
         auto &enactor_slices = this->enactor->enactor_slices;
         auto iter = enactor_slices[0].enactor_stats.iteration;
         auto user_iter = data_slice.max_iter;
-        printf("Max Iter: %d\n", iter);
         
         // user defined stop condition
         if (iter == user_iter) return true;
