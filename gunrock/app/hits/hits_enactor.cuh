@@ -105,13 +105,16 @@ struct hitsIterationLoop : public IterationLoopBase
         auto &in_degrees = data_slice.in_degrees;
         auto &out_degrees = data_slice.out_degrees;
 
+        util::Array1D<SizeT, VertexT> *null_frontier = NULL;
+        auto null_ptr = null_frontier;
+
         auto max_iter = data_slice.max_iter;
 
         // --
         // Define operations
 
         printf("Frontier Size: %d\n", frontier.queue_length);
-        printf("Iteration: %d\n", enactor_stats.iteration);
+        printf("Iteration: %d\n", iteration);
 
         // advance operation
         auto advance_op = [
@@ -167,7 +170,7 @@ struct hitsIterationLoop : public IterationLoopBase
         // !! How much variation between apps is there in these calls?
         
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+            graph.csr(), null_ptr, null_ptr,
             oprtr_parameters, advance_op, filter_op));
         
         if (oprtr_parameters.advance_mode != "LB_CULL" &&
@@ -175,7 +178,7 @@ struct hitsIterationLoop : public IterationLoopBase
         {
             frontier.queue_reset = false;
             GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                graph.csr(), null_ptr, null_ptr,
                 oprtr_parameters, filter_op));
         }
 
@@ -189,30 +192,16 @@ struct hitsIterationLoop : public IterationLoopBase
         return retval;
     }
 
-    bool Stop_Condition(int gpu_num = 0)
-    {
-        auto &enactor_slices = this -> enactor -> enactor_slices;
-        int num_gpus = this -> enactor -> num_gpus;
-        for (int gpu = 0; gpu < num_gpus * num_gpus; gpu++)
-        {
-            auto &retval = enactor_slices[gpu].enactor_stats.retval;
-            if (retval == cudaSuccess) continue;
-            printf("(CUDA error %d @ GPU %d: %s\n",
-                retval, gpu % num_gpus, cudaGetErrorString(retval));
-            fflush(stdout);
-            return true;
-        }
-
-        auto &data_slices = this -> enactor -> problem -> data_slices;
-
-        for (int gpu = 0; gpu < num_gpus; gpu++)
-        if (enactor_slices[gpu * num_gpus].enactor_stats.iteration
-            < data_slices[0] -> max_iter)
-        {
-            //printf("enactor_stats[%d].iteration = %lld\n", gpu, enactor_stats[gpu * num_gpus].iteration);
-            return false;
-        }
-        return true;
+    bool Stop_Condition(int gpu_num = 0) {
+        auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+        auto &enactor_slices = this->enactor->enactor_slices;
+        auto iter = enactor_slices[0].enactor_stats.iteration;
+        auto user_iter = data_slice.max_iter;
+        printf("Max Iter: %d\n", iter);
+        
+        // user defined stop condition
+        if (iter == user_iter) return true;
+        return false;
     }
 
     /**
