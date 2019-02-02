@@ -179,7 +179,6 @@ __device__ static unsigned long atomicAdd(unsigned long *addr, unsigned long val
 
 __device__ static uint64_t atomicMin(uint64_t* addr, uint64_t val)
 {
-    unsigned long long int pre_value = (unsigned long long int)val;
     unsigned long long int old = (unsigned long long int)val;
     unsigned long long int expected;
     do {

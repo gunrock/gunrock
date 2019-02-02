@@ -14,13 +14,19 @@
 
 #pragma once
 
+#include <gunrock/util/sort_device.cuh>
+
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-#include <gunrock/oprtr/oprtr.cuh>
 
 #include <gunrock/app/color/color_problem.cuh>
-#include <gunrock/util/sort_device.cuh>
+
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600
+#include <gunrock/oprtr/1D_oprtr/for.cuh>
+#endif
+
+#include <gunrock/oprtr/oprtr.cuh>
 
 namespace gunrock {
 namespace app {
@@ -94,16 +100,26 @@ struct ColorIterationLoop
     auto stream = oprtr_parameters.stream;
     util::Array1D<SizeT, VertexT> *null_frontier = NULL;
     auto null_ptr = null_frontier;
+    auto user_iter = data_slice.user_iter;
+    auto gen = data_slice.gen;
 
     //======================================================================//
     // Jones-Plassman-Luby Graph Coloring: Compute Operator                 //
     //======================================================================//
     if (use_jpl) {
       if (!color_balance) {
+        if (iteration % 2)
+	   curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
+
         auto jpl_color_op =
-            [graph, colors, rand, iteration, min_color] __host__ __device__(
+            [graph, colors, rand, iteration, min_color, colored] __host__ __device__(
+// #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600
+//                const int &counter, const VertexT &v) {
+// #else
                 VertexT * v_q, const SizeT &pos) {
-              VertexT v = v_q[pos];
+              VertexT v = pos; // v_q[pos];
+// #endif
+	      if (pos == 0) colored[0] = 0; // reset colored ahead-of-time
               if (util::isValid(colors[v])) return;
 
               SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
@@ -132,8 +148,25 @@ struct ColorIterationLoop
               }
             };
 
+#if 0 // (RepeatFor Implementation)
+// #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600
+        SizeT loop_size = frontier.queue_length;
+        gunrock::oprtr::RepeatFor(
+            jpl_color_op,                              /* lambda */
+            user_iter,                                 /* num_repeats (int) */
+            loop_size,                                 /* ForIterT loop_size */
+            util::DEVICE,                              /* target */
+            stream,                                    /* stream */
+            util::PreDefinedValues<int>::InvalidValue, /* grid_size */
+            util::PreDefinedValues<int>::InvalidValue, /* block_size */
+            2 /* mode: stacked kernels */);
+// #else
+#endif
+
         GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
                                         util::DEVICE, stream));
+// #endif
+
       }
 
       else {
@@ -171,8 +204,9 @@ struct ColorIterationLoop
             reduce_op, Identity));
 
         auto reduce_color_op =
-            [graph, rand, colors, color_predicate, iteration] __host__
+            [graph, rand, colors, color_predicate, iteration, colored] __host__
             __device__(VertexT * v_q, const SizeT &pos) {
+	      if (pos == 0) colored[0] = 0; // reset colored ahead-of-time
               VertexT v = v_q[pos];
               if (util::isValid(colors[v])) return;
 
@@ -192,8 +226,9 @@ struct ColorIterationLoop
     else {
       auto color_op =
           [graph, colors, rand, iteration, prohibit_size, visited,
-           prohibit] __host__
+           prohibit, colored] __host__
           __device__(VertexT * v_q, const SizeT &pos) {
+	    if (pos == 0) colored[0] = 0; // reset colored ahead-of-time
             VertexT v = v_q[pos];
             SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
             SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
@@ -314,25 +349,14 @@ struct ColorIterationLoop
 
     if (test_run) {
       // reset atomic count
-      GUARD_CU(data_slice.colored.ForAll(
-          [] __host__ __device__(SizeT * x, const VertexT &pos) { x[pos] = 0; },
-          1, util::DEVICE, stream));
+      GUARD_CU(colors.ForAll(
+          [colored] __host__ __device__(VertexT * x, const VertexT &pos) {
+            if (util::isValid(x[pos])) atomicAdd(&colored[0], 1);
+          },
+          graph.nodes, util::DEVICE, stream));
 
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
-
-      auto status_op = [colors, colored] __host__ __device__(VertexT * v_q,
-                                                             const SizeT &pos) {
-        VertexT v = v_q[pos];
-        if (util::isValid(colors[v])) {
-          atomicAdd(&colored[0], 1);
-        }
-      };
-
-      GUARD_CU(frontier.V_Q()->ForAll(status_op, frontier.queue_length,
-                                      util::DEVICE, stream));
-
-      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
-      GUARD_CU(data_slice.colored.Move(util::DEVICE, util::HOST));
+      GUARD_CU(colored.Move(util::DEVICE, util::HOST));
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
     }
 

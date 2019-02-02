@@ -4,7 +4,7 @@
 # read -p "--no-conflict: " no_conflict
 # read -p "--seed: " seed
 # read -p "--user-iter: " usr_iter
-# read -p "--hash-size: " hash_size
+# read -p "--prohibit-size: " prohibit-size
 # read -p "--graph-file: " graph_file
 # read -p "--quick: " quick
 # read -p "--test-run: " test_run
@@ -48,9 +48,10 @@ then
     --JPL=true \
     --no-conflict=0 \
     --user-iter=0 \
-    --hash-size=0 \
+    --prohibit-size=0 \
     --quick=true \
     --device=3 \
+    --min-color=false \
     --test-run=true > ./$logsFolder/$i.log
     grep -F "Max iteration" ./$logsFolder/$i.log
     grep -F "Number of colors" ./$logsFolder/$i.log
@@ -81,9 +82,10 @@ then
     --JPL=true \
     --no-conflict=0 \
     --user-iter=${ITR_ARRAY[$i]} \
-    --hash-size=0 \
+    --prohibit-size=0 \
     --quick=true \
     --device=3 \
+    --min-color=false \
     --test-run=false > ./$logsFolder/$i.log
     grep -F "Max iteration" ./$logsFolder/$i.log
     grep -F "Number of colors" ./$logsFolder/$i.log
@@ -109,7 +111,7 @@ then
     --JPL=true \
     --no-conflict=0 \
     --user-iter=0 \
-    --hash-size=0 \
+    --prohibit-size=0 \
     --quick=true \
     --device=3 \
     --min-color=true \
@@ -143,7 +145,7 @@ then
     --JPL=true \
     --no-conflict=0 \
     --user-iter=${ITR_ARRAY[$i]} \
-    --hash-size=0 \
+    --prohibit-size=0 \
     --quick=true \
     --device=3 \
     --min-color=true \
@@ -173,7 +175,7 @@ then
     --JPL=false \
     --no-conflict=1 \
     --user-iter=0 \
-    --hash-size=0 \
+    --prohibit-size=0 \
     --quick=false \
     --device=3 \
     --undirected \

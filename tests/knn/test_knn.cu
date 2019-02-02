@@ -56,9 +56,9 @@ struct main_struct {
     // Get the min density
     SizeT min_pts = parameters.Get<SizeT>("min-pts");
 
-    if (min_pts >= k){
-        util::PrintMsg("Min pts should be smaller than k", true);
-        return (cudaError_t)1;
+    if (min_pts >= k) {
+      util::PrintMsg("Min pts should be smaller than k", true);
+      return (cudaError_t)1;
     }
 
     util::PrintMsg("Reference point is (" + std::to_string(point_x) + ", " +
@@ -71,39 +71,37 @@ struct main_struct {
         GraphT;
 
     cudaError_t retval = cudaSuccess;
-    //util::CpuTimer cpu_timer;
+    util::CpuTimer cpu_timer;
     GraphT graph;
 
-    //cpu_timer.Start();
+    cpu_timer.Start();
     GUARD_CU(graphio::LoadGraph(parameters, graph));
-    //cpu_timer.Stop();
-    //parameters.Set("load-time", cpu_timer.ElapsedMillis());
-
-    // <TODO> get srcs if needed, e.g.:
-    // GUARD_CU(app::Set_Srcs (parameters, graph));
-    // std::vector<VertexT> srcs
-    //    = parameters.Get<std::vector<VertexT> >("srcs");
-    // int num_srcs = srcs.size();
-    // </TODO>
+    cpu_timer.Stop();
+    parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
     // Reference result on CPU
     SizeT* ref_cluster = NULL;
+
     SizeT* h_cluster = (SizeT*)malloc(sizeof(SizeT)*graph.nodes);
     SizeT* h_core_point_counter = (SizeT*)malloc(sizeof(SizeT));
     SizeT* h_cluster_counter = (SizeT*)malloc(sizeof(SizeT));
 
+    SizeT* ref_knns = NULL;
+    SizeT* h_knns = (SizeT*)malloc(sizeof(SizeT) * graph.nodes * k);
+
     if (!quick) {
       // Init datastructures for reference result on GPU
-      ref_cluster = (SizeT*)malloc(sizeof(SizeT)*graph.nodes);
-      for (auto i=0; i<graph.nodes; ++i) 
-          ref_cluster[i] = i;
+      ref_cluster = (SizeT*)malloc(sizeof(SizeT) * graph.nodes);
+      for (auto i = 0; i < graph.nodes; ++i) ref_cluster[i] = i;
+
+      ref_knns = (SizeT*)malloc(sizeof(SizeT) * graph.nodes * k);
 
       // If not in `quick` mode, compute CPU reference implementation
       util::PrintMsg("__________________________", !quiet);
       util::PrintMsg("______ CPU Reference _____", !quiet);
 
-      float elapsed = app::knn::CPU_Reference(graph.csr(), k, eps, min_pts, 
-              point_x, point_y, ref_cluster, quiet);
+      float elapsed = app::knn::CPU_Reference(
+          graph.csr(), k, eps, min_pts, point_x, point_y, ref_knns, ref_cluster, quiet);
 
       util::PrintMsg(
           "--------------------------\n Elapsed: " + std::to_string(elapsed),
@@ -115,15 +113,15 @@ struct main_struct {
 
     GUARD_CU(app::Switch_Parameters(
         parameters, graph, switches,
-        [k, eps, min_pts, h_cluster, ref_cluster, h_core_point_counter, h_cluster_counter](
-            util::Parameters& parameters, GraphT& graph) {
-          return app::knn::RunTests(parameters, graph, k, eps, min_pts, 
-                  h_cluster, ref_cluster, h_core_point_counter, h_cluster_counter, 
-                  util::DEVICE);
+        [k, eps, min_pts, h_knns, ref_knns, h_cluster, h_core_point_counter, h_cluster_counter, ref_cluster](util::Parameters& parameters,
+                                                  GraphT& graph) {
+          return app::knn::RunTests(parameters, graph, k, eps, min_pts, h_knns, ref_knns,
+                                    h_cluster, ref_cluster, h_core_point_counter, h_cluster_counter, util::DEVICE);
         }));
 
     if (!quick) {
-        delete[] ref_cluster;
+      delete[] ref_cluster;
+      delete[] ref_knns;
     }
 
     delete[] h_cluster;

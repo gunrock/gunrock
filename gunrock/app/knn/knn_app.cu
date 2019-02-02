@@ -38,6 +38,10 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_problem(parameters));
   GUARD_CU(UseParameters_enactor(parameters));
 
+  GUARD_CU(parameters.Use<std::string>(
+      "tag", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, "",
+      "tag info for json string", __FILE__, __LINE__));
+
   GUARD_CU(parameters.Use<int>(
       "k",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
@@ -67,6 +71,14 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       "point\n",
       __FILE__, __LINE__));
 
+  GUARD_CU(parameters.Use<bool>(
+      "snn",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      true,
+      "Perform Shared Nearest Neighbor using K-Nearest Neighbor. (enables SNN "
+      "app).",
+      __FILE__, __LINE__));
+
   return retval;
 }
 
@@ -82,9 +94,10 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  */
 template <typename GraphT>
 cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
-                     typename GraphT::SizeT k, 
-                     typename GraphT::SizeT eps,
+                     typename GraphT::SizeT k, typename GraphT::SizeT eps,
                      typename GraphT::SizeT min_pts,
+                     typename GraphT::SizeT *h_knns,
+                     typename GraphT::SizeT *ref_knns,
                      typename GraphT::SizeT *h_cluster,
                      typename GraphT::SizeT *ref_cluster,
                      typename GraphT::SizeT *h_core_point_counter,
@@ -106,6 +119,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   VertexT point_x = parameters.Get<int>("x");
   VertexT point_y = parameters.Get<int>("y");
+
+  bool snn = parameters.Get<bool>("snn");
 
   util::CpuTimer cpu_timer, total_timer;
   cpu_timer.Start();
@@ -139,29 +154,28 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
         !quiet_mode);
 
     if (validation == "each") {
-      GUARD_CU(problem.Extract(graph.nodes, h_cluster, h_core_point_counter, h_cluster_counter));
-      SizeT num_errors =
-          Validate_Results(parameters, graph, h_cluster, ref_cluster, false);
+      GUARD_CU(problem.Extract(graph.nodes, k, h_knns, h_cluster, h_core_point_counter, h_cluster_counter, snn));
+      SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
+                                          ref_cluster, h_knns, ref_knns, false);
     }
   }
 
   cpu_timer.Start();
 
-  GUARD_CU(problem.Extract(graph.nodes, h_cluster, h_core_point_counter, h_cluster_counter));
+  GUARD_CU(problem.Extract(graph.nodes, k, h_knns, h_cluster, h_core_point_counter, h_cluster_counter, snn));
   if (validation == "last") {
-    SizeT num_errors =
-        Validate_Results(parameters, graph, h_cluster, ref_cluster, false);
+    SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
+                                        ref_cluster, h_knns, ref_knns, false);
   }
 
   // compute running statistics
-  // <TODO> change NULL to problem specific per-vertex visited marker, e.g.
+  // Change NULL to problem specific per-vertex visited marker, e.g.
   // h_distances
   info.ComputeTraversalStats(enactor, (VertexT *)NULL);
 // Display_Memory_Usage(problem);
 #ifdef ENABLE_PERFORMANCE_PROFILING
   // Display_Performance_Profiling(enactor);
 #endif
-  // </TODO>
 
   // Clean up
   GUARD_CU(enactor.Release(target));
