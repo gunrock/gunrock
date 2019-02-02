@@ -28,6 +28,8 @@
 #include <gunrock/app/knn/knn_enactor.cuh>
 #include <gunrock/app/knn/knn_test.cuh>
 
+#include <gunrock/util/info_rapidjson.cuh>
+
 namespace gunrock {
 namespace app {
 namespace knn {
@@ -93,16 +95,13 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT>
-cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
-                     typename GraphT::SizeT k, typename GraphT::SizeT eps,
-                     typename GraphT::SizeT min_pts,
-                     typename GraphT::SizeT *h_knns,
-                     typename GraphT::SizeT *ref_knns,
-                     typename GraphT::SizeT *h_cluster,
-                     typename GraphT::SizeT *ref_cluster,
-                     typename GraphT::SizeT *h_core_point_counter,
-                     typename GraphT::SizeT *h_cluster_counter,
-                     util::Location target) {
+cudaError_t RunTests(
+    util::Parameters &parameters, GraphT &graph, typename GraphT::SizeT k,
+    typename GraphT::SizeT eps, typename GraphT::SizeT min_pts,
+    typename GraphT::SizeT *h_knns, typename GraphT::SizeT *ref_knns,
+    typename GraphT::SizeT *h_cluster, typename GraphT::SizeT *ref_cluster,
+    typename GraphT::SizeT *h_core_point_counter,
+    typename GraphT::SizeT *h_cluster_counter, util::Location target) {
   cudaError_t retval = cudaSuccess;
 
   typedef typename GraphT::VertexT VertexT;
@@ -154,7 +153,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
         !quiet_mode);
 
     if (validation == "each") {
-      GUARD_CU(problem.Extract(graph.nodes, k, h_knns, h_cluster, h_core_point_counter, h_cluster_counter, snn));
+      GUARD_CU(problem.Extract(graph.nodes, k, h_knns, h_cluster,
+                               h_core_point_counter, h_cluster_counter, snn));
       SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
                                           ref_cluster, h_knns, ref_knns, false);
     }
@@ -162,7 +162,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   cpu_timer.Start();
 
-  GUARD_CU(problem.Extract(graph.nodes, k, h_knns, h_cluster, h_core_point_counter, h_cluster_counter, snn));
+  GUARD_CU(problem.Extract(graph.nodes, k, h_knns, h_cluster,
+                           h_core_point_counter, h_cluster_counter, snn));
   if (validation == "last") {
     SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
                                         ref_cluster, h_knns, ref_knns, false);
@@ -176,6 +177,10 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 #ifdef ENABLE_PERFORMANCE_PROFILING
   // Display_Performance_Profiling(enactor);
 #endif
+
+  // For JSON output
+  info.SetVal("num-corepoints", std::to_string(h_core_point_counter[0]));
+  info.SetVal("num-clusters", std::to_string(h_cluster_counter[0]));
 
   // Clean up
   GUARD_CU(enactor.Release(target));
