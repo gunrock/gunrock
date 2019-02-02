@@ -87,6 +87,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
                      typename GraphT::SizeT min_pts,
                      typename GraphT::SizeT *h_cluster,
                      typename GraphT::SizeT *ref_cluster,
+                     typename GraphT::SizeT *h_core_point_counter,
+                     typename GraphT::SizeT *h_cluster_counter,
                      util::Location target) {
   cudaError_t retval = cudaSuccess;
 
@@ -137,7 +139,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
         !quiet_mode);
 
     if (validation == "each") {
-      GUARD_CU(problem.Extract(graph.nodes, h_cluster));
+      GUARD_CU(problem.Extract(graph.nodes, h_cluster, h_core_point_counter, h_cluster_counter));
       SizeT num_errors =
           Validate_Results(parameters, graph, h_cluster, ref_cluster, false);
     }
@@ -145,7 +147,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   cpu_timer.Start();
 
-  GUARD_CU(problem.Extract(graph.nodes, h_cluster));
+  GUARD_CU(problem.Extract(graph.nodes, h_cluster, h_core_point_counter, h_cluster_counter));
   if (validation == "last") {
     SizeT num_errors =
         Validate_Results(parameters, graph, h_cluster, ref_cluster, false);

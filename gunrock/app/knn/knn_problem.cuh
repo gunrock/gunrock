@@ -16,6 +16,15 @@
 
 #include <gunrock/app/problem_base.cuh>
 
+//#define KNN_DEBUG 1
+
+#ifdef KNN_DEBUG
+#define debug(a...) printf(a)
+#else
+#define debug(a...)
+#endif
+
+
 namespace gunrock {
 namespace app {
 namespace knn {
@@ -292,12 +301,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 ...
    * \return     cudaError_t Error message(s), if any
    */
-  cudaError_t Extract(SizeT n, SizeT *h_cluster,
-                      util::Location target = util::DEVICE) {
+  cudaError_t Extract(SizeT n, SizeT *h_cluster, SizeT *h_core_point_counter,
+                      SizeT *h_cluster_counter, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
+    auto &data_slice = data_slices[0][0];
+    SizeT nodes = data_slice.sub_graph[0].nodes;
 
     if (this->num_gpus == 1) {
-      auto &data_slice = data_slices[0][0];
+      bool* cluster_mark = (bool*)malloc(sizeof(bool)*nodes);
+      for (int i=0; i<nodes; ++i) cluster_mark[i] = false;
 
       // Set device
       if (target == util::DEVICE) {
@@ -305,8 +317,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         GUARD_CU(data_slice.cluster_id.Move(util::DEVICE, util::HOST));
         for (int i = 0; i < n; ++i) {
           h_cluster[i] = data_slice.cluster_id[i];
+          cluster_mark[h_cluster[i]] = true;
         }
+        h_cluster_counter[0] = 0;
+        for (int i = 0; i < n; ++i) {
+            if (cluster_mark[i])
+                ++h_cluster_counter[0];
+        }
+        h_core_point_counter[0] = data_slice.core_points_counter[0];
+        printf("core points %d, clusters %d\n", 
+                h_core_point_counter[0], h_cluster_counter[0]);
       }
+      delete[] cluster_mark;
     } else if (target == util::HOST) {
     }
 
