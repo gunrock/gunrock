@@ -547,6 +547,14 @@ cudaError_t Read(
 
     bool read_done = false;
     retval = ReadMeta(parameters, filename, meta_data);
+
+    if (parameters.UseDefault("dataset"))
+    {
+        std::string dir, file, extension;
+        util::SeperateFileName(filename, dir, file, extension);
+        parameters.Set("dataset", file);
+    }
+
     if (retval == cudaSuccess)
     {
         auto num_vertices = util::strtoT<SizeT>(meta_data["num_vertices"]);
@@ -569,13 +577,14 @@ cudaError_t Read(
                 " does not exist.", __FILE__, __LINE__);
         }
         fp.close();
+#if 0
         if (parameters.UseDefault("dataset"))
         {
             std::string dir, file, extension;
             util::SeperateFileName(filename, dir, file, extension);
             parameters.Set("dataset", file);
         }
-
+#endif
         GUARD_CU(ReadMarketStream(
             parameters, graph, meta_data, graph_prefix));
 
