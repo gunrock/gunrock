@@ -15,6 +15,7 @@
 #pragma once
 
 #include <gunrock/app/problem_base.cuh>
+#include <unordered_set>
 
 //#define KNN_DEBUG 1
 
@@ -23,7 +24,6 @@
 #else
 #define debug(a...)
 #endif
-
 
 namespace gunrock {
 namespace app {
@@ -305,47 +305,54 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 ...
    * \return     cudaError_t Error message(s), if any
    */
-  cudaError_t Extract(SizeT nodes, SizeT k, SizeT *h_knns, SizeT *h_cluster, SizeT *h_core_point_counter,
-                      SizeT *h_cluster_counter, bool snn = true, util::Location target = util::DEVICE) {
+  cudaError_t Extract(SizeT nodes, SizeT k, SizeT *h_knns, SizeT *h_cluster,
+                      SizeT *h_core_point_counter, SizeT *h_cluster_counter,
+                      bool snn = true, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     auto &data_slice = data_slices[0][0];
-    SizeT nodes = data_slice.sub_graph[0].nodes;
 
     if (this->num_gpus == 1) {
-      bool* cluster_mark = (bool*)malloc(sizeof(bool)*nodes);
-      for (int i=0; i<nodes; ++i) cluster_mark[i] = false;
-
       // Set device
       if (target == util::DEVICE) {
         // Extract SNN clusters
         GUARD_CU(util::SetDevice(this->gpu_idx[0]));
         if (snn) {
+          GUARD_CU(
+              data_slice.cluster_id.SetPointer(h_cluster, nodes, util::HOST));
           GUARD_CU(data_slice.cluster_id.Move(util::DEVICE, util::HOST));
-          for (int i = 0; i < n; ++i) {
-            h_cluster[i] = data_slice.cluster_id[i];
-            cluster_mark[h_cluster[i]] = true;
-          }
+
+          SizeT *h_core_points = (SizeT *)malloc(sizeof(SizeT) * nodes);
+          GUARD_CU(data_slice.core_points.SetPointer(h_core_points, nodes,
+                                                     util::HOST));
+          GUARD_CU(data_slice.core_points.Move(util::DEVICE, util::HOST));
+
           h_cluster_counter[0] = 0;
-          for (int i = 0; i < n; ++i) {
-              if (cluster_mark[i])
-                  ++h_cluster_counter[0];
-          
+
+          std::unordered_set<SizeT> set;
+          for (SizeT i = 0; i < nodes; ++i) {
+            if (util::isValid(h_core_points[i])) {
+              SizeT c = h_cluster[i];
+              if (set.find(c) == set.end()) {
+                set.insert(c);
+                ++h_cluster_counter[0];
+              }
+            }
+          }
+
+          delete[] h_core_points;
+
           h_core_point_counter[0] = data_slice.core_points_counter[0];
-          printf("core points %d, clusters %d\n", 
-                  h_core_point_counter[0], h_cluster_counter[0]);
-                
-          delete[] cluster_mark;
+          printf("Core points: %d, Clusters: %d\n", h_core_point_counter[0],
+                 h_cluster_counter[0]);
         }
 
         // Extract KNNs
+        GUARD_CU(data_slice.knns.SetPointer(h_knns, nodes * k, util::HOST));
         GUARD_CU(data_slice.knns.Move(util::DEVICE, util::HOST));
-        for (int i = 0; i < nodes * k; ++i) {
-          h_knns[i] = data_slice.knns[i];
-
       }
 
-      } else if (target == util::HOST) {
-      auto &data_slice = data_slices[0][0];
+    } else if (target == util::HOST) {
+      // auto &data_slice = data_slices[0][0];
       GUARD_CU(data_slice.cluster_id.ForEach(
           h_cluster,
           [] __host__ __device__(const SizeT &device_val, SizeT &host_val) {

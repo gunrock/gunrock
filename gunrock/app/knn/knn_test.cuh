@@ -76,16 +76,16 @@ double CPU_Reference(
   auto nodes = graph.nodes;
   auto edges = graph.edges;
 
-  #pragma omp parallel for
-  for (auto x = 0; x < nodes; ++x){
-      cluster[x] = x;
+#pragma omp parallel for
+  for (auto x = 0; x < nodes; ++x) {
+    cluster[x] = x;
   }
 
   std::set<SizeT> core_points;
   std::vector<std::set<SizeT>> adj;
   adj.resize(nodes);
 
-  #pragma omp parallel for
+#pragma omp parallel for
   for (SizeT x = 0; x < nodes; ++x) {
     auto x_start = graph.CsrT::GetNeighborListOffset(x);
     auto num = graph.CsrT::GetNeighborListLength(x);
@@ -101,8 +101,8 @@ double CPU_Reference(
   util::CpuTimer cpu_timer;
   cpu_timer.Start();
 
-  // implement CPU reference implementation
-  #pragma omp parallel for
+// implement CPU reference implementation
+#pragma omp parallel for
   for (SizeT x = 0; x < nodes; ++x) {
     auto x_start = graph.CsrT::GetNeighborListOffset(x);
     auto num = graph.CsrT::GetNeighborListLength(x);
@@ -115,8 +115,8 @@ double CPU_Reference(
     }
   }
 
-  // Sort distances for each adjacency list
-  #pragma omp parallel for
+// Sort distances for each adjacency list
+#pragma omp parallel for
   for (SizeT x = 0; x < nodes; ++x) {
     auto x_start = graph.CsrT::GetNeighborListOffset(x);
     auto num = graph.CsrT::GetNeighborListLength(x);
@@ -140,8 +140,8 @@ double CPU_Reference(
   }
 #endif
 
-  // Find k nearest neighbors
-  #pragma omp parallel for
+// Find k nearest neighbors
+#pragma omp parallel for
   for (SizeT x = 0; x < nodes; ++x) {
     auto x_start = graph.CsrT::GetNeighborListOffset(x);
     auto num = graph.CsrT::GetNeighborListLength(x);
@@ -164,7 +164,7 @@ double CPU_Reference(
     if (num < k) continue;
     auto x_end = x_start + num;
     int snn_density = 0;
-    #pragma omp parallel for reduction(+:snn_density)
+#pragma omp parallel for reduction(+ : snn_density)
     for (int i = 0; i < k; ++i) {
       auto near_neighbor = knns[x * k + i];
       int counter = 0;
@@ -216,22 +216,20 @@ double CPU_Reference(
       }
     }
   }
-  
-  #pragma omp parallel for 
-  for (int i = 0; i < nodes; ++i){
-      // only non-core points
-      if (core_points.find(i) == core_points.end()){
-          auto num_neighbors = graph.CsrT::GetNeighborListLength(i);
-          // only non-noise points
-          if (num_neighbors >= k){
-              auto e_start = graph.CsrT::GetNeighborListOffset(i);
-              for (auto e = e_start; e < e_start + num_neighbors; ++e){
-                  auto m = graph.CsrT::GetEdgeDest(distance[e].e_id);
-                  if (core_points.find(m) != core_points.end()){
-                      cluster[i] = cluster[m];
-                      break;
-                  }
-              }
+
+#pragma omp parallel for
+  for (int i = 0; i < nodes; ++i) {
+    // only non-core points
+    if (core_points.find(i) == core_points.end()) {
+      auto num_neighbors = graph.CsrT::GetNeighborListLength(i);
+      // only non-noise points
+      if (num_neighbors >= k) {
+        auto e_start = graph.CsrT::GetNeighborListOffset(i);
+        for (auto e = e_start; e < e_start + num_neighbors; ++e) {
+          auto m = graph.CsrT::GetEdgeDest(distance[e].e_id);
+          if (core_points.find(m) != core_points.end()) {
+            cluster[i] = cluster[m];
+            break;
           }
         }
       }
