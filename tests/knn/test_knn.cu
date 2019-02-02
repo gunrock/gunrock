@@ -89,6 +89,8 @@ struct main_struct {
     // Reference result on CPU
     SizeT* ref_cluster = NULL;
     SizeT* h_cluster = (SizeT*)malloc(sizeof(SizeT)*graph.nodes);
+    SizeT* h_core_point_counter = (SizeT*)malloc(sizeof(SizeT));
+    SizeT* h_cluster_counter = (SizeT*)malloc(sizeof(SizeT));
 
     if (!quick) {
       // Init datastructures for reference result on GPU
@@ -113,10 +115,11 @@ struct main_struct {
 
     GUARD_CU(app::Switch_Parameters(
         parameters, graph, switches,
-        [k, eps, min_pts, h_cluster, ref_cluster](
+        [k, eps, min_pts, h_cluster, ref_cluster, h_core_point_counter, h_cluster_counter](
             util::Parameters& parameters, GraphT& graph) {
           return app::knn::RunTests(parameters, graph, k, eps, min_pts, 
-                  h_cluster, ref_cluster, util::DEVICE);
+                  h_cluster, ref_cluster, h_core_point_counter, h_cluster_counter, 
+                  util::DEVICE);
         }));
 
     if (!quick) {
