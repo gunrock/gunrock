@@ -22,15 +22,15 @@ EXECUTION=$exe_file
 DATADIR="/data/gunrock_dataset/large"
 
 # graphs
-NAME[0]="soc-LiveJournal1" 	&& K[0]="20" && EPS[0]="7" && MINPTS[0]="10"
-NAME[1]="soc-orkut" 		&& K[1]="20" && EPS[1]="7" && MINPTS[1]="10"
-NAME[2]="hollywood-2009" 	&& K[2]="20" && EPS[2]="7" && MINPTS[2]="10"
-NAME[3]="indochina-2004" 	&& K[3]="20" && EPS[3]="7" && MINPTS[3]="10"
-NAME[4]="rgg_n_2_19_s0" 	&& K[4]="20" && EPS[4]="7" && MINPTS[4]="10"
-NAME[5]="rgg_n_2_20_s0" 	&& K[5]="20" && EPS[5]="7" && MINPTS[5]="10"
-NAME[6]="rgg_n_2_21_s0" 	&& K[6]="20" && EPS[6]="7" && MINPTS[6]="10"
-NAME[7]="rgg_n_2_22_s0" 	&& K[7]="20" && EPS[7]="7" && MINPTS[7]="10"
-NAME[8]="road_usa" 		&& K[8]="20" && EPS[8]="7" && MINPTS[8]="10"
+NAME[0]="soc-LiveJournal1" 	&& K[0]="10" && EPS[0]="5" && MINPTS[0]="7"
+NAME[1]="soc-orkut" 		&& K[1]="10" && EPS[1]="5" && MINPTS[1]="7"
+NAME[2]="hollywood-2009" 	&& K[2]="10" && EPS[2]="5" && MINPTS[2]="7"
+NAME[3]="indochina-2004" 	&& K[3]="10" && EPS[3]="5" && MINPTS[3]="7"
+NAME[4]="rgg_n_2_19_s0" 	&& K[4]="10" && EPS[4]="5" && MINPTS[4]="7"
+NAME[5]="rgg_n_2_20_s0" 	&& K[5]="10" && EPS[5]="5" && MINPTS[5]="7"
+NAME[6]="rgg_n_2_21_s0" 	&& K[6]="10" && EPS[6]="5" && MINPTS[6]="7"
+NAME[7]="rgg_n_2_22_s0" 	&& K[7]="10" && EPS[7]="5" && MINPTS[7]="7"
+NAME[8]="road_usa" 		&& K[8]="10" && EPS[8]="5" && MINPTS[8]="7"
 
 # network graphs
 
