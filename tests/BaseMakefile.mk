@@ -34,8 +34,11 @@ GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\" # Kepler K80
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" # Kepler K20, K40
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" # Kepler K10
 
-# Add your own SM target (default: V100, P100, K40):
-SM_TARGETS = $(GEN_SM70) $(GEN_SM60) $(GEN_SM35)
+# Note: Some of the architectures don't support Gunrock's 
+# RepeatFor (Cooperative Groups), e.g: SM35
+
+# Add your own SM target (default: V100, P100):
+SM_TARGETS = $(GEN_SM70) $(GEN_SM60)
 
 #-------------------------------------------------------------------------------
 # Libs

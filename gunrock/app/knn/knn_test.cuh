@@ -44,9 +44,8 @@ namespace knn {
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    typename GraphT::SizeT k,  // number of nearest neighbor
-    typename GraphT::SizeT
-        eps,  // mininum number of shared neighbors to increase snn-density
+    typename GraphT::SizeT k,    // number of nearest neighbor
+    typename GraphT::SizeT eps,  // min number of SNN to increase snn-density
     typename GraphT::SizeT min_pts,    // mininum snn-density to be core point
     typename GraphT::VertexT point_x,  // index of reference point
     typename GraphT::VertexT point_y,  // index of reference point
@@ -76,6 +75,8 @@ double CPU_Reference(
   auto nodes = graph.nodes;
   auto edges = graph.edges;
 
+  // util::PrintMsg("#threads: " + std::to_string(omp_get_num_threads()));
+
 #pragma omp parallel for
   for (auto x = 0; x < nodes; ++x) {
     cluster[x] = x;
@@ -97,7 +98,6 @@ double CPU_Reference(
   }
 
   Point *distance = (Point *)malloc(sizeof(Point) * edges);
-  // SizeT *knns = (SizeT*)malloc(sizeof(SizeT) * nodes * k);
   util::CpuTimer cpu_timer;
   cpu_timer.Start();
 
@@ -223,7 +223,7 @@ double CPU_Reference(
     if (core_points.find(i) == core_points.end()) {
       auto num_neighbors = graph.CsrT::GetNeighborListLength(i);
       // only non-noise points
-      if (num_neighbors >= k) {
+      if (num_neighbors >= k) {  // was k
         auto e_start = graph.CsrT::GetNeighborListOffset(i);
         for (auto e = e_start; e < e_start + num_neighbors; ++e) {
           auto m = graph.CsrT::GetEdgeDest(distance[e].e_id);

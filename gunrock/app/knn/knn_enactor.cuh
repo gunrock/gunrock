@@ -141,7 +141,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                          (dest - ref_dest) * (dest - ref_dest);
 
       // struct Point()
-      keys[edge_id] = edge_id;  // shouldn't this be like this
+      keys[edge_id] = edge_id;
       distances[edge_id] = distance;
       return true;
     };
@@ -303,6 +303,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
       GUARD_CU(
           core_points_counter.Move(util::DEVICE, util::HOST, 1, 0, stream));
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+      printf("Core points found: %d\n", core_points_counter[0]);
 
       // Assign core points to clusters
       SizeT loop_size = core_points_counter[0] * core_points_counter[0];
@@ -315,7 +316,8 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
       // Assign other non-core and non-noise points to clusters
       auto clustering_op =
-          [graph, core_point_mark, keys, keys_out, k, cluster_id] __host__
+          [graph, core_point_mark, keys, keys_out, k, cluster_id,
+           min_pts] __host__
           __device__(VertexT * v_q, const SizeT &src) {
             // only non-core points
             if (src == 0 && core_point_mark[src] == 1) return;
@@ -323,7 +325,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
               return;
             // only non-noise points
             auto num_neighbors = graph.CsrT::GetNeighborListLength(src);
-            if (num_neighbors < k) return;
+            if (num_neighbors < k) return;  // (was k)
             auto e_start = graph.CsrT::GetNeighborListOffset(src);
             for (auto e = e_start; e < e_start + num_neighbors; ++e) {
               auto m = graph.CsrT::GetEdgeDest(keys_out[keys[e]]);

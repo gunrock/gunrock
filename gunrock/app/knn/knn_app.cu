@@ -24,11 +24,12 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
+// JSON includes
+#include <gunrock/util/info_rapidjson.cuh>
+
 // KNN includes
 #include <gunrock/app/knn/knn_enactor.cuh>
 #include <gunrock/app/knn/knn_test.cuh>
-
-#include <gunrock/util/info_rapidjson.cuh>
 
 namespace gunrock {
 namespace app {
@@ -80,6 +81,10 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       "Perform Shared Nearest Neighbor using K-Nearest Neighbor. (enables SNN "
       "app).",
       __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<float>(
+      "cpu-elapsed", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0.0f,
+      "CPU implementation, elapsed time (ms) for JSON.", __FILE__, __LINE__));
 
   return retval;
 }
@@ -173,7 +178,7 @@ cudaError_t RunTests(
   // Change NULL to problem specific per-vertex visited marker, e.g.
   // h_distances
   info.ComputeTraversalStats(enactor, (VertexT *)NULL);
-// Display_Memory_Usage(problem);
+  // Display_Memory_Usage(problem);
 #ifdef ENABLE_PERFORMANCE_PROFILING
   // Display_Performance_Profiling(enactor);
 #endif
@@ -181,6 +186,8 @@ cudaError_t RunTests(
   // For JSON output
   info.SetVal("num-corepoints", std::to_string(h_core_point_counter[0]));
   info.SetVal("num-clusters", std::to_string(h_cluster_counter[0]));
+  // info.SetVal("cpu-elapsed",
+  // std::to_string(parameters.Get<float>("cpu-elapsed")));
 
   // Clean up
   GUARD_CU(enactor.Release(target));
