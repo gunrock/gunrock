@@ -18,6 +18,7 @@
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
+#include <gunrock/util/reduce_device.cuh>
  
 #include <gunrock/app/hits/hits_problem.cuh>
 
@@ -100,20 +101,25 @@ struct hitsIterationLoop : public IterationLoopBase
         auto &degrees = data_slice.degrees;
         auto &visited = data_slice.visited;
 
+        // HITS-specific data slices
         auto &hrank_curr = data_slice.hrank_curr;
         auto &arank_curr = data_slice.arank_curr;
         auto &hrank_next = data_slice.hrank_next;
         auto &arank_next = data_slice.arank_next;
         auto &in_degrees = data_slice.in_degrees;
         auto &out_degrees = data_slice.out_degrees;
+        auto &cub_temp_space = data_slice.cub_temp_space;
+        auto &hrank_mag = data_slice.hrank_mag;
+        auto &arank_mag = data_slice.arank_mag;
 
+
+        // Set the frontier to NULL to specify that it should include
+        // all vertices
         util::Array1D<SizeT, VertexT> *null_frontier = NULL;
         auto null_ptr = null_frontier;
 
+        // Number of times to iterate the HITS algorithm
         auto max_iter = data_slice.max_iter;
-
-        // --
-        // Define operations
 
         printf("Frontier Size: %d\n", frontier.queue_length);
         printf("Iteration: %d\n", iteration);
@@ -121,35 +127,91 @@ struct hitsIterationLoop : public IterationLoopBase
         frontier.queue_length = graph.nodes;
         frontier.queue_reset = true;
 
+        // Reset next ranks to zero
+        GUARD_CU(hrank_next.ForEach([]__host__ __device__ (ValueT &x){
+            x = (ValueT)0.0;
+        }, graph.nodes));
+
+        GUARD_CU(arank_next.ForEach([]__host__ __device__ (ValueT &x){
+            x = (ValueT)0.0;
+        }, graph.nodes));
+
         // advance operation
         auto advance_op = [
-            // <TODO> pass data to lambda
             degrees,
             visited,
             hrank_curr,
             arank_curr,
             hrank_next,
             arank_next
-            // </TODO>
         ] __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // <TODO> Implement advance operation
-            printf("Adv Src: %d, %f, %f\n", src, hrank_curr[src], hrank_next[src]);
-            printf("Adv Dest: %d\n", dest);
+            // Update the hub and authority scores
+            atomicAdd(&hrank_next[src], arank_curr[dest]);
+            atomicAdd(&arank_next[dest], hrank_curr[src]);
 
             return true;
-            
-            // </TODO>
         };
-
 
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), null_ptr, null_ptr,
             oprtr_parameters, advance_op));
-        
+       
+        // After updating the scores, normalize the hub and array scores
+
+        // 1) Square each element
+        GUARD_CU(hrank_next.ForEach([]__host__ __device__ (ValueT &x){
+            x = x*x;
+        }, graph.nodes));
+
+        GUARD_CU(arank_next.ForEach([]__host__ __device__ (ValueT &x){
+            x = x*x;
+        }, graph.nodes));
+
+        // 2) Sum all elements in each array
+        GUARD_CU(util::cubReduce(
+            cub_temp_space,
+            hrank_next,
+            hrank_mag,
+            graph.nodes,
+            [] __host__ __device__ (const ValueT &a, const ValueT &b)
+            {
+                return a + b;
+            }, ValueT(0), stream));
+            
+    
+        GUARD_CU(util::cubReduce(
+            cub_temp_space,
+            arank_next,
+            arank_mag,
+            graph.nodes,
+            [] __host__ __device__ (const ValueT &a, const ValueT &b)
+            {
+                return a + b;
+            }, ValueT(0), stream));
+
+        // Divide all elements by the square root of their squared sums
+
+        GUARD_CU(hrank_next.ForEach([hrank_mag]__host__ __device__ (ValueT &x){
+            x = sqrt(x)/sqrt(hrank_mag[0]);
+        }, graph.nodes));
+
+        GUARD_CU(arank_next.ForEach([arank_mag]__host__ __device__ (ValueT &x){
+            x = sqrt(x)/sqrt(arank_mag[0]);
+        }, graph.nodes));
+
+        // After normalization, swap the next and current vectors
+        auto hrank_temp = hrank_curr;
+        hrank_curr = hrank_next;
+        hrank_next = hrank_temp;
+
+        auto arank_temp = arank_curr;
+        arank_curr = arank_next;
+        arank_next = arank_temp;
+
         return retval;
     }
 

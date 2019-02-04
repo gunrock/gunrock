@@ -91,7 +91,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT> arank_next;    
         util::Array1D<SizeT, ValueT> in_degrees;    // Number of nodes that link to given node
         util::Array1D<SizeT, ValueT> out_degrees;   // Number of nodes given node links to
-
+        util::Array1D<uint64_t, char> cub_temp_space; // Temporary space for normalization addition
+        util::Array1D<SizeT, ValueT> hrank_mag;
+        util::Array1D<SizeT, ValueT> arank_mag;
 	    SizeT max_iter;                             // Maximum number of HITS iterations to perform
 		
 
@@ -111,6 +113,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             arank_next.SetName("arank_next");
             in_degrees.SetName("in_degrees");
             out_degrees.SetName("out_degrees");
+            cub_temp_space.SetName("cub_temp_space");
+            hrank_mag.SetName("hrank_mag");
+            arank_mag.SetName("arank_mag");
         }
 
         /*
@@ -139,7 +144,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(arank_next.Release(target));
             GUARD_CU(in_degrees.Release(target));
             GUARD_CU(out_degrees.Release(target));
-
+            GUARD_CU(cub_temp_space.Release(target));
+            GUARD_CU(hrank_mag.Release(target));
+            GUARD_CU(arank_mag.Release(target));
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
         }
@@ -173,6 +180,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(arank_next.Allocate(sub_graph.nodes, target));
             GUARD_CU(in_degrees.Allocate(sub_graph.nodes, target));
             GUARD_CU(out_degrees.Allocate(sub_graph.nodes, target));
+            GUARD_CU(cub_temp_space.Allocate(1, target));
+
+            GUARD_CU(hrank_mag.Allocate(1, target | util::HOST));
+            GUARD_CU(arank_mag.Allocate(1, target | util::HOST));
 
             if (target & util::DEVICE) {
                 // <TODO> move sub-graph used by the problem onto GPU,
