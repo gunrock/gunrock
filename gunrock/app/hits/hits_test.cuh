@@ -46,6 +46,14 @@ double CPU_Reference(
     // <TODO> 
     // implement CPU reference implementation
     // </TODO>
+
+    // Temporary, just set to 0
+    for(SizeT v = 0; v < graph.nodes; v++)
+    {
+        ref_hrank[v] = 0;
+        ref_arank[v] = 0;
+
+    }
     
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();

@@ -128,7 +128,7 @@ struct hitsIterationLoop : public IterationLoopBase
             // TODO: look into NeighborReduce for speed improvements
             atomicAdd(&hrank_next[src], arank_curr[dest]);
             atomicAdd(&arank_next[dest], hrank_curr[src]);
-
+            
             return true;
         };
 
@@ -173,6 +173,7 @@ struct hitsIterationLoop : public IterationLoopBase
         // Note: take sqrt of x in denominator because x^2 was done in place.
         GUARD_CU(hrank_next.ForEach([hrank_mag]__host__ __device__ (ValueT &x){
             x = sqrt(x)/sqrt(hrank_mag[0]);
+            printf("HMag: %f\n", hrank_mag[0]);
         }, graph.nodes));
 
         GUARD_CU(arank_next.ForEach([arank_mag]__host__ __device__ (ValueT &x){
@@ -181,12 +182,12 @@ struct hitsIterationLoop : public IterationLoopBase
 
         // After normalization, swap the next and current vectors
         auto hrank_temp = hrank_curr;
-        hrank_curr = hrank_next;
-        hrank_next = hrank_temp;
+        data_slice.hrank_curr = hrank_next;
+        data_slice.hrank_next = hrank_temp;
 
         auto arank_temp = arank_curr;
-        arank_curr = arank_next;
-        arank_next = arank_temp;
+        data_slice.arank_curr = arank_next;
+        data_slice.arank_next = arank_temp;
 
         // TODO: Possibly normalize only at the end, or every n iterations
         // for potential speed improvements. Additionally, look into
