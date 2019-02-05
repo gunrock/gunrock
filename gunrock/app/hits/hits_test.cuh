@@ -16,13 +16,10 @@
 
 namespace gunrock {
 namespace app {
-// <TODO> change namespace
 namespace hits {
-// </TODO>
-
 
 /******************************************************************************
- * Template Testing Routines
+ * HITS Testing Routines
  *****************************************************************************/
 
 /**
@@ -55,6 +52,103 @@ double CPU_Reference(
     return elapsed;
 }
 
+// Structs and functions to rank hubs and authorities
+template<typename RankPairT>
+bool HITSCompare(
+    const RankPairT &elem1,
+    const RankPairT &elem2)
+{
+    return elem1.rank > elem2.rank;
+}
+
+template <typename GraphT>
+struct RankPair
+{
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::ValueT  ValueT;
+
+    VertexT        vertex_id;
+    ValueT         rank;
+};
+
+template <typename GraphT>
+struct RankList
+{
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::ValueT  ValueT;
+    typedef typename GraphT::SizeT   SizeT;
+    
+    typedef RankPair<GraphT> RankPairT;
+    RankPairT *rankPairs;
+    SizeT num_nodes;
+
+    RankList(ValueT *ranks, SizeT num_nodes)
+    {
+        rankPairs = new RankPairT[num_nodes];
+
+        this->num_nodes = num_nodes;
+
+        for(SizeT v = 0; v < this->num_nodes; v++)
+        {
+            rankPairs[v].vertex_id = v;
+            rankPairs[v].rank = ranks[v];
+        }
+
+        std::stable_sort(rankPairs, rankPairs+num_nodes, HITSCompare<RankPairT>);
+    }
+
+    ~RankList()
+    {
+        delete [] rankPairs;
+        rankPairs = NULL;
+    }
+
+};
+
+
+
+/**
+ * @brief Displays the hits result
+ *
+ * @param[in] vertices Vertex Ids
+ * @param[in] hrank HITS hub scores (sorted)
+ * @param[in] arank HITS authority scores (sorted)
+ * @param[in] num_vertices Number of vertices to display
+ */
+ template <typename GraphT>
+ void DisplaySolution(
+    typename GraphT::ValueT  *hrank,
+    typename GraphT::ValueT  *arank,
+    typename GraphT::SizeT    num_vertices
+    )
+ {
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::ValueT  ValueT;
+    typedef typename GraphT::SizeT   SizeT;
+
+    typedef RankList<GraphT> RankListT;
+    RankListT hlist(hrank, num_vertices);
+    RankListT alist(arank, num_vertices);
+
+     // At most top 10 ranked vertices
+     SizeT top = (num_vertices < 10) ? num_vertices : 10;
+
+     util::PrintMsg("Top " + std::to_string(top)
+         + " Ranks");
+
+     for (SizeT i = 0; i < top; ++i)
+     {
+        util::PrintMsg("Vertex ID: " + std::to_string(hlist.rankPairs[i].vertex_id)
+             + ", Hub Rank: " + std::to_string(hlist.rankPairs[i].rank));
+        util::PrintMsg("Vertex ID: " + std::to_string(alist.rankPairs[i].vertex_id)
+             + ", Authority Rank: " + std::to_string(alist.rankPairs[i].rank));
+     }
+
+     return;
+ }
+
+
+
 /**
  * @brief Validation of hits results
  * @tparam     GraphT        Type of the graph
@@ -76,25 +170,41 @@ typename GraphT::SizeT Validate_Results(
              bool verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::VertexT ValueT;
     typedef typename GraphT::SizeT   SizeT;
+
+    typedef RankList<GraphT> RankListT;
 
     SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
+    bool quick = parameters.Get<bool>("quick");
 
-    // Result validation and display
-    for(SizeT v = 0; v < graph.nodes; ++v) {
-        printf("Node: %d, hrank: %f, arank: %f\n", v, h_hrank[v], h_arank[v]);
+    RankListT h_hlist(h_hrank, graph.nodes);
+    RankListT h_alist(h_arank, graph.nodes);
+
+
+    if (!quick)
+    {
+        // Add CPU references to RankList to sort
+        RankListT ref_hlist(ref_hrank, graph.nodes);
+        RankListT ref_alist(ref_arank, graph.nodes);
+
+        for (SizeT v = 0; v < graph.nodes; v++)
+        {
+            if (ref_hlist.rankPairs[v].vertex_id != h_hlist.rankPairs[v].vertex_id) num_errors++;
+            if (ref_alist.rankPairs[v].vertex_id != h_alist.rankPairs[v].vertex_id) num_errors++;
+        }
+
+        util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
     }
 
-    if(num_errors == 0) {
-       util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
-    }
+
 
     return num_errors;
 }
 
-} // namespace Template
 } // namespace hits
+} // namespace app
 } // namespace gunrock
 
 // Leave this at the end of the file

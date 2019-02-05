@@ -61,9 +61,10 @@ cudaError_t RunTests(
 
     // CLI parameters
     bool quiet_mode = parameters.Get<bool>("quiet");
+    bool quick_mode = parameters.Get<bool>("quick");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    util::Info info("hits", parameters, graph);
+    util::Info info("HITS", parameters, graph);
     
     util::CpuTimer cpu_timer, total_timer;
     cpu_timer.Start(); total_timer.Start();
@@ -127,6 +128,24 @@ cudaError_t RunTests(
             h_hrank, h_arank,
             ref_hrank, ref_arank,
             false);
+            
+            // num_errors stores how many positions are mismatched
+            // Makes sense to keep this? Would need to sort first.
+            if (!quiet_mode)
+            {
+                if (!quick_mode)
+                {
+                    printf("CPU Algorithm Results:\n");
+                    DisplaySolution<GraphT>(ref_hrank, ref_arank, graph.nodes);
+                    printf("\n");
+                }
+    
+                printf("GPU Algorithm Results:\n");
+                DisplaySolution<GraphT>(h_hrank, h_arank, graph.nodes);
+            }
+
+
+            // Display and validate results can both use the sort function
     }
 
     // compute running statistics
