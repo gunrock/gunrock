@@ -30,6 +30,14 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_app(parameters));
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
+
+    // GUARD_CU(parameters.Use<std::string>(
+    //     "output-filename",
+    //     util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+    //     "",
+    //     "file to output ranking values",
+    //     __FILE__, __LINE__));
+
     return retval;
 }
 
@@ -143,10 +151,33 @@ cudaError_t RunTests(
                 printf("GPU Algorithm Results:\n");
                 DisplaySolution<GraphT>(h_hrank, h_arank, graph.nodes);
             }
-
-
-            // Display and validate results can both use the sort function
     }
+
+    // if (parameters.Get<std::string>("output-filename") != "")
+    // {
+    //     cpu_timer.Start();
+    //     std::ofstream fout;
+    //     size_t buf_size = 1024 * 1024 * 16;
+    //     char *fout_buf = new char[buf_size];
+    //     fout.rdbuf() -> pubsetbuf(fout_buf, buf_size);
+    //     fout.open(parameters.Get<std::string>("output-filename").c_str());
+
+    //     fout << "Hub Ranks:" << std::endl;
+    //     for (VertexT v = 0; v < graph.nodes; v++)
+    //     {
+    //         fout<< v << "," << h_hrank[v] << std::endl;
+    //     }
+
+    //     fout << "Authority Ranks:" << std::endl;
+    //     for (VertexT v = 0; v < graph.nodes; v++)
+    //     {
+    //         fout<< v << "," << h_arank[v] << std::endl;
+    //     }
+    //     fout.close();
+    //     delete[] fout_buf; fout_buf = NULL;
+    //     cpu_timer.Stop();
+    //     parameters.Set("write-time", cpu_timer.ElapsedMillis());
+    // }
 
     // compute running statistics
     // <TODO> change NULL to problem specific per-vertex visited marker, e.g. h_distances

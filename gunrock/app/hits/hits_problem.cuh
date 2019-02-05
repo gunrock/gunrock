@@ -157,7 +157,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(arank_mag.Allocate(1, target | util::HOST));
 
             if (target & util::DEVICE) {
-                // <TODO> move sub-graph used by the problem onto GPU,
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
             }
             return retval;
@@ -344,14 +343,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseProblem::Init(graph, target));
         data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
-
-        // MOHAMMAD: DO I NEED THIS?
-        // <TODO> get problem specific flags from parameters, e.g.:
-        // if (this -> parameters.template Get<bool>("mark-pred"))
-        //    this -> flag = this -> flag | Mark_Predecessors;
-        // </TODO>
-
-        
 
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
             data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
