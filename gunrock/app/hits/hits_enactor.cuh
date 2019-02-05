@@ -181,12 +181,12 @@ struct hitsIterationLoop : public IterationLoopBase
 
         // After normalization, swap the next and current vectors
         auto hrank_temp         = hrank_curr;
-        data_slice.hrank_curr   = hrank_next;
-        data_slice.hrank_next   = hrank_temp;
+        hrank_curr   = hrank_next;
+        hrank_next   = hrank_temp;
 
         auto arank_temp         = arank_curr;
-        data_slice.arank_curr   = arank_next;
-        data_slice.arank_next   = arank_temp;
+        arank_curr   = arank_next;
+        arank_next   = arank_temp;
 
         // TODO: Possibly normalize only at the end, or every n iterations
         // for potential speed improvements. Additionally, look into
