@@ -173,10 +173,21 @@ struct hitsIterationLoop : public IterationLoopBase
         // Note: take sqrt of x in denominator because x^2 was done in place.
         GUARD_CU(hrank_next.ForEach([hrank_mag]__host__ __device__ (ValueT &x){
             x = sqrt(x)/sqrt(hrank_mag[0]);
+
+            if(hrank_mag[0] <= 0)
+            {
+                printf("Error\n");
+            }
+
         }, graph.nodes));
 
         GUARD_CU(arank_next.ForEach([arank_mag]__host__ __device__ (ValueT &x){
             x = sqrt(x)/sqrt(arank_mag[0]);
+
+            if(arank_mag[0] <= 0)
+            {
+                printf("Error\n");
+            }
         }, graph.nodes));
 
         // After normalization, swap the next and current vectors
