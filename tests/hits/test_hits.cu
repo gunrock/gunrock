@@ -47,6 +47,7 @@ struct main_struct
         // CLI parameters        
         bool quick = parameters.Get<bool>("quick");
         bool quiet = parameters.Get<bool>("quiet");
+        int  max_iter   = parameters.Get<SizeT >("max-iter");
 
         typedef typename app::TestGraph<VertexT, SizeT, ValueT,
             graph::HAS_EDGE_VALUES | graph::HAS_CSR >
@@ -60,55 +61,45 @@ struct main_struct
         GUARD_CU(graphio::LoadGraph(parameters, graph));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
-
-        // <TODO> get srcs if needed, e.g.:
-        // GUARD_CU(app::Set_Srcs (parameters, graph));
-        // std::vector<VertexT> srcs
-        //    = parameters.Get<std::vector<VertexT> >("srcs");
-        // int num_srcs = srcs.size();
-        // </TODO>
         
-        // <TODO> declare datastructures for reference result on GPU
-        ValueT *ref_degrees;
-        // </TODO>
+        // Declare datastructures for reference result on GPU
+        ValueT *ref_hrank;
+        ValueT *ref_arank;
         
         if (!quick) {
-            // <TODO> init datastructures for reference result on GPU
-            ref_degrees = new ValueT[graph.nodes];
-            // </TODO>
+            // Init datastructures for reference result on GPU
+            ref_hrank = new ValueT[graph.nodes];
+            ref_arank = new ValueT[graph.nodes];
 
             // If not in `quick` mode, compute CPU reference implementation
             util::PrintMsg("__________________________", !quiet);
             
             float elapsed = app::hits::CPU_Reference(
                 graph,
-                ref_degrees,
+                ref_hrank,
+                ref_arank,
+                max_iter,
                 quiet);
             
             util::PrintMsg("--------------------------\n Elapsed: "
                 + std::to_string(elapsed), !quiet);
         }
 
-        // <TODO> add other switching parameters, if needed
         std::vector<std::string> switches{"advance-mode"};
-        // </TODO>
         
         GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
             [
-                // </TODO> pass necessary data to lambda
-                ref_degrees
-                // </TODO>
+                ref_hrank,
+                ref_arank
             ](util::Parameters &parameters, GraphT &graph)
             {
-                // <TODO> pass necessary data to app::Template::RunTests
-                return app::hits::RunTests(parameters, graph, ref_degrees, util::DEVICE);
-                // </TODO>
+                return app::hits::RunTests(parameters, graph, ref_hrank, ref_arank, util::DEVICE);
             }));
 
         if (!quick) {
-            // <TODO> deallocate host references
-            delete[] ref_degrees; ref_degrees = NULL;
-            // </TODO>
+            // Deallocate host references
+            delete[] ref_hrank; ref_hrank = NULL;
+            delete[] ref_arank; ref_arank = NULL;
         }
         return retval;
     }

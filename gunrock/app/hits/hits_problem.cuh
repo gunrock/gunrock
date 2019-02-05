@@ -20,7 +20,6 @@ namespace gunrock {
 namespace app {
 namespace hits {
 
-
 /**
  * @brief Speciflying parameters for hits Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter info
@@ -39,15 +38,6 @@ cudaError_t UseParameters_problem(
         50,
         "Maximum number of HITS iterations.",
         __FILE__, __LINE__));
-
-    // <TODO> Add problem specific command-line parameter usages here, e.g.:
-    // GUARD_CU(parameters.Use<bool>(
-    //    "mark-pred",
-    //    util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-    //    false,
-    //    "Whether to mark predecessor info.",
-    //    __FILE__, __LINE__));
-    // </TODO>
 
     return retval;
 }
@@ -81,16 +71,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      */
     struct DataSlice : BaseDataSlice
     {
-        util::Array1D<SizeT, ValueT> degrees;
-        util::Array1D<SizeT, int> visited;
-
         // HITS problem-specific storage arrays
         util::Array1D<SizeT, ValueT> hrank_curr;    // Holds hub rank value
         util::Array1D<SizeT, ValueT> arank_curr;    // Holds authority rank value
         util::Array1D<SizeT, ValueT> hrank_next;    
         util::Array1D<SizeT, ValueT> arank_next;    
-        util::Array1D<SizeT, ValueT> in_degrees;    // Number of nodes that link to given node
-        util::Array1D<SizeT, ValueT> out_degrees;   // Number of nodes given node links to
         util::Array1D<uint64_t, char> cub_temp_space; // Temporary space for normalization addition
         util::Array1D<SizeT, ValueT> hrank_mag;
         util::Array1D<SizeT, ValueT> arank_mag;
@@ -104,15 +89,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             max_iter(0)
         {
             // Name of the problem specific arrays:
-            degrees.SetName("degrees");
-            visited.SetName("visited");
-
             hrank_curr.SetName("hrank_curr");
             arank_curr.SetName("arank_curr");
             hrank_next.SetName("hrank_next");
             arank_next.SetName("arank_next");
-            in_degrees.SetName("in_degrees");
-            out_degrees.SetName("out_degrees");
             cub_temp_space.SetName("cub_temp_space");
             hrank_mag.SetName("hrank_mag");
             arank_mag.SetName("arank_mag");
@@ -134,16 +114,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target & util::DEVICE)
                 GUARD_CU(util::SetDevice(this->gpu_idx));
 
-            GUARD_CU(degrees.Release(target));
-            GUARD_CU(visited.Release(target));
-
             // Release allocated data
             GUARD_CU(hrank_curr.Release(target));
             GUARD_CU(arank_curr.Release(target));
             GUARD_CU(hrank_next.Release(target));
             GUARD_CU(arank_next.Release(target));
-            GUARD_CU(in_degrees.Release(target));
-            GUARD_CU(out_degrees.Release(target));
             GUARD_CU(cub_temp_space.Release(target));
             GUARD_CU(hrank_mag.Release(target));
             GUARD_CU(arank_mag.Release(target));
@@ -171,15 +146,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
             // Allocate problem specific data here
-            GUARD_CU(degrees.Allocate(sub_graph.nodes, target));
-            GUARD_CU(visited.Allocate(sub_graph.nodes, target));
 
             GUARD_CU(hrank_curr.Allocate(sub_graph.nodes, target));
             GUARD_CU(arank_curr.Allocate(sub_graph.nodes, target));
             GUARD_CU(hrank_next.Allocate(sub_graph.nodes, target));
             GUARD_CU(arank_next.Allocate(sub_graph.nodes, target));
-            GUARD_CU(in_degrees.Allocate(sub_graph.nodes, target));
-            GUARD_CU(out_degrees.Allocate(sub_graph.nodes, target));
             GUARD_CU(cub_temp_space.Allocate(1, target));
 
             GUARD_CU(hrank_mag.Allocate(1, target | util::HOST));
@@ -203,24 +174,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT nodes = this -> sub_graph -> nodes;
 
             // Ensure data are allocated
-            GUARD_CU(degrees.EnsureSize_(nodes, target));
-            GUARD_CU(visited.EnsureSize_(nodes, target));
 
             GUARD_CU(hrank_curr.EnsureSize_(nodes, target));
             GUARD_CU(arank_curr.EnsureSize_(nodes, target));
             GUARD_CU(hrank_next.EnsureSize_(nodes, target));
             GUARD_CU(arank_next.EnsureSize_(nodes, target));
-            GUARD_CU(in_degrees.EnsureSize_(nodes, target));
-            GUARD_CU(out_degrees.EnsureSize_(nodes, target));
+
+            GUARD_CU(cub_temp_space.EnsureSize_(1, target));
+            GUARD_CU(hrank_mag.EnsureSize_(1, target));
+            GUARD_CU(arank_mag.EnsureSize_(1, target));
 
             // Reset data
-            GUARD_CU(degrees.ForEach([]__host__ __device__ (ValueT &x){
-               x = (ValueT)0;
-            }, nodes, target, this -> stream));
-
-            GUARD_CU(visited.ForEach([]__host__ __device__ (int &x){
-               x = (int)0;
-            }, nodes, target, this -> stream));
 
             // Initialize current hrank and arank to 1.
             // Initialize next ranks to 0 (will be updated).
@@ -240,13 +204,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                x = (ValueT)0.0;
             }, nodes, target, this -> stream));
 
-            // Initialize number of degrees to zero. May not be needed
-            GUARD_CU(in_degrees.ForEach([]__host__ __device__ (ValueT &x){
-               x = (ValueT)0;
+            GUARD_CU(hrank_mag.ForEach([]__host__ __device__ (ValueT &x){
+                x = (ValueT)0.0;
             }, nodes, target, this -> stream));
 
-            GUARD_CU(out_degrees.ForEach([]__host__ __device__ (ValueT &x){
-               x = (ValueT)0;
+             GUARD_CU(arank_mag.ForEach([]__host__ __device__ (ValueT &x){
+                x = (ValueT)0.0;
             }, nodes, target, this -> stream));
 
             return retval;
@@ -300,10 +263,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
      * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
-        // <TODO> problem specific data to extract
-        ValueT *h_degrees,
         ValueT *h_hrank_curr,
-        // </TODO>
+        ValueT *h_arank_curr,
         util::Location target = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
@@ -316,28 +277,23 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             if (target == util::DEVICE) {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-                // <TODO> extract the results from single GPU, e.g.:
-                GUARD_CU(data_slice.degrees.SetPointer(h_degrees, nodes, util::HOST));
-                GUARD_CU(data_slice.degrees.Move(util::DEVICE, util::HOST));
-
-
+                // Extract the results from a single GPU
                 GUARD_CU(data_slice.hrank_curr.SetPointer(h_hrank_curr, nodes, util::HOST));
                 GUARD_CU(data_slice.hrank_curr.Move(util::DEVICE, util::HOST));
 
-                // </TODO>
+                GUARD_CU(data_slice.arank_curr.SetPointer(h_arank_curr, nodes, util::HOST));
+                GUARD_CU(data_slice.arank_curr.Move(util::DEVICE, util::HOST));
             } else if (target == util::HOST) {
-                // <TODO> extract the results from single CPU, e.g.:
-                GUARD_CU(data_slice.degrees.ForEach(h_degrees,
-                   []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
-                       host_val = device_val;
-                   }, nodes, util::HOST));
-
-
+                // Extract the results from single CPU, e.g.:
                 GUARD_CU(data_slice.hrank_curr.ForEach(h_hrank_curr,
                    []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
                        host_val = device_val;
                    }, nodes, util::HOST));
-                // </TODO>
+
+                GUARD_CU(data_slice.arank_curr.ForEach(h_arank_curr,
+                   []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
+                       host_val = device_val;
+                   }, nodes, util::HOST));
             }
         } else { // num_gpus != 1
             

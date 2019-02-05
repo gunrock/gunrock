@@ -36,9 +36,6 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
-
-    // <TODO> if needed, add command line parameters used by the enactor here
-    // </TODO>
     
     return retval;
 }
@@ -49,12 +46,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
  */
 template <typename EnactorT>
 struct hitsIterationLoop : public IterationLoopBase
-    <EnactorT, Use_FullQ | Push
-    // <TODO>if needed, stack more option, e.g.:
-    // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-    // Update_Predecessors : 0x0)
-    // </TODO>
-    >
+    <EnactorT, Use_FullQ | Push>
 {
     typedef typename EnactorT::VertexT VertexT;
     typedef typename EnactorT::SizeT   SizeT;
@@ -63,12 +55,7 @@ struct hitsIterationLoop : public IterationLoopBase
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
     
     typedef IterationLoopBase
-        <EnactorT, Use_FullQ | Push
-        // <TODO> add the same options as in template parameters here, e.g.:
-        // | (((EnactorT::Problem::FLAG & Mark_Predecessors) != 0) ?
-        // Update_Predecessors : 0x0)
-        // </TODO>
-        > BaseIterationLoop;
+        <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
     hitsIterationLoop() : BaseIterationLoop() {}
 
@@ -96,18 +83,13 @@ struct hitsIterationLoop : public IterationLoopBase
         auto &iteration        = enactor_stats.iteration;
 
         cudaStream_t stream = enactor_slice.stream;
-        
-        // Problem specific data aliases:
-        auto &degrees = data_slice.degrees;
-        auto &visited = data_slice.visited;
 
         // HITS-specific data slices
         auto &hrank_curr = data_slice.hrank_curr;
         auto &arank_curr = data_slice.arank_curr;
         auto &hrank_next = data_slice.hrank_next;
         auto &arank_next = data_slice.arank_next;
-        auto &in_degrees = data_slice.in_degrees;
-        auto &out_degrees = data_slice.out_degrees;
+
         auto &cub_temp_space = data_slice.cub_temp_space;
         auto &hrank_mag = data_slice.hrank_mag;
         auto &arank_mag = data_slice.arank_mag;
@@ -116,16 +98,11 @@ struct hitsIterationLoop : public IterationLoopBase
         // Set the frontier to NULL to specify that it should include
         // all vertices
         util::Array1D<SizeT, VertexT> *null_frontier = NULL;
-        auto null_ptr = null_frontier;
+        frontier.queue_length = graph.nodes;
+        frontier.queue_reset = true;
 
         // Number of times to iterate the HITS algorithm
         auto max_iter = data_slice.max_iter;
-
-        printf("Frontier Size: %d\n", frontier.queue_length);
-        printf("Iteration: %d\n", iteration);
-
-        frontier.queue_length = graph.nodes;
-        frontier.queue_reset = true;
 
         // Reset next ranks to zero
         GUARD_CU(hrank_next.ForEach([]__host__ __device__ (ValueT &x){
@@ -136,10 +113,8 @@ struct hitsIterationLoop : public IterationLoopBase
             x = (ValueT)0.0;
         }, graph.nodes));
 
-        // advance operation
+        // Advance operation to update all hub and auth scores
         auto advance_op = [
-            degrees,
-            visited,
             hrank_curr,
             arank_curr,
             hrank_next,
@@ -149,15 +124,17 @@ struct hitsIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            // Update the hub and authority scores
+            // Update the hub and authority scores.
+            // TODO: look into NeighborReduce for speed improvements
             atomicAdd(&hrank_next[src], arank_curr[dest]);
             atomicAdd(&arank_next[dest], hrank_curr[src]);
 
             return true;
         };
 
+        // Perform advance operation
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-            graph.csr(), null_ptr, null_ptr,
+            graph.csr(), null_frontier, null_frontier,
             oprtr_parameters, advance_op));
        
         // After updating the scores, normalize the hub and array scores
@@ -171,7 +148,7 @@ struct hitsIterationLoop : public IterationLoopBase
             x = x*x;
         }, graph.nodes));
 
-        // 2) Sum all elements in each array
+        // 2) Sum all squared scores in each array
         GUARD_CU(util::cubReduce(
             cub_temp_space,
             hrank_next,
@@ -182,7 +159,6 @@ struct hitsIterationLoop : public IterationLoopBase
                 return a + b;
             }, ValueT(0), stream));
             
-    
         GUARD_CU(util::cubReduce(
             cub_temp_space,
             arank_next,
@@ -193,8 +169,8 @@ struct hitsIterationLoop : public IterationLoopBase
                 return a + b;
             }, ValueT(0), stream));
 
-        // Divide all elements by the square root of their squared sums
-
+        // Divide all elements by the square root of their squared sums.
+        // Note: take sqrt of x in denominator because x^2 was done in place.
         GUARD_CU(hrank_next.ForEach([hrank_mag]__host__ __device__ (ValueT &x){
             x = sqrt(x)/sqrt(hrank_mag[0]);
         }, graph.nodes));
@@ -211,6 +187,10 @@ struct hitsIterationLoop : public IterationLoopBase
         auto arank_temp = arank_curr;
         arank_curr = arank_next;
         arank_next = arank_temp;
+
+        // TODO: Possibly normalize only at the end, or every n iterations
+        // for potential speed improvements. Additionally, look into
+        // NeighborReduce for adding host and auth scores
 
         return retval;
     }
@@ -410,8 +390,9 @@ public:
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
 
-        // <TODO> Initialize frontiers according to the algorithm:
-        // In this case, we add a single `src` to the frontier
+        // This frontier initialization came from the "Hello" app
+        // but it will be overwritten in the iteration loop so that
+        // the frontier contains all nodes
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
            if ((this->num_gpus == 1) ||
                 (gpu == this->problem->org_graph->GpT::partition_table[src])) {
@@ -433,7 +414,6 @@ public:
                 }
            }
         }
-        // </TODO>
         
         GUARD_CU(BaseEnactor::Sync());
         return retval;
@@ -444,11 +424,7 @@ public:
 ...
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Enact(
-        // <TODO> problem specific data if necessary, eg
-        VertexT src = 0
-        // </TODO>
-    )
+    cudaError_t Enact()
     {
         cudaError_t retval = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));

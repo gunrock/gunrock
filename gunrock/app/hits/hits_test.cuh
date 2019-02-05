@@ -35,10 +35,10 @@ namespace hits {
  */
 template <typename GraphT>
 double CPU_Reference(
-    const GraphT &graph,
-    // <TODO> add problem specific inputs and outputs 
-    typename GraphT::ValueT *degrees,
-    // </TODO>
+    const GraphT &graph, 
+    typename GraphT::ValueT *ref_hrank,
+    typename GraphT::ValueT *ref_arank,
+    typename GraphT::SizeT max_iter,
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
@@ -48,9 +48,6 @@ double CPU_Reference(
     
     // <TODO> 
     // implement CPU reference implementation
-    for(SizeT v = 0; v < graph.nodes; ++v) {
-        degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
-    }
     // </TODO>
     
     cpu_timer.Stop();
@@ -72,10 +69,10 @@ template <typename GraphT>
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
              GraphT           &graph,
-             // <TODO>
-             typename GraphT::ValueT *h_degrees,
-             typename GraphT::ValueT *ref_degrees,
-             // </TODO>
+             typename GraphT::ValueT *h_hrank,
+             typename GraphT::ValueT *h_arank,
+             typename GraphT::ValueT *ref_hrank,
+             typename GraphT::ValueT *ref_arank,
              bool verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
@@ -84,11 +81,10 @@ typename GraphT::SizeT Validate_Results(
     SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
 
-    // <TODO> result validation and display
+    // Result validation and display
     for(SizeT v = 0; v < graph.nodes; ++v) {
-        printf("%d %f %f\n", v, h_degrees[v], ref_degrees[v]);
+        printf("Node: %d, hrank: %f, arank: %f\n", v, h_hrank[v], h_arank[v]);
     }
-    // </TODO>
 
     if(num_errors == 0) {
        util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
@@ -98,7 +94,7 @@ typename GraphT::SizeT Validate_Results(
 }
 
 } // namespace Template
-} // namespace app
+} // namespace hits
 } // namespace gunrock
 
 // Leave this at the end of the file
