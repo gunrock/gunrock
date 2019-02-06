@@ -104,6 +104,15 @@ struct hitsIterationLoop : public IterationLoopBase
         // Number of times to iterate the HITS algorithm
         auto max_iter = data_slice.max_iter;
 
+/*
+        GUARD_CU(hrank_curr.ForAll([]__host__ __device__ (ValueT *x, const SizeT &pos){
+            printf("Starting Hrank: %d, %f\n", pos, x[pos]);
+        }, graph.nodes));
+        GUARD_CU(arank_curr.ForAll([]__host__ __device__ (ValueT *x, const SizeT &pos){
+            printf("Starting Arank: %d, %f\n", pos, x[pos]);
+        }, graph.nodes));
+*/
+
         // Reset next ranks to zero
         GUARD_CU(hrank_next.ForEach([]__host__ __device__ (ValueT &x){
             x = (ValueT)0.0;
@@ -113,6 +122,14 @@ struct hitsIterationLoop : public IterationLoopBase
             x = (ValueT)0.0;
         }, graph.nodes));
 
+/*
+        GUARD_CU(hrank_next.ForAll([]__host__ __device__ (ValueT *x, const SizeT &pos){
+            printf("Zeroed Next Hrank: %d, %f\n", pos, x[pos]);
+        }, graph.nodes));
+        GUARD_CU(arank_next.ForAll([]__host__ __device__ (ValueT *x, const SizeT &pos){
+            printf("Zeroed Next Arank: %d, %f\n", pos, x[pos]);
+        }, graph.nodes));
+*/
         // Advance operation to update all hub and auth scores
         auto advance_op = [
             hrank_curr,
@@ -176,7 +193,7 @@ struct hitsIterationLoop : public IterationLoopBase
 
             if(hrank_mag[0] <= 0)
             {
-                printf("Error\n");
+                printf("Error Hub\n");
             }
 
         }, graph.nodes));
@@ -186,7 +203,7 @@ struct hitsIterationLoop : public IterationLoopBase
 
             if(arank_mag[0] <= 0)
             {
-                printf("Error\n");
+                printf("Error Auth\n");
             }
         }, graph.nodes));
 
