@@ -104,15 +104,6 @@ struct hitsIterationLoop : public IterationLoopBase
         // Number of times to iterate the HITS algorithm
         auto max_iter = data_slice.max_iter;
 
-/*
-        GUARD_CU(hrank_curr.ForAll([]__host__ __device__ (ValueT *x, const SizeT &pos){
-            printf("Starting Hrank: %d, %f\n", pos, x[pos]);
-        }, graph.nodes));
-        GUARD_CU(arank_curr.ForAll([]__host__ __device__ (ValueT *x, const SizeT &pos){
-            printf("Starting Arank: %d, %f\n", pos, x[pos]);
-        }, graph.nodes));
-*/
-
         // Reset next ranks to zero
         GUARD_CU(hrank_next.ForEach([]__host__ __device__ (ValueT &x){
             x = (ValueT)0.0;
@@ -122,14 +113,9 @@ struct hitsIterationLoop : public IterationLoopBase
             x = (ValueT)0.0;
         }, graph.nodes));
 
-/*
-        GUARD_CU(hrank_next.ForAll([]__host__ __device__ (ValueT *x, const SizeT &pos){
-            printf("Zeroed Next Hrank: %d, %f\n", pos, x[pos]);
-        }, graph.nodes));
-        GUARD_CU(arank_next.ForAll([]__host__ __device__ (ValueT *x, const SizeT &pos){
-            printf("Zeroed Next Arank: %d, %f\n", pos, x[pos]);
-        }, graph.nodes));
-*/
+        GUARD_CU2(cudaStreamSynchronize(stream),
+            "cudaStreamSynchronize Failed");
+
         // Advance operation to update all hub and auth scores
         auto advance_op = [
             hrank_curr,
@@ -153,7 +139,11 @@ struct hitsIterationLoop : public IterationLoopBase
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), null_frontier, null_frontier,
             oprtr_parameters, advance_op));
-       
+      
+
+        GUARD_CU2(cudaStreamSynchronize(stream),
+            "cudaStreamSynchronize Failed");
+
         // After updating the scores, normalize the hub and array scores
 
         // 1) Square each element
@@ -164,6 +154,10 @@ struct hitsIterationLoop : public IterationLoopBase
         GUARD_CU(arank_next.ForEach([]__host__ __device__ (ValueT &x){
             x = x*x;
         }, graph.nodes));
+
+
+        GUARD_CU2(cudaStreamSynchronize(stream),
+            "cudaStreamSynchronize Failed");
 
         // 2) Sum all squared scores in each array
         GUARD_CU(util::cubReduce(
@@ -186,26 +180,39 @@ struct hitsIterationLoop : public IterationLoopBase
                 return a + b;
             }, ValueT(0), stream));
 
+
+        GUARD_CU2(cudaStreamSynchronize(stream),
+            "cudaStreamSynchronize Failed");
+
         // Divide all elements by the square root of their squared sums.
         // Note: take sqrt of x in denominator because x^2 was done in place.
         GUARD_CU(hrank_next.ForEach([hrank_mag]__host__ __device__ (ValueT &x){
-            x = sqrt(x)/sqrt(hrank_mag[0]);
-
-            if(hrank_mag[0] <= 0)
+            if(hrank_mag[0] > 0)
             {
-                printf("Error Hub\n");
+                x = sqrt(x)/sqrt(hrank_mag[0]);
             }
-
+            else
+            {
+                x = x;
+                //printf("Error Hub\n");
+            }
         }, graph.nodes));
 
         GUARD_CU(arank_next.ForEach([arank_mag]__host__ __device__ (ValueT &x){
-            x = sqrt(x)/sqrt(arank_mag[0]);
-
-            if(arank_mag[0] <= 0)
+            if(arank_mag[0] > 0)
             {
-                printf("Error Auth\n");
+                x = sqrt(x)/sqrt(arank_mag[0]);
+            }
+            else
+            {
+                x = x;
+                //printf("Error Auth\n");
             }
         }, graph.nodes));
+
+
+        GUARD_CU2(cudaStreamSynchronize(stream),
+            "cudaStreamSynchronize Failed");
 
         // After normalization, swap the next and current vectors
         auto hrank_temp         = hrank_curr;
