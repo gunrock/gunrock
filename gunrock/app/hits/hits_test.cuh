@@ -52,7 +52,6 @@ double CPU_Reference(
     {
         ref_hrank[v] = 0;
         ref_arank[v] = 0;
-
     }
     
     cpu_timer.Stop();
@@ -142,12 +141,20 @@ struct RankList
      SizeT top = (num_vertices < 10) ? num_vertices : 10;
 
      util::PrintMsg("Top " + std::to_string(top)
-         + " Ranks");
+         + " Ranks:");
+
+    
+     util::PrintMsg("Hub Ranks:");
 
      for (SizeT i = 0; i < top; ++i)
      {
         util::PrintMsg("Vertex ID: " + std::to_string(hlist.rankPairs[i].vertex_id)
              + ", Hub Rank: " + std::to_string(hlist.rankPairs[i].rank));
+     }
+
+     util::PrintMsg("Authority Ranks:");
+     for (SizeT i = 0; i < top; ++i)
+     {
         util::PrintMsg("Vertex ID: " + std::to_string(alist.rankPairs[i].vertex_id)
              + ", Authority Rank: " + std::to_string(alist.rankPairs[i].rank));
      }
