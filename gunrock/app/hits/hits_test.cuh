@@ -112,8 +112,6 @@ struct RankList
 
 };
 
-
-
 /**
  * @brief Displays the hits result
  *
@@ -143,7 +141,6 @@ struct RankList
      util::PrintMsg("Top " + std::to_string(top)
          + " Ranks:");
 
-    
      util::PrintMsg("Hub Ranks:");
 
      for (SizeT i = 0; i < top; ++i)
@@ -161,8 +158,6 @@ struct RankList
 
      return;
  }
-
-
 
 /**
  * @brief Validation of hits results
@@ -197,7 +192,6 @@ typename GraphT::SizeT Validate_Results(
     RankListT h_hlist(h_hrank, graph.nodes);
     RankListT h_alist(h_arank, graph.nodes);
 
-
     if (!quick)
     {
         // Add CPU references to RankList to sort
@@ -212,8 +206,6 @@ typename GraphT::SizeT Validate_Results(
 
         util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
     }
-
-
 
     return num_errors;
 }

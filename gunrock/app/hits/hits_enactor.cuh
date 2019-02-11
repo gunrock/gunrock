@@ -22,7 +22,6 @@
  
 #include <gunrock/app/hits/hits_problem.cuh>
 
-
 namespace gunrock {
 namespace app {
 namespace hits {
@@ -140,7 +139,6 @@ struct hitsIterationLoop : public IterationLoopBase
             graph.csr(), null_frontier, null_frontier,
             oprtr_parameters, advance_op));
       
-
         GUARD_CU2(cudaStreamSynchronize(stream),
             "cudaStreamSynchronize Failed");
 
@@ -154,7 +152,6 @@ struct hitsIterationLoop : public IterationLoopBase
         GUARD_CU(arank_next.ForEach([]__host__ __device__ (ValueT &x){
             x = x*x;
         }, graph.nodes));
-
 
         GUARD_CU2(cudaStreamSynchronize(stream),
             "cudaStreamSynchronize Failed");

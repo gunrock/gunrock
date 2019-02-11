@@ -35,8 +35,8 @@ cudaError_t UseParameters_problem(
     GUARD_CU(parameters.Use<int64_t>(
         "max-iter",
         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-        50,
-        "Maximum number of HITS iterations.",
+        100,
+        "Number of HITS iterations.",
         __FILE__, __LINE__));
 
     return retval;
@@ -144,7 +144,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             cudaError_t retval  = cudaSuccess;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
-
             // Allocate problem specific data here
 
             GUARD_CU(hrank_curr.Allocate(sub_graph.nodes, target));
