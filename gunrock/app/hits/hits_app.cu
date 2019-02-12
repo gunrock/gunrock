@@ -85,7 +85,7 @@ cudaError_t RunTests(
     
     for (int run_num = 0; run_num < num_runs; ++run_num) {
         GUARD_CU(problem.Reset(target));
-        GUARD_CU(enactor.Reset(target));
+        GUARD_CU(enactor.Reset(graph.nodes, target));
         
         util::PrintMsg("__________________________", !quiet_mode);
 
@@ -147,13 +147,9 @@ cudaError_t RunTests(
     }
 
     // compute running statistics
-    // <TODO> change NULL to problem specific per-vertex visited marker, e.g. h_distances
     info.ComputeTraversalStats(enactor, (VertexT*)NULL);
-    //Display_Memory_Usage(problem);
     #ifdef ENABLE_PERFORMANCE_PROFILING
-        //Display_Performance_Profiling(enactor);
     #endif
-    // </TODO>
 
     // Clean up
     GUARD_CU(enactor.Release(target));

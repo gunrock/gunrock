@@ -51,17 +51,22 @@ double CPU_Reference(
     ValueT *next_hrank = new ValueT[graph.nodes];
     ValueT *next_arank = new ValueT[graph.nodes];
 
+    // Set next scores to 1 and 0
+    for(SizeT v = 0; v < graph.nodes; v++)
+    {
+        curr_hrank[v] = 1.0;
+        curr_arank[v] = 1.0;
+    }
+
     for(SizeT iterCount = 0; iterCount < max_iter; iterCount++)
     {
         // Set next scores to 1 and 0
         for(SizeT v = 0; v < graph.nodes; v++)
         {
-            curr_hrank[v] = 1.0;
-            curr_arank[v] = 1.0;
-
             next_hrank[v] = 0.0;
             next_arank[v] = 0.0;
         }
+
 
         // Iterate through graph to add hub and auth scores
         for(SizeT link = 0; link < graph.edges; link++)

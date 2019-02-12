@@ -147,13 +147,15 @@ struct hitsIterationLoop : public IterationLoopBase
         // After updating the scores, normalize the hub and array scores
 
         // 1) Square each element
-        GUARD_CU(hrank_next.ForEach([]__host__ __device__ (ValueT &x){
-            x = x*x;
-        }, graph.nodes));
+        auto square_op =
+            [hrank_next, arank_next] __host__ __device__
+            (VertexT *v_q, const SizeT &pos)
+            {
+                hrank_next[pos] = hrank_next[pos] * hrank_next[pos];
+                arank_next[pos] = arank_next[pos] * arank_next[pos];
+            };
 
-        GUARD_CU(arank_next.ForEach([]__host__ __device__ (ValueT &x){
-            x = x*x;
-        }, graph.nodes));
+        GUARD_CU(frontier.V_Q()->ForAll(square_op, graph.nodes));
 
         GUARD_CU2(cudaStreamSynchronize(stream),
             "cudaStreamSynchronize Failed");
@@ -183,42 +185,35 @@ struct hitsIterationLoop : public IterationLoopBase
         GUARD_CU2(cudaStreamSynchronize(stream),
             "cudaStreamSynchronize Failed");
 
-        // Divide all elements by the square root of their squared sums.
-        // Note: take sqrt of x in denominator because x^2 was done in place.
-        GUARD_CU(hrank_next.ForEach([hrank_mag]__host__ __device__ (ValueT &x){
+        auto normalize_divide_op =
+        [hrank_next, arank_next, hrank_mag, arank_mag] __host__ __device__ 
+        (VertexT* v_q, const SizeT &pos)
+        {
             if(hrank_mag[0] > 0)
             {
-                x = sqrt(x)/sqrt(hrank_mag[0]);
+                hrank_next[pos] = sqrt(hrank_next[pos])/sqrt(hrank_mag[0]);
             }
-            else
-            {
-                x = x;
-            }
-        }, graph.nodes));
 
-        GUARD_CU(arank_next.ForEach([arank_mag]__host__ __device__ (ValueT &x){
             if(arank_mag[0] > 0)
             {
-                x = sqrt(x)/sqrt(arank_mag[0]);
+                arank_next[pos] = sqrt(arank_next[pos])/sqrt(arank_mag[0]);
             }
-            else
-            {
-                x = x;
-            }
-        }, graph.nodes));
-
+        };
+        // Divide all elements by the square root of their squared sums.
+        // Note: take sqrt of x in denominator because x^2 was done in place.
+        GUARD_CU(frontier.V_Q()->ForAll(normalize_divide_op, graph.nodes));
 
         GUARD_CU2(cudaStreamSynchronize(stream),
             "cudaStreamSynchronize Failed");
 
         // After normalization, swap the next and current vectors
         auto hrank_temp         = hrank_curr;
-        hrank_curr   = hrank_next;
-        hrank_next   = hrank_temp;
+        hrank_curr              = hrank_next;
+        hrank_next              = hrank_temp;
 
         auto arank_temp         = arank_curr;
-        arank_curr   = arank_next;
-        arank_next   = arank_temp;
+        arank_curr              = arank_next;
+        arank_next              = arank_temp;
 
         // TODO: Possibly normalize only at the end, or every n iterations
         // for potential speed improvements. Additionally, look into
@@ -408,35 +403,27 @@ public:
 
     /**
      * @brief Reset enactor
-...
+     * @param[in] nodes Number of nodes in the graph
      * @param[in] target Target location of data
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Reset(
-        // <TODO> problem specific data if necessary, eg
-        VertexT src = 0,
-        // </TODO>
+    cudaError_t Reset(typename GraphT::SizeT nodes,
         util::Location target = util::DEVICE)
     {
-        typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
 
-        // This frontier initialization came from the "Hello" app
-        // but it will be overwritten in the iteration loop so that
-        // the frontier contains all nodes
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
-           if ((this->num_gpus == 1) ||
-                (gpu == this->problem->org_graph->GpT::partition_table[src])) {
+           if (this->num_gpus == 1) {
                this -> thread_slices[gpu].init_size = 1;
                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
                    auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                   frontier.queue_length = (peer_ == 0) ? 1 : 0;
+                   frontier.queue_length = (peer_ == 0) ? nodes : 0;
                    if (peer_ == 0) {
-                       GUARD_CU(frontier.V_Q() -> ForEach(
-                           [src]__host__ __device__ (VertexT &v) {
-                           v = src;
-                       }, 1, target, 0));
+                       GUARD_CU(frontier.V_Q() -> ForAll(
+                           []__host__ __device__ (VertexT *v_q, const SizeT &pos) {
+                           v_q[pos] = pos;
+                       }, nodes, target, 0));
                    }
                }
            } else {
