@@ -81,7 +81,7 @@ struct main_struct
                 max_iter,
                 quiet);
             
-            util::PrintMsg("--------------------------\n Elapsed: "
+            util::PrintMsg("--------------------------\n CPU Elapsed: "
                 + std::to_string(elapsed), !quiet);
         }
 
