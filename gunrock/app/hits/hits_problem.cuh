@@ -339,7 +339,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
     /**
      * @brief Reset problem function. Must be called prior to each run.
-     * @param[in] src      Source vertex to start.
      * @param[in] location Memory location to work on
      * \return cudaError_t Error message(s), if any
      */
