@@ -129,7 +129,7 @@ struct hitsIterationLoop : public IterationLoopBase
             SizeT &output_pos) -> bool
         {
             // Update the hub and authority scores.
-            // TODO: look into NeighborReduce for speed improvements
+            // Look into NeighborReduce for speed improvements
             atomicAdd(&hrank_next[src], arank_curr[dest]);
             atomicAdd(&arank_next[dest], hrank_curr[src]);
             
@@ -215,7 +215,7 @@ struct hitsIterationLoop : public IterationLoopBase
         arank_curr              = arank_next;
         arank_next              = arank_temp;
 
-        // TODO: Possibly normalize only at the end, or every n iterations
+        // Possibly normalize only at the end, or every n iterations
         // for potential speed improvements. Additionally, look into
         // NeighborReduce for adding host and auth scores
 

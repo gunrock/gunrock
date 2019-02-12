@@ -81,7 +81,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT> arank_mag;
 	    SizeT max_iter;                             // Maximum number of HITS iterations to perform
 		
-
         /*
          * @brief Default constructor
          */
@@ -257,7 +256,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     
     /**
      * @brief Copy result distancess computed on GPUs back to host-side arrays.
-...
+     * @param[in] h_hrank_curr The host memory to extract hub scores to
+     * @param[in] h_arank_curr The host memory to extract auth scores to
+     * @param[in] target       The location to copy memory from
      * \return     cudaError_t Error message(s), if any
      */
     cudaError_t Extract(
@@ -293,37 +294,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                        host_val = device_val;
                    }, nodes, util::HOST));
             }
-        } else { // num_gpus != 1
-            
-            // ============ INCOMPLETE TEMPLATE - MULTIGPU ============
-            
-            // // TODO: extract the results from multiple GPUs, e.g.:
-            // // util::Array1D<SizeT, ValueT *> th_distances;
-            // // th_distances.SetName("bfs::Problem::Extract::th_distances");
-            // // GUARD_CU(th_distances.Allocate(this->num_gpus, util::HOST));
-
-            // for (int gpu = 0; gpu < this->num_gpus; gpu++)
-            // {
-            //     auto &data_slice = data_slices[gpu][0];
-            //     if (target == util::DEVICE)
-            //     {
-            //         GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-            //         // GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
-            //     }
-            //     // th_distances[gpu] = data_slice.distances.GetPointer(util::HOST);
-            // } //end for(gpu)
-
-            // for (VertexT v = 0; v < nodes; v++)
-            // {
-            //     int gpu = this -> org_graph -> GpT::partition_table[v];
-            //     VertexT v_ = v;
-            //     if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
-            //         v_ = this -> org_graph -> GpT::convertion_table[v];
-
-            //     // h_distances[v] = th_distances[gpu][v_];
-            // }
-
-            // // GUARD_CU(th_distances.Release());
+        } else { // Incomplete multi-gpu
         }
 
         return retval;
