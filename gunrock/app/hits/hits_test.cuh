@@ -38,22 +38,82 @@ double CPU_Reference(
     typename GraphT::SizeT max_iter,
     bool quiet)
 {
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::ValueT ValueT;
     typedef typename GraphT::SizeT SizeT;
     
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
     
-    // <TODO> 
-    // implement CPU reference implementation
-    // </TODO>
+    // Allocate space for next ranks
+    ValueT *curr_hrank = new ValueT[graph.nodes];
+    ValueT *curr_arank = new ValueT[graph.nodes];
+    ValueT *next_hrank = new ValueT[graph.nodes];
+    ValueT *next_arank = new ValueT[graph.nodes];
 
-    // Temporary, just set to 0
+    for(SizeT iterCount = 0; iterCount < max_iter; iterCount++)
+    {
+        // Set next scores to 1 and 0
+        for(SizeT v = 0; v < graph.nodes; v++)
+        {
+            curr_hrank[v] = 1.0;
+            curr_arank[v] = 1.0;
+
+            next_hrank[v] = 0.0;
+            next_arank[v] = 0.0;
+        }
+
+        // Iterate through graph to add hub and auth scores
+        for(SizeT link = 0; link < graph.edges; link++)
+        {
+            VertexT src = graph.edge_pairs[link].x;
+            VertexT dest = graph.edge_pairs[link].y;
+
+            next_hrank[src] += curr_arank[dest];
+            next_arank[dest] += curr_hrank[src];
+        }
+
+        // Normalize
+        ValueT h_norm = 0.0;
+        ValueT a_norm = 0.0;
+
+        for(SizeT v = 0; v < graph.nodes; v++)
+        {
+            h_norm += pow(next_hrank[v], 2.0);
+            a_norm += pow(next_arank[v], 2.0);
+        }
+
+        h_norm = sqrt(h_norm);
+        a_norm = sqrt(a_norm);
+
+        for(SizeT v = 0; v < graph.nodes; v++)
+        {
+            next_hrank[v] /= h_norm;
+            next_arank[v] /= a_norm;
+        }
+
+        // Swap current and next
+        auto curr_hrank_temp = curr_hrank;
+        curr_hrank = next_hrank;
+        next_hrank = curr_hrank_temp;
+
+        auto curr_arank_temp = curr_arank;
+        curr_arank = next_arank;
+        next_arank = curr_arank_temp;
+    }
+
+    // Copy to ref
     for(SizeT v = 0; v < graph.nodes; v++)
     {
-        ref_hrank[v] = 0;
-        ref_arank[v] = 0;
+        ref_hrank[v] = curr_hrank[v];
+        ref_arank[v] = curr_arank[v];
     }
-    
+
+    delete [] curr_hrank;
+    delete [] curr_arank;
+    delete [] next_hrank;
+    delete [] next_arank;
+
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
     return elapsed;
@@ -109,7 +169,6 @@ struct RankList
         delete [] rankPairs;
         rankPairs = NULL;
     }
-
 };
 
 /**

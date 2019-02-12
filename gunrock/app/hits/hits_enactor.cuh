@@ -104,13 +104,15 @@ struct hitsIterationLoop : public IterationLoopBase
         auto max_iter = data_slice.max_iter;
 
         // Reset next ranks to zero
-        GUARD_CU(hrank_next.ForEach([]__host__ __device__ (ValueT &x){
-            x = (ValueT)0.0;
-        }, graph.nodes));
+        auto reset_zero_op = 
+            [hrank_next, arank_next] __host__ __device__
+            (VertexT *v_q, const SizeT &pos)
+            {
+                hrank_next[pos] = (ValueT)0.0;
+                arank_next[pos] = (ValueT)0.0;
+            };
 
-        GUARD_CU(arank_next.ForEach([]__host__ __device__ (ValueT &x){
-            x = (ValueT)0.0;
-        }, graph.nodes));
+        GUARD_CU(frontier.V_Q()->ForAll(reset_zero_op, graph.nodes));
 
         GUARD_CU2(cudaStreamSynchronize(stream),
             "cudaStreamSynchronize Failed");
@@ -191,7 +193,6 @@ struct hitsIterationLoop : public IterationLoopBase
             else
             {
                 x = x;
-                //printf("Error Hub\n");
             }
         }, graph.nodes));
 
@@ -203,7 +204,6 @@ struct hitsIterationLoop : public IterationLoopBase
             else
             {
                 x = x;
-                //printf("Error Auth\n");
             }
         }, graph.nodes));
 
@@ -465,7 +465,7 @@ public:
     }
 };
 
-} // namespace Template
+} // namespace hits
 } // namespace app
 } // namespace gunrock
 

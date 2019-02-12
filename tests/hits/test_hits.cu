@@ -50,7 +50,7 @@ struct main_struct
         int  max_iter   = parameters.Get<SizeT >("max-iter");
 
         typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-            graph::HAS_EDGE_VALUES | graph::HAS_CSR >
+            graph::HAS_CSR | graph::HAS_COO >
             GraphT;
 
         cudaError_t retval = cudaSuccess;
@@ -75,7 +75,7 @@ struct main_struct
             util::PrintMsg("__________________________", !quiet);
             
             float elapsed = app::hits::CPU_Reference(
-                graph,
+                graph.coo(),
                 ref_hrank,
                 ref_arank,
                 max_iter,
