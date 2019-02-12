@@ -8,7 +8,7 @@
 /**
  * @file hits_app.cu
  *
- * @brief Simple Gunrock Application
+ * @brief HITS Gunrock Application
  */
 
 #include <gunrock/gunrock.h>
