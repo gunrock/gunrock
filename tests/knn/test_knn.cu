@@ -15,6 +15,9 @@
 #include <gunrock/app/knn/knn_app.cu>
 #include <gunrock/app/test_base.cuh>
 
+// JSON includes
+#include <gunrock/util/info_rapidjson.cuh>
+
 using namespace gunrock;
 
 namespace APP_NAMESPACE = app::knn;
@@ -82,7 +85,7 @@ struct main_struct {
     // Reference result on CPU
     SizeT* ref_cluster = NULL;
 
-    SizeT* h_cluster = (SizeT*)malloc(sizeof(SizeT)*graph.nodes);
+    SizeT* h_cluster = (SizeT*)malloc(sizeof(SizeT) * graph.nodes);
     SizeT* h_core_point_counter = (SizeT*)malloc(sizeof(SizeT));
     SizeT* h_cluster_counter = (SizeT*)malloc(sizeof(SizeT));
 
@@ -100,23 +103,28 @@ struct main_struct {
       util::PrintMsg("__________________________", !quiet);
       util::PrintMsg("______ CPU Reference _____", !quiet);
 
-      float elapsed = app::knn::CPU_Reference(
-          graph.csr(), k, eps, min_pts, point_x, point_y, ref_knns, ref_cluster, quiet);
+      float elapsed =
+          app::knn::CPU_Reference(graph.csr(), k, eps, min_pts, point_x,
+                                  point_y, ref_knns, ref_cluster, quiet);
 
       util::PrintMsg(
           "--------------------------\n Elapsed: " + std::to_string(elapsed),
           !quiet);
       util::PrintMsg("__________________________", !quiet);
+      parameters.Set("cpu-elapsed", elapsed);
     }
 
     std::vector<std::string> switches{"advance-mode"};
 
     GUARD_CU(app::Switch_Parameters(
         parameters, graph, switches,
-        [k, eps, min_pts, h_knns, ref_knns, h_cluster, h_core_point_counter, h_cluster_counter, ref_cluster](util::Parameters& parameters,
-                                                  GraphT& graph) {
-          return app::knn::RunTests(parameters, graph, k, eps, min_pts, h_knns, ref_knns,
-                                    h_cluster, ref_cluster, h_core_point_counter, h_cluster_counter, util::DEVICE);
+        [k, eps, min_pts, h_knns, ref_knns, h_cluster, h_core_point_counter,
+         h_cluster_counter,
+         ref_cluster](util::Parameters& parameters, GraphT& graph) {
+          return app::knn::RunTests(parameters, graph, k, eps, min_pts, h_knns,
+                                    ref_knns, h_cluster, ref_cluster,
+                                    h_core_point_counter, h_cluster_counter,
+                                    util::DEVICE);
         }));
 
     if (!quick) {
