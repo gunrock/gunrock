@@ -120,7 +120,6 @@ int main(int argc, char** argv)
     }
     GUARD_CU(parameters.Check_Required());
 
-    // TODO: change available graph types, according to requirements
     return app::Switch_Types<
         app::VERTEXT_U32B | app::VERTEXT_U64B |
         app::SIZET_U32B | app::SIZET_U64B |

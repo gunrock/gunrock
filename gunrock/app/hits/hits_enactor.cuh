@@ -253,23 +253,13 @@ struct hitsIterationLoop : public IterationLoopBase
             problem -> data_slices[this -> gpu_num][0];
         auto &enactor_slice = this -> enactor ->
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
-        //auto iteration = enactor_slice.enactor_stats.iteration;
-        // TODO: add problem specific data alias here, e.g.:
-        // auto         &distances          =   data_slice.distances;
 
         auto expand_op = [
-        // TODO: pass data used by the lambda, e.g.:
-        // distances
         ] __host__ __device__(
             VertexT &key, const SizeT &in_pos,
             VertexT *vertex_associate_ins,
             ValueT  *value__associate_ins) -> bool
         {
-            // TODO: fill in the lambda to combine received and local data, e.g.:
-            // ValueT in_val  = value__associate_ins[in_pos];
-            // ValueT old_val = atomicMin(distances + key, in_val);
-            // if (old_val <= in_val)
-            //     return false;
             return true;
         };
 
@@ -321,10 +311,8 @@ public:
         BaseEnactor("hits"),
         problem    (NULL  )
     {
-        // <TODO> change according to algorithmic needs
         this -> max_num_vertex_associates = 0;
         this -> max_num_value__associates = 1;
-        // </TODO>
     }
 
     /**
@@ -362,9 +350,7 @@ public:
         // Lazy initialization
         GUARD_CU(BaseEnactor::Init(
             problem, Enactor_None,
-            // <TODO> change to how many frontier queues, and their types
             2, NULL,
-            // </TODO>
             target, false));
         for (int gpu = 0; gpu < this -> num_gpus; gpu ++) {
             GUARD_CU(util::SetDevice(this -> gpu_idx[gpu]));
@@ -392,10 +378,7 @@ public:
     cudaError_t Run(ThreadSlice &thread_data)
     {
         gunrock::app::Iteration_Loop<
-            // <TODO> change to how many {VertexT, ValueT} data need to communicate
-            //       per element in the inter-GPU sub-frontiers
             0, 1,
-            // </TODO>
             IterationT>(
             thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
