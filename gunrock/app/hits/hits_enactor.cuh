@@ -409,7 +409,7 @@ public:
                        }, nodes, target, 0));
                    }
                }
-           } else {
+           } else { // Incomplete/untested
                 this -> thread_slices[gpu].init_size = 0;
                 for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
                     this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier.queue_length = 0;
