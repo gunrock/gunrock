@@ -293,12 +293,13 @@ cudaError_t Build(
             double co_y0 = points[node].y;
             SizeT x_index = co_x0 / threshold;
             SizeT y_index = co_y0 / threshold;
+            SizeT x_start = x_index < 2 ? 0 : x_index - 2;
+            SizeT y_start = y_index < 2 ? 0 : y_index - 2;
 
-            for (SizeT x1 = x_index-2; x1 <= x_index+2; x1++)
-            for (SizeT y1 = y_index-2; y1 <= y_index+2; y1++)
+            for (SizeT x1 = x_start; x1 <= x_index+2; x1++)
+            for (SizeT y1 = y_start; y1 <= y_index+2; y1++)
             {
-                if (util::lessThanZero(x1) || util::lessThanZero(y1) ||
-                    x1 >= row_length || y1 >= row_length)
+                if (x1 >= row_length || y1 >= row_length)
                     continue;
 
                 SizeT block_index = x1*row_length + y1;
@@ -364,6 +365,7 @@ cudaError_t Build(
         values    = NULL;
     } while (false);
     if (retval) return retval;
+    graph.CsrT::row_offsets[num_nodes] = num_edges;
 
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
