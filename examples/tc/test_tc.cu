@@ -25,9 +25,9 @@
 // Graph construction utilities
 #include <gunrock/graphio/market.cuh>
 
-// MST includes
-#include <gunrock/global_indicator/tc/tc_enactor.cuh>
-#include <gunrock/global_indicator/tc/tc_problem.cuh>
+// TC includes
+#include <gunrock/app/tc/tc_enactor.cuh>
+#include <gunrock/app/tc/tc_problem.cuh>
 
 // Operator includes
 #include <gunrock/oprtr/advance/kernel.cuh>
@@ -38,7 +38,7 @@ using namespace gunrock;
 using namespace gunrock::app;
 using namespace gunrock::util;
 using namespace gunrock::oprtr;
-using namespace gunrock::global_indicator::tc;
+using namespace gunrock::app::tc;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Housekeeping and utility routines

@@ -1,10 +1,10 @@
 #pragma once
 
 #include <gunrock/app/problem_base.cuh>
-#include <gunrock/global_indicator/tc/tc_problem.cuh>
+#include <gunrock/app/tc/tc_problem.cuh>
 
 namespace gunrock {
-namespace global_indicator {
+namespace app {
 namespace tc {
 
 template<
