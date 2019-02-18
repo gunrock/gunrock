@@ -148,8 +148,7 @@ struct hitsIterationLoop : public IterationLoopBase
             "cudaStreamSynchronize Failed");
 
         // After updating the scores, normalize the hub and array scores
-//        if (normalize_every || iteration == (max_iter - 1) )
-        if(0)
+        if (normalize_every || iteration == (max_iter - 1) )
         {
             printf("Normalizing: %d\n", iteration);
 
