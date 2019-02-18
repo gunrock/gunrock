@@ -247,26 +247,17 @@ typename GraphT::SizeT Validate_Results(
     typedef typename GraphT::VertexT ValueT;
     typedef typename GraphT::SizeT   SizeT;
 
-    typedef RankList<GraphT> RankListT;
-
     SizeT num_errors = 0;
     bool quiet = parameters.Get<bool>("quiet");
     bool quick = parameters.Get<bool>("quick");
 
-    RankListT h_hlist(h_hrank, graph.nodes);
-    RankListT h_alist(h_arank, graph.nodes);
-
     if (!quick)
     {
-        // Add CPU references to RankList to sort
-        RankListT ref_hlist(ref_hrank, graph.nodes);
-        RankListT ref_alist(ref_arank, graph.nodes);
-
         ValueT tol = 1e-6;
         for (SizeT v = 0; v < graph.nodes; v++)
         {
-            if (fabs(ref_hlist.rankPairs[v].rank - h_hlist.rankPairs[v].rank) > tol) num_errors++;
-            if (fabs(ref_alist.rankPairs[v].rank - h_alist.rankPairs[v].rank) > tol) num_errors++;
+            if (fabs(ref_hrank[v] - h_hrank[v]) > tol) num_errors++;
+            if (fabs(ref_arank[v] - h_arank[v]) > tol) num_errors++;
         }
 
         util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
