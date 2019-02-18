@@ -18,7 +18,7 @@
 using namespace gunrock::app;
 
 namespace gunrock {
-namespace global_indicator {
+namespace app {
 namespace tc {
 
 /**

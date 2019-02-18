@@ -22,8 +22,8 @@
 #include <gunrock/oprtr/intersection/kernel.cuh>
 
 #include <gunrock/app/enactor_base.cuh>
-#include <gunrock/global_indicator/tc/tc_problem.cuh>
-#include <gunrock/global_indicator/tc/tc_functor.cuh>
+#include <gunrock/app/tc/tc_problem.cuh>
+#include <gunrock/app/tc/tc_functor.cuh>
 
 #include <moderngpu.cuh>
 #include <cub/cub.cuh>
@@ -34,7 +34,7 @@
 using namespace gunrock::app;
 
 namespace gunrock {
-namespace global_indicator {
+namespace app {
 namespace tc {
 
 /// Selection functor type
@@ -660,7 +660,7 @@ public:
 };
 
 } // namespace tc
-} // namespace global_indicator
+} // namespace app
 } // namespace gunrock
 
 // Leave this at the end of the file

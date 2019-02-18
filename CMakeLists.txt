@@ -87,9 +87,13 @@ endif (GUNROCK_GOOGLE_TESTS)
 # end /* Include googletest & googlemock */
 
 # begin /* Include CodeCoverage */
+option(GUNROCK_CODE_COVERAGE "Use CodeCoverage, requires lcov (default: OFF)." OFF)
+
+if (GUNROCK_CODE_COVERAGE)
 include(CodeCoverage)
 setup_target_for_coverage(${PROJECT_NAME}_coverage tests coverage)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
+endif (GUNROCK_CODE_COVERAGE)
 # end /* Include CodeCoverage */
 
 ## Set the directory where the binaries will be stored
