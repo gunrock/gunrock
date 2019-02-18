@@ -64,6 +64,7 @@ cudaError_t RunTests(
     bool quiet_mode = parameters.Get<bool>("quiet");
     bool quick_mode = parameters.Get<bool>("quick");
     int  num_runs   = parameters.Get<int >("num-runs");
+    double tol      = parameters.Get<double >("tol");
     std::string validation = parameters.Get<std::string>("validation");
     util::Info info("HITS", parameters, graph);
     
@@ -128,6 +129,7 @@ cudaError_t RunTests(
             graph,
             h_hrank, h_arank,
             ref_hrank, ref_arank,
+            tol,
             false);
             
             // num_errors stores how many positions are mismatched

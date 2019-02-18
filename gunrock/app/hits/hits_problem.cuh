@@ -46,6 +46,13 @@ cudaError_t UseParameters_problem(
         "Normalize the hub and authority scores after every iteration.",
         __FILE__, __LINE__));
 
+    GUARD_CU(parameters.Use<double>(
+        "tol",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        1e-6,
+        "Floating-point tolerance for CPU/GPU rank comparison.",
+        __FILE__, __LINE__));
+
     return retval;
 }
 

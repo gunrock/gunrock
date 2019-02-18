@@ -241,6 +241,7 @@ typename GraphT::SizeT Validate_Results(
              typename GraphT::ValueT *h_arank,
              typename GraphT::ValueT *ref_hrank,
              typename GraphT::ValueT *ref_arank,
+             typename GraphT::ValueT tol,
              bool verbose = true)
 {
     typedef typename GraphT::VertexT VertexT;
@@ -251,9 +252,10 @@ typename GraphT::SizeT Validate_Results(
     bool quiet = parameters.Get<bool>("quiet");
     bool quick = parameters.Get<bool>("quick");
 
+    printf("Tol: %f\n", tol);
+
     if (!quick)
     {
-        ValueT tol = 1e-6;
         for (SizeT v = 0; v < graph.nodes; v++)
         {
             if (fabs(ref_hrank[v] - h_hrank[v]) > tol) num_errors++;
