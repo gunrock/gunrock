@@ -102,7 +102,10 @@ struct hitsIterationLoop : public IterationLoopBase
 
         // Number of times to iterate the HITS algorithm
         auto max_iter = data_slice.max_iter;
+        auto normalize_every = data_slice.normalize_every;
 
+
+        printf("Normalize Every: %b\n", normalize_every);
         // Reset next ranks to zero
         auto reset_zero_op = 
             [hrank_next, arank_next] __host__ __device__
@@ -145,67 +148,71 @@ struct hitsIterationLoop : public IterationLoopBase
             "cudaStreamSynchronize Failed");
 
         // After updating the scores, normalize the hub and array scores
-
-        // 1) Square each element
-        auto square_op =
-            [hrank_next, arank_next] __host__ __device__
-            (VertexT *v_q, const SizeT &pos)
-            {
-                hrank_next[pos] = hrank_next[pos] * hrank_next[pos];
-                arank_next[pos] = arank_next[pos] * arank_next[pos];
-            };
-
-        GUARD_CU(frontier.V_Q()->ForAll(square_op, graph.nodes));
-
-        GUARD_CU2(cudaStreamSynchronize(stream),
-            "cudaStreamSynchronize Failed");
-
-        // 2) Sum all squared scores in each array
-        GUARD_CU(util::cubReduce(
-            cub_temp_space,
-            hrank_next,
-            hrank_mag,
-            graph.nodes,
-            [] __host__ __device__ (const ValueT &a, const ValueT &b)
-            {
-                return a + b;
-            }, ValueT(0), stream));
-            
-        GUARD_CU(util::cubReduce(
-            cub_temp_space,
-            arank_next,
-            arank_mag,
-            graph.nodes,
-            [] __host__ __device__ (const ValueT &a, const ValueT &b)
-            {
-                return a + b;
-            }, ValueT(0), stream));
-
-
-        GUARD_CU2(cudaStreamSynchronize(stream),
-            "cudaStreamSynchronize Failed");
-
-        auto normalize_divide_op =
-        [hrank_next, arank_next, hrank_mag, arank_mag] __host__ __device__ 
-        (VertexT* v_q, const SizeT &pos)
+//        if (normalize_every || iteration == (max_iter - 1) )
+        if(0)
         {
-            if(hrank_mag[0] > 0)
+            printf("Normalizing: %d\n", iteration);
+
+            // 1) Square each element
+            auto square_op =
+                [hrank_next, arank_next] __host__ __device__
+                (VertexT *v_q, const SizeT &pos)
+                {
+                    hrank_next[pos] = hrank_next[pos] * hrank_next[pos];
+                    arank_next[pos] = arank_next[pos] * arank_next[pos];
+                };
+
+            GUARD_CU(frontier.V_Q()->ForAll(square_op, graph.nodes));
+
+            GUARD_CU2(cudaStreamSynchronize(stream),
+                "cudaStreamSynchronize Failed");
+
+            // 2) Sum all squared scores in each array
+            GUARD_CU(util::cubReduce(
+                cub_temp_space,
+                hrank_next,
+                hrank_mag,
+                graph.nodes,
+                [] __host__ __device__ (const ValueT &a, const ValueT &b)
+                {
+                    return a + b;
+                }, ValueT(0), stream));
+                
+            GUARD_CU(util::cubReduce(
+                cub_temp_space,
+                arank_next,
+                arank_mag,
+                graph.nodes,
+                [] __host__ __device__ (const ValueT &a, const ValueT &b)
+                {
+                    return a + b;
+                }, ValueT(0), stream));
+
+
+            GUARD_CU2(cudaStreamSynchronize(stream),
+                "cudaStreamSynchronize Failed");
+
+            auto normalize_divide_op =
+            [hrank_next, arank_next, hrank_mag, arank_mag] __host__ __device__ 
+            (VertexT* v_q, const SizeT &pos)
             {
-                hrank_next[pos] = sqrt(hrank_next[pos])/sqrt(hrank_mag[0]);
-            }
+                if(hrank_mag[0] > 0)
+                {
+                    hrank_next[pos] = sqrt(hrank_next[pos])/sqrt(hrank_mag[0]);
+                }
 
-            if(arank_mag[0] > 0)
-            {
-                arank_next[pos] = sqrt(arank_next[pos])/sqrt(arank_mag[0]);
-            }
-        };
-        // Divide all elements by the square root of their squared sums.
-        // Note: take sqrt of x in denominator because x^2 was done in place.
-        GUARD_CU(frontier.V_Q()->ForAll(normalize_divide_op, graph.nodes));
+                if(arank_mag[0] > 0)
+                {
+                    arank_next[pos] = sqrt(arank_next[pos])/sqrt(arank_mag[0]);
+                }
+            };
+            // Divide all elements by the square root of their squared sums.
+            // Note: take sqrt of x in denominator because x^2 was done in place.
+            GUARD_CU(frontier.V_Q()->ForAll(normalize_divide_op, graph.nodes));
 
-        GUARD_CU2(cudaStreamSynchronize(stream),
-            "cudaStreamSynchronize Failed");
-
+            GUARD_CU2(cudaStreamSynchronize(stream),
+                "cudaStreamSynchronize Failed");
+        }
         // After normalization, swap the next and current vectors
         auto hrank_temp         = hrank_curr;
         hrank_curr              = hrank_next;
