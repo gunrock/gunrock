@@ -42,7 +42,7 @@ cudaError_t UseParameters_problem(
     GUARD_CU(parameters.Use<bool>(
         "normalize-every",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        false,
+        true,
         "Normalize the hub and authority scores after every iteration.",
         __FILE__, __LINE__));
 

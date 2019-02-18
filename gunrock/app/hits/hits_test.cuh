@@ -262,10 +262,11 @@ typename GraphT::SizeT Validate_Results(
         RankListT ref_hlist(ref_hrank, graph.nodes);
         RankListT ref_alist(ref_arank, graph.nodes);
 
+        ValueT tol = 1e-6;
         for (SizeT v = 0; v < graph.nodes; v++)
         {
-            if (ref_hlist.rankPairs[v].vertex_id != h_hlist.rankPairs[v].vertex_id) num_errors++;
-            if (ref_alist.rankPairs[v].vertex_id != h_alist.rankPairs[v].vertex_id) num_errors++;
+            if (fabs(ref_hlist.rankPairs[v].rank - h_hlist.rankPairs[v].rank) > tol) num_errors++;
+            if (fabs(ref_alist.rankPairs[v].rank - h_alist.rankPairs[v].rank) > tol) num_errors++;
         }
 
         util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);

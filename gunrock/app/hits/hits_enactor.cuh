@@ -104,8 +104,6 @@ struct hitsIterationLoop : public IterationLoopBase
         auto max_iter = data_slice.max_iter;
         auto normalize_every = data_slice.normalize_every;
 
-
-        printf("Normalize Every: %d\n", normalize_every);
         // Reset next ranks to zero
         auto reset_zero_op = 
             [hrank_next, arank_next] __host__ __device__
@@ -150,8 +148,6 @@ struct hitsIterationLoop : public IterationLoopBase
         // After updating the scores, normalize the hub and array scores
         if (normalize_every || iteration == (max_iter - 1) )
         {
-            printf("Normalizing: %d\n", iteration);
-
             // 1) Square each element
             auto square_op =
                 [hrank_next, arank_next] __host__ __device__
