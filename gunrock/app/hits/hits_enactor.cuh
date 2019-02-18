@@ -105,7 +105,7 @@ struct hitsIterationLoop : public IterationLoopBase
         auto normalize_every = data_slice.normalize_every;
 
 
-        printf("Normalize Every: %b\n", normalize_every);
+        printf("Normalize Every: %d\n", normalize_every);
         // Reset next ranks to zero
         auto reset_zero_op = 
             [hrank_next, arank_next] __host__ __device__
