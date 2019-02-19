@@ -102,7 +102,10 @@ struct hitsIterationLoop : public IterationLoopBase
 
         // Number of times to iterate the HITS algorithm
         auto max_iter = data_slice.max_iter;
-        auto normalize_every = data_slice.normalize_every;
+
+        // Normalize the HITS scores every N iterations.
+        // Provides speedup at the risk of data overflow
+        auto normalize_n = data_slice.normalize_n;
 
         // Reset next ranks to zero
         auto reset_zero_op = 
@@ -146,7 +149,9 @@ struct hitsIterationLoop : public IterationLoopBase
             "cudaStreamSynchronize Failed");
 
         // After updating the scores, normalize the hub and array scores
-        if (normalize_every || iteration == (max_iter - 1) )
+        // either after every N iterations (user-specified, default=1),
+        // or at the last iteration
+        if ( ((iteration+1) % normalize_n == 0) || iteration == (max_iter - 1) )
         {
             // 1) Square each element
             auto square_op =
