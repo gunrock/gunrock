@@ -48,10 +48,12 @@ struct main_struct
 
         cudaError_t retval = cudaSuccess;
         util::CpuTimer cpu_timer;
-        GraphT graph;
+        GraphT data_graph;
+        GraphT pattern_graph;
 
         cpu_timer.Start();
-        GUARD_CU(graphio::LoadGraph(parameters, graph));
+        GUARD_CU(graphio::LoadGraph(parameters, data_graph));
+        GUARD_CU(graphio::LoadGraph(parameters, pattern_graph, "pattern-"));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
@@ -59,14 +61,15 @@ struct main_struct
         bool quiet   = parameters.Get<bool>("quiet");
         int num_runs = parameters.Get<int>("num-runs");
 
-        SizeT nodes = graph.nodes;
-        VertexT *ref_subgraph_match = new VertexT[nodes];
+        // counts of matched subgraphs
+        VertexT *ref_subgraph_match = new VertexT[1];
         if (!quick) {
             util::PrintMsg("__________________________", !quiet);
 
             float elapsed = app::sm::CPU_Reference(
                 parameters,
-                graph.csr(),
+                pattern_graph.csr(),
+                data_graph.csr(),
                 ref_subgraph_match
             );
 
@@ -77,16 +80,17 @@ struct main_struct
         }
 
         std::vector<std::string> switches{"advance-mode"};
-        GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [ref_subgraph_match](util::Parameters &parameters, GraphT &graph)
+        GUARD_CU(app::Switch_Parameters(parameters, data_graph, switches,
+            [&pattern_graph, &ref_subgraph_match](util::Parameters &parameters, GraphT &data_graph)
             {
-                return app::sm::RunTests(parameters, graph, ref_subgraph_match);
+                return app::sm::RunTests(parameters, data_graph, pattern_graph, ref_subgraph_match, util::DEVICE);
             }));
 
         if (ref_subgraph_match != NULL)
         {
             delete[] ref_subgraph_match; ref_subgraph_match = NULL;
         }
+        GUARD_CU(pattern_graph.Release());
         return retval;
     }
 };

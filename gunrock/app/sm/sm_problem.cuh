@@ -91,7 +91,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, VertexT>    index;        /** < Used for storing intermediate flag val */
         SizeT    nodes_data;       /** < Used for number of data nodes  */
         SizeT    nodes_query;      /** < Used for number of query nodes */
-        SizeT    edges_data;       /** < Used for number of data edges   */
         SizeT    num_matches;      /** < Used for number of matches in the result */
 
         // query graph col_indices
@@ -112,14 +111,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             counter         .SetName("counter");
             num_subs        .SetName("num_subs");
             NG              .SetName("NG");
-            NG_ro           .SetName("NG_ci");
-            NG_ci           .SetName("NG_ro");
+            NG_ro           .SetName("NG_ro");
+            NG_ci           .SetName("NG_ci");
             partial         .SetName("partial");
             src_node_id     .SetName("src_node_id");
             index           .SetName("index");
-            nodes_data      = 0;
             nodes_query     = 0;       
-            edges_data      = 0;
             num_matches     = 0; 
         }
 
@@ -258,10 +255,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 }
             }
             // Initialize query row offsets with query_graph.row_offsets
-            GUARD_CU(query_ro.ForAll([query_ro, query_graph] 
-                __host__(SizeT * x, const SizeT &pos) { x[pos] = query_graph.row_offsets[pos]; }, 
-                query_graph.nodes + 1, target, this->stream));
-
+            GUARD_CU(query_ro.ForAll([query_graph] 
+                __host__ __device__(SizeT * x, const SizeT &pos) 
+                { x[pos] = query_graph.row_offsets[pos]; }, 
+                query_graph.nodes + 1, util::HOST));
+            GUARD_CU(query_ro.Move(util::HOST, target));
 	    GUARD_CU(isValid.ForAll(
 	        [] __device__(bool * x, const SizeT &pos) { x[pos] = false; },
 		data_graph.nodes, target, this->stream));
@@ -275,14 +273,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	        [] __device__(SizeT * x, const SizeT &pos) { x[pos] = 0; },
 		1, target, this->stream));
 
-            nodes_data   = data_graph.nodes;
             nodes_query  = query_graph.nodes;
-            edges_data   = data_graph.edges;
 
             if (target & util::DEVICE)
             {
                 GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
-                GUARD_CU(query_ro.Move(util::HOST, target, this -> stream));
                 return retval;
             }
 
