@@ -39,11 +39,11 @@ cudaError_t UseParameters_problem(
         "Number of HITS iterations.",
         __FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<bool>(
-        "normalize-every",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        true,
-        "Normalize the hub and authority scores after every iteration.",
+    GUARD_CU(parameters.Use<int64_t>(
+        "normalize-n",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        1,
+        "Normalize HITS scores every N iterations.",
         __FILE__, __LINE__));
 
     GUARD_CU(parameters.Use<double>(
@@ -94,13 +94,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, ValueT> hrank_mag;
         util::Array1D<SizeT, ValueT> arank_mag;
 	    SizeT max_iter;                             // Maximum number of HITS iterations to perform
-	    bool normalize_every;                        // Whether to normalize scores every iteration	
+	    SizeT normalize_n;                        // Normalize every N iterations
         /*
          * @brief Default constructor
          */
         DataSlice() : BaseDataSlice(),
             max_iter(0),
-            normalize_every(false)
+            normalize_n(0)
         {
             // Name of the problem specific arrays:
             hrank_curr.SetName("hrank_curr");
@@ -340,8 +340,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             data_slice.max_iter
                 = this -> parameters.template Get<SizeT >("max-iter");
 
-            data_slice.normalize_every
-                = this -> parameters.template Get<bool >("normalize-every");
+            data_slice.normalize_n
+                = this -> parameters.template Get<SizeT >("normalize-n");
 
             GUARD_CU(data_slice.Init(
                 this -> sub_graphs[gpu],
