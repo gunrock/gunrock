@@ -143,14 +143,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             SizeT num_edges = this -> sub_graph -> edges;
 
             // Ensure data are allocated
-            GUARD_CU(tc_counts.EnsureSize_(num_edges, target));
+            GUARD_CU(tc_counts.EnsureSize_(num_nodes, target));
 //            GUARD_CU(nodes     .EnsureSize_(num_nodes, target));
 
             // Reset data
             GUARD_CU(tc_counts.ForEach([]__host__ __device__
             (VertexT &x){
                 x = (VertexT)0;
-            }, num_edges, target, this -> stream));
+            }, num_nodes, target, this -> stream));
 
             return retval;
         }

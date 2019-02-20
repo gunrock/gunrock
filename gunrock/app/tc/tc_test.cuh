@@ -101,7 +101,7 @@ double CPU_Reference(
 
   // In pseudocode:
   //
-  // Init tc_counts[i] = degree(i)
+  // Init tc_counts[i] = 0
   // For (u, v) in graph:
   //   u_neibs = get_neibs(u)
   //   v_neibs = get_neibs(v)
@@ -118,7 +118,7 @@ double CPU_Reference(
       cpu_timer.Start();
       // Initialize tc counts as degree of nodes
       for(VertexT i = 0; i < graph.nodes; i++) {
-        tc_counts[i] = graph.GetNeighborListLength(i);
+        tc_counts[i] = 0;
       }
 
       // For each node
@@ -210,7 +210,7 @@ typename GraphT::SizeT Validate_Results(
 
     // Verify the result
     util::PrintMsg("Triangle Counting Validity: ", !quiet, false);
-//    num_errors = util::CompareResults(h_tc_counts, ref_tc_counts, graph.nodes, true, quiet);
+    num_errors = util::CompareResults(h_tc_counts, ref_tc_counts, graph.nodes, true, quiet);
 
     if (num_errors > 0) {
         util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);

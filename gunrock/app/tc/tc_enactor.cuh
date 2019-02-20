@@ -82,7 +82,7 @@ struct TCIterationLoop : public IterationLoopBase
         auto intersect_op = [tc_counts] __host__ __device__(
             VertexT &comm_node, VertexT &edge) -> bool
         {
-            atomicAdd(tc_counts + edge,  1);
+            atomicAdd(tc_counts + comm_node,  1);
             
             return true;
         };
@@ -91,6 +91,7 @@ struct TCIterationLoop : public IterationLoopBase
         GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
             oprtr_parameters, intersect_op));
+        //tc_counts = tc_counts/3
 
         return retval;
     }
