@@ -93,7 +93,8 @@ template <
     typename VertexT = typename GraphT::VertexT>
 double CPU_Reference(
   util::Parameters         &parameters,
-           GraphT          &graph,
+           GraphT          &data_graph,
+           GraphT          &query_graph,
            VertexT         *subgraphs)
 {
 
@@ -108,7 +109,7 @@ double CPU_Reference(
   //   For n in intersect(u_neibs, v_neibs):
   //     subgraphs[n] += 1
 
-  typedef typename GraphT::SizeT   SizeT;
+/*  typedef typename GraphT::SizeT   SizeT;
 
   util::CpuTimer cpu_timer;
   float total_time = 0.0;
@@ -165,7 +166,8 @@ double CPU_Reference(
   total_time += cpu_timer.ElapsedMillis();
   }
   float elapsed = total_time / num_iter;
-
+*/
+  float elapsed = 0.0;
   printf("CPU_Reference: done\n");
 
   return elapsed;
@@ -190,7 +192,8 @@ template <
     typename VertexT = typename GraphT::VertexT>
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
-                     GraphT   &graph,
+                     GraphT   &data_graph,
+                     GraphT   &query_graph,
                      VertexT  *h_subgraphs,
                      VertexT  *ref_subgraphs,
                      bool      verbose       = true)
@@ -201,7 +204,7 @@ typename GraphT::SizeT Validate_Results(
     std::cerr << "Validate_Results" << std::endl;
     bool quiet = parameters.Get<bool>("quiet");
     if (!quiet && verbose) {
-        for(int i = 0; i < graph.nodes; i++) {
+        for(int i = 0; i < data_graph.nodes; i++) {
             std::cerr << i << " " << ref_subgraphs[i] << " " << h_subgraphs[i] << std::endl;
         }
     }
@@ -210,7 +213,7 @@ typename GraphT::SizeT Validate_Results(
 
     // Verify the result
     util::PrintMsg("Subgraph Matching Validity: ", !quiet, false);
-    num_errors = util::CompareResults(h_subgraphs, ref_subgraphs, graph.nodes, true, quiet);
+    num_errors = util::CompareResults(h_subgraphs, ref_subgraphs, data_graph.nodes, true, quiet);
 
     if (num_errors > 0) {
         util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
@@ -222,7 +225,7 @@ typename GraphT::SizeT Validate_Results(
     if (!quiet && verbose)
     {
         util::PrintMsg("number of subgraphs: ");
-        DisplaySolution(h_subgraphs, graph.nodes);
+        DisplaySolution(h_subgraphs, data_graph.nodes);
     }
 
     return num_errors;
