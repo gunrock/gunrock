@@ -346,42 +346,6 @@ void pagerank(
     const int* col_indices,   // Input graph col_indices
     bool       normalized);   // normalized pagerank flag
 
-/**
- * @brief Max flow public interface.
- *
- * @param[out] grapho Output data structure contains results.
- * @param[in]  graphi Input data structure contains graph.
- * @param[in]  config Primitive-specific configurations.
- * @param[in]  data_t Primitive-specific data type setting.
- *
- * \return Elapsed run time in milliseconds
- */
-float gunrock_mf(
-    struct GRGraph*       grapho,   // Output graph / results
-    const struct GRGraph* graphi,   // Input graph structure
-    const struct GRSetup* config,   // Flag configurations
-    const struct GRTypes  data_t);  // Data type Configurations
-
-/*
- * @brief Simple interface take in CSR arrays as input
- *
- * @param[out] excess               Return excess per nodes
- * @param[in]  num_nodes            Number of nodes of the input graph
- * @param[in]  num_edges            Number of edges of the input graph
- * @param[in]  row_offsets          CSR-formatted graph input row offsets
- * @param[in]  col_indices          CSR-formatted graph input column indices
- * @param[in]  source               Sources to begin traverse
- */
-float mf(
-    unsigned int*       excess,
-    const int           num_nodes,
-    const int           num_edges,
-    const int*          row_offsets,
-    const int*          col_indices,
-    const unsigned int* edge_values,
-    const int           num_iters,
-    int*                source);
-
 // TODO Add other primitives
 
 #ifdef __cplusplus
