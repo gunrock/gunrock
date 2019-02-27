@@ -133,21 +133,23 @@ void DisplaySolution(
     SizeT nodes,
     bool  quiet = false)
 {
-    if (quiet) return;
-    if (nodes < 40)
-    {
-        printf("[");
-        for (SizeT i = 0; i < nodes; ++i)
+    if (!quiet) {
+        if (nodes < 40)
         {
-            PrintValue(i);
-            printf(":");
-            PrintValue(sigmas[i]);
-            printf(",");
-            PrintValue(bc_values[i]);
-            printf(" ");
+	    printf("[");
+	    for (SizeT i = 0; i < nodes; ++i)
+	    {
+	        PrintValue(i);
+	        printf(":");
+	        PrintValue(sigmas[i]);
+	        printf(",");
+	        PrintValue(bc_values[i]);
+	        printf(" ");
+	    }
+	    printf("]\n");
         }
-        printf("]\n");
     }
+    return;
 }
 
 /******************************************************************************
