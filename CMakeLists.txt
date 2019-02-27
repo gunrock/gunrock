@@ -91,7 +91,8 @@ option(GUNROCK_CODE_COVERAGE "Use CodeCoverage, requires lcov (default: OFF)." O
 
 if (GUNROCK_CODE_COVERAGE)
 include(CodeCoverage)
-setup_target_for_coverage(${PROJECT_NAME}_coverage tests coverage)
+# setup_target_for_coverage(${PROJECT_NAME}_coverage ctest coverage)
+SETUP_TARGET_FOR_COVERAGE(${PROJECT_NAME}_coverage unit_test coverage)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
 endif (GUNROCK_CODE_COVERAGE)
 # end /* Include CodeCoverage */
@@ -344,6 +345,6 @@ endif(GUNROCK_BUILD_LIB)
 if(GUNROCK_BUILD_TESTS)
   add_subdirectory(examples)
   if(GUNROCK_GOOGLE_TESTS)
-    add_subdirectory(tests)
+    add_subdirectory(unittests)
   endif(GUNROCK_GOOGLE_TESTS)
 endif(GUNROCK_BUILD_TESTS)
