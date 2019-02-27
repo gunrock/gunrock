@@ -169,10 +169,6 @@ option(GUNROCK_APP_SSSP
   "If on, builds only SSSP application."
   OFF)
 
-option(GUNROCK_APP_MF
-  "If on, builds only MF application."
-  OFF)
-
 option(GUNROCK_APP_HITS
   "If on, builds only HITS application."
   OFF)
