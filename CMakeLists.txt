@@ -108,6 +108,10 @@ set(LIBRARY_OUTPUT_PATH
   CACHE PATH
   "Directory where all the libraries will be stored")
 
+## Export compile commands
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_VERBOSE_MAKEFILE OFF)
+
 # begin /* SET GENCODE_SM */
 set(GENCODE_SM10
   -gencode=arch=compute_10,code=sm_10 -gencode=arch=compute_10,code=compute_10)
@@ -187,6 +191,10 @@ option(GUNROCK_APP_WTF
 
 option(GUNROCK_APP_TOPK
   "If on, builds only TOPK application."
+  OFF)
+
+option(GUNROCK_APP_GRMAT
+  "If on, builds only GRMAT application."
   OFF)
 
 #option(GUNROCK_APP_SAMPLE
