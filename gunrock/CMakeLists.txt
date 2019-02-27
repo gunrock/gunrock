@@ -25,7 +25,6 @@ set(CUFILES
   app/cc/cc_app.cu
   app/pr/pr_app.cu
   app/sssp/sssp_app.cu
-  app/mf/mf_app.cu
   util/test_utils.cu
   util/error_utils.cu
   util/misc_utils.cu
