@@ -135,7 +135,7 @@ COSN '14, pages 63&ndash;68, October 2014.
 
 GTC 2018, **Latest Development of the Gunrock Graph Processing Library on GPUs**, March 2018. [[slides](http://on-demand.gputechconf.com/gtc/2018/presentation/s8594-latest-development-of-the-gunrock-graph-processing-library-on-gpus.pdf) | [video](http://on-demand.gputechconf.com/gtc/2018/video/S8594/)]
 
-GTC 2018, **Writing Graph Primitives with Gunrock**, March 2018. [[slides](https://github.com/gunrock/gunrock/blob/master/doc/Writing-Gunrock-Primitives.pdf) | [video](http://on-demand.gputechconf.com/gtc/2018/video/S8586/)]
+GTC 2018, **Writing Graph Primitives with Gunrock**, March 2018. [[slides](https://github.com/gunrock/docs/blob/master/source/pdf/Writing-Gunrock-Primitives.pdf) | [video](http://on-demand.gputechconf.com/gtc/2018/video/S8586/)]
 
 GTC 2016, **Gunrock: A Fast and Programmable Multi-GPU Graph Processing Library**, April 2016. [[slides](http://on-demand.gputechconf.com/gtc/2016/presentation/s6374-yangzihao-wang-gunrock.pdf)]
 
