@@ -1,7 +1,7 @@
 project(gunrock)
 
 set(gunrock_VERSION_MAJOR 0)
-set(gunrock_VERSION_MINOR 4)
+set(gunrock_VERSION_MINOR 5)
 set(gunrock_VERSION_PATCH 0)
 add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
