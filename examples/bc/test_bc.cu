@@ -87,6 +87,7 @@ void Usage()
         "                          Begins traversal from the source (Default: 0).\n"
         "                          If randomize: from a random source vertex.\n"
         "                          If largestdegree: from largest degree vertex.\n"
+        "                          If -1: run full exact BC using BGL (see issue#251).\n"
         "[--quick]                 Skip the CPU reference validation process.\n"
         "[--mark-pred]             Keep both label info and predecessor info.\n"
         "[--disable-size-check]    Disable frontier queue size check.\n"
@@ -548,11 +549,19 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info)
         }
         if (src == -1)
         {
+	    if(!quiet_mode)
+            { 
+		printf("Running full exact BC using BGL (this may take a long time).\n");
+            }
             start_src = 0;
             end_src = graph->nodes;
         }
         else
         {
+	    if(!quiet_mode)
+            {
+	    	printf("Running partial BC using BGL.\n");
+            }
             start_src = src;
             end_src = src + 1;
         }
@@ -796,6 +805,14 @@ int main_(CommandLineArgs* args)
     Info<VertexId, SizeT, Value> *info = new Info<VertexId, SizeT, Value>;
 
     // graph construction or generation related parameters
+    // BGL uses an algorithm from the paper by Ulrik Brandes, 
+    // "A Faster Algorithm for Betweenness Centrality", in 
+    // the Journal of Mathematical Sociology, volume 25 
+    // number 2, pages 163--177, 2001. The paper noted 
+    // "For simplicity, we assume that all graphs are 
+    // undirected and connected, though they may have loops 
+    // or multiple edges. Note that our results generalize to 
+    // directed graphs with only minor modification."
     info -> info["undirected"] = true;  // require undirected input graph
 
     cpu_timer2.Start();

@@ -160,11 +160,13 @@ void runBC(GRGraph* output, BC_Parameter *parameter)
 
     if (src == -1)
     {
+	// Running full exact BC using BGL (this may take a long time).
         start_src = 0;
         end_src = graph->nodes;
     }
     else
     {
+	// Running partial BC
         start_src = src;
         end_src = src + 1;
     }
