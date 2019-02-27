@@ -475,7 +475,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info, Value *latitudes, Value
     // Allocate host-side array (for both reference and GPU-computed results)
     VertexId *reference_preds       = new VertexId[graph->nodes];
     VertexId *h_preds               = new VertexId[graph->nodes];
-    VertexId *reference_check_pred  = (quick_mode) ? NULL : reference_preds;
+    // VertexId *reference_check_pred  = (quick_mode) ? NULL : reference_preds;
 
     size_t *org_size = new size_t[num_gpus];
     for (int gpu = 0; gpu < num_gpus; gpu++)

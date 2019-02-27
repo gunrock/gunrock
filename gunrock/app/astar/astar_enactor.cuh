@@ -267,7 +267,7 @@ struct ASTARIteration : public IterationBase <
         10>
         PriorityQueueKernelPolicy;
 
-        NearFarPriorityQueue *pq = data_slice->pq;
+        // NearFarPriorityQueue *pq = data_slice->pq;
 
         frontier_attribute->queue_reset = true;
         enactor_stats     ->nodes_queued[0] += frontier_attribute -> queue_length;

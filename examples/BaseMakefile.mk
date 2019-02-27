@@ -76,7 +76,8 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 #-ccbin=g++-4.8
+# NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 #-ccbin=g++-4.8
+NVCCFLAGS = -Xcudafe -\# -lineinfo --std=c++11
 #used to link to curand library
 NVCCFLAGS += -lcurand
 
