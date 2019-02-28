@@ -759,9 +759,9 @@ int main_(CommandLineArgs *args)
     }
    
     if (info->info["undirected"].get_bool())
-        RunTests<VertexId, SizeT, Value, true, 1>(info, latitudes, longitudes, names);  // run test, now only test the distance_heuristic
-    else
         RunTests<VertexId, SizeT, Value, false, 1>(info, latitudes, longitudes, names);  // run test, now only test the distance_heuristic
+    else
+        RunTests<VertexId, SizeT, Value, true, 1>(info, latitudes, longitudes, names);  // run test, now only test the distance_heuristic
 
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
