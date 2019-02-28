@@ -2,7 +2,6 @@
 
 # begin /* Add premitives' subdirectories */
 if(GUNROCK_BUILD_APPLICATIONS)
-  #add_subdirectory(simple_example)
   add_subdirectory(shared_libs)
 
   add_subdirectory(astar)
@@ -20,11 +19,10 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(lp)
   add_subdirectory(tc)
   add_subdirectory(sm)
+  add_subdirectory(grmat)
 
-  #add_subdirectory(mf)
+  #add_subdirectory(simple_example)
   #add_subdirectory(template)
-  #add_subdirectory(vis)
-  #add_subdirectory(mis)
 
 # Individual options to build specific applications
 else(GUNROCK_BUILD_APPLICATIONS)
@@ -88,9 +86,9 @@ else(GUNROCK_BUILD_APPLICATIONS)
     add_subdirectory(sm)
   endif(GUNROCK_APP_SM)
 
-  # if(GUNROCK_APP_MF)
-  #  add_subdirectory(mf)
-  # endif(GUNROCK_APP_MF)
+  if(GUNROCK_APP_GRMAT)
+    add_subdirectory(grmat)
+  endif(GUNROCK_APP_GRMAT)
 
   # if(GUNROCK_APP_SAMPLE)
   #   add_subdirectory(sample)
@@ -161,10 +159,6 @@ set_tests_properties(SHARED_LIB_TEST_SSSP
 add_test(NAME SHARED_LIB_TEST_PAGERANK COMMAND shared_lib_pr)
 set_tests_properties(SHARED_LIB_TEST_PAGERANK
   PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*2.*: Score.*1.2*")
-
-# add_test(NAME SHARED_LIB_TEST_MF COMMAND shared_lib_mf)
-# set_tests_properties(SHARED_LIB_TEST_MF
-#  PROPERTIES PASS_REGULAR_EXPRESSION "Node_ID.*1.*: Label.*39.*")
 
 # note: Some premitives are not added as test because they don't have
 #	cpu reference code.
