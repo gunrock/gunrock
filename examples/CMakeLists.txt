@@ -103,7 +103,7 @@ enable_testing()
 ### primitive tests with bips98_606 graph
 add_test(NAME TEST_ASTAR COMMAND astar market
   ${gunrock_INCLUDE_DIRS}/dataset/small/map/cities.mtx
-  --mapfile=${gunrock_INCLUDE_DIRS}/dataset/small/map/cities.map --undirected)
+  --mapfile=${gunrock_INCLUDE_DIRS}/dataset/small/map/cities.map)
 set_tests_properties(TEST_ASTAR PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 
 add_test(NAME TEST_BFS COMMAND bfs market
