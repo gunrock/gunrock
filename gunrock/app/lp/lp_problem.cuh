@@ -127,10 +127,11 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
                                   num_in_nodes, num_out_nodes, in_sizing))
         return retval;
 
-      if (retval = this -> frontier_queues[0].keys[0].Release()) return retval; 
-      if (this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE) == NULL)
-          if (retval = this -> frontier_queues[0].keys[0].Allocate(graph->edges, util::DEVICE))
-              return retval;
+      if (retval = this->frontier_queues[0].keys[0].Release()) return retval;
+      if (this->frontier_queues[0].keys[0].GetPointer(util::DEVICE) == NULL)
+        if (retval = this->frontier_queues[0].keys[0].Allocate(graph->edges,
+                                                               util::DEVICE))
+          return retval;
       // Create SoA on device
       if (retval = this->labels.Allocate(graph->nodes, util::DEVICE))
         return retval;
@@ -179,7 +180,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
       if (retval = tmp_val.Allocate(graph->edges, util::DEVICE)) return retval;
 
       util::MemsetIdxKernel<<<128, 128>>>(tmp_val.GetPointer(util::DEVICE),
-                                           graph->edges);
+                                          graph->edges);
 
       mgpu::IntervalExpand(graph->edges,
                            graph_slice->row_offsets.GetPointer(util::DEVICE),
@@ -262,12 +263,12 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
         if (retval = degrees.Allocate(graph_slice->nodes, util::DEVICE))
           return retval;
 
-      util::MemsetIdxKernel<<<128, 128>>>(
-          this->labels.GetPointer(util::DEVICE), graph_slice->nodes);
+      util::MemsetIdxKernel<<<128, 128>>>(this->labels.GetPointer(util::DEVICE),
+                                          graph_slice->nodes);
       util::MemsetKernel<<<128, 128>>>(edge_weights.GetPointer(util::DEVICE),
-                                        0.0f, graph_slice->nodes);
+                                       0.0f, graph_slice->nodes);
       util::MemsetKernel<<<128, 128>>>(weight_reg.GetPointer(util::DEVICE),
-                                        1.0f, graph_slice->nodes);
+                                       1.0f, graph_slice->nodes);
 
       util::MemsetMadVectorKernel<<<128, 128>>>(
           degrees.GetPointer(util::DEVICE),
@@ -276,7 +277,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
           graph_slice->nodes);
       Value norm = 1.0f / (2 * graph_slice->edges);
       util::MemsetScaleKernel<<<128, 128>>>(degrees.GetPointer(util::DEVICE),
-                                             norm, graph_slice->nodes);
+                                            norm, graph_slice->nodes);
 
       stable_flag[0] = 0;
       if (retval = stable_flag.Move(util::HOST, util::DEVICE)) return retval;

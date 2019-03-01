@@ -112,6 +112,11 @@ struct WTFProblem : ProblemBase<VertexId, SizeT, Value,
 
       // Create SoA on device
       SizeT nodes = graph->nodes;
+      if (retval = this->frontier_queues[0].keys[0].Release()) return retval;
+      if (this->frontier_queues[0].keys[0].GetPointer(util::DEVICE) == NULL)
+        if (retval =
+                this->frontier_queues[0].keys[0].Allocate(nodes, util::DEVICE))
+          return retval;
       if (retval = rank_curr.Allocate(nodes, util::DEVICE)) return retval;
       if (retval = rank_next.Allocate(nodes, util::DEVICE)) return retval;
       if (retval = refscore_curr.Allocate(nodes, util::DEVICE)) return retval;

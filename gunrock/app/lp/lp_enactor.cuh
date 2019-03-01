@@ -275,8 +275,9 @@ class LpEnactor
             (unsigned char *)NULL,
             frontier_queue->keys[frontier_attribute->selector].GetPointer(
                 util::DEVICE),  // d_in_queue
-            (VertexId *)NULL,  // frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
-                               // // d_out_queue
+            (VertexId *)
+                NULL,  // frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
+                       // // d_out_queue
             (Value *)NULL, (Value *)NULL, frontier_attribute->queue_length,
             graph_slice->nodes, work_progress[0], context[0], stream,
             util::MaxValue<SizeT>(), util::MaxValue<SizeT>(),
@@ -292,8 +293,9 @@ class LpEnactor
             (unsigned char *)NULL,
             frontier_queue->keys[frontier_attribute->selector].GetPointer(
                 util::DEVICE),  // d_in_queue
-            (VertexId *)NULL,  // frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
-                               // // d_out_queue
+            (VertexId *)
+                NULL,  // frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
+                       // // d_out_queue
             (Value *)NULL, (Value *)NULL, frontier_attribute->queue_length,
             graph_slice->nodes, work_progress[0], context[0], stream,
             util::MaxValue<SizeT>(), util::MaxValue<SizeT>(),
@@ -320,8 +322,9 @@ class LpEnactor
             (unsigned char *)NULL,
             frontier_queue->keys[frontier_attribute->selector].GetPointer(
                 util::DEVICE),  // d_in_queue
-            (VertexId *)NULL,  // frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
-                               // // d_out_queue
+            (VertexId *)
+                NULL,  // frontier_queue->keys[frontier_attribute->selector^1].GetPointer(util::DEVICE),
+                       // // d_out_queue
             (Value *)NULL, (Value *)NULL, frontier_attribute->queue_length,
             graph_slice->nodes, work_progress[0], context[0], stream,
             util::MaxValue<SizeT>(), util::MaxValue<SizeT>(),

@@ -439,10 +439,12 @@ class WTFEnactor
           graph_slice->row_offsets.GetPointer(util::DEVICE),
           graph_slice->column_indices.GetPointer(util::DEVICE), (SizeT*)NULL,
           (VertexId*)NULL,
-          graph_slice->nodes,  // graph_slice->frontier_elements[frontier_attribute.selector],
-                               // // max_in_queue
-          graph_slice->edges,  // graph_slice->frontier_elements[frontier_attribute.selector^1],
-                               // // max_out_queue
+          graph_slice
+              ->nodes,  // graph_slice->frontier_elements[frontier_attribute.selector],
+                        // // max_in_queue
+          graph_slice
+              ->edges,  // graph_slice->frontier_elements[frontier_attribute.selector^1],
+                        // // max_out_queue
           work_progress[0], context[0], stream, false, false, true);
 
       if (this->debug) {
