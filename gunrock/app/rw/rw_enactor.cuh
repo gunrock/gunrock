@@ -310,8 +310,8 @@ public:
         typedef typename Problem::DataSlice DataSlice;
 
         // single gpu graph slice
-        GraphSlice<VertexId, SizeT, Value>
-                  *graph_slice   =  problem -> graph_slices[0];
+        // GraphSlice<VertexId, SizeT, Value>
+        //          *graph_slice   =  problem -> graph_slices[0];
         DataSlice *data_slice    =  problem -> data_slices [0].GetPointer(util::HOST);
         util::CtaWorkProgressLifetime<SizeT>
                   *work_progress = &this->work_progress    [0];

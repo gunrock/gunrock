@@ -352,15 +352,16 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info, int mode)
     */
     SizeT nodes = graph->nodes;
     VertexId *h_paths;
-    VertexId *h_trailing_paths;
+    // VertexId *h_trailing_paths; // not used?
 
     if(mode == BLOCK){
         int grid = nodes/(THREAD_BLOCK*ELEMS_PER_THREAD);
         int block_data = ELEMS_PER_THREAD*THREAD_BLOCK*grid;
-        int trailing = nodes - block_data;
+        // int trailing = nodes - block_data;
 
         h_paths = (VertexId*)malloc(sizeof(VertexId) * block_data * walk_length);
-        h_trailing_paths = (VertexId*)malloc(sizeof(VertexId) * trailing * walk_length);
+	// not used?
+        // h_trailing_paths = (VertexId*)malloc(sizeof(VertexId) * trailing * walk_length);
     }else{
         h_paths = (VertexId*)malloc(sizeof(VertexId) * nodes * walk_length);
 
