@@ -62,7 +62,8 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, Value   > hrank_curr;           /**< Used for ping-pong hub rank value */
         util::Array1D<SizeT, Value   > arank_curr;           /**< Used for ping-pong authority rank value */
         util::Array1D<SizeT, Value   > hrank_next;           /**< Used for ping-pong page rank value */       
-        util::Array1D<SizeT, Value   > arank_next;           /**< Used for ping-pong page rank value */       
+        util::Array1D<SizeT, Value   > arank_next;           /**< Used for ping-pong page rank value */
+	util::Array1D<SizeT, Value   > rank_mag;
         util::Array1D<SizeT, SizeT   > in_degrees;          /**< Used for keeping in-degree for each vertex */
         util::Array1D<SizeT, SizeT   > out_degrees;         /**< Used for keeping out-degree for each vertex */
         Value                          delta;
@@ -121,6 +122,7 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
             data_slices[i]->arank_curr.Release();
             data_slices[i]->hrank_next.Release();
             data_slices[i]->arank_next.Release();
+            data_slices[i]->rank_mag.Release();
             data_slices[i]->in_degrees.Release();
             data_slices[i]->out_degrees.Release();
 
@@ -262,6 +264,9 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
                 data_slices[0]->arank_next.SetName("arank_next");
                 if (retval = data_slices[0]->arank_next.Allocate(this -> nodes, util::DEVICE)) return retval;
 
+                data_slices[0]->rank_mag.SetName("rank_mag");
+                if (retval = data_slices[0]->rank_mag.Allocate(1, util::DEVICE)) return retval;
+
                 data_slices[0]->in_degrees.SetName("in_degrees");
                 if (retval = data_slices[0]->in_degrees.Allocate(this -> nodes, util::DEVICE)) return retval;
 
@@ -315,6 +320,9 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
             if (data_slices[gpu]->arank_next.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->arank_next.Allocate(this -> nodes, util::DEVICE)) return retval;
 
+            if (data_slices[gpu]->rank_mag.GetPointer(util::DEVICE) == NULL)
+                if (retval = data_slices[gpu]->rank_mag.Allocate(1, util::DEVICE)) return retval;
+
             // Allocate d_degrees if necessary
             if (data_slices[gpu]->in_degrees.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->in_degrees.Allocate(this -> nodes, util::DEVICE)) return retval;
@@ -324,10 +332,12 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
                 if (retval = data_slices[gpu]->out_degrees.Allocate(this -> nodes, util::DEVICE)) return retval;
 
             // Initial rank_curr = 0 
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->hrank_curr.GetPointer(util::DEVICE), (Value)0, this -> nodes);
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->arank_curr.GetPointer(util::DEVICE), (Value)0, this -> nodes);
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->hrank_next.GetPointer(util::DEVICE), (Value)0, this -> nodes);
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->arank_next.GetPointer(util::DEVICE), (Value)0, this -> nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->hrank_curr.GetPointer(util::DEVICE), (Value)1.0f, this -> nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->arank_curr.GetPointer(util::DEVICE), (Value)1.0f, this -> nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->hrank_next.GetPointer(util::DEVICE), (Value)0.0f, this -> nodes);
+            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->arank_next.GetPointer(util::DEVICE), (Value)0.0f, this -> nodes);
+
+            util::MemsetKernel<<<1, 1>>>(data_slices[gpu]->rank_mag.GetPointer(util::DEVICE), (Value)0.0f, 1);
 
             util::MemsetKernel<<<128, 128>>>(
                 data_slices[gpu]->out_degrees.GetPointer(util::DEVICE), (SizeT)0, this -> nodes);

@@ -94,6 +94,8 @@ void Usage()
         "        --rgg_vmultipiler=<vmultipiler>\n"
         "        --rgg_seed=<seed>\n\n"
         "Optional arguments:\n"
+        "[--max-iter=<num>]        Set maximum iterations number HITS should\n"
+        "                          run for (Default: 50).\n"
         "[--device=<device_index>] Set GPU(s) for testing (Default: 0).\n"
         "[--instrumented]          Keep kernels statics [Default: Disable].\n"
         "                          total_queued, search_depth and barrier duty.\n"
@@ -104,6 +106,7 @@ void Usage()
         "                          (graph-edges * <factor>). (Default: 1.0)\n"
         "[--v]                     Print verbose per iteration debug info.\n"
         "[--iteration-num=<num>]   Number of runs to perform the test.\n"
+        "[--error=<error>]         Error threshold for HITS (Default 0.01f).\n"
         "[--quick]                 Skip the CPU reference validation process.\n"
         "[--quiet]                 No output (unless --json is specified).\n"
         "[--json]                  Output JSON-format statistics to STDOUT.\n"
@@ -113,8 +116,95 @@ void Usage()
     );
 }
 
+
 /**
- * @brief Displays the BFS result (i.e., distance from source)
+ * @brief Compares the equivalence of two arrays. If incorrect, print the location
+ * of the first incorrect value appears, the incorrect value, and the reference
+ * value.
+ *
+ * @tparam T datatype of the values being compared with.
+ * @tparam SizeT datatype of the array length.
+ *
+ * @param[in] computed Vector of values to be compared.
+ * @param[in] reference Vector of reference values.
+ * @param[in] len Vector length.
+ * @param[in] verbose Whether to print values around the incorrect one.
+ * @param[in] quiet     Don't print out anything to stdout.
+ * @param[in] threshold Results error checking threshold.
+ *
+ * \return Zero if two vectors are exactly the same, non-zero if there is any difference.
+ */
+template <typename SizeT, typename Value>
+int CompareResults_(
+    Value* computed,
+    Value* reference,
+    SizeT len,
+    bool verbose = true,
+    bool quiet = false,
+    Value threshold = 0.05f)
+{
+    int flag = 0;
+    for (SizeT i = 0; i < len; i++)
+    {
+
+        // Use relative error rate here.
+        bool is_right = true;
+        if (fabs(computed[i]) < 0.01f && fabs(reference[i] - 1) < 0.01f) continue;
+        if (fabs(computed[i] - 0.0) < 0.01f)
+        {
+            if (fabs(computed[i] - reference[i]) > threshold)
+                is_right = false;
+        }
+        else
+        {
+            if (fabs((computed[i] - reference[i]) / reference[i]) > threshold)
+                is_right = false;
+        }
+        if (!is_right && flag == 0)
+        {
+            if (!quiet)
+            {
+                printf("\nINCORRECT: [%lu]: ", (unsigned long) i);
+                PrintValue<Value>(computed[i]);
+                printf(" != ");
+                PrintValue<Value>(reference[i]);
+
+                if (verbose)
+                {
+                    printf("\nresult[...");
+                    for (SizeT j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                    {
+                        PrintValue<Value>(computed[j]);
+                        printf(", ");
+                    }
+                    printf("...]");
+                    printf("\nreference[...");
+                    for (SizeT j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
+                    {
+                        PrintValue<Value>(reference[j]);
+                        printf(", ");
+                    }
+                    printf("...]");
+                }
+            }
+            flag += 1;
+        }
+        if (!is_right && flag > 0) flag += 1;
+    }
+    if (!quiet)
+    {
+        printf("\n");
+        if (!flag)
+        {
+            printf("CORRECT");
+        }
+    }
+    return flag;
+}
+
+
+/**
+ * @brief Displays the HITS result (i.e., hub and auth score)
  *
  * @param[in] hrank Pointer to hub rank score array
  * @param[in] arank Pointer to authority rank score array
@@ -316,6 +406,7 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     VertexId    src                 = info->info["source_vertex"    ].get_int64();
     int         max_grid_size       = info->info["max_grid_size"    ].get_int  ();
     SizeT       max_iter            = info->info["max_iteration"    ].get_int  ();
+    Value       error               = info->info["error"            ].get_real ();
     Value       delta               = info->info["delta"            ].get_real ();
     int         num_gpus            = info->info["num_gpus"         ].get_int  ();
     double      max_queue_sizing    = info->info["max_queue_sizing" ].get_real ();
@@ -416,6 +507,18 @@ void RunTests(Info<VertexId, SizeT, Value> *info)
     // Display GPU Solution
     if (!quiet_mode) printf("GPU Algorithm Results:\n");
     if (!quiet_mode) DisplaySolution(h_hrank, h_arank, csr->nodes);
+    if (!quiet_mode) printf("Maximum iterations: %lld\n", (long long) max_iter);
+
+    // Compare Results (HUB score only)
+    SizeT errors_count = CompareResults_(h_hrank, reference_check_h,
+                           csr->nodes, true, quiet_mode, error);
+    if (errors_count > 0)
+    {
+        if (!quiet_mode)
+        {
+            printf("number of errors : %lld\n", (long long) errors_count);
+        }
+    }
 
     info->ComputeCommonStats(enactor -> enactor_stats.GetPointer(), elapsed, (VertexId*) NULL);
 

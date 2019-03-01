@@ -95,6 +95,9 @@ public:
 
         Value *rank_curr;
         Value *rank_next;
+	Value *rank_mag;
+	rank_mag = problem->data_slices[0]->rank_mag.GetPointer(util::DEVICE);
+
         if (hub_or_auth == 0) {
             rank_curr = problem->data_slices[0]->hrank_curr.GetPointer(util::DEVICE);
             rank_next = problem->data_slices[0]->hrank_next.GetPointer(util::DEVICE);
@@ -102,6 +105,25 @@ public:
             rank_curr = problem->data_slices[0]->arank_curr.GetPointer(util::DEVICE);
             rank_next = problem->data_slices[0]->arank_next.GetPointer(util::DEVICE);
         }
+
+	// Square each element
+	util::MemsetSquareKernel<<<128, 128>>>(
+            rank_next, this -> problem -> nodes);
+
+	// Sum all squared scores in each array
+        void *d_temp_storage = NULL;
+        size_t temp_storage_bytes = 0;
+	cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
+			rank_next, rank_mag, 
+			this -> problem -> nodes);
+
+	cudaMalloc(&d_temp_storage, temp_storage_bytes);
+	cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
+                        rank_next, rank_mag,
+                        this -> problem -> nodes);
+
+	util::MemsetSqrtDivScalarKernel<<<128, 128>>>(rank_next, 
+	    rank_mag, this -> problem -> nodes);
 
         //swap rank_curr and rank_next
         util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(
@@ -248,10 +270,10 @@ public:
                         break;
                 }
 
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
+                // util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next.GetPointer(util::DEVICE), graph_slice->nodes);
                 NormalizeRank(1, stream);
 
-                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
+                // util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel
                     <AdvanceKernelPolicy, Problem, HubFunctor, gunrock::oprtr::advance::V2V>(
@@ -278,7 +300,7 @@ public:
                     context[0],
                     stream);
 
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
+                // util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
 
                 if (this -> debug)
                 {
@@ -302,12 +324,11 @@ public:
 
                 NormalizeRank(0, stream);
 
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_next,graph_slice->nodes);
-                //util::DisplayDeviceResults(problem->data_slices[0]->d_rank_curr,
-                //    graph_slice->nodes);
+                // util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
+                // util::DisplayDeviceResults(problem->data_slices[0]->d_arank_curr,\
+                    graph_slice->nodes);
 
                 enactor_stats->iteration++;
-
                 if (enactor_stats->iteration >= max_iteration) break;
 
                 if (this -> debug) 
