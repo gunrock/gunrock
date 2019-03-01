@@ -14,3 +14,7 @@ add_test(NAME TEST_ASTAR_UNDIRECTED COMMAND astar market
   ${gunrock_INCLUDE_DIRS}/dataset/small/map/cities.mtx
   --mapfile=${gunrock_INCLUDE_DIRS}/dataset/small/map/cities.map --undirected)
 set_tests_properties(TEST_ASTAR_UNDIRECTED PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
+
+add_test(NAME TEST_ASTAR_CMD COMMAND astar)
+set_tests_properties(TEST_ASTAR_CMD PROPERTIES 
+  PASS_REGULAR_EXPRESSION "Graph type and graph type arguments:")

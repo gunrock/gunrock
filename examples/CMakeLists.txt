@@ -99,8 +99,8 @@ if(GUNROCK_MGPU_TESTS)
   if(DEFINED DEVICES)
     set(DEVICES "--device=${DEVICES}")
   else(DEFINED DEVICES)
-    message(WARNING "GUNROCK_MGPU_TESTS was set ON, but devices were not \
-			specified. Using `-DDEVICES=0,0` (default).")
+    message(WARNING "GUNROCK_MGPU_TESTS was set ON, but devices were not"
+		    " specified, using `-DDEVICES=0,0` instead (default).")
     set(DEVICES "--device=0,0")
   endif(DEFINED DEVICES)
 endif(GUNROCK_MGPU_TESTS)

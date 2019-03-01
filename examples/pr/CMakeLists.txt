@@ -11,6 +11,7 @@ set_tests_properties(TEST_PR PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 
 if(GUNROCK_MGPU_TESTS)
   add_test(NAME TEST_MGPU_PR COMMAND pr market
-    ${gunrock_INCLUDE_DIRS}/dataset/small/bips98_606.mtx ${DEVICES} --undirected)
-  set_tests_properties(TEST_PAGERANK PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
+    ${gunrock_INCLUDE_DIRS}/dataset/small/bips98_606.mtx ${DEVICES} 
+    --normalized --compensate --undirected)
+  set_tests_properties(TEST_MGPU_PR PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 endif(GUNROCK_MGPU_TESTS)
