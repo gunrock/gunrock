@@ -25,7 +25,7 @@
 // Graph construction utils
 #include <gunrock/graphio/market.cuh>
 
-// BFS includes
+// HITS includes
 #include <gunrock/app/hits/hits_enactor.cuh>
 #include <gunrock/app/hits/hits_problem.cuh>
 #include <gunrock/app/hits/hits_functor.cuh>
@@ -557,7 +557,6 @@ int main_(CommandLineArgs *args)
     cpu_timer2.Stop();
     info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
-    //info->info["max_iteration"] = 100;
     RunTests<VertexId, SizeT, Value>(info);
     cpu_timer.Stop();
     info->info["total_time"] = cpu_timer.ElapsedMillis();
@@ -576,10 +575,9 @@ template <
     typename SizeT   > // the size tyep, usually int or long long
 int main_Value(CommandLineArgs *args)
 {
-// disabled to reduce compile time
-//    if (args -> CheckCmdLineFlag("64bit-Value"))
-//        return main_<VertexId, SizeT, double>(args);
-//    else 
+    if (args -> CheckCmdLineFlag("64bit-Value"))
+        return main_<VertexId, SizeT, double>(args);
+    else 
         return main_<VertexId, SizeT, float >(args);
 }
 
@@ -587,10 +585,9 @@ template <
     typename VertexId>
 int main_SizeT(CommandLineArgs *args)
 {
-// disabled to reduce compile time
-//    if (args -> CheckCmdLineFlag("64bit-SizeT"))
-//        return main_Value<VertexId, long long>(args);
-//    else
+    if (args -> CheckCmdLineFlag("64bit-SizeT"))
+        return main_Value<VertexId, long long>(args);
+    else
         return main_Value<VertexId, int      >(args);
 }
 

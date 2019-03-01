@@ -131,8 +131,6 @@ public:
 
         util::MemsetKernel<<<128, 128>>>(
             rank_next, (Value)0.0, this -> problem -> nodes);
-
-        //util::DisplayDeviceResults(rank_curr, nodes);
     }
 
     /**
@@ -153,7 +151,6 @@ public:
         cudaError_t retval = cudaSuccess;
 
         if (retval = BaseEnactor::Init(
-            //problem,
             max_grid_size,
             AdvanceKernelPolicy::CTA_OCCUPANCY,
             FilterKernelPolicy::CTA_OCCUPANCY)) 
@@ -218,13 +215,6 @@ public:
                 fflush(stdout);
             }
 
-            // Single-gpu graph slice
-            //typename HITSProblem::GraphSlice *graph_slice = problem->graph_slices[0];
-            //typename HITSProblem::DataSlice *data_slice = problem->d_data_slices[0];
-
-            // Bind row-offsets texture
-            //cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
-
             frontier_attribute->queue_length         = graph_slice->nodes;
             frontier_attribute->queue_index          = 0;        // Work queue index
             frontier_attribute->selector             = 0;
@@ -233,10 +223,6 @@ public:
             // Step through HITS iterations
             while (true) 
             {
-                //if (retval = work_progress -> SetQueueLength(
-                //    frontier_attribute -> queue_index, 
-                //    frontier_attribute -> queue_length)) break;
-                //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel
                     <AdvanceKernelPolicy, Problem, AuthFunctor, gunrock::oprtr::advance::V2V>(
@@ -270,10 +256,8 @@ public:
                         break;
                 }
 
-                // util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next.GetPointer(util::DEVICE), graph_slice->nodes);
                 NormalizeRank(1, stream);
 
-                // util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], edge_map_queue_len);
                 // Edge Map
                 gunrock::oprtr::advance::LaunchKernel
                     <AdvanceKernelPolicy, Problem, HubFunctor, gunrock::oprtr::advance::V2V>(
@@ -300,8 +284,6 @@ public:
                     context[0],
                     stream);
 
-                // util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
-
                 if (this -> debug)
                 {
                     if (retval = work_progress -> GetQueueLength(
@@ -315,18 +297,7 @@ public:
                     printf(", %lld", (long long)frontier_attribute->queue_length);
                 }
 
-                //if (this -> instrument) {
-                //    if (retval = enactor_stats->advance_kernel_stats.Accumulate(
-                //        enactor_stats->advance_grid_size,
-                //        enactor_stats->total_runtimes,
-                //        enactor_stats->total_lifetimes)) break;
-                //}
-
                 NormalizeRank(0, stream);
-
-                // util::DisplayDeviceResults(problem->data_slices[0]->d_arank_next,graph_slice->nodes);
-                // util::DisplayDeviceResults(problem->data_slices[0]->d_arank_curr,\
-                    graph_slice->nodes);
 
                 enactor_stats->iteration++;
                 if (enactor_stats->iteration >= max_iteration) break;

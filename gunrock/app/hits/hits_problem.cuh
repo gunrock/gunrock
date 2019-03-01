@@ -64,10 +64,6 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
         util::Array1D<SizeT, Value   > hrank_next;           /**< Used for ping-pong page rank value */       
         util::Array1D<SizeT, Value   > arank_next;           /**< Used for ping-pong page rank value */
 	util::Array1D<SizeT, Value   > rank_mag;
-        util::Array1D<SizeT, SizeT   > in_degrees;          /**< Used for keeping in-degree for each vertex */
-        util::Array1D<SizeT, SizeT   > out_degrees;         /**< Used for keeping out-degree for each vertex */
-        Value                          delta;
-        VertexId                       src_node;
     };
 
     // Members
@@ -123,8 +119,6 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
             data_slices[i]->hrank_next.Release();
             data_slices[i]->arank_next.Release();
             data_slices[i]->rank_mag.Release();
-            data_slices[i]->in_degrees.Release();
-            data_slices[i]->out_degrees.Release();
 
             if (d_data_slices[i]) 
                 util::GRError(cudaFree(d_data_slices[i]), 
@@ -227,11 +221,6 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
 
         do {
             if (num_gpus <= 1) {
-                //gpu_idx = (int*)malloc(sizeof(int));
-                // Create a single data slice for the currently-set gpu
-                //int gpu;
-                //if (retval = util::GRError(cudaGetDevice(&gpu), "HITSProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
-                //gpu_idx[0] = gpu;
                 int gpu = 0;
                 if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
                 data_slices[gpu] = new DataSlice;
@@ -266,12 +255,6 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
 
                 data_slices[0]->rank_mag.SetName("rank_mag");
                 if (retval = data_slices[0]->rank_mag.Allocate(1, util::DEVICE)) return retval;
-
-                data_slices[0]->in_degrees.SetName("in_degrees");
-                if (retval = data_slices[0]->in_degrees.Allocate(this -> nodes, util::DEVICE)) return retval;
-
-                data_slices[0]->out_degrees.SetName("out_degrees");
-                if (retval = data_slices[0]->out_degrees.Allocate(this -> nodes, util::DEVICE)) return retval;
 
             }
             //TODO: add multi-GPU allocation code
@@ -323,15 +306,6 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
             if (data_slices[gpu]->rank_mag.GetPointer(util::DEVICE) == NULL)
                 if (retval = data_slices[gpu]->rank_mag.Allocate(1, util::DEVICE)) return retval;
 
-            // Allocate d_degrees if necessary
-            if (data_slices[gpu]->in_degrees.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->in_degrees.Allocate(this -> nodes, util::DEVICE)) return retval;
-
-            // Allocate d_degrees if necessary
-            if (data_slices[gpu]->out_degrees.GetPointer(util::DEVICE) == NULL)
-                if (retval = data_slices[gpu]->out_degrees.Allocate(this -> nodes, util::DEVICE)) return retval;
-
-            // Initial rank_curr = 0 
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->hrank_curr.GetPointer(util::DEVICE), (Value)1.0f, this -> nodes);
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->arank_curr.GetPointer(util::DEVICE), (Value)1.0f, this -> nodes);
             util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->hrank_next.GetPointer(util::DEVICE), (Value)0.0f, this -> nodes);
@@ -339,25 +313,6 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
 
             util::MemsetKernel<<<1, 1>>>(data_slices[gpu]->rank_mag.GetPointer(util::DEVICE), (Value)0.0f, 1);
 
-            util::MemsetKernel<<<128, 128>>>(
-                data_slices[gpu]->out_degrees.GetPointer(util::DEVICE), (SizeT)0, this -> nodes);
-            util::MemsetKernel<<<128, 128>>>(
-                data_slices[gpu]-> in_degrees.GetPointer(util::DEVICE), (SizeT)0, this -> nodes);
-            util::MemsetMadVectorKernel<<<128, 128>>>(
-                data_slices[gpu]->out_degrees.GetPointer(util::DEVICE), 
-                this->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE), 
-                this->graph_slices[gpu]->row_offsets.GetPointer(util::DEVICE)+1, 
-                (SizeT)-1, this -> nodes);
-            util::MemsetMadVectorKernel<<<128, 128>>>(
-                data_slices[gpu]->in_degrees.GetPointer(util::DEVICE), 
-                this->graph_slices[gpu]->column_offsets.GetPointer(util::DEVICE), 
-                this->graph_slices[gpu]->column_offsets.GetPointer(util::DEVICE)+1, 
-                (SizeT)-1, this -> nodes);
-            //util::DisplayDeviceResults(data_slices[gpu]->d_out_degrees, nodes);
-
-            data_slices[gpu]->delta = delta;
-            data_slices[gpu]->src_node = src;
-              
             if (retval = util::GRError(cudaMemcpy(
                             d_data_slices[gpu],
                             data_slices[gpu],
@@ -376,21 +331,6 @@ struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
                         sizeof(Value),
                         cudaMemcpyHostToDevice),
                     "BFSProblem cudaMemcpy d_hrank_curr[src] failed", __FILE__, __LINE__)) return retval;
-
-        /*if (retval = util::GRError(cudaMemcpy(
-                        data_slices[0]->d_delta,
-                        &delta,
-                        sizeof(Value),
-                        cudaMemcpyHostToDevice),
-                    "BFSProblem cudaMemcpy d_delta failed", __FILE__, __LINE__)) return retval;
-
-        if (retval = util::GRError(cudaMemcpy(
-                            data_slices[0]->d_src_node,
-                            &src,
-                            sizeof(VertexId),
-                            cudaMemcpyHostToDevice),
-                        "CCProblem cudaMemcpy src to d_src_node failed", __FILE__, __LINE__)) return retval;
-        */
 
         // Put every vertex in there
         util::MemsetIdxKernel<<<128, 128>>>(

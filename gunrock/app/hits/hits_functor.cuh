@@ -87,15 +87,7 @@ struct HUBFunctor
         SizeT       input_pos,
         SizeT       &output_pos)
     {
-/*
-        Value val = (s_id == d_data_slice->src_node ? d_data_slice->delta/d_data_slice->out_degrees[s_id] : 0)
-                  + (1-d_data_slice->delta)*d_data_slice->arank_curr[d_id]/d_data_slice->in_degrees[d_id];
-        atomicAdd(&d_data_slice->hrank_next[s_id], val);
-*/
-	// printf("hrank_next[%u] = %f.\n", s_id, d_data_slice->hrank_next[s_id]);
-	// printf("arank_next[%u] = %f.\n", d_id, d_data_slice->arank_curr[d_id]);
 	atomicAdd(&d_data_slice->hrank_next[s_id], d_data_slice->arank_curr[d_id]); 
-	// printf("hrank_next[%u] = %f.\n", s_id, d_data_slice->hrank_next[s_id]);
     }
 
 };
@@ -168,12 +160,7 @@ struct AUTHFunctor
         SizeT       input_pos,
         SizeT       &output_pos)
     {
-/*
-        Value val = d_data_slice->hrank_curr[d_id]/ (d_data_slice->out_degrees[d_id] > 0 ? d_data_slice->out_degrees[d_id] : 1.0);
-        atomicAdd(&d_data_slice->arank_next[s_id], val);
-*/
 	atomicAdd(&d_data_slice->arank_next[s_id], d_data_slice->hrank_curr[d_id]);
-	// printf("arank_next[%u] = %f.\n", s_id, *d_data_slice->arank_next[s_id]);
     }
 };
 
