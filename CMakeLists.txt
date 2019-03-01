@@ -136,8 +136,11 @@ set(GENCODE_SM61
   -gencode=arch=compute_61,code=sm_61 -gencode=arch=compute_61,code=compute_61)
 set(GENCODE_SM70
   -gencode=arch=compute_70,code=sm_70 -gencode=arch=compute_70,code=compute_70)
-set(GENCODE_SM71
-  -gencode=arch=compute_71,code=sm_71 -gencode=arch=compute_71,code=compute_71)
+set(GENCODE_SM72
+  -gencode=arch=compute_72,code=sm_72 -gencode=arch=compute_72,code=compute_72)
+set(GENCODE_SM75
+  -gencode=arch=compute_75,code=sm_75 -gencode=arch=compute_75,code=compute_75)
+
 #set(GENCODE -gencode=arch=compute_10,code=compute_10) # at least generate PTX
 # end /* SET GENCODE_SM */
 
@@ -243,20 +246,29 @@ option(GUNROCK_GENCODE_SM52
   ON)
 
 #Pascal Architecture: CUDA 8
-if (CUDA_VERSION VERSION_EQUAL "8.0" OR (CUDA_VERSION VERSION_GREATER "8.0" AND CUDA_VERSION VERSION_LESS "9.0"))
+if (CUDA_VERSION VERSION_EQUAL "8.0" OR CUDA_VERSION VERSION_GREATER "8.0")
   option(GUNROCK_GENCODE_SM60
     "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
     ON)
   option(GUNROCK_GENCODE_SM61
     "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
     ON)
+endif ()
+
 #Volta Architecture: CUDA 9
-elseif (CUDA_VERSION VERSION_EQUAL "9.0" OR CUDA_VERSION VERSION_GREATER "9.0")
+if (CUDA_VERSION VERSION_EQUAL "9.0" OR CUDA_VERSION VERSION_GREATER "9.0")
   option(GUNROCK_GENCODE_SM70
     "ON to generate code for Compute Capability 7.0 devices (e.g. Volta V100)"
     ON)
-  option(GUNROCK_GENCODE_SM71
-    "ON to generate code for Compute Capability 7.1 devices"
+  option(GUNROCK_GENCODE_SM72
+    "ON to generate code for Compute Capability 7.2 devices (e.g. Jetson AGX Xavier)"
+    OFF)
+endif ()
+
+#Turing Architecture: CUDA 10
+if (CUDA_VERSION VERSION_EQUAL "10.0" OR CUDA_VERSION VERSION_GREATER "10.0")
+  option(GUNROCK_GENCODE_SM75
+    "ON to generate code for Compute Capability 7.5 devices (e.g. GTX 1160 or RTX 2080)"
     OFF)
 endif ()
 
@@ -308,9 +320,13 @@ if (GUNROCK_GENCODE_SM70)
   set(GENCODE ${GENCODE} ${GENCODE_SM70})
 endif(GUNROCK_GENCODE_SM70)
 
-if (GUNROCK_GENCODE_SM71)
-  set(GENCODE ${GENCODE} ${GENCODE_SM71})
-endif(GUNROCK_GENCODE_SM71)
+if (GUNROCK_GENCODE_SM72)
+  set(GENCODE ${GENCODE} ${GENCODE_SM72})
+endif(GUNROCK_GENCODE_SM72)
+
+if (GUNROCK_GENCODE_SM75)
+  set(GENCODE ${GENCODE} ${GENCODE_SM75})
+endif(GUNROCK_GENCODE_SM75)
 
 if (CUDA_VERBOSE_PTXAS)
   set(VERBOSE_PTXAS --ptxas-options=-v)
