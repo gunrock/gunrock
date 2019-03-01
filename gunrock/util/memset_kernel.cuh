@@ -184,6 +184,19 @@ __global__ void MemsetDivVectorKernel(T *d_dst, T *d_src, SizeT length)
     }
 }
 
+template <typename T, typename SizeT>
+__global__ void MemsetSqrtDivScalarKernel(T *d_dst, T *d_src, SizeT length)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
+         idx < length; idx += STRIDE)
+    {
+	if (d_src[0] > 0) 
+	{
+            d_dst[idx] = sqrt(d_dst[idx])/sqrt(d_src[0]);
+	}
+    }
+}
 /**
  * @brief Copy the source vector to the destination vector with the same length
  *
@@ -246,6 +259,25 @@ __global__ void MemsetCASKernel(T *d_dst, T compare, T val, SizeT *length)
         idx < length[0]; idx += STRIDE) 
     {
         if (d_dst[idx] == compare) d_dst[idx] = val;
+    }
+}
+
+/**
+ * @brief Square each element of a device vector.
+ *
+ * @tparam T datatype of the vector.
+ *
+ * @param[in] d_out values we want to square
+ * @param[in] length Vector length
+ */
+template <typename T, typename SizeT>
+__global__ void MemsetSquareKernel(T *d_out, SizeT length)
+{
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
+         idx < length; idx += STRIDE)
+    {
+        d_out[idx] = d_out[idx] * d_out[idx];
     }
 }
 /** @} */
