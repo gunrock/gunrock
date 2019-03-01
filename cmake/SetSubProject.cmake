@@ -41,3 +41,10 @@ if (METIS_LIBRARY)
 endif()
 # end /* Link Metis and Boost */
 
+# begin /* Simple ctest that tests cmd help */
+string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UP)
+add_test(NAME TEST_${PROJECT_NAME_UP}_CMD COMMAND ${PROJECT_NAME})
+set_tests_properties(TEST_${PROJECT_NAME_UP}_CMD PROPERTIES 
+  PASS_REGULAR_EXPRESSION "Graph type and graph type arguments:")
+# end /* Simple ctest that tests cmd help */
+
