@@ -27,8 +27,7 @@ do
 done
 
 #put OS and Device type here
-SUFFIX="ubuntu16.04_TitanV"
-#EXECUTION="./bin/test_bfs_7.5_x86_64"
+SUFFIX="GUNROCK_v0-5-0"
 DATADIR="../../dataset/large"
 ORG_OPTION="--src=largestdegree --device=0 --partition_method=random --iteration-num=10 --queue-sizing=0 --in-sizing=0 --jsondir=./eval/$SUFFIX"
 ORG_MARK=""

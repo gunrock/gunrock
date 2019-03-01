@@ -90,6 +90,8 @@ void Usage() {
       "        --rgg_vmultipiler=<vmultipiler>\n"
       "        --rgg_seed=<seed>\n\n"
       "Optional arguments:\n"
+      "[--max-iter=<num>]        Set maximum iterations number SALSA should\n"
+      "                          run for (Default: 50).\n"
       "[--device=<device_index>] Set GPU(s) for testing (Default: 0).\n"
       "[--instrumented]          Keep kernels statics [Default: Disable].\n"
       "                          total_queued, search_depth and barrier duty.\n"
@@ -115,7 +117,7 @@ void Usage() {
 }
 
 /**
- * @brief Displays the BFS result (i.e., distance from source)
+ * @brief Displays the SALSA result (i.e., distance from source)
  *
  * @param[in] hrank Pointer to hub rank score array
  * @param[in] arank Pointer to authority rank score array
@@ -189,7 +191,8 @@ void ReferenceSALSA(const Csr<VertexId, SizeT, Value> &graph,
   float elapsed = cpu_timer.ElapsedMillis();
 
   if (!quiet) {
-    printf("CPU BFS finished in %lf msec.\n", elapsed);
+    printf("CPU SALSA is not implemented yet.\n");
+    printf("CPU SALSA finished in %lf msec.\n", elapsed);
   }
 }
 
