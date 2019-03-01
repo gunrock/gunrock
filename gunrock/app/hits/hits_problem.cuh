@@ -218,11 +218,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 
             GUARD_CU(hrank_mag.ForEach([]__host__ __device__ (ValueT &x){
                 x = (ValueT)0.0;
-            }, nodes, target, this -> stream));
+            }, 1, target, this -> stream));
 
              GUARD_CU(arank_mag.ForEach([]__host__ __device__ (ValueT &x){
                 x = (ValueT)0.0;
-            }, nodes, target, this -> stream));
+            }, 1, target, this -> stream));
 
             return retval;
         }
