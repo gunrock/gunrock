@@ -343,6 +343,14 @@ endif(GUNROCK_BUILD_LIB)
 
 # Subdirectories for examples, testing and documentation
 if(GUNROCK_BUILD_TESTS)
+  # Enables testing for this directory and below.
+  # Note that ctest expects to find a test file 
+  # in the build directory root. Therefore, 
+  # this command should be in the source directory root.
+  # https://cmake.org/cmake/help/v3.0/command/enable_testing.html
+  # Note: For gunrock, use ctest or make check to run the tests
+  enable_testing()
+
   add_subdirectory(examples)
   if(GUNROCK_GOOGLE_TESTS)
     add_subdirectory(unittests)
