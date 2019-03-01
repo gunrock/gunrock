@@ -201,7 +201,7 @@ class LpEnactor
       // one pass of connected component.
 
       // initialize frontier as edge index using memsetidx
-      util::MemsetIdxKernel<<<256, 1024>>>(
+      util::MemsetIdxKernel<<<128, 128>>>(
           frontier_queue->keys[0].GetPointer(util::DEVICE), graph_slice->edges);
       frontier_attribute->queue_length = graph_slice->edges;
       frontier_attribute->queue_reset = true;
@@ -257,7 +257,7 @@ class LpEnactor
       frontier_attribute->queue_reset = true;
       // initialize frontier as edge index using memsetidx
       //
-      util::MemsetIdxKernel<<<256, 1024>>>(
+      util::MemsetIdxKernel<<<128, 128>>>(
           frontier_queue->keys[0].GetPointer(util::DEVICE), graph_slice->edges);
       frontier_attribute->queue_length = graph_slice->edges;
       frontier_attribute->selector = 0;

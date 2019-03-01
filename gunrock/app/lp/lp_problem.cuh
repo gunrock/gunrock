@@ -127,6 +127,10 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
                                   num_in_nodes, num_out_nodes, in_sizing))
         return retval;
 
+      if (retval = this -> frontier_queues[0].keys[0].Release()) return retval; 
+      if (this -> frontier_queues[0].keys[0].GetPointer(util::DEVICE) == NULL)
+          if (retval = this -> frontier_queues[0].keys[0].Allocate(graph->edges, util::DEVICE))
+              return retval;
       // Create SoA on device
       if (retval = this->labels.Allocate(graph->nodes, util::DEVICE))
         return retval;
@@ -174,8 +178,8 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
           tmp_val;  // Updated community ID (argmax of neighgor weights
       if (retval = tmp_val.Allocate(graph->edges, util::DEVICE)) return retval;
 
-      util::MemsetIdxKernel<<<256, 1024>>>(tmp_val.GetPointer(util::DEVICE),
-                                           graph->nodes);
+      util::MemsetIdxKernel<<<128, 128>>>(tmp_val.GetPointer(util::DEVICE),
+                                           graph->edges);
 
       mgpu::IntervalExpand(graph->edges,
                            graph_slice->row_offsets.GetPointer(util::DEVICE),
@@ -202,7 +206,7 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
                            node_weights.GetPointer(util::DEVICE), graph->nodes,
                            tmp_val.GetPointer(util::DEVICE), context[0]);
 
-      util::MemsetDivVectorKernel<<<256, 1024>>>(
+      util::MemsetDivVectorKernel<<<128, 128>>>(
           edge_weights.GetPointer(util::DEVICE),
           (Value *)tmp_val.GetPointer(util::DEVICE), graph->edges);
       cub::DeviceReduce::ReduceByKey(
@@ -258,20 +262,20 @@ struct LpProblem : ProblemBase<VertexId, SizeT, Value,
         if (retval = degrees.Allocate(graph_slice->nodes, util::DEVICE))
           return retval;
 
-      util::MemsetIdxKernel<<<256, 1024>>>(
+      util::MemsetIdxKernel<<<128, 128>>>(
           this->labels.GetPointer(util::DEVICE), graph_slice->nodes);
-      util::MemsetKernel<<<256, 1024>>>(edge_weights.GetPointer(util::DEVICE),
+      util::MemsetKernel<<<128, 128>>>(edge_weights.GetPointer(util::DEVICE),
                                         0.0f, graph_slice->nodes);
-      util::MemsetKernel<<<256, 1024>>>(weight_reg.GetPointer(util::DEVICE),
+      util::MemsetKernel<<<128, 128>>>(weight_reg.GetPointer(util::DEVICE),
                                         1.0f, graph_slice->nodes);
 
-      util::MemsetMadVectorKernel<<<256, 1024>>>(
+      util::MemsetMadVectorKernel<<<128, 128>>>(
           degrees.GetPointer(util::DEVICE),
           (Value *)graph_slice->row_offsets.GetPointer(util::DEVICE),
           (Value *)graph_slice->row_offsets.GetPointer(util::DEVICE) + 1, -1.0f,
           graph_slice->nodes);
       Value norm = 1.0f / (2 * graph_slice->edges);
-      util::MemsetScaleKernel<<<256, 1024>>>(degrees.GetPointer(util::DEVICE),
+      util::MemsetScaleKernel<<<128, 128>>>(degrees.GetPointer(util::DEVICE),
                                              norm, graph_slice->nodes);
 
       stable_flag[0] = 0;

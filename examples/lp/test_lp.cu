@@ -175,6 +175,7 @@ void DisplaySolution(VertexId *comp_ids, SizeT nodes, SizeT num_components,
 template <typename VertexId, typename SizeT, typename Value>
 unsigned int ReferenceLP(const Csr<VertexId, SizeT, Value> &graph,
                          VertexId *labels, bool quiet = false) {
+  if (!quiet) printf("Reference LP not implemented.\n");
   return 0;
 }
 
