@@ -10,7 +10,8 @@
  * test.cpp
  *
  * @brief Main test driver for all googletests.
- * @source https://github.com/google/googletest/blob/master/googletest/docs/Primer.md
+ * @source
+ * https://github.com/google/googletest/blob/master/googletest/docs/Primer.md
  */
 
 #include <stdio.h>

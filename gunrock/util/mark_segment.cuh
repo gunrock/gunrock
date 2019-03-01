@@ -28,13 +28,12 @@ namespace util {
  * @param[in] length Vector length
  */
 template <typename T>
-__global__ void MarkSegmentFromKeys(unsigned int *flag, T *vid, int len)
-{
+__global__ void MarkSegmentFromKeys(unsigned int *flag, T *vid, int len) {
   const int STRIDE = gridDim.x * blockDim.x;
   // skip the first one facilitate scan for keys array
-  for(int idx = (blockIdx.x*blockDim.x)+threadIdx.x+1; idx < len; idx += STRIDE)
-  {
-    flag[idx] = (vid[idx] != vid[idx-1]) ? 1 : 0;
+  for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x + 1; idx < len;
+       idx += STRIDE) {
+    flag[idx] = (vid[idx] != vid[idx - 1]) ? 1 : 0;
   }
 }
 
@@ -49,18 +48,18 @@ __global__ void MarkSegmentFromKeys(unsigned int *flag, T *vid, int len)
  * @param[in] length  Vector length
  */
 template <typename T>
-__global__ void MarkSegmentFromIndices(unsigned int *flag, T *indices, int len)
-{
+__global__ void MarkSegmentFromIndices(unsigned int *flag, T *indices,
+                                       int len) {
   const int STRIDE = gridDim.x * blockDim.x;
   // skip the first one facilitate scan for keys array
-  for(int idx = (blockIdx.x*blockDim.x)+threadIdx.x+1; idx < len; idx += STRIDE)
-  {
+  for (int idx = (blockIdx.x * blockDim.x) + threadIdx.x + 1; idx < len;
+       idx += STRIDE) {
     flag[indices[idx]] = 1;
   }
 }
 
-} // namespace util
-} // namespace gunrock
+}  // namespace util
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variable
