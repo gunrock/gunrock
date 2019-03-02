@@ -9,7 +9,8 @@
  * @file
  * select_utils.cuh
  *
- * @brief kenel utils used in minimum spanning tree algorithm.
+ * @brief kenel utils used in minimum spanning tree, subgraph matching
+ * algorithms.
  */
 
 #pragma once
@@ -26,74 +27,98 @@ namespace util {
 //---------------------------------------------------------------------
 // Globals, constants and typedefs
 //---------------------------------------------------------------------
-struct GreaterThan
-{
-    int compare;
+struct GreaterThan {
+  int compare;
 
-    __host__ __device__ __forceinline__
-    GreaterThan(int compare) : compare(compare) { }
+  __host__ __device__ __forceinline__ GreaterThan(int compare)
+      : compare(compare) {}
 
-    __host__ __device__ __forceinline__
-    bool operator()(const int &a) const { return (a > compare); }
+  __host__ __device__ __forceinline__ bool operator()(const int &a) const {
+    return (a > compare);
+  }
 };
 
 /**
- * @brief Uses the \p d_flags sequence to selectively copy the corresponding 
- * items from \p d_in into \p d_out. The total number of items selected is 
+ * @brief Uses the \p d_flags sequence to selectively copy the corresponding
+ * items from \p d_in into \p d_out. The total number of items selected is
  * stored in \p d_num_selected_out.
  *
  */
-template <typename InputT, typename OutputT, typename SizeT, typename FlagT>
-cudaError_t CUBSelect_flagged(
-    InputT 	*d_in,
-    FlagT	*d_flags,
-    OutputT	*d_out,
-    SizeT	*d_num_selected_out,
-    SizeT 	num_elements)
-{
-    cudaError_t retval = cudaSuccess;
+template <typename InputT, typename OutputT, typename SizeT, typename Value,
+          typename FlagT>
+cudaError_t CUBSelect_flagged(InputT *d_in, FlagT *d_flags, OutputT *d_out,
+                              Value *d_num_selected_out, SizeT num_elements) {
+  cudaError_t retval = cudaSuccess;
 
-    void *d_temp_storage = NULL;
-    size_t temp_storage_bytes = 0;
+  void *d_temp_storage = NULL;
+  size_t temp_storage_bytes = 0;
 
-    if(util::GRError(
-	    (retval = cub::DeviceSelect::Flagged(
-		d_temp_storage,
-		temp_storage_bytes,
-		d_in,
-		d_flags,
-		d_out,
-		d_num_selected_out,
-		num_elements)),
-	    "CUBSelect_flagged cub::DeviceSelect::Flagged failed",
-	    __FILE__, __LINE__)) return retval;
-	
-    // allocate temporary storage
-    if (util::GRError(
-            (retval = cudaMalloc(&d_temp_storage, temp_storage_bytes)),
-            "CUBSelect malloc d_temp_storage failed",
-            __FILE__, __LINE__)) return retval;
-    
-    // run selection
-    if (util::GRError(
-            (retval = cub::DeviceSelect::Flagged(
-                d_temp_storage,
-                temp_storage_bytes,
-                d_in,
-                d_flags,
-                d_out,
-                d_num_selected_out,
-                num_elements)),
-            "CUBSelect cub::DeviceSelect::Flagged failed",
-            __FILE__, __LINE__)) return retval;
-
-    // clean up
-    if (util::GRError(
-            (retval = cudaFree(d_temp_storage)),
-            "CUBSelect free d_temp_storage failed",
-            __FILE__, __LINE__)) return retval;
-
+  if (util::GRError((retval = cub::DeviceSelect::Flagged(
+                         d_temp_storage, temp_storage_bytes, d_in, d_flags,
+                         d_out, d_num_selected_out, num_elements)),
+                    "CUBSelect_flagged cub::DeviceSelect::Flagged failed",
+                    __FILE__, __LINE__))
     return retval;
+  // allocate temporary storage
+  if (util::GRError((retval = cudaMalloc(&d_temp_storage, temp_storage_bytes)),
+                    "CUBSelect malloc d_temp_storage failed", __FILE__,
+                    __LINE__))
+    return retval;
+  // run selection
+  if (util::GRError((retval = cub::DeviceSelect::Flagged(
+                         d_temp_storage, temp_storage_bytes, d_in, d_flags,
+                         d_out, d_num_selected_out, num_elements)),
+                    "CUBSelect cub::DeviceSelect::Flagged failed", __FILE__,
+                    __LINE__))
+    return retval;
+
+  // clean up
+  /*    if (util::GRError(
+              (retval = cudaFree(d_temp_storage)),
+              "CUBSelect free d_temp_storage failed",
+              __FILE__, __LINE__)) return retval;
+  */
+  return retval;
+}
+
+/**
+ * @brief Uses the \p d_flags sequence to selectively copy the corresponding
+ * items from \p d_in into \p d_out. The total number of items selected is
+ * stored in \p d_num_selected_out.
+ *
+ */
+template <typename InputT, typename OutputT, typename SizeT, typename SelectOp>
+cudaError_t CUBSelect_if(InputT *d_in, OutputT *d_out,
+                         SizeT *d_num_selected_out, SizeT num_elements,
+                         SelectOp select_op) {
+  cudaError_t retval = cudaSuccess;
+  void *d_temp_storage = NULL;
+  size_t temp_storage_bytes = 0;
+
+  if (util::GRError((retval = cub::DeviceSelect::If(
+                         d_temp_storage, temp_storage_bytes, d_in, d_out,
+                         d_num_selected_out, num_elements, select_op)),
+                    "CUBSelect_flagged cub::DeviceSelect::If failed", __FILE__,
+                    __LINE__))
+    return retval;
+  // allocate temporary storage
+  if (util::GRError((retval = cudaMalloc(&d_temp_storage, temp_storage_bytes)),
+                    "CUBSelect malloc d_temp_storage failed", __FILE__,
+                    __LINE__))
+    return retval;
+  // run selection
+  if (util::GRError((retval = cub::DeviceSelect::If(
+                         d_temp_storage, temp_storage_bytes, d_in, d_out,
+                         d_num_selected_out, num_elements, select_op)),
+                    "CUBSelect cub::DeviceSelect::If failed", __FILE__,
+                    __LINE__))
+    return retval;
+  // clean up
+  if (util::GRError((retval = cudaFree(d_temp_storage)),
+                    "CUBSelect free d_temp_storage failed", __FILE__, __LINE__))
+    return retval;
+
+  return retval;
 }
 
 /**
@@ -102,82 +127,63 @@ cudaError_t CUBSelect_flagged(
  *
  */
 template <typename T, typename SizeT>
-cudaError_t CUBSelect(
-    T             *d_input,
-    SizeT         num_elements,
-    T	     	  *d_output,
-    unsigned int  *num_selected)
-{
-    cudaError_t retval = cudaSuccess;
-    SizeT *d_num_selected = NULL;
+cudaError_t CUBSelect(T *d_input, SizeT num_elements, T *d_output,
+                      unsigned int *num_selected) {
+  cudaError_t retval = cudaSuccess;
+  SizeT *d_num_selected = NULL;
 
-    if (util::GRError(
-            (retval = cudaMalloc((void**)&d_num_selected, sizeof(SizeT))),
-            "CUBSelect d_num_selected malloc failed",
-            __FILE__, __LINE__)) return retval;
-
-    void *d_temp_storage = NULL;
-    size_t temp_storage_bytes = 0;
-    GreaterThan select_op(-1);
-
-    // determine temporary device storage requirements
-    if (util::GRError(
-            (retval = cub::DeviceSelect::If(
-                d_temp_storage,
-                temp_storage_bytes,
-                d_input,
-                d_output,
-                d_num_selected,
-                num_elements,
-                select_op)),
-            "CUBSelect cub::DeviceSelect::If failed",
-            __FILE__, __LINE__)) return retval;
-
-    // allocate temporary storage
-    if (util::GRError(
-            (retval = cudaMalloc(&d_temp_storage, temp_storage_bytes)),
-            "CUBSelect malloc d_temp_storage failed",
-            __FILE__, __LINE__)) return retval;
-
-    // run selection
-    if (util::GRError(
-            (retval = cub::DeviceSelect::If(
-                d_temp_storage,
-                temp_storage_bytes,
-                d_input,
-                d_output,
-                d_num_selected,
-                num_elements,
-                select_op)),
-            "CUBSelect cub::DeviceSelect::If failed",
-            __FILE__, __LINE__)) return retval;
-
-    if (util::GRError(
-            (retval = cudaMemcpy(
-                num_selected,
-                d_num_selected,
-                sizeof(SizeT),
-                cudaMemcpyDeviceToHost)),
-            "CUBSelect copy back num_selected failed",
-            __FILE__, __LINE__)) return retval;
-
-    // clean up
-    if (util::GRError(
-            (retval = cudaFree(d_temp_storage)),
-            "CUBSelect free d_temp_storage failed",
-            __FILE__, __LINE__)) return retval;
-    if (util::GRError(
-            (retval = cudaFree(d_num_selected)),
-            "CUBSelect free d_num_selected failed",
-            __FILE__, __LINE__)) return retval;
-
+  if (util::GRError(
+          (retval = cudaMalloc((void **)&d_num_selected, sizeof(SizeT))),
+          "CUBSelect d_num_selected malloc failed", __FILE__, __LINE__))
     return retval;
+
+  void *d_temp_storage = NULL;
+  size_t temp_storage_bytes = 0;
+  GreaterThan select_op(-1);
+
+  // determine temporary device storage requirements
+  if (util::GRError((retval = cub::DeviceSelect::If(
+                         d_temp_storage, temp_storage_bytes, d_input, d_output,
+                         d_num_selected, num_elements, select_op)),
+                    "CUBSelect cub::DeviceSelect::If failed", __FILE__,
+                    __LINE__))
+    return retval;
+
+  // allocate temporary storage
+  if (util::GRError((retval = cudaMalloc(&d_temp_storage, temp_storage_bytes)),
+                    "CUBSelect malloc d_temp_storage failed", __FILE__,
+                    __LINE__))
+    return retval;
+
+  // run selection
+  if (util::GRError((retval = cub::DeviceSelect::If(
+                         d_temp_storage, temp_storage_bytes, d_input, d_output,
+                         d_num_selected, num_elements, select_op)),
+                    "CUBSelect cub::DeviceSelect::If failed", __FILE__,
+                    __LINE__))
+    return retval;
+
+  if (util::GRError(
+          (retval = cudaMemcpy(num_selected, d_num_selected, sizeof(SizeT),
+                               cudaMemcpyDeviceToHost)),
+          "CUBSelect copy back num_selected failed", __FILE__, __LINE__))
+    return retval;
+
+  // clean up
+  if (util::GRError((retval = cudaFree(d_temp_storage)),
+                    "CUBSelect free d_temp_storage failed", __FILE__, __LINE__))
+    return retval;
+  if (util::GRError((retval = cudaFree(d_num_selected)),
+                    "CUBSelect free d_num_selected failed", __FILE__, __LINE__))
+    return retval;
+
+  return retval;
 }
 
 /** @} */
 
-} //util
-} //gunrock
+}  // namespace util
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

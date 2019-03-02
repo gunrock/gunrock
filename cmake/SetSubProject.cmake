@@ -29,6 +29,7 @@ CUDA_ADD_EXECUTABLE(${PROJECT_NAME}
   ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/misc_utils.cu
   ${CMAKE_SOURCE_DIR}/gunrock/util/gitsha1.c
+  ${CMAKE_SOURCE_DIR}/gunrock/util/types.cu
   ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
 # end /* Add CUDA executables */
@@ -39,4 +40,11 @@ if (METIS_LIBRARY)
   target_link_libraries(${PROJECT_NAME} ${METIS_LIBRARY})
 endif()
 # end /* Link Metis and Boost */
+
+# begin /* Simple ctest that tests cmd help */
+string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UP)
+add_test(NAME TEST_${PROJECT_NAME_UP}_CMD COMMAND ${PROJECT_NAME})
+set_tests_properties(TEST_${PROJECT_NAME_UP}_CMD PROPERTIES 
+  PASS_REGULAR_EXPRESSION "Graph type and graph type arguments:")
+# end /* Simple ctest that tests cmd help */
 

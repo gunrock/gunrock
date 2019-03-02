@@ -16,11 +16,9 @@
 
 namespace gunrock {
 namespace oprtr {
-namespace bypass_filter {
-
-} // namespace simplified2_filter
-} // namespace oprtr
-} // namespace gunrock
+namespace bypass_filter {}  // namespace bypass_filter
+}  // namespace oprtr
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

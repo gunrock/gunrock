@@ -5,7 +5,6 @@
 // in the root directory of this source distribution.
 // ----------------------------------------------------------------
 
-
 /**
  * @file
  * cta.cuh
@@ -17,13 +16,9 @@
 
 namespace gunrock {
 namespace oprtr {
-namespace edge_map_partitioned_cull {
-
-
-
-} //namespace edge_map_partitioned
-} //namespace oprtr
-} //namespace gunrock
+namespace edge_map_partitioned_cull {}  // namespace edge_map_partitioned_cull
+}  // namespace oprtr
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

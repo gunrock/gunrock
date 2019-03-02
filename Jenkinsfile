@@ -18,7 +18,7 @@ def cmake_build() {
     timeout(time: 20, unit: 'MINUTES') {
       sh 'mkdir -p build'
       sh '''cd build
-            cmake ..
+            cmake -DGUNROCK_CODE_COVERAGE=ON -DGUNROCK_MGPU_TESTS=ON ..
             make -j16'''
     }
   }
@@ -48,9 +48,6 @@ def notifySlack(String buildStatus = 'STARTED') {
 
 pipeline {
   agent any
-  triggers {
-    pollSCM '@hourly'
-  }
   stages {
     stage('Init') {
       steps {
@@ -64,29 +61,48 @@ pipeline {
         cmake_build()
       }
     }
+    
+    stage('Unit Tests') {
+      steps {
+        sh '''cd build
+              ./bin/unit_test'''
+      }
+    }
+    
     stage('Regression Tests') {
       steps {
         sh '''cd build
+              cd examples
               ctest -VV'''
       }
     }
+    
+    stage('Code Coverage') {
+      steps {
+        sh '''#!/bin/bash
+              cd build
+              CODECOV_TOKEN="d0690e81-c2ed-42d0-8a63-da351c3ae619"
+              bash <(curl -s https://codecov.io/bash) -t ${CODECOV_TOKEN} || echo "Error: Codecov did not collect coverage reports"'''
+      }
+    }
+    
     stage('Deploy') {
       steps {
-        echo 'Branch: Master.'
+        echo 'Branch: Dev.'
         echo 'Pipleline finished.'
       }
     }
   }
-  post { 
-      always {
-        cleanWs()
-      }
-      success {
-        // Implement: junit 'build/reports/**/*.xml'  
-        notifySlack('SUCCESS')
-      }
-      failure {
-        notifySlack('FAILURE')
-      }
-   }
+  
+  post {
+    always {
+      cleanWs() 
+    }
+    success {
+      notifySlack('SUCCESS')
+    }
+    failure {
+      notifySlack('FAILURE')
+    }
+  }
 }

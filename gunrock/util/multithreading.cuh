@@ -11,231 +11,197 @@
 #ifndef MULTITHREADING_H
 #define MULTITHREADING_H
 
-
-//Simple portable thread library.
+// Simple portable thread library.
 
 #if _WIN32
-//Windows threads.
+// Windows threads.
 #include <windows.h>
 
 typedef HANDLE CUTThread;
 typedef unsigned(WINAPI *CUT_THREADROUTINE)(void *);
 
-struct CUTBarrier
-{
-    CRITICAL_SECTION criticalSection;
-    HANDLE barrierEvent;
-    int releaseCount;
-    int count;
+struct CUTBarrier {
+  CRITICAL_SECTION criticalSection;
+  HANDLE barrierEvent;
+  int releaseCount;
+  int count;
 };
 
 #define CUT_THREADPROC unsigned WINAPI
-#define  CUT_THREADEND return 0
+#define CUT_THREADEND return 0
 
 #else
-//POSIX threads.
+// POSIX threads.
 #include <pthread.h>
 
 typedef pthread_t CUTThread;
 typedef void *(*CUT_THREADROUTINE)(void *);
 
-#define CUT_THREADPROC void*
-#define  CUT_THREADEND return 0
+#define CUT_THREADPROC void *
+#define CUT_THREADEND return 0
 
-struct CUTBarrier
-{
-    pthread_mutex_t mutex;
-    pthread_cond_t conditionVariable;
-    int releaseCount;
-    int count;
+struct CUTBarrier {
+  pthread_mutex_t mutex;
+  pthread_cond_t conditionVariable;
+  int releaseCount;
+  int count;
 };
 
 #endif
-
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-    //Create thread.
-    CUTThread cutStartThread(CUT_THREADROUTINE, void *data);
+// Create thread.
+CUTThread cutStartThread(CUT_THREADROUTINE, void *data);
 
-    //Wait for thread to finish.
-    void cutEndThread(CUTThread thread);
+// Wait for thread to finish.
+void cutEndThread(CUTThread thread);
 
-    //Destroy thread.
-    void cutDestroyThread(CUTThread thread);
+// Destroy thread.
+void cutDestroyThread(CUTThread thread);
 
-    //Wait for multiple threads.
-    void cutWaitForThreads(const CUTThread *threads, int num);
+// Wait for multiple threads.
+void cutWaitForThreads(const CUTThread *threads, int num);
 
-    //Create barrier.
-    CUTBarrier cutCreateBarrier(int releaseCount);
+// Create barrier.
+CUTBarrier cutCreateBarrier(int releaseCount);
 
-    //Increment barrier. (excution continues)
-    void cutIncrementBarrier(CUTBarrier *barrier);
+// Increment barrier. (excution continues)
+void cutIncrementBarrier(CUTBarrier *barrier);
 
-    //Wait for barrier release.
-    void cutWaitForBarrier(CUTBarrier *barrier);
+// Wait for barrier release.
+void cutWaitForBarrier(CUTBarrier *barrier);
 
-    //Destory barrier
-    void cutDestroyBarrier(CUTBarrier *barrier);
-
+// Destory barrier
+void cutDestroyBarrier(CUTBarrier *barrier);
 
 #ifdef __cplusplus
-} //extern "C"
+}  // extern "C"
 #endif
 
 #if _WIN32
-//Create thread
-CUTThread cutStartThread(CUT_THREADROUTINE func, void *data)
-{
-    return CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)func, data, 0, NULL);
+// Create thread
+CUTThread cutStartThread(CUT_THREADROUTINE func, void *data) {
+  return CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)func, data, 0, NULL);
 }
 
-//Wait for thread to finish
-void cutEndThread(CUTThread thread)
-{
-    WaitForSingleObject(thread, INFINITE);
-    CloseHandle(thread);
+// Wait for thread to finish
+void cutEndThread(CUTThread thread) {
+  WaitForSingleObject(thread, INFINITE);
+  CloseHandle(thread);
 }
 
-//Destroy thread
-void cutDestroyThread(CUTThread thread)
-{
-    TerminateThread(thread, 0);
-    CloseHandle(thread);
+// Destroy thread
+void cutDestroyThread(CUTThread thread) {
+  TerminateThread(thread, 0);
+  CloseHandle(thread);
 }
 
-//Wait for multiple threads
-void cutWaitForThreads(const CUTThread *threads, int num)
-{
-    WaitForMultipleObjects(num, threads, true, INFINITE);
+// Wait for multiple threads
+void cutWaitForThreads(const CUTThread *threads, int num) {
+  WaitForMultipleObjects(num, threads, true, INFINITE);
 
-    for (int i = 0; i < num; i++)
-    {
-        CloseHandle(threads[i]);
-    }
+  for (int i = 0; i < num; i++) {
+    CloseHandle(threads[i]);
+  }
 }
 
-//Create barrier.
-CUTBarrier cutCreateBarrier(int releaseCount)
-{
-    CUTBarrier barrier;
+// Create barrier.
+CUTBarrier cutCreateBarrier(int releaseCount) {
+  CUTBarrier barrier;
 
-    InitializeCriticalSection(&barrier.criticalSection);
-    barrier.barrierEvent = CreateEvent(NULL, TRUE, FALSE, TEXT("BarrierEvent"));
-    barrier.count = 0;
-    barrier.releaseCount = releaseCount;
+  InitializeCriticalSection(&barrier.criticalSection);
+  barrier.barrierEvent = CreateEvent(NULL, TRUE, FALSE, TEXT("BarrierEvent"));
+  barrier.count = 0;
+  barrier.releaseCount = releaseCount;
 
-    return barrier;
+  return barrier;
 }
 
-//Increment barrier. (excution continues)
-void cutIncrementBarrier(CUTBarrier *barrier)
-{
-    int myBarrierCount;
-    EnterCriticalSection(&barrier->criticalSection);
-    myBarrierCount = ++barrier->count;
-    LeaveCriticalSection(&barrier->criticalSection);
+// Increment barrier. (excution continues)
+void cutIncrementBarrier(CUTBarrier *barrier) {
+  int myBarrierCount;
+  EnterCriticalSection(&barrier->criticalSection);
+  myBarrierCount = ++barrier->count;
+  LeaveCriticalSection(&barrier->criticalSection);
 
-    if (myBarrierCount >= barrier->releaseCount)
-    {
-        SetEvent(barrier->barrierEvent);
-    }
+  if (myBarrierCount >= barrier->releaseCount) {
+    SetEvent(barrier->barrierEvent);
+  }
 }
 
-//Wait for barrier release.
-void cutWaitForBarrier(CUTBarrier *barrier)
-{
-    WaitForSingleObject(barrier->barrierEvent, INFINITE);
+// Wait for barrier release.
+void cutWaitForBarrier(CUTBarrier *barrier) {
+  WaitForSingleObject(barrier->barrierEvent, INFINITE);
 }
 
-//Destory barrier
-void cutDestroyBarrier(CUTBarrier *barrier)
-{
-
-}
-
+// Destory barrier
+void cutDestroyBarrier(CUTBarrier *barrier) {}
 
 #else
-//Create thread
-inline CUTThread cutStartThread(CUT_THREADROUTINE func, void *data)
-{
-    pthread_t thread;
-    pthread_create(&thread, NULL, func, data);
-    return thread;
+// Create thread
+inline CUTThread cutStartThread(CUT_THREADROUTINE func, void *data) {
+  pthread_t thread;
+  pthread_create(&thread, NULL, func, data);
+  return thread;
 }
 
-//Wait for thread to finish
-inline void cutEndThread(CUTThread thread)
-{
-    pthread_join(thread, NULL);
+// Wait for thread to finish
+inline void cutEndThread(CUTThread thread) { pthread_join(thread, NULL); }
+
+// Destroy thread
+inline void cutDestroyThread(CUTThread thread) { pthread_cancel(thread); }
+
+// Wait for multiple threads
+inline void cutWaitForThreads(const CUTThread *threads, int num) {
+  for (int i = 0; i < num; i++) {
+    cutEndThread(threads[i]);
+  }
 }
 
-//Destroy thread
-inline void cutDestroyThread(CUTThread thread)
-{
-    pthread_cancel(thread);
+// Create barrier.
+inline CUTBarrier cutCreateBarrier(int releaseCount) {
+  CUTBarrier barrier;
+
+  barrier.count = 0;
+  barrier.releaseCount = releaseCount;
+
+  pthread_mutex_init(&barrier.mutex, 0);
+  pthread_cond_init(&barrier.conditionVariable, 0);
+
+  return barrier;
 }
 
-//Wait for multiple threads
-inline void cutWaitForThreads(const CUTThread *threads, int num)
-{
-    for (int i = 0; i < num; i++)
-    {
-        cutEndThread(threads[i]);
-    }
+// Increment barrier. (excution continues)
+inline void cutIncrementBarrier(CUTBarrier *barrier) {
+  int myBarrierCount;
+  pthread_mutex_lock(&barrier->mutex);
+  myBarrierCount = ++barrier->count;
+  pthread_mutex_unlock(&barrier->mutex);
+
+  if (myBarrierCount >= barrier->releaseCount) {
+    pthread_cond_signal(&barrier->conditionVariable);
+  }
 }
 
-//Create barrier.
-inline CUTBarrier cutCreateBarrier(int releaseCount)
-{
-    CUTBarrier barrier;
+// Wait for barrier release.
+inline void cutWaitForBarrier(CUTBarrier *barrier) {
+  pthread_mutex_lock(&barrier->mutex);
 
-    barrier.count = 0;
-    barrier.releaseCount = releaseCount;
+  while (barrier->count < barrier->releaseCount) {
+    pthread_cond_wait(&barrier->conditionVariable, &barrier->mutex);
+  }
 
-    pthread_mutex_init(&barrier.mutex, 0);
-    pthread_cond_init(&barrier.conditionVariable,0);
-
-
-    return barrier;
+  pthread_mutex_unlock(&barrier->mutex);
 }
 
-//Increment barrier. (excution continues)
-inline void cutIncrementBarrier(CUTBarrier *barrier)
-{
-    int myBarrierCount;
-    pthread_mutex_lock(&barrier->mutex);
-    myBarrierCount = ++barrier->count;
-    pthread_mutex_unlock(&barrier->mutex);
-
-    if (myBarrierCount >=barrier->releaseCount)
-    {
-        pthread_cond_signal(&barrier->conditionVariable);
-    }
-}
-
-//Wait for barrier release.
-inline void cutWaitForBarrier(CUTBarrier *barrier)
-{
-    pthread_mutex_lock(&barrier->mutex);
-
-    while (barrier->count < barrier->releaseCount)
-    {
-        pthread_cond_wait(&barrier->conditionVariable, &barrier->mutex);
-    }
-
-    pthread_mutex_unlock(&barrier->mutex);
-}
-
-//Destory barrier
-inline void cutDestroyBarrier(CUTBarrier *barrier)
-{
-    pthread_mutex_destroy(&barrier->mutex);
-    pthread_cond_destroy(&barrier->conditionVariable);
+// Destory barrier
+inline void cutDestroyBarrier(CUTBarrier *barrier) {
+  pthread_mutex_destroy(&barrier->mutex);
+  pthread_cond_destroy(&barrier->conditionVariable);
 }
 
 #endif
-#endif //MULTITHREADING_H
+#endif  // MULTITHREADING_H

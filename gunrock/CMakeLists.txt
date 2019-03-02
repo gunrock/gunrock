@@ -28,6 +28,7 @@ set(CUFILES
   util/test_utils.cu
   util/error_utils.cu
   util/misc_utils.cu
+  util/types.cu
   ${mgpu_SOURCE_FILES}
   util/gitsha1.c)
 
