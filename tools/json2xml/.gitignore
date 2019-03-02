@@ -1,6 +1,0 @@
-.idea
-*.pyc
-json2xml.egg-info
-build
-*.swp
-dist/*
