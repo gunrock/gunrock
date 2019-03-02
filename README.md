@@ -5,7 +5,8 @@
   <a href="http://mario.ece.ucdavis.edu:8080/job/gunrock/job/master/"><img src="http://mario.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/master" alt="Build Status"></a>
   <br>
   <a href="https://github.com/gunrock/gunrock/blob/master/LICENSE.TXT"><img src="https://img.shields.io/github/license/gunrock/gunrock.svg" alt="Apache 2"></a>
-  <a href="https://github.com/gunrock/gunrock/issues"><img src="https://img.shields.io/github/issues/gunrock/gunrock.svg" alt="Issues Open"></a><a href="https://codecov.io/gh/gunrock/gunrock"><img src="https://codecov.io/gh/gunrock/gunrock/branch/master/graph/badge.svg" /></a>
+  <a href="https://github.com/gunrock/gunrock/issues"><img src="https://img.shields.io/github/issues/gunrock/gunrock.svg" alt="Issues Open"></a>
+  <a href="https://codecov.io/gh/gunrock/gunrock"><img src="https://codecov.io/gh/gunrock/gunrock/branch/master/graph/badge.svg" /></a>
 </p>
 <h1 id="gunrock-gpu-graph-analytics" align="center">Gunrock: GPU Graph Analytics</h1>
 
