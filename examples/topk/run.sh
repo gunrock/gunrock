@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #put OS and Device type here
-SUFFIX="ubuntu16.04_TitanV"
+SUFFIX="GUNROCK_v0-5-0"
 
 #get all execution files in ./bin
 files=./bin/*

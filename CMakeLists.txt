@@ -1,7 +1,7 @@
 project(gunrock)
 
 set(gunrock_VERSION_MAJOR 0)
-set(gunrock_VERSION_MINOR 4)
+set(gunrock_VERSION_MINOR 5)
 set(gunrock_VERSION_PATCH 0)
 add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
@@ -91,7 +91,8 @@ option(GUNROCK_CODE_COVERAGE "Use CodeCoverage, requires lcov (default: OFF)." O
 
 if (GUNROCK_CODE_COVERAGE)
 include(CodeCoverage)
-setup_target_for_coverage(${PROJECT_NAME}_coverage tests coverage)
+# setup_target_for_coverage(${PROJECT_NAME}_coverage ctest coverage)
+SETUP_TARGET_FOR_COVERAGE(${PROJECT_NAME}_coverage unit_test coverage)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
 endif (GUNROCK_CODE_COVERAGE)
 # end /* Include CodeCoverage */
@@ -107,6 +108,10 @@ set(LIBRARY_OUTPUT_PATH
   ${PROJECT_BINARY_DIR}/lib
   CACHE PATH
   "Directory where all the libraries will be stored")
+
+## Export compile commands
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_VERBOSE_MAKEFILE OFF)
 
 # begin /* SET GENCODE_SM */
 set(GENCODE_SM10
@@ -131,8 +136,11 @@ set(GENCODE_SM61
   -gencode=arch=compute_61,code=sm_61 -gencode=arch=compute_61,code=compute_61)
 set(GENCODE_SM70
   -gencode=arch=compute_70,code=sm_70 -gencode=arch=compute_70,code=compute_70)
-set(GENCODE_SM71
-  -gencode=arch=compute_71,code=sm_71 -gencode=arch=compute_71,code=compute_71)
+set(GENCODE_SM72
+  -gencode=arch=compute_72,code=sm_72 -gencode=arch=compute_72,code=compute_72)
+set(GENCODE_SM75
+  -gencode=arch=compute_75,code=sm_75 -gencode=arch=compute_75,code=compute_75)
+
 #set(GENCODE -gencode=arch=compute_10,code=compute_10) # at least generate PTX
 # end /* SET GENCODE_SM */
 
@@ -169,10 +177,6 @@ option(GUNROCK_APP_SSSP
   "If on, builds only SSSP application."
   OFF)
 
-option(GUNROCK_APP_MF
-  "If on, builds only MF application."
-  OFF)
-
 option(GUNROCK_APP_HITS
   "If on, builds only HITS application."
   OFF)
@@ -191,6 +195,10 @@ option(GUNROCK_APP_WTF
 
 option(GUNROCK_APP_TOPK
   "If on, builds only TOPK application."
+  OFF)
+
+option(GUNROCK_APP_GRMAT
+  "If on, builds only GRMAT application."
   OFF)
 
 #option(GUNROCK_APP_SAMPLE
@@ -238,20 +246,29 @@ option(GUNROCK_GENCODE_SM52
   ON)
 
 #Pascal Architecture: CUDA 8
-if (CUDA_VERSION VERSION_EQUAL "8.0" OR (CUDA_VERSION VERSION_GREATER "8.0" AND CUDA_VERSION VERSION_LESS "9.0"))
+if (CUDA_VERSION VERSION_EQUAL "8.0" OR CUDA_VERSION VERSION_GREATER "8.0")
   option(GUNROCK_GENCODE_SM60
     "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
     ON)
   option(GUNROCK_GENCODE_SM61
     "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
     ON)
+endif ()
+
 #Volta Architecture: CUDA 9
-elseif (CUDA_VERSION VERSION_EQUAL "9.0" OR CUDA_VERSION VERSION_GREATER "9.0")
+if (CUDA_VERSION VERSION_EQUAL "9.0" OR CUDA_VERSION VERSION_GREATER "9.0")
   option(GUNROCK_GENCODE_SM70
     "ON to generate code for Compute Capability 7.0 devices (e.g. Volta V100)"
     ON)
-  option(GUNROCK_GENCODE_SM71
-    "ON to generate code for Compute Capability 7.1 devices"
+  option(GUNROCK_GENCODE_SM72
+    "ON to generate code for Compute Capability 7.2 devices (e.g. Jetson AGX Xavier)"
+    OFF)
+endif ()
+
+#Turing Architecture: CUDA 10
+if (CUDA_VERSION VERSION_EQUAL "10.0" OR CUDA_VERSION VERSION_GREATER "10.0")
+  option(GUNROCK_GENCODE_SM75
+    "ON to generate code for Compute Capability 7.5 devices (e.g. GTX 1160 or RTX 2080)"
     OFF)
 endif ()
 
@@ -303,9 +320,13 @@ if (GUNROCK_GENCODE_SM70)
   set(GENCODE ${GENCODE} ${GENCODE_SM70})
 endif(GUNROCK_GENCODE_SM70)
 
-if (GUNROCK_GENCODE_SM71)
-  set(GENCODE ${GENCODE} ${GENCODE_SM71})
-endif(GUNROCK_GENCODE_SM71)
+if (GUNROCK_GENCODE_SM72)
+  set(GENCODE ${GENCODE} ${GENCODE_SM72})
+endif(GUNROCK_GENCODE_SM72)
+
+if (GUNROCK_GENCODE_SM75)
+  set(GENCODE ${GENCODE} ${GENCODE_SM75})
+endif(GUNROCK_GENCODE_SM75)
 
 if (CUDA_VERBOSE_PTXAS)
   set(VERBOSE_PTXAS --ptxas-options=-v)
@@ -338,8 +359,16 @@ endif(GUNROCK_BUILD_LIB)
 
 # Subdirectories for examples, testing and documentation
 if(GUNROCK_BUILD_TESTS)
+  # Enables testing for this directory and below.
+  # Note that ctest expects to find a test file 
+  # in the build directory root. Therefore, 
+  # this command should be in the source directory root.
+  # https://cmake.org/cmake/help/v3.0/command/enable_testing.html
+  # Note: For gunrock, use ctest or make check to run the tests
+  enable_testing()
+
   add_subdirectory(examples)
   if(GUNROCK_GOOGLE_TESTS)
-    add_subdirectory(tests)
+    add_subdirectory(unittests)
   endif(GUNROCK_GOOGLE_TESTS)
 endif(GUNROCK_BUILD_TESTS)

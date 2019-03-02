@@ -12,7 +12,6 @@
  * @brief Misc. Utility Routines (header)
  */
 
-
 #ifndef MISC_UTILS_H
 #define MISC_UTILS_H
 
@@ -27,19 +26,18 @@
 #ifdef __APPLE__
 #ifdef __clang__
 typedef int pthread_barrierattr_t;
-typedef struct
-{
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
-    int count;
-    int tripCount;
+typedef struct {
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+  int count;
+  int tripCount;
 } pthread_barrier_t;
 
-
-int pthread_barrier_init(pthread_barrier_t *barrier, const pthread_barrierattr_t *attr, unsigned int count);
+int pthread_barrier_init(pthread_barrier_t *barrier,
+                         const pthread_barrierattr_t *attr, unsigned int count);
 int pthread_barrier_destroy(pthread_barrier_t *barrier);
 int pthread_barrier_wait(pthread_barrier_t *barrier);
 #endif
 #endif
 
-#endif // MISC_UTILS_H
+#endif  // MISC_UTILS_H

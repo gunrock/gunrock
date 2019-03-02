@@ -24,16 +24,19 @@ namespace topk {
 /**
  * @brief Structure contains device functions in top k problem.
  *
- * @tparam VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam ProblemData         Problem data type which contains data slice for top k problem
+ * @tparam VertexId            Type of signed integer to use as vertex id (e.g.,
+ * uint32)
+ * @tparam SizeT               Type of unsigned integer to use for array
+ * indexing. (e.g., uint32)
+ * @tparam ProblemData         Problem data type which contains data slice for
+ * top k problem
  *
  */
-template<typename VertexId, typename SizeT, typename Value, typename ProblemData>
-struct TOPKFunctor
-{
+template <typename VertexId, typename SizeT, typename Value,
+          typename ProblemData>
+struct TOPKFunctor {
   typedef typename ProblemData::DataSlice DataSlice;
-  
+
   /**
    * @brief Forward Edge Mapping condition function.
    * find each vertex's neighbors
@@ -44,14 +47,16 @@ struct TOPKFunctor
    * @param[in] e_id Output edge index
    * @param[in] e_id_in Input edge index
    *
-   * \return Whether to load the apply function for the edge and include the destination node in the next frontier.
+   * \return Whether to load the apply function for the edge and include the
+   * destination node in the next frontier.
    */
-  static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id, DataSlice *problem, 
-						  VertexId e_id = 0, VertexId e_id_in = 0)
-  {
+  static __device__ __forceinline__ bool CondEdge(VertexId s_id, VertexId d_id,
+                                                  DataSlice *problem,
+                                                  VertexId e_id = 0,
+                                                  VertexId e_id_in = 0) {
     return true;
   }
-  
+
   /**
    * @brief Forward Edge Mapping apply function. Now we know the source node
    *
@@ -62,29 +67,31 @@ struct TOPKFunctor
    * @param[in] e_id_in Input edge index
    *
    */
-  static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id, DataSlice *problem, 
-						   VertexId e_id = 0, VertexId e_id_in = 0)
-  {
-  
-  }
-  
+  static __device__ __forceinline__ void ApplyEdge(VertexId s_id, VertexId d_id,
+                                                   DataSlice *problem,
+                                                   VertexId e_id = 0,
+                                                   VertexId e_id_in = 0) {}
+
   /**
-   * @brief filter condition function. 
+   * @brief filter condition function.
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
    * @param[in] v Vertex value
    * @param[in] nid Node ID
    *
-   * \return Whether to load the apply function for the node and include it in the outgoing vertex frontier.
+   * \return Whether to load the apply function for the node and include it in
+   * the outgoing vertex frontier.
    */
-  static __device__ __forceinline__ bool CondFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {
+  static __device__ __forceinline__ bool CondFilter(VertexId node,
+                                                    DataSlice *problem,
+                                                    Value v = 0,
+                                                    SizeT nid = 0) {
     return true;
   }
-  
+
   /**
-   * @brief filter apply function. 
+   * @brief filter apply function.
    *
    * @param[in] node Vertex Id
    * @param[in] problem Data slice object
@@ -92,13 +99,15 @@ struct TOPKFunctor
    * @param[in] nid Node ID
    *
    */
-  static __device__ __forceinline__ void ApplyFilter(VertexId node, DataSlice *problem, Value v = 0, SizeT nid=0)
-  {}
+  static __device__ __forceinline__ void ApplyFilter(VertexId node,
+                                                     DataSlice *problem,
+                                                     Value v = 0,
+                                                     SizeT nid = 0) {}
 };
-  
-} // topk
-} // app
-} // gunrock
+
+}  // namespace topk
+}  // namespace app
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

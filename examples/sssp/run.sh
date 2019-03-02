@@ -95,7 +95,7 @@ F[10]="1.0"
 for k in {0..10}
 do
     #put OS and Device type here
-    SUFFIX="ubuntu16.04_TitanVx2_brp${F[$k]}"
+    SUFFIX="GUNROCK_v0-5-0${F[$k]}"
     mkdir -p eval/$SUFFIX
 
     for i in  {0..43} 

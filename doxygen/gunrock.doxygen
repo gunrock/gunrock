@@ -38,7 +38,7 @@ PROJECT_NAME           = Gunrock
 # could be handy for archiving the generated documentation or if some version
 # control system is used.
 
-PROJECT_NUMBER         = 0.4
+PROJECT_NUMBER         = 0.5
 
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
 # for a project that appears at the top of each page and should give viewer a
@@ -788,7 +788,8 @@ WARN_LOGFILE           = warn.log
 
 INPUT                  = ../README.md \
                          ../gunrock \
-                         ../examples \
+                         ../examples
+			 # These files have been moved to slate docs
                          # ../docs/source/includes/building_gunrock.md \
                          # ../docs/source/includes/programming_model.md \
                          # ./gunrock_to_json.md \

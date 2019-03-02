@@ -33,7 +33,7 @@ GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\"
 GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\"
 GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 
-SM_TARGETS = $(GEN_SM70) $(GEN_SM35) $(GEN_SM61) #$(GEN_SM61) 
+SM_TARGETS = $(GEN_SM70) $(GEN_SM60) $(GEN_SM61) 
 #-------------------------------------------------------------------------------
 # Libs
 #-------------------------------------------------------------------------------
@@ -54,14 +54,14 @@ ifneq ($(use_metis), 1)
 else
 	METIS_DEPS = -Xlinker -lmetis -Xcompiler -DMETIS_FOUND
 endif
-GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=0.4.0
+GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=0.5.0
 INC = -I$(CUDA_INC) -I$(MGPU_INC) -I$(CUB_INC) $(BOOST_DEPS) $(OMP_DEPS) $(METIS_DEPS) $(GUNROCK_DEF) -I.. -I../..
 
 #-------------------------------------------------------------------------------
 # Defines
 #-------------------------------------------------------------------------------
 
-DEFINES =
+DEFINES = -DGIT_SHA1="\"$(shell git rev-parse HEAD)\""
 
 #-------------------------------------------------------------------------------
 # Compiler Flags
@@ -76,7 +76,8 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 #-ccbin=g++-4.8
+# NVCCFLAGS = -Xptxas -v -Xcudafe -\# -lineinfo --std=c++11 #-ccbin=g++-4.8
+NVCCFLAGS = -Xcudafe -\# -lineinfo --std=c++11
 #used to link to curand library
 NVCCFLAGS += -lcurand
 
@@ -100,9 +101,21 @@ endif
 #-------------------------------------------------------------------------------
 # Dependency Lists
 #-------------------------------------------------------------------------------
-EXTRA_SOURCE = ../../gunrock/util/types.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp ../../gunrock/util/gitsha1.c
+EXTRA_SOURCE_ = ../../gunrock/util/types.cu \
+ 		../../gunrock/util/test_utils.cu \
+		../../gunrock/util/error_utils.cu \
+		../../externals/moderngpu/src/mgpucontext.cu \
+		../../externals/moderngpu/src/mgpuutil.cpp \
+		../../gunrock/util/gitsha1make.c
 
-DEPS = 	./Makefile \
+ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
+    EXTRA_SOURCE = $(EXTRA_SOURCE_) \
+	    ../../gunrock/util/misc_utils.cu
+else
+    EXTRA_SOURCE = $(EXTRA_SOURCE_)
+endif
+
+DEPS = ./Makefile \
     ../BaseMakefile.mk \
     $(EXTRA_SOURCE) \
     $(wildcard ../../gunrock/util/*.cuh) \
@@ -118,7 +131,7 @@ DEPS = 	./Makefile \
 #-------------------------------------------------------------------------------
 # (make test) Test driver for
 #-------------------------------------------------------------------------------
-# leave to indivual algos
+# leave to individual algos
 
 #-------------------------------------------------------------------------------
 # Clean

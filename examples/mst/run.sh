@@ -24,7 +24,7 @@ do
 done
 
 # put OS and Device here
-SUFFIX="ubuntu16.04_TitanV"
+SUFFIX="GUNROCK_v0-5-0"
 
 mkdir -p eval/$SUFFIX
 

@@ -81,7 +81,7 @@ for ndevice in 1 4 2 3
 do
     for k in 0 #{1..9}
     do
-        SUFFIX="ubuntu16.04_TitanVx${ndevice}_rand"
+        SUFFIX="GUNROCK_v0-5-0x${ndevice}"
         mkdir -p eval/$SUFFIX
         DEVICE="0"
         for (( i = 1; i<$ndevice; i++ ))
