@@ -7,7 +7,7 @@
 
 /**
  * @file
- * test_sssp.cu
+ * test_sample.cu
  *
  * @brief Simple test driver program for sample problem.
  */
@@ -21,7 +21,7 @@
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
 
-// Sample Problem includes
+// Sample includes
 #include <gunrock/app/sample/sample_enactor.cuh>
 
 // Operator includes
@@ -31,12 +31,12 @@
 
 #include <moderngpu.cuh>
 
-// Boost includes for CPU Dijkstra SSSP reference algorithms
-#include <boost/config.hpp>
-#include <boost/graph/graph_traits.hpp>
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/dijkstra_shortest_paths.hpp>
-#include <boost/property_map/property_map.hpp>
+// Boost includes for CPU Sample reference algorithms
+// #include <boost/config.hpp>
+// #include <boost/graph/graph_traits.hpp>
+// #include <boost/graph/adjacency_list.hpp>
+// #include <boost/graph/dijkstra_shortest_paths.hpp>
+// #include <boost/property_map/property_map.hpp>
 
 using namespace gunrock;
 using namespace gunrock::app;
@@ -146,9 +146,18 @@ template <typename VertexId, typename SizeT, typename Value>
 void Reference(const std::string &fname, Csr<VertexId, SizeT, Value> &graph,
                bool quiet) {
   // Add CPU Implementation here.
-  // Write graph to txt file and generate random edge weights [0,64)
-  graph.WriteToLigraFile(fname.c_str(), graph.nodes, graph.edges,
-                         graph.row_offsets, graph.column_indices);
+  // initialization
+  // perform calculation
+
+  CpuTimer cpu_timer;
+  cpu_timer.Start();
+
+  // TODO(developer): CPU validation code here
+
+  cpu_timer.Stop();
+
+  float cpu_elapsed = cpu_timer.ElapsedMillis();
+  printf("CPU reference finished in %lf ms.\n\n", cpu_elapsed);
 }
 
 /**
@@ -281,10 +290,10 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info) {
     if (retval =
             util::GRError(problem->Reset(enactor->GetFrontierType(),
                                          max_queue_sizing, max_queue_sizing1),
-                          "SSSP Problem Data Reset Failed", __FILE__, __LINE__))
+                          "Sample Problem Data Reset Failed", __FILE__, __LINE__))
       return retval;
 
-    if (retval = util::GRError(enactor->Reset(), "SSSP Enactor Reset failed",
+    if (retval = util::GRError(enactor->Reset(), "Sample Enactor Reset failed",
                                __FILE__, __LINE__))
       return retval;
 
@@ -302,7 +311,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info) {
     }
     cpu_timer.Start();
     if (retval = util::GRError(enactor->Enact(src, traversal_mode),
-                               "SSSP Problem Enact Failed", __FILE__, __LINE__))
+                               "Sample Problem Enact Failed", __FILE__, __LINE__))
       return retval;
     cpu_timer.Stop();
     single_elapsed = cpu_timer.ElapsedMillis();
@@ -324,7 +333,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info) {
   info->info["min_process_time"] = min_elapsed;
   info->info["max_process_time"] = max_elapsed;
 
-  // compute reference CPU SSSP solution for source-distance
+  // compute reference CPU Sample solution
   if (!quick_mode) {
     if (!quiet_mode) {
       printf("Computing reference value ...\n");
@@ -391,7 +400,7 @@ int main_(CommandLineArgs *args) {
   info->info["random_edge_value"] = args->CheckCmdLineFlag("random-edge-value");
 
   cpu_timer2.Start();
-  info->Init("SSSP", *args, csr);  // initialize Info structure
+  info->Init("Sample", *args, csr);  // initialize Info structure
   cpu_timer2.Stop();
   info->info["load_time"] = cpu_timer2.ElapsedMillis();
 
