@@ -20,8 +20,7 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(tc)
   add_subdirectory(grmat)
 
-  #add_subdirectory(simple_example)
-  #add_subdirectory(template)
+  #add_subdirectory(sample)
 
 # Individual options to build specific applications
 else(GUNROCK_BUILD_APPLICATIONS)
