@@ -327,7 +327,6 @@ struct AUTHFunctor {
     atomicAdd(&problem->refscore_next[d_id], val);
   }
 };
-
 }  // namespace wtf
 }  // namespace app
 }  // namespace gunrock

@@ -83,19 +83,8 @@ struct Dispatch<KernelPolicy, Problem, Functor, ADVANCE_TYPE, R_TYPE, R_OP,
                         VertexId &vertex_id, SizeT &max_vertex, SizeT &max_edge)
   // gunrock::oprtr::advance::TYPE &ADVANCE_TYPE)
   {
-    SizeT first  = /*(d_vertex_id >= max_vertex) ?
-            max_edge :*/ //d_row_offsets[d_vertex_id];
-            //tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  vertex_id);
-            _ldg(d_row_offsets + vertex_id);
-    SizeT second = /*(d_vertex_id + 1 >= max_vertex) ?
-            max_edge :*/ //d_row_offsets[d_vertex_id+1];
-            //tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,  vertex_id + 1);
-            _ldg(d_row_offsets + (vertex_id + 1));
-
-    // printf(" d_vertex_id = %d, max_vertex = %d, max_edge = %d, first = %d,
-    // second = %d\n",
-    //       d_vertex_id, max_vertex, max_edge, first, second);
-    return /*(second > first) ?*/ second - first /* : 0*/;
+    return _ldg(d_row_offsets + (vertex_id + 1)) -
+           _ldg(d_row_offsets + vertex_id);
   }
 
   static __device__ __forceinline__ void GetEdgeCounts(
@@ -123,8 +112,10 @@ struct Dispatch<KernelPolicy, Problem, Functor, ADVANCE_TYPE, R_TYPE, R_OP,
         v_id =
             (in_inv) ? d_row_indices[thread_pos] : d_column_indices[thread_pos];
       }
-    } else
+    } else {
       v_id = (VertexId)-1;
+    }
+
     if (v_id < 0 || v_id >= max_vertex) {
       d_scanned_edges[thread_pos] = 0;
       return;
@@ -234,10 +225,11 @@ struct Dispatch<KernelPolicy, Problem, Functor, ADVANCE_TYPE, R_TYPE, R_OP,
               ADVANCE_TYPE == gunrock::oprtr::advance::V2E) {
             // smem_storage.vertices [threadIdx.x] = input_item;
             if (input_item >= 0)
-              smem_storage
-                  .row_offset[threadIdx.x] =  // row_offsets[input_item];
-                                              // tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,
-                                              // input_item);
+              smem_storage.row_offset
+                  [threadIdx
+                       .x] =  // row_offsets[input_item];
+                              // tex1Dfetch(RowOffsetsTex<SizeT>::row_offsets,
+                              // input_item);
                   _ldg(row_offsets + input_item);
             else
               smem_storage.row_offset[threadIdx.x] = util::MaxValue<SizeT>();
