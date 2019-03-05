@@ -183,9 +183,9 @@ class WTFEnactor
 
     if (AdvanceKernelPolicy::ADVANCE_MODE == gunrock::oprtr::advance::LB) {
       if (data_slice->scanned_edges[0].GetSize() == 0) {
-        if (retval = data_slice->scanned_edges[0].Allocate(edges, util::DEVICE))
+        if (retval = data_slice->scanned_edges[0].Allocate(nodes + 1 /*edges*/, util::DEVICE))
           return retval;
-      } else if (retval = data_slice->scanned_edges[0].EnsureSize(edges)) {
+      } else if (retval = data_slice->scanned_edges[0].EnsureSize(nodes + 1 /*edges*/)) {
         return retval;
       }
       d_scanned_edges = data_slice->scanned_edges[0].GetPointer(util::DEVICE);
@@ -503,7 +503,7 @@ class WTFEnactor
       Problem,  // Problem data type
       300,      // CUDA_ARCH
       // INSTRUMENT,                         // INSTRUMENT
-      1,         // MIN_CTA_OCCUPANCY
+      8,         // MIN_CTA_OCCUPANCY
       10,        // LOG_THREADS
       8,         // LOG_BLOCKS
       32 * 128,  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
