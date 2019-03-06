@@ -78,17 +78,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, VertexT >    query_ci    ; // query graph column indices
         util::Array1D<SizeT, SizeT   >    data_degree ; // data graph nodes' degrees
         util::Array1D<SizeT, SizeT   >    query_degree; // query graph nodes' degrees
-        util::Array1D<SizeT, bool    >    isValid;     /** < Used for data node validation    */
-        util::Array1D<SizeT, SizeT   >    data_ne;     /** < Used for data graph node ne info */
-        util::Array1D<SizeT, SizeT   >    query_ne;    /** < Used for query graph node ne info*/
-        util::Array1D<SizeT, SizeT   >    counter;       /** < Used for counting iBFS sources   */
-        util::Array1D<SizeT, SizeT   >    num_subs;      /** < Used for counting iBFS sources   */
-        util::Array1D<SizeT, VertexT >    NG;          /** < Used for query node explore seq  */
-        util::Array1D<SizeT, SizeT   >    NG_ro;       /** < Used for query node sequence non-tree edge info */
-        util::Array1D<SizeT, VertexT>    NG_ci;       /** < Used for query node sequence non-tree edge info */
-        util::Array1D<SizeT, VertexT>    partial;     /** < Used for storing partial results */
-        util::Array1D<SizeT, VertexT>    src_node_id; /** < Used for storing compacted src nodes */
-        util::Array1D<SizeT, VertexT>    index;        /** < Used for storing intermediate flag val */
+        util::Array1D<SizeT, bool    >    isValid;      /** < Used for data node validation    */
+        util::Array1D<SizeT, SizeT   >    data_ne;      /** < Used for data graph node ne info */
+        util::Array1D<SizeT, SizeT   >    query_ne;     /** < Used for query graph node ne info*/
+        util::Array1D<SizeT, SizeT   >    counter;      /** < Used for counting iBFS sources   */
+        util::Array1D<SizeT, SizeT   >    num_subs;     /** < Used for counting iBFS sources   */
+        util::Array1D<SizeT, VertexT >    NG;           /** < Used for query node explore seq  */
+        util::Array1D<SizeT, SizeT   >    NG_ro;        /** < Used for query node sequence non-tree edge info */
+        util::Array1D<SizeT, VertexT>     NG_ci;        /** < Used for query node sequence non-tree edge info */
+        util::Array1D<SizeT, VertexT>     partial;      /** < Used for storing partial results */
+        util::Array1D<SizeT, VertexT>     src_node_id;  /** < Used for storing compacted src nodes */
+        util::Array1D<SizeT, VertexT>     index;         /** < Used for storing intermediate flag val */
         SizeT    nodes_data;       /** < Used for number of data nodes  */
         SizeT    nodes_query;      /** < Used for number of query nodes */
         SizeT    num_matches;      /** < Used for number of matches in the result */
@@ -208,14 +208,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 }
             }
             // Generate query graph node exploration sequence based on maximum likelihood estimation (MLE)
-            // node mapping degree, TODO:probablity estimation based on label and degree, degree
+            // node mapping degree, TODO:probablity estimation based on label and degree
             int *d_m = new int[query_graph.nodes];
             memset(d_m, 0, sizeof(int)*query_graph.nodes);
             int degree_max = query_degree[0];
             int index = 0;
-            for(int i=0; i < query_graph.nodes; i++) {
+            for(int i = 0; i < query_graph.nodes; ++i) {
                 if(i == 0) {
-                    for(int j = 1; j < query_graph.nodes; j++) {
+                    for(int j = 1; j < query_graph.nodes; ++j) {
                         if(query_degree[j] > degree_max) {
                             index = j;
                             degree_max = query_degree[j];
@@ -223,12 +223,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     }
                 }
                 else {
-                    int dm_max=0;
+                    int dm_max = 0;
                     index = 0;
-                    for(int j=0; j<query_graph.nodes; j++){
-                        if(d_m[j]>=0) {
-                            if(index*degree_max+query_degree[j]>dm_max){
-                                dm_max = index*degree_max+query_degree[j];
+                    for(int j = 0; j < query_graph.nodes; ++j){
+                        if(d_m[j] >= 0) {
+                            if(index * degree_max + query_degree[j] > dm_max){
+                                dm_max = index * degree_max + query_degree[j];
                                 index = j;
                             }
                         }
@@ -236,21 +236,23 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 }
                 NG[i] = index;
                 d_m[index] = -1;
-                for(int j = query_graph.row_offsets[index]; j < query_graph.row_offsets[index+1]; j++)
-                    if(d_m[query_graph.column_indices[j]]!=-1)
+                for(int j = query_graph.row_offsets[index]; j < query_graph.row_offsets[index + 1]; ++j)
+                    if(d_m[query_graph.column_indices[j]] != -1)
                         d_m[query_graph.column_indices[j]]++;
             }
             delete[] d_m;
             // fill query node non-tree edges info 
-            if(query_graph.nodes>2){
+            if(query_graph.nodes > 2){
                 NG_ro[0] = 0;
-                for(int id=2; id<query_graph.nodes; id++){
-                    int idx=0;
-                    for(int j=0; j<id-1; j++)
-                        for(int i = query_graph.row_offsets[id]; i < query_graph.row_offsets[id+1]; i++)
-                            if(NG[j]==query_graph.column_indices[i])
+                for(int id = 2; id < query_graph.nodes; ++id){
+                    int idx = 0;
+                    for(int j = 0; j < id - 1; ++j)
+                        for(int i = query_graph.row_offsets[id]; i < query_graph.row_offsets[id+1]; ++i)
+                            if(NG[j] == query_graph.column_indices[i]) {
                                 // store the index of the dest node instead of the node id itself
-                                NG_ci[NG_ro[id-2]+idx++] = j;
+                                std::cout << "NG_ci[" << NG_ro[id-2] + id << "] = " << j << std::endl;
+                                NG_ci[NG_ro[id - 2] + idx++] = j;
+                            }
                     NG_ro[id-1] = idx;
                 }
             }
