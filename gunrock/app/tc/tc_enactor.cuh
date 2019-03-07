@@ -299,7 +299,7 @@ public:
                    if (peer_ == 0) {
                         auto &graph = this->problem->sub_graphs[gpu];
                         util::Array1D<SizeT, VertexT> tmp_srcs;
-                        tmp_srcs.Allocate(num_srcs, target | util::HOST);
+                        GUARD_CU(tmp_srcs.Allocate(num_srcs, target | util::HOST));
                         int pos = 0;
                         for(SizeT i = 0; i < graph.nodes; ++i) {
                             for (SizeT j = graph.CsrT::row_offsets[i]; j < graph.CsrT::row_offsets[i+1]; ++j) {
@@ -313,6 +313,7 @@ public:
                            []__host__ __device__ (VertexT &v, VertexT &src) {
                            v = src;
                        }, num_srcs, target, 0));
+                       GUARD_CU(tmp_srcs.Release(target | util::HOST));
                    }
                }
            } else {
