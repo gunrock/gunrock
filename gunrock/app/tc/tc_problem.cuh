@@ -219,7 +219,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Location  target      = util::DEVICE)
     {
         cudaError_t retval = cudaSuccess;
-        SizeT edges = this -> org_graph -> edges;
+        SizeT nodes = this -> org_graph -> nodes;
 
         if (this-> num_gpus == 1)
         {
@@ -230,7 +230,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-                GUARD_CU(data_slice.tc_counts.SetPointer(h_tc_counts, edges, util::HOST));
+                GUARD_CU(data_slice.tc_counts.SetPointer(h_tc_counts, nodes, util::HOST));
                 GUARD_CU(data_slice.tc_counts.Move(util::DEVICE, util::HOST));
             }
             else if (target == util::HOST) {
@@ -238,7 +238,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     []__host__ __device__
                     (const VertexT &d_x, VertexT &h_x){
                         h_x = d_x;
-                    }, edges, util::HOST));
+                    }, nodes, util::HOST));
             }
         }
         else { // num_gpus != 1
