@@ -24,7 +24,7 @@ namespace app {
 namespace sample {
 
 /**
- * @brief Sample Problem structure stores device-side vectors for doing SSSP
+ * @brief Sample Problem structure stores device-side vectors for doing Sample
  * computing on the GPU.
  *
  * @tparam _VertexId            Type of signed integer to use as vertex id
@@ -53,7 +53,7 @@ struct SampleProblem : ProblemBase<VertexId, SizeT, Value,
   // Helper structures
 
   /**
-   * @brief Data slice structure which contains SSSP problem specific data.
+   * @brief Data slice structure which contains Sample problem specific data.
    */
   struct DataSlice : BaseDataSlice {
     // device storage arrays

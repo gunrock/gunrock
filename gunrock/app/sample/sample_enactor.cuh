@@ -61,7 +61,6 @@ __global__ void Expand_Incoming_Kernel(
     bool to_process = true;
     SizeT output_pos = util::InvalidValue<SizeT>();
     VertexId key = util::InvalidValue<VertexId>();
-    Value value;
 
     if (x < num_elements) {
       // try to decide whether to process element
