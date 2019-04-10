@@ -392,6 +392,49 @@ struct Csr :
         return retval;
     }
 
+    /**
+     * @brief Sort CSR graph edges per vertex in ascending order
+     *
+     */
+     cudaError_t Sort()
+     {
+         cudaError_t retval = cudaSuccess;
+         SizeT num_nodes = this -> nodes;
+         SizeT num_edges = this -> edges;
+
+         typedef std::pair<VertexT, ValueT> EdgeValPairT;
+         util::Array1D<SizeT, EdgeValPairT> sorted_neighbors;
+         GUARD_CU(sorted_neighbors.Allocate(num_edges, util::HOST));
+         #pragma omp parallel
+         do {
+           int       thread_num  = omp_get_thread_num();
+           int       num_threads = omp_get_num_threads();
+           SizeT     node_start  = (SizeT)(num_nodes) * thread_num / num_threads;
+           SizeT     node_end    = (SizeT)(num_nodes) * (thread_num + 1) / num_threads;
+           node_end = (thread_num == (num_threads - 1)) ? num_nodes : node_end;
+           for (SizeT node = node_start; node < node_end; node++) {
+             SizeT start_offset = row_offsets[node];
+             SizeT end_offset   = row_offsets[node + 1];
+             for (SizeT off = start_offset; off < end_offset; off++) {
+              sorted_neighbors[off]  = std::make_pair(column_indices[off], edge_values[off]);
+             }
+             std::sort(sorted_neighbors + start_offset,
+                       sorted_neighbors + end_offset,
+                       [](const EdgeValPairT & a, const EdgeValPairT & b) -> bool
+                       {
+                         return a.first < b.first;
+                       }
+                       );
+             for (SizeT off = start_offset; off < end_offset; off++) {
+                column_indices[off] = sorted_neighbors[off].first;
+                edge_values   [off] = sorted_neighbors[off].second;
+              }
+           }
+         }while (false);
+         GUARD_CU(sorted_neighbors.Release(util::HOST));
+         return cudaSuccess;
+     }
+
     __device__ __host__ __forceinline__
     SizeT GetNeighborListLength(const VertexT &v) const
     {

@@ -59,7 +59,7 @@ cudaError_t UseParameters(
         graph_prefix + "random-edge-values",
         util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         false,
-        "If true, " + graph_prefix + 
+        "If true, " + graph_prefix +
         " graph edge values are randomly generated when missing. " +
         "If false, they are set to 1.",
         __FILE__, __LINE__));
@@ -190,8 +190,15 @@ cudaError_t UseParameters(
         graph_prefix + "binary-prefix",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         "",
-        "Prefix to store a binary copy of the graph, default is the value of " 
+        "Prefix to store a binary copy of the graph, default is the value of "
         + graph_prefix + "-graph-file", __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<bool>(
+          graph_prefix + "sort-csr",
+          util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+          false,
+          "Whether to sort CSR edges per vertex",
+          __FILE__, __LINE__));
 
     GUARD_CU(market     ::UseParameters(parameters, graph_prefix));
     GUARD_CU(rgg        ::UseParameters(parameters, graph_prefix));
@@ -396,6 +403,11 @@ cudaError_t LoadGraph(
     {
          return util::GRError(cudaErrorUnknown, "Unspecified graph type " + graph_type,
             __FILE__, __LINE__);
+    }
+
+    if (graph.FLAG & gunrock::graph::HAS_CSR && parameters.Get<bool>("sort-csr"))
+    {
+        graph.csr().Sort();
     }
 
     if (!parameters.Get<bool>("quiet"))
