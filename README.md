@@ -2,7 +2,7 @@
   <a href="https://github.com/gunrock/gunrock/"><img src="https://github.com/gunrock/docs/raw/master/source/images/GunrockLogo150px.png"></a>
   <br>
   <a href="https://github.com/gunrock/gunrock/releases/tag/v0.5"><img src="https://img.shields.io/badge/gunrock-0.5-blue.svg"></a>
-  <a href="http://mario.ece.ucdavis.edu:8080/job/gunrock/job/master/"><img src="http://mario.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/master" alt="Build Status"></a>
+  <a href="http://mario.ece.ucdavis.edu:8080/job/gunrock/job/dev/"><img src="http://mario.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/dev" alt="Build Status"></a>
   <br>
   <a href="https://github.com/gunrock/gunrock/blob/master/LICENSE.TXT"><img src="https://img.shields.io/github/license/gunrock/gunrock.svg" alt="Apache 2"></a>
   <a href="https://github.com/gunrock/gunrock/issues"><img src="https://img.shields.io/github/issues/gunrock/gunrock.svg" alt="Issues Open"></a>
@@ -28,7 +28,7 @@ Gunrock is featured on NVIDIA's list of [GPU Accelerated Libraries](https://deve
   <td><a href="https://jenkins.io/">Jenkins</a></td>
   <td>Ubuntu 16.04.4 LTS</td>
   <td>CUDA 10.0, NVIDIA Driver 410.73, GCC/G++ 5.4, Boost 1.58.0</td>
-  <td><a href="http://mario.ece.ucdavis.edu:8080/blue/organizations/jenkins/gunrock/activity"><img src="http://mario.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/master" alt="Build Status"></a></td>
+  <td><a href="http://mario.ece.ucdavis.edu:8080/blue/organizations/jenkins/gunrock/activity"><img src="http://mario.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/dev" alt="Build Status"></a></td>
 </tr>
 </tbody></table>
 
