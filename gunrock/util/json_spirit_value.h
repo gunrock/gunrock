@@ -16,6 +16,7 @@
 #include <cassert>
 #include <sstream>
 #include <stdexcept>
+
 #include <boost/config.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/shared_ptr.hpp>
@@ -28,149 +29,151 @@
 #define JSON_SPIRIT_MVALUE_ENABLED
 #define JSON_SPIRIT_WMVALUE_ENABLED
 
-namespace json_spirit {
-enum Value_type {
-  obj_type,
-  array_type,
-  str_type,
-  bool_type,
-  int_type,
-  real_type,
-  null_type
-};
+namespace json_spirit
+{
+    enum Value_type{ obj_type, array_type, str_type, bool_type, int_type, real_type, null_type };
 
-static std::string value_type_to_string(Value_type vtype);
+    static std::string value_type_to_string( Value_type vtype );
 
-struct Null {};
+    struct Null{};
 
-template <class Config>  // Config determines whether the value uses std::string
-                         // or std::wstring and whether JSON Objects are
-                         // represented as vectors or maps
-                         class Value_impl {
- public:
-  typedef Config Config_type;
-  typedef typename Config::String_type String_type;
-  typedef typename Config::Object_type Object;
-  typedef typename Config::Array_type Array;
-  typedef typename String_type::const_pointer Const_str_ptr;  // eg const char*
+    template< class Config >    // Config determines whether the value uses std::string or std::wstring and
+                                // whether JSON Objects are represented as vectors or maps
+    class Value_impl
+    {
+    public:
 
-  Value_impl();  // creates null value
-  Value_impl(Const_str_ptr value);
-  Value_impl(const String_type& value);
-  Value_impl(const Object& value);
-  Value_impl(const Array& value);
-  Value_impl(bool value);
-  Value_impl(int value);
-  Value_impl(boost::int64_t value);
-  Value_impl(boost::uint64_t value);
-  Value_impl(double value);
+        typedef Config Config_type;
+        typedef typename Config::String_type String_type;
+        typedef typename Config::Object_type Object;
+        typedef typename Config::Array_type Array;
+        typedef typename String_type::const_pointer Const_str_ptr;  // eg const char*
 
-  template <class Iter>
-  Value_impl(
-      Iter first,
-      Iter last);  // constructor from containers, e.g. std::vector or std::list
+        Value_impl();  // creates null value
+        Value_impl( Const_str_ptr      value );
+        Value_impl( const String_type& value );
+        Value_impl( const Object&      value );
+        Value_impl( const Array&       value );
+        Value_impl( bool               value );
+        Value_impl( int                value );
+        Value_impl( int64_t            value );
+        Value_impl( uint64_t           value );
+        Value_impl( double             value );
 
-  template <BOOST_VARIANT_ENUM_PARAMS(typename T)>
-  Value_impl(const boost::variant<BOOST_VARIANT_ENUM_PARAMS(T)>&
-                 variant);  // constructor for compatible variant types
+        template< class Iter >
+        Value_impl( Iter first, Iter last );    // constructor from containers, e.g. std::vector or std::list
 
-  Value_impl(const Value_impl& other);
+        template< BOOST_VARIANT_ENUM_PARAMS( typename T ) >
+            Value_impl( const boost::variant< BOOST_VARIANT_ENUM_PARAMS(T) >&
+                variant ); // constructor for compatible variant types
 
-  bool operator==(const Value_impl& lhs) const;
+        Value_impl( const Value_impl& other );
 
-  Value_impl& operator=(const Value_impl& lhs);
+        bool operator==( const Value_impl& lhs ) const;
 
-  Value_type type() const;
+        Value_impl& operator=( const Value_impl& lhs );
 
-  bool is_uint64() const;
-  bool is_null() const;
+        Value_type type() const;
 
-  const String_type& get_str() const;
-  const Object& get_obj() const;
-  const Array& get_array() const;
-  bool get_bool() const;
-  int get_int() const;
-  boost::int64_t get_int64() const;
-  boost::uint64_t get_uint64() const;
-  double get_real() const;
+        bool is_uint64() const;
+        bool is_null() const;
 
-  Object& get_obj();
-  Array& get_array();
+        const String_type& get_str()    const;
+        const Object&      get_obj()    const;
+        const Array&       get_array()  const;
+        bool               get_bool()   const;
+        int                get_int()    const;
+        int64_t            get_int64()  const;
+        uint64_t           get_uint64() const;
+        double             get_real()   const;
 
-  template <typename T>
-  T get_value()
-      const;  // example usage: int    i = value.get_value< int >();
-              // or             double d = value.get_value< double >();
+        Object& get_obj();
+        Array&  get_array();
 
-  static const Value_impl null;
+        template< typename T > T get_value() const;  // example usage: int    i = value.get_value< int >();
+                                                     // or             double d = value.get_value< double >();
 
- private:
-  void check_type(const Value_type vtype) const;
+        static const Value_impl null;
 
-  typedef boost::variant<boost::recursive_wrapper<Object>,
-                         boost::recursive_wrapper<Array>, String_type, bool,
-                         boost::int64_t, double, Null, boost::uint64_t>
-      Variant;
+    private:
 
-  Variant v_;
+        void check_type( const Value_type vtype ) const;
 
-  class Variant_converter_visitor : public boost::static_visitor<Variant> {
-   public:
-    template <typename T, typename A, template <typename, typename> class Cont>
-    Variant operator()(const Cont<T, A>& cont) const {
-      return Array(cont.begin(), cont.end());
-    }
+        typedef boost::variant< boost::recursive_wrapper< Object >, boost::recursive_wrapper< Array >,
+                                String_type, bool, int64_t, double, Null, uint64_t > Variant;
 
-    Variant operator()(int i) const { return static_cast<boost::int64_t>(i); }
+        Variant v_;
 
-    template <class T>
-    Variant operator()(const T& t) const {
-      return t;
-    }
-  };
-};
+        class Variant_converter_visitor : public boost::static_visitor< Variant >
+        {
+        public:
 
-// vector objects
+              template< typename T, typename A, template< typename, typename > class Cont >
+              Variant operator()( const Cont< T, A >& cont ) const
+              {
+                  return Array( cont.begin(), cont.end() );
+              }
 
-template <class Config>
-struct Pair_impl {
-  typedef typename Config::String_type String_type;
-  typedef typename Config::Value_type Value_type;
+              Variant operator()( int i ) const
+              {
+                  return static_cast< boost::int64_t >( i );
+              }
 
-  Pair_impl() {}
+              template<class T>
+              Variant operator()( const T& t ) const
+              {
+                  return t;
+              }
+        };
+    };
 
-  Pair_impl(const String_type& name, const Value_type& value);
+    // vector objects
 
-  bool operator==(const Pair_impl& lhs) const;
+    template< class Config >
+    struct Pair_impl
+    {
+        typedef typename Config::String_type String_type;
+        typedef typename Config::Value_type Value_type;
 
-  String_type name_;
-  Value_type value_;
-};
+        Pair_impl()
+        {
+        }
 
-#if defined(JSON_SPIRIT_VALUE_ENABLED) || defined(JSON_SPIRIT_WVALUE_ENABLED)
-template <class String>
-struct Config_vector {
-  typedef String String_type;
-  typedef Value_impl<Config_vector> Value_type;
-  typedef Pair_impl<Config_vector> Pair_type;
-  typedef std::vector<Value_type> Array_type;
-  typedef std::vector<Pair_type> Object_type;
+        Pair_impl( const String_type& name, const Value_type& value );
 
-  static Value_type& add(Object_type& obj, const String_type& name,
-                         const Value_type& value) {
-    obj.push_back(Pair_type(name, value));
+        bool operator==( const Pair_impl& lhs ) const;
 
-    return obj.back().value_;
-  }
+        String_type name_;
+        Value_type value_;
+    };
 
-  static const String_type& get_name(const Pair_type& pair) {
-    return pair.name_;
-  }
+#if defined( JSON_SPIRIT_VALUE_ENABLED ) || defined( JSON_SPIRIT_WVALUE_ENABLED )
+    template< class String >
+    struct Config_vector
+    {
+        typedef String String_type;
+        typedef Value_impl< Config_vector > Value_type;
+        typedef Pair_impl < Config_vector > Pair_type;
+        typedef std::vector< Value_type > Array_type;
+        typedef std::vector< Pair_type > Object_type;
 
-  static const Value_type& get_value(const Pair_type& pair) {
-    return pair.value_;
-  }
-};
+        static Value_type& add( Object_type& obj, const String_type& name, const Value_type& value )
+        {
+            obj.push_back( Pair_type( name , value ) );
+
+            return obj.back().value_;
+        }
+
+        static const String_type& get_name( const Pair_type& pair )
+        {
+            return pair.name_;
+        }
+
+        static const Value_type& get_value( const Pair_type& pair )
+        {
+            return pair.value_;
+        }
+    };
 #endif
 
 // typedefs for ASCII
@@ -195,30 +198,33 @@ typedef wConfig::Object_type wObject;
 typedef wConfig::Array_type wArray;
 #endif
 
-// map objects
+    // map objects
 
-#if defined(JSON_SPIRIT_MVALUE_ENABLED) || defined(JSON_SPIRIT_WMVALUE_ENABLED)
-template <class String>
-struct Config_map {
-  typedef String String_type;
-  typedef Value_impl<Config_map> Value_type;
-  typedef std::vector<Value_type> Array_type;
-  typedef std::map<String_type, Value_type> Object_type;
-  typedef std::pair<const String_type, Value_type> Pair_type;
+#if defined( JSON_SPIRIT_MVALUE_ENABLED ) || defined( JSON_SPIRIT_WMVALUE_ENABLED )
+    template< class String >
+    struct Config_map
+    {
+        typedef String String_type;
+        typedef Value_impl< Config_map > Value_type;
+        typedef std::vector< Value_type > Array_type;
+        typedef std::map< String_type, Value_type > Object_type;
+        typedef std::pair< const String_type, Value_type > Pair_type;
 
-  static Value_type& add(Object_type& obj, const String_type& name,
-                         const Value_type& value) {
-    return obj[name] = value;
-  }
+        static Value_type& add( Object_type& obj, const String_type& name, const Value_type& value )
+        {
+            return obj[ name ] = value;
+        }
 
-  static const String_type& get_name(const Pair_type& pair) {
-    return pair.first;
-  }
+        static const String_type& get_name( const Pair_type& pair )
+        {
+            return pair.first;
+        }
 
-  static const Value_type& get_value(const Pair_type& pair) {
-    return pair.second;
-  }
-};
+        static const Value_type& get_value( const Pair_type& pair )
+        {
+            return pair.second;
+        }
+    };
 #endif
 
 // typedefs for ASCII
@@ -269,15 +275,23 @@ Value_impl<Config>::Value_impl(const Array& value) : v_(value) {}
 template <class Config>
 Value_impl<Config>::Value_impl(bool value) : v_(value) {}
 
-template <class Config>
-Value_impl<Config>::Value_impl(int value)
-    : v_(static_cast<boost::int64_t>(value)) {}
+    template< class Config >
+    Value_impl< Config >::Value_impl( int value )
+    :   v_( static_cast< int64_t >( value ) )
+    {
+    }
 
-template <class Config>
-Value_impl<Config>::Value_impl(boost::int64_t value) : v_(value) {}
+    template< class Config >
+    Value_impl< Config >::Value_impl( int64_t value )
+    :   v_( value )
+    {
+    }
 
-template <class Config>
-Value_impl<Config>::Value_impl(boost::uint64_t value) : v_(value) {}
+    template< class Config >
+    Value_impl< Config >::Value_impl( uint64_t value )
+    :   v_( value )
+    {
+    }
 
 template <class Config>
 Value_impl<Config>::Value_impl(double value) : v_(value) {}
@@ -312,8 +326,8 @@ bool Value_impl<Config>::operator==(const Value_impl& lhs) const {
 
   if (type() != lhs.type()) return false;
 
-  return v_ == lhs.v_;
-}
+        return v_ == lhs.v_;
+    }
 
 template <class Config>
 Value_type Value_impl<Config>::type() const {
@@ -334,10 +348,12 @@ bool Value_impl<Config>::is_null() const {
   return type() == null_type;
 }
 
-template <class Config>
-void Value_impl<Config>::check_type(const Value_type vtype) const {
-  if (type() != vtype) {
-    std::ostringstream os;
+    template< class Config >
+    void Value_impl< Config >::check_type( const Value_type vtype ) const
+    {
+        if( type() != vtype )
+        {
+            std::ostringstream os;
 
     os << "get_value< " << value_type_to_string(vtype) << " > called on "
        << value_type_to_string(type()) << " Value";
@@ -357,20 +373,58 @@ template <class Config>
 const typename Value_impl<Config>::Object& Value_impl<Config>::get_obj() const {
   check_type(obj_type);
 
-  return *boost::get<Object>(&v_);
-}
+        return *boost::get< Object >( &v_ );
+    }
 
-template <class Config>
-const typename Value_impl<Config>::Array& Value_impl<Config>::get_array()
-    const {
-  check_type(array_type);
+    template< class Config >
+    const typename Value_impl< Config >::Array& Value_impl< Config >::get_array() const
+    {
+        check_type( array_type );
 
-  return *boost::get<Array>(&v_);
-}
+        return *boost::get< Array >( &v_ );
+    }
 
-template <class Config>
-bool Value_impl<Config>::get_bool() const {
-  check_type(bool_type);
+    template< class Config >
+    bool Value_impl< Config >::get_bool() const
+    {
+        check_type( bool_type );
+
+        return boost::get< bool >( v_ );
+    }
+
+    template< class Config >
+    int Value_impl< Config >::get_int() const
+    {
+        check_type( int_type );
+
+        return static_cast< int >( get_int64() );
+    }
+
+    template< class Config >
+    boost::int64_t Value_impl< Config >::get_int64() const
+    {
+        check_type( int_type );
+
+        if( is_uint64() )
+        {
+            return static_cast< int64_t >( get_uint64() );
+        }
+
+        return boost::get< int64_t >( v_ );
+    }
+
+    template< class Config >
+    boost::uint64_t Value_impl< Config >::get_uint64() const
+    {
+        check_type( int_type );
+
+        if( !is_uint64() )
+        {
+            return static_cast< uint64_t >( get_int64() );
+        }
+
+        return boost::get< uint64_t >( v_ );
+    }
 
   return boost::get<bool>(v_);
 }
@@ -420,12 +474,68 @@ template <class Config>
 typename Value_impl<Config>::Object& Value_impl<Config>::get_obj() {
   check_type(obj_type);
 
-  return *boost::get<Object>(&v_);
-}
+    namespace internal_
+    {
+        template< typename T >
+        struct Type_to_type
+        {
+        };
 
-template <class Config>
-typename Value_impl<Config>::Array& Value_impl<Config>::get_array() {
-  check_type(array_type);
+        template< class Value >
+        int get_value( const Value& value, Type_to_type< int > )
+        {
+            return value.get_int();
+        }
+
+        template< class Value >
+        int64_t get_value( const Value& value, Type_to_type< int64_t > )
+        {
+            return value.get_int64();
+        }
+
+        template< class Value >
+        uint64_t get_value( const Value& value, Type_to_type< uint64_t > )
+        {
+            return value.get_uint64();
+        }
+
+        template< class Value >
+        double get_value( const Value& value, Type_to_type< double > )
+        {
+            return value.get_real();
+        }
+
+        template< class Value >
+        typename Value::String_type get_value( const Value& value, Type_to_type< typename Value::String_type > )
+        {
+            return value.get_str();
+        }
+
+        template< class Value >
+        typename Value::Array get_value( const Value& value, Type_to_type< typename Value::Array > )
+        {
+            return value.get_array();
+        }
+
+        template< class Value >
+        typename Value::Object get_value( const Value& value, Type_to_type< typename Value::Object > )
+        {
+            return value.get_obj();
+        }
+
+        template< class Value >
+        bool get_value( const Value& value, Type_to_type< bool > )
+        {
+            return value.get_bool();
+        }
+    }
+
+    template< class Config >
+    template< typename T >
+    T Value_impl< Config >::get_value() const
+    {
+        return internal_::get_value( *this, internal_::Type_to_type< T >() );
+    }
 
   return *boost::get<Array>(&v_);
 }

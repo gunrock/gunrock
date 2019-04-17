@@ -25,7 +25,7 @@ namespace util {
  * CUDA architecture of the current compilation path
  */
 #ifndef __CUDA_ARCH__
-#define __GR_CUDA_ARCH__ 0  // Host path
+    //#define __GR_CUDA_ARCH__ 0                      // Host path
 #else
 #define __GR_CUDA_ARCH__ __CUDA_ARCH__  // Device path
 #endif
@@ -38,30 +38,24 @@ namespace util {
 #define GR_INVALID_DEVICE (-1)
 
 // Threads per warp.
-#define GR_LOG_WARP_THREADS(arch) (5)  // 32 threads in a warp
-#define GR_WARP_THREADS(arch) (1 << GR_LOG_WARP_THREADS(arch))
+#define GR_LOG_WARP_THREADS(arch)       (5)         // 32 threads in a warp
+#define GR_WARP_THREADS(arch)           (1 << GR_LOG_WARP_THREADS(arch))
 
 // SM memory bank stride (in bytes)
 #define GR_LOG_BANK_STRIDE_BYTES(arch) (2)  // 4 byte words
 #define GR_BANK_STRIDE_BYTES(arch) (1 << GR_LOG_BANK_STRIDE_BYTES)
 
 // Memory banks per SM
-#define GR_SM20_LOG_MEM_BANKS() (5)  // 32 banks on SM2.0+
-#define GR_SM10_LOG_MEM_BANKS() (4)  // 16 banks on SM1.0-SM1.3
-#define GR_LOG_MEM_BANKS(arch) \
-  ((arch >= 200) ? GR_SM20_LOG_MEM_BANKS() : GR_SM10_LOG_MEM_BANKS())
+#define GR_SM20_LOG_MEM_BANKS()     (5)         // 32 banks on SM2.0+
+#define GR_SM10_LOG_MEM_BANKS()     (4)         // 16 banks on SM1.0-SM1.3
+#define GR_LOG_MEM_BANKS(arch)      ((arch >= 200) ? GR_SM20_LOG_MEM_BANKS() :  \
+                                                         GR_SM10_LOG_MEM_BANKS())
 
 // Physical shared memory per SM (bytes)
-// #define GR_SM62_SMEM_BYTES()            (65536)     // 64KB on SM6.2
-#define GR_SM61_SMEM_BYTES() (98304)  // 96KB on SM6.1+
-#define GR_SM60_SMEM_BYTES() (65536)  // 64KB on SM6.0+
-#define GR_SM20_SMEM_BYTES() (49152)  // 48KB on SM2.0+
-#define GR_SM10_SMEM_BYTES() (16384)  // 32KB on SM1.0-SM1.3
-#define GR_SMEM_BYTES(arch)                                             \
-  ((arch >= 610) ? GR_SM61_SMEM_BYTES()                                 \
-                 : (arch >= 600) ? GR_SM60_SMEM_BYTES()                 \
-                                 : (arch >= 200) ? GR_SM20_SMEM_BYTES() \
-                                                 : GR_SM10_SMEM_BYTES())
+#define GR_SM20_SMEM_BYTES()            (49152)     // 48KB on SM2.0+
+#define GR_SM10_SMEM_BYTES()            (16384)     // 32KB on SM1.0-SM1.3
+#define GR_SMEM_BYTES(arch)         ((arch >= 200) ? GR_SM20_SMEM_BYTES() :     \
+                                                         GR_SM10_SMEM_BYTES())
 
 // Physical threads per SM
 // #define GR_SM62_SM_THREADS()            (4096)      // 4096 threads on SM6.2
@@ -134,36 +128,43 @@ __global__ void FlushKernel(void) {}
 /**
  * Class encapsulating device properties for dynamic host-side inspection
  */
-class CudaProperties {
- public:
-  // Information about our target device
-  cudaDeviceProp device_props;
-  int device_sm_version;
+class CudaProperties
+{
+public:
 
-  // Information about our kernel assembly
-  int kernel_ptx_version;
+    // Information about our target device
+    cudaDeviceProp      device_props;
+    int                 device_sm_version;
 
- public:
-  CudaProperties() {}
-  CudaProperties(int gpu) { Setup(gpu); }
-  void Setup() {
-    int current_device;
-    cudaGetDevice(&current_device);
-    Setup(current_device);
-  }
+    // Information about our kernel assembly
+    int                 kernel_ptx_version;
 
-  // Constructor
-  void Setup(int gpu) {
-    // Get current device properties
-    cudaGetDeviceProperties(&device_props, gpu);
-    device_sm_version = device_props.major * 100 + device_props.minor * 10;
+public:
 
-    // Get SM version of compiled kernel assemblies
-    cudaFuncAttributes flush_kernel_attrs;
-    cudaFuncGetAttributes(&flush_kernel_attrs, FlushKernel<void>);
-    kernel_ptx_version = flush_kernel_attrs.ptxVersion * 10;
-  }
+    CudaProperties()        {           }
+    CudaProperties(int gpu) {Setup(gpu);}
+    void Setup()
+    {
+        int current_device;
+        cudaGetDevice(&current_device);
+        Setup(current_device);
+    }
+
+    // Constructor
+    void Setup(int gpu)
+    {
+        // Get current device properties
+        cudaGetDeviceProperties(&device_props, gpu);
+        device_sm_version = device_props.major * 100 + device_props.minor * 10;
+
+        // Get SM version of compiled kernel assemblies
+        cudaFuncAttributes flush_kernel_attrs;
+        cudaFuncGetAttributes(&flush_kernel_attrs, FlushKernel<void>);
+        kernel_ptx_version = flush_kernel_attrs.ptxVersion * 10;
+    }
 };
 
-}  // namespace util
-}  // namespace gunrock
+
+
+} // namespace util
+} // namespace gunrock

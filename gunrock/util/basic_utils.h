@@ -13,6 +13,7 @@
  */
 
 #pragma once
+#include <string>
 
 namespace gunrock {
 namespace util {
@@ -75,9 +76,9 @@ struct MagnitudeShiftOp;
  * we force the issue earlier using structural template specialization.
  */
 template <typename K, int magnitude>
-__device__ __forceinline__ K MagnitudeShift(K key) {
-  return MagnitudeShiftOp < K, (magnitude > 0) ? magnitude : magnitude * -1,
-         (magnitude > 0) > ::Shift(key);
+__device__ __forceinline__ K MagnitudeShift(K key)
+{
+    return MagnitudeShiftOp<K, (magnitude > 0) ? magnitude : magnitude * -1, (magnitude > 0)>::Shift(key);
 }
 
 template <typename K, int magnitude>
@@ -97,7 +98,15 @@ struct MagnitudeShiftOp<K, magnitude, false> {
 /**
  * Null type
  */
-struct NullType {};
+struct NullType {
+
+    template <typename T>
+    __host__ __device__ __forceinline__
+    NullType& operator =(const T&)
+    {
+        return *this;
+    }
+};
 
 /**
  * Int2Type
@@ -139,6 +148,39 @@ struct If<false, ThenType, ElseType> {
   typedef ElseType Type;
 };
 
+template <bool IF, unsigned int ThenVal, unsigned int ElseVal>
+struct If_Val
+{
+    // true
+    static const unsigned int Value = ThenVal;
+};
+
+template <unsigned int ThenVal, unsigned int ElseVal>
+struct If_Val<false, ThenVal, ElseVal>
+{
+    // false
+    static const unsigned int Value = ElseVal;
+};
+
+template <bool IF>
+struct If_Op
+{
+    template <typename Op>
+    static void Exec(Op op)
+    {
+    }
+};
+
+template <>
+struct If_Op<true>
+{
+    template <typename Op>
+    static void Exec(Op op)
+    {
+        op();
+    }
+};
+
 /**
  * Equals
  */
@@ -178,5 +220,52 @@ struct RemovePointersHelper<Tp, Up *> {
 template <typename Tp>
 struct RemovePointers : RemovePointersHelper<Tp, Tp> {};
 
-}  // namespace util
-}  // namespace gunrock
+template <typename T>
+std::string to_string(T* ptr)
+{
+    char temp_str[128];
+    sprintf(temp_str, "%p", ptr);
+    return std::string(temp_str);
+}
+
+template <typename T>
+void SeperateFileName(
+    T _filename,
+    std::string &dir,
+    std::string &file,
+    std::string &extension)
+{
+    std::string filename(_filename);
+
+    auto dir_pos = std::string::npos;
+    #ifdef _WIN32
+        dir_pos = filename.find_last_of('\\');
+    #else
+        dir_pos = filename.find_last_of('/');
+    #endif
+    auto extension_pos = filename.find_last_of('.');
+
+    if (dir_pos == std::string::npos)
+    {
+        dir_pos = 0;
+        dir = "";
+        file = filename.substr(0, extension_pos);
+    } else {
+        if (dir_pos == 0)
+            dir = "/";
+        else
+            dir  = filename.substr(0, dir_pos);
+        if (extension_pos == std::string::npos)
+            file = filename.substr(dir_pos + 1);
+        else
+            file = filename.substr(dir_pos + 1, extension_pos - dir_pos - 1);
+    }
+
+    if (extension_pos != std::string::npos)
+        extension = filename.substr(extension_pos + 1);
+    else
+        extension = "";
+}
+
+} // namespace util
+} // namespace gunrock

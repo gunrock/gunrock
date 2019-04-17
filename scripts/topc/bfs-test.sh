@@ -32,5 +32,3 @@ do
          $EXEDIR/$EXECUTION ${GRAPH[$i]} $SETTING --device=$DEVICE --traversal-mode=${T_MODE[$i]} --do_a=${DO_A[$i]} --do_b=${DO_B[$i]} --jsondir=./eval/  > ./eval/${NAME[$i]}.$EXECUTION.output.txt
     sleep 1
 done
-
-

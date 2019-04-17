@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <gunrock/oprtr/cull_filter/kernel_policy.cuh>
+// #include <gunrock/oprtr/cull_filter/kernel_policy.cuh>
 
 namespace gunrock {
 namespace oprtr {

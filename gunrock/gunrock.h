@@ -14,6 +14,8 @@
  * are not limited to C.
  */
 
+#pragma once
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -300,10 +302,12 @@ float sssp(unsigned int* distances,  // Return shortest distances
  * @param[in]  config Primitive-specific configurations.
  * @param[in]  data_t Primitive-specific data type setting.
  */
-void gunrock_pagerank(struct GRGraph* grapho,        // Output graph / results
-                      const struct GRGraph* graphi,  // Input graph structure
-                      const struct GRSetup* config,  // Flag configurations
-                      const struct GRTypes data_t);  // Data type Configurations
+/*void gunrock_pagerank(
+    struct GRGraph*       grapho,   // Output graph / results
+    const struct GRGraph* graphi,   // Input graph structure
+    const struct GRSetup* config,   // Flag configurations
+    const struct GRTypes  data_t);  // Data type Configurations
+*/
 
 /**
  * @brief PageRank simple public interface.
@@ -316,13 +320,14 @@ void gunrock_pagerank(struct GRGraph* grapho,        // Output graph / results
  * @param[in] col_indices Input graph col_indices.
  * @param[in] normalized Whether to perform a normalized PageRank
  */
-void pagerank(int* node_ids,           // Return top-ranked vertex IDs
-              float* pagerank,         // Return top-ranked PageRank scores
-              const int num_nodes,     // Input graph number of nodes
-              const int num_edges,     // Input graph number of edges
-              const int* row_offsets,  // Input graph row_offsets
-              const int* col_indices,  // Input graph col_indices
-              bool normalized);        // normalized pagerank flag
+double pagerank(
+    const int  num_nodes,     // Input graph number of nodes
+    const int  num_edges,     // Input graph number of edges
+    const int* row_offsets,   // Input graph row_offsets
+    const int* col_indices,   // Input graph col_indices
+    bool       normalize,   // normalized pagerank flag
+    int*       node_ids,
+    float*     ranks);
 
 // TODO Add other primitives
 

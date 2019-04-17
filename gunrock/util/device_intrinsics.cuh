@@ -17,18 +17,19 @@
 #ifndef DEVICE_INTRINSICS_CUH
 #define DEVICE_INTRINSICS_CUH
 
+#include <limits>
 #include <gunrock/util/cuda_properties.cuh>
-#include <gunrock/util/types.cuh>
+//#include <gunrock/util/types.cuh>
 
-#define MEMBERMASK 0xffffffff
+#define MEMBERMASK 0xffffffffu
 #define WARPSIZE 32
 
 // CUDA 9 warp shuffles (device intrinsics)
 template <typename T>
-__device__ static __forceinline__ T _shfl_up(T var, unsigned int delta,
-                                             int width = WARPSIZE,
-                                             unsigned int mask = MEMBERMASK) {
-  // int first_lane = (WARPSIZE-width) << 8;
+__device__ static __forceinline__
+T _shfl_up(T var, unsigned int delta, int width=WARPSIZE, unsigned mask=MEMBERMASK)
+{
+  //int first_lane = (WARPSIZE-width) << 8;
 #if __CUDACC_VER_MAJOR__ < 9
   return __shfl_up(var, delta, width);
 #else
@@ -37,10 +38,10 @@ __device__ static __forceinline__ T _shfl_up(T var, unsigned int delta,
 }
 
 template <typename T>
-__device__ static __forceinline__ T _shfl_down(T var, unsigned int delta,
-                                               int width = WARPSIZE,
-                                               unsigned int mask = MEMBERMASK) {
-  // int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
+__device__ static __forceinline__
+T _shfl_down(T var, unsigned int delta, int width=WARPSIZE, unsigned mask=MEMBERMASK)
+{
+  //int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
 #if __CUDACC_VER_MAJOR__ < 9
   return __shfl_down(var, delta, width);
 #else
@@ -49,10 +50,10 @@ __device__ static __forceinline__ T _shfl_down(T var, unsigned int delta,
 }
 
 template <typename T>
-__device__ static __forceinline__ T _shfl_xor(T var, int lane_mask,
-                                              int width = WARPSIZE,
-                                              unsigned int mask = MEMBERMASK) {
-  // int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
+__device__ static __forceinline__
+T _shfl_xor(T var, int lane_mask, int width=WARPSIZE, unsigned mask = MEMBERMASK)
+{
+  //int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
 #if __CUDACC_VER_MAJOR__ < 9
   return __shfl_xor(var, lane_mask, width);
 #else
@@ -61,10 +62,10 @@ __device__ static __forceinline__ T _shfl_xor(T var, int lane_mask,
 }
 
 template <typename T>
-__device__ static __forceinline__ T _shfl(T var, int source_lane,
-                                          int width = WARPSIZE,
-                                          unsigned int mask = MEMBERMASK) {
-  // int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
+__device__ static __forceinline__
+T _shfl(T var, int source_lane, int width=WARPSIZE, unsigned mask=MEMBERMASK)
+{
+  //int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
 #if __CUDACC_VER_MAJOR__ < 9
   return __shfl(var, source_lane, width);
 #else
@@ -72,8 +73,9 @@ __device__ static __forceinline__ T _shfl(T var, int source_lane,
 #endif
 }
 
-__device__ static __forceinline__ unsigned int _ballot(
-    int predicate, unsigned int mask = MEMBERMASK) {
+__device__ static __forceinline__
+unsigned _ballot(int predicate, unsigned mask=MEMBERMASK)
+{
 #if __CUDACC_VER_MAJOR__ < 9
   return __ballot(predicate);
 #else
@@ -81,19 +83,21 @@ __device__ static __forceinline__ unsigned int _ballot(
 #endif
 }
 
-__device__ static __forceinline__ int _any(int predicate,
-                                           unsigned int mask = MEMBERMASK) {
+__device__ static __forceinline__
+int _any(int predicate, unsigned mask=MEMBERMASK)
+{
 #if __CUDACC_VER_MAJOR__ < 9
-  return ::__any(predicate);
+  return __any(predicate);
 #else
   return __any_sync(mask, predicate);
 #endif
 }
 
-__device__ static __forceinline__ int _all(int predicate,
-                                           unsigned int mask = MEMBERMASK) {
+__device__ static __forceinline__
+int _all(int predicate, unsigned mask=MEMBERMASK)
+{
 #if __CUDACC_VER_MAJOR__ < 9
-  return ::__all(predicate);
+  return __all(predicate);
 #else
   return __all_sync(mask, predicate);
 #endif
@@ -122,12 +126,38 @@ __device__ static __forceinline__ long long atomicCAS(long long* addr,
                               (unsigned long long)val);
 }
 
+__device__ static float atomicCAS(float *addr, float comp, float val)
+{
+    return __int_as_float(atomicCAS(
+        (int*)addr,
+        __float_as_int(comp),
+        __float_as_int(val )));
+}
+
+__device__ static double atomicCAS(double *addr, double comp, double val)
+{
+    return __longlong_as_double(atomicCAS(
+        (long long*)addr,
+        __double_as_longlong(comp),
+        __double_as_longlong(val)));
+}
+
 // TODO: verify overflow condition
 __device__ static __forceinline__ long long atomicAdd(long long* addr,
                                                       long long val) {
   return (long long)atomicAdd((unsigned long long*)addr,
                               (unsigned long long)val);
 }
+
+#if ULONG_MAX == ULLONG_MAX
+__device__ static unsigned long atomicAdd(unsigned long *addr, unsigned long val)
+{
+    return (unsigned long long)atomicAdd(
+        (unsigned long long*)addr, (unsigned long long)val);
+}
+#endif
+
+#if __GR_CUDA_ARCH__ <= 300
 
 // TODO: only works if both *addr and val are non-negetive
 __device__ static __forceinline__ long long atomicMin_(long long* addr,
@@ -147,28 +177,97 @@ __device__ static __forceinline__ long long atomicMin_(long long* addr,
 #endif
 }
 
-__device__ static __forceinline__ int atomicMin_(int* addr, int val) {
-  return atomicMin(addr, val);
+__device__ static uint64_t atomicMin(uint64_t* addr, uint64_t val)
+{
+    unsigned long long int old = (unsigned long long int)val;
+    unsigned long long int expected;
+    do {
+        expected = old;
+        old = atomicCAS((unsigned long long int*)addr, val, (unsigned long long int)val);
+    } while (expected != old);
+    return old;
 }
 
-__device__ static __forceinline__ float atomicMin(float* addr, float val) {
-  int* addr_as_int = (int*)addr;
-  int old = *addr_as_int;
-  int expected;
-  do {
-    expected = old;
-    old = ::atomicCAS(addr_as_int, expected,
-                      __float_as_int(::fminf(val, __int_as_float(expected))));
-  } while (expected != old);
-  return __int_as_float(old);
+__device__ static float atomicMin(float* addr, float val)
+{
+    int* addr_as_int = (int*)addr;
+    int old = *addr_as_int;
+    int expected;
+    do {
+        expected = old;
+        old = ::atomicCAS(addr_as_int, expected, __float_as_int(
+            ::fminf(val, __int_as_float(expected))));
+    } while (expected != old);
+    return __int_as_float(old);
+}
+
+__device__ static double atomicMin(double* addr, double val)
+{
+    long long* addr_as_longlong = (long long*)addr;
+    long long old = *addr_as_longlong;
+    long long expected;
+    do {
+        expected = old;
+        old = ::atomicCAS(addr_as_longlong, expected, __double_as_longlong(
+            ::fmin(val, __longlong_as_double(expected))));
+    } while (expected != old);
+    return __longlong_as_double(old);
+}
+
+__device__ static float atomicMax(float* addr, float val)
+{
+    int* addr_as_int = (int*)addr;
+    int old = *addr_as_int;
+    int expected;
+    do {
+        expected = old;
+        old = ::atomicCAS(addr_as_int, expected, __float_as_int(
+            ::fmaxf(val, __int_as_float(expected))));
+    } while (expected != old);
+    return __int_as_float(old);
+}
+
+__device__ static double atomicMax(double* addr, double val)
+{
+    long long* addr_as_longlong = (long long*)addr;
+    long long old = *addr_as_longlong;
+    long long expected;
+    do {
+        expected = old;
+        old = ::atomicCAS(addr_as_longlong, expected, __double_as_longlong(
+            ::fmax(val, __longlong_as_double(expected))));
+    } while (expected != old);
+    return __longlong_as_double(old);
 }
 
 template <typename T>
-__device__ __forceinline__ T _ldg(T* addr) {
-#if __GR_CUDA_ARCH__ >= 350
-  return __ldg(addr);
+__device__ __host__ __forceinline__ T _ldg(T* addr)
+{
+#ifdef __CUDA_ARCH__
+    #if __GR_CUDA_ARCH__ >= 350
+        return __ldg(addr);
+    #else
+        return *addr;
+    #endif
 #else
-  return *addr;
+    return *addr;
+#endif
+}
+
+template <typename T>
+__device__ __host__ __forceinline__
+T _atomicAdd(T* ptr, const T &val)
+{
+#ifdef __CUDA_ARCH__
+    return atomicAdd(ptr, val);
+#else
+    T retval;
+    #pragma omp atomic capture
+    {
+        retval = ptr[0];
+        ptr[0] += val;
+    }
+    return retval;
 #endif
 }
 

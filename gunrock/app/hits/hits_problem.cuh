@@ -9,366 +9,373 @@
  * @file
  * hits_problem.cuh
  *
- * @brief GPU Storage management Structure for HITS(Hyperlink-Induced Topic
- * Search) Problem Data
+ * @brief GPU Storage management Structure for hits Problem Data
  */
 
 #pragma once
 
-#include <cub/cub.cuh>
 #include <gunrock/app/problem_base.cuh>
-#include <gunrock/util/memset_kernel.cuh>
 
 namespace gunrock {
 namespace app {
 namespace hits {
 
 /**
- * @brief HITS Problem structure stores device-side vectors for doing HITS
- * Algorithm on the GPU.
- *
- * @tparam _VertexId            Type of signed integer to use as vertex id
- * (e.g., uint32)
- * @tparam _SizeT               Type of unsigned integer to use for array
- * indexing. (e.g., uint32)
- * @tparam _Value               Type of float or double to use for computing
- * HITS rank value.
+ * @brief Speciflying parameters for hits Problem
+ * @param  parameters  The util::Parameter<...> structure holding all parameter info
+ * \return cudaError_t error message(s), if any
  */
-template <typename VertexId, typename SizeT, typename Value>
-struct HITSProblem : ProblemBase<VertexId, SizeT, Value,
-                                 true,   // MARK_PREDECESSORS
-                                 false>  // ENABLE_IDEMPOTENCE
-                                         // false, // USE_DOUBLE_BUFFER = false
-// false, // ENABLE_BACKWARD
-// false, // KEEP_ORDER
-// false> // KEEP_NODE_NUM
+cudaError_t UseParameters_problem(
+    util::Parameters &parameters)
 {
-  static const bool MARK_PREDECESSORS = true;
-  static const bool ENABLE_IDEMPOTENCE = false;
-  static const int MAX_NUM_VERTEX_ASSOCIATES = 0;  // TODO: update for multi-GPU
-  static const int MAX_NUM_VALUE__ASSOCIATES = 1;  // TODO: update for multi-GPU
-  typedef ProblemBase<VertexId, SizeT, Value, MARK_PREDECESSORS,
-                      ENABLE_IDEMPOTENCE>
-      BaseProblem;
-  typedef DataSliceBase<VertexId, SizeT, Value, MAX_NUM_VERTEX_ASSOCIATES,
-                        MAX_NUM_VALUE__ASSOCIATES>
-      BaseDataSlice;
-  typedef unsigned char MaskT;
-
-  // Helper structures
-
-  /**
-   * @brief Data slice structure which contains HITS problem specific data.
-   */
-  struct DataSlice : BaseDataSlice {
-    // device storage arrays
-    util::Array1D<SizeT, Value>
-        hrank_curr; /**< Used for ping-pong hub rank value */
-    util::Array1D<SizeT, Value>
-        arank_curr; /**< Used for ping-pong authority rank value */
-    util::Array1D<SizeT, Value>
-        hrank_next; /**< Used for ping-pong page rank value */
-    util::Array1D<SizeT, Value>
-        arank_next; /**< Used for ping-pong page rank value */
-    util::Array1D<SizeT, Value> rank_mag;
-  };
-
-  // Members
-
-  // Number of GPUs to be sliced over
-  // int                 num_gpus;
-
-  // Size of the graph
-  // SizeT               nodes;
-  // SizeT               edges;
-
-  // Selector, which d_rank array stores the final page rank?
-  SizeT selector;
-
-  // Set of data slices (one for each GPU)
-  DataSlice **data_slices;
-
-  // Nasty method for putting struct on device
-  // while keeping the SoA structure
-  DataSlice **d_data_slices;
-
-  // Device indices for each data slice
-  // int                 *gpu_idx;
-
-  // Methods
-
-  /**
-   * @brief HITSProblem default constructor
-   */
-
-  HITSProblem()
-      : BaseProblem(false,   // use_double_buffer
-                    false,   // enable_backward
-                    false,   // keep_order
-                    false),  // keep_node_num
-        selector(0),
-        data_slices(NULL),
-        d_data_slices(NULL) {}
-
-  /**
-   * @brief HITSProblem default destructor
-   */
-  ~HITSProblem() {
-    for (int i = 0; i < this->num_gpus; ++i) {
-      if (util::GRError(cudaSetDevice(this->gpu_idx[i]),
-                        "~HITSProblem cudaSetDevice failed", __FILE__,
-                        __LINE__))
-        break;
-      data_slices[i]->hrank_curr.Release();
-      data_slices[i]->arank_curr.Release();
-      data_slices[i]->hrank_next.Release();
-      data_slices[i]->arank_next.Release();
-      data_slices[i]->rank_mag.Release();
-
-      if (d_data_slices[i])
-        util::GRError(cudaFree(d_data_slices[i]),
-                      "GpuSlice cudaFree data_slices failed", __FILE__,
-                      __LINE__);
-    }
-    if (d_data_slices) delete[] d_data_slices;
-    if (data_slices) delete[] data_slices;
-  }
-
-  /**
-   * \addtogroup PublicInterface
-   * @{
-   */
-
-  /**
-   * @brief Copy result labels and/or predecessors computed on the GPU back to
-   *host-side vectors.
-   *
-   * @param[out] h_hrank host-side vector to store hub rank values.
-   *
-   * @param[out] h_arank host-side vector to store authority rank values.
-   *
-   *\return cudaError_t object which indicates the success of all CUDA function
-   *calls.
-   */
-  cudaError_t Extract(Value *h_hrank, Value *h_arank) {
     cudaError_t retval = cudaSuccess;
 
-    do {
-      if (this->num_gpus == 1) {
-        // Set device
-        if (util::GRError(cudaSetDevice(this->gpu_idx[0]),
-                          "HITSProblem cudaSetDevice failed", __FILE__,
-                          __LINE__))
-          break;
+    GUARD_CU(gunrock::app::UseParameters_problem(parameters));
 
-        data_slices[0]->hrank_curr.SetPointer(h_hrank);
-        if (retval = data_slices[0]->hrank_curr.Move(util::DEVICE, util::HOST))
-          return retval;
+    GUARD_CU(parameters.Use<int64_t>(
+        "max-iter",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        100,
+        "Number of HITS iterations.",
+        __FILE__, __LINE__));
 
-        data_slices[0]->arank_curr.SetPointer(h_arank);
-        if (retval = data_slices[0]->arank_curr.Move(util::DEVICE, util::HOST))
-          return retval;
-      } else {
-        // TODO: multi-GPU extract result
-      }  // end if (data_slices.size() ==1)
-    } while (0);
+    GUARD_CU(parameters.Use<int64_t>(
+        "normalize-n",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        1,
+        "Normalize HITS scores every N iterations.",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<double>(
+        "tol",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        1e-6,
+        "Floating-point tolerance for CPU/GPU rank comparison.",
+        __FILE__, __LINE__));
 
     return retval;
-  }
+}
 
-  /**
-   * @brief HITSProblem initialization
-   *
-   * @param[in] stream_from_host Whether to stream data from host.
-   * @param[in] hub_graph Reference to the CSR graph object we process on. @see
-   * Csr
-   * @param[in] auth_graph Reference to the CSC graph object we process on.
-   * @param[in] num_gpus Number of the GPUs used.
-   * @param[in] gpu_idx
-   * @param[in] partition_method
-   * @param[in] streams CUDA Streams
-   * @param[in] queue_sizing
-   * @param[in] in_sizing
-   * @param[in] partition_factor
-   * @param[in] partition_seed
-   *
-   * \return cudaError_t object which indicates the success of all CUDA function
-   * calls.
-   */
-  cudaError_t Init(bool stream_from_host,  // Only meaningful for single-GPU
-                   Csr<VertexId, SizeT, Value> &hub_graph,
-                   Csr<VertexId, SizeT, Value> &auth_graph, int num_gpus = 1,
-                   int *gpu_idx = NULL, std::string partition_method = "random",
-                   cudaStream_t *streams = NULL, float queue_sizing = 2.0f,
-                   float in_sizing = 1.0f, float partition_factor = -1.0f,
-                   int partition_seed = -1) {
-    BaseProblem::Init(stream_from_host, &hub_graph, &auth_graph, num_gpus,
-                      gpu_idx, partition_method, queue_sizing, partition_factor,
-                      partition_seed);
+/**
+ * @brief Template Problem structure.
+ * @tparam _GraphT  Type of the graph
+ * @tparam _FLAG    Problem flags
+ */
+template <
+    typename _GraphT,
+    ProblemFlag _FLAG = Problem_None>
+struct Problem : ProblemBase<_GraphT, _FLAG>
+{
+    typedef _GraphT GraphT;
+    static const ProblemFlag FLAG = _FLAG;
+    typedef typename GraphT::VertexT VertexT;
+    typedef typename GraphT::ValueT  ValueT;
+    typedef typename GraphT::SizeT   SizeT;
+    typedef typename GraphT::CsrT    CsrT;
+    typedef typename GraphT::GpT     GpT;
 
-    // No data in DataSlice needs to be copied from host
+    typedef ProblemBase   <GraphT, FLAG> BaseProblem;
+    typedef DataSliceBase <GraphT, FLAG> BaseDataSlice;
+
+    // ----------------------------------------------------------------
+    // Dataslice structure
 
     /**
-     * Allocate output labels/preds
+     * @brief Data structure containing problem specific data on indivual GPU.
      */
-    cudaError_t retval = cudaSuccess;
-    data_slices = new DataSlice *[num_gpus];
-    d_data_slices = new DataSlice *[num_gpus];
-    if (streams == NULL) {
-      streams = new cudaStream_t[num_gpus];
-      streams[0] = 0;
+    struct DataSlice : BaseDataSlice
+    {
+        // HITS problem-specific storage arrays
+        util::Array1D<SizeT, ValueT> hrank_curr;    // Holds hub rank value
+        util::Array1D<SizeT, ValueT> arank_curr;    // Holds authority rank value
+        util::Array1D<SizeT, ValueT> hrank_next;
+        util::Array1D<SizeT, ValueT> arank_next;
+        util::Array1D<uint64_t, char> cub_temp_space; // Temporary space for normalization addition
+        util::Array1D<SizeT, ValueT> hrank_mag;
+        util::Array1D<SizeT, ValueT> arank_mag;
+	    SizeT max_iter;                             // Maximum number of HITS iterations to perform
+	    SizeT normalize_n;                        // Normalize every N iterations
+        /*
+         * @brief Default constructor
+         */
+        DataSlice() : BaseDataSlice(),
+            max_iter(0),
+            normalize_n(0)
+        {
+            // Name of the problem specific arrays:
+            hrank_curr.SetName("hrank_curr");
+            arank_curr.SetName("arank_curr");
+            hrank_next.SetName("hrank_next");
+            arank_next.SetName("arank_next");
+            cub_temp_space.SetName("cub_temp_space");
+            hrank_mag.SetName("hrank_mag");
+            arank_mag.SetName("arank_mag");
+        }
+
+        /*
+         * @brief Default destructor
+         */
+        virtual ~DataSlice() { Release(); }
+
+        /*
+         * @brief Releasing allocated memory space
+         * @param[in] target      The location to release memory from
+         * \return    cudaError_t Error message(s), if any
+         */
+        cudaError_t Release(util::Location target = util::LOCATION_ALL)
+        {
+            cudaError_t retval = cudaSuccess;
+            if (target & util::DEVICE)
+                GUARD_CU(util::SetDevice(this->gpu_idx));
+
+            // Release allocated data
+            GUARD_CU(hrank_curr.Release(target));
+            GUARD_CU(arank_curr.Release(target));
+            GUARD_CU(hrank_next.Release(target));
+            GUARD_CU(arank_next.Release(target));
+            GUARD_CU(cub_temp_space.Release(target));
+            GUARD_CU(hrank_mag.Release(target));
+            GUARD_CU(arank_mag.Release(target));
+            GUARD_CU(BaseDataSlice ::Release(target));
+            return retval;
+        }
+
+        /**
+         * @brief initializing hits-specific data on each gpu
+         * @param     sub_graph   Sub graph on the GPU.
+         * @param[in] gpu_idx     GPU device index
+         * @param[in] target      Targeting device location
+         * @param[in] flag        Problem flag containling options
+         * \return    cudaError_t Error message(s), if any
+         */
+        cudaError_t Init(
+            GraphT        &sub_graph,
+            int            num_gpus,
+            int            gpu_idx,
+            util::Location target,
+            ProblemFlag    flag)
+        {
+            cudaError_t retval  = cudaSuccess;
+
+            GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
+            // Allocate problem specific data here
+
+            GUARD_CU(hrank_curr.Allocate(sub_graph.nodes, target));
+            GUARD_CU(arank_curr.Allocate(sub_graph.nodes, target));
+            GUARD_CU(hrank_next.Allocate(sub_graph.nodes, target));
+            GUARD_CU(arank_next.Allocate(sub_graph.nodes, target));
+            GUARD_CU(cub_temp_space.Allocate(1, target));
+
+            GUARD_CU(hrank_mag.Allocate(1, target | util::HOST));
+            GUARD_CU(arank_mag.Allocate(1, target | util::HOST));
+
+            if (target & util::DEVICE) {
+                GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
+            }
+            return retval;
+        }
+
+        /**
+         * @brief Reset problem function. Must be called prior to each run.
+         * @param[in] target      Targeting device location
+         * \return    cudaError_t Error message(s), if any
+         */
+        cudaError_t Reset(util::Location target = util::DEVICE)
+        {
+            cudaError_t retval = cudaSuccess;
+            SizeT nodes = this -> sub_graph -> nodes;
+
+            // Ensure data are allocated
+
+            GUARD_CU(hrank_curr.EnsureSize_(nodes, target));
+            GUARD_CU(arank_curr.EnsureSize_(nodes, target));
+            GUARD_CU(hrank_next.EnsureSize_(nodes, target));
+            GUARD_CU(arank_next.EnsureSize_(nodes, target));
+
+            GUARD_CU(cub_temp_space.EnsureSize_(1, target));
+            GUARD_CU(hrank_mag.EnsureSize_(1, target));
+            GUARD_CU(arank_mag.EnsureSize_(1, target));
+
+            // Reset data
+
+            // Initialize current hrank and arank to 1.
+            // Initialize next ranks to 0 (will be updated).
+            GUARD_CU(hrank_curr.ForEach([]__host__ __device__ (ValueT &x){
+               x = (ValueT)1.0;
+            }, nodes, target, this -> stream));
+
+            GUARD_CU(arank_curr.ForEach([]__host__ __device__ (ValueT &x){
+               x = (ValueT)1.0;
+            }, nodes, target, this -> stream));
+
+            GUARD_CU(hrank_next.ForEach([]__host__ __device__ (ValueT &x){
+               x = (ValueT)0.0;
+            }, nodes, target, this -> stream));
+
+            GUARD_CU(arank_next.ForEach([]__host__ __device__ (ValueT &x){
+               x = (ValueT)0.0;
+            }, nodes, target, this -> stream));
+
+            GUARD_CU(hrank_mag.ForEach([]__host__ __device__ (ValueT &x){
+                x = (ValueT)0.0;
+            }, 1, target, this -> stream));
+
+             GUARD_CU(arank_mag.ForEach([]__host__ __device__ (ValueT &x){
+                x = (ValueT)0.0;
+            }, 1, target, this -> stream));
+
+            return retval;
+        }
+    }; // DataSlice
+
+    // Set of data slices (one for each GPU)
+    util::Array1D<SizeT, DataSlice> *data_slices;
+
+    // ----------------------------------------------------------------
+    // Problem Methods
+
+    /**
+     * @brief hits default constructor
+     */
+    Problem(
+        util::Parameters &_parameters,
+        ProblemFlag _flag = Problem_None) :
+        BaseProblem(_parameters, _flag),
+        data_slices(NULL) {}
+
+    /**
+     * @brief hits default destructor
+     */
+    virtual ~Problem() { Release(); }
+
+    /*
+     * @brief Releasing allocated memory space
+     * @param[in] target      The location to release memory from
+     * \return    cudaError_t Error message(s), if any
+     */
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
+    {
+        cudaError_t retval = cudaSuccess;
+        if (data_slices == NULL) return retval;
+        for (int i = 0; i < this->num_gpus; i++)
+            GUARD_CU(data_slices[i].Release(target));
+
+        if ((target & util::HOST) != 0 &&
+            data_slices[0].GetPointer(util::DEVICE) == NULL)
+        {
+            delete[] data_slices; data_slices=NULL;
+        }
+        GUARD_CU(BaseProblem::Release(target));
+        return retval;
     }
 
-    do {
-      if (num_gpus <= 1) {
-        int gpu = 0;
-        if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-        data_slices[gpu] = new DataSlice;
-        if (retval = util::GRError(
-                cudaMalloc((void **)&d_data_slices[gpu], sizeof(DataSlice)),
-                "HITSProblem cudaMalloc d_data_slices failed", __FILE__,
-                __LINE__))
-          return retval;
-        data_slices[gpu][0].streams.SetPointer(&streams[gpu * num_gpus * 2],
-                                               num_gpus * 2);
-        data_slices[0]->Init(this->num_gpus, this->gpu_idx[gpu],
-                             // 0,
-                             // 0,
-                             this->use_double_buffer, &hub_graph, NULL, NULL,
-                             in_sizing);
+    /**
+     * @brief Copy result distancess computed on GPUs back to host-side arrays.
+     * @param[in] h_hrank_curr The host memory to extract hub scores to
+     * @param[in] h_arank_curr The host memory to extract auth scores to
+     * @param[in] target       The location to copy memory from
+     * \return     cudaError_t Error message(s), if any
+     */
+    cudaError_t Extract(
+        ValueT *h_hrank_curr,
+        ValueT *h_arank_curr,
+        util::Location target = util::DEVICE)
+    {
+        cudaError_t retval = cudaSuccess;
+        SizeT nodes = this -> org_graph -> nodes;
 
-        // Create SoA on device
-        data_slices[0]->hrank_curr.SetName("hrank_curr");
-        if (retval =
-                data_slices[0]->hrank_curr.Allocate(this->nodes, util::DEVICE))
-          return retval;
+        if (this-> num_gpus == 1) {
+            auto &data_slice = data_slices[0][0];
 
-        data_slices[0]->arank_curr.SetName("arank_curr");
-        if (retval =
-                data_slices[0]->arank_curr.Allocate(this->nodes, util::DEVICE))
-          return retval;
+            // Set device
+            if (target == util::DEVICE) {
+                GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-        data_slices[0]->hrank_next.SetName("hrank_next");
-        if (retval =
-                data_slices[0]->hrank_next.Allocate(this->nodes, util::DEVICE))
-          return retval;
+                // Extract the results from a single GPU
+                GUARD_CU(data_slice.hrank_curr.SetPointer(h_hrank_curr, nodes, util::HOST));
+                GUARD_CU(data_slice.hrank_curr.Move(util::DEVICE, util::HOST));
 
-        data_slices[0]->arank_next.SetName("arank_next");
-        if (retval =
-                data_slices[0]->arank_next.Allocate(this->nodes, util::DEVICE))
-          return retval;
+                GUARD_CU(data_slice.arank_curr.SetPointer(h_arank_curr, nodes, util::HOST));
+                GUARD_CU(data_slice.arank_curr.Move(util::DEVICE, util::HOST));
+            } else if (target == util::HOST) {
+                // Extract the results from single CPU, e.g.:
+                GUARD_CU(data_slice.hrank_curr.ForEach(h_hrank_curr,
+                   []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
+                       host_val = device_val;
+                   }, nodes, util::HOST));
 
-        data_slices[0]->rank_mag.SetName("rank_mag");
-        if (retval = data_slices[0]->rank_mag.Allocate(1, util::DEVICE))
-          return retval;
-      }
-      // TODO: add multi-GPU allocation code
-    } while (0);
+                GUARD_CU(data_slice.arank_curr.ForEach(h_arank_curr,
+                   []__host__ __device__ (const ValueT &device_val, ValueT &host_val){
+                       host_val = device_val;
+                   }, nodes, util::HOST));
+            }
+        } else { // Incomplete multi-gpu
+        }
 
-    return retval;
-  }
-
-  /**
-   *  @brief Performs any initialization work needed for PR problem type. Must
-   * be called prior to each PR iteration.
-   *
-   *  @param[in] src Source node for one PR computing pass.
-   *  @param[in] delta Parameter for PR value distribution equation
-   *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
-   *  @param[in] queue_sizing Frontier queue scaling factor
-   *
-   *  \return cudaError_t object which indicates the success of all CUDA
-   * function calls.
-   */
-  cudaError_t Reset(
-      VertexId src, Value delta, FrontierType frontier_type,
-      double queue_sizing = 1.0)  // The frontier type (i.e., edge/vertex/mixed)
-  {
-    // typedef ProblemBase<VertexId, SizeT, false> BaseProblem;
-    // load ProblemBase Reset
-    // BaseProblem::Reset(frontier_type, queue_sizing); // Default queue sizing
-    // is 1.0
-
-    cudaError_t retval = cudaSuccess;
-
-    for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
-      // Set device
-      if (retval = util::GRError(cudaSetDevice(this->gpu_idx[gpu]),
-                                 "HITSProblem cudaSetDevice failed", __FILE__,
-                                 __LINE__))
-        return retval;
-      data_slices[gpu]->Reset(frontier_type, this->graph_slices[gpu],
-                              queue_sizing, queue_sizing);
-
-      if (data_slices[gpu]->hrank_curr.GetPointer(util::DEVICE) == NULL)
-        if (retval = data_slices[gpu]->hrank_curr.Allocate(this->nodes,
-                                                           util::DEVICE))
-          return retval;
-
-      if (data_slices[gpu]->arank_curr.GetPointer(util::DEVICE) == NULL)
-        if (retval = data_slices[gpu]->arank_curr.Allocate(this->nodes,
-                                                           util::DEVICE))
-          return retval;
-
-      if (data_slices[gpu]->hrank_next.GetPointer(util::DEVICE) == NULL)
-        if (retval = data_slices[gpu]->hrank_next.Allocate(this->nodes,
-                                                           util::DEVICE))
-          return retval;
-
-      if (data_slices[gpu]->arank_next.GetPointer(util::DEVICE) == NULL)
-        if (retval = data_slices[gpu]->arank_next.Allocate(this->nodes,
-                                                           util::DEVICE))
-          return retval;
-
-      if (data_slices[gpu]->rank_mag.GetPointer(util::DEVICE) == NULL)
-        if (retval = data_slices[gpu]->rank_mag.Allocate(1, util::DEVICE))
-          return retval;
-
-      util::MemsetKernel<<<128, 128>>>(
-          data_slices[gpu]->hrank_curr.GetPointer(util::DEVICE), (Value)1.0f,
-          this->nodes);
-      util::MemsetKernel<<<128, 128>>>(
-          data_slices[gpu]->arank_curr.GetPointer(util::DEVICE), (Value)1.0f,
-          this->nodes);
-      util::MemsetKernel<<<128, 128>>>(
-          data_slices[gpu]->hrank_next.GetPointer(util::DEVICE), (Value)0.0f,
-          this->nodes);
-      util::MemsetKernel<<<128, 128>>>(
-          data_slices[gpu]->arank_next.GetPointer(util::DEVICE), (Value)0.0f,
-          this->nodes);
-
-      util::MemsetKernel<<<1, 1>>>(
-          data_slices[gpu]->rank_mag.GetPointer(util::DEVICE), (Value)0.0f, 1);
-
-      if (retval = util::GRError(
-              cudaMemcpy(d_data_slices[gpu], data_slices[gpu],
-                         sizeof(DataSlice), cudaMemcpyHostToDevice),
-              "HITSProblem cudaMemcpy data_slices to d_data_slices failed",
-              __FILE__, __LINE__))
         return retval;
     }
 
-    // Fillin the initial input_queue for PR problem, this needs to be modified
-    // in multi-GPU scene
-    Value init_score = 1.0;
-    if (retval = util::GRError(
-            cudaMemcpy(
-                data_slices[0]->hrank_curr.GetPointer(util::DEVICE) + src,
-                &init_score, sizeof(Value), cudaMemcpyHostToDevice),
-            "BFSProblem cudaMemcpy d_hrank_curr[src] failed", __FILE__,
-            __LINE__))
-      return retval;
+    /**
+     * @brief initialization function.
+     * @param     graph       The graph that SSSP processes on
+     * @param[in] Location    Memory location to work on
+     * \return    cudaError_t Error message(s), if any
+     */
+    cudaError_t Init(
+            GraphT           &graph,
+            util::Location    target = util::DEVICE)
+    {
+        cudaError_t retval = cudaSuccess;
+        GUARD_CU(BaseProblem::Init(graph, target));
+        data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
-    // Put every vertex in there
-    util::MemsetIdxKernel<<<128, 128>>>(
-        this->data_slices[0]->frontier_queues[0].keys[0].GetPointer(
-            util::DEVICE),
-        this->nodes);
+        for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+            data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
+            if (target & util::DEVICE)
+                GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
 
-    return retval;
-  }
+            GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
+            auto &data_slice = data_slices[gpu][0];
 
-  /** @} */
+            data_slice.max_iter
+                = this -> parameters.template Get<SizeT >("max-iter");
+
+            data_slice.normalize_n
+                = this -> parameters.template Get<SizeT >("normalize-n");
+
+            GUARD_CU(data_slice.Init(
+                this -> sub_graphs[gpu],
+                this -> num_gpus,
+                this -> gpu_idx[gpu],
+                target,
+                this -> flag
+            ));
+        }
+
+        return retval;
+    }
+
+    /**
+     * @brief Reset problem function. Must be called prior to each run.
+     * @param[in] location Memory location to work on
+     * \return cudaError_t Error message(s), if any
+     */
+    cudaError_t Reset(
+        util::Location target = util::DEVICE)
+    {
+        cudaError_t retval = cudaSuccess;
+
+        // Reset data slices
+        for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
+            if (target & util::DEVICE)
+                GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+            GUARD_CU(data_slices[gpu] -> Reset(target));
+            GUARD_CU(data_slices[gpu].Move(util::HOST, target));
+        }
+
+        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
+        return retval;
+    }
 };
 
 }  // namespace hits

@@ -67,6 +67,7 @@ include_directories(${gunrock_INCLUDE_DIRS})
 # end /* Include gunrock directories ./ */
 
 # begin /* Include moderngpu & cub */
+include(${CMAKE_SOURCE_DIR}/cmake/FindRapidJson.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindModernGPU.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindCUB.cmake)
 # end /* Include moderngpu & cub */
@@ -334,9 +335,9 @@ endif (CUDA_VERBOSE_PTXAS)
 # end /* Configure GUNROCK build options */
 
 # c++11 is required
-# Already set above. Causes build error on Ubuntu 18.04.1 LTS 
-#set(CUDA_NVCC_FLAGS -std=c++11)
-set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_curand_LIBRARY})
+# Already set above. Causes build error on Ubuntu 18.04.1 LTS
+#set(CUDA_NVCC_FLAGS -std=c++11 --expt-extended-lambda)
+#set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_curand_LIBRARY})
 
 if(GUNROCK_BUILD_LIB)
   if(GUNROCK_BUILD_SHARED_LIBS)
@@ -360,8 +361,8 @@ endif(GUNROCK_BUILD_LIB)
 # Subdirectories for examples, testing and documentation
 if(GUNROCK_BUILD_TESTS)
   # Enables testing for this directory and below.
-  # Note that ctest expects to find a test file 
-  # in the build directory root. Therefore, 
+  # Note that ctest expects to find a test file
+  # in the build directory root. Therefore,
   # this command should be in the source directory root.
   # https://cmake.org/cmake/help/v3.0/command/enable_testing.html
   # Note: For gunrock, use ctest or make check to run the tests
