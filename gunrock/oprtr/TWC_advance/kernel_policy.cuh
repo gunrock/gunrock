@@ -27,37 +27,25 @@ namespace TWC {
  *
  * Parameterizations of this type encapsulate our kernel-tuning parameters
  *
- * Kernels can be specialized for problem-type, SM-version, etc. by
- * parameterizing them with different performance-tuned parameterizations of
- * this type.  By incorporating this type into the kernel code itself, we guide
- * the compiler in expanding/unrolling the kernel code for specific
- * architectures and problem types.
+ * Kernels can be specialized for problem-type, SM-version, etc. by parameterizing
+ * them with different performance-tuned parameterizations of this type.  By
+ * incorporating this type into the kernel code itself, we guide the compiler in
+ * expanding/unrolling the kernel code for specific architectures and problem
+ * types.
  *
  * @tparam _ProblemData                 Problem data type.
- * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code
- * for.
- * @tparam _INSTRUMENT                  Whether or not we want instrumentation
- * logic generated
- * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have
- * resident per SM (influences per-CTA smem cache sizes and register
- * allocation/spills).
+ * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code for.
+ * @tparam _INSTRUMENT                  Whether or not we want instrumentation logic generated
+ * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have resident per SM (influences per-CTA smem cache sizes and register allocation/spills).
  * @tparam _LOG_THREADS                 Number of threads per CTA (log).
- * @tparam _LOG_LOAD_VEC_SIZE           Number of incoming frontier vertex-ids
- * to dequeue in a single load (log).
- * @tparam _LOG_LOADS_PER_TILE          Number of such loads that constitute a
- * tile of incoming frontier vertex-ids (log)
- * @tparam _LOG_RAKING_THREADS          Number of raking threads to use for
- * prefix sum (log), range [5, LOG_THREADS]
- * @tparam _WARP_GATHER_THRESHOLD       Adjacency-list length above which we
- * expand an that list using coarser-grained warp-based cooperative expansion
- *                                      (below which we perform fine-grained
- * scan-based expansion)
- * @tparam _CTA_GATHER_THRESHOLD        Adjacency-list length above which we
- * expand an that list using coarsest-grained CTA-based cooperative expansion
- *                                      (below which we perform warp-based
- * expansion)
- * @tparam _LOG_SCHEDULE_GRANULARITY    The scheduling granularity of incoming
- * frontier tiles (for even-share work distribution only) (log)
+ * @tparam _LOG_LOAD_VEC_SIZE           Number of incoming frontier vertex-ids to dequeue in a single load (log).
+ * @tparam _LOG_LOADS_PER_TILE          Number of such loads that constitute a tile of incoming frontier vertex-ids (log)
+ * @tparam _LOG_RAKING_THREADS          Number of raking threads to use for prefix sum (log), range [5, LOG_THREADS]
+ * @tparam _WARP_GATHER_THRESHOLD       Adjacency-list length above which we expand an that list using coarser-grained warp-based cooperative expansion
+ *                                      (below which we perform fine-grained scan-based expansion)
+ * @tparam _CTA_GATHER_THRESHOLD        Adjacency-list length above which we expand an that list using coarsest-grained CTA-based cooperative expansion
+ *                                      (below which we perform warp-based expansion)
+ * @tparam _LOG_SCHEDULE_GRANULARITY    The scheduling granularity of incoming frontier tiles (for even-share work distribution only) (log)
  */
 template <
     //typename _ProblemData,
@@ -98,41 +86,30 @@ struct KernelPolicy
         LOG_THREADS                     = _LOG_THREADS,
         THREADS                         = 1 << LOG_THREADS,
 
-    // SOA identity operator
-    __device__ __forceinline__ TileTuple operator()() {
-      return TileTuple(0, 0);
-    }
-  };
+        LOG_LOAD_VEC_SIZE               = _LOG_LOAD_VEC_SIZE,
+        LOAD_VEC_SIZE                   = 1 << LOG_LOAD_VEC_SIZE,
 
-  /**
-   * @brief Shared memory storage type for the CTA
-   */
-  struct SmemStorage {
-    // Persistent shared state for the CTA
-    struct State {
-      // Type describing four shared memory channels per warp for intra-warp
-      // communication
-      typedef SizeT WarpComm[WARPS][5];
+        LOG_LOADS_PER_TILE              = _LOG_LOADS_PER_TILE,
+        LOADS_PER_TILE                  = 1 << LOG_LOADS_PER_TILE,
 
-      // Whether or not we overflowed our outgoing frontier
-      bool overflowed;
+        LOG_RAKING_THREADS              = _LOG_RAKING_THREADS,
+        RAKING_THREADS                  = 1 << LOG_RAKING_THREADS,
 
-      // Shared work-processing limits
-      util::CtaWorkDistribution<SizeT> work_decomposition;
+        LOG_WARPS                       = LOG_THREADS - GR_LOG_WARP_THREADS(CUDA_ARCH),
+        WARPS                           = 1 << LOG_WARPS,
 
-      // Shared memory channels for intra-warp communication
-      volatile WarpComm warp_comm;
-      int cta_comm;
+        LOG_TILE_ELEMENTS_PER_THREAD    = LOG_LOAD_VEC_SIZE + LOG_LOADS_PER_TILE,
+        TILE_ELEMENTS_PER_THREAD        = 1 << LOG_TILE_ELEMENTS_PER_THREAD,
 
-      // Storage for scanning local contract-expand ranks
-      SizeT coarse_warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
-      SizeT fine_warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
+        LOG_TILE_ELEMENTS               = LOG_TILE_ELEMENTS_PER_THREAD + LOG_THREADS,
+        TILE_ELEMENTS                   = 1 << LOG_TILE_ELEMENTS,
 
-      // Enqueue offset for neighbors of the current tile
-      SizeT coarse_enqueue_offset;
-      SizeT fine_enqueue_offset;
+        LOG_SCHEDULE_GRANULARITY        = _LOG_SCHEDULE_GRANULARITY,
+        SCHEDULE_GRANULARITY            = 1 << LOG_SCHEDULE_GRANULARITY,
 
-    } state;
+        WARP_GATHER_THRESHOLD           = _WARP_GATHER_THRESHOLD,
+        CTA_GATHER_THRESHOLD            = _CTA_GATHER_THRESHOLD,
+    };
 
     // Prefix sum raking grid for coarse-grained expansion allocations
     typedef gunrock::util::RakingGrid<
@@ -252,22 +229,20 @@ struct KernelPolicy
             };
         };
     };
-  };
 
-  enum {
-    THREAD_OCCUPANCY = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
-    SMEM_OCCUPANCY = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
-    CTA_OCCUPANCY = GR_MIN(_MIN_CTA_OCCUPANCY,
-                           GR_MIN(GR_SM_CTAS(CUDA_ARCH),
-                                  GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
+    enum {
+        THREAD_OCCUPANCY                = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
+        SMEM_OCCUPANCY                  = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
+        CTA_OCCUPANCY                   = GR_MIN(_MIN_CTA_OCCUPANCY, GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
 
-    VALID = (CTA_OCCUPANCY > 0),
-  };
+        VALID                           = (CTA_OCCUPANCY > 0),
+    };
 };
 
-}  // namespace edge_map_forward
-}  // namespace oprtr
-}  // namespace gunrock
+
+} // namespace edge_map_forward
+} // namespace oprtr
+} // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

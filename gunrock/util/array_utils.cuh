@@ -803,40 +803,7 @@ public:
 #endif
         }
         return retval;
-      }
-    }
-  }  // ShrinkSize(...)
-
-  __host__ __device__ __forceinline__ Value* GetPointer(
-      unsigned int target = HOST) {
-    if (target == HOST) {
-      // if (ARRAY_DEBUG) {printf("%s \tpointer on HOST   get = %p\n",
-      // name.c_str(), h_pointer);fflush(stdout);}
-      return h_pointer;
-    }
-    if (target == DEVICE) {
-      // if (ARRAY_DEBUG) {printf("%s \tpointer on DEVICE get =
-      // %p\n",name.c_str(), d_pointer);fflush(stdout);}
-      return d_pointer;
-    }
-    return NULL;
-  }  // GetPointer(...)
-
-  cudaError_t SetPointer(Value* pointer, SizeT size = -1,
-                         unsigned int target = HOST) {
-    cudaError_t retval = cudaSuccess;
-    if (size == -1) size = this->size;
-    if (size < this->size) {
-      if (ARRAY_DEBUG) {
-        printf(
-            "%s\t setting pointer, size too small, size = %lld, this->size = "
-            "%lld\n",
-            name.c_str(), (long long)size, (long long)this->size);
-        fflush(stdout);
-      }
-      return GRError(name + " SetPointer size is too small", __FILE__,
-                     __LINE__);
-    }
+    } // SetPointer(...)
 
     cudaError_t ForceSetPointer(ValueT* pointer, Location target = ARRAY_DEFAULT_TARGET)
     {
@@ -1546,8 +1513,8 @@ public:
 
 }; // struct Array1D
 
-}  // namespace util
-}  // namespace gunrock
+} // namespace util
+} // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

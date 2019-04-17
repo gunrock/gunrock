@@ -37,8 +37,7 @@ typedef std::map<std::string, std::string> MetaData;
  * +----------------------------------------------+
  * |%%MatrixMarket matrix coordinate real general | <--- header line
  * |%                                             | <--+
- * |% comments                                    |    |-- 0 or more comment
- * lines
+ * |% comments                                    |    |-- 0 or more comment lines
  * |%                                             | <--+
  * |  M N L                                       | <--- rows, columns, entries
  * |  I1 J1 A(I1, J1)                             | <--+
@@ -133,7 +132,7 @@ cudaError_t ReadMarketStream(
     //if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
     //    srand(edge_value_seed);
 
-  char line[1024];
+    char line[1024];
 
     //bool ordered_rows = true;
     GUARD_CU(graph.CooT::Release());
@@ -350,17 +349,7 @@ cudaError_t ReadMarketStream(
     {
         fclose(f_in);
     }
-  }
 
-  if (is_first_line_empty) {
-    fprintf(stderr, "\nInvalid graph, first line cannot be empty.\n");
-    exit(1);
-  }
-
-  if (coo == NULL) {
-    fprintf(stderr, "No graph found\n");
-    return -1;
-  }
     meta_data["symmetric"] = symmetric ? "true" : "false";
     meta_data["array"    ] = array     ? "true" : "false";
     meta_data["skew"     ] = skew      ? "true" : "false";
@@ -615,7 +604,6 @@ cudaError_t Read(
             else if (retval)
                 GUARD_CU2(retval, "Writting binary failed");
         }
-      }
     }
 
     if (meta_data["got_edge_values"] != "true" &&

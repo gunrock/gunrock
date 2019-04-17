@@ -21,6 +21,7 @@
 namespace gunrock {
 namespace util {
 
+
 /**
  * Manages device storage needed for conveying kernel runtime stats
  */
@@ -73,16 +74,27 @@ public:
     {
         aggregate += increment;
     }
-  }
 
-  // Resets statistics. Typically called by thread-0.
-  __device__ __forceinline__ void Reset() const {
-    if (d_stat != NULL) {
-      d_stat[blockIdx.x + (CLOCKS * gridDim.x)] = 0;
-      d_stat[blockIdx.x + (AGGREGATE * gridDim.x)] = 0;
+    // Flushes statistics to global mem
+    __device__ __forceinline__ void Flush()
+    {
+        if (d_stat != NULL) {
+            d_stat[blockIdx.x + (CLOCKS * gridDim.x)] = clocks;
+            d_stat[blockIdx.x + (AGGREGATE * gridDim.x)] = aggregate;
+        }
     }
-  }
+
+    // Resets statistics. Typically called by thread-0.
+    __device__ __forceinline__ void Reset() const
+    {
+        if (d_stat != NULL) {
+            d_stat[blockIdx.x + (CLOCKS * gridDim.x)] = 0;
+            d_stat[blockIdx.x + (AGGREGATE * gridDim.x)] = 0;
+        }
+    }
+
 };
+
 
 /**
  * Version of global barrier with storage lifetime management.
@@ -247,32 +259,33 @@ public:
                 total_runtimes += runtime;
             }
 
-        total_runtimes += runtime;
-      }
+            total_lifetimes += (max_runtime * grid_size);
 
-      total_lifetimes += (max_runtime * grid_size);
+            // Accumulate aggregates
+            for (int block = 0; block < grid_size; block++) {
+                total_aggregate += h_stat[(AGGREGATE * grid_size) + block];
+            }
 
-      // Accumulate aggregates
-      for (int block = 0; block < grid_size; block++) {
-        total_aggregate += h_stat[(AGGREGATE * grid_size) + block];
-      }
+            free(h_stat);
 
-      free(h_stat);
+        } while (0);
 
-    } while (0);
+        return retval;
+    }
 
-    return retval;
-  }
 
-  // Accumulates avg live, max live
-  cudaError_t Accumulate(int grid_size, unsigned long long &total_runtimes,
-                         unsigned long long &total_lifetimes,
-                         bool check_gpu = true, cudaStream_t stream = 0) {
-    unsigned long long total_aggregate = 0;
-    return Accumulate(grid_size, total_runtimes, total_lifetimes,
-                      total_aggregate, check_gpu, stream);
-  }
+    // Accumulates avg live, max live
+    cudaError_t Accumulate(
+        int grid_size,
+        unsigned long long &total_runtimes,
+        unsigned long long &total_lifetimes,
+        bool check_gpu = true,
+        cudaStream_t stream = 0)
+    {
+        unsigned long long total_aggregate = 0;
+        return Accumulate(grid_size, total_runtimes, total_lifetimes, total_aggregate, check_gpu, stream);
+    }
 };
 
-}  // namespace util
-}  // namespace gunrock
+} // namespace util
+} // namespace gunrock

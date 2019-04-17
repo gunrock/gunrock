@@ -95,7 +95,7 @@ cudaError_t cubSegmentedReduce(
 {
     cudaError_t retval = cudaSuccess;
     size_t request_bytes = 0;
-    
+
     retval = cub::DispatchSegmentedReduce<InputT*, OutputT*, SizeT*,
         SizeT, ReductionOp>::Dispatch(
         NULL, request_bytes,
@@ -123,7 +123,7 @@ cudaError_t cubSegmentedReduce(
         reduction_op, initial_value, stream, debug_synchronous);
     if (retval)
         return retval;
- 
+
     return retval;
 }
 
@@ -141,7 +141,7 @@ cudaError_t cubReduce(
 {
     cudaError_t retval = cudaSuccess;
     size_t request_bytes = 0;
-    
+
     retval = cub::DispatchReduce<InputT*, OutputT*,
         SizeT, ReductionOp>::Dispatch(
         NULL, request_bytes,
@@ -165,7 +165,7 @@ cudaError_t cubReduce(
         reduction_op, initial_value, stream, debug_synchronous);
     if (retval)
         return retval;
- 
+
     return retval;
 }
 

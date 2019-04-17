@@ -122,7 +122,7 @@ struct BlockReduce
 
 
 using ReduceFlag = uint32_t;
-enum : ReduceFlag 
+enum : ReduceFlag
 {
     LOG_THREADS_    = 9,
     BLOCK_SIZE_     = 1 << LOG_THREADS_,
@@ -156,11 +156,11 @@ __global__ void SegReduce_Kernel(
 
     SizeT block_seg_idx = (SizeT)blockIdx.x * blockDim.x;
     SizeT seg_idx = 0, seg_start = 0, seg_end = 0, seg_size = 0;
-    int  warp_offset = (threadIdx.x >> BlockReduceT::LOG_WARP_THREADS) 
+    int  warp_offset = (threadIdx.x >> BlockReduceT::LOG_WARP_THREADS)
         << BlockReduceT::LOG_WARP_THREADS;
     int  lane_id = threadIdx.x & BlockReduceT::WARP_THREADS_MASK;
     bool seg_active = false;
- 
+
     while (block_seg_idx < num_segments)
     {
         seg_idx = block_seg_idx + threadIdx.x;
@@ -212,11 +212,11 @@ __global__ void SegReduce_Kernel(
             }
             val = BlockReduceT::WarpReduce(val, reduce_op);
             if (lane_id == 0)
-                keys_out[s_seg_idxs[warp_offset + i]] = val; 
+                keys_out[s_seg_idxs[warp_offset + i]] = val;
         }
         __syncthreads();
 
-        BlockScanT::LogicScan((seg_active && seg_size < GRID_THRESHOLD)? 1 : 0, store_pos, 
+        BlockScanT::LogicScan((seg_active && seg_size < GRID_THRESHOLD)? 1 : 0, store_pos,
             s_temp_space.scan, num_segs_in_store);
         if (seg_active && seg_size < GRID_THRESHOLD)
         {
@@ -249,7 +249,7 @@ __global__ void SegReduce_Kernel(
             grid_segments[store_pos] = seg_idx;
             keys_out[seg_idx] = init_value;
             //printf("Pos %d <- Seg %d, [%d, %d)\n",
-            //    store_pos, seg_idx, seg_start, seg_end); 
+            //    store_pos, seg_idx, seg_start, seg_end);
         }
         block_seg_idx += (SizeT)gridDim.x * blockDim.x;
     }
@@ -331,4 +331,3 @@ __global__ void SegReduce_GKernel(
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-

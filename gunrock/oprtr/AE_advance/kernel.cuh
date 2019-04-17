@@ -268,7 +268,7 @@ void Kernel(
         graph, keys_out, values_out,
         work_progress.template GetQueueCounter<typename GraphT::VertexT>
             (queue_index + 1),
-        //reduce_values_in, reduce_values_out, 
+        //reduce_values_in, reduce_values_out,
         advance_op);
 }
 

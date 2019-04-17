@@ -89,7 +89,7 @@ cudaError_t Launch(
 
     if ((parameters.advance_mode == "LB" ||
          parameters.advance_mode == "LB_LIGHT" ||
-         (parameters.advance_mode == "ALL_EDGES" && 
+         (parameters.advance_mode == "ALL_EDGES" &&
           ((GraphT::FLAG & graph::HAS_CSR) != 0 ||
            (GraphT::FLAG & graph::HAS_CSC) != 0))) &&
         ((FLAG & OprtrMode_ReduceMask) == OprtrMode_REDUCE_TO_SRC ||
@@ -105,7 +105,7 @@ cudaError_t Launch(
         //    + ", size = " + std::to_string(values_temp.GetSize()));
         GUARD_CU(oprtr::Advance<FLAG>(
             graph, frontier_in, frontier_out, parameters,
-            [advance_op, values_temp, init_value] 
+            [advance_op, values_temp, init_value]
             __host__ __device__ (
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
@@ -135,7 +135,7 @@ cudaError_t Launch(
         auto &values_temp2_ = values_temp2[0];
         auto offsets = frontier.segment_offsets;
         //GUARD_CU(cudaStreamSynchronize(parameters.stream));
-        //util::PrintMsg("Past Advance");   
+        //util::PrintMsg("Past Advance");
 
         //GUARD_CU(values_temp2_.ForEach(
         //    [] __host__ __device__ (ValueT &val)
@@ -143,7 +143,7 @@ cudaError_t Launch(
         //        val = 0;
         //    }, parameters.advance_mode == "ALL_EDGES" ? graph.nodes : frontier.queue_length,
         //    util::DEVICE, parameters.stream));
- 
+
         typedef GraphTypeSwitch<GraphT, GraphT::FLAG & (graph::HAS_CSR | graph::HAS_CSC)>
             GraphSwitchT;
         if (parameters.advance_mode == "ALL_EDGES")
@@ -162,7 +162,7 @@ cudaError_t Launch(
                 reduce_op, init_value, parameters.stream));
         }
         //GUARD_CU(cudaStreamSynchronize(parameters.stream));
-        //util::PrintMsg("Past SegReduce");   
+        //util::PrintMsg("Past SegReduce");
 
         bool reduce_reset = parameters.reduce_reset;
         if ((FLAG & OprtrMode_ReduceMask) == OprtrMode_REDUCE_TO_SRC &&
@@ -170,7 +170,7 @@ cudaError_t Launch(
         {
             auto &keys_in = frontier_in[0];
             GUARD_CU(parameters.reduce_values_out -> ForAll(
-                [values_temp2_, keys_in, reduce_reset, reduce_op] 
+                [values_temp2_, keys_in, reduce_reset, reduce_op]
                 __host__ __device__ (ValueT *vals, const SizeT &pos)
                 {
                     SizeT val_pos = keys_in[pos];
@@ -179,7 +179,7 @@ cudaError_t Launch(
                 }, frontier.queue_length, util::DEVICE, parameters.stream));
         } else {
             GUARD_CU(parameters.reduce_values_out -> ForAll(
-                [values_temp2_, reduce_reset, reduce_op] 
+                [values_temp2_, reduce_reset, reduce_op]
                 __host__ __device__ (ValueT *vals, const SizeT &pos)
                 {
                     ValueT new_val = reduce_reset ? values_temp2_[pos]
@@ -187,11 +187,11 @@ cudaError_t Launch(
                     //printf("vals[%d] : %f <- %f\n",
                     //    pos, vals[pos], new_val);
                     vals[pos] = new_val;
-                }, parameters.advance_mode == "ALL_EDGES" ? graph.nodes : 
+                }, parameters.advance_mode == "ALL_EDGES" ? graph.nodes :
                 frontier.queue_length, util::DEVICE, parameters.stream));
         }
         //GUARD_CU(cudaStreamSynchronize(parameters.stream));
-        //util::PrintMsg("Past Val Assigment");   
+        //util::PrintMsg("Past Val Assigment");
     }
 
     else if (parameters.advance_mode == "TWC" &&
@@ -200,7 +200,7 @@ cudaError_t Launch(
     {
         GUARD_CU2(cudaErrorNotSupported,
             "NeighborReduce with TWC advance and reduce to source or input_pos "
-            "has not been implemented yet."); 
+            "has not been implemented yet.");
     }
 
     else if ((FLAG & OprtrMode_ReduceMask) == OprtrMode_REDUCE_TO_DEST ||
@@ -250,7 +250,7 @@ cudaError_t Launch(
             " reduce target combination is not supported");
     }
 
-    return retval;    
+    return retval;
 }
 
 } //neighborreduce
@@ -262,4 +262,3 @@ cudaError_t Launch(
 // mode:c++
 // c-file-style: "NVIDIA"
 // End:
-

@@ -70,13 +70,7 @@ cudaError_t omp_sort(
     if (retval = table3.Allocate(num_elements, HOST))
         return retval;
 
-    SizeT step = (end_pos - start_pos) / (num_threads * pivot_multi);
-    for (int i = 0; i < num_threads * pivot_multi; i++)
-      table2[i * num_threads + thread_num] =
-          elements[start_pos + int((i + 0.1) * step)];
-
-#pragma omp barrier
-#pragma omp single
+    #pragma omp parallel
     {
         int   thread_num  = omp_get_thread_num();
         int   num_threads = omp_get_num_threads();
@@ -167,8 +161,8 @@ cudaError_t omp_sort(
     return retval;
 }
 
-}  // namespace util
-}  // namespace gunrock
+} //namespace util
+} //namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

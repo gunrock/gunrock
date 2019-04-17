@@ -23,11 +23,11 @@ namespace LB {
  *
  * Parameterizations of this type encapsulate our kernel-tuning parameters
  *
- * Kernels can be specialized for problem-type, SM-version, etc. by
- * parameterizing them with different performance-tuned parameterizations of
- * this type.  By incorporating this type into the kernel code itself, we guide
- * the compiler in expanding/unrolling the kernel code for specific
- * architectures and problem types.
+ * Kernels can be specialized for problem-type, SM-version, etc. by parameterizing
+ * them with different performance-tuned parameterizations of this type.  By
+ * incorporating this type into the kernel code itself, we guide the compiler in
+ * expanding/unrolling the kernel code for specific architectures and problem
+ * types.
  *
  * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have resident per SM (influences per-CTA smem cache sizes and register allocation/spills).
  * @tparam _LOG_THREADS                 Number of threads per CTA (log).
@@ -73,14 +73,7 @@ struct KernelPolicy
 
         SCRATCH_ELEMENTS                 = 256, //(THREADS > MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE) ? MAX_SCRATCH_BYTES_PER_CTA / SCRATCH_ELEMENT_SIZE : THREADS,
     };
-  };
 
-  enum {
-    THREAD_OCCUPANCY = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
-    SMEM_OCCUPANCY = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
-    CTA_OCCUPANCY = GR_MIN(_MIN_CTA_OCCUPANCY,
-                           GR_MIN(GR_SM_CTAS(CUDA_ARCH),
-                                  GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
 
     /**
      * @brief Shared memory storage type for the CTA

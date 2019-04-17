@@ -5,6 +5,7 @@
 // in the root directory of this source distribution.
 // ----------------------------------------------------------------
 
+
 /**
  * @file
  * kernel.cuh
@@ -12,9 +13,9 @@
  * @brief Intersection Kernel Entry point
  *
  * Expected inputs are two arrays of node IDs, each pair of nodes forms an edge.
- * The intersections of each node pair's neighbor lists are computed and
- * returned as a single usnigned int value. Can perform user-defined functors on
- * each of these intersection.
+ * The intersections of each node pair's neighbor lists are computed and returned
+ * as a single usnigned int value. Can perform user-defined functors on each of
+ * these intersection.
  */
 
 
@@ -142,42 +143,6 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true>
     } // IntersectTwoSmallNL
 };
 
-/**
- * @brief Kernel entry for Inspect function
- *
- * @tparam KernelPolicy Kernel policy type for intersection.
- * @tparam ProblemData Problem data type for intersection.
- * @tparam Functor Functor type for the specific problem type.
- *
- * @param[in] d_src_node_ids    Device pointer of VertexId to the incoming
- * frontier queue (source node ids)
- * @param[in] d_dst_node_ids    Device pointer of VertexId to the incoming
- * frontier queue (destination node ids)
- * @param[in] d_edge_list       Device pointer of SizeT to the edge list index
- * @param[in] d_degrees         Device pointer of SizeT to the degree array
- * @param[out] d_flags          Device pointer of SizeT to the partition flag
- * queue
- * @param[in] input_queue_len   Length of the incoming frontier
- * queues(d_src_node_ids and d_dst_node_ids should have the same length)
- * @param[in] max_vertices      Maximum number of elements we can place into the
- *                              incoming frontier
- * @param[in] max_edges         Maximum number of elements we can place into the
- *                              outgoing frontier
- */
-template <typename KernelPolicy, typename ProblemData, typename Functor>
-__launch_bounds__(KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY) __global__
-    void Inspect(typename KernelPolicy::VertexId *d_src_node_ids,
-                 typename KernelPolicy::VertexId *d_dst_node_ids,
-                 typename KernelPolicy::VertexId *d_edge_list,
-                 typename KernelPolicy::SizeT *d_degrees,
-                 typename KernelPolicy::SizeT *d_flags,
-                 typename KernelPolicy::SizeT input_queue_len,
-                 typename KernelPolicy::SizeT max_vertices,
-                 typename KernelPolicy::SizeT max_edges) {
-  Dispatch<KernelPolicy, ProblemData, Functor>::Inspect(
-      d_src_node_ids, d_dst_node_ids, d_edge_list, d_degrees, d_flags,
-      input_queue_len, max_vertices, max_edges);
-}
 
 /**
  * @brief Kernel entry for IntersectTwoSmallNL function
@@ -194,12 +159,9 @@ __launch_bounds__(KernelPolicy::THREADS, KernelPolicy::CTA_OCCUPANCY) __global__
  * @param[in] d_degrees         Device pointer of SizeT to degree array
  * @param[in] problem           Device pointer to the problem object
  * @param[out] d_output_counts  Device pointer to the output counts array
- * @param[in] input_length      Length of the incoming frontier queues
- * (d_src_node_ids and d_dst_node_ids should have the same length)
- * @param[in] num_vertex        Maximum number of elements we can place into the
- * incoming frontier
- * @param[in] num_edge          Maximum number of elements we can place into the
- * outgoing frontier
+ * @param[in] input_length      Length of the incoming frontier queues (d_src_node_ids and d_dst_node_ids should have the same length)
+ * @param[in] num_vertex        Maximum number of elements we can place into the incoming frontier
+ * @param[in] num_edge          Maximum number of elements we can place into the outgoing frontier
  *
  */
 template <
@@ -294,9 +256,9 @@ cudaError_t Launch(
     return cudaSuccess;//(float)tc_count / (float)total;
 }
 
-}  // namespace intersection
-}  // namespace oprtr
-}  // namespace gunrock
+}  // intersection
+}  // oprtr
+}  // gunrock
 
 // Leave this at the end of the file
 // Local Variables:

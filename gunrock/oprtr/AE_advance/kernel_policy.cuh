@@ -25,11 +25,11 @@ namespace AE {
  *
  * Parameterizations of this type encapsulate our kernel-tuning parameters
  *
- * Kernels can be specialized for problem-type, SM-version, etc. by
- * parameterizing them with different performance-tuned parameterizations of
- * this type.  By incorporating this type into the kernel code itself, we guide
- * the compiler in expanding/unrolling the kernel code for specific
- * architectures and problem types.
+ * Kernels can be specialized for problem-type, SM-version, etc. by parameterizing
+ * them with different performance-tuned parameterizations of this type.  By
+ * incorporating this type into the kernel code itself, we guide the compiler in
+ * expanding/unrolling the kernel code for specific architectures and problem
+ * types.
  *
  * @tparam _MAX_CTA_OCCUPANCY           Lower bound on number of CTAs to have resident per SM (influences per-CTA smem cache sizes and register allocation/spills).
  * @tparam _LOG_THREADS                 Number of threads per CTA (log).
@@ -77,7 +77,6 @@ struct KernelPolicy
             SizeT *output_counter;
         };
     };
-  };
 
     enum {
         THREAD_OCCUPANCY                = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
@@ -87,9 +86,10 @@ struct KernelPolicy
     };
 };
 
-}  // namespace all_edges_advance
-}  // namespace oprtr
-}  // namespace gunrock
+
+} // namespace edge_map_partitioned
+} // namespace oprtr
+} // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

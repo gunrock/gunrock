@@ -190,56 +190,63 @@ __global__ void Assign_Marker_Backward(
  */
 template <typename VertexId, typename SizeT, typename Value,
           SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES>
-__global__ void Make_Out(const SizeT num_elements, const int num_gpus,
-                         const VertexId* const keys_in,
-                         const int* const partition_table,
-                         const VertexId* const convertion_table,
-                         const size_t array_size, char* array) {
-  extern __shared__ char s_array[];
-  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-  size_t offset = 0;
-  SizeT** s_marker = (SizeT**)&(s_array[offset]);
-  offset += sizeof(SizeT*) * num_gpus;
-  VertexId** s_keys_outs = (VertexId**)&(s_array[offset]);
-  offset += sizeof(VertexId*) * num_gpus;
-  VertexId** s_vertex_associate_orgs = (VertexId**)&(s_array[offset]);
-  offset += sizeof(VertexId*) * NUM_VERTEX_ASSOCIATES;
-  Value** s_value__associate_orgs = (Value**)&(s_array[offset]);
-  offset += sizeof(Value*) * NUM_VALUE__ASSOCIATES;
-  VertexId** s_vertex_associate_outss = (VertexId**)&(s_array[offset]);
-  offset += sizeof(VertexId*) * num_gpus * NUM_VERTEX_ASSOCIATES;
-  Value** s_value__associate_outss = (Value**)&(s_array[offset]);
-  offset += sizeof(Value*) * num_gpus * NUM_VALUE__ASSOCIATES;
-  SizeT* s_offset = (SizeT*)&(s_array[offset]);
-  SizeT x = threadIdx.x;
+__global__ void Make_Out(
+   const  SizeT             num_elements,
+   const  int               num_gpus,
+   const  VertexId*   const keys_in,
+   const  int*        const partition_table,
+   const  VertexId*   const convertion_table,
+   const  size_t            array_size,
+          char*             array)
+{
+    extern __shared__ char s_array[];
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    size_t     offset                  = 0;
+    SizeT**    s_marker                = (SizeT**   )&(s_array[offset]);
+    offset+=sizeof(SizeT*   ) * num_gpus;
+    VertexId** s_keys_outs             = (VertexId**)&(s_array[offset]);
+    offset+=sizeof(VertexId*) * num_gpus;
+    VertexId** s_vertex_associate_orgs = (VertexId**)&(s_array[offset]);
+    offset+=sizeof(VertexId*) * NUM_VERTEX_ASSOCIATES;
+    Value**    s_value__associate_orgs = (Value**   )&(s_array[offset]);
+    offset+=sizeof(Value*   ) * NUM_VALUE__ASSOCIATES;
+    VertexId** s_vertex_associate_outss= (VertexId**)&(s_array[offset]);
+    offset+=sizeof(VertexId*) * num_gpus * NUM_VERTEX_ASSOCIATES;
+    Value**    s_value__associate_outss= (Value**   )&(s_array[offset]);
+    offset+=sizeof(Value*   ) * num_gpus * NUM_VALUE__ASSOCIATES;
+    SizeT*     s_offset                = (SizeT*    )&(s_array[offset]);
+    SizeT x= threadIdx.x;
 
-  while (x < array_size) {
-    s_array[x] = array[x];
-    x += blockDim.x;
-  }
-  __syncthreads();
-
-  x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
-  while (x < num_elements) {
-    VertexId key = keys_in[x];
-    int target = partition_table[key];
-    SizeT pos = s_marker[target][x] - 1 + s_offset[target];
-
-    if (target == 0) {
-      s_keys_outs[0][pos] = key;
-    } else {
-      s_keys_outs[target][pos] = convertion_table[key];
-#pragma unroll
-      for (int i = 0; i < NUM_VERTEX_ASSOCIATES; i++)
-        s_vertex_associate_outss[target * NUM_VERTEX_ASSOCIATES + i][pos] =
-            s_vertex_associate_orgs[i][key];
-#pragma unroll
-      for (int i = 0; i < NUM_VALUE__ASSOCIATES; i++)
-        s_value__associate_outss[target * NUM_VALUE__ASSOCIATES + i][pos] =
-            s_value__associate_orgs[i][key];
+    while (x<array_size)
+    {
+        s_array[x]=array[x];
+        x+=blockDim.x;
     }
-    x += STRIDE;
-  }
+    __syncthreads();
+
+    x= (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+    while (x<num_elements)
+    {
+        VertexId key    = keys_in [x];
+        int      target = partition_table[key];
+        SizeT    pos    = s_marker[target][x]-1 + s_offset[target];
+
+        if (target==0)
+        {
+            s_keys_outs[0][pos]=key;
+        } else {
+            s_keys_outs[target][pos]=convertion_table[key];
+            #pragma unroll
+            for (int i = 0; i < NUM_VERTEX_ASSOCIATES; i++)
+                s_vertex_associate_outss[ target * NUM_VERTEX_ASSOCIATES + i][pos]
+                    =s_vertex_associate_orgs[i][key];
+            #pragma unroll
+            for (int i = 0; i < NUM_VALUE__ASSOCIATES; i++)
+                s_value__associate_outss[ target * NUM_VALUE__ASSOCIATES + i][pos]
+                    =s_value__associate_orgs[i][key];
+        }
+        x+=STRIDE;
+    }
 }
 
 /*
@@ -261,63 +268,72 @@ __global__ void Make_Out(const SizeT num_elements, const int num_gpus,
  */
 template <typename VertexId, typename SizeT, typename Value,
           SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES>
-__global__ void Make_Out_Backward(const SizeT num_elements, const int num_gpus,
-                                  const VertexId* const keys_in,
-                                  const SizeT* const offsets,
-                                  const int* const partition_table,
-                                  const VertexId* const convertion_table,
-                                  const size_t array_size, char* array) {
-  extern __shared__ char s_array[];
-  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-  size_t offset = 0;
-  SizeT** s_marker = (SizeT**)&(s_array[offset]);
-  offset += sizeof(SizeT*) * num_gpus;
-  VertexId** s_keys_outs = (VertexId**)&(s_array[offset]);
-  offset += sizeof(VertexId*) * num_gpus;
-  VertexId** s_vertex_associate_orgs = (VertexId**)&(s_array[offset]);
-  offset += sizeof(VertexId*) * NUM_VERTEX_ASSOCIATES;
-  Value** s_value__associate_orgs = (Value**)&(s_array[offset]);
-  offset += sizeof(Value*) * NUM_VALUE__ASSOCIATES;
-  VertexId** s_vertex_associate_outss = (VertexId**)&(s_array[offset]);
-  offset += sizeof(VertexId*) * num_gpus * NUM_VERTEX_ASSOCIATES;
-  Value** s_value__associate_outss = (Value**)&(s_array[offset]);
-  offset += sizeof(Value*) * num_gpus * NUM_VALUE__ASSOCIATES;
-  SizeT* s_offset = (SizeT*)&(s_array[offset]);
-  SizeT x = threadIdx.x;
+__global__ void Make_Out_Backward(
+   const  SizeT             num_elements,
+   const  int               num_gpus,
+   const  VertexId*   const keys_in,
+   const  SizeT*      const offsets,
+   const  int*        const partition_table,
+   const  VertexId*   const convertion_table,
+   const  size_t            array_size,
+          char*             array)
+{
+    extern __shared__ char s_array[];
+    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+    size_t     offset                  = 0;
+    SizeT**    s_marker                = (SizeT**   )&(s_array[offset]);
+    offset+=sizeof(SizeT*   ) * num_gpus;
+    VertexId** s_keys_outs             = (VertexId**)&(s_array[offset]);
+    offset+=sizeof(VertexId*) * num_gpus;
+    VertexId** s_vertex_associate_orgs = (VertexId**)&(s_array[offset]);
+    offset+=sizeof(VertexId*) * NUM_VERTEX_ASSOCIATES;
+    Value**    s_value__associate_orgs = (Value**   )&(s_array[offset]);
+    offset+=sizeof(Value*   ) * NUM_VALUE__ASSOCIATES;
+    VertexId** s_vertex_associate_outss= (VertexId**)&(s_array[offset]);
+    offset+=sizeof(VertexId*) * num_gpus * NUM_VERTEX_ASSOCIATES;
+    Value**    s_value__associate_outss= (Value**   )&(s_array[offset]);
+    offset+=sizeof(Value*   ) * num_gpus * NUM_VALUE__ASSOCIATES;
+    SizeT*     s_offset                = (SizeT*    )&(s_array[offset]);
+    SizeT x= threadIdx.x;
 
-  while (x < array_size) {
-    s_array[x] = array[x];
-    x += blockDim.x;
-  }
-  __syncthreads();
-
-  x = (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
-  while (x < num_elements) {
-    VertexId key = keys_in[x];
-    if (key < 0) {
-      x += STRIDE;
-      continue;
+    while (x<array_size)
+    {
+        s_array[x]=array[x];
+        x+=blockDim.x;
     }
-    for (SizeT j = offsets[key]; j < offsets[key + 1]; j++) {
-      int target = partition_table[j];
-      SizeT pos = s_marker[target][x] - 1 + s_offset[target];
+    __syncthreads();
 
-      if (target == 0) {
-        s_keys_outs[0][pos] = key;
-      } else {
-        s_keys_outs[target][pos] = convertion_table[j];
-#pragma unroll
-        for (int i = 0; i < NUM_VERTEX_ASSOCIATES; i++)
-          s_vertex_associate_outss[target * NUM_VERTEX_ASSOCIATES + i][pos] =
-              s_vertex_associate_orgs[i][key];
-#pragma unroll
-        for (int i = 0; i < NUM_VALUE__ASSOCIATES; i++)
-          s_value__associate_outss[target * NUM_VALUE__ASSOCIATES + i][pos] =
-              s_value__associate_orgs[i][key];
-      }
+    x= (SizeT)blockIdx.x * blockDim.x + threadIdx.x;
+    while (x<num_elements)
+    {
+        VertexId key    = keys_in [x];
+        if (key < 0)
+        {
+            x+=STRIDE;
+            continue;
+        }
+        for (SizeT j = offsets[key]; j < offsets[key+1]; j++)
+        {
+            int      target = partition_table[j];
+            SizeT    pos    = s_marker[target][x]-1 + s_offset[target];
+
+            if (target==0)
+            {
+                s_keys_outs[0][pos]=key;
+            } else {
+                s_keys_outs[target][pos]=convertion_table[j];
+                #pragma unroll
+                for (int i = 0; i < NUM_VERTEX_ASSOCIATES; i++)
+                    s_vertex_associate_outss[ target * NUM_VERTEX_ASSOCIATES + i][pos]
+                        =s_vertex_associate_orgs[i][key];
+                #pragma unroll
+                for (int i = 0; i < NUM_VALUE__ASSOCIATES; i++)
+                    s_value__associate_outss[ target * NUM_VALUE__ASSOCIATES + i][pos]
+                        =s_value__associate_orgs[i][key];
+            }
+        }
+        x+=STRIDE;
     }
-    x += STRIDE;
-  }
 }
 
 template <typename VertexT, typename SizeT, typename ValueT,
@@ -395,40 +411,27 @@ __global__ void MakeOutput_Kernel(
             d_keys_outs[target][out_pos] = d_convertion_table[key];
         }
 
-    if (in_pos >= num_elements) break;
-    // printf("(%4d, %4d) : in_pos = %d, key = %d, target = %d, out_pos = %d +
-    // %d\n",
-    //    blockIdx.x, threadIdx.x, in_pos, key, target, out_pos,
-    //    offset[target]-1);
-    if (key < 0) {
-      in_pos += STRIDE;
-      continue;
+        if (target != 0)
+        {
+            out_offset = out_pos * NUM_VERTEX_ASSOCIATES;
+            //#pragma unroll
+            for (int i = 0; i < NUM_VERTEX_ASSOCIATES; i++)
+            {
+                d_vertex_associate_outs[target][out_offset]
+                    =d_vertex_associate_orgs[i][key];
+                out_offset ++;
+            }
+            out_offset = out_pos * NUM_VALUE__ASSOCIATES;
+            //#pragma unroll
+            for (int i = 0; i < NUM_VALUE__ASSOCIATES; i++)
+            {
+                d_value__associate_outs[target][out_offset]
+                    =d_value__associate_orgs[i][key];
+                out_offset ++;
+            }
+        }
+        in_pos += STRIDE;
     }
-    out_pos += sum_offset[target] - 1;
-    if (skip_convertion) {
-      d_keys_outs[target][out_pos] = key;
-    } else {
-      d_keys_outs[target][out_pos] = d_convertion_table[key];
-    }
-
-    if (target != 0) {
-      out_offset = out_pos * NUM_VERTEX_ASSOCIATES;
-      //#pragma unroll
-      for (int i = 0; i < NUM_VERTEX_ASSOCIATES; i++) {
-        d_vertex_associate_outs[target][out_offset] =
-            d_vertex_associate_orgs[i][key];
-        out_offset++;
-      }
-      out_offset = out_pos * NUM_VALUE__ASSOCIATES;
-      //#pragma unroll
-      for (int i = 0; i < NUM_VALUE__ASSOCIATES; i++) {
-        d_value__associate_outs[target][out_offset] =
-            d_value__associate_orgs[i][key];
-        out_offset++;
-      }
-    }
-    in_pos += STRIDE;
-  }
 }
 
 template <typename VertexT, typename SizeT, typename ValueT,
@@ -526,14 +529,10 @@ __global__ void MakeOutput_Backward_Kernel(
                 //    key, out_pos[target], d_value__associate_orgs[0][key], d_value__associate_orgs[1][key]);
             }
         }
-        // printf("Make_Output : values[%2d, %2d] = %.4f, %.4f\n",
-        //    key, out_pos[target], d_value__associate_orgs[0][key],
-        //    d_value__associate_orgs[1][key]);
-      }
+        in_pos += STRIDE;
     }
-    in_pos += STRIDE;
-  }
 }
+
 
 template <typename VertexT, typename SizeT, typename ValueT,
           SizeT NUM_VERTEX_ASSOCIATES, SizeT NUM_VALUE__ASSOCIATES>
@@ -575,8 +574,6 @@ __global__ void MakeOutput_SkipSelection_Kernel(
         }
         in_pos += STRIDE;
     }
-    in_pos += STRIDE;
-  }
 }
 
 template <

@@ -862,10 +862,10 @@ cudaError_t Launch(
             ::template Launch_Csr_Csc<FLAG> (graph, frontier_in, frontier_out,
                 parameters, advance_op, filter_op);
 
-    else 
+    else
         retval = util::GRError(cudaErrorInvalidDeviceFunction,
         "LB is not implemented for given graph representation.");
-    
+
     return retval;
 }
 
@@ -896,7 +896,7 @@ cudaError_t Launch_Light(
         retval = GraphT_Switch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSC) != 0>
             ::template Launch_Light_Csr_Csc<FLAG> (graph, frontier_in,
                 frontier_out, parameters, advance_op, filter_op);
-    
+
     else
         retval = util::GRError(cudaErrorInvalidDeviceFunction,
         "LB is not implemented for given graph representation.");

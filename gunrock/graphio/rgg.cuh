@@ -30,45 +30,53 @@ typedef std::mt19937 Engine;
 typedef std::uniform_real_distribution<double> Distribution;
 
 template <typename T>
-inline T SqrtSum(T x, T y) {
-  return sqrt(x * x + y * y);
+inline T SqrtSum(T x, T y)
+{
+    return sqrt(x*x + y*y);
 }
 
 template <typename T>
-T P2PDistance(T co_x0, T co_y0, T co_x1, T co_y1) {
-  return SqrtSum(co_x0 - co_x1, co_y0 - co_y1);
+T P2PDistance(T co_x0, T co_y0, T co_x1, T co_y1)
+{
+    return SqrtSum(co_x0 - co_x1, co_y0 - co_y1);
 }
 
 class RggPoint {
- public:
-  double x, y;
-  long long node;
+public:
+    double x, y;
+    long long node;
 
-  RggPoint() {}
-  RggPoint(double x, double y, long long node) {
-    this->x = x;
-    this->y = y;
-    this->node = node;
-  }
+    RggPoint() {}
+    RggPoint(double x, double y, long long node)
+    {
+        this->x = x;
+        this->y = y;
+        this->node = node;
+    }
 };
 
-// inline bool operator< (const RggPoint& lhs, const RggPoint& rhs)
+//inline bool operator< (const RggPoint& lhs, const RggPoint& rhs)
 template <typename Point>
-bool XFirstPointCompare(Point lhs, Point rhs) {
-  if (lhs.x < rhs.x) return true;
-  if (lhs.x > rhs.x) return false;
-  if (lhs.y < rhs.y) return true;
-  return false;
+bool XFirstPointCompare (
+    Point lhs,
+    Point rhs)
+{
+    if (lhs.x < rhs.x) return true;
+    if (lhs.x > rhs.x) return false;
+    if (lhs.y < rhs.y) return true;
+    return false;
 }
 
 template <typename T>
-bool PureTwoFactor(T x) {
-  if (x < 3) return true;
-  while (x > 0) {
-    if ((x % 2) != 0) return false;
-    x /= 2;
-  }
-  return true;
+bool PureTwoFactor(T x)
+{
+    if (x<3) return true;
+    while (x > 0)
+    {
+        if ((x%2) != 0) return false;
+        x /= 2;
+    }
+    return true;
 }
 
 cudaError_t UseParameters(
@@ -273,11 +281,8 @@ cudaError_t Build(
                 pos = block_length[block_index];
                 block_length[block_index] += 1;
             }
-            counter++;
-          }
+            blocks[block_index][pos] = node;
         }
-    }
-    offsets[thread_num + 1] = counter;
 
         #pragma omp barrier
 
@@ -434,9 +439,9 @@ cudaError_t Load(
         ::Load(parameters, graph_, graph_prefix);
 }
 
-}  // namespace rgg
-}  // namespace graphio
-}  // namespace gunrock
+} // namespace rgg
+} // namespace graphio
+} // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:
