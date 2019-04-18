@@ -376,7 +376,7 @@ cudaError_t ReadBinary(
     else
         filename = parameters.Get<std::string>(graph_prefix + "binary-prefix");
 
-    util::PrintMsg("  Reading edge lists from "
+    util::PrintMsg("  Reading edge lists from " 
         + filename + ".coo_edge_pairs", !quiet);
     retval = graph.CooT::edge_pairs.ReadBinary(
         filename + ".coo_edge_pairs", true);
@@ -384,10 +384,10 @@ cudaError_t ReadBinary(
         return retval;
     else GUARD_CU(retval);
 
-    if ((GraphT::FLAG & graph::HAS_EDGE_VALUES) != 0 &&
+    if ((GraphT::FLAG & graph::HAS_EDGE_VALUES) != 0 && 
         meta_data["got_edge_values"] == "true")
     {
-        util::PrintMsg("  Reading edge values from "
+        util::PrintMsg("  Reading edge values from " 
             + filename + ".coo_edge_values", !quiet);
         retval = graph.CooT::edge_values.ReadBinary(
             filename + ".coo_edge_values", true);
@@ -398,7 +398,7 @@ cudaError_t ReadBinary(
 
     if (GraphT::FLAG & graph::HAS_NODE_VALUES)
     {
-        util::PrintMsg("  Reading node values from "
+        util::PrintMsg("  Reading node values from " 
             + filename + ".coo_node_values", !quiet);
         retval = graph.CooT::node_values.ReadBinary(
             filename + ".coo_node_values", true);
@@ -434,7 +434,7 @@ cudaError_t WriteBinary(
         return retval;
     else GUARD_CU(retval);
 
-    if ((GraphT::FLAG & graph::HAS_EDGE_VALUES) != 0 &&
+    if ((GraphT::FLAG & graph::HAS_EDGE_VALUES) != 0 && 
         meta_data["got_edge_values"] == "true")
     {
         util::PrintMsg("  Writting edge values in binary into "

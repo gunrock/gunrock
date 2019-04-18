@@ -58,6 +58,7 @@
 #ifndef _SHAREDMEM_H_
 #define _SHAREDMEM_H_
 
+
 /** @brief Wrapper class for templatized dynamic shared memory arrays.
   *
   * This struct uses template specialization on the type \a T to declare
@@ -171,23 +172,21 @@ struct SharedMemory <uchar4>
     __device__ uchar4* getPointer() { extern __shared__ uchar4 s_uchar4[]; return s_uchar4; }
 };
 
+
 template <>
-struct SharedMemory<int*> {
-  __device__ int** getPointer() {
-    extern __shared__ int* s_intP[];
-    return s_intP;
-  }
+struct SharedMemory <int*>
+{
+    __device__ int** getPointer() { extern __shared__ int* s_intP[]; return s_intP; }
 };
 
 template <>
-struct SharedMemory<long long*> {
-  __device__ long long** getPointer() {
-    extern __shared__ long long* s_longlongP[];
-    return s_longlongP;
-  }
+struct SharedMemory <long long*>
+{
+    __device__ long long** getPointer() { extern __shared__ long long* s_longlongP[]; return s_longlongP; }
 };
 
-#endif  //_SHAREDMEM_H_
+
+#endif //_SHAREDMEM_H_
 
 // Leave this at the end of the file
 // Local Variables:

@@ -249,3 +249,4 @@ struct RakingDetails : RakingGrid
 
 } // namespace util
 } // namespace gunrock
+

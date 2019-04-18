@@ -141,7 +141,6 @@ cudaError_t Build(
         }
         edge_counter ++;
     }
-  }
 
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
@@ -242,9 +241,9 @@ cudaError_t Load(
         ::Load(parameters, graph, graph_prefix);
 }
 
-}  // namespace small_world
-}  // namespace graphio
-}  // namespace gunrock
+} // namespace small_world
+} // namespace graphio
+} // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

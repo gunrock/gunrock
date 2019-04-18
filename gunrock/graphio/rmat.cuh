@@ -455,9 +455,9 @@ cudaError_t Load(
         ::Load(parameters, graph_, graph_prefix);
 }
 
-}  // namespace rmat
-}  // namespace graphio
-}  // namespace gunrock
+} // namespace rmat
+} // namespace graphio
+} // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:
