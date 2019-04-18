@@ -405,7 +405,7 @@ cudaError_t LoadGraph(
             __FILE__, __LINE__);
     }
 
-    if (graph.FLAG & gunrock::graph::HAS_CSR && parameters.Get<bool>("sort-csr"))
+    if ((graph.FLAG & gunrock::graph::HAS_CSR) && parameters.Get<bool>("sort-csr"))
     {
         graph.csr().Sort();
     }

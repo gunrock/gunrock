@@ -949,6 +949,11 @@ struct Csr<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
         return cudaSuccess;
     }
 
+    cudaError_t Sort()
+    {
+         return cudaSuccess;
+    }
+
     __device__ __host__ __forceinline__
     SizeT GetNeighborListLength(const VertexT &v) const
     {
