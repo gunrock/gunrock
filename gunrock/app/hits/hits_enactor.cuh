@@ -19,7 +19,7 @@
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 #include <gunrock/util/reduce_device.cuh>
-
+ 
 #include <gunrock/app/hits/hits_problem.cuh>
 
 namespace gunrock {
@@ -35,7 +35,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
-
+    
     return retval;
 }
 
@@ -52,7 +52,7 @@ struct hitsIterationLoop : public IterationLoopBase
     typedef typename EnactorT::ValueT  ValueT;
     typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
     typedef typename EnactorT::Problem::GraphT::GpT  GpT;
-
+    
     typedef IterationLoopBase
         <EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
@@ -67,13 +67,13 @@ struct hitsIterationLoop : public IterationLoopBase
     {
         // --
         // Alias variables
-
+        
         auto &data_slice = this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
-
+        
         auto &enactor_slice = this -> enactor ->
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
-
+        
         auto &enactor_stats    = enactor_slice.enactor_stats;
         auto &graph            = data_slice.sub_graph[0];
         auto &frontier         = enactor_slice.frontier;
@@ -108,7 +108,7 @@ struct hitsIterationLoop : public IterationLoopBase
         auto normalize_n = data_slice.normalize_n;
 
         // Reset next ranks to zero
-        auto reset_zero_op =
+        auto reset_zero_op = 
             [hrank_next, arank_next] __host__ __device__
             (VertexT *v_q, const SizeT &pos)
             {
@@ -136,7 +136,7 @@ struct hitsIterationLoop : public IterationLoopBase
             // Look into NeighborReduce for speed improvements
             atomicAdd(&hrank_next[src], arank_curr[dest]);
             atomicAdd(&arank_next[dest], hrank_curr[src]);
-
+            
             return true;
         };
 
@@ -144,7 +144,7 @@ struct hitsIterationLoop : public IterationLoopBase
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
             graph.csr(), null_frontier, null_frontier,
             oprtr_parameters, advance_op));
-
+      
         GUARD_CU2(cudaStreamSynchronize(stream),
             "cudaStreamSynchronize Failed");
 
@@ -177,7 +177,7 @@ struct hitsIterationLoop : public IterationLoopBase
                 {
                     return a + b;
                 }, ValueT(0), stream));
-
+                
             GUARD_CU(util::cubReduce(
                 cub_temp_space,
                 arank_next,
@@ -193,7 +193,7 @@ struct hitsIterationLoop : public IterationLoopBase
                 "cudaStreamSynchronize Failed");
 
             auto normalize_divide_op =
-            [hrank_next, arank_next, hrank_mag, arank_mag] __host__ __device__
+            [hrank_next, arank_next, hrank_mag, arank_mag] __host__ __device__ 
             (VertexT* v_q, const SizeT &pos)
             {
                 if(hrank_mag[0] > 0)
@@ -234,7 +234,7 @@ struct hitsIterationLoop : public IterationLoopBase
         auto &enactor_slices = this->enactor->enactor_slices;
         auto iter = enactor_slices[0].enactor_stats.iteration;
         auto user_iter = data_slice.max_iter;
-
+        
         // user defined stop condition
         if (iter == user_iter) return true;
         return false;
@@ -253,9 +253,9 @@ struct hitsIterationLoop : public IterationLoopBase
         int NUM_VALUE__ASSOCIATES>
     cudaError_t ExpandIncoming(SizeT &received_length, int peer_)
     {
-
+        
         // ================ INCOMPLETE TEMPLATE - MULTIGPU ====================
-
+        
         auto &data_slice    = this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
         auto &enactor_slice = this -> enactor ->
@@ -303,9 +303,9 @@ public:
     typedef typename GraphT::ValueT    ValueT  ;
     typedef EnactorBase<GraphT, LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
         BaseEnactor;
-    typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag>
+    typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> 
         EnactorT;
-    typedef hitsIterationLoop<EnactorT>
+    typedef hitsIterationLoop<EnactorT> 
         IterationT;
 
     Problem *problem;
@@ -423,7 +423,7 @@ public:
                 }
            }
         }
-
+        
         GUARD_CU(BaseEnactor::Sync());
         return retval;
     }
@@ -442,9 +442,9 @@ public:
     }
 };
 
-}  // namespace hits
-}  // namespace app
-}  // namespace gunrock
+} // namespace hits
+} // namespace app
+} // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

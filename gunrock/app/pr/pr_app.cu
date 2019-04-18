@@ -348,7 +348,7 @@ double pagerank(
     csr.column_indices.SetPointer((int*)col_indices, num_edges, gunrock::util::HOST);
     // csr.Move(gunrock::util::HOST, gunrock::util::DEVICE);
 
-    gunrock::util::Location target = gunrock::util::HOST;
+    gunrock::util::Location target = gunrock::util::HOST;    
 
     GraphT graph;
     graph.FromCsr(csr, target, 0, quiet, true);

@@ -82,7 +82,7 @@ struct BCForwardIterationLoop : public IterationLoopBase
 
         // ----------------------------
         // Forward advance -- BFS
-
+        
         auto advance_op = [
             labels, sigmas
         ] __host__ __device__ (
@@ -162,7 +162,7 @@ struct BCForwardIterationLoop : public IterationLoopBase
             over_sized, this -> gpu_num, enactor_stats.iteration, peer_);
         if (retval)
             return retval;
-
+        
         auto  &forward_output = data_slice.forward_output[peer_];
         GUARD_CU(frontier.V_Q()->ForAll([
             forward_output, cur_offset
@@ -265,7 +265,7 @@ struct BCBackwardIterationLoop : public IterationLoopBase
 
         // ----------------------------
         // Backward advance -- accumulating BC values
-
+        
         auto advance_op = [
             labels, deltas, bc_values, iteration, src_node, sigmas, num_vertices
         ] __host__ __device__ (
@@ -448,7 +448,7 @@ struct BCBackwardIterationLoop : public IterationLoopBase
                 ] __host__ __device__ (VertexT *v_q, const SizeT &i){
                     v_q[i] = forward_output[pre_pos + i];
                 }, frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
-
+        
         } else {
           frontier.queue_length = 0;
         }

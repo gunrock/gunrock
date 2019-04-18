@@ -88,8 +88,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         // HITS problem-specific storage arrays
         util::Array1D<SizeT, ValueT> hrank_curr;    // Holds hub rank value
         util::Array1D<SizeT, ValueT> arank_curr;    // Holds authority rank value
-        util::Array1D<SizeT, ValueT> hrank_next;
-        util::Array1D<SizeT, ValueT> arank_next;
+        util::Array1D<SizeT, ValueT> hrank_next;    
+        util::Array1D<SizeT, ValueT> arank_next;    
         util::Array1D<uint64_t, char> cub_temp_space; // Temporary space for normalization addition
         util::Array1D<SizeT, ValueT> hrank_mag;
         util::Array1D<SizeT, ValueT> arank_mag;
@@ -203,7 +203,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(hrank_curr.ForEach([]__host__ __device__ (ValueT &x){
                x = (ValueT)1.0;
             }, nodes, target, this -> stream));
-
+            
             GUARD_CU(arank_curr.ForEach([]__host__ __device__ (ValueT &x){
                x = (ValueT)1.0;
             }, nodes, target, this -> stream));
@@ -268,7 +268,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         GUARD_CU(BaseProblem::Release(target));
         return retval;
     }
-
+    
     /**
      * @brief Copy result distancess computed on GPUs back to host-side arrays.
      * @param[in] h_hrank_curr The host memory to extract hub scores to
@@ -378,9 +378,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     }
 };
 
-}  // namespace hits
-}  // namespace app
-}  // namespace gunrock
+} //namespace hits
+} //namespace app
+} //namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

@@ -6,11 +6,11 @@
 // ---------------------------------------------------------------------------
 
 /**
- * @file
- * pr_enactor.cuh
- *
- * @brief PR Problem Enactor
- */
+* @file
+* pr_enactor.cuh
+*
+* @brief PR Problem Enactor
+*/
 
 #pragma once
 
@@ -36,7 +36,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
-
+    
     GUARD_CU(parameters.Use<bool>(
         "pull",
         util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
@@ -127,7 +127,7 @@ struct PRIterationLoop : public IterationLoopBase
             GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
                 graph.coo(), &local_vertices, null_ptr,
                 oprtr_parameters, filter_op));
-
+            
             if (enactor.flag & Debug)
                 util::cpu_mt::PrintMessage("Filter end.",
                     gpu_num, iteration, peer_);
@@ -158,7 +158,7 @@ struct PRIterationLoop : public IterationLoopBase
                 util::cpu_mt::PrintMessage("NeighborReduce start.",
                     gpu_num, iteration, peer_);
 
-            auto advance_op = [rank_curr, graph]
+            auto advance_op = [rank_curr, graph] 
             __host__ __device__ (
                 const VertexT &src, VertexT &dest, const SizeT &edge_id,
                 const VertexT &input_item, const SizeT &input_pos,
@@ -166,7 +166,7 @@ struct PRIterationLoop : public IterationLoopBase
             {
                 return rank_curr[dest];
             };
-
+           
             oprtr_parameters.reduce_values_out   = &rank_next;
             oprtr_parameters.reduce_reset        = true;
             oprtr_parameters.reduce_values_temp  = &rank_temp;
@@ -174,10 +174,10 @@ struct PRIterationLoop : public IterationLoopBase
             oprtr_parameters.advance_mode        = "ALL_EDGES";
             frontier.queue_length = graph.nodes;
             frontier.queue_reset  = true;
-            GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V |
+            GUARD_CU(oprtr::NeighborReduce<oprtr::OprtrType_V2V | 
                 oprtr::OprtrMode_REDUCE_TO_SRC | oprtr::ReduceOp_Plus>(
                 graph.csc(), null_ptr, null_ptr,
-                oprtr_parameters, advance_op,
+                oprtr_parameters, advance_op, 
                 []__host__ __device__ (const ValueT &a, const ValueT &b)
                 {
                     return a+b;
@@ -593,85 +593,6 @@ public:
 
         GUARD_CU(BaseEnactor::Sync());
         return retval;
-      }
-
-    if (this->debug) printf("\nGPU PR Done.\n");
-    return retval;
-  }
-
-  /** @} */
-
-  typedef gunrock::oprtr::filter::KernelPolicy<
-      Problem,  // Problem data type
-      300,      // CUDA_ARCH
-      // INSTRUMENT,                         // INSTRUMENT
-      0,                              // SATURATION QUIT
-      true,                           // DEQUEUE_PROBLEM_SIZE
-      sizeof(VertexId) == 4 ? 8 : 4,  // MIN_CTA_OCCUPANCY
-      8,                              // LOG_THREADS
-      1,                              // LOG_LOAD_VEC_SIZE
-      0,                              // LOG_LOADS_PER_TILE
-      5,                              // LOG_RAKING_THREADS
-      5,                              // END_BITMASK_CULL
-      8,                              // LOG_SCHEDULE_GRANULARITY
-      gunrock::oprtr::filter::BY_PASS>
-      FilterKernelPolicy;
-
-  typedef gunrock::oprtr::advance::KernelPolicy<
-      Problem,   // Problem data type
-      300,       // CUDA_ARCH
-      1,         // MIN_CTA_OCCUPANCY
-      10,        // LOG_THREADS
-      8,         // LOG_BLOCKS
-      32 * 128,  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
-      1,         // LOG_LOAD_VEC_SIZE
-      0,         // LOG_LOADS_PER_TILE
-      5,         // LOG_RAKING_THREADS
-      32,        // WARP_GATHER_THRESHOLD
-      128 * 4,   // CTA_GATHER_THRESHOLD
-      7,         // LOG_SCHEDULE_GRANULARITY
-      gunrock::oprtr::advance::LB>
-      LB_AdvanceKernelPolicy;
-
-  typedef gunrock::oprtr::advance::KernelPolicy<
-      Problem,   // Problem data type
-      300,       // CUDA_ARCH
-      1,         // MIN_CTA_OCCUPANCY
-      10,        // LOG_THREADS
-      8,         // LOG_BLOCKS
-      32 * 128,  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
-      1,         // LOG_LOAD_VEC_SIZE
-      0,         // LOG_LOADS_PER_TILE
-      5,         // LOG_RAKING_THREADS
-      32,        // WARP_GATHER_THRESHOLD
-      128 * 4,   // CTA_GATHER_THRESHOLD
-      7,         // LOG_SCHEDULE_GRANULARITY
-      gunrock::oprtr::advance::LB_LIGHT>
-      LB_LIGHT_AdvanceKernelPolicy;
-
-  typedef gunrock::oprtr::advance::KernelPolicy<
-      Problem,   // Problem data type
-      300,       // CUDA_ARCH
-      1,         // MIN_CTA_OCCUPANCY
-      7,         // LOG_THREADS
-      8,         // LOG_BLOCKS
-      32 * 128,  // LIGHT_EDGE_THRESHOLD (used for partitioned advance mode)
-      1,         // LOG_LOAD_VEC_SIZE
-      1,         // LOG_LOADS_PER_TILE
-      5,         // LOG_RAKING_THREADS
-      32,        // WARP_GATHER_THRESHOLD
-      128 * 4,   // CTA_GATHER_THRESHOLD
-      7,         // LOG_SCHEDULE_GRANULARITY
-      gunrock::oprtr::advance::TWC_FORWARD>
-      TWC_AdvanceKernelPolicy;
-
-  template <typename Dummy, gunrock::oprtr::advance::MODE A_MODE>
-  struct MODE_SWITCH {};
-
-  template <typename Dummy>
-  struct MODE_SWITCH<Dummy, gunrock::oprtr::advance::LB> {
-    static cudaError_t Enact(Enactor &enactor) {
-      return enactor.EnactPR<LB_AdvanceKernelPolicy, FilterKernelPolicy>();
     }
 
     /**
@@ -792,7 +713,7 @@ public:
         SizeT nodes = data_slice.org_nodes;
         GUARD_CU(data_slice.node_ids   .EnsureSize_(nodes, util::DEVICE));
         GUARD_CU(data_slice.temp_vertex.EnsureSize_(nodes, util::DEVICE));
-
+        
         GUARD_CU(data_slice.node_ids.ForAll(
             []__host__ __device__ (VertexT *ids, const SizeT &pos)
             {
@@ -825,7 +746,7 @@ public:
 
         // sort according to the rank of nodes
         GUARD_CU2(cub::DeviceRadixSort::SortPairsDescending(
-            data_slice.cub_sort_storage.GetPointer(util::DEVICE),
+            data_slice.cub_sort_storage.GetPointer(util::DEVICE), 
             cub_required_size,
             key_buffer, value_buffer, nodes,
             0, sizeof(ValueT) * 8, this -> enactor_slices[0].stream),
@@ -868,7 +789,7 @@ public:
         //auto &rank_curr   = data_slice.rank_curr;
         auto &rank_next   = data_slice.rank_next;
         GUARD_CU(data_slice.node_ids.ForAll(
-            [temp_vertex, rank_curr, rank_next]
+            [temp_vertex, rank_curr, rank_next] 
             __host__ __device__ (VertexT *ids, const SizeT &v)
             {
                 ids[v] = temp_vertex[v];
@@ -891,18 +812,12 @@ public:
         return retval;
     }
 
-    // to reduce compile time, get rid of other architecture for now
-    // TODO: add all the kernel policy settings for all architectures
-    printf("Not yet tuned for this architecture\n");
-    return cudaErrorInvalidDeviceFunction;
-  }
-
-  /** @} */
+    /** @} */
 };
 
-}  // namespace pr
-}  // namespace app
-}  // namespace gunrock
+} // namespace pr
+} // namespace app
+} // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

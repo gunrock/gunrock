@@ -37,11 +37,11 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_problem(parameters));
     GUARD_CU(UseParameters_enactor(parameters));
 
-    GUARD_CU(parameters.Use<std::string>(
-         "src",
-         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-         "invalid",
-         "vertex id",
+    GUARD_CU(parameters.Use<std::string>(    
+         "src",   
+         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,  
+         "invalid",   
+         "vertex id", 
          __FILE__, __LINE__));
     return retval;
 }
@@ -290,13 +290,13 @@ float bc(
 
     bool quiet = parameters.Get<bool>("quiet");
     GraphT graph;
-
+    
     // Assign pointers into gunrock graph format
     CsrT csr;
     csr.Allocate(num_nodes, num_edges, gunrock::util::HOST);
     csr.row_offsets.SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
     csr.column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
-
+    
     gunrock::graphio::LoadGraph(parameters, graph);
 
     // Run BC
