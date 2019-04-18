@@ -218,8 +218,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     {
     }
 
-    /*
-     * @brief Default destructor
+    /**
+     * @brief SSSPProblem default destructor
      */
     virtual ~Problem()
     {
@@ -371,17 +371,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 this -> num_gpus, this -> gpu_idx[gpu], target, this -> flag));
         } // end for (gpu)
 
-    /*
-     * @brief Estimate delta factor for delta-stepping.
-     *
-     * @param[in] graph Reference to the graph we process on.
-     *
-     * \return float Delta factor.
-     */
-    float EstimatedDelta(const Csr<VertexId, Value, SizeT> &graph) {
-      double avgV = graph.average_edge_value;
-      int avgD = graph.average_degree;
-      return avgV * 32 / avgD;
+        return retval;
     }
 
     /**
@@ -461,9 +451,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
     /** @} */
 };
 
-}  // namespace sssp
-}  // namespace app
-}  // namespace gunrock
+} //namespace sssp
+} //namespace app
+} //namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

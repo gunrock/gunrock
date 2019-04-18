@@ -313,12 +313,6 @@ public:
             (CUT_THREADROUTINE)&(GunrockThread<EnactorT>)));
         return retval;
     }
-    static cudaError_t Init(Enactor &enactor, ContextPtr *context,
-                            Problem *problem, int max_grid_size = 0) {
-      return enactor.InitSSSP<TWC_AdvanceKernelPolicy, FilterKernelPolicy>(
-          context, problem, max_grid_size);
-    }
-  };
 
     /**
      * @brief Reset enactor
@@ -365,7 +359,6 @@ public:
         GUARD_CU(BaseEnactor::Sync());
         return retval;
     }
-  };
 
     /**
       * @brief one run of sssp, to be called within GunrockThread
@@ -380,13 +373,6 @@ public:
             thread_data, iterations[thread_data.thread_num]);
         return cudaSuccess;
     }
-    static cudaError_t Init(Enactor &enactor, ContextPtr *context,
-                            Problem *problem, int max_grid_size = 0) {
-      return enactor
-          .InitSSSP<LB_LIGHT_CULL_AdvanceKernelPolicy, FilterKernelPolicy>(
-              context, problem, max_grid_size);
-    }
-  };
 
     /**
      * @brief Enacts a SSSP computing on the specified graph.
@@ -404,9 +390,9 @@ public:
     /** @} */
 };
 
-}  // namespace sssp
-}  // namespace app
-}  // namespace gunrock
+} // namespace sssp
+} // namespace app
+} // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:
