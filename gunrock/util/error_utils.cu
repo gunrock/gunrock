@@ -68,8 +68,7 @@ cudaError_t GRError(
 }
 
 /**
- * Checks and resets last CUDA error.  If set, displays last error message in
- * accordance with debug mode.
+ * Checks and resets last CUDA error.  If set, displays last error message in accordance with debug mode.
  */
 cudaError_t GRError(
     const char *message,
@@ -120,8 +119,7 @@ cudaError_t GRError(
 }
 
 /**
- * Checks and resets last CUDA error.  If set, displays last error message in
- * accordance with debug mode.
+ * Checks and resets last CUDA error.  If set, displays last error message in accordance with debug mode.
  */
 cudaError_t GRError(
     bool print)
@@ -140,10 +138,10 @@ std::string GetErrorString(gunrock::util::gunrockError_t error)
 {
     switch (error) {
     case gunrock::util::GR_UNSUPPORTED_INPUT_DATA:
-      return "unsupported input data";
-    default:
-      return "unknown error";
-  }
+        return "unsupported input data";
+        default:
+        return "unknown error";
+    }
 }
 gunrockError_t GRError(
     gunrock::util::gunrockError_t error,

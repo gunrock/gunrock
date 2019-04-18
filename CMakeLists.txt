@@ -336,7 +336,7 @@ endif (CUDA_VERBOSE_PTXAS)
 
 # c++11 is required
 # Already set above. Causes build error on Ubuntu 18.04.1 LTS
-#set(CUDA_NVCC_FLAGS -std=c++11 --expt-extended-lambda)
+set(CUDA_NVCC_FLAGS --expt-extended-lambda)
 #set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_curand_LIBRARY})
 
 if(GUNROCK_BUILD_LIB)
