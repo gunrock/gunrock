@@ -348,7 +348,7 @@ double pagerank(
     csr.column_indices.SetPointer((int*)col_indices, num_edges, gunrock::util::HOST);
     // csr.Move(gunrock::util::HOST, gunrock::util::DEVICE);
 
-    gunrock::util::Location target = gunrock::util::HOST;    
+    gunrock::util::Location target = gunrock::util::HOST;
 
     GraphT graph;
     graph.FromCsr(csr, target, 0, quiet, true);
@@ -411,16 +411,6 @@ double pagerank(
  * @param[out] pagerank    Return PageRank scores per node
  * \return     double      Return accumulated elapsed times for all runs
  */
-/*
-template <
-    typename VertexT = int,
-    typename SizeT   = int,
-    typename ValueT  = float>
-
-*/
-
-//            argument types are: (const int, const int, const int *, const int *, int, int *, int **, float **)
-
 double pagerank(
     const int         num_nodes,
     const int         num_edges,

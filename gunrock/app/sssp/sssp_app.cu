@@ -293,6 +293,34 @@ double sssp(
     return elapsed_time;
 }
 
+/*
+ * @brief Simple C-interface take in graph as CSR format
+ * @param[in]  num_nodes   Number of veritces in the input graph
+ * @param[in]  num_edges   Number of edges in the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  edge_values CSR-formatted graph input edge weights
+ * @param[in]  source      Source to begin traverse
+ * @param[in]  mark_preds  Whether to output predecessor info
+ * @param[out] distances   Return shortest distance to source per vertex
+ * @param[out] preds       Return predecessors of each vertex
+ * \return     double      Return accumulated elapsed times for all runs
+ */
+double sssp(
+    const int        num_nodes,
+    const int        num_edges,
+    const int       *row_offsets,
+    const int       *col_indices,
+    const float     *edge_values,
+          int        source,
+    const bool       mark_pred,
+          float     *distances,
+          int       *preds)
+{
+  return sssp(num_nodes, num_edges, row_offsets, col_indices, edge_values,
+              1 /* num_runs */, &source, mark_pred, &distances, &preds);
+}
+
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++

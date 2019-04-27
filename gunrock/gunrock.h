@@ -285,14 +285,17 @@ float gunrock_sssp(struct GRGraph* grapho,        // Output graph / results
  *
  * \return Elapsed run time in milliseconds
  */
-float sssp(unsigned int* distances,  // Return shortest distances
-           int* preds,
-           const int num_nodes,              // Input graph number of nodes
-           const int num_edges,              // Input graph number of edges
-           const int* row_offsets,           // Input graph row_offsets
-           const int* col_indices,           // Input graph col_indices
-           const unsigned int* edge_values,  // Input graph edge weight
-           const int num_iters, int* source, const bool mark_preds);
+ double sssp(
+     const int        num_nodes,  // Input graph number of nodes
+     const int        num_edges,  // Input graph number of edges
+     const int       *row_offsets,  // Input graph CSR row offsets array
+     const int       *col_indices,  // Input graph CSR column indices array
+     const float     *edge_values,  // Input graph's values on edges (float)
+           int        source, // Source vertext for SSSP algorithm
+     const bool       mark_pred,  // Whether to output predecessor info or not
+           float     *distances,  // Return shortest distance to source per vertex
+           int       *preds // Return predecessors of each vertex
+         );
 
 /**
  * @brief PageRank public interface.

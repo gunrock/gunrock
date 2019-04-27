@@ -1,4 +1,7 @@
-# gunrock shared library cmake file
+# ------------------------------------------------------------------------
+#  Gunrock: Shared Library CMAKE files
+# ------------------------------------------------------------------------
+
 if(RAPIDJSON_FOUND)
   include_directories(${RAPIDJSON_INCLUDEDIR})
 else()
@@ -29,7 +32,7 @@ set(CUFILES
   #app/bc/bc_app.cu
   #app/cc/cc_app.cu
   app/pr/pr_app.cu
-  #app/sssp/sssp_app.cu
+  app/sssp/sssp_app.cu
   util/test_utils.cu
   util/error_utils.cu
   util/misc_utils.cu
@@ -37,7 +40,7 @@ set(CUFILES
   ${mgpu_SOURCE_FILES}
   util/gitsha1.c)
 
-cuda_add_library(gunrock ${LIB_TYPE}
+CUDA_ADD_LIBRARY(gunrock ${LIB_TYPE}
   ${HFILES}
   ${CUHFILES}
   ${HFILES_PUBLIC}
