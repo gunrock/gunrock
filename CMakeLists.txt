@@ -204,6 +204,10 @@ option(GUNROCK_APP_GRMAT
   "If on, builds only GRMAT application."
   OFF)
 
+option(GUNROCK_APP_LOUVAIN
+  "If on, builds only LOUVAIN application."
+  OFF)
+
 #option(GUNROCK_APP_SAMPLE
 #  "If on, builds only SAMPLE application."
 #  OFF)

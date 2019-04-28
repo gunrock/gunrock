@@ -51,6 +51,6 @@ endif()
 string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UP)
 add_test(NAME TEST_${PROJECT_NAME_UP}_CMD COMMAND ${PROJECT_NAME})
 set_tests_properties(TEST_${PROJECT_NAME_UP}_CMD PROPERTIES 
-  PASS_REGULAR_EXPRESSION "Graph type and graph type arguments:")
+PASS_REGULAR_EXPRESSION "Required arguments:")
 # end /* Simple ctest that tests cmd help */
 

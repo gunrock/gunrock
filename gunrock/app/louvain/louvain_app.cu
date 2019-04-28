@@ -239,10 +239,10 @@ float louvain(
 
     // Assign pointers into gunrock graph format
     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
-    graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
-    graph.CsrT::edge_values   .SetPointer(edge_values, num_edges, gunrock::util::HOST);
-    graph.FromCsr(graph.csr(), true, quiet);
+    graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, gunrock::util::HOST);
+    graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, gunrock::util::HOST);
+    graph.CsrT::edge_values   .SetPointer((GValueT *)edge_values, num_edges, gunrock::util::HOST);
+    // graph.FromCsr(graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, graph);
 
     // Run the Louvain
@@ -252,6 +252,19 @@ float louvain(
     graph.Release();
 
     return elapsed_time;
+}
+
+
+float louvain(
+    const int        num_nodes,
+    const int        num_edges,
+    const int       *row_offsets,
+    const int       *col_indices,
+    const int       *edge_values,
+          int       *communities) 
+{
+    return louvain(num_nodes, num_edges, row_offsets, col_indices,
+		edge_values, 1 /* num_runs */, communities);
 }
 
 // Leave this at the end of the file

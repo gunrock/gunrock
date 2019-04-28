@@ -165,10 +165,12 @@ extern "C" {
  *
  * \return Elapsed run time in milliseconds
  */
+/*
 float gunrock_bfs(struct GRGraph* grapho,        // Output graph / results
                   const struct GRGraph* graphi,  // Input graph structure
                   const struct GRSetup* config,  // Flag configurations
                   const struct GRTypes data_t);  // Data type Configurations
+*/
 
 /*
  * @brief Simple interface take in CSR arrays as input
@@ -189,10 +191,12 @@ float gunrock_bfs(struct GRGraph* grapho,        // Output graph / results
  * @param[in]  enable_idempotence   If the flag is set, use optimizations that
  * allow idempotence operation (will usually bring better performance)
  */
+/*
 float bfs(int* bfs_label, int* bfs_pred, const int num_nodes,
           const int num_edges, const int* row_offsets, const int* col_indices,
           const int num_iters, int* source, enum SrcMode source_mode,
           const bool mark_predecessors, const bool enable_idempotence);
+*/
 
 /**
  * @brief Betweenness centrality public interface.
@@ -202,10 +206,12 @@ float bfs(int* bfs_label, int* bfs_pred, const int num_nodes,
  * @param[in]  config Primitive-specific configurations.
  * @param[in]  data_t Primitive-specific data type setting.
  */
+/*
 void gunrock_bc(struct GRGraph* grapho,        // Output graph / results
                 const struct GRGraph* graphi,  // Input graph structure
                 const struct GRSetup* config,  // Flag configurations
                 const struct GRTypes data_t);  // Data type Configurations
+*/
 
 /**
  * @brief Betweenness centrality simple public interface.
@@ -235,10 +241,12 @@ double bc(
  * @param[in]  config Primitive-specific configurations.
  * @param[in]  data_t Primitive-specific data type setting.
  */
+/*
 void gunrock_cc(struct GRGraph* grapho,        // Output graph / results
                 const struct GRGraph* graphi,  // Input graph structure
                 const struct GRSetup* config,  // Flag configurations
                 const struct GRTypes data_t);  // Data type Configurations
+*/
 
 /**
  * @brief Connected component simple public interface.
@@ -251,11 +259,13 @@ void gunrock_cc(struct GRGraph* grapho,        // Output graph / results
 
  *\return int number of connected components in the graph.
  */
+/*
 int cc(int* component,           // Return component IDs per node
        const int num_nodes,      // Input graph number of nodes
        const int num_edges,      // Input graph number of edges
        const int* row_offsets,   // Input graph row_offsets
        const int* col_indices);  // Input graph col_indices
+*/
 
 /**
  * @brief Single-source shortest path public interface.
@@ -267,10 +277,12 @@ int cc(int* component,           // Return component IDs per node
  *
  * \return Elapsed run time in milliseconds
  */
+/*
 float gunrock_sssp(struct GRGraph* grapho,        // Output graph / results
                    const struct GRGraph* graphi,  // Input graph structure
                    const struct GRSetup* config,  // Flag configurations
                    const struct GRTypes data_t);  // Data type Configurations
+*/
 
 /**
  * @brief Single-source shortest path simple public interface.
@@ -335,7 +347,24 @@ double pagerank(
     int*       node_ids,
     float*     ranks);
 
-// TODO Add other primitives
+
+/*
+ * @brief Louvain simple public interface.
+ *
+ * @param[in]  num_nodes   Number of veritces in the input graph
+ * @param[in]  num_edges   Number of edges in the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[out] communities Louvain's communities output
+ * \return     float       Return accumulated elapsed times for all runs
+ */
+float louvain(
+    const int        num_nodes,
+    const int        num_edges,
+    const int       *row_offsets,
+    const int       *col_indices,
+    const int       *edge_values,
+          int       *communities);
 
 #ifdef __cplusplus
 }

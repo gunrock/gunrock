@@ -18,6 +18,7 @@ if(GUNROCK_BUILD_APPLICATIONS)
   #add_subdirectory(lp)
   #add_subdirectory(tc)
   #add_subdirectory(grmat)
+  add_subdirectory(louvain)
 
   #add_subdirectory(sample)
 
@@ -82,6 +83,10 @@ else(GUNROCK_BUILD_APPLICATIONS)
   if(GUNROCK_APP_GRMAT)
     add_subdirectory(grmat)
   endif(GUNROCK_APP_GRMAT)
+
+  if(GUNROCK_APP_LOUVAIN)
+    add_subdirectory(louvain)
+  endif(GUNROCK_APP_LOUVAIN)
 
   # if(GUNROCK_APP_SAMPLE)
   #   add_subdirectory(sample)
