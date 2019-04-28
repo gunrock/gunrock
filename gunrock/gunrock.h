@@ -217,12 +217,15 @@ void gunrock_bc(struct GRGraph* grapho,        // Output graph / results
  * @param[in] col_indices Input graph col_indices.
  * @param[in] source Source node to start.
  */
-void bc(float* bc_scores,        // Return centrality score per node
-        const int num_nodes,     // Input graph number of nodes
-        const int num_edges,     // Input graph number of edges
-        const int* row_offsets,  // Input graph row_offsets
-        const int* col_indices,  // Input graph col_indices
-        const int source);       // Source vertex to start
+double bc(
+    const int         num_nodes,   // Input graph number of nodes
+    const int         num_edges,   // Input graph number of edges
+    const int        *row_offsets, // Input graph row_offsets
+    const int        *col_indices, // Input graph col_indices
+          int         source,	   // Source vertex to start
+          float      *bc_values,   // Return centrality score per node
+          float      *sigmas,
+          int        *labels);
 
 /**
  * @brief Connected component public interface.
