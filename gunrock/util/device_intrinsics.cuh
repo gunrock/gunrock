@@ -12,17 +12,17 @@
  * @brief Common device intrinsics (potentially specialized by architecture)
  */
 
-//#pragma once
+#pragma once
 
-#ifndef DEVICE_INTRINSICS_CUH
-#define DEVICE_INTRINSICS_CUH
+//#ifndef DEVICE_INTRINSICS_CUH
+//#define DEVICE_INTRINSICS_CUH
 
 #include <limits>
 #include <gunrock/util/cuda_properties.cuh>
 //#include <gunrock/util/types.cuh>
 
 #ifndef MEMBERBASK
-#define MEMBERMASK 0xffffffffu
+  #define MEMBERMASK 0xffffffffu
 #endif
 
 #define WARPSIZE 32
@@ -376,7 +376,7 @@ __device__ int BinarySearch(KeyType i, ArrayType *queue)
 } // namespace util
 } // namespace gunrock
 
-#endif
+//#endif
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++

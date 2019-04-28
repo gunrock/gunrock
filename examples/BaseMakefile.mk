@@ -10,7 +10,7 @@
 #-------------------------------------------------------------------------------
 
 force64 = 1
-use_metis = 1
+use_metis = 0
 use_boost = 0
 NVCC = "$(shell which nvcc)"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
@@ -38,7 +38,7 @@ GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" # Kepler K10
 # RepeatFor (Cooperative Groups), e.g: SM35
 
 # Add your own SM target (default: V100, P100):
-SM_TARGETS = $(GEN_SM70) $(GEN_SM60)
+SM_TARGETS = $(GEN_SM70)
 
 #-------------------------------------------------------------------------------
 # Libs

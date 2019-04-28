@@ -1017,7 +1017,7 @@ public:
             {
                 GUARD_CU(util::SetDevice(my_gpu_idx));
             }
-            GUARD_CU(cudaThreadSynchronize());
+            GUARD_CU(cudaDeviceSynchronize());
 
             for (int peer = 0; peer < num_gpus; ++peer)
             {

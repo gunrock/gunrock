@@ -11,9 +11,9 @@
  *
  * @brief utilities for cpu multithreading
  */
+#pragma once
 
 #include <time.h>
-#pragma once
 #include <typeinfo>
 #ifdef _WIN32
 #include <windows.h>

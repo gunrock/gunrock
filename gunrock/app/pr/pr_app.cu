@@ -11,16 +11,8 @@
  * @brief Gunrock PageRank application
  */
 
-#include <gunrock/gunrock.h>
-
-// Utilities and correctness-checking
-#include <gunrock/util/test_utils.cuh>
-#include <gunrock/util/type_limits.cuh>
-
-// Graph definations
-#include <gunrock/graphio/graphio.cuh>
-#include <gunrock/app/app_base.cuh>
-#include <gunrock/app/test_base.cuh>
+// <primitive>_app.cuh includes
+#include <gunrock/app/app.cuh>
 
 // page-rank includes
 #include <gunrock/app/pr/pr_enactor.cuh>

@@ -11,15 +11,8 @@
  * @brief single-source shortest path (SSSP) application
  */
 
-#include <gunrock/gunrock.h>
-
-// Utilities and correctness-checking
-#include <gunrock/util/test_utils.cuh>
-
-// Graph definations
-#include <gunrock/graphio/graphio.cuh>
-#include <gunrock/app/app_base.cuh>
-#include <gunrock/app/test_base.cuh>
+// <primitive>_app.cuh includes
+#include <gunrock/app/app.cuh>
 
 // single-source shortest path includes
 #include <gunrock/app/sssp/sssp_enactor.cuh>
@@ -277,9 +270,9 @@ double sssp(
     GraphT graph;
     // Assign pointers into gunrock graph format
     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
-    graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
-    graph.CsrT::edge_values   .SetPointer(edge_values, num_edges, gunrock::util::HOST);
+    graph.CsrT::row_offsets   .SetPointer((int*)row_offsets, num_nodes + 1, gunrock::util::HOST);
+    graph.CsrT::column_indices.SetPointer((int*)col_indices, num_edges, gunrock::util::HOST);
+    graph.CsrT::edge_values   .SetPointer((float*)edge_values, num_edges, gunrock::util::HOST);
     // graph.FromCsr(graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, graph);
 

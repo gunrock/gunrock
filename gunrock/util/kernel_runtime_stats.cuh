@@ -193,7 +193,7 @@ public:
                     stat = 0;
                     }, grid_size, util::DEVICE);
 
-                if (retval = util::GRError(cudaThreadSynchronize(),
+                if (retval = util::GRError(cudaDeviceSynchronize(),
                     "KernelRuntimeStatsLifetime MemsetKernel d_stat failed", __FILE__, __LINE__)) break;
             }
         } while (0);

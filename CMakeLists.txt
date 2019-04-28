@@ -28,7 +28,7 @@ endif (WARNING_DEP_FLAG)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
 
-option(CMAKE_VERBOSE_MAKEFILE ON)
+option(CMAKE_VERBOSE_MAKEFILE OFF)
 
 # begin /* Find and set CUDA arch */
 set(gunrock_REQUIRED_CUDA_VERSION 7.5)
@@ -49,7 +49,9 @@ if(${CUDA_VERSION} EQUAL "8.0" AND ${Boost_VERSION} EQUAL "106400")
 endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/FindOpenMP.cmake)
-include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)
+if (METIS_LIBRARY)
+  include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)
+endif()
 # end /* Include Boost, OpenMP & Metis */
 
 # begin /* How can I pass git SHA1 to compiler as definition using cmake? */
@@ -73,7 +75,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/FindCUB.cmake)
 # end /* Include moderngpu & cub */
 
 # begin /* Include googletest & googlemock */
-option(GUNROCK_GOOGLE_TESTS "Use Googletest as testing framework (default: ON)." ON)
+option(GUNROCK_GOOGLE_TESTS "Use Googletest as testing framework (default: OFF)." OFF)
 
 if (GUNROCK_GOOGLE_TESTS)
 include(${CMAKE_SOURCE_DIR}/cmake/DownloadProject/DownloadProject.cmake)
@@ -232,7 +234,7 @@ option(GUNROCK_GENCODE_SM30
 
 option(GUNROCK_GENCODE_SM35
   "ON to generate code for Compute Capability 3.5 devices (e.g. Tesla K40)"
-  ON)
+  OFF)
 
 option(GUNROCK_GENCODE_SM37
   "ON to generate code for Compute Capability 3.7 devices (e.g. Tesla K80)"
@@ -244,16 +246,16 @@ option(GUNROCK_GENCODE_SM50
 
 option(GUNROCK_GENCODE_SM52
   "ON to generate code for Compute Capability 5.2 devices (e.g. GeForce Titan X)"
-  ON)
+  OFF)
 
 #Pascal Architecture: CUDA 8
 if (CUDA_VERSION VERSION_EQUAL "8.0" OR CUDA_VERSION VERSION_GREATER "8.0")
   option(GUNROCK_GENCODE_SM60
     "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
-    ON)
+    OFF)
   option(GUNROCK_GENCODE_SM61
     "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
-    ON)
+    OFF)
 endif ()
 
 #Volta Architecture: CUDA 9

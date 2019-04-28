@@ -12,6 +12,7 @@
  * @brief Structure for base data slice. Only for temp dummping of code, will be
  * refactored latter
  */
+#pragma once
 
 namespace gunrock {
 namespace app {

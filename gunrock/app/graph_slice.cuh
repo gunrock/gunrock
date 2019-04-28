@@ -12,6 +12,7 @@
  * @brief Structure for graph slice. Only for temp dummping of code, will be
  * refactored latter
  */
+#pragma once
 
 /**
  * @brief Graph slice structure which contains common graph structural data.
