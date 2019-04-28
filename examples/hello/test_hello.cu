@@ -81,7 +81,7 @@ struct main_struct
             util::PrintMsg("__________________________", !quiet);
             
             float elapsed = app::hello::CPU_Reference(
-                graph.csr(),
+                graph,
                 ref_degrees,
                 quiet);
             

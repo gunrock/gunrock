@@ -42,6 +42,7 @@ double CPU_Reference(
     bool quiet)
 {
     typedef typename GraphT::SizeT SizeT;
+    typedef typename GraphT::CsrT CsrT;
     
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
@@ -49,7 +50,8 @@ double CPU_Reference(
     // <TODO> 
     // implement CPU reference implementation
     for(SizeT v = 0; v < graph.nodes; ++v) {
-        degrees[v] = graph.row_offsets[v + 1] - graph.row_offsets[v];
+        // degrees[v] = graph.CsrT::row_offsets[v + 1] - graph.CsrT::row_offsets[v];
+	degrees[v] = graph.CsrT::GetNeighborListLength(v);
     }
     // </TODO>
     
