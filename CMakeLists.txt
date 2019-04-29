@@ -154,7 +154,7 @@ option(GUNROCK_BUILD_LIB
 
 option(GUNROCK_BUILD_SHARED_LIBS
   "On to build shared libraries, off for static libraries."
-  ON)
+  OFF)
 
 option(GUNROCK_BUILD_APPLICATIONS
   "If on, builds the sample applications."
@@ -206,6 +206,10 @@ option(GUNROCK_APP_GRMAT
 
 option(GUNROCK_APP_LOUVAIN
   "If on, builds only LOUVAIN application."
+  OFF)
+
+option(GUNROCK_APP_COLOR
+  "If on, builds only COLOR application."
   OFF)
 
 #option(GUNROCK_APP_SAMPLE
@@ -343,7 +347,7 @@ endif (CUDA_VERBOSE_PTXAS)
 # c++11 is required
 # Already set above. Causes build error on Ubuntu 18.04.1 LTS
 set(CUDA_NVCC_FLAGS --expt-extended-lambda)
-#set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_curand_LIBRARY})
+set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_curand_LIBRARY})
 
 if(GUNROCK_BUILD_LIB)
   if(GUNROCK_BUILD_SHARED_LIBS)

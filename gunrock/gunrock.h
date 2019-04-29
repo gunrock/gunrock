@@ -366,6 +366,24 @@ float louvain(
     const int       *edge_values,
           int       *communities);
 
+
+/*
+ * @brief Graph Coloring simple public interface.
+ *
+ * @param[in]  parameters Excution parameters
+ * @param[in]  graph      Input graph
+ * @param[out] colors     Return generated colors for each run
+ * @param[out] num_colors Return number of colors generated for each run
+ * \return     double     Return accumulated elapsed times for all runs
+ */
+double color(
+    const int        num_nodes,
+    const int        num_edges,
+    const int       *row_offsets,
+    const int       *col_indices,
+          int       *colors,
+          int        num_colors);
+
 #ifdef __cplusplus
 }
 #endif
