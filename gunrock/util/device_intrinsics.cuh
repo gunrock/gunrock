@@ -12,90 +12,110 @@
  * @brief Common device intrinsics (potentially specialized by architecture)
  */
 
-//#pragma once
+#pragma once
 
-#ifndef DEVICE_INTRINSICS_CUH
-#define DEVICE_INTRINSICS_CUH
-
+#include <limits>
 #include <gunrock/util/cuda_properties.cuh>
-#include <gunrock/util/types.cuh>
+//#include <gunrock/util/types.cuh>
 
-#define MEMBERMASK 0xffffffff
-#define WARPSIZE 32
+#ifndef WARPSIZE
+  #define WARPSIZE 32
+#endif
+
+#if (__CUDACC_VER_MAJOR__ >= 9 && __CUDA_ARCH__ >= 300) && !defined(USE_SHFL_SYNC)
+  #define USE_SHFL_SYNC
+#endif
 
 // CUDA 9 warp shuffles (device intrinsics)
 template <typename T>
-__device__ static __forceinline__ T _shfl_up(T var, unsigned int delta,
-                                             int width = WARPSIZE,
-                                             unsigned int mask = MEMBERMASK) {
-  // int first_lane = (WARPSIZE-width) << 8;
-#if __CUDACC_VER_MAJOR__ < 9
-  return __shfl_up(var, delta, width);
+__device__ static __forceinline__
+T _shfl_up(T var, unsigned int delta, int width=WARPSIZE, unsigned mask=MEMBERMASK)
+{
+#ifdef USE_SHFL_SYNC
+  var = __shfl_up_sync(mask, var, delta, width);
 #else
-  return __shfl_up_sync(mask, var, delta, width);
+#if ( __CUDA_ARCH__ >= 300)
+  var = __shfl_up(var, delta, width);
 #endif
+#endif
+  return var;
 }
 
 template <typename T>
-__device__ static __forceinline__ T _shfl_down(T var, unsigned int delta,
-                                               int width = WARPSIZE,
-                                               unsigned int mask = MEMBERMASK) {
-  // int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
-#if __CUDACC_VER_MAJOR__ < 9
-  return __shfl_down(var, delta, width);
+__device__ static __forceinline__
+T _shfl_down(T var, unsigned int delta, int width=WARPSIZE, unsigned mask=MEMBERMASK)
+{
+#ifdef USE_SHFL_SYNC
+  var = __shfl_down_sync(mask, var, delta, width);
 #else
-  return __shfl_down_sync(mask, var, delta, width);
+#if ( __CUDA_ARCH__ >= 300)
+  var = __shfl_down(var, delta, width);
 #endif
+#endif
+  return var;
 }
 
 template <typename T>
-__device__ static __forceinline__ T _shfl_xor(T var, int lane_mask,
-                                              int width = WARPSIZE,
-                                              unsigned int mask = MEMBERMASK) {
-  // int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
-#if __CUDACC_VER_MAJOR__ < 9
-  return __shfl_xor(var, lane_mask, width);
+__device__ static __forceinline__
+T _shfl_xor(T var, int lane_mask, int width=WARPSIZE, unsigned mask = MEMBERMASK)
+{
+#ifdef USE_SHFL_SYNC
+  var = __shfl_xor_sync(mask, var, lane_mask, width);
 #else
-  return __shfl_xor_sync(mask, var, lane_mask, width);
+#if ( __CUDA_ARCH__ >= 300)
+  var = __shfl_xor(var, lane_mask, width);
 #endif
+#endif
+  return var;
 }
 
 template <typename T>
-__device__ static __forceinline__ T _shfl(T var, int source_lane,
-                                          int width = WARPSIZE,
-                                          unsigned int mask = MEMBERMASK) {
-  // int last_lane = ((WARPSIZE-width) << 8) | 0x1f;
-#if __CUDACC_VER_MAJOR__ < 9
-  return __shfl(var, source_lane, width);
+__device__ static __forceinline__
+T _shfl(T var, int source_lane, int width=WARPSIZE, unsigned mask=MEMBERMASK)
+{
+#ifdef USE_SHFL_SYNC
+  var = __shfl_sync(mask, var, source_lane, width);
 #else
-  return __shfl_sync(mask, var, source_lane, width);
+#if ( __CUDA_ARCH__ >= 300)
+  var = __shfl(var, source_lane, width);
 #endif
+#endif
+  return var;
 }
 
-__device__ static __forceinline__ unsigned int _ballot(
-    int predicate, unsigned int mask = MEMBERMASK) {
-#if __CUDACC_VER_MAJOR__ < 9
-  return __ballot(predicate);
-#else
+__device__ static __forceinline__
+unsigned _ballot(int predicate, unsigned mask=MEMBERMASK)
+{
+#ifdef USE_SHFL_SYNC
   return __ballot_sync(mask, predicate);
+#else
+#if ( __CUDA_ARCH__ >= 300)
+  return __ballot(predicate);
+#endif
 #endif
 }
 
-__device__ static __forceinline__ int _any(int predicate,
-                                           unsigned int mask = MEMBERMASK) {
-#if __CUDACC_VER_MAJOR__ < 9
-  return ::__any(predicate);
-#else
+__device__ static __forceinline__
+int _any(int predicate, unsigned mask=MEMBERMASK)
+{
+#ifdef USE_SHFL_SYNC
   return __any_sync(mask, predicate);
+#else
+#if ( __CUDA_ARCH__ >= 300)
+  return __any(predicate);
+#endif
 #endif
 }
 
-__device__ static __forceinline__ int _all(int predicate,
-                                           unsigned int mask = MEMBERMASK) {
-#if __CUDACC_VER_MAJOR__ < 9
-  return ::__all(predicate);
-#else
+__device__ static __forceinline__
+int _all(int predicate, unsigned mask=MEMBERMASK)
+{
+#ifdef USE_SHFL_SYNC
   return __all_sync(mask, predicate);
+#else
+#if ( __CUDA_ARCH__ >= 300)
+  return __all(predicate);
+#endif
 #endif
 }
 
@@ -257,7 +277,6 @@ __device__ int BinarySearch(KeyType i, ArrayType* queue) {
 }  // namespace util
 }  // namespace gunrock
 
-#endif
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++
