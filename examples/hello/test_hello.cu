@@ -49,7 +49,7 @@ struct main_struct
         bool quiet = parameters.Get<bool>("quiet");
 
         typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-            graph::HAS_EDGE_VALUES | graph::HAS_CSR>
+            graph::HAS_EDGE_VALUES | graph::HAS_COO | graph::HAS_CSR | graph::HAS_CSC>
             GraphT;
 
         cudaError_t retval = cudaSuccess;
@@ -81,7 +81,7 @@ struct main_struct
             util::PrintMsg("__________________________", !quiet);
             
             float elapsed = app::hello::CPU_Reference(
-                graph,
+                graph.csr(),
                 ref_degrees,
                 quiet);
             

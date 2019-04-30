@@ -123,10 +123,6 @@ struct Csr :
         util::Location target = GRAPH_DEFAULT_TARGET)
     {
         cudaError_t retval = cudaSuccess;
-        row_offsets   .SetName("row_offsets");
-        column_indices.SetName("column_indices");
-        edge_values   .SetName("edge_values");
-        node_values   .SetName("node_values");
         GUARD_CU(BaseGraph    ::Allocate(nodes, edges, target));
         GUARD_CU(row_offsets   .Allocate(nodes + 1  , target));
         GUARD_CU(column_indices.Allocate(edges      , target));

@@ -266,7 +266,7 @@ struct Csc :
         if (FLAG & HAS_NODE_VALUES)
         {
             GUARD_CU(node_values.ForEach(source.CooT::node_values,
-                []__host__ __device__ (EdgeValueT &node_value,
+                []__host__ __device__ (NodeValueT &node_value,
                 const typename CooT::ValueT &node_value_in){
                 node_value = node_value_in;},
                 this -> nodes, target, stream));
