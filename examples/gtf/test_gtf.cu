@@ -12,7 +12,7 @@
  * @brief Simple test driver program for max-flow algorithm.
  */
 
-#include <gunrock/app/mf/mf_app.cu>
+// #include <gunrock/app/mf/mf_app.cu>
 #include <gunrock/app/mf/mf_helpers.cuh>
 #include <gunrock/app/gtf/gtf_app.cu>
 #include <gunrock/app/test_base.cuh>
@@ -94,7 +94,9 @@ struct main_struct
         reverse_edges.SetName("reverse_edges");
         GUARD_CU(reverse_edges.Allocate(d_graph.edges, util::HOST));
 
-        app::mf::InitReverse(d_graph, reverse_edges.GetPointer(util::HOST));
+        std::map<std::pair<VertexT, VertexT>, SizeT> u_edge_id;
+        app::mf::GetEdgesIds(d_graph, u_edge_id);
+        app::mf::InitReverse(d_graph, u_edge_id, reverse_edges.GetPointer(util::HOST));
 
         // Compute reference CPU GTF algorithm.
     	util::PrintMsg("______CPU reference algorithm______", true);
@@ -103,7 +105,7 @@ struct main_struct
         if (!quick)
         {
             GUARD_CU(app::gtf::CPU_Reference
-    	        (parameters, d_graph, reverse_edges, elapsed));
+    	        (parameters, d_graph, u_edge_id, reverse_edges, elapsed));
             util::PrintMsg("-----------------------------------\n"
                 "Elapsed: " + std::to_string(elapsed) + " ms", true);
         }

@@ -128,20 +128,18 @@ void DisplaySolution(GraphT graph, ValueT* h_flow, VertexT* reverse,
  }
 
 
-template <typename GraphT>
+template <typename GraphT, typename VertexT, typename SizeT, typename ValueT>
 cudaError_t MinCut(
     util::Parameters         &parameters,
     GraphT                   &graph,
-    typename GraphT::SizeT   *reverse_edges,
-    typename GraphT::VertexT  source,
-    typename GraphT::VertexT  dest,
-    typename GraphT::ValueT  *edge_flows,
-    typename GraphT::ValueT  *edge_residuals,
+    std::map<std::pair<VertexT, VertexT>, SizeT> &edge_id,
+    SizeT   *reverse_edges,
+    VertexT  source,
+    VertexT  dest,
+    ValueT  *edge_flows,
+    ValueT  *edge_residuals,
     bool                     *vertex_reachabilities)
 {
-    typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::SizeT   SizeT;
-    typedef typename GraphT::ValueT  ValueT;
     cudaError_t retval = cudaSuccess;
     double error_threshold = parameters.Get<double>("error_threshold");
 
@@ -149,8 +147,8 @@ cudaError_t MinCut(
     // for (auto e = 0; e < graph.edges; e++){
     //     printf("CPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
     // }
-    mf::CPU_Reference(parameters, graph,
-        source, dest, max_flow, reverse_edges, edge_flows);
+    mf::CPU_Reference(parameters, graph, 
+		edge_id, source, dest, max_flow, reverse_edges, edge_flows);
     memset(vertex_reachabilities, false, graph.nodes*sizeof(vertex_reachabilities[0]));
     
     minCut_sub(graph, source, edge_flows, vertex_reachabilities, edge_residuals);
@@ -383,15 +381,14 @@ void soft_thresh(ValueT *Y, const ValueT thresh, const int n){
  *
  * \return     double      Time taken for the GTF
  */
-template <typename GraphT, typename ArrayT>
+template <typename GraphT, typename ArrayT, typename VertexT, typename SizeT>
 cudaError_t CPU_Reference(
 	util::Parameters &parameters,
 	GraphT  &graph,
+        std::map<std::pair<VertexT, VertexT>, SizeT>& edge_id,
 	ArrayT  &reverse_edges,
     double  &elapsed)
 {
-    typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::SizeT   SizeT;
     typedef typename GraphT::ValueT  ValueT;
 
     cudaError_t retval = cudaSuccess;
@@ -471,7 +468,7 @@ cudaError_t CPU_Reference(
         //for(int e = 0; e < 10; e++)
         //  printf("CPU: e_idx %d, e_val %f\n", e, graph.edge_values[e]);
 
-        GUARD_CU(MinCut(parameters, graph, reverse_edges + 0, source, dest,
+        GUARD_CU(MinCut(parameters, graph, edge_id, reverse_edges + 0, source, dest,
             edge_flows, edge_residuals, vertex_reachabilities));
         // minCut(graph, source, dest, vertex_reachabilities, edge_residuals, num_nodes);
 
