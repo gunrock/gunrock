@@ -28,6 +28,7 @@ set(HFILES_PUBLIC
   gunrock.h)
 
 set(CUFILES
+  # TODO: Add support for remaining primitives
   #app/bfs/bfs_app.cu
   app/bc/bc_app.cu
   #app/cc/cc_app.cu

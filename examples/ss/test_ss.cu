@@ -7,7 +7,7 @@
 
 /**
  * @file
- * test_sssp.cu
+ * test_ss.cu
  *
  * @brief Simple test driver program for Gunrock template.
  */
