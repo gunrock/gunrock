@@ -16,7 +16,11 @@
 
 #include <limits>
 #include <gunrock/util/cuda_properties.cuh>
-//#include <gunrock/util/types.cuh>
+#include <gunrock/util/types.cuh>
+
+#ifndef MEMBERMASK
+  #define MEMBERMASK 0xffffffffu
+#endif
 
 #ifndef WARPSIZE
   #define WARPSIZE 32
