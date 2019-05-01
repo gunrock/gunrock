@@ -32,7 +32,9 @@ option(CMAKE_VERBOSE_MAKEFILE OFF)
 
 # begin /* Find and set CUDA arch */
 set(gunrock_REQUIRED_CUDA_VERSION 7.5)
+# /* enables relocatable device code linking */
 FIND_PACKAGE(CUDA ${gunrock_REQUIRED_CUDA_VERSION} REQUIRED)
+SET(CUDA_SEPARABLE_COMPILATION ON)
 if(CUDA_64_BIT_DEVICE_CODE)
   set(gunrock_arch_suffix x86_64)
 else()
@@ -346,7 +348,7 @@ endif (CUDA_VERBOSE_PTXAS)
 
 # c++11 is required
 # Already set above. Causes build error on Ubuntu 18.04.1 LTS
-set(CUDA_NVCC_FLAGS --expt-extended-lambda)
+set(CUDA_NVCC_FLAGS --expt-extended-lambda -rdc=true -lcudadevrt)
 set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_curand_LIBRARY})
 
 if(GUNROCK_BUILD_LIB)

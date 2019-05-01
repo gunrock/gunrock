@@ -29,13 +29,13 @@ set(HFILES_PUBLIC
 
 set(CUFILES
   # TODO: Add support for remaining primitives
-  #app/bfs/bfs_app.cu
-  app/bc/bc_app.cu
-  #app/cc/cc_app.cu
-  app/pr/pr_app.cu
-  app/sssp/sssp_app.cu
-  app/louvain/louvain_app.cu
-  app/color/color_app.cu
+  ##app/bfs/bfs_app.cu
+  #app/bc/bc_app.cu
+  ##app/cc/cc_app.cu
+  #app/pr/pr_app.cu
+  #app/sssp/sssp_app.cu
+  #app/louvain/louvain_app.cu
+  #app/color/color_app.cu
   util/test_utils.cu
   util/error_utils.cu
   util/misc_utils.cu
