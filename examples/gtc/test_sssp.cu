@@ -7,12 +7,12 @@
 
 /**
  * @file
- * test_sssp.cu
+ * test_gtc.cu
  *
  * @brief Simple test driver program for single source shortest path.
  */
 
-#include <gunrock/app/gtc/sssp_app.cu>
+#include <gunrock/app/gtc/gtc_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
