@@ -62,13 +62,6 @@ pipeline {
       }
     }
     
-    stage('Unit Tests') {
-      steps {
-        //sh '''cd build
-        //      ./bin/unit_test'''
-      }
-    }
-    
     stage('Regression Tests') {
       steps {
         sh '''cd build
