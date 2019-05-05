@@ -40,10 +40,8 @@ Before building Gunrock make sure you have **CUDA 7.5 or higher** (recommended C
 <code>git clone --recursive https://github.com/gunrock/gunrock/
 cd gunrock
 mkdir build && cd build
-cmake ..
-make -j$(nproc)
-make test</code>
-</pre>
+cmake .. && make -j$(nproc)
+make test</code></pre>
 
 ## Getting Started with Gunrock
 
