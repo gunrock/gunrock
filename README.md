@@ -32,7 +32,7 @@
 
 ## Quick Start Guide
 
-Before building Gunrock make sure you have **CUDA 7.5 or higher** (recommended CUDA 9 or higher) installed on your Linux system. We support building Gunrock on docker images using the provided docker files under `docker` subdirectory. For complete build guide, see [Building Gunrock](https://gunrock.github.io/docs/#building-gunrock).
+Before building Gunrock make sure you have **CUDA 7.5 or higher** (recommended CUDA 9 or higher) installed on your Linux system. We also support building Gunrock on docker images using the provided docker files under `docker` subdirectory. For complete build guide, see [Building Gunrock](https://gunrock.github.io/docs/#building-gunrock).
 
 <pre class="highlight mid-column-code shell tab-shell">
 <code>git clone --recursive https://github.com/gunrock/gunrock/
