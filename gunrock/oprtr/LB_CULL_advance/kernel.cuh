@@ -490,7 +490,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
                     {
                         // Location of mask byte to read
                         //SizeT mask_byte_offset = (u & KernelPolicy::ELEMENT_ID_MASK) >> 3;
-                        SizeT mask_pos = (out_key & KernelPolicyT::ELEMENT_ID_MASK) >> 3;
+                        SizeT mask_pos = (out_key //& KernelPolicyT::ELEMENT_ID_MASK
+                            ) >> 3;
 
                         // Bit in mask byte corresponding to current vertex id
                         unsigned char mask_bit = 1 << (out_key & 7);
@@ -779,7 +780,8 @@ struct Dispatch<FLAG, GraphT, InKeyT, OutKeyT, ValueT, LabelT, true>
 
                     if (to_process && (FLAG & OprtrOption_Idempotence) != 0)
                     {
-                        SizeT mask_pos = (out_key & KernelPolicyT::ELEMENT_ID_MASK) >> 3;
+                        SizeT mask_pos = (out_key //& KernelPolicyT::ELEMENT_ID_MASK
+                            ) >> 3;
                         //output_pos = (u & KernelPolicyT::ELEMENT_ID_MASK) >> (2 + sizeof(MaskT));
 
                         // Bit in mask byte corresponding to current vertex id
@@ -935,7 +937,7 @@ void RelaxPartitionedEdges2(
         label, labels, visited_masks, output_offsets,
         block_input_starts, //partition_size, //num_partitions,
         keys_out, values_out, num_outputs[0],
-        //reduce_values_in, reduce_values_out, 
+        //reduce_values_in, reduce_values_out,
         work_progress, advance_op, filter_op);
 }
 

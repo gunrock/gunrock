@@ -47,7 +47,7 @@ struct KernelPolicy {
     WARP_HASH_LENGTH = 1 << WARP_HASH_BITS,
     WARP_HASH_MASK = WARP_HASH_LENGTH - 1,
     WARPS = THREADS / WARP_SIZE,
-    ELEMENT_ID_MASK = ~(1ULL << (sizeof(VertexId) * 8 - 2)),
+    //ELEMENT_ID_MASK = ~(1ULL << (sizeof(VertexId) * 8 - 2)),
     MAX_CTA_OCCUPANCY = _MAX_CTA_OCCUPANCY,
   };
 

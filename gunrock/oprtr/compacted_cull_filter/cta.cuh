@@ -276,7 +276,8 @@ struct Cta {
       if (!util::isValid(thread_work.vertices[i])) continue;
       // Location of mask byte to read
       SizeT mask_byte_offset =
-          (thread_work.vertices[i] & KernelPolicy::ELEMENT_ID_MASK) >> 3;
+          (thread_work.vertices[i] //& KernelPolicy::ELEMENT_ID_MASK
+          ) >> 3;
 
       // Bit in mask byte corresponding to current vertex id
       unsigned char mask_bit = 1 << (thread_work.vertices[i] & 7);
@@ -336,7 +337,7 @@ struct Cta {
            i++) {
         if (!util::isValid(thread_work.vertices[i])) continue;
         VertexId row_id =
-            thread_work.vertices[i] & KernelPolicy::ELEMENT_ID_MASK;
+            thread_work.vertices[i]; //& KernelPolicy::ELEMENT_ID_MASK;
         if (thread_work.d_labels[row_id] != util::MaxValue<LabelT>())
           thread_work.vertices[i] = util::InvalidValue<VertexId>();
       }
@@ -419,7 +420,7 @@ struct Cta {
            i++) {
         if (!util::isValid(thread_work.vertices[i])) continue;
         VertexId row_id =
-            thread_work.vertices[i] & KernelPolicy::ELEMENT_ID_MASK;
+            thread_work.vertices[i];// & KernelPolicy::ELEMENT_ID_MASK;
 
         if (thread_work.d_labels[row_id] != util::MaxValue<LabelT>()) {
           thread_work.vertices[i] = util::InvalidValue<VertexId>();

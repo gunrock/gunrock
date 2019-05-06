@@ -186,7 +186,8 @@ struct Cta
                 {
                     // Location of mask byte to read
                     SizeT mask_byte_offset =
-                        (tile->element_id[LOAD][VEC] & KernelPolicyT::ELEMENT_ID_MASK) >> 3;
+                        (tile->element_id[LOAD][VEC] //& KernelPolicyT::ELEMENT_ID_MASK
+                            ) >> 3;
 
                     // Bit in mask byte corresponding to current vertex id
                     unsigned char mask_bit = 1 << (tile->element_id[LOAD][VEC] & 7);
@@ -231,7 +232,8 @@ struct Cta
                     if (util::isValid(tile -> element_id[LOAD][VEC]))
                     {
                         InKeyT key_in = (tile->element_id[LOAD][VEC]
-                            & KernelPolicyT::ELEMENT_ID_MASK);
+                            //& KernelPolicyT::ELEMENT_ID_MASK
+                            );
                         //row_id = row_id & KernelPolicyT::ELEMENT_ID_MASK;
 
                         //LabelT label;

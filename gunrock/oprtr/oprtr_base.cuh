@@ -15,6 +15,8 @@
 #pragma once
 
 #include <gunrock/util/io/cub_io.cuh>
+#include <gunrock/util/io/modified_load.cuh>
+#include <gunrock/util/io/modified_store.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -168,7 +170,7 @@ struct Reduce
 {
     static const T Identity = util::PreDefinedValues<T>::InvalidValue;
 
-    __device__ __host__ __forceinline__ 
+    __device__ __host__ __forceinline__
     static T op(const T &a, const T &b)
     {
         return util::PreDefinedValues<T>::InvalidValue;

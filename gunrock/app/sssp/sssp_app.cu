@@ -89,13 +89,10 @@ cudaError_t RunTests(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    //util::PrintMsg("Before init");
     GUARD_CU(problem.Init(graph  , target));
     GUARD_CU(enactor.Init(problem, target));
-    //util::PrintMsg("After init");
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
-    //info.preprocess_time = cpu_timer.ElapsedMillis();
 
     // perform SSSP
     VertexT src;
@@ -270,10 +267,9 @@ double sssp(
     GraphT graph;
     // Assign pointers into gunrock graph format
     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    graph.CsrT::row_offsets   .SetPointer((int*)row_offsets, num_nodes + 1, gunrock::util::HOST);
-    graph.CsrT::column_indices.SetPointer((int*)col_indices, num_edges, gunrock::util::HOST);
-    graph.CsrT::edge_values   .SetPointer((float*)edge_values, num_edges, gunrock::util::HOST);
-    // graph.FromCsr(graph.csr(), true, quiet);
+    graph.CsrT::row_offsets   .SetPointer((SizeT*)row_offsets, num_nodes + 1, gunrock::util::HOST);
+    graph.CsrT::column_indices.SetPointer((VertexT*)col_indices, num_edges, gunrock::util::HOST);
+    graph.CsrT::edge_values   .SetPointer((GValueT*)edge_values, num_edges, gunrock::util::HOST);
     gunrock::graphio::LoadGraph(parameters, graph);
 
     // Run the SSSP

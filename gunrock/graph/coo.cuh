@@ -424,7 +424,7 @@ struct Coo :
         srand(edge_value_seed);
         util::PrintMsg("  Generating edge values in ["
             + std::to_string(edge_value_min) + ", "
-            + std::to_string(edge_value_min + edge_value_range) 
+            + std::to_string(edge_value_min + edge_value_range)
             + "), seed = " + std::to_string(edge_value_seed), !quiet);
 
         for (SizeT e = 0; e < this -> edges; e++)
@@ -444,16 +444,16 @@ struct Coo :
     {
         cudaError_t retval = cudaSuccess;
         auto &e_values = this -> edge_values;
-        auto  edges    = this -> edges; 
+        auto  edges    = this -> edges;
         bool has_edge_values = FLAG & graph::HAS_EDGE_VALUES;
- 
+
         util::PrintMsg("  Edge doubleing: " + std::to_string(edges)
             + " -> " + std::to_string(edges * 2) + " edges", !quiet);
         GUARD_CU(edge_pairs .EnsureSize(this -> edges * 2, true));
         GUARD_CU(edge_values.EnsureSize(this -> edges * 2, true));
-      
+
         GUARD_CU(edge_pairs.ForAll(
-            [e_values, skew, has_edge_values, edges] 
+            [e_values, skew, has_edge_values, edges]
             __host__ __device__ (EdgePairT *pairs, const SizeT &e)
             {
                 pairs[e + edges].x = pairs[e].y;
@@ -461,8 +461,8 @@ struct Coo :
                 if (has_edge_values)
                 {
                     e_values[e + edges] = (skew ? (e_values[e] * -1) : e_values[e]);
-                }    
-            }, edges, util::HOST)); 
+                }
+            }, edges, util::HOST));
         this -> edges *= 2;
         return retval;
     }
@@ -493,7 +493,7 @@ struct Coo :
             int thread_num  = omp_get_thread_num();
             SizeT edge_start = this -> edges / num_threads * thread_num;
             SizeT edge_end   = this -> edges / num_threads * (thread_num + 1);
-            
+
             if (thread_num == 0)
                 edge_start = 0;
             if (thread_num == num_threads - 1)
@@ -753,6 +753,7 @@ struct Coo<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
         return cudaSuccess;
     }
 
+    __host__ __device__ __forceinline__
     SizeT GetNeighborListLength(const VertexT &v) const
     {
         return 0;
@@ -772,7 +773,7 @@ struct Coo<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
         bool  with_edge_values = true)
     {
         return cudaSuccess;
-    } 
+    }
 };
 
 } // namespace graph
