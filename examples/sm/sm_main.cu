@@ -55,6 +55,8 @@ struct main_struct
         GUARD_CU(graphio::LoadGraph(parameters, data_graph));
         GUARD_CU(graphio::LoadGraph(parameters, pattern_graph, "pattern-"));
         cpu_timer.Stop();
+        std::cout << "data_graph: " << data_graph.nodes << " " << data_graph.edges << std::endl;
+        std::cout << "query_graph: " << pattern_graph.nodes << " " << pattern_graph.edges <<std::endl;
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
         bool quick   = parameters.Get<bool>("quick");
@@ -62,7 +64,7 @@ struct main_struct
         int num_runs = parameters.Get<int>("num-runs");
 
         // counts of matched subgraphs
-        VertexT *ref_subgraph_match = new VertexT[1];
+        VertexT *ref_subgraph_match = new VertexT[data_graph.nodes];
         if (!quick) {
             util::PrintMsg("__________________________", !quiet);
 
@@ -100,6 +102,8 @@ int main(int argc, char** argv)
     cudaError_t retval = cudaSuccess;
     util::Parameters parameters("test Subgraph Matching");
     GUARD_CU(graphio::UseParameters(parameters));
+    // Recogonize pattern graph
+    GUARD_CU(graphio::UseParameters(parameters, "pattern-"));
     GUARD_CU(app::sm::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
     GUARD_CU(parameters.Parse_CommandLine(argc, argv));
