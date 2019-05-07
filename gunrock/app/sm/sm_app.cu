@@ -37,17 +37,6 @@ cudaError_t UseParameters(util::Parameters &parameters)
     GUARD_CU(UseParameters_enactor(parameters));
     GUARD_CU(UseParameters_test   (parameters));
 
-    GUARD_CU(parameters.Use<std::string>(
-        "pattern-graph-file",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        "", "Input pattern graph for subgraph matching.",
-        __FILE__, __LINE__));
-    GUARD_CU(parameters.Use<std::string>(
-        "pattern-graph-type",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-        "", "Input pattern graph for subgraph matching.",
-        __FILE__, __LINE__));
-
     return retval;
 }
 

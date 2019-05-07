@@ -79,8 +79,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, SizeT   >    data_degree ; // data graph nodes' degrees
         util::Array1D<SizeT, SizeT   >    query_degree; // query graph nodes' degrees
         util::Array1D<SizeT, bool    >    isValid;      /** < Used for data node validation    */
-        util::Array1D<SizeT, SizeT   >    data_ne;      /** < Used for data graph node ne info */
-        util::Array1D<SizeT, SizeT   >    query_ne;     /** < Used for query graph node ne info*/
         util::Array1D<SizeT, SizeT   >    counter;      /** < Used for counting iBFS sources   */
         util::Array1D<SizeT, SizeT   >    num_subs;     /** < Used for counting iBFS sources   */
         util::Array1D<SizeT, VertexT >    NG;           /** < Used for query node explore seq  */
@@ -106,8 +104,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             data_degree     .SetName("data_degree");
             query_degree    .SetName("query_degree");
             isValid         .SetName("isValid");
-            data_ne         .SetName("data_ne");
-            query_ne        .SetName("query_ne");
             counter         .SetName("counter");
             num_subs        .SetName("num_subs");
             NG              .SetName("NG");
@@ -145,7 +141,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_degree    .Release(target));
             GUARD_CU(query_degree   .Release(target));
             GUARD_CU(isValid        .Release(target));
-            GUARD_CU(query_ne       .Release(target));
             GUARD_CU(counter        .Release(target));
             GUARD_CU(num_subs       .Release(target));
             GUARD_CU(NG             .Release(target));
@@ -184,14 +179,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(data_degree    .Allocate(data_graph.nodes, util::DEVICE));
             GUARD_CU(query_degree   .Allocate(query_graph.nodes, util::HOST | util::DEVICE));
             GUARD_CU(isValid        .Allocate(data_graph.nodes, util::DEVICE));
-            GUARD_CU(query_ne       .Allocate(query_graph.nodes, util::HOST | util::DEVICE));
             GUARD_CU(counter        .Allocate(1, util::HOST | util::DEVICE));
             GUARD_CU(num_subs       .Allocate(1, util::HOST | util::DEVICE));
             GUARD_CU(NG             .Allocate(query_graph.nodes, util::HOST | util::DEVICE));
-            //query node sequence connection row offsets/column indices
-            if(query_graph.nodes > 2) {
+            // non-tree edges only exist in the following condition
+            if(query_graph.edges - query_graph.nodes + 1 > 0) {
                 GUARD_CU(NG_ro      .Allocate(query_graph.nodes - 1, util::HOST | util::DEVICE));
-                GUARD_CU(NG_ci      .Allocate(query_graph.edges/2 - query_graph.nodes + 1, util::HOST | util::DEVICE));
+                GUARD_CU(NG_ci      .Allocate(query_graph.edges - query_graph.nodes + 1, util::HOST | util::DEVICE));
             }
             // partial results storage: as much as possible
             GUARD_CU(partial        .Allocate(query_graph.nodes * data_graph.edges,  util::DEVICE));
@@ -202,10 +196,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             // neighbor node encoding = sum of neighbor node labels
             for(int i = 0; i < query_graph.nodes; i++) {
                 query_degree[i] = query_graph.row_offsets[i+1] - query_graph.row_offsets[i];
-                query_ne[i] = 0;
-                for(int j = query_graph.row_offsets[i]; j < query_graph.row_offsets[i+1]; j++){ 
-                    query_ne[i] += 1;
-                }
             }
             // Generate query graph node exploration sequence based on maximum likelihood estimation (MLE)
             // node mapping degree, TODO:probablity estimation based on label and degree
@@ -215,16 +205,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             int index = 0;
             for(int i = 0; i < query_graph.nodes; ++i) {
                 if(i == 0) {
+                    // find maximum degree in query graph and corresponding node index
                     for(int j = 1; j < query_graph.nodes; ++j) {
                         if(query_degree[j] > degree_max) {
                             index = j;
                             degree_max = query_degree[j];
                         }
                     }
-                }
-                else {
+                } else {
                     int dm_max = 0;
                     index = 0;
+                    while (d_m[index] == -1) {
+                        index++;
+                    }
                     for(int j = 0; j < query_graph.nodes; ++j){
                         if(d_m[j] >= 0) {
                             if(index * degree_max + query_degree[j] > dm_max){
@@ -234,6 +227,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                         }
                     }
                 }
+                // put the node index with max degree in NG, and mark that node as solved -1, and add priority to its neighbors
                 NG[i] = index;
                 d_m[index] = -1;
                 for(int j = query_graph.row_offsets[index]; j < query_graph.row_offsets[index + 1]; ++j)
@@ -241,21 +235,24 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                         d_m[query_graph.column_indices[j]]++;
             }
             delete[] d_m;
-            // fill query node non-tree edges info 
-            if(query_graph.nodes > 2){
+            // fill query graph non-tree edges info for each node
+            if(query_graph.edges - query_graph.nodes + 1 > 0){
                 NG_ro[0] = 0;
+                NG_ci[0] = 0;
                 for(int id = 2; id < query_graph.nodes; ++id){
                     int idx = 0;
                     for(int j = 0; j < id - 1; ++j)
-                        for(int i = query_graph.row_offsets[id]; i < query_graph.row_offsets[id+1]; ++i)
+                        for(int i = query_graph.row_offsets[id]; i < query_graph.row_offsets[id + 1] && (NG_ro[id - 2] + idx + 1) < (query_graph.edges - query_graph.nodes + 1); ++i)
                             if(NG[j] == query_graph.column_indices[i]) {
                                 // store the index of the dest node instead of the node id itself
-                                std::cout << "NG_ci[" << NG_ro[id-2] + id << "] = " << j << std::endl;
                                 NG_ci[NG_ro[id - 2] + idx++] = j;
                             }
                     NG_ro[id-1] = idx;
                 }
             }
+            GUARD_CU(NG_ci.Move(util::HOST, target));
+            GUARD_CU(NG.Move(util::HOST, target));
+            GUARD_CU(NG_ro.Move(util::HOST, target));
             // Initialize query row offsets with query_graph.row_offsets
             GUARD_CU(query_ro.ForAll([query_graph] 
                 __host__ __device__(SizeT * x, const SizeT &pos) 
