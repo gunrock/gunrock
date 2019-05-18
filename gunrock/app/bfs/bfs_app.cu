@@ -27,7 +27,7 @@ cudaError_t UseParameters(util::Parameters &parameters)
     cudaError_t retval = cudaSuccess;
     GUARD_CU(UseParameters_app    (parameters));
     GUARD_CU(UseParameters_problem(parameters));
-    //GUARD_CU(UseParameters_enactor(parameters));
+    GUARD_CU(UseParameters_enactor(parameters));
 
     GUARD_CU(parameters.Use<std::string>(
         "src",
@@ -299,6 +299,7 @@ double bfs(
  * @param[out] preds       Return predecessors of each vertex
  * \return     double      Return accumulated elapsed times for all runs
  */
+/*
 double bfs(
     const int        num_nodes,
     const int        num_edges,
@@ -312,9 +313,9 @@ double bfs(
           int       *preds)
 {
     return bfs(num_nodes, num_edges, row_offsets, col_indices,
-        1 /* num_runs */, &source, mark_pred, direction_optimized, idempotence,
+        1, &source, mark_pred, direction_optimized, idempotence,
         &distances, &preds);
-}
+}*/
 
 // Leave this at the end of the file
 // Local Variables:

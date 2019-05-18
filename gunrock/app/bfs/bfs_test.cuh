@@ -109,7 +109,14 @@ double CPU_Reference(
             for (SizeT e = e_start; e < e_end; e++)
             {
                 VertexT u = graph.CsrT::GetEdgeDest(e);
-                if (!util::isValid(labels[u]))
+                //if (v == 79 || u == 79)
+                //    //v == 23604 || u == 23604)
+                //    util::PrintMsg("Edge " + std::to_string(e)
+                //        + ": " + std::to_string(v)
+                //        + " -> " + std::to_string(u)
+                //        + " (" + std::to_string(labels[u])
+                //        + " -> " + std::to_string(iter));
+                if (iter < labels[u])
                 {
                     labels[u] = iter;
                     if (mark_preds && preds != NULL)
@@ -178,6 +185,24 @@ typename GraphT::SizeT Validate_Results(
             util::PrintMsg(
                 std::to_string(errors_num) + " errors occurred.", !quiet);
             num_errors += errors_num;
+            
+            LabelT  min_mismatch_label  = util::PreDefinedValues<LabelT >::MaxValue;
+            VertexT min_mismatch_vertex = util::PreDefinedValues<VertexT>::InvalidValue;
+            for (VertexT v = 0; v < graph.nodes; v++)
+            {
+                if (h_labels[v] == ref_labels[v])
+                    continue;
+                if (h_labels[v] >= min_mismatch_label)
+                    continue;
+                min_mismatch_label  = h_labels[v];
+                min_mismatch_vertex = v;
+            }
+            util::PrintMsg("First mismatch: ref_labels["
+                + std::to_string(min_mismatch_vertex) + "] ("
+                + std::to_string(ref_labels[min_mismatch_vertex])
+                + ") != h_labels[" + std::to_string(min_mismatch_vertex)
+                + "] (" + std::to_string(h_labels[min_mismatch_vertex])
+                + ")", !quiet);
         }
     }
     else if (ref_labels == NULL)

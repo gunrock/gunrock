@@ -141,7 +141,7 @@ public:
 
     // Get counter for specified iteration
     template </*typename SizeT,*/ typename IterationT>
-    __device__ __forceinline__ SizeT* GetQueueCounter(IterationT iteration)
+    __device__ __forceinline__ SizeT* GetQueueCounter(IterationT iteration) const
     {
         return d_counters + (iteration & 0x3);
     }
@@ -250,7 +250,7 @@ public:
      */
     virtual ~CtaWorkProgressLifetime()
     {
-        Release();
+        //Release();
     }
 
     // Deallocates and resets the progress counters

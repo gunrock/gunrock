@@ -32,7 +32,7 @@ void PrintMsg(std::string msg, bool to_print, bool new_line)
     PrintMsg(msg.c_str(), to_print, new_line);
 }
 
-void PringMsg(const char* msg,
+void PrintMsg(const char* msg,
     int gpu_num, long long iteration, int peer, bool to_print, bool new_line)
 {
     if (!to_print) return;
@@ -42,7 +42,7 @@ void PringMsg(const char* msg,
         + std::string(msg), true, new_line);
 }
 
-void PringMsg(std::string msg,
+void PrintMsg(std::string msg,
     int gpu_num, long long iteration, int peer, bool to_print, bool new_line)
 {
     if (!to_print) return;

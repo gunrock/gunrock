@@ -58,6 +58,8 @@ cudaError_t For(
             grid_size = FOR_GRIDSIZE;
         if (!util::isValid(block_size))
             block_size = FOR_BLOCKSIZE;
+        //printf("grid_size = %d, block_size = %d\n",
+        //    grid_size, block_size);
         For_Kernel
             <<<grid_size, block_size, 0, stream>>>(
             loop_size, op);

@@ -198,18 +198,21 @@ __device__ static unsigned long atomicAdd(unsigned long *addr, unsigned long val
 }*/
 #endif
 
-#if UINT64_MAX != ULLONG_MAX
+//#if UINT64_MAX != ULLONG_MAX
 __device__ static uint64_t atomicMin(uint64_t* addr, uint64_t val)
 {
-    unsigned long long int old = (unsigned long long int)val;
-    unsigned long long int expected;
-    do {
-        expected = old;
-        old = atomicCAS((unsigned long long int*)addr, val, (unsigned long long int)val);
-    } while (expected != old);
-    return old;
+    return (uint64_t)atomicMin((unsigned long long int*)addr, (unsigned long long int)val);
+//    unsigned long long int old = (unsigned long long int)(*addr);
+//    unsigned long long int expected;
+//    do {
+//        expected = old;
+//        old = atomicCAS(
+//            (unsigned long long int*)addr, 
+//            expected, min((unsigned long long int)val, expected));
+//    } while (expected != old);
+//    return old;
 }
-#endif
+//#endif
 
 __device__ static float atomicMin(float* addr, float val)
 {

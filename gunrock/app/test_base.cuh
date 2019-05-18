@@ -180,6 +180,11 @@ cudaError_t Switch_Parameters(
         if (level == num_levels)
         {
             std::string str = "";
+            str += std::string("64bit-VertexT=") + (parameters.Get<bool>("64bit-VertexT") ? "true" : "false");
+            str += std::string(" 64bit-SizeT=" ) + (parameters.Get<bool>("64bit-SizeT"  ) ? "true" : "false");
+            str += std::string(" 64bit-ValueT=") + (parameters.Get<bool>("64bit-ValueT" ) ? "true" : "false");
+            str += std::string(" undirected="  ) + (parameters.Get<bool>("undirected"   ) ? "true" : "false");
+
             for (int i = 0; i < num_levels; i++)
                 str = str + " " + switching_paras[i]
                     + "=" + parameters.Get<std::string>(switching_paras[i]);

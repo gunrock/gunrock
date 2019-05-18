@@ -35,6 +35,35 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters)
 {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(app::UseParameters_enactor(parameters));
+    
+    GUARD_CU(parameters.Use<bool>(
+        "idempotence",
+        util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        false,
+        "Whether to enable idempotence optimization",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<bool>(
+        "direction-optimized",
+        util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        false,
+        "Whether to enable direction optimizing BFS",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<float>(
+        "do-a",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        0.001,
+        "Threshold to switch from forward-push to backward-pull in DOBFS",
+        __FILE__, __LINE__));
+
+    GUARD_CU(parameters.Use<float>(
+        "do-b",
+        util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+        0.200,
+        "Threshold to switch from backward-pull to forward-push in DOBFS",
+        __FILE__, __LINE__));
+
     return retval;
 }
 
@@ -245,7 +274,7 @@ struct BFSIterationLoop : public IterationLoopBase
         auto         &stream             =   enactor_slice.stream;
         auto         &iteration          =   enactor_stats.iteration;
         bool          debug              =   ((this -> enactor -> flag & Debug) != 0);
-        bool          mark_preds         =   ((ProblemT::FLAG & Mark_Predecessors) != 0);
+        bool          mark_preds         =   ((this -> enactor -> problem -> flag & Mark_Predecessors) != 0);
         bool          idempotence        =   ((this -> enactor -> problem -> flag & Enable_Idempotence) != 0);
         auto          target             =   util::DEVICE;
         auto         &gpu_num            =   this -> gpu_num;
@@ -267,7 +296,7 @@ struct BFSIterationLoop : public IterationLoopBase
             if (debug)
                 util::PrintMsg("Forward Advance begin", gpu_num, iteration, peer_);
 
-            VertexT label = iteration;
+            LabelT label = iteration + 1;
             auto advance_op = [idempotence, labels, label, mark_preds, preds, original_vertex]
             __host__ __device__ (
                 const VertexT &src, VertexT &dest, const SizeT &edge_id,
@@ -277,7 +306,12 @@ struct BFSIterationLoop : public IterationLoopBase
                 if (!idempotence)
                 {
                     // Check if the destination node has been claimed as someone's child
-                    VertexT old_label = _atomicMin(labels + dest, label);
+                    LabelT old_label = _atomicMin(labels + dest, label);
+                    //if (src == 79 || dest == 79 ||
+                    //    //src == 24301 || dest == 24301 ||
+                    //    src == 0 || dest == 0)
+                    //printf("Edge %u: %u -> %u (%u -> %u), input_pos = %u, %p\n",
+                    //    edge_id, src, dest, old_label, label, input_pos, labels + dest);
                     if (label >= old_label)
                         return false;
 
@@ -287,6 +321,8 @@ struct BFSIterationLoop : public IterationLoopBase
                         VertexT pred = src;
                         if (original_vertex + 0 != NULL)
                             pred = original_vertex[src];
+                        //printf("pred[%d] <- %d\n",
+                        //    dest, pred);
                         Store(preds + dest, pred);
                     }
                 }
@@ -301,6 +337,10 @@ struct BFSIterationLoop : public IterationLoopBase
             {
                 if (!util::isValid(dest))
                     return false;
+                //if (dest == 0)
+                //    printf("Qi[%u] = %u\n",
+                //        input_pos, dest);
+
                 if (idempotence && mark_preds)
                 {
                     VertexT pred = src;
@@ -316,9 +356,23 @@ struct BFSIterationLoop : public IterationLoopBase
             gpu_timer.Start();
             #endif
 
+            auto &work_progress = frontier.work_progress;
+            auto  queue_index = frontier.queue_index;
+            GUARD_CU(oprtr::For(
+                [work_progress, queue_index] __host__ __device__ (SizeT i)
+                {
+                    SizeT *counter = work_progress.GetQueueCounter(queue_index + 1);
+                    //printf("queue_length = %d\n", counter[0]);
+                //work_progress.StoreQueueLength((SizeT)0, (SizeT)(queue_index + 1));
+                    counter[0] = 0;
+                }, 1, util::DEVICE, oprtr_parameters.stream, 1, 1));
+            //GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), "Set counter");
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
                 oprtr_parameters, advance_op, filter_op));
+
+            //GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+            //    "After advance");
 
             #ifdef RECORD_PER_ITERATION_STATS
             gpu_timer.Stop();
@@ -359,6 +413,9 @@ struct BFSIterationLoop : public IterationLoopBase
                     oprtr_parameters, filter_op));
                 if (debug)
                     util::PrintMsg("Filter end.", gpu_num, iteration, peer_);
+
+                //GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+                //    "After filter");
             }
 
             // Get back the resulted frontier length
@@ -447,6 +504,10 @@ struct BFSIterationLoop : public IterationLoopBase
                 data_slice.num_unvisited_vertices = data_slice.split_lengths[0];
                 data_slice.num_visited_vertices =
                     graph.nodes - data_slice.num_unvisited_vertices;
+                if (debug)
+                    util::PrintMsg("Changing from forward to backward, #unvisited_vertices ="
+                        + std::to_string(data_slice.num_unvisited_vertices));
+
             } else {
                 data_slice.num_unvisited_vertices = data_slice.split_lengths[0];
             }
@@ -494,13 +555,34 @@ struct BFSIterationLoop : public IterationLoopBase
             data_slice.split_lengths.Move(target, util::HOST, 2, 0, stream);
             GUARD_CU2(cudaStreamSynchronize(stream),
                 "cudaStreamSynchronize failed");
+            if (debug)
+                util::PrintMsg("#unvisited v = " 
+                    + std::to_string(data_slice. num_unvisited_vertices)
+                    + ", #newly visited = " + std::to_string(data_slice.split_lengths[1])
+                    + ", #still unvisited = " + std::to_string(data_slice.split_lengths[0]));
 
             frontier  .queue_length = data_slice.split_lengths[1];
             data_slice.num_visited_vertices =
                 graph.nodes - data_slice.num_unvisited_vertices;
             enactor_stats.edges_queued[0] += frontier.output_length[0];
             frontier.queue_reset = false;
+            frontier.queue_index++;
         } // end of backward
+
+        //GUARD_CU2(cudaStreamSynchronize(stream),
+        //    "cudaStreamSynchronize failed");
+ 
+        //GUARD_CU(frontier.V_Q() -> ForAll(
+        //    [iteration] __host__ __device__ (VertexT *queue, const SizeT &pos)
+        //    {
+        //        VertexT v = queue[pos];
+        //        if (v == 0)
+        //            printf("After iter %lu, Q[%lu] = %lu\n",
+        //                (unsigned long long)iteration,
+        //                (unsigned long long)pos,
+        //                (unsigned long long)v);
+        //    }, frontier.queue_length, util::DEVICE, stream));
+
         data_slice.previous_direction = data_slice.current_direction;
 
         //if (TO_TRACK)
