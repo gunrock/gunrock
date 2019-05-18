@@ -27,7 +27,7 @@ NAME[ 7]="webbase-2001"     && OPT[ 7]="--queue-factor=2 --undirected=true,false
 #2, 1.2 for memory
 NAME[ 8]="indochina-2004"   && OPT[ 8]="--undirected=true,false --do-a=500,2000,200,10000,1000" #DO_A[ 8]="100"   && DO_B[ 8]="100"
 NAME[ 9]="arabic-2005"      && OPT[ 9]="--queue-factor=1.1 --undirected=true,false --do-a=500,2000,200,10000,1000,100" ##DO_A[ 9]="100"   && DO_B[ 9]="100"
-NAME[10]="europe_osm"       && OPT[10]="--do-a=2.5,0.00005,20000" ##DO_A[10]="2.5"   && DO_B[10]="15"
+NAME[10]="europe_osm"       && OPT[10]="--do-a=2.5,1,20000" ##DO_A[10]="2.5"   && DO_B[10]="15"
 NAME[11]="asia_osm"         && OPT[11]="--queue-factor=0.01 --do-a=20000,-1,1.5" #DO_A[11]="1.5"   && DO_B[11]="10"
 NAME[12]="germany_osm"      && OPT[12]="--do-a=0.5,20,1000,0.05" #DO_A[12]="1.5"   && DO_B[12]="10"
 NAME[13]="road_usa"          && OPT[13]="--queue-factor=0.01 --do-a=20000,500,5000,10,0.5" #DO_A[13]="1.0"   && DO_B[13]="10"
@@ -62,7 +62,7 @@ do
         fi
     done
 
-    for i in {0..30}
+    for i in {10..30}
     do
         if [ "$i" -lt "27" ]; then
             GRAPH_="market $DATADIR/${NAME[$i]}/${NAME[$i]}.mtx"
