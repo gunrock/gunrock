@@ -77,13 +77,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, SizeT   >    query_ro    ; // query graph row offsets
         util::Array1D<SizeT, VertexT >    query_ci    ; // query graph column indices
         util::Array1D<SizeT, SizeT   >    data_degree ; // data graph nodes' degrees
-        util::Array1D<SizeT, SizeT   >    query_degree; // query graph nodes' degrees
         util::Array1D<SizeT, bool    >    isValid;      /** < Used for data node validation    */
         util::Array1D<SizeT, SizeT   >    counter;      /** < Used for counting iBFS sources   */
         util::Array1D<SizeT, SizeT   >    num_subs;     /** < Used for counting iBFS sources   */
+        util::Array1D<SizeT, SizeT   >    constrain;    /** < Smallest degree in query graph   */
         util::Array1D<SizeT, VertexT >    NG;           /** < Used for query node explore seq  */
-        util::Array1D<SizeT, SizeT   >    NG_ro;        /** < Used for query node sequence non-tree edge info */
-        util::Array1D<SizeT, VertexT>     NG_ci;        /** < Used for query node sequence non-tree edge info */
+        util::Array1D<SizeT, VertexT >    NG_src;       /** < Used for query node sequence non-tree edge info */
+        util::Array1D<SizeT, VertexT>     NG_dest;      /** < Used for query node sequence non-tree edge info */
         util::Array1D<SizeT, VertexT>     partial;      /** < Used for storing partial results */
         util::Array1D<SizeT, VertexT>     src_node_id;  /** < Used for storing compacted src nodes */
         util::Array1D<SizeT, VertexT>     index;         /** < Used for storing intermediate flag val */
@@ -102,13 +102,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             data_labels     .SetName("data_labels");
             query_ro        .SetName("query_ro");
             data_degree     .SetName("data_degree");
-            query_degree    .SetName("query_degree");
             isValid         .SetName("isValid");
             counter         .SetName("counter");
             num_subs        .SetName("num_subs");
+            constrain       .SetName("constrain");
             NG              .SetName("NG");
-            NG_ro           .SetName("NG_ro");
-            NG_ci           .SetName("NG_ci");
+            NG_src          .SetName("NG_src");
+            NG_dest         .SetName("NG_dest");
             partial         .SetName("partial");
             src_node_id     .SetName("src_node_id");
             index           .SetName("index");
@@ -139,13 +139,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(query_labels   .Release(target));
             GUARD_CU(data_labels    .Release(target));
             GUARD_CU(data_degree    .Release(target));
-            GUARD_CU(query_degree   .Release(target));
             GUARD_CU(isValid        .Release(target));
             GUARD_CU(counter        .Release(target));
             GUARD_CU(num_subs       .Release(target));
+            GUARD_CU(constrain      .Release(target));
             GUARD_CU(NG             .Release(target));
-            GUARD_CU(NG_ro          .Release(target));
-            GUARD_CU(NG_ci          .Release(target));
+            GUARD_CU(NG_src         .Release(target));
+            GUARD_CU(NG_dest        .Release(target));
             GUARD_CU(partial        .Release(target));
             GUARD_CU(src_node_id    .Release(target));
             GUARD_CU(index          .Release(target));
@@ -172,44 +172,50 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             ProblemFlag    flag    = Problem_None)
         {
             cudaError_t retval  = cudaSuccess;
+            int num_query_edge = query_graph.edges / 2;
+            int num_query_node = query_graph.nodes;
 
             GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
             GUARD_CU(subgraphs      .Allocate(sub_graph.nodes, target));
-            GUARD_CU(query_ro       .Allocate(query_graph.nodes + 1, util::HOST | util::DEVICE)); 
+            GUARD_CU(query_ro       .Allocate(num_query_node + 1, util::HOST | util::DEVICE)); 
             GUARD_CU(data_degree    .Allocate(data_graph.nodes, util::DEVICE));
-            GUARD_CU(query_degree   .Allocate(query_graph.nodes, util::HOST | util::DEVICE));
             GUARD_CU(isValid        .Allocate(data_graph.nodes, util::DEVICE));
             GUARD_CU(counter        .Allocate(1, util::HOST | util::DEVICE));
             GUARD_CU(num_subs       .Allocate(1, util::HOST | util::DEVICE));
-            GUARD_CU(NG             .Allocate(query_graph.nodes, util::HOST | util::DEVICE));
+            GUARD_CU(constrain      .Allocate(1, util::HOST | util::DEVICE));
+            GUARD_CU(NG             .Allocate(num_query_node, util::HOST | util::DEVICE));
             // non-tree edges only exist in the following condition
-            if(query_graph.edges - query_graph.nodes + 1 > 0) {
-                GUARD_CU(NG_ro      .Allocate(query_graph.nodes - 1, util::HOST | util::DEVICE));
-                GUARD_CU(NG_ci      .Allocate(query_graph.edges - query_graph.nodes + 1, util::HOST | util::DEVICE));
+            if(num_query_edge - query_graph.nodes + 1 > 0) {
+                GUARD_CU(NG_src     .Allocate(num_query_edge - num_query_node + 1, util::HOST | util::DEVICE));
+                GUARD_CU(NG_dest    .Allocate(num_query_edge - num_query_node + 1, util::HOST | util::DEVICE));
             }
             // partial results storage: as much as possible
-            GUARD_CU(partial        .Allocate(query_graph.nodes * data_graph.edges,  util::DEVICE));
+            GUARD_CU(partial        .Allocate(num_query_node * data_graph.edges,  util::DEVICE));
             GUARD_CU(src_node_id    .Allocate(data_graph.edges,  util::DEVICE));
             GUARD_CU(index          .Allocate(data_graph.edges,  util::DEVICE));
 
             // Initialize query graph node degree by row offsets
             // neighbor node encoding = sum of neighbor node labels
-            for(int i = 0; i < query_graph.nodes; i++) {
-                query_degree[i] = query_graph.row_offsets[i+1] - query_graph.row_offsets[i];
+            int *query_degree = new int[num_query_node];
+            for(int i = 0; i < num_query_node; i++) {
+                query_degree[i] = query_graph.row_offsets[i + 1] - query_graph.row_offsets[i];
             }
             // Generate query graph node exploration sequence based on maximum likelihood estimation (MLE)
             // node mapping degree, TODO:probablity estimation based on label and degree
-            int *d_m = new int[query_graph.nodes];
-            memset(d_m, 0, sizeof(int)*query_graph.nodes);
+            int *d_m = new int[num_query_node];
+            memset(d_m, 0, sizeof(int) * num_query_node);
             int degree_max = query_degree[0];
+            int degree_min = query_degree[0];
             int index = 0;
-            for(int i = 0; i < query_graph.nodes; ++i) {
+            for(int i = 0; i < num_query_node; ++i) {
                 if(i == 0) {
                     // find maximum degree in query graph and corresponding node index
-                    for(int j = 1; j < query_graph.nodes; ++j) {
+                    for(int j = 1; j < num_query_node; ++j) {
                         if(query_degree[j] > degree_max) {
                             index = j;
                             degree_max = query_degree[j];
+                        } else {
+                            degree_min = query_degree[j];
                         }
                     }
                 } else {
@@ -218,7 +224,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     while (d_m[index] == -1) {
                         index++;
                     }
-                    for(int j = 0; j < query_graph.nodes; ++j){
+                    for(int j = 0; j < num_query_node; ++j){
                         if(d_m[j] >= 0) {
                             if(index * degree_max + query_degree[j] > dm_max){
                                 dm_max = index * degree_max + query_degree[j];
@@ -234,25 +240,57 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                     if(d_m[query_graph.column_indices[j]] != -1)
                         d_m[query_graph.column_indices[j]]++;
             }
+            constrain[0] = degree_min;
             delete[] d_m;
-            // fill query graph non-tree edges info for each node
-            if(query_graph.edges - query_graph.nodes + 1 > 0){
-                NG_ro[0] = 0;
-                NG_ci[0] = 0;
-                for(int id = 2; id < query_graph.nodes; ++id){
-                    int idx = 0;
-                    for(int j = 0; j < id - 1; ++j)
-                        for(int i = query_graph.row_offsets[id]; i < query_graph.row_offsets[id + 1] && (NG_ro[id - 2] + idx + 1) < (query_graph.edges - query_graph.nodes + 1); ++i)
-                            if(NG[j] == query_graph.column_indices[i]) {
-                                // store the index of the dest node instead of the node id itself
-                                NG_ci[NG_ro[id - 2] + idx++] = j;
-                            }
-                    NG_ro[id-1] = idx;
+            delete[] query_degree;
+
+            bool *node_visited = new bool[num_query_node];
+            bool *edge_visited = new bool[num_query_node * num_query_node];
+            memset(node_visited, false, sizeof(bool) * num_query_node);
+            memset(edge_visited, false, sizeof(bool) * num_query_node * num_query_node);
+            // fill in query graph non-tree edges info for each node
+            if(num_query_edge - num_query_node + 1 > 0){
+                int i = 0;
+                int j = 0;
+                for(int id = 0; id < num_query_node; ++id) {
+                    int src = NG[id];
+                    node_visited[src] = true;
+                    for (int idx = query_graph.row_offsets[src]; idx < query_graph.row_offsets[src + 1]; ++idx) {
+                        int dest = query_graph.column_indices[idx];
+                        if (edge_visited[src * num_query_node + dest]) continue;
+                        edge_visited[src * num_query_node + dest] = true;
+                        edge_visited[dest * num_query_node + src] = true;
+                        if (node_visited[dest]) {
+                            // This is a non-tree edge, store src and dest
+                            NG_src[i++] = src;
+                            NG_dest[j++] = dest;
+                        }
+                        node_visited[dest] = true;
+                    }
                 }
             }
-            GUARD_CU(NG_ci.Move(util::HOST, target));
+            delete[] node_visited;
+            delete[] edge_visited;
+
+            std::cout << "==============NG===========" << std::endl;
+            for (int i = 0; i < query_graph.nodes; ++i) {
+                std::cout << NG[i] << std::endl;
+            }
+            std::cout << "==============NG_src===========" << std::endl;
+            for (int i = 0; i < num_query_edge - query_graph.nodes + 1; ++i) {
+                std::cout << NG_src[i] << std::endl;
+            }
+            std::cout << "==============NG_dest===========" << std::endl;
+            for (int i = 0; i < num_query_edge - query_graph.nodes + 1; ++i) {
+                std::cout << NG_dest[i] << std::endl;
+            }
+            std::cout << "==============MIN degree===========" << std::endl;
+            std::cout << constrain[0] << std::endl;
+            
             GUARD_CU(NG.Move(util::HOST, target));
-            GUARD_CU(NG_ro.Move(util::HOST, target));
+            GUARD_CU(NG_src.Move(util::HOST, target));
+            GUARD_CU(NG_dest.Move(util::HOST, target));
+            GUARD_CU(constrain.Move(util::HOST, target));
             // Initialize query row offsets with query_graph.row_offsets
             GUARD_CU(query_ro.ForAll([query_graph] 
                 __host__ __device__(SizeT * x, const SizeT &pos) 

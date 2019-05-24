@@ -69,14 +69,15 @@ struct SMIterationLoop : public IterationLoopBase
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
         auto         &enactor_stats      =   enactor_slice.enactor_stats;
         auto         &graph              =   data_slice.sub_graph[0];
-        auto         &subgraphs         =   data_slice.subgraphs;
+        auto         &subgraphs          =   data_slice.subgraphs;
+        auto         &constrain          =   data_slice.constrain;
         auto         &row_offsets        =   graph.CsrT::row_offsets;
         auto         &col_indices        =   graph.CsrT::column_indices;
         auto         &frontier           =   enactor_slice.frontier;
         auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
         auto         &retval             =   enactor_stats.retval;
-        auto         &stream             =   oprtr_parameters.stream;
         auto         &iteration          =   enactor_stats.iteration;
+        auto         &stream             =   oprtr_parameters.stream;
         auto         target              =   util::DEVICE;
 
         // First add degrees to subgraph matching
@@ -86,20 +87,69 @@ struct SMIterationLoop : public IterationLoopBase
                 subgraphs_[v] = row_offsets[v + 1] - row_offsets[v];
             }, graph.nodes, target, stream));
 
+        subgraphs.Print();
+        constrain.Print();
+        // advance to filter out data graph nodes which don't satisfy constrain
+        auto advance_op = [subgraphs, constrain] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            if (subgraphs[src] >= constrain[0])
+                return true;
+            atomicAdd(subgraphs + dest,  -1);
+            return false;
+        };
+        auto filter_op = [subgraphs, constrain] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            if (!util::isValid(dest)) {
+                printf("False @ %u\n", dest);
+                return false;
+            }
+            return true;
+        };
+
+	auto print_frontier = [] __host__ __device__(
+	    VertexT * v_q, const SizeT &pos) 
+        {
+	    VertexT v = v_q[pos];
+	    printf("Frontier @ %u = %u\n", pos, v);
+	    return;
+	};
+
         // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
         // The intersection operation
         auto intersect_op = [subgraphs] __host__ __device__(
             VertexT &comm_node, VertexT &edge) -> bool
         {
             atomicAdd(subgraphs + comm_node,  1);
-            
             return true;
         };
-        frontier.queue_length = graph.edges;
-        frontier.queue_reset  = true;
+
+        //oprtr_parameters.label = iteration + 1;
+//        frontier.queue_length = graph.edges;
+//        frontier.queue_reset = true;
+        printf("=============Iteration: %u=================\n", iteration);
+        if (iteration == 0) {
+            GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
+                oprtr_parameters, advance_op, filter_op));
+            subgraphs.Print();
+        } else {
+/*        frontier.queue_reset = false;
         GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
             graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
-            oprtr_parameters, intersect_op));
+            oprtr_parameters, intersect_op));*/
+            frontier.queue_reset = false;
+             
+
+        }
+
+
+
 
 	// // Sort the subgraph matching values for each node in descending order
  //        GUARD_CU(util::cubSortPairs(
