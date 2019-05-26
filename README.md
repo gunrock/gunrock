@@ -18,21 +18,9 @@
 **Gunrock** is a CUDA library for graph-processing designed specifically for the GPU. It uses a **high-level**, **bulk-synchronous**, **data-centric abstraction** focused on operations on a vertex or edge frontier. Gunrock achieves a balance between performance and expressiveness by coupling high performance GPU computing primitives and optimization strategies with a high-level programming model that allows programmers to quickly develop new graph primitives with small code size and minimal GPU programming knowledge. For more details, see [Gunrock's Overview](http://gunrock.github.io/docs/#overview).
 
 
-<table style="font-size: 12px;"><thead>
-<tr>
-  <th><strong>Service</strong></th>
-  <th><strong>System</strong></th>
-  <th><strong>Environment</strong></th>
-  <th><strong>Status</strong></th>
-</tr>
-</thead><tbody>
-<tr>
-  <td><a href="https://jenkins.io/">Jenkins</a></td>
-  <td>Ubuntu 18.04.2 LTS</td>
-  <td>CUDA 10.1, NVIDIA Driver 418.39, GCC/G++ 7.3</td>
-  <td><a href="http://daisy.ece.ucdavis.edu:8080/blue/organizations/jenkins/gunrock/activity"><img src="http://daisy.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/master" alt="Build Status"></a></td>
-</tr>
-</tbody></table>
+| **Service**                    | **System**         | **Environment**                              | **Status**                                                                                                                                                                                       |
+|--------------------------------|--------------------|----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [Jenkins](https://jenkins.io/) | Ubuntu 18.04.2 LTS | CUDA 10.1, NVIDIA Driver 418.39, GCC/G++ 7.3 | <a href="http://daisy.ece.ucdavis.edu:8080/blue/organizations/jenkins/gunrock/activity"><img src="http://daisy.ece.ucdavis.edu:8080/buildStatus/icon?job=gunrock/master" alt="Build Status"></a> |
 
 ## Quick Start Guide
 
