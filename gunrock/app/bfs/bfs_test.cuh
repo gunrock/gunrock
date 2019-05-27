@@ -109,13 +109,6 @@ double CPU_Reference(
             for (SizeT e = e_start; e < e_end; e++)
             {
                 VertexT u = graph.CsrT::GetEdgeDest(e);
-                //if (v == 79 || u == 79)
-                //    //v == 23604 || u == 23604)
-                //    util::PrintMsg("Edge " + std::to_string(e)
-                //        + ": " + std::to_string(v)
-                //        + " -> " + std::to_string(u)
-                //        + " (" + std::to_string(labels[u])
-                //        + " -> " + std::to_string(iter));
                 if (iter < labels[u])
                 {
                     labels[u] = iter;

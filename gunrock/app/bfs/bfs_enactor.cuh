@@ -184,7 +184,8 @@ struct BFSIterationLoop : public IterationLoopBase
                 this -> enactor -> flag & Size_Check, "scanned_edges",
                 frontier.queue_length + 2,
                 &frontier.output_offsets, over_sized, -1, -1, -1, false);
-            if (retval) return retval;
+            if (retval)
+                return retval;
 
             GUARD_CU(oprtr::ComputeOutputLength<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), enactor_slice.oprtr_parameters));
@@ -209,11 +210,10 @@ struct BFSIterationLoop : public IterationLoopBase
 
         if (this -> enactor -> flag & Debug)
         {
-            printf("%d\t %lld\t %d\t queue_size = %lld, output_length = %lld\n",
-                 this -> gpu_num, (long long)iteration, peer_,
-                 (long long)(frontier.Next_V_Q() -> GetSize()),
-                 (long long)request_length);
-            fflush(stdout);
+            util::PrintMsg(
+                "queue_size = " + std::to_string(frontier.Next_V_Q() -> GetSize())
+                + "output_length = " + std::to_string(request_length),
+                this -> gpu_num, iteration, peer_);
         }
 
         if ((this -> enactor -> flag & Size_Check) == 0 &&
@@ -224,13 +224,15 @@ struct BFSIterationLoop : public IterationLoopBase
         //(AdvanceKernelPolicy::ADVANCE_MODE != gunrock::oprtr::advance::LB_CULL)
         {
             retval = CheckSize<SizeT, VertexT>(
-                  true, "queue3", request_length, frontier.Next_V_Q(),
-                  over_sized, this -> gpu_num, iteration, peer_, false);
-            if (retval) return retval;
+                true, "queue3", request_length, frontier.Next_V_Q(),
+                over_sized, this -> gpu_num, iteration, peer_, false);
+            if (retval)
+                return retval;
             retval = CheckSize<SizeT, VertexT>(
                   true, "queue3", graph.nodes + 2, frontier.V_Q(),
                   over_sized, this -> gpu_num, iteration, peer_, true);
-            if (retval) return retval;
+            if (retval)
+                return retval;
             // TODO
             //if (enactor->problem->use_double_buffer)
             //{
@@ -280,9 +282,9 @@ struct BFSIterationLoop : public IterationLoopBase
         auto         &gpu_num            =   this -> gpu_num;
 
         #if TO_TRACK
-            util::PrintMsg("Core queue_length = "
-                + std::to_string(frontier.queue_length),
-                gpu_num, iteration, peer_);
+        util::PrintMsg("Core queue_length = "
+            + std::to_string(frontier.queue_length),
+            gpu_num, iteration, peer_);
         #endif
         #ifdef RECORD_PER_ITERATION_STATS
         GpuTimer gpu_timer;
@@ -307,11 +309,6 @@ struct BFSIterationLoop : public IterationLoopBase
                 {
                     // Check if the destination node has been claimed as someone's child
                     LabelT old_label = _atomicMin(labels + dest, label);
-                    //if (src == 79 || dest == 79 ||
-                    //    //src == 24301 || dest == 24301 ||
-                    //    src == 0 || dest == 0)
-                    //printf("Edge %u: %u -> %u (%u -> %u), input_pos = %u, %p\n",
-                    //    edge_id, src, dest, old_label, label, input_pos, labels + dest);
                     if (label >= old_label)
                         return false;
 
@@ -321,8 +318,6 @@ struct BFSIterationLoop : public IterationLoopBase
                         VertexT pred = src;
                         if (original_vertex + 0 != NULL)
                             pred = original_vertex[src];
-                        //printf("pred[%d] <- %d\n",
-                        //    dest, pred);
                         Store(preds + dest, pred);
                     }
                 }
@@ -337,9 +332,6 @@ struct BFSIterationLoop : public IterationLoopBase
             {
                 if (!util::isValid(dest))
                     return false;
-                //if (dest == 0)
-                //    printf("Qi[%u] = %u\n",
-                //        input_pos, dest);
 
                 if (idempotence && mark_preds)
                 {
@@ -362,17 +354,11 @@ struct BFSIterationLoop : public IterationLoopBase
                 [work_progress, queue_index] __host__ __device__ (SizeT i)
                 {
                     SizeT *counter = work_progress.GetQueueCounter(queue_index + 1);
-                    //printf("queue_length = %d\n", counter[0]);
-                //work_progress.StoreQueueLength((SizeT)0, (SizeT)(queue_index + 1));
                     counter[0] = 0;
                 }, 1, util::DEVICE, oprtr_parameters.stream, 1, 1));
-            //GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), "Set counter");
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
                 oprtr_parameters, advance_op, filter_op));
-
-            //GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-            //    "After advance");
 
             #ifdef RECORD_PER_ITERATION_STATS
             gpu_timer.Stop();
@@ -414,8 +400,6 @@ struct BFSIterationLoop : public IterationLoopBase
                 if (debug)
                     util::PrintMsg("Filter end.", gpu_num, iteration, peer_);
 
-                //GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-                //    "After filter");
             }
 
             // Get back the resulted frontier length
@@ -496,11 +480,8 @@ struct BFSIterationLoop : public IterationLoopBase
                     }
                 }
 
-                data_slice.split_lengths.Move(util::DEVICE, util::HOST, 1, 0, stream);
-                if (enactor_stats.retval = util::GRError(
-                    cudaStreamSynchronize(stream), "cudaStreamSynchronize failed",
-                    __FILE__, __LINE__))
-                    return retval;
+                GUARD_CU(data_slice.split_lengths.Move(util::DEVICE, util::HOST, 1, 0, stream));
+                GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
                 data_slice.num_unvisited_vertices = data_slice.split_lengths[0];
                 data_slice.num_visited_vertices =
                     graph.nodes - data_slice.num_unvisited_vertices;
@@ -569,40 +550,8 @@ struct BFSIterationLoop : public IterationLoopBase
             frontier.queue_index++;
         } // end of backward
 
-        //GUARD_CU2(cudaStreamSynchronize(stream),
-        //    "cudaStreamSynchronize failed");
- 
-        //GUARD_CU(frontier.V_Q() -> ForAll(
-        //    [iteration] __host__ __device__ (VertexT *queue, const SizeT &pos)
-        //    {
-        //        VertexT v = queue[pos];
-        //        if (v == 0)
-        //            printf("After iter %lu, Q[%lu] = %lu\n",
-        //                (unsigned long long)iteration,
-        //                (unsigned long long)pos,
-        //                (unsigned long long)v);
-        //    }, frontier.queue_length, util::DEVICE, stream));
-
         data_slice.previous_direction = data_slice.current_direction;
 
-        //if (TO_TRACK)
-        //{
-        //    util::Check_Value<<<1, 1, 0, stream>>>(
-        //        work_progress->template GetQueueLengthPointer<unsigned int>(
-        //            frontier.queue_index),
-        //        data_slice->gpu_idx, 3, iteration);
-        //
-        //    util::Check_Value<<<1, 1, 0, stream>>>(
-        //        work_progress->template GetQueueLengthPointer<unsigned int>(
-        //            frontier.queue_index),
-        //        data_slice->gpu_idx, 4, iteration);
-        //
-        //    util::Check_Exist_<<<256, 256, 0, stream>>>(
-        //        work_progress->template GetQueueLengthPointer<unsigned int>(
-        //            frontier.queue_index),
-        //        data_slice->gpu_idx, 4, iteration,
-        //        frontier.V_Q() -> GetPointer(util::DEVICE));
-        //}
         return retval;
     }
 

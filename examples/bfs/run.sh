@@ -16,13 +16,13 @@ do
 done
 
 #put OS and Device type here
-SUFFIX="GUNROCK_v1-0-0_TitanV"
+SUFFIX="GUNROCK_v1-0-0_TitanXp"
 DATADIR="/data/gunrock_dataset/large"
 
 ORG_OPTIONS=""
 ORG_OPTIONS="$ORG_OPTIONS --num-runs=10"
 ORG_OPTIONS="$ORG_OPTIONS --validation=each"
-ORG_OPTIONS="$ORG_OPTIONS --device=0"
+ORG_OPTIONS="$ORG_OPTIONS --device=2"
 ORG_OPTIONS="$ORG_OPTIONS --jsondir=./eval/$SUFFIX"
 ORG_OPTIONS="$ORG_OPTIONS --src=random"
 ORG_OPTIONS="$ORG_OPTIONS --64bit-SizeT=false,true"
@@ -91,7 +91,7 @@ NAME[54]="uk-2005"           &&  OPT_DIR[54]="--do-a=200      --do-b=2000  --que
                                 OPT_UDIR[54]="--do-a=20       --do-b=2     --queue-factor=1.1"
 NAME[55]="webbase-2001"      &&  OPT_DIR[55]="--do-a=50       --do-b=0.002 --queue-factor=2"
                                 OPT_UDIR[55]="--do-a=5        --do-b=20    --queue-factor=2"
-NAME[56]="indochina-2001"    &&  OPT_DIR[56]="--do-a=1000     --do-b=0.001"
+NAME[56]="indochina-2004"    &&  OPT_DIR[56]="--do-a=1000     --do-b=0.001"
                                 OPT_UDIR[56]="--do-a=200      --do-b=1000"
 NAME[57]="caidaRouterLevel"  && OPT_UDIR[57]="--do-a=0.1      --do-b=0.00005" #&& QFACROR="1.00" && I_SIZE_DIR[43]="0.30" && OPT_UDIR[43]="--queue-factor=3.60" && I_SIZE_UDIR[43]="0.40" 
 
@@ -110,15 +110,9 @@ NAME[71]="road_central"      && OPT_UDIR[71]="--do-a=0.1      --do-b=0.00001 --q
 #NAME[41]="tweets"            && OPT_DIR[41]="--queue-factor=5.00" && I_SIZE_DIR[41]="2.00" && OPT_UDIR[41]="--queue-factor=5.00" && I_SIZE_UDIR[41]="2.00" 
 #NAME[42]="bitcoin"           && OPT_DIR[42]="--queue-factor=5.00" && I_SIZE_DIR[42]="2.00" && OPT_UDIR[42]="--queue-factor=10.0" && I_SIZE_UDIR[42]="2.00" 
 
-NAMES=""
-for i in {0..71}; do
-    NAMES="$NAMES ${NAME[$i]}"
-done
-echo $NAMES
-
 mkdir -p eval/$SUFFIX
 
-for i in 72; do #{0..71}; do
+for i in {0..71}; do
     if [ "${NAME[$i]}" = "" ]; then
         continue
     fi
