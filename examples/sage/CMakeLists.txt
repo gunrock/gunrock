@@ -1,10 +1,10 @@
 # ------------------------------------------------------------------------
-#  Gunrock: Sub-Project Random Walk
+#  Gunrock: Sub-Project Graph Sage
 # ------------------------------------------------------------------------
-project(rw)
+project(sage)
 message("-- Project Added: ${PROJECT_NAME}")
 include(${CMAKE_SOURCE_DIR}/cmake/SetSubProject.cmake)
 
-add_test(NAME TEST_RW COMMAND rw market
-   ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx)
-set_tests_properties(TEST_RW PROPERTIES PASS_REGULAR_EXPRESSION "0 errors occurred")
+add_test(NAME TEST_SAGE COMMAND sage market
+	${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx) 
+set_tests_properties(TEST_SAGE PROPERTIES PASS_REGULAR_EXPRESSION "Embedding validation: PASS")

@@ -60,28 +60,6 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 0,
       "Index of reference point.", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
-      "eps",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 0,
-      "The minimum number of neighbors two points should share\n"
-      "to be considered close to each other",
-      __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<int>(
-      "min-pts",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 0,
-      "The minimum density that a point should have to be considered a core "
-      "point\n",
-      __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<bool>(
-      "snn",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      true,
-      "Perform Shared Nearest Neighbor using K-Nearest Neighbor. (enables SNN "
-      "app).",
-      __FILE__, __LINE__));
-
   GUARD_CU(parameters.Use<float>(
       "cpu-elapsed", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0.0f,
       "CPU implementation, elapsed time (ms) for JSON.", __FILE__, __LINE__));
@@ -102,11 +80,8 @@ cudaError_t UseParameters(util::Parameters &parameters) {
 template <typename GraphT>
 cudaError_t RunTests(
     util::Parameters &parameters, GraphT &graph, typename GraphT::SizeT k,
-    typename GraphT::SizeT eps, typename GraphT::SizeT min_pts,
     typename GraphT::SizeT *h_knns, typename GraphT::SizeT *ref_knns,
-    typename GraphT::SizeT *h_cluster, typename GraphT::SizeT *ref_cluster,
-    typename GraphT::SizeT *h_core_point_counter,
-    typename GraphT::SizeT *h_cluster_counter, util::Location target) {
+    util::Location target) {
   cudaError_t retval = cudaSuccess;
 
   typedef typename GraphT::VertexT VertexT;
@@ -124,8 +99,6 @@ cudaError_t RunTests(
   VertexT point_x = parameters.Get<int>("x");
   VertexT point_y = parameters.Get<int>("y");
 
-  bool snn = parameters.Get<bool>("snn");
-
   util::CpuTimer cpu_timer, total_timer;
   cpu_timer.Start();
   total_timer.Start();
@@ -140,7 +113,7 @@ cudaError_t RunTests(
   parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
   for (int run_num = 0; run_num < num_runs; ++run_num) {
-    GUARD_CU(problem.Reset(point_x, point_y, k, eps, min_pts, target));
+    GUARD_CU(problem.Reset(point_x, point_y, k, target));
     GUARD_CU(enactor.Reset(target));
 
     util::PrintMsg("__________________________", !quiet_mode);
@@ -158,20 +131,16 @@ cudaError_t RunTests(
         !quiet_mode);
 
     if (validation == "each") {
-      GUARD_CU(problem.Extract(graph.nodes, k, h_knns, h_cluster,
-                               h_core_point_counter, h_cluster_counter, snn));
-      SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
-                                          ref_cluster, h_knns, ref_knns, false);
+      GUARD_CU(problem.Extract(graph.nodes, k, h_knns));
+      SizeT num_errors = Validate_Results(parameters, graph, h_knns, ref_knns, false);
     }
   }
 
   cpu_timer.Start();
 
-  GUARD_CU(problem.Extract(graph.nodes, k, h_knns, h_cluster,
-                           h_core_point_counter, h_cluster_counter, snn));
+  GUARD_CU(problem.Extract(graph.nodes, k, h_knns));
   if (validation == "last") {
-    SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
-                                        ref_cluster, h_knns, ref_knns, false);
+    SizeT num_errors = Validate_Results(parameters, graph, h_knns, ref_knns, false);
   }
 
   // compute running statistics
@@ -182,12 +151,6 @@ cudaError_t RunTests(
 #ifdef ENABLE_PERFORMANCE_PROFILING
   // Display_Performance_Profiling(enactor);
 #endif
-
-  // For JSON output
-  info.SetVal("num-corepoints", std::to_string(h_core_point_counter[0]));
-  info.SetVal("num-clusters", std::to_string(h_cluster_counter[0]));
-  // info.SetVal("cpu-elapsed",
-  // std::to_string(parameters.Get<float>("cpu-elapsed")));
 
   // Clean up
   GUARD_CU(enactor.Release(target));

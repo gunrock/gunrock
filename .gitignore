@@ -36,6 +36,10 @@ doxygen/html
 unittests/*/*.txt
 examples/*/*.txt
 
+# exceptions for ignore
+!unittests/*/CMakeLists.txt
+!examples/*/CMakeLists.txt
+
 # Ignore vim temp files
 *.sw~
 

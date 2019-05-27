@@ -7,7 +7,7 @@
 
 /**
  * @file
- * sssp_test.cu
+ * gtc_test.cu
  *
  * @brief Test related functions for SSSP
  */

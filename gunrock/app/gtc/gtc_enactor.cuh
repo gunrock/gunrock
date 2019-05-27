@@ -7,7 +7,7 @@
 
 /**
  * @file
- * sssp_enactor.cuh
+ * gtc_enactor.cuh
  *
  * @brief SSSP Problem Enactor
  */
@@ -17,7 +17,7 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-#include <gunrock/app/gtc/sssp_problem.cuh>
+#include <gunrock/app/gtc/gtc_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
 namespace gunrock {

@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file sssp_app.cu
+ * @file gtc_app.cu
  *
  * @brief single-source shortest path (SSSP) application
  */
@@ -22,8 +22,8 @@
 #include <gunrock/app/test_base.cuh>
 
 // single-source shortest path includes
-#include <gunrock/app/gtc/sssp_enactor.cuh>
-#include <gunrock/app/gtc/sssp_test.cuh>
+#include <gunrock/app/gtc/gtc_enactor.cuh>
+#include <gunrock/app/gtc/gtc_test.cuh>
 
 namespace gunrock {
 namespace app {

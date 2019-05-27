@@ -1,10 +1,10 @@
 # ------------------------------------------------------------------------
-#  Gunrock: Sub-Project Random Walk
+#  Gunrock: Sub-Project Scan Statistics
 # ------------------------------------------------------------------------
-project(rw)
+project(ss)
 message("-- Project Added: ${PROJECT_NAME}")
 include(${CMAKE_SOURCE_DIR}/cmake/SetSubProject.cmake)
 
-add_test(NAME TEST_RW COMMAND rw market
-   ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx)
-set_tests_properties(TEST_RW PROPERTIES PASS_REGULAR_EXPRESSION "0 errors occurred")
+add_test(NAME TEST_SS COMMAND ss market
+	${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx) 
+set_tests_properties(TEST_SS PROPERTIES PASS_REGULAR_EXPRESSION "PASS")

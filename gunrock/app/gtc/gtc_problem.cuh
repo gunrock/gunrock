@@ -7,7 +7,7 @@
 
 /**
  * @file
- * sssp_problem.cuh
+ * gtc_problem.cuh
  *
  * @brief GPU Storage management Structure for SSSP Problem Data
  */

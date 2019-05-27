@@ -10,7 +10,7 @@
 #-------------------------------------------------------------------------------
 
 include ../BaseMakefile.mk
-ALGO = sssp
+ALGO = gtc
 EXEC = bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
 test: $(EXEC)

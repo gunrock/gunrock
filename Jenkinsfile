@@ -18,7 +18,7 @@ def cmake_build() {
     timeout(time: 20, unit: 'MINUTES') {
       sh 'mkdir -p build'
       sh '''cd build
-            cmake -DGUNROCK_CODE_COVERAGE=ON -DGUNROCK_MGPU_TESTS=ON ..
+            cmake -DGUNROCK_CODE_COVERAGE=ON .. //-DGUNROCK_MGPU_TESTS=ON ..
             make -j16'''
     }
   }
@@ -62,13 +62,6 @@ pipeline {
       }
     }
     
-    stage('Unit Tests') {
-      steps {
-        sh '''cd build
-              ./bin/unit_test'''
-      }
-    }
-    
     stage('Regression Tests') {
       steps {
         sh '''cd build
@@ -88,7 +81,7 @@ pipeline {
     
     stage('Deploy') {
       steps {
-        echo 'Branch: Master.'
+        echo 'Branch: Pre-release.'
         echo 'Pipleline finished.'
       }
     }
