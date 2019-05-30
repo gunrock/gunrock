@@ -57,7 +57,7 @@ namespace util {
 #define GR_SM60_SMEM_BYTES()            (65536)     // 64KB on SM6.0+
 #define GR_SM52_SMEM_BYTES()            (98304)     // 64KB on SM5.2
 #define GR_SM50_SMEM_BYTES()            (65536)     // 64KB on SM5.0+
-#define GR_SM37_SMEM_BYTES()            (131072)    // 48KB + 64KB on SM3.7
+#define GR_SM37_SMEM_BYTES()            (114688)    // 48KB + 64KB on SM3.7
 #define GR_SM20_SMEM_BYTES()            (49152)     // 48KB on SM2.0+
 #define GR_SM10_SMEM_BYTES()            (16384)     // 32KB on SM1.0-SM1.3
 #define GR_SMEM_BYTES(arch)             ((arch == 750) ? GR_SM75_SMEM_BYTES() : \
