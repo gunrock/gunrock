@@ -298,7 +298,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 query_graph.nodes + 1, util::HOST));
             GUARD_CU(query_ro.Move(util::HOST, target));
 	    GUARD_CU(isValid.ForAll(
-	        [] __device__(bool * x, const SizeT &pos) { x[pos] = false; },
+	        [] __device__(bool * x, const SizeT &pos) { x[pos] = true; },
 		data_graph.nodes, target, this->stream));
 	    GUARD_CU(data_degree.ForAll(
 	        [] __device__(SizeT * x, const SizeT &pos) { x[pos] = 0; },
