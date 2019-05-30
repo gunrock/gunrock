@@ -71,6 +71,7 @@ struct SMIterationLoop : public IterationLoopBase
         auto         &graph              =   data_slice.sub_graph[0];
         auto         &subgraphs          =   data_slice.subgraphs;
         auto         &constrain          =   data_slice.constrain;
+        auto         &isValid            =   data_slice.isValid;
         auto         &row_offsets        =   graph.CsrT::row_offsets;
         auto         &col_indices        =   graph.CsrT::column_indices;
         auto         &frontier           =   enactor_slice.frontier;
@@ -90,14 +91,20 @@ struct SMIterationLoop : public IterationLoopBase
         subgraphs.Print();
         constrain.Print();
         // advance to filter out data graph nodes which don't satisfy constrain
-        auto advance_op = [subgraphs, constrain] __host__ __device__(
+        auto advance_op = [subgraphs, constrain, isValid] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            if (subgraphs[src] >= constrain[0])
-                return true;
-            atomicAdd(subgraphs + dest,  -1);
+            if (isValid[src]) {
+                if (subgraphs[src] >= constrain[0]) {
+                    return true;
+                } else {
+                    isValid[src] = false;
+                    atomicAdd(subgraphs + dest,  -1);
+                }
+
+            }
             return false;
         };
         auto filter_op = [subgraphs, constrain] __host__ __device__(
@@ -130,21 +137,24 @@ struct SMIterationLoop : public IterationLoopBase
         };
 
         //oprtr_parameters.label = iteration + 1;
-//        frontier.queue_length = graph.edges;
-//        frontier.queue_reset = true;
-        printf("=============Iteration: %u=================\n", iteration);
-        if (iteration == 0) {
+        frontier.queue_length = graph.edges;
+        frontier.queue_reset = true;
+        int num_init = 3;
+        for (int iter = 0; iter < num_init; ++iter) {
+            printf("===================iter:%d====================\n", iter);
+            if (iter > 0)
+                frontier.queue_reset = false;
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
-                oprtr_parameters, advance_op, filter_op));
+                oprtr_parameters, advance_op));
+            isValid.Print();
             subgraphs.Print();
-        } else {
-/*        frontier.queue_reset = false;
-        GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
-            oprtr_parameters, intersect_op));*/
-            frontier.queue_reset = false;
-             
+
+   /*         GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
+                oprtr_parameters, intersect_op));*/
+                //frontier.queue_reset = false;
+                 
 
         }
 
