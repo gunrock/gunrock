@@ -26,18 +26,19 @@
 
 Before building Gunrock make sure you have **CUDA 7.5 or higher** (recommended CUDA 9 or higher) installed on your Linux system. We also support building Gunrock on docker images using the provided docker files under `docker` subdirectory. For complete build guide, see [Building Gunrock](https://gunrock.github.io/docs/#building-gunrock).
 
-<pre class="highlight mid-column-code shell tab-shell">
-<code>git clone --recursive https://github.com/gunrock/gunrock/
+```shell
+git clone --recursive https://github.com/gunrock/gunrock/
 cd gunrock
 mkdir build && cd build
 cmake .. && make -j$(nproc)
-make test</code></pre>
+make test
+```
 
 ## Getting Started with Gunrock
 
 - To learn more about Gunrock and its programming model, see [Gunrock's Overview](http://gunrock.github.io/docs/#overview).
 - For information on building Gunrock, see [Building Gunrock](http://gunrock.github.io/docs/#building-gunrock).
-- Tutorial: [How to write a graph primitive within Gunrock?]()
+- Tutorial: [How to write a graph primitive within Gunrock?](https://gunrock.github.io/docs/developers.html)
 - Comprehensive [list](https://gunrock.github.io/docs/#gunrock-39-s-application-cases) of test applications and primitives for most the functionality of Gunrock.
 - [API Reference documentation](http://gunrock.github.io/gunrock) (generated using doxygen).
 - Find our [publications](http://gunrock.github.io/docs/#publications), [presentations](http://gunrock.github.io/docs/#presentations), and [results and analysis](http://gunrock.github.io/docs/#results-and-analysis).
