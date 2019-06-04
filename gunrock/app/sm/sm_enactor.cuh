@@ -72,12 +72,17 @@ struct SMIterationLoop : public IterationLoopBase
         auto         &subgraphs          =   data_slice.subgraphs;
         auto         &constrain          =   data_slice.constrain;
         auto         &isValid            =   data_slice.isValid;
+        auto         &NG                 =   data_slice.NG;
+        auto         &NG_src             =   data_slice.NG_src;
+        auto         &NG_dest            =   data_slice.NG_dest;
+        auto         &query_ro           =   data_slice.query_ro;
+        auto         &query_ci           =   data_slice.query_ci;
+        auto         &counter            =   data_slice.counter;
         auto         &row_offsets        =   graph.CsrT::row_offsets;
         auto         &col_indices        =   graph.CsrT::column_indices;
         auto         &frontier           =   enactor_slice.frontier;
         auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
         auto         &retval             =   enactor_stats.retval;
-        auto         &iteration          =   enactor_stats.iteration;
         auto         &stream             =   oprtr_parameters.stream;
         auto         target              =   util::DEVICE;
 
@@ -127,6 +132,23 @@ struct SMIterationLoop : public IterationLoopBase
 	    return;
 	};
 
+        auto distribute_op = [subgraphs, isValid, NG, query_ro, query_ci, counter] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            if ((!isValid[src]) || (!isValid[dest])) {
+                return false;
+            }
+            // NG has query node id sequens in its even pos; min degree of neighbors in odd pos
+            VertexT query_id = NG[counter[0] * 2];
+            if (subgraphs[src] < (query_ro[query_id + 1] - query_ro[query_id]))
+                return false;
+            // 1 way look ahead
+            if (subgrahps[dest] < NG[counter[0] * 2 + 1]) {
+                return false;
+            }
+        };
         // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
         // The intersection operation
         auto intersect_op = [subgraphs] __host__ __device__(
@@ -141,22 +163,27 @@ struct SMIterationLoop : public IterationLoopBase
         frontier.queue_reset = true;
         int num_init = 3;
         for (int iter = 0; iter < num_init; ++iter) {
-            printf("===================iter:%d====================\n", iter);
-            if (iter > 0)
+            if (iter > 0) {
                 frontier.queue_reset = false;
+            }
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
                 oprtr_parameters, advance_op));
             isValid.Print();
             subgraphs.Print();
-
-   /*         GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
-                oprtr_parameters, intersect_op));*/
-                //frontier.queue_reset = false;
                  
 
         }
+
+        for (int iter = 0; iter < query_graph.nodes; ++iter) {
+            GUARD_CU(counter.ForAll([counter]
+                __host__ __device__ (VertexT *counter_)
+                {
+                    counter_[0] = iter;
+                }, 1, target, stream));
+        
+        }
+
 
 
 
@@ -409,7 +436,7 @@ public:
      */
     cudaError_t Enact()
     {
-        cudaError_t  retval     = cudaSuccess;
+        cudaError_t  retval = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));
         util::PrintMsg("GPU SM Done.", this -> flag & Debug);
         return retval;

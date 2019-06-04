@@ -78,7 +78,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, VertexT >    query_ci    ; // query graph column indices
         util::Array1D<SizeT, SizeT   >    data_degree ; // data graph nodes' degrees
         util::Array1D<SizeT, bool    >    isValid;      /** < Used for data node validation    */
-        util::Array1D<SizeT, SizeT   >    counter;      /** < Used for counting iBFS sources   */
+        util::Array1D<SizeT, SizeT   >    counter;      /** < Used for minimum degree in query graph */
         util::Array1D<SizeT, SizeT   >    num_subs;     /** < Used for counting iBFS sources   */
         util::Array1D<SizeT, SizeT   >    constrain;    /** < Smallest degree in query graph   */
         util::Array1D<SizeT, VertexT >    NG;           /** < Used for query node explore seq  */
@@ -183,7 +183,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(counter        .Allocate(1, util::HOST | util::DEVICE));
             GUARD_CU(num_subs       .Allocate(1, util::HOST | util::DEVICE));
             GUARD_CU(constrain      .Allocate(1, util::HOST | util::DEVICE));
-            GUARD_CU(NG             .Allocate(num_query_node, util::HOST | util::DEVICE));
+            GUARD_CU(NG             .Allocate(2 * num_query_node, util::HOST | util::DEVICE));
             // non-tree edges only exist in the following condition
             if(num_query_edge - query_graph.nodes + 1 > 0) {
                 GUARD_CU(NG_src     .Allocate(num_query_edge - num_query_node + 1, util::HOST | util::DEVICE));
@@ -272,8 +272,25 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             delete[] node_visited;
             delete[] edge_visited;
 
-            std::cout << "==============NG===========" << std::endl;
+            // Add 1 look ahead info: each query node's neighbors' min degree in the pos of (query_node_id, min_degree)
+            // rearange NG pos
+            for (int i = query_graph.nodes - 1; i >= 0; --i) {
+                NG[i * 2] = NG[i];
+            }
             for (int i = 0; i < query_graph.nodes; ++i) {
+                VertexT src = NG[i * 2];
+                int min_degree = INT_MAX;
+                for (int j = query_graph.row_offsets[src]; j < query_graph.row_offsets[src + 1]; ++j) {
+                    VertexT dest = query_graph.column_indices[src];
+                    if (query_graph.row_offsets[dest + 1] - query_graph.row_offsets[dest] < min_degree) {
+                        min_degree = query_graph.row_offsets[dest + 1] - query_graph.row_offsets[dest];
+                    }
+                }
+                NG[i * 2 + 1] = min_degree;
+            }
+
+            std::cout << "==============NG===========" << std::endl;
+            for (int i = 0; i < 2 * query_graph.nodes; ++i) {
                 std::cout << NG[i] << std::endl;
             }
             std::cout << "==============NG_src===========" << std::endl;
