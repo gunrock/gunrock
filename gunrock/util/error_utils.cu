@@ -32,6 +32,26 @@ void PrintMsg(std::string msg, bool to_print, bool new_line)
     PrintMsg(msg.c_str(), to_print, new_line);
 }
 
+void PrintMsg(const char* msg,
+    int gpu_num, long long iteration, int peer, bool to_print, bool new_line)
+{
+    if (!to_print) return;
+    PrintMsg(std::to_string(gpu_num) + "\t "
+        + std::to_string(iteration) + "\t "
+        + std::to_string(peer) + "\t "
+        + std::string(msg), true, new_line);
+}
+
+void PrintMsg(std::string msg,
+    int gpu_num, long long iteration, int peer, bool to_print, bool new_line)
+{
+    if (!to_print) return;
+    PrintMsg(std::to_string(gpu_num) + "\t "
+        + std::to_string(iteration) + "\t "
+        + std::to_string(peer) + "\t "
+        + msg, true, new_line);
+}
+
 /**
  * Displays error message in accordance with debug mode
  */

@@ -213,6 +213,8 @@ struct Frontier
         GUARD_CU(queue_offsets .Release(target));
         GUARD_CU(output_offsets.Release(target));
         GUARD_CU(cub_temp_space.Release(target));
+        // TODO: make cta_work_progress::Release run on Host
+        GUARD_CU(work_progress .Release());
         delete[] segment_offsets; segment_offsets = NULL;
         delete[] vertex_queues  ; vertex_queues   = NULL;
         delete[] edge_queues    ; edge_queues     = NULL;

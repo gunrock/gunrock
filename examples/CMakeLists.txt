@@ -4,7 +4,7 @@
 if(GUNROCK_BUILD_APPLICATIONS)
   #add_subdirectory(astar)
   add_subdirectory(bc)
-  #add_subdirectory(bfs)
+  add_subdirectory(bfs)
   #add_subdirectory(cc)
   add_subdirectory(color)
   add_subdirectory(geo)

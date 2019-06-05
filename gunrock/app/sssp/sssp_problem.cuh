@@ -326,7 +326,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             {
                 int gpu = this -> org_graph -> GpT::partition_table[v];
                 VertexT v_ = v;
-                if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
+                if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) == 0)
                     v_ = this -> org_graph -> GpT::convertion_table[v];
 
                 h_distances[v] = th_distances[gpu][v_];

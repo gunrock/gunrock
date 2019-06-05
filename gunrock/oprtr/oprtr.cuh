@@ -19,6 +19,7 @@
 #include <gunrock/oprtr/filter/kernel.cuh>
 #include <gunrock/oprtr/intersection/kernel.cuh>
 #include <gunrock/oprtr/neighborreduce/kernel.cuh>
+#include <gunrock/oprtr/1D_oprtr/for.cuh>
 
 namespace gunrock {
 namespace oprtr {

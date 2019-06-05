@@ -160,7 +160,7 @@ struct KernelPolicy
             GR_MIN(GR_SM_CTAS(CUDA_ARCH), GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
         VALID               = (CTA_OCCUPANCY > 0),
         // Bitmask for masking off the upper control bits in element identifier
-	    ELEMENT_ID_MASK	    = ~(1ULL<<(sizeof(InKeyT)*8-2)),
+	    //ELEMENT_ID_MASK	    = ~(1ULL<<(sizeof(InKeyT)*8-2)),
 
     };
 }; // end of kernelPolicy

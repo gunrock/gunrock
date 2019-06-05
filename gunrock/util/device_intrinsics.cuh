@@ -15,6 +15,7 @@
 #pragma once
 
 #include <limits>
+#include <atomic>
 #include <gunrock/util/cuda_properties.cuh>
 //#include <gunrock/util/types.cuh>
 
@@ -197,16 +198,21 @@ __device__ static unsigned long atomicAdd(unsigned long *addr, unsigned long val
 }*/
 #endif
 
+//#if UINT64_MAX != ULLONG_MAX
 __device__ static uint64_t atomicMin(uint64_t* addr, uint64_t val)
 {
-    unsigned long long int old = (unsigned long long int)val;
-    unsigned long long int expected;
-    do {
-        expected = old;
-        old = atomicCAS((unsigned long long int*)addr, val, (unsigned long long int)val);
-    } while (expected != old);
-    return old;
+    return (uint64_t)atomicMin((unsigned long long int*)addr, (unsigned long long int)val);
+//    unsigned long long int old = (unsigned long long int)(*addr);
+//    unsigned long long int expected;
+//    do {
+//        expected = old;
+//        old = atomicCAS(
+//            (unsigned long long int*)addr, 
+//            expected, min((unsigned long long int)val, expected));
+//    } while (expected != old);
+//    return old;
 }
+//#endif
 
 __device__ static float atomicMin(float* addr, float val)
 {
@@ -288,6 +294,27 @@ T _atomicAdd(T* ptr, const T &val)
         ptr[0] += val;
     }
     return retval;
+#endif
+}
+
+template <typename T>
+__device__ __host__ __forceinline__
+T _atomicMin(T* ptr, const T &val)
+{
+#ifdef __CUDA_ARCH__
+    return atomicMin(ptr, val);
+#else
+    std::atomic<T> *atomic_ptr = reinterpret_cast<std::atomic<T>*>(ptr);
+
+    T old_val = *ptr;
+    while (true)
+    {
+        bool is_equal = std::atomic_compare_exchange_strong(atomic_ptr,
+            &old_val, min(old_val, val));
+        if (is_equal)
+            break;
+    }
+    return old_val;
 #endif
 }
 

@@ -10,12 +10,12 @@
 #-------------------------------------------------------------------------------
 
 include ../BaseMakefile.mk
-ALGO = refactor
+ALGO = bfs
 EXEC = bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
 
 test: $(EXEC)
 
-bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX) : test_$(ALGO).cu $(DEPS)
+$(EXEC) : test_$(ALGO).cu $(DEPS)
 	mkdir -p bin
 	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3
 

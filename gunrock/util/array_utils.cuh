@@ -1012,10 +1012,12 @@ public:
 #else
     #ifdef ENABLE_ARRAY_DEBUG
         if (h_pointer == NULL)
-            GRError(std::string(name) + " not defined on " + Location_to_string(HOST),
+            GRError(cudaErrorInvalidHostPointer, 
+                std::string(name) + " not defined on " + Location_to_string(HOST),
                 __FILE__, __LINE__);
         if (idx >= size)
-            GRError(std::string(name) + " access out of bound", __FILE__, __LINE__);
+            GRError(cudaErrorInvalidHostPointer,
+                std::string(name) + " access out of bound", __FILE__, __LINE__);
         //printf("%s @ %p [%ld]ed1\n", name.c_str(), h_pointer,idx);fflush(stdout);
     #endif
         return h_pointer[idx];
@@ -1030,10 +1032,12 @@ public:
 #else
     #ifdef ENABLE_ARRAY_DEBUG
         if (h_pointer == NULL)
-            GRError(std::string(name) + " not defined on " + Location_to_string(HOST),
+            GRError(cudaErrorInvalidHostPointer,
+                std::string(name) + " not defined on " + Location_to_string(HOST),
                 __FILE__, __LINE__);
         if (idx >= size)
-            GRError(std::string(name) + " access out of bound", __FILE__, __LINE__);
+            GRError(cudaErrorInvalidHostPointer,
+                std::string(name) + " access out of bound", __FILE__, __LINE__);
         //PrintMsg(name + " [" + std::string(idx) + "]ed2");
     #endif
         return h_pointer[idx];
@@ -1048,7 +1052,8 @@ public:
 #else
     #ifdef ENABLE_ARRAY_DEBUG
         if (h_pointer == NULL)
-            GRError(std::string(name) + " not deined on " + Location_to_string(HOST),
+            GRError(cudaErrorInvalidHostPointer,
+                std::string(name) + " not deined on " + Location_to_string(HOST),
                 __FILE__, __LINE__);
         //PrintMsg(std::string(name) + " -> ed");
     #endif
@@ -1065,7 +1070,8 @@ public:
 #else
     #ifdef ENABLE_ARRAY_DEBUG
         if (h_pointer == NULL)
-            GRError(std::string(name) + " not deined on " + Location_to_string(HOST),
+            GRError(cudaErrorInvalidHostPointer,
+                std::string(name) + " not deined on " + Location_to_string(HOST),
                 __FILE__, __LINE__);
         //PrintMsg(name + " -> ed");
     #endif
@@ -1208,7 +1214,8 @@ public:
         std::ifstream fin;
         fin.open(filename.c_str());
         if (!fin.is_open())
-            return GRError("Unable to read file " + filename,
+            return GRError(cudaErrorInvalidValue,
+                "Unable to read file " + filename,
                 __FILE__, __LINE__);
 
         fin >> tLength >> tType;
@@ -1238,7 +1245,8 @@ public:
         std::ifstream fin;
         fin.open(filename.c_str());
         if (!fin.is_open())
-            return GRError("Unable to read file " + filename,
+            return GRError(cudaErrorInvalidValue,
+                "Unable to read file " + filename,
                 __FILE__, __LINE__);
 
         fin >> tLength >> tType;
@@ -1254,36 +1262,113 @@ public:
             fin.close();
             switch(tType)
             {
-            case Type2Enum<char>::Id :
-                retval = tRead<char>(filename); break;
-            case Type2Enum<unsigned char>::Id :
-                retval = tRead<unsigned char>(filename); break;
-            case Type2Enum<short>::Id :
-                retval = tRead<short>(filename); break;
-            case Type2Enum<unsigned short>::Id :
-                retval = tRead<unsigned short>(filename); break;
-            case Type2Enum<int>::Id :
-                retval = tRead<int>(filename); break;
-            case Type2Enum<unsigned int>::Id :
-                retval = tRead<unsigned int>(filename); break;
-            case Type2Enum<long>::Id :
-                retval = tRead<long>(filename); break;
-            case Type2Enum<unsigned long>::Id :
-                retval = tRead<unsigned long>(filename); break;
-            case Type2Enum<long long>::Id :
-                retval = tRead<long long>(filename); break;
-            case Type2Enum<unsigned long long>::Id :
+            case Type2Enum<             char     >::Id :
+                retval = tRead<         char     >(filename); break;
+            case Type2Enum<    unsigned char     >::Id :
+                retval = tRead<unsigned char     >(filename); break;
+            case Type2Enum<             short    >::Id :
+                retval = tRead<         short    >(filename); break;
+            case Type2Enum<    unsigned short    >::Id :
+                retval = tRead<unsigned short    >(filename); break;
+            case Type2Enum<             int      >::Id :
+                retval = tRead<         int      >(filename); break;
+            case Type2Enum<    unsigned int      >::Id :
+                retval = tRead<unsigned int      >(filename); break;
+            case Type2Enum<             long     >::Id :
+                retval = tRead<         long     >(filename); break;
+            case Type2Enum<    unsigned long     >::Id :
+                retval = tRead<unsigned long     >(filename); break;
+            case Type2Enum<             long long>::Id :
+                retval = tRead<         long long>(filename); break;
+            case Type2Enum<    unsigned long long>::Id :
                 retval = tRead<unsigned long long>(filename); break;
-            case Type2Enum<float>::Id :
-                retval = tRead<float>(filename); break;
-            case Type2Enum<double>::Id :
-                retval = tRead<double>(filename); break;
+            case Type2Enum<             float    >::Id :
+                retval = tRead<         float    >(filename); break;
+            case Type2Enum<             double   >::Id :
+                retval = tRead<         double   >(filename); break;
+
+            case Type2Enum<              char2   >::Id :
+                retval = tRead<          char2   >(filename); break; 
+            case Type2Enum<             uchar2   >::Id :
+                retval = tRead<         uchar2   >(filename); break; 
+            case Type2Enum<              short2  >::Id :
+                retval = tRead<          short2  >(filename); break; 
+            case Type2Enum<             ushort2  >::Id :
+                retval = tRead<         ushort2  >(filename); break; 
+            case Type2Enum<              int2    >::Id :
+                retval = tRead<          int2    >(filename); break; 
+            case Type2Enum<             uint2    >::Id :
+                retval = tRead<         uint2    >(filename); break;
+            case Type2Enum<              long2   >::Id :
+                retval = tRead<          long2   >(filename); break; 
+            case Type2Enum<             ulong2   >::Id :
+                retval = tRead<         ulong2   >(filename); break;
+            case Type2Enum<             longlong2>::Id :
+                retval = tRead<         longlong2>(filename); break; 
+            case Type2Enum<            ulonglong2>::Id :
+                retval = tRead<        ulonglong2>(filename); break;
+            case Type2Enum<              float2  >::Id :
+                retval = tRead<          float2  >(filename); break;
+            case Type2Enum<              double2 >::Id :
+                retval = tRead<          double2 >(filename); break;
+ 
+            case Type2Enum<              char3   >::Id :
+                retval = tRead<          char3   >(filename); break; 
+            case Type2Enum<             uchar3   >::Id :
+                retval = tRead<         uchar3   >(filename); break; 
+            case Type2Enum<              short3  >::Id :
+                retval = tRead<          short3  >(filename); break; 
+            case Type2Enum<             ushort3  >::Id :
+                retval = tRead<         ushort3  >(filename); break; 
+            case Type2Enum<              int3    >::Id :
+                retval = tRead<          int3    >(filename); break; 
+            case Type2Enum<             uint3    >::Id :
+                retval = tRead<         uint3    >(filename); break;
+            case Type2Enum<              long3   >::Id :
+                retval = tRead<          long3   >(filename); break; 
+            case Type2Enum<             ulong3   >::Id :
+                retval = tRead<         ulong3   >(filename); break;
+            case Type2Enum<             longlong3>::Id :
+                retval = tRead<         longlong3>(filename); break; 
+            case Type2Enum<            ulonglong3>::Id :
+                retval = tRead<        ulonglong3>(filename); break;
+            case Type2Enum<              float3  >::Id :
+                retval = tRead<          float3  >(filename); break;
+            case Type2Enum<              double3 >::Id :
+                retval = tRead<          double3 >(filename); break;
+ 
+            case Type2Enum<              char4   >::Id :
+                retval = tRead<          char4   >(filename); break; 
+            case Type2Enum<             uchar4   >::Id :
+                retval = tRead<         uchar4   >(filename); break; 
+            case Type2Enum<              short4  >::Id :
+                retval = tRead<          short4  >(filename); break; 
+            case Type2Enum<             ushort4  >::Id :
+                retval = tRead<         ushort4  >(filename); break; 
+            case Type2Enum<              int4    >::Id :
+                retval = tRead<          int4    >(filename); break; 
+            case Type2Enum<             uint4    >::Id :
+                retval = tRead<         uint4    >(filename); break;
+            case Type2Enum<              long4   >::Id :
+                retval = tRead<          long4   >(filename); break; 
+            case Type2Enum<             ulong4   >::Id :
+                retval = tRead<         ulong4   >(filename); break;
+            case Type2Enum<             longlong4>::Id :
+                retval = tRead<         longlong4>(filename); break; 
+            case Type2Enum<            ulonglong4>::Id :
+                retval = tRead<        ulonglong4>(filename); break;
+            case Type2Enum<              float4  >::Id :
+                retval = tRead<          float4  >(filename); break;
+            case Type2Enum<              double4 >::Id :
+                retval = tRead<          double4 >(filename); break;
+ 
             //case Type2Enum<std::string>::Id :
             //    retval = tRead<std::string>(filename); break;
             //case util::Type2Enum<char*>::Id :
             //    retval = tRead<char*>(filename); break;
             default:
-                retval = GRError("Unsupported type (Id = " +
+                retval = GRError(cudaErrorInvalidValue,
+                    "Unsupported type (Id = " +
                     std::to_string(tType) + ")",
                     __FILE__, __LINE__);
             }
@@ -1300,7 +1385,8 @@ public:
         std::ofstream fout;
         fout.open(filename.c_str());
         if (!fout.is_open())
-            return GRError("Unable to write file " + filename,
+            return GRError(cudaErrorInvalidValue,
+                "Unable to write file " + filename,
                 __FILE__, __LINE__);
 
         fout << size << " "
@@ -1320,13 +1406,17 @@ public:
         std::ifstream fin;
         fin.open(filename.c_str(), std::ios::in | std::ios::binary);
         if (!fin.is_open())
-            return GRError("Unable to read file " + filename,
+            return GRError(cudaErrorInvalidValue,
+                "Unable to read file " + filename,
                 __FILE__, __LINE__);
 
         fin.read((char*)(&tLength), 8);
         fin.read((char*)(&tType), 8);
         if (retval = tArray.Allocate(tLength, HOST))
             return retval;
+        PrintMsg("Reading " + std::to_string(tLength)
+            + " " + typeid(T).name() + " from "
+            + filename);
 
         fin.read((char*)(tArray + 0), tLength * sizeof(T));
         fin.close();
@@ -1376,13 +1466,18 @@ public:
             {
                 return cudaErrorInvalidValue;
             } else
-                return GRError("Unable to read file " + filename,
-                __FILE__, __LINE__);
+                return GRError(cudaErrorInvalidValue,
+                    "Unable to read file " + filename,
+                    __FILE__, __LINE__);
         }
 
         fin.read((char*)(&tLength), 8);
         fin.read((char*)(&tType), 8);
         tType = tType & 0xFFF;
+        PrintMsg("Reading from " + filename
+            + ", typeId = " + std::to_string(tType)
+            + ", targetId = " + std::to_string(util::Type2Enum<ValueT>::Id)
+            + ", length = " + std::to_string(tLength));
         if (tType == util::Type2Enum<ValueT>::Id)
         {
             if (retval = EnsureSize_(tLength, util::HOST))
@@ -1417,12 +1512,88 @@ public:
                 retval = tReadBinary<         float    >(filename); break;
             case Type2Enum<                   double   >::Id :
                 retval = tReadBinary<         double   >(filename); break;
+            
+            case Type2Enum<                    char2   >::Id :
+                retval = tReadBinary<          char2   >(filename); break; 
+            case Type2Enum<                   uchar2   >::Id :
+                retval = tReadBinary<         uchar2   >(filename); break; 
+            case Type2Enum<                    short2  >::Id :
+                retval = tReadBinary<          short2  >(filename); break; 
+            case Type2Enum<                   ushort2  >::Id :
+                retval = tReadBinary<         ushort2  >(filename); break; 
+            case Type2Enum<                    int2    >::Id :
+                retval = tReadBinary<          int2    >(filename); break; 
+            case Type2Enum<                   uint2    >::Id :
+                retval = tReadBinary<         uint2    >(filename); break;
+            case Type2Enum<                    long2   >::Id :
+                retval = tReadBinary<          long2   >(filename); break; 
+            case Type2Enum<                   ulong2   >::Id :
+                retval = tReadBinary<         ulong2   >(filename); break;
+            case Type2Enum<                   longlong2>::Id :
+                retval = tReadBinary<         longlong2>(filename); break; 
+            case Type2Enum<                  ulonglong2>::Id :
+                retval = tReadBinary<        ulonglong2>(filename); break;
+            case Type2Enum<                    float2  >::Id :
+                retval = tReadBinary<          float2  >(filename); break;
+            case Type2Enum<                    double2 >::Id :
+                retval = tReadBinary<          double2 >(filename); break;
+
+            case Type2Enum<                    char3   >::Id :
+                retval = tReadBinary<          char3   >(filename); break; 
+            case Type2Enum<                   uchar3   >::Id :
+                retval = tReadBinary<         uchar3   >(filename); break; 
+            case Type2Enum<                    short3  >::Id :
+                retval = tReadBinary<          short3  >(filename); break; 
+            case Type2Enum<                   ushort3  >::Id :
+                retval = tReadBinary<         ushort3  >(filename); break; 
+            case Type2Enum<                    int3    >::Id :
+                retval = tReadBinary<          int3    >(filename); break; 
+            case Type2Enum<                   uint3    >::Id :
+                retval = tReadBinary<         uint3    >(filename); break;
+            case Type2Enum<                    long3   >::Id :
+                retval = tReadBinary<          long3   >(filename); break; 
+            case Type2Enum<                   ulong3   >::Id :
+                retval = tReadBinary<         ulong3   >(filename); break;
+            case Type2Enum<                   longlong3>::Id :
+                retval = tReadBinary<         longlong3>(filename); break; 
+            case Type2Enum<                  ulonglong3>::Id :
+                retval = tReadBinary<        ulonglong3>(filename); break;
+            case Type2Enum<                    float3  >::Id :
+                retval = tReadBinary<          float3  >(filename); break;
+            case Type2Enum<                    double3 >::Id :
+                retval = tReadBinary<          double3 >(filename); break;
+
+            case Type2Enum<                    char4   >::Id :
+                retval = tReadBinary<          char4   >(filename); break; 
+            case Type2Enum<                   uchar4   >::Id :
+                retval = tReadBinary<         uchar4   >(filename); break; 
+            case Type2Enum<                    short4  >::Id :
+                retval = tReadBinary<          short4  >(filename); break; 
+            case Type2Enum<                   ushort4  >::Id :
+                retval = tReadBinary<         ushort4  >(filename); break; 
+            case Type2Enum<                    int4    >::Id :
+                retval = tReadBinary<          int4    >(filename); break; 
+            case Type2Enum<                   uint4    >::Id :
+                retval = tReadBinary<         uint4    >(filename); break;
+            case Type2Enum<                    long4   >::Id :
+                retval = tReadBinary<          long4   >(filename); break; 
+            case Type2Enum<                   ulong4   >::Id :
+                retval = tReadBinary<         ulong4   >(filename); break;
+            case Type2Enum<                   longlong4>::Id :
+                retval = tReadBinary<         longlong4>(filename); break; 
+            case Type2Enum<                  ulonglong4>::Id :
+                retval = tReadBinary<        ulonglong4>(filename); break;
+            case Type2Enum<                    float4  >::Id :
+                retval = tReadBinary<          float4  >(filename); break;
+            case Type2Enum<                    double4 >::Id :
+                retval = tReadBinary<          double4 >(filename); break;
+    
             //case Type2Enum<std::string>::Id :
             //    retval = tReadBinary<std::string>(filename); break;
             //case util::Type2Enum<char*>::Id :
             //    retval = tReadBinary<char*>(filename); break;
             default:
-                retval = GRError("Unsupported type (Id = " +
+                retval = GRError(cudaErrorInvalidValue, "Unsupported type (Id = " +
                     std::to_string(tType) + ")",
                     __FILE__, __LINE__);
             }
@@ -1446,7 +1617,7 @@ public:
             {
                 return cudaErrorInvalidValue;
             } else
-                return GRError("Unable to write file " + filename,
+                return GRError(cudaErrorInvalidValue, "Unable to write file " + filename,
                     __FILE__, __LINE__);
         }
 

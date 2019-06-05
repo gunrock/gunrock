@@ -28,6 +28,12 @@ typedef enum gunrockError gunrockError_t;
 
 void PrintMsg(const char* msg, bool to_print = true, bool new_line = true);
 void PrintMsg(std::string msg, bool to_print = true, bool new_line = true);
+void PrintMsg(const char* msg,
+    int gpu_num, long long iteration, int peer,
+    bool to_print = true, bool new_line = true);
+void PrintMsg(std::string msg,
+    int gpu_num, long long iteration, int peer,
+    bool to_print = true, bool new_line = true);
 
 /**
  * Displays error message in accordance with debug mode
@@ -101,6 +107,4 @@ gunrockError_t GRError(
 { \
     retval = gunrock::util::GRError(cuda_call, message, __FILE__, __LINE__); \
     if (retval) return retval; \
-} \
-
-
+}
