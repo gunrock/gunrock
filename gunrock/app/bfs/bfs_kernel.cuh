@@ -18,6 +18,10 @@ namespace gunrock {
 namespace app {
 namespace bfs {
 
+/**
+ * @brief forms unvisited vertices queue, when switching from top-down to
+ *    bottom-up visiting direction, with idempotence and for single-GPU
+ */
 template <typename ProblemT, int LOG_THREADS>
 __global__ void From_Unvisited_Queue_IDEM(
     typename ProblemT::SizeT     num_nodes,
@@ -87,6 +91,10 @@ __global__ void From_Unvisited_Queue_IDEM(
     x += STRIDE;
 }
 
+/**
+ * @brief forms unvisited vertices queue, when switching from top-down to
+ *    bottom-up visiting direction, without idempotence, for single-GPU
+ */
 template <typename ProblemT, int LOG_THREADS>
 __global__ void From_Unvisited_Queue(
     typename ProblemT::SizeT    num_nodes,
@@ -134,6 +142,10 @@ __global__ void From_Unvisited_Queue(
     }
 }
 
+/**
+ * @brief forms unvisited vertices queue, when switching from top-down to
+ *    bottom-up visiting direction, without idempotence, for multi-GPUs
+ */
 template <typename ProblemT, int LOG_THREADS>
 __global__ void From_Unvisited_Queue_Local(
     typename ProblemT::SizeT    num_local_vertices,
@@ -186,6 +198,10 @@ __global__ void From_Unvisited_Queue_Local(
     }
 }
 
+/**
+ * @brief forms unvisited vertices queue, when switching from top-down to
+ *    bottom-up visiting direction, with idempotence and for multi-GPUs
+ */
 template <typename ProblemT, int LOG_THREADS>
 __global__ void From_Unvisited_Queue_Local_IDEM(
     typename ProblemT::SizeT    num_local_vertices,
@@ -251,6 +267,11 @@ __global__ void From_Unvisited_Queue_Local_IDEM(
     }
 }
 
+/**
+ * @brief Bottom-up search to find possible parents of unvisited
+ *  local vertices; output both newly visited vertices and still-unvisited
+ *  vertices
+ */
 template <typename ProblemT, int LOG_THREADS>
 __global__ void Inverse_Expand(
     typename ProblemT::GraphT   graph,

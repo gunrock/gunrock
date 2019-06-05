@@ -299,7 +299,6 @@ double bfs(
  * @param[out] preds       Return predecessors of each vertex
  * \return     double      Return accumulated elapsed times for all runs
  */
-/*
 double bfs(
     const int        num_nodes,
     const int        num_edges,
@@ -315,7 +314,7 @@ double bfs(
     return bfs(num_nodes, num_edges, row_offsets, col_indices,
         1, &source, mark_pred, direction_optimized, idempotence,
         &distances, &preds);
-}*/
+}
 
 // Leave this at the end of the file
 // Local Variables:

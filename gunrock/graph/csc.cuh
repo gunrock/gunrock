@@ -451,6 +451,7 @@ struct Csc<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
         return cudaSuccess;
     }
 
+    __host__ __device__ __forceinline__
     SizeT GetNeighborListLength(const VertexT &v) const
     {
         return 0;
