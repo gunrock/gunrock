@@ -81,7 +81,8 @@ public:
         {
             return info;        /* empty */
         }
-        int dev = 0;            /* currently assumes GPU 0 */
+        int dev = 0;
+        cudaGetDevice(&dev);
         cudaGetDeviceProperties(&devProps, dev);
         info["name"] = devProps.name;
         info["total_global_mem"] = int64_t(devProps.totalGlobalMem);
