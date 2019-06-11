@@ -78,6 +78,7 @@ struct SMIterationLoop : public IterationLoopBase
         auto         &query_ro           =   data_slice.query_ro;
         auto         &query_ci           =   data_slice.query_ci;
         auto         &counter            =   data_slice.counter;
+        auto         &src_node_id        =   data_slice.src_node_id;
         auto         &row_offsets        =   graph.CsrT::row_offsets;
         auto         &col_indices        =   graph.CsrT::column_indices;
         auto         &frontier           =   enactor_slice.frontier;
@@ -85,14 +86,34 @@ struct SMIterationLoop : public IterationLoopBase
         auto         &retval             =   enactor_stats.retval;
         auto         &stream             =   oprtr_parameters.stream;
         auto         target              =   util::DEVICE;
+        size_t       nodes_query         =   data_slice.nodes_query;
+
+
+	auto print_frontier = [] __host__ __device__(
+	    VertexT * v_q, const SizeT &pos) 
+        {
+	    VertexT v = v_q[pos];
+	    printf("Frontier @ %u = %u\n", pos, v);
+	    return;
+	};
+
+	GUARD_CU(frontier.V_Q()->ForAll(print_frontier , frontier.queue_length, util::DEVICE, stream));
+//	GUARD_CU(frontier.Next_V_Q()->ForAll(print_frontier , frontier.queue_length, util::DEVICE, stream));
 
         // First add degrees to subgraph matching
-        GUARD_CU(subgraphs.ForAll([subgraphs, row_offsets]
+        GUARD_CU(subgraphs.ForAll([row_offsets]
             __host__ __device__ (VertexT *subgraphs_, const SizeT & v)
             {
                 subgraphs_[v] = row_offsets[v + 1] - row_offsets[v];
             }, graph.nodes, target, stream));
+        // Initialize src_node_ids to be composed of 0
+        GUARD_CU(src_node_id.ForAll([]
+            __device__ (VertexT *src_node_id_, const SizeT & e)
+            {
+                src_node_id_[e] = 0;
+            }, graph.edges, target, stream));
 
+        src_node_id.Print();
         subgraphs.Print();
         constrain.Print();
         // advance to filter out data graph nodes which don't satisfy constrain
@@ -112,7 +133,7 @@ struct SMIterationLoop : public IterationLoopBase
             }
             return false;
         };
-        auto filter_op = [subgraphs, constrain] __host__ __device__(
+        auto filter_op = [subgraphs, nodes_query] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
@@ -124,30 +145,30 @@ struct SMIterationLoop : public IterationLoopBase
             return true;
         };
 
-	auto print_frontier = [] __host__ __device__(
-	    VertexT * v_q, const SizeT &pos) 
-        {
-	    VertexT v = v_q[pos];
-	    printf("Frontier @ %u = %u\n", pos, v);
-	    return;
-	};
-
-        auto distribute_op = [subgraphs, isValid, NG, query_ro, query_ci, counter] __host__ __device__(
+        auto distribute_op = [subgraphs, isValid, NG, query_ro, query_ci, src_node_id, counter, nodes_query] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
+        //    printf("src: %d, dest: %d\n", src, dest);
+            if (src < 0 || src >= nodes_query)
+                return false;
             if ((!isValid[src]) || (!isValid[dest])) {
                 return false;
             }
-            // NG has query node id sequens in its even pos; min degree of neighbors in odd pos
+            // NG has query node id sequence in its even pos; min degree of neighbors in odd pos
             VertexT query_id = NG[counter[0] * 2];
             if (subgraphs[src] < (query_ro[query_id + 1] - query_ro[query_id]))
                 return false;
             // 1 way look ahead
-            if (subgrahps[dest] < NG[counter[0] * 2 + 1]) {
+            if (subgraphs[dest] < NG[counter[0] * 2 + 1]) {
                 return false;
             }
+            // only mark each edge once
+            if (src < dest) {
+                src_node_id[edge_id] = 1;
+            }
+            return true;
         };
         // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
         // The intersection operation
@@ -158,32 +179,60 @@ struct SMIterationLoop : public IterationLoopBase
             return true;
         };
 
-        //oprtr_parameters.label = iteration + 1;
         frontier.queue_length = graph.edges;
         frontier.queue_reset = true;
         int num_init = 3;
         for (int iter = 0; iter < num_init; ++iter) {
-            if (iter > 0) {
-                frontier.queue_reset = false;
-            }
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
                 oprtr_parameters, advance_op));
+/*	    if (oprtr_parameters.advance_mode != "LB_CULL" &&
+		oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
+	    {
+                frontier.queue_reset = false;
+                GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+                    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                    oprtr_parameters, filter_op)); 
+            }
+            frontier.queue_index++;
+            // Get back the resulted frontier length
+            GUARD_CU(frontier.work_progress.GetQueueLength(
+                    frontier.queue_index, frontier.queue_length,
+                    false, oprtr_parameters.stream, true));
+*/
+//            frontier.queue_reset = false;
             isValid.Print();
             subgraphs.Print();
-                 
-
         }
 
-        for (int iter = 0; iter < query_graph.nodes; ++iter) {
-            GUARD_CU(counter.ForAll([counter]
-                __host__ __device__ (VertexT *counter_)
+        for (int iter = 0; iter < nodes_query; ++iter) {
+            GUARD_CU(counter.ForAll([iter]
+                __host__ __device__ (VertexT *counter_, const SizeT & v)
                 {
-                    counter_[0] = iter;
+                    counter_[v] = iter;
                 }, 1, target, stream));
+            counter.Print();
+            GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
+                oprtr_parameters, distribute_op));
+/*	    if (oprtr_parameters.advance_mode != "LB_CULL" &&
+		oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
+	    {
+                frontier.queue_reset = false;
+                GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+                    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                    oprtr_parameters, filter_op)); 
+            }
+            frontier.queue_index++;
+            // Get back the resulted frontier length
+            GUARD_CU(frontier.work_progress.GetQueueLength(
+                    frontier.queue_index, frontier.queue_length,
+                    false, oprtr_parameters.stream, true));
+*/
+//            frontier.queue_reset = false;
+            src_node_id.Print();
         
         }
-
 
 
 

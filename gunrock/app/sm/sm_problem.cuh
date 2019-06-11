@@ -87,7 +87,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, VertexT>     partial;      /** < Used for storing partial results */
         util::Array1D<SizeT, VertexT>     src_node_id;  /** < Used for storing compacted src nodes */
         util::Array1D<SizeT, VertexT>     index;         /** < Used for storing intermediate flag val */
-        SizeT    nodes_data;       /** < Used for number of data nodes  */
         SizeT    nodes_query;      /** < Used for number of query nodes */
         SizeT    num_matches;      /** < Used for number of matches in the result */
 
