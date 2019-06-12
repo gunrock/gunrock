@@ -112,8 +112,6 @@ struct SMIterationLoop : public IterationLoopBase
             {
                 subgraphs_[v] = row_offsets[v + 1] - row_offsets[v];
             }, graph.nodes, target, stream));
-        subgraphs.Print();
-        constrain.Print();
         // advance to filter out data graph nodes which don't satisfy constrain
         auto advance_op = [subgraphs, constrain, isValid] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
@@ -214,7 +212,6 @@ struct SMIterationLoop : public IterationLoopBase
                 {
                     counter_[v] = iter;
                 }, 1, target, stream));
-            counter.Print();
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
                 oprtr_parameters, distribute_op));
