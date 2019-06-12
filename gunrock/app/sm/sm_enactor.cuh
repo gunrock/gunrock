@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <gunrock/util/select_device.cuh>
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
@@ -69,44 +70,173 @@ struct SMIterationLoop : public IterationLoopBase
             enactor_slices[this -> gpu_num * this -> enactor -> num_gpus + peer_];
         auto         &enactor_stats      =   enactor_slice.enactor_stats;
         auto         &graph              =   data_slice.sub_graph[0];
-        auto         &subgraphs         =   data_slice.subgraphs;
+        auto         &subgraphs          =   data_slice.subgraphs;
+        auto         &constrain          =   data_slice.constrain;
+        auto         &isValid            =   data_slice.isValid;
+        auto         &NG                 =   data_slice.NG;
+        auto         &NG_src             =   data_slice.NG_src;
+        auto         &NG_dest            =   data_slice.NG_dest;
+        auto         &query_ro           =   data_slice.query_ro;
+        auto         &query_ci           =   data_slice.query_ci;
+        auto         &counter            =   data_slice.counter;
+        auto         &flags              =   data_slice.flags;
+        auto         &indices              =   data_slice.indices;
+        auto         &partial            =   data_slice.partial;
+        auto         &num_subs           =   data_slice.num_subs;
+        auto         &results            =   data_slice.results;
         auto         &row_offsets        =   graph.CsrT::row_offsets;
         auto         &col_indices        =   graph.CsrT::column_indices;
         auto         &frontier           =   enactor_slice.frontier;
         auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
         auto         &retval             =   enactor_stats.retval;
         auto         &stream             =   oprtr_parameters.stream;
-        auto         &iteration          =   enactor_stats.iteration;
         auto         target              =   util::DEVICE;
+        size_t       nodes_query         =   data_slice.nodes_query;
+        size_t       nodes_data          =   graph.nodes;
+
+
+	auto print_frontier = [] __host__ __device__(
+	    VertexT * v_q, const SizeT &pos) 
+        {
+	    VertexT v = v_q[pos];
+	    printf("Frontier @ %u = %u\n", pos, v);
+	    return;
+	};
+
+//	GUARD_CU(frontier.V_Q()->ForAll(print_frontier , frontier.queue_length, util::DEVICE, stream));
+//	GUARD_CU(frontier.Next_V_Q()->ForAll(print_frontier , frontier.queue_length, util::DEVICE, stream));
 
         // First add degrees to subgraph matching
-        GUARD_CU(subgraphs.ForAll([subgraphs, row_offsets]
+        GUARD_CU(subgraphs.ForAll([row_offsets]
             __host__ __device__ (VertexT *subgraphs_, const SizeT & v)
             {
                 subgraphs_[v] = row_offsets[v + 1] - row_offsets[v];
             }, graph.nodes, target, stream));
+        // advance to filter out data graph nodes which don't satisfy constrain
+        auto advance_op = [subgraphs, constrain, isValid] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            if (isValid[src]) {
+                if (subgraphs[src] >= constrain[0]) {
+                    return true;
+                } else {
+                    isValid[src] = false;
+                    atomicAdd(subgraphs + dest,  -1);
+                }
 
+            }
+            return false;
+        };
+        auto filter_op = [subgraphs, nodes_query] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            if (!util::isValid(dest)) {
+                return false;
+            }
+            return true;
+        };
+
+        auto distribute_op = [subgraphs, isValid, NG, query_ro, query_ci, flags, counter, NG_src, NG_dest, results, nodes_data] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            if (src < 0 || src >= nodes_data)
+                return false;
+            if ((!isValid[src]) || (!isValid[dest])) {
+                return false;
+            }
+            // NG has query node id sequence in its even pos; min degree of neighbors in odd pos
+            VertexT query_id = NG[counter[0] * 2];
+            // special init for first iteration
+            if (counter[0] == 0) {
+                if (subgraphs[src] < (query_ro[query_id + 1] - query_ro[query_id]))
+                    return false;
+                // 1 way look ahead
+                if (subgraphs[dest] < NG[counter[0] * 2 + 1]) {
+                    return false;
+                }
+                flags[src] = true;
+                return true;
+            } else {
+                // check if src belongs to partial results
+                if (!flags[src])
+                    return false;
+                if (subgraphs[dest] < (query_ro[query_id + 1] - query_ro[query_id]))
+                    return false;
+                // 1 way look ahead to be done in filter
+		results[dest] = 1;
+                return true;
+            }
+        };
+        auto look_ahead_op = [isValid, flags, nodes_data] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            if (src < 0 || src >= nodes_data)
+                return false;
+            if ((!isValid[src]) || (!isValid[dest])) {
+                return false;
+            }
+            flags[src] = true;
+            return true;
+        };
         // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
         // The intersection operation
         auto intersect_op = [subgraphs] __host__ __device__(
             VertexT &comm_node, VertexT &edge) -> bool
         {
             atomicAdd(subgraphs + comm_node,  1);
-            
             return true;
         };
-        frontier.queue_length = graph.edges;
-        frontier.queue_reset  = true;
-        GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
-            oprtr_parameters, intersect_op));
 
-	// // Sort the subgraph matching values for each node in descending order
- //        GUARD_CU(util::cubSortPairs(
- //            cub_temp_space,
- //            subgraphs, tats1,
- //            nodes,      nodes1,
- //            graph.nodes, 0, sizeof(ValueT) * 8, stream));
+        frontier.queue_length = graph.edges;
+        frontier.queue_reset = true;
+        size_t pointer_head = 0;
+        int num_init = nodes_query;
+        for (int iter = 0; iter < num_init; ++iter) {
+            GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
+                oprtr_parameters, advance_op));
+        }
+
+        for (int iter = 0; iter < nodes_query; ++iter) {
+            GUARD_CU(counter.ForAll([iter]
+                __host__ __device__ (VertexT *counter_, const SizeT & v)
+                {
+                    counter_[v] = iter;
+                }, 1, target, stream));
+            GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
+                oprtr_parameters, distribute_op));
+
+            if (iter == 0) {
+            } else {
+                // Initialize flagss to be composed of 0
+                GUARD_CU(flags.ForAll([]
+                    __device__ (bool *flags_, const SizeT & v)
+                    {
+                        flags_[v] = false;
+                    }, graph.nodes, target, stream));
+
+                GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                    graph.csr(), frontier.Next_V_Q(), frontier.V_Q(), 
+                    oprtr_parameters, look_ahead_op));
+            }
+            GUARD_CU(util::CUBSelect_flagged(
+                indices.GetPointer(util::DEVICE),
+                flags.GetPointer(util::DEVICE),
+                partial.GetPointer(util::DEVICE) + pointer_head,
+                num_subs.GetPointer(util::DEVICE),
+                nodes_data));
+            GUARD_CU(num_subs.Move(util::DEVICE, util::HOST));
+            pointer_head += num_subs.GetPointer(util::HOST)[0];
+        }
 
         return retval;
     }
@@ -349,7 +479,7 @@ public:
      */
     cudaError_t Enact()
     {
-        cudaError_t  retval     = cudaSuccess;
+        cudaError_t  retval = cudaSuccess;
         GUARD_CU(this -> Run_Threads(this));
         util::PrintMsg("GPU SM Done.", this -> flag & Debug);
         return retval;

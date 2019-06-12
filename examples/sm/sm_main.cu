@@ -48,10 +48,12 @@ struct main_struct
 
         cudaError_t retval = cudaSuccess;
         util::CpuTimer cpu_timer;
-        GraphT graph;
+        GraphT data_graph;
+        GraphT pattern_graph;
 
         cpu_timer.Start();
-        GUARD_CU(graphio::LoadGraph(parameters, graph));
+        GUARD_CU(graphio::LoadGraph(parameters, data_graph));
+        GUARD_CU(graphio::LoadGraph(parameters, pattern_graph, "pattern-"));
         cpu_timer.Stop();
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
@@ -59,14 +61,18 @@ struct main_struct
         bool quiet   = parameters.Get<bool>("quiet");
         int num_runs = parameters.Get<int>("num-runs");
 
-        SizeT nodes = graph.nodes;
-        VertexT *ref_subgraph_match = new VertexT[nodes];
+        util::PrintMsg("# of nodes in data graph: " + std::to_string(data_graph.nodes), !quiet);
+        util::PrintMsg("# of nodes in query graph: " + std::to_string(pattern_graph.nodes), !quiet);
+
+        // counts of matched subgraphs
+        VertexT *ref_subgraph_match = new VertexT[data_graph.nodes];
         if (!quick) {
             util::PrintMsg("__________________________", !quiet);
 
             float elapsed = app::sm::CPU_Reference(
                 parameters,
-                graph.csr(),
+                data_graph.csr(),
+                pattern_graph.csr(),
                 ref_subgraph_match
             );
 
@@ -77,16 +83,18 @@ struct main_struct
         }
 
         std::vector<std::string> switches{"advance-mode"};
-        GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
-            [ref_subgraph_match](util::Parameters &parameters, GraphT &graph)
+        GUARD_CU(app::Switch_Parameters(parameters, data_graph, switches,
+            [&pattern_graph, &ref_subgraph_match](util::Parameters &parameters, GraphT &data_graph)
             {
-                return app::sm::RunTests(parameters, graph, ref_subgraph_match);
+                return app::sm::RunTests(parameters, data_graph, pattern_graph, ref_subgraph_match, util::DEVICE);
             }));
 
         if (ref_subgraph_match != NULL)
         {
             delete[] ref_subgraph_match; ref_subgraph_match = NULL;
         }
+        GUARD_CU(pattern_graph.Release());
+        GUARD_CU(data_graph.Release());
         return retval;
     }
 };
@@ -96,6 +104,8 @@ int main(int argc, char** argv)
     cudaError_t retval = cudaSuccess;
     util::Parameters parameters("test Subgraph Matching");
     GUARD_CU(graphio::UseParameters(parameters));
+    // Recogonize pattern graph
+    GUARD_CU(graphio::UseParameters(parameters, "pattern-"));
     GUARD_CU(app::sm::UseParameters(parameters));
     GUARD_CU(app::UseParameters_test(parameters));
     GUARD_CU(parameters.Parse_CommandLine(argc, argv));

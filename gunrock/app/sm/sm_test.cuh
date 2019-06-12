@@ -88,12 +88,14 @@ void DisplaySolution(T *array, SizeT length)
  * @param[in]   mark_preds    Whether to compute predecessor info
  * \return      double        Time taken for the SM
  */
+ // TODO: change CPU reference code to count subgraphs instead of triangles
 template <
     typename GraphT,
     typename VertexT = typename GraphT::VertexT>
 double CPU_Reference(
   util::Parameters         &parameters,
-           GraphT          &graph,
+           GraphT          &data_graph,
+           GraphT          &query_graph,
            VertexT         *subgraphs)
 {
 
@@ -117,26 +119,26 @@ double CPU_Reference(
   for (int iter = 0; iter < num_iter; ++iter) {
       cpu_timer.Start();
       // Initialize subgraphs as degree of nodes
-      for(VertexT i = 0; i < graph.nodes; i++) {
-        subgraphs[i] = graph.GetNeighborListLength(i);
+      for(VertexT i = 0; i < data_graph.nodes; i++) {
+        subgraphs[i] = 0;
       }
 
       // For each node
-      for(VertexT src = 0; src < graph.nodes; src++) {
-        SizeT src_num_neighbors = graph.GetNeighborListLength(src);
+      for(VertexT src = 0; src < data_graph.nodes; src++) {
+        SizeT src_num_neighbors = data_graph.GetNeighborListLength(src);
         if(src_num_neighbors > 0) {
-          SizeT src_edge_start = graph.GetNeighborListOffset(src);
+          SizeT src_edge_start = data_graph.GetNeighborListOffset(src);
           SizeT src_edge_end   = src_edge_start + src_num_neighbors;
 
           // Iterate over outgoing edges
           for(SizeT src_edge_idx = src_edge_start; src_edge_idx < src_edge_end; src_edge_idx++) {
 
-            VertexT dst = graph.GetEdgeDest(src_edge_idx);
+            VertexT dst = data_graph.GetEdgeDest(src_edge_idx);
             if(src < dst) { // Avoid double counting.  This also implies we only support undirected graphs.
 
-              SizeT dst_num_neighbors = graph.GetNeighborListLength(dst);
+              SizeT dst_num_neighbors = data_graph.GetNeighborListLength(dst);
               if(dst_num_neighbors > 0) {
-                SizeT dst_edge_start = graph.GetNeighborListOffset(dst);
+                SizeT dst_edge_start = data_graph.GetNeighborListOffset(dst);
                 SizeT dst_edge_end   = dst_edge_start + dst_num_neighbors;
 
                 // Find nodes that are neighbors of both `src` and `dst`
@@ -144,8 +146,8 @@ double CPU_Reference(
                 int src_offset = src_edge_start;
                 int dst_offset = dst_edge_start;
                 while(dst_offset < dst_edge_end && src_offset < src_edge_end) {
-                  VertexT dst_neib = graph.GetEdgeDest(dst_offset);
-                  VertexT src_neib = graph.GetEdgeDest(src_offset);
+                  VertexT dst_neib = data_graph.GetEdgeDest(dst_offset);
+                  VertexT src_neib = data_graph.GetEdgeDest(src_offset);
                   if(dst_neib == src_neib) {
                     subgraphs[src_neib]++;
                     dst_offset++;
@@ -165,7 +167,6 @@ double CPU_Reference(
   total_time += cpu_timer.ElapsedMillis();
   }
   float elapsed = total_time / num_iter;
-
   printf("CPU_Reference: done\n");
 
   return elapsed;
@@ -190,7 +191,8 @@ template <
     typename VertexT = typename GraphT::VertexT>
 typename GraphT::SizeT Validate_Results(
              util::Parameters &parameters,
-                     GraphT   &graph,
+                     GraphT   &data_graph,
+                     GraphT   &query_graph,
                      VertexT  *h_subgraphs,
                      VertexT  *ref_subgraphs,
                      bool      verbose       = true)
@@ -201,7 +203,7 @@ typename GraphT::SizeT Validate_Results(
     std::cerr << "Validate_Results" << std::endl;
     bool quiet = parameters.Get<bool>("quiet");
     if (!quiet && verbose) {
-        for(int i = 0; i < graph.nodes; i++) {
+        for(int i = 0; i < data_graph.nodes; i++) {
             std::cerr << i << " " << ref_subgraphs[i] << " " << h_subgraphs[i] << std::endl;
         }
     }
@@ -210,7 +212,7 @@ typename GraphT::SizeT Validate_Results(
 
     // Verify the result
     util::PrintMsg("Subgraph Matching Validity: ", !quiet, false);
-    num_errors = util::CompareResults(h_subgraphs, ref_subgraphs, graph.nodes, true, quiet);
+    num_errors = util::CompareResults(h_subgraphs, ref_subgraphs, data_graph.nodes, true, quiet);
 
     if (num_errors > 0) {
         util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
@@ -222,7 +224,7 @@ typename GraphT::SizeT Validate_Results(
     if (!quiet && verbose)
     {
         util::PrintMsg("number of subgraphs: ");
-        DisplaySolution(h_subgraphs, graph.nodes);
+        DisplaySolution(h_subgraphs, data_graph.nodes);
     }
 
     return num_errors;

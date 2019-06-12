@@ -50,15 +50,15 @@ cudaError_t UseParameters(util::Parameters &parameters)
  * @param[in]  target        Whether to perform the SM
  * \return cudaError_t error message(s), if any
  */
-template <typename GraphT, typename ValueT = typename GraphT::ValueT>
+template <typename GraphT, typename VertexT = typename GraphT::VertexT>
 cudaError_t RunTests(
     util::Parameters         &parameters,
-    GraphT                   &graph,
-    typename GraphT::VertexT  *ref_subgraphs,
+    GraphT                   &data_graph,
+    GraphT                   &query_graph,
+    VertexT                  *ref_subgraphs,
     util::Location target = util::DEVICE)
 {
     cudaError_t retval = cudaSuccess;
-    typedef typename GraphT::VertexT VertexT;
     typedef typename GraphT::SizeT   SizeT;
     typedef Problem<GraphT  > ProblemT;
     typedef Enactor<ProblemT> EnactorT;
@@ -69,13 +69,13 @@ cudaError_t RunTests(
     bool quiet_mode = parameters.Get<bool>("quiet");
     int  num_runs   = parameters.Get<int >("num-runs");
     std::string validation = parameters.Get<std::string>("validation");
-    util::Info info("SM", parameters, graph); // initialize Info structure
+    util::Info info("SM", parameters, data_graph); // initialize Info structure
 
-    VertexT *h_subgraphs = new VertexT[graph.nodes];
+    VertexT *h_subgraphs = new VertexT[data_graph.nodes];
 
     ProblemT problem(parameters);
     EnactorT enactor;
-    GUARD_CU(problem.Init(graph  , target));
+    GUARD_CU(problem.Init(data_graph, query_graph, target));
     GUARD_CU(enactor.Init(problem, target));
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
@@ -84,7 +84,7 @@ cudaError_t RunTests(
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
         GUARD_CU(problem.Reset(target));
-        GUARD_CU(enactor.Reset(graph.edges, target));
+        GUARD_CU(enactor.Reset(data_graph.edges, target));
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
@@ -102,8 +102,8 @@ cudaError_t RunTests(
         {
             GUARD_CU(problem.Extract(h_subgraphs));
             SizeT num_errors = app::sm::Validate_Results(
-                parameters, graph, h_subgraphs,
-                ref_subgraphs, false);
+                parameters, data_graph, query_graph, 
+                h_subgraphs, ref_subgraphs, false);
         }
     }
 
@@ -113,8 +113,8 @@ cudaError_t RunTests(
     if (validation == "last")
     {
         SizeT num_errors = app::sm::Validate_Results(
-            parameters, graph, h_subgraphs,
-            ref_subgraphs, false);
+            parameters, data_graph, query_graph,
+            h_subgraphs, ref_subgraphs, false);
     }
 
     // compute running statistics
@@ -150,7 +150,8 @@ cudaError_t RunTests(
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_sm(
     gunrock::util::Parameters &parameters,
-    GraphT &graph,
+    GraphT &data_graph,
+    GraphT &query_graph,
     typename GraphT::VertexT *subgraphs)
 {
     typedef typename GraphT::VertexT VertexT;
@@ -165,8 +166,8 @@ double gunrock_sm(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    problem.Init(graph  , target);
-    enactor.Init(problem, target);
+    problem.Init(data_graph, target);
+    enactor.Init(problem   , target);
 
     int num_runs = parameters.Get<int>("num-runs");
     for (int run_num = 0; run_num < num_runs; ++run_num)
@@ -213,7 +214,7 @@ double sm(
     const VertexT     *col_indices,
     const GValueT     *edge_values,
     const int          num_runs,
-          VertexT    *subgraphs)
+          VertexT     *subgraphs)
 {
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
         gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
@@ -229,19 +230,21 @@ double sm(
     parameters.Set("graph-type", "by-pass");
     parameters.Set("num-runs", num_runs);
     bool quiet = parameters.Get<bool>("quiet");
-    GraphT graph;
+    GraphT data_graph;
+    GraphT query_graph;
     // Assign pointers into gunrock graph format
-    graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
-    graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
-    graph.CsrT::edge_values   .SetPointer(edge_values, num_edges, gunrock::util::HOST);
-    graph.FromCsr(graph.csr(), true, quiet);
-    gunrock::graphio::LoadGraph(parameters, graph);
+    data_graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
+    data_graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
+    data_graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
+    data_graph.CsrT::edge_values   .SetPointer(edge_values, num_edges, gunrock::util::HOST);
+    data_graph.FromCsr(data_graph.csr(), true, quiet);
+    gunrock::graphio::LoadGraph(parameters, data_graph);
+    gunrock::graphio::LoadGraph(parameters, query_graph, "pattern-");
 
     // Run the SM
-    double elapsed_time = gunrock_sm(parameters, graph, subgraphs);
+    double elapsed_time = gunrock_sm(parameters, data_graph, query_graph, subgraphs);
     // Cleanup
-    graph.Release();
+    data_graph.Release();
 
     return elapsed_time;
 }
