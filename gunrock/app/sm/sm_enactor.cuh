@@ -135,7 +135,6 @@ struct SMIterationLoop : public IterationLoopBase
             SizeT &output_pos) -> bool
         {
             if (!util::isValid(dest)) {
-                printf("False @ %u\n", dest);
                 return false;
             }
             return true;
@@ -199,7 +198,7 @@ struct SMIterationLoop : public IterationLoopBase
         frontier.queue_length = graph.edges;
         frontier.queue_reset = true;
         size_t pointer_head = 0;
-        int num_init = 3; // for current tests, 3 is enough
+        int num_init = nodes_query;
         for (int iter = 0; iter < num_init; ++iter) {
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 

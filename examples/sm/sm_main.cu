@@ -55,13 +55,14 @@ struct main_struct
         GUARD_CU(graphio::LoadGraph(parameters, data_graph));
         GUARD_CU(graphio::LoadGraph(parameters, pattern_graph, "pattern-"));
         cpu_timer.Stop();
-        std::cout << "data_graph: " << data_graph.nodes << " " << data_graph.edges << std::endl;
-        std::cout << "query_graph: " << pattern_graph.nodes << " " << pattern_graph.edges <<std::endl;
         parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
         bool quick   = parameters.Get<bool>("quick");
         bool quiet   = parameters.Get<bool>("quiet");
         int num_runs = parameters.Get<int>("num-runs");
+
+        util::PrintMsg("# of nodes in data graph: " + std::to_string(data_graph.nodes), !quiet);
+        util::PrintMsg("# of nodes in query graph: " + std::to_string(pattern_graph.nodes), !quiet);
 
         // counts of matched subgraphs
         VertexT *ref_subgraph_match = new VertexT[data_graph.nodes];
@@ -93,6 +94,7 @@ struct main_struct
             delete[] ref_subgraph_match; ref_subgraph_match = NULL;
         }
         GUARD_CU(pattern_graph.Release());
+        GUARD_CU(data_graph.Release());
         return retval;
     }
 };
