@@ -79,14 +79,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
         util::Array1D<SizeT, SizeT   >    data_degree ; // data graph nodes' degrees
         util::Array1D<SizeT, bool    >    isValid;      /** < Used for data node validation    */
         util::Array1D<SizeT, SizeT   >    counter;      /** < Used for minimum degree in query graph */
-        util::Array1D<SizeT, SizeT   >    num_subs;     /** < Used for counting iBFS sources   */
+        util::Array1D<SizeT, SizeT   >    num_subs;     /** < Used for counting subgraphs   */
+        util::Array1D<SizeT, SizeT   >    results;     /** < Used for gpu results   */
         util::Array1D<SizeT, SizeT   >    constrain;    /** < Smallest degree in query graph   */
         util::Array1D<SizeT, VertexT >    NG;           /** < Used for query node explore seq  */
         util::Array1D<SizeT, VertexT >    NG_src;       /** < Used for query node sequence non-tree edge info */
         util::Array1D<SizeT, VertexT>     NG_dest;      /** < Used for query node sequence non-tree edge info */
         util::Array1D<SizeT, VertexT>     partial;      /** < Used for storing partial results */
-        util::Array1D<SizeT, VertexT>     src_node_id;  /** < Used for storing compacted src nodes */
-        util::Array1D<SizeT, VertexT>     index;         /** < Used for storing intermediate flag val */
+        util::Array1D<SizeT, bool   >     flags;  /** < Used for storing compacted src nodes */
+        util::Array1D<SizeT, VertexT>     indices;         /** < Used for storing intermediate flag val */
         SizeT    nodes_query;      /** < Used for number of query nodes */
         SizeT    num_matches;      /** < Used for number of matches in the result */
 
@@ -104,13 +105,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             isValid         .SetName("isValid");
             counter         .SetName("counter");
             num_subs        .SetName("num_subs");
+            results         .SetName("results");
             constrain       .SetName("constrain");
             NG              .SetName("NG");
             NG_src          .SetName("NG_src");
             NG_dest         .SetName("NG_dest");
             partial         .SetName("partial");
-            src_node_id     .SetName("src_node_id");
-            index           .SetName("index");
+            flags           .SetName("src_node_id");
+            indices         .SetName("indices");
             nodes_query     = 0;       
             num_matches     = 0; 
         }
@@ -141,13 +143,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(isValid        .Release(target));
             GUARD_CU(counter        .Release(target));
             GUARD_CU(num_subs       .Release(target));
+            GUARD_CU(results        .Release(target));
             GUARD_CU(constrain      .Release(target));
             GUARD_CU(NG             .Release(target));
             GUARD_CU(NG_src         .Release(target));
             GUARD_CU(NG_dest        .Release(target));
             GUARD_CU(partial        .Release(target));
-            GUARD_CU(src_node_id    .Release(target));
-            GUARD_CU(index          .Release(target));
+            GUARD_CU(flags          .Release(target));
+            GUARD_CU(indices        .Release(target));
             GUARD_CU(BaseDataSlice ::Release(target));
             return retval;
         }
@@ -181,17 +184,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(isValid        .Allocate(data_graph.nodes, util::DEVICE));
             GUARD_CU(counter        .Allocate(1, util::HOST | util::DEVICE));
             GUARD_CU(num_subs       .Allocate(1, util::HOST | util::DEVICE));
+            GUARD_CU(results        .Allocate(data_graph.nodes, util::HOST | util::DEVICE));
             GUARD_CU(constrain      .Allocate(1, util::HOST | util::DEVICE));
             GUARD_CU(NG             .Allocate(2 * num_query_node, util::HOST | util::DEVICE));
-            // non-tree edges only exist in the following condition
+            // non-tree edges only exist in the following condition; double the size to store nodes for duplicate edges
             if(num_query_edge - query_graph.nodes + 1 > 0) {
-                GUARD_CU(NG_src     .Allocate(num_query_edge - num_query_node + 1, util::HOST | util::DEVICE));
-                GUARD_CU(NG_dest    .Allocate(num_query_edge - num_query_node + 1, util::HOST | util::DEVICE));
+                GUARD_CU(NG_src     .Allocate((num_query_edge - num_query_node + 1) * 2, util::HOST | util::DEVICE));
+                GUARD_CU(NG_dest    .Allocate((num_query_edge - num_query_node + 1) * 2, util::HOST | util::DEVICE));
             }
             // partial results storage: as much as possible
             GUARD_CU(partial        .Allocate(num_query_node * data_graph.edges,  util::DEVICE));
-            GUARD_CU(src_node_id    .Allocate(data_graph.edges,  util::DEVICE));
-            GUARD_CU(index          .Allocate(data_graph.edges,  util::DEVICE));
+            GUARD_CU(flags          .Allocate(data_graph.nodes,  util::DEVICE));
+            GUARD_CU(indices          .Allocate(data_graph.nodes,  util::DEVICE));
 
             // Initialize query graph node degree by row offsets
             // neighbor node encoding = sum of neighbor node labels
@@ -262,7 +266,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                         if (node_visited[dest]) {
                             // This is a non-tree edge, store src and dest
                             NG_src[i++] = src;
+                            NG_src[i++] = dest;
                             NG_dest[j++] = dest;
+                            NG_dest[j++] = src;
                         }
                         node_visited[dest] = true;
                     }
@@ -288,7 +294,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
                 NG[i * 2 + 1] = min_degree;
             }
 
-            std::cout << "==============NG===========" << std::endl;
+/*            std::cout << "==============NG===========" << std::endl;
             for (int i = 0; i < 2 * query_graph.nodes; ++i) {
                 std::cout << NG[i] << std::endl;
             }
@@ -302,7 +308,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             }
             std::cout << "==============MIN degree===========" << std::endl;
             std::cout << constrain[0] << std::endl;
-            
+*/            
             GUARD_CU(NG.Move(util::HOST, target));
             GUARD_CU(NG_src.Move(util::HOST, target));
             GUARD_CU(NG_dest.Move(util::HOST, target));
@@ -316,6 +322,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	    GUARD_CU(isValid.ForAll(
 	        [] __device__(bool * x, const SizeT &pos) { x[pos] = true; },
 		data_graph.nodes, target, this->stream));
+	    GUARD_CU(flags.ForAll(
+	        [] __device__(bool * x, const SizeT &pos) { x[pos] = false; },
+		data_graph.nodes, target, this->stream));
+	    GUARD_CU(indices.ForAll(
+	        [] __device__(VertexT * x, const SizeT &pos) { x[pos] = pos; },
+		data_graph.nodes, target, this->stream));
 	    GUARD_CU(data_degree.ForAll(
 	        [] __device__(SizeT * x, const SizeT &pos) { x[pos] = 0; },
 		data_graph.nodes, target, this->stream));
@@ -323,8 +335,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
 	        [] __device__(SizeT * x, const SizeT &pos) { x[pos] = 0; },
 		1, target, this->stream));
 	    GUARD_CU(num_subs.ForAll(
-	        [] __device__(SizeT * x, const SizeT &pos) { x[pos] = 0; },
+	        [] __host__ __device__(SizeT * x, const SizeT &pos) { x[pos] = 0; },
 		1, target, this->stream));
+	    GUARD_CU(results.ForAll(
+	        [] __host__ __device__(SizeT * x, const SizeT &pos) { x[pos] = 0; },
+		data_graph.nodes, target, this->stream));
 
             nodes_query  = query_graph.nodes;
 
@@ -436,11 +451,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             {
                 GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-                GUARD_CU(data_slice.subgraphs.SetPointer(h_subgraphs, nodes, util::HOST));
-                GUARD_CU(data_slice.subgraphs.Move(util::DEVICE, util::HOST));
+                GUARD_CU(data_slice.results.SetPointer(h_subgraphs, nodes, util::HOST));
+                GUARD_CU(data_slice.results.Move(util::DEVICE, util::HOST));
             }
             else if (target == util::HOST) {
-                GUARD_CU(data_slice.subgraphs.ForEach(h_subgraphs,
+                GUARD_CU(data_slice.results.ForEach(h_subgraphs,
                     []__host__ __device__
                     (const VertexT &d_x, VertexT &h_x){
                         h_x = d_x;
