@@ -14,7 +14,10 @@
 
 #pragma once
 
-#include <cooperative_groups.h>
+#if (__CUDACC_VER_MAJOR__ >= 9)
+  #include <cooperative_groups.h>
+#endif
+
 #include <gunrock/util/array_utils.cuh>
 
 namespace gunrock {
@@ -82,6 +85,7 @@ __global__ void RepeatFor0_Kernel(int num_repeats, ForIterT loop_size, OpT op)
     }
 }
 
+#if (__CUDACC_VER_MAJOR__ >= 9)
 template <typename OpT>
 cudaError_t RepeatFor0(
     OpT            op,
@@ -124,10 +128,10 @@ cudaError_t RepeatFor0(
             grid_dim, block_dim, kernelArgs, 0, stream);
         if (retval)
             return util::GRError(retval, "RepeatFor kernel launch failed", __FILE__, __LINE__);
-
     }
     return retval;
 }
+#endif
 
 template <typename OpT>
 __global__ void RepeatFor1_Kernel(int r, ForIterT loop_size, OpT op)
@@ -144,6 +148,7 @@ __global__ void RepeatFor1_Kernel(int r, ForIterT loop_size, OpT op)
     }
 }
 
+#if (__CUDACC_VER_MAJOR__ >= 10)
 template <typename OpT>
 cudaError_t RepeatFor1(
     OpT            op,
@@ -227,6 +232,7 @@ cudaError_t RepeatFor1(
     }
     return retval;
 }
+#endif
 
 template <typename OpT>
 cudaError_t RepeatFor2(
@@ -266,9 +272,17 @@ cudaError_t RepeatFor(
     cudaError_t retval = cudaSuccess;
 
     if (method == 0 || target == util::HOST)
+#if (__CUDACC_VER_MAJOR__ >= 9)
         retval = RepeatFor0(op, num_repeats, loop_size, target, stream ,grid_size, block_size);
+#else
+        retval = RepeatFor2(op, num_repeats, loop_size, target, stream ,grid_size, block_size);
+#endif
     else if (method == 1)
+#if (__CUDACC_VER_MAJOR__ >= 10)
         retval = RepeatFor1(op, num_repeats, loop_size, target, stream ,grid_size, block_size);
+#else
+        retval = RepeatFor2(op, num_repeats, loop_size, target, stream ,grid_size, block_size);
+#endif
     else if (method == 2)
         retval = RepeatFor2(op, num_repeats, loop_size, target, stream ,grid_size, block_size);
 
