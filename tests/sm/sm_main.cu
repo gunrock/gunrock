@@ -70,8 +70,8 @@ struct main_struct
 
             float elapsed = app::sm::CPU_Reference(
                 parameters,
-                pattern_graph.csr(),
                 data_graph.csr(),
+                pattern_graph.csr(),
                 ref_subgraph_match
             );
 

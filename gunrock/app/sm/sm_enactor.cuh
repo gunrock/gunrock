@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <gunrock/util/select_device.cuh>
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
@@ -78,7 +79,11 @@ struct SMIterationLoop : public IterationLoopBase
         auto         &query_ro           =   data_slice.query_ro;
         auto         &query_ci           =   data_slice.query_ci;
         auto         &counter            =   data_slice.counter;
-        auto         &src_node_id        =   data_slice.src_node_id;
+        auto         &flags              =   data_slice.flags;
+        auto         &indices              =   data_slice.indices;
+        auto         &partial            =   data_slice.partial;
+        auto         &num_subs           =   data_slice.num_subs;
+        auto         &results            =   data_slice.results;
         auto         &row_offsets        =   graph.CsrT::row_offsets;
         auto         &col_indices        =   graph.CsrT::column_indices;
         auto         &frontier           =   enactor_slice.frontier;
@@ -87,6 +92,7 @@ struct SMIterationLoop : public IterationLoopBase
         auto         &stream             =   oprtr_parameters.stream;
         auto         target              =   util::DEVICE;
         size_t       nodes_query         =   data_slice.nodes_query;
+        size_t       nodes_data          =   graph.nodes;
 
 
 	auto print_frontier = [] __host__ __device__(
@@ -97,7 +103,7 @@ struct SMIterationLoop : public IterationLoopBase
 	    return;
 	};
 
-	GUARD_CU(frontier.V_Q()->ForAll(print_frontier , frontier.queue_length, util::DEVICE, stream));
+//	GUARD_CU(frontier.V_Q()->ForAll(print_frontier , frontier.queue_length, util::DEVICE, stream));
 //	GUARD_CU(frontier.Next_V_Q()->ForAll(print_frontier , frontier.queue_length, util::DEVICE, stream));
 
         // First add degrees to subgraph matching
@@ -106,14 +112,6 @@ struct SMIterationLoop : public IterationLoopBase
             {
                 subgraphs_[v] = row_offsets[v + 1] - row_offsets[v];
             }, graph.nodes, target, stream));
-        // Initialize src_node_ids to be composed of 0
-        GUARD_CU(src_node_id.ForAll([]
-            __device__ (VertexT *src_node_id_, const SizeT & e)
-            {
-                src_node_id_[e] = 0;
-            }, graph.edges, target, stream));
-
-        src_node_id.Print();
         subgraphs.Print();
         constrain.Print();
         // advance to filter out data graph nodes which don't satisfy constrain
@@ -145,29 +143,50 @@ struct SMIterationLoop : public IterationLoopBase
             return true;
         };
 
-        auto distribute_op = [subgraphs, isValid, NG, query_ro, query_ci, src_node_id, counter, nodes_query] __host__ __device__(
+        auto distribute_op = [subgraphs, isValid, NG, query_ro, query_ci, flags, counter, NG_src, NG_dest, results, nodes_data] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-        //    printf("src: %d, dest: %d\n", src, dest);
-            if (src < 0 || src >= nodes_query)
+            if (src < 0 || src >= nodes_data)
                 return false;
             if ((!isValid[src]) || (!isValid[dest])) {
                 return false;
             }
             // NG has query node id sequence in its even pos; min degree of neighbors in odd pos
             VertexT query_id = NG[counter[0] * 2];
-            if (subgraphs[src] < (query_ro[query_id + 1] - query_ro[query_id]))
+            // special init for first iteration
+            if (counter[0] == 0) {
+                if (subgraphs[src] < (query_ro[query_id + 1] - query_ro[query_id]))
+                    return false;
+                // 1 way look ahead
+                if (subgraphs[dest] < NG[counter[0] * 2 + 1]) {
+                    return false;
+                }
+                flags[src] = true;
+                return true;
+            } else {
+                // check if src belongs to partial results
+                if (!flags[src])
+                    return false;
+                if (subgraphs[dest] < (query_ro[query_id + 1] - query_ro[query_id]))
+                    return false;
+                // 1 way look ahead to be done in filter
+		results[dest] = 1;
+                return true;
+            }
+        };
+        auto look_ahead_op = [isValid, flags, nodes_data] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool
+        {
+            if (src < 0 || src >= nodes_data)
                 return false;
-            // 1 way look ahead
-            if (subgraphs[dest] < NG[counter[0] * 2 + 1]) {
+            if ((!isValid[src]) || (!isValid[dest])) {
                 return false;
             }
-            // only mark each edge once
-            if (src < dest) {
-                src_node_id[edge_id] = 1;
-            }
+            flags[src] = true;
             return true;
         };
         // Compute number of triangles for each edge and atomicly add the count to each node, then divided by 2
@@ -181,28 +200,12 @@ struct SMIterationLoop : public IterationLoopBase
 
         frontier.queue_length = graph.edges;
         frontier.queue_reset = true;
-        int num_init = 3;
+        size_t pointer_head = 0;
+        int num_init = 3; // for current tests, 3 is enough
         for (int iter = 0; iter < num_init; ++iter) {
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
                 oprtr_parameters, advance_op));
-/*	    if (oprtr_parameters.advance_mode != "LB_CULL" &&
-		oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
-	    {
-                frontier.queue_reset = false;
-                GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-                    oprtr_parameters, filter_op)); 
-            }
-            frontier.queue_index++;
-            // Get back the resulted frontier length
-            GUARD_CU(frontier.work_progress.GetQueueLength(
-                    frontier.queue_index, frontier.queue_length,
-                    false, oprtr_parameters.stream, true));
-*/
-//            frontier.queue_reset = false;
-            isValid.Print();
-            subgraphs.Print();
         }
 
         for (int iter = 0; iter < nodes_query; ++iter) {
@@ -215,34 +218,29 @@ struct SMIterationLoop : public IterationLoopBase
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
                 oprtr_parameters, distribute_op));
-/*	    if (oprtr_parameters.advance_mode != "LB_CULL" &&
-		oprtr_parameters.advance_mode != "LB_LIGHT_CULL")
-	    {
-                frontier.queue_reset = false;
-                GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-                    graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
-                    oprtr_parameters, filter_op)); 
+
+            if (iter == 0) {
+            } else {
+                // Initialize flagss to be composed of 0
+                GUARD_CU(flags.ForAll([]
+                    __device__ (bool *flags_, const SizeT & v)
+                    {
+                        flags_[v] = false;
+                    }, graph.nodes, target, stream));
+
+                GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                    graph.csr(), frontier.Next_V_Q(), frontier.V_Q(), 
+                    oprtr_parameters, look_ahead_op));
             }
-            frontier.queue_index++;
-            // Get back the resulted frontier length
-            GUARD_CU(frontier.work_progress.GetQueueLength(
-                    frontier.queue_index, frontier.queue_length,
-                    false, oprtr_parameters.stream, true));
-*/
-//            frontier.queue_reset = false;
-            src_node_id.Print();
-        
+            GUARD_CU(util::CUBSelect_flagged(
+                indices.GetPointer(util::DEVICE),
+                flags.GetPointer(util::DEVICE),
+                partial.GetPointer(util::DEVICE) + pointer_head,
+                num_subs.GetPointer(util::DEVICE),
+                nodes_data));
+            GUARD_CU(num_subs.Move(util::DEVICE, util::HOST));
+            pointer_head += num_subs.GetPointer(util::HOST)[0];
         }
-
-
-
-
-	// // Sort the subgraph matching values for each node in descending order
- //        GUARD_CU(util::cubSortPairs(
- //            cub_temp_space,
- //            subgraphs, tats1,
- //            nodes,      nodes1,
- //            graph.nodes, 0, sizeof(ValueT) * 8, stream));
 
         return retval;
     }
