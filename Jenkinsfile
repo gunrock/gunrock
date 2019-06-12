@@ -18,7 +18,7 @@ def cmake_build() {
     timeout(time: 20, unit: 'MINUTES') {
       sh 'mkdir -p build'
       sh '''cd build
-            cmake -DGUNROCK_CODE_COVERAGE=ON -DGUNROCK_MGPU_TESTS=ON ..
+            cmake -DGUNROCK_CODE_COVERAGE=ON -DGUNROCK_MGPU_TESTS=ON -DGUNROCK_CODE_COVERAGE=ON ..
             make -j16'''
     }
   }
