@@ -60,44 +60,28 @@ __device__ __forceinline__ void ChoosePartition(VertexId &u, VertexId &v,
   }
 }
 
-__device__ __forceinline__ void VaryParams(double a, double b, double c,
-                                           double d, curandState &rand_state) {
-  double v, S;
+__device__ __forceinline__ void VaryParams(
+    double &a, double &b, double &c, double &d,
+    curandState &rand_state)
+{
+    double v, S;
 
-  // Allow a max. of 5% variation
-  v = 0.05;
+    // Allow a max. of 5% variation
+    v = 0.05;
 
-  if (Flip(rand_state)) {
-    a += a * v * Sprng(rand_state);
-  } else {
-    a -= a * v * Sprng(rand_state);
-  }
+    if (Flip(rand_state))
+    {
+        a += a * v * Sprng(rand_state);
+    } else {
+        a -= a * v * Sprng(rand_state);
+    }
 
-  if (Flip(rand_state)) {
-    b += b * v * Sprng(rand_state);
-  } else {
-    b -= b * v * Sprng(rand_state);
-  }
-
-  if (Flip(rand_state)) {
-    c += c * v * Sprng(rand_state);
-  } else {
-    c -= c * v * Sprng(rand_state);
-  }
-
-  if (Flip(rand_state)) {
-    d += d * v * Sprng(rand_state);
-  } else {
-    d -= d * v * Sprng(rand_state);
-  }
-
-  S = a + b + c + d;
-
-  a = a / S;
-  b = b / S;
-  c = c / S;
-  d = d / S;
-}
+    if (Flip(rand_state))
+    {
+        b += b * v * Sprng(rand_state);
+    } else {
+        b -= b * v * Sprng(rand_state);
+    }
 
 template <bool WITH_VALUES, typename VertexId, typename SizeT, typename Value>
 __global__ void Rmat_Kernel(SizeT num_nodes, SizeT edge_count,
@@ -619,9 +603,60 @@ cudaError_t BuildRmatGraph_coo_nv(SizeT num_nodes, SizeT num_edges,
       }
     }
 
-    if (retval = util::GRError(cudaStreamCreate(streams + gpu),
-                               "cudaStreamCreate failed", __FILE__, __LINE__)) {
-      return retval;
+    cudaStream_t *streams = new cudaStream_t[num_gpus];
+    util::Array1D<SizeT, EdgeTupleType> *edges = new util::Array1D<SizeT, EdgeTupleType>[num_gpus];
+    util::Array1D<SizeT, curandState> *rand_states = new util::Array1D<SizeT, curandState>[num_gpus];
+
+    for (int gpu = 0; gpu < num_gpus; gpu++)
+    {
+        if (gpu_idx != NULL)
+        {
+            if (retval = util::SetDevice(gpu_idx[gpu]))
+                return retval;
+        }
+
+        if (retval = util::GRError(cudaStreamCreate(streams + gpu),
+                    "cudaStreamCreate failed", __FILE__, __LINE__))
+            return retval;
+        SizeT start_edge = num_edges * 1.0 / num_gpus * gpu;
+        SizeT end_edge = num_edges * 1.0 / num_gpus * (gpu+1);
+        SizeT edge_count = end_edge - start_edge;
+        if (undirected) edge_count *=2;
+        unsigned int seed_ = seed + 616 * gpu;
+        if (retval = edges[gpu].Allocate(edge_count, util::DEVICE))
+            return retval;
+
+        int block_size = 1024;
+        int grid_size = edge_count / block_size + 1;
+        if (grid_size > 480) grid_size = 480;
+        if (retval = rand_states[gpu].Allocate(block_size * grid_size, util::DEVICE))
+            return retval;
+        Rand_Init
+            <SizeT>
+            <<<grid_size, block_size, 0, streams[gpu]>>>
+            (seed_, rand_states[gpu].GetPointer(util::DEVICE));
+
+        Rmat_Kernel
+            <WITH_VALUES, VertexId, SizeT, Value>
+            <<<grid_size, block_size, 0, streams[gpu]>>>
+            (num_nodes, (undirected ? edge_count/2 : edge_count),
+             edges[gpu].GetPointer(util::DEVICE),
+             undirected, vmultipiler, vmin,
+             a0, b0, c0, d0,
+             rand_states[gpu].GetPointer(util::DEVICE));
+
+        // for source node: add num_nodes
+        // for dest node: add num_nodes
+        VertexId pre_offset = (num_gpus > 1)?1:0;
+        for (int copy_idx = 0; copy_idx < num_gpus; ++copy_idx) {
+            VertexId offset = (copy_idx) ? num_nodes : pre_offset;
+            EdgeTupleType *edges_pointer = edges[gpu].GetPointer(util::DEVICE);
+            util::MemsetAddEdgeValKernel<<<256, 1024>>>(edges_pointer, offset, edge_count);
+            if (retval = edges[gpu].SetPointer(coo + ((num_gpus>1)?num_gpus:0) + directed_edges * copy_idx + start_edge * (undirected ? 2 : 1), edge_count, util::HOST))
+                return retval;
+            if (retval = edges[gpu].Move(util::DEVICE, util::HOST, edge_count, 0, streams[gpu]))
+                return retval;
+        }
     }
     SizeT start_edge = num_edges * 1.0 / num_gpus * gpu;
     SizeT end_edge = num_edges * 1.0 / num_gpus * (gpu + 1);

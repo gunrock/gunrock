@@ -8,3 +8,6 @@
 	path = docs
 	url = https://github.com/gunrock/docs.git
 	branch = master
+[submodule "externals/rapidjson"]
+	path = externals/rapidjson
+	url = https://github.com/Tencent/rapidjson.git

@@ -14,11 +14,11 @@
 
 #pragma once
 
-#include <gunrock/oprtr/cull_filter/kernel_policy.cuh>
+// #include <gunrock/oprtr/cull_filter/kernel_policy.cuh>
 #include <gunrock/oprtr/simplified_filter/kernel_policy.cuh>
 #include <gunrock/oprtr/simplified2_filter/kernel_policy.cuh>
 #include <gunrock/oprtr/compacted_cull_filter/kernel_policy.cuh>
-#include <gunrock/oprtr/bypass_filter/kernel_policy.cuh>
+// #include <gunrock/oprtr/bypass_filter/kernel_policy.cuh>
 
 namespace gunrock {
 namespace oprtr {

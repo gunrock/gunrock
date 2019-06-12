@@ -1,0 +1,1 @@
+./bin/sm_main_9.0_x86_64 market  ../../dataset/small/tree.mtx --pattern-graph-type=market --pattern-graph-file=../../dataset/small/query_sm.mtx --undirected=1 --pattern-undirected=1 --num-runs=1 --quiet=False
