@@ -81,7 +81,7 @@ pipeline {
     
     stage('Deploy') {
       steps {
-        echo 'Branch: Dev.'
+        echo 'Branch: Master.'
         echo 'Pipleline finished.'
       }
     }

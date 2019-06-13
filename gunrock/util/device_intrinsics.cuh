@@ -23,6 +23,10 @@
   #define MEMBERMASK 0xffffffffu
 #endif
 
+#ifndef MEMBERMASK
+  #define MEMBERMASK 0xffffffffu
+#endif
+
 #ifndef WARPSIZE
   #define WARPSIZE 32
 #endif
