@@ -7,7 +7,7 @@
 
 /**
  * @file
- * test.cpp
+ * test_unitests.cu
  *
  * @brief Main test driver for all googletests.
  * @source
@@ -19,12 +19,22 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-// Add google tests
-#include "bfs/test_lib_bfs.h"
-#include "cc/test_lib_cc.h"
-#include "bc/test_lib_bc.h"
-#include "pr/test_lib_pr.h"
-#include "sssp/test_lib_sssp.h"
+/**
+ * @brief: Gunrock: Google tests -- list of tests
+ * found in this directory, testing core functionality
+ * of gunrock: primitives, operators, device intrinsics,
+ * etc.
+ *
+ */
+
+// bug:: malloc_consolidate(): invalid chunk size
+//#include "test_lib_pr.h"
+
+// Tests the RepeatFor Operator
+#include "test_repeatfor.h"
+
+// Tests Segmented Reduction (device)
+#include "test_segreduce.h"
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

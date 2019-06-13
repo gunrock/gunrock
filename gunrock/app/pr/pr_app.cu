@@ -351,8 +351,8 @@ double pagerank(
     double elapsed_time = gunrock_pagerank(parameters, graph, node_ids, ranks);
 
     // Cleanup
-    graph.Release();
-    srcs.clear();
+    // graph.Release();
+    // srcs.clear();
 
     return elapsed_time;
 }

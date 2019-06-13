@@ -2,8 +2,10 @@
 #include <algorithm>
 #include <gunrock/util/binary_search.cuh>
 
-int main()
+cudaError_t BinarySearchTest()
 {
+    cudaError_t retval = cudaSuccess;
+
     int num_elements  = 2000;
     int min_element   = 0;
     int max_element   = 512;
@@ -11,6 +13,8 @@ int main()
     int element_range = max_element - min_element;
 
     int* elements = new int[num_elements];
+
+    int num_errors = 0;
  
     srand(time(NULL));
     for (int i = 0; i < num_elements; i++)
@@ -38,6 +42,7 @@ int main()
             (pos     >=0  && pos + 1 < num_elements && element >  elements[pos    ] && element == elements[pos + 1]) || 
             (pos + 1 >= 0 && pos + 1 < num_elements && element >  elements[pos + 1]))
         {
+	    num_errors++;
             std::cout << i << " Error " << element << ": pos = " << pos << " ..."
                 << (pos <= 0 ? -1 : elements[pos - 1]) << " , "
                 << (pos < 0 || pos >= num_elements ? -1 : elements[pos]) << " , "
@@ -63,13 +68,18 @@ int main()
         if ((pos - 1 >= 0 && pos - 1 < num_elements && element <  elements[pos - 1]) ||
             (pos     >= 0 && pos     < num_elements && element <  elements[pos    ]) ||
             (pos + 1 >= 0 && pos + 1 < num_elements && element >= elements[pos + 1]))
+	{
+	    num_errors++;
             std::cout << i << " Error " << element << ": pos = " << pos << " ..."
                 << (pos <= 0 ? -1 : elements[pos - 1]) << " , "
                 << (pos < 0 || pos >= num_elements ? -1 : elements[pos]) << " , "
                 << (pos + 1 >= num_elements ? -1 : elements[pos + 1]) << std::endl;
+	}	
     }
 
-    delete[] elements; elements = NULL;
-    return 0; 
-}
+    if (num_errors > 0) retval = cudaErrorUnknown;
 
+    delete[] elements; elements = NULL;
+
+    return retval; 
+}
