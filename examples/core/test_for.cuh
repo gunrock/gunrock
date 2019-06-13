@@ -3,8 +3,10 @@
 #include <gunrock/util/io/cub_io.cuh>
 #include <gunrock/oprtr/1D_oprtr/for.cuh>
 
-int main()
+cudaError_t RepeatForTest()
 {
+    cudaError_t retval = cudaSuccess;
+
     typedef uint32_t T;
     typedef uint32_t SizeT;
     
@@ -78,11 +80,19 @@ int main()
                 num_errors ++;
             }
         }
-        if (num_errors == 0)
+        if (num_errors == 0) 
+	{
             std::cout << "PASS, time = " << cpu_timer.ElapsedMillis() << std::endl;
-        else 
+    	} else 
+	{ 
             std::cout << "num_errors = " << num_errors << std::endl;
+            retval = cudaErrorUnknown;
+	    break;
+	}
     }
-    return 0;
-}
+	
+    GUARD_CU(counter .Release());
+    GUARD_CU(results .Release());
 
+    return retval;
+}

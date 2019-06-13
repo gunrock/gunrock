@@ -2,8 +2,8 @@
 #include <algorithm>
 #include <gunrock/util/reduce_device.cuh>
 
-int main()
-{
+cudaError_t SegReduceTest() 
+{ 
     cudaError_t retval = cudaSuccess;
 
     int num_elements = 2000000;
@@ -94,7 +94,8 @@ int main()
         if (num_errors > 0)
         {
             std::cout << "#errors = " << num_errors << std::endl;
-            break;
+            retval = cudaErrorUnknown;
+	    break;
         } else {
             std::cout << "Pass" << std::endl;
         }
@@ -104,6 +105,5 @@ int main()
     GUARD_CU(offsets .Release());
     GUARD_CU(results .Release());
     GUARD_CU(temp_space.Release());
-    return 0;
+    return retval;
 }
-
