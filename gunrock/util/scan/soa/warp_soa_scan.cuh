@@ -36,7 +36,7 @@ template <int LOG_NUM_ELEMENTS,   // Log of number of elements to warp-reduce
           int STEPS =
               LOG_NUM_ELEMENTS>  // Number of steps to run, i.e., produce
                                  // scanned segments of (1 << STEPS) elements
-                                 struct WarpSoaScan {
+struct WarpSoaScan {
   static const int NUM_ELEMENTS = 1 << LOG_NUM_ELEMENTS;
 
   //---------------------------------------------------------------------

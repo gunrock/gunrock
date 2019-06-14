@@ -78,10 +78,9 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT>
-cudaError_t RunTests(
-    util::Parameters &parameters, GraphT &graph, typename GraphT::SizeT k,
-    typename GraphT::SizeT *h_knns, typename GraphT::SizeT *ref_knns,
-    util::Location target) {
+cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
+                     typename GraphT::SizeT k, typename GraphT::SizeT *h_knns,
+                     typename GraphT::SizeT *ref_knns, util::Location target) {
   cudaError_t retval = cudaSuccess;
 
   typedef typename GraphT::VertexT VertexT;
@@ -132,7 +131,8 @@ cudaError_t RunTests(
 
     if (validation == "each") {
       GUARD_CU(problem.Extract(graph.nodes, k, h_knns));
-      SizeT num_errors = Validate_Results(parameters, graph, h_knns, ref_knns, false);
+      SizeT num_errors =
+          Validate_Results(parameters, graph, h_knns, ref_knns, false);
     }
   }
 
@@ -140,7 +140,8 @@ cudaError_t RunTests(
 
   GUARD_CU(problem.Extract(graph.nodes, k, h_knns));
   if (validation == "last") {
-    SizeT num_errors = Validate_Results(parameters, graph, h_knns, ref_knns, false);
+    SizeT num_errors =
+        Validate_Results(parameters, graph, h_knns, ref_knns, false);
   }
 
   // compute running statistics

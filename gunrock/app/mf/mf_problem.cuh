@@ -65,14 +65,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   struct DataSlice : BaseDataSlice {
     // MF-specific storage arrays:
-    util::Array1D<SizeT, ValueT> flow;             // edge flow
-    util::Array1D<SizeT, ValueT> residuals;        // edge residuals
-    util::Array1D<SizeT, ValueT> excess;           // vertex excess
-    util::Array1D<SizeT, VertexT> height;          // vertex height
-    util::Array1D<SizeT, VertexT> reverse;         // id reverse edge
-    util::Array1D<SizeT, SizeT> lowest_neighbor;   // id lowest neighbor
-    util::Array1D<SizeT, VertexT> local_vertices;  // set of vertices
-    util::Array1D<SizeT, SizeT, util::PINNED> active;            // flag active vertices
+    util::Array1D<SizeT, ValueT> flow;                 // edge flow
+    util::Array1D<SizeT, ValueT> residuals;            // edge residuals
+    util::Array1D<SizeT, ValueT> excess;               // vertex excess
+    util::Array1D<SizeT, VertexT> height;              // vertex height
+    util::Array1D<SizeT, VertexT> reverse;             // id reverse edge
+    util::Array1D<SizeT, SizeT> lowest_neighbor;       // id lowest neighbor
+    util::Array1D<SizeT, VertexT> local_vertices;      // set of vertices
+    util::Array1D<SizeT, SizeT, util::PINNED> active;  // flag active vertices
 
     util::Array1D<SizeT, VertexT> head;
     util::Array1D<SizeT, VertexT> tail;
@@ -261,16 +261,16 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       this->num_updated_vertices = 1;
       // Reset data
       GUARD_CU(height.ForAll(
-					[source, sink, nodes_size] 
-					__host__ __device__( VertexT * h, const VertexT &pos) { 
-						if (pos == source)
-	    				h[pos] = nodes_size; 
-	    			else //if (pos == sink)
-	    				h[pos] = 0;
-	    			//else
-	    			 // h[pos] = 2 * nodes_size + 1;
-					},
-					nodes_size, target, this->stream));
+          [source, sink, nodes_size] __host__ __device__(VertexT * h,
+                                                         const VertexT &pos) {
+            if (pos == source)
+              h[pos] = nodes_size;
+            else  // if (pos == sink)
+              h[pos] = 0;
+            // else
+            // h[pos] = 2 * nodes_size + 1;
+          },
+          nodes_size, target, this->stream));
 
       GUARD_CU(flow.ForAll(
           [] __host__ __device__(ValueT * f, const VertexT &pos) {
@@ -442,8 +442,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       // Set device
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-      GUARD_CU(
-          data_slices[gpu]->Reset(graph, source_vertex, sink_vertex, h_reverse, target));
+      GUARD_CU(data_slices[gpu]->Reset(graph, source_vertex, sink_vertex,
+                                       h_reverse, target));
       GUARD_CU(data_slices[gpu].Move(util::HOST, target));
     }
 

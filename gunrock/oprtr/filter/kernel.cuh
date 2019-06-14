@@ -53,9 +53,11 @@ struct Dispatch<Parameter, SIMPLIFIED2>
         //d_data_slice->valid_in.GetPointer(util::DEVICE)
         //d_data_slice->valid_out.GetPointer(util::DEVICE)
         // launch settings
-        int num_block = (parameter.num_elements + KernelPolicy::THREADS - 1) / KernelPolicy::THREADS;
+        int num_block = (parameter.num_elements + KernelPolicy::THREADS - 1) /
+KernelPolicy::THREADS;
 
-        if (parameter.h_data_slice -> visit_lookup[0].GetPointer(util::DEVICE) == NULL)
+        if (parameter.h_data_slice -> visit_lookup[0].GetPointer(util::DEVICE)
+== NULL)
         {
             if (retval = parameter.h_data_slice -> visit_lookup[0].
                 Allocate(parameter.num_nodes + 1, util::DEVICE))
@@ -66,7 +68,8 @@ struct Dispatch<Parameter, SIMPLIFIED2>
                 return retval;
         }
 
-        if (parameter.h_data_slice -> valid_in[0].GetPointer(util::DEVICE) == NULL)
+        if (parameter.h_data_slice -> valid_in[0].GetPointer(util::DEVICE) ==
+NULL)
         {
             if (retval = parameter.h_data_slice -> valid_in[0].
                 Allocate(parameter.num_elements + 1, util::DEVICE))
@@ -77,7 +80,8 @@ struct Dispatch<Parameter, SIMPLIFIED2>
                 return retval;
         }
 
-        if (parameter.h_data_slice -> valid_out[0].GetPointer(util::DEVICE) == NULL)
+        if (parameter.h_data_slice -> valid_out[0].GetPointer(util::DEVICE) ==
+NULL)
         {
             if (retval = parameter.h_data_slice -> valid_out[0].
                 Allocate(parameter.num_elements + 1, util::DEVICE))
@@ -290,69 +294,49 @@ cudaError_t LaunchKernel(
 
     if (filtering_flag)
     {
-        if (retval = Dispatch<Parameter, KernelPolicy::FILTER_MODE>::Launch(parameter))
-        return retval;
-    } else {
-        if (retval = Dispatch<Parameter, BY_PASS>::Launch(parameter))
-        return retval;
+        if (retval = Dispatch<Parameter,
+KernelPolicy::FILTER_MODE>::Launch(parameter)) return retval; } else { if
+(retval = Dispatch<Parameter, BY_PASS>::Launch(parameter)) return retval;
     }
 
     return retval;
 }*/
 
-template <
-    OprtrFlag FLAG,
-    typename GraphT,
-    typename FrontierInT,
-    typename FrontierOutT,
-    typename ParametersT,
-    typename AdvanceOpT,
-    typename FilterOpT>
-cudaError_t Launch(
-    const GraphT         &graph,
-    const FrontierInT   * frontier_in,
-          FrontierOutT  * frontier_out,
-          ParametersT    &parameters,
-          AdvanceOpT      advance_op,
-          FilterOpT       filter_op)
-{
-    if (parameters.filter_mode == "CULL")
-        return CULL::Launch<FLAG>(graph, frontier_in, frontier_out,
-            parameters, advance_op, filter_op);
-    if (parameters.filter_mode == "BY_PASS")
-        return BP::Launch<FLAG>(graph, frontier_in, frontier_out,
-            parameters, advance_op, filter_op);
+template <OprtrFlag FLAG, typename GraphT, typename FrontierInT,
+          typename FrontierOutT, typename ParametersT, typename AdvanceOpT,
+          typename FilterOpT>
+cudaError_t Launch(const GraphT &graph, const FrontierInT *frontier_in,
+                   FrontierOutT *frontier_out, ParametersT &parameters,
+                   AdvanceOpT advance_op, FilterOpT filter_op) {
+  if (parameters.filter_mode == "CULL")
+    return CULL::Launch<FLAG>(graph, frontier_in, frontier_out, parameters,
+                              advance_op, filter_op);
+  if (parameters.filter_mode == "BY_PASS")
+    return BP::Launch<FLAG>(graph, frontier_in, frontier_out, parameters,
+                            advance_op, filter_op);
 
-    return util::GRError(cudaErrorInvalidValue,
-        "FilterMode " + parameters.filter_mode + " undefined.", __FILE__, __LINE__);
+  return util::GRError(cudaErrorInvalidValue,
+                       "FilterMode " + parameters.filter_mode + " undefined.",
+                       __FILE__, __LINE__);
 }
 
-template <
-    OprtrFlag FLAG,
-    typename GraphT,
-    typename FrontierInT,
-    typename FrontierOutT,
-    typename ParametersT,
-    typename OpT>
-cudaError_t Launch(
-    const GraphT         &graph,
-    const FrontierInT   * frontier_in,
-          FrontierOutT  * frontier_out,
-          ParametersT    &parameters,
-          OpT             op)
-{
-    typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::SizeT   SizeT;
-    typedef typename FrontierInT::ValueT InKeyT;
+template <OprtrFlag FLAG, typename GraphT, typename FrontierInT,
+          typename FrontierOutT, typename ParametersT, typename OpT>
+cudaError_t Launch(const GraphT &graph, const FrontierInT *frontier_in,
+                   FrontierOutT *frontier_out, ParametersT &parameters,
+                   OpT op) {
+  typedef typename GraphT::VertexT VertexT;
+  typedef typename GraphT::SizeT SizeT;
+  typedef typename FrontierInT::ValueT InKeyT;
 
-    auto dummy_advance = []__host__ __device__ (
-        const VertexT &src   , VertexT &dest, const SizeT &edge_id,
-        const InKeyT  &key_in, const SizeT &input_pos, SizeT &output_pos) -> bool{
-            return true;
-        };
+  auto dummy_advance = [] __host__ __device__(
+                           const VertexT &src, VertexT &dest,
+                           const SizeT &edge_id, const InKeyT &key_in,
+                           const SizeT &input_pos,
+                           SizeT &output_pos) -> bool { return true; };
 
-    return Launch<FLAG>(graph, frontier_in, frontier_out,
-        parameters, dummy_advance, op);
+  return Launch<FLAG>(graph, frontier_in, frontier_out, parameters,
+                      dummy_advance, op);
 }
 
 }  // namespace filter

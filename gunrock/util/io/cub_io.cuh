@@ -21,30 +21,26 @@ namespace gunrock {
 template <
     cub::CacheLoadModifier MODIFIER = cub::CacheLoadModifier::LOAD_DEFAULT,
     typename T>
-__device__ __host__ __forceinline__
-T Load(T* ptr)
-{
+__device__ __host__ __forceinline__ T Load(T* ptr) {
 #ifdef __CUDA_ARCH__
-    return cub::ThreadLoad<MODIFIER>(ptr);
+  return cub::ThreadLoad<MODIFIER>(ptr);
 #else
-    return *ptr;
+  return *ptr;
 #endif
 }
 
 template <
     cub::CacheStoreModifier MODIFIER = cub::CacheStoreModifier::STORE_DEFAULT,
     typename T>
-__device__ __host__ __forceinline__
-void Store(T* ptr, const T &val)
-{
+__device__ __host__ __forceinline__ void Store(T* ptr, const T& val) {
 #ifdef __CUDA_ARCH__
-    cub::ThreadStore<MODIFIER>(ptr, val);
+  cub::ThreadStore<MODIFIER>(ptr, val);
 #else
-    *ptr = val;
+  *ptr = val;
 #endif
 }
 
-} // namespace gunrock
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

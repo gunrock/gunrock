@@ -109,17 +109,19 @@ struct ColorIterationLoop
     if (use_jpl) {
       if (!color_balance) {
         if (iteration % 2)
-	   curandGenerateUniform(gen, rand.GetPointer(util::DEVICE), graph.nodes);
+          curandGenerateUniform(gen, rand.GetPointer(util::DEVICE),
+                                graph.nodes);
 
         auto jpl_color_op =
-            [graph, colors, rand, iteration, min_color, colored] __host__ __device__(
-// #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600
-//                const int &counter, const VertexT &v) {
-// #else
+            [graph, colors, rand, iteration, min_color, colored] __host__
+            __device__(
+                // #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600
+                //                const int &counter, const VertexT &v) {
+                // #else
                 VertexT * v_q, const SizeT &pos) {
-              VertexT v = pos; // v_q[pos];
-// #endif
-	      if (pos == 0) colored[0] = 0; // reset colored ahead-of-time
+              VertexT v = pos;               // v_q[pos];
+                                             // #endif
+              if (pos == 0) colored[0] = 0;  // reset colored ahead-of-time
               if (util::isValid(colors[v])) return;
 
               SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
@@ -148,7 +150,7 @@ struct ColorIterationLoop
               }
             };
 
-#if 0 // (RepeatFor Implementation)
+#if 0  // (RepeatFor Implementation)
 // #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600
         SizeT loop_size = frontier.queue_length;
         gunrock::oprtr::RepeatFor(
@@ -165,7 +167,7 @@ struct ColorIterationLoop
 
         GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
                                         util::DEVICE, stream));
-// #endif
+        // #endif
 
       }
 
@@ -206,7 +208,7 @@ struct ColorIterationLoop
         auto reduce_color_op =
             [graph, rand, colors, color_predicate, iteration, colored] __host__
             __device__(VertexT * v_q, const SizeT &pos) {
-	      if (pos == 0) colored[0] = 0; // reset colored ahead-of-time
+              if (pos == 0) colored[0] = 0;  // reset colored ahead-of-time
               VertexT v = v_q[pos];
               if (util::isValid(colors[v])) return;
 
@@ -225,10 +227,10 @@ struct ColorIterationLoop
     //======================================================================//
     else {
       auto color_op =
-          [graph, colors, rand, iteration, prohibit_size, visited,
-           prohibit, colored] __host__
+          [graph, colors, rand, iteration, prohibit_size, visited, prohibit,
+           colored] __host__
           __device__(VertexT * v_q, const SizeT &pos) {
-	    if (pos == 0) colored[0] = 0; // reset colored ahead-of-time
+            if (pos == 0) colored[0] = 0;  // reset colored ahead-of-time
             VertexT v = v_q[pos];
             SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
             SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);

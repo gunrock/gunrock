@@ -240,8 +240,9 @@ struct CCProblem : ProblemBase<VertexId, SizeT, Value,
         return retval;
       scanned_queue_computed = false;
       // if (retval = this->frontier_queues[0].keys  [0].Allocate(edges+2,
-      // util::DEVICE)) return retval; if (retval = this->frontier_queues[0].keys
-      // [1].Allocate(edges+2, util::DEVICE)) return retval; if (retval =
+      // util::DEVICE)) return retval; if (retval =
+      // this->frontier_queues[0].keys [1].Allocate(edges+2, util::DEVICE))
+      // return retval; if (retval =
       // this->frontier_queues[0].values[0].Allocate(nodes+2, util::DEVICE))
       // return retval; if (retval =
       // this->frontier_queues[0].values[1].Allocate(nodes+2, util::DEVICE))

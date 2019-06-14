@@ -57,11 +57,11 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
-      "num-repeats", 
+      "num-repeats",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       util::PreDefinedValues<int>::InvalidValue,
       "Number of repeats for ReapetFor operator\n"
-      "\tDefault num-repeats is linear from number of vertices", 
+      "\tDefault num-repeats is linear from number of vertices",
       __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
@@ -143,7 +143,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
     cpu_timer.Stop();
     info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
-//    fprintf(stderr, "-----------------------------------\nRun %d, elapsed: %lf ms, #iterations = %d\n", \
+    //    fprintf(stderr, "-----------------------------------\nRun %d, elapsed: %lf ms, #iterations = %d\n", \
 		    run_num, cpu_timer.ElapsedMillis(), enactor.enactor_slices[0].enactor_stats.iteration);
 
     fprintf(stderr, "GPU Elapsed: %lf ms, ", cpu_timer.ElapsedMillis());

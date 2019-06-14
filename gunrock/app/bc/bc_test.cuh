@@ -36,22 +36,18 @@ namespace bc {
  * @param[in] quiet Whether to disable print out.
  */
 template <typename SizeT, typename ValueT>
-void DisplaySolution(
-    ValueT *sigmas, ValueT *bc_values, SizeT nodes, bool quiet = false)
-{
-    if (quiet)
-        return;
-    if (nodes > 40)
-        nodes = 40;
+void DisplaySolution(ValueT *sigmas, ValueT *bc_values, SizeT nodes,
+                     bool quiet = false) {
+  if (quiet) return;
+  if (nodes > 40) nodes = 40;
 
-    util::PrintMsg("[", true, false);
-    for (SizeT v = 0; v < nodes; ++v)
-    {
-        util::PrintMsg(std::to_string(v) + ":"
-            + std::to_string(sigmas[v]) + ","
-            + std::to_string(bc_values[v]) + " ", true, false);
-    }
-    util::PrintMsg("]");
+  util::PrintMsg("[", true, false);
+  for (SizeT v = 0; v < nodes; ++v) {
+    util::PrintMsg(std::to_string(v) + ":" + std::to_string(sigmas[v]) + "," +
+                       std::to_string(bc_values[v]) + " ",
+                   true, false);
+  }
+  util::PrintMsg("]");
 }
 
 /******************************************************************************
@@ -71,98 +67,92 @@ void DisplaySolution(
  * \return      double        Time taken for the BC
  */
 
-template <
-    typename GraphT,
-    typename ValueT = typename GraphT::ValueT,
-    typename VertexT = typename GraphT::VertexT>
-double CPU_Reference(
-    const GraphT &graph,
-    ValueT  *bc_values,
-    ValueT  *sigmas,
-    VertexT *source_path,
-    VertexT src,
-    bool quiet = false)
-{
-    typedef typename GraphT::SizeT SizeT;
+template <typename GraphT, typename ValueT = typename GraphT::ValueT,
+          typename VertexT = typename GraphT::VertexT>
+double CPU_Reference(const GraphT &graph, ValueT *bc_values, ValueT *sigmas,
+                     VertexT *source_path, VertexT src, bool quiet = false) {
+  typedef typename GraphT::SizeT SizeT;
 
-    for(VertexT v = 0; v < graph.nodes; ++v) {
-        bc_values[v]   = 0;
-        sigmas[v]      = v == src ? 1 : 0;
-        source_path[v] = v == src ? 0 : util::PreDefinedValues<VertexT>::InvalidValue;
+  for (VertexT v = 0; v < graph.nodes; ++v) {
+    bc_values[v] = 0;
+    sigmas[v] = v == src ? 1 : 0;
+    source_path[v] =
+        v == src ? 0 : util::PreDefinedValues<VertexT>::InvalidValue;
+  }
+
+  VertexT search_depth = 0;
+
+  std::deque<VertexT> frontier;
+  frontier.push_back(src);
+
+  util::CpuTimer cpu_timer;
+  cpu_timer.Start();
+
+  while (!frontier.empty()) {
+    VertexT v = frontier.front();
+    frontier.pop_front();
+    VertexT neighbor_dist = source_path[v] + 1;
+
+    SizeT edges_begin = graph.row_offsets[v];
+    SizeT edges_end = graph.row_offsets[v + 1];
+
+    for (SizeT edge = edges_begin; edge < edges_end; ++edge) {
+      VertexT neighbor = graph.column_indices[edge];
+
+      if (!util::isValid(source_path[neighbor])) {
+        // if unseen
+        source_path[neighbor] = neighbor_dist;
+        sigmas[neighbor] += sigmas[v];
+        if (search_depth < neighbor_dist) {
+          search_depth = neighbor_dist;
+        }
+        frontier.push_back(neighbor);
+      } else {
+        // if seen
+        if (source_path[neighbor] == source_path[v] + 1) {
+          sigmas[neighbor] += sigmas[v];
+        }
+      }
     }
+  }
+  search_depth++;
 
-    VertexT search_depth = 0;
-
-    std::deque<VertexT> frontier;
-    frontier.push_back(src);
-
-    util::CpuTimer cpu_timer;
-    cpu_timer.Start();
-
-    while (!frontier.empty()) {
-        VertexT v = frontier.front();
-        frontier.pop_front();
-        VertexT neighbor_dist = source_path[v] + 1;
+  for (VertexT iter = search_depth - 2; iter > 0; --iter) {
+    VertexT cur_level = 0;
+    for (VertexT v = 0; v < graph.nodes; ++v) {
+      if (source_path[v] == iter) {
+        ++cur_level;
 
         SizeT edges_begin = graph.row_offsets[v];
-        SizeT edges_end   = graph.row_offsets[v + 1];
-
+        SizeT edges_end = graph.row_offsets[v + 1];
         for (SizeT edge = edges_begin; edge < edges_end; ++edge) {
-            VertexT neighbor = graph.column_indices[edge];
-
-            if (!util::isValid(source_path[neighbor])) {
-                // if unseen
-                source_path[neighbor] = neighbor_dist;
-                sigmas[neighbor] += sigmas[v];
-                if (search_depth < neighbor_dist) {
-                    search_depth = neighbor_dist;
-                }
-                frontier.push_back(neighbor);
-            } else {
-                // if seen
-                if(source_path[neighbor] == source_path[v] + 1) {
-                    sigmas[neighbor] += sigmas[v];
-                }
-            }
-        }
-    }
-    search_depth++;
-
-    for (VertexT iter = search_depth - 2; iter > 0; --iter) {
-        VertexT cur_level = 0;
-        for (VertexT v = 0; v < graph.nodes; ++v) {
-            if (source_path[v] == iter) {
-                ++cur_level;
-
-                SizeT edges_begin = graph.row_offsets[v];
-                SizeT edges_end   = graph.row_offsets[v + 1];
-                for(SizeT edge = edges_begin; edge < edges_end; ++edge) {
-                    VertexT neighbor = graph.column_indices[edge];
-                    if(source_path[neighbor] == iter + 1) {
-                         bc_values[v] +=
-                            1.0f * sigmas[v] / sigmas[neighbor] *
+          VertexT neighbor = graph.column_indices[edge];
+          if (source_path[neighbor] == iter + 1) {
+            bc_values[v] += 1.0f * sigmas[v] / sigmas[neighbor] *
                             (1.0f + bc_values[neighbor]);
-                    }
-                }
-            }
+          }
         }
+      }
     }
+  }
 
-    for (VertexT v =0; v < graph.nodes; ++v) {
-        bc_values[v] *= 0.5f;
-    //    std::cout << "v=" << v << " | bc_values[v]=" << bc_values[v] << std::endl;
-    }
+  for (VertexT v = 0; v < graph.nodes; ++v) {
+    bc_values[v] *= 0.5f;
+    //    std::cout << "v=" << v << " | bc_values[v]=" << bc_values[v] <<
+    //    std::endl;
+  }
 
-    //for (VertexT v =0; v < graph.nodes; ++v) {
-    //    std::cout << "v=" << v << " | sigmas[v]=" << sigmas[v] << std::endl;
-    //}
+  // for (VertexT v =0; v < graph.nodes; ++v) {
+  //    std::cout << "v=" << v << " | sigmas[v]=" << sigmas[v] << std::endl;
+  //}
 
-    //for (VertexT v =0; v < graph.nodes; ++v) {
-    //    std::cout << "v=" << v << " | source_path[v]=" << source_path[v] << std::endl;
-    //}
+  // for (VertexT v =0; v < graph.nodes; ++v) {
+  //    std::cout << "v=" << v << " | source_path[v]=" << source_path[v] <<
+  //    std::endl;
+  //}
 
-    cpu_timer.Stop();
-    return cpu_timer.ElapsedMillis();
+  cpu_timer.Stop();
+  return cpu_timer.ElapsedMillis();
 }
 
 /**
@@ -179,76 +169,60 @@ double CPU_Reference(
  * @param[in]  verbose       Whether to output detail comparsions
  * \return     GraphT::SizeT Number of errors
  */
-template <
-    typename GraphT,
-    typename ValueT = typename GraphT::ValueT>
+template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 typename GraphT::SizeT Validate_Results(
-             util::Parameters &parameters,
-             GraphT           &graph,
-    typename GraphT::VertexT   src,
-                     ValueT   *h_bc_values,
-                     ValueT   *h_sigmas,
-    typename GraphT::VertexT  *h_labels,
-                     ValueT   *ref_bc_values = NULL,
-                     ValueT   *ref_sigmas = NULL,
-    typename GraphT::VertexT  *ref_labels = NULL,
-                     bool      verbose = true)
-{
-    typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::SizeT   SizeT;
+    util::Parameters &parameters, GraphT &graph, typename GraphT::VertexT src,
+    ValueT *h_bc_values, ValueT *h_sigmas, typename GraphT::VertexT *h_labels,
+    ValueT *ref_bc_values = NULL, ValueT *ref_sigmas = NULL,
+    typename GraphT::VertexT *ref_labels = NULL, bool verbose = true) {
+  typedef typename GraphT::VertexT VertexT;
+  typedef typename GraphT::SizeT SizeT;
 
-    SizeT num_errors = 0;
-    SizeT num_vertices = graph.nodes;
-    bool quiet = parameters.Get<bool>("quiet");
+  SizeT num_errors = 0;
+  SizeT num_vertices = graph.nodes;
+  bool quiet = parameters.Get<bool>("quiet");
 
-    if (ref_bc_values != NULL) {
-        util::PrintMsg("BC value validity:", !quiet, false);
-        SizeT errors_num = util::CompareResults(
-            h_bc_values, ref_bc_values,
-            num_vertices, true, quiet);
-        if (errors_num > 0) {
-            util::PrintMsg(std::to_string(errors_num)
-                + " errors occurred.", !quiet);
-            num_errors += errors_num;
-        }
+  if (ref_bc_values != NULL) {
+    util::PrintMsg("BC value validity:", !quiet, false);
+    SizeT errors_num = util::CompareResults(h_bc_values, ref_bc_values,
+                                            num_vertices, true, quiet);
+    if (errors_num > 0) {
+      util::PrintMsg(std::to_string(errors_num) + " errors occurred.", !quiet);
+      num_errors += errors_num;
     }
+  }
 
-    if (ref_sigmas != NULL) {
-        util::PrintMsg("Sigma validity:", !quiet, false);
-        SizeT errors_num = util::CompareResults(
-            h_sigmas, ref_sigmas,
-            num_vertices, true, quiet);
-        if (errors_num > 0) {
-            util::PrintMsg(std::to_string(errors_num)
-                + " errors occurred.", !quiet);
-            num_errors += errors_num;
-        }
+  if (ref_sigmas != NULL) {
+    util::PrintMsg("Sigma validity:", !quiet, false);
+    SizeT errors_num =
+        util::CompareResults(h_sigmas, ref_sigmas, num_vertices, true, quiet);
+    if (errors_num > 0) {
+      util::PrintMsg(std::to_string(errors_num) + " errors occurred.", !quiet);
+      num_errors += errors_num;
     }
+  }
 
-    if (ref_labels != NULL) {
-        util::PrintMsg("Label validity:", !quiet, false);
-        SizeT errors_num = util::CompareResults(
-            h_labels, ref_labels,
-            num_vertices, true, quiet);
-        if (errors_num > 0) {
-            util::PrintMsg(std::to_string(errors_num)
-                + " errors occurred.", !quiet);
-            num_errors += errors_num;
-        }
+  if (ref_labels != NULL) {
+    util::PrintMsg("Label validity:", !quiet, false);
+    SizeT errors_num =
+        util::CompareResults(h_labels, ref_labels, num_vertices, true, quiet);
+    if (errors_num > 0) {
+      util::PrintMsg(std::to_string(errors_num) + " errors occurred.", !quiet);
+      num_errors += errors_num;
     }
+  }
 
-    if (!quiet && verbose)
-    {
-       // Display Solution
-      DisplaySolution(h_bc_values, h_sigmas, num_vertices, quiet);
-    }
+  if (!quiet && verbose) {
+    // Display Solution
+    DisplaySolution(h_bc_values, h_sigmas, num_vertices, quiet);
+  }
 
-    return num_errors;
+  return num_errors;
 }
 
-} // namespace Template
-} // namespace app
-} // namespace gunrock
+}  // namespace bc
+}  // namespace app
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

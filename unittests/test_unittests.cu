@@ -43,51 +43,44 @@
 using namespace gunrock;
 
 cudaError_t UseParameters(util::Parameters &parameters) {
-    cudaError_t retval = cudaSuccess;
+  cudaError_t retval = cudaSuccess;
 
-    GUARD_CU(parameters.Use<bool>(
-        "googletest",
-        util::OPTIONAL_PARAMETER,
-        true,
-        "Example parameter for googletest",
-        __FILE__, __LINE__));
+  GUARD_CU(parameters.Use<bool>("googletest", util::OPTIONAL_PARAMETER, true,
+                                "Example parameter for googletest", __FILE__,
+                                __LINE__));
 
-    return retval;
+  return retval;
 }
 
-
 /******************************************************************************
-* Main
-******************************************************************************/
+ * Main
+ ******************************************************************************/
 
 /**
  * @brief Enclosure to the main function
  */
-struct main_struct
-{
-    /**
-     * @brief the actual main function, after type switching
-     * @tparam VertexT    Type of vertex identifier
-     * @tparam SizeT      Type of graph size, i.e. type of edge identifier
-     * @tparam ValueT     Type of edge values
-     * @param  parameters Command line parameters
-     * @param  v,s,val    Place holders for type deduction
-     * \return cudaError_t error message(s), if any
-     */
-    template <
-        typename VertexT, // Use int as the vertex identifier
-        typename SizeT,   // Use int as the graph size type
-        typename ValueT>  // Use int as the value type
-    cudaError_t operator()(util::Parameters &parameters,
-        VertexT v, SizeT s, ValueT val)
-    {
-        // CLI parameters        
-        bool quick = parameters.Get<bool>("quick");
-        bool quiet = parameters.Get<bool>("quiet");
+struct main_struct {
+  /**
+   * @brief the actual main function, after type switching
+   * @tparam VertexT    Type of vertex identifier
+   * @tparam SizeT      Type of graph size, i.e. type of edge identifier
+   * @tparam ValueT     Type of edge values
+   * @param  parameters Command line parameters
+   * @param  v,s,val    Place holders for type deduction
+   * \return cudaError_t error message(s), if any
+   */
+  template <typename VertexT,  // Use int as the vertex identifier
+            typename SizeT,    // Use int as the graph size type
+            typename ValueT>   // Use int as the value type
+  cudaError_t
+  operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val) {
+    // CLI parameters
+    bool quick = parameters.Get<bool>("quick");
+    bool quiet = parameters.Get<bool>("quiet");
 
-        cudaError_t retval = cudaSuccess;
-        return retval;
-    }
+    cudaError_t retval = cudaSuccess;
+    return retval;
+  }
 };
 
 int main(int argc, char **argv) {
@@ -98,8 +91,7 @@ int main(int argc, char **argv) {
   GUARD_CU(app::UseParameters_test(parameters));
   GUARD_CU(UseParameters(parameters));
   GUARD_CU(parameters.Parse_CommandLine(argc, argv));
-  if (parameters.Get<bool>("help"))
-  {
+  if (parameters.Get<bool>("help")) {
     parameters.Print_Help();
     return cudaSuccess;
   }
@@ -109,12 +101,9 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   RUN_ALL_TESTS();
 
-
-  return app::Switch_Types<
-    app::VERTEXT_U32B | app::VERTEXT_U64B |
-    app::SIZET_U32B | //app::SIZET_U64B |
-    app::VALUET_F32B | //app::VALUET_F64B |
-    app::DIRECTED | app::UNDIRECTED>
-    (parameters, main_struct());
-
+  return app::Switch_Types<app::VERTEXT_U32B | app::VERTEXT_U64B |
+                           app::SIZET_U32B |   // app::SIZET_U64B |
+                           app::VALUET_F32B |  // app::VALUET_F64B |
+                           app::DIRECTED | app::UNDIRECTED>(parameters,
+                                                            main_struct());
 }

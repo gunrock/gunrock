@@ -31,81 +31,75 @@ typedef uint32_t VertexT;
 typedef unsigned long long SizeT;
 typedef float ValueT;
 
-template <
-    typename _VertexT = int,
-    typename _SizeT   = _VertexT,
-    typename _ValueT  = _VertexT,
-    GraphFlag _FLAG   = GRAPH_NONE,
-    unsigned int _cudaHostRegisterFlag = cudaHostRegisterDefault>
-struct TestGraph :
-    public Csr<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP, _cudaHostRegisterFlag>,
-    public Coo<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP, _cudaHostRegisterFlag>,
-    public Csc<VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP, _cudaHostRegisterFlag>,
-    public Gp <VertexT, SizeT, ValueT, _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP, _cudaHostRegisterFlag>
-{
-    typedef _VertexT VertexT;
-    typedef _SizeT   SizeT;
-    typedef _ValueT  ValueT;
-    static const GraphFlag FLAG = _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP;
-    static const unsigned int cudaHostRegisterFlag = _cudaHostRegisterFlag;
-    typedef Csr<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CsrT;
-    typedef Coo<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CooT;
-    typedef Csc<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CscT;
-    typedef Gp <VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> GpT;
+template <typename _VertexT = int, typename _SizeT = _VertexT,
+          typename _ValueT = _VertexT, GraphFlag _FLAG = GRAPH_NONE,
+          unsigned int _cudaHostRegisterFlag = cudaHostRegisterDefault>
+struct TestGraph : public Csr<VertexT, SizeT, ValueT,
+                              _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP,
+                              _cudaHostRegisterFlag>,
+                   public Coo<VertexT, SizeT, ValueT,
+                              _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP,
+                              _cudaHostRegisterFlag>,
+                   public Csc<VertexT, SizeT, ValueT,
+                              _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP,
+                              _cudaHostRegisterFlag>,
+                   public Gp<VertexT, SizeT, ValueT,
+                             _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP,
+                             _cudaHostRegisterFlag> {
+  typedef _VertexT VertexT;
+  typedef _SizeT SizeT;
+  typedef _ValueT ValueT;
+  static const GraphFlag FLAG = _FLAG | HAS_CSR | HAS_COO | HAS_CSC | HAS_GP;
+  static const unsigned int cudaHostRegisterFlag = _cudaHostRegisterFlag;
+  typedef Csr<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CsrT;
+  typedef Coo<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CooT;
+  typedef Csc<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CscT;
+  typedef Gp<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> GpT;
 
-    SizeT nodes, edges;
+  SizeT nodes, edges;
 
-    template <typename CooT_in>
-    cudaError_t FromCoo(CooT_in &coo, bool self_coo = false)
-    {
-        cudaError_t retval = cudaSuccess;
-        nodes = coo.CooT::nodes;
-        edges = coo.CooT::edges;
-        retval = this -> CsrT::FromCoo(coo);
-        if (retval) return retval;
-        retval = this -> CscT::FromCoo(coo);
-        if (retval) return retval;
-        if (!self_coo)
-            retval = this -> CooT::FromCoo(coo);
-        return retval;
-    }
+  template <typename CooT_in>
+  cudaError_t FromCoo(CooT_in &coo, bool self_coo = false) {
+    cudaError_t retval = cudaSuccess;
+    nodes = coo.CooT::nodes;
+    edges = coo.CooT::edges;
+    retval = this->CsrT::FromCoo(coo);
+    if (retval) return retval;
+    retval = this->CscT::FromCoo(coo);
+    if (retval) return retval;
+    if (!self_coo) retval = this->CooT::FromCoo(coo);
+    return retval;
+  }
 
-    template <typename CsrT_in>
-    cudaError_t FromCsr(CsrT_in &csr, bool self_csr = false)
-    {
-        cudaError_t retval = cudaSuccess;
-        nodes = csr.CsrT::nodes;
-        edges = csr.CsrT::edges;
-        retval = this -> CooT::FromCsr(csr);
-        if (retval) return retval;
-        retval = this -> CscT::FromCsr(csr);
-        if (retval) return retval;
-        if (!self_csr)
-            retval = this -> CsrT::FromCsr(csr);
-        return retval;
-    }
+  template <typename CsrT_in>
+  cudaError_t FromCsr(CsrT_in &csr, bool self_csr = false) {
+    cudaError_t retval = cudaSuccess;
+    nodes = csr.CsrT::nodes;
+    edges = csr.CsrT::edges;
+    retval = this->CooT::FromCsr(csr);
+    if (retval) return retval;
+    retval = this->CscT::FromCsr(csr);
+    if (retval) return retval;
+    if (!self_csr) retval = this->CsrT::FromCsr(csr);
+    return retval;
+  }
 
-    cudaError_t Release(util::Location target = util::LOCATION_ALL)
-    {
-        cudaError_t retval = cudaSuccess;
+  cudaError_t Release(util::Location target = util::LOCATION_ALL) {
+    cudaError_t retval = cudaSuccess;
 
-        util::PrintMsg("GraphT::Realeasing on " +
-            util::Location_to_string(target));
-        retval = this -> CooT::Release(target);
-        if (retval) return retval;
-        retval = this -> CsrT::Release(target);
-        if (retval) return retval;
-        retval = this -> CscT::Release(target);
-        if (retval) return retval;
-        retval = this -> GpT::Release(target);
-        if (retval) return retval;
-        return retval;
-    }
+    util::PrintMsg("GraphT::Realeasing on " + util::Location_to_string(target));
+    retval = this->CooT::Release(target);
+    if (retval) return retval;
+    retval = this->CsrT::Release(target);
+    if (retval) return retval;
+    retval = this->CscT::Release(target);
+    if (retval) return retval;
+    retval = this->GpT::Release(target);
+    if (retval) return retval;
+    return retval;
+  }
 
-    CsrT &csr()
-    {
-        return (static_cast<CsrT*>(this))[0];
-    }
+  CsrT &csr() { return (static_cast<CsrT *>(this))[0]; }
 };
 
 /*void Test_Array()
@@ -360,18 +354,19 @@ void Test_Frontier()
 }*/
 
 template <typename GraphT>
-cudaError_t LoadGraph(util::Parameters &parameters, GraphT &graph)
-{
-    cudaError_t retval = cudaSuccess;
+cudaError_t LoadGraph(util::Parameters &parameters, GraphT &graph) {
+  cudaError_t retval = cudaSuccess;
 
-    retval = graphio::LoadGraph(parameters, graph);
-    if (retval) return retval;
-    //util::cpu_mt::PrintCPUArray<typename GraphT::SizeT, typename GraphT::SizeT>(
-    //    "row_offsets", graph.GraphT::CsrT::row_offsets + 0, graph.nodes+1);
+  retval = graphio::LoadGraph(parameters, graph);
+  if (retval) return retval;
+  // util::cpu_mt::PrintCPUArray<typename GraphT::SizeT, typename
+  // GraphT::SizeT>(
+  //    "row_offsets", graph.GraphT::CsrT::row_offsets + 0, graph.nodes+1);
 
-    //util::cpu_mt::PrintCPUArray<typename GraphT::SizeT, typename GraphT::ValueT>(
-    //    "edge_values", graph.GraphT::CsrT::edge_values + 0, graph.edges);
-    return retval;
+  // util::cpu_mt::PrintCPUArray<typename GraphT::SizeT, typename
+  // GraphT::ValueT>(
+  //    "edge_values", graph.GraphT::CsrT::edge_values + 0, graph.edges);
+  return retval;
 }
 
 /*template <typename GraphT>
@@ -411,37 +406,38 @@ cudaError_t Test_ProblemBase(Parameters &parameters, GraphT &graph)
 }*/
 
 template <typename GraphT>
-cudaError_t Test_SSSP(Parameters &parameters, GraphT &graph, util::Location target = util::HOST)
-{
-    cudaError_t retval = cudaSuccess;
+cudaError_t Test_SSSP(Parameters &parameters, GraphT &graph,
+                      util::Location target = util::HOST) {
+  cudaError_t retval = cudaSuccess;
 
-    typedef gunrock::app::sssp::Problem<GraphT, unsigned char> ProblemT;
-    typedef gunrock::app::sssp::Enactor<ProblemT> EnactorT;
-    ProblemT problem;
-    EnactorT enactor;
+  typedef gunrock::app::sssp::Problem<GraphT, unsigned char> ProblemT;
+  typedef gunrock::app::sssp::Enactor<ProblemT> EnactorT;
+  ProblemT problem;
+  EnactorT enactor;
 
-    retval = problem.Init(parameters, graph, target);
-    if (retval) return retval;
-    retval = enactor.Init(parameters, &problem, target);
-    if (retval) return retval;
+  retval = problem.Init(parameters, graph, target);
+  if (retval) return retval;
+  retval = enactor.Init(parameters, &problem, target);
+  if (retval) return retval;
 
-    retval = problem.Reset(0, target);
-    if (retval) return retval;
-    retval = enactor.Reset(0, target);
-    if (retval) return retval;
+  retval = problem.Reset(0, target);
+  if (retval) return retval;
+  retval = enactor.Reset(0, target);
+  if (retval) return retval;
 
-    retval = enactor.Enact(0);
-    if (retval) return retval;
+  retval = enactor.Enact(0);
+  if (retval) return retval;
 
-    retval = problem.Release(target);
-    if (retval) return retval;
-    retval = enactor.Release(target);
-    if (retval) return retval;
-    return retval;
+  retval = problem.Release(target);
+  if (retval) return retval;
+  retval = enactor.Release(target);
+  if (retval) return retval;
+  return retval;
 }
 
 /*template <typename GraphT>
-cudaError_t Test_EnactorBase(Parameters &parameters, GraphT &graph, util::Location target = util::HOST)
+cudaError_t Test_EnactorBase(Parameters &parameters, GraphT &graph,
+util::Location target = util::HOST)
 {
     cudaError_t retval = cudaSuccess;
 
@@ -460,73 +456,71 @@ cudaError_t Test_EnactorBase(Parameters &parameters, GraphT &graph, util::Locati
     return retval;
 }*/
 
-int main(int argc, char* argv[])
-{
-    //const SizeT DefaultSize = PreDefinedValues<SizeT>::InvalidValue;
-    // Test_Array();
-    // Test_ForAll();
-    // Test_ForEach();
-    // Test_Csr();
-    // Test_GraphIo(argc, argv);
-    // Test_Frontier();
+int main(int argc, char *argv[]) {
+  // const SizeT DefaultSize = PreDefinedValues<SizeT>::InvalidValue;
+  // Test_Array();
+  // Test_ForAll();
+  // Test_ForEach();
+  // Test_Csr();
+  // Test_GraphIo(argc, argv);
+  // Test_Frontier();
 
-    cudaError_t retval = cudaSuccess;
-    util::Parameters parameters("test refactor");
-    typedef TestGraph<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> GraphT;
-    GraphT graph;
+  cudaError_t retval = cudaSuccess;
+  util::Parameters parameters("test refactor");
+  typedef TestGraph<VertexT, SizeT, ValueT, HAS_EDGE_VALUES> GraphT;
+  GraphT graph;
 
-    GUARD_CU(graphio::UseParameters(parameters));
-    //GUARD_CU(partitioner::UseParameters(parameters));
-    GUARD_CU(app::sssp::UseParameters(parameters));
-    GUARD_CU(app::sssp::UseParameters2(parameters));
-    GUARD_CU(parameters.Parse_CommandLine(argc, argv));
-    if (parameters.Get<bool>("help"))
-    {
-        parameters.Print_Help();
-        return cudaSuccess;
-    }
+  GUARD_CU(graphio::UseParameters(parameters));
+  // GUARD_CU(partitioner::UseParameters(parameters));
+  GUARD_CU(app::sssp::UseParameters(parameters));
+  GUARD_CU(app::sssp::UseParameters2(parameters));
+  GUARD_CU(parameters.Parse_CommandLine(argc, argv));
+  if (parameters.Get<bool>("help")) {
+    parameters.Print_Help();
+    return cudaSuccess;
+  }
 
-    retval = parameters.Check_Required();
-    if (retval) return 5;
+  retval = parameters.Check_Required();
+  if (retval) return 5;
 
-    retval = LoadGraph(parameters, graph);
-    if (retval) return 11;
-    //retval = Test_Partitioner(parameters, graph);
-    //if (retval) return 12;
-    /*retval = Test_SSSPProblem(parameters, graph, util::HOST);
-    if (retval) return 13;
-    util::PrintMsg("====Test on HOST finished");
+  retval = LoadGraph(parameters, graph);
+  if (retval) return 11;
+  // retval = Test_Partitioner(parameters, graph);
+  // if (retval) return 12;
+  /*retval = Test_SSSPProblem(parameters, graph, util::HOST);
+  if (retval) return 13;
+  util::PrintMsg("====Test on HOST finished");
 
-    retval = Test_SSSPProblem(parameters, graph, util::DEVICE);
-    if (retval) return 14;
-    util::PrintMsg("====Test on DEVICE finished");
+  retval = Test_SSSPProblem(parameters, graph, util::DEVICE);
+  if (retval) return 14;
+  util::PrintMsg("====Test on DEVICE finished");
 
-    retval = Test_SSSPProblem(parameters, graph, util::HOST | util::DEVICE);
-    if (retval) return 15;
-    util::PrintMsg("====Test on HOST | DEVICE finished");*/
+  retval = Test_SSSPProblem(parameters, graph, util::HOST | util::DEVICE);
+  if (retval) return 15;
+  util::PrintMsg("====Test on HOST | DEVICE finished");*/
 
-    /*retval = Test_EnactorBase(parameters, graph, util::HOST);
-    if (retval) return 16;
-    util::PrintMsg("====Test on HOST finished");
+  /*retval = Test_EnactorBase(parameters, graph, util::HOST);
+  if (retval) return 16;
+  util::PrintMsg("====Test on HOST finished");
 
-    retval = Test_EnactorBase(parameters, graph, util::DEVICE);
-    if (retval) return 17;
-    util::PrintMsg("====Test on DEVICE finished");
+  retval = Test_EnactorBase(parameters, graph, util::DEVICE);
+  if (retval) return 17;
+  util::PrintMsg("====Test on DEVICE finished");
 
-    retval = Test_EnactorBase(parameters, graph, util::HOST | util::DEVICE);
-    if (retval) return 18;
-    util::PrintMsg("====Test on HOST | DEVICE finished");*/
+  retval = Test_EnactorBase(parameters, graph, util::HOST | util::DEVICE);
+  if (retval) return 18;
+  util::PrintMsg("====Test on HOST | DEVICE finished");*/
 
-    //retval = Test_SSSP(parameters, graph, util::HOST);
-    //if (retval) return 16;
-    //util::PrintMsg("====Test on HOST finished");
+  // retval = Test_SSSP(parameters, graph, util::HOST);
+  // if (retval) return 16;
+  // util::PrintMsg("====Test on HOST finished");
 
-    retval = Test_SSSP(parameters, graph, util::DEVICE);
-    if (retval) return 17;
-    util::PrintMsg("====Test on DEVICE finished");
+  retval = Test_SSSP(parameters, graph, util::DEVICE);
+  if (retval) return 17;
+  util::PrintMsg("====Test on DEVICE finished");
 
-    //retval = Test_SSSP(parameters, graph, util::HOST | util::DEVICE);
-    //if (retval) return 18;
-    //util::PrintMsg("====Test on HOST | DEVICE finished");
-    return 0;
+  // retval = Test_SSSP(parameters, graph, util::HOST | util::DEVICE);
+  // if (retval) return 18;
+  // util::PrintMsg("====Test on HOST | DEVICE finished");
+  return 0;
 }

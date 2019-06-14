@@ -42,8 +42,8 @@ struct main_struct {
   template <typename VertexT,  // Use int as the vertex identifier
             typename SizeT,    // Use int as the graph size type
             typename ValueT>   // Use int as the value type
-  cudaError_t operator()(util::Parameters& parameters, VertexT v, SizeT s,
-                         ValueT val) {
+  cudaError_t
+  operator()(util::Parameters& parameters, VertexT v, SizeT s, ValueT val) {
     // CLI parameters
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
@@ -56,7 +56,8 @@ struct main_struct {
     VertexT point_y = parameters.Get<VertexT>("y");
 
     util::PrintMsg("Reference point is (" + std::to_string(point_x) + ", " +
-                       std::to_string(point_y) + "), k = " + std::to_string(k) + "\n",
+                       std::to_string(point_y) + "), k = " + std::to_string(k) +
+                       "\n",
                    !quiet);
 
     typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_CSR>
@@ -83,9 +84,8 @@ struct main_struct {
       util::PrintMsg("__________________________", !quiet);
       util::PrintMsg("______ CPU Reference _____", !quiet);
 
-      float elapsed =
-          app::knn::CPU_Reference(graph.csr(), k, point_x,
-                                  point_y, ref_knns, quiet);
+      float elapsed = app::knn::CPU_Reference(graph.csr(), k, point_x, point_y,
+                                              ref_knns, quiet);
 
       util::PrintMsg(
           "--------------------------\n Elapsed: " + std::to_string(elapsed),
@@ -99,8 +99,8 @@ struct main_struct {
     GUARD_CU(app::Switch_Parameters(
         parameters, graph, switches,
         [k, h_knns, ref_knns](util::Parameters& parameters, GraphT& graph) {
-          return app::knn::RunTests(parameters, graph, k, h_knns,
-                                    ref_knns, util::DEVICE);
+          return app::knn::RunTests(parameters, graph, k, h_knns, ref_knns,
+                                    util::DEVICE);
         }));
 
     if (!quick) {

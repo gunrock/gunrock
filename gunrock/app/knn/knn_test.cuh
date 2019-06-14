@@ -44,7 +44,7 @@ namespace knn {
 template <typename GraphT>
 double CPU_Reference(
     const GraphT &graph,
-    typename GraphT::SizeT k,    // number of nearest neighbor
+    typename GraphT::SizeT k,          // number of nearest neighbor
     typename GraphT::VertexT point_x,  // index of reference point
     typename GraphT::VertexT point_y,  // index of reference point
     typename GraphT::SizeT *knns,      // knns
@@ -98,7 +98,6 @@ double CPU_Reference(
     auto x_end = x_start + num;
     std::sort(distance + x_start, distance + x_end, comp());
   }
-
 
 // Find k nearest neighbors
 #pragma omp parallel for

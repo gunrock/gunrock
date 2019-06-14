@@ -120,13 +120,14 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     };
 
     auto par_global_relabeling_op =
-        [graph, source, sink, height, reverse, queue0, queue1, residuals] 
-	__host__ __device__(VertexT * v_q, const SizeT &pos) {
+        [graph, source, sink, height, reverse, queue0, queue1,
+         residuals] __host__
+        __device__(VertexT * v_q, const SizeT &pos) {
           VertexT first = 0, last = 0;
-	  auto &queue = (pos == 0 ? queue0 : queue1);
-	  auto &start = (pos == 0 ? source : sink);
-	  height[start] = (pos == 0 ? graph.nodes : 0);
-          auto H      = height[start];
+          auto &queue = (pos == 0 ? queue0 : queue1);
+          auto &start = (pos == 0 ? source : sink);
+          height[start] = (pos == 0 ? graph.nodes : 0);
+          auto H = height[start];
           queue[last++] = start;
           while (first < last) {
             auto v = queue[first++];
@@ -137,14 +138,13 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             for (auto e = e_start; e < e_end; ++e) {
               auto neighbor = graph.CsrT::GetEdgeDest(e);
               if (residuals[reverse[e]] < MF_EPSILON) continue;
-	      if (height[neighbor] > H + 1){
-		   height[neighbor] = H + 1;
-		   queue[last++] = neighbor;
-	      }
-	    }
+              if (height[neighbor] > H + 1) {
+                height[neighbor] = H + 1;
+                queue[last++] = neighbor;
+              }
+            }
           }
         };
-
 
     auto global_relabeling_op =
         [graph, source, sink, height, reverse, queue, residuals] __host__
@@ -204,7 +204,7 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           ValueT excess_v = excess[v];
           if (excess_v < MF_EPSILON || neighbor_num == 0) return;
 
-	  // turn off vertices which relabeling drop out from graph
+          // turn off vertices which relabeling drop out from graph
 
           // else, try push-relable:
           VertexT e_start = graph.CsrT::GetNeighborListOffset(v);
@@ -253,26 +253,27 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           graph.csr(), &local_vertices, null_ptr, oprtr_parameters,
           advance_preflow_op));
 
-      //GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      // GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       // GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
       //        "cudaStreamSynchronize failed.");
     }
 
     // Global relabeling
-      // Height reset
-//    if (iteration == 0){
-//    fprintf(stderr, "global relabeling in iteration %d\n", iteration);
-      GUARD_CU(height.ForAll(
-          [graph] __host__ __device__(VertexT * h, const VertexT &pos) {
-             h[pos] = 2 * graph.nodes + 1;
-          },
-          graph.nodes, util::DEVICE, oprtr_parameters.stream));
+    // Height reset
+    //    if (iteration == 0){
+    //    fprintf(stderr, "global relabeling in iteration %d\n", iteration);
+    GUARD_CU(height.ForAll(
+        [graph] __host__ __device__(VertexT * h, const VertexT &pos) {
+          h[pos] = 2 * graph.nodes + 1;
+        },
+        graph.nodes, util::DEVICE, oprtr_parameters.stream));
 
-      // Serial relabeling on the GPU (ignores moves)
-      GUARD_CU(frontier.V_Q()->ForAll(global_relabeling_op, 1, util::DEVICE,
-//      GUARD_CU(frontier.V_Q()->ForAll(par_global_relabeling_op, 2, util::DEVICE,
-                                      oprtr_parameters.stream));
- //   }
+    // Serial relabeling on the GPU (ignores moves)
+    GUARD_CU(frontier.V_Q()->ForAll(global_relabeling_op, 1, util::DEVICE,
+                                    //      GUARD_CU(frontier.V_Q()->ForAll(par_global_relabeling_op,
+                                    //      2, util::DEVICE,
+                                    oprtr_parameters.stream));
+    //   }
     debug_aml("[%d]frontier que length before compute op is %d\n", iteration,
               frontier.queue_length);
 

@@ -16,16 +16,15 @@
 #include <examples/core/test_segreduce.cuh>
 #include <examples/core/test_binarysearch.cuh>
 
-int main ()
-{
-    std::cout << "--- Testing RepeatFor ---" << std::endl;
-    RepeatForTest();
+int main() {
+  std::cout << "--- Testing RepeatFor ---" << std::endl;
+  RepeatForTest();
 
-    std::cout << "--- Testing SegReduce ---" << std::endl;
-    SegReduceTest();
+  std::cout << "--- Testing SegReduce ---" << std::endl;
+  SegReduceTest();
 
-    std::cout << "--- Testing BinarySearch ---" << std::endl;
-    BinarySearchTest();
+  std::cout << "--- Testing BinarySearch ---" << std::endl;
+  BinarySearchTest();
 
-    return 0;
+  return 0;
 }

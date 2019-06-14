@@ -28,7 +28,7 @@ namespace reduction {
 template <int LOG_CTA_THREADS,
           bool ALL_RETURN>  // If true, everyone returns the result.  If false,
                             // only thread-0.
-                            struct TreeReduce {
+struct TreeReduce {
   static const int CTA_THREADS = 1 << LOG_CTA_THREADS;
 
   //---------------------------------------------------------------------

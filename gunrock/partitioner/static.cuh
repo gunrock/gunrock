@@ -21,30 +21,26 @@ namespace partitioner {
 namespace static_p {
 
 template <typename GraphT>
-cudaError_t Partition(
-    GraphT     &org_graph,
-    GraphT*    &sub_graphs,
-    util::Parameters &parameters,
-    int         num_subgraphs = 1,
-    PartitionFlag flag = PARTITION_NONE,
-    util::Location target = util::HOST,
-    float      *weitage = NULL)
-{
-    typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::GpT     GpT;
+cudaError_t Partition(GraphT &org_graph, GraphT *&sub_graphs,
+                      util::Parameters &parameters, int num_subgraphs = 1,
+                      PartitionFlag flag = PARTITION_NONE,
+                      util::Location target = util::HOST,
+                      float *weitage = NULL) {
+  typedef typename GraphT::VertexT VertexT;
+  typedef typename GraphT::GpT GpT;
 
-    cudaError_t retval = cudaSuccess;
-    auto &partition_table = org_graph.GpT::partition_table;
+  cudaError_t retval = cudaSuccess;
+  auto &partition_table = org_graph.GpT::partition_table;
 
-    for (VertexT v = 0; v < org_graph.nodes; v++)
-        partition_table[v] = (v % num_subgraphs);
+  for (VertexT v = 0; v < org_graph.nodes; v++)
+    partition_table[v] = (v % num_subgraphs);
 
-    return retval;
+  return retval;
 }
 
-} //namespace static_p
-} //namespace partitioner
-} //namespace gunrock
+}  // namespace static_p
+}  // namespace partitioner
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

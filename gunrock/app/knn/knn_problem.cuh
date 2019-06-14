@@ -286,8 +286,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       auto &data_slice = data_slices[gpu][0];
       GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
-                               this->gpu_idx[gpu], k, target,
-                               this->flag));
+                               this->gpu_idx[gpu], k, target, this->flag));
     }
 
     return retval;
@@ -306,8 +305,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     // Reset data slices
     for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-      GUARD_CU(
-          data_slices[gpu]->Reset(point_x, point_y, k, target));
+      GUARD_CU(data_slices[gpu]->Reset(point_x, point_y, k, target));
       GUARD_CU(data_slices[gpu].Move(util::HOST, target));
     }
 

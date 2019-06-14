@@ -39,8 +39,8 @@ struct main_struct {
   template <typename VertexT,  // Use int as the vertex identifier
             typename SizeT,    // Use int as the graph size type
             typename ValueT>   // Use int as the value type
-  cudaError_t operator()(util::Parameters &parameters, VertexT v, SizeT s,
-                         ValueT val) {
+  cudaError_t
+  operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val) {
     // CLI parameters
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");

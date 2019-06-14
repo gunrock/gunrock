@@ -33,7 +33,7 @@ template <int LOG_LOADS_PER_TILE,  // Number of vector stores (log)
                                              // WB/CG/CS/NONE/etc.)
           bool CHECK_ALIGNMENT>  // Whether or not to check alignment to see if
                                  // vector stores can be used
-                                 struct StoreTile {
+struct StoreTile {
   enum {
     LOADS_PER_TILE = 1 << LOG_LOADS_PER_TILE,
     LOAD_VEC_SIZE = 1 << LOG_LOAD_VEC_SIZE,
