@@ -17,6 +17,7 @@ def cmake_build() {
   retry(5) {
     timeout(time: 20, unit: 'MINUTES') {
       sh 'mkdir -p build'
+      // MGPU not fully supported in v1.0.0
       sh '''cd build
             cmake -DGUNROCK_CODE_COVERAGE=ON -DGUNROCK_GOOGLE_TESTS=ON .. //-DGUNROCK_MGPU_TESTS=ON ..
             make -j16'''
