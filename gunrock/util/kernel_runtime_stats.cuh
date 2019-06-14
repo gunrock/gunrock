@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include <gunrock/util/memset_kernel.cuh>
+//#include <gunrock/util/memset_kernel.cuh>
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/cuda_properties.cuh>
 
@@ -173,8 +173,14 @@ class KernelRuntimeStatsLifetime : public KernelRuntimeStats {
           break;
 
         // Initialize to zero
-        util::MemsetKernel<unsigned long long>
-            <<<(grid_size + 128 - 1) / 128, 128>>>(d_stat, 0, grid_size);
+        // util::MemsetKernel<unsigned long long><<<(grid_size + 128 - 1) / 128,
+        // 128>>>(
+        //    d_stat, 0, grid_size);
+        oprtr::ForEach(
+            d_stat,
+            [] __host__ __device__(unsigned long long &stat) { stat = 0; },
+            grid_size, util::DEVICE);
+
         if (retval = util::GRError(
                 cudaDeviceSynchronize(),
                 "KernelRuntimeStatsLifetime MemsetKernel d_stat failed",

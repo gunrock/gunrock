@@ -88,7 +88,7 @@ struct Dispatch<KernelPolicy, Problem, Functor, true> {
         work_progress.template GetQueueCounter<typename Problem::VertexId>(
             queue_index + 1),
         0,  //(typename Problem::SizeT)blockIdx.x * KernelPolicy::THREADS *
-            //KernelPolicy::GLOBAL_LOAD_SIZE,
+            // KernelPolicy::GLOBAL_LOAD_SIZE,
         d_visited_mask, d_data_slice, label);
 
     cta.Init(thread_work);

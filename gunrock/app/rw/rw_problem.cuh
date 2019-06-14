@@ -14,545 +14,377 @@
 
 #pragma once
 
-#include <limits>
-#include <stdio.h>
-#include <stdlib.h>
-
 #include <gunrock/app/problem_base.cuh>
-#include <gunrock/util/memset_kernel.cuh>
-#include <gunrock/util/array_utils.cuh>
-
-#define ELEMS_PER_THREAD 4
-#define THREAD_BLOCK 128
-
-enum MODE {
-  RAW = 0,
-  DEVICE = 1,
-  BLOCK = 2,
-};
 
 namespace gunrock {
 namespace app {
 namespace rw {
 
 /**
- * @brief RW Problem structure stores device-side vectors for doing RW computing
- * on the GPU.
- *
- * @tparam _VertexId            Type of signed integer to use as vertex id
- * (e.g., uint32)
- * @tparam _SizeT               Type of unsigned integer to use for array
- * indexing. (e.g., uint32)
- * @tparam _Value               Type of value used for computed values.
+ * @brief Speciflying parameters for RW Problem
+ * @param  parameters  The util::Parameter<...> structure holding all parameter
+ * info \return cudaError_t error message(s), if any
  */
-template <typename VertexId, typename SizeT, typename Value>
-struct RWProblem : ProblemBase<VertexId, SizeT, Value,
-                               true,   //_MARK_PREDECESSORS
-                               false>  // ENABLE_IDEMPOTENCE
-{
-  static const bool MARK_PREDECESSORS = true;
-  static const bool ENABLE_IDEMPOTENCE = false;
+cudaError_t UseParameters_problem(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
 
-  static const int MAX_NUM_VERTEX_ASSOCIATES = 0;
-  static const int MAX_NUM_VALUE__ASSOCIATES = 1;
-  typedef ProblemBase<VertexId, SizeT, Value, MARK_PREDECESSORS,
-                      ENABLE_IDEMPOTENCE>
-      BaseProblem;
-  typedef DataSliceBase<VertexId, SizeT, Value, MAX_NUM_VERTEX_ASSOCIATES,
-                        MAX_NUM_VALUE__ASSOCIATES>
-      BaseDataSlice;
-  typedef unsigned char MaskT;
+  GUARD_CU(gunrock::app::UseParameters_problem(parameters));
 
-  // Helper structures
+  return retval;
+}
+
+/**
+ * @brief Template Problem structure.
+ * @tparam _GraphT  Type of the graph
+ * @tparam _FLAG    Problem flags
+ */
+template <typename _GraphT, ProblemFlag _FLAG = Problem_None>
+struct Problem : ProblemBase<_GraphT, _FLAG> {
+  typedef _GraphT GraphT;
+  static const ProblemFlag FLAG = _FLAG;
+  typedef typename GraphT::VertexT VertexT;
+  typedef typename GraphT::ValueT ValueT;
+  typedef typename GraphT::SizeT SizeT;
+  typedef typename GraphT::CsrT CsrT;
+  typedef typename GraphT::GpT GpT;
+
+  typedef ProblemBase<GraphT, FLAG> BaseProblem;
+  typedef DataSliceBase<GraphT, FLAG> BaseDataSlice;
+
+  // ----------------------------------------------------------------
+  // Dataslice structure
 
   /**
-   * @brief Data slice structure which contains RW problem specific data.
+   * @brief Data structure containing problem specific data on indivual GPU.
    */
   struct DataSlice : BaseDataSlice {
-    // device storage arrays
-    // util::Array1D<SizeT, Value>    user_specific_array;     /**< users can
-    // add arbitrary device arrays here. */
-
-    util::Array1D<SizeT, SizeT>
-        node_id; /**< Used for the mapping between original vertex IDs and local
-                    vertex IDs on multi-GPUs */
-    util::Array1D<SizeT, Value> d_row_offsets;
-    util::Array1D<SizeT, Value> d_col_indices;
-    util::Array1D<SizeT, Value> num_neighbor;
-    /**< Used for randomly choosing next neighbor node */
-    util::Array1D<SizeT, Value> paths; /**< Used for store output paths */
-    util::Array1D<SizeT, float> d_rand;
-    util::Array1D<SizeT, Value>
-        trailing_slice;  // used in sorted random walk to deal with
-    SizeT size;          // frontier size
-    SizeT trailing;
-    SizeT grid_size;
-    // bool                              block; // 0, raw, 1, device sort, 2,
-    // block sort, 3: pre-process bool                              device;
-
-    // util::Array1D<SizeT, Value>       path_length;
+    // problem specific storage arrays:
+    util::Array1D<SizeT, VertexT> walks;
+    util::Array1D<SizeT, float> rand;
+    util::Array1D<SizeT, uint64_t> neighbors_seen;
+    util::Array1D<SizeT, uint64_t> steps_taken;
+    int walk_length;
+    int walks_per_node;
+    int walk_mode;
+    bool store_walks;
+    curandGenerator_t gen;
 
     /*
      * @brief Default constructor
      */
     DataSlice() : BaseDataSlice() {
-      node_id.SetName("node_id");
-      num_neighbor.SetName("num_neighbor");
-      d_row_offsets.SetName("d_row_offsets");
-      d_col_indices.SetName("d_col_indices");
-      d_rand.SetName("d_rand");
-      paths.SetName("paths");
-      trailing_slice.SetName("padding_slice");
-      size = 1;
-      trailing = 0;
-      grid_size = 1;
-      // path_length.SetName("path_length");
+      walks.SetName("walks");
+      rand.SetName("rand");
+      neighbors_seen.SetName("neighbors_seen");
+      steps_taken.SetName("steps_taken");
     }
 
     /*
      * @brief Default destructor
      */
-    ~DataSlice() {
-      if (util::SetDevice(this->gpu_idx)) return;
-      node_id.Release();
-      d_row_offsets.Release();
-      d_col_indices.Release();
-      d_rand.Release();
-      num_neighbor.Release();
-      paths.Release();
-      trailing_slice.Release();
+    virtual ~DataSlice() { Release(); }
+
+    /*
+     * @brief Releasing allocated memory space
+     * @param[in] target      The location to release memory from
+     * \return    cudaError_t Error message(s), if any
+     */
+    cudaError_t Release(util::Location target = util::LOCATION_ALL) {
+      cudaError_t retval = cudaSuccess;
+      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx));
+
+      GUARD_CU(walks.Release(target));
+      GUARD_CU(rand.Release(target));
+      GUARD_CU(neighbors_seen.Release(target));
+      GUARD_CU(steps_taken.Release(target));
+
+      GUARD_CU(BaseDataSlice ::Release(target));
+      return retval;
     }
 
     /**
-     * @brief initialization function of dataslice struct.
-     * Define and allocate mem for all the needed data/data array for this
-     * problem Define specific data needed for this problem/primitive here
-     *
-     * @param[in] walk_length Number of the rw walks.
-     * @param[in] block Block sort rw or not.
-     * @param[in] device Device sort rw or not.
-     * @param[in] num_gpus Number of the GPUs used.
-     * @param[in] gpu_idx GPU index used for testing.
-     * @param[in] use_double_buffer Whether to use double buffer.
-     * @param[in] graph Pointer to the graph we process on.
-     * @param[in] graph_slice Pointer to the GraphSlice object.
-     * @param[in] num_in_nodes
-     * @param[in] num_out_nodes
-     * @param[in] queue_sizing Maximum queue sizing factor.
-     * @param[in] in_sizing
-     * @param[in] skip_makeout_selection
-     * @param[in] keep_node_num
-     *
-     * \return cudaError_t object Indicates the success of all CUDA calls.
+     * @brief initializing sssp-specific data on each gpu
+     * @param     sub_graph   Sub graph on the GPU.
+     * @param[in] gpu_idx     GPU device index
+     * @param[in] target      Targeting device location
+     * @param[in] flag        Problem flag containling options
+     * \return    cudaError_t Error message(s), if any
      */
-    cudaError_t Init(int walk_length, int mode, int num_gpus, int gpu_idx,
-                     bool use_double_buffer, Csr<VertexId, SizeT, Value> *graph,
-                     SizeT *num_in_nodes, SizeT *num_out_nodes,
-                     float queue_sizing = 2.0, float in_sizing = 1.0) {
+    cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,
+                     util::Location target, ProblemFlag flag, int walk_length_,
+                     int walks_per_node_, int walk_mode_, bool store_walks_,
+                     int seed) {
       cudaError_t retval = cudaSuccess;
 
-      if (retval =
-              BaseDataSlice::Init(num_gpus, gpu_idx, use_double_buffer, graph,
-                                  num_in_nodes, num_out_nodes, in_sizing))
-        return retval;
+      GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
-      // enum { GRID = DSIZE / ELEMS_PER_THREAD };
+      walk_length = walk_length_;
+      walks_per_node = walks_per_node_;
+      walk_mode = walk_mode_;
+      store_walks = store_walks_;
 
-      // int frontierSize=grid*ITEM_PER_THERAD*tb;
+      curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+      curandSetPseudoRandomGeneratorSeed(gen, seed);
 
-      // ITEM_PER_THERAD = 4
-      // block size-> 128
-      // if  data size  = 70
-      // 70/4 = 17, -> 17 threads/block
-      // 70/128 = 0-> 1 block(gridsize)
-      // only sorting 68 element
-
-      // this-> walk_length = walk_length;
-      if (mode == BLOCK) {
-        this->grid_size = graph->nodes / (THREAD_BLOCK * ELEMS_PER_THREAD);
-        this->size = ELEMS_PER_THREAD * THREAD_BLOCK * grid_size;
-        this->trailing = graph->nodes - this->size;
-        if (retval = this->node_id.Allocate(this->size, util::DEVICE))
-          return retval;
-        if (retval =
-                this->paths.Allocate(this->size * walk_length, util::DEVICE))
-          return retval;
-        if (retval = this->trailing_slice.Allocate(this->trailing * walk_length,
-                                                   util::DEVICE))
-          return retval;
-
-      } else if (mode == DEVICE) {
-        this->size = graph->nodes;
-        if (retval = this->node_id.Allocate(graph->nodes, util::DEVICE))
-          return retval;
-        if (retval =
-                this->paths.Allocate(graph->nodes * walk_length, util::DEVICE))
-          return retval;
-
+      if (store_walks_) {
+        GUARD_CU(walks.Allocate(sub_graph.nodes * walk_length * walks_per_node,
+                                target));
       } else {
-        this->size = graph->nodes;
-        if (retval =
-                this->paths.Allocate(graph->nodes * walk_length, util::DEVICE))
-          return retval;
+        GUARD_CU(walks.Allocate(1, target));  // Dummy allocation
       }
+      GUARD_CU(rand.Allocate(sub_graph.nodes * walks_per_node, target));
+      GUARD_CU(
+          neighbors_seen.Allocate(sub_graph.nodes * walks_per_node, target));
+      GUARD_CU(steps_taken.Allocate(sub_graph.nodes * walks_per_node, target));
 
-      // labels is a required array that defined in BaseProblem class.
-      // if (retval = this->node_id.Allocate(graph->nodes, util::DEVICE)) return
-      // retval;
-
-      // problem.walk_leg
-
-      if (retval = this->d_row_offsets.Allocate(graph->nodes + 1, util::DEVICE))
-        return retval;
-
-      if (retval = this->d_rand.Allocate(graph->nodes, util::DEVICE))
-        return retval;
-
-      if (retval = this->d_col_indices.Allocate(graph->edges, util::DEVICE))
-        return retval;
-
-      if (retval = this->num_neighbor.Allocate(graph->nodes,
-                                               util::HOST | util::DEVICE))
-        return retval;
-
-      // calculate number of neighbor node from row_offsets of csr graph
-
-      for (VertexId node = 0; node < graph->nodes; node++) {
-        num_neighbor[node] =
-            graph->row_offsets[node + 1] - graph->row_offsets[node];
+      if (target & util::DEVICE) {
+        GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
       }
-      if (retval = num_neighbor.Move(util::HOST, util::DEVICE)) return retval;
-      if (retval = num_neighbor.Release(util::HOST)) return retval;
-
       return retval;
-    }  // Init
+    }
 
     /**
-     * @brief Reset problem function of datas_slice struct. Must be called prior
-     * to each run. Will be call within problem->reset()
-     *
-     * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
-     * @param[in] graph_slice Pointer to the graph slice we process on.
-     * @param[in] queue_sizing Size scaling factor for work queue allocation
-     * (e.g., 1.0 creates n-element and m-element vertex and edge frontiers,
-     * respectively).
-     * @param[in] queue_sizing1 Size scaling factor for work queue allocation.
-     *
-     * \return cudaError_t object Indicates the success of all CUDA calls.
+     * @brief Reset problem function. Must be called prior to each run.
+     * @param[in] target      Targeting device location
+     * \return    cudaError_t Error message(s), if any
      */
-    cudaError_t Reset(int walk_length, int mode, FrontierType frontier_type,
-                      GraphSlice<VertexId, SizeT, Value> *graph_slice,
-                      double queue_sizing = 2.0, bool use_double_buffer = false,
-                      double queue_sizing1 = -1.0,
-                      bool skip_scanned_edges = false) {
+    cudaError_t Reset(util::Location target = util::DEVICE) {
       cudaError_t retval = cudaSuccess;
+      SizeT nodes = this->sub_graph->nodes;
+      int walks_per_node = this->walks_per_node;
+      int walk_length = this->walk_length;
 
-      // printf("graph slice edges: %d, queue_sizing:%f\n", graph_slice->edges,
-      // queue_sizing);
-
-      if (retval = BaseDataSlice::Reset(frontier_type, graph_slice,
-                                        queue_sizing, use_double_buffer,
-                                        queue_sizing1, skip_scanned_edges))
-        return retval;
-
-      SizeT node = graph_slice->nodes;
-      SizeT edge = graph_slice->edges;
-
-      if (d_row_offsets.GetPointer(util::DEVICE) == NULL) {
-        printf("d_row_offsets pointer is null.\n");
-        if (retval = d_row_offsets.Allocate(node + 1, util::DEVICE))
-          return retval;
-      }
-
-      if (d_col_indices.GetPointer(util::DEVICE) == NULL) {
-        printf("d_col_indices pointer is null.\n");
-        if (retval = d_row_offsets.Allocate(edge, util::DEVICE)) return retval;
-      }
-
-      if (d_rand.GetPointer(util::DEVICE) == NULL) {
-        printf("d_rand pointer is null.\n");
-        if (retval = d_rand.Allocate(node, util::DEVICE)) return retval;
-      }
-
-      if (num_neighbor.GetPointer(util::DEVICE) == NULL)
-        if (retval = num_neighbor.Allocate(node, util::DEVICE)) return retval;
-
-      d_row_offsets.SetPointer(
-          (SizeT *)graph_slice->row_offsets.GetPointer(util::DEVICE), node + 1,
-          util::DEVICE);
-
-      d_col_indices.SetPointer(
-          (VertexId *)graph_slice->column_indices.GetPointer(util::DEVICE),
-          edge, util::DEVICE);
-
-      /*
-      util::MemsetIdxKernel<<<128, 128>>>(
-          node_id.GetPointer(util::DEVICE), this->size);
-
-      util::MemsetIdxKernel<<<128, 128>>>(
-          paths.GetPointer(util::DEVICE), this->size);*/
-
-      if (mode == BLOCK) {
-        if (node_id.GetPointer(util::DEVICE) == NULL)
-          if (retval = node_id.Allocate(this->size * walk_length, util::DEVICE))
-            return retval;
-
-        if (paths.GetPointer(util::DEVICE) == NULL)
-          if (retval = paths.Allocate(this->size * walk_length, util::DEVICE))
-            return retval;
-
-        if (trailing_slice.GetPointer(util::DEVICE) == NULL)
-          if (retval = trailing_slice.Allocate(this->trailing * walk_length,
-                                               util::DEVICE))
-            return retval;
-
-        util::MemsetIdxKernel<<<128, 128>>>(node_id.GetPointer(util::DEVICE),
-                                            this->size);
-
-        util::MemsetIdxKernel<<<128, 128>>>(paths.GetPointer(util::DEVICE),
-                                            this->size);
-
-        util::MemsetIdxKernel<<<128, 128>>>(
-            trailing_slice.GetPointer(util::DEVICE), this->trailing);
-
-        // offset node_id in the trailing slice by "size" number
-        util::MemsetAddKernel<<<128, 128>>>(
-            trailing_slice.GetPointer(util::DEVICE), this->size,
-            this->trailing);
-
-      } else if (mode == DEVICE) {
-        if (node_id.GetPointer(util::DEVICE) == NULL)
-          if (retval = node_id.Allocate(node, util::DEVICE)) return retval;
-
-        if (paths.GetPointer(util::DEVICE) == NULL)
-          if (retval = paths.Allocate(node * walk_length, util::DEVICE))
-            return retval;
-
-        util::MemsetIdxKernel<<<128, 128>>>(node_id.GetPointer(util::DEVICE),
-                                            node);
-
-        util::MemsetIdxKernel<<<128, 128>>>(paths.GetPointer(util::DEVICE),
-                                            node);
-
+      // Ensure data are allocated
+      if (this->store_walks) {
+        GUARD_CU(
+            walks.EnsureSize_(nodes * walk_length * walks_per_node, target));
       } else {
-        if (paths.GetPointer(util::DEVICE) == NULL)
-          if (retval = paths.Allocate(node * walk_length, util::DEVICE))
-            return retval;
+        GUARD_CU(walks.EnsureSize_(1, target));
+      }
+      GUARD_CU(rand.EnsureSize_(nodes * walks_per_node, target));
+      GUARD_CU(neighbors_seen.EnsureSize_(nodes * walks_per_node, target));
+      GUARD_CU(steps_taken.EnsureSize_(nodes * walks_per_node, target));
 
-        util::MemsetIdxKernel<<<128, 128>>>(paths.GetPointer(util::DEVICE),
-                                            node);
+      // Reset data
+      if (this->store_walks) {
+        GUARD_CU(walks.ForEach(
+            [] __host__ __device__(VertexT & x) {
+              x = util::PreDefinedValues<VertexT>::InvalidValue;
+            },
+            nodes * walk_length * walks_per_node, target, this->stream));
+      } else {
+        GUARD_CU(walks.ForEach(
+            [] __host__ __device__(VertexT & x) {
+              x = util::PreDefinedValues<VertexT>::InvalidValue;
+            },
+            1, target, this->stream));
       }
 
-      /*
-      util::MemsetIdxKernel<<<128, 128>>>(
-          num_neighbor.GetPointer(util::DEVICE), node);*/
+      GUARD_CU(
+          rand.ForEach([] __host__ __device__(float &x) { x = (float)0.0; },
+                       nodes * walks_per_node, target, this->stream));
+
+      GUARD_CU(neighbors_seen.ForEach(
+          [] __host__ __device__(uint64_t & x) { x = (uint64_t)0; },
+          nodes * walks_per_node, target, this->stream));
+      GUARD_CU(steps_taken.ForEach(
+          [] __host__ __device__(uint64_t & x) { x = (uint64_t)0; },
+          nodes * walks_per_node, target, this->stream));
 
       return retval;
     }
   };  // DataSlice
 
-  // Members
   // Set of data slices (one for each GPU)
   util::Array1D<SizeT, DataSlice> *data_slices;
-  SizeT walk_length;
-  SizeT mode;
-  // Methods
+  int walk_length;
+  int walks_per_node;
+  int walk_mode;
+  bool store_walks;
+  int seed;
+
+  // ----------------------------------------------------------------
+  // Problem Methods
 
   /**
-   * @brief RWProblem default constructor
+   * @brief RW default constructor
    */
-
-  RWProblem(SizeT _walk_length, SizeT _mode)
-      : BaseProblem(false,  // use_double_buffer
-                    false,  // enable_backward
-                    false,  // keep_order
-                    false   // keep_node_num
-                    ),      // unified_receive
-        data_slices(NULL),
-        walk_length(_walk_length),
-        mode(_mode) {
-    // this->walk_length = length;
-    // this->block = block;
+  Problem(util::Parameters &_parameters, ProblemFlag _flag = Problem_None)
+      : BaseProblem(_parameters, _flag), data_slices(NULL) {
+    walk_length = _parameters.Get<int>("walk-length");
+    walks_per_node = _parameters.Get<int>("walks-per-node");
+    walk_mode = _parameters.Get<int>("walk-mode");
+    store_walks = _parameters.Get<bool>("store-walks");
+    seed = _parameters.Get<int>("seed");
   }
 
   /**
-   * @brief RWProblem default destructor
+   * @brief RW default destructor
    */
-  ~RWProblem() {
-    if (data_slices == NULL) return;
+  virtual ~Problem() { Release(); }
 
-    for (int i = 0; i < this->num_gpus; ++i) {
-      //************ not sure why this SetDevice cause seg-fault
-      // util::SetDevice(this -> gpu_idx[i]);
-
-      data_slices[i].Release();
-    }
-
-    delete[] data_slices;
-    data_slices = NULL;
-  }
-
-  /**
-   * \addtogroup PublicInterface
-   * @{
+  /*
+   * @brief Releasing allocated memory space
+   * @param[in] target      The location to release memory from
+   * \return    cudaError_t Error message(s), if any
    */
-
-  /**
-   * @brief Copy result distancess computed on the GPU back to host-side
-   *vectors.
-   *
-   *\return cudaError_t object Indicates the success of all CUDA calls.
-   */
-  cudaError_t Extract(
-      SizeT    *h_paths /*，
-
-      bool      block=false,
-      SizeT    *h_trailing=NULL*/)
-    {
+  cudaError_t Release(util::Location target = util::LOCATION_ALL) {
     cudaError_t retval = cudaSuccess;
-    if (this->num_gpus == 1) {
-      // Set device
-      if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
+    if (data_slices == NULL) return retval;
+    for (int i = 0; i < this->num_gpus; i++)
+      GUARD_CU(data_slices[i].Release(target));
 
-      data_slices[0]->paths.SetPointer(h_paths);
-      if (retval = data_slices[0]->paths.Move(util::DEVICE, util::HOST))
-        return retval;
-
-      if (mode == BLOCK) {
-        if (retval =
-                data_slices[0]->trailing_slice.Move(util::DEVICE, util::HOST))
-          return retval;
-      }
-
-      /*      if (this -> num_gpus == 1)
-            {
-                // Set device
-                int gpu = 0;
-                DataSlice *data_slice = data_slices[gpu].GetPointer(util::HOST);
-                if (retval = util::SetDevice( this -> gpu_idx[gpu]))
-                    return retval;
-
-                data_slice -> paths.SetPointer(h_paths);
-                if (retval = data_slice -> paths.Move(util::DEVICE, util::HOST,
-         num_nodes*this->walk_length)) return retval;
-        */
-    } else {
-      // TODO: multi-GPU extract result
+    if ((target & util::HOST) != 0 &&
+        data_slices[0].GetPointer(util::DEVICE) == NULL) {
+      delete[] data_slices;
+      data_slices = NULL;
     }
+    GUARD_CU(BaseProblem::Release(target));
     return retval;
   }
 
   /**
+   * @brief Copy result distancess computed on GPUs back to host-side arrays.
+...
+   * \return     cudaError_t Error message(s), if any
+   */
+  cudaError_t Extract(VertexT *h_walks, uint64_t *h_neighbors_seen,
+                      uint64_t *h_steps_taken,
+                      util::Location target = util::DEVICE) {
+    cudaError_t retval = cudaSuccess;
+    SizeT nodes = this->org_graph->nodes;
 
+    if (this->num_gpus == 1) {
+      auto &data_slice = data_slices[0][0];
+
+      int walk_length = this->walk_length;
+      int walks_per_node = this->walks_per_node;
+
+      // Set device
+      if (target == util::DEVICE) {
+        GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+        if (this->store_walks) {
+          GUARD_CU(data_slice.walks.SetPointer(
+              h_walks, nodes * walk_length * walks_per_node, util::HOST));
+          GUARD_CU(data_slice.walks.Move(util::DEVICE, util::HOST));
+        }
+        GUARD_CU(data_slice.neighbors_seen.SetPointer(
+            h_neighbors_seen, nodes * walks_per_node, util::HOST));
+        GUARD_CU(data_slice.neighbors_seen.Move(util::DEVICE, util::HOST));
+        GUARD_CU(data_slice.steps_taken.SetPointer(
+            h_steps_taken, nodes * walks_per_node, util::HOST));
+        GUARD_CU(data_slice.steps_taken.Move(util::DEVICE, util::HOST));
+
+      } else if (target == util::HOST) {
+        if (this->store_walks) {
+          GUARD_CU(data_slice.walks.ForEach(
+              h_walks,
+              [] __host__ __device__(const VertexT &device_val,
+                                     VertexT &host_val) {
+                host_val = device_val;
+              },
+              nodes * walk_length * walks_per_node, util::HOST));
+        }
+
+        GUARD_CU(data_slice.neighbors_seen.ForEach(
+            h_neighbors_seen,
+            [] __host__ __device__(const uint64_t &device_val,
+                                   uint64_t &host_val) {
+              host_val = device_val;
+            },
+            nodes * walks_per_node, util::HOST));
+
+        GUARD_CU(data_slice.steps_taken.ForEach(
+            h_steps_taken,
+            [] __host__ __device__(const uint64_t &device_val,
+                                   uint64_t &host_val) {
+              host_val = device_val;
+            },
+            nodes * walks_per_node, util::HOST));
+      }
+    } else {  // num_gpus != 1
+
+      // ============ INCOMPLETE TEMPLATE - MULTIGPU ============
+
+      // // TODO: extract the results from multiple GPUs, e.g.:
+      // // util::Array1D<SizeT, ValueT *> th_distances;
+      // // th_distances.SetName("bfs::Problem::Extract::th_distances");
+      // // GUARD_CU(th_distances.Allocate(this->num_gpus, util::HOST));
+
+      // for (int gpu = 0; gpu < this->num_gpus; gpu++)
+      // {
+      //     auto &data_slice = data_slices[gpu][0];
+      //     if (target == util::DEVICE)
+      //     {
+      //         GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+      //         // GUARD_CU(data_slice.distances.Move(util::DEVICE,
+      //         util::HOST));
+      //     }
+      //     // th_distances[gpu] = data_slice.distances.GetPointer(util::HOST);
+      // } //end for(gpu)
+
+      // for (VertexT v = 0; v < nodes; v++)
+      // {
+      //     int gpu = this -> org_graph -> GpT::partition_table[v];
+      //     VertexT v_ = v;
+      //     if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
+      //         v_ = this -> org_graph -> GpT::convertion_table[v];
+
+      //     // h_distances[v] = th_distances[gpu][v_];
+      // }
+
+      // // GUARD_CU(th_distances.Release());
+    }
+
+    return retval;
+  }
 
   /**
-   * @brief initialization function of Problem Struct.
-   *data_slice is initialized here
-   *
-   * @param[in] stream_from_host Whether to stream data from host.
-   * @param[in] graph Pointer to the CSR graph object we process on. @see Csr
-   * @param[in] inversegraph Pointer to the inversed CSR graph object we process
-  on.
-   * @param[in] num_gpus Number of the GPUs used.
-   * @param[in] gpu_idx GPU index used for testing.
-   * @param[in] partition_method Partition method to partition input graph.
-   * @param[in] streams CUDA stream.
-   * @param[in] queue_sizing Maximum queue sizing factor.
-   * @param[in] in_sizing
-   * @param[in] partition_factor Partition factor for partitioner.
-   * @param[in] partition_seed Partition seed used for partitioner.
-   *
-   * \return cudaError_t object Indicates the success of all CUDA calls.
+   * @brief initialization function.
+   * @param     graph       The graph that SSSP processes on
+   * @param[in] Location    Memory location to work on
+   * \return    cudaError_t Error message(s), if any
    */
-  cudaError_t Init(bool stream_from_host,  // Only meaningful for single-GPU
-                   Csr<VertexId, SizeT, Value> *graph,
-                   Csr<VertexId, SizeT, Value> *inversegraph = NULL,
-                   int num_gpus = 1, int *gpu_idx = NULL,
-                   std::string partition_method = "random",
-                   cudaStream_t *streams = NULL, float queue_sizing = 2.0,
-                   float in_sizing = 1.0, float partition_factor = -1.0,
-                   int partition_seed = -1) {
+  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
-    if (retval = BaseProblem::Init(
-            stream_from_host, graph, inversegraph, num_gpus, gpu_idx,
-            partition_method, queue_sizing, partition_factor, partition_seed))
-      return retval;
-
-    // No data in DataSlice needs to be copied from host
-
+    GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
-      data_slices[gpu].SetName("data_slices[]");
-      if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-      if (retval = data_slices[gpu].Allocate(1, util::DEVICE | util::HOST))
-        return retval;
-      DataSlice *data_slice = data_slices[gpu].GetPointer(util::HOST);
-      GraphSlice<VertexId, SizeT, Value> *graph_slice = this->graph_slices[gpu];
-      data_slice->streams.SetPointer(streams + gpu * num_gpus * 2,
-                                     num_gpus * 2);
+      data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
+      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
 
-      if (retval = data_slice->Init(
-              walk_length, mode, this->num_gpus, this->gpu_idx[gpu],
-              this->use_double_buffer, &(this->sub_graphs[gpu]),
-              this->num_gpus > 1
-                  ? graph_slice->in_counter.GetPointer(util::HOST)
-                  : NULL,
-              this->num_gpus > 1
-                  ? graph_slice->out_counter.GetPointer(util::HOST)
-                  : NULL,
-              in_sizing))
-        return retval;
+      GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
+
+      auto &data_slice = data_slices[gpu][0];
+      GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
+                               this->gpu_idx[gpu], target, this->flag,
+                               this->walk_length, this->walks_per_node,
+                               this->walk_mode, this->store_walks, this->seed));
     }
 
-    // no mgpu support
     return retval;
   }
 
   /**
    * @brief Reset problem function. Must be called prior to each run.
-   * Initialize frontier type and frontier queue_size
-   * Fill in data_slice inital values of problem here
-   *
-   * @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed).
-   * @param[in] queue_sizing Size scaling factor for work queue allocation
-   * (e.g., 1.0 creates n-element and m-element vertex and edge frontiers,
-   * respectively).
-   * @param[in] queue_sizing1
-   *
-   *  \return cudaError_t object Indicates the success of all CUDA calls.
+   * @param[in] src      Source vertex to start.
+   * @param[in] location Memory location to work on
+   * \return cudaError_t Error message(s), if any
    */
-  cudaError_t Reset(FrontierType frontier_type, double queue_sizing,
-                    double queue_sizing1 = -1) {
+  cudaError_t Reset(util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
-    if (queue_sizing1 < 0) queue_sizing1 = queue_sizing;
 
-    if (retval = util::SetDevice(this->gpu_idx[0])) return retval;
-
-    // single gpu
-    if (retval = data_slices[0]->Reset(walk_length, mode, frontier_type,
-                                       this->graph_slices[0], queue_sizing,
-                                       queue_sizing1))
-      return retval;
-
-    if (retval = data_slices[0].Move(util::HOST, util::DEVICE)) return retval;
-
-    /*
+    // Reset data slices
     for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
-        // Set device
-        if (retval = util::SetDevice(this->gpu_idx[gpu])) return retval;
-        if (retval = data_slices[gpu] -> Reset(
-            frontier_type, this->graph_slices[gpu],
-            queue_sizing, queue_sizing1)) return retval;
-        if (retval = data_slices[gpu].Move(util::HOST, util::DEVICE)) return
-    retval;
+      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+      GUARD_CU(data_slices[gpu]->Reset(target));
+      GUARD_CU(data_slices[gpu].Move(util::HOST, target));
     }
-    */
 
+    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
     return retval;
   }
-
-  /** @} */
 };
 
 }  // namespace rw

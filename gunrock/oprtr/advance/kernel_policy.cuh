@@ -14,148 +14,16 @@
 
 #pragma once
 
-#include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
+// #include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_backward/kernel_policy.cuh>
 #include <gunrock/oprtr/edge_map_partitioned_backward/kernel_policy.cuh>
-#include <gunrock/oprtr/edge_map_partitioned/kernel_policy.cuh>
-#include <gunrock/oprtr/edge_map_partitioned_cull/kernel_policy.cuh>
-#include <gunrock/oprtr/all_edges_advance/kernel_policy.cuh>
-#include <gunrock/oprtr/simplified_advance/kernel_policy.cuh>
+// #include <gunrock/oprtr/edge_map_partitioned/kernel_policy.cuh>
+// #include <gunrock/oprtr/edge_map_partitioned_cull/kernel_policy.cuh>
+// #include <gunrock/oprtr/all_edges_advance/kernel_policy.cuh>
 
 namespace gunrock {
 namespace oprtr {
 namespace advance {
-
-/**
- * @brief Traversal Modes
- */
-enum MODE {
-  TWC_FORWARD,
-  TWC_BACKWARD,
-  LB_BACKWARD,
-  LB,
-  LB_LIGHT,
-  LB_CULL,
-  LB_LIGHT_CULL,
-  ALL_EDGES,
-  SIMPLE,
-};
-
-template <MODE A_MODE>
-bool isFused() {
-  if (A_MODE == LB_CULL)
-    return true;
-  else if (A_MODE == LB_LIGHT_CULL)
-    return true;
-  else
-    return false;
-}
-
-template <MODE A_MODE>
-bool hasPreScan() {
-  if (A_MODE == LB)
-    return true;
-  else if (A_MODE == LB_LIGHT)
-    return true;
-  else if (A_MODE == LB_CULL)
-    return true;
-  else if (A_MODE == LB_LIGHT_CULL)
-    return true;
-  else
-    return false;
-}
-
-template <MODE A_MODE>
-bool isBackward() {
-  if (A_MODE == TWC_BACKWARD)
-    return true;
-  else if (A_MODE == LB_BACKWARD)
-    return true;
-  else
-    return false;
-}
-
-/**
- * @brief Four types of advance operator
- */
-enum TYPE { V2V, V2E, E2V, E2E };
-
-/**
- * @brief opeartion to use for mgpu primitives
- */
-enum REDUCE_OP {
-  NONE,
-  PLUS,
-  MINUS,
-  MULTIPLIES,
-  MODULUS,
-  BIT_OR,
-  BIT_AND,
-  BIT_XOR,
-  MAXIMUM,
-  MINIMUM
-};
-
-enum REDUCE_TYPE { EMPTY, VERTEX, EDGE };
-
-template <typename T, REDUCE_OP R_OP>
-struct Identity {
-  __device__ __host__ __forceinline__ T operator()() {
-    extern __device__ __host__ void Error_UnsupportedOperation();
-    Error_UnsupportedOperation();
-    return 0;
-  }
-};
-
-template <typename T>
-struct Identity<T, NONE> {
-  __device__ __host__ __forceinline__ T operator()() { return 0; }
-};
-
-template <typename T>
-struct Identity<T, PLUS> {
-  __device__ __host__ __forceinline__ T operator()() { return 0; }
-};
-
-template <typename T>
-struct Identity<T, MULTIPLIES> {
-  __device__ __host__ __forceinline__ T operator()() { return 1; }
-};
-
-template <typename T>
-struct Identity<T, BIT_OR> {
-  __device__ __host__ __forceinline__ T operator()() {
-    return util::AllZeros<T>();
-  }
-};
-
-template <typename T>
-struct Identity<T, BIT_AND> {
-  __device__ __host__ __forceinline__ T operator()() {
-    return util::AllOnes<T>();
-  }
-};
-
-template <typename T>
-struct Identity<T, BIT_XOR> {
-  __device__ __host__ __forceinline__ T operator()() {
-    return util::AllZeros<T>();
-  }
-};
-
-template <typename T>
-struct Identity<T, MAXIMUM> {
-  __device__ __host__ __forceinline__ T operator()() {
-    return util::MinValue<T>();
-  }
-};
-
-template <typename T>
-struct Identity<T, MINIMUM> {
-  __device__ __host__ __forceinline__ T operator()() {
-    return util::MaxValue<T>();
-  }
-};
 
 /**
  * @brief Kernel configuration policy for all three advance kernels (forward,
@@ -266,12 +134,6 @@ struct KernelPolicy {
       //_INSTRUMENT,
       _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_BLOCKS>
       EDGES;
-
-  typedef gunrock::oprtr::simplified_advance::KernelPolicy<
-      _Problem, _CUDA_ARCH,
-      //_INSTRUMENT,
-      _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_BLOCKS, _LIGHT_EDGE_THRESHOLD>
-      SIMPLE;
 
   static const int CTA_OCCUPANCY =
       (ADVANCE_MODE == TWC_FORWARD)

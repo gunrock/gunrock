@@ -19,10 +19,10 @@
 namespace gunrock {
 namespace util {
 
-template <typename T, int _CUDA_ARCH, int _LOG_THREADS>
+template <typename T, /*int _CUDA_ARCH,*/ int _LOG_THREADS>
 struct Block_Scan {
   enum {
-    CUDA_ARCH = _CUDA_ARCH,
+    // CUDA_ARCH         = _CUDA_ARCH,
     LOG_THREADS = _LOG_THREADS,
     THREADS = 1 << LOG_THREADS,
     LOG_WARP_THREADS = 5,  // GR_LOG_WARP_THREADS(CUDA_ARCH),
@@ -110,35 +110,29 @@ struct Block_Scan {
     // UpSweep LOG_WIDTH = 5
     // if ((lane_id & 1) == 0)
     lane_recv = _shfl_xor(lane_local, 1);
-
-    // printf("(%3d, %3d) 2.1\n", blockIdx.x, threadIdx.x);
     if ((lane_id & 1) == 0) {
       lane_local += lane_recv;
       // UpSweep LOG_WIDTH = 4
       lane_recv = _shfl_xor(lane_local, 2, WARPSIZE, 0x55555555u);
     }
-    // printf("(%3d, %3d) 2.2\n", blockIdx.x, threadIdx.x);
 
     if ((lane_id & 3) == 0) {
       lane_local += lane_recv;
       // UpSweep LOG_WIDTH = 3
       lane_recv = _shfl_xor(lane_local, 4, WARPSIZE, 0x11111111u);
     }
-    // printf("(%3d, %3d) 2.3\n", blockIdx.x, threadIdx.x);
 
     if ((lane_id & 7) == 0) {
       lane_local += lane_recv;
       // UpSweep LOG_WIDTH = 2
       lane_recv = _shfl_xor(lane_local, 8, WARPSIZE, 0x01010101u);
     }
-    // printf("(%3d, %3d) 2.4\n", blockIdx.x, threadIdx.x);
 
     if ((lane_id & 0xF) == 0) {
       lane_local += lane_recv;
       // UpSweep LOG_WIDTH = 1
       lane_recv = _shfl_xor(lane_local, 0x10, WARPSIZE, 0x00010001u);
     }
-    // printf("(%3d, %3d) 2.5\n", blockIdx.x, threadIdx.x);
 
     if (lane_id == 0) {
       lane_local += lane_recv;
@@ -146,33 +140,24 @@ struct Block_Scan {
       lane_recv = 0;
     }
     lane_local = lane_recv;
-    //__syncthreads();
     _all(1);
 
     // DownSweep<int, LOG_WARP_THREADS-2>::Sweep(lane_local, lane_recv,
     // lane_id); DownSweep LOG_WIDTH = 3
     lane_recv = _shfl_up(lane_local, 8);
     if ((lane_id & 15) == 8) lane_local += lane_recv;
-    // if ((lane_id & 0xF) == 0)
-    //    printf("(%3d, %3d) 2.6\n", blockIdx.x, threadIdx.x);
 
     // DownSweep LOG_WIDTH = 2
     lane_recv = _shfl_up(lane_local, 4);
     if ((lane_id & 7) == 4) lane_local += lane_recv;
-    // if ((lane_id & 0xF) == 0)
-    //    printf("(%3d, %3d) 2.7\n", blockIdx.x, threadIdx.x);
 
     // DownSweep LOG_WIDTH = 1
     lane_recv = _shfl_up(lane_local, 2);
     if ((lane_id & 3) == 2) lane_local += lane_recv;
-    // if ((lane_id & 0xF) == 0)
-    //    printf("(%3d, %3d) 2.8\n", blockIdx.x, threadIdx.x);
 
     // DownSweep LOG_WIDTH = 0
     lane_recv = _shfl_up(lane_local, 1);
     if ((lane_id & 1) == 1) lane_local += lane_recv;
-    // if ((lane_id & 0xF) == 0)
-    //    printf("(%3d, %3d) 2.9\n", blockIdx.x, threadIdx.x);
   }
 
   static __device__ __forceinline__ void Warp_LogicScan(int thread_in,
@@ -196,14 +181,17 @@ struct Block_Scan {
                                               Temp_Space &temp_space) {
     T warp_sum;
     int warp_id = threadIdx.x >> LOG_WARP_THREADS;
-    Warp_Scan(thread_in, thread_out, warp_sum);
-    if ((threadIdx.x & WARP_THREADS_MASK) == 0) {
-      // printf("(%4d, %4d) : warp_sum = %d\n",
-      //    blockIdx.x, threadIdx.x, warp_sum);
+    Warp_Scan(thread_in, thread_out);
+    if ((threadIdx.x & WARP_THREADS_MASK) == WARP_THREADS_MASK) {
+      warp_sum = thread_in + thread_out;
+      // if (warp_sum != 0)
+      //    printf("(%4d, %4d) : warp_sum = %d\n",
+      //        blockIdx.x, threadIdx.x, warp_sum);
       temp_space.warp_counter_offset[warp_id] = warp_sum;
     }
-    // printf("(%4d, %4d) : thread_out = %4d\n",
-    //    blockIdx.x, threadIdx.x, thread_out);
+    // if (thread_in != 0)
+    //    printf("(%4d, %4d) : thread_out = %4d, warp_sum = %4d\n",
+    //        blockIdx.x, threadIdx.x, thread_out, warp_sum);
     __syncthreads();
 
     if ((warp_id) == 0) {
@@ -217,6 +205,9 @@ struct Block_Scan {
     __syncthreads();
 
     thread_out += temp_space.warp_counter_offset[warp_id];
+    // if (thread_in != 0)
+    //    printf("(%4d, %4d) : thread_out2 = %4d\n",
+    //        blockIdx.x, threadIdx.x, thread_out);
   }
 
   static __device__ __forceinline__ void Scan(T thread_in, T &thread_out,
@@ -227,7 +218,7 @@ struct Block_Scan {
     Warp_Scan(thread_in, thread_out, warp_sum);
     // printf("(%4d, %4d) : WARP_THREADS_MASK = %d\n",
     //    blockIdx.x, threadIdx.x, WARP_THREADS_MASK);
-    if ((threadIdx.x & WARP_THREADS_MASK) == 0) {
+    if ((threadIdx.x & WARP_THREADS_MASK) == WARP_THREADS_MASK) {
       // printf("(%4d, %4d, %d) : warp_sum = %d\n",
       //    blockIdx.x, threadIdx.x, threadIdx.x >> LOG_WARP_THREADS, warp_sum);
       temp_space.warp_counter_offset[warp_id] = warp_sum;
@@ -263,7 +254,6 @@ struct Block_Scan {
     if ((threadIdx.x & WARP_THREADS_MASK) == 0)
       temp_space.warp_counter_offset[warp_id] = warp_sum;
     __syncthreads();
-    // printf("(%3d, %3d) 1\n", blockIdx.x, threadIdx.x);
 
     if ((warp_id) == 0) {
       warp_sum = threadIdx.x < BLOCK_WARPS
@@ -273,9 +263,7 @@ struct Block_Scan {
       if (threadIdx.x < BLOCK_WARPS)
         temp_space.warp_counter_offset[threadIdx.x] = warp_sum;
     }
-    // printf("(%3d, %3d) 2\n", blockIdx.x, threadIdx.x);
     __syncthreads();
-    // printf("(%3d, %3d) 3\n", blockIdx.x, threadIdx.x);
 
     thread_out += temp_space.warp_counter_offset[warp_id];
   }

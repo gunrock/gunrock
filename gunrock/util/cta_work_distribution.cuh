@@ -55,7 +55,7 @@ struct CtaWorkLimits {
  */
 template <typename SizeT>  // Integer type for indexing into problem arrays
                            // (e.g., int, long long, etc.)
-                           struct CtaWorkDistribution {
+struct CtaWorkDistribution {
   SizeT num_elements;    // Number of elements in the problem
   SizeT total_grains;    // Number of "grain" blocks to break the problem into
                          // (round up)
@@ -99,10 +99,8 @@ template <typename SizeT>  // Integer type for indexing into problem arrays
                               // CTA processes work
       int LOG_SCHEDULE_GRANULARITY>  // Problem granularity by which work is
                                      // distributed amongst CTA threadblocks
-                                     __host__ __device__ __forceinline__ void
-                                     GetCtaWorkLimits(
-                                         CtaWorkLimits<SizeT>
-                                             &work_limits)  // Out param
+  __host__ __device__ __forceinline__ void
+  GetCtaWorkLimits(CtaWorkLimits<SizeT> &work_limits)  // Out param
   {
     const int TILE_ELEMENTS = 1 << LOG_TILE_ELEMENTS;
 

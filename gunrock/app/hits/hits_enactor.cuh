@@ -9,358 +9,385 @@
  * @file
  * hits_enactor.cuh
  *
- * @brief HITS (Hyperlink-Induced Topic Search) Problem Enactor
+ * @brief hits Problem Enactor
  */
 
 #pragma once
 
-#include <thread>
-#include <gunrock/util/kernel_runtime_stats.cuh>
-#include <gunrock/util/test_utils.cuh>
-#include <gunrock/util/sort_utils.cuh>
-#include <gunrock/util/sharedmem.cuh>
-#include <gunrock/oprtr/advance/kernel.cuh>
-#include <gunrock/oprtr/advance/kernel_policy.cuh>
-#include <gunrock/oprtr/filter/kernel.cuh>
-#include <gunrock/oprtr/filter/kernel_policy.cuh>
 #include <gunrock/app/enactor_base.cuh>
-#include <gunrock/app/hits/hits_problem.cuh>
-#include <gunrock/app/hits/hits_functor.cuh>
-#include <moderngpu.cuh>
+#include <gunrock/app/enactor_iteration.cuh>
+#include <gunrock/app/enactor_loop.cuh>
+#include <gunrock/oprtr/oprtr.cuh>
+#include <gunrock/util/reduce_device.cuh>
 
-using namespace mgpu;
+#include <gunrock/app/hits/hits_problem.cuh>
 
 namespace gunrock {
 namespace app {
 namespace hits {
 
 /**
- * @brief HITS problem enactor class.
- *
- * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA
- * clock-count statistics
+ * @brief Speciflying parameters for hits Enactor
+ * @param parameters The util::Parameter<...> structure holding all parameter
+ * info \return cudaError_t error message(s), if any
  */
-template <typename _Problem>
-class HITSEnactor : public EnactorBase<typename _Problem::SizeT> {
+cudaError_t UseParameters_enactor(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
+  GUARD_CU(app::UseParameters_enactor(parameters));
+
+  return retval;
+}
+
+/**
+ * @brief defination of hits iteration loop
+ * @tparam EnactorT Type of enactor
+ */
+template <typename EnactorT>
+struct hitsIterationLoop
+    : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
+  typedef typename EnactorT::VertexT VertexT;
+  typedef typename EnactorT::SizeT SizeT;
+  typedef typename EnactorT::ValueT ValueT;
+  typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
+  typedef typename EnactorT::Problem::GraphT::GpT GpT;
+
+  typedef IterationLoopBase<EnactorT, Use_FullQ | Push> BaseIterationLoop;
+
+  hitsIterationLoop() : BaseIterationLoop() {}
+
+  /**
+   * @brief Core computation of hits, one iteration
+   * @param[in] peer_ Which GPU peers to work on, 0 means local
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Core(int peer_ = 0) {
+    // --
+    // Alias variables
+
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+
+    auto &enactor_slice =
+        this->enactor
+            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
+
+    auto &enactor_stats = enactor_slice.enactor_stats;
+    auto &graph = data_slice.sub_graph[0];
+    auto &frontier = enactor_slice.frontier;
+    auto &oprtr_parameters = enactor_slice.oprtr_parameters;
+    auto &retval = enactor_stats.retval;
+    auto &iteration = enactor_stats.iteration;
+
+    cudaStream_t stream = enactor_slice.stream;
+
+    // HITS-specific data slices
+    auto &hrank_curr = data_slice.hrank_curr;
+    auto &arank_curr = data_slice.arank_curr;
+    auto &hrank_next = data_slice.hrank_next;
+    auto &arank_next = data_slice.arank_next;
+
+    auto &cub_temp_space = data_slice.cub_temp_space;
+    auto &hrank_mag = data_slice.hrank_mag;
+    auto &arank_mag = data_slice.arank_mag;
+
+    // Set the frontier to NULL to specify that it should include
+    // all vertices
+    util::Array1D<SizeT, VertexT> *null_frontier = NULL;
+    frontier.queue_length = graph.nodes;
+    frontier.queue_reset = true;
+
+    // Number of times to iterate the HITS algorithm
+    auto max_iter = data_slice.max_iter;
+
+    // Normalize the HITS scores every N iterations.
+    // Provides speedup at the risk of data overflow
+    auto normalize_n = data_slice.normalize_n;
+
+    // Reset next ranks to zero
+    auto reset_zero_op = [hrank_next, arank_next] __host__ __device__(
+                             VertexT * v_q, const SizeT &pos) {
+      hrank_next[pos] = (ValueT)0.0;
+      arank_next[pos] = (ValueT)0.0;
+    };
+
+    GUARD_CU(frontier.V_Q()->ForAll(reset_zero_op, graph.nodes));
+
+    GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+
+    // Advance operation to update all hub and auth scores
+    auto advance_op =
+        [hrank_curr, arank_curr, hrank_next, arank_next] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool {
+      // Update the hub and authority scores.
+      // Look into NeighborReduce for speed improvements
+      atomicAdd(&hrank_next[src], arank_curr[dest]);
+      atomicAdd(&arank_next[dest], hrank_curr[src]);
+
+      return true;
+    };
+
+    // Perform advance operation
+    GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+        graph.csr(), null_frontier, null_frontier, oprtr_parameters,
+        advance_op));
+
+    GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+
+    // After updating the scores, normalize the hub and array scores
+    // either after every N iterations (user-specified, default=1),
+    // or at the last iteration
+    if (((iteration + 1) % normalize_n == 0) || iteration == (max_iter - 1)) {
+      // 1) Square each element
+      auto square_op = [hrank_next, arank_next] __host__ __device__(
+                           VertexT * v_q, const SizeT &pos) {
+        hrank_next[pos] = hrank_next[pos] * hrank_next[pos];
+        arank_next[pos] = arank_next[pos] * arank_next[pos];
+      };
+
+      GUARD_CU(frontier.V_Q()->ForAll(square_op, graph.nodes));
+
+      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+
+      // 2) Sum all squared scores in each array
+      GUARD_CU(util::cubReduce(
+          cub_temp_space, hrank_next, hrank_mag, graph.nodes,
+          [] __host__ __device__(const ValueT &a, const ValueT &b) {
+            return a + b;
+          },
+          ValueT(0), stream));
+
+      GUARD_CU(util::cubReduce(
+          cub_temp_space, arank_next, arank_mag, graph.nodes,
+          [] __host__ __device__(const ValueT &a, const ValueT &b) {
+            return a + b;
+          },
+          ValueT(0), stream));
+
+      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+
+      auto normalize_divide_op =
+          [hrank_next, arank_next, hrank_mag, arank_mag] __host__ __device__(
+              VertexT * v_q, const SizeT &pos) {
+            if (hrank_mag[0] > 0) {
+              hrank_next[pos] = sqrt(hrank_next[pos]) / sqrt(hrank_mag[0]);
+            }
+
+            if (arank_mag[0] > 0) {
+              arank_next[pos] = sqrt(arank_next[pos]) / sqrt(arank_mag[0]);
+            }
+          };
+      // Divide all elements by the square root of their squared sums.
+      // Note: take sqrt of x in denominator because x^2 was done in place.
+      GUARD_CU(frontier.V_Q()->ForAll(normalize_divide_op, graph.nodes));
+
+      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+    }
+    // After normalization, swap the next and current vectors
+    auto hrank_temp = hrank_curr;
+    hrank_curr = hrank_next;
+    hrank_next = hrank_temp;
+
+    auto arank_temp = arank_curr;
+    arank_curr = arank_next;
+    arank_next = arank_temp;
+
+    // Possibly normalize only at the end, or every n iterations
+    // for potential speed improvements. Additionally, look into
+    // NeighborReduce for adding host and auth scores
+
+    return retval;
+  }
+
+  bool Stop_Condition(int gpu_num = 0) {
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+    auto &enactor_slices = this->enactor->enactor_slices;
+    auto iter = enactor_slices[0].enactor_stats.iteration;
+    auto user_iter = data_slice.max_iter;
+
+    // user defined stop condition
+    if (iter == user_iter) return true;
+    return false;
+  }
+
+  /**
+   * @brief Routine to combine received data and local data
+   * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each
+   * transmition item, typed VertexT
+   * @tparam NUM_VALUE__ASSOCIATES Number of data associated with each
+   * transmition item, typed ValueT
+   * @param  received_length The numver of transmition items received
+   * @param[in] peer_ which peer GPU the data came from
+   * \return cudaError_t error message(s), if any
+   */
+  template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
+  cudaError_t ExpandIncoming(SizeT &received_length, int peer_) {
+    // ================ INCOMPLETE TEMPLATE - MULTIGPU ====================
+
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+    auto &enactor_slice =
+        this->enactor
+            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
+
+    auto expand_op = [] __host__ __device__(
+                         VertexT & key, const SizeT &in_pos,
+                         VertexT *vertex_associate_ins,
+                         ValueT *value__associate_ins) -> bool { return true; };
+
+    cudaError_t retval =
+        BaseIterationLoop::template ExpandIncomingBase<NUM_VERTEX_ASSOCIATES,
+                                                       NUM_VALUE__ASSOCIATES>(
+            received_length, peer_, expand_op);
+    return retval;
+  }
+};  // end of hitsIteration
+
+/**
+ * @brief Template enactor class.
+ * @tparam _Problem Problem type we process on
+ * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
+ * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
+ */
+template <typename _Problem, util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
+          unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
+class Enactor
+    : public EnactorBase<
+          typename _Problem::GraphT, typename _Problem::GraphT::VertexT,
+          typename _Problem::GraphT::ValueT, ARRAY_FLAG, cudaHostRegisterFlag> {
  public:
   typedef _Problem Problem;
   typedef typename Problem::SizeT SizeT;
-  typedef typename Problem::VertexId VertexId;
-  typedef typename Problem::Value Value;
-  typedef EnactorBase<SizeT> BaseEnactor;
+  typedef typename Problem::VertexT VertexT;
+  typedef typename Problem::GraphT GraphT;
+  typedef typename GraphT::VertexT LabelT;
+  typedef typename GraphT::ValueT ValueT;
+  typedef EnactorBase<GraphT, LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
+      BaseEnactor;
+  typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> EnactorT;
+  typedef hitsIterationLoop<EnactorT> IterationT;
+
   Problem *problem;
-  ContextPtr *context;
-
-  // Members
- protected:
-  /**
-   * Current iteration, also used to get the final search depth of the HITS
-   * search
-   */
-  long long iteration;
-
-  // Methods
- protected:
- public:
-  /**
-   * @brief HITSEnactor constructor
-   */
-  HITSEnactor(int num_gpus = 1, int *gpu_idx = NULL, bool instrument = false,
-              bool debug = false, bool size_check = true)
-      : BaseEnactor(EDGE_FRONTIERS, num_gpus, gpu_idx, instrument, debug,
-                    size_check),
-        problem(NULL),
-        context(NULL),
-        iteration(0) {}
+  IterationT *iterations;
 
   /**
-   * @brief HITSEnactor destructor
+   * @brief hits constructor
    */
-  virtual ~HITSEnactor() {}
-
-  void NormalizeRank(int hub_or_auth, cudaStream_t stream = 0) {
-    Value *rank_curr;
-    Value *rank_next;
-    Value *rank_mag;
-    rank_mag = problem->data_slices[0]->rank_mag.GetPointer(util::DEVICE);
-
-    if (hub_or_auth == 0) {
-      rank_curr = problem->data_slices[0]->hrank_curr.GetPointer(util::DEVICE);
-      rank_next = problem->data_slices[0]->hrank_next.GetPointer(util::DEVICE);
-    } else {
-      rank_curr = problem->data_slices[0]->arank_curr.GetPointer(util::DEVICE);
-      rank_next = problem->data_slices[0]->arank_next.GetPointer(util::DEVICE);
-    }
-
-    // Square each element
-    util::MemsetSquareKernel<<<128, 128>>>(rank_next, this->problem->nodes);
-
-    // Sum all squared scores in each array
-    void *d_temp_storage = NULL;
-    size_t temp_storage_bytes = 0;
-    cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, rank_next,
-                           rank_mag, this->problem->nodes);
-
-    cudaMalloc(&d_temp_storage, temp_storage_bytes);
-    cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, rank_next,
-                           rank_mag, this->problem->nodes);
-
-    util::MemsetSqrtDivScalarKernel<<<128, 128>>>(rank_next, rank_mag,
-                                                  this->problem->nodes);
-
-    // swap rank_curr and rank_next
-    util::MemsetCopyVectorKernel<<<128, 128, 0, stream>>>(rank_curr, rank_next,
-                                                          this->problem->nodes);
-
-    util::MemsetKernel<<<128, 128>>>(rank_next, (Value)0.0,
-                                     this->problem->nodes);
+  Enactor() : BaseEnactor("hits"), problem(NULL) {
+    this->max_num_vertex_associates = 0;
+    this->max_num_value__associates = 1;
   }
 
   /**
-   * \addtogroup PublicInterface
-   * @{
+   * @brief hits destructor
    */
+  virtual ~Enactor() { /*Release();*/
+  }
 
-  /** @} */
-
-  template <typename AdvancekernelPolicy, typename FilterkernelPolicy>
-  cudaError_t InitHITS(ContextPtr *context, Problem *problem,
-                       int max_grid_size = 0) {
+  /*
+   * @brief Releasing allocated memory space
+   * @param target The location to release memory from
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Release(util::Location target = util::LOCATION_ALL) {
     cudaError_t retval = cudaSuccess;
-
-    if (retval =
-            BaseEnactor::Init(max_grid_size, AdvanceKernelPolicy::CTA_OCCUPANCY,
-                              FilterKernelPolicy::CTA_OCCUPANCY))
-      return retval;
-
-    this->problem = problem;
-    this->context = context;
+    GUARD_CU(BaseEnactor::Release(target));
+    delete[] iterations;
+    iterations = NULL;
+    problem = NULL;
     return retval;
   }
 
   /**
-   * @brief Enacts a HITS computing on the specified graph.
-   *
-   * @tparam AdvanceKernelPolicy Kernel policy for advance.
-   * @tparam FilterKernelPolicy Kernel policy for filter.
-   *
-   * @param[in] max_iteration Max number of iterations of HITS algorithm
-   *
-   * \return cudaError_t object which indicates the success of all CUDA function
-   * calls.
+   * @brief Initialize the problem.
+   * @param[in] problem The problem object.
+   * @param[in] target Target location of data
+   * \return cudaError_t error message(s), if any
    */
-  template <typename AdvanceKernelPolicy, typename FilterKernelPolicy>
-  cudaError_t EnactHITS(SizeT max_iteration) {
-    typedef HUBFunctor<VertexId, SizeT, Value, Problem> HubFunctor;
-
-    typedef AUTHFunctor<VertexId, SizeT, Value, Problem> AuthFunctor;
-
-    GraphSlice<VertexId, SizeT, Value> *graph_slice = problem->graph_slices[0];
-    FrontierAttribute<SizeT> *frontier_attribute = &this->frontier_attribute[0];
-    EnactorStats<SizeT> *enactor_stats = &this->enactor_stats[0];
-    // Single-gpu graph slice
-    typename Problem::DataSlice *data_slice = problem->data_slices[0];
-    typename Problem::DataSlice *d_data_slice = problem->d_data_slices[0];
-    util::DoubleBuffer<VertexId, SizeT, Value> *frontier_queue =
-        &data_slice->frontier_queues[0];
-    util::CtaWorkProgressLifetime<SizeT> *work_progress =
-        &this->work_progress[0];
-    cudaStream_t stream = data_slice->streams[0];
-    ContextPtr context = this->context[0];
+  cudaError_t Init(Problem &problem, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
+    this->problem = &problem;
 
-    do {
-      if (this->debug) {
-        printf("Iteration, Edge map queue, Vertex map queue\n");
-        printf("0");
-        fflush(stdout);
-      }
+    // Lazy initialization
+    GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target, false));
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+      auto &enactor_slice = this->enactor_slices[gpu * this->num_gpus + 0];
+      auto &graph = problem.sub_graphs[gpu];
+      GUARD_CU(enactor_slice.frontier.Allocate(graph.nodes, graph.edges,
+                                               this->queue_factors));
+    }
 
-      frontier_attribute->queue_length = graph_slice->nodes;
-      frontier_attribute->queue_index = 0;  // Work queue index
-      frontier_attribute->selector = 0;
-      frontier_attribute->queue_reset = true;
+    iterations = new IterationT[this->num_gpus];
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      GUARD_CU(iterations[gpu].Init(this, gpu));
+    }
 
-      // Step through HITS iterations
-      while (true) {
-        // Edge Map
-        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem,
-                                              AuthFunctor,
-                                              gunrock::oprtr::advance::V2V>(
-            enactor_stats[0], frontier_attribute[0],
-            typename AuthFunctor::LabelT(), data_slice, d_data_slice,
-            (VertexId *)NULL, (bool *)NULL, (bool *)NULL, (SizeT *)NULL,
-            frontier_queue->keys[frontier_attribute->selector].GetPointer(
-                util::DEVICE),  // d_in_queue
-            frontier_queue->keys[frontier_attribute->selector ^ 1].GetPointer(
-                util::DEVICE),  // d_out_queue
-            (Value *)NULL, (Value *)NULL,
-            graph_slice->column_offsets.GetPointer(util::DEVICE),
-            graph_slice->row_indices.GetPointer(util::DEVICE), (SizeT *)NULL,
-            (VertexId *)NULL,
-            graph_slice->nodes,  // graph_slice->frontier_elements[frontier_attribute.selector],
-                                 // // max_in_queue
-            graph_slice->edges,  // graph_slice->frontier_elements[frontier_attribute.selector^1],
-                                 // // max_out_queue
-            work_progress[0], context[0], stream);
-
-        if (this->debug) {
-          if (retval = util::GRError(cudaStreamSynchronize(stream),
-                                     "edge_map_forward::Kernel failed",
-                                     __FILE__, __LINE__))
-            break;
-        }
-
-        NormalizeRank(1, stream);
-
-        // Edge Map
-        gunrock::oprtr::advance::LaunchKernel<AdvanceKernelPolicy, Problem,
-                                              HubFunctor,
-                                              gunrock::oprtr::advance::V2V>(
-            enactor_stats[0], frontier_attribute[0],
-            typename HubFunctor::LabelT(), data_slice, d_data_slice,
-            (VertexId *)NULL, (bool *)NULL, (bool *)NULL, (SizeT *)NULL,
-            frontier_queue->keys[frontier_attribute->selector].GetPointer(
-                util::DEVICE),  // d_in_queue
-            frontier_queue->keys[frontier_attribute->selector ^ 1].GetPointer(
-                util::DEVICE),  // d_out_queue
-            (Value *)NULL, (Value *)NULL,
-            graph_slice->row_offsets.GetPointer(util::DEVICE),
-            graph_slice->column_indices.GetPointer(util::DEVICE), (SizeT *)NULL,
-            (VertexId *)NULL,
-            graph_slice->nodes,  // graph_slice->frontier_elements[frontier_attribute.selector],
-                                 // // max_in_queue
-            graph_slice->edges,  // graph_slice->frontier_elements[frontier_attribute.selector^1],
-                                 // // max_out_queue
-            work_progress[0], context[0], stream);
-
-        if (this->debug) {
-          if (retval = work_progress->GetQueueLength(
-                  frontier_attribute->queue_index,
-                  frontier_attribute->queue_length, false, stream))
-            break;
-
-          if (retval = util::GRError(cudaStreamSynchronize(stream),
-                                     "edge_map_forward::Kernel failed",
-                                     __FILE__, __LINE__))
-            break;
-
-          printf(", %lld", (long long)frontier_attribute->queue_length);
-        }
-
-        NormalizeRank(0, stream);
-
-        enactor_stats->iteration++;
-        if (enactor_stats->iteration >= max_iteration) break;
-
-        if (this->debug) printf("\n%lld", (long long)enactor_stats->iteration);
-      }
-
-      if (retval) break;
-
-    } while (0);
-
-    if (this->debug) printf("\nGPU HITS Done.\n");
+    GUARD_CU(this->Init_Threads(
+        this, (CUT_THREADROUTINE) & (GunrockThread<EnactorT>)));
     return retval;
   }
 
-  typedef gunrock::oprtr::filter::KernelPolicy<Problem,  // Problem data type
-                                               300,      // CUDA_ARCH
-                                               // INSTRUMENT, // INSTRUMENT
-                                               0,     // SATURATION QUIT
-                                               true,  // DEQUEUE_HITSOBLEM_SIZE
-                                               8,     // MIN_CTA_OCCUPANCY
-                                               6,     // LOG_THREADS
-                                               1,     // LOG_LOAD_VEC_SIZE
-                                               0,     // LOG_LOADS_PER_TILE
-                                               5,     // LOG_RAKING_THREADS
-                                               5,     // END_BITMASK_CULL
-                                               8>  // LOG_SCHEDULE_GRANULARITY
-      FilterKernelPolicy;
-
-  typedef gunrock::oprtr::advance::KernelPolicy<
-      Problem,  // Problem data type
-      300,      // CUDA_ARCH
-      // INSTRUMENT,                         // INSTRUMENT
-      8,        // MIN_CTA_OCCUPANCY
-      6,        // LOG_THREADS
-      0,        // LOG_BLOCKS
-      0,        // LIGHT_EDGE_THRESHOLD
-      1,        // LOG_LOAD_VEC_SIZE
-      0,        // LOG_LOADS_PER_TILE
-      5,        // LOG_RAKING_THREADS
-      32,       // WARP_GATHER_THRESHOLD
-      128 * 4,  // CTA_GATHER_THRESHOLD
-      7,        // LOG_SCHEDULE_GRANULARITY
-      gunrock::oprtr::advance::TWC_FORWARD>
-      AdvanceKernelPolicy;
-
   /**
-   * \addtogroup PublicInterface
-   * @{
+   * @brief one run of hits, to be called within GunrockThread
+   * @param thread_data Data for the CPU thread
+   * \return cudaError_t error message(s), if any
    */
-
-  /**
-   * @brief HITS Enact kernel entry.
-   *
-   * @tparam HITSProblem HITS Problem type. @see HITSProblem
-   *
-   * @param[in] context CudaContext for moderngpu library
-   * @param[in] problem Pointer to HITSProblem object.
-   * @param[in] max_grid_size Max grid size for HITS kernel calls.
-   *
-   * \return cudaError_t object which indicates the success of all CUDA function
-   * calls.
-   */
-  cudaError_t Init(ContextPtr *context, Problem *problem,
-                   int max_grid_size = 0) {
-    int min_sm_version = -1;
-    for (int i = 0; i < this->num_gpus; i++)
-      if (min_sm_version == -1 ||
-          this->cuda_props[i].device_sm_version < min_sm_version)
-        min_sm_version = this->cuda_props[i].device_sm_version;
-
-    if (min_sm_version >= 300) {
-      return InitHITS<AdvanceKernelPolicy, FilterKernelPolicy>(context, problem,
-                                                               max_grid_size);
-    }
-
-    // to reduce compile time, get rid of other architecture for now
-    // TODO: add all the kernelpolicy settings for all archs
-
-    printf("Not yet tuned for this architecture\n");
-    return cudaErrorInvalidDeviceFunction;
+  cudaError_t Run(ThreadSlice &thread_data) {
+    gunrock::app::Iteration_Loop<0, 1, IterationT>(
+        thread_data, iterations[thread_data.thread_num]);
+    return cudaSuccess;
   }
 
   /**
-   * @brief HITS Enact kernel entry.
-   *
-   * @tparam HITSProblem HITS Problem type. @see HITSProblem
-   *
-   * @param[in] max_iteration Max iteration number for the algorithm
-   *
-   * \return cudaError_t object which indicates the success of all CUDA function
-   * calls.
+   * @brief Reset enactor
+   * @param[in] nodes Number of nodes in the graph
+   * @param[in] target Target location of data
+   * \return cudaError_t error message(s), if any
    */
-  cudaError_t Enact(SizeT max_iteration) {
-    int min_sm_version = -1;
-    for (int i = 0; i < this->num_gpus; i++)
-      if (min_sm_version == -1 ||
-          this->cuda_props[i].device_sm_version < min_sm_version)
-        min_sm_version = this->cuda_props[i].device_sm_version;
+  cudaError_t Reset(typename GraphT::SizeT nodes,
+                    util::Location target = util::DEVICE) {
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(BaseEnactor::Reset(target));
 
-    if (min_sm_version >= 300) {
-      return EnactHITS<AdvanceKernelPolicy, FilterKernelPolicy>(max_iteration);
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      if (this->num_gpus == 1) {
+        this->thread_slices[gpu].init_size = 1;
+        for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
+          auto &frontier =
+              this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
+          frontier.queue_length = (peer_ == 0) ? nodes : 0;
+          if (peer_ == 0) {
+            GUARD_CU(frontier.V_Q()->ForAll(
+                [] __host__ __device__(VertexT * v_q, const SizeT &pos) {
+                  v_q[pos] = pos;
+                },
+                nodes, target, 0));
+          }
+        }
+      } else {  // Incomplete/untested
+        this->thread_slices[gpu].init_size = 0;
+        for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
+          this->enactor_slices[gpu * this->num_gpus + peer_]
+              .frontier.queue_length = 0;
+        }
+      }
     }
 
-    // to reduce compile time, get rid of other architecture for now
-    // TODO: add all the kernelpolicy settings for all archs
-
-    printf("Not yet tuned for this architecture\n");
-    return cudaErrorInvalidDeviceFunction;
+    GUARD_CU(BaseEnactor::Sync());
+    return retval;
   }
 
-  /** @} */
+  /**
+   * @brief Enacts a hits computing on the specified graph.
+...
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Enact() {
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(this->Run_Threads(this));
+    util::PrintMsg("GPU Template Done.", this->flag & Debug);
+    return retval;
+  }
 };
 
 }  // namespace hits

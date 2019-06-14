@@ -14,6 +14,8 @@
  * are not limited to C.
  */
 
+#pragma once
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -163,34 +165,38 @@ extern "C" {
  *
  * \return Elapsed run time in milliseconds
  */
+/*
 float gunrock_bfs(struct GRGraph* grapho,        // Output graph / results
                   const struct GRGraph* graphi,  // Input graph structure
                   const struct GRSetup* config,  // Flag configurations
                   const struct GRTypes data_t);  // Data type Configurations
+*/
 
 /*
- * @brief Simple interface take in CSR arrays as input
- *
- * @param[out] bfs_label            Return BFS label (depth) per nodes
- * @param[out] bfs_label            Return the predecessor per nodes
- * @param[in]  num_nodes            Number of nodes of the input graph
- * @param[in]  num_edges            Number of edges of the input graph
- * @param[in]  row_offsets          CSR-formatted graph input row offsets
- * @param[in]  col_indices          CSR-formatted graph input column indices
- * @param[in]  num_iters            Number of BFS runs. Note if num_iters > 1,
- * the bfs_lbel will only store the results from the last run
- * @param[in]  source               Sources to begin traverse
- * @param[in]  source_mode          Enumerator of source mode: manually,
- * randomize, largest_degree
- * @param[in]  mark_predecessors    If the flag is set, mark predecessors
- * instead of bfs label
- * @param[in]  enable_idempotence   If the flag is set, use optimizations that
- * allow idempotence operation (will usually bring better performance)
+ * @brief Simple C-interface take in graph as CSR format
+ * @param[in]  num_nodes   Number of veritces in the input graph
+ * @param[in]  num_edges   Number of edges in the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  source      Source to begin traverse
+ * @param[in]  mark_preds  Whether to output predecessor info
+ * @param[in]  direction_optimized Whether to use directional optimizing BFS
+ * @param[in]  idempotence Whether to use idempotence
+ * @param[out] labels      Return shortest hop distances to source per vertex
+ * @param[out] preds       Return predecessors of each vertex
+ * \return     double      Return accumulated elapsed times for all runs
  */
-float bfs(int* bfs_label, int* bfs_pred, const int num_nodes,
-          const int num_edges, const int* row_offsets, const int* col_indices,
-          const int num_iters, int* source, enum SrcMode source_mode,
-          const bool mark_predecessors, const bool enable_idempotence);
+double bfs(
+    const int        num_nodes,
+    const int        num_edges,
+    const int       *row_offsets,
+    const int       *col_indices,
+          int        source,
+    const bool       mark_pred,
+    const bool       direction_optimized,
+    const bool       idempotence,
+          int       *distances,
+          int       *preds);
 
 /**
  * @brief Betweenness centrality public interface.
@@ -200,10 +206,12 @@ float bfs(int* bfs_label, int* bfs_pred, const int num_nodes,
  * @param[in]  config Primitive-specific configurations.
  * @param[in]  data_t Primitive-specific data type setting.
  */
+/*
 void gunrock_bc(struct GRGraph* grapho,        // Output graph / results
                 const struct GRGraph* graphi,  // Input graph structure
                 const struct GRSetup* config,  // Flag configurations
                 const struct GRTypes data_t);  // Data type Configurations
+*/
 
 /**
  * @brief Betweenness centrality simple public interface.
@@ -215,12 +223,15 @@ void gunrock_bc(struct GRGraph* grapho,        // Output graph / results
  * @param[in] col_indices Input graph col_indices.
  * @param[in] source Source node to start.
  */
-void bc(float* bc_scores,        // Return centrality score per node
-        const int num_nodes,     // Input graph number of nodes
-        const int num_edges,     // Input graph number of edges
-        const int* row_offsets,  // Input graph row_offsets
-        const int* col_indices,  // Input graph col_indices
-        const int source);       // Source vertex to start
+double bc(
+    const int         num_nodes,   // Input graph number of nodes
+    const int         num_edges,   // Input graph number of edges
+    const int        *row_offsets, // Input graph row_offsets
+    const int        *col_indices, // Input graph col_indices
+          int         source,	   // Source vertex to start
+          float      *bc_values,   // Return centrality score per node
+          float      *sigmas,
+          int        *labels);
 
 /**
  * @brief Connected component public interface.
@@ -230,10 +241,12 @@ void bc(float* bc_scores,        // Return centrality score per node
  * @param[in]  config Primitive-specific configurations.
  * @param[in]  data_t Primitive-specific data type setting.
  */
+/*
 void gunrock_cc(struct GRGraph* grapho,        // Output graph / results
                 const struct GRGraph* graphi,  // Input graph structure
                 const struct GRSetup* config,  // Flag configurations
                 const struct GRTypes data_t);  // Data type Configurations
+*/
 
 /**
  * @brief Connected component simple public interface.
@@ -246,11 +259,13 @@ void gunrock_cc(struct GRGraph* grapho,        // Output graph / results
 
  *\return int number of connected components in the graph.
  */
+/*
 int cc(int* component,           // Return component IDs per node
        const int num_nodes,      // Input graph number of nodes
        const int num_edges,      // Input graph number of edges
        const int* row_offsets,   // Input graph row_offsets
        const int* col_indices);  // Input graph col_indices
+*/
 
 /**
  * @brief Single-source shortest path public interface.
@@ -262,10 +277,12 @@ int cc(int* component,           // Return component IDs per node
  *
  * \return Elapsed run time in milliseconds
  */
+/*
 float gunrock_sssp(struct GRGraph* grapho,        // Output graph / results
                    const struct GRGraph* graphi,  // Input graph structure
                    const struct GRSetup* config,  // Flag configurations
                    const struct GRTypes data_t);  // Data type Configurations
+*/
 
 /**
  * @brief Single-source shortest path simple public interface.
@@ -283,14 +300,17 @@ float gunrock_sssp(struct GRGraph* grapho,        // Output graph / results
  *
  * \return Elapsed run time in milliseconds
  */
-float sssp(unsigned int* distances,  // Return shortest distances
-           int* preds,
-           const int num_nodes,              // Input graph number of nodes
-           const int num_edges,              // Input graph number of edges
-           const int* row_offsets,           // Input graph row_offsets
-           const int* col_indices,           // Input graph col_indices
-           const unsigned int* edge_values,  // Input graph edge weight
-           const int num_iters, int* source, const bool mark_preds);
+ double sssp(
+     const int        num_nodes,  // Input graph number of nodes
+     const int        num_edges,  // Input graph number of edges
+     const int       *row_offsets,  // Input graph CSR row offsets array
+     const int       *col_indices,  // Input graph CSR column indices array
+     const float     *edge_values,  // Input graph's values on edges (float)
+           int        source, // Source vertext for SSSP algorithm
+     const bool       mark_pred,  // Whether to output predecessor info or not
+           float     *distances,  // Return shortest distance to source per vertex
+           int       *preds // Return predecessors of each vertex
+         );
 
 /**
  * @brief PageRank public interface.
@@ -300,10 +320,12 @@ float sssp(unsigned int* distances,  // Return shortest distances
  * @param[in]  config Primitive-specific configurations.
  * @param[in]  data_t Primitive-specific data type setting.
  */
-void gunrock_pagerank(struct GRGraph* grapho,        // Output graph / results
-                      const struct GRGraph* graphi,  // Input graph structure
-                      const struct GRSetup* config,  // Flag configurations
-                      const struct GRTypes data_t);  // Data type Configurations
+/*void gunrock_pagerank(
+    struct GRGraph*       grapho,   // Output graph / results
+    const struct GRGraph* graphi,   // Input graph structure
+    const struct GRSetup* config,   // Flag configurations
+    const struct GRTypes  data_t);  // Data type Configurations
+*/
 
 /**
  * @brief PageRank simple public interface.
@@ -316,15 +338,51 @@ void gunrock_pagerank(struct GRGraph* grapho,        // Output graph / results
  * @param[in] col_indices Input graph col_indices.
  * @param[in] normalized Whether to perform a normalized PageRank
  */
-void pagerank(int* node_ids,           // Return top-ranked vertex IDs
-              float* pagerank,         // Return top-ranked PageRank scores
-              const int num_nodes,     // Input graph number of nodes
-              const int num_edges,     // Input graph number of edges
-              const int* row_offsets,  // Input graph row_offsets
-              const int* col_indices,  // Input graph col_indices
-              bool normalized);        // normalized pagerank flag
+double pagerank(
+    const int  num_nodes,     // Input graph number of nodes
+    const int  num_edges,     // Input graph number of edges
+    const int* row_offsets,   // Input graph row_offsets
+    const int* col_indices,   // Input graph col_indices
+    bool       normalize,   // normalized pagerank flag
+    int*       node_ids,
+    float*     ranks);
 
-// TODO Add other primitives
+
+/*
+ * @brief Louvain simple public interface.
+ *
+ * @param[in]  num_nodes   Number of veritces in the input graph
+ * @param[in]  num_edges   Number of edges in the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[out] communities Louvain's communities output
+ * \return     float       Return accumulated elapsed times for all runs
+ */
+float louvain(
+    const int        num_nodes,
+    const int        num_edges,
+    const int       *row_offsets,
+    const int       *col_indices,
+    const int       *edge_values,
+          int       *communities);
+
+
+/*
+ * @brief Graph Coloring simple public interface.
+ *
+ * @param[in]  parameters Excution parameters
+ * @param[in]  graph      Input graph
+ * @param[out] colors     Return generated colors for each run
+ * @param[out] num_colors Return number of colors generated for each run
+ * \return     double     Return accumulated elapsed times for all runs
+ */
+double color(
+    const int        num_nodes,
+    const int        num_edges,
+    const int       *row_offsets,
+    const int       *col_indices,
+          int       *colors,
+          int        num_colors);
 
 #ifdef __cplusplus
 }

@@ -61,7 +61,8 @@ class CtaWorkProgress {
   // Seven pointer-sized counters in global device memory (we may not use
   // all of them, or may only use 32-bit versions of them)
   SizeT* d_counters;
-  util::Array1D<int, SizeT>* p_counters;
+  util::Array1D<int, SizeT, PINNED,
+                cudaHostAllocMapped | cudaHostAllocPortable>* p_counters;
 
   // Host-controlled selector for indexing into d_counters.
   int progress_selector;
@@ -127,7 +128,8 @@ class CtaWorkProgress {
 
   // Get counter for specified iteration
   template </*typename SizeT,*/ typename IterationT>
-  __device__ __forceinline__ SizeT* GetQueueCounter(IterationT iteration) {
+  __device__ __forceinline__ SizeT* GetQueueCounter(
+      IterationT iteration) const {
     return d_counters + (iteration & 0x3);
   }
 
@@ -180,8 +182,7 @@ class CtaWorkProgress {
 
   cudaError_t Init() {
     cudaError_t retval = cudaSuccess;
-    if (retval = p_counters->Init(COUNTERS, util::HOST | util::DEVICE, true,
-                                  cudaHostAllocMapped | cudaHostAllocPortable))
+    if (retval = p_counters->Allocate(COUNTERS, util::HOST | util::DEVICE))
       return retval;
     d_counters = p_counters->GetPointer(util::DEVICE);
     progress_selector = 0;
@@ -206,7 +207,8 @@ class CtaWorkProgressLifetime : public CtaWorkProgress<SizeT> {
  protected:
   // GPU d_counters was allocated on
   int gpu;
-  util::Array1D<int, SizeT> counters;
+  util::Array1D<int, SizeT, PINNED, cudaHostAllocMapped | cudaHostAllocPortable>
+      counters;
 
  public:
   /**
@@ -220,7 +222,9 @@ class CtaWorkProgressLifetime : public CtaWorkProgress<SizeT> {
   /**
    * Destructor
    */
-  virtual ~CtaWorkProgressLifetime() { Release(); }
+  virtual ~CtaWorkProgressLifetime() {
+    // Release();
+  }
 
   // Deallocates and resets the progress counters
   cudaError_t Release() {

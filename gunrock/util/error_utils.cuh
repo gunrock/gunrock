@@ -26,6 +26,13 @@ enum gunrockError {
 
 typedef enum gunrockError gunrockError_t;
 
+void PrintMsg(const char *msg, bool to_print = true, bool new_line = true);
+void PrintMsg(std::string msg, bool to_print = true, bool new_line = true);
+void PrintMsg(const char *msg, int gpu_num, long long iteration, int peer,
+              bool to_print = true, bool new_line = true);
+void PrintMsg(std::string msg, int gpu_num, long long iteration, int peer,
+              bool to_print = true, bool new_line = true);
+
 /**
  * Displays error message in accordance with debug mode
  */
@@ -66,3 +73,16 @@ gunrockError_t GRError(gunrockError_t error, std::string message,
 
 }  // namespace util
 }  // namespace gunrock
+
+#define GUARD_CU(cuda_call)                                                   \
+  {                                                                           \
+    retval = gunrock::util::GRError(cuda_call, "error encountered", __FILE__, \
+                                    __LINE__);                                \
+    if (retval) return retval;                                                \
+  }
+
+#define GUARD_CU2(cuda_call, message)                                        \
+  {                                                                          \
+    retval = gunrock::util::GRError(cuda_call, message, __FILE__, __LINE__); \
+    if (retval) return retval;                                               \
+  }

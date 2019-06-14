@@ -25,7 +25,7 @@ namespace util {
  * CUDA architecture of the current compilation path
  */
 #ifndef __CUDA_ARCH__
-#define __GR_CUDA_ARCH__ 0  // Host path
+//#define __GR_CUDA_ARCH__ 0                      // Host path
 #else
 #define __GR_CUDA_ARCH__ __CUDA_ARCH__  // Device path
 #endif
@@ -52,19 +52,31 @@ namespace util {
   ((arch >= 200) ? GR_SM20_LOG_MEM_BANKS() : GR_SM10_LOG_MEM_BANKS())
 
 // Physical shared memory per SM (bytes)
-// #define GR_SM62_SMEM_BYTES()            (65536)     // 64KB on SM6.2
-#define GR_SM61_SMEM_BYTES() (98304)  // 96KB on SM6.1+
-#define GR_SM60_SMEM_BYTES() (65536)  // 64KB on SM6.0+
-#define GR_SM20_SMEM_BYTES() (49152)  // 48KB on SM2.0+
-#define GR_SM10_SMEM_BYTES() (16384)  // 32KB on SM1.0-SM1.3
-#define GR_SMEM_BYTES(arch)                                             \
-  ((arch >= 610) ? GR_SM61_SMEM_BYTES()                                 \
-                 : (arch >= 600) ? GR_SM60_SMEM_BYTES()                 \
-                                 : (arch >= 200) ? GR_SM20_SMEM_BYTES() \
-                                                 : GR_SM10_SMEM_BYTES())
+#define GR_SM75_SMEM_BYTES() (65536)   // 64KB on SM7.5
+#define GR_SM61_SMEM_BYTES() (98304)   // 96KB on SM6.1+
+#define GR_SM60_SMEM_BYTES() (65536)   // 64KB on SM6.0+
+#define GR_SM52_SMEM_BYTES() (98304)   // 64KB on SM5.2
+#define GR_SM50_SMEM_BYTES() (65536)   // 64KB on SM5.0+
+#define GR_SM37_SMEM_BYTES() (114688)  // 48KB + 64KB on SM3.7
+#define GR_SM20_SMEM_BYTES() (49152)   // 48KB on SM2.0+
+#define GR_SM10_SMEM_BYTES() (16384)   // 32KB on SM1.0-SM1.3
+#define GR_SMEM_BYTES(arch)                                                 \
+  ((arch == 750)                                                            \
+       ? GR_SM75_SMEM_BYTES()                                               \
+       : (arch >= 610)                                                      \
+             ? GR_SM61_SMEM_BYTES()                                         \
+             : (arch >= 600)                                                \
+                   ? GR_SM60_SMEM_BYTES()                                   \
+                   : (arch == 520)                                          \
+                         ? GR_SM52_SMEM_BYTES()                             \
+                         : (arch >= 500)                                    \
+                               ? GR_SM50_SMEM_BYTES()                       \
+                               : (arch == 370)                              \
+                                     ? GR_SM37_SMEM_BYTES()                 \
+                                     : (arch >= 200) ? GR_SM20_SMEM_BYTES() \
+                                                     : GR_SM10_SMEM_BYTES())
 
 // Physical threads per SM
-// #define GR_SM62_SM_THREADS()            (4096)      // 4096 threads on SM6.2
 #define GR_SM30_SM_THREADS() (2048)  // 2048 threads on SM3.0+
 #define GR_SM20_SM_THREADS() (1536)  // 1536 threads on SM2.0+
 #define GR_SM12_SM_THREADS() (1024)  // 1024 threads on SM1.2-SM1.3

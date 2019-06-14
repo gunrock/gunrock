@@ -1,7 +1,7 @@
 project(gunrock)
 
-set(gunrock_VERSION_MAJOR 0)
-set(gunrock_VERSION_MINOR 5)
+set(gunrock_VERSION_MAJOR 1)
+set(gunrock_VERSION_MINOR 0)
 set(gunrock_VERSION_PATCH 0)
 add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
@@ -26,13 +26,15 @@ else (WARNING_DEP_FLAG)
 endif (WARNING_DEP_FLAG)
 # end /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -fPIC")
 
-option(CMAKE_VERBOSE_MAKEFILE ON)
+option(CMAKE_VERBOSE_MAKEFILE OFF)
 
 # begin /* Find and set CUDA arch */
 set(gunrock_REQUIRED_CUDA_VERSION 7.5)
 FIND_PACKAGE(CUDA ${gunrock_REQUIRED_CUDA_VERSION} REQUIRED)
+# /* enables relocatable device code linking */
+SET(CUDA_SEPARABLE_COMPILATION ON)
 if(CUDA_64_BIT_DEVICE_CODE)
   set(gunrock_arch_suffix x86_64)
 else()
@@ -49,7 +51,9 @@ if(${CUDA_VERSION} EQUAL "8.0" AND ${Boost_VERSION} EQUAL "106400")
 endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/FindOpenMP.cmake)
-include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)
+if (METIS_LIBRARY)
+  include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)
+endif()
 # end /* Include Boost, OpenMP & Metis */
 
 # begin /* How can I pass git SHA1 to compiler as definition using cmake? */
@@ -67,12 +71,13 @@ include_directories(${gunrock_INCLUDE_DIRS})
 # end /* Include gunrock directories ./ */
 
 # begin /* Include moderngpu & cub */
+include(${CMAKE_SOURCE_DIR}/cmake/FindRapidJson.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindModernGPU.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindCUB.cmake)
 # end /* Include moderngpu & cub */
 
 # begin /* Include googletest & googlemock */
-option(GUNROCK_GOOGLE_TESTS "Use Googletest as testing framework (default: ON)." OFF)
+option(GUNROCK_GOOGLE_TESTS "Use Googletest as testing framework (default: OFF)." OFF)
 
 if (GUNROCK_GOOGLE_TESTS)
 include(${CMAKE_SOURCE_DIR}/cmake/DownloadProject/DownloadProject.cmake)
@@ -201,6 +206,14 @@ option(GUNROCK_APP_GRMAT
   "If on, builds only GRMAT application."
   OFF)
 
+option(GUNROCK_APP_LOUVAIN
+  "If on, builds only LOUVAIN application."
+  OFF)
+
+option(GUNROCK_APP_COLOR
+  "If on, builds only COLOR application."
+  OFF)
+
 #option(GUNROCK_APP_SAMPLE
 #  "If on, builds only SAMPLE application."
 #  OFF)
@@ -231,7 +244,7 @@ option(GUNROCK_GENCODE_SM30
 
 option(GUNROCK_GENCODE_SM35
   "ON to generate code for Compute Capability 3.5 devices (e.g. Tesla K40)"
-  ON)
+  OFF)
 
 option(GUNROCK_GENCODE_SM37
   "ON to generate code for Compute Capability 3.7 devices (e.g. Tesla K80)"
@@ -243,16 +256,16 @@ option(GUNROCK_GENCODE_SM50
 
 option(GUNROCK_GENCODE_SM52
   "ON to generate code for Compute Capability 5.2 devices (e.g. GeForce Titan X)"
-  ON)
+  OFF)
 
 #Pascal Architecture: CUDA 8
 if (CUDA_VERSION VERSION_EQUAL "8.0" OR CUDA_VERSION VERSION_GREATER "8.0")
   option(GUNROCK_GENCODE_SM60
     "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
-    ON)
+    OFF)
   option(GUNROCK_GENCODE_SM61
     "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
-    ON)
+    OFF)
 endif ()
 
 #Volta Architecture: CUDA 9
@@ -334,8 +347,8 @@ endif (CUDA_VERBOSE_PTXAS)
 # end /* Configure GUNROCK build options */
 
 # c++11 is required
-# Already set above. Causes build error on Ubuntu 18.04.1 LTS 
-#set(CUDA_NVCC_FLAGS -std=c++11)
+# Already set above. Causes build error on Ubuntu 18.04.1 LTS
+set(CUDA_NVCC_FLAGS --expt-extended-lambda -rdc=true -lcudadevrt)
 set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_curand_LIBRARY})
 
 if(GUNROCK_BUILD_LIB)
@@ -360,8 +373,8 @@ endif(GUNROCK_BUILD_LIB)
 # Subdirectories for examples, testing and documentation
 if(GUNROCK_BUILD_TESTS)
   # Enables testing for this directory and below.
-  # Note that ctest expects to find a test file 
-  # in the build directory root. Therefore, 
+  # Note that ctest expects to find a test file
+  # in the build directory root. Therefore,
   # this command should be in the source directory root.
   # https://cmake.org/cmake/help/v3.0/command/enable_testing.html
   # Note: For gunrock, use ctest or make check to run the tests

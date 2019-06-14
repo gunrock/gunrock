@@ -344,46 +344,35 @@ inline bool EnoughDeviceMemory(unsigned int mem_needed) {
  *
  */
 template <typename T, typename SizeT>
-int CompareResults(T *computed, T *reference, SizeT len, bool verbose = true,
-                   bool quiet = false) {
-  int flag = 0;
+SizeT CompareResults(T *computed, T *reference, SizeT len, bool verbose = true,
+                     bool quiet = false) {
+  SizeT num_errors = 0;
   for (SizeT i = 0; i < len; i++) {
-    if (computed[i] != reference[i] && flag == 0) {
-      if (!quiet) {
-        printf("\nINCORRECT: [%lu]: ", (unsigned long)i);
-        PrintValue<T>(computed[i]);
-        printf(" != ");
-        PrintValue<T>(reference[i]);
+    if (computed[i] == reference[i]) continue;
+    num_errors += 1;
+    if (quiet || num_errors > 1) continue;
 
-        if (verbose) {
-          printf("\nresult[...");
-          for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
-            PrintValue<T>(computed[j]);
-            printf(", ");
-          }
-          printf("...]");
-          printf("\nreference[...");
-          for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
-            PrintValue<T>(reference[j]);
-            printf(", ");
-          }
-          printf("...]");
-        }
-      }
-      flag += 1;
-      // return flag;
+    util::PrintMsg("FAIL: [" + std::to_string(i) +
+                   "]: " + std::to_string(computed[i]) +
+                   " != " + std::to_string(reference[i]));
+    if (!verbose) continue;
+
+    util::PrintMsg("result[...", true, false);
+    for (SizeT j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+      util::PrintMsg(std::to_string(computed[j]) + ", ", true, false);
     }
-    if (computed[i] != reference[i] && flag > 0) flag += 1;
-  }
-  if (!quiet) {
-    printf("\n");
-  }
-  if (flag == 0) {
-    if (!quiet) {
-      printf("CORRECT");
+    util::PrintMsg("...]");
+    util::PrintMsg("reference[...", true, false);
+    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+      util::PrintMsg(std::to_string(reference[j]) + ", ", true, false);
     }
+    util::PrintMsg("...]");
   }
-  return flag;
+
+  if (num_errors == 0 && !quiet) {
+    util::PrintMsg("PASS");
+  }
+  return num_errors;
 }
 
 /**
@@ -405,58 +394,42 @@ int CompareResults(T *computed, T *reference, SizeT len, bool verbose = true,
  *
  */
 template <typename SizeT>
-int CompareResults(float *computed, float *reference, SizeT len,
-                   bool verbose = true, bool quiet = false) {
+SizeT CompareResults(float *computed, float *reference, SizeT len,
+                     bool verbose = true, bool quiet = false) {
   float THRESHOLD = 0.05f;
-  int flag = 0;
+  SizeT num_errors = 0;
   for (SizeT i = 0; i < len; i++) {
     // Use relative error rate here.
-    bool is_right = true;
     if (fabs(computed[i] - 0.0) < 0.01f) {
-      if (fabs(computed[i] - reference[i]) > THRESHOLD) {
-        is_right = false;
-      }
+      if (fabs(computed[i] - reference[i]) <= THRESHOLD) continue;
     } else {
-      if (fabs((computed[i] - reference[i]) / reference[i]) > THRESHOLD) {
-        is_right = false;
-      }
+      if (fabs((computed[i] - reference[i]) / reference[i]) <= THRESHOLD)
+        continue;
     }
 
-    if (!is_right) {
-      if (!quiet && flag < 10) {
-        printf("\nINCORRECT: [%lu]: ", (unsigned long)i);
-        PrintValue<float>(computed[i]);
-        printf(" != ");
-        PrintValue<float>(reference[i]);
+    num_errors += 1;
+    if (quiet || num_errors > 1) continue;
 
-        if (verbose) {
-          printf("\nresult[...");
-          for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
-            PrintValue<float>(computed[j]);
-            printf(", ");
-          }
-          printf("...]");
-          printf("\nreference[...");
-          for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
-            PrintValue<float>(reference[j]);
-            printf(", ");
-          }
-          printf("...]");
-        }
-      }
-      flag += 1;
+    util::PrintMsg("FAIL: [" + std::to_string(i) +
+                   "]: " + std::to_string(computed[i]) +
+                   " != " + std::to_string(reference[i]));
+    if (!verbose) continue;
+
+    util::PrintMsg("result[...", true, false);
+    for (SizeT j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+      util::PrintMsg(std::to_string(computed[j]) + ", ", true, false);
     }
-    if (!is_right && flag > 0) flag += 1;
-  }
-  if (!quiet) {
-    printf("\n");
-  }
-  if (!flag) {
-    if (!quiet) {
-      printf("CORRECT");
+    util::PrintMsg("...]");
+    util::PrintMsg("reference[...", true, false);
+    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+      util::PrintMsg(std::to_string(reference[j]) + ", ", true, false);
     }
+    util::PrintMsg("...]");
   }
-  return flag;
+  if (num_errors == 0 && !quiet) {
+    util::PrintMsg("PASS");
+  }
+  return num_errors;
 }
 
 /** @} */
