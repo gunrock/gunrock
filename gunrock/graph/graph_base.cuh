@@ -222,7 +222,7 @@ double GetAverageDegree(GraphT &graph)
 }
 
 /**
- * @brief Get the average degree of all the nodes in graph
+ * @brief Get the Standard Deviation of degrees of all the nodes in graph
  */
 template <typename GraphT>
 double GetStddevDegree(GraphT &graph)
