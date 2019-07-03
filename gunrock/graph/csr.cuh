@@ -110,10 +110,10 @@ struct Csr :
      }
      
      void DumpH(){
-        char vertex="vertex.bin";
-        char graph="graph.bin";
-        dump_ram(vertex,row_offsets,row_offsets.size);
-        dump_ram(graph,column_indices,row_offsets.size);
+        char* vertex="vertex.bin";
+        char* graph="graph.bin";
+        dump_ram(vertex,(void*)row_offsets,row_offsets.size);
+        dump_ram(graph,(void*)column_indices,row_offsets.size);
      }
 
 
