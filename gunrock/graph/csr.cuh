@@ -98,6 +98,24 @@ struct Csr :
     {
         //Release();
     }
+#include <gunrock/util/io/dump.h>
+    /**
+     * @brief Dump CSR graph in binary format
+     */
+     void DumpD(){
+        char vertex="vertex.bin";
+        char graph="graph.bin";
+        dump_cuda_mem(vertex,row_offsets,row_offsets.size);
+        dump_cuda_mem(graph,column_indices,row_offsets.size);
+     }
+     
+     void DumpH(){
+        char vertex="vertex.bin";
+        char graph="graph.bin";
+        dump_ram(vertex,row_offsets,row_offsets.size);
+        dump_ram(graph,column_indices,row_offsets.size);
+     }
+
 
     /**
      * @brief Deallocates CSR graph
