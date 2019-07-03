@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
+//#include <assert.h>
 
 
 bool _dump_binary_graph(char* filename,char* graph,size_t size){
@@ -27,14 +27,14 @@ bool _dump_binary_graph(char* filename,char* graph,size_t size){
 
 bool dump_cuda_mem(char * name,void* device,size_t size){
     void* hMem=malloc(size);
-    assert(hMem);
+    //assert(hMem);
     cudaMemcpy(hMem,device, size, cudaMemcpyDeviceToHost);
     bool result=_dump_binary_graph(name,hMem,size);
     free(hMem);
     return result;
 }
 bool dump_ram(char * name,void* hMem,size_t size){
-    assert(hMem);
+    //assert(hMem);
     bool result=_dump_binary_graph(name,hMem,size);
     return result;
 }

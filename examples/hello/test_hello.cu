@@ -88,7 +88,7 @@ struct main_struct
             util::PrintMsg("--------------------------\n Elapsed: "
                 + std::to_string(elapsed), !quiet);
         }
-
+        graph.csr().DumpH();
         // <TODO> add other switching parameters, if needed
         std::vector<std::string> switches{"advance-mode"};
         // </TODO>
