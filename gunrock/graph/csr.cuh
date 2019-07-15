@@ -323,6 +323,7 @@ struct Csr :
         //                + ") != v " + std::to_string(v));
         //    }
         //}
+
         return retval;
     }
 
@@ -368,7 +369,7 @@ struct Csr :
              " " + std::to_string(row_offsets[node]) + " : ";
             for (SizeT edge = row_offsets[node];
                     edge < row_offsets[node + 1];
-                    edge++)
+                    edge++)        
             {
                 if (edge - row_offsets[node] > 40) break;
                 str = str + "[" + std::to_string(column_indices[edge]);
@@ -464,6 +465,21 @@ struct Csr :
         src = util::BinarySearch_RightMost(e, row_offsets + 0, (SizeT)0, this -> nodes);
         dest = column_indices[e];
     }
+
+    __device__ __host__ __forceinline__ 
+    SizeT GetSrcDestEdge(const VertexT &src, const VertexT &dest)
+    {
+      for(int i = row_offsets[src]; i < row_offsets[src + 1]; i++)
+      {
+        //if condition is met, edge has been found. Can return early.
+        if(column_indices[i] == dest)
+        {
+          return i;
+        }
+      }
+      //No edge exists for the given src and dest pair, setting edge to -1.
+      return -1;
+    }  
 
     /*template <typename Tuple>
     void CsrToCsc(Csr<VertexId, SizeT, Value> &target,
