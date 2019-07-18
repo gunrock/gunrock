@@ -36,6 +36,9 @@
 // Tests Segmented Reduction (device)
 #include "test_segreduce.h"
 
+// Tests Binary Search
+#include "test_binarysearch.h"
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
