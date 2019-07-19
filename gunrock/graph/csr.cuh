@@ -469,16 +469,6 @@ struct Csr :
     SizeT GetSrcDestEdge(const VertexT &src, const VertexT &dest)
     {
         return util::BinarySearch(dest, column_indices + 0, row_offsets[src], row_offsets[src + 1] - 1);
-      /*for(int i = row_offsets[src]; i < row_offsets[src + 1]; i++)
-      {
-        //if condition is met, edge has been found. Can return early.
-        if(column_indices[i] == dest)
-        {
-          return i;
-        }
-      }
-      //No edge exists for the given src and dest pair, setting edge to -1.
-      return -1;*/
     }  
 
     /*template <typename Tuple>
