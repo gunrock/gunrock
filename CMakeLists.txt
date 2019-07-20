@@ -34,11 +34,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -fPIC")
 
 option(CMAKE_VERBOSE_MAKEFILE OFF)
 
-#set(PROJECT_CMAKE_MODULES cmake)
-#set(CMAKE_MODULE_PATH
-#    ${CMAKE_MODULE_PATH}
-#    ${CMAKE_SOURCE_DIR}/${PROJECT_CMAKE_MODULES})
-
 # begin /* Find and set CUDA arch */
 set(gunrock_REQUIRED_CUDA_VERSION 7.5)
 FIND_PACKAGE(CUDA ${gunrock_REQUIRED_CUDA_VERSION} REQUIRED)
@@ -51,7 +46,6 @@ else()
 endif()
 # end /* Find and set CUDA arch */
 
-
 # begin /* Include Boost, OpenMP & Metis */
 include(${CMAKE_SOURCE_DIR}/cmake/FindBoostHeaders.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindBoost.cmake)
@@ -62,7 +56,7 @@ endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/FindOpenMP.cmake)
 if (METIS_LIBRARY)
-	include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)
+  include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)
 endif()
 # end /* Include Boost, OpenMP & Metis */
 
