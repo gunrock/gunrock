@@ -15,6 +15,10 @@ set(CMAKE_MACOSX_RPATH 1)
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure)
 # end /* Added make check target to improve ctest command */
 
+# begin /* Dependencies directory */
+set(PROJECT_DEPS_DIR externals)
+# end /* Dependencies directory */
+
 # begin /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
 option(WARNING_DEP_FLAG "Deprecated declarations warning flag." OFF)
 if (WARNING_DEP_FLAG)
@@ -30,6 +34,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -fPIC")
 
 option(CMAKE_VERBOSE_MAKEFILE OFF)
 
+#set(PROJECT_CMAKE_MODULES cmake)
+#set(CMAKE_MODULE_PATH
+#    ${CMAKE_MODULE_PATH}
+#    ${CMAKE_SOURCE_DIR}/${PROJECT_CMAKE_MODULES})
+
 # begin /* Find and set CUDA arch */
 set(gunrock_REQUIRED_CUDA_VERSION 7.5)
 FIND_PACKAGE(CUDA ${gunrock_REQUIRED_CUDA_VERSION} REQUIRED)
@@ -42,6 +51,7 @@ else()
 endif()
 # end /* Find and set CUDA arch */
 
+
 # begin /* Include Boost, OpenMP & Metis */
 include(${CMAKE_SOURCE_DIR}/cmake/FindBoostHeaders.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindBoost.cmake)
@@ -52,7 +62,7 @@ endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/FindOpenMP.cmake)
 if (METIS_LIBRARY)
-  include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)
+	include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)
 endif()
 # end /* Include Boost, OpenMP & Metis */
 
@@ -80,14 +90,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/FindCUB.cmake)
 option(GUNROCK_GOOGLE_TESTS "Use Googletest as testing framework (default: OFF)." OFF)
 
 if (GUNROCK_GOOGLE_TESTS)
-include(${CMAKE_SOURCE_DIR}/cmake/DownloadProject/DownloadProject.cmake)
-download_project(
-    PROJ googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG master
-    UPDATE_DISCONNECTED 1
-)
-add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
+  include(${CMAKE_SOURCE_DIR}/cmake/FindGoogleTest.cmake)
 endif (GUNROCK_GOOGLE_TESTS)
 # end /* Include googletest & googlemock */
 

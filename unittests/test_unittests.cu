@@ -20,7 +20,6 @@
 #include <gunrock/app/hello/hello_app.cu>
 #include <gunrock/app/test_base.cuh>
 
-#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 /**
