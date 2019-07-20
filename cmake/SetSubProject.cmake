@@ -2,11 +2,13 @@
 #  Gunrock: Set sub projects includes, links and executables.
 # ------------------------------------------------------------------------
 
+# begin /* rapidjson include directories */
 if(RAPIDJSON_FOUND)
   include_directories(${RAPIDJSON_INCLUDEDIR})
 else()
   message(SEND_ERROR "RapidJson include directory not set.")
 endif()
+# end /* rapidjson include directories */
 
 # begin /* moderngpu include directories */
 if(mgpu_INCLUDE_DIRS)

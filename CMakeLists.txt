@@ -15,6 +15,10 @@ set(CMAKE_MACOSX_RPATH 1)
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure)
 # end /* Added make check target to improve ctest command */
 
+# begin /* Dependencies directory */
+set(PROJECT_DEPS_DIR externals)
+# end /* Dependencies directory */
+
 # begin /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
 option(WARNING_DEP_FLAG "Deprecated declarations warning flag." OFF)
 if (WARNING_DEP_FLAG)
@@ -80,14 +84,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/FindCUB.cmake)
 option(GUNROCK_GOOGLE_TESTS "Use Googletest as testing framework (default: OFF)." OFF)
 
 if (GUNROCK_GOOGLE_TESTS)
-include(${CMAKE_SOURCE_DIR}/cmake/DownloadProject/DownloadProject.cmake)
-download_project(
-    PROJ googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG master
-    UPDATE_DISCONNECTED 1
-)
-add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
+  include(${CMAKE_SOURCE_DIR}/cmake/FindGoogleTest.cmake)
 endif (GUNROCK_GOOGLE_TESTS)
 # end /* Include googletest & googlemock */
 
