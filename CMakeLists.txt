@@ -19,16 +19,16 @@ add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure)
 set(PROJECT_DEPS_DIR externals)
 # end /* Dependencies directory */
 
-# begin /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
-option(WARNING_DEP_FLAG "Deprecated declarations warning flag." OFF)
-if (WARNING_DEP_FLAG)
+# begin /* Suppress all warnings from gcc */
+option(ENABLE_WARNINGS "Deprecated declarations warning flag." OFF)
+if (ENABLE_WARNINGS)
   # moderngpu will give auto_ptr warning.
-else (WARNING_DEP_FLAG)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-declarations")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
-  add_definitions ("-Wno-deprecated-declarations")
-endif (WARNING_DEP_FLAG)
-# end /* Suppress "deprecated auto_ptr" warnings caused by moderngpu */
+else (ENABLE_WARNINGS)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -w")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w")
+  add_definitions ("-w")
+endif (ENABLE_WARNINGS)
+# end /* Suppress all warnings from gcc */
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -fPIC")
 
