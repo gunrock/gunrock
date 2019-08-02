@@ -16,11 +16,7 @@
 
 // Graph definations
 #include <gunrock/graphio/graphio.cuh>
-#ifdef BOOST_FOUND
-#include <gunrock/util/info.cuh>
-#else
 #include <gunrock/util/info_rapidjson.cuh>
-#endif
 
 namespace gunrock {
 namespace app {
