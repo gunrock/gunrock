@@ -20,6 +20,7 @@
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/filewritestream.h>
 #include <gunrock/util/gitsha1.h>
+#include <gunrock/util/sysinfo_rapidjson.h>
 
 /* this is the "stringize macro macro" hack */
 #define STR(x) #x
@@ -46,6 +47,12 @@ cudaError_t UseParameters_info(util::Parameters &parameters) {
       "jsondir",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       "", "Directory to output statistics in json format", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<std::string>(
+      "tag",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      "", "Tag to better describe and identify json outputs", __FILE__,
+      __LINE__));
 
   return retval;
 }
@@ -175,9 +182,15 @@ struct Info {
 
     SetVal("engine", "Gunrock");
     SetVal("command-line", parameters.Get_CommandLine());
-    // SetVal("sysinfo", sysinfo.getSysinfo());
-    // SetVal("gpuinfo", gpuinfo.getGpuinfo());
-    // SetVal("userinfo", userinfo.getUserinfo());
+
+    util::Sysinfo sysinfo;
+    SetVal("sysinfo", sysinfo.getSysinfo());
+
+    util::Gpuinfo gpuinfo;
+    SetVal("gpuinfo", gpuinfo.getGpuinfo());
+
+    util::Userinfo userinfo;
+    SetVal("userinfo", userinfo.getUserinfo());
 
 #ifdef BOOST_FOUND
 #if BOOST_COMP_CLANG
@@ -344,10 +357,34 @@ struct Info {
   template <typename T>
   void SetVal(std::string name, const std::vector<T> &vec) {
     if (json_writer == NULL) return;
+    if (vec.size() == 1) {
+      SetVal(name, vec.front());
+    } else {
+      json_writer->Key(name.c_str());
+      json_writer->StartArray();
+      for (auto it = vec.begin(); it != vec.end(); it++)
+        SetVal(name, *it, false);
+      json_writer->EndArray();
+    }
+  }
+
+  template <typename T>
+  void SetVal(std::string name, const std::vector<std::pair<T, T>> &vec) {
+    if (json_writer == NULL) return;
     json_writer->Key(name.c_str());
-    json_writer->StartArray();
-    for (auto it = vec.begin(); it != vec.end(); it++) SetVal(name, *it, false);
-    json_writer->EndArray();
+    json_writer->StartObject();
+    // json_writer->StartArray();
+    // for (auto it = vec.begin(); it != vec.end(); it++) SetVal();
+    // for(auto const& item:vec) {
+    // std::cout << item.first << " " << item.second << std::endl;
+    // SetVal(item.first.c_str(), item.second);
+    //}
+    for (auto it = vec.begin(); it != vec.end(); it++) {
+      SetVal(it->first.c_str(), it->second);
+    }
+
+    // json_writer->EndArray();
+    json_writer->EndObject();
   }
 
   void CollectSingleRun(double single_elapsed) {
@@ -383,7 +420,7 @@ struct Info {
     edges_redundance = 0.0f;
     nodes_redundance = 0.0f;
 
-    std::vector<int> device_list = parameters->Get<std::vector<int> >("device");
+    std::vector<int> device_list = parameters->Get<std::vector<int>>("device");
     int num_gpus = device_list.size();
     auto graph = enactor.problem->org_graph[0];
 
@@ -447,7 +484,7 @@ struct Info {
                    : 0.0f;
 
     double elapsed = total_elapsed / num_runs;
-    SetVal("elapsed", elapsed);
+    SetVal("avg-process-time", elapsed);
     SetVal("average-duty", avg_duty);
     SetVal("search-depth", search_depth);
 
@@ -494,7 +531,7 @@ struct Info {
       SetVal("edges-visited", edges_visited);
       SetVal("nodes-redundance", nodes_redundance);
       SetVal("edges-redundance", edges_redundance);
-      SetVal("m-teps", m_teps);
+      SetVal("mteps", m_teps);
     }
 
     return retval;
@@ -520,7 +557,7 @@ struct Info {
     int num_srcs = 0;
     std::vector<int64_t> srcs;
     if (parameters->Have("srcs")) {
-      srcs = parameters->Get<std::vector<int64_t> >("srcs");
+      srcs = parameters->Get<std::vector<int64_t>>("srcs");
       num_srcs = srcs.size();
     }
 
@@ -574,6 +611,8 @@ struct Info {
 
   void Finalize(double postprocess_time, double total_time) {
     bool quiet = parameters->Get<bool>("quiet");
+    double min_m_teps = (double)this->edges_visited / max_elapsed;
+    double max_m_teps = (double)this->edges_visited / min_elapsed;
 
     preprocess_time = parameters->Get<double>("preprocess-time");
     SetVal("process-times", process_times);
@@ -581,6 +620,8 @@ struct Info {
     SetVal("max-process-time", max_elapsed);
     SetVal("postprocess-time", postprocess_time);
     SetVal("total-time", total_time);
+    SetVal("min-mteps", min_m_teps);
+    SetVal("max-mteps", max_m_teps);
 
     this->postprocess_time = postprocess_time;
     this->total_time = total_time;
