@@ -611,8 +611,8 @@ struct Info {
 
   void Finalize(double postprocess_time, double total_time) {
     bool quiet = parameters->Get<bool>("quiet");
-    double min_m_teps = (double)this->edges_visited / max_elapsed;
-    double max_m_teps = (double)this->edges_visited / min_elapsed;
+    double min_m_teps = (double)this->edges_visited / (max_elapsed * 1000.0);
+    double max_m_teps = (double)this->edges_visited / (min_elapsed * 1000.0);
 
     preprocess_time = parameters->Get<double>("preprocess-time");
     SetVal("process-times", process_times);
