@@ -62,7 +62,6 @@ struct SMIterationLoop : public IterationLoopBase
      */
     cudaError_t Core(int peer_ = 0)
     {
-        // Data sn works on
         auto         &enactor            =   this -> enactor[0];
         auto         &data_slice         =   this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
@@ -80,7 +79,7 @@ struct SMIterationLoop : public IterationLoopBase
         auto         &query_ci           =   data_slice.query_ci;
         auto         &counter            =   data_slice.counter;
         auto         &flags              =   data_slice.flags;
-        auto         &indices              =   data_slice.indices;
+        auto         &indices            =   data_slice.indices;
         auto         &partial            =   data_slice.partial;
         auto         &num_subs           =   data_slice.num_subs;
         auto         &results            =   data_slice.results;
@@ -94,6 +93,9 @@ struct SMIterationLoop : public IterationLoopBase
         size_t       nodes_query         =   data_slice.nodes_query;
         size_t       nodes_data          =   graph.nodes;
 
+	util::Array1D<SizeT, VertexT> *null_frontier = NULL;
+        auto complete_graph = null_frontier;
+
 
 	auto print_frontier = [] __host__ __device__(
 	    VertexT * v_q, const SizeT &pos) 
@@ -106,7 +108,7 @@ struct SMIterationLoop : public IterationLoopBase
 //	GUARD_CU(frontier.V_Q()->ForAll(print_frontier , frontier.queue_length, util::DEVICE, stream));
 //	GUARD_CU(frontier.Next_V_Q()->ForAll(print_frontier , frontier.queue_length, util::DEVICE, stream));
 
-        // First add degrees to subgraph matching
+        // Store data graph degrees to subgraphs
         GUARD_CU(subgraphs.ForAll([row_offsets]
             __host__ __device__ (VertexT *subgraphs_, const SizeT & v)
             {
@@ -140,7 +142,7 @@ struct SMIterationLoop : public IterationLoopBase
             return true;
         };
 
-        auto distribute_op = [subgraphs, isValid, NG, query_ro, query_ci, flags, counter, NG_src, NG_dest, results, nodes_data] __host__ __device__(
+        auto prune_op = [subgraphs, isValid, NG, query_ro, query_ci, flags, counter, NG_src, NG_dest, results, nodes_data] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
@@ -173,7 +175,7 @@ struct SMIterationLoop : public IterationLoopBase
                 return true;
             }
         };
-        auto look_ahead_op = [isValid, flags, nodes_data] __host__ __device__(
+        auto look_ahead_op = [isValid, flags, results, NG, counter, subgraphs, nodes_data] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
@@ -183,6 +185,12 @@ struct SMIterationLoop : public IterationLoopBase
             if ((!isValid[src]) || (!isValid[dest])) {
                 return false;
             }
+            // src is valid
+            if (results[src] != 1)
+                return false;
+            // 1 way look-ahead
+            if (subgraphs[dest] < NG[counter[0] * 2 + 1])
+                return false;
             flags[src] = true;
             return true;
         };
@@ -195,29 +203,31 @@ struct SMIterationLoop : public IterationLoopBase
             return true;
         };
 
-        frontier.queue_length = graph.edges;
-        frontier.queue_reset = true;
+        //frontier.queue_length = graph.edges;
+        //frontier.queue_reset = true;
         size_t pointer_head = 0;
         int num_init = nodes_query;
-        for (int iter = 0; iter < num_init; ++iter) {
+        for (int iter = 0; iter < 1; ++iter) {
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
+                graph.csr(), complete_graph, complete_graph,
                 oprtr_parameters, advance_op));
         }
 
         for (int iter = 0; iter < nodes_query; ++iter) {
+            // set counter to be equal to iter
             GUARD_CU(counter.ForAll([iter]
                 __host__ __device__ (VertexT *counter_, const SizeT & v)
                 {
                     counter_[v] = iter;
                 }, 1, target, stream));
-            GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), 
-                oprtr_parameters, distribute_op));
+            counter.Print();
 
-            if (iter == 0) {
-            } else {
-                // Initialize flagss to be composed of 0
+            GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+                graph.csr(), complete_graph, complete_graph,
+                oprtr_parameters, prune_op));
+
+            if (iter > 0) {
+                // Initialize flags to be composed of 0
                 GUARD_CU(flags.ForAll([]
                     __device__ (bool *flags_, const SizeT & v)
                     {
@@ -225,9 +235,10 @@ struct SMIterationLoop : public IterationLoopBase
                     }, graph.nodes, target, stream));
 
                 GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-                    graph.csr(), frontier.Next_V_Q(), frontier.V_Q(), 
+                    graph.csr(), complete_graph, complete_graph,
                     oprtr_parameters, look_ahead_op));
             }
+
             GUARD_CU(util::CUBSelect_flagged(
                 indices.GetPointer(util::DEVICE),
                 flags.GetPointer(util::DEVICE),
@@ -426,51 +437,43 @@ public:
      * @param[in] target Target location of data
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Reset(SizeT num_srcs, util::Location target = util::DEVICE)
-    {
+    cudaError_t Reset(
+          SizeT num_srcs,
+          VertexT src = 0,
+          util::Location target = util::DEVICE) {
         typedef typename GraphT::GpT GpT;
-        typedef typename GraphT::CsrT CsrT;
         cudaError_t retval = cudaSuccess;
         GUARD_CU(BaseEnactor::Reset(target));
-        for (int gpu = 0; gpu < this->num_gpus; gpu++)
-        {
-           if ((this->num_gpus == 1)) 
-            //|| (gpu == this->problem->org_graph->GpT::partition_table[src])) 
-           {
-               this -> thread_slices[gpu].init_size = num_srcs;
-               for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
-                   auto &frontier = this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier;
-                   frontier.queue_length = (peer_ == 0) ? num_srcs : 0;
-                   if (peer_ == 0) {
-                        auto &graph = this->problem->sub_graphs[gpu];
-                        util::Array1D<SizeT, VertexT> tmp_srcs;
-                        tmp_srcs.Allocate(num_srcs, target | util::HOST);
-                        int pos = 0;
-                        for(SizeT i = 0; i < graph.nodes; ++i) {
-                            for (SizeT j = graph.CsrT::row_offsets[i]; j < graph.CsrT::row_offsets[i+1]; ++j) {
-                                tmp_srcs[pos++] = i;
-                            }
-                        }
-                        GUARD_CU(tmp_srcs.Move(util::HOST, target));
-                        GUARD_CU(frontier.V_Q() -> EnsureSize_(graph.edges, target));
 
-                        GUARD_CU(frontier.V_Q() -> ForEach(tmp_srcs,
-                           []__host__ __device__ (VertexT &v, VertexT &src) {
-                           v = src;
-                       }, num_srcs, target, 0));
-                   }
-               }
-           } else {
-                this -> thread_slices[gpu].init_size = 0;
-                for (int peer_ = 0; peer_ < this -> num_gpus; peer_++) {
-                    this -> enactor_slices[gpu * this -> num_gpus + peer_].frontier.queue_length = 0;
-                }
-           }
+        // <TODO> Initialize frontiers according to the algorithm:
+        // In this case, we add a single `src` to the frontier
+        for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+          if ((this->num_gpus == 1) ||
+              (gpu == this->problem->org_graph->GpT::partition_table[src])) {
+            this->thread_slices[gpu].init_size = 1;
+            for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
+              auto &frontier =
+                  this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
+              frontier.queue_length = (peer_ == 0) ? 1 : 0;
+              if (peer_ == 0) {
+                GUARD_CU(frontier.V_Q()->ForEach(
+                    [src] __host__ __device__(VertexT & v) { v = src; }, 1, target,
+                    0));
+              }
+            }
+          } else {
+            this->thread_slices[gpu].init_size = 0;
+            for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
+              this->enactor_slices[gpu * this->num_gpus + peer_]
+                  .frontier.queue_length = 0;
+            }
+          }
         }
+        // </TODO>
+
         GUARD_CU(BaseEnactor::Sync());
         return retval;
-
-    }
+      }
 
     /**
      * @brief Enacts a SM computing on the specified graph.
