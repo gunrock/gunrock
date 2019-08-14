@@ -692,11 +692,12 @@ public:
                 info.SetVal(item.name, strtoT<      std::vector<         uint64_t> >(str, str_end));
             else if (tidx == std::type_index(typeid(std::vector<         bool >)))
             {
-                auto vec = strtoT<      std::vector<     std::string> >(str, str_end);
-                if (vec.size() == 1)
-                    info.SetVal(item.name, vec[0]);
-                else
-                    info.SetVal(item.name, vec);
+                info.SetVal(item.name, strtoT<      std::vector<        bool>>(str, str_end));
+                // auto vec = strtoT<      std::vector<     std::string> >(str, str_end);
+                // if (vec.size() == 1)
+                //     info.SetVal(item.name, vec[0]);
+                // else
+                //     info.SetVal(item.name, vec);
             } else if (tidx == std::type_index(typeid(std::vector<         float>)))
                 info.SetVal(item.name, strtoT<      std::vector<         float> >(str, str_end));
             else if (tidx == std::type_index(typeid(std::vector<         double>)))

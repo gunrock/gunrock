@@ -54,42 +54,42 @@ class Sysinfo {
   }
 };
 
+template <typename InfoT>
 class Gpuinfo {
  public:
-  std::vector<std::pair<string, string>> getGpuinfo() const {
-    std::vector<std::pair<string, string>> info;
-    cudaDeviceProp devProps;
+  /* TODO: Support  different pair types (other than string) */
+  // std::vector<std::pair<string, string>> getGpuinfo(util::Info info) const {
+  //   std::vector<std::pair<string, string>> info;
+  //   cudaDeviceProp devProps;
 
-    int deviceCount;
-    cudaGetDeviceCount(&deviceCount);
-    if (deviceCount == 0) /* no valid devices */
-    {
-      return info; /* empty */
-    }
-    int dev = 0;
-    cudaGetDevice(&dev);
-    cudaGetDeviceProperties(&devProps, dev);
-    info.push_back(make_pair("name", devProps.name));
-    info.push_back(make_pair("total_global_mem",
-                             std::to_string(int64_t(devProps.totalGlobalMem))));
-    info.push_back(make_pair("major", std::to_string(devProps.major)));
-    info.push_back(make_pair("minor", std::to_string(devProps.minor)));
-    info.push_back(make_pair("clock_rate", std::to_string(devProps.clockRate)));
-    info.push_back(make_pair("multi_processor_count",
-                             std::to_string(devProps.multiProcessorCount)));
+  //   int deviceCount;
+  //   cudaGetDeviceCount(&deviceCount);
+  //   if (deviceCount == 0) /* no valid devices */
+  //   {
+  //     return info; /* empty */
+  //   }
+  //   int dev = 0;
+  //   cudaGetDevice(&dev);
+  //   cudaGetDeviceProperties(&devProps, dev);
+  //   info.push_back(make_pair("name", devProps.name));
+  //   info.push_back(make_pair("total_global_mem", std::to_string(int64_t(devProps.totalGlobalMem))));
+  //   info.push_back(make_pair("major", std::to_string(devProps.major)));
+  //   info.push_back(make_pair("minor", std::to_string(devProps.minor)));
+  //   info.push_back(make_pair("clock_rate", std::to_string(devProps.clockRate)));
+  //   info.push_back(make_pair("multi_processor_count", std::to_string(devProps.multiProcessorCount)));
 
-    int runtimeVersion, driverVersion;
-    cudaRuntimeGetVersion(&runtimeVersion);
-    cudaDriverGetVersion(&driverVersion);
-    info.push_back(make_pair("driver_api", std::to_string(CUDA_VERSION)));
-    info.push_back(make_pair("driver_version", std::to_string(driverVersion)));
-    info.push_back(
-        make_pair("runtime_version", std::to_string(runtimeVersion)));
-    info.push_back(
-        make_pair("compute_version",
-                  std::to_string((devProps.major * 10 + devProps.minor))));
-    return info;
-  }
+  //   int runtimeVersion, driverVersion;
+  //   cudaRuntimeGetVersion(&runtimeVersion);
+  //   cudaDriverGetVersion(&driverVersion);
+  //   info.push_back(make_pair("driver_api", std::to_string(CUDA_VERSION)));
+  //   info.push_back(make_pair("driver_version", std::to_string(driverVersion)));
+  //   info.push_back(
+  //       make_pair("runtime_version", std::to_string(runtimeVersion)));
+  //   info.push_back(
+  //       make_pair("compute_version",
+  //                 std::to_string((devProps.major * 10 + devProps.minor))));
+  //   return info;
+  // }
 };
 
 class Userinfo {

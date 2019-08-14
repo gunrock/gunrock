@@ -214,7 +214,11 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
     }
   }
 
-  util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
+  if (num_errors > 0) {
+      util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
+  } else {
+      util::PrintMsg("PASSED", !quiet);
+  }
 
   return num_errors;
 }
