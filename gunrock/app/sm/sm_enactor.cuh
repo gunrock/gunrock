@@ -163,6 +163,7 @@ struct SMIterationLoop : public IterationLoopBase
                     return false;
                 }
                 flags[src] = true;
+		results[src] = 1;
                 return true;
             } else {
                 // check if src belongs to partial results
