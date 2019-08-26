@@ -182,7 +182,6 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::CsrT CsrT;
 
-  std::cerr << "Validate_Results" << std::endl;
   bool quiet = parameters.Get<bool>("quiet");
   if (!quiet && verbose) {
     for (int i = 0; i < graph.nodes; i++) {
