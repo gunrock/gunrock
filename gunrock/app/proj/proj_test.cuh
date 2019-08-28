@@ -111,7 +111,7 @@ typename GraphT::SizeT Validate_Results(
 	    num_errors++;
 	    util::PrintMsg(std::to_string(row) + " => " +
 			     std::to_string(col) + " | GPU = " +
-			     std:to_string(h_proj) + " CPU = " +
+			     std::to_string(h_proj) + " CPU = " +
 			     std::to_string(ref_proj),
 			   !quiet);
 	}
