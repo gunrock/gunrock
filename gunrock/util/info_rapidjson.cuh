@@ -78,6 +78,8 @@ struct Info {
   int num_runs;                       // number of runs
   int64_t nodes_visited;
   int64_t edges_visited;
+  double max_m_teps;                 // maximum MTEPS
+  double min_m_teps;                 // minimum MTEPS
   double m_teps;
   int64_t search_depth;
   double avg_duty;
@@ -504,58 +506,61 @@ struct Info {
     // the mean (processing times) and recompute the average.
     // filtering: start
     elapsed = total_elapsed / num_runs;
-    double variance = 0.0;
 
-    for (auto i = process_times.begin(); i != process_times.end(); i++)
-	    variance += pow(*i - elapsed, 2);
+    if (num_runs > 1) {
+      double variance = 0.0;
+
+      for (auto i = process_times.begin(); i != process_times.end(); i++)
+        variance += pow(*i - elapsed, 2);
+      
+      variance = variance / num_runs;
+      stddev_process_time = sqrt(variance);
+
+      auto lower_limit = elapsed - (2*stddev_process_time);
+      auto upper_limit = elapsed + (2*stddev_process_time);
+
+      // TODO: Check if this works with cases where we don't have
+      // multiple srcs, instead all process times maybe use one src
+      // (for example, src = 0 or largestdegree, etc.)
+      std::vector<int64_t> srcs;
+      if (parameters->Have("srcs")) {
+        srcs = parameters->Get<std::vector<int64_t>>("srcs");
+      }
+
+      std::vector<std::pair<int64_t, double>> delete_runs;
+
+      for(auto i = 0; i < process_times.size(); i++) {
+          delete_runs.push_back(std::make_pair((int64_t)srcs[i], (double)process_times[i]));
+      }
+
+      // for (auto q = delete_runs.begin(); q != delete_runs.end(); ++q) 
+      //     std::cout << ' ' << (*q).first << ' ' << (*q).second << std::endl;
+
+      delete_runs.erase(std::remove_if(
+                          delete_runs.begin(), delete_runs.end(),
+                          [lower_limit, upper_limit](const std::pair<const int64_t, 
+                                                                    const double>& x) {
+                            return ((x.second < lower_limit) || (x.second > upper_limit));
+                          }), delete_runs.end());
+
+      std::vector<int64_t> _srcs;
+
+      for (auto q = delete_runs.begin(); q != delete_runs.end(); ++q) {
+        _process_times.push_back((double)(*q).second);
+        _srcs.push_back((int64_t)(*q).first);
+      }
+
+      // filtering: end
+      
+      total_elapsed = 0.0;
+      for (auto i = _process_times.begin(); i != _process_times.end(); i++) {
+        total_elapsed += *i;
+      }
+      
+      elapsed = total_elapsed / _process_times.size();
+      SetVal("filtered-srcs", _srcs);
+    }
     
-    variance = variance / num_runs;
-    stddev_process_time = sqrt(variance);
-
-    auto lower_limit = elapsed - (2*stddev_process_time);
-    auto upper_limit = elapsed + (2*stddev_process_time);
-
-    // TODO: Check if this works with cases where we don't have
-    // multiple srcs, instead all process times maybe use one src
-    // (for example, src = 0 or largestdegree, etc.)
-    std::vector<int64_t> srcs;
-    if (parameters->Have("srcs")) {
-      srcs = parameters->Get<std::vector<int64_t>>("srcs");
-    }
-
-    std::vector<std::pair<int64_t, double>> delete_runs;
-
-    for(auto i = 0; i < process_times.size(); i++) {
-        delete_runs.push_back(std::make_pair((int64_t)srcs[i], (double)process_times[i]));
-    }
-
-    // for (auto q = delete_runs.begin(); q != delete_runs.end(); ++q) 
-    //     std::cout << ' ' << (*q).first << ' ' << (*q).second << std::endl;
-
-    delete_runs.erase(std::remove_if(
-                        delete_runs.begin(), delete_runs.end(),
-                        [lower_limit, upper_limit](const std::pair<const int64_t, 
-                                                                  const double>& x) {
-                          return ((x.second < lower_limit) || (x.second > upper_limit));
-                        }), delete_runs.end());
-
-    std::vector<int64_t> _srcs;
-
-    for (auto q = delete_runs.begin(); q != delete_runs.end(); ++q) {
-      _process_times.push_back((double)(*q).second);
-      _srcs.push_back((int64_t)(*q).first);
-    }
-
-    // filtering: end
-    
-    total_elapsed = 0.0;
-    for (auto i = _process_times.begin(); i != _process_times.end(); i++) {
-      total_elapsed += *i;
-    }
-    
-    elapsed = total_elapsed / _process_times.size();
-    // parameters.Set<std::vector<uint64_t>>("filtered-srcs", _srcs);
-    SetVal("filtered-srcs", _srcs);
     SetVal("average-duty", avg_duty);
     SetVal("search-depth", search_depth);
 
@@ -716,12 +721,20 @@ struct Info {
 
   void Finalize(double postprocess_time, double total_time) {
     bool quiet = parameters->Get<bool>("quiet");
+    int num_runs = parameters->Get<int>("num-runs");
 
-    min_elapsed = *std::min_element(_process_times.begin(), _process_times.end());
-    max_elapsed = *std::max_element(_process_times.begin(), _process_times.end());
-    double min_m_teps = (double)this->edges_visited / (max_elapsed * 1000.0);
-    double max_m_teps = (double)this->edges_visited / (min_elapsed * 1000.0);
-
+    if (num_runs > 1) {
+      min_elapsed = *std::min_element(_process_times.begin(), _process_times.end());
+      max_elapsed = *std::max_element(_process_times.begin(), _process_times.end());
+      min_m_teps = (double)this->edges_visited / (max_elapsed * 1000.0);
+      max_m_teps = (double)this->edges_visited / (min_elapsed * 1000.0);
+    } else {
+      min_elapsed = elapsed;
+      max_elapsed = elapsed;
+      min_m_teps = m_teps;
+      max_m_teps = m_teps;
+    }
+    
     preprocess_time = parameters->Get<double>("preprocess-time");
     SetVal("process-times", process_times);
     SetVal("filtered-process-times", _process_times);
