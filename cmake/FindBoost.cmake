@@ -3,8 +3,7 @@
 # ------------------------------------------------------------------------
 SET(gunrock_REQUIRED_BOOST_VERSION 1.58)
 
-FIND_PACKAGE(Boost ${gunrock_REQUIRED_BOOST_VERSION}
-  REQUIRED system filesystem timer chrono)
+FIND_PACKAGE(Boost ${gunrock_REQUIRED_BOOST_VERSION})
 IF (Boost_FOUND)
   INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
   LINK_DIRECTORIES(${Boost_LIBRARY_DIRS})
