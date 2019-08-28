@@ -5,7 +5,7 @@ set(gunrock_VERSION_MINOR 0)
 set(gunrock_VERSION_PATCH 0)
 add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.10)
 
 # enable @rpath in the install name for any shared library being built
 # note: it is planned that a future version of CMake will enable this by default
@@ -30,6 +30,8 @@ else (ENABLE_WARNINGS)
 endif (ENABLE_WARNINGS)
 # end /* Suppress all warnings from gcc */
 
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -fPIC")
 
 option(CMAKE_VERBOSE_MAKEFILE OFF)
