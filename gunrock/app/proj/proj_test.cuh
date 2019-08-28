@@ -102,13 +102,18 @@ typename GraphT::SizeT Validate_Results(
   if (ref_projections != NULL) {
     for (SizeT v = 0; v < graph.nodes * graph.nodes; ++v) {
       if (ref_projections[v] != 0) {
-        int row = (int)(v / graph.nodes);
-        int col = v % graph.nodes;
-	if (h_projections[v] != ref_projections[v]) {
+	auto row = (int)(v / graph.nodes);
+	auto col = v % graph.nodes;
+	auto h_proj = h_projections[v];
+	auto ref_proj = ref_projections[v];
+	      
+	if (h_proj != ref_proj) {
 	    num_errors++;
-	    util::PrintMsg(std::to_string(row) + " => " + std::to_string(col) + 
-			   " | GPU = " + std:to_string(h_projections[v]) + " CPU = " +
-			   std::to_string(ref_projections[v]), !quiet);
+	    util::PrintMsg(std::to_string(row) + " => " +
+			     std::to_string(col) + " | GPU = " +
+			     std::to_string(h_proj) + " CPU = " +
+			     std::to_string(ref_proj),
+			   !quiet);
 	}
       }
     }
