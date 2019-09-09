@@ -197,10 +197,7 @@ double gunrock_sm(
  * @param[in]  col_indices CSR-formatted graph input column indices
  * @param[in]  edge_values CSR-formatted graph input edge weights
  * @param[in]  num_runs    Number of runs to perform SM
- * @param[in]  sources     Sources to begin traverse, one for each run
- * @param[in]  mark_preds  Whether to output predecessor info
- * @param[out] distances   Return shortest distance to source per vertex
- * @param[out] preds       Return predecessors of each vertex
+ * @param[out] subgraphs   Return number of subgraphs
  * \return     double      Return accumulated elapsed times for all runs
  */
 template <
@@ -234,9 +231,9 @@ double sm(
     GraphT query_graph;
     // Assign pointers into gunrock graph format
     data_graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    data_graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
-    data_graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
-    data_graph.CsrT::edge_values   .SetPointer(edge_values, num_edges, gunrock::util::HOST);
+    data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, gunrock::util::HOST);
+    data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, gunrock::util::HOST);
+    data_graph.CsrT::edge_values   .SetPointer((GValueT *)edge_values, num_edges, gunrock::util::HOST);
     data_graph.FromCsr(data_graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, data_graph);
     gunrock::graphio::LoadGraph(parameters, query_graph, "pattern-");
@@ -245,8 +242,34 @@ double sm(
     double elapsed_time = gunrock_sm(parameters, data_graph, query_graph, subgraphs);
     // Cleanup
     data_graph.Release();
+    query_graph.Release();
 
     return elapsed_time;
+}
+
+
+/*
+ * @brief Simple interface take in graph as CSR format
+ * @param[in]  num_nodes   Number of veritces in the input graph
+ * @param[in]  num_edges   Number of edges in the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  edge_values CSR-formatted graph input edge weights
+ * @param[in]  num_runs    Number of runs to perform SM
+ * @param[out] subgraphs   Return number of subgraphs
+ * \return     double      Return accumulated elapsed times for all runs
+ */
+double sm(
+    const int            num_nodes,
+    const int            num_edges,
+    const int           *row_offsets,
+    const int           *col_indices,
+    const unsigned long *edge_values,
+    const int            num_runs,
+          int           *subgraphs)
+{
+    return sm(num_nodes, num_edges, row_offsets, col_indices,
+        edge_values, 1 /* num_runs */, subgraphs);
 }
 
 // Leave this at the end of the file
