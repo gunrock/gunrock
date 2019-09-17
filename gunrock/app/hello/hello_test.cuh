@@ -83,7 +83,9 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
 
   // <TODO> result validation and display
   for (SizeT v = 0; v < graph.nodes; ++v) {
-    printf("%d %f %f\n", v, h_degrees[v], ref_degrees[v]);
+    util::PrintMsg(std::to_string(v) + "\t" + 
+                   std::to_string(h_degrees[v]) + "\t" + 
+                   std::to_string(ref_degrees[v]), !quiet);
   }
   // </TODO>
 

@@ -282,12 +282,12 @@ cudaError_t Build(
         ", " + std::to_string(d0) + ")", !quiet);
 
     util::CpuTimer cpu_timer;
-    cpu_timer.Start();
-
+    
     // construct COO format graph
     GUARD_CU(graph.CooT::Allocate(num_nodes, num_edges, util::HOST | util::DEVICE));
-    
+
     if (!grmat) {
+        cpu_timer.Start();
         util::Location  target        = util::HOST;
         #pragma omp parallel
         {
@@ -335,6 +335,7 @@ cudaError_t Build(
                 }
             }
         }
+        cpu_timer.Stop();
     } else {
         util::Location  target        = util::DEVICE;
         cudaStream_t stream;
@@ -343,9 +344,15 @@ cudaError_t Build(
         util::Array1D<SizeT, curandState> rand_states;
         GUARD_CU(rand_states.Allocate(num_edges, target));
         GUARD_CU(rand_states.EnsureSize_(num_edges, target));
+
+        // TODO: Temporary, remove this and replace with
+        // existing arrays.
+        util::Array1D<SizeT, SizeT> empty_loop;
+        GUARD_CU(empty_loop.Allocate(num_edges, target));
+        GUARD_CU(empty_loop.EnsureSize_(num_edges, target));
         
         auto state_generator = [seed, rand_states] 
-            __device__ (ValueT * s_q, const SizeT &s) {
+            __device__ (SizeT * s_q, const SizeT &s) {
             curand_init(seed, s, 0, rand_states + s);
         };
 
@@ -357,7 +364,7 @@ cudaError_t Build(
                 edge_value_range, edge_value_min,
                 a0, b0, c0, d0, rand_states, random_edge_values,
                 edge_values, edge_pairs] 
-                __device__ (ValueT * e_q, const SizeT &pos) {
+                __device__ (SizeT * e_q, const SizeT &pos) {
 
 			auto e = pos;
 			//SizeT e = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
@@ -398,19 +405,22 @@ cudaError_t Build(
                     edge_values[e] = 1;
                 }
             }
-            // e += STRIDE;
         };
 
-        GUARD_CU(edge_values.ForAll(state_generator, num_edges, target, stream));
-        GUARD_CU(edge_values.ForAll(grmat, num_edges, target, stream));
-        
+        cpu_timer.Start();
+        GUARD_CU(empty_loop.ForAll(state_generator, num_edges, target, stream));
+        GUARD_CU(empty_loop.ForAll(grmat, num_edges, target, stream));
+        cpu_timer.Stop();
+
         // TODO: we need this right now to remove duplicate edges on HOST
         GUARD_CU(graph.CooT ::Move(util::DEVICE, util::HOST)); 
+        
+        GUARD_CU(rand_states.Release());
+        GUARD_CU(empty_loop.Release());
     }
 
     if (retval) return retval;
-
-    cpu_timer.Stop();
+    
     float elapsed = cpu_timer.ElapsedMillis();
     util::PrintMsg("RMAT generated in " +
         std::to_string(elapsed) + " ms.", !quiet);
