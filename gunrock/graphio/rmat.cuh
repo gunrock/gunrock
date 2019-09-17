@@ -179,9 +179,6 @@ cudaError_t UseParameters(util::Parameters &parameters,
       0.05, "d for rmat generator, default is 1 - a - b - c", __FILE__,
       __LINE__));
 
-<<<<<<< Updated upstream
-  return retval;
-=======
     GUARD_CU(parameters.Use<bool>(
         graph_prefix + "grmat",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
@@ -191,7 +188,6 @@ cudaError_t UseParameters(util::Parameters &parameters,
     
 
     return retval;
->>>>>>> Stashed changes
 }
 
 /**
