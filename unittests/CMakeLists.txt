@@ -5,5 +5,5 @@ include(${CMAKE_SOURCE_DIR}/cmake/SetSubProject.cmake)
 
 ### tests using googletest and googlemock
 add_test(NAME UNITTESTS COMMAND unittests)
-# add_executable(unit test.cpp)
-target_link_libraries(unittests gunrock gtest gmock)
+target_link_libraries(unittests gunrock gtest_main)
+set_tests_properties(UNITTESTS PROPERTIES PASS_REGULAR_EXPRESSION "PASSED")

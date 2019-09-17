@@ -16,11 +16,9 @@
 
 namespace gunrock {
 namespace oprtr {
-namespace LB_CULL {
-
-} //namespace LB_CULL
-} //namespace oprtr
-} //namespace gunrock
+namespace LB_CULL {}  // namespace LB_CULL
+}  // namespace oprtr
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

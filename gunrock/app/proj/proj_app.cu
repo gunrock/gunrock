@@ -24,14 +24,12 @@ namespace gunrock {
 namespace app {
 namespace proj {
 
-
-cudaError_t UseParameters(util::Parameters &parameters)
-{
-    cudaError_t retval = cudaSuccess;
-    GUARD_CU(UseParameters_app(parameters));
-    GUARD_CU(UseParameters_problem(parameters));
-    GUARD_CU(UseParameters_enactor(parameters));
-    return retval;
+cudaError_t UseParameters(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
+  GUARD_CU(UseParameters_app(parameters));
+  GUARD_CU(UseParameters_problem(parameters));
+  GUARD_CU(UseParameters_enactor(parameters));
+  return retval;
 }
 
 /**
@@ -45,115 +43,100 @@ cudaError_t UseParameters(util::Parameters &parameters)
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT>
-cudaError_t RunTests(
-    util::Parameters &parameters,
-    GraphT           &graph,
-    typename GraphT::ValueT *ref_projections,
-    util::Location target)
-{
+cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
+                     typename GraphT::ValueT *ref_projections,
+                     util::Location target) {
+  cudaError_t retval = cudaSuccess;
 
-    cudaError_t retval = cudaSuccess;
+  typedef typename GraphT::VertexT VertexT;
+  typedef typename GraphT::ValueT ValueT;
+  typedef typename GraphT::SizeT SizeT;
+  typedef Problem<GraphT> ProblemT;
+  typedef Enactor<ProblemT> EnactorT;
 
-    typedef typename GraphT::VertexT VertexT;
-    typedef typename GraphT::ValueT  ValueT;
-    typedef typename GraphT::SizeT   SizeT;
-    typedef Problem<GraphT>          ProblemT;
-    typedef Enactor<ProblemT>        EnactorT;
+  // CLI parameters
+  bool quiet_mode = parameters.Get<bool>("quiet");
+  bool quick = parameters.Get<bool>("quick");
+  int num_runs = parameters.Get<int>("num-runs");
+  std::string validation = parameters.Get<std::string>("validation");
+  util::Info info("proj", parameters, graph);
 
-    // CLI parameters
-    bool quiet_mode = parameters.Get<bool>("quiet");
-    bool quick      = parameters.Get<bool>("quick");
-    int  num_runs   = parameters.Get<int >("num-runs");
-    std::string validation = parameters.Get<std::string>("validation");
-    util::Info info("proj", parameters, graph);
+  util::CpuTimer cpu_timer, total_timer;
+  cpu_timer.Start();
+  total_timer.Start();
 
-    util::CpuTimer cpu_timer, total_timer;
-    cpu_timer.Start(); total_timer.Start();
+  ValueT *h_projections = new ValueT[graph.nodes * graph.nodes];
 
-    ValueT *h_projections = new ValueT[graph.nodes * graph.nodes];
+  // Allocate problem and enactor on GPU, and initialize them
+  ProblemT problem(parameters);
+  EnactorT enactor;
+  GUARD_CU(problem.Init(graph, target));
+  GUARD_CU(enactor.Init(problem, target));
 
-    // Allocate problem and enactor on GPU, and initialize them
-    ProblemT problem(parameters);
-    EnactorT enactor;
-    GUARD_CU(problem.Init(graph, target));
-    GUARD_CU(enactor.Init(problem, target));
+  cpu_timer.Stop();
+  parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
-    cpu_timer.Stop();
-    parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
+  for (int run_num = 0; run_num < num_runs; ++run_num) {
+    GUARD_CU(problem.Reset(target));
+    GUARD_CU(enactor.Reset(target));
 
-    for (int run_num = 0; run_num < num_runs; ++run_num) {
-        GUARD_CU(problem.Reset(
-            target
-        ));
-        GUARD_CU(enactor.Reset(
-            target
-        ));
-
-        util::PrintMsg("__________________________", !quiet_mode);
-
-        cpu_timer.Start();
-        GUARD_CU(enactor.Enact());
-        cpu_timer.Stop();
-        info.CollectSingleRun(cpu_timer.ElapsedMillis());
-
-        util::PrintMsg("--------------------------\nRun "
-            + std::to_string(run_num) + " elapsed: "
-            + std::to_string(cpu_timer.ElapsedMillis()) +
-            ", #iterations = "
-            + std::to_string(enactor.enactor_slices[0]
-                .enactor_stats.iteration), !quiet_mode);
-
-        if (validation == "each") {
-            GUARD_CU(problem.Extract(
-                h_projections
-            ));
-            SizeT num_errors = Validate_Results(
-                parameters,
-                graph,
-                h_projections,
-                quick ? NULL : ref_projections,
-                false);
-        }
-    }
+    util::PrintMsg("__________________________", !quiet_mode);
 
     cpu_timer.Start();
+    GUARD_CU(enactor.Enact());
+    cpu_timer.Stop();
+    info.CollectSingleRun(cpu_timer.ElapsedMillis());
 
-    if (validation == "last") {
-        GUARD_CU(problem.Extract(
-            h_projections
-        ));
-        SizeT num_errors = Validate_Results(
-            parameters,
-            graph,
-            h_projections,
-            quick ? NULL : ref_projections,
-            false);
+    util::PrintMsg(
+        "--------------------------\nRun " + std::to_string(run_num) +
+            " elapsed: " + std::to_string(cpu_timer.ElapsedMillis()) +
+            ", #iterations = " +
+            std::to_string(enactor.enactor_slices[0].enactor_stats.iteration),
+        !quiet_mode);
+
+    if (validation == "each") {
+      GUARD_CU(problem.Extract(h_projections));
+      SizeT num_errors =
+          Validate_Results(parameters, graph, h_projections,
+                           quick ? NULL : ref_projections, false);
     }
+  }
 
-    // compute running statistics
-    // TODO: change NULL to problem specific per-vertex visited marker, e.g. h_distances
-    // info.ComputeTraversalStats(enactor, (VertexT*)NULL);
-    // //Display_Memory_Usage(problem);
-    // #ifdef ENABLE_PERFORMANCE_PROFILING
-    //     //Display_Performance_Profiling(enactor);
-    // #endif
+  cpu_timer.Start();
 
-    // Clean up
-    GUARD_CU(enactor.Release(target));
-    GUARD_CU(problem.Release(target));
-    delete[] h_projections; h_projections   = NULL;
-    cpu_timer.Stop(); total_timer.Stop();
+  if (validation == "last") {
+    GUARD_CU(problem.Extract(h_projections));
+    SizeT num_errors = Validate_Results(parameters, graph, h_projections,
+                                        quick ? NULL : ref_projections, false);
+  }
 
-    info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
-    return retval;
+  // compute running statistics
+  // TODO: change NULL to problem specific per-vertex visited marker, e.g.
+  // h_distances info.ComputeTraversalStats(enactor, (VertexT*)NULL);
+  // //Display_Memory_Usage(problem);
+  // #ifdef ENABLE_PERFORMANCE_PROFILING
+  //     //Display_Performance_Profiling(enactor);
+  // #endif
+
+  // Clean up
+  GUARD_CU(enactor.Release(target));
+  GUARD_CU(problem.Release(target));
+  delete[] h_projections;
+  h_projections = NULL;
+  cpu_timer.Stop();
+  total_timer.Stop();
+
+  info.Finalize(cpu_timer.ElapsedMillis(), total_timer.ElapsedMillis());
+  return retval;
 }
 
-} // namespace proj
-} // namespace app
-} // namespace gunrock
+}  // namespace proj
+}  // namespace app
+}  // namespace gunrock
 
 // ===========================================================================================
-// ========================= CODE BELOW THIS LINE NOT NEEDED FOR TESTS =======================
+// ========================= CODE BELOW THIS LINE NOT NEEDED FOR TESTS
+// =======================
 // ===========================================================================================
 
 // /*
@@ -191,7 +174,8 @@ cudaError_t RunTests(
 
 //     int num_runs = parameters.Get<int>("num-runs");
 //     // TODO: get problem specific inputs, e.g.:
-//     // std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
+//     // std::vector<VertexT> srcs =
+//     parameters.Get<std::vector<VertexT>>("srcs");
 //     // int num_srcs = srcs.size();
 //     for (int run_num = 0; run_num < num_runs; ++run_num)
 //     {
@@ -216,7 +200,6 @@ cudaError_t RunTests(
 //     // srcs.clear();
 //     return total_time;
 // }
-
 
 //  * @brief Simple interface take in graph as CSR format
 //  * @param[in]  num_nodes   Number of veritces in the input graph
@@ -273,15 +256,17 @@ cudaError_t RunTests(
 //     // Assign pointers into gunrock graph format
 //     // TODO: change to other graph representation, if not using CSR
 //     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-//     graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1, gunrock::util::HOST);
-//     graph.CsrT::column_indices.SetPointer(col_indices, num_edges, gunrock::util::HOST);
-//     graph.CsrT::edge_values   .SetPointer(edge_values, num_edges, gunrock::util::HOST);
+//     graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1,
+//     gunrock::util::HOST); graph.CsrT::column_indices.SetPointer(col_indices,
+//     num_edges, gunrock::util::HOST); graph.CsrT::edge_values
+//     .SetPointer(edge_values, num_edges, gunrock::util::HOST);
 //     graph.FromCsr(graph.csr(), true, quiet);
 //     gunrock::graphio::LoadGraph(parameters, graph);
 
 //     // Run the Template
 //     // TODO: add problem specific outputs, e.g.
-//     double elapsed_time = gunrock_Template(parameters, graph /*, distances*/);
+//     double elapsed_time = gunrock_Template(parameters, graph /*,
+//     distances*/);
 
 //     // Cleanup
 //     graph.Release();

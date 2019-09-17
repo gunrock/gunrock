@@ -158,7 +158,6 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
     printf("Validating result ...  \n");
     printf("Comparison: <node idx, gunrock, cpu>\n");
     for (SizeT v = 0; v < graph.nodes; v++) {
-
       SizeT start_edge = graph.GetNeighborListOffset(v);
       SizeT num_neighbors = graph.GetNeighborListLength(v);
 

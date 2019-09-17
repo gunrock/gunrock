@@ -344,47 +344,35 @@ inline bool EnoughDeviceMemory(unsigned int mem_needed) {
  *
  */
 template <typename T, typename SizeT>
-SizeT CompareResults(
-    T* computed,
-    T* reference,
-    SizeT len,
-    bool verbose = true,
-    bool quiet = false)
-{
-    SizeT num_errors = 0;
-    for (SizeT i = 0; i < len; i++)
-    {
-        if (computed[i] == reference[i])
-            continue;
-        num_errors += 1;
-        if (quiet || num_errors > 1)
-            continue;
+SizeT CompareResults(T *computed, T *reference, SizeT len, bool verbose = true,
+                     bool quiet = false) {
+  SizeT num_errors = 0;
+  for (SizeT i = 0; i < len; i++) {
+    if (computed[i] == reference[i]) continue;
+    num_errors += 1;
+    if (quiet || num_errors > 1) continue;
 
-        util::PrintMsg("FAIL: [" + std::to_string(i)
-            + "]: " + std::to_string(computed[i])
-            + " != " + std::to_string(reference[i]));
-        if (!verbose)
-            continue;
+    util::PrintMsg("FAIL: [" + std::to_string(i) +
+                   "]: " + std::to_string(computed[i]) +
+                   " != " + std::to_string(reference[i]));
+    if (!verbose) continue;
 
-        util::PrintMsg("result[...", true, false);
-        for (SizeT j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
-        {
-            util::PrintMsg(std::to_string(computed[j]) + ", ", true, false);
-        }
-        util::PrintMsg("...]");
-        util::PrintMsg("reference[...", true, false);
-        for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
-        {
-            util::PrintMsg(std::to_string(reference[j]) + ", ", true, false);
-        }
-        util::PrintMsg("...]");
+    util::PrintMsg("result[...", true, false);
+    for (SizeT j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+      util::PrintMsg(std::to_string(computed[j]) + ", ", true, false);
     }
-
-    if (num_errors == 0 && !quiet)
-    {
-        util::PrintMsg("PASS");
+    util::PrintMsg("...]");
+    util::PrintMsg("reference[...", true, false);
+    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+      util::PrintMsg(std::to_string(reference[j]) + ", ", true, false);
     }
-    return num_errors;
+    util::PrintMsg("...]");
+  }
+
+  if (num_errors == 0 && !quiet) {
+    util::PrintMsg("PASS");
+  }
+  return num_errors;
 }
 
 /**
@@ -406,55 +394,42 @@ SizeT CompareResults(
  *
  */
 template <typename SizeT>
-SizeT CompareResults(
-    float* computed,
-    float* reference,
-    SizeT len,
-    bool verbose = true,
-    bool quiet = false)
-{
-    float THRESHOLD = 0.05f;
-    SizeT num_errors = 0;
-    for (SizeT i = 0; i < len; i++)
-    {
-        // Use relative error rate here.
-        if (fabs(computed[i] - 0.0) < 0.01f)
-        {
-            if (fabs(computed[i] - reference[i]) <= THRESHOLD)
-                continue;
-        } else {
-            if (fabs((computed[i] - reference[i]) / reference[i]) <= THRESHOLD)
-                continue;
-        }
-
-        num_errors += 1;
-        if (quiet || num_errors > 1)
-            continue;
-
-        util::PrintMsg("FAIL: [" + std::to_string(i)
-            + "]: " + std::to_string(computed[i])
-            + " != " + std::to_string(reference[i]));
-        if (!verbose)
-            continue;
-
-        util::PrintMsg("result[...", true, false);
-        for (SizeT j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
-        {
-            util::PrintMsg(std::to_string(computed[j]) + ", ", true, false);
-        }
-        util::PrintMsg("...]");
-        util::PrintMsg("reference[...", true, false);
-        for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++)
-        {
-            util::PrintMsg(std::to_string(reference[j]) + ", ", true, false);
-        }
-        util::PrintMsg("...]");
+SizeT CompareResults(float *computed, float *reference, SizeT len,
+                     bool verbose = true, bool quiet = false) {
+  float THRESHOLD = 0.05f;
+  SizeT num_errors = 0;
+  for (SizeT i = 0; i < len; i++) {
+    // Use relative error rate here.
+    if (fabs(computed[i] - 0.0) < 0.01f) {
+      if (fabs(computed[i] - reference[i]) <= THRESHOLD) continue;
+    } else {
+      if (fabs((computed[i] - reference[i]) / reference[i]) <= THRESHOLD)
+        continue;
     }
-    if (num_errors == 0 && !quiet)
-    {
-        util::PrintMsg("PASS");
+
+    num_errors += 1;
+    if (quiet || num_errors > 1) continue;
+
+    util::PrintMsg("FAIL: [" + std::to_string(i) +
+                   "]: " + std::to_string(computed[i]) +
+                   " != " + std::to_string(reference[i]));
+    if (!verbose) continue;
+
+    util::PrintMsg("result[...", true, false);
+    for (SizeT j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+      util::PrintMsg(std::to_string(computed[j]) + ", ", true, false);
     }
-    return num_errors;
+    util::PrintMsg("...]");
+    util::PrintMsg("reference[...", true, false);
+    for (size_t j = (i >= 5) ? i - 5 : 0; (j < i + 5) && (j < len); j++) {
+      util::PrintMsg(std::to_string(reference[j]) + ", ", true, false);
+    }
+    util::PrintMsg("...]");
+  }
+  if (num_errors == 0 && !quiet) {
+    util::PrintMsg("PASS");
+  }
+  return num_errors;
 }
 
 /** @} */

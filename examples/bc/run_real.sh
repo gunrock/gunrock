@@ -2,7 +2,7 @@
 
 BASEOPTION="--src=randomize2 --in-sizing=1.1 --queue-sizing=1.2 --iteration-num=16"
 BASEMARK=""
-EXECUTION="./bin/test_bc_9.1_x86_64"
+EXECUTION="./bin/test_bc*"
 # DATADIR="/data/gunrock_dataset/large"
 DATADIR="../../dataset/large"
 

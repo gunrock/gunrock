@@ -17,21 +17,19 @@ namespace gunrock {
 namespace app {
 namespace sm {
 
-cudaError_t UseParameters(util::Parameters &parameters)
-{
-    cudaError_t retval = cudaSuccess;
-    GUARD_CU(UseParameters_app    (parameters));
-    GUARD_CU(UseParameters_problem(parameters));
-    GUARD_CU(UseParameters_enactor(parameters));
-    GUARD_CU(UseParameters_test   (parameters));
+cudaError_t UseParameters(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
+  GUARD_CU(UseParameters_app(parameters));
+  GUARD_CU(UseParameters_problem(parameters));
+  GUARD_CU(UseParameters_enactor(parameters));
+  GUARD_CU(UseParameters_test(parameters));
 
-    return retval;
+  return retval;
 }
 
 } // namespace sm
 } // namespace app
 } // namespace gunrock
-
 
 /*
  * @brief Simple interface take in graph as CSR format

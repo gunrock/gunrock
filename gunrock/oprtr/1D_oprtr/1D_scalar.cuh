@@ -12,7 +12,6 @@
  * @brief 1D array with scalar operations
  */
 
-
 /******************************************************************************
  * 1D_scalar routines
  ******************************************************************************/
@@ -43,35 +42,26 @@ namespace oprtr {
  * @param[in] length Vector length
  */
 template <typename ValueT, typename T, typename SizeT>
-__global__ void Set_Kernel(
-    ValueT *d_out,
-    T       value,
-    SizeT   length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-         idx < length; idx += STRIDE)
-    {
-        d_out[idx] = value;
-    }
+__global__ void Set_Kernel(ValueT *d_out, T value, SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    d_out[idx] = value;
+  }
 }
 
 template <typename ValueT, typename T, typename SizeT>
-cudaError_t Set(
-    ValueT         *elements,
-    T               value,
-    SizeT           length,
-    util::Location  target = util::DEVICE,
-    cudaStream_t    stream = 0)
-{
-    return ForEach(elements,
-        [value] __host__ __device__ (ValueT &element){
-            element = value;
-        }, length, target, stream);
+cudaError_t Set(ValueT *elements, T value, SizeT length,
+                util::Location target = util::DEVICE, cudaStream_t stream = 0) {
+  return ForEach(
+      elements,
+      [value] __host__ __device__(ValueT & element) { element = value; },
+      length, target, stream);
 }
 
 /*template <typename VertexId, typename SizeT, typename Value>
-__global__ void MemsetAddEdgeValKernel(Coo<VertexId, Value> *d_out, VertexId value, SizeT length)
+__global__ void MemsetAddEdgeValKernel(Coo<VertexId, Value> *d_out, VertexId
+value, SizeT length)
 {
    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
     for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
@@ -92,33 +82,25 @@ __global__ void MemsetAddEdgeValKernel(Coo<VertexId, Value> *d_out, VertexId val
  * @param[in] scale The scale for indexing (1 by default)
  */
 template <typename ValueT, typename T, typename SizeT>
-__global__ void SetIdx_Kernel(
-    ValueT *d_out,
-    T       scale,
-    SizeT   length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-         idx < length; idx += STRIDE)
-    {
-        d_out[idx] = idx * scale;
-    }
+__global__ void SetIdx_Kernel(ValueT *d_out, T scale, SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    d_out[idx] = idx * scale;
+  }
 }
 
 template <typename ValueT, typename T, typename SizeT>
-cudaError_t SetIdx(
-    ValueT  *elements,
-    T        scale,// = 1,
-    SizeT    length,
-    util::Location target = util::DEVICE,
-    cudaStream_t stream = 0)
-{
-    return ForAll(elements,
-        [scale] __host__ __device__ (ValueT* elements, int pos){
-            elements[pos] = pos * scale;
-        }, length, target, stream);
+cudaError_t SetIdx(ValueT *elements,
+                   T scale,  // = 1,
+                   SizeT length, util::Location target = util::DEVICE,
+                   cudaStream_t stream = 0) {
+  return ForAll(elements,
+                [scale] __host__ __device__(ValueT * elements, int pos) {
+                  elements[pos] = pos * scale;
+                },
+                length, target, stream);
 }
-
 
 /**
  * @brief Add value to each element in a device vector.
@@ -130,28 +112,21 @@ cudaError_t SetIdx(
  * @param[in] length Vector length
  */
 template <typename ValueT, typename T, typename SizeT>
-__global__ void Add_Kernel(ValueT *d_out, T value, SizeT length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-         idx < length; idx += STRIDE)
-    {
-        d_out[idx] += value;
-    }
+__global__ void Add_Kernel(ValueT *d_out, T value, SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    d_out[idx] += value;
+  }
 }
 
 template <typename ValueT, typename T, typename SizeT>
-cudaError_t Add(
-    ValueT  *elements,
-    T        value,
-    SizeT    length,
-    util::Location target = util::DEVICE,
-    cudaStream_t stream = 0)
-{
-    return ForEach(elements,
-        [value] __host__ __device__ (ValueT &element){
-            element += value;
-        }, length, target, stream);
+cudaError_t Add(ValueT *elements, T value, SizeT length,
+                util::Location target = util::DEVICE, cudaStream_t stream = 0) {
+  return ForEach(
+      elements,
+      [value] __host__ __device__(ValueT & element) { element += value; },
+      length, target, stream);
 }
 
 /**
@@ -164,28 +139,22 @@ cudaError_t Add(
  * @param[in] length Vector length
  */
 template <typename ValueT, typename T, typename SizeT>
-__global__ void Minus_Kernel(ValueT *d_out, T value, SizeT length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-         idx < length; idx += STRIDE)
-    {
-        d_out[idx] -= value;
-    }
+__global__ void Minus_Kernel(ValueT *d_out, T value, SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    d_out[idx] -= value;
+  }
 }
 
 template <typename ValueT, typename T, typename SizeT>
-cudaError_t Minus(
-    ValueT  *elements,
-    T        value,
-    SizeT    length,
-    util::Location target = util::DEVICE,
-    cudaStream_t stream = 0)
-{
-    return ForEach(elements,
-        [value] __host__ __device__ (ValueT &element){
-            element -= value;
-        }, length, target, stream);
+cudaError_t Minus(ValueT *elements, T value, SizeT length,
+                  util::Location target = util::DEVICE,
+                  cudaStream_t stream = 0) {
+  return ForEach(
+      elements,
+      [value] __host__ __device__(ValueT & element) { element -= value; },
+      length, target, stream);
 }
 
 /**
@@ -198,28 +167,21 @@ cudaError_t Minus(
  * @param[in] length Vector length
  */
 template <typename ValueT, typename T, typename SizeT>
-__global__ void Mul_Kernel(ValueT *d_out, T value, SizeT length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-         idx < length; idx += STRIDE)
-    {
-        d_out[idx] *= value;
-    }
+__global__ void Mul_Kernel(ValueT *d_out, T value, SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    d_out[idx] *= value;
+  }
 }
 
 template <typename ValueT, typename T, typename SizeT>
-cudaError_t Mul(
-    ValueT  *elements,
-    T        value,
-    SizeT    length,
-    util::Location target = util::DEVICE,
-    cudaStream_t stream = 0)
-{
-    return ForEach(elements,
-        [value] __host__ __device__ (ValueT &element){
-            element *= value;
-        }, length, target, stream);
+cudaError_t Mul(ValueT *elements, T value, SizeT length,
+                util::Location target = util::DEVICE, cudaStream_t stream = 0) {
+  return ForEach(
+      elements,
+      [value] __host__ __device__(ValueT & element) { element *= value; },
+      length, target, stream);
 }
 
 /**
@@ -233,28 +195,21 @@ cudaError_t Mul(
  * @param[in] length Vector length
  */
 template <typename ValueT, typename T, typename SizeT>
-__global__ void Div_Kernel(ValueT *d_out, T value, SizeT length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-         idx < length; idx += STRIDE)
-    {
-        d_out[idx] /= value;
-    }
+__global__ void Div_Kernel(ValueT *d_out, T value, SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    d_out[idx] /= value;
+  }
 }
 
 template <typename ValueT, typename T, typename SizeT>
-cudaError_t Div(
-    ValueT  *elements,
-    T        value,
-    SizeT    length,
-    util::Location target = util::DEVICE,
-    cudaStream_t stream = 0)
-{
-    return ForEach(elements,
-        [value] __host__ __device__ (ValueT &element){
-            element /= value;
-        }, length, target, stream);
+cudaError_t Div(ValueT *elements, T value, SizeT length,
+                util::Location target = util::DEVICE, cudaStream_t stream = 0) {
+  return ForEach(
+      elements,
+      [value] __host__ __device__(ValueT & element) { element /= value; },
+      length, target, stream);
 }
 
 /**
@@ -267,234 +222,182 @@ cudaError_t Div(
  * @param[in] length Vector length
  */
 template <typename ValueT, typename CompareT, typename AssignT, typename SizeT>
-__global__ void CAS_Kernel(ValueT *d_dst, CompareT compare, AssignT val, SizeT length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-        idx < length; idx += STRIDE)
-    {
-        if (d_dst[idx] == compare) d_dst[idx] = val;
-    }
+__global__ void CAS_Kernel(ValueT *d_dst, CompareT compare, AssignT val,
+                           SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    if (d_dst[idx] == compare) d_dst[idx] = val;
+  }
 }
 
 template <typename ValueT, typename CompareT, typename AssignT, typename SizeT>
-__global__ void CAS_Kernel(ValueT *d_dst, CompareT compare, AssignT val, SizeT *length_)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    SizeT length = length_[0];
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-        idx < length; idx += STRIDE)
-    {
-        if (d_dst[idx] == compare) d_dst[idx] = val;
-    }
+__global__ void CAS_Kernel(ValueT *d_dst, CompareT compare, AssignT val,
+                           SizeT *length_) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  SizeT length = length_[0];
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    if (d_dst[idx] == compare) d_dst[idx] = val;
+  }
 }
 /** @} */
 
-} // namespace oprtr
+}  // namespace oprtr
 
-namespace util
-{
+namespace util {
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 template <typename T>
-Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::operator= (T val)
-{
-    GRError(Set(val), std::string(name) + " Set() failed.", __FILE__, __LINE__);
-    return (*this);
+    &Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::operator=(T val) {
+  GRError(Set(val), std::string(name) + " Set() failed.", __FILE__, __LINE__);
+  return (*this);
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 template <typename T>
-Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::operator+= (T val)
-{
-    GRError(Add(val), std::string(name) + " Add() failed.", __FILE__, __LINE__);
-    return (*this);
+    &Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::operator+=(T val) {
+  GRError(Add(val), std::string(name) + " Add() failed.", __FILE__, __LINE__);
+  return (*this);
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 template <typename T>
-Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::operator-= (T val)
-{
-    GRError(Minus(val), std::string(name) + " Minus() failed.", __FILE__, __LINE__);
-    return (*this);
+    &Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::operator-=(T val) {
+  GRError(Minus(val), std::string(name) + " Minus() failed.", __FILE__,
+          __LINE__);
+  return (*this);
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 template <typename T>
-Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::operator*= (T val)
-{
-    GRError(Minus(val), std::string(name) + " Mul() failed.", __FILE__, __LINE__);
-    return (*this);
+    &Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::operator*=(T val) {
+  GRError(Minus(val), std::string(name) + " Mul() failed.", __FILE__, __LINE__);
+  return (*this);
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 template <typename T>
-Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>&
 Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::operator/= (T val)
-{
-    GRError(Minus(val), std::string(name) + " Div() failed.", __FILE__, __LINE__);
-    return (*this);
+    &Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::operator/=(T val) {
+  GRError(Minus(val), std::string(name) + " Div() failed.", __FILE__, __LINE__);
+  return (*this);
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 template <typename T>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::Set(
-    T          value,
-    SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
-    Location   target,// = LOCATION_DEFAULT,
-    cudaStream_t stream)// = 0)
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::Set(
+    T value,
+    SizeT length,  // = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
+    Location target,      // = LOCATION_DEFAULT,
+    cudaStream_t stream)  // = 0)
 {
-    return ForEach([value] __host__ __device__ (ValueT &element){
-            element = value;
-        }, length, target, stream);
+  return ForEach(
+      [value] __host__ __device__(ValueT & element) { element = value; },
+      length, target, stream);
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 template <typename T>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::SetIdx(
-    T          scale,// = 1,
-    SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
-    Location   target,// = LOCATION_DEFAULT,
-    cudaStream_t stream)// = 0)
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::SetIdx(
+    T scale,       // = 1,
+    SizeT length,  // = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
+    Location target,      // = LOCATION_DEFAULT,
+    cudaStream_t stream)  // = 0)
 {
-    return ForAll([scale] __host__ __device__ (ValueT* elements, SizeT pos){
-            elements[pos] = pos * scale;
-        }, length, target, stream);
+  return ForAll(
+      [scale] __host__ __device__(ValueT * elements, SizeT pos) {
+        elements[pos] = pos * scale;
+      },
+      length, target, stream);
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 template <typename T>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::Add(
-    T          value,
-    SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
-    Location   target,// = LOCATION_DEFAULT,
-    cudaStream_t stream)// = 0)
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::Add(
+    T value,
+    SizeT length,  // = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
+    Location target,      // = LOCATION_DEFAULT,
+    cudaStream_t stream)  // = 0)
 {
-    return ForEach([value] __host__ __device__ (ValueT &element){
-            element += value;
-        }, length, target, stream);
+  return ForEach(
+      [value] __host__ __device__(ValueT & element) { element += value; },
+      length, target, stream);
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 template <typename T>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::Minus(
-    T          value,
-    SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
-    Location   target,// = LOCATION_DEFAULT,
-    cudaStream_t stream)// = 0)
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::Minus(
+    T value,
+    SizeT length,  // = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
+    Location target,      // = LOCATION_DEFAULT,
+    cudaStream_t stream)  // = 0)
 {
-    return ForEach([value] __host__ __device__ (ValueT &element){
-            element -= value;
-        }, length, target, stream);
+  return ForEach(
+      [value] __host__ __device__(ValueT & element) { element -= value; },
+      length, target, stream);
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 template <typename T>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::Mul(
-    T          value,
-    SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
-    Location   target,// = LOCATION_DEFAULT,
-    cudaStream_t stream)// = 0)
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::Mul(
+    T value,
+    SizeT length,  // = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
+    Location target,      // = LOCATION_DEFAULT,
+    cudaStream_t stream)  // = 0)
 {
-    return ForEach([value] __host__ __device__ (ValueT &element){
-            element *= value;
-        }, length, target, stream);
+  return ForEach(
+      [value] __host__ __device__(ValueT & element) { element *= value; },
+      length, target, stream);
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 template <typename T>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::Div(
-    T          value,
-    SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
-    Location   target,// = LOCATION_DEFAULT,
-    cudaStream_t stream)// = 0)
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::Div(
+    T value,
+    SizeT length,  // = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
+    Location target,      // = LOCATION_DEFAULT,
+    cudaStream_t stream)  // = 0)
 {
-    return ForEach([value] __host__ __device__ (ValueT &element){
-            element /= value;
-        }, length, target, stream);
+  return ForEach(
+      [value] __host__ __device__(ValueT & element) { element /= value; },
+      length, target, stream);
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 template <typename CompareT, typename AssignT>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::CAS(
-    CompareT   compare,
-    AssignT    assign,
-    SizeT      length,// = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
-    Location   target,// = LOCATION_DEFAULT,
-    cudaStream_t stream)// = 0)
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::CAS(
+    CompareT compare, AssignT assign,
+    SizeT length,  // = PreDefinedValues<typename ArrayT::SizeT>::InvalidValue,
+    Location target,      // = LOCATION_DEFAULT,
+    cudaStream_t stream)  // = 0)
 {
-    //typedef typename ArrayT::ValueT ValueT;
-    return ForEach([compare, assign] __host__ __device__ (ValueT &element){
-            if (element == compare) element = assign;
-        }, length, target, stream);
+  // typedef typename ArrayT::ValueT ValueT;
+  return ForEach(
+      [compare, assign] __host__ __device__(ValueT & element) {
+        if (element == compare) element = assign;
+      },
+      length, target, stream);
 }
 
-} // namespace util
-} // namespace gunrock
+}  // namespace util
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

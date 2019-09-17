@@ -41,8 +41,8 @@ struct main_struct {
   template <typename VertexT,  // Use int as the vertex identifier
             typename SizeT,    // Use int as the graph size type
             typename ValueT>   // Use int as the value type
-  cudaError_t operator()(util::Parameters &parameters, VertexT v, SizeT s,
-                         ValueT val) {
+  cudaError_t
+  operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val) {
     typedef typename app::TestGraph<VertexT, SizeT, ValueT,
                                     graph::HAS_EDGE_VALUES | graph::HAS_CSR>
         GraphT;
@@ -81,10 +81,11 @@ struct main_struct {
     VertexT sink = parameters.Get<VertexT>("sink");
     int num_repeats = parameters.Get<int>("num-repeats");
 
-    if (num_repeats == util::PreDefinedValues<int>::InvalidValue){
-	    num_repeats = max(10, static_cast<int>(pow(10, floor(log10(u_graph.nodes)))));
-	    parameters.Set<int>("num-repeats", num_repeats);
-   }
+    if (num_repeats == util::PreDefinedValues<int>::InvalidValue) {
+      num_repeats =
+          max(10, static_cast<int>(pow(10, floor(log10(u_graph.nodes)))));
+      parameters.Set<int>("num-repeats", num_repeats);
+    }
 
     util::PrintMsg("Number of ForAll() repeats per iteration: " +
                        std::to_string(num_repeats),
@@ -135,9 +136,9 @@ struct main_struct {
     if (!quick) {
       util::PrintMsg("______CPU reference algorithm______", true);
       flow_edge = (ValueT *)malloc(sizeof(ValueT) * u_graph.edges);
-      double elapsed =
-          app::mf::CPU_Reference(parameters, u_graph, u_edge_id, source, sink, max_flow,
-                                 reverse.GetPointer(util::HOST), flow_edge);
+      double elapsed = app::mf::CPU_Reference(
+          parameters, u_graph, u_edge_id, source, sink, max_flow,
+          reverse.GetPointer(util::HOST), flow_edge);
       util::PrintMsg("-----------------------------------\nElapsed: " +
                          std::to_string(elapsed) +
                          " ms\n Max flow CPU = " + std::to_string(max_flow),

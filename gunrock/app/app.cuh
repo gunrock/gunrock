@@ -23,7 +23,6 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++

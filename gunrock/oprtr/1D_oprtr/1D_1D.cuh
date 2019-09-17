@@ -30,31 +30,21 @@ namespace oprtr {
  * @param[in] length Vector length
  */
 template <typename ValueT, typename T, typename SizeT>
-__global__ void Set_Kernel(
-    ValueT *d_dst,
-    T      *d_src,
-    SizeT   length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-         idx < length; idx += STRIDE)
-    {
-        d_dst[idx] = d_src[idx];
-    }
+__global__ void Set_Kernel(ValueT *d_dst, T *d_src, SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    d_dst[idx] = d_src[idx];
+  }
 }
 
 template <typename ValueT, typename T, typename SizeT>
-cudaError_t Set(
-    ValueT *elements,
-    T      *values,
-    SizeT   length,
-    util::Location target = util::DEVICE,
-    cudaStream_t stream = 0)
-{
-    return ForEach(elements, values,
-        [] __host__ __device__ (ValueT &element, T value){
-            element = value;
-        }, length, target, stream);
+cudaError_t Set(ValueT *elements, T *values, SizeT length,
+                util::Location target = util::DEVICE, cudaStream_t stream = 0) {
+  return ForEach(
+      elements, values,
+      [] __host__ __device__(ValueT & element, T value) { element = value; },
+      length, target, stream);
 }
 
 /**
@@ -67,31 +57,21 @@ cudaError_t Set(
  * @param[in] length Vector length
  */
 template <typename ValueT, typename T, typename SizeT>
-__global__ void Add_Kernel(
-    ValueT *d_dst,
-    T      *d_src,
-    SizeT   length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-         idx < length; idx += STRIDE)
-    {
-        d_dst[idx] += d_src[idx];
-    }
+__global__ void Add_Kernel(ValueT *d_dst, T *d_src, SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    d_dst[idx] += d_src[idx];
+  }
 }
 
 template <typename ValueT, typename T, typename SizeT>
-cudaError_t Add(
-    ValueT *elements,
-    T      *values,
-    SizeT   length,
-    util::Location target = util::DEVICE,
-    cudaStream_t stream = 0)
-{
-    return ForEach(elements, values,
-        [] __host__ __device__ (ValueT &element, T value){
-            element += value;
-        }, length, target, stream);
+cudaError_t Add(ValueT *elements, T *values, SizeT length,
+                util::Location target = util::DEVICE, cudaStream_t stream = 0) {
+  return ForEach(
+      elements, values,
+      [] __host__ __device__(ValueT & element, T value) { element += value; },
+      length, target, stream);
 }
 
 /**
@@ -104,35 +84,27 @@ cudaError_t Add(
  * @param[in] length Vector length
  */
 template <typename ValueT, typename T, typename SizeT>
-__global__ void Minus_Kernel(
-    ValueT *d_dst,
-    T      *d_src,
-    SizeT   length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-         idx < length; idx += STRIDE)
-    {
-        d_dst[idx] -= d_src[idx];
-    }
+__global__ void Minus_Kernel(ValueT *d_dst, T *d_src, SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    d_dst[idx] -= d_src[idx];
+  }
 }
 
 template <typename ValueT, typename T, typename SizeT>
-cudaError_t Minus(
-    ValueT *elements,
-    T      *values,
-    SizeT   length,
-    util::Location target = util::DEVICE,
-    cudaStream_t stream = 0)
-{
-    return ForEach(elements, values,
-        [] __host__ __device__ (ValueT &element, T value){
-            element -= value;
-        }, length, target, stream);
+cudaError_t Minus(ValueT *elements, T *values, SizeT length,
+                  util::Location target = util::DEVICE,
+                  cudaStream_t stream = 0) {
+  return ForEach(
+      elements, values,
+      [] __host__ __device__(ValueT & element, T value) { element -= value; },
+      length, target, stream);
 }
 
 /**
- * @brief Multiply the source vector to the destination vector with the same length
+ * @brief Multiply the source vector to the destination vector with the same
+ * length
  *
  * @tparam T datatype of the vector.
  *
@@ -141,35 +113,26 @@ cudaError_t Minus(
  * @param[in] length Vector length
  */
 template <typename ValueT, typename T, typename SizeT>
-__global__ void Mul_Kernel(
-    ValueT *d_dst,
-    T      *d_src,
-    SizeT   length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-         idx < length; idx += STRIDE)
-    {
-        d_dst[idx] *= d_src[idx];
-    }
+__global__ void Mul_Kernel(ValueT *d_dst, T *d_src, SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    d_dst[idx] *= d_src[idx];
+  }
 }
 
 template <typename ValueT, typename T, typename SizeT>
-cudaError_t Mul(
-    ValueT *elements,
-    T      *values,
-    SizeT   length,
-    util::Location target = util::DEVICE,
-    cudaStream_t stream = 0)
-{
-    return ForEach(elements, values,
-        [] __host__ __device__ (ValueT &element, T value){
-            element *= value;
-        }, length, target, stream);
+cudaError_t Mul(ValueT *elements, T *values, SizeT length,
+                util::Location target = util::DEVICE, cudaStream_t stream = 0) {
+  return ForEach(
+      elements, values,
+      [] __host__ __device__(ValueT & element, T value) { element *= value; },
+      length, target, stream);
 }
 
 /**
- * @brief Divide the source vector to the destination vector with the same length
+ * @brief Divide the source vector to the destination vector with the same
+ * length
  * TODO: divide by zero check
  *
  * @tparam T datatype of the vector.
@@ -179,28 +142,21 @@ cudaError_t Mul(
  * @param[in] length Vector length
  */
 template <typename ValueT, typename T, typename SizeT>
-__global__ void Div_Kernel(ValueT *d_dst, T *d_src, SizeT length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-         idx < length; idx += STRIDE)
-    {
-        d_dst[idx] /= d_src[idx];
-    }
+__global__ void Div_Kernel(ValueT *d_dst, T *d_src, SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    d_dst[idx] /= d_src[idx];
+  }
 }
 
 template <typename ValueT, typename T, typename SizeT>
-cudaError_t Div(
-    ValueT *elements,
-    T      *values,
-    SizeT   length,
-    util::Location target = util::DEVICE,
-    cudaStream_t stream = 0)
-{
-    return ForEach(elements, values,
-        [] __host__ __device__ (ValueT &element, T value){
-            element /= value;
-        }, length, target, stream);
+cudaError_t Div(ValueT *elements, T *values, SizeT length,
+                util::Location target = util::DEVICE, cudaStream_t stream = 0) {
+  return ForEach(
+      elements, values,
+      [] __host__ __device__(ValueT & element, T value) { element /= value; },
+      length, target, stream);
 }
 
 /**
@@ -214,192 +170,120 @@ cudaError_t Div(
  * @param[in] scale Scale factor
  * @param[in] length Vector length
  */
-template <typename ValueT, typename T1, typename T2, typename T3, typename SizeT>
-__global__ void
-Mad_Kernel(ValueT *d_dst, T1 *d_src1, T2 *d_src2, T3 scale, SizeT length)
-{
-    const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
-    for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x;
-         idx < length; idx += STRIDE)
-    {
-        d_dst[idx] = d_src1[idx] * scale + d_src2[idx];
-    }
+template <typename ValueT, typename T1, typename T2, typename T3,
+          typename SizeT>
+__global__ void Mad_Kernel(ValueT *d_dst, T1 *d_src1, T2 *d_src2, T3 scale,
+                           SizeT length) {
+  const SizeT STRIDE = (SizeT)gridDim.x * blockDim.x;
+  for (SizeT idx = ((SizeT)blockIdx.x * blockDim.x) + threadIdx.x; idx < length;
+       idx += STRIDE) {
+    d_dst[idx] = d_src1[idx] * scale + d_src2[idx];
+  }
 }
 
-template <typename ValueT, typename T1, typename T2, typename T3, typename SizeT>
-cudaError_t Mad(
-    ValueT *elements,
-    T1     *src1s,
-    T2     *src2s,
-    T3      scale,
-    SizeT   length,
-    util::Location target = util::DEVICE,
-    cudaStream_t stream = 0)
-{
-    return ForEach(elements, src1s, src2s,
-        [scale] __host__ __device__ (ValueT &element, T1 src1, T2 src2){
-            element = src1 * scale + src2;
-        }, length, target, stream);
+template <typename ValueT, typename T1, typename T2, typename T3,
+          typename SizeT>
+cudaError_t Mad(ValueT *elements, T1 *src1s, T2 *src2s, T3 scale, SizeT length,
+                util::Location target = util::DEVICE, cudaStream_t stream = 0) {
+  return ForEach(
+      elements, src1s, src2s,
+      [scale] __host__ __device__(ValueT & element, T1 src1, T2 src2) {
+        element = src1 * scale + src2;
+      },
+      length, target, stream);
 }
 
-} // namespace oprtr
+}  // namespace oprtr
 
 namespace util {
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
-template <
-    typename SizeT_in,
-    typename ValueT_in,
-    ArrayFlag FLAG_in,
-    unsigned int cudaHostRegisterFlag_in>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::Set(
-    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in>
-        &array_in,
-    SizeT length,
-    Location target,
-    cudaStream_t stream)
-{
-    return ForEach(array_in, []__host__ __device__ (
-        ValueT &element, ValueT_in element_in){
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
+template <typename SizeT_in, typename ValueT_in, ArrayFlag FLAG_in,
+          unsigned int cudaHostRegisterFlag_in>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::Set(
+    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in> &array_in,
+    SizeT length, Location target, cudaStream_t stream) {
+  return ForEach(
+      array_in, [] __host__ __device__(ValueT & element, ValueT_in element_in) {
         element = element_in;
-    });
+      });
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
-template <
-    typename SizeT_in,
-    typename ValueT_in,
-    ArrayFlag FLAG_in,
-    unsigned int cudaHostRegisterFlag_in>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::Add(
-    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in>
-        &array_in,
-    SizeT length,
-    Location target,
-    cudaStream_t stream)
-{
-    return ForEach(array_in, []__host__ __device__ (
-        ValueT &element, ValueT_in element_in){
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
+template <typename SizeT_in, typename ValueT_in, ArrayFlag FLAG_in,
+          unsigned int cudaHostRegisterFlag_in>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::Add(
+    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in> &array_in,
+    SizeT length, Location target, cudaStream_t stream) {
+  return ForEach(
+      array_in, [] __host__ __device__(ValueT & element, ValueT_in element_in) {
         element += element_in;
-    });
+      });
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
-template <
-    typename SizeT_in,
-    typename ValueT_in,
-    ArrayFlag FLAG_in,
-    unsigned int cudaHostRegisterFlag_in>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::Minus(
-    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in>
-        &array_in,
-    SizeT length,
-    Location target,
-    cudaStream_t stream)
-{
-    return ForEach(array_in, []__host__ __device__ (
-        ValueT &element, ValueT_in element_in){
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
+template <typename SizeT_in, typename ValueT_in, ArrayFlag FLAG_in,
+          unsigned int cudaHostRegisterFlag_in>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::Minus(
+    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in> &array_in,
+    SizeT length, Location target, cudaStream_t stream) {
+  return ForEach(
+      array_in, [] __host__ __device__(ValueT & element, ValueT_in element_in) {
         element -= element_in;
-    });
+      });
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
-template <
-    typename SizeT_in,
-    typename ValueT_in,
-    ArrayFlag FLAG_in,
-    unsigned int cudaHostRegisterFlag_in>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::Mul(
-    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in>
-        &array_in,
-    SizeT length,
-    Location target,
-    cudaStream_t stream)
-{
-    return ForEach(array_in, []__host__ __device__ (
-        ValueT &element, ValueT_in element_in){
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
+template <typename SizeT_in, typename ValueT_in, ArrayFlag FLAG_in,
+          unsigned int cudaHostRegisterFlag_in>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::Mul(
+    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in> &array_in,
+    SizeT length, Location target, cudaStream_t stream) {
+  return ForEach(
+      array_in, [] __host__ __device__(ValueT & element, ValueT_in element_in) {
         element *= element_in;
-    });
+      });
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
-template <
-    typename SizeT_in,
-    typename ValueT_in,
-    ArrayFlag FLAG_in,
-    unsigned int cudaHostRegisterFlag_in>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::Div(
-    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in>
-        &array_in,
-    SizeT length,
-    Location target,
-    cudaStream_t stream)
-{
-    return ForEach(array_in, []__host__ __device__ (
-        ValueT &element, ValueT_in element_in){
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
+template <typename SizeT_in, typename ValueT_in, ArrayFlag FLAG_in,
+          unsigned int cudaHostRegisterFlag_in>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::Div(
+    Array1D<SizeT_in, ValueT_in, FLAG_in, cudaHostRegisterFlag_in> &array_in,
+    SizeT length, Location target, cudaStream_t stream) {
+  return ForEach(
+      array_in, [] __host__ __device__(ValueT & element, ValueT_in element_in) {
         element /= element_in;
-    });
+      });
 }
 
-template <
-    typename SizeT,
-    typename ValueT,
-    ArrayFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
-template <
-    typename SizeT_in1,
-    typename ValueT_in1,
-    ArrayFlag FLAG_in1,
-    unsigned int cudaHostRegisterFlag_in1,
-    typename SizeT_in2,
-    typename ValueT_in2,
-    ArrayFlag FLAG_in2,
-    unsigned int cudaHostRegisterFlag_in2,
-    typename T>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>
-    ::Mad(
+template <typename SizeT, typename ValueT, ArrayFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
+template <typename SizeT_in1, typename ValueT_in1, ArrayFlag FLAG_in1,
+          unsigned int cudaHostRegisterFlag_in1, typename SizeT_in2,
+          typename ValueT_in2, ArrayFlag FLAG_in2,
+          unsigned int cudaHostRegisterFlag_in2, typename T>
+cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::Mad(
     Array1D<SizeT_in1, ValueT_in1, FLAG_in1, cudaHostRegisterFlag_in1>
         &array_in1,
     Array1D<SizeT_in2, ValueT_in2, FLAG_in2, cudaHostRegisterFlag_in2>
         &array_in2,
-    T     scale,
-    SizeT length,
-    Location target,
-    cudaStream_t stream)
-{
-    return ForEach(array_in1, array_in2, [scale]__host__ __device__ (
-        ValueT &element, ValueT_in1 element_in1, ValueT_in2 element_in2){
+    T scale, SizeT length, Location target, cudaStream_t stream) {
+  return ForEach(
+      array_in1, array_in2,
+      [scale] __host__ __device__(ValueT & element, ValueT_in1 element_in1,
+                                  ValueT_in2 element_in2) {
         element = element_in1 * scale + element_in2;
-    });
+      });
 }
 
-} // namespace util
-} // namespace gunrock
+}  // namespace util
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

@@ -32,7 +32,7 @@ template <int LOG_NUM_ELEMENTS,   // Log of number of elements to warp-reduce
           int STEPS =
               LOG_NUM_ELEMENTS>  // Number of steps to run, i.e., produce
                                  // scanned segments of (1 << STEPS) elements
-                                 struct WarpScan {
+struct WarpScan {
   enum {
     NUM_ELEMENTS = 1 << LOG_NUM_ELEMENTS,
   };
@@ -88,7 +88,7 @@ template <int LOG_NUM_ELEMENTS,   // Log of number of elements to warp-reduce
                                               // at least two segments of size
                                               // NUM_ELEMENTS (the first being
                                               // initialized to identity)
-         ReductionOp scan_op,             // Scan operator
+         ReductionOp scan_op,                 // Scan operator
          int warpscan_tid = threadIdx.x)  // Thread's local index into a segment
                                           // of NUM_ELEMENTS items
   {
@@ -138,7 +138,7 @@ template <int LOG_NUM_ELEMENTS,   // Log of number of elements to warp-reduce
                                               // at least two segments of size
                                               // NUM_ELEMENTS (the first being
                                               // initialized to identity)
-         ReductionOp scan_op,             // Scan operator
+         ReductionOp scan_op,                 // Scan operator
          int warpscan_tid = threadIdx.x)  // Thread's local index into a segment
                                           // of NUM_ELEMENTS items
   {

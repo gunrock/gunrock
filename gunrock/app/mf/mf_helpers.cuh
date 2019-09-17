@@ -20,7 +20,7 @@
 #define MF_EPSILON 0.000001
 #define MF_EPSILON_VALIDATE 1e-3
 
-#include<map>
+#include <map>
 
 namespace gunrock {
 namespace app {
@@ -35,7 +35,7 @@ __host__ __device__ bool almost_eql(ValueT A, ValueT B,
 
 template <typename GraphT, typename VertexT, typename ValueT>
 int relabeling(GraphT graph, VertexT source, VertexT sink, VertexT* height,
-                VertexT* reverse, ValueT* flow) {
+               VertexT* reverse, ValueT* flow) {
   typedef typename GraphT::CsrT CsrT;
 
   bool mark[graph.nodes];
@@ -71,13 +71,11 @@ int relabeling(GraphT graph, VertexT source, VertexT sink, VertexT* height,
   return changed;
 }
 
-template <typename GraphT, 
-	 typename VertexT,
-	 typename SizeT = typename GraphT::SizeT>
-__host__ void InitReverse(
-		GraphT& graph, 
-		std::map<std::pair<VertexT, VertexT>, SizeT>& edge_id,
-		VertexT* reverse){
+template <typename GraphT, typename VertexT,
+          typename SizeT = typename GraphT::SizeT>
+__host__ void InitReverse(GraphT& graph,
+                          std::map<std::pair<VertexT, VertexT>, SizeT>& edge_id,
+                          VertexT* reverse) {
   typedef typename GraphT::CsrT CsrT;
 
   for (auto u = 0; u < graph.nodes; ++u) {
@@ -92,13 +90,12 @@ __host__ void InitReverse(
     }
   }
 }
-template <typename GraphT, 
-	 typename VertexT = typename GraphT::VertexT, 
-	 typename SizeT = typename GraphT::SizeT>
-__host__ void GetEdgesIds(GraphT& graph, 
-		std::map<std::pair<VertexT, VertexT>, SizeT>& edge_id){
+template <typename GraphT, typename VertexT = typename GraphT::VertexT,
+          typename SizeT = typename GraphT::SizeT>
+__host__ void GetEdgesIds(
+    GraphT& graph, std::map<std::pair<VertexT, VertexT>, SizeT>& edge_id) {
   typedef typename GraphT::CsrT CsrT;
-  for (VertexT u = 0; u < graph.nodes; ++u){
+  for (VertexT u = 0; u < graph.nodes; ++u) {
     auto f_start = graph.CsrT::GetNeighborListOffset(u);
     auto num_neighbors2 = graph.CsrT::GetNeighborListLength(u);
     auto f_end = f_start + num_neighbors2;
@@ -108,13 +105,11 @@ __host__ void GetEdgesIds(GraphT& graph,
     }
   }
 }
-template <typename GraphT, 
-	 typename VertexT = typename GraphT::VertexT, 
-	 typename SizeT = typename GraphT::SizeT>
+template <typename GraphT, typename VertexT = typename GraphT::VertexT,
+          typename SizeT = typename GraphT::SizeT>
 __host__ void CorrectCapacity(
-		GraphT& undirected_graph,
-		GraphT& directed_graph,
-		std::map<std::pair<VertexT, VertexT>, SizeT>& d_edge_id) {
+    GraphT& undirected_graph, GraphT& directed_graph,
+    std::map<std::pair<VertexT, VertexT>, SizeT>& d_edge_id) {
   typedef typename GraphT::CsrT CsrT;
   typedef typename GraphT::ValueT ValueT;
 
@@ -130,8 +125,7 @@ __host__ void CorrectCapacity(
       // Looking for edge u->v in directed graph
       auto f = d_edge_id[std::make_pair(u, v)];
       auto cap_f = directed_graph.CsrT::edge_values[f];
-      if (cap_f > (ValueT)0)
-          undirected_graph.CsrT::edge_values[e] = cap_f;
+      if (cap_f > (ValueT)0) undirected_graph.CsrT::edge_values[e] = cap_f;
     }
   }
 }

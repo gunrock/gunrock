@@ -26,7 +26,8 @@ namespace oprtr {
 namespace advance {
 
 /**
- * @brief Kernel configuration policy for all three advance kernels (forward, backward, and load balanced).
+ * @brief Kernel configuration policy for all three advance kernels (forward,
+ * backward, and load balanced).
  *
  * Parameterizations of this type encapsulate our kernel-tuning parameters
  *
@@ -81,105 +82,81 @@ template <typename _Problem,
           // Advance Mode and Type parameters
           MODE _ADVANCE_MODE>
 struct KernelPolicy {
+  typedef _Problem Problem;
+  typedef typename Problem::VertexId VertexId;
+  typedef typename Problem::SizeT SizeT;
+  typedef typename Problem::Value Value;
 
-    typedef _Problem                    Problem;
-    typedef typename Problem::VertexId  VertexId;
-    typedef typename Problem::SizeT     SizeT;
-    typedef typename Problem::Value     Value;
+  static const MODE ADVANCE_MODE = _ADVANCE_MODE;
 
-    static const MODE   ADVANCE_MODE = _ADVANCE_MODE;
+  enum {
+    CUDA_ARCH = _CUDA_ARCH,
+    LOG_THREADS = _LOG_THREADS,
+    THREADS = 1 << LOG_THREADS,
+  };
 
-    enum
-    {
-        CUDA_ARCH = _CUDA_ARCH,
-        LOG_THREADS = _LOG_THREADS,
-        THREADS = 1 << LOG_THREADS,
-    };
+  typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
+      _Problem, _CUDA_ARCH,
+      //_INSTRUMENT,
+      _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_LOAD_VEC_SIZE, _LOG_LOADS_PER_TILE,
+      _LOG_RAKING_THREADS, _WARP_GATHER_THRESHOLD, _CTA_GATHER_THRESHOLD,
+      _LOG_SCHEDULE_GRANULARITY>
+      THREAD_WARP_CTA_FORWARD;
 
-    typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
-        _Problem,
-        _CUDA_ARCH,
-        //_INSTRUMENT,
-        _MAX_CTA_OCCUPANCY,
-        _LOG_THREADS,
-        _LOG_LOAD_VEC_SIZE,
-        _LOG_LOADS_PER_TILE,
-        _LOG_RAKING_THREADS,
-        _WARP_GATHER_THRESHOLD,
-        _CTA_GATHER_THRESHOLD,
-        _LOG_SCHEDULE_GRANULARITY>
-    THREAD_WARP_CTA_FORWARD;
+  typedef gunrock::oprtr::edge_map_backward::KernelPolicy<
+      _Problem, _CUDA_ARCH,
+      //_INSTRUMENT,
+      _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_LOAD_VEC_SIZE, _LOG_LOADS_PER_TILE,
+      _LOG_RAKING_THREADS, _WARP_GATHER_THRESHOLD, _CTA_GATHER_THRESHOLD,
+      _LOG_SCHEDULE_GRANULARITY>
+      THREAD_WARP_CTA_BACKWARD;
 
-    typedef gunrock::oprtr::edge_map_backward::KernelPolicy<
-        _Problem,
-        _CUDA_ARCH,
-        //_INSTRUMENT,
-        _MAX_CTA_OCCUPANCY,
-        _LOG_THREADS,
-        _LOG_LOAD_VEC_SIZE,
-        _LOG_LOADS_PER_TILE,
-        _LOG_RAKING_THREADS,
-        _WARP_GATHER_THRESHOLD,
-        _CTA_GATHER_THRESHOLD,
-        _LOG_SCHEDULE_GRANULARITY>
-    THREAD_WARP_CTA_BACKWARD;
+  typedef gunrock::oprtr::edge_map_partitioned::KernelPolicy<
+      _Problem, _CUDA_ARCH,
+      //_INSTRUMENT,
+      _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_BLOCKS, _LIGHT_EDGE_THRESHOLD>
+      LOAD_BALANCED;
 
-    typedef gunrock::oprtr::edge_map_partitioned::KernelPolicy<
-        _Problem,
-        _CUDA_ARCH,
-        //_INSTRUMENT,
-        _MAX_CTA_OCCUPANCY,
-        _LOG_THREADS,
-        _LOG_BLOCKS,
-        _LIGHT_EDGE_THRESHOLD>
-    LOAD_BALANCED;
+  typedef gunrock::oprtr::edge_map_partitioned_backward::KernelPolicy<
+      _Problem, _CUDA_ARCH,
+      //_INSTRUMENT,
+      _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_BLOCKS, _LIGHT_EDGE_THRESHOLD>
+      LOAD_BALANCED_BACKWARD;
 
-    typedef gunrock::oprtr::edge_map_partitioned_backward::KernelPolicy<
-        _Problem,
-        _CUDA_ARCH,
-        //_INSTRUMENT,
-        _MAX_CTA_OCCUPANCY,
-        _LOG_THREADS,
-        _LOG_BLOCKS,
-        _LIGHT_EDGE_THRESHOLD>
-    LOAD_BALANCED_BACKWARD;
+  typedef gunrock::oprtr::edge_map_partitioned_cull::KernelPolicy<
+      _Problem, _CUDA_ARCH,
+      //_INSTRUMENT,
+      _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_BLOCKS, _LIGHT_EDGE_THRESHOLD>
+      LOAD_BALANCED_CULL;
 
-    typedef gunrock::oprtr::edge_map_partitioned_cull::KernelPolicy<
-        _Problem,
-        _CUDA_ARCH,
-        //_INSTRUMENT,
-        _MAX_CTA_OCCUPANCY,
-        _LOG_THREADS,
-        _LOG_BLOCKS,
-        _LIGHT_EDGE_THRESHOLD>
-    LOAD_BALANCED_CULL;
+  typedef gunrock::oprtr::all_edges_advance::KernelPolicy<
+      _Problem, _CUDA_ARCH,
+      //_INSTRUMENT,
+      _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_BLOCKS>
+      EDGES;
 
-    typedef gunrock::oprtr::all_edges_advance::KernelPolicy<
-        _Problem,
-        _CUDA_ARCH,
-        //_INSTRUMENT,
-        _MAX_CTA_OCCUPANCY,
-        _LOG_THREADS,
-        _LOG_BLOCKS>
-    EDGES;
-
-    static const int CTA_OCCUPANCY =
-         (ADVANCE_MODE == TWC_FORWARD ) ?
-            THREAD_WARP_CTA_FORWARD ::CTA_OCCUPANCY :
-        ((ADVANCE_MODE == TWC_BACKWARD) ?
-            THREAD_WARP_CTA_BACKWARD::CTA_OCCUPANCY :
-        ((ADVANCE_MODE == LB_BACKWARD ) ?
-            LOAD_BALANCED_BACKWARD  ::CTA_OCCUPANCY :
-        ((ADVANCE_MODE == LB          ) ?
-            LOAD_BALANCED           ::CTA_OCCUPANCY :
-        ((ADVANCE_MODE == LB_LIGHT    ) ?
-            LOAD_BALANCED           ::CTA_OCCUPANCY :
-        ((ADVANCE_MODE == LB_CULL     ) ?
-            LOAD_BALANCED_CULL      ::CTA_OCCUPANCY :
-        ((ADVANCE_MODE == LB_LIGHT_CULL) ?
-            LOAD_BALANCED_CULL      ::CTA_OCCUPANCY :
-        ((ADVANCE_MODE == ALL_EDGES    ) ?
-            EDGES                   ::CTA_OCCUPANCY : 0)))))));
+  static const int CTA_OCCUPANCY =
+      (ADVANCE_MODE == TWC_FORWARD)
+          ? THREAD_WARP_CTA_FORWARD ::CTA_OCCUPANCY
+          : ((ADVANCE_MODE == TWC_BACKWARD)
+                 ? THREAD_WARP_CTA_BACKWARD::CTA_OCCUPANCY
+                 : ((ADVANCE_MODE == LB_BACKWARD)
+                        ? LOAD_BALANCED_BACKWARD ::CTA_OCCUPANCY
+                        : ((ADVANCE_MODE == LB)
+                               ? LOAD_BALANCED ::CTA_OCCUPANCY
+                               : ((ADVANCE_MODE == LB_LIGHT)
+                                      ? LOAD_BALANCED ::CTA_OCCUPANCY
+                                      : ((ADVANCE_MODE == LB_CULL)
+                                             ? LOAD_BALANCED_CULL ::
+                                                   CTA_OCCUPANCY
+                                             : ((ADVANCE_MODE == LB_LIGHT_CULL)
+                                                    ? LOAD_BALANCED_CULL ::
+                                                          CTA_OCCUPANCY
+                                                    : ((ADVANCE_MODE ==
+                                                        ALL_EDGES)
+                                                           ? EDGES ::
+                                                                 CTA_OCCUPANCY
+                                                           : 0)))))));
 };
 
 }  // namespace advance

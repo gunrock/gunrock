@@ -211,14 +211,11 @@ void minCut(GraphT& graph, VertexT src, ValueT* flow, int* min_cut,
  *
  * \return     double      Time taken for the MF
  */
-template <typename VertexT, 
-	 typename ValueT, 
-	 typename GraphT,
-	 typename SizeT>
-double CPU_Reference(util::Parameters& parameters, GraphT& graph, 
-		std::map<std::pair<VertexT, VertexT>, SizeT>& edge_id,
-		VertexT src, VertexT sin, ValueT& maxflow, VertexT* reverse,
-                ValueT* flow) {
+template <typename VertexT, typename ValueT, typename GraphT, typename SizeT>
+double CPU_Reference(util::Parameters& parameters, GraphT& graph,
+                     std::map<std::pair<VertexT, VertexT>, SizeT>& edge_id,
+                     VertexT src, VertexT sin, ValueT& maxflow,
+                     VertexT* reverse, ValueT* flow) {
   debug_aml("CPU_Reference start\n");
   typedef typename GraphT::CsrT CsrT;
 
@@ -231,17 +228,19 @@ double CPU_Reference(util::Parameters& parameters, GraphT& graph,
 
   // Prepare Boost Datatype and Data structure
   typedef adjacency_list_traits<vecS, vecS, directedS> Traits;
-  typedef adjacency_list<vecS, vecS, directedS, 
-	  //property<vertex_name_t, std::string>,
-	  property < vertex_name_t, std::string,
-	  property < vertex_index_t, long,
-	  property < vertex_color_t, boost::default_color_type,
-	  property < vertex_distance_t, long,
-	  property < vertex_predecessor_t, Traits::edge_descriptor > > > > >,
-	  
-    	  property<edge_capacity_t, ValueT,
-	  property<edge_residual_capacity_t, ValueT,
-	  property<edge_reverse_t, Traits::edge_descriptor>>>>
+  typedef adjacency_list<
+      vecS, vecS, directedS,
+      // property<vertex_name_t, std::string>,
+      property<vertex_name_t, std::string,
+               property<vertex_index_t, long,
+                        property<vertex_color_t, boost::default_color_type,
+                                 property<vertex_distance_t, long,
+                                          property<vertex_predecessor_t,
+                                                   Traits::edge_descriptor>>>>>,
+
+      property<edge_capacity_t, ValueT,
+               property<edge_residual_capacity_t, ValueT,
+                        property<edge_reverse_t, Traits::edge_descriptor>>>>
       Graph;
 
   Graph boost_graph;
@@ -291,15 +290,16 @@ double CPU_Reference(util::Parameters& parameters, GraphT& graph,
 
   util::CpuTimer cpu_timer;
   cpu_timer.Start();
-  //maxflow = edmonds_karp_max_flow(boost_graph, source, sink);
-  //maxflow = push_relabel_max_flow(boost_graph, source, sink);
+  // maxflow = edmonds_karp_max_flow(boost_graph, source, sink);
+  // maxflow = push_relabel_max_flow(boost_graph, source, sink);
   maxflow = boykov_kolmogorov_max_flow(boost_graph, source, sink);
   cpu_timer.Stop();
   elapsed = cpu_timer.ElapsedMillis();
 
-  fprintf(stderr, "CPU Elapsed: %lf ms, cpu_reference result %lf\n", elapsed, maxflow);
+  fprintf(stderr, "CPU Elapsed: %lf ms, cpu_reference result %lf\n", elapsed,
+          maxflow);
   printf("CPU Elapsed: %lf ms, maxflow result %lf\n", elapsed, maxflow);
-  
+
   //
   // Extracting results on CPU
   //
@@ -307,11 +307,12 @@ double CPU_Reference(util::Parameters& parameters, GraphT& graph,
   typename graph_traits<Graph>::vertex_iterator u_it, u_end;
   typename graph_traits<Graph>::out_edge_iterator e_it, e_end;
   for (tie(u_it, u_end) = vertices(boost_graph); u_it != u_end; ++u_it) {
-    for (tie(e_it, e_end) = out_edges(*u_it, boost_graph); e_it != e_end; ++e_it) {
+    for (tie(e_it, e_end) = out_edges(*u_it, boost_graph); e_it != e_end;
+         ++e_it) {
       if (capacity[*e_it] > 0) {
         ValueT e_f = capacity[*e_it] - residual_capacity[*e_it];
         VertexT t = target(*e_it, boost_graph);
-	flow[edge_id[std::make_pair(*u_it, t)]] = e_f;
+        flow[edge_id[std::make_pair(*u_it, t)]] = e_f;
       }
     }
   }
@@ -496,7 +497,7 @@ int Validate_Results(util::Parameters& parameters, GraphT& graph,
       util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
     } else {
       util::PrintMsg("PASS", !quiet);
-      //fprintf(stderr, "PASS\n");
+      // fprintf(stderr, "PASS\n");
     }
   } else {
     util::PrintMsg("Flow Validity:\n", !quiet, false);
@@ -539,7 +540,7 @@ int Validate_Results(util::Parameters& parameters, GraphT& graph,
       util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
     } else {
       util::PrintMsg("PASS", !quiet);
-      //fprintf(stderr, "PASS\n");
+      // fprintf(stderr, "PASS\n");
     }
   }
 

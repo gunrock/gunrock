@@ -29,7 +29,7 @@ template <int LOG_LOADS_PER_TILE,  // Number of vector loads (log)
           int ACTIVE_THREADS,      // Active threads that will be loading
           st::CacheModifier CACHE_MODIFIER>  // Cache modifier (e.g.,
                                              // CA/CG/CS/NONE/etc.)
-                                             struct ScatterTile {
+struct ScatterTile {
   enum {
     LOADS_PER_TILE = 1 << LOG_LOADS_PER_TILE,
     LOAD_VEC_SIZE = 1 << LOG_LOAD_VEC_SIZE,
