@@ -24,6 +24,8 @@
 #include <gunrock/util/parameters.h>
 #include <gunrock/util/test_utils.h>
 
+#include <gunrock/oprtr/oprtr.cuh>
+
 namespace gunrock {
 namespace graphio {
 namespace rmat {
@@ -347,26 +349,29 @@ cudaError_t Build(
 
         // TODO: Temporary, remove this and replace with
         // existing arrays.
-        util::Array1D<SizeT, SizeT> empty_loop;
-        GUARD_CU(empty_loop.Allocate(num_edges, target));
-        GUARD_CU(empty_loop.EnsureSize_(num_edges, target));
-        
-        auto state_generator = [seed, rand_states] 
-            __device__ (SizeT * s_q, const SizeT &s) {
-            curand_init(seed, s, 0, rand_states + s);
-        };
+        // util::Array1D<SizeT, SizeT> empty_loop;
+        // GUARD_CU(empty_loop.Allocate(num_edges, target));
+        // GUARD_CU(empty_loop.EnsureSize_(num_edges, target));
 
         auto &edge_values = graph.CooT::edge_values;
         auto &edge_pairs = graph.CooT::edge_pairs;
+        
+        cpu_timer.Start();
 
-        auto grmat =
+        GUARD_CU(oprtr::For( 
+            [seed, rand_states] 
+            __device__ (const SizeT &s) {
+            curand_init(seed, s, 0, rand_states + s);
+        }, num_edges, target, stream));
+
+        GUARD_CU(oprtr::For(
                 [graph, num_nodes, num_edges,
                 edge_value_range, edge_value_min,
                 a0, b0, c0, d0, rand_states, random_edge_values,
                 edge_values, edge_pairs] 
-                __device__ (SizeT * e_q, const SizeT &pos) {
+                __device__ (const SizeT &e) {
 
-			auto e = pos;
+			// auto e = pos;
 			//SizeT e = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
             // const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;
             curandState &rand_state = rand_states[e];
@@ -405,18 +410,15 @@ cudaError_t Build(
                     edge_values[e] = 1;
                 }
             }
-        };
+        }, num_edges, target, stream));
 
-        cpu_timer.Start();
-        GUARD_CU(empty_loop.ForAll(state_generator, num_edges, target, stream));
-        GUARD_CU(empty_loop.ForAll(grmat, num_edges, target, stream));
         cpu_timer.Stop();
 
         // TODO: we need this right now to remove duplicate edges on HOST
         GUARD_CU(graph.CooT ::Move(util::DEVICE, util::HOST)); 
         
         GUARD_CU(rand_states.Release());
-        GUARD_CU(empty_loop.Release());
+        // GUARD_CU(empty_loop.Release());
     }
 
     if (retval) return retval;
