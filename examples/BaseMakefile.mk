@@ -11,7 +11,10 @@
 
 force64 = 1
 use_metis = 0
+
+# -g -G failed? uncomment the maxregisters:
 # maxregisters = 32
+
 use_boost = 0
 NVCC = "$(shell which nvcc)"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
@@ -81,7 +84,7 @@ else
 	METIS_LINK = -Xlinker -lmetis -Xcompiler -DMETIS_FOUND
 endif
 
-GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=1.0.0
+GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=1.0.1
 LINK = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
 INC = $(CUDA_INC) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(BOOST_INC) -I.. -I../.. $(LINK)
 
