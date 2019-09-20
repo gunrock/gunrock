@@ -25,8 +25,6 @@
 #include <gunrock/app/color/color_enactor.cuh>
 #include <gunrock/app/color/color_test.cuh>
 
-#include <gunrock/util/info_rapidjson.cuh>
-
 // Others
 #include <cstdio>
 
@@ -41,16 +39,10 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_enactor(parameters));
   GUARD_CU(UseParameters_test(parameters));
 
-  /*
-    GUARD_CU(parameters.Use<unsigned int>(
+  GUARD_CU(parameters.Use<unsigned int>(
         "num-colors",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
         0, "number of output colors", __FILE__, __LINE__));
-  */
-
-  GUARD_CU(parameters.Use<std::string>(
-      "tag", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, "",
-      "tag info for json string", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<bool>(
       "loop-color", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
@@ -182,8 +174,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   printf("Number of colors needed: %d\n", num_colors);
 
   UseParameters_test(parameters);
-  // parameters.Set("num-colors", num_colors);
-  info.SetVal("num-colors", std::to_string(num_colors));
+  parameters.Set("num-colors", num_colors);
 
   // compute running statistics
   info.ComputeTraversalStats(enactor, (VertexT *)NULL);

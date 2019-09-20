@@ -48,6 +48,12 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       "\tIf largestdegree, select vertices with largest degrees",
       __FILE__, __LINE__));
 
+  GUARD_CU(parameters.Use<int>(
+    "src-seed",
+    util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+    util::PreDefinedValues<int>::InvalidValue,
+    "seed to generate random sources", __FILE__, __LINE__));
+
   return retval;
 }
 

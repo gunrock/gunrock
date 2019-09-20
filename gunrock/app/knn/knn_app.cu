@@ -24,9 +24,6 @@
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// JSON includes
-#include <gunrock/util/info_rapidjson.cuh>
-
 // KNN includes
 #include <gunrock/app/knn/knn_enactor.cuh>
 #include <gunrock/app/knn/knn_test.cuh>
@@ -40,10 +37,6 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_app(parameters));
   GUARD_CU(UseParameters_problem(parameters));
   GUARD_CU(UseParameters_enactor(parameters));
-
-  GUARD_CU(parameters.Use<std::string>(
-      "tag", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, "",
-      "tag info for json string", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
       "k",

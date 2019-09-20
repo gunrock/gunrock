@@ -96,22 +96,31 @@ typename GraphT::SizeT Validate_Results(
       edge_counter++;
     }
   }
-  printf("edge_counter=%d\n", edge_counter);
+
+  util::PrintMsg("edge counter = " + std::to_string(edge_counter), !quiet);
 
   if (ref_projections != NULL) {
     for (SizeT v = 0; v < graph.nodes * graph.nodes; ++v) {
       if (ref_projections[v] != 0) {
-        int row = (int)(v / graph.nodes);
-        int col = v % graph.nodes;
-        printf("%d->%d | GPU=%f CPU=%f\n", row, col, h_projections[v],
-               ref_projections[v]);
-        num_errors += (int)(h_projections[v] != ref_projections[v]);
+	auto row = (int)(v / graph.nodes);
+	auto col = v % graph.nodes;
+	auto h_proj = h_projections[v];
+	auto ref_proj = ref_projections[v];
+	      
+	if (h_proj != ref_proj) {
+	    num_errors++;
+	    util::PrintMsg(std::to_string(row) + " => " +
+			     std::to_string(col) + " | GPU = " +
+			     std::to_string(h_proj) + " CPU = " +
+			     std::to_string(ref_proj),
+			   !quiet);
+	}
       }
     }
+
     if (num_errors == 0) {
-      printf("======= PASSED ======\n");
+      util::PrintMsg("PASSED", !quiet);
     } else {
-      printf("======= FAILED ======\n");
       util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
     }
   }
