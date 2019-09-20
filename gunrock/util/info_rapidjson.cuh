@@ -175,6 +175,10 @@ struct Info {
 
     SetVal("engine", "Gunrock");
     SetVal("command-line", parameters.Get_CommandLine());
+    
+    // Update this date when JSON Schema is changed:
+    SetVal("json-schema", "2019-09-20");  
+    
     // SetVal("sysinfo", sysinfo.getSysinfo());
     // SetVal("gpuinfo", gpuinfo.getGpuinfo());
     // SetVal("userinfo", userinfo.getUserinfo());
