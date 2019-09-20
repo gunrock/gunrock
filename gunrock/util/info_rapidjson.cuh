@@ -17,9 +17,11 @@
 #include <cstdio>
 #include <vector>
 #include <ctime>
+#include <time.h>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/filewritestream.h>
 #include <gunrock/util/gitsha1.h>
+#include <gunrock/util/sysinfo_rapidjson.h>
 
 /* this is the "stringize macro macro" hack */
 #define STR(x) #x
@@ -30,7 +32,7 @@ namespace util {
 
 cudaError_t UseParameters_info(util::Parameters &parameters) {
   cudaError_t retval = cudaSuccess;
-
+  
   GUARD_CU(parameters.Use<bool>(
       "json",
       util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
@@ -47,6 +49,17 @@ cudaError_t UseParameters_info(util::Parameters &parameters) {
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       "", "Directory to output statistics in json format", __FILE__, __LINE__));
 
+  GUARD_CU(parameters.Use<std::string>(
+      "tag",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      "", "Tag to better describe and identify json outputs", __FILE__,
+      __LINE__));
+
+  // GUARD_CU(parameters.Use<uint64_t>(
+  //   "filtered-srcs",
+  //   util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::INTERNAL_PARAMETER, 0,
+  //   "Array of filtered source vertices", __FILE__, __LINE__));
+
   return retval;
 }
 
@@ -56,12 +69,17 @@ cudaError_t UseParameters_info(util::Parameters &parameters) {
 struct Info {
  private:
   double total_elapsed;               // sum of running times
+  double elapsed;                     // average of running times
   double max_elapsed;                 // maximum running time
   double min_elapsed;                 // minimum running time
-  std::vector<double> process_times;  // array of running times
+  double stddev_process_time;         // std. deviation of running times
+  std::vector<double> process_times;  // array of running times (raw)
+  std::vector<double> _process_times; // array of running times (filtered)
   int num_runs;                       // number of runs
   int64_t nodes_visited;
   int64_t edges_visited;
+  double max_m_teps;                 // maximum MTEPS
+  double min_m_teps;                 // minimum MTEPS
   double m_teps;
   int64_t search_depth;
   double avg_duty;
@@ -129,6 +147,10 @@ struct Info {
    * @param[in] args Command line arguments.
    */
   void InitBase(std::string algorithm_name, util::Parameters &parameters) {
+
+    std::transform (algorithm_name.begin(), algorithm_name.end(), 
+                    algorithm_name.begin(), ::tolower);
+
     this->algorithm_name = algorithm_name;
     this->parameters = &parameters;
 
@@ -138,7 +160,26 @@ struct Info {
     num_runs = 0;
 
     time_t now = time(NULL);
-    time_str = std::string(ctime(&now));
+
+    long        ms; // Milliseconds
+    time_t          s;  // Seconds
+    struct timespec spec;
+
+    clock_gettime(CLOCK_REALTIME, &spec);
+
+    s  = spec.tv_sec;
+    ms = round(spec.tv_nsec / 1.0e6); // Convert nanoseconds to milliseconds
+    if (ms > 999) {
+        s++;
+        ms = 0;
+    }
+
+    std::string time_s = std::string(ctime(&now));
+    std::string time_ms = std::to_string(ms);
+
+    time_str = time_s;
+    std::string time_str_filename = time_s.substr(0, time_s.size() - 5) + time_ms + ' ' + time_s.substr(time_s.length() - 5);
+
     if (parameters.Get<bool>("json")) {
       json_filename = "";
     } else if (parameters.Get<std::string>("jsonfile") != "") {
@@ -147,7 +188,7 @@ struct Info {
       std::string dataset = parameters.Get<std::string>("dataset");
       std::string dir = parameters.Get<std::string>("jsondir");
       json_filename = dir + "/" + algorithm_name + "_" +
-                      ((dataset != "") ? (dataset + "_") : "") + time_str +
+                      ((dataset != "") ? (dataset + "_") : "") + time_str_filename +
                       ".json";
 
       char bad_chars[] = ":\n";
@@ -175,9 +216,6 @@ struct Info {
 
     SetVal("engine", "Gunrock");
     SetVal("command-line", parameters.Get_CommandLine());
-    // SetVal("sysinfo", sysinfo.getSysinfo());
-    // SetVal("gpuinfo", gpuinfo.getGpuinfo());
-    // SetVal("userinfo", userinfo.getUserinfo());
 
 #ifdef BOOST_FOUND
 #if BOOST_COMP_CLANG
@@ -210,7 +248,7 @@ struct Info {
     SetVal("gunrock-version", XSTR(GUNROCKVERSION));
     SetVal("git-commit-sha", g_GIT_SHA1);
     SetVal("load-time", parameters.Get<float>("load-time"));
-    SetVal("algorithm", algorithm_name);
+    SetVal("primitive", algorithm_name);
 
     parameters.List(*this);
   }
@@ -230,7 +268,7 @@ struct Info {
     //    info["destination_vertex"].get_int64() >= graph.nodes)
     //    info["destination_vertex"] = graph.nodes - 1;
 
-    SetVal("setdev-degree", graph::GetStddevDegree(graph));
+    SetVal("stddev-degree", graph::GetStddevDegree(graph));
     SetVal("num-vertices", graph.nodes);
     SetVal("num-edges", graph.edges);
   }
@@ -344,17 +382,35 @@ struct Info {
   template <typename T>
   void SetVal(std::string name, const std::vector<T> &vec) {
     if (json_writer == NULL) return;
+    // TODO: update parameters to support "ALWAYS_ARRAY" type
+    // currently using a hack to make sure tag is always an 
+    // array in JSON. This is also required for fields such
+    // as srcs, process-times, etc.
+    if (vec.size() == 1 && (name.compare("tag") != 0)) {
+      SetVal(name, vec.front());
+    } else {
+      json_writer->Key(name.c_str());
+      json_writer->StartArray();
+      for (auto it = vec.begin(); it != vec.end(); it++)
+        SetVal(name, *it, false);
+      json_writer->EndArray();
+    }
+  }
+
+  template <typename T>
+  void SetVal(std::string name, const std::vector<std::pair<T, T>> &vec) {
+    if (json_writer == NULL) return;
     json_writer->Key(name.c_str());
-    json_writer->StartArray();
-    for (auto it = vec.begin(); it != vec.end(); it++) SetVal(name, *it, false);
-    json_writer->EndArray();
+    json_writer->StartObject();
+    for (auto it = vec.begin(); it != vec.end(); it++) {
+      SetVal(it->first.c_str(), it->second);
+    }
+    json_writer->EndObject();
   }
 
   void CollectSingleRun(double single_elapsed) {
     total_elapsed += single_elapsed;
     process_times.push_back(single_elapsed);
-    if (max_elapsed < single_elapsed) max_elapsed = single_elapsed;
-    if (min_elapsed > single_elapsed) min_elapsed = single_elapsed;
     num_runs++;
   }
 
@@ -383,7 +439,7 @@ struct Info {
     edges_redundance = 0.0f;
     nodes_redundance = 0.0f;
 
-    std::vector<int> device_list = parameters->Get<std::vector<int> >("device");
+    std::vector<int> device_list = parameters->Get<std::vector<int>>("device");
     int num_gpus = device_list.size();
     auto graph = enactor.problem->org_graph[0];
 
@@ -445,9 +501,66 @@ struct Info {
     avg_duty = (total_lifetimes > 0)
                    ? double(total_runtimes) / total_lifetimes * 100.0
                    : 0.0f;
+   
+    // Throw out results that are 2 standard deviations away from
+    // the mean (processing times) and recompute the average.
+    // filtering: start
+    elapsed = total_elapsed / num_runs;
 
-    double elapsed = total_elapsed / num_runs;
-    SetVal("elapsed", elapsed);
+    if (num_runs > 1) {
+      double variance = 0.0;
+
+      for (auto i = process_times.begin(); i != process_times.end(); i++)
+        variance += pow(*i - elapsed, 2);
+      
+      variance = variance / num_runs;
+      stddev_process_time = sqrt(variance);
+
+      auto lower_limit = elapsed - (2*stddev_process_time);
+      auto upper_limit = elapsed + (2*stddev_process_time);
+
+      // TODO: Check if this works with cases where we don't have
+      // multiple srcs, instead all process times maybe use one src
+      // (for example, src = 0 or largestdegree, etc.)
+      std::vector<int64_t> srcs;
+      if (parameters->Have("srcs")) {
+        srcs = parameters->Get<std::vector<int64_t>>("srcs");
+      }
+
+      std::vector<std::pair<int64_t, double>> delete_runs;
+
+      for(auto i = 0; i < process_times.size(); i++) {
+          delete_runs.push_back(std::make_pair((int64_t)srcs[i], (double)process_times[i]));
+      }
+
+      // for (auto q = delete_runs.begin(); q != delete_runs.end(); ++q) 
+      //     std::cout << ' ' << (*q).first << ' ' << (*q).second << std::endl;
+
+      delete_runs.erase(std::remove_if(
+                          delete_runs.begin(), delete_runs.end(),
+                          [lower_limit, upper_limit](const std::pair<const int64_t, 
+                                                                    const double>& x) {
+                            return ((x.second < lower_limit) || (x.second > upper_limit));
+                          }), delete_runs.end());
+
+      std::vector<int64_t> _srcs;
+
+      for (auto q = delete_runs.begin(); q != delete_runs.end(); ++q) {
+        _process_times.push_back((double)(*q).second);
+        _srcs.push_back((int64_t)(*q).first);
+      }
+
+      // filtering: end
+      
+      total_elapsed = 0.0;
+      for (auto i = _process_times.begin(); i != _process_times.end(); i++) {
+        total_elapsed += *i;
+      }
+      
+      elapsed = total_elapsed / _process_times.size();
+      SetVal("filtered-srcs", _srcs);
+    }
+    
     SetVal("average-duty", avg_duty);
     SetVal("search-depth", search_depth);
 
@@ -494,7 +607,6 @@ struct Info {
       SetVal("edges-visited", edges_visited);
       SetVal("nodes-redundance", nodes_redundance);
       SetVal("edges-redundance", edges_redundance);
-      SetVal("m-teps", m_teps);
     }
 
     return retval;
@@ -520,7 +632,7 @@ struct Info {
     int num_srcs = 0;
     std::vector<int64_t> srcs;
     if (parameters->Have("srcs")) {
-      srcs = parameters->Get<std::vector<int64_t> >("srcs");
+      srcs = parameters->Get<std::vector<int64_t>>("srcs");
       num_srcs = srcs.size();
     }
 
@@ -570,25 +682,90 @@ struct Info {
     // if (parameters -> Get<std::string>("output_filename") != "")
     //    util::PrintMsg(" write time: " + std::to_string(write_time) + " ms");
     util::PrintMsg(" total time: " + std::to_string(total_time) + " ms");
+
+    // TODO: Update DisplayStats to display the new fields and more detailed
+    // information about the runs. 
+  }
+
+  /* work around to supporting different pair types */
+  void getGpuinfo() {
+    cudaDeviceProp devProps;
+    int deviceCount;
+    cudaGetDeviceCount(&deviceCount);
+    if (deviceCount == 0) /* no valid devices */
+    {
+      return;
+    }
+    int dev = 0;
+    cudaGetDevice(&dev);
+    cudaGetDeviceProperties(&devProps, dev);
+    if (json_writer == NULL) return;
+    json_writer->Key("gpuinfo");
+    json_writer->StartObject();
+    SetVal("name", devProps.name);
+    SetVal("total_global_mem", int64_t(devProps.totalGlobalMem));
+    SetVal("major", std::to_string(devProps.major));
+    SetVal("minor", std::to_string(devProps.minor));
+    SetVal("clock_rate", devProps.clockRate);
+    SetVal("multi_processor_count", devProps.multiProcessorCount);
+
+    int runtimeVersion, driverVersion;
+    cudaRuntimeGetVersion(&runtimeVersion);
+    cudaDriverGetVersion(&driverVersion);
+    SetVal("driver_api", std::to_string(CUDA_VERSION));
+    SetVal("driver_version", std::to_string(driverVersion));
+    SetVal("runtime_version", std::to_string(runtimeVersion));
+    SetVal("compute_version", std::to_string((devProps.major * 10 + devProps.minor)));
+    json_writer->EndObject();
   }
 
   void Finalize(double postprocess_time, double total_time) {
     bool quiet = parameters->Get<bool>("quiet");
+    int num_runs = parameters->Get<int>("num-runs");
 
+    if (num_runs > 1) {
+      min_elapsed = *std::min_element(_process_times.begin(), _process_times.end());
+      max_elapsed = *std::max_element(_process_times.begin(), _process_times.end());
+      min_m_teps = (double)this->edges_visited / (max_elapsed * 1000.0);
+      max_m_teps = (double)this->edges_visited / (min_elapsed * 1000.0);
+    } else {
+      min_elapsed = elapsed;
+      max_elapsed = elapsed;
+      min_m_teps = m_teps;
+      max_m_teps = m_teps;
+    }
+    
     preprocess_time = parameters->Get<double>("preprocess-time");
     SetVal("process-times", process_times);
+    SetVal("filtered-process-times", _process_times);
+    SetVal("stddev-process-time", stddev_process_time);
+    SetVal("avg-process-time", elapsed);
     SetVal("min-process-time", min_elapsed);
     SetVal("max-process-time", max_elapsed);
     SetVal("postprocess-time", postprocess_time);
     SetVal("total-time", total_time);
+    SetVal("avg-mteps", m_teps);
+    SetVal("min-mteps", min_m_teps);
+    SetVal("max-mteps", max_m_teps);
 
     this->postprocess_time = postprocess_time;
     this->total_time = total_time;
+
+    util::Sysinfo sysinfo;
+    SetVal("sysinfo", sysinfo.getSysinfo());
+
+    getGpuinfo();
+    // util::Gpuinfo gpuinfo;
+    // SetVal("gpuinfo", gpuinfo.getGpuinfo());
+
+    util::Userinfo userinfo;
+    SetVal("userinfo", userinfo.getUserinfo());
+
+    if (json_writer != NULL) json_writer->EndObject();
+    
     if (!quiet) {
       DisplayStats();
     }
-
-    if (json_writer != NULL) json_writer->EndObject();
   }
 };
 

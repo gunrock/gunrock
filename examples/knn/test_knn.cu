@@ -15,9 +15,6 @@
 #include <gunrock/app/knn/knn_app.cu>
 #include <gunrock/app/test_base.cuh>
 
-// JSON includes
-#include <gunrock/util/info_rapidjson.cuh>
-
 using namespace gunrock;
 
 namespace APP_NAMESPACE = app::knn;

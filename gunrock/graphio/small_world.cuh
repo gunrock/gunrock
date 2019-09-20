@@ -33,12 +33,12 @@ cudaError_t UseParameters(util::Parameters &parameters,
   cudaError_t retval = cudaSuccess;
 
   GUARD_CU(parameters.Use<double>(
-      graph_prefix + "sw-p",
+      graph_prefix + "small-world-p",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0.00, "p", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<long long>(
-      graph_prefix + "sw-k",
+      graph_prefix + "small-world-k",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       6, "k", __FILE__, __LINE__));
 
@@ -74,8 +74,8 @@ cudaError_t Build(util::Parameters &parameters, GraphT &graph,
     num_nodes = 1 << scale;
     dataset = dataset + "n" + std::to_string(scale) + "_";
   }
-  double p = parameters.Get<double>(graph_prefix + "sw-p");
-  SizeT k = parameters.Get<SizeT>(graph_prefix + "sw-k");
+  double p = parameters.Get<double>(graph_prefix + "small-world-p");
+  SizeT k = parameters.Get<SizeT>(graph_prefix + "small-world-k");
   dataset = dataset + "_k" + std::to_string(k) + "_p" + std::to_string(p);
   if (parameters.UseDefault("dataset"))
     parameters.Set<std::string>("dataset", dataset);
