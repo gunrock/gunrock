@@ -347,15 +347,9 @@ cudaError_t Build(
         GUARD_CU(rand_states.Allocate(num_edges, target));
         GUARD_CU(rand_states.EnsureSize_(num_edges, target));
 
-        // TODO: Temporary, remove this and replace with
-        // existing arrays.
-        // util::Array1D<SizeT, SizeT> empty_loop;
-        // GUARD_CU(empty_loop.Allocate(num_edges, target));
-        // GUARD_CU(empty_loop.EnsureSize_(num_edges, target));
-
         auto &edge_values = graph.CooT::edge_values;
         auto &edge_pairs = graph.CooT::edge_pairs;
-        
+
         cpu_timer.Start();
 
         GUARD_CU(oprtr::For( 
@@ -371,9 +365,6 @@ cudaError_t Build(
                 edge_values, edge_pairs] 
                 __device__ (const SizeT &e) {
 
-			// auto e = pos;
-			//SizeT e = (SizeT) blockIdx.x * blockDim.x + threadIdx.x;
-            // const SizeT STRIDE = (SizeT) blockDim.x * gridDim.x;
             curandState &rand_state = rand_states[e];
         
             if (e >= num_edges) return;
@@ -413,12 +404,11 @@ cudaError_t Build(
         }, num_edges, target, stream));
 
         cpu_timer.Stop();
-
+        
         // TODO: we need this right now to remove duplicate edges on HOST
         GUARD_CU(graph.CooT ::Move(util::DEVICE, util::HOST)); 
         
         GUARD_CU(rand_states.Release());
-        // GUARD_CU(empty_loop.Release());
     }
 
     if (retval) return retval;
