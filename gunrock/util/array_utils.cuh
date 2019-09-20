@@ -22,7 +22,6 @@
 #include <gunrock/util/type_limits.cuh>
 #include <gunrock/util/type_enum.cuh>
 #include <gunrock/util/vector_utils.cuh>
-//#include <gunrock/util/memset_kernel.cuh>
 
 namespace gunrock {
 namespace util {
