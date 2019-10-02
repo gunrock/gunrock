@@ -238,6 +238,59 @@ double sm(
     return elapsed_time;
 }
 
+/*
+ * @brief Simple interface take in graph as Gunrock format
+ * @param[in]  query_graph The query graph pattern to search
+ * @param[in]  data_graph  The data graph to search on
+ * @param[in]  num_runs    Number of runs to perform SM
+ * @param[out] subgraphs   Return number of subgraphs
+ * \return     double      Return accumulated elapsed times for all runs
+ */
+template <
+    typename VertexT = int,
+    typename SizeT   = int,
+    typename GValueT = unsigned long>
+double nv_sm(
+    gunrock::app::TestGraph<VertexT, SizeT, GValueT,
+    gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR> &query_graph,
+    gunrock::app::TestGraph<VertexT, SizeT, GValueT,
+    gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR> &data_graph,
+    const int          num_runs,
+    VertexT           *subgraphs)
+{
+    typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
+        gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
+        GraphT;
+    typedef typename GraphT::CsrT CsrT;
+
+    // Setup parameters
+    gunrock::util::Parameters parameters("sm");
+    gunrock::graphio::UseParameters(parameters);
+    gunrock::app::sm::UseParameters(parameters);
+    gunrock::app::UseParameters_test(parameters);
+    parameters.Parse_CommandLine(0, NULL);
+    parameters.Set("graph-type", "by-pass");
+    parameters.Set("num-runs", num_runs);
+    bool quiet = parameters.Get<bool>("quiet");
+//    GraphT data_graph;
+//    GraphT query_graph;
+    // Assign pointers into gunrock graph format
+/*    data_graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
+    data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, gunrock::util::HOST);
+    data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, gunrock::util::HOST);
+    data_graph.CsrT::edge_values   .SetPointer((GValueT *)edge_values, num_edges, gunrock::util::HOST);
+    data_graph.FromCsr(data_graph.csr(), true, quiet);
+    gunrock::graphio::LoadGraph(parameters, data_graph);
+    gunrock::graphio::LoadGraph(parameters, query_graph, "pattern-");
+*/
+    // Run the SM
+    double elapsed_time = gunrock_sm(parameters, data_graph, query_graph, subgraphs);
+    // Cleanup
+//    data_graph.Release();
+//    query_graph.Release();
+
+    return elapsed_time;
+}
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++
