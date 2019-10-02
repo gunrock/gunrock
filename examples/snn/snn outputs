@@ -1,0 +1,247 @@
+agnes@bowser:~/knn_gunrock/tests/knn$ make && ./bin/test_knn_10.0_x86_64 market ../../dataset/small/chesapeake.mtx --k=4 --eps=1 --min-pts=3
+mkdir -p bin
+"/usr/local/cuda/bin/nvcc" -w -DGIT_SHA1="\"d64e7435ea30a1d05ebafa5d7d42a7868b10753d\"" -gencode=arch=compute_70,code=\"sm_70,compute_70\" -gencode=arch=compute_60,code=\"sm_60,compute_60\" -o bin/test_knn_10.0_x86_64 test_knn.cu ../../gunrock/util/str_to_T.cu ../../gunrock/util/test_utils.cu ../../gunrock/util/error_utils.cu ../../externals/moderngpu/src/mgpucontext.cu ../../externals/moderngpu/src/mgpuutil.cpp ../../gunrock/util/gitsha1make.c -lineinfo --std=c++11 --expt-extended-lambda -rdc=true  -m64 -I"/usr/local/cuda/bin/../include"  -I"../../externals/moderngpu/include" -I"../../externals/cub" -I"../../externals/rapidjson/include" -I.. -I../..  -Xcompiler -fopenmp -Xlinker -lgomp -Xlinker -lmetis -Xcompiler -DMETIS_FOUND -Xcompiler -DGUNROCKVERSION=0.4.0 -O0
+Reference point is (0, 0), k = 4, eps = 1, min-pts = 3
+
+Loading Matrix-market coordinate-formatted graph ...
+  Reading meta data from ../../dataset/small/chesapeake.mtx.meta
+  Reading edge lists from ../../dataset/small/chesapeake.mtx.coo_edge_pairs
+  Substracting 1 from node Ids...
+  Edge doubleing: 170 -> 340 edges
+  graph loaded as COO in 0.120580s.
+Converting 39 vertices, 340 directed edges ( ordered tuples) to CSR format...Done (0s).
+Degree Histogram (39 vertices, 340 edges):
+    Degree 0: 0 (0.000000 %)
+    Degree 2^0: 0 (0.000000 %)
+    Degree 2^1: 1 (2.564103 %)
+    Degree 2^2: 22 (56.410256 %)
+    Degree 2^3: 13 (33.333333 %)
+    Degree 2^4: 2 (5.128205 %)
+    Degree 2^5: 1 (2.564103 %)
+
+__________________________
+______ CPU Reference _____
+--------------------------
+ Elapsed: 1.910925
+__________________________
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+0	 0	 0	 queue3 	 oversize :	 234 ->	 342
+0	 0	 0	 queue3 	 oversize :	 234 ->	 342
+--------------------------
+Run 0 elapsed: 0.331163, #iterations = 1
+PASS
+[knn] finished.
+ avg. elapsed: 0.331163 ms
+ iterations: 1
+ min. elapsed: 0.331163 ms
+ max. elapsed: 0.331163 ms
+ load time: 0 ms
+ preprocess time: 388.070000 ms
+ postprocess time: 0.382185 ms
+ total time: 388.920069 ms
+agnes@bowser:~/knn_gunrock/tests/knn$ ./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n12/delaunay_n12.mtx --k=4 --eps=1 --min-pts=2
+Reference point is (0, 0), k = 4, eps = 1, min-pts = 2
+
+Loading Matrix-market coordinate-formatted graph ...
+  Reading meta data from /data/gunrock_dataset/large/delaunay_n12/delaunay_n12.mtx.meta
+  Reading edge lists from /data/gunrock_dataset/large/delaunay_n12/delaunay_n12.mtx.coo_edge_pairs
+  Substracting 1 from node Ids...
+  Edge doubleing: 12264 -> 24528 edges
+  graph loaded as COO in 0.211627s.
+Converting 4096 vertices, 24528 directed edges ( ordered tuples) to CSR format...Done (0s).
+Degree Histogram (4096 vertices, 24528 edges):
+    Degree 0: 0 (0.000000 %)
+    Degree 2^0: 0 (0.000000 %)
+    Degree 2^1: 46 (1.123047 %)
+    Degree 2^2: 3542 (86.474609 %)
+    Degree 2^3: 508 (12.402344 %)
+
+__________________________
+______ CPU Reference _____
+--------------------------
+ Elapsed: 13683.758789
+__________________________
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+--------------------------
+Run 0 elapsed: 4.204988, #iterations = 1
+PASS
+[knn] finished.
+ avg. elapsed: 4.204988 ms
+ iterations: 1
+ min. elapsed: 4.204988 ms
+ max. elapsed: 4.204988 ms
+ load time: 0 ms
+ preprocess time: 452.781000 ms
+ postprocess time: 41.126013 ms
+ total time: 498.371124 ms
+agnes@bowser:~/knn_gunrock/tests/knn$ ./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n13/delaunay_n13.mtx --k=4 --eps=1 --min-pts=2
+Reference point is (0, 0), k = 4, eps = 1, min-pts = 2
+
+Loading Matrix-market coordinate-formatted graph ...
+  Reading meta data from /data/gunrock_dataset/large/delaunay_n13/delaunay_n13.mtx.meta
+  Reading edge lists from /data/gunrock_dataset/large/delaunay_n13/delaunay_n13.mtx.coo_edge_pairs
+  Substracting 1 from node Ids...
+  Edge doubleing: 24547 -> 49094 edges
+  graph loaded as COO in 0.196318s.
+Converting 8192 vertices, 49094 directed edges ( ordered tuples) to CSR format...Done (0s).
+Degree Histogram (8192 vertices, 49094 edges):
+    Degree 0: 0 (0.000000 %)
+    Degree 2^0: 0 (0.000000 %)
+    Degree 2^1: 85 (1.037598 %)
+    Degree 2^2: 7055 (86.120605 %)
+    Degree 2^3: 1052 (12.841797 %)
+
+__________________________
+______ CPU Reference _____
+--------------------------
+ Elapsed: 55676.554688
+__________________________
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+--------------------------
+Run 0 elapsed: 10.523081, #iterations = 1
+PASS
+[knn] finished.
+ avg. elapsed: 10.523081 ms
+ iterations: 1
+ min. elapsed: 10.523081 ms
+ max. elapsed: 10.523081 ms
+ load time: 0 ms
+ preprocess time: 476.858000 ms
+ postprocess time: 197.055101 ms
+ total time: 685.079098 ms
+agnes@bowser:~/knn_gunrock/tests/knn$ ./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n14/delaunay_n14.mtx --k=4 --eps=1 --min-pts=2
+Reference point is (0, 0), k = 4, eps = 1, min-pts = 2
+
+Loading Matrix-market coordinate-formatted graph ...
+  Reading meta data from /data/gunrock_dataset/large/delaunay_n14/delaunay_n14.mtx.meta
+  Reading edge lists from /data/gunrock_dataset/large/delaunay_n14/delaunay_n14.mtx.coo_edge_pairs
+  Substracting 1 from node Ids...
+  Edge doubleing: 49122 -> 98244 edges
+  graph loaded as COO in 0.200240s.
+Converting 16384 vertices, 98244 directed edges ( ordered tuples) to CSR format...Done (0s).
+Degree Histogram (16384 vertices, 98244 edges):
+    Degree 0: 0 (0.000000 %)
+    Degree 2^0: 0 (0.000000 %)
+    Degree 2^1: 180 (1.098633 %)
+    Degree 2^2: 14071 (85.882568 %)
+    Degree 2^3: 2132 (13.012695 %)
+    Degree 2^4: 1 (0.006104 %)
+
+__________________________
+______ CPU Reference _____
+
+
+--------------------------
+ Elapsed: 227701.625000
+__________________________
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+--------------------------
+Run 0 elapsed: 33.720970, #iterations = 1
+PASS
+[knn] finished.
+ avg. elapsed: 33.720970 ms
+ iterations: 1
+ min. elapsed: 33.720970 ms
+ max. elapsed: 33.720970 ms
+ load time: 0 ms
+ preprocess time: 447.906000 ms
+ postprocess time: 631.419182 ms
+ total time: 1115.134001 ms
+agnes@bowser:~/knn_gunrock/tests/knn$ 
+agnes@bowser:~/knn_gunrock/tests/knn$ 
+agnes@bowser:~/knn_gunrock/tests/knn$ ./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n15/delaunay_n15.mtx --k=4 --eps=1 --min-pts=2
+Reference point is (0, 0), k = 4, eps = 1, min-pts = 2
+
+Loading Matrix-market coordinate-formatted graph ...
+  Reading meta data from /data/gunrock_dataset/large/delaunay_n15/delaunay_n15.mtx.meta
+  Reading edge lists from /data/gunrock_dataset/large/delaunay_n15/delaunay_n15.mtx.coo_edge_pairs
+  Substracting 1 from node Ids...
+  Edge doubleing: 98274 -> 196548 edges
+  graph loaded as COO in 0.041817s.
+Converting 32768 vertices, 196548 directed edges ( ordered tuples) to CSR format...Done (0s).
+Degree Histogram (32768 vertices, 196548 edges):
+    Degree 0: 0 (0.000000 %)
+    Degree 2^0: 0 (0.000000 %)
+    Degree 2^1: 358 (1.092529 %)
+    Degree 2^2: 28249 (86.209106 %)
+    Degree 2^3: 4156 (12.683105 %)
+    Degree 2^4: 5 (0.015259 %)
+
+__________________________
+______ CPU Reference _____
+--------------------------
+ Elapsed: 931239.062500
+__________________________
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+--------------------------
+Run 0 elapsed: 118.573189, #iterations = 1
+PASS
+[knn] finished.
+ avg. elapsed: 118.573189 ms
+ iterations: 1
+ min. elapsed: 118.573189 ms
+ max. elapsed: 118.573189 ms
+ load time: 0 ms
+ preprocess time: 453.134000 ms
+ postprocess time: 2477.478027 ms
+ total time: 3057.486057 ms
+agnes@bowser:~/knn_gunrock/tests/knn$ ./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n16/delaunay_n16.mtx --k=4 --eps=1 --min-pts=2
+Reference point is (0, 0), k = 4, eps = 1, min-pts = 2
+
+Loading Matrix-market coordinate-formatted graph ...
+  Reading meta data from /data/gunrock_dataset/large/delaunay_n16/delaunay_n16.mtx.meta
+  Reading edge lists from /data/gunrock_dataset/large/delaunay_n16/delaunay_n16.mtx.coo_edge_pairs
+  Substracting 1 from node Ids...
+  Edge doubleing: 196575 -> 393150 edges
+  graph loaded as COO in 0.041701s.
+Converting 65536 vertices, 393150 directed edges ( ordered tuples) to CSR format...Done (0s).
+Degree Histogram (65536 vertices, 393150 edges):
+    Degree 0: 0 (0.000000 %)
+    Degree 2^0: 0 (0.000000 %)
+    Degree 2^1: 789 (1.203918 %)
+    Degree 2^2: 56227 (85.795593 %)
+    Degree 2^3: 8519 (12.998962 %)
+    Degree 2^4: 1 (0.001526 %)
+
+__________________________
+______ CPU Reference _____
+--------------------------
+ Elapsed: 3769173.000000
+__________________________
+==============================================
+ advance-mode=LB
+Using advance mode LB
+Using filter mode CULL
+__________________________
+[../../gunrock/util/array_utils.cuh, 939 @ gpu 0] edges_queued cudaMemcpy D2H failed (CUDA error 77: an illegal memory access was encountered)
+[../../gunrock/util/array_utils.cuh, 939 @ gpu 0] nodes_queued cudaMemcpy D2H failed (CUDA error 77: an illegal memory access was encountered)
+[../../gunrock/app/enactor_loop.cuh, 686 @ gpu 0] FullQueue_Core failed. (CUDA error 77: an illegal memory access was encountered)
+[../../gunrock/app/enactor_base.cuh, 568 @ gpu 0] error encountered (CUDA error 77: an illegal memory access was encountered)
+[../../gunrock/app/knn/knn_enactor.cuh, 591 @ gpu 0] error encountered (CUDA error 77: an illegal memory access was encountered)
+[../../gunrock/app/knn/knn_app.cu, 127 @ gpu 0] error encountered (CUDA error 77: an illegal memory access was encountered)
+[../../gunrock/util/array_utils.cuh, 587 @ gpu 0] keys cudaFree failed (CUDA error 77: an illegal memory access was encountered)
+[../../gunrock/app/knn/knn_problem.cuh, 117 @ gpu 0] error encountered (CUDA error 77: an illegal memory access was encountered)
+[../../gunrock/util/array_utils.cuh, 587 @ gpu 0] data_slices[0] cudaFree failed (CUDA error 77: an illegal memory access was encountered)
+[../../gunrock/app/knn/knn_problem.cuh, 252 @ gpu 0] error encountered (CUDA error 77: an illegal memory access was encountered)
+[test_knn.cu, 119 @ gpu 0] error encountered (CUDA error 77: an illegal memory access was encountered)
+
