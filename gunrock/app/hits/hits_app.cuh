@@ -6,17 +6,22 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file hits_app.cu
+ * @file hits_app.cuh
  *
  * @brief HITS Gunrock Application
  */
 
 #include <gunrock/gunrock.h>
+
+// Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
+
+// Graph definitions
 #include <gunrock/graphio/graphio.cuh>
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
+// HITS includes
 #include <gunrock/app/hits/hits_enactor.cuh>
 #include <gunrock/app/hits/hits_test.cuh>
 
@@ -24,14 +29,7 @@ namespace gunrock {
 namespace app {
 namespace hits {
 
-cudaError_t UseParameters(util::Parameters &parameters) {
-  cudaError_t retval = cudaSuccess;
-  GUARD_CU(UseParameters_app(parameters));
-  GUARD_CU(UseParameters_problem(parameters));
-  GUARD_CU(UseParameters_enactor(parameters));
-
-  return retval;
-}
+cudaError_t UseParameters(util::Parameters &parameters);
 
 /**
  * @brief Run hits tests
@@ -152,6 +150,114 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 }  // namespace hits
 }  // namespace app
 }  // namespace gunrock
+
+// Above code remains from the original HITS test implementation. Below code is copied from sm_app.cuh.
+// THIS NEEDS TO BE CHANGED
+
+
+/*
+ * @brief Entry of gunrock_sm function
+ * @tparam     GraphT     Type of the graph
+ * @tparam     ValueT     Type of the distances
+ * @param[in]  parameters Excution parameters
+ * @param[in]  graph      Input graph
+ * @param[out] distances  Return shortest distance to source per vertex
+ * @param[out] preds      Return predecessors of each vertex
+ * \return     double     Return accumulated elapsed times for all runs
+ */
+template <typename GraphT, typename ValueT = typename GraphT::ValueT>
+double gunrock_hits(
+    gunrock::util::Parameters &parameters,
+    GraphT &data_graph,
+    ValueT *hub_ranks,
+    ValueT *auth_ranks)
+{
+    typedef typename GraphT::VertexT VertexT;
+    typedef gunrock::app::hits::Problem<GraphT  > ProblemT;
+    typedef gunrock::app::hits::Enactor<ProblemT> EnactorT;
+    gunrock::util::CpuTimer cpu_timer;
+    gunrock::util::Location target = gunrock::util::DEVICE;
+    double total_time = 0;
+    if (parameters.UseDefault("quiet"))
+        parameters.Set("quiet", true);
+
+    // Allocate problem and enactor on GPU, and initialize them
+    ProblemT problem(parameters);
+    EnactorT enactor;
+    problem.Init(data_graph, target);
+    enactor.Init(problem   , target);
+
+    problem.Reset(target);
+    enactor.Reset(data_graph.nodes, target);
+
+    cpu_timer.Start();
+    enactor.Enact();
+    cpu_timer.Stop();
+
+    total_time += cpu_timer.ElapsedMillis();
+    problem.Extract(hub_ranks, auth_ranks);
+    
+
+    enactor.Release(target);
+    problem.Release(target);
+    return total_time;
+}
+
+/*
+ * @brief Simple interface take in graph as CSR format
+ * @param[in]  num_nodes   Number of veritces in the input graph
+ * @param[in]  num_edges   Number of edges in the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  edge_values CSR-formatted graph input edge weights
+ * @param[in]  num_runs    Number of runs to perform SM
+ * @param[out] subgraphs   Return number of subgraphs
+ * \return     double      Return accumulated elapsed times for all runs
+ */
+template <
+    typename VertexT = int,
+    typename SizeT   = int,
+    typename GValueT = float>
+double hits(
+    const SizeT        num_nodes,
+    const SizeT        num_edges,
+    const SizeT       *row_offsets,
+    const VertexT     *col_indices,
+    const int          num_iter,
+    GValueT            *hub_ranks,
+    GValueT            *auth_ranks)
+{
+    typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
+        gunrock::graph::HAS_CSR>
+        GraphT;
+    typedef typename GraphT::CsrT CsrT;
+
+    // Setup parameters
+    gunrock::util::Parameters parameters("hits");
+    gunrock::graphio::UseParameters(parameters);
+    gunrock::app::hits::UseParameters(parameters);
+    gunrock::app::UseParameters_test(parameters);
+    parameters.Parse_CommandLine(0, NULL);
+    parameters.Set("graph-type", "by-pass");
+    parameters.Set("max-iter", num_iter);
+    bool quiet = parameters.Get<bool>("quiet");
+    GraphT data_graph;
+
+    // Assign pointers into gunrock graph format
+    data_graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
+    data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, gunrock::util::HOST);
+    data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, gunrock::util::HOST);
+
+    data_graph.FromCsr(data_graph.csr(), true, quiet);
+    gunrock::graphio::LoadGraph(parameters, data_graph);
+
+    // Run HITS
+    double elapsed_time = gunrock_sm(parameters, data_graph, hub_ranks, auth_ranks);
+    // Cleanup
+    data_graph.Release();
+
+    return elapsed_time;
+}
 
 // Leave this at the end of the file
 // Local Variables:
