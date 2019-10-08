@@ -424,8 +424,8 @@ double hits(
     const int           *row_offsets,
     const int           *col_indices, 
     const int            num_iter,
-    float*              *hub_ranks,
-    float*              *auth_ranks);     
+    float               *hub_ranks,
+    float               *auth_ranks);     
 
 #ifdef __cplusplus
 }

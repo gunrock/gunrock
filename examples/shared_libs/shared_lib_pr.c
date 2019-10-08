@@ -17,6 +17,7 @@ int main(int argc, char *argv[]) {
   int *node_ids = (int *)malloc(sizeof(int) * num_nodes);
   float *ranks = (float *)malloc(sizeof(float) * num_nodes);
 
+  // Jonathan's Note: Disabled pagerank here since I was testing only hits and sm in CMakeLists.txt.
   // double elapsed = pagerank(num_nodes, num_edges, row_offsets, col_indices, 1,
   //                           node_ids, ranks);
 
@@ -30,7 +31,7 @@ int main(int argc, char *argv[]) {
   float *hub_ranks = (float *)malloc(sizeof(float) * num_nodes);
   float *auth_ranks = (float *)malloc(sizeof(float) * num_nodes);
   int num_iter = 10;
-  double elapsed_hits = hits(num_nodes, num_edges, row_offsets, col_indices, num_iter, hub_ranks, auth_ranks);
+  // double elapsed_hits = hits(num_nodes, num_edges, row_offsets, col_indices, num_iter, hub_ranks, auth_ranks);
 
   if (node_ids) free(node_ids);
   if (ranks) free(ranks);
