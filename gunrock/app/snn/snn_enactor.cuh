@@ -26,12 +26,16 @@
 #include <gunrock/oprtr/1D_oprtr/for.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
-//#define KNN_DEBUG 1
+//KNN app
+#include <gunrock/app/knn/knn_enactor.cuh>
+#include <gunrock/app/knn/knn_test.cuh>
+
+//#define SNN_DEBUG 1
 
 #define debug2(a...)
 //#define debug2(a...) printf(a)
 
-#ifdef KNN_DEBUG
+#ifdef SNN_DEBUG
 #define debug(a...) printf(a)
 #else
 #define debug(a...)
@@ -42,7 +46,7 @@ namespace app {
 namespace snn {
 
 /**
- * @brief Speciflying parameters for knn Enactor
+ * @brief Speciflying parameters for snn Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter
  * info \return cudaError_t error message(s), if any
  */
@@ -54,11 +58,11 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
 }
 
 /**
- * @brief defination of knn iteration loop
+ * @brief defination of snn iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
-struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
+struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
   typedef typename EnactorT::VertexT VertexT;
   typedef typename EnactorT::SizeT SizeT;
   typedef typename EnactorT::ValueT ValueT;
@@ -67,7 +71,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
   typedef IterationLoopBase<EnactorT, Use_FullQ | Push> BaseIterationLoop;
 
-  knnIterationLoop() : BaseIterationLoop() {}
+  snnIterationLoop() : BaseIterationLoop() {}
 
   /**
    * @brief Core computation of knn, one iteration
@@ -94,11 +98,18 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &iteration = enactor_stats.iteration;
 
     // struct Point()
-    auto &keys = data_slice.keys;
-    auto &distances = data_slice.distances;
+    //auto &distances = data_slice.distances;
 
-    // K-Nearest Neighbors
-    auto &knns = data_slice.knns;
+    // K-Nearest Neighbors data
+    auto &knn_enactor = this->enactor->knn_enactor;
+    auto &knn_problem = this->enactor->problem->knn_problem;
+    auto &knn_problem_data = knn_problem.data_slices[this->gpu_num][0];
+    auto &knns = knn_problem_data.knns;
+    auto &keys = knn_problem_data.keys;
+    auto &keys_out = knn_problem_data.keys_out;
+
+    // Shared Nearest Neighbors
+    //auto &knns = data_slice.knns;
     auto &core_point_mark_0 = data_slice.core_point_mark_0;
     auto &core_point_mark = data_slice.core_point_mark;
     auto &core_points = data_slice.core_points;
@@ -119,8 +130,8 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &cub_temp_storage = data_slice.cub_temp_storage;
 
     // Sorted arrays
-    auto &keys_out = data_slice.keys_out;
     auto &distances_out = data_slice.distances;
+    //auto &keys_out = knn_problem_data.keys_out;
 
     cudaStream_t stream = oprtr_parameters.stream;
     auto target = util::DEVICE;
@@ -129,83 +140,14 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // Perform SNN
     auto &snn = data_slice.snn;
 
-    // Define operations
-
-    // advance operation
-    auto distance_op = [keys, distances, ref_src, ref_dest] __host__ __device__(
-                           const VertexT &src, VertexT &dest,
-                           const SizeT &edge_id, const VertexT &input_item,
-                           const SizeT &input_pos, SizeT &output_pos) -> bool {
-      // Calculate distance between src to edge vertex ref: (x,y)
-      ValueT x = (ValueT)(src - ref_src);
-      ValueT y = (ValueT)(dest - ref_dest);
-      ValueT distance = (x * x) + (y * y);
-      if (distance < 0)
-        printf("(%d, %d) - (%d, %d) distance is %ld\n", src, dest, ref_src, ref_dest, distance);
-
-      // struct Point()
-      keys[edge_id] = edge_id;
-      distances[edge_id] = distance;
-      return true;
-    };
-
     oprtr_parameters.advance_mode = "ALL_EDGES";
 
-    // Compute distances
-    GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-        graph.csr(), null_frontier, null_frontier, oprtr_parameters,
-        distance_op));
-
-    // Sort all the distances using CUB
-    GUARD_CU(util::cubSegmentedSortPairs(cub_temp_storage, distances,
-                                         distances_out, keys, keys_out, edges,
-                                         nodes, graph.CsrT::row_offsets, 0,
-                                         std::ceil(std::log2(nodes)), stream, false));
-
-    // Get reverse keys_out array
-    GUARD_CU(keys.ForAll(
-        [keys_out] __host__ __device__(SizeT * k, const SizeT &pos) {
-          k[keys_out[pos]] = pos;
-        },
-        edges, target, stream));
-/*
-   //debug only
-    GUARD_CU(knns.ForAll(
-                [nodes, graph, distances] __host__ __device__ (SizeT *k, const SizeT &pos){
-                printf("debug: number of nodes = %d\n", nodes);
-                for (int tested_node = 0; tested_node < nodes; ++tested_node){
-                    //auto tested_node = 62734;
-                    auto e_start = graph.CsrT::GetNeighborListOffset(tested_node);
-                    auto num_neighbors = graph.CsrT::GetNeighborListLength(tested_node);
-                    auto e_end = e_start + num_neighbors;
-                    printf("neighbors of thread %d\n", tested_node);
-                    for (int e = e_start; e != e_end; ++e){
-                        auto m = graph.CsrT::GetEdgeDest(e);
-                        printf("%d(%ld) ", m, distances[e]);
-                    }
-                    printf("\n");
-                }
-                }, 1, target, stream));
-*/
-    // Choose k nearest neighbors for each node
-    GUARD_CU(knns.ForAll(
-        [graph, k, keys, keys_out, nodes] __host__ __device__(
-            SizeT * knns_, const SizeT &src) {
-          auto pos = src / k;
-          auto i = src % k;
-          // go to first nearest neighbor
-          auto e_start = graph.CsrT::GetNeighborListOffset(pos);
-          auto num_neighbors = graph.CsrT::GetNeighborListLength(pos);
-          if (i < num_neighbors) {
-            auto e = e_start + i;
-            auto m = graph.CsrT::GetEdgeDest(keys_out[keys[e]]);
-            if (!util::isValid(knns_[src]))
-                knns_[src] = m;
-            //if (k * pos + i < 100)
-            //    printf("(src %d) knns[%d] = %d\n", src, k * pos + i, m);
-          }
-        },
-        nodes * k, target, stream));
+    // Perform KNN
+    knn_problem.parameters.Set("k", k);
+    GUARD_CU(knn_problem.Reset(ref_src, ref_dest, k, target));
+    GUARD_CU(cudaDeviceSynchronize());
+    GUARD_CU(knn_enactor.Enact());
+    GUARD_CU(cudaDeviceSynchronize());
 
     if (snn) {
       // SNN density of each point
@@ -214,8 +156,6 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           __device__(VertexT * v_q, const SizeT &pos) {
             auto src = pos / k;
             auto i = pos % k;
-            if (src == 0)
-                printf("src = %d, density starts\n", src); 
             auto src_neighbors = graph.CsrT::GetNeighborListLength(src);
             auto src_start = graph.CsrT::GetNeighborListOffset(src);
             auto src_end = src_start + src_neighbors;
@@ -239,6 +179,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 if (m == possible_src) ++num_shared_neighbors;
               }
             }
+
             // if src and neighbor share eps or more neighbors then increase
             // snn density
             if (num_shared_neighbors >= eps) {
@@ -348,6 +289,11 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             if (src == 0 && core_point_mark[src] == 1) return;
             if (src > 0 && core_point_mark[src - 1] != core_point_mark[src])
               return;
+
+            if (src == 0)
+                printf("src = %d, 0 clustering op \n", src); 
+
+
             // only non-noise points
             auto num_neighbors = graph.CsrT::GetNeighborListLength(src);
             if (num_neighbors < k) return;  // (was k)
@@ -360,6 +306,9 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 break;
               }
             }
+
+            if (src == 0)
+                printf("src = %d, 1 clustering op\n", src);
           };
 
       // Assign other non-core and non-noise points to clusters
@@ -422,10 +371,10 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     else
       return false;
   }
-};  // end of knnIteration
+};  // end of snnIteration
 
 /**
- * @brief knn enactor class.
+ * @brief snn enactor class.
  * @tparam _Problem Problem type we process on
  * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
  * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
@@ -441,26 +390,29 @@ class Enactor
   typedef typename Problem::SizeT SizeT;
   typedef typename Problem::VertexT VertexT;
   typedef typename Problem::GraphT GraphT;
+  typedef typename Problem::KnnProblemT KnnProblemT;
   typedef typename GraphT::VertexT LabelT;
   typedef typename GraphT::ValueT ValueT;
   typedef EnactorBase<GraphT, LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
       BaseEnactor;
   typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> EnactorT;
-  typedef knnIterationLoop<EnactorT> IterationT;
+  typedef snnIterationLoop<EnactorT> IterationT;
 
   Problem *problem;
   IterationT *iterations;
+  typedef knn::Enactor<KnnProblemT> KnnEnactorT;
+  KnnEnactorT knn_enactor;
 
   /**
-   * @brief knn constructor
+   * @brief snn constructor
    */
-  Enactor() : BaseEnactor("KNN"), problem(NULL) {
+  Enactor() : BaseEnactor("SNN"), knn_enactor(), problem(NULL) {
     this->max_num_vertex_associates = 0;
     this->max_num_value__associates = 1;
   }
 
   /**
-   * @brief knn destructor
+   * @brief snn destructor
    */
   virtual ~Enactor() { /*Release();*/
   }
@@ -490,12 +442,9 @@ class Enactor
     this->problem = &problem;
 
     // Lazy initialization
-    GUARD_CU(BaseEnactor::Init(
-        problem, Enactor_None,
-        // <TODO> change to how many frontier queues, and their types
-        2, NULL,
-        // </TODO>
-        target, false));
+    GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target, false));
+    GUARD_CU(knn_enactor.Init(problem.knn_problem, target));
+
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       auto &enactor_slice = this->enactor_slices[gpu * this->num_gpus + 0];
@@ -515,7 +464,7 @@ class Enactor
   }
 
   /**
-   * @brief one run of knn, to be called within GunrockThread
+   * @brief one run of snn, to be called within GunrockThread
    * @param thread_data Data for the CPU thread
    * \return cudaError_t error message(s), if any
    */
@@ -538,6 +487,7 @@ class Enactor
     cudaError_t retval = cudaSuccess;
 
     GUARD_CU(BaseEnactor::Reset(target));
+    GUARD_CU(knn_enactor.Reset(target));
 
     SizeT nodes = this->problem->data_slices[0][0].sub_graph[0].nodes;
 
@@ -574,14 +524,14 @@ class Enactor
   }
 
   /**
-   * @brief Enacts a knn computing on the specified graph.
+   * @brief Enacts a snn computing on the specified graph.
 ...
    * \return cudaError_t error message(s), if any
    */
   cudaError_t Enact() {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(this->Run_Threads(this));
-    util::PrintMsg("GPU KNN Done.", this->flag & Debug);
+    util::PrintMsg("GPU SNN Done.", this->flag & Debug);
     return retval;
   }
 };

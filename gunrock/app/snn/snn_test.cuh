@@ -9,12 +9,12 @@
  * @file
  * snn_test.cuh
  *
- * @brief Test related functions for knn
+ * @brief Test related functions for snn
  */
 
 #pragma once
 
-// #define KNN_DEBUG 1
+// #define SNN_DEBUG 1
 
 #ifdef SNN_DEBUG
 #define debug(a...) fprintf(stderr, a)
@@ -25,16 +25,18 @@
 #include <set>
 #include <vector>
 
+#include <gunrock/app/knn/knn_test.cuh>
+
 namespace gunrock {
 namespace app {
 namespace snn {
 
 /******************************************************************************
- * KNN Testing Routines
+ * SNN Testing Routines
  *****************************************************************************/
 
 /**
- * @brief Simple CPU-based reference knn ranking implementations
+ * @brief Simple CPU-based reference snn ranking implementations
  * @tparam      GraphT        Type of the graph
  * @tparam      ValueT        Type of the values
  * @param[in]   graph         Input graph
@@ -51,7 +53,6 @@ double CPU_Reference(
     SizeT min_pts,  // mininum snn-density to be core point
     VertexT point_x,// index of reference point
     VertexT point_y,// index of reference point
-    SizeT *knns,    // knns
     SizeT *cluster, // cluster id
     SizeT *core_point_counter, 
     SizeT *cluster_counter, 
@@ -84,6 +85,7 @@ double CPU_Reference(
     cluster[x] = x;
   }
 
+  SizeT *knns = (SizeT*)malloc(sizeof(SizeT) * graph.nodes * k);    // knns
   std::set<SizeT> core_points;
   std::vector<std::set<SizeT>> adj;
   adj.resize(nodes);
@@ -143,7 +145,7 @@ double CPU_Reference(
   */
 
   // Debug
-#if KNN_DEBUG
+#if SNN_DEBUG
   for (SizeT x = 0; x < nodes; ++x) {
     auto x_start = graph.CsrT::GetNeighborListOffset(x);
     auto num = graph.CsrT::GetNeighborListLength(x);
@@ -202,7 +204,7 @@ double CPU_Reference(
     }
   }
 
-#if KNN_DEBUG
+#if SNN_DEBUG
   debug("core points: ");
   for (auto cpb = core_points.begin(); cpb != core_points.end(); ++cpb) {
     debug("%d ", *cpb);
@@ -255,20 +257,26 @@ double CPU_Reference(
     }
   }
 
-//#if KNN_DEBUG
+#if SNN_DEBUG
   for (int i = 0; i < nodes; ++i) printf("cluster[%d] = %d\n", i, cluster[i]);
-//#endif
+#endif
 
   std::set<SizeT> cluster_set; 
+#if SNN_DEBUG
   printf("cpu clusters: ");
+#endif
   for (int i = 0; i < nodes; ++i){
       
       if (cluster_set.find(cluster[i]) == cluster_set.end()){
           cluster_set.insert(cluster[i]);
+#if SNN_DEBUG
           printf("%d ", cluster[i]);
+#endif
       }
   }
+#if SNN_DEBUG
   printf("\n");
+#endif
   *cluster_counter = cluster_set.size();
 
   cpu_timer.Stop();
@@ -278,7 +286,7 @@ double CPU_Reference(
 }
 
 /**
- * @brief Validation of knn results
+ * @brief Validation of snn results
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the values
  * @param[in]  parameters    Excution parameters
@@ -296,8 +304,8 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
                                         SizeT *ref_cluster,
                                         SizeT *ref_core_point_counter,
                                         SizeT *ref_cluster_counter,
-                                        SizeT *h_knns,
-                                        SizeT *ref_knns,
+                                        //SizeT *h_knns,
+                                        //SizeT *ref_knns,
                                         bool verbose = true) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::CsrT CsrT;
@@ -323,7 +331,7 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
       printf("cpu cluster counter %d, gpu cluster counter %d\n",
               *ref_cluster_counter, *h_cluster_counter);
   }
-
+/*
   for (SizeT v = 0; v < graph.nodes; ++v) {
     auto v_start = graph.CsrT::GetNeighborListOffset(v);
     auto num = graph.CsrT::GetNeighborListLength(v);
@@ -348,6 +356,7 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
   }
 
   SizeT knn_errors = num_errors;
+  */
   num_errors = 0;
 
   for (SizeT i = 0; i < graph.nodes; ++i) {
@@ -364,10 +373,11 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
     util::PrintMsg("PASSED SNN", !quiet);
   }
 
-  return num_errors + knn_errors;
+  return num_errors;
+      //+ knn_errors;
 }
 
-}  // namespace knn
+}  // namespace snn
 }  // namespace app
 }  // namespace gunrock
 

@@ -37,7 +37,7 @@ GRAPH[3]="market $DATADIR/${NAME[3]}/${NAME[3]}.mtx"
 GRAPH[4]="market $DATADIR/${NAME[4]}/${NAME[4]}.mtx"
 
 # parameters
-OPTIONS="--undirected --snn=true --quick --tag=Gunrock/SNN_GRAPL19"
+OPTIONS="--undirected --snn=true --quick --snn-tag=Gunrock/SNN_GRAPL19"
 
 for i in {0..4}
 do
