@@ -239,9 +239,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 ...
    * \return     cudaError_t Error message(s), if any
    */
-  cudaError_t Extract(SizeT nodes, SizeT edges, SizeT k, 
-            SizeT *h_knns, SizeT *h_keys, SizeT *h_keys_out, 
-                      util::Location target = util::DEVICE) {
+  cudaError_t Extract(SizeT nodes, SizeT k, 
+            SizeT *h_knns, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     auto &data_slice = data_slices[0][0];
 
@@ -254,12 +253,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         // knns array
         GUARD_CU(data_slice.knns.SetPointer(h_knns, nodes * k, util::HOST));
         GUARD_CU(data_slice.knns.Move(util::DEVICE, util::HOST));
-        // keys array
-        GUARD_CU(data_slice.keys.SetPointer(h_keys, edges, util::HOST));
-        GUARD_CU(data_slice.keys.Move(util::DEVICE, util::HOST));
-        // keys_out array
-        GUARD_CU(data_slice.keys_out.SetPointer(h_keys_out, edges, util::HOST));
-        GUARD_CU(data_slice.keys_out.Move(util::DEVICE, util::HOST));
       }
 
     } else if (target == util::HOST) {
@@ -269,20 +262,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             host_val = device_val;
           },
           nodes * k, util::HOST));
-
-      GUARD_CU(data_slice.keys.ForEach(
-          h_keys,
-          [] __host__ __device__(const SizeT &device_val, SizeT &host_val) {
-            host_val = device_val;
-          },
-          edges, util::HOST));
-
-      GUARD_CU(data_slice.keys_out.ForEach(
-          h_keys_out,
-          [] __host__ __device__(const SizeT &device_val, SizeT &host_val) {
-            host_val = device_val;
-          },
-          edges, util::HOST));
     }
 
     return retval;
