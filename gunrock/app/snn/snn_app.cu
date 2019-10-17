@@ -42,8 +42,8 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_enactor(parameters));
 
   GUARD_CU(parameters.Use<std::string>(
-      "tag", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, "",
-      "tag info for json string", __FILE__, __LINE__));
+      "snn-tag", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, "",
+      "snn-tag info for json string", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
       "k",
@@ -103,7 +103,7 @@ template <typename GraphT, typename SizeT = typename GraphT::SizeT>
 cudaError_t RunTests(
     util::Parameters &parameters, GraphT &graph, SizeT k,
     SizeT eps, SizeT min_pts,
-    SizeT *h_knns, SizeT *ref_knns,
+    //SizeT *h_knns, SizeT *ref_knns,
     SizeT *h_cluster, SizeT *ref_cluster,
     SizeT *h_core_point_counter, SizeT *ref_core_point_counter,
     SizeT *h_cluster_counter, SizeT *ref_cluster_counter, 
@@ -158,24 +158,24 @@ cudaError_t RunTests(
         !quiet_mode);
 
     if (validation == "each") {
-      GUARD_CU(problem.Extract(graph.nodes, k, h_knns, h_cluster,
+      GUARD_CU(problem.Extract(graph.nodes, k, /*h_knns, */h_cluster,
                                h_core_point_counter, h_cluster_counter, snn));
       SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
                                h_core_point_counter, h_cluster_counter,
                                ref_cluster, ref_core_point_counter, 
-                               ref_cluster_counter, h_knns, ref_knns, false);
+                               ref_cluster_counter, /*h_knns, ref_knns, */false);
     }
   }
 
   cpu_timer.Start();
 
-  GUARD_CU(problem.Extract(graph.nodes, k, h_knns, h_cluster,
+  GUARD_CU(problem.Extract(graph.nodes, k, /*h_knns,*/ h_cluster,
                            h_core_point_counter, h_cluster_counter, snn));
   if (validation == "last") {
     SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
                                 h_core_point_counter, h_cluster_counter,
                                 ref_cluster, ref_core_point_counter, 
-                                ref_cluster_counter, h_knns, ref_knns, false);
+                                ref_cluster_counter, /*h_knns, ref_knns, */false);
   }
 
   // compute running statistics

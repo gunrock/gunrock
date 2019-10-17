@@ -17,6 +17,10 @@
 #include <gunrock/app/problem_base.cuh>
 #include <unordered_set>
 
+//KNN includes
+#include <gunrock/app/knn/knn_enactor.cuh>
+#include <gunrock/app/knn/knn_test.cuh>
+
 //#define SNN_DEBUG 1
 
 #ifdef SNN_DEBUG
@@ -151,7 +155,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     }
 
     /**
-     * @brief initializing sssp-specific data on each gpu
+     * @brief initializing snn-specific data on each gpu
      * @param     sub_graph   Sub graph on the GPU.
      * @param[in] gpu_idx     GPU device index
      * @param[in] target      Targeting device location
@@ -171,21 +175,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       snn = snn_;
 
       // Point ()
-      GUARD_CU(keys.Allocate(edges, target));
-      GUARD_CU(distances.Allocate(edges, target));
+      //GUARD_CU(keys.Allocate(edges, target));
+      //GUARD_CU(distances.Allocate(edges, target));
       GUARD_CU(core_point_mark_0.Allocate(nodes, target));
       GUARD_CU(core_point_mark.Allocate(nodes, target));
       GUARD_CU(cluster_id.Allocate(nodes, target));
       GUARD_CU(snn_density.Allocate(nodes, target));
 
       // k-nearest neighbors
-      GUARD_CU(knns.Allocate(k * nodes, target));
+      //GUARD_CU(knns.Allocate(k * nodes, target));
 
       GUARD_CU(cub_temp_storage.Allocate(1, target));
       GUARD_CU(core_points_counter.Allocate(1, target | util::HOST));
 
-      GUARD_CU(keys_out.Allocate(edges, target));
-      GUARD_CU(distances_out.Allocate(edges, target));
+      //GUARD_CU(keys_out.Allocate(edges, target));
+      //GUARD_CU(distances_out.Allocate(edges, target));
 
       if (target & util::DEVICE) {
         GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
@@ -221,7 +225,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(snn_density.ForAll(
           [nodes] __host__ __device__(SizeT * s, const SizeT &p) { s[p] = 0; },
           nodes, util::DEVICE, this->stream));
-      GUARD_CU(keys.EnsureSize_(edges, target));
+      //GUARD_CU(keys.EnsureSize_(edges, target));
       GUARD_CU(distances.EnsureSize_(edges, target));
 
       GUARD_CU(cluster_id.EnsureSize_(nodes, target));
@@ -250,7 +254,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(core_points_counter.ForAll(
           [] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = 0; }, 1,
           util::DEVICE, this->stream));
-
+/*
       // K-Nearest Neighbors
       GUARD_CU(knns.EnsureSize_(k * nodes, target));
       GUARD_CU(knns.ForAll(
@@ -258,13 +262,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             k_[p] = util::PreDefinedValues<SizeT>::InvalidValue;
           },
           k * nodes, util::DEVICE, this->stream));
-
+*/
       return retval;
     }
   };  // DataSlice
 
   // Set of data slices (one for each GPU)
   util::Array1D<SizeT, DataSlice> *data_slices;
+  typedef knn::Problem<GraphT, FLAG> KnnProblemT;
+  KnnProblemT knn_problem;
   SizeT k;
   bool snn;
 
@@ -272,16 +278,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   // Problem Methods
 
   /**
-   * @brief knn default constructor
+   * @brief snn default constructor
    */
   Problem(util::Parameters &_parameters, ProblemFlag _flag = Problem_None)
-      : BaseProblem(_parameters, _flag), data_slices(NULL) {
+      : BaseProblem(_parameters, _flag), 
+        knn_problem(_parameters, _flag),
+        data_slices(NULL) {
     k = _parameters.Get<int>("k");
     snn = _parameters.Get<bool>("snn");
   }
 
   /**
-   * @brief knn default destructor
+   * @brief snn default destructor
    */
   virtual ~Problem() { Release(); }
 
@@ -293,14 +301,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   cudaError_t Release(util::Location target = util::LOCATION_ALL) {
     cudaError_t retval = cudaSuccess;
     if (data_slices == NULL) return retval;
-    for (int i = 0; i < this->num_gpus; i++)
+    for (int i = 0; i < this->num_gpus; i++){
       GUARD_CU(data_slices[i].Release(target));
+      GUARD_CU(knn_problem.data_slices[i].Release(target));
+    }
 
     if ((target & util::HOST) != 0 &&
         data_slices[0].GetPointer(util::DEVICE) == NULL) {
       delete[] data_slices;
       data_slices = NULL;
     }
+    GUARD_CU(knn_problem.Release(target));
     GUARD_CU(BaseProblem::Release(target));
     return retval;
   }
@@ -310,7 +321,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 ...
    * \return     cudaError_t Error message(s), if any
    */
-  cudaError_t Extract(SizeT nodes, SizeT k, SizeT *h_knns, SizeT *h_cluster,
+  cudaError_t Extract(SizeT nodes, SizeT k, /*SizeT *h_knns,*/ SizeT *h_cluster,
                       SizeT *h_core_point_counter, SizeT *h_cluster_counter,
                       bool snn = true, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
@@ -355,8 +366,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         }
 
         // Extract KNNs
-        GUARD_CU(data_slice.knns.SetPointer(h_knns, nodes * k, util::HOST));
-        GUARD_CU(data_slice.knns.Move(util::DEVICE, util::HOST));
+        // GUARD_CU(data_slice.knns.SetPointer(h_knns, nodes * k, util::HOST));
+        // GUARD_CU(data_slice.knns.Move(util::DEVICE, util::HOST));
       }
 
     } else if (target == util::HOST) {
@@ -368,12 +379,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           },
           nodes, util::HOST));
 
-      GUARD_CU(data_slice.knns.ForEach(
+      /*GUARD_CU(data_slice.knns.ForEach(
           h_knns,
           [] __host__ __device__(const SizeT &device_val, SizeT &host_val) {
             host_val = device_val;
           },
-          nodes * k, util::HOST));
+          nodes * k, util::HOST));*/
     }
 
     return retval;
@@ -381,7 +392,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
   /**
    * @brief initialization function.
-   * @param     graph       The graph that SSSP processes on
+   * @param     graph       The graph that SNN processes on
    * @param[in] Location    Memory location to work on
    * \return    cudaError_t Error message(s), if any
    */
@@ -390,6 +401,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
+    GUARD_CU(knn_problem.Init(graph, target));
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
@@ -429,7 +441,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   }
 };
 
-}  // namespace knn
+}  // namespace snn
 }  // namespace app
 }  // namespace gunrock
 
