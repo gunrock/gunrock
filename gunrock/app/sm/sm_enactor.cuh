@@ -181,7 +181,7 @@ struct SMIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            if (src < 0 || src >= nodes_data)
+            if (src >= nodes_data)
                 return false;
             if ((!isValid[src]) || (!isValid[dest])) {
                 return false;
@@ -207,7 +207,6 @@ struct SMIterationLoop : public IterationLoopBase
         //frontier.queue_length = graph.edges;
         //frontier.queue_reset = true;
         size_t pointer_head = 0;
-        int num_init = nodes_query;
         for (int iter = 0; iter < 1; ++iter) {
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                 graph.csr(), complete_graph, complete_graph,

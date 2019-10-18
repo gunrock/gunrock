@@ -106,7 +106,7 @@ cudaError_t RunTests(
     {
         SizeT num_errors = app::sm::Validate_Results(
             parameters, data_graph, query_graph,
-            h_subgraphs, ref_subgraphs, false);
+            h_subgraphs, ref_subgraphs, &num_subgraphs, false);
     }
 
     UseParameters_test(parameters);
