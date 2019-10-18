@@ -29,7 +29,8 @@ namespace gunrock {
 namespace app {
 namespace sm {
 
-cudaError_t UseParameters(util::Parameters &parameters);
+template <typename ParametersT>
+cudaError_t UseParameters(ParametersT &parameters);
 
 /**
  * @brief Run SM tests

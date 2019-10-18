@@ -44,20 +44,21 @@ enum : SwitchFlag {
   UNDIRECTED = 0x20000,
 };
 
-cudaError_t UseParameters_test(util::Parameters &parameters) {
+template <typename ParametersT>
+cudaError_t UseParameters_test(ParametersT &parameters) {
   cudaError_t retval = cudaSuccess;
 
-  GUARD_CU(parameters.Use<uint64_t>(
+  GUARD_CU(parameters.template Use<uint64_t>(
       "srcs",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::INTERNAL_PARAMETER, 0,
       "Array of source vertices", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<float>(
+  GUARD_CU(parameters.template Use<float>(
       "load-time",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
       0, "Time used to load / generate the graph", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<std::string>(
+  GUARD_CU(parameters.template Use<std::string>(
       "validation",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       "last", "<none | last | each> When to validate the results", __FILE__,

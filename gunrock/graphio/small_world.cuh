@@ -28,16 +28,17 @@ namespace small_world {
 typedef std::mt19937 Engine;
 typedef std::uniform_real_distribution<double> Distribution;
 
-cudaError_t UseParameters(util::Parameters &parameters,
+template <typename ParametersT>
+cudaError_t UseParameters(ParametersT &parameters,
                           std::string graph_prefix = "") {
   cudaError_t retval = cudaSuccess;
 
-  GUARD_CU(parameters.Use<double>(
+  GUARD_CU(parameters.template Use<double>(
       graph_prefix + "small-world-p",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0.00, "p", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<long long>(
+  GUARD_CU(parameters.template Use<long long>(
       graph_prefix + "small-world-k",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       6, "k", __FILE__, __LINE__));

@@ -156,32 +156,33 @@ __device__ __host__ __forceinline__ void VaryParams(double &a, double &b,
   d = d / S;
 }
 
-cudaError_t UseParameters(util::Parameters &parameters,
+template <typename ParametersT>
+cudaError_t UseParameters(ParametersT &parameters,
                           std::string graph_prefix = "") {
   cudaError_t retval = cudaSuccess;
 
-  GUARD_CU(parameters.Use<double>(
+  GUARD_CU(parameters.template Use<double>(
       graph_prefix + "rmat-a",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0.57, "a for rmat generator", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<double>(
+  GUARD_CU(parameters.template Use<double>(
       graph_prefix + "rmat-b",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0.19, "b for rmat generator", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<double>(
+  GUARD_CU(parameters.template Use<double>(
       graph_prefix + "rmat-c",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0.19, "c for rmat generator", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<double>(
+  GUARD_CU(parameters.template Use<double>(
       graph_prefix + "rmat-d",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0.05, "d for rmat generator, default is 1 - a - b - c", __FILE__,
       __LINE__));
 
-    GUARD_CU(parameters.Use<bool>(
+    GUARD_CU(parameters.template Use<bool>(
         graph_prefix + "grmat",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         false,
