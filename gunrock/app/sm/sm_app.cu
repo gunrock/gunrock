@@ -65,9 +65,9 @@ double sm(
  */
 double nv_sm(
     gunrock::app::TestGraph<int, int, unsigned long,
-    gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR> &query_graph,
+    gunrock::graph::HAS_CSR> &query_graph,
     gunrock::app::TestGraph<int, int, unsigned long,
-    gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR> &data_graph,
+    gunrock::graph::HAS_CSR> &data_graph,
     const int            num_runs,
           int           *subgraphs)
 {

@@ -205,7 +205,7 @@ double sm(
           VertexT     *subgraphs)
 {
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-        gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
+        gunrock::graph::HAS_CSR>
         GraphT;
     typedef typename GraphT::CsrT CsrT;
 
@@ -252,14 +252,14 @@ template <
     typename GValueT = unsigned long>
 double nv_sm(
     gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-    gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR> &query_graph,
+    gunrock::graph::HAS_CSR> &query_graph,
     gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-    gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR> &data_graph,
+    gunrock::graph::HAS_CSR> &data_graph,
     const int          num_runs,
     VertexT           *subgraphs)
 {
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-        gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
+        gunrock::graph::HAS_CSR>
         GraphT;
     typedef typename GraphT::CsrT CsrT;
 
