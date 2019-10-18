@@ -71,6 +71,7 @@ cudaError_t RunTests(
     cpu_timer.Stop();
     parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
+    int num_subgraphs = 0;
     // perform SM
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
@@ -94,7 +95,7 @@ cudaError_t RunTests(
             GUARD_CU(problem.Extract(h_subgraphs));
             SizeT num_errors = app::sm::Validate_Results(
                 parameters, data_graph, query_graph, 
-                h_subgraphs, ref_subgraphs, false);
+                h_subgraphs, ref_subgraphs, &num_subgraphs, false);
         }
     }
 
@@ -107,6 +108,9 @@ cudaError_t RunTests(
             parameters, data_graph, query_graph,
             h_subgraphs, ref_subgraphs, false);
     }
+
+    UseParameters_test(parameters);
+    parameters.Set("num_subgraphs", num_subgraphs);
 
     // compute running statistics
     info.ComputeTraversalStats(enactor, (VertexT*)NULL);
