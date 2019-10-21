@@ -110,7 +110,7 @@ cudaError_t RunTests(
     }
 
     UseParameters_test(parameters);
-    parameters.Set("num_subgraphs", num_subgraphs);
+    parameters.Set("num-subgraphs", num_subgraphs);
 
     // compute running statistics
     info.ComputeTraversalStats(enactor, (VertexT*)NULL);
