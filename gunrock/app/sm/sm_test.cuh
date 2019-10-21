@@ -194,17 +194,17 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
     }
   }
 
+  for (SizeT v =0; v < data_graph.nodes; v++) {
+    (*num_subgraphs) += h_subgraphs[v];
+  }
+  *num_subgraphs = *num_subgraphs / query_graph.nodes;
+
   SizeT num_errors = 0;
 
   // Verify the result
   util::PrintMsg("Subgraph Matching Validity: ", !quiet, false);
   num_errors = util::CompareResults(h_subgraphs, ref_subgraphs,
                                     data_graph.nodes, true, quiet);
-
-  for (SizeT v =0; v < data_graph.nodes; v++) {
-    *num_subgraphs += h_subgraphs[v];
-  }
-  *num_subgraphs = *num_subgraphs / query_graph.nodes;
 
   if (num_errors > 0) {
     util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
