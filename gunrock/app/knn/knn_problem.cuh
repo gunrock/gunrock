@@ -188,7 +188,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(distances.EnsureSize_(edges, target));
 
       // K-Nearest Neighbors
-      GUARD_CU(knns.EnsureSize_(k, target));
+      GUARD_CU(knns.EnsureSize_(k * nodes, target));
+      GUARD_CU(knns.ForAll(
+          [] __host__ __device__(SizeT * k_, const SizeT &p) { 
+            k_[p] = util::PreDefinedValues<SizeT>::InvalidValue;
+          },
+          k * nodes, util::DEVICE, this->stream));
 
       return retval;
     }
