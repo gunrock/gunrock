@@ -32,7 +32,6 @@ cudaError_t SegReduceTest() {
   for (int t = 0; t < num_tests; t++) {
     int pervious_seed = seed;
     while (seed == pervious_seed) seed = rand();
-    // std::cout << "seed = " << elements[0] << std::endl;
     srand(seed);
     for (int i = 0; i < num_elements; i++)
       elements[i] = (rand() % element_range) + min_element;
@@ -40,26 +39,22 @@ cudaError_t SegReduceTest() {
     std::sort(offsets + 0, offsets + num_segments);
     offsets[0] = 0;
     offsets[num_segments] = num_elements;
-    // std::cout << "Move Start" << std::endl;
     GUARD_CU(elements.Move(gunrock::util::HOST, gunrock::util::DEVICE));
     GUARD_CU(offsets.Move(gunrock::util::HOST, gunrock::util::DEVICE));
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize");
 
-    // std::cout << "GPU Start" << std::endl;
     GUARD_CU(gunrock::util::SegmentedReduce(
         temp_space, elements, results, num_segments, offsets,
         [] __host__ __device__(const int &a, const int &b) { return a + b; }, 0,
         0, false, gunrock::util::DEVICE));
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize");
 
-    // std::cout << "CPU Start" << std::endl;
     GUARD_CU(gunrock::util::SegmentedReduce(
         temp_space, elements, results, num_segments, offsets,
         [] __host__ __device__(const int &a, const int &b) { return a + b; }, 0,
         0, false, gunrock::util::HOST));
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize");
 
-    // std::cout << "CPU Finished" << std::endl;
     for (int i = 0; i < num_segments; i++) h_results[i] = results[i];
     GUARD_CU(results.Move(gunrock::util::DEVICE, gunrock::util::HOST));
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize");
