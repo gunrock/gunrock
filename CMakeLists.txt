@@ -1,7 +1,7 @@
 project(gunrock)
 
 set(gunrock_VERSION_MAJOR 1)
-set(gunrock_VERSION_MINOR 0)
+set(gunrock_VERSION_MINOR 1)
 set(gunrock_VERSION_PATCH 0)
 add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
@@ -51,7 +51,6 @@ endif()
 # begin /* Include Boost, OpenMP & Metis */
 include(${CMAKE_SOURCE_DIR}/cmake/FindBoostHeaders.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindBoost.cmake)
-
 include(${CMAKE_SOURCE_DIR}/cmake/FindOpenMP.cmake)
 if (METIS_LIBRARY)
   include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)

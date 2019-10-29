@@ -140,21 +140,21 @@ void Display_Performance_Profiling(Enactor *enactor) {
           enactor->iter_full_queue_nodes_queued[gpu][i];
       if (iter_full_queue_nodes_queued.size() != 0) {
         V2Str(iter_full_queue_nodes_queued, str);
-        printf("%d\t %d\t Fu-queue nodes\t %s\n", i, gpu, str.c_str());
+        printf("%d\t %d\t full-queue nodes\t %s\n", i, gpu, str.c_str());
       }
 
       std::vector<SizeT> &iter_full_queue_edges_queued =
           enactor->iter_full_queue_edges_queued[gpu][i];
       if (iter_full_queue_edges_queued.size() != 0) {
         V2Str(iter_full_queue_edges_queued, str);
-        printf("%d\t %d\t Fu-queue edges\t %s\n", i, gpu, str.c_str());
+        printf("%d\t %d\t full-queue edges\t %s\n", i, gpu, str.c_str());
       }
 
       std::vector<double> &iter_full_queue_time =
           enactor->iter_full_queue_time[gpu][i];
       if (iter_full_queue_time.size() != 0) {
         V2Str(iter_full_queue_time, str);
-        printf("%d\t %d\t Fu-queue time\t %s\n", i, gpu, str.c_str());
+        printf("%d\t %d\t full-queue time\t %s\n", i, gpu, str.c_str());
       }
 
       std::vector<double> &iter_total_time = enactor->iter_total_time[gpu][i];

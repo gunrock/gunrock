@@ -14,11 +14,13 @@
 
 #pragma once
 
+#ifdef BOOST_FOUND
 // boost includes
 #include <boost/config.hpp>
 #include <boost/utility.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/page_rank.hpp>
+#endif
 
 namespace gunrock {
 namespace app {

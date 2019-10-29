@@ -292,13 +292,13 @@ struct PartitionerBase {
         marker[node] = 1;
         for (SizeT edge = graph->row_offsets[node];
              edge < graph->row_offsets[node + 1]; edge++) {
-          SizeT neibor = graph->column_indices[edge];
-          int peer = partition_table0[neibor];
-          if ((peer != gpu) && (marker[neibor] == 0)) {
-            tconvertion_table[neibor] =
-                keep_node_num ? neibor : out_counter[peer];
+          SizeT neighbour = graph->column_indices[edge];
+          int peer = partition_table0[neighbour];
+          if ((peer != gpu) && (marker[neighbour] == 0)) {
+            tconvertion_table[neighbour] =
+                keep_node_num ? neighbour : out_counter[peer];
             out_counter[peer]++;
-            marker[neibor] = 1;
+            marker[neighbour] = 1;
             num_nodes++;
           }
         }
@@ -363,14 +363,14 @@ struct PartitionerBase {
         marker = new VertexId[num_gpus * out_counter[gpu]];
         memset(marker, 0, sizeof(VertexId) * num_gpus * out_counter[gpu]);
       }
-      for (SizeT neibor = 0; neibor < graph->nodes; neibor++)
-        if (partition_table0[neibor] != gpu) {
-          for (SizeT edge = graph->row_offsets[neibor];
-               edge < graph->row_offsets[neibor + 1]; edge++) {
+      for (SizeT neighbour = 0; neighbour < graph->nodes; neighbour++)
+        if (partition_table0[neighbour] != gpu) {
+          for (SizeT edge = graph->row_offsets[neighbour];
+               edge < graph->row_offsets[neighbour + 1]; edge++) {
             VertexId node = graph->column_indices[edge];
             if (partition_table0[node] != gpu) continue;
             marker[convertion_table0[node] * num_gpus +
-                   partition_table0[neibor]] = 1 + neibor;
+                   partition_table0[neighbour]] = 1 + neighbour;
           }
         }
     }
@@ -386,22 +386,22 @@ struct PartitionerBase {
         original_vertexes[0][node_] = node;
         for (SizeT edge = graph->row_offsets[node];
              edge < graph->row_offsets[node + 1]; edge++) {
-          SizeT neibor = graph->column_indices[edge];
-          int peer = partition_table0[neibor];
+          SizeT neighbour = graph->column_indices[edge];
+          int peer = partition_table0[neighbour];
           int peer_ = peer < gpu ? peer + 1 : peer;
           if (peer == gpu) peer_ = 0;
-          VertexId neibor_ = keep_node_num ? neibor
-                                           : tconvertion_table[neibor] +
+          VertexId neighbour_ = keep_node_num ? neighbour
+                                           : tconvertion_table[neighbour] +
                                                  out_offsets[gpu][peer_];
 
-          sub_graph->column_indices[edge_counter] = neibor_;
+          sub_graph->column_indices[edge_counter] = neighbour_;
           if (graph->edge_values != NULL)
             sub_graph->edge_values[edge_counter] = graph->edge_values[edge];
           if (peer != gpu && !keep_node_num) {
-            sub_graph->row_offsets[neibor_] = num_edges;
-            partition_table1[0][neibor_] = peer_;
-            convertion_table1[0][neibor_] = convertion_table0[neibor];
-            original_vertexes[0][neibor_] = neibor;
+            sub_graph->row_offsets[neighbour_] = num_edges;
+            partition_table1[0][neighbour_] = peer_;
+            convertion_table1[0][neighbour_] = convertion_table0[neighbour];
+            original_vertexes[0][neighbour_] = neighbour;
           }
           edge_counter++;
         }
@@ -428,10 +428,10 @@ struct PartitionerBase {
             if (marker[node_ * num_gpus + peer] == 0) continue;
             int peer_ = peer < gpu ? peer + 1 : peer;
             int gpu_ = gpu < peer ? gpu + 1 : gpu;
-            VertexId neibor = marker[node_ * num_gpus + peer] - 1;
-            VertexId neibor_ = convertion_table0[neibor];
-            for (SizeT edge = sub_graphs[peer].row_offsets[neibor_];
-                 edge < sub_graphs[peer].row_offsets[neibor_ + 1]; edge++) {
+            VertexId neighbour = marker[node_ * num_gpus + peer] - 1;
+            VertexId neighbour_ = convertion_table0[neighbour];
+            for (SizeT edge = sub_graphs[peer].row_offsets[neighbour_];
+                 edge < sub_graphs[peer].row_offsets[neighbour_ + 1]; edge++) {
               VertexId _node = sub_graphs[peer].column_indices[edge];
               if (convertion_tables[peer + 1][_node] == node_ &&
                   partition_tables[peer + 1][_node] == gpu_) {
