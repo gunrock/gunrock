@@ -119,7 +119,6 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   for (auto i = 0; i < graph.nodes; i++) {
     num_triangles += h_tc_counts[i];
   }
-  num_triangles = num_triangles/3;
   parameters.Set("num-triangles", num_triangles);
 
   // compute running statistics
