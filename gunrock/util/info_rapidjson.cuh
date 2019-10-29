@@ -249,8 +249,6 @@ struct Info {
     SetVal("git-commit-sha", g_GIT_SHA1);
     SetVal("load-time", parameters.Get<float>("load-time"));
     SetVal("primitive", algorithm_name);
-
-    parameters.List(*this);
   }
 
   /**
@@ -760,6 +758,9 @@ struct Info {
 
     util::Userinfo userinfo;
     SetVal("userinfo", userinfo.getUserinfo());
+
+    // Add all the parameters to JSON
+    this->parameters->List(*this);
 
     if (json_writer != NULL) json_writer->EndObject();
     

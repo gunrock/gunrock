@@ -41,7 +41,7 @@ cudaError_t UseParameters(util::Parameters &parameters) {
 
   GUARD_CU(parameters.Use<unsigned int>(
         "num-colors",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE, // | util::INTERNAL_PARAMETER,
         0, "number of output colors", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<bool>(
@@ -160,7 +160,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
     if (validation == "each") {
       GUARD_CU(problem.Extract(h_colors));
       SizeT num_errors = Validate_Results(parameters, graph, h_colors,
-                                          ref_colors, &num_colors, false);
+                                          ref_colors, false);
     }
   }
 
@@ -169,11 +169,21 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   GUARD_CU(problem.Extract(h_colors));
   if (validation == "last") {
     SizeT num_errors = Validate_Results(parameters, graph, h_colors, ref_colors,
-                                        &num_colors, false);
+                                        false);
   }
-  printf("Number of colors needed: %d\n", num_colors);
 
-  UseParameters_test(parameters);
+  // count number of colors
+  std::unordered_set<int> set;
+  for (SizeT v = 0; v < graph.nodes; v++) {
+    int c = h_colors[v];
+    if (set.find(c) == set.end()) {
+      set.insert(c);
+      num_colors++;
+    }
+  }
+
+  util::PrintMsg("Number of colors: " + std::to_string(num_colors), !quiet_mode);
+
   parameters.Set("num-colors", num_colors);
 
   // compute running statistics
