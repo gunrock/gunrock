@@ -37,7 +37,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -fPIC")
 option(CMAKE_VERBOSE_MAKEFILE OFF)
 
 # begin /* Find and set CUDA arch */
-set(gunrock_REQUIRED_CUDA_VERSION 7.5)
+set(gunrock_REQUIRED_CUDA_VERSION 9.0)
 FIND_PACKAGE(CUDA ${gunrock_REQUIRED_CUDA_VERSION} REQUIRED)
 # /* enables relocatable device code linking */
 SET(CUDA_SEPARABLE_COMPILATION ON)
@@ -51,10 +51,6 @@ endif()
 # begin /* Include Boost, OpenMP & Metis */
 include(${CMAKE_SOURCE_DIR}/cmake/FindBoostHeaders.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindBoost.cmake)
-
-if(${CUDA_VERSION} EQUAL "8.0" AND ${Boost_VERSION} EQUAL "106400")
-  message(FATAL_ERROR "Boost 1.64 is not compatible with CUDA 8.0 due to a bug in CUDA, this is resolved in CUDA 9. Please either use Boost 1.58 or upgrade CUDA to 9.0.")
-endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/FindOpenMP.cmake)
 if (METIS_LIBRARY)
@@ -243,7 +239,7 @@ option(GUNROCK_GENCODE_SM30
 
 option(GUNROCK_GENCODE_SM35
   "ON to generate code for Compute Capability 3.5 devices (e.g. Tesla K40)"
-  OFF)
+  ON)
 
 option(GUNROCK_GENCODE_SM37
   "ON to generate code for Compute Capability 3.7 devices (e.g. Tesla K80)"
@@ -251,20 +247,20 @@ option(GUNROCK_GENCODE_SM37
 
 option(GUNROCK_GENCODE_SM50
   "ON to generate code for Compute Capability 5.0 devices (e.g. GeForce GTX 750 TI)"
-  OFF)
+  ON)
 
 option(GUNROCK_GENCODE_SM52
   "ON to generate code for Compute Capability 5.2 devices (e.g. GeForce Titan X)"
-  OFF)
+  ON)
 
 #Pascal Architecture: CUDA 8
 if (CUDA_VERSION VERSION_EQUAL "8.0" OR CUDA_VERSION VERSION_GREATER "8.0")
   option(GUNROCK_GENCODE_SM60
     "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
-    OFF)
+    ON)
   option(GUNROCK_GENCODE_SM61
     "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
-    OFF)
+    ON)
 endif ()
 
 #Volta Architecture: CUDA 9
@@ -281,7 +277,7 @@ endif ()
 if (CUDA_VERSION VERSION_EQUAL "10.0" OR CUDA_VERSION VERSION_GREATER "10.0")
   option(GUNROCK_GENCODE_SM75
     "ON to generate code for Compute Capability 7.5 devices (e.g. GTX 1160 or RTX 2080)"
-    OFF)
+    ON)
 endif ()
 
 option(CUDA_VERBOSE_PTXAS
