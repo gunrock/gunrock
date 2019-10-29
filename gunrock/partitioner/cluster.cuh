@@ -162,24 +162,24 @@ struct CsrSwitch<GraphT, true> {
           end_edge = row_offsets[t_node + 1];
           // printf("t_node = %d\t",t_node);fflush(stdout);
           for (SizeT e = start_edge; e < end_edge; e++) {
-            VertexT neibor = column_indices[e];
-            if (marker[neibor] == node) continue;
-            if (partition_table[neibor] < num_subgraphs) {
+            VertexT neighbour = column_indices[e];
+            if (marker[neighbour] == node) continue;
+            if (partition_table[neighbour] < num_subgraphs) {
               if (level < n1) {
-                counter[partition_table[neibor]]++;
+                counter[partition_table[neighbour]]++;
                 total_count++;
               }
             } else {
               if (level < n2) {
                 counter[num_subgraphs]++;
-                partition_table[neibor] = num_subgraphs + 1;
-                // printf("%d\t",neibor);
+                partition_table[neighbour] = num_subgraphs + 1;
+                // printf("%d\t",neighbour);
               }
               if (level < n1) total_count++;
             }
-            marker[neibor] = node;
+            marker[neighbour] = node;
             tail++;
-            t_queue[tail] = neibor;
+            t_queue[tail] = neighbour;
           }
           // current ++;
         }

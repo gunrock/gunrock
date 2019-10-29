@@ -14,18 +14,9 @@ cudaError_t RepeatForTest() {
   cudaStream_t stream = 0;
   int num_launchs = 20;
 
-  // gunrock::util::Array1D<SizeT, T> host_sfor_results;
-  // gunrock::util::Array1D<SizeT, T> host_rfor_results;
-  // gunrock::util::Array1D<SizeT, T> device_sfor_results;
-  // gunrock::util::Array1D<SizeT, T> device_rfor_results;
   gunrock::util::Array1D<SizeT, T> results;
   gunrock::util::Array1D<SizeT, int> counter;
 
-  // host_sfor_results  .Allocate(loop_size, gunrock::util::HOST);
-  // host_rfor_results  .Allocate(loop_size, gunrock::util::HOST);
-  // device_sfor_results.Allocate(loop_size, gunrock::util::HOST |
-  // gunrock::util::DEVICE); device_rfor_results.Allocate(loop_size,
-  // gunrock::util::HOST | gunrock::util::DEVICE);
   results.Allocate(loop_size, gunrock::util::HOST | gunrock::util::DEVICE);
   counter.Allocate(2, gunrock::util::HOST | gunrock::util::DEVICE);
   cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
@@ -35,7 +26,6 @@ cudaError_t RepeatForTest() {
   auto op = [counter, results] __host__ __device__(const int &r,
                                                    const SizeT &i) {
     if (i == 0) {
-      // counter[(r + 1) % 2] = r + 1;
       gunrock::Store<cub::STORE_WB>(counter + ((r + 1) % 2), r + 1);
     }
 

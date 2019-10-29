@@ -39,6 +39,9 @@
 // Tests Segmented Reduction (device)
 #include "test_segreduce.h"
 
+// Tests Binary Search
+#include "test_binarysearch.h"
+
 using namespace gunrock;
 
 cudaError_t UseParameters(util::Parameters &parameters) {
