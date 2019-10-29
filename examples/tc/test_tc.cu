@@ -98,8 +98,10 @@ int main(int argc, char **argv) {
   }
   GUARD_CU(parameters.Check_Required());
   if (!parameters.Get<bool>("sort-csr")) {
-    return gunrock::util::GRError(
-        cudaErrorInvalidValue, "TC requires a sorted CSR", __FILE__, __LINE__);
+    util::PrintMsg("TC requires sorted CSR, using --sort-csr");
+    // return gunrock::util::GRError(
+    //     cudaErrorInvalidValue, "TC requires a sorted CSR", __FILE__, __LINE__);
+    parameters.Set("sort-csr", true);
   }
 
   return app::Switch_Types<app::VERTEXT_U32B |  // app::VERTEXT_U64B |

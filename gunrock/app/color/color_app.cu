@@ -41,7 +41,7 @@ cudaError_t UseParameters(util::Parameters &parameters) {
 
   GUARD_CU(parameters.Use<unsigned int>(
         "num-colors",
-        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE, // | util::INTERNAL_PARAMETER,
+        util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
         0, "number of output colors", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<bool>(

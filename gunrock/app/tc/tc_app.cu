@@ -36,6 +36,11 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_enactor(parameters));
   GUARD_CU(UseParameters_test(parameters));
 
+  GUARD_CU(parameters.Use<unsigned int>(
+    "num-triangles",
+    util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
+    0, "number of output colors", __FILE__, __LINE__));
+
   return retval;
 }
 
@@ -109,6 +114,13 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
     SizeT num_errors = app::tc::Validate_Results(parameters, graph, h_tc_counts,
                                                  ref_tc_counts, false);
   }
+
+  int num_triangles = 0;
+  for (auto i = 0; i < graph.nodes; i++) {
+    num_triangles += h_tc_counts[i];
+  }
+  num_triangles = num_triangles/3;
+  parameters.Set("num-triangles", num_triangles);
 
   // compute running statistics
   info.ComputeTraversalStats(enactor, (VertexT *)NULL);
