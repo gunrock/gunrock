@@ -24,6 +24,11 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_enactor(parameters));
   GUARD_CU(UseParameters_test(parameters));
 
+  GUARD_CU(parameters.Use<unsigned int>(
+              "num-subgraphs",
+              util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
+              0, "number of matched subgraphs", __FILE__, __LINE__));
+
   return retval;
 }
 
@@ -55,6 +60,24 @@ double sm(
         edge_values, 1 /* num_runs */, subgraphs);
 }
 
+/*
+ * @brief Simple interface take in graph as Gunrock format
+ * @param[in]  query_graph Query graph to be searched
+ * @param[in]  data_graph  data graph to be searched on
+ * @param[in]  num_runs    Number of runs to perform SM
+ * @param[out] subgraphs   Return number of subgraphs
+ * \return     double      Return accumulated elapsed times for all runs
+ */
+double nv_sm(
+    gunrock::app::TestGraph<int, int, unsigned long,
+    gunrock::graph::HAS_CSR> &query_graph,
+    gunrock::app::TestGraph<int, int, unsigned long,
+    gunrock::graph::HAS_CSR> &data_graph,
+    const int            num_runs,
+          int           *subgraphs)
+{
+    return nv_sm(query_graph, data_graph, 1 /* num_runs */, subgraphs);
+}
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++

@@ -180,6 +180,7 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
                                         GraphT &data_graph, GraphT &query_graph,
                                         VertexT *h_subgraphs,
                                         VertexT *ref_subgraphs,
+                                        int *num_subgraphs,
                                         bool verbose = true) {
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::CsrT CsrT;
@@ -192,6 +193,11 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
                 << std::endl;
     }
   }
+
+  for (SizeT v =0; v < data_graph.nodes; v++) {
+    (*num_subgraphs) += h_subgraphs[v];
+  }
+  *num_subgraphs = *num_subgraphs / query_graph.nodes;
 
   SizeT num_errors = 0;
 
