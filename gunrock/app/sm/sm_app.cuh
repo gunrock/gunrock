@@ -200,8 +200,8 @@ double gunrock_sm(
  * \return     double            Return accumulated elapsed times for all runs
  */
 template <
-    typename VertexT = int,
-    typename SizeT   = int>
+    typename VertexT,
+    typename SizeT>
 double sm(
     const SizeT        num_nodes,
     const SizeT        num_edges,
