@@ -214,7 +214,7 @@ double sm(
     const int          num_runs,
           VertexT     *subgraphs)
 {
-    typedef typename gunrock::app::TestGraph<VertexT, SizeT,
+    typedef typename gunrock::app::TestGraph<VertexT, SizeT, VertexT,
         gunrock::graph::HAS_CSR>  GraphT;
     typedef typename GraphT::CsrT CsrT;
 
