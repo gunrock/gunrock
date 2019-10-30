@@ -58,6 +58,7 @@ cudaError_t For(OpT op, ForIterT loop_size, util::Location target,
   return retval;
 }
 
+#if (__CUDACC_VER_MAJOR__ >= 9)
 template <typename OpT>
 __global__ void RepeatFor0_Kernel(int num_repeats, ForIterT loop_size, OpT op) {
   const ForIterT STRIDE = (ForIterT)blockDim.x * gridDim.x;
@@ -71,7 +72,6 @@ __global__ void RepeatFor0_Kernel(int num_repeats, ForIterT loop_size, OpT op) {
   }
 }
 
-#if (__CUDACC_VER_MAJOR__ >= 9)
 template <typename OpT>
 cudaError_t RepeatFor0(
     OpT op, int num_repeats, ForIterT loop_size, util::Location target,
@@ -111,6 +111,7 @@ cudaError_t RepeatFor0(
 }
 #endif
 
+#if (__CUDACC_VER_MAJOR__ >= 10)
 template <typename OpT>
 __global__ void RepeatFor1_Kernel(int r, ForIterT loop_size, OpT op) {
   const ForIterT STRIDE = (ForIterT)blockDim.x * gridDim.x;
@@ -125,7 +126,6 @@ __global__ void RepeatFor1_Kernel(int r, ForIterT loop_size, OpT op) {
   }
 }
 
-#if (__CUDACC_VER_MAJOR__ >= 10)
 template <typename OpT>
 cudaError_t RepeatFor1(
     OpT op, int num_repeats, ForIterT loop_size, util::Location target,

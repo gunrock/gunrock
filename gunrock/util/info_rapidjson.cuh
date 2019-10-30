@@ -587,7 +587,7 @@ struct Info {
       if (algorithm_name == "BC") {
         // for betweenness should count the backward phase too.
         edges_visited = 2 * edges_queued;
-      } else if (algorithm_name == "PageRank") {
+      } else if (algorithm_name == "PR") {
         edges_visited = graph.edges;
         nodes_visited = graph.nodes;
       }
