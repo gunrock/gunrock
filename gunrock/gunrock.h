@@ -410,7 +410,7 @@ double sm(
     const int           *query_row_offsets,
     const int           *query_col_indices,
     const int            num_runs,
-          int            subgraphs);
+          int            *subgraphs);
 
  /*
  * @brief Subgraph Matching simple public interface.
