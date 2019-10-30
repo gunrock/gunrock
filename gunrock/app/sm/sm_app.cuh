@@ -187,31 +187,35 @@ double gunrock_sm(
 
 /*
  * @brief Simple interface take in graph as CSR format
- * @param[in]  num_nodes   Number of veritces in the input graph
- * @param[in]  num_edges   Number of edges in the input graph
- * @param[in]  row_offsets CSR-formatted graph input row offsets
- * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  edge_values CSR-formatted graph input edge weights
- * @param[in]  num_runs    Number of runs to perform SM
- * @param[out] subgraphs   Return number of subgraphs
- * \return     double      Return accumulated elapsed times for all runs
+ * @param[in]  num_nodes         Number of veritces in the input data graph
+ * @param[in]  num_edges         Number of edges in the input data graph
+ * @param[in]  row_offsets       CSR-formatted data graph input row offsets
+ * @param[in]  col_indices       CSR-formatted data graph input column indices
+ * @param[in]  num_query_nodes   Number of veritces in the input query graph
+ * @param[in]  num_query_edges   Number of edges in the input query graph
+ * @param[in]  query_row_offsets CSR-formatted query graph input row offsets
+ * @param[in]  query_col_indices CSR-formatted query graph input column indices
+ * @param[in]  num_runs          Number of runs to perform SM
+ * @param[out] subgraphs         Return number of subgraphs
+ * \return     double            Return accumulated elapsed times for all runs
  */
 template <
     typename VertexT = int,
-    typename SizeT   = int,
-    typename GValueT = unsigned long>
+    typename SizeT   = int>
 double sm(
     const SizeT        num_nodes,
     const SizeT        num_edges,
     const SizeT       *row_offsets,
     const VertexT     *col_indices,
-    const GValueT     *edge_values,
+    const SizeT        num_query_nodes,
+    const SizeT        num_query_edges,
+    const SizeT       *query_row_offsets,
+    const VertexT     *query_col_indices,
     const int          num_runs,
           VertexT     *subgraphs)
 {
-    typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-        gunrock::graph::HAS_CSR>
-        GraphT;
+    typedef typename gunrock::app::TestGraph<VertexT, SizeT,
+        gunrock::graph::HAS_CSR>  GraphT;
     typedef typename GraphT::CsrT CsrT;
 
     // Setup parameters
@@ -229,9 +233,12 @@ double sm(
     data_graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
     data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, gunrock::util::HOST);
     data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, gunrock::util::HOST);
-    data_graph.CsrT::edge_values   .SetPointer((GValueT *)edge_values, num_edges, gunrock::util::HOST);
     data_graph.FromCsr(data_graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, data_graph);
+    data_graph.CsrT::Allocate(num_query_nodes, num_query_edges, gunrock::util::HOST);
+    data_graph.CsrT::query_row_offsets   .SetPointer((SizeT *)query_row_offsets, num_query_nodes + 1, gunrock::util::HOST);
+    data_graph.CsrT::query_column_indices.SetPointer((VertexT *)query_col_indices, num_query_edges, gunrock::util::HOST);
+    data_graph.FromCsr(query_graph.csr(), true, quiet);
     gunrock::graphio::LoadGraph(parameters, query_graph, "pattern-");
 
     // Run the SM
@@ -243,59 +250,6 @@ double sm(
     return elapsed_time;
 }
 
-/*
- * @brief Simple interface take in graph as Gunrock format
- * @param[in]  query_graph The query graph pattern to search
- * @param[in]  data_graph  The data graph to search on
- * @param[in]  num_runs    Number of runs to perform SM
- * @param[out] subgraphs   Return number of subgraphs
- * \return     double      Return accumulated elapsed times for all runs
- */
-template <
-    typename VertexT = int,
-    typename SizeT   = int,
-    typename GValueT = unsigned long>
-double nv_sm(
-    gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-    gunrock::graph::HAS_CSR> &query_graph,
-    gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-    gunrock::graph::HAS_CSR> &data_graph,
-    const int          num_runs,
-    VertexT           *subgraphs)
-{
-    typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-        gunrock::graph::HAS_CSR>
-        GraphT;
-    typedef typename GraphT::CsrT CsrT;
-
-    // Setup parameters
-    gunrock::util::Parameters parameters("sm");
-    gunrock::graphio::UseParameters(parameters);
-    gunrock::app::sm::UseParameters(parameters);
-    gunrock::app::UseParameters_test(parameters);
-    parameters.Parse_CommandLine(0, NULL);
-    parameters.Set("graph-type", "by-pass");
-    parameters.Set("num-runs", num_runs);
-    bool quiet = parameters.Get<bool>("quiet");
-//    GraphT data_graph;
-//    GraphT query_graph;
-    // Assign pointers into gunrock graph format
-/*    data_graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, gunrock::util::HOST);
-    data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, gunrock::util::HOST);
-    data_graph.CsrT::edge_values   .SetPointer((GValueT *)edge_values, num_edges, gunrock::util::HOST);
-    data_graph.FromCsr(data_graph.csr(), true, quiet);
-    gunrock::graphio::LoadGraph(parameters, data_graph);
-    gunrock::graphio::LoadGraph(parameters, query_graph, "pattern-");
-*/
-    // Run the SM
-    double elapsed_time = gunrock_sm(parameters, data_graph, query_graph, subgraphs);
-    // Cleanup
-//    data_graph.Release();
-//    query_graph.Release();
-
-    return elapsed_time;
-}
 // Leave this at the end of the file
 // Local Variables:
 // mode:c++
