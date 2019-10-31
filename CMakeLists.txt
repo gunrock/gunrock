@@ -246,11 +246,11 @@ option(GUNROCK_GENCODE_SM37
 
 option(GUNROCK_GENCODE_SM50
   "ON to generate code for Compute Capability 5.0 devices (e.g. GeForce GTX 750 TI)"
-  ON)
+  OFF)
 
 option(GUNROCK_GENCODE_SM52
   "ON to generate code for Compute Capability 5.2 devices (e.g. GeForce Titan X)"
-  ON)
+  OFF)
 
 #Pascal Architecture: CUDA 8
 if (CUDA_VERSION VERSION_EQUAL "8.0" OR CUDA_VERSION VERSION_GREATER "8.0")
