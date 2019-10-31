@@ -21,17 +21,18 @@
 namespace gunrock {
 namespace app {
 
-cudaError_t UseParameters_app(util::Parameters &parameters) {
+template <typename ParametersT>
+cudaError_t UseParameters_app(ParametersT &parameters) {
   cudaError_t retval = cudaSuccess;
   GUARD_CU(util::UseParameters_info(parameters));
 
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.template Use<int>(
       "num-runs",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       1, "Number of runs to perform the test, per parameter-set", __FILE__,
       __LINE__));
 
-  GUARD_CU(parameters.Use<double>(
+  GUARD_CU(parameters.template Use<double>(
       "preprocess-time",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
       0.0, "Preprocessing time", __FILE__, __LINE__));

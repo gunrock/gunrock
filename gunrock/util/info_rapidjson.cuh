@@ -30,32 +30,33 @@
 namespace gunrock {
 namespace util {
 
-cudaError_t UseParameters_info(util::Parameters &parameters) {
+template <typename ParametersT>
+cudaError_t UseParameters_info(ParametersT &parameters) {
   cudaError_t retval = cudaSuccess;
   
-  GUARD_CU(parameters.Use<bool>(
+  GUARD_CU(parameters.template Use<bool>(
       "json",
       util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       false, "Whether to output statistics in json format", __FILE__,
       __LINE__));
 
-  GUARD_CU(parameters.Use<std::string>(
+  GUARD_CU(parameters.template Use<std::string>(
       "jsonfile",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       "", "Filename to output statistics in json format", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<std::string>(
+  GUARD_CU(parameters.template Use<std::string>(
       "jsondir",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       "", "Directory to output statistics in json format", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<std::string>(
+  GUARD_CU(parameters.template Use<std::string>(
       "tag",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
       "", "Tag to better describe and identify json outputs", __FILE__,
       __LINE__));
 
-  // GUARD_CU(parameters.Use<uint64_t>(
+  // GUARD_CU(parameters.template Use<uint64_t>(
   //   "filtered-srcs",
   //   util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::INTERNAL_PARAMETER, 0,
   //   "Array of filtered source vertices", __FILE__, __LINE__));

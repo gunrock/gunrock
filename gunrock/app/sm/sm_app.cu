@@ -17,7 +17,8 @@ namespace gunrock {
 namespace app {
 namespace sm {
 
-cudaError_t UseParameters(util::Parameters &parameters) {
+template <typename ParametersT>
+cudaError_t UseParameters(ParametersT &parameters) {
   cudaError_t retval = cudaSuccess;
   GUARD_CU(UseParameters_app(parameters));
   GUARD_CU(UseParameters_problem(parameters));
