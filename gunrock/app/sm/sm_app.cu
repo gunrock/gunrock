@@ -24,7 +24,7 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_enactor(parameters));
   GUARD_CU(UseParameters_test(parameters));
 
-  GUARD_CU(parameters.template Use<unsigned int>(
+  GUARD_CU(parameters.Use<unsigned int>(
               "num-subgraphs",
               util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
               0, "number of matched subgraphs", __FILE__, __LINE__));
