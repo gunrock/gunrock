@@ -18,8 +18,8 @@ int main(int argc, char *argv[]) {
   float *ranks = (float *)malloc(sizeof(float) * num_nodes);
 
   // Jonathan's Note: Disabled pagerank here since I was testing only hits and sm in CMakeLists.txt.
-  // double elapsed = pagerank(num_nodes, num_edges, row_offsets, col_indices, 1,
-  //                           node_ids, ranks);
+  double elapsed = pagerank(num_nodes, num_edges, row_offsets, col_indices, 1,
+                            node_ids, ranks);
 
 
 

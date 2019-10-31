@@ -2,7 +2,7 @@
 
 BASEOPTION="--src=randomize2 --queue-sizing=1.2 --iteration-num=16"
 BASEFLAG=""
-EXECUTION="./bin/test_sssp_8.0_x86_64"
+EXECUTION="./bin/test_sssp_10.0_x86_64"
 DATADIR="/data/gunrock_dataset/large"
 
 OPTION[0]="" && FLAG[0]=".default"
