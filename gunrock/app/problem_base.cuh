@@ -40,12 +40,13 @@ enum : ProblemFlag {
  * @param parameters The util::Parameter<...> structure holding all parameter
  * info \return cudaError_t error message(s), if any
  */
-cudaError_t UseParameters_problem(util::Parameters &parameters) {
+template <typename ParametersT>
+cudaError_t UseParameters_problem(ParametersT &parameters) {
   cudaError_t retval = cudaSuccess;
 
   GUARD_CU(partitioner::UseParameters(parameters));
-  if (!parameters.Have("device"))
-    GUARD_CU(parameters.Use<int>(
+  if (!parameters.template Have("device"))
+    GUARD_CU(parameters.template Use<int>(
         "device",
         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         0, "Set GPU(s) for testing", __FILE__, __LINE__));

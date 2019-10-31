@@ -27,11 +27,12 @@
 namespace gunrock {
 namespace graphio {
 
-cudaError_t UseParameters(util::Parameters &parameters,
+template <typename ParametersT>
+cudaError_t UseParameters(ParametersT &parameters,
                           std::string graph_prefix = "") {
   cudaError_t retval = cudaSuccess;
 
-  GUARD_CU(parameters.Use<std::string>(
+  GUARD_CU(parameters.template Use<std::string>(
       graph_prefix + "graph-type",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
       "",
@@ -39,19 +40,19 @@ cudaError_t UseParameters(util::Parameters &parameters,
                      " rmat, grmat or smallworld",
       __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<std::string>(
+  GUARD_CU(parameters.template Use<std::string>(
       graph_prefix + "graph-file",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       "", graph_prefix + " graph file, empty points to STDIN", __FILE__,
       __LINE__));
 
-  GUARD_CU(parameters.Use<bool>(
+  GUARD_CU(parameters.template Use<bool>(
       graph_prefix + "undirected",
       util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
       false, "Whether " + graph_prefix + " graph is undirected", __FILE__,
       __LINE__));
 
-  GUARD_CU(parameters.Use<bool>(
+  GUARD_CU(parameters.template Use<bool>(
       graph_prefix + "random-edge-values",
       util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       false,
@@ -60,18 +61,18 @@ cudaError_t UseParameters(util::Parameters &parameters,
           "If false, they are set to 1.",
       __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<float>(
+  GUARD_CU(parameters.template Use<float>(
       graph_prefix + "edge-value-range",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       64, "Range of edge values when randomly generated", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<float>(
+  GUARD_CU(parameters.template Use<float>(
       graph_prefix + "edge-value-min",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0, "Minimum value of edge values when randomly generated", __FILE__,
       __LINE__));
 
-  GUARD_CU(parameters.Use<bool>(
+  GUARD_CU(parameters.template Use<bool>(
       graph_prefix + "vertex-start-from-zero",
       util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       true,
@@ -79,72 +80,72 @@ cudaError_t UseParameters(util::Parameters &parameters,
           " starts from 0 instead of 1",
       __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<long>(
+  GUARD_CU(parameters.template Use<long>(
       graph_prefix + "edge-value-seed",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0, "Rand seed to generate edge values, default is time(NULL)", __FILE__,
       __LINE__));
 
-  GUARD_CU(parameters.Use<long long>(
+  GUARD_CU(parameters.template Use<long long>(
       graph_prefix + "graph-nodes",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       1 << 10, "Number of nodes", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<long long>(
+  GUARD_CU(parameters.template Use<long long>(
       graph_prefix + "graph-edges",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       (1 << 10) * 48, "Number of edges", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<long long>(
+  GUARD_CU(parameters.template Use<long long>(
       graph_prefix + "graph-scale",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       10, "Vertex scale", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<double>(
+  GUARD_CU(parameters.template Use<double>(
       graph_prefix + "graph-edgefactor",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       48, "Edge factor", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.template Use<int>(
       graph_prefix + "graph-seed",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0, "Rand seed to generate the graph, default is time(NULL)", __FILE__,
       __LINE__));
 
   if (graph_prefix == "") {
-    GUARD_CU(parameters.Use<bool>(
+    GUARD_CU(parameters.template Use<bool>(
         "64bit-VertexT",
         util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         false, "Whether to use 64-bit VertexT", __FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<bool>(
+    GUARD_CU(parameters.template Use<bool>(
         "64bit-SizeT",
         util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         false, "Whether to use 64-bit SizeT", __FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<bool>(
+    GUARD_CU(parameters.template Use<bool>(
         "64bit-ValueT",
         util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         false, "Whether to use 64-bit ValueT", __FILE__, __LINE__));
 
-    GUARD_CU(parameters.Use<std::string>(
+    GUARD_CU(parameters.template Use<std::string>(
         "dataset",
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
         "", "Name of dataset, default value is set by graph reader / generator",
         __FILE__, __LINE__));
   }
 
-  GUARD_CU(parameters.Use<bool>(
+  GUARD_CU(parameters.template Use<bool>(
       graph_prefix + "remove-duplicate-edges",
       util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       true, "Whether to remove duplicate edges", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<bool>(
+  GUARD_CU(parameters.template Use<bool>(
       graph_prefix + "remove-self-loops",
       util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       true, "Whether to remove self loops", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<bool>(
+  GUARD_CU(parameters.template Use<bool>(
       graph_prefix + "read-from-binary",
       util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       true,
@@ -152,13 +153,13 @@ cudaError_t UseParameters(util::Parameters &parameters,
       "available",
       __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<bool>(
+  GUARD_CU(parameters.template Use<bool>(
       graph_prefix + "store-to-binary",
       util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       true, "Whether to store the graph to binary file, if supported", __FILE__,
       __LINE__));
 
-  GUARD_CU(parameters.Use<std::string>(
+  GUARD_CU(parameters.template Use<std::string>(
       graph_prefix + "binary-prefix",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       "",
@@ -166,7 +167,7 @@ cudaError_t UseParameters(util::Parameters &parameters,
           graph_prefix + "-graph-file",
       __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<bool>(
+  GUARD_CU(parameters.template Use<bool>(
       graph_prefix + "sort-csr",
       util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       false, "Whether to sort CSR edges per vertex", __FILE__, __LINE__));

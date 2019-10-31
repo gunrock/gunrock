@@ -45,46 +45,47 @@ enum : Enactor_Flag {
  * @param parameters The util::Parameter<...> structure holding all parameter
  * info \return cudaError_t error message(s), if any
  */
-cudaError_t UseParameters_enactor(util::Parameters &parameters) {
+template <typename ParametersT>
+cudaError_t UseParameters_enactor(ParametersT &parameters) {
   cudaError_t retval = cudaSuccess;
 
-  if (!parameters.Have("device"))
-    GUARD_CU(parameters.Use<int>(
+  if (!parameters.template Have("device"))
+    GUARD_CU(parameters.template Use<int>(
         "device",
         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
         0, "Set GPU(s) for testing", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.template Use<int>(
       "communicate-latency",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0, "additional communication latency", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<float>(
+  GUARD_CU(parameters.template Use<float>(
       "communicate-multipy",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       1.0f, "communication sizing factor", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.template Use<int>(
       "expand-latency",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0, "additional expand incoming latency", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.template Use<int>(
       "subqueue-latency",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0, "additional subqueue latency", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.template Use<int>(
       "fullqueue-latency",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0, "additional fullqueue latency", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.template Use<int>(
       "makeout-latency",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0, "additional make-out latency", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<std::string>(
+  GUARD_CU(parameters.template Use<std::string>(
       "advance-mode",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
       "LB",
@@ -97,12 +98,12 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
       "\tadd -CULL for fuzed kernels;\n"
       "\tnot all modes are available for specific problem;\n"));
 
-  GUARD_CU(parameters.Use<std::string>(
+  GUARD_CU(parameters.template Use<std::string>(
       "filter-mode",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       "CULL", "Filter strategy", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<double>(
+  GUARD_CU(parameters.template Use<double>(
       "queue-factor",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
       6.0,
@@ -110,7 +111,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
       "edges",
       __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<double>(
+  GUARD_CU(parameters.template Use<double>(
       "trans-factor",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       1.0,
@@ -118,12 +119,12 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
       "vertices",
       __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<bool>(
+  GUARD_CU(parameters.template Use<bool>(
       "size-check",
       util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       true, "Whether to enable frontier auto resizing", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.template Use<int>(
       "max-grid-size",
       util::OPTIONAL_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0, "Maximun number of grids for GPU kernels", __FILE__, __LINE__));
