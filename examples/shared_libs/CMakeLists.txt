@@ -1,8 +1,8 @@
 # ------------------------------------------------------------------------
 #  Gunrock: Sub-Project C Shared Libraries
 # ------------------------------------------------------------------------
-#add_executable(shared_lib_pr shared_lib_pr.c)
-#target_link_libraries(shared_lib_pr gunrock)
+add_executable(shared_lib_pr shared_lib_pr.c)
+target_link_libraries(shared_lib_pr gunrock)
 
 add_executable(shared_lib_sm shared_lib_sm.c)
 target_link_libraries(shared_lib_sm gunrock)
