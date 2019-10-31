@@ -37,7 +37,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -fPIC")
 option(CMAKE_VERBOSE_MAKEFILE OFF)
 
 # begin /* Find and set CUDA arch */
-set(gunrock_REQUIRED_CUDA_VERSION 7.5)
+set(gunrock_REQUIRED_CUDA_VERSION 9.0)
 FIND_PACKAGE(CUDA ${gunrock_REQUIRED_CUDA_VERSION} REQUIRED)
 # /* enables relocatable device code linking */
 SET(CUDA_SEPARABLE_COMPILATION ON)
@@ -256,10 +256,10 @@ option(GUNROCK_GENCODE_SM52
 if (CUDA_VERSION VERSION_EQUAL "8.0" OR CUDA_VERSION VERSION_GREATER "8.0")
   option(GUNROCK_GENCODE_SM60
     "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
-    OFF)
+    ON)
   option(GUNROCK_GENCODE_SM61
     "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
-    OFF)
+    ON)
 endif ()
 
 #Volta Architecture: CUDA 9
@@ -276,7 +276,7 @@ endif ()
 if (CUDA_VERSION VERSION_EQUAL "10.0" OR CUDA_VERSION VERSION_GREATER "10.0")
   option(GUNROCK_GENCODE_SM75
     "ON to generate code for Compute Capability 7.5 devices (e.g. GTX 1160 or RTX 2080)"
-    OFF)
+    ON)
 endif ()
 
 option(CUDA_VERBOSE_PTXAS

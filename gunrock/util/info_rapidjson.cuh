@@ -256,8 +256,6 @@ struct Info {
     SetVal("git-commit-sha", g_GIT_SHA1);
     SetVal("load-time", parameters.Get<float>("load-time"));
     SetVal("primitive", algorithm_name);
-
-    parameters.List(*this);
   }
 
   /**
@@ -589,7 +587,7 @@ struct Info {
       if (algorithm_name == "BC") {
         // for betweenness should count the backward phase too.
         edges_visited = 2 * edges_queued;
-      } else if (algorithm_name == "PageRank") {
+      } else if (algorithm_name == "PR") {
         edges_visited = graph.edges;
         nodes_visited = graph.nodes;
       }
@@ -767,6 +765,9 @@ struct Info {
 
     util::Userinfo userinfo;
     SetVal("userinfo", userinfo.getUserinfo());
+
+    // Add all the parameters to JSON
+    this->parameters->List(*this);
 
     if (json_writer != NULL) json_writer->EndObject();
     
