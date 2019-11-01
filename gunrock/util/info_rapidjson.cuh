@@ -196,7 +196,7 @@ struct Info {
       for (unsigned int i = 0; i < strlen(bad_chars); ++i) {
         json_filename.erase(std::remove(json_filename.begin(),
                                         json_filename.end(), bad_chars[i]),
-                            json_filename.end());
+                            		json_filename.end());
       }
     } else {
       return;
@@ -257,8 +257,6 @@ struct Info {
     SetVal("git-commit-sha", g_GIT_SHA1);
     SetVal("load-time", parameters.Get<float>("load-time"));
     SetVal("primitive", algorithm_name);
-
-    parameters.List(*this);
   }
 
   /**
@@ -590,7 +588,7 @@ struct Info {
       if (algorithm_name == "BC") {
         // for betweenness should count the backward phase too.
         edges_visited = 2 * edges_queued;
-      } else if (algorithm_name == "PageRank") {
+      } else if (algorithm_name == "PR") {
         edges_visited = graph.edges;
         nodes_visited = graph.nodes;
       }
@@ -731,7 +729,7 @@ struct Info {
     bool quiet = parameters->Get<bool>("quiet");
     int num_runs = parameters->Get<int>("num-runs");
 
-    if (num_runs > 1) {
+    if (_process_times.size() > 1) {
       min_elapsed = *std::min_element(_process_times.begin(), _process_times.end());
       max_elapsed = *std::max_element(_process_times.begin(), _process_times.end());
       min_m_teps = (double)this->edges_visited / (max_elapsed * 1000.0);
@@ -768,6 +766,9 @@ struct Info {
 
     util::Userinfo userinfo;
     SetVal("userinfo", userinfo.getUserinfo());
+
+    // Add all the parameters to JSON
+    this->parameters->List(*this);
 
     if (json_writer != NULL) json_writer->EndObject();
     

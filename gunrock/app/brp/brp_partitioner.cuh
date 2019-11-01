@@ -163,16 +163,16 @@ ENABLE_BACKWARD, KEEP_ORDER, KEEP_NODE_NUM*/> {
           StartId = row_offsets[t_node];
           EndId = row_offsets[t_node + 1];
           for (VertexId i = StartId; i < EndId; i++) {
-            VertexId neibor = column_indices[i];
-            if (marker[neibor] == node) continue;
-            if (tpartition_table[neibor] < this->num_gpus) {
+            VertexId neighbour = column_indices[i];
+            if (marker[neighbour] == node) continue;
+            if (tpartition_table[neighbour] < this->num_gpus) {
               if (level < n1) {
-                counter[tpartition_table[neibor]]++;
+                counter[tpartition_table[neighbour]]++;
               }
             }
-            marker[neibor] = node;
+            marker[neighbour] = node;
             tail++;
-            t_queue[tail] = neibor;
+            t_queue[tail] = neighbour;
           }
         }
       }

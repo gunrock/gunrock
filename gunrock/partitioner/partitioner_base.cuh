@@ -166,12 +166,12 @@ struct CsrSwitch<GraphT, true> {
         SizeT edge_start = org_graph->CsrT::row_offsets[v];
         SizeT edge_end = org_graph->CsrT::row_offsets[v + 1];
         for (SizeT edge = edge_start; edge < edge_end; edge++) {
-          SizeT neibor = org_graph->CsrT::column_indices[edge];
-          int peer = org_partition_table[neibor];
-          if ((peer != thread_num) && (marker[neibor] == 0)) {
-            if (!keep_node_num) tconvertion_table[neibor] = out_counter[peer];
+          SizeT neighbour = org_graph->CsrT::column_indices[edge];
+          int peer = org_partition_table[neighbour];
+          if ((peer != thread_num) && (marker[neighbour] == 0)) {
+            if (!keep_node_num) tconvertion_table[neighbour] = out_counter[peer];
             out_counter[peer]++;
-            marker[neibor] = 1;
+            marker[neighbour] = 1;
             num_nodes++;
           }
         }
@@ -224,15 +224,15 @@ struct CsrSwitch<GraphT, true> {
             marker.Allocate(num_subgraphs * out_counter[thread_num], target);
       memset(marker + 0, 0, sizeof(VertexT) * marker.GetSize());
 
-      for (SizeT neibor = 0; neibor < org_graph->nodes; neibor++)
-        if (org_partition_table[neibor] != thread_num) {
-          SizeT edge_start = org_graph->CsrT::row_offsets[neibor];
-          SizeT edge_end = org_graph->CsrT::row_offsets[neibor + 1];
+      for (SizeT neighbour = 0; neighbour < org_graph->nodes; neighbour++)
+        if (org_partition_table[neighbour] != thread_num) {
+          SizeT edge_start = org_graph->CsrT::row_offsets[neighbour];
+          SizeT edge_end = org_graph->CsrT::row_offsets[neighbour + 1];
           for (SizeT edge = edge_start; edge < edge_end; edge++) {
             VertexT v = org_graph->CsrT::column_indices[edge];
             if (org_partition_table[v] != thread_num) continue;
             marker[org_convertion_table[v] * num_subgraphs +
-                   org_partition_table[v]] = 1 + neibor;
+                   org_partition_table[v]] = 1 + neighbour;
           }
         }
     }
@@ -254,24 +254,24 @@ struct CsrSwitch<GraphT, true> {
         SizeT edge_start = org_graph->CsrT::row_offsets[v];
         SizeT edge_end = org_graph->CsrT::row_offsets[v + 1];
         for (SizeT edge = edge_start; edge < edge_end; edge++) {
-          SizeT neibor = org_graph->CsrT::column_indices[edge];
-          int peer = org_partition_table[neibor];
+          SizeT neighbour = org_graph->CsrT::column_indices[edge];
+          int peer = org_partition_table[neighbour];
           int peer_ = (peer < thread_num ? peer + 1 : peer);
           if (peer == thread_num) peer_ = 0;
-          VertexT neibor_ =
-              (keep_node_num) ? neibor
-                              : (tconvertion_table[neibor] + out_offset[peer_]);
+          VertexT neighbour_ =
+              (keep_node_num) ? neighbour
+                              : (tconvertion_table[neighbour] + out_offset[peer_]);
 
-          sub_graph->CsrT::column_indices[edge_counter] = neibor_;
+          sub_graph->CsrT::column_indices[edge_counter] = neighbour_;
           if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
             sub_graph->CsrT::edge_values[edge_counter] =
                 org_graph->CsrT::edge_values[edge];
           if (peer != thread_num && !keep_node_num) {
-            sub_graph->CsrT::row_offsets[neibor_] = num_edges;
-            partition_table[neibor_] = peer_;
+            sub_graph->CsrT::row_offsets[neighbour_] = num_edges;
+            partition_table[neighbour_] = peer_;
             if (!keep_node_num) {
-              convertion_table[neibor_] = org_convertion_table[neibor];
-              if (flag & Use_Original_Vertex) original_vertex[neibor_] = neibor;
+              convertion_table[neighbour_] = org_convertion_table[neighbour];
+              if (flag & Use_Original_Vertex) original_vertex[neighbour_] = neighbour;
             }
           }
           edge_counter++;
@@ -299,10 +299,10 @@ struct CsrSwitch<GraphT, true> {
             if (marker[v_ * num_subgraphs + peer] == 0) continue;
             int peer_ = peer < thread_num ? peer + 1 : peer;
             int thread_num_ = thread_num < peer ? thread_num + 1 : thread_num;
-            VertexT neibor = marker[v_ * num_subgraphs + peer] - 1;
-            VertexT neibor_ = convertion_table[neibor];
-            SizeT edge_start = sub_graph->CsrT::row_offsets[neibor_];
-            SizeT edge_end = sub_graph->CsrT::row_offsets[neibor_ + 1];
+            VertexT neighbour = marker[v_ * num_subgraphs + peer] - 1;
+            VertexT neighbour_ = convertion_table[neighbour];
+            SizeT edge_start = sub_graph->CsrT::row_offsets[neighbour_];
+            SizeT edge_end = sub_graph->CsrT::row_offsets[neighbour_ + 1];
             for (SizeT edge = edge_start; edge < edge_end; edge++) {
               VertexT _v = sub_graph->CsrT::column_indices[edge];
               if (sub_graphs[peer].GpT::convertion_table[_v] == v_ &&
