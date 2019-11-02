@@ -78,7 +78,7 @@ struct main_struct {
         VertexT src = srcs[i];
         util::PrintMsg("__________________________", !quiet);
         float elapsed = app::sssp::CPU_Reference(graph.csr(), ref_distances[i],
-                                                 NULL, src, quiet, false);
+                                                 (VertexT*)NULL, src, quiet, false);
         util::PrintMsg("--------------------------\nRun " + std::to_string(i) +
                            " elapsed: " + std::to_string(elapsed) +
                            " ms, src = " + std::to_string(src),

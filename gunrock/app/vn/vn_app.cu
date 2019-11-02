@@ -146,7 +146,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
       GUARD_CU(problem.Extract(h_distances, h_preds));
       SizeT num_errors = app::vn::Validate_Results(
           parameters, graph, srcs, h_distances, h_preds,
-          ref_distances == NULL ? NULL : ref_distances[run_num], NULL, false);
+          ref_distances == NULL ? NULL : ref_distances[run_num], (VertexT*)NULL, false);
     }
   }
 

@@ -133,7 +133,7 @@ struct main_struct {
 
         util::PrintMsg("__________________________", !quiet);
         float elapsed =
-            app::vn::CPU_Reference(graph.csr(), ref_distances[run_num], NULL,
+            app::vn::CPU_Reference(graph.csr(), ref_distances[run_num], (VertexT*)NULL,
                                    srcs, srcs_per_run, quiet, false);
 
         std::string src_msg = "";
