@@ -198,7 +198,7 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
   while (true) {
       std::string line;
       std::getline(Labels, line);
-      std::cout << line << std::endl;
+      //std::cout << line << std::endl;
       std::stringstream ss(line);
 
       if (line[0] == '%') {  // Comment
@@ -223,8 +223,8 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
           num_labels = ll_num_labels;
           dim = ll_dim;
 
-          util::PrintMsg(" (" + std::to_string(num_labels) + " labels) ", 
-                  !quiet);
+          /*util::PrintMsg(" (" + std::to_string(num_labels) + " labels) ", 
+                  !quiet);*/
 
           for (int k = 0; k < num_labels; k++) {
               for (int d = 0; d < dim; d++){
@@ -255,7 +255,6 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
 
       int d = 0;
       while (!ss.eof()){
-      //for (int d = 0; d < dim; ++d){
           if (d > dim){
               return util::GRError(
                       "Error parsing LABELS: "
