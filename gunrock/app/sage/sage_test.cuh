@@ -159,8 +159,10 @@ double CPU_Reference(util::Parameters &para, const GraphT &graph,
       // std::vector <SizeT> edges_source_child;
       // SizeT edges_source_child[num_children_per_source];
       VertexT children[num_children_per_source];
-      float children_temp[Wa2_dim0] = {0.0};  // agg(h_B1^1)
-      float source_temp[Wf2_dim0] = {0.0};    // h_B2^1
+      float children_temp[Wa2_dim0];  // agg(h_B1^1)
+      memset( children_temp, 0, Wa2_dim0*sizeof(float) );
+      float source_temp[Wf2_dim0];    // h_B2^1
+      memset( source_temp, 0, Wf2_dim0*sizeof(float) );
       // float source_result [256] = {0.0}; // h_B2_2, result
       auto source_result =
           source_embedding + ((uint64_t)source) * result_column;
@@ -199,7 +201,8 @@ double CPU_Reference(util::Parameters &para, const GraphT &graph,
         // SizeT pos = edges_source_child[i];
         // VertexT child = graph.GetEdgeDest(pos);
         VertexT child = children[i];
-        float sums[feature_column] = {0.0};
+        float sums[feature_column];
+        memset( sums, 0, feature_column*sizeof(float) );
 
         // sample leaf node for each child
         for (int j = 0; j < num_leafs_per_child; j++) {
@@ -225,7 +228,8 @@ double CPU_Reference(util::Parameters &para, const GraphT &graph,
           sums[m] = sums[m] / num_leafs_per_child;
         }  // get mean  agg of leaf features.
         // get ebedding vector for child node (h_{B1}^{1}) alg2 line 12
-        float child_temp[Wa2_dim0] = {0.0};
+        float child_temp[Wa2_dim0];
+        memset( child_temp, 0, Wa2_dim0*sizeof(float) );
         for (int idx_0 = 0; idx_0 < Wf1_dim1; idx_0++) {
           for (int idx_1 = 0; idx_1 < feature_column; idx_1++)
             child_temp[idx_0] += features[child][idx_1] * W_f_1[idx_1][idx_0];
@@ -256,7 +260,8 @@ double CPU_Reference(util::Parameters &para, const GraphT &graph,
       //////////////////////////////////////////////////////////////////////////////////////
       // get h_B2^1, k =1 ; this time, child is like leaf, and source is like
       // child
-      float sums_child_feat[feature_column] = {0.0};  // agg(h_B1^0)
+      float sums_child_feat[feature_column];  // agg(h_B1^0)
+      memset( sums_child_feat, 0, feature_column*sizeof(float) );
       for (int i = 0; i < num_children_per_source; i++) {
         // SizeT pos = edges_source_child[i];
         // VertexT child = graph.GetEdgeDest(pos);

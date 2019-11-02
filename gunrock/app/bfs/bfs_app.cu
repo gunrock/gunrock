@@ -113,7 +113,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
       GUARD_CU(problem.Extract(h_labels, h_preds));
       SizeT num_errors = app::bfs::Validate_Results(
           parameters, graph, src, h_labels, h_preds,
-          ref_labels == NULL ? NULL : ref_labels[run_num % num_srcs], NULL,
+          ref_labels == NULL ? NULL : ref_labels[run_num % num_srcs], (VertexT*)NULL,
           false);
     }
   }
