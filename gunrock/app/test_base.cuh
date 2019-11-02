@@ -194,7 +194,77 @@ cudaError_t Switch_Parameters(util::Parameters &parameters, GraphT &graph,
   level_strings = NULL;
   return retval;
 }
+template <typename VertexT, typename SizeT, typename ValueT, typename ArrayT, typename OpT>
+cudaError_t Switch_Parameters(util::Parameters &parameters, 
+                                ArrayT points,
+                              std::vector<std::string> &switching_paras,
+                              OpT op) {
+  cudaError_t retval;
+  int num_levels = switching_paras.size();
+  if (num_levels == 0) {
+    return op(parameters, points);
+  }
 
+  int *level_counters = new int[num_levels];
+  int *level_limits = new int[num_levels];
+  std::vector<std::string> *level_strings =
+      new std::vector<std::string>[num_levels];
+  for (int i = 0; i < num_levels; i++) {
+    parameters.Get<std::vector<std::string>>(switching_paras[i],
+                                             level_strings[i]);
+    level_limits[i] = level_strings[i].size();
+    // level_counters[i] = 0;
+  }
+
+  int level = 0;
+  level_counters[0] = -1;
+  // DFS to try every para selection combination
+  while (level >= 0) {
+    if (level == num_levels) {
+      std::string str = "";
+      str += std::string("64bit-VertexT=") +
+             (parameters.Get<bool>("64bit-VertexT") ? "true" : "false");
+      str += std::string(" 64bit-SizeT=") +
+             (parameters.Get<bool>("64bit-SizeT") ? "true" : "false");
+      str += std::string(" 64bit-ValueT=") +
+             (parameters.Get<bool>("64bit-ValueT") ? "true" : "false");
+      str += std::string(" undirected=") +
+             (parameters.Get<bool>("undirected") ? "true" : "false");
+
+      for (int i = 0; i < num_levels; i++)
+        str = str + " " + switching_paras[i] + "=" +
+              parameters.Get<std::string>(switching_paras[i]);
+      util::PrintMsg("==============================================");
+      util::PrintMsg(str);
+      retval = op(parameters, points);
+      if (retval) break;
+      level--;
+    } else if (level >= 0) {
+      if (level_counters[level] + 1 < level_limits[level]) {
+        level_counters[level]++;
+        parameters.Set(switching_paras[level],
+                       level_strings[level][level_counters[level]]);
+        level++;
+        if (level != num_levels) level_counters[level] = -1;
+      } else {  // backtrack
+        level--;
+      }
+    } else
+      break;
+  }
+
+  for (int i = 0; i < num_levels; i++) {
+    parameters.Set(switching_paras[i], level_strings[i]);
+    level_strings[i].clear();
+  }
+  delete[] level_counters;
+  level_counters = NULL;
+  delete[] level_limits;
+  level_limits = NULL;
+  delete[] level_strings;
+  level_strings = NULL;
+  return retval;
+}
 template <typename OpT, typename VertexT, typename SizeT, typename ValueT,
           SwitchFlag FLAG>
 cudaError_t Switch_Direction(util::Parameters &parameters, OpT op) {
