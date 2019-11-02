@@ -17,8 +17,11 @@
 #include <libgen.h>
 #include <math.h>
 #include <stdio.h>
+#include <vector>
 #include <time.h>
 #include <iostream>
+#include <sstream>
+#include <string>
 
 #include <gunrock/util/parameters.h>
 #include <gunrock/graph/coo.cuh>
@@ -170,6 +173,140 @@ cudaError_t ReadLabelsStream(FILE *f_in, util::Parameters &parameters,
   return retval;
 }
 
+template <typename SizeT, typename ValueT>
+cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters,
+                        util::Array1D<SizeT, std::vector<ValueT>> &labels) {
+
+  cudaError_t retval = cudaSuccess;
+  bool quiet = parameters.Get<bool>("quiet");
+  /*
+  int dim = parameters.Get<int>("dim");
+  int n = parameters.Get<int>("n");
+  */
+
+  int labels_read = -1;
+  long long num_labels = 0;
+  long long dim = 0;
+
+  // bool label_b_exists = false; // change this to a parameter
+  // util::Array1D<SizeT, EdgePairT> temp_edge_pairs;
+  // temp_edge_pairs.SetName("graphio::market::ReadMarketStream::temp_edge_pairs");
+  // EdgeTupleType *coo = NULL; // read in COO format
+
+  time_t mark0 = time(NULL);
+
+  while (true) {
+      std::string line;
+      std::getline(Labels, line);
+      std::cout << line << std::endl;
+      std::stringstream ss(line);
+
+      if (line[0] == '%') {  // Comment
+          if (line.length() >= 2 && line[1] == '%') {
+              // Header -> Can be used to extract info for labels
+          }
+      }  // -> if
+
+      else if (!util::isValid(labels_read)) {  // Problem description-> First line
+          // with nodes and labels info
+          long long ll_num_labels, ll_dim;
+          ss >> ll_num_labels;
+          ss >> ll_dim;
+          if ((!util::isValid(ll_num_labels)) or (!util::isValid(ll_dim))){
+              return util::GRError(
+                      "Error parsing LABELS, problem description invalid (" +
+                      std::to_string(ll_num_labels) + " < 0" + 
+                      std::to_string(ll_dim) + " < 0",
+                      __FILE__, __LINE__);
+          }
+
+          num_labels = ll_num_labels;
+          dim = ll_dim;
+
+          util::PrintMsg(" (" + std::to_string(num_labels) + " labels) ", 
+                  !quiet);
+
+          for (int k = 0; k < num_labels; k++) {
+              for (int d = 0; d < dim; d++){
+                  labels[k][d] = util::PreDefinedValues<ValueT>::InvalidValue;
+              }
+          }
+
+          labels_read = 0;
+    }  // -> else if
+
+    else {  // Now we can start storing labels
+      if (labels_read >= num_labels) {
+        return util::GRError(
+            "Error parsing LABELS: "
+            "encountered more than " +
+                std::to_string(num_labels) + " num_labels",
+            __FILE__, __LINE__);
+      }
+
+      long long ll_node;  // Active node
+      ss >> ll_node;
+      if (!util::isValid(ll_node)){
+          return util::GRError(
+            "Error parsing LABELS: "
+            "Invalid number of label: " + std::to_string(ll_node),
+            __FILE__, __LINE__);
+      }
+
+      int d = 0;
+      while (!ss.eof()){
+          ++d;
+      //for (int d = 0; d < dim; ++d){
+          if (d > dim){
+              return util::GRError(
+                      "Error parsing LABELS: "
+                      "Invalid length of label: " + std::to_string(d),
+                      __FILE__, __LINE__);
+          }
+          double lf_label = util::PreDefinedValues<ValueT>::InvalidValue;
+          ss >> lf_label;
+          ValueT ll_label;
+          if (typeid(ValueT) == typeid(float) || typeid(ValueT) == typeid(double) ||
+          typeid(ValueT) == typeid(long double)) {
+              ll_label = (ValueT)lf_label;
+          }else{
+              ll_label = lf_label;
+          }
+          if (!util::isValid(ll_label)){
+              return util::GRError(
+                      "Error parsing LABELS: "  
+                      "Invalid " + std::to_string(d) + 
+                      "th element of label: " + 
+                      std::to_string(ll_label),
+                      __FILE__, __LINE__);
+          }
+          labels[ll_node - 1][d] = ll_label;
+      }
+      if (d < dim){
+              return util::GRError(
+                      "Error parsing LABELS: "
+                      "Invalid length of label: " + std::to_string(d),
+                      __FILE__, __LINE__);
+      }
+      labels_read++;
+    }  // -> else
+  }    // -> while
+
+  if (labels_read != num_labels) {
+      return util::GRError(
+              "Error parsing LABELS: " 
+              "only " + std::to_string(labels_read) + 
+              "/" + std::to_string(num_labels) +
+              " nodes read",
+        __FILE__, __LINE__);
+  }
+
+  time_t mark1 = time(NULL);
+  util::PrintMsg("Done parsing (" + std::to_string(mark1 - mark0) + " s).",
+                 !quiet);
+
+  return retval;
+}
 /**
  * \defgroup Public Interface
  * @{
@@ -199,6 +336,31 @@ cudaError_t BuildLabelsArray(std::string filename, util::Parameters &parameters,
     util::PrintMsg("Reading from " + filename + ":", !quiet);
     if (retval = ReadLabelsStream(f_in, parameters, labels_a, labels_b)) {
       fclose(f_in);
+      return retval;
+    }
+  }
+
+  else {
+    return util::GRError("Unable to open file " + filename, __FILE__, __LINE__);
+  }
+  return retval;
+}
+
+template <typename SizeT, typename ValueT>
+cudaError_t BuildLabelsArray(std::string filename, 
+        util::Parameters &parameters, 
+        util::Array1D<SizeT, std::vector<ValueT>> &labels) {
+
+  cudaError_t retval = cudaSuccess;
+  bool quiet = parameters.Get<bool>("quiet");
+
+  std::ifstream Labels;
+  Labels.open(filename);
+  //FILE *f_in = fopen(filename.c_str(), "r");
+  if (Labels.is_open()) {
+    util::PrintMsg("Reading from " + filename + ":", !quiet);
+    if (retval = ReadLabelsStream(Labels, parameters, labels)) {
+      Labels.close();
       return retval;
     }
   }
@@ -242,6 +404,40 @@ cudaError_t Read(util::Parameters &parameters, ArrayT &labels_a,
   }
 
   GUARD_CU(BuildLabelsArray(filename, parameters, labels_a, labels_b));
+  return retval;
+}
+
+template <typename SizeT, typename ValueT, typename GraphT>
+cudaError_t Read(util::Parameters &parameters, 
+        util::Array1D<SizeT, std::vector<ValueT>> &labels,
+        GraphT& graph){
+
+    // TO DO initialized graph
+  cudaError_t retval = cudaSuccess;
+  
+  bool quiet = parameters.Get<bool>("quiet");
+
+  util::PrintMsg("Loading Labels into an array ...", !quiet);
+
+  std::string filename = parameters.Get<std::string>("labels-file");
+
+  std::ifstream fp(filename.c_str());
+  if (filename == "" || !fp.is_open()) {
+    return util::GRError("Input labels file " + filename + " does not exist.",
+                         __FILE__, __LINE__);
+  }
+
+  if (parameters.UseDefault("dataset")) {
+    std::string dir, file, extension;
+    util::SeperateFileName(filename, dir, file, extension);
+    // util::PrintMsg("filename = " + filename
+    //    + ", dir = " + dir
+    //    + ", file = " + file
+    //    + ", extension = " + extension);
+    parameters.Set("dataset", file);
+  }
+
+  GUARD_CU(BuildLabelsArray(filename, parameters, labels));
   return retval;
 }
 
