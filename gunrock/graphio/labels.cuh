@@ -255,7 +255,6 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
 
       int d = 0;
       while (!ss.eof()){
-          ++d;
       //for (int d = 0; d < dim; ++d){
           if (d > dim){
               return util::GRError(
@@ -281,6 +280,7 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
                       __FILE__, __LINE__);
           }
           labels[ll_node - 1][d] = ll_label;
+          ++d;
       }
       if (d < dim){
               return util::GRError(
