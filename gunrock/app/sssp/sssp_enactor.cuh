@@ -14,453 +14,345 @@
 
 #pragma once
 
-#include <gunrock/util/kernel_runtime_stats.cuh>
-#include <gunrock/util/test_utils.cuh>
-
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
-#include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel_policy.cuh>
-
 #include <gunrock/app/enactor_base.cuh>
+#include <gunrock/app/enactor_iteration.cuh>
+#include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/app/sssp/sssp_problem.cuh>
-#include <gunrock/app/sssp/sssp_functor.cuh>
-
+#include <gunrock/oprtr/oprtr.cuh>
 
 namespace gunrock {
 namespace app {
 namespace sssp {
 
 /**
- * @brief SSSP problem enactor class.
- *
- * @tparam INSTRUMWENT Boolean type to show whether or not to collect per-CTA clock-count statistics
+ * @brief Speciflying parameters for SSSP Enactor
+ * @param parameters The util::Parameter<...> structure holding all parameter
+ * info \return cudaError_t error message(s), if any
  */
-template<bool INSTRUMENT>
-class SSSPEnactor : public EnactorBase
-{
-    // Members
-    protected:
+cudaError_t UseParameters_enactor(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
+  GUARD_CU(app::UseParameters_enactor(parameters));
+  return retval;
+}
 
-    /**
-     * CTA duty kernel stats
-     */
-    util::KernelRuntimeStatsLifetime edge_map_kernel_stats;
-    util::KernelRuntimeStatsLifetime vertex_map_kernel_stats;
+/**
+ * @brief defination of SSSP iteration loop
+ * @tparam EnactorT Type of enactor
+ */
+template <typename EnactorT>
+struct SSSPIterationLoop
+    : public IterationLoopBase<EnactorT, Use_FullQ | Push |
+                                             (((EnactorT::Problem::FLAG &
+                                                Mark_Predecessors) != 0)
+                                                  ? Update_Predecessors
+                                                  : 0x0)> {
+  typedef typename EnactorT::VertexT VertexT;
+  typedef typename EnactorT::SizeT SizeT;
+  typedef typename EnactorT::ValueT ValueT;
+  typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
+  typedef typename EnactorT::Problem::GraphT::GpT GpT;
+  typedef IterationLoopBase<EnactorT, Use_FullQ | Push |
+                                          (((EnactorT::Problem::FLAG &
+                                             Mark_Predecessors) != 0)
+                                               ? Update_Predecessors
+                                               : 0x0)>
+      BaseIterationLoop;
 
-    unsigned long long total_runtimes;              // Total working time by each CTA
-    unsigned long long total_lifetimes;             // Total life time of each CTA
-    unsigned long long total_queued;
+  SSSPIterationLoop() : BaseIterationLoop() {}
 
-    /**
-     * A pinned, mapped word that the traversal kernels will signal when done
-     */
-    volatile int        *done;
-    int                 *d_done;
-    cudaEvent_t         throttle_event;
+  /**
+   * @brief Core computation of sssp, one iteration
+   * @param[in] peer_ Which GPU peers to work on, 0 means local
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Core(int peer_ = 0) {
+    // Data sssp that works on
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+    auto &enactor_slice =
+        this->enactor
+            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
+    auto &enactor_stats = enactor_slice.enactor_stats;
+    auto &graph = data_slice.sub_graph[0];
+    auto &distances = data_slice.distances;
+    auto &labels = data_slice.labels;
+    auto &preds = data_slice.preds;
+    // auto         &row_offsets        =   graph.CsrT::row_offsets;
+    auto &weights = graph.CsrT::edge_values;
+    auto &original_vertex = graph.GpT::original_vertex;
+    auto &frontier = enactor_slice.frontier;
+    auto &oprtr_parameters = enactor_slice.oprtr_parameters;
+    auto &retval = enactor_stats.retval;
+    // auto         &stream             =   enactor_slice.stream;
+    auto &iteration = enactor_stats.iteration;
 
-    /**
-     * Current iteration, also used to get the final search depth of the SSSP search
-     */
-    long long                           iteration;
+    // The advance operation
+    auto advance_op =
+        [distances, weights, original_vertex, preds] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+            const VertexT &input_item, const SizeT &input_pos,
+            SizeT &output_pos) -> bool {
+      ValueT src_distance = Load<cub::LOAD_CG>(distances + src);
+      ValueT edge_weight = Load<cub::LOAD_CS>(weights + edge_id);
+      ValueT new_distance = src_distance + edge_weight;
 
-    // Methods
-    protected:
+      // Check if the destination node has been claimed as someone's child
+      ValueT old_distance = atomicMin(distances + dest, new_distance);
 
-    /**
-     * @brief Prepare the enactor for SSSP kernel call. Must be called prior to each SSSP search.
-     *
-     * @param[in] problem SSSP Problem object which holds the graph data and SSSP problem data to compute.
-     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    template <typename ProblemData>
-    cudaError_t Setup(
-        ProblemData *problem,
-        int edge_map_grid_size,
-        int vertex_map_grid_size)
-    {
-        typedef typename ProblemData::SizeT         SizeT;
-        typedef typename ProblemData::VertexId      VertexId;
-        
-        cudaError_t retval = cudaSuccess;
-
-        do {
-            //initialize the host-mapped "done"
-            if (!done) {
-                int flags = cudaHostAllocMapped;
-
-                // Allocate pinned memory for done
-                if (retval = util::GRError(cudaHostAlloc((void**)&done, sizeof(int) * 1, flags),
-                    "SSSPEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) break;
-
-                // Map done into GPU space
-                if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_done, (void*) done, 0),
-                    "SSSPEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) break;
-
-                // Create throttle event
-                if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_event, cudaEventDisableTiming),
-                    "SSSPEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) break;
-            }
-
-            //initialize runtime stats
-            if (retval = edge_map_kernel_stats.Setup(edge_map_grid_size)) break;
-            if (retval = vertex_map_kernel_stats.Setup(vertex_map_grid_size)) break;
-
-            //Reset statistics
-            iteration           = 0;
-            total_runtimes      = 0;
-            total_lifetimes     = 0;
-            total_queued        = 0;
-            done[0]             = -1;
-
-            //graph slice
-            typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
-
-            // Bind row-offsets and bitmask texture
-            cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
-            if (retval = util::GRError(cudaBindTexture(
-                    0,
-                    gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
-                    graph_slice->d_row_offsets,
-                    row_offsets_desc,
-                    (graph_slice->nodes + 1) * sizeof(SizeT)),
-                        "SSSPEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
-
-            /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
-            if (retval = util::GRError(cudaBindTexture(
-                            0,
-                            gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref,
-                            graph_slice->d_column_indices,
-                            column_indices_desc,
-                            graph_slice->edges * sizeof(VertexId)),
-                        "SSSPEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
-        } while (0);
-        
-        return retval;
-    }
-
-    public:
-
-    /**
-     * @brief SSSPEnactor constructor
-     */
-    SSSPEnactor(bool DEBUG = false) :
-        EnactorBase(EDGE_FRONTIERS, DEBUG),
-        iteration(0),
-        total_queued(0),
-        done(NULL),
-        d_done(NULL)
-    {}
-
-    /**
-     * @brief SSSPEnactor destructor
-     */
-    virtual ~SSSPEnactor()
-    {
-        if (done) {
-            util::GRError(cudaFreeHost((void*)done),
-                "SSSPEnactor cudaFreeHost done failed", __FILE__, __LINE__);
-
-            util::GRError(cudaEventDestroy(throttle_event),
-                "SSSPEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
+      if (new_distance < old_distance) {
+        if (!preds.isEmpty()) {
+          VertexT pred = src;
+          if (!original_vertex.isEmpty()) pred = original_vertex[src];
+          Store(preds + dest, pred);
         }
+        return true;
+      }
+      return false;
+    };
+
+    // The filter operation
+    auto filter_op = [labels, iteration] __host__ __device__(
+                         const VertexT &src, VertexT &dest,
+                         const SizeT &edge_id, const VertexT &input_item,
+                         const SizeT &input_pos, SizeT &output_pos) -> bool {
+      if (!util::isValid(dest)) return false;
+      if (labels[dest] == iteration) return false;
+      labels[dest] = iteration;
+      return true;
+    };
+
+    oprtr_parameters.label = iteration + 1;
+    // Call the advance operator, using the advance operation
+    GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+        graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+        advance_op, filter_op));
+
+    if (oprtr_parameters.advance_mode != "LB_CULL" &&
+        oprtr_parameters.advance_mode != "LB_LIGHT_CULL") {
+      frontier.queue_reset = false;
+      // Call the filter operator, using the filter operation
+      GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+          graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+          filter_op));
     }
 
-    /**
-     * \addtogroup PublicInterface
-     * @{
-     */
+    // Get back the resulted frontier length
+    GUARD_CU(frontier.work_progress.GetQueueLength(
+        frontier.queue_index, frontier.queue_length, false,
+        oprtr_parameters.stream, true));
 
-    /**
-     * @brief Obtain statistics about the last SSSP search enacted.
-     *
-     * @param[out] total_queued Total queued elements in SSSP kernel running.
-     * @param[out] search_depth Search depth of SSSP algorithm.
-     * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
-     */
-    template <typename VertexId>
-    void GetStatistics(
-        long long &total_queued,
-        VertexId &search_depth,
-        double &avg_duty)
-    {
-        cudaThreadSynchronize();
+    return retval;
+  }
 
-        total_queued = this->total_queued;
-        search_depth = this->iteration;
+  /**
+   * @brief Routine to combine received data and local data
+   * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each
+   * transmition item, typed VertexT
+   * @tparam NUM_VALUE__ASSOCIATES Number of data associated with each
+   * transmition item, typed ValueT
+   * @param  received_length The numver of transmition items received
+   * @param[in] peer_ which peer GPU the data came from
+   * \return cudaError_t error message(s), if any
+   */
+  template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
+  cudaError_t ExpandIncoming(SizeT &received_length, int peer_) {
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+    auto &enactor_slice =
+        this->enactor
+            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
+    auto iteration = enactor_slice.enactor_stats.iteration;
+    auto &distances = data_slice.distances;
+    auto &labels = data_slice.labels;
+    auto &preds = data_slice.preds;
+    auto label = this->enactor->mgpu_slices[this->gpu_num]
+                     .in_iteration[iteration % 2][peer_];
 
-        avg_duty = (total_lifetimes >0) ?
-            double(total_runtimes) / total_lifetimes : 0.0;
+    auto expand_op = [distances, labels, label, preds] __host__ __device__(
+                         VertexT & key, const SizeT &in_pos,
+                         VertexT *vertex_associate_ins,
+                         ValueT *value__associate_ins) -> bool {
+      ValueT in_val = value__associate_ins[in_pos];
+      ValueT old_val = atomicMin(distances + key, in_val);
+      if (old_val <= in_val) return false;
+      if (labels[key] == label) return false;
+      labels[key] = label;
+      if (!preds.isEmpty()) preds[key] = vertex_associate_ins[in_pos];
+      return true;
+    };
+
+    cudaError_t retval =
+        BaseIterationLoop::template ExpandIncomingBase<NUM_VERTEX_ASSOCIATES,
+                                                       NUM_VALUE__ASSOCIATES>(
+            received_length, peer_, expand_op);
+    return retval;
+  }
+};  // end of SSSPIteration
+
+/**
+ * @brief SSSP enactor class.
+ * @tparam _Problem Problem type we process on
+ * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
+ * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
+ */
+template <typename _Problem, util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
+          unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
+class Enactor
+    : public EnactorBase<typename _Problem::GraphT, typename _Problem::LabelT,
+                         typename _Problem::ValueT, ARRAY_FLAG,
+                         cudaHostRegisterFlag> {
+ public:
+  // Definations
+  typedef _Problem Problem;
+  typedef typename Problem::SizeT SizeT;
+  typedef typename Problem::VertexT VertexT;
+  typedef typename Problem::ValueT ValueT;
+  typedef typename Problem::GraphT GraphT;
+  typedef typename Problem::LabelT LabelT;
+  typedef EnactorBase<GraphT, LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
+      BaseEnactor;
+  typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> EnactorT;
+  typedef SSSPIterationLoop<EnactorT> IterationT;
+
+  // Members
+  Problem *problem;
+  IterationT *iterations;
+
+  /**
+   * \addtogroup PublicInterface
+   * @{
+   */
+
+  /**
+   * @brief SSSPEnactor constructor
+   */
+  Enactor() : BaseEnactor("sssp"), problem(NULL) {
+    this->max_num_vertex_associates =
+        (Problem::FLAG & Mark_Predecessors) != 0 ? 1 : 0;
+    this->max_num_value__associates = 1;
+  }
+
+  /**
+   * @brief SSSPEnactor destructor
+   */
+  virtual ~Enactor() {
+    // Release();
+  }
+
+  /*
+   * @brief Releasing allocated memory space
+   * @param target The location to release memory from
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Release(util::Location target = util::LOCATION_ALL) {
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(BaseEnactor::Release(target));
+    delete[] iterations;
+    iterations = NULL;
+    problem = NULL;
+    return retval;
+  }
+
+  /**
+   * @brief Initialize the enactor.
+   * @param[in] problem The problem object.
+   * @param[in] target Target location of data
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Init(Problem &problem, util::Location target = util::DEVICE) {
+    cudaError_t retval = cudaSuccess;
+    this->problem = &problem;
+
+    GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target, false));
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+      auto &enactor_slice = this->enactor_slices[gpu * this->num_gpus + 0];
+      auto &graph = problem.sub_graphs[gpu];
+      GUARD_CU(enactor_slice.frontier.Allocate(graph.nodes, graph.edges,
+                                               this->queue_factors));
+
+      for (int peer = 0; peer < this->num_gpus; peer++) {
+        this->enactor_slices[gpu * this->num_gpus + peer]
+            .oprtr_parameters.labels = &(problem.data_slices[gpu]->labels);
+      }
     }
 
-    /** @} */
-
-    /**
-     * @brief Enacts a breadth-first search computing on the specified graph.
-     *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam VertexMapPolicy Kernel policy for vertex mapping.
-     * @tparam SSSPProblem SSSP Problem type.
-     *
-     * @param[in] problem SSSPProblem object.
-     * @param[in] src Source node for SSSP.
-     * @param[in] max_grid_size Max grid size for SSSP kernel calls.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    template<
-        typename EdgeMapPolicy,
-        typename VertexMapPolicy,
-        typename SSSPProblem>
-    cudaError_t EnactSSSP(
-    SSSPProblem                          *problem,
-    typename SSSPProblem::VertexId       src,
-    int                                 max_grid_size = 0)
-    {
-        typedef typename SSSPProblem::SizeT      SizeT;
-        typedef typename SSSPProblem::VertexId   VertexId;
-
-        typedef SSSPFunctor<
-            VertexId,
-            SizeT,
-            SSSPProblem> SsspFunctor;
-
-        cudaError_t retval = cudaSuccess;
-
-        do {
-            // Determine grid size(s)
-            int edge_map_occupancy      = EdgeMapPolicy::CTA_OCCUPANCY;
-            int edge_map_grid_size      = MaxGridSize(edge_map_occupancy, max_grid_size);
-
-            int vertex_map_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
-            int vertex_map_grid_size    = MaxGridSize(vertex_map_occupancy, max_grid_size);
-
-            if (DEBUG) {
-                printf("SSSP edge map occupancy %d, level-grid size %d\n",
-                        edge_map_occupancy, edge_map_grid_size);
-                printf("SSSP vertex map occupancy %d, level-grid size %d\n",
-                        vertex_map_occupancy, vertex_map_grid_size);
-                printf("Iteration, Edge map queue, Vertex map queue\n");
-                printf("0");
-            }
-
-
-            // Lazy initialization
-            if (retval = Setup(problem, edge_map_grid_size, vertex_map_grid_size)) break;
-
-            // Single-gpu graph slice
-            typename SSSPProblem::GraphSlice *graph_slice = problem->graph_slices[0];
-            typename SSSPProblem::DataSlice *data_slice = problem->d_data_slices[0];
-
-
-
-            fflush(stdout);
-            // Step through SSSP iterations
-
-            //for (int iter = 0; iter < graph_slice->nodes; ++iter) {
-            
-            SizeT queue_length          = 1;
-            VertexId queue_index        = 0;        // Work queue index
-            int selector                = 0;
-            SizeT num_elements          = 1;
-
-            bool queue_reset = true;
-            done[0] = -1;
-
-            while (done[0] < 0) {
-
-                // Edge Map
-                gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, SSSPProblem, SsspFunctor>
-                <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
-                    queue_reset,
-                    queue_index,
-                    1,
-                    iteration,
-                    num_elements,
-                    d_done,
-                    graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
-                    NULL,                                                       // d_pred_out_queue
-                    graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
-                    graph_slice->d_column_indices,
-                    data_slice,
-                    this->work_progress,
-                    graph_slice->frontier_elements[selector],                   // max_in_queue
-                    graph_slice->frontier_elements[selector^1],                 // max_out_queue
-                    this->edge_map_kernel_stats);
-
-
-                // Only need to reset queue for once
-                if (queue_reset)
-                    queue_reset = false;
-
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
-
-                queue_index++;
-                selector ^= 1;
-    
-                if (DEBUG) {
-                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    printf(", %lld", (long long) queue_length);
-                    //util::DisplayDeviceResults(graph_slice->frontier_queues.d_keys[selector], queue_length);
-                    //util::DisplayDeviceResults(problem->data_slices[0]->d_labels, graph_slice->nodes);
-                }
-
-                if (INSTRUMENT) {
-                    if (retval = edge_map_kernel_stats.Accumulate(
-                        edge_map_grid_size,
-                        total_runtimes,
-                        total_lifetimes)) break;
-                }
-
-                // Throttle
-                if (iteration & 1) {
-                    if (retval = util::GRError(cudaEventRecord(throttle_event),
-                        "SSSPEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
-                } else {
-                    if (retval = util::GRError(cudaEventSynchronize(throttle_event),
-                        "SSSPEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
-                }
-
-                // Check if done
-                if (done[0] == 0) break;
-
-                // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, SSSPProblem, SsspFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
-                    iteration+1,
-                    queue_reset,
-                    queue_index,
-                    1,
-                    num_elements,
-                    d_done,
-                    graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
-                    NULL,    // d_pred_in_queue
-                    graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
-                    data_slice,
-                    NULL,
-                    work_progress,
-                    graph_slice->frontier_elements[selector],           // max_in_queue
-                    graph_slice->frontier_elements[selector^1],         // max_out_queue
-                    this->vertex_map_kernel_stats);
-
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
-
-
-                queue_index++;
-                selector ^= 1;
-                iteration++;
-
-                if (INSTRUMENT || DEBUG) {
-                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    total_queued += queue_length;
-                    if (DEBUG) printf(", %lld", (long long) queue_length);
-                    if (INSTRUMENT) {
-                        if (retval = vertex_map_kernel_stats.Accumulate(
-                            vertex_map_grid_size,
-                            total_runtimes,
-                            total_lifetimes)) break;
-                    }
-                }
-                // Check if done
-                if (done[0] == 0) break;
-
-                if (DEBUG) printf("\n%lld", (long long) iteration);
-
-            }
-            //}
-
-            if (retval) break;
-
-            // Check if any of the frontiers overflowed due to redundant expansion
-            /*bool overflowed = false;
-            if (retval = work_progress.CheckOverflow<SizeT>(overflowed)) break;
-            if (overflowed) {
-                retval = util::GRError(cudaErrorInvalidConfiguration, "Frontier queue overflow. Please increase queue-sizing factor.",__FILE__, __LINE__);
-                break;
-            }*/
-            
-        } while(0);
-
-        if (DEBUG) printf("\nGPU SSSP Done.\n");
-        return retval;
+    iterations = new IterationT[this->num_gpus];
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      GUARD_CU(iterations[gpu].Init(this, gpu));
     }
 
-    /**
-     * \addtogroup PublicInterface
-     * @{
-     */
+    GUARD_CU(this->Init_Threads(
+        this, (CUT_THREADROUTINE) & (GunrockThread<EnactorT>)));
+    return retval;
+  }
 
-    /**
-     * @brief SSSP Enact kernel entry.
-     *
-     * @tparam SSSPProblem SSSP Problem type. @see SSSPProblem
-     *
-     * @param[in] problem Pointer to SSSPProblem object.
-     * @param[in] src Source node for SSSP.
-     * @param[in] max_grid_size Max grid size for SSSP kernel calls.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    template <typename SSSPProblem>
-    cudaError_t Enact(
-        SSSPProblem                      *problem,
-        typename SSSPProblem::VertexId    src,
-        int                             max_grid_size = 0)
-    {
-        
-        if (this->cuda_props.device_sm_version >= 300) {
-            typedef gunrock::oprtr::vertex_map::KernelPolicy<
-                SSSPProblem,                         // Problem data type
-            300,                                // CUDA_ARCH
-            INSTRUMENT,                         // INSTRUMENT
-            0,                                  // SATURATION QUIT
-            true,                               // DEQUEUE_PROBLEM_SIZE
-            8,                                  // MIN_CTA_OCCUPANCY
-            6,                                  // LOG_THREADS
-            1,                                  // LOG_LOAD_VEC_SIZE
-            0,                                  // LOG_LOADS_PER_TILE
-            5,                                  // LOG_RAKING_THREADS
-            5,                                  // END_BITMASK_CULL
-            8>                                  // LOG_SCHEDULE_GRANULARITY
-                VertexMapPolicy;
-
-            typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
-                SSSPProblem,                         // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                5,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                            // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7>                                  // LOG_SCHEDULE_GRANULARITY
-                    EdgeMapPolicy;
-
-            return EnactSSSP<EdgeMapPolicy, VertexMapPolicy, SSSPProblem>(
-                    problem, src, max_grid_size);
+  /**
+   * @brief Reset enactor
+   * @param[in] src Source node to start primitive.
+   * @param[in] target Target location of data
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Reset(VertexT src, util::Location target = util::DEVICE) {
+    typedef typename GraphT::GpT GpT;
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(BaseEnactor::Reset(target));
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      if ((this->num_gpus == 1) ||
+          (gpu == this->problem->org_graph->GpT::partition_table[src])) {
+        this->thread_slices[gpu].init_size = 1;
+        for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
+          auto &frontier =
+              this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
+          frontier.queue_length = (peer_ == 0) ? 1 : 0;
+          if (peer_ == 0) {
+            GUARD_CU(frontier.V_Q()->ForEach(
+                [src] __host__ __device__(VertexT & v) { v = src; }, 1, target,
+                0));
+          }
         }
+      }
 
-        //to reduce compile time, get rid of other architecture for now
-        //TODO: add all the kernelpolicy settings for all archs
-
-        printf("Not yet tuned for this architecture\n");
-        return cudaErrorInvalidDeviceFunction;
+      else {
+        this->thread_slices[gpu].init_size = 0;
+        for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
+          this->enactor_slices[gpu * this->num_gpus + peer_]
+              .frontier.queue_length = 0;
+        }
+      }
     }
+    GUARD_CU(BaseEnactor::Sync());
+    return retval;
+  }
 
-    /** @} */
+  /**
+   * @brief one run of sssp, to be called within GunrockThread
+   * @param thread_data Data for the CPU thread
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Run(ThreadSlice &thread_data) {
+    gunrock::app::Iteration_Loop<
+        ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0, 1,
+        IterationT>(thread_data, iterations[thread_data.thread_num]);
+    return cudaSuccess;
+  }
 
+  /**
+   * @brief Enacts a SSSP computing on the specified graph.
+   * @param[in] src Source node to start primitive.
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Enact(VertexT src) {
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(this->Run_Threads(this));
+    util::PrintMsg("GPU SSSP Done.", this->flag & Debug);
+    return retval;
+  }
+
+  /** @} */
 };
 
-} // namespace sssp
-} // namespace app
-} // namespace gunrock
+}  // namespace sssp
+}  // namespace app
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

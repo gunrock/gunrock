@@ -14,570 +14,606 @@
 
 #pragma once
 
-#include <gunrock/util/kernel_runtime_stats.cuh>
-#include <gunrock/util/test_utils.cuh>
-
-#include <gunrock/oprtr/edge_map_forward/kernel.cuh>
-#include <gunrock/oprtr/edge_map_forward/kernel_policy.cuh>
-#include <gunrock/oprtr/vertex_map/kernel.cuh>
-#include <gunrock/oprtr/vertex_map/kernel_policy.cuh>
-
+#include <iostream>
 #include <gunrock/app/enactor_base.cuh>
+#include <gunrock/app/enactor_iteration.cuh>
+#include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/app/bc/bc_problem.cuh>
-#include <gunrock/app/bc/bc_functor.cuh>
-
+#include <gunrock/oprtr/oprtr.cuh>
 
 namespace gunrock {
 namespace app {
 namespace bc {
 
 /**
- * @brief BC problem enactor class.
- *
- * @tparam INSTRUMENT Boolean type to show whether or not to collect per-CTA clock-count statistics
+ * @brief Speciflying parameters for BC Enactor
+ * @param parameters The util::Parameter<...> structure holding all parameter
+ * info \return cudaError_t error message(s), if any
  */
-template<bool INSTRUMENT>
-class BCEnactor : public EnactorBase
+cudaError_t UseParameters_enactor(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
+  GUARD_CU(app::UseParameters_enactor(parameters));
+
+  return retval;
+}
+
+/**
+ * @brief defination of BC iteration loop
+ * @tparam EnactorT Type of enactor
+ */
+template <typename EnactorT>
+struct BCForwardIterationLoop
+    : public IterationLoopBase<EnactorT,
+                               Use_FullQ | Push>  //| Update_Predecessors>
 {
-    // Members
-    protected:
+  typedef typename EnactorT::VertexT VertexT;
+  typedef typename EnactorT::SizeT SizeT;
+  typedef typename EnactorT::ValueT ValueT;
+  typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
+  typedef typename EnactorT::Problem::GraphT::GpT GpT;
 
-    /**
-     * CTA duty kernel stats
-     */
-    util::KernelRuntimeStatsLifetime edge_map_kernel_stats;
-    util::KernelRuntimeStatsLifetime vertex_map_kernel_stats;
+  typedef IterationLoopBase<EnactorT, Use_FullQ | Push  //| Update_Predecessors
+                            >
+      BaseIterationLoop;
 
-    unsigned long long total_runtimes;              // Total working time by each CTA
-    unsigned long long total_lifetimes;             // Total life time of each CTA
+  BCForwardIterationLoop() : BaseIterationLoop() {}
 
-    /**
-     * A pinned, mapped word that the traversal kernels will signal when done
-     */
-    volatile int        *done;
-    int                 *d_done;
-    cudaEvent_t         throttle_event;
+  /**
+   * @brief Core computation of bc, one iteration
+   * @param[in] peer_ Which GPU peers to work on, 0 means local
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Core(int peer_ = 0) {
+    // Data alias the enactor works on
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+    auto &enactor_slice =
+        this->enactor
+            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
+    auto &enactor_stats = enactor_slice.enactor_stats;
+    auto &graph = data_slice.sub_graph[0];
+    auto &frontier = enactor_slice.frontier;
+    auto &oprtr_parameters = enactor_slice.oprtr_parameters;
+    auto &retval = enactor_stats.retval;
 
-    /**
-     * Current iteration, also used to get the final search depth of the BC search
-     */
-    long long                           iteration;
+    // BC specific data alias here, e.g.:
+    auto &sigmas = data_slice.sigmas;
+    auto &labels = data_slice.labels;
 
-    // Methods
-    protected:
+    // ----------------------------
+    // Forward advance -- BFS
 
-    /**
-     * @brief Prepare the enactor for BC kernel call. Must be called prior to each BC search.
-     *
-     * @param[in] problem BC Problem object which holds the graph data and BC problem data to compute.
-     * @param[in] edge_map_grid_size CTA occupancy for edge mapping kernel call.
-     * @param[in] vertex_map_grid_size CTA occupancy for vertex mapping kernel call.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    template <typename ProblemData>
-    cudaError_t Setup(
-        ProblemData *problem,
-        int edge_map_grid_size,
-        int vertex_map_grid_size)
-    {
-        typedef typename ProblemData::SizeT         SizeT;
-        typedef typename ProblemData::VertexId      VertexId;
-        
-        cudaError_t retval = cudaSuccess;
+    auto advance_op = [labels, sigmas] __host__ __device__(
+                          const VertexT &src, VertexT &dest,
+                          const SizeT &edge_id, const VertexT &input_item,
+                          const SizeT &input_pos, SizeT &output_pos) -> bool {
+      // Check if the destination node has been claimed as someone's child
+      VertexT new_label = Load<cub::LOAD_CG>(labels + src) + 1;
+      VertexT old_label =
+          atomicCAS(labels + dest,
+                    util::PreDefinedValues<VertexT>::InvalidValue, new_label);
+      if (old_label != new_label && util::isValid(old_label)) return false;
 
-        do {
-            //initialize the host-mapped "done"
-            if (!done) {
-                int flags = cudaHostAllocMapped;
+      // Accumulate sigma value
+      atomicAdd(sigmas + dest, sigmas[src]);
+      if (!util::isValid(old_label)) {
+        return true;
+      } else {
+        return false;
+      }
+    };
 
-                // Allocate pinned memory for done
-                if (retval = util::GRError(cudaHostAlloc((void**)&done, sizeof(int) * 1, flags),
-                    "BCEnactor cudaHostAlloc done failed", __FILE__, __LINE__)) break;
+    auto filter_op = [] __host__ __device__(
+                         const VertexT &src, VertexT &dest,
+                         const SizeT &edge_id, const VertexT &input_item,
+                         const SizeT &input_pos, SizeT &output_pos) -> bool {
+      return util::isValid(dest);
+    };
 
-                // Map done into GPU space
-                if (retval = util::GRError(cudaHostGetDevicePointer((void**)&d_done, (void*) done, 0),
-                    "BCEnactor cudaHostGetDevicePointer done failed", __FILE__, __LINE__)) break;
+    // Call the advance operator, using the advance operation.
+    // BC only uses an advance + a filter, with
+    // possible optimization to fuze the two kernels.
+    GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+        graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+        advance_op, filter_op));
 
-                // Create throttle event
-                if (retval = util::GRError(cudaEventCreateWithFlags(&throttle_event, cudaEventDisableTiming),
-                    "BCEnactor cudaEventCreateWithFlags throttle_event failed", __FILE__, __LINE__)) break;
-            }
-
-            //initialize runtime stats
-            if (retval = edge_map_kernel_stats.Setup(edge_map_grid_size)) break;
-            if (retval = vertex_map_kernel_stats.Setup(vertex_map_grid_size)) break;
-
-            //Reset statistics
-            iteration           = 0;
-            total_runtimes      = 0;
-            total_lifetimes     = 0;
-            done[0]             = -1;
-
-            //graph slice
-            typename ProblemData::GraphSlice *graph_slice = problem->graph_slices[0];
-
-            // Bind row-offsets and column_indices texture
-            cudaChannelFormatDesc   row_offsets_desc = cudaCreateChannelDesc<SizeT>();
-            if (retval = util::GRError(cudaBindTexture(
-                    0,
-                    gunrock::oprtr::edge_map_forward::RowOffsetTex<SizeT>::ref,
-                    graph_slice->d_row_offsets,
-                    row_offsets_desc,
-                    (graph_slice->nodes + 1) * sizeof(SizeT)),
-                        "BCEnactor cudaBindTexture row_offset_tex_ref failed", __FILE__, __LINE__)) break;
-
-            /*cudaChannelFormatDesc   column_indices_desc = cudaCreateChannelDesc<VertexId>();
-            if (retval = util::GRError(cudaBindTexture(
-                            0,
-                            gunrock::oprtr::edge_map_forward::ColumnIndicesTex<SizeT>::ref,
-                            graph_slice->d_column_indices,
-                            column_indices_desc,
-                            graph_slice->edges * sizeof(VertexId)),
-                        "BCEnactor cudaBindTexture column_indices_tex_ref failed", __FILE__, __LINE__)) break;*/
-        } while (0);
-        
-        return retval;
+    if (oprtr_parameters.advance_mode != "LB_CULL" &&
+        oprtr_parameters.advance_mode != "LB_LIGHT_CULL") {
+      frontier.queue_reset = false;
+      // Call the filter operator, using the filter operation
+      GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+          graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+          filter_op));
     }
 
-    public:
+    // Get back the resulted frontier length
+    GUARD_CU(frontier.work_progress.GetQueueLength(
+        frontier.queue_index, frontier.queue_length, false,
+        oprtr_parameters.stream, true));
 
-    /**
-     * @brief BCEnactor constructor
-     */
-    BCEnactor(bool DEBUG = false) :
-        EnactorBase(EDGE_FRONTIERS, DEBUG),
-        iteration(0),
-        done(NULL),
-        d_done(NULL)
-    {}
+    return retval;
+  }
 
-    /**
-     * @brief BCEnactor destructor
-     */
-    virtual ~BCEnactor()
-    {
-        if (done) {
-            util::GRError(cudaFreeHost((void*)done),
-                "BCEnactor cudaFreeHost done failed", __FILE__, __LINE__);
+  cudaError_t Gather(int peer_) {
+    cudaError_t retval = cudaSuccess;
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+    auto &enactor_slice =
+        this->enactor
+            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
+    auto &enactor_stats = enactor_slice.enactor_stats;
+    auto &frontier = enactor_slice.frontier;
+    auto &oprtr_parameters = enactor_slice.oprtr_parameters;
 
-            util::GRError(cudaEventDestroy(throttle_event),
-                "BCEnactor cudaEventDestroy throttle_event failed", __FILE__, __LINE__);
+    if (enactor_stats.iteration <= 0) return retval;
+
+    SizeT cur_offset = data_slice.forward_queue_offsets[peer_].back();
+    bool over_sized = false;
+    retval = CheckSize<SizeT, VertexT>(
+        (this->enactor->flag & Size_Check) != 0, "forward_output",
+        cur_offset + frontier.queue_length, &data_slice.forward_output[peer_],
+        over_sized, this->gpu_num, enactor_stats.iteration, peer_);
+    if (retval) return retval;
+
+    auto &forward_output = data_slice.forward_output[peer_];
+    GUARD_CU(frontier.V_Q()->ForAll(
+        [forward_output, cur_offset] __host__ __device__(const VertexT *v_q,
+                                                         const SizeT &i) {
+          forward_output[cur_offset + i] = v_q[i];
+        },
+        frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+
+    data_slice.forward_queue_offsets[peer_].push_back(frontier.queue_length +
+                                                      cur_offset);
+    return retval;
+  }
+
+  /**
+   * @brief Routine to combine received data and local data
+   * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each
+   * transmition item, typed VertexT
+   * @tparam NUM_VALUE__ASSOCIATES Number of data associated with each
+   * transmition item, typed ValueT
+   * @param  received_length The numver of transmition items received
+   * @param[in] peer_ which peer GPU the data came from
+   * \return cudaError_t error message(s), if any
+   */
+  template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
+  cudaError_t ExpandIncoming(SizeT &received_length, int peer_) {
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+    auto &enactor_slice =
+        this->enactor
+            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
+    // auto iteration = enactor_slice.enactor_stats.iteration;
+    // TODO: add problem specific data alias here, e.g.:
+    // auto         &distances          =   data_slice.distances;
+
+    auto expand_op = [
+                         // TODO: pass data used by the lambda, e.g.:
+                         // distances
+    ] __host__ __device__(VertexT & key, const SizeT &in_pos,
+                          VertexT *vertex_associate_ins,
+                          ValueT *value__associate_ins) -> bool {
+      // TODO: fill in the lambda to combine received and local data, e.g.:
+      // ValueT in_val  = value__associate_ins[in_pos];
+      // ValueT old_val = atomicMin(distances + key, in_val);
+      // if (old_val <= in_val)
+      //     return false;
+      return true;
+    };
+
+    cudaError_t retval =
+        BaseIterationLoop::template ExpandIncomingBase<NUM_VERTEX_ASSOCIATES,
+                                                       NUM_VALUE__ASSOCIATES>(
+            received_length, peer_, expand_op);
+    return retval;
+  }
+};  // end of BCForwardIterationLoop
+
+template <typename EnactorT>
+struct BCBackwardIterationLoop
+    : public IterationLoopBase<EnactorT, Use_FullQ | Pull> {
+  typedef typename EnactorT::VertexT VertexT;
+  typedef typename EnactorT::SizeT SizeT;
+  typedef typename EnactorT::ValueT ValueT;
+
+  typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
+
+  typedef typename EnactorT::Problem::GraphT::GpT GpT;
+  typedef IterationLoopBase<EnactorT, Use_FullQ | Pull> BaseIterationLoop;
+
+  BCBackwardIterationLoop() : BaseIterationLoop() {}
+
+  /**
+   * @brief Core computation of bc, one iteration
+   * @param[in] peer_ Which GPU peers to work on, 0 means local
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Core(int peer_ = 0) {
+    // Data alias the enactor works on
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+    auto &enactor_slice =
+        this->enactor
+            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
+    auto &enactor_stats = enactor_slice.enactor_stats;
+    auto &graph = data_slice.sub_graph[0];
+    auto &frontier = enactor_slice.frontier;
+    auto &oprtr_parameters = enactor_slice.oprtr_parameters;
+    auto &retval = enactor_stats.retval;
+    auto &iteration = enactor_stats.iteration;
+
+    // BC problem specific data alias here, e.g.:
+    auto &bc_values = data_slice.bc_values;
+    auto &sigmas = data_slice.sigmas;
+    auto &deltas = data_slice.deltas;
+    auto &labels = data_slice.labels;
+    auto src_node = data_slice.src_node;
+    auto num_vertices = graph.nodes;
+
+    // ----------------------------
+    // Backward advance -- accumulating BC values
+
+    auto advance_op =
+        [labels, deltas, bc_values, iteration, src_node, sigmas,
+         num_vertices] __host__
+        __device__(const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                   const VertexT &input_item, const SizeT &input_pos,
+                   SizeT &output_pos) -> bool {
+      VertexT s_label = Load<cub::LOAD_CG>(labels + src);
+      VertexT d_label = Load<cub::LOAD_CG>(labels + dest);
+
+      if (iteration == 0) {
+        return (d_label == s_label + 1);
+      } else {
+        if (d_label == s_label + 1) {
+          if (src == src_node) return true;  // !! Is this right? YC: it's right
+
+          ValueT from_sigma = Load<cub::LOAD_CG>(sigmas + src);
+          ValueT to_sigma = Load<cub::LOAD_CG>(sigmas + dest);
+          ValueT to_delta = Load<cub::LOAD_CG>(deltas + dest);
+          ValueT result = from_sigma / to_sigma * (1.0 + to_delta);
+
+          // Accumulate bc value
+          ValueT old_delta = atomicAdd(deltas + src, result);
+          ValueT old_bc_value = atomicAdd(bc_values + src, result);
+          return true;
+        } else {
+          return false;
         }
+      }
+    };
+
+    auto filter_op = [labels] __host__ __device__(
+                         const VertexT &src, VertexT &dest,
+                         const SizeT &edge_id, const VertexT &input_item,
+                         const SizeT &input_pos, SizeT &output_pos) -> bool {
+      return labels[dest] == 0;
+    };
+
+    frontier.queue_reset = true;
+    auto empty_q = frontier.Next_V_Q();
+    empty_q = NULL;
+    // Call the advance operator, using the advance operation.
+    // BC only uses an advance + a filter, with
+    // possible optimization to fuze the two kernels.
+
+    GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(graph.csr(), frontier.V_Q(),
+                                                  empty_q, oprtr_parameters,
+                                                  advance_op, filter_op));
+
+    if (oprtr_parameters.advance_mode != "LB_CULL" &&
+        oprtr_parameters.advance_mode != "LB_LIGHT_CULL") {
+      frontier.queue_reset = false;
+      // Call the filter operator, using the filter operation
+      GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+          graph.csr(), frontier.V_Q(), empty_q, oprtr_parameters, filter_op));
     }
 
-    /**
-     * \addtogroup PublicInterface
-     * @{
-     */
+    // Get back the resulted frontier length
+    GUARD_CU(frontier.work_progress.GetQueueLength(
+        frontier.queue_index, frontier.queue_length, false,
+        oprtr_parameters.stream, true));
 
-    /**
-     * @brief Obtain statistics about the last BC search enacted.
-     *
-     * @param[out] avg_duty Average kernel running duty (kernel run time/kernel lifetime).
-     */
-    void GetStatistics(
-        double &avg_duty)
-    {
-        cudaThreadSynchronize();
+    return retval;
+  }
 
-        avg_duty = (total_lifetimes >0) ?
-            double(total_runtimes) / total_lifetimes : 0.0;
+  cudaError_t Change() {
+    auto &enactor_stats =
+        this->enactor->enactor_slices[this->gpu_num * this->enactor->num_gpus]
+            .enactor_stats;
+    enactor_stats.iteration--;
+    return enactor_stats.retval;
+  }
+
+  bool Stop_Condition(int gpu_num = 0) {
+    auto &enactor_slices = this->enactor->enactor_slices;
+    auto iter = enactor_slices[0].enactor_stats.iteration;
+    if (All_Done(this->enactor[0], gpu_num)) {
+      if (iter > 1) {
+        return false;
+      } else {
+        return true;
+      }
+    } else {
+      if (iter < 0) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+  }
+
+  /**
+   * @brief Routine to combine received data and local data
+   * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each
+   * transmition item, typed VertexT
+   * @tparam NUM_VALUE__ASSOCIATES Number of data associated with each
+   * transmition item, typed ValueT
+   * @param  received_length The numver of transmition items received
+   * @param[in] peer_ which peer GPU the data came from
+   * \return cudaError_t error message(s), if any
+   */
+  template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
+  cudaError_t ExpandIncoming(SizeT &received_length, int peer_) {
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+    auto &enactor_slice =
+        this->enactor
+            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
+    // auto iteration = enactor_slice.enactor_stats.iteration;
+    // TODO: add problem specific data alias here, e.g.:
+    // auto         &distances          =   data_slice.distances;
+
+    auto expand_op = [
+                         // TODO: pass data used by the lambda, e.g.:
+                         // distances
+    ] __host__ __device__(VertexT & key, const SizeT &in_pos,
+                          VertexT *vertex_associate_ins,
+                          ValueT *value__associate_ins) -> bool {
+      // TODO: fill in the lambda to combine received and local data, e.g.:
+      // ValueT in_val  = value__associate_ins[in_pos];
+      // ValueT old_val = atomicMin(distances + key, in_val);
+      // if (old_val <= in_val)
+      //     return false;
+      return true;
+    };
+
+    cudaError_t retval =
+        BaseIterationLoop::template ExpandIncomingBase<NUM_VERTEX_ASSOCIATES,
+                                                       NUM_VALUE__ASSOCIATES>(
+            received_length, peer_, expand_op);
+    return retval;
+  }
+
+  cudaError_t Gather(int peer_) {
+    cudaError_t retval = cudaSuccess;
+    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+    auto &enactor_slice =
+        this->enactor
+            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
+    auto &enactor_stats = enactor_slice.enactor_stats;
+    auto &frontier = enactor_slice.frontier;
+    auto &oprtr_parameters = enactor_slice.oprtr_parameters;
+
+    // printf("-- Gather --\n");
+    // printf("  queue_length=%d\n", frontier.queue_length);
+
+    SizeT cur_pos = data_slice.forward_queue_offsets[peer_].back();
+    data_slice.forward_queue_offsets[peer_].pop_back();
+    SizeT pre_pos = data_slice.forward_queue_offsets[peer_].back();
+    frontier.queue_reset = true;
+    if (enactor_stats.iteration > 0 && cur_pos - pre_pos > 0) {
+      frontier.queue_length = cur_pos - pre_pos;
+
+      bool over_sized = false;
+      // if (enactor_stats -> retval = Check_Size<SizeT, VertexId> (
+      //     enactor -> size_check, "queue1",
+      //     frontier.queue_length,
+      //     &frontier_queue -> keys[frontier_queue -> selector],
+      //     over_sized, thread_num, enactor_stats->iteration, peer_, false))
+      //     return;
+      retval = CheckSize<SizeT, VertexT>(
+          (this->enactor->flag & Size_Check) != 0, "queue1",
+          frontier.queue_length, frontier.V_Q(), over_sized, this->gpu_num,
+          enactor_stats.iteration, peer_);
+      if (retval) return retval;
+
+      // MemsetCopyVectorKernel<<<120, 512, 0, oprtr_parameters.stream>>>(
+      //    frontier.V_Q()->GetPointer(util::DEVICE),
+      //    data_slice.forward_output[peer_].GetPointer(util::DEVICE) + pre_pos,
+      //    frontier.queue_length);
+      auto &forward_output = data_slice.forward_output[peer_];
+      GUARD_CU(frontier.V_Q()->ForAll(
+          [forward_output, pre_pos] __host__ __device__(VertexT * v_q,
+                                                        const SizeT &i) {
+            v_q[i] = forward_output[pre_pos + i];
+          },
+          frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+
+    } else {
+      frontier.queue_length = 0;
+    }
+    return retval;
+  }
+};  // end of BCBackwardIterationLoop
+
+/**
+ * @brief BC enactor class.
+ * @tparam _Problem Problem type we process on
+ * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
+ * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
+ */
+template <typename _Problem, util::ArrayFlag ARRAY_FLAG = util::ARRAY_NONE,
+          unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
+class Enactor
+    : public EnactorBase<
+          typename _Problem::GraphT, typename _Problem::GraphT::VertexT,
+          typename _Problem::ValueT, ARRAY_FLAG, cudaHostRegisterFlag> {
+ public:
+  typedef _Problem Problem;
+  typedef typename Problem::SizeT SizeT;
+  typedef typename Problem::VertexT VertexT;
+  typedef typename Problem::GraphT GraphT;
+  typedef typename GraphT::VertexT
+      LabelT;  // e.g. typedef typename Problem::LabelT LabelT;
+  typedef typename Problem::ValueT
+      ValueT;  // e.g. typedef typename Problem::ValueT ValueT;
+  typedef EnactorBase<GraphT, VertexT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
+      BaseEnactor;
+  typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> EnactorT;
+
+  typedef BCForwardIterationLoop<EnactorT> ForwardIterationT;
+  typedef BCBackwardIterationLoop<EnactorT> BackwardIterationT;
+
+  Problem *problem;
+  ForwardIterationT *forward_iterations;
+  BackwardIterationT *backward_iterations;
+
+  /**
+   * @brief BCEnactor constructor
+   */
+  Enactor() : BaseEnactor("bc"), problem(NULL) {
+    this->max_num_vertex_associates = 0;
+    this->max_num_value__associates = 2;
+  }
+
+  /**
+   * @brief BCEnactor destructor
+   */
+  virtual ~Enactor() {
+    // Release();
+  }
+
+  /*
+   * @brief Releasing allocated memory space
+   * @param target The location to release memory from
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Release(util::Location target = util::LOCATION_ALL) {
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(BaseEnactor::Release(target));
+    delete[] forward_iterations;
+    forward_iterations = NULL;
+    delete[] backward_iterations;
+    backward_iterations = NULL;
+    problem = NULL;
+    return retval;
+  }
+
+  /**
+   * \addtogroup PublicInterface
+   * @{
+   */
+
+  /**
+   * @brief Initialize the problem.
+   * @param[in] parameters Running parameters.
+   * @param[in] problem The problem object.
+   * @param[in] target Target location of data
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Init(Problem &problem, util::Location target = util::DEVICE) {
+    cudaError_t retval = cudaSuccess;
+    this->problem = &problem;
+
+    // Lazy initialization
+    GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target,
+                               false));  // 2 vertex frontiers
+
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+      auto &enactor_slice = this->enactor_slices[gpu * this->num_gpus + 0];
+      auto &graph = problem.sub_graphs[gpu];
+      GUARD_CU(enactor_slice.frontier.Allocate(graph.nodes, graph.edges,
+                                               this->queue_factors));
+      for (int peer = 0; peer < this->num_gpus; peer++) {
+        this->enactor_slices[gpu * this->num_gpus + peer]
+            .oprtr_parameters.labels = &(problem.data_slices[gpu]->labels);
+      }
     }
 
-    /** @} */
-
-    /**
-     * @brief Enacts a brandes betweenness centrality computing on the specified graph.
-     *
-     * @tparam EdgeMapPolicy Kernel policy for forward edge mapping.
-     * @tparam VertexMapPolicy Kernel policy for vertex mapping.
-     * @tparam BCProblem BC Problem type.
-     * @tparam ForwardFunctor Forward Functor type used in the forward sigma computing pass.
-     * @tparam BackwardFunctor Backward Functor type used in the backward bc value accumulation pass.
-     * @param[in] problem BCProblem object.
-     * @param[in] src Source node for BC. -1 to compute BC value for each node.
-     * @param[in] max_grid_size Max grid size for BC kernel calls.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    template<
-        typename EdgeMapPolicy,
-        typename VertexMapPolicy,
-        typename BCProblem>
-    cudaError_t EnactBC(
-    BCProblem                          *problem,
-    typename BCProblem::VertexId       src,
-    int                                 max_grid_size = 0)
-    {
-        typedef typename BCProblem::SizeT       SizeT;
-        typedef typename BCProblem::VertexId    VertexId;
-        typedef typename BCProblem::Value       Value;
-
-        typedef ForwardFunctor<
-            VertexId,
-            SizeT,
-            Value,
-            BCProblem> ForwardFunctor;
-
-        typedef BackwardFunctor<
-            VertexId,
-            SizeT,
-            Value,
-            BCProblem> BackwardFunctor;
-
-        cudaError_t retval = cudaSuccess;
-
-        do {
-            // Determine grid size(s)
-            int edge_map_occupancy      = EdgeMapPolicy::CTA_OCCUPANCY;
-            int edge_map_grid_size      = MaxGridSize(edge_map_occupancy, max_grid_size);
-
-            int vertex_map_occupancy    = VertexMapPolicy::CTA_OCCUPANCY;
-            int vertex_map_grid_size    = MaxGridSize(vertex_map_occupancy, max_grid_size);
-
-            if (DEBUG) {
-                printf("BC edge map occupancy %d, level-grid size %d\n",
-                        edge_map_occupancy, edge_map_grid_size);
-                printf("BC vertex map occupancy %d, level-grid size %d\n",
-                        vertex_map_occupancy, vertex_map_grid_size);
-                printf("Iteration, Edge map queue, Vertex map queue\n");
-                printf("0");
-            }
-
-            // Lazy initialization
-            if (retval = Setup(problem, edge_map_grid_size, vertex_map_grid_size)) break;
-
-            // Single-gpu graph slice
-            typename BCProblem::GraphSlice *graph_slice = problem->graph_slices[0];
-            typename BCProblem::DataSlice *data_slice = problem->d_data_slices[0];
-
-            SizeT queue_length          = 0;
-            VertexId queue_index        = 0;        // Work queue index
-            int selector                = 0;
-            SizeT num_elements          = 1;
-
-            bool queue_reset = true; 
-
-
-            fflush(stdout);
-
-            //VertexId *vids = new VertexId[graph_slice->edges*2];
-            //VertexId *labels = new VertexId[graph_slice->nodes];
-            //Value *sigmas = new Value[graph_slice->nodes];
-            // Forward BC iteration
-            while (done[0] < 0) {
-
-                // Edge Map
-                gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, BCProblem, ForwardFunctor>
-                <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
-                    queue_reset,
-                    queue_index,
-                    1,
-                    iteration,
-                    num_elements,
-                    d_done,
-                    graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
-                    NULL,
-                    graph_slice->frontier_queues.d_keys[selector^1],            // d_out_queue
-                    graph_slice->d_column_indices,
-                    data_slice,
-                    this->work_progress,
-                    graph_slice->frontier_elements[selector],                   // max_in_queue
-                    graph_slice->frontier_elements[selector^1],                 // max_out_queue
-                    this->edge_map_kernel_stats);
-
-
-                // Only need to reset queue for once
-                if (queue_reset)
-                    queue_reset = false;
-
-                if (/*DEBUG &&*/ (retval = util::GRError(cudaThreadSynchronize(), "edge_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
-
-
-                queue_index++;
-                selector ^= 1;
-                
-                if (DEBUG) {
-                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    printf(", %lld", (long long) queue_length);
-                }
-
-                if (INSTRUMENT) {
-                    if (retval = edge_map_kernel_stats.Accumulate(
-                        edge_map_grid_size,
-                        total_runtimes,
-                        total_lifetimes)) break;
-                }
-
-                // Throttle
-                if (iteration & 1) {
-                    if (retval = util::GRError(cudaEventRecord(throttle_event),
-                        "BCEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
-                } else {
-                    if (retval = util::GRError(cudaEventSynchronize(throttle_event),
-                        "BCEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
-                }
-
-                // Check if done
-                if (done[0] == 0) break;
-
-                // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BCProblem, ForwardFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
-                    0,
-                    queue_reset,
-                    queue_index,
-                    1,
-                    num_elements,
-                    d_done,
-                    graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
-                    NULL,
-                    graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
-                    data_slice,
-                    NULL,
-                    work_progress,
-                    graph_slice->frontier_elements[selector],           // max_in_queue
-                    graph_slice->frontier_elements[selector^1],         // max_out_queue
-                    this->vertex_map_kernel_stats);
-
-                if (/*DEBUG &&*/ (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
-
-
-                queue_index++;
-                selector ^= 1;
-                iteration++;
-
-                if (INSTRUMENT || DEBUG) {
-                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    if (DEBUG) printf(", %lld", (long long) queue_length);
-                    if (INSTRUMENT) {
-                        if (retval = vertex_map_kernel_stats.Accumulate(
-                            vertex_map_grid_size,
-                            total_runtimes,
-                            total_lifetimes)) break;
-                    }
-                }
-                // Check if done
-                if (done[0] == 0) break;
-
-                if (DEBUG) printf("\n%lld", (long long) iteration);
-
-            }
-            //delete[] sigmas;
-            //delete[] labels;
-            //delete[] vids;
-
-            iteration           = iteration - 2;
-
-            queue_length        = 0;
-            queue_index         = 0;        // Work queue index
-            selector            = 0;
-            num_elements        = graph_slice->nodes;
-            queue_reset         = true;
-            done[0]             = -1;
-
-
-            // Prepare the label array
-            VertexId            label_adjust = -iteration; 
-            util::MemsetAddKernel<<<128, 128>>>(problem->data_slices[0]->d_labels, label_adjust, graph_slice->nodes);
-
-
-            if (DEBUG) printf("\nStart backward phase\n%lld", (long long) iteration);
-
-            // Backward BC iteration
-            for (;iteration > 0; --iteration) {
-                num_elements        = graph_slice->nodes;
-                // Fill in the frontier_queues
-                util::MemsetIdxKernel<<<128, 128>>>(graph_slice->frontier_queues.d_keys[selector], num_elements);
-
-                // Vertex Map
-                gunrock::oprtr::vertex_map::Kernel<VertexMapPolicy, BCProblem, BackwardFunctor>
-                <<<vertex_map_grid_size, VertexMapPolicy::THREADS>>>(
-                    0,
-                    queue_reset,
-                    queue_index,
-                    1,
-                    num_elements,
-                    d_done,
-                    graph_slice->frontier_queues.d_keys[selector],      // d_in_queue
-                    NULL,
-                    graph_slice->frontier_queues.d_keys[selector^1],    // d_out_queue
-                    data_slice,
-                    NULL,
-                    work_progress,
-                    graph_slice->frontier_elements[selector],           // max_in_queue
-                    graph_slice->frontier_elements[selector^1],         // max_out_queue
-                    this->vertex_map_kernel_stats);
-
-
-                // Only need to reset queue for once
-                if (queue_reset)
-                    queue_reset = false;
-
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "edge_map_backward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event);                                 // give host memory mapped visibility to GPU updates
-
-
-                queue_index++;
-                selector ^= 1;
-                
-                if (DEBUG) {
-                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    printf(", %lld", (long long) queue_length);
-                }
-
-                if (INSTRUMENT) {
-                    if (retval = edge_map_kernel_stats.Accumulate(
-                        edge_map_grid_size,
-                        total_runtimes,
-                        total_lifetimes)) break;
-                }
-
-                // Throttle
-                if (iteration & 1) {
-                    if (retval = util::GRError(cudaEventRecord(throttle_event),
-                        "BCEnactor cudaEventRecord throttle_event failed", __FILE__, __LINE__)) break;
-                } else {
-                    if (retval = util::GRError(cudaEventSynchronize(throttle_event),
-                        "BCEnactor cudaEventSynchronize throttle_event failed", __FILE__, __LINE__)) break;
-                }
-
-                // Check if done
-                if (done[0] == 0) break;
-
-                // Edge Map
-                gunrock::oprtr::edge_map_forward::Kernel<EdgeMapPolicy, BCProblem, BackwardFunctor>
-                <<<edge_map_grid_size, EdgeMapPolicy::THREADS>>>(
-                    queue_reset,
-                    queue_index,
-                    1,
-                    iteration,
-                    num_elements,
-                    d_done,
-                    graph_slice->frontier_queues.d_keys[selector],              // d_in_queue
-                    NULL,                                                       // d_out_pred
-                    graph_slice->frontier_queues.d_keys[selector],            // d_out_queue
-                    graph_slice->d_column_indices,
-                    data_slice,
-                    this->work_progress,
-                    graph_slice->frontier_elements[selector],                   // max_in_queue
-                    graph_slice->frontier_elements[selector^1],                 // max_out_queue
-                    this->edge_map_kernel_stats);
-
-                if (DEBUG && (retval = util::GRError(cudaThreadSynchronize(), "vertex_map_forward::Kernel failed", __FILE__, __LINE__))) break;
-                cudaEventQuery(throttle_event); // give host memory mapped visibility to GPU updates
-
-                queue_index++;
-                selector ^= 1;
-                queue_reset = true;
-
-                util::MemsetAddKernel<<<128, 128>>>(problem->data_slices[0]->d_labels, 1, graph_slice->nodes);
-
-                if (INSTRUMENT || DEBUG) {
-                    if (retval = work_progress.GetQueueLength(queue_index, queue_length)) break;
-                    if (DEBUG) printf(", %lld", (long long) queue_length);
-                    if (INSTRUMENT) {
-                        if (retval = vertex_map_kernel_stats.Accumulate(
-                            vertex_map_grid_size,
-                            total_runtimes,
-                            total_lifetimes)) break;
-                    }
-                }
-                // Check if done
-                if (done[0] == 0) break;
-
-                if (DEBUG) printf("\n%lld", (long long) iteration-1);
-
-            }
-            if (retval) break;
-
-            // Check if any of the frontiers overflowed due to redundant expansion
-            bool overflowed = false;
-            if (retval = work_progress.CheckOverflow<SizeT>(overflowed)) break;
-            if (overflowed) {
-                retval = util::GRError(cudaErrorInvalidConfiguration, "Frontier queue overflow. Please increase queue-sizing factor.",__FILE__, __LINE__);
-                break;
-            }
-            
-        } while(0);
-
-        if (DEBUG) printf("\nGPU BC Done.\n");
-        return retval;
+    forward_iterations = new ForwardIterationT[this->num_gpus];
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      GUARD_CU(forward_iterations[gpu].Init(this, gpu));
     }
 
-    /**
-     * \addtogroup PublicInterface
-     * @{
-     */
+    backward_iterations = new BackwardIterationT[this->num_gpus];
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      GUARD_CU(backward_iterations[gpu].Init(this, gpu));
+    }
 
-    /**
-     * @brief BC Enact kernel entry.
-     *
-     * @tparam BCProblem BC Problem type. @see BCProblem
-     *
-     * @param[in] problem Pointer to BCProblem object.
-     * @param[in] src Source node for BC. -1 indicates computing BC value for all nodes.
-     * @param[in] max_grid_size Max grid size for BC kernel calls.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    template <typename BCProblem>
-    cudaError_t Enact(
-        BCProblem                      *problem,
-        typename BCProblem::VertexId    src,
-        int                             max_grid_size = 0)
-    {
-        if (this->cuda_props.device_sm_version >= 300) {
-            typedef gunrock::oprtr::vertex_map::KernelPolicy<
-                BCProblem,                         // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                0,                                  // SATURATION QUIT
-                true,                               // DEQUEUE_PROBLEM_SIZE
-                8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                0,                                  // END BIT_MASK (no bitmask cull in BC)
-                8>                                  // LOG_SCHEDULE_GRANULARITY
-                VertexMapPolicy;
+    GUARD_CU(this->Init_Threads(
+        this, (CUT_THREADROUTINE) & (GunrockThread<EnactorT>)));
+    return retval;
+  }
 
-                typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
-                BCProblem,                         // Problem data type
-                300,                                // CUDA_ARCH
-                INSTRUMENT,                         // INSTRUMENT
-                8,                                  // MIN_CTA_OCCUPANCY
-                6,                                  // LOG_THREADS
-                1,                                  // LOG_LOAD_VEC_SIZE
-                0,                                  // LOG_LOADS_PER_TILE
-                5,                                  // LOG_RAKING_THREADS
-                32,                                 // WARP_GATHER_THRESHOLD
-                128 * 4,                            // CTA_GATHER_THRESHOLD
-                7>                                  // LOG_SCHEDULE_GRANULARITY
-                EdgeMapPolicy;
+  /**
+   * @brief one run of BC, to be called within GunrockThread
+   * @param thread_data Data for the CPU thread
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Run(ThreadSlice &thread_data) {
+    gunrock::app::Iteration_Loop<0, 1, ForwardIterationT>(
+        thread_data, forward_iterations[thread_data.thread_num]);
+    gunrock::app::Iteration_Loop<0, 2, BackwardIterationT>(
+        thread_data, backward_iterations[thread_data.thread_num]);
+    return cudaSuccess;
+  }
 
-                return EnactBC<EdgeMapPolicy, VertexMapPolicy, BCProblem>(
-                problem, src, max_grid_size);
+  /**
+   * @brief Reset enactor
+   * @param[in] src Source node to start primitive.
+   * @param[in] target Target location of data
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Reset(VertexT src, util::Location target = util::DEVICE) {
+    typedef typename GraphT::GpT GpT;
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(BaseEnactor::Reset(target));
+
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      if ((this->num_gpus == 1) ||
+          (gpu == this->problem->org_graph->GpT::partition_table[src])) {
+        this->thread_slices[gpu].init_size = 1;
+        for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
+          auto &frontier =
+              this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
+          frontier.queue_length = (peer_ == 0) ? 1 : 0;
+          if (peer_ == 0) {
+            GUARD_CU(frontier.V_Q()->ForEach(
+                [src] __host__ __device__(VertexT & v) { v = src; }, 1, target,
+                0));
+          }
         }
+      }
 
-        //to reduce compile time, get rid of other architecture for now
-        //TODO: add all the kernelpolicy settings for all archs
-
-        printf("Not yet tuned for this architecture\n");
-        return cudaErrorInvalidDeviceFunction;
+      else {
+        this->thread_slices[gpu].init_size = 0;
+        for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
+          this->enactor_slices[gpu * this->num_gpus + peer_]
+              .frontier.queue_length = 0;
+        }
+      }
     }
+    GUARD_CU(BaseEnactor::Sync());
+    return retval;
+  }
 
-    /** @} */
+  /**
+   * @brief Enacts a BC computing on the specified graph.
+   * @param[in] src Source node to start primitive.
+   * \return cudaError_t error message(s), if any
+   */
+  cudaError_t Enact(VertexT src) {
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(this->Run_Threads(this));
+    util::PrintMsg("GPU BC Done.", this->flag & Debug);
+    return retval;
+  }
 
+  /** @} */
 };
 
-} // namespace bc
-} // namespace app
-} // namespace gunrock
+}  // namespace bc
+}  // namespace app
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

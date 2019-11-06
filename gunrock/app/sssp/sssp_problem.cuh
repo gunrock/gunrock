@@ -15,332 +15,391 @@
 #pragma once
 
 #include <gunrock/app/problem_base.cuh>
-#include <gunrock/util/memset_kernel.cuh>
 
 namespace gunrock {
 namespace app {
 namespace sssp {
 
 /**
- * @brief Single-Source Shortest Path Problem structure stores device-side vectors for doing SSSP computing on the GPU.
- *
- * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam _Value               Type of float or double to use for computing BC value.
+ * @brief Speciflying parameters for SSSP Problem
+ * @param  parameters  The util::Parameter<...> structure holding all parameter
+ * info \return cudaError_t error message(s), if any
  */
-template <
-    typename    VertexId,                       
-    typename    SizeT,
-    bool        _MARK_PREDECESSORS>
-struct SSSPProblem : ProblemBase<VertexId, SizeT, false>
-{
+cudaError_t UseParameters_problem(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
 
-    static const bool MARK_PREDECESSORS     = true;
-    static const bool ENABLE_IDEMPOTENCE    = false;
-    static const bool MARK_PATHS            = _MARK_PREDECESSORS;
+  GUARD_CU(gunrock::app::UseParameters_problem(parameters));
+  GUARD_CU(parameters.Use<bool>(
+      "mark-pred",
+      util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      false, "Whether to mark predecessor info.", __FILE__, __LINE__));
 
-    //Helper structures
+  return retval;
+}
 
-    /**
-     * @brief Data slice structure which contains SSSP problem specific data.
+/**
+ * @brief Single-Source Shortest Path Problem structure.
+ * @tparam _GraphT  Type of the graph
+ * @tparam _LabelT  Type of labels used in sssp
+ * @tparam _ValueT  Type of per-vertex distance values
+ * @tparam _FLAG    Problem flags
+ */
+template <typename _GraphT, typename _LabelT = typename _GraphT::VertexT,
+          typename _ValueT = typename _GraphT::ValueT,
+          ProblemFlag _FLAG = Problem_None>
+struct Problem : ProblemBase<_GraphT, _FLAG> {
+  typedef _GraphT GraphT;
+  static const ProblemFlag FLAG = _FLAG;
+  typedef typename GraphT::VertexT VertexT;
+  typedef typename GraphT::SizeT SizeT;
+  typedef typename GraphT::CsrT CsrT;
+  typedef typename GraphT::GpT GpT;
+  typedef _LabelT LabelT;
+  typedef _ValueT ValueT;
+
+  typedef ProblemBase<GraphT, FLAG> BaseProblem;
+  typedef DataSliceBase<GraphT, FLAG> BaseDataSlice;
+
+  // Helper structures
+
+  /**
+   * @brief Data structure containing SSSP-specific data on indivual GPU.
+   */
+  struct DataSlice : BaseDataSlice {
+    // sssp-specific storage arrays
+    util::Array1D<SizeT, ValueT> distances;  // source distance
+    util::Array1D<SizeT, LabelT>
+        labels;  // labels to mark latest iteration the vertex been visited
+    util::Array1D<SizeT, VertexT> preds;       // predecessors of vertices
+    util::Array1D<SizeT, VertexT> temp_preds;  // predecessors of vertices
+
+    /*
+     * @brief Default constructor
      */
-    struct DataSlice
-    {
-        // device storage arrays
-        unsigned int        *d_labels;              /**< Used for source distance */
-        unsigned int        *d_weights;             /**< Used for storing edge weights */
-        VertexId            *d_preds;               /**< Used for storing the actual shortest path */
-    };
+    DataSlice() : BaseDataSlice() {
+      distances.SetName("distances");
+      labels.SetName("labels");
+      preds.SetName("preds");
+      temp_preds.SetName("temp_preds");
+    }
 
-    // Members
-    
-    // Number of GPUs to be sliced over
-    int                 num_gpus;
-
-    // Size of the graph
-    SizeT               nodes;
-    SizeT               edges;
-
-    // Set of data slices (one for each GPU)
-    DataSlice           **data_slices;
-   
-    // Nasty method for putting struct on device
-    // while keeping the SoA structure
-    DataSlice           **d_data_slices;
-
-    // Device indices for each data slice
-    int                 *gpu_idx;
-
-    // Methods
-
-    /**
-     * @brief SSSPProblem default constructor
+    /*
+     * @brief Default destructor
      */
+    virtual ~DataSlice() { Release(); }
 
-    SSSPProblem():
-    nodes(0),
-    edges(0),
-    num_gpus(0) {}
-
-    /**
-     * @brief SSSPProblem constructor
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on.
-     * @param[in] num_gpus Number of the GPUs used.
+    /*
+     * @brief Releasing allocated memory space
+     * @param[in] target      The location to release memory from
+     * \return    cudaError_t Error message(s), if any
      */
-    SSSPProblem(bool        stream_from_host,       // Only meaningful for single-GPU
-               const Csr<VertexId, unsigned int, SizeT> &graph,
-               int         num_gpus) :
-        num_gpus(num_gpus)
-    {
-        Init(
-            stream_from_host,
-            graph,
-            num_gpus);
+    cudaError_t Release(util::Location target = util::LOCATION_ALL) {
+      cudaError_t retval = cudaSuccess;
+      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx));
+
+      GUARD_CU(distances.Release(target));
+      GUARD_CU(labels.Release(target));
+      GUARD_CU(preds.Release(target));
+      GUARD_CU(temp_preds.Release(target));
+      GUARD_CU(BaseDataSlice ::Release(target));
+      return retval;
     }
 
     /**
-     * @brief SSSPProblem default destructor
+     * @brief initializing sssp-specific data on each gpu
+     * @param     sub_graph   Sub graph on the GPU.
+     * @param[in] num_gpus    Number of GPUs
+     * @param[in] gpu_idx     GPU device index
+     * @param[in] target      Targeting device location
+     * @param[in] flag        Problem flag containling options
+     * \return    cudaError_t Error message(s), if any
      */
-    ~SSSPProblem()
-    {
-        for (int i = 0; i < num_gpus; ++i)
-        {
-            if (util::GRError(cudaSetDevice(gpu_idx[i]),
-                "~SSSPProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
-            if (data_slices[i]->d_labels)      util::GRError(cudaFree(data_slices[i]->d_labels), "GpuSlice cudaFree d_labels failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_weights)      util::GRError(cudaFree(data_slices[i]->d_weights), "GpuSlice cudaFree d_weights failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_preds)      util::GRError(cudaFree(data_slices[i]->d_preds), "GpuSlice cudaFree d_preds failed", __FILE__, __LINE__);
-            if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
+    cudaError_t Init(GraphT &sub_graph, int num_gpus = 1, int gpu_idx = 0,
+                     util::Location target = util::DEVICE,
+                     ProblemFlag flag = Problem_None) {
+      cudaError_t retval = cudaSuccess;
+
+      GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
+      GUARD_CU(distances.Allocate(sub_graph.nodes, target));
+      GUARD_CU(labels.Allocate(sub_graph.nodes, target));
+      if (flag & Mark_Predecessors) {
+        GUARD_CU(preds.Allocate(sub_graph.nodes, target));
+        GUARD_CU(temp_preds.Allocate(sub_graph.nodes, target));
+      }
+
+      /*if (target & util::DEVICE)
+      {
+          GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
+      }*/
+      GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
+      return retval;
+    }  // Init
+
+    /**
+     * @brief Reset problem function. Must be called prior to each run.
+     * @param[in] target      Targeting device location
+     * \return    cudaError_t Error message(s), if any
+     */
+    cudaError_t Reset(util::Location target = util::DEVICE) {
+      cudaError_t retval = cudaSuccess;
+      SizeT nodes = this->sub_graph->nodes;
+
+      // Ensure data are allocated
+      GUARD_CU(distances.EnsureSize_(nodes, target));
+      GUARD_CU(labels.EnsureSize_(nodes, target));
+      if (this->flag & Mark_Predecessors) {
+        GUARD_CU(preds.EnsureSize_(nodes, target));
+        GUARD_CU(temp_preds.EnsureSize_(nodes, target));
+      }
+
+      // Reset data
+      GUARD_CU(distances.ForEach(
+          [] __host__ __device__(ValueT & distance) {
+            distance = util::PreDefinedValues<ValueT>::MaxValue;
+          },
+          nodes, target, this->stream));
+
+      GUARD_CU(labels.ForEach(
+          [] __host__ __device__(LabelT & label) {
+            label = util::PreDefinedValues<LabelT>::InvalidValue;
+          },
+          nodes, target, this->stream));
+
+      if (this->flag & Mark_Predecessors) {
+        GUARD_CU(preds.ForAll(
+            [] __host__ __device__(VertexT * preds_, const SizeT &pos) {
+              preds_[pos] = pos;
+            },
+            nodes, target, this->stream));
+
+        GUARD_CU(temp_preds.ForAll(
+            [] __host__ __device__(VertexT * preds_, const SizeT &pos) {
+              preds_[pos] = pos;
+            },
+            nodes, target, this->stream));
+      }
+
+      return retval;
+    }
+  };  // DataSlice
+
+  // Members
+  // Set of data slices (one for each GPU)
+  util::Array1D<SizeT, DataSlice> *data_slices;
+
+  // Methods
+
+  /**
+   * @brief SSSPProblem default constructor
+   */
+  Problem(util::Parameters &_parameters, ProblemFlag _flag = Problem_None)
+      : BaseProblem(_parameters, _flag), data_slices(NULL) {}
+
+  /**
+   * @brief SSSPProblem default destructor
+   */
+  virtual ~Problem() { Release(); }
+
+  /*
+   * @brief Releasing allocated memory space
+   * @param[in] target      The location to release memory from
+   * \return    cudaError_t Error message(s), if any
+   */
+  cudaError_t Release(util::Location target = util::LOCATION_ALL) {
+    cudaError_t retval = cudaSuccess;
+    if (data_slices == NULL) return retval;
+    for (int i = 0; i < this->num_gpus; i++)
+      GUARD_CU(data_slices[i].Release(target));
+
+    if ((target & util::HOST) != 0 &&
+        data_slices[0].GetPointer(util::DEVICE) == NULL) {
+      delete[] data_slices;
+      data_slices = NULL;
+    }
+    GUARD_CU(BaseProblem::Release(target));
+    return retval;
+  }
+
+  /**
+   * \addtogroup PublicInterface
+   * @{
+   */
+
+  /**
+   * @brief Copy result distancess computed on GPUs back to host-side arrays.
+   * @param[out] h_distances Host array to store computed vertex distances from
+   * the source.
+   * @param[out] h_preds     Host array to store computed vertex predecessors.
+   * @param[in]  target where the results are stored
+   * \return     cudaError_t Error message(s), if any
+   */
+  cudaError_t Extract(ValueT *h_distances, VertexT *h_preds = NULL,
+                      util::Location target = util::DEVICE) {
+    cudaError_t retval = cudaSuccess;
+    SizeT nodes = this->org_graph->nodes;
+
+    if (this->num_gpus == 1) {
+      auto &data_slice = data_slices[0][0];
+
+      // Set device
+      if (target == util::DEVICE) {
+        GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+
+        GUARD_CU(
+            data_slice.distances.SetPointer(h_distances, nodes, util::HOST));
+        GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
+
+        if ((this->flag & Mark_Predecessors) == 0) return retval;
+        GUARD_CU(data_slice.preds.SetPointer(h_preds, nodes, util::HOST));
+        GUARD_CU(data_slice.preds.Move(util::DEVICE, util::HOST));
+      } else if (target == util::HOST) {
+        GUARD_CU(data_slice.distances.ForEach(
+            h_distances,
+            [] __host__ __device__(const ValueT &distance, ValueT &h_distance) {
+              h_distance = distance;
+            },
+            nodes, util::HOST));
+
+        if (this->flag & Mark_Predecessors)
+          GUARD_CU(data_slice.preds.ForEach(
+              h_preds,
+              [] __host__ __device__(const VertexT &pred, VertexT &h_pred) {
+                h_pred = pred;
+              },
+              nodes, util::HOST));
+      }
+    } else {  // num_gpus != 1
+      util::Array1D<SizeT, ValueT *> th_distances;
+      util::Array1D<SizeT, VertexT *> th_preds;
+      th_distances.SetName("bfs::Problem::Extract::th_distances");
+      th_preds.SetName("bfs::Problem::Extract::th_preds");
+      GUARD_CU(th_distances.Allocate(this->num_gpus, util::HOST));
+      GUARD_CU(th_preds.Allocate(this->num_gpus, util::HOST));
+
+      for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+        auto &data_slice = data_slices[gpu][0];
+        if (target == util::DEVICE) {
+          GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+          GUARD_CU(data_slice.distances.Move(util::DEVICE, util::HOST));
+          if (this->flag & Mark_Predecessors)
+            GUARD_CU(data_slice.preds.Move(util::DEVICE, util::HOST));
         }
-        if (d_data_slices)  delete[] d_data_slices;
-        if (data_slices) delete[] data_slices;
+        th_distances[gpu] = data_slice.distances.GetPointer(util::HOST);
+        th_preds[gpu] = data_slice.preds.GetPointer(util::HOST);
+      }  // end for(gpu)
+
+      for (VertexT v = 0; v < nodes; v++) {
+        int gpu = this->org_graph->GpT::partition_table[v];
+        VertexT v_ = v;
+        if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) == 0)
+          v_ = this->org_graph->GpT::convertion_table[v];
+
+        h_distances[v] = th_distances[gpu][v_];
+        if (this->flag & Mark_Predecessors) h_preds[v] = th_preds[gpu][v_];
+      }
+
+      GUARD_CU(th_distances.Release());
+      GUARD_CU(th_preds.Release());
+    }  // end if
+
+    return retval;
+  }
+
+  /**
+   * @brief initialization function.
+   * @param     graph       The graph that SSSP processes on
+   * @param[in] Location    Memory location to work on
+   * \return    cudaError_t Error message(s), if any
+   */
+  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE) {
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(BaseProblem::Init(graph, target));
+    data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
+
+    if (this->parameters.template Get<bool>("mark-pred"))
+      this->flag = this->flag | Mark_Predecessors;
+
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
+      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+
+      GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
+
+      auto &data_slice = data_slices[gpu][0];
+      GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
+                               this->gpu_idx[gpu], target, this->flag));
+    }  // end for (gpu)
+
+    return retval;
+  }
+
+  /**
+   * @brief Reset problem function. Must be called prior to each run.
+   * @param[in] src      Source vertex to start.
+   * @param[in] location Memory location to work on
+   * \return cudaError_t Error message(s), if any
+   */
+  cudaError_t Reset(VertexT src, util::Location target = util::DEVICE) {
+    cudaError_t retval = cudaSuccess;
+
+    for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
+      // Set device
+      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+      GUARD_CU(data_slices[gpu]->Reset(target));
+      GUARD_CU(data_slices[gpu].Move(util::HOST, target));
     }
 
-    /**
-     * \addtogroup PublicInterface
-     * @{
-     */
-
-    /**
-     * @brief Copy result labels computed on the GPU back to host-side vectors.
-     *
-     * @param[out] h_labels host-side vector to store computed node labels (distances from the source).
-     *
-     *\return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    cudaError_t Extract(unsigned int *h_labels, VertexId *h_preds)
-    {
-        cudaError_t retval = cudaSuccess;
-
-        do {
-            if (num_gpus == 1) {
-
-                // Set device
-                if (util::GRError(cudaSetDevice(gpu_idx[0]),
-                            "SSSPProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
-
-                if (retval = util::GRError(cudaMemcpy(
-                                h_labels,
-                                data_slices[0]->d_labels,
-                                sizeof(unsigned int) * nodes,
-                                cudaMemcpyDeviceToHost),
-                            "SSSPProblem cudaMemcpy d_labels failed", __FILE__, __LINE__)) break;
-                if (MARK_PATHS) {
-                    if (retval = util::GRError(cudaMemcpy(
-                                    h_preds,
-                                    data_slices[0]->d_preds,
-                                    sizeof(VertexId) * nodes,
-                                    cudaMemcpyDeviceToHost),
-                                "SSSPProblem cudaMemcpy d_preds failed", __FILE__, __LINE__)) break;
-                }
-            } else {
-                // TODO: multi-GPU extract result
-            } //end if (data_slices.size() ==1)
-        } while(0);
-
-        return retval;
+    // Fillin the initial input_queue for SSSP problem
+    int gpu;
+    VertexT src_;
+    if (this->num_gpus <= 1) {
+      gpu = 0;
+      src_ = src;
+    } else {
+      gpu = this->org_graph->partition_table[src];
+      if (this->flag & partitioner::Keep_Node_Num)
+        src_ = src;
+      else
+        src_ = this->org_graph->GpT::convertion_table[src];
+    }
+    if (target & util::DEVICE) {
+      GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
     }
 
-    /**
-     * @brief SSSPProblem initialization
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on. @see Csr
-     * @param[in] _num_gpus Number of the GPUs used.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    cudaError_t Init(
-            bool        stream_from_host,       // Only meaningful for single-GPU
-            const Csr<VertexId, unsigned int, SizeT> &graph,
-            int         _num_gpus)
-    {
-        num_gpus = _num_gpus;
-        nodes = graph.nodes;
-        edges = graph.edges;
-        VertexId *h_row_offsets = graph.row_offsets;
-        VertexId *h_column_indices = graph.column_indices;
-            ProblemBase<VertexId, SizeT, false>::Init(stream_from_host,
-                    nodes,
-                    edges,
-                    h_row_offsets,
-                    h_column_indices,
-                    NULL,
-                    NULL,
-                    num_gpus);
-
-        // No data in DataSlice needs to be copied from host
-
-        /**
-         * Allocate output labels
-         */
-        cudaError_t retval = cudaSuccess;
-        data_slices = new DataSlice*[num_gpus];
-        d_data_slices = new DataSlice*[num_gpus];
-
-        do {
-            if (num_gpus <= 1) {
-                gpu_idx = (int*)malloc(sizeof(int));
-                // Create a single data slice for the currently-set gpu
-                int gpu;
-                if (retval = util::GRError(cudaGetDevice(&gpu), "SSSPProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
-                gpu_idx[0] = gpu;
-
-                data_slices[0] = new DataSlice;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_data_slices[0],
-                                sizeof(DataSlice)),
-                            "SSSPProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
-
-                // Create SoA on device
-                unsigned int    *d_labels;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_labels,
-                        nodes * sizeof(unsigned int)),
-                    "SSSPProblem cudaMalloc d_labels failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_labels = d_labels;
-
-                unsigned int    *d_weights;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_weights,
-                        edges * sizeof(unsigned int)),
-                    "SSSPProblem cudaMalloc d_weights failed", __FILE__, __LINE__)) return retval;
-
-                VertexId    *d_preds = NULL;
-
-                if (MARK_PATHS) {
-                    if (retval = util::GRError(cudaMalloc(
-                                    (void**)&d_preds,
-                                    nodes * sizeof(VertexId)),
-                                "SSSPProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
-                }
-                data_slices[0]->d_preds = d_preds;
-    
-                if (retval = util::GRError(cudaMemcpy(
-                        d_weights,
-                        graph.edge_values,
-                        edges * sizeof(unsigned int),
-                        cudaMemcpyHostToDevice),
-                        "ProblemBase cudaMemcpy d_weights failed", __FILE__, __LINE__)) return retval;
-
-                data_slices[0]->d_weights = d_weights;
-            }
-            //TODO: add multi-GPU allocation code
-        } while (0);
-
-        return retval;
+    ValueT src_distance = 0;
+    if (target & util::HOST) {
+      data_slices[gpu]->distances[src_] = src_distance;
+      if (this->flag & Mark_Predecessors)
+        data_slices[gpu]->preds[src_] =
+            util::PreDefinedValues<VertexT>::InvalidValue;
     }
 
-    /**
-     *  @brief Performs any initialization work needed for SSSP problem type. Must be called prior to each SSSP run.
-     *
-     *  @param[in] src Source node for one SSSP computing pass.
-     *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
-     *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
-     * 
-     *  \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    cudaError_t Reset(
-            VertexId    src,
-            FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
-            double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
-    {
-        typedef ProblemBase<VertexId, SizeT, false> BaseProblem;
-        //load ProblemBase Reset
-        BaseProblem::Reset(frontier_type, queue_sizing);
+    if (target & util::DEVICE) {
+      GUARD_CU2(cudaMemcpy(
+                    data_slices[gpu]->distances.GetPointer(util::DEVICE) + src_,
+                    &src_distance, sizeof(ValueT), cudaMemcpyHostToDevice),
+                "SSSPProblem cudaMemcpy distances failed");
 
-        cudaError_t retval = cudaSuccess;
-
-        for (int gpu = 0; gpu < num_gpus; ++gpu) {
-            // Set device
-            if (retval = util::GRError(cudaSetDevice(gpu_idx[gpu]),
-                        "BSFProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
-
-            // Allocate output labels if necessary
-            if (!data_slices[gpu]->d_labels) {
-                unsigned int    *d_labels;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_labels,
-                                nodes * sizeof(unsigned int)),
-                            "SSSPProblem cudaMalloc d_labels failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_labels = d_labels;
-            }
-
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_labels, UINT_MAX, nodes);
-
-            if (!data_slices[gpu]->d_preds && MARK_PATHS) {
-                VertexId    *d_preds;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_preds,
-                        nodes * sizeof(VertexId)),
-                    "SSSPProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_preds = d_preds;
-            }
-
-
-            if (retval = util::GRError(cudaMemcpy(
-                            d_data_slices[gpu],
-                            data_slices[gpu],
-                            sizeof(DataSlice),
-                            cudaMemcpyHostToDevice),
-                        "SSSPProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
-
-
-        }
-
-        
-        // Fillin the initial input_queue for SSSP problem, this needs to be modified
-        // in multi-GPU scene
-        if (retval = util::GRError(cudaMemcpy(
-                        BaseProblem::graph_slices[0]->frontier_queues.d_keys[0],
-                        &src,
-                        sizeof(VertexId),
-                        cudaMemcpyHostToDevice),
-                    "SSSPProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
-        VertexId src_label = 0; 
-        if (retval = util::GRError(cudaMemcpy(
-                        data_slices[0]->d_labels+src,
-                        &src_label,
-                        sizeof(VertexId),
-                        cudaMemcpyHostToDevice),
-                    "SSSPProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
-
-
-        if (MARK_PATHS) util::MemsetIdxKernel<<<128, 128>>>(data_slices[0]->d_preds, nodes);
-
-
-        return retval;
+      if (this->flag & Mark_Predecessors) {
+        VertexT src_pred = util::PreDefinedValues<VertexT>::InvalidValue;
+        GUARD_CU2(
+            cudaMemcpy(data_slices[gpu]->preds.GetPointer(util::DEVICE) + src_,
+                       &src_pred, sizeof(VertexT), cudaMemcpyHostToDevice),
+            "SSSPProblem cudaMemcpy preds failed");
+      }
+      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
     }
 
-    /** @} */
+    return retval;
+  }
 
+  /** @} */
 };
 
-} //namespace sssp
-} //namespace app
-} //namespace gunrock
+}  // namespace sssp
+}  // namespace app
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

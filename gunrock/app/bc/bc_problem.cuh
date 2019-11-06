@@ -7,403 +7,468 @@
 
 /**
  * @file
- * bc_problem.cuh
+ * template_problem.cuh
  *
- * @brief GPU Storage management Structure for BC Problem Data
+ * @brief GPU Storage management Structure for Template Problem Data
  */
 
 #pragma once
 
+#include <iostream>
 #include <gunrock/app/problem_base.cuh>
-#include <gunrock/util/memset_kernel.cuh>
 
 namespace gunrock {
 namespace app {
 namespace bc {
 
 /**
- * @brief Betweenness centrality problem data structure which stores device-side vectors for doing BC computing on the GPU.
- *
- * @tparam _VertexId            Type of signed integer to use as vertex id (e.g., uint32)
- * @tparam _SizeT               Type of unsigned integer to use for array indexing. (e.g., uint32)
- * @tparam _Value               Type of float or double to use for computing BC value.
- * @tparam _USE_DOUBLE_BUFFER   Boolean type parameter which defines whether to use double buffer
+ * @brief  Speciflying parameters for BC Problem
+ * @param  parameters  The util::Parameter<...> structure holding all parameter
+ * info \return cudaError_t error message(s), if any
  */
-template <
-    typename    _VertexId,                      
-    typename    _SizeT,                        
-    typename    _Value,                       
-    bool        _MARK_PREDECESSORS,
-    bool        _USE_DOUBLE_BUFFER>
-struct BCProblem : ProblemBase<_VertexId, _SizeT,
-                                _USE_DOUBLE_BUFFER>
-{
-    typedef _VertexId       VertexId;
-    typedef _SizeT          SizeT;
-    typedef _Value          Value;
+cudaError_t UseParameters_problem(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
 
-    static const bool MARK_PREDECESSORS     = _MARK_PREDECESSORS;
-    static const bool ENABLE_IDEMPOTENCE    = false;
-    
-    //Helper structures
-    
-    /** 
-     * @brief Data slice structure which contains BC problem specific data.
+  GUARD_CU(gunrock::app::UseParameters_problem(parameters));
+
+  return retval;
+}
+
+/**
+ * @brief  BetweennessCentrality Problem structure.
+ * @tparam _GraphT  Type of the graph
+ * @tparam _ValueT  Type of BC values, usually float or double
+ * @tparam _FLAG    Problem flags
+ */
+template <typename _GraphT, typename _ValueT = typename _GraphT::ValueT,
+          ProblemFlag _FLAG = Problem_None>
+struct Problem : ProblemBase<_GraphT, _FLAG> {
+  typedef _GraphT GraphT;
+  static const ProblemFlag FLAG = _FLAG;
+  typedef typename GraphT::VertexT VertexT;
+  typedef typename GraphT::SizeT SizeT;
+  typedef _ValueT ValueT;
+  typedef typename GraphT::CsrT CsrT;
+  typedef typename GraphT::GpT GpT;
+
+  typedef ProblemBase<GraphT, FLAG> BaseProblem;
+  typedef DataSliceBase<GraphT, FLAG> BaseDataSlice;
+
+  // Helper structures
+
+  /**
+   * @brief Data structure containing BC-specific data on indivual GPU.
+   */
+  struct DataSlice : BaseDataSlice {
+    // device storage arrays
+    util::Array1D<SizeT, ValueT> bc_values;  // Final BC values for each vertex
+    util::Array1D<SizeT, ValueT>
+        sigmas;  // Accumulated sigma values for each vertex
+    util::Array1D<SizeT, ValueT>
+        deltas;        // Accumulated delta values for each vertex
+    VertexT src_node;  // Source vertex ID
+    util::Array1D<SizeT, VertexT>
+        *forward_output;  // Output vertex IDs by the forward pass
+    std::vector<SizeT> *forward_queue_offsets;
+    util::Array1D<SizeT, VertexT> original_vertex;
+    util::Array1D<int, unsigned char> *barrier_markers;
+    util::Array1D<SizeT, bool> first_backward_incoming;
+    util::Array1D<SizeT, VertexT> local_vertices;
+    util::Array1D<SizeT, bool> middle_event_set;
+    util::Array1D<SizeT, cudaEvent_t> middle_events;
+    VertexT middle_iteration;
+    bool middle_finish;
+
+    util::Array1D<SizeT, VertexT> preds;   // predecessors of vertices
+    util::Array1D<SizeT, VertexT> labels;  // Source distance
+
+    /*
+     * @brief Default constructor
      */
-    struct DataSlice
-    {
-        // device storage arrays
-        VertexId        *d_labels;              /**< Used for source distance */
-        VertexId        *d_preds;               /**< Used for predecessor */
-        Value           *d_bc_values;           /**< Used to store final BC values for each node */
-        Value           *d_sigmas;              /**< Accumulated sigma values for each node */
-        Value           *d_deltas;              /**< Accumulated delta values for each node */
-    };
+    DataSlice()
+        : BaseDataSlice(),
+          src_node(0),
+          middle_iteration(0),
+          middle_finish(false),
+          forward_output(NULL),
+          forward_queue_offsets(NULL),
+          barrier_markers(NULL) {
+      bc_values.SetName("bc_values");
+      sigmas.SetName("sigmas");
+      deltas.SetName("deltas");
+      original_vertex.SetName("original_vertex");
+      first_backward_incoming.SetName("first_backward_incoming");
+      local_vertices.SetName("local_vertices");
+      middle_event_set.SetName("middle_event_set");
+      middle_events.SetName("middle_events");
+      preds.SetName("preds");
+      labels.SetName("labels");
+    }
 
-    // Members
-
-    // Number of GPUs to be sliced over
-    int                 num_gpus;
-
-    // Size of the graph
-    SizeT               nodes;
-    SizeT               edges;
-
-    // Set of data slices (one for each GPU)
-    DataSlice           **data_slices;
-   
-    // Nasty method for putting struct on device
-    // while keeping the SoA structure
-    DataSlice           **d_data_slices;
-
-    // Device indices for each data slice
-    int                 *gpu_idx;
-
-    // Methods
-
-    /**
-     * @brief BCProblem default constructor
+    /*
+     * @brief Default destructor
      */
+    virtual ~DataSlice() { Release(); }
 
-    BCProblem():
-    nodes(0),
-    edges(0),
-    num_gpus(0) {}
-
-    /**
-     * @brief BCProblem constructor
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on.
-     * @param[in] num_gpus Number of the GPUs used.
+    /*
+     * @brief Releasing allocated memory space
+     * @param[in] target      The location to release memory from
+     * \return    cudaError_t Error message(s), if any
      */
-    BCProblem(bool        stream_from_host,       // Only meaningful for single-GPU
-              const Csr<VertexId, Value, SizeT> &graph,
-              int         num_gpus) :
-        num_gpus(num_gpus)
-    {
-        Init(
-            stream_from_host,
-            graph,
-            num_gpus);
+    cudaError_t Release(util::Location target = util::LOCATION_ALL) {
+      cudaError_t retval = cudaSuccess;
+      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx));
+
+      GUARD_CU(labels.Release(target));
+      GUARD_CU(preds.Release(target));
+      GUARD_CU(bc_values.Release(target));
+      GUARD_CU(sigmas.Release(target));
+      GUARD_CU(deltas.Release(target));
+      GUARD_CU(original_vertex.Release(target));
+      GUARD_CU(first_backward_incoming.Release(target));
+      GUARD_CU(local_vertices.Release(target));
+      GUARD_CU(middle_events.Release(target));
+      GUARD_CU(middle_event_set.Release(target));
+
+      for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+        GUARD_CU(forward_output[gpu].Release(target));
+        forward_queue_offsets[gpu].resize(0);
+      }
+      if (forward_output != NULL) {
+        delete[] forward_output;
+        forward_output = NULL;
+      }
+      if (forward_queue_offsets != NULL) {
+        delete[] forward_queue_offsets;
+        forward_queue_offsets = NULL;
+      }
+      barrier_markers = NULL;
+
+      GUARD_CU(BaseDataSlice::Release(target));
+      return retval;
     }
 
     /**
-     * @brief BCProblem default destructor
+     * @brief initializing bc-specific data on each gpu
+     * @param     sub_graph   Sub graph on the GPU.
+     * @param[in] gpu_idx     GPU device index
+     * @param[in] target      Targeting device location
+     * @param[in] flag        Problem flag containling options
+     * \return    cudaError_t Error message(s), if any
      */
-    ~BCProblem()
-    {
-        for (int i = 0; i < num_gpus; ++i)
-        {
-            if (util::GRError(cudaSetDevice(gpu_idx[i]),
-                "~BCProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
-            if (data_slices[i]->d_labels)      util::GRError(cudaFree(data_slices[i]->d_labels), "GpuSlice cudaFree d_labels failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_preds)      util::GRError(cudaFree(data_slices[i]->d_preds), "GpuSlice cudaFree d_preds failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_bc_values)      util::GRError(cudaFree(data_slices[i]->d_bc_values), "GpuSlice cudaFree d_bc_values failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_sigmas)      util::GRError(cudaFree(data_slices[i]->d_sigmas), "GpuSlice cudaFree d_sigmas failed", __FILE__, __LINE__);
-            if (data_slices[i]->d_deltas)      util::GRError(cudaFree(data_slices[i]->d_deltas), "GpuSlice cudaFree d_deltas failed", __FILE__, __LINE__);
-            if (d_data_slices[i])                 util::GRError(cudaFree(d_data_slices[i]), "GpuSlice cudaFree data_slices failed", __FILE__, __LINE__);
-        }
-        if (d_data_slices)  delete[] d_data_slices;
-        if (data_slices) delete[] data_slices;
-    }
+    cudaError_t Init(GraphT &sub_graph, int num_gpus = 1, int gpu_idx = 0,
+                     util::Location target = util::DEVICE,
+                     ProblemFlag flag = Problem_None) {
+      cudaError_t retval = cudaSuccess;
+
+      GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
+
+      GUARD_CU(labels.Allocate(sub_graph.nodes, target | util::HOST));
+      GUARD_CU(preds.Allocate(sub_graph.nodes, target));
+      GUARD_CU(bc_values.Allocate(sub_graph.nodes, target));
+      GUARD_CU(sigmas.Allocate(sub_graph.nodes, target | util::HOST));
+      GUARD_CU(deltas.Allocate(sub_graph.nodes, target));
+
+      GUARD_CU(bc_values.ForEach(
+          [] __host__ __device__(ValueT & x) { x = (ValueT)0.0; },
+          sub_graph.nodes, target, this->stream));
+
+      forward_queue_offsets = new std::vector<SizeT>[num_gpus];
+
+      forward_output = new util::Array1D<SizeT, VertexT>[num_gpus];
+      for (int gpu = 0; gpu < num_gpus; gpu++) {
+        forward_queue_offsets[gpu].reserve(sub_graph.nodes);
+        forward_queue_offsets[gpu].push_back(0);
+        forward_output[gpu].SetName("forward_output[]");
+        GUARD_CU(forward_output[gpu].Allocate(sub_graph.nodes, target));
+      }
+
+      if (target & util::DEVICE) {
+        GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
+      }
+
+      return retval;
+    }  // Init
 
     /**
-     * \addtogroup PublicInterface
-     * @{
+     * @brief Reset problem function. Must be called prior to each run.
+     * @param[in] target      Targeting device location
+     * \return    cudaError_t Error message(s), if any
      */
+    cudaError_t Reset(util::Location target = util::DEVICE) {
+      cudaError_t retval = cudaSuccess;
+      SizeT nodes = this->sub_graph->nodes;
 
-    /**
-     * @brief Copy result per-node BC values and/or sigma values computed on the GPU back to host-side vectors.
-     *
-     * @param[out] h_sigmas host-side vector to store computed sigma values. (Meaningful only in single-pass BC)
-     * @param[out] h_bc_values host-side vector to store BC_values.
-     *
-     *\return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    cudaError_t Extract(Value *h_sigmas, Value *h_bc_values)
-    {
-        cudaError_t retval = cudaSuccess;
+      // Ensure data are allocated
+      GUARD_CU(labels.EnsureSize_(nodes, target));
+      GUARD_CU(preds.EnsureSize_(nodes, target));
+      GUARD_CU(bc_values.EnsureSize_(nodes, target));
+      GUARD_CU(sigmas.EnsureSize_(nodes, target));
+      GUARD_CU(deltas.EnsureSize_(nodes, target));
 
-        do {
-            if (num_gpus == 1) {
+      // Reset data
+      GUARD_CU(labels.ForEach(
+          [] __host__ __device__(VertexT & x) {
+            x = util::PreDefinedValues<VertexT>::InvalidValue;  //(VertexT)-1;
+          },
+          nodes, target, this->stream));
 
-                // Set device
-                if (util::GRError(cudaSetDevice(gpu_idx[0]),
-                            "BCProblem cudaSetDevice failed", __FILE__, __LINE__)) break;
+      GUARD_CU(preds.ForEach(
+          [] __host__ __device__(VertexT & x) {
+            x = util::PreDefinedValues<VertexT>::InvalidValue;  //(VertexT)-2;
+          },
+          nodes, target, this->stream));
 
-                if (retval = util::GRError(cudaMemcpy(
-                                h_bc_values,
-                                data_slices[0]->d_bc_values,
-                                sizeof(Value) * nodes,
-                                cudaMemcpyDeviceToHost),
-                            "BCProblem cudaMemcpy d_bc_values failed", __FILE__, __LINE__)) break;
+      // ?? Do I actually want to be resetting this?
+      GUARD_CU(bc_values.ForEach(
+          [] __host__ __device__(ValueT & x) { x = (ValueT)0.0; }, nodes,
+          target, this->stream));
 
-                if (h_sigmas) {
-                    if (retval = util::GRError(cudaMemcpy(
-                                    h_sigmas,
-                                    data_slices[0]->d_sigmas,
-                                    sizeof(Value) * nodes,
-                                    cudaMemcpyDeviceToHost),
-                                "BCProblem cudaMemcpy d_sigmas failed", __FILE__, __LINE__)) break;
-                }
-            } else {
-                // TODO: multi-GPU extract result
-            } //end if (data_slices.size() ==1)
-        } while(0);
+      GUARD_CU(deltas.ForEach(
+          [] __host__ __device__(ValueT & x) { x = (ValueT)0.0; }, nodes,
+          target, this->stream));
 
-        return retval;
+      GUARD_CU(sigmas.ForEach(
+          [] __host__ __device__(ValueT & x) { x = (ValueT)0.0; }, nodes,
+          target, this->stream));
+
+      // ?? Reset `src_node YC: in problem::Reset()`
+
+      for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+        GUARD_CU(forward_output[gpu].EnsureSize_(nodes, util::DEVICE));
+
+        forward_queue_offsets[gpu].clear();
+        forward_queue_offsets[gpu].reserve(nodes);
+        forward_queue_offsets[gpu].push_back(0);
+
+        if (this->num_gpus > 1) middle_event_set[gpu] = false;
+      }
+      middle_iteration = util::PreDefinedValues<VertexT>::InvalidValue;
+      middle_finish = false;
+
+      return retval;
+    }
+  };  // DataSlice
+
+  // Members
+  // Set of data slices (one for each GPU)
+  util::Array1D<SizeT, DataSlice> *data_slices;
+
+  // Methods
+
+  /**
+   * @brief BCProblem default constructor
+   */
+  Problem(util::Parameters &_parameters, ProblemFlag _flag = Problem_None)
+      : BaseProblem(_parameters, _flag), data_slices(NULL) {}
+
+  /**
+   * @brief BCProblem default destructor
+   */
+  virtual ~Problem() { Release(); }
+
+  /*
+   * @brief Releasing allocated memory space
+   * @param[in] target      The location to release memory from
+   * \return    cudaError_t Error message(s), if any
+   */
+  cudaError_t Release(util::Location target = util::LOCATION_ALL) {
+    cudaError_t retval = cudaSuccess;
+    if (data_slices == NULL) return retval;
+    for (int gpu = 0; gpu < this->num_gpus; gpu++)
+      GUARD_CU(data_slices[gpu].Release(target));
+
+    if ((target & util::HOST) != 0 &&
+        data_slices[0].GetPointer(util::DEVICE) == NULL) {
+      delete[] data_slices;
+      data_slices = NULL;
+    }
+    GUARD_CU(BaseProblem::Release(target));
+    return retval;
+  }
+
+  /**
+   * \addtogroup PublicInterface
+   * @{
+   */
+
+  /**
+   * @brief Copy result distancess computed on GPUs back to host-side arrays.
+   * @param[out] h_distances Host array to store computed vertex distances from
+   * the source. \return     cudaError_t Error message(s), if any
+   */
+  cudaError_t Extract(ValueT *h_bc_values, ValueT *h_sigmas, VertexT *h_labels,
+                      util::Location target = util::DEVICE) {
+    cudaError_t retval = cudaSuccess;
+    SizeT nodes = this->org_graph->nodes;
+
+    if (this->num_gpus == 1) {
+      auto &data_slice = data_slices[0][0];
+
+      // Set device
+      if (target == util::DEVICE) {
+        GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+
+        GUARD_CU(
+            data_slice.bc_values.SetPointer(h_bc_values, nodes, util::HOST));
+        GUARD_CU(data_slice.bc_values.Move(util::DEVICE, util::HOST));
+
+        GUARD_CU(data_slice.sigmas.SetPointer(h_sigmas, nodes, util::HOST));
+        GUARD_CU(data_slice.sigmas.Move(util::DEVICE, util::HOST));
+
+        GUARD_CU(data_slice.labels.SetPointer(h_labels, nodes, util::HOST));
+        GUARD_CU(data_slice.labels.Move(util::DEVICE, util::HOST));
+
+      } else if (target == util::HOST) {
+        GUARD_CU(data_slice.bc_values.ForEach(
+            h_bc_values,
+            [] __host__ __device__(const ValueT &x, ValueT &h_x) { h_x = x; },
+            nodes, util::HOST));
+
+        GUARD_CU(data_slice.sigmas.ForEach(
+            h_sigmas,
+            [] __host__ __device__(const ValueT &x, ValueT &h_x) { h_x = x; },
+            nodes, util::HOST));
+
+        GUARD_CU(data_slice.labels.ForEach(
+            h_labels,
+            [] __host__ __device__(const VertexT &x, VertexT &h_x) { h_x = x; },
+            nodes, util::HOST));
+      }
+    } else {
+      // TODO: extract the results from multiple GPUs, e.g.:
     }
 
-    /**
-     * @brief BCProblem initialization
-     *
-     * @param[in] stream_from_host Whether to stream data from host.
-     * @param[in] graph Reference to the CSR graph object we process on. @see Csr
-     * @param[in] _num_gpus Number of the GPUs used.
-     *
-     * \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    cudaError_t Init(
-            bool        stream_from_host,       // Only meaningful for single-GPU
-            const Csr<VertexId, Value, SizeT> &graph,
-            int         _num_gpus)
-    {
-        num_gpus = _num_gpus;
-        nodes = graph.nodes;
-        edges = graph.edges;
-        VertexId *h_row_offsets = graph.row_offsets;
-        VertexId *h_column_indices = graph.column_indices;
-        ProblemBase<VertexId, SizeT,
-                                _USE_DOUBLE_BUFFER>::Init(stream_from_host,
-                                        nodes,
-                                        edges,
-                                        h_row_offsets,
-                                        h_column_indices,
-                                        NULL,
-                                        NULL,
-                                        num_gpus);
-
-        // No data in DataSlice needs to be copied from host
-
-        /**
-         * Allocate output labels/preds
-         */
-        cudaError_t retval = cudaSuccess;
-        data_slices = new DataSlice*[num_gpus];
-        d_data_slices = new DataSlice*[num_gpus];
-
-        do {
-            if (num_gpus <= 1) {
-                gpu_idx = (int*)malloc(sizeof(int));
-                // Create a single data slice for the currently-set gpu
-                int gpu;
-                if (retval = util::GRError(cudaGetDevice(&gpu), "BCProblem cudaGetDevice failed", __FILE__, __LINE__)) break;
-                gpu_idx[0] = gpu;
-
-                data_slices[0] = new DataSlice;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_data_slices[0],
-                                sizeof(DataSlice)),
-                            "BCProblem cudaMalloc d_data_slices failed", __FILE__, __LINE__)) return retval;
-
-                // Create SoA on device
-                VertexId    *d_labels;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_labels,
-                        nodes * sizeof(VertexId)),
-                    "BCProblem cudaMalloc d_labels failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_labels = d_labels;
-
-                VertexId    *d_preds;
-                if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_preds,
-                        nodes * sizeof(VertexId)),
-                    "BCProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_preds = d_preds;
- 
-                Value   *d_bc_values;
-                    if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_bc_values,
-                        nodes * sizeof(Value)),
-                    "BCProblem cudaMalloc d_bc_values failed", __FILE__, __LINE__)) return retval;
-
-                data_slices[0]->d_bc_values = d_bc_values;
-
-                util::MemsetKernel<<<128, 128>>>(data_slices[0]->d_bc_values, (Value)0.0f, nodes);
-
-
-                Value   *d_sigmas;
-                    if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_sigmas,
-                        nodes * sizeof(Value)),
-                    "BCProblem cudaMalloc d_sigmas failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_sigmas = d_sigmas;
-                
-                Value   *d_deltas;
-                    if (retval = util::GRError(cudaMalloc(
-                        (void**)&d_deltas,
-                        nodes * sizeof(Value)),
-                    "BCProblem cudaMalloc d_deltas failed", __FILE__, __LINE__)) return retval;
-                data_slices[0]->d_deltas = d_deltas;
-
-            }
-            //TODO: add multi-GPU allocation code
-        } while (0);
-
-        return retval;
+    // Scale final results by 0.5
+    // YC: ?
+    for (VertexT v = 0; v < nodes; ++v) {
+      h_bc_values[v] *= (ValueT)0.5;
     }
 
-    /**
-     *  @brief Performs any initialization work needed for BC problem type. Must be called prior to each BC run.
-     *
-     *  @param[in] src Source node for one BC computing pass. If equals to -1 then compute BC value for each node.
-     *  @param[in] frontier_type The frontier type (i.e., edge/vertex/mixed)
-     *  @param[in] queue_sizing Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively).
-     * 
-     *  \return cudaError_t object which indicates the success of all CUDA function calls.
-     */
-    cudaError_t Reset(
-            VertexId    src,
-            FrontierType frontier_type,             // The frontier type (i.e., edge/vertex/mixed)
-            double queue_sizing)                    // Size scaling factor for work queue allocation (e.g., 1.0 creates n-element and m-element vertex and edge frontiers, respectively). 0.0 is unspecified.
-    {
-        typedef ProblemBase<VertexId, SizeT,
-                                _USE_DOUBLE_BUFFER> BaseProblem;
-        //load ProblemBase Reset
-        BaseProblem::Reset(frontier_type, queue_sizing);
+    // Logging
+    // for(VertexT v = 0; v < nodes; ++v) {
+    //    std::cout
+    //        << "v=" << v
+    //        << " | h_bc_values[v]="   << h_bc_values[v]
+    //    << std::endl;
+    //}
 
-        cudaError_t retval = cudaSuccess;
+    // for(VertexT v = 0; v < nodes; ++v) {
+    //    std::cout
+    //        << "v=" << v
+    //        << " | h_sigmas[v]="   << h_sigmas[v]
+    //    << std::endl;
+    //}
 
-        // Reset all data but d_bc_values (Because we need to accumulate it)
-        for (int gpu = 0; gpu < num_gpus; ++gpu) {
-            // Set device
-            if (retval = util::GRError(cudaSetDevice(gpu_idx[gpu]),
-                        "BSFProblem cudaSetDevice failed", __FILE__, __LINE__)) return retval;
+    // for(VertexT v = 0; v < nodes; ++v) {
+    //    std::cout
+    //        << "v=" << v
+    //        << " | h_labels[v]="   << h_labels[v]
+    //    << std::endl;
+    //}
 
-            // Allocate output labels if necessary
-            if (!data_slices[gpu]->d_labels) {
-                VertexId    *d_labels;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_labels,
-                                nodes * sizeof(VertexId)),
-                            "BCProblem cudaMalloc d_labels failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_labels = d_labels;
-            }
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_labels, -1, nodes);
+    return retval;
+  }
 
-            // Allocate preds if necessary
-            if (!data_slices[gpu]->d_preds) {
-                VertexId    *d_preds;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_preds,
-                                nodes * sizeof(VertexId)),
-                            "BCProblem cudaMalloc d_preds failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_preds = d_preds;
-            }
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_preds, -2, nodes);
+  /**
+   * @brief initialization function.
+   * @param     graph       The graph that BC processes on
+   * @param[in] Location    Memory location to work on
+   * \return    cudaError_t Error message(s), if any
+   */
+  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE) {
+    cudaError_t retval = cudaSuccess;
+    GUARD_CU(BaseProblem::Init(graph, target));
+    data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
-            // Allocate bc_values if necessary
-            if (!data_slices[gpu]->d_bc_values) {
-                Value    *d_bc_values;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_bc_values,
-                                nodes * sizeof(Value)),
-                            "BCProblem cudaMalloc d_bc_values failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_bc_values = d_bc_values;
-            }
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
+      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
 
-            // Allocate deltas if necessary
-            if (!data_slices[gpu]->d_deltas) {
-                Value    *d_deltas;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_deltas,
-                                nodes * sizeof(Value)),
-                            "BCProblem cudaMalloc d_deltas failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_deltas = d_deltas;
-            }
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_deltas, (Value)0.0f, nodes);
+      GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
+      auto &data_slice = data_slices[gpu][0];
 
-            // Allocate deltas if necessary
-            if (!data_slices[gpu]->d_sigmas) {
-                Value    *d_sigmas;
-                if (retval = util::GRError(cudaMalloc(
-                                (void**)&d_sigmas,
-                                nodes * sizeof(Value)),
-                            "BCProblem cudaMalloc d_sigmas failed", __FILE__, __LINE__)) return retval;
-                data_slices[gpu]->d_sigmas = d_sigmas;
-            }
-            util::MemsetKernel<<<128, 128>>>(data_slices[gpu]->d_sigmas, (Value)0.0f, nodes);
+      GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
+                               this->gpu_idx[gpu], target, this->flag));
+    }  // end for (gpu)
 
+    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      if (target & util::DEVICE) {
+        GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+        GUARD_CU2(cudaStreamSynchronize(data_slices[gpu]->stream),
+                  "cudaStreamSynchronize failed");
+      }
+    }
+    return retval;
+  }
 
-            if (retval = util::GRError(cudaMemcpy(
-                            d_data_slices[gpu],
-                            data_slices[gpu],
-                            sizeof(DataSlice),
-                            cudaMemcpyHostToDevice),
-                        "BCProblem cudaMemcpy data_slices to d_data_slices failed", __FILE__, __LINE__)) return retval;
-        }
-        
-        // Fillin the initial input_queue for BC problem, this needs to be modified
-        // in multi-GPU scene
-        if (retval = util::GRError(cudaMemcpy(
-                        BaseProblem::graph_slices[0]->frontier_queues.d_keys[0],
-                        &src,
-                        sizeof(VertexId),
-                        cudaMemcpyHostToDevice),
-                    "BCProblem cudaMemcpy frontier_queues failed", __FILE__, __LINE__)) return retval;
-        VertexId src_label = 0; 
-        if (retval = util::GRError(cudaMemcpy(
-                        data_slices[0]->d_labels+src,
-                        &src_label,
-                        sizeof(VertexId),
-                        cudaMemcpyHostToDevice),
-                    "BCProblem cudaMemcpy labels failed", __FILE__, __LINE__)) return retval;
-        VertexId src_pred = -1; 
-        if (retval = util::GRError(cudaMemcpy(
-                        data_slices[0]->d_preds+src,
-                        &src_pred,
-                        sizeof(VertexId),
-                        cudaMemcpyHostToDevice),
-                    "BCProblem cudaMemcpy preds failed", __FILE__, __LINE__)) return retval;
-        Value src_sigma = 1.0f;
-        if (retval = util::GRError(cudaMemcpy(
-                        data_slices[0]->d_sigmas+src,
-                        &src_sigma,
-                        sizeof(Value),
-                        cudaMemcpyHostToDevice),
-                    "BCProblem cudaMemcpy sigmas failed", __FILE__, __LINE__)) return retval;
+  /**
+   * @brief Reset problem function. Must be called prior to each run.
+   * @param[in] src      Source vertex to start.
+   * @param[in] location Memory location to work on
+   * \return cudaError_t Error message(s), if any
+   */
+  cudaError_t Reset(VertexT src, util::Location target = util::DEVICE) {
+    std::cout << "Problem->Reset(" << src << ")" << std::endl;
+    cudaError_t retval = cudaSuccess;
 
-        return retval;
+    for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
+      // Set device
+      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+
+      GUARD_CU(data_slices[gpu]->Reset(target));
+      GUARD_CU(data_slices[gpu].Move(util::HOST, target));
     }
 
-    /** @} */
+    int gpu;
+    VertexT tsrc;
+    if (this->num_gpus <= 1) {
+      gpu = 0;
+      tsrc = src;
+    } else {
+      // TODO
+    }
 
+    GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
+
+    VertexT src_label = 0;
+    VertexT src_pred = util::PreDefinedValues<VertexT>::InvalidValue;
+    ValueT src_sigma = 1.0;
+    data_slices[gpu]->src_node = tsrc;
+
+    if (target & util::HOST) {
+      data_slices[gpu]->labels[tsrc] = src_label;
+      data_slices[gpu]->preds[tsrc] = src_pred;
+      data_slices[gpu]->sigmas[tsrc] = src_sigma;
+    }
+    if (target & util::DEVICE) {
+      GUARD_CU2(
+          cudaMemcpy(data_slices[gpu]->labels.GetPointer(util::DEVICE) + tsrc,
+                     &src_label, sizeof(VertexT), cudaMemcpyHostToDevice),
+          "BCProblem cudaMemcpy labels failed");
+
+      GUARD_CU2(
+          cudaMemcpy(data_slices[gpu]->preds.GetPointer(util::DEVICE) + tsrc,
+                     &src_pred, sizeof(VertexT), cudaMemcpyHostToDevice),
+          "BCProblem cudaMemcpy preds failed");
+
+      GUARD_CU2(
+          cudaMemcpy(data_slices[gpu]->sigmas.GetPointer(util::DEVICE) + tsrc,
+                     &src_sigma, sizeof(ValueT), cudaMemcpyHostToDevice),
+          "BCProblem cudaMemcpy sigmas failed");
+    }
+    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
+
+    return retval;
+  }
+
+  /** @} */
 };
 
-} //namespace bc
-} //namespace app
-} //namespace gunrock
+}  // namespace bc
+}  // namespace app
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:
