@@ -33,11 +33,17 @@
 // bug:: malloc_consolidate(): invalid chunk size
 //#include "test_lib_pr.h"
 
+// Tests Subgraph Matching
+#include "test_lib_sm.h"
+
 // Tests the RepeatFor Operator
 #include "test_repeatfor.h"
 
 // Tests Segmented Reduction (device)
 #include "test_segreduce.h"
+
+// Tests Binary Search
+#include "test_binarysearch.h"
 
 using namespace gunrock;
 

@@ -33,6 +33,8 @@ set(CUFILES
   #app/bc/bc_app.cu
   ##app/cc/cc_app.cu
   app/pr/pr_app.cu
+  app/hits/hits_app.cu
+  app/sm/sm_app.cu
   #app/sssp/sssp_app.cu
   #app/louvain/louvain_app.cu
   #app/color/color_app.cu

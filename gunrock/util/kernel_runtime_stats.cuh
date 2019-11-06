@@ -14,7 +14,6 @@
 
 #pragma once
 
-//#include <gunrock/util/memset_kernel.cuh>
 #include <gunrock/util/error_utils.cuh>
 #include <gunrock/util/cuda_properties.cuh>
 

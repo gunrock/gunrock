@@ -71,16 +71,17 @@ bool PureTwoFactor(T x) {
   return true;
 }
 
-cudaError_t UseParameters(util::Parameters &parameters,
+template <typename ParametersT>
+cudaError_t UseParameters(ParametersT &parameters,
                           std::string graph_prefix = "") {
   cudaError_t retval = cudaSuccess;
 
-  GUARD_CU(parameters.Use<double>(
+  GUARD_CU(parameters.template Use<double>(
       graph_prefix + "rgg-thfactor",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0.55, "Threshold-factor", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<double>(
+  GUARD_CU(parameters.template Use<double>(
       graph_prefix + "rgg-threshold",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0, "Threshold, default is thfactor * sqrt(log(#nodes) / #nodes)",

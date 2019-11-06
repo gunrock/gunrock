@@ -5,7 +5,7 @@ set(gunrock_VERSION_MINOR 1)
 set(gunrock_VERSION_PATCH 0)
 add_definitions("-DGUNROCKVERSION=${gunrock_VERSION_MAJOR}.${gunrock_VERSION_MINOR}.${gunrock_VERSION_PATCH}")
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.10)
 
 # enable @rpath in the install name for any shared library being built
 # note: it is planned that a future version of CMake will enable this by default
@@ -30,12 +30,14 @@ else (ENABLE_WARNINGS)
 endif (ENABLE_WARNINGS)
 # end /* Suppress all warnings from gcc */
 
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -fPIC")
 
 option(CMAKE_VERBOSE_MAKEFILE OFF)
 
 # begin /* Find and set CUDA arch */
-set(gunrock_REQUIRED_CUDA_VERSION 7.5)
+set(gunrock_REQUIRED_CUDA_VERSION 9.0)
 FIND_PACKAGE(CUDA ${gunrock_REQUIRED_CUDA_VERSION} REQUIRED)
 # /* enables relocatable device code linking */
 SET(CUDA_SEPARABLE_COMPILATION ON)
@@ -49,11 +51,6 @@ endif()
 # begin /* Include Boost, OpenMP & Metis */
 include(${CMAKE_SOURCE_DIR}/cmake/FindBoostHeaders.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindBoost.cmake)
-
-if(${CUDA_VERSION} EQUAL "8.0" AND ${Boost_VERSION} EQUAL "106400")
-  message(FATAL_ERROR "Boost 1.64 is not compatible with CUDA 8.0 due to a bug in CUDA, this is resolved in CUDA 9. Please either use Boost 1.58 or upgrade CUDA to 9.0.")
-endif()
-
 include(${CMAKE_SOURCE_DIR}/cmake/FindOpenMP.cmake)
 if (METIS_LIBRARY)
   include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)
@@ -259,10 +256,10 @@ option(GUNROCK_GENCODE_SM52
 if (CUDA_VERSION VERSION_EQUAL "8.0" OR CUDA_VERSION VERSION_GREATER "8.0")
   option(GUNROCK_GENCODE_SM60
     "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
-    OFF)
+    ON)
   option(GUNROCK_GENCODE_SM61
     "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
-    OFF)
+    ON)
 endif ()
 
 #Volta Architecture: CUDA 9
@@ -279,7 +276,7 @@ endif ()
 if (CUDA_VERSION VERSION_EQUAL "10.0" OR CUDA_VERSION VERSION_GREATER "10.0")
   option(GUNROCK_GENCODE_SM75
     "ON to generate code for Compute Capability 7.5 devices (e.g. GTX 1160 or RTX 2080)"
-    OFF)
+    ON)
 endif ()
 
 option(CUDA_VERBOSE_PTXAS

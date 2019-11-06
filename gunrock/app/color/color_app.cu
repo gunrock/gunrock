@@ -25,8 +25,6 @@
 #include <gunrock/app/color/color_enactor.cuh>
 #include <gunrock/app/color/color_test.cuh>
 
-#include <gunrock/util/info_rapidjson.cuh>
-
 // Others
 #include <cstdio>
 
@@ -116,7 +114,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
     if (validation == "each") {
       GUARD_CU(problem.Extract(h_colors));
       SizeT num_errors = Validate_Results(parameters, graph, h_colors,
-                                          ref_colors, &num_colors, false);
+                                          ref_colors, false);
     }
   }
 
@@ -125,7 +123,17 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   GUARD_CU(problem.Extract(h_colors));
   if (validation == "last") {
     SizeT num_errors = Validate_Results(parameters, graph, h_colors, ref_colors,
-                                        &num_colors, false);
+                                        false);
+  }
+
+  // count number of colors
+  std::unordered_set<int> set;
+  for (SizeT v = 0; v < graph.nodes; v++) {
+    int c = h_colors[v];
+    if (set.find(c) == set.end()) {
+      set.insert(c);
+      num_colors++;
+    }
   }
   
   util::PrintMsg("Number of colors needed: " + num_colors, !quiet_mode);

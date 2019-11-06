@@ -90,7 +90,8 @@ enum EdgeOrder {
   UNORDERED,
 };
 
-std::string EdgeOrder_to_string(EdgeOrder order) {
+template <typename EdgeOrderT>
+std::string EdgeOrder_to_string(EdgeOrderT order) {
   switch (order) {
     case BY_ROW_ASCENDING:
       return "by row ascending";
