@@ -56,9 +56,8 @@ struct main_struct {
     VertexT *ref_colors = NULL;
 
     bool quick = parameters.Get<bool>("quick");
-    bool color_balance = parameters.Get<bool>("LBCOLOR");
 
-    // compute reference CPU SSSP solution for source-distance
+    // compute reference CPU coloring
     if (!quick) {
       bool quiet = parameters.Get<bool>("quiet");
       std::string validation = parameters.Get<std::string>("validation");
@@ -79,10 +78,9 @@ struct main_struct {
     std::vector<std::string> switches{"advance-mode"};
     GUARD_CU(app::Switch_Parameters(
         parameters, graph, switches,
-        [color_balance, ref_colors](util::Parameters &parameters,
+        [ref_colors](util::Parameters &parameters,
                                     GraphT &graph) {
-          return app::color::RunTests(parameters, graph, color_balance,
-                                      ref_colors, util::DEVICE);
+          return app::color::RunTests(parameters, graph, ref_colors, util::DEVICE);
         }));
 
     if (!quick) {
