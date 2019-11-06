@@ -485,7 +485,7 @@ cudaError_t RunTests(Info<VertexId, SizeT, Value> *info) {
   if (!quiet_mode) {
     Display_Memory_Usage(num_gpus, gpu_idx, org_size, problem);
 #ifdef ENABLE_PERFORMANCE_PROFILING
-    Display_Performance_Profiling(enactor);
+    Display_Performance_Profiling(&enactor);
 #endif
   }
 
