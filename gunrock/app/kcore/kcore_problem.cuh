@@ -120,7 +120,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
 
       GUARD_CU(num_cores.ForEach([] __host__ __device__(SizeT &x) { x = 0; },
-                                 nodes+1, target, this->stream));
+                                 nodes, target, this->stream));
 
       if (GraphT::FLAG & gunrock::graph::HAS_CSR) {
         GUARD_CU(out_degrees.ForAll(
@@ -156,12 +156,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       SizeT nodes = this->sub_graph->nodes;
       SizeT edges = this->sub_graph->edges;
       
-      GUARD_CU(num_cores.EnsureSize_(nodes+1, target));
+      GUARD_CU(num_cores.EnsureSize_(nodes, target));
       GUARD_CU(out_degrees.EnsureSize_(nodes, target));
 
       // Reset data
       GUARD_CU(num_cores.ForEach([] __host__ __device__(SizeT &x) { x = 0; },
-                                 nodes+1, target, this->stream));
+                                 nodes, target, this->stream));
 
       if (GraphT::FLAG & gunrock::graph::HAS_CSR) {
         GUARD_CU(out_degrees.ForAll(

@@ -94,18 +94,78 @@ struct KCoreIterationLoop
     // 1) do filter before advance? (no technical difficulty)
     // 2) take one input frontier, output two frontiers?
     // 3) specify frontier to operate on and take attribute arbitrarily.
-    
+
+    auto deg_less_than_k_op =
+          [k, out_degrees, num_cores] __host__ __device__ (
+              const vertext &src, vertext &dest, const sizet &edge_id,
+              const vertext &input_item, const sizet &input_pos,
+              sizet &output_pos) -> bool {
+                if (out_degrees[src] < k) {
+                  num_cores[src] = k - 1;
+                  out_degrees[src] = 0;
+                  return true;
+                } else {
+                  return false;
+                }
+          };
+        
+    auto deg_at_least_k_op =
+          [k, out_degrees] __host__ __device__ (
+              const vertext &src, vertext &dest, const sizet &edge_id,
+              const vertext &input_item, const sizet &input_pos,
+              sizet &output_pos) -> bool {
+                return (out_degrees[src] >= k);
+          };
+      
+    auto update_deg_op =
+          [k, out_degrees] __host__ __device__(
+            const VertexT &src, VertexT &dest, const SizeT &edge_id,
+                     const VertexT &input_item, const SizeT &input_pos,
+                     SizeT &output_pos) -> bool {
+                 atomicAdd(out_degrees[dest], -1);
+                 return out_degrees[dest] > 0;      
+          };
     for (int k = 1; k <= graph.nodes; ++k) {
+      // set frontier to all nodes (null_frontier means all)
+      frontier = null_ptr;
       while (true) {
-        // filter(input, to_remove);
-        // filter(input, remaining);
-        // if (to_remove.len() == 0) break;
-        // else
-        //   advance(to_remove, empty_q);
-        // input = remaining
+        // filter(input, to_remove)
+        GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+          graph.csr(), frontier == null_ptr ? null_ptr : frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+          deg_less_than_k_op));
+        
+        GUARD_CU(frontier.work_progress.GetQueueLength(
+          frontier.queue_index, frontier.queue_length, false,
+          oprtr_parameters.stream, true));
+
+        // if (to_remove.len() == 0) {
+        if (frontier.queue_length == 0) {
+          // reset frontier
+          frontier.Next_V_Q();
+          // filter(input, remaining);
+          GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+          graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+          deg_at_least_k_op));
+          
+          break;
+        } else {
+          // advance(to_remove, empty_q);
+          GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+          graph.csr(), frontier.V_Q(), null_frontier, oprtr_parameters,
+          advance_op));
+          // reset frontier
+          frontier.Next_V_Q();
+          // filter(input, remaining);
+          GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+          graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+          deg_at_least_k_op));
+        }
       }
       // if (remaining.len() == 0) break;
-      // reset frontier to nodes length
+      GUARD_CU(frontier.work_progress.GetQueueLength(
+          frontier.queue_index, frontier.queue_length, false,
+          oprtr_parameters.stream, true));
+      if (frontier.queue_length == 0) break;
     }
 
     return retval;
