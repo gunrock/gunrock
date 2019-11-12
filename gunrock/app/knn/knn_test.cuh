@@ -14,20 +14,27 @@
 
 #pragma once
 
-// #define KNN_DEBUG 1
-
-#ifdef KNN_DEBUG
-#define debug(a...) fprintf(stderr, a)
-#else
-#define debug(a...)
-#endif
-
 #include <set>
+#include <map>
 #include <vector>
+#include <algorithm>
 
 namespace gunrock {
 namespace app {
 namespace knn {
+
+template<typename SizeT, typename ValueT>
+std::pair<ValueT, SizeT> flip_pair(const std::pair<SizeT, ValueT> &p){
+    return std::pair<ValueT, SizeT>(p.second, p.first);
+}
+
+template<typename SizeT, typename ValueT, typename C>
+std::multimap<ValueT, SizeT, C> flip_map(const std::map<SizeT, ValueT, C>& map){
+    std::multimap<ValueT, SizeT, C> result;
+    std::transform(map.begin(), map.end(), std::inserter(result, result.begin()),
+            flip_pair<SizeT, ValueT>);
+    return result;
+}
 
 /******************************************************************************
  * KNN Testing Routines
@@ -41,126 +48,146 @@ namespace knn {
 ...
  * @param[in]   quiet         Whether to print out anything to stdout
  */
-template <typename GraphT>
+template <
+        typename VertexT,
+        typename SizeT,
+        typename ValueT>
 double CPU_Reference(
-    const GraphT &graph,
-    typename GraphT::SizeT k,          // number of nearest neighbor
-    typename GraphT::VertexT point_x,  // index of reference point
-    typename GraphT::VertexT point_y,  // index of reference point
-    typename GraphT::SizeT *knns,      // knns
-    bool quiet) {
-  typedef typename GraphT::SizeT SizeT;
-  typedef typename GraphT::ValueT ValueT;
-  typedef typename GraphT::VertexT VertexT;
-  typedef typename GraphT::CsrT CsrT;
+        //util::Array1D<SizeT, ValueT>& points,
+        ValueT* points,    // points
+        SizeT n,           // number of points
+        SizeT dim,         // number of dimension
+        SizeT k,           // number of nearest neighbor
+        SizeT *knns,       // knns
+        bool quiet) {
 
-  struct Point {
-    VertexT x;
-    SizeT e_id;
-    VertexT dist;
+    struct comp {
+        inline bool operator()(const ValueT &dist1, const ValueT &dist2) {
+            return (dist1 < dist2);
+        }
+    };
 
-    Point() {}
-    Point(VertexT X, SizeT E_id, VertexT Dist) : x(X), e_id(E_id), dist(Dist) {}
-  };
+    std::vector<std::map<SizeT, ValueT, comp>> distance0;
+    distance0.resize(n);
+    util::CpuTimer cpu_timer;
+    cpu_timer.Start();
 
-  struct comp {
-    inline bool operator()(const Point &p1, const Point &p2) {
-      return (p1.dist < p2.dist);
+    // CPU reference implementation
+    //#pragma omp parallel for
+    for (SizeT p1 = 0; p1 < n; ++p1){
+        for (SizeT p2 = p1+1; p2 < n; ++p2){
+            ValueT d = compute_dist(dim, points, p1, p2);
+            distance0[p1][p2] = d;
+            distance0[p2][p1] = d;
+        }
     }
-  };
-
-  auto nodes = graph.nodes;
-  auto edges = graph.edges;
-
-  Point *distance = (Point *)malloc(sizeof(Point) * edges);
-  util::CpuTimer cpu_timer;
-  cpu_timer.Start();
-
-// CPU reference implementation
-#pragma omp parallel for
-  for (SizeT x = 0; x < nodes; ++x) {
-    auto x_start = graph.CsrT::GetNeighborListOffset(x);
-    auto num = graph.CsrT::GetNeighborListLength(x);
-    auto x_end = x_start + num;
-    for (SizeT i = x_start; i < x_end; ++i) {
-      VertexT y = graph.column_indices[i];
-      VertexT dist =
-          (x - point_x) * (x - point_x) + (y - point_y) * (y - point_y);
-      distance[i] = Point(x, i, dist);
+    
+    std::vector<std::multimap<ValueT, SizeT, comp>> distance;
+    distance.resize(n);
+    for (SizeT p=0; p<n; ++p){
+        distance[p] = flip_map(distance0[p]);
     }
-  }
-
-// Sort distances for each adjacency list
-#pragma omp parallel for
-  for (SizeT x = 0; x < nodes; ++x) {
-    auto x_start = graph.CsrT::GetNeighborListOffset(x);
-    auto num = graph.CsrT::GetNeighborListLength(x);
-    auto x_end = x_start + num;
-    std::sort(distance + x_start, distance + x_end, comp());
-  }
-
-// Find k nearest neighbors
-#pragma omp parallel for
-  for (SizeT x = 0; x < nodes; ++x) {
-    auto x_start = graph.CsrT::GetNeighborListOffset(x);
-    auto num = graph.CsrT::GetNeighborListLength(x);
-    if (num < k) continue;
-    auto x_end = x_start + num;
-    debug("%d nearest neighbors\n", k);
-    int i = 0;
-    for (int neighbor = x_start; neighbor < x_end && i < k; ++neighbor, ++i) {
-      // k nearest points to (point_x, pointy)
-      knns[x * k + i] = graph.CsrT::GetEdgeDest(distance[neighbor].e_id);
-      debug("%d ", graph.CsrT::GetEdgeDest(distance[neighbor].e_id));
+   
+    for (SizeT p = 0; p < n; ++p) {
+        int i = 0;
+        for (auto& dd :distance[p]){
+            knns[p * k + i] = dd.second;
+            ++i;
+            if (i == k)
+                break;
+        }
     }
-    debug("\n");
-  }
 
-  cpu_timer.Stop();
-  float elapsed = cpu_timer.ElapsedMillis();
-  delete[] distance;
-  return elapsed;
+#ifdef KNN_DEBUG
+    //debug of knns
+    debug("nearest neighbors\n");
+    for (SizeT p = 0; p < n; ++p) {
+        debug("%d: ", (int)p);
+        for (SizeT i = 0; i < k; ++i){
+            debug("%.lf ", knns[p * k + i]);;
+        }
+        debug("\n");
+    }
+#endif
+
+    cpu_timer.Stop();
+    float elapsed = cpu_timer.ElapsedMillis();
+    return elapsed;
 }
 
 /**
- * @brief Validation of knn results
+ * @brief Validation of KNN results
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the values
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
-...
+ * @param[in]  h_knns        KNN computed on GPU
+ * @param[in]  ref_knns      KNN computed on CPU
+ * @param[in]  points        List of points 
  * @param[in]  verbose       Whether to output detail comparsions
  * \return     GraphT::SizeT Number of errors
  */
-template <typename GraphT>
+template <typename GraphT, typename ArrayT>
 typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
-                                        GraphT &graph,
-                                        typename GraphT::SizeT *h_knns,
-                                        typename GraphT::SizeT *ref_knns,
-                                        bool verbose = true) {
-  typedef typename GraphT::VertexT VertexT;
+                    GraphT &graph,
+                    typename GraphT::SizeT *h_knns,
+                    typename GraphT::SizeT *ref_knns,
+                    ArrayT& points,
+                    bool verbose = true) {
+
+  typedef typename GraphT::ValueT ValueT;
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::CsrT CsrT;
 
   SizeT num_errors = 0;
   bool quiet = parameters.Get<bool>("quiet");
   bool quick = parameters.Get<bool>("quick");
-  SizeT k = parameters.Get<int>("k");
+  SizeT k = parameters.Get<SizeT>("k");
+  SizeT num_points = parameters.Get<SizeT>("n");
+  SizeT dim = parameters.Get<SizeT>("dim");
 
   if (quick) return num_errors;
 
-  for (SizeT v = 0; v < graph.nodes; ++v) {
-    auto v_start = graph.CsrT::GetNeighborListOffset(v);
-    auto num = graph.CsrT::GetNeighborListLength(v);
-    if (num < k) continue;
-    auto v_end = v_start + num;
-    int i = 0;
-    for (SizeT neighbor = v_start; neighbor < v_end && i < k; ++neighbor, ++i) {
-      if (h_knns[v * k + i] != ref_knns[v * k + i]) {
-        debug("[%d] %d != %d\n", i, h_knns[i], ref_knns[i]);
-        ++num_errors;
+#ifdef KNN_DEBUG
+  // Debug write out KNNs of GPU and CPU:
+  debug("gpu knns and cpu knns:\n");
+  for (SizeT v = 0; v < num_points; ++v){
+      debug("%2d: ", (int)v);
+      for (SizeT i = 0; i < k; ++i){
+          debug("%2d ", (int)h_knns[v * k + i]);
       }
-    }
+      debug("\t\t");
+      for (SizeT i = 0; i < k; ++i){
+          debug("%2d ", (int)ref_knns[v * k + i]);
+      }
+      debug("\n");
+  }
+#endif
+
+  for (SizeT v = 0; v < num_points; ++v){
+      bool notyet = true;
+      for (SizeT i = 0; i < k; ++i){
+          SizeT w1 =   h_knns[v * k + i];
+          SizeT w2 = ref_knns[v * k + i];
+          if (w1 != w2){
+              ValueT dist1 = compute_dist(dim, points, v, w1);
+              ValueT dist2 = compute_dist(dim, points, v, w2);
+              if (dist1 != dist2){
+                  if (notyet){
+                      util::PrintMsg("[" + std::to_string(v) + "] ", !quiet);
+                      notyet = false;
+                  }
+                  util::PrintMsg(
+                          "dist(" + 
+                          std::to_string(v) + ", " + std::to_string(w1) + ") = " + 
+                          std::to_string(dist1) + " != " + 
+                          std::to_string(dist2) + " dist(" + 
+                          std::to_string(v) + ", " + std::to_string(w2) + "  ", 
+                          !quiet);
+                  ++num_errors;
+              }
+          }
+      }
   }
 
   if (num_errors > 0) {
