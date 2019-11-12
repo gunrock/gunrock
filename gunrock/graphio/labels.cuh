@@ -174,38 +174,29 @@ cudaError_t ReadLabelsStream(FILE *f_in, util::Parameters &parameters,
 }
 
 template <typename SizeT, typename ValueT>
-cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters,
-                        util::Array1D<SizeT, std::vector<ValueT>> &labels) {
+cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters, util::Array1D<SizeT, ValueT>& labels) {
 
   cudaError_t retval = cudaSuccess;
   bool quiet = parameters.Get<bool>("quiet");
-  /*
-  int dim = parameters.Get<int>("dim");
-  int n = parameters.Get<int>("n");
-  */
-
-  int labels_read = -1;
-  long long num_labels = 0;
-  long long dim = 0;
-
-  // bool label_b_exists = false; // change this to a parameter
-  // util::Array1D<SizeT, EdgePairT> temp_edge_pairs;
-  // temp_edge_pairs.SetName("graphio::market::ReadMarketStream::temp_edge_pairs");
-  // EdgeTupleType *coo = NULL; // read in COO format
-
+  long long dim; 
+  long long num_labels;
+  long long labels_read = -1;
   time_t mark0 = time(NULL);
 
   while (true) {
       std::string line;
       std::getline(Labels, line);
-      //std::cout << line << std::endl;
+
+#if DEBUG_LABEL
+      std::cerr << line << std::endl;
+#endif
       std::stringstream ss(line);
 
       if (line[0] == '%') {  // Comment
           if (line.length() >= 2 && line[1] == '%') {
               // Header -> Can be used to extract info for labels
           }
-      }  // -> if
+      }  // -> if comment
 
       else if (!util::isValid(labels_read)) {  // Problem description-> First line
           // with nodes and labels info
@@ -219,29 +210,32 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
                       std::to_string(ll_dim) + " < 0",
                       __FILE__, __LINE__);
           }
-
           num_labels = ll_num_labels;
           dim = ll_dim;
+  
+          util::PrintMsg("Number of labels " + std::to_string(num_labels) + 
+                  ", dimension " + std::to_string(dim), !quiet);
 
-          /*util::PrintMsg(" (" + std::to_string(num_labels) + " labels) ", 
-                  !quiet);*/
+          parameters.Set("n", num_labels);
+          parameters.Set("dim", dim);
+
+          // Allocation memory for points
+          GUARD_CU(labels.Allocate(num_labels*dim, util::HOST));
 
           for (int k = 0; k < num_labels; k++) {
               for (int d = 0; d < dim; d++){
-                  labels[k][d] = util::PreDefinedValues<ValueT>::InvalidValue;
+                  labels[k * dim + d] = 
+                      util::PreDefinedValues<ValueT>::InvalidValue;
               }
           }
 
           labels_read = 0;
-    }  // -> else if
+    }  // -> else if problem description
 
     else {  // Now we can start storing labels
       if (labels_read >= num_labels) {
-        return util::GRError(
-            "Error parsing LABELS: "
-            "encountered more than " +
-                std::to_string(num_labels) + " num_labels",
-            __FILE__, __LINE__);
+          // Reading labels is done
+          break;
       }
 
       long long ll_node;  // Active node
@@ -278,9 +272,9 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
                       std::to_string(ll_label),
                       __FILE__, __LINE__);
           }
-          labels[ll_node - 1][d] = ll_label;
+          labels[(ll_node - 1) * dim + d] = ll_label;
           ++d;
-      }
+      } // -> while reading line
       if (d < dim){
               return util::GRError(
                       "Error parsing LABELS: "
@@ -288,7 +282,7 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
                       __FILE__, __LINE__);
       }
       labels_read++;
-    }  // -> else
+    }  // -> else storing labels
   }    // -> while
 
   if (labels_read != num_labels) {
@@ -348,14 +342,13 @@ cudaError_t BuildLabelsArray(std::string filename, util::Parameters &parameters,
 template <typename SizeT, typename ValueT>
 cudaError_t BuildLabelsArray(std::string filename, 
         util::Parameters &parameters, 
-        util::Array1D<SizeT, std::vector<ValueT>> &labels) {
+        util::Array1D<SizeT, ValueT> &labels) {
 
   cudaError_t retval = cudaSuccess;
   bool quiet = parameters.Get<bool>("quiet");
 
   std::ifstream Labels;
   Labels.open(filename);
-  //FILE *f_in = fopen(filename.c_str(), "r");
   if (Labels.is_open()) {
     util::PrintMsg("Reading from " + filename + ":", !quiet);
     if (retval = ReadLabelsStream(Labels, parameters, labels)) {
@@ -408,7 +401,7 @@ cudaError_t Read(util::Parameters &parameters, ArrayT &labels_a,
 
 template <typename SizeT, typename ValueT, typename GraphT>
 cudaError_t Read(util::Parameters &parameters, 
-        util::Array1D<SizeT, std::vector<ValueT>> &labels,
+        util::Array1D<SizeT, ValueT> &labels,
         GraphT& graph){
 
     // TO DO initialized graph
@@ -436,7 +429,8 @@ cudaError_t Read(util::Parameters &parameters,
     parameters.Set("dataset", file);
   }
 
-  GUARD_CU(BuildLabelsArray(filename, parameters, labels));
+  if (retval = BuildLabelsArray(filename, parameters, labels)){
+  }
   return retval;
 }
 
