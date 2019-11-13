@@ -60,13 +60,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, VertexT> num_cores;
     util::Array1D<SizeT, VertexT> out_degrees;
 
-    SizeT num_remaining_vertices;
+    SizeT num_remaining_nodes;
 
     /*
      * @brief Default constructor
      */
     DataSlice() : BaseDataSlice(),
-      num_remaining_vertices(0) {
+      num_remaining_nodes(0) {
       num_cores.SetName("num_cores");
       out_degrees.SetName("out_degrees");
     }
@@ -134,11 +134,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             [] __host__ __device__(SizeT & out_degrees) { out_degrees = 0; }, nodes + 1,
             target, this->stream));
 
-        GUARD_CU(degrees.ForAll(
+        GUARD_CU(out_degrees.ForAll(
             [sub_graph, nodes] __host__ __device__(SizeT * out_degrees,
                                                          const SizeT &e) {
               VertexT src, dest;
-                sub_graph.CooT::GetEdgeSrcDest(e, src, dest);
+                sub_graph.CsrT::GetEdgeSrcDest(e, src, dest);
                 atomicAdd(out_degrees + src, 1);
             },
             sub_graph.edges, target, this->stream));
@@ -151,10 +151,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * @param[in] target      Targeting device location
      * \return    cudaError_t Error message(s), if any
      */
-    cudaError_t Reset(util::Location target = util::DEVICE) {
+    cudaError_t Reset(GraphT &sub_graph, util::Location target = util::DEVICE) {
       cudaError_t retval = cudaSuccess;
-      SizeT nodes = this->sub_graph->nodes;
-      SizeT edges = this->sub_graph->edges;
+      SizeT nodes = sub_graph.nodes;
+      SizeT edges = sub_graph.edges;
       
       GUARD_CU(num_cores.EnsureSize_(nodes, target));
       GUARD_CU(out_degrees.EnsureSize_(nodes, target));
@@ -175,17 +175,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             [] __host__ __device__(SizeT & out_degrees) { out_degrees = 0; }, nodes + 1,
             target, this->stream));
 
-        GUARD_CU(degrees.ForAll(
+        GUARD_CU(out_degrees.ForAll(
             [sub_graph, nodes] __host__ __device__(SizeT * out_degrees,
                                                          const SizeT &e) {
               VertexT src, dest;
-                sub_graph.CooT::GetEdgeSrcDest(e, src, dest);
+                sub_graph.CsrT::GetEdgeSrcDest(e, src, dest);
                 atomicAdd(out_degrees + src, 1);
             },
             sub_graph.edges, target, this->stream));
       }
 
-      this->num_remaining_vertices = nodes;
+      this->num_remaining_nodes = nodes;
       return retval;
     }
   };  // DataSlice
@@ -291,13 +291,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @param[in] location Memory location to work on
    * \return cudaError_t Error message(s), if any
    */
-  cudaError_t Reset(util::Location target = util::DEVICE) {
+  cudaError_t Reset(GraphT &graph, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
 
     // Reset data slices
     for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-      GUARD_CU(data_slices[gpu]->Reset(target));
+      GUARD_CU(data_slices[gpu]->Reset(graph, target));
       GUARD_CU(data_slices[gpu].Move(util::HOST, target));
     }
 

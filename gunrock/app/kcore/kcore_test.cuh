@@ -76,7 +76,8 @@ double CPU_Reference(util::Parameters &parameters, GraphT &graph,
   
   #pragma omp parallel for
     for (SizeT e = 0; e < edges; ++e) {
-      VertexT v = graph.CooT::edge_pairs[e].x;
+      VertexT v, u;
+      graph.CsrT::GetEdgeSrcDest(e, v, u);
   #pragma omp atomic
       out_degrees[v] += 1;
     }
@@ -111,9 +112,8 @@ double CPU_Reference(util::Parameters &parameters, GraphT &graph,
       else {
         #pragma omp parallel for
           for (SizeT e = 0; e < edges; ++e) {
-            auto &edge_pair = graph.CooT::edge_pairs[e];
-            auto &src = edge_pair.x;
-            auto &dest = edge_pair.y;
+            VertexT src, dest;
+            graph.CsrT::GetEdgeSrcDest(e, src, dest);
             if (to_remove[src]) {
               #pragma omp atomic
                 out_degrees[dest] -= 1;
@@ -151,12 +151,13 @@ template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 typename GraphT::SizeT Validate_Results(
     util::Parameters &parameters, GraphT &graph,
     typename GraphT::VertexT *h_num_cores,
-    typename GraphT::VertexT *ref_num_cores = std::nullptr, bool verbose = true) {
+    typename GraphT::VertexT *ref_num_cores = NULL, bool verbose = true) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::SizeT SizeT;
   
   bool quiet = parameters.Get<bool>("quiet");
   SizeT nodes = graph.nodes;
+  SizeT num_errors = 0;
 
   // Verify the results
   if (ref_num_cores) {
@@ -167,7 +168,7 @@ typename GraphT::SizeT Validate_Results(
       util::PrintMsg(std::to_string(errors_num) + " errors occurred.", !quiet);
       num_errors += errors_num;
 
-      LabelT min_mismatch_label = util::PreDefinedValues<LabelT>::MaxValue;
+      VertexT min_mismatch_label = util::PreDefinedValues<VertexT>::MaxValue;
       VertexT min_mismatch_vertex =
           util::PreDefinedValues<VertexT>::InvalidValue;
       for (VertexT v = 0; v < nodes; v++) {
@@ -178,7 +179,7 @@ typename GraphT::SizeT Validate_Results(
       }
       util::PrintMsg(
           "First mismatch: ref_num_cores[" + std::to_string(min_mismatch_vertex) +
-              "] (" + std::to_string(ref_labels[min_mismatch_vertex]) +
+              "] (" + std::to_string(ref_num_cores[min_mismatch_vertex]) +
               ") != h_num_cores[" + std::to_string(min_mismatch_vertex) + "] (" +
               std::to_string(h_num_cores[min_mismatch_vertex]) + ")",
           !quiet);

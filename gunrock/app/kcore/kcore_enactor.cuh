@@ -94,12 +94,16 @@ struct KCoreIterationLoop
     // 1) do filter before advance? (no technical difficulty)
     // 2) take one input frontier, output two frontiers?
     // 3) specify frontier to operate on and take attribute arbitrarily.
+    
+    for (int k = 1; k <= graph.nodes; ++k) {
+      // set frontier to all nodes (null_frontier means all)
+      bool init_round = true;
 
-    auto deg_less_than_k_op =
+      auto deg_less_than_k_op =
           [k, out_degrees, num_cores] __host__ __device__ (
-              const vertext &src, vertext &dest, const sizet &edge_id,
-              const vertext &input_item, const sizet &input_pos,
-              sizet &output_pos) -> bool {
+              const VertexT &src, VertexT &dest, const SizeT &edge_id,
+              const VertexT &input_item, const SizeT &input_pos,
+              SizeT &output_pos) -> bool {
                 if (out_degrees[src] < k) {
                   num_cores[src] = k - 1;
                   out_degrees[src] = 0;
@@ -109,30 +113,29 @@ struct KCoreIterationLoop
                 }
           };
         
-    auto deg_at_least_k_op =
+      auto deg_at_least_k_op =
           [k, out_degrees] __host__ __device__ (
-              const vertext &src, vertext &dest, const sizet &edge_id,
-              const vertext &input_item, const sizet &input_pos,
-              sizet &output_pos) -> bool {
+              const VertexT &src, VertexT &dest, const SizeT &edge_id,
+              const VertexT &input_item, const SizeT &input_pos,
+              SizeT &output_pos) -> bool {
                 return (out_degrees[src] >= k);
           };
       
-    auto update_deg_op =
+      auto update_deg_op =
           [k, out_degrees] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
                      const VertexT &input_item, const SizeT &input_pos,
                      SizeT &output_pos) -> bool {
-                 atomicAdd(out_degrees[dest], -1);
+                 atomicAdd(out_degrees+dest, -1);
                  return out_degrees[dest] > 0;      
           };
-    for (int k = 1; k <= graph.nodes; ++k) {
-      // set frontier to all nodes (null_frontier means all)
-      frontier = null_ptr;
+
       while (true) {
         // filter(input, to_remove)
         GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-          graph.csr(), frontier == null_ptr ? null_ptr : frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+          graph.csr(), init_round ? null_ptr : frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
           deg_less_than_k_op));
+          init_round = false;
         
         GUARD_CU(frontier.work_progress.GetQueueLength(
           frontier.queue_index, frontier.queue_length, false,
@@ -152,7 +155,7 @@ struct KCoreIterationLoop
           // advance(to_remove, empty_q);
           GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
           graph.csr(), frontier.V_Q(), null_frontier, oprtr_parameters,
-          advance_op));
+          update_deg_op));
           // reset frontier
           frontier.Next_V_Q();
           // filter(input, remaining);
@@ -165,6 +168,7 @@ struct KCoreIterationLoop
       GUARD_CU(frontier.work_progress.GetQueueLength(
           frontier.queue_index, frontier.queue_length, false,
           oprtr_parameters.stream, true));
+      data_slice.num_remaining_nodes = frontier.queue_length;
       if (frontier.queue_length == 0) break;
     }
 
@@ -173,7 +177,7 @@ struct KCoreIterationLoop
 
   bool Stop_Condition(int gpu_num = 0) {
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
-    auto num_remaining_nodes = data_slice->num_remaining_nodes;
+    auto num_remaining_nodes = data_slice.num_remaining_nodes;
 
     if (num_remaining_nodes == 0) {
       return true;
@@ -232,7 +236,7 @@ class Enactor : public EnactorBase<typename _Problem::GraphT,
   typedef _Problem Problem;
   typedef typename Problem::SizeT SizeT;
   typedef typename Problem::VertexT VertexT;
-  typedef typename Problem::ValueT ValueT;
+  typedef typename Problem::GraphT::ValueT ValueT;
   typedef typename Problem::GraphT GraphT;
   typedef EnactorBase<GraphT, VertexT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
       BaseEnactor;
