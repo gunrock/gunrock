@@ -152,19 +152,15 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 }  // namespace app
 }  // namespace gunrock
 
-// Above code remains from the original HITS test implementation. Below code is copied from sm_app.cuh.
-// THIS NEEDS TO BE CHANGED
-
-
 /*
- * @brief Entry of gunrock_sm function
+ * @brief Entry of gunrock_hits function
  * @tparam     GraphT     Type of the graph
  * @tparam     ValueT     Type of the distances
  * @param[in]  parameters Excution parameters
  * @param[in]  graph      Input graph
- * @param[out] distances  Return shortest distance to source per vertex
- * @param[out] preds      Return predecessors of each vertex
- * \return     double     Return accumulated elapsed times for all runs
+ * @param[out] hub_ranks   Vertex hub scores
+ * @param[out] auth ranks  Vertex authority scores
+ * \return     double     Return accumulated elapsed times for all iterations
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_hits(
@@ -205,15 +201,15 @@ double gunrock_hits(
 }
 
 /*
- * @brief Simple interface take in graph as CSR format
+ * @brief Templated interface take in a graph in CSR format and return vertex hub and authority scores
  * @param[in]  num_nodes   Number of veritces in the input graph
  * @param[in]  num_edges   Number of edges in the input graph
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  edge_values CSR-formatted graph input edge weights
- * @param[in]  num_runs    Number of runs to perform SM
- * @param[out] subgraphs   Return number of subgraphs
- * \return     double      Return accumulated elapsed times for all runs
+ * @param[in]  num_iter    Number of iterations to perform HITS
+ * @param[out] hub_ranks   Vertex hub scores
+ * @param[out] auth ranks  Vertex authority scores
+ * \return     double      Return accumulated elapsed times for all iterations
  */
 template <
     typename VertexT,
