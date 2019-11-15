@@ -216,10 +216,10 @@ double gunrock_hits(
  * \return     double      Return accumulated elapsed times for all runs
  */
 template <
-    typename VertexT = int,
-    typename SizeT   = int,
-    typename GValueT = float>
-double hits(
+    typename VertexT,
+    typename SizeT,
+    typename GValueT>
+double hits_template(
     const SizeT        num_nodes,
     const SizeT        num_edges,
     const SizeT       *row_offsets,
@@ -228,6 +228,7 @@ double hits(
     GValueT            *hub_ranks,
     GValueT            *auth_ranks)
 {
+
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
         gunrock::graph::HAS_CSR>
         GraphT;
@@ -249,11 +250,13 @@ double hits(
     data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, gunrock::util::HOST);
     data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, gunrock::util::HOST);
 
-    data_graph.FromCsr(data_graph.csr(), true, quiet);
+    gunrock::util::Location target = gunrock::util::HOST;
+    data_graph.FromCsr(data_graph.csr(), target, 0, quiet, true);
     gunrock::graphio::LoadGraph(parameters, data_graph);
 
     // Run HITS
-    double elapsed_time = gunrock_sm(parameters, data_graph, hub_ranks, auth_ranks);
+    double elapsed_time = gunrock_hits(parameters, data_graph, hub_ranks, auth_ranks);
+
     // Cleanup
     data_graph.Release();
 

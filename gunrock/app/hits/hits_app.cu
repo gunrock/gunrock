@@ -52,7 +52,7 @@ double hits(
     float            *hub_ranks,
     float            *auth_ranks)
 {
-    return hits(num_nodes, num_edges, row_offsets, col_indices,
+      return hits_template(num_nodes, num_edges, row_offsets, col_indices,
          num_iter, hub_ranks, auth_ranks);
 }
 
