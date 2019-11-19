@@ -20,6 +20,7 @@
 #include <gunrock/oprtr/oprtr.cuh>
 
 #include <gunrock/app/snn/snn_problem.cuh>
+#include <gunrock/app/snn/snn_helpers.cuh>
 #include <gunrock/util/scan_device.cuh>
 #include <gunrock/util/sort_device.cuh>
 
@@ -32,13 +33,10 @@
 
 //#define SNN_DEBUG 1
 
-#define debug2(a...)
-//#define debug2(a...) printf(a)
-
 #ifdef SNN_DEBUG
-#define debug(a...) printf(a)
+    #define debug(a...) printf(a)
 #else
-#define debug(a...)
+    #define debug(a...)
 #endif
 
 namespace gunrock {
@@ -89,236 +87,257 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
 
     auto &enactor_stats = enactor_slice.enactor_stats;
-    auto &graph = data_slice.sub_graph[0];
-    auto nodes = graph.nodes;
-    auto edges = graph.edges;
     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
     auto &iteration = enactor_stats.iteration;
-
-    // struct Point()
-    //auto &distances = data_slice.distances;
+    auto num_points = data_slice.num_points;
 
     // K-Nearest Neighbors data
-    auto &knn_enactor = this->enactor->knn_enactor;
-    auto &knn_problem = this->enactor->problem->knn_problem;
-    auto &knn_problem_data = knn_problem.data_slices[this->gpu_num][0];
-    auto &knns = knn_problem_data.knns;
-    auto &keys = knn_problem_data.keys;
-    auto &keys_out = knn_problem_data.keys_out;
-
-    // Shared Nearest Neighbors
-    //auto &knns = data_slice.knns;
-    auto &core_point_mark_0 = data_slice.core_point_mark_0;
-    auto &core_point_mark = data_slice.core_point_mark;
-    auto &core_points = data_slice.core_points;
-    auto &core_points_counter = data_slice.core_points_counter;
-    auto &cluster_id = data_slice.cluster_id;
-    auto &snn_density = data_slice.snn_density;
+    auto &knns = data_slice.knns;
 
     // Number of KNNs
     auto k = data_slice.k;
+    // Parameter of density
     auto eps = data_slice.eps;
+    // Parameter of core point
     auto min_pts = data_slice.min_pts;
 
-    // Reference Point
-    auto ref_src = data_slice.point_x;
-    auto ref_dest = data_slice.point_y;
+    // Shared Nearest Neighbors
+    auto &snn_density = data_slice.snn_density;
+    auto &cluster_id = data_slice.cluster_id;
+    auto &core_points = data_slice.core_points;
+    auto &core_points_counter = data_slice.core_points_counter;
+    auto &core_point_mark_0 = data_slice.core_point_mark_0;
+    auto &core_point_mark = data_slice.core_point_mark;
 
     // CUB Related storage
     auto &cub_temp_storage = data_slice.cub_temp_storage;
-
-    // Sorted arrays
-    auto &distances_out = data_slice.distances;
-    //auto &keys_out = knn_problem_data.keys_out;
+    auto &row_offsets = data_slice.row_offsets;
+    auto &keys = data_slice.keys;
+    auto &keys_out = data_slice.keys_out;
+    auto &knns_sorted = data_slice.knns_out;
 
     cudaStream_t stream = oprtr_parameters.stream;
     auto target = util::DEVICE;
     util::Array1D<SizeT, VertexT> *null_frontier = NULL;
-
-    // Perform SNN
-    auto &snn = data_slice.snn;
-
     oprtr_parameters.advance_mode = "ALL_EDGES";
 
-    // Perform KNN
-    knn_problem.parameters.Set("k", k);
-    GUARD_CU(knn_problem.Reset(ref_src, ref_dest, k, target));
-    GUARD_CU(cudaDeviceSynchronize());
-    GUARD_CU(knn_enactor.Enact());
-    GUARD_CU(cudaDeviceSynchronize());
+#ifdef SNN_DEBUG
+    // DEBUG ONLY
+      GUARD_CU(knns.ForAll(
+          [num_points, k] 
+          __host__ __device__(SizeT * knns_, const SizeT &pos) {
+          debug("[knn_enactor] knn:\n");
+          for (int i=0; i<num_points; ++i){
+            debug("knn[%d]: ", i);
+            for (int j=0; j<k; ++j){
+                debug("%d ", knns_[i*k+j]);
+            }
+            debug("\n");
+          }
+          }, 1, target, stream));
+#endif
 
-    if (snn) {
-      // SNN density of each point
-      auto density_op =
-          [graph, nodes, knns, k, eps, snn_density, min_pts] __host__
-          __device__(VertexT * v_q, const SizeT &pos) {
-            auto src = pos / k;
-            auto i = pos % k;
-            auto src_neighbors = graph.CsrT::GetNeighborListLength(src);
-            auto src_start = graph.CsrT::GetNeighborListOffset(src);
-            auto src_end = src_start + src_neighbors;
-            if (src_neighbors < k) return;
+    // Sort all the knns using CUB
+    GUARD_CU(util::cubSegmentedSortPairs(cub_temp_storage, 
+                knns, knns_sorted, keys, keys_out, num_points*k,
+                num_points, row_offsets));
+    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
 
-            // chose i nearest neighbor
-            auto neighbor = knns[src * k + i];
+#ifdef SNN_DEBUG
+    // DEBUG ONLY
+      GUARD_CU(knns_sorted.ForAll(
+          [num_points, k] 
+          __host__ __device__(SizeT * knns_, const SizeT &pos) {
+          debug("[knn_enactor] knn:\n");
+          for (int i=0; i<num_points; ++i){
+            debug("knn[%d]: ", i);
+            for (int j=0; j<k; ++j){
+                debug("%d ", knns_[i*k+j]);
+            }
+            debug("\n");
+          }
+          }, 1, target, stream));
+#endif
+          
+    // SNN density of each point
+    auto density_op = 
+        [num_points, k, eps, min_pts, knns_sorted, snn_density]
+        __host__ __device__ (VertexT *v, const SizeT &pos){
+          for (int pos = 0; pos < k*num_points; ++pos){
+          auto x = pos/k;
+          auto q = knns_sorted[x * k + (pos%k)];
+          //   continue;
+          // Checking SNN similarity
+          // knns are sorted, counting intersection of knns[x] and knns[q]
+          for (int i = 0; i < k; ++i){
+            if (knns_sorted[q * k + i] == x){
+              auto similarity = SNNsimilarity(x, q, knns_sorted, eps, k);
+              if (similarity >= eps){
+                  // x and q are SNN
+                  atomicAdd(&snn_density[x], 1);
+              }
+              break;
+            }
+          }
+          }
+        };
+    // Find density of each point
+    //GUARD_CU(frontier.V_Q()->ForAll(density_op, num_points*k, target, stream));
+    GUARD_CU(frontier.V_Q()->ForAll(density_op, 1, target, stream));
+   
+#ifdef SNN_DEBUG
+    // DEBUG ONLY: write down densities:
+    GUARD_CU(snn_density.ForAll(
+        [num_points, k]
+        __host__ __device__ (SizeT* sd, const SizeT &pos){
+          debug("snn densities: \n");
+          for (int i=0; i<num_points; ++i){
+            debug("density[%d] = %d\n", i, sd[i]);
+          }
+        }, 1, target, stream));
+#endif
+         
+    // Mark core points
+    GUARD_CU(core_point_mark_0.ForAll(
+        [snn_density, min_pts] 
+        __host__ __device__(SizeT* cp, const SizeT &pos) {
+          if (snn_density[pos] >= min_pts) {
+            cp[pos] = 1;
+          }
+        }, num_points, target, stream));
 
-            // go over neighbors of the nearest neighbor
-            auto knn_start = graph.CsrT::GetNeighborListOffset(neighbor);
-            auto knn_neighbors = graph.CsrT::GetNeighborListLength(neighbor);
-            auto knn_end = knn_start + knn_neighbors;
-            int num_shared_neighbors = 0;
+    GUARD_CU(util::cubInclusiveSum(cub_temp_storage, core_point_mark_0,
+                                     core_point_mark, num_points, stream));
 
-            // Loop over k's neighbors
-            for (auto j = knn_start; j < knn_end; ++j) {
-              // Get the neighbor of active k from the edge:
-              auto m = graph.CsrT::GetEdgeDest(j);
-              for (auto v = src_start; v < src_end; ++v) {
-                auto possible_src = graph.CsrT::GetEdgeDest(v);
-                if (m == possible_src) ++num_shared_neighbors;
+    GUARD_CU(core_points.ForAll(
+        [num_points, core_point_mark, core_points_counter] 
+        __host__ __device__(SizeT * cps, const SizeT &pos) {
+          if ((pos == 0 && core_point_mark[pos] != 0) ||
+            (pos > 0 && core_point_mark[pos] != core_point_mark[pos - 1])) {
+            cps[core_point_mark[pos] - 1] = pos;
+            //printf("%d core point go to %d\n", pos, core_point_mark[pos] - 1);
+          }
+          if (pos == num_points - 1) 
+            core_points_counter[0] = core_point_mark[pos];
+        }, num_points, target, stream));
+
+#ifdef SNN_DEBUG
+    // DEBUG ONLY: write down core points
+    GUARD_CU(core_point_mark_0.ForAll(
+        [core_points_counter, core_points]
+        __host__ __device__ (SizeT* cp, const SizeT &pos){
+          SizeT cpc = core_points_counter[0];
+          debug("core pointes: \n");
+          for (int i=0; i<cpc; ++i){
+            debug("%d ", core_points[i]);
+          }
+          debug("\n");
+        }, 1, target, stream));
+#endif
+
+    // Core points merging
+    auto merging_op = 
+        [num_points, eps, k, core_point_mark, core_points, core_points_counter,
+        knns_sorted, cluster_id]
+        __host__ __device__ (const int &cos, const SizeT &pos){
+          auto x = core_points[pos/k];
+          auto q = knns_sorted[x * k + (pos%k)];
+          if (x <= q)
+            return;
+          if ((q == 0 && core_point_mark[q] != 1) || 
+            (q > 0 && core_point_mark[q] == core_point_mark[q-1])){
+            // q non core point
+            return;
+          }
+          for (int i = 0; i < k; ++i){
+            if (knns_sorted[q * k + i] == x){
+              // x and q are core points
+              auto SNNsm = SNNsimilarity(x, q, knns_sorted, eps, k);
+              debug("%d and %d share %d neighbors\n", x, q, SNNsm);
+              if (SNNsm >= eps){
+                // x and q are SNN
+                auto cluster_id_x = cluster_id[x];
+                if (!util::isValid(cluster_id_x))
+                    cluster_id_x = x;
+                auto cluster_id_q = cluster_id[q];
+                if (!util::isValid(cluster_id_q))
+                    cluster_id_q = q;
+                auto cluster_min = min(cluster_id_x, cluster_id_q);
+                atomicMin(cluster_id + x, cluster_min);
+                atomicMin(cluster_id + q, cluster_min);
+              }
+              break;
+            }
+          }
+        };
+
+     GUARD_CU(core_points_counter.Move(util::DEVICE, util::HOST, 1, 0, stream));
+     GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+     
+     printf("GPU number of core points found: %d\n", core_points_counter[0]);
+
+     // Assign core points to clusters
+     SizeT loop_size = core_points_counter[0] * k;
+     SizeT num_repeats = log2(core_points_counter[0]);
+     gunrock::oprtr::RepeatFor(
+         merging_op, num_repeats, loop_size, util::DEVICE, stream,
+         util::PreDefinedValues<int>::InvalidValue,  // grid_size
+         util::PreDefinedValues<int>::InvalidValue,  // block_size
+         2);
+     
+     // Assign other non-core and non-noise points to clusters
+     auto clustering_op = 
+        [core_point_mark, eps, k, cluster_id, min_pts, knns_sorted] 
+        __host__ __device__(VertexT * v_q, const SizeT &src) {
+          // only non-core points
+          if ((src == 0 && core_point_mark[src] == 1) || 
+            (src > 0 && core_point_mark[src - 1] != core_point_mark[src])) 
+            return;
+          SizeT counterMax = 0;
+          SizeT max_y = util::PreDefinedValues<SizeT>::InvalidValue;;
+          for (int i = 0; i < k; ++i){
+            SizeT y = knns_sorted[src * k + i];
+            if ((y == 0 && core_point_mark[y] == 1) || 
+              (y > 0 && core_point_mark[y - 1] != core_point_mark[y])){
+              SizeT res = SNNsimilarity(src, y, knns_sorted, eps, k, false);
+              if (!util::isValid(max_y) || res > counterMax){
+                counterMax = res;
+                max_y = y;
               }
             }
+          }
+          // only non-noise points
+          if (util::isValid(max_y) && counterMax >= eps){
+            auto c_id = cluster_id[max_y];
+            if (!util::isValid(c_id))
+                c_id = max_y;
+            cluster_id[src] = c_id;
+          }else{
+            cluster_id[src] = util::PreDefinedValues<SizeT>::InvalidValue;
+          }
+        };
 
-            // if src and neighbor share eps or more neighbors then increase
-            // snn density
-            if (num_shared_neighbors >= eps) {
-              atomicAdd(&snn_density[src], 1);
-            }
-          };
+     // Assign other non-core and non-noise points to clusters
+     GUARD_CU(frontier.V_Q()->ForAll(clustering_op, num_points, target, stream));
 
-      // Find density of each point
-      GUARD_CU(
-          frontier.V_Q()->ForAll(density_op, nodes * k, target, stream));
-
-      // Find core points
-      GUARD_CU(core_point_mark_0.ForAll(
-          [graph, snn_density, min_pts] __host__ __device__(SizeT * cp,
-                                                            const SizeT &pos) {
-            if (snn_density[pos] >= min_pts) {
-              cp[pos] = 1;
-            }
-          },
-          nodes, target, stream));
-
-      GUARD_CU(util::cubInclusiveSum(cub_temp_storage, core_point_mark_0,
-                                     core_point_mark, nodes, stream));
-
-      GUARD_CU(core_points.ForAll(
-          [nodes, core_point_mark, core_points_counter] __host__ __device__(
-              SizeT * cps, const SizeT &pos) {
-            if ((pos == 0 && core_point_mark[pos] != 0) ||
-                (pos > 0 && core_point_mark[pos] != core_point_mark[pos - 1])) {
-              cps[core_point_mark[pos] - 1] = pos;
-            }
-            if (pos == nodes - 1) core_points_counter[0] = core_point_mark[pos];
-          },
-          nodes, target, stream));
-
-      // Core points merging
-      auto merging_op =
-          [graph, nodes, eps, core_point_mark, core_points, core_points_counter,
-           cluster_id] __host__
-          __device__(const int &counter, const VertexT &p) {
-            auto cp_counter = core_points_counter[0];
-            auto x = core_points[p / cp_counter];
-            auto y = core_points[p % cp_counter];
-            if (x >= nodes || y >= nodes) {
-              debug2("sth wrong x=%d, y=%d, cp_counter = %d\n", x, y,
-                     cp_counter);
-              return;
-            }
-            if ((x == 0 && core_point_mark[x] != 1) ||
-                (x > 0 && core_point_mark[x] == core_point_mark[x - 1])) {
-              debug2("x %d, if you see this, algo is really wrong..\n", x);
-              return;
-            }
-            if ((y == 0 && core_point_mark[y] != 1) ||
-                (y > 0 && core_point_mark[y] == core_point_mark[y - 1])) {
-              debug2("y %d if you see this, algo is really wrong..\n", y);
-              return;
-            }
-            // go over neighbors of core point x
-            auto x_start = graph.CsrT::GetNeighborListOffset(x);
-            auto x_neighbors = graph.CsrT::GetNeighborListLength(x);
-            auto x_end = x_start + x_neighbors;
-            // go over neighbors of core point src
-            auto y_start = graph.CsrT::GetNeighborListOffset(y);
-            auto y_neighbors = graph.CsrT::GetNeighborListLength(y);
-            auto y_end = y_start + y_neighbors;
-            int num_shared_neighbors = 0;
-            for (auto xn = x_start; xn < x_end; ++xn) {
-              auto m = graph.CsrT::GetEdgeDest(xn);
-              for (auto yn = y_start; yn < y_end; ++yn) {
-                auto k = graph.CsrT::GetEdgeDest(yn);
-                if (m == k) ++num_shared_neighbors;
-                if (num_shared_neighbors >= eps) break;
-              }
-              if (num_shared_neighbors >= eps) break;
-            }
-            // if src and neighbor share eps or more neighbors then merge
-            if (num_shared_neighbors >= eps) {
-              auto cluster_id_x = cluster_id[x];
-              auto cluster_id_y = cluster_id[y];
-              auto cluster_min = min(cluster_id_x, cluster_id_y);
-              atomicMin(cluster_id + x, cluster_min);
-              atomicMin(cluster_id + y, cluster_min);
-            }
-          };
-
-      GUARD_CU(
-          core_points_counter.Move(util::DEVICE, util::HOST, 1, 0, stream));
-      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
-      printf("Core points found: %d\n", core_points_counter[0]);
-
-      // Assign core points to clusters
-      SizeT loop_size = core_points_counter[0] * core_points_counter[0];
-      SizeT num_repeats = log2(core_points_counter[0]);
-      gunrock::oprtr::RepeatFor(
-          merging_op, num_repeats, loop_size, util::DEVICE, stream,
-          util::PreDefinedValues<int>::InvalidValue,  // grid_size
-          util::PreDefinedValues<int>::InvalidValue,  // block_size
-          2);
-
-      // Assign other non-core and non-noise points to clusters
-      auto clustering_op =
-          [graph, core_point_mark, keys, keys_out, k, cluster_id,
-           min_pts] __host__
-          __device__(VertexT * v_q, const SizeT &src) {
-            // only non-core points
-            if (src == 0 && core_point_mark[src] == 1) return;
-            if (src > 0 && core_point_mark[src - 1] != core_point_mark[src])
-              return;
-
-            if (src == 0)
-                printf("src = %d, 0 clustering op \n", src); 
-
-
-            // only non-noise points
-            auto num_neighbors = graph.CsrT::GetNeighborListLength(src);
-            if (num_neighbors < k) return;  // (was k)
-            auto e_start = graph.CsrT::GetNeighborListOffset(src);
-            for (auto e = e_start; e < e_start + num_neighbors; ++e) {
-              auto m = graph.CsrT::GetEdgeDest(keys_out[keys[e]]);
-              if ((m == 0 && core_point_mark[m] == 1) ||
-                  (m > 0 && core_point_mark[m] != core_point_mark[m - 1])) {
-                cluster_id[src] = cluster_id[m];
-                break;
-              }
-            }
-
-            if (src == 0)
-                printf("src = %d, 1 clustering op\n", src);
-          };
-
-      // Assign other non-core and non-noise points to clusters
-      GUARD_CU(frontier.V_Q()->ForAll(clustering_op, nodes, target, stream));
-    }
-
-    GUARD_CU(frontier.work_progress.GetQueueLength(
+#ifdef SNN_DEBUG
+     // DEBUG ONLY: write down densities:
+    GUARD_CU(cluster_id.ForAll(
+        [num_points, k]
+        __host__ __device__ (SizeT* c_id, const SizeT &pos){
+          debug("clusters: \n");
+          for (int i=0; i<num_points; ++i){
+            debug("cluster[%d] = %d\n", i, c_id[i]);
+          }
+        }, 1, target, stream));
+#endif
+    
+     GUARD_CU(frontier.work_progress.GetQueueLength(
         frontier.queue_index, frontier.queue_length, false, stream, true));
 
-    return retval;
+     return retval;
   }
 
   /**
@@ -340,20 +359,12 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         this->enactor
             ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
     // auto iteration = enactor_slice.enactor_stats.iteration;
-    // TODO: add problem specific data alias here, e.g.:
-    // auto         &distances          =   data_slice.distances;
 
     auto expand_op = [
                          // TODO: pass data used by the lambda, e.g.:
-                         // distances
     ] __host__ __device__(VertexT & key, const SizeT &in_pos,
                           VertexT *vertex_associate_ins,
                           ValueT *value__associate_ins) -> bool {
-      // TODO: fill in the lambda to combine received and local data, e.g.:
-      // ValueT in_val  = value__associate_ins[in_pos];
-      // ValueT old_val = atomicMin(distances + key, in_val);
-      // if (old_val <= in_val)
-      //     return false;
       return true;
     };
 
@@ -390,7 +401,6 @@ class Enactor
   typedef typename Problem::SizeT SizeT;
   typedef typename Problem::VertexT VertexT;
   typedef typename Problem::GraphT GraphT;
-  typedef typename Problem::KnnProblemT KnnProblemT;
   typedef typename GraphT::VertexT LabelT;
   typedef typename GraphT::ValueT ValueT;
   typedef EnactorBase<GraphT, LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
@@ -400,13 +410,11 @@ class Enactor
 
   Problem *problem;
   IterationT *iterations;
-  typedef knn::Enactor<KnnProblemT> KnnEnactorT;
-  KnnEnactorT knn_enactor;
 
   /**
    * @brief snn constructor
    */
-  Enactor() : BaseEnactor("SNN"), knn_enactor(), problem(NULL) {
+  Enactor() : BaseEnactor("SNN"), problem(NULL) {
     this->max_num_vertex_associates = 0;
     this->max_num_value__associates = 1;
   }
@@ -440,17 +448,17 @@ class Enactor
   cudaError_t Init(Problem &problem, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     this->problem = &problem;
+    SizeT num_points = problem.num_points;
 
     // Lazy initialization
     GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target, false));
-    GUARD_CU(knn_enactor.Init(problem.knn_problem, target));
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       auto &enactor_slice = this->enactor_slices[gpu * this->num_gpus + 0];
       auto &graph = problem.sub_graphs[gpu];
-      GUARD_CU(enactor_slice.frontier.Allocate(graph.nodes, graph.edges,
-                                               this->queue_factors));
+      GUARD_CU(enactor_slice.frontier.Allocate(num_points, 
+                  num_points*num_points, this->queue_factors));
     }
 
     iterations = new IterationT[this->num_gpus];
@@ -487,29 +495,29 @@ class Enactor
     cudaError_t retval = cudaSuccess;
 
     GUARD_CU(BaseEnactor::Reset(target));
-    GUARD_CU(knn_enactor.Reset(target));
 
-    SizeT nodes = this->problem->data_slices[0][0].sub_graph[0].nodes;
+    SizeT num_points = this->problem->data_slices[0][0].num_points;
+                //this->problem->data_slices[0][0].sub_graph[0].num_points;
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       if (this->num_gpus == 1) {
-        this->thread_slices[gpu].init_size = nodes;
+        this->thread_slices[gpu].init_size = num_points;
         for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
           auto &frontier =
               this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
-          frontier.queue_length = (peer_ == 0) ? nodes : 0;
+          frontier.queue_length = (peer_ == 0) ? num_points : 0;
           if (peer_ == 0) {
             util::Array1D<SizeT, VertexT> tmp;
-            tmp.Allocate(nodes, target | util::HOST);
-            for (SizeT i = 0; i < nodes; ++i) {
-              tmp[i] = (VertexT)i % nodes;
+            tmp.Allocate(num_points, target | util::HOST);
+            for (SizeT i = 0; i < num_points; ++i) {
+              tmp[i] = (VertexT)i % num_points;
             }
             GUARD_CU(tmp.Move(util::HOST, target));
 
             GUARD_CU(frontier.V_Q()->ForEach(
                 tmp,
                 [] __host__ __device__(VertexT & v, VertexT & i) { v = i; },
-                nodes, target, 0));
+                num_points, target, 0));
 
             tmp.Release();
           }
