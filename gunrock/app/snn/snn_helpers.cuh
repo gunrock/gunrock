@@ -17,6 +17,13 @@
 #include <map>
 #include <gunrock/util/array_utils.cuh>
 
+//#define SNN_DEBUG 1
+#ifdef SNN_DEBUG
+    #define debug(a...) printf(a)
+#else
+    #define debug(a...)
+#endif
+
 namespace gunrock {
 namespace app {
 namespace snn {
@@ -63,6 +70,44 @@ public:
       }
     }
 };
+
+template <typename SizeT>
+__device__ __host__
+SizeT SNNsimilarity(SizeT x, SizeT y, util::Array1D<SizeT, SizeT> knns_sorted, 
+        SizeT eps, SizeT k, bool fast=false){
+    SizeT y_it = 0, counter = 0;
+    debug("x = %d, y = %d\n", x, y);
+    for (SizeT x_it = 0; x_it < k; ++x_it){
+        SizeT x_neighbor = knns_sorted[x * k + x_it];
+        SizeT y_neighbor = knns_sorted[y * k + y_it];
+        debug("try x_neighbor %d, y_neighbor %d\t", x_neighbor, y_neighbor);
+        if (x_neighbor == y_neighbor){
+            debug("the same\n");
+            ++counter;
+            ++y_it; // x_it is increasing in 'for' loop 
+            if (y_it == k) break;
+            if (fast && counter >= eps) return counter;
+        }else if (x_neighbor > y_neighbor){
+            while (x_neighbor > y_neighbor){
+                ++y_it; 
+                if (y_it == k) break;
+                y_neighbor = knns_sorted[y * k + y_it];
+                debug("try y_neighbor %d\t", y_neighbor);
+            }
+            if (x_neighbor == y_neighbor){
+                debug("the same");
+                ++counter;
+                ++y_it; // x_it is increasing in 'for' loop 
+                if (y_it == k) break;
+                if (fast && counter >= eps) return counter;
+            }
+            debug("\n");
+        }
+        if (y_it == k) break;
+    }
+    return counter;
+}
+
 
 }  // namespace snn
 }  // namespace app
