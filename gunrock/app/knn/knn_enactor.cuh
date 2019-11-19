@@ -102,11 +102,13 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // Sorted arrays
     auto &keys_out = data_slice.keys_out;
-    auto &distance_out = data_slice.distance;
+    auto &distance_out = data_slice.distance_out;
 
     cudaStream_t stream = oprtr_parameters.stream;
     auto target = util::DEVICE;
     //util::Array1D<SizeT, VertexT> *null_frontier = NULL;
+
+    auto &iteration = enactor_stats.iteration;
 
     // Define operations
 
