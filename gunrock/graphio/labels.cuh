@@ -192,7 +192,7 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
 #endif
       std::stringstream ss(line);
 
-      if (line[0] == '%') {  // Comment
+      if (line[0] == '%' || line[0] == '#') {  // Comment
           if (line.length() >= 2 && line[1] == '%') {
               // Header -> Can be used to extract info for labels
           }
