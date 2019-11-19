@@ -11,6 +11,8 @@
  * @brief Simple Gunrock Application
  */
 
+#include <cstdio>
+
 // Gunrock api
 #include <gunrock/gunrock.h>
 
@@ -42,44 +44,41 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_enactor(parameters));
 
   GUARD_CU(parameters.Use<std::string>(
+      "labels-file",
+      util::REQUIRED_ARGUMENT | util::REQUIRED_PARAMETER, 
+      "", "List of points of dim-dimensional space", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<std::string>(
       "snn-tag", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, "",
       "snn-tag info for json string", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.Use<uint32_t>(
+      "n",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      10, "Numbers of points", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<uint32_t>(
+      "dim",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      10, "Dimension of labels", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<uint32_t>(
       "k",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
       10, "Numbers of k neighbors.", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
-      "x",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 0,
-      "Index of reference point.", __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<int>(
-      "y",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 0,
-      "Index of reference point.", __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.Use<uint32_t>(
       "eps",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 0,
       "The minimum number of neighbors two points should share\n"
       "to be considered close to each other",
       __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.Use<uint32_t>(
       "min-pts",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 0,
       "The minimum density that a point should have to be considered a core "
       "point\n",
-      __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<bool>(
-      "snn",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      true,
-      "Perform Shared Nearest Neighbor using K-Nearest Neighbor. (enables SNN "
-      "app).",
       __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<float>(
@@ -101,16 +100,16 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  */
 template <typename GraphT, typename SizeT = typename GraphT::SizeT>
 cudaError_t RunTests(
-    util::Parameters &parameters, GraphT &graph, SizeT k,
+    util::Parameters &parameters, GraphT &graph, SizeT num_points, SizeT k,
     SizeT eps, SizeT min_pts,
-    //SizeT *h_knns, SizeT *ref_knns,
+    SizeT *h_knns,
     SizeT *h_cluster, SizeT *ref_cluster,
     SizeT *h_core_point_counter, SizeT *ref_core_point_counter,
     SizeT *h_cluster_counter, SizeT *ref_cluster_counter, 
     util::Location target) {
   cudaError_t retval = cudaSuccess;
 
-  typedef typename GraphT::VertexT VertexT;
+  //typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::ValueT ValueT;
   typedef Problem<GraphT> ProblemT;
   typedef Enactor<ProblemT> EnactorT;
@@ -119,12 +118,7 @@ cudaError_t RunTests(
   bool quiet_mode = parameters.Get<bool>("quiet");
   int num_runs = parameters.Get<int>("num-runs");
   std::string validation = parameters.Get<std::string>("validation");
-  util::Info info("knn", parameters, graph);
-
-  VertexT point_x = parameters.Get<int>("x");
-  VertexT point_y = parameters.Get<int>("y");
-
-  bool snn = parameters.Get<bool>("snn");
+  util::Info info("snn", parameters, graph);
 
   util::CpuTimer cpu_timer, total_timer;
   cpu_timer.Start();
@@ -133,14 +127,14 @@ cudaError_t RunTests(
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
-  GUARD_CU(problem.Init(graph, k, target));
+  GUARD_CU(problem.Init(graph, target));
   GUARD_CU(enactor.Init(problem, target));
 
   cpu_timer.Stop();
   parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
   for (int run_num = 0; run_num < num_runs; ++run_num) {
-    GUARD_CU(problem.Reset(point_x, point_y, k, eps, min_pts, target));
+    GUARD_CU(problem.Reset(h_knns, target));
     GUARD_CU(enactor.Reset(target));
 
     util::PrintMsg("__________________________", !quiet_mode);
@@ -158,30 +152,30 @@ cudaError_t RunTests(
         !quiet_mode);
 
     if (validation == "each") {
-      GUARD_CU(problem.Extract(graph.nodes, k, /*h_knns, */h_cluster,
-                               h_core_point_counter, h_cluster_counter, snn));
+      GUARD_CU(problem.Extract(num_points, k, h_cluster, h_core_point_counter,
+                  h_cluster_counter));
       SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
                                h_core_point_counter, h_cluster_counter,
                                ref_cluster, ref_core_point_counter, 
-                               ref_cluster_counter, /*h_knns, ref_knns, */false);
+                               ref_cluster_counter, false);
     }
   }
 
   cpu_timer.Start();
 
-  GUARD_CU(problem.Extract(graph.nodes, k, /*h_knns,*/ h_cluster,
-                           h_core_point_counter, h_cluster_counter, snn));
+  GUARD_CU(problem.Extract(num_points, k, h_cluster, h_core_point_counter, 
+              h_cluster_counter));
   if (validation == "last") {
     SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
                                 h_core_point_counter, h_cluster_counter,
                                 ref_cluster, ref_core_point_counter, 
-                                ref_cluster_counter, /*h_knns, ref_knns, */false);
+                                ref_cluster_counter, /*h_knns, ref_knns,*/false);
   }
 
   // compute running statistics
   // Change NULL to problem specific per-vertex visited marker, e.g.
   // h_distances
-  info.ComputeTraversalStats(enactor, (VertexT *)NULL);
+  info.ComputeTraversalStats(enactor, (SizeT *)NULL);
   // Display_Memory_Usage(problem);
 #ifdef ENABLE_PERFORMANCE_PROFILING
   // Display_Performance_Profiling(enactor);
