@@ -80,7 +80,6 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  */
 template <typename GraphT, typename ArrayT>
 cudaError_t RunTests(util::Parameters &parameters,
-        //typename GraphT::ValueT* points,
         ArrayT& points,
         GraphT& graph,
         typename GraphT::SizeT n,
