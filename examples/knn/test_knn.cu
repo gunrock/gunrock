@@ -71,23 +71,22 @@ struct main_struct {
     GraphT graph;
 
     cudaError_t retval = cudaSuccess;
-    util::CpuTimer cpu_timer;
 
     // Initialization of the points array
     util::Array1D<SizeT, ValueT> points;
     //Initialization is moved to gunrock::graphio::labels::Read ... ReadLabelsStream
     //GUARD_CU(points.Allocate(n*dim, util::HOST));
     
+    util::CpuTimer cpu_timer;
     cpu_timer.Start();
-
     // graphio::labels is setting "n" and "dim"
     retval = gunrock::graphio::labels::Read(parameters, points, graph);
     if (retval){
         util::PrintMsg("Reading error\n");
         return retval;
     }
-
     cpu_timer.Stop();
+    parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
     // Get number of points
     SizeT n = parameters.Get<SizeT>("n");
@@ -102,7 +101,8 @@ struct main_struct {
         util::PrintMsg("k has to be at most n-1", !quiet);
         return retval;
     }
-    
+ 
+#ifdef KNN_DEBUG
     // Debug of points:
     debug("debug points\n");
     for (int i=0; i<n; ++i){
@@ -112,7 +112,8 @@ struct main_struct {
         }
         debug("\n");
     }
-    parameters.Set("load-time", cpu_timer.ElapsedMillis());
+#endif
+
 
     // Reference result on CPU
     SizeT* ref_knns = NULL;
@@ -140,9 +141,8 @@ struct main_struct {
     GUARD_CU((app::Switch_Parameters(parameters, graph, switches,
         [n, dim, k, h_knns, points, ref_knns]
         (util::Parameters& parameters, GraphT& graph) {
-            return app::knn::RunTests(parameters, points,
-            //return app::knn::RunTests(parameters, points.GetPointer(util::HOST),
-                    graph, n, dim, k, h_knns, ref_knns, util::DEVICE);
+            return app::knn::RunTests(parameters, points, graph, n, dim, k, 
+                    h_knns, ref_knns, util::DEVICE);
         })));
 
     if (!quick) {

@@ -53,7 +53,6 @@ template <
         typename SizeT,
         typename ValueT>
 double CPU_Reference(
-        //util::Array1D<SizeT, ValueT>& points,
         ValueT* points,    // points
         SizeT n,           // number of points
         SizeT dim,         // number of dimension
