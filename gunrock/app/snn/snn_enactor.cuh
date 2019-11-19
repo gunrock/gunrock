@@ -165,7 +165,7 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto density_op = 
         [num_points, k, eps, min_pts, knns_sorted, snn_density]
         __host__ __device__ (VertexT *v, const SizeT &pos){
-          for (int pos = 0; pos < k*num_points; ++pos){
+     //     for (int pos = 0; pos < k*num_points; ++pos){ //uncomment for debug
           auto x = pos/k;
           auto q = knns_sorted[x * k + (pos%k)];
           //   continue;
@@ -181,11 +181,11 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
               break;
             }
           }
-          }
+    //      }       //uncomment for debug
         };
     // Find density of each point
-    //GUARD_CU(frontier.V_Q()->ForAll(density_op, num_points*k, target, stream));
-    GUARD_CU(frontier.V_Q()->ForAll(density_op, 1, target, stream));
+    GUARD_CU(frontier.V_Q()->ForAll(density_op, num_points*k, target, stream));
+    //GUARD_CU(frontier.V_Q()->ForAll(density_op, 1, target, stream)); //uncomment for debug
    
 #ifdef SNN_DEBUG
     // DEBUG ONLY: write down densities:
