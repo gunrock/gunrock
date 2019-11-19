@@ -7,16 +7,29 @@
 
 /**
  * @file
- * test_knn.cu
+ * test_snn.cu
  *
  * @brief Simple test driver program for Gunrock template.
  */
 
+#include <gunrock/app/knn/knn_app.cu>
+#include <gunrock/app/knn/knn_problem.cuh>
+#include <gunrock/app/knn/knn_enactor.cuh>
+#include <gunrock/app/knn/knn_test.cuh>
 #include <gunrock/app/snn/snn_app.cu>
+#include <gunrock/graphio/labels.cuh>
 #include <gunrock/app/test_base.cuh>
+#include <gunrock/app/problem_base.cuh>
 
 // JSON includes
 #include <gunrock/util/info_rapidjson.cuh>
+
+//#define SNN_DEBUG 1
+#ifdef SNN_DEBUG
+    #define debug(a...) fprintf(stderr, a)
+#else
+    #define debug(a...)
+#endif
 
 using namespace gunrock;
 
@@ -48,103 +61,162 @@ struct main_struct {
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
 
+    // Get n dimension tuplets
+    std::string labels_file = parameters.Get<std::string>("labels-file");
+    util::PrintMsg("Points File Input: " + labels_file, !quiet);
+    std::ifstream lfile(labels_file.c_str());
+    if (labels_file == "" || !lfile.is_open()){
+        util::PrintMsg("file cannot be open\n", !quiet);
+        return (cudaError_t)1; 
+    }
+
+    cudaError_t retval = cudaSuccess;
+    typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_CSR>
+        GraphT;
+    GraphT graph;
+
+    auto target = util::DEVICE;
+
+    // Initialization of the points array
+    util::Array1D<SizeT, ValueT> points;
+    //Initialization is moved to gunrock::graphio::labels::Read ... ReadLabelsStream
+    //GUARD_CU(points.Allocate(n*dim, util::HOST));
+ 
+    util::CpuTimer cpu_timer;
+    cpu_timer.Start();
+    // graphio::labels is setting "n" and "dim"
+    retval = gunrock::graphio::labels::Read(parameters, points, graph);
+    if (retval){
+        util::PrintMsg("Reading error\n");
+        return retval;
+    }
+    cpu_timer.Stop();
+    parameters.Set("load-time", cpu_timer.ElapsedMillis());
+
+    // Get number of points
+    SizeT num_points = parameters.Get<SizeT>("n");
+    // Get dimensional of space
+    SizeT dim = parameters.Get<SizeT>("dim");
     // Get number of nearest neighbors, default k = 10
     SizeT k = parameters.Get<int>("k");
-    // Get x reference point, default point_id = 0
-    VertexT point_x = parameters.Get<VertexT>("x");
-    // Get y reference point, default point_id = 0
-    VertexT point_y = parameters.Get<VertexT>("y");
     // Get number of neighbors two close points should share
     SizeT eps = parameters.Get<SizeT>("eps");
     // Get the min density
     SizeT min_pts = parameters.Get<SizeT>("min-pts");
 
-    if (min_pts >= k) {
+    if (k >= num_points){
+      util::PrintMsg("k can be at most n-1", !quiet);
+      return retval;
+    }
+    if (min_pts > k) {
       util::PrintMsg("Min pts should be smaller than k", true);
-      return (cudaError_t)1;
+      return retval;
     }
 
-    util::PrintMsg("Reference point is (" + std::to_string(point_x) + ", " +
-                       std::to_string(point_y) + "), k = " + std::to_string(k) +
-                       ", eps = " + std::to_string(eps) +
-                       +", min-pts = " + std::to_string(min_pts) + "\n",
-                   !quiet);
+#ifdef SNN_DEBUG
+    // Debug of points:
+    debug("debug points\n");
+    for (SizeT i=0; i<num_points; ++i){
+        debug("for point %d: ", i);
+        for (SizeT j=0; j<dim; ++j){
+            if (typeid(ValueT) == typeid(double))
+                debug("%lf ", points[i*dim + j]);
+            else 
+                debug("%d ", points[i*dim + j]);
+        }
+        debug("\n");
+    }
+#endif
 
-    typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_CSR>
-        GraphT;
+    util::PrintMsg("num_points = " + std::to_string(num_points) +
+            ", k = " + std::to_string(k) +
+            ", eps = " + std::to_string(eps) +
+            ", min-pts = " + std::to_string(min_pts), !quiet);
 
-    cudaError_t retval = cudaSuccess;
-    util::CpuTimer cpu_timer;
-    GraphT graph;
-
+    typedef app::knn::Problem<GraphT> ProblemKNN;
+    typedef app::knn::Enactor<ProblemKNN> EnactorKNN;
+    ProblemKNN knn_problem(parameters);
+    EnactorKNN knn_enactor;
+    GUARD_CU(knn_problem.Init(graph, util::DEVICE));
+    GUARD_CU(knn_enactor.Init(knn_problem, util::DEVICE));
+    GUARD_CU(knn_problem.Reset(points.GetPointer(util::HOST), target));
+    GUARD_CU(knn_enactor.Reset(num_points, k, target));
+   
+    // Computing k Nearest Neighbors
     cpu_timer.Start();
-    GUARD_CU(graphio::LoadGraph(parameters, graph));
+    GUARD_CU(knn_enactor.Enact());
     cpu_timer.Stop();
-    parameters.Set("load-time", cpu_timer.ElapsedMillis());
+
+    // Extract kNN
+    SizeT* h_knns = (SizeT*) malloc(sizeof(SizeT)*num_points*k);
+    GUARD_CU(knn_problem.Extract(h_knns));
+
+#ifdef SNN_DEBUG
+    for (SizeT x = 0; x < num_points; ++x){
+        debug("knn[%d]: ", x);
+        for (int i = 0; i < k; ++i){
+            if (typeid(ValueT) == typeid(double))
+                debug("%lf ", h_knns[x * k + i]);
+            else
+                debug("%d ", h_knns[x * k + i]);
+        }
+        debug("\n");
+    }
+#endif
 
     // Reference result on CPU
     SizeT* ref_cluster = NULL;
-
-    SizeT* h_cluster = (SizeT*)malloc(sizeof(SizeT) * graph.nodes);
-
     SizeT* ref_core_point_counter = NULL;
-    SizeT* h_core_point_counter = (SizeT*)malloc(sizeof(SizeT));
-
     SizeT* ref_cluster_counter = NULL;
-    SizeT* h_cluster_counter = (SizeT*)malloc(sizeof(SizeT));
 
-    //SizeT* ref_knns = NULL;
-    //SizeT* h_knns = (SizeT*)malloc(sizeof(SizeT) * graph.nodes * k);
+    // Result on GPU
+    SizeT* h_cluster = (SizeT*)malloc(sizeof(SizeT) * num_points);
+    SizeT* h_core_point_counter = (SizeT*)malloc(sizeof(SizeT));
+    SizeT* h_cluster_counter = (SizeT*)malloc(sizeof(SizeT));
 
     if (!quick) {
       // Init datastructures for reference result on GPU
-      ref_cluster = (SizeT*)malloc(sizeof(SizeT) * graph.nodes);
-      for (auto i = 0; i < graph.nodes; ++i) ref_cluster[i] = i;
-
+      ref_cluster = (SizeT*)malloc(sizeof(SizeT) * num_points);
+      for (auto i = 0; i < num_points; ++i) ref_cluster[i] = i;
       ref_core_point_counter = (SizeT*)malloc(sizeof(SizeT));
       ref_cluster_counter = (SizeT*)malloc(sizeof(SizeT));
-      //ref_knns = (SizeT*)malloc(sizeof(SizeT) * graph.nodes * k);
 
       // If not in `quick` mode, compute CPU reference implementation
       util::PrintMsg("__________________________", !quiet);
       util::PrintMsg("______ CPU Reference _____", !quiet);
 
-      float elapsed =
-          app::snn::CPU_Reference(graph.csr(), k, eps, min_pts, point_x,
-                                  point_y, /*ref_knns,*/ ref_cluster, 
-                                  ref_core_point_counter, ref_cluster_counter,
-                                  quiet);
+      float elapsed = app::snn::CPU_Reference(graph.csr(), num_points, k, 
+              eps, min_pts, h_knns, ref_cluster, ref_core_point_counter,
+              ref_cluster_counter, !quiet);
 
-      util::PrintMsg(
-          "--------------------------\n Elapsed: " + std::to_string(elapsed),
-          !quiet);
+      util::PrintMsg("--------------------------\n Elapsed: " 
+              + std::to_string(elapsed), !quiet);
       util::PrintMsg("__________________________", !quiet);
       parameters.Set("cpu-elapsed", elapsed);
     }
 
     std::vector<std::string> switches{"advance-mode"};
 
-    GUARD_CU(app::Switch_Parameters(
-        parameters, graph, switches,
-        [k, eps, min_pts, /*h_knns, ref_knns, */h_cluster, h_core_point_counter,
+    GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
+        [num_points, k, eps, min_pts, h_knns, h_cluster, h_core_point_counter,
          h_cluster_counter, ref_core_point_counter, ref_cluster_counter,
-         ref_cluster](util::Parameters& parameters, GraphT& graph) {
-          return app::snn::RunTests(parameters, graph, k, eps, min_pts, /*h_knns,
-                                    ref_knns,*/ h_cluster, ref_cluster,
-                                    h_core_point_counter, ref_core_point_counter, 
-                                    h_cluster_counter, ref_cluster_counter,
-                                    util::DEVICE);
+         ref_cluster]
+         (util::Parameters& parameters, GraphT& graph) {
+          return app::snn::RunTests(parameters, graph, num_points, k, eps, 
+                  min_pts, 
+                  h_knns, h_cluster, ref_cluster, h_core_point_counter,
+                  ref_core_point_counter, h_cluster_counter,
+                  ref_cluster_counter, util::DEVICE);
         }));
 
     if (!quick) {
+      delete[] h_knns;
       delete[] ref_cluster;
-      //delete[] ref_knns;
       delete[] ref_core_point_counter;
       delete[] ref_cluster_counter;
     }
 
     delete[] h_cluster;
-
     return retval;
   }
 };
