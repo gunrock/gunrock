@@ -106,20 +106,18 @@ double CPU_Reference(util::Parameters &parameters, GraphT &data_graph,
   struct vf2_count_callback {
   vf2_count_callback(const Graph1& graph1, const Graph2& graph2)
       : graph1_(graph1), graph2_(graph2), count_(0) {
-          count_ptr = &count_;
       }
 
       template<typename CorrespondenceMap1To2,
                typename CorrespondenceMap2To1>
       bool operator()(CorrespondenceMap1To2 f, CorrespondenceMap2To1) {
           // Count number of matches from isomorphism map
-          (*count_ptr)++;
+          count_++;
           return true;
       }
   private:
       const Graph1& graph1_;
       const Graph2& graph2_;
-      size_t *count_ptr{nullptr};
   public:
       size_t count_;
   };
@@ -156,7 +154,7 @@ double CPU_Reference(util::Parameters &parameters, GraphT &data_graph,
 
       // Print out all mappings
       // Vertices and edges are assumed to be always equivalent
-      vf2_subgraph_iso(b_query, b_data, callback);
+      vf2_subgraph_iso(b_query, b_data, std::ref(callback));
 
       cpu_timer.Stop();
 
