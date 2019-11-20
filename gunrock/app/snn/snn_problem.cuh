@@ -89,10 +89,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
     // CUB Related storage
     util::Array1D<uint64_t, char> cub_temp_storage;
-    util::Array1D<SizeT, SizeT> keys;
-    util::Array1D<SizeT, SizeT> keys_out;
     util::Array1D<SizeT, SizeT> knns_out;
-    util::Array1D<SizeT, SizeT> row_offsets;
+    util::Array1D<SizeT, SizeT> offsets;
 
     /*
      * @brief Default constructor
@@ -107,9 +105,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       snn_density.SetName("snn_density");
       cub_temp_storage.SetName("cub_temp_storage");
       knns_out.SetName("knns_out");
-      keys.SetName("keys");
-      keys_out.SetName("keys_out");
-      row_offsets.SetName("row_offsets");
+      offsets.SetName("offsets");
     }
 
     /*
@@ -134,10 +130,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(knns.Release(target));
       GUARD_CU(cub_temp_storage.Release(target));
       GUARD_CU(knns_out.Release(target));
-      GUARD_CU(keys.Release(target));
-      GUARD_CU(keys_out.Release(target));
       GUARD_CU(BaseDataSlice ::Release(target));
-      GUARD_CU(row_offsets.Release(target));
+      GUARD_CU(offsets.Release(target));
       return retval;
     }
 
@@ -172,9 +166,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(core_points_counter.Allocate(1, target | util::HOST));
       GUARD_CU(cub_temp_storage.Allocate(1, target));
       GUARD_CU(knns_out.Allocate(k * num_points, target));
-      GUARD_CU(keys.Allocate(k * num_points, target));
-      GUARD_CU(keys_out.Allocate(k * num_points, target));
-      GUARD_CU(row_offsets.Allocate(num_points+1, target));
+      GUARD_CU(offsets.Allocate(num_points+1, target));
 //      if (target & util::DEVICE) {
 //        GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
 //      }
@@ -232,15 +224,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           util::DEVICE, this->stream));
 
       GUARD_CU(knns_out.EnsureSize_(num_points*k, target));
-      GUARD_CU(keys.EnsureSize_(num_points*k, target));
-      GUARD_CU(keys.ForAll(
-          [k_number] __host__ __device__(SizeT * key, const SizeT &p) { 
-            key[p] = p%k_number; 
-          }, num_points*k_number, util::DEVICE, this->stream));
 
-      GUARD_CU(keys_out.EnsureSize_(num_points*k, target)); 
-      GUARD_CU(row_offsets.EnsureSize_(num_points+1, target));
-      GUARD_CU(row_offsets.ForAll(
+      GUARD_CU(offsets.EnsureSize_(num_points+1, target));
+      GUARD_CU(offsets.ForAll(
         [k_number] __host__ __device__ (SizeT *ro, const SizeT &pos){
             ro[pos] = pos*k_number;
         }, num_points+1, util::DEVICE, this->stream));
