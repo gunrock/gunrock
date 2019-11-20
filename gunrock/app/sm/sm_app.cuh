@@ -202,7 +202,7 @@ double gunrock_sm(
 template <
     typename VertexT,
     typename SizeT>
-double sm(
+double sm_template(
     const SizeT        num_nodes,
     const SizeT        num_edges,
     const SizeT       *row_offsets,
