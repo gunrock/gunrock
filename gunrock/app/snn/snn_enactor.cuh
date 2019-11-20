@@ -113,9 +113,7 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // CUB Related storage
     auto &cub_temp_storage = data_slice.cub_temp_storage;
-    auto &row_offsets = data_slice.row_offsets;
-    auto &keys = data_slice.keys;
-    auto &keys_out = data_slice.keys_out;
+    auto &offsets = data_slice.offsets;
     auto &knns_sorted = data_slice.knns_out;
 
     cudaStream_t stream = oprtr_parameters.stream;
@@ -140,9 +138,8 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 #endif
 
     // Sort all the knns using CUB
-    GUARD_CU(util::cubSegmentedSortPairs(cub_temp_storage, 
-                knns, knns_sorted, keys, keys_out, num_points*k,
-                num_points, row_offsets));
+    GUARD_CU(util::SegmentedSort(knns, knns_sorted, num_points*k,
+                num_points, offsets));
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
 
 #ifdef SNN_DEBUG
@@ -171,6 +168,8 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           //   continue;
           // Checking SNN similarity
           // knns are sorted, counting intersection of knns[x] and knns[q]
+          
+          #pragma unroll  // all iterations are independent
           for (int i = 0; i < k; ++i){
             if (knns_sorted[q * k + i] == x){
               auto similarity = SNNsimilarity(x, q, knns_sorted, eps, k);
@@ -185,8 +184,15 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         };
     // Find density of each point
     GUARD_CU(frontier.V_Q()->ForAll(density_op, num_points*k, target, stream));
-    //GUARD_CU(frontier.V_Q()->ForAll(density_op, 1, target, stream)); //uncomment for debug
-   
+    //uncomment for debug
+    //GUARD_CU(frontier.V_Q()->ForAll(density_op, 1, target, stream)); 
+ 
+/*    auto intersect_op =
+        [num_points, k, eps, min_pts, knns_sorted, snn_density]
+        __host__ __device__ (VertexT *v, const VertexT* edge){
+          atomicAdd(&snn_density[x], 1);
+        };*/
+
 #ifdef SNN_DEBUG
     // DEBUG ONLY: write down densities:
     GUARD_CU(snn_density.ForAll(
@@ -242,22 +248,25 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         [num_points, eps, k, core_point_mark, core_points, core_points_counter,
         knns_sorted, cluster_id]
         __host__ __device__ (const int &cos, const SizeT &pos){
+          // x core point
           auto x = core_points[pos/k];
           auto q = knns_sorted[x * k + (pos%k)];
+          // q is k nearest neighbor of x and ...
           if (x <= q)
             return;
           if ((q == 0 && core_point_mark[q] != 1) || 
             (q > 0 && core_point_mark[q] == core_point_mark[q-1])){
-            // q non core point
+            // ... q is non core point
             return;
           }
+          // then if 
           for (int i = 0; i < k; ++i){
             if (knns_sorted[q * k + i] == x){
-              // x and q are core points
+              // x is k nearest neighbor of q as well then ...
               auto SNNsm = SNNsimilarity(x, q, knns_sorted, eps, k);
               debug("%d and %d share %d neighbors\n", x, q, SNNsm);
               if (SNNsm >= eps){
-                // x and q are SNN
+                // ... if x and q are shared nearest neighbors then merge them
                 auto cluster_id_x = cluster_id[x];
                 if (!util::isValid(cluster_id_x))
                     cluster_id_x = x;

@@ -219,6 +219,56 @@ cudaError_t CUBRadixSort(bool is_ascend, size_t num_elements, KeyType *d_key,
     return retval;
   }
 */
+
+template <typename KeyT, typename SizeT, typename OffsetT>
+cudaError_t SegmentedSort(util::Array1D<SizeT, KeyT> &in,
+                          util::Array1D<SizeT, KeyT> &out,
+                          SizeT num_items,
+                          SizeT num_segments,
+                          util::Array1D<SizeT, OffsetT> offsets,
+                          int begin_bit = 0, int end_bit = sizeof(KeyT) * 8,
+                          cudaStream_t stream = 0,
+                          bool debug_synchronous = false) {
+    cudaError_t retval = cudaSuccess;
+    cub::DoubleBuffer<KeyT> keys(
+        const_cast<KeyT *>(in.GetPointer(util::DEVICE)),
+        out.GetPointer(util::DEVICE));
+
+    util::Array1D<uint64_t, char> temp_space;
+    size_t request_bytes = 0;
+
+    retval = cub::DeviceSegmentedRadixSort::SortKeys(NULL, request_bytes,
+            keys, num_items, num_segments, 
+            offsets.GetPointer(util::DEVICE),
+            offsets.GetPointer(util::DEVICE) + 1,
+            begin_bit, end_bit, stream, debug_synchronous);
+    if(retval) return retval;
+
+    retval = temp_space.EnsureSize_(request_bytes, util::DEVICE);
+    if(retval) return retval;
+    
+    retval = cub::DeviceSegmentedRadixSort::SortKeys(
+            temp_space.GetPointer(util::DEVICE), 
+            request_bytes,
+            keys, num_items, num_segments, 
+            offsets.GetPointer(util::DEVICE),
+            offsets.GetPointer(util::DEVICE) + 1,
+            begin_bit, end_bit, stream, debug_synchronous);
+
+    if(retval) return retval;
+
+    if (keys.Current() != out.GetPointer(util::DEVICE)) {
+        KeyT *keys_ = keys.Current();
+        GUARD_CU(out.ForAll(
+            [keys_] __host__ __device__(KeyT * keys_o, const SizeT &pos) {
+                keys_o[pos] = keys_[pos];
+            },
+            num_items, util::DEVICE, stream));
+    }
+
+    return retval;
+}
+
 template <typename KeyT, typename ValueT, typename SizeT>
 cudaError_t cubSortPairs(util::Array1D<uint64_t, char> &temp_space,
                          util::Array1D<SizeT, KeyT> &keys_in,
