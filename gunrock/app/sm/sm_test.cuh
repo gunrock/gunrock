@@ -108,7 +108,7 @@ double CPU_Reference(util::Parameters &parameters, GraphT &data_graph,
       : graph1_(graph1), graph2_(graph2), count_(0) {
           count_ptr = &count_;
       }
-  
+
       template<typename CorrespondenceMap1To2,
                typename CorrespondenceMap2To1>
       bool operator()(CorrespondenceMap1To2 f, CorrespondenceMap2To1) {
