@@ -16,7 +16,7 @@
 
 #include <numeric>
 #ifdef BOOST_FOUND
-// Boost includes for CPU Dijkstra SSSP reference algorithms
+// Boost includes for CPU VF2 reference algorithms
 #include <boost/config.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
