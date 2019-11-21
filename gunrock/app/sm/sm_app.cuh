@@ -176,7 +176,6 @@ double gunrock_sm(
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-//        problem.Extract(node, subgraphs, NULL, target);
         problem.Extract(subgraphs, target);
     }
 
