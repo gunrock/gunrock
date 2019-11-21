@@ -152,8 +152,6 @@ double CPU_Reference(util::Parameters &parameters, GraphT &data_graph,
       // Create call back to print mappings
       vf2_print_callback<BGraphT, BGraphT> callback(b_query, b_data);
 
-      // Print out all mappings
-      // Vertices and edges are assumed to be always equivalent
       vf2_subgraph_iso(b_query, b_data, std::ref(callback));
 
       cpu_timer.Stop();

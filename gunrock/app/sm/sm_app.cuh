@@ -232,7 +232,7 @@ double sm_template(
 
     gunrock::util::Location target = gunrock::util::HOST;
     // Assign pointers into gunrock graph format
-    data_graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
+    data_graph.CsrT::Allocate(num_nodes, num_edges, target);
     data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, target);
     data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, target);
 
