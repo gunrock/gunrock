@@ -176,7 +176,6 @@ double gunrock_sm(
         cpu_timer.Stop();
 
         total_time += cpu_timer.ElapsedMillis();
-//        problem.Extract(node, subgraphs, NULL, target);
         problem.Extract(subgraphs, target);
     }
 
@@ -202,7 +201,7 @@ double gunrock_sm(
 template <
     typename VertexT,
     typename SizeT>
-double sm(
+double sm_template(
     const SizeT        num_nodes,
     const SizeT        num_edges,
     const SizeT       *row_offsets,
@@ -229,16 +228,21 @@ double sm(
     bool quiet = parameters.Get<bool>("quiet");
     GraphT data_graph;
     GraphT query_graph;
+
+    gunrock::util::Location target = gunrock::util::HOST;
     // Assign pointers into gunrock graph format
-    data_graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, gunrock::util::HOST);
-    data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, gunrock::util::HOST);
-    data_graph.FromCsr(data_graph.csr(), true, quiet);
+    data_graph.CsrT::Allocate(num_nodes, num_edges, target);
+    data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, target);
+    data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, target);
+
+    data_graph.FromCsr(data_graph.csr(), target, 0, quiet, true);
     gunrock::graphio::LoadGraph(parameters, data_graph);
-    data_graph.CsrT::Allocate(num_query_nodes, num_query_edges, gunrock::util::HOST);
-    data_graph.CsrT::query_row_offsets   .SetPointer((SizeT *)query_row_offsets, num_query_nodes + 1, gunrock::util::HOST);
-    data_graph.CsrT::query_column_indices.SetPointer((VertexT *)query_col_indices, num_query_edges, gunrock::util::HOST);
-    data_graph.FromCsr(query_graph.csr(), true, quiet);
+
+    query_graph.CsrT::Allocate(num_query_nodes, num_query_edges, target);
+    query_graph.CsrT::row_offsets   .SetPointer((SizeT *)query_row_offsets, num_query_nodes + 1, target);
+    query_graph.CsrT::column_indices.SetPointer((VertexT *)query_col_indices, num_query_edges, target);
+
+    query_graph.FromCsr(query_graph.csr(), target, 0, quiet, true);
     gunrock::graphio::LoadGraph(parameters, query_graph, "pattern-");
 
     // Run the SM
