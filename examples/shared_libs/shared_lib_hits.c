@@ -1,6 +1,6 @@
 /**
- * @brief PageRank test for shared library advanced interface
- * @file shared_lib_pr.c
+ * @brief HITS test for shared library advanced interface
+ * @file shared_lib_hits.c
  */
 
 #include <stdio.h>
