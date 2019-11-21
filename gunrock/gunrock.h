@@ -422,7 +422,7 @@ double sm(
  * @param[in]  num_iter    Number of iterations to perform HITS
  * @param[out] hub_ranks   Vertex hub scores
  * @param[out] auth ranks  Vertex authority scores
- * \return     double      Return accumulated elapsed times for all iterations
+ * \return     double      Elapsed run time in milliseconds
  */
 double hits(
     const int            num_nodes,
