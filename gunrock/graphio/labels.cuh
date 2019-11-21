@@ -238,15 +238,7 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
           break;
       }
 
-      long long ll_node;  // Active node
-      ss >> ll_node;
-      if (!util::isValid(ll_node)){
-          return util::GRError(
-            "Error parsing LABELS: "
-            "Invalid number of label: " + std::to_string(ll_node),
-            __FILE__, __LINE__);
-      }
-
+      long long ll_node = 0;
       int d = 0;
       while (!ss.eof()){
           if (d > dim){
@@ -272,7 +264,8 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
                       std::to_string(ll_label),
                       __FILE__, __LINE__);
           }
-          labels[(ll_node - 1) * dim + d] = ll_label;
+          labels[ll_node * dim + d] = ll_label;
+          ++ll_node;
           ++d;
       } // -> while reading line
       if (d < dim){
