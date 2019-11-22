@@ -145,44 +145,16 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
 
   if (quick) return num_errors;
 
-#ifdef KNN_DEBUG
-  // Debug write out KNNs of GPU and CPU:
-  debug("gpu knns and cpu knns:\n");
-  for (SizeT v = 0; v < num_points; ++v){
-      debug("%2d: ", (int)v);
-      for (SizeT i = 0; i < k; ++i){
-          debug("%2d ", (int)h_knns[v * k + i]);
-      }
-      debug("\t\t");
-      for (SizeT i = 0; i < k; ++i){
-          debug("%2d ", (int)ref_knns[v * k + i]);
-      }
-      debug("\n");
-  }
-#endif
-
-  for (SizeT v = 0; v < num_points; ++v){
-      bool notyet = true;
-      for (SizeT i = 0; i < k; ++i){
-          SizeT w1 =   h_knns[v * k + i];
-          SizeT w2 = ref_knns[v * k + i];
-          if (w1 != w2){
-              ValueT dist1 = euclidean_distance(dim, points, v, w1);
-              ValueT dist2 = euclidean_distance(dim, points, v, w2);
-              if (dist1 != dist2){
-                  if (notyet){
-                      util::PrintMsg("[" + std::to_string(v) + "] ", !quiet);
-                      notyet = false;
-                  }
-                  util::PrintMsg(
-                          "dist(" + 
-                          std::to_string(v) + ", " + std::to_string(w1) + ") = " + 
-                          std::to_string(dist1) + " != " + 
-                          std::to_string(dist2) + " dist(" + 
-                          std::to_string(v) + ", " + std::to_string(w2) + "  ", 
-                          !quiet);
-                  ++num_errors;
-              }
+  for (SizeT v = 0; v < num_points; ++v) {
+      for (SizeT i = 0; i < k; ++i) {
+          if (h_knns[v * k + i] != ref_knns[v * k + i]) {
+            util::PrintMsg(
+                    "point::nearest-neighbor = [gpu]" + 
+                    std::to_string(v) + "::" + std::to_string(h_knns[v * k + i]) + 
+                    " !=  [cpu]" + 
+                    std::to_string(v) + "::" + std::to_string(ref_knns[v * k + i]), 
+                    !quiet);
+            ++num_errors;
           }
       }
   }

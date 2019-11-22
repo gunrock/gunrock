@@ -157,7 +157,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // k-nearest neighbors
       GUARD_CU(knns.Allocate((k+1) * num_points, target));
 
-      GUARD_CU(cub_temp_storage.Allocate(1, target));
+      // GUARD_CU(cub_temp_storage.Allocate(1, target));
 
       GUARD_CU(offsets.Allocate(num_points+1, target));
 
@@ -178,7 +178,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // Ensure data are allocated
       GUARD_CU(keys.EnsureSize_((k+1) * num_points, target));
       GUARD_CU(keys_out.EnsureSize_((k+1) * num_points, target)); 
-      GUARD_CU(cub_temp_storage.EnsureSize_(1, target));
+      // GUARD_CU(cub_temp_storage.EnsureSize_(1, target));
       
       GUARD_CU(distance.EnsureSize_((k+1) * num_points, target));
       GUARD_CU(distance.ForAll(

@@ -105,55 +105,54 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     cudaStream_t stream = oprtr_parameters.stream;
     auto target = util::DEVICE;
-    //util::Array1D<SizeT, VertexT> *null_frontier = NULL;
-
-    // auto &iteration = enactor_stats.iteration;
 
     // Define operations
-
+ 
+    auto k_ = k + 1;
     // Compute the distance array and define keys
     GUARD_CU(distance.ForAll(
-        [num_points, dim, points, keys, k] 
+        [num_points, dim, points, keys, k_] 
         __host__ __device__ (ValueT* d, const SizeT &src){
-            SizeT pos = src / (k+1);
-            SizeT i = src % (k+1);
-            d[pos * (k+1) + i] = euclidean_distance(dim, points, pos, i);
-            keys[pos * num_points + i] = i;
+            auto pos = src / k_;
+            auto i = src % k_;
+            auto dist = euclidean_distance(dim, points, pos, i);
+            // printf("distance: %d %d = %lf\n", pos, i, dist);
+            d[pos * k_ + i] = dist;
+            keys[pos * k_ + i] = i;
         },
-        num_points*(k+1), target, stream));
-        
+        num_points*k_, target, stream));
+   
     // Sort all the distance using CUB
     GUARD_CU(util::cubSegmentedSortPairs(cub_temp_storage, 
                 distance, distance_out, keys, keys_out, num_points*(k+1),
-                num_points, offsets, /* begin_bit */ 0, 
-                /* end_bit */ sizeof(ValueT) * 8, stream));
-   
+                num_points, offsets, 0, sizeof(ValueT) * 8, stream));
+
     GUARD_CU(distance_out.ForAll(
-        [num_points, k, dim, points, keys_out] 
+        [num_points, k_, dim, points, keys_out] 
         __host__ __device__ (ValueT* d, const SizeT &src){
-            for (SizeT i = k; i<num_points; ++i){
+            for (SizeT i = k_; i<num_points; ++i){
                 auto new_dist = euclidean_distance(dim, points, src, i);
-                if (new_dist >= d[src * (k+1) + (k+1)-1]){
+                if (new_dist >= d[src * k_ + k_-1]) {
                     // new element is larger than the largest in distance array for "src" row
                     continue;
                 }
                 // new_dist < d[src * k + k]
-                SizeT current = k;
+                SizeT current = k_-1;
                 SizeT one_before = current-1;
                 while (current > 0) {
-                    if (new_dist >= d[src * (k+1) + one_before]){
-                        d[src * (k+1) + current] = new_dist;
-                        keys_out[src * (k+1) + current] = i;
+                    if (new_dist >= d[src * k_ + one_before]){
+                        d[src * k_ + current] = new_dist;
+                        keys_out[src * k_ + current] = i;
                         break;
                     } else {
                         //new_dist < d[src * k + one_before]
-                        d[src * (k+1) + current] = d[src * (k+1) + one_before];
-                        keys_out[src * (k+1) + current] = keys_out[src * (k+1) + one_before];
+                        d[src * k_ + current] = d[src * k_ + one_before];
+                        keys_out[src * k_ + current] = keys_out[src * k_ + one_before];
                         --current;
                         --one_before;
                         if (current == (SizeT)0){
-                            d[src * (k+1)] = new_dist;
-                            keys_out[src * (k+1)] = i;
+                            d[src * k_] = new_dist;
+                            keys_out[src * k_] = i;
                         }
                     }
                 }
@@ -165,16 +164,12 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     GUARD_CU(knns.ForAll(
         [num_points, k, keys_out] 
         __host__ __device__(SizeT* knns_, const SizeT &src){
-            auto pos = src/(k+1);
-            auto i = src%(k+1);
+            auto pos = src/k;
+            auto i = src%k;
             knns_[pos * k + i] = keys_out[pos * (k+1) + i+1];
         },
         num_points*k, target, stream));
-
-    SizeT queLenght = 0;
-    GUARD_CU(frontier.work_progress.GetQueueLength(
-                frontier.queue_index, queLenght, false, stream, true));
-
+        
     return retval;
   }
 
