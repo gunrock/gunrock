@@ -147,17 +147,16 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       num_points = num_points_;
       k = k_;
       dim = dim_;
-      SizeT neighbors = num_points*num_points;
 
       //keys need for cub sorting, the same size like distance array
-      GUARD_CU(keys.Allocate(neighbors, target));
-      GUARD_CU(keys_out.Allocate(neighbors, target));
+      GUARD_CU(keys.Allocate((k+1)*num_points, target));
+      GUARD_CU(keys_out.Allocate((k+1)*num_points, target));
       
-      GUARD_CU(distance.Allocate(neighbors, target));
-      GUARD_CU(distance_out.Allocate(neighbors, target));
+      GUARD_CU(distance.Allocate((k+1) * num_points, target));
+      GUARD_CU(distance_out.Allocate((k+1) * num_points, target));
 
       // k-nearest neighbors
-      GUARD_CU(knns.Allocate(k * num_points, target));
+      GUARD_CU(knns.Allocate((k+1) * num_points, target));
 
       GUARD_CU(cub_temp_storage.Allocate(1, target));
 
@@ -181,38 +180,40 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       cudaError_t retval = cudaSuccess;
       SizeT num_points = this->num_points;
-      SizeT neighbors = num_points*num_points;
       typedef typename GraphT::CsrT CsrT;
 
       // Ensure data are allocated
-      GUARD_CU(keys.EnsureSize_(neighbors, target));
-      GUARD_CU(keys_out.EnsureSize_(neighbors, target)); 
+      GUARD_CU(keys.EnsureSize_((k+1) * num_points, target));
+      GUARD_CU(keys_out.EnsureSize_((k+1) * num_points, target)); 
+      GUARD_CU(cub_temp_storage.EnsureSize_(1, target));
       
-      GUARD_CU(distance.EnsureSize_(neighbors, target));
+      GUARD_CU(distance.EnsureSize_((k+1) * num_points, target));
       GUARD_CU(distance.ForAll(
             [] __host__ __device__(ValueT * d, const SizeT &p) { 
                 d[p] = util::PreDefinedValues<ValueT>::InvalidValue;
             },
-            neighbors, util::DEVICE, this->stream));
+            (k+1) * num_points, util::DEVICE, this->stream));
 
       // K-Nearest Neighbors
-      GUARD_CU(knns.EnsureSize_(k * num_points, target));
+      GUARD_CU(knns.EnsureSize_((k+1) * num_points, target));
       GUARD_CU(knns.ForAll(
           [] __host__ __device__(SizeT * k_, const SizeT &p) { 
             k_[p] = util::PreDefinedValues<SizeT>::InvalidValue;
           },
-          k * num_points, util::DEVICE, this->stream));
+          (k+1) * num_points, util::DEVICE, this->stream));
 
+      GUARD_CU(distance_out.EnsureSize_((k+1) * num_points, target));
       GUARD_CU(distance_out.ForAll(
             [] __host__ __device__(ValueT * d, const SizeT &p) { 
                 d[p] = util::PreDefinedValues<ValueT>::InvalidValue;
             },
-            neighbors, util::DEVICE, this->stream));
-    
+            (k+1) * num_points, util::DEVICE, this->stream));
+   
+      auto k_ = k;
       GUARD_CU(row_offsets.EnsureSize_(num_points+1, target));
       GUARD_CU(row_offsets.ForAll(
-        [num_points] __host__ __device__ (SizeT *ro, const SizeT &pos){
-            ro[pos] = pos*num_points;
+        [k_] __host__ __device__ (SizeT *ro, const SizeT &pos){
+            ro[pos] = pos*(k_+1);
         }, num_points+1, target, this->stream));
 
       GUARD_CU(util::SetDevice(this->gpu_idx));
