@@ -114,33 +114,64 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // Compute the distance array and define keys
     GUARD_CU(distance.ForAll(
-        [num_points, dim, points, keys] 
+        [num_points, dim, points, keys, k] 
         __host__ __device__ (ValueT* d, const SizeT &src){
-            SizeT pos = src / num_points;
-            SizeT i = src % num_points;
-            d[i * num_points + pos] = compute_dist(dim, points, pos, i);
-            keys[i * num_points + pos] = pos;
+            SizeT pos = src / (k+1);
+            SizeT i = src % (k+1);
+            d[pos * (k+1) + i] = compute_dist(dim, points.GetPointer(util::DEVICE), pos, i);
+            keys[pos * num_points + i] = i;
         },
-        num_points*num_points, target, stream));
+        num_points*(k+1), target, stream));
         
     // Sort all the distance using CUB
     GUARD_CU(util::cubSegmentedSortPairs(cub_temp_storage, 
-                distance, distance_out, keys, keys_out, num_points*num_points,
+                distance, distance_out, keys, keys_out, num_points*(k+1),
                 num_points, row_offsets));
 
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
-    
+    //GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+   
+    GUARD_CU(distance_out.ForAll(
+        [num_points, k, dim, points, keys_out] 
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            for (SizeT i = k; i<num_points; ++i){
+                auto new_dist = compute_dist(dim, points.GetPointer(util::DEVICE), src, i);
+                if (new_dist >= d[src * (k+1) + (k+1)-1]){
+                    // new element is larger than the largest in distance array for "src" row
+                    continue;
+                }
+                // new_dist < d[src * k + k]
+                SizeT current = k;
+                SizeT one_before = current-1;
+                while (current > 0){
+                    if (new_dist >= d[src * (k+1) + one_before]){
+                        d[src * (k+1) + current] = new_dist;
+                        keys_out[src * (k+1) + current] = i;
+                        break;
+                    }else{
+                        //new_dist < d[src * k + one_before]
+                        d[src * (k+1) + current] = d[src * (k+1) + one_before];
+                        keys_out[src * (k+1) + current] = keys_out[src * (k+1) + one_before];
+                        --current;
+                        --one_before;
+                        if (current == (SizeT)0){
+                            d[src * (k+1)] = new_dist;
+                            keys_out[src * (k+1)] = i;
+                        }
+                    }
+                }
+            }
+        },
+        num_points, target, stream));
+     
     // Choose k nearest neighbors for each node
     GUARD_CU(knns.ForAll(
         [num_points, k, keys_out] 
         __host__ __device__(SizeT* knns_, const SizeT &src){
-            auto pos = src/num_points;
-            auto i = src%num_points;
-            if (i < k){
-                knns_[pos * k + i] = keys_out[pos * num_points + i + 1];
-            }
+            auto pos = src/(k+1);
+            auto i = src%(k+1);
+            knns_[pos * k + i] = keys_out[pos * (k+1) + i+1];
         },
-        num_points*num_points, target, stream));
+        num_points*k, target, stream));
 
     SizeT queLenght = 0;
     GUARD_CU(frontier.work_progress.GetQueueLength(
