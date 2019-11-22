@@ -64,7 +64,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, ValueT> points;
     util::Array1D<SizeT, SizeT> keys;
     util::Array1D<SizeT, ValueT> distance;
-    util::Array1D<SizeT, SizeT> row_offsets;
+    util::Array1D<SizeT, SizeT> offsets;
 
     // Nearest Neighbors
     util::Array1D<SizeT, SizeT> knns;
@@ -90,7 +90,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       points.SetName("points");
       keys.SetName("keys");
       distance.SetName("distance");
-      row_offsets.SetName("row_offsets");
+      offsets.SetName("offsets");
       knns.SetName("knns");
       cub_temp_storage.SetName("cub_temp_storage");
       keys_out.SetName("keys_out");
@@ -113,7 +113,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(keys.Release(target));
       GUARD_CU(distance.Release(target));
-      GUARD_CU(row_offsets.Release(target));
+      GUARD_CU(offsets.Release(target));
       GUARD_CU(knns.Release(target));
       GUARD_CU(cub_temp_storage.Release(target));
       GUARD_CU(keys_out.Release(target));
@@ -140,8 +140,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             ProblemFlag flag = Problem_None) {
       cudaError_t retval = cudaSuccess;
 
-      GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, 
-                  flag));
+      GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
       // Basic problem parameters
       num_points = num_points_;
@@ -160,13 +159,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(cub_temp_storage.Allocate(1, target));
 
-      GUARD_CU(row_offsets.Allocate(num_points+1, target));
-    
-      //Do I have to do it if graph is empty?
-      //if (target & util::DEVICE) {
-      //GUARD_CU(util::SetDevice(gpu_idx));
-      //GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
-      //}
+      GUARD_CU(offsets.Allocate(num_points+1, target));
 
       return retval;
     }
@@ -192,7 +185,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             [] __host__ __device__(ValueT * d, const SizeT &p) { 
                 d[p] = util::PreDefinedValues<ValueT>::InvalidValue;
             },
-            (k+1) * num_points, util::DEVICE, this->stream));
+            (k+1) * num_points, target, this->stream));
 
       // K-Nearest Neighbors
       GUARD_CU(knns.EnsureSize_((k+1) * num_points, target));
@@ -200,18 +193,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           [] __host__ __device__(SizeT * k_, const SizeT &p) { 
             k_[p] = util::PreDefinedValues<SizeT>::InvalidValue;
           },
-          (k+1) * num_points, util::DEVICE, this->stream));
+          (k+1) * num_points, target, this->stream));
 
       GUARD_CU(distance_out.EnsureSize_((k+1) * num_points, target));
       GUARD_CU(distance_out.ForAll(
             [] __host__ __device__(ValueT * d, const SizeT &p) { 
                 d[p] = util::PreDefinedValues<ValueT>::InvalidValue;
             },
-            (k+1) * num_points, util::DEVICE, this->stream));
+            (k+1) * num_points, target, this->stream));
    
       auto k_ = k;
-      GUARD_CU(row_offsets.EnsureSize_(num_points+1, target));
-      GUARD_CU(row_offsets.ForAll(
+      GUARD_CU(offsets.EnsureSize_(num_points+1, target));
+      GUARD_CU(offsets.ForAll(
         [k_] __host__ __device__ (SizeT *ro, const SizeT &pos){
             ro[pos] = pos*(k_+1);
         }, num_points+1, target, this->stream));
@@ -237,11 +230,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @brief KNN Problem default constructor
    */
   Problem(util::Parameters &_parameters, ProblemFlag _flag = Problem_None)
-      : BaseProblem(_parameters, _flag), data_slices(NULL) {
-    k = _parameters.Get<SizeT>("k");
-    num_points = _parameters.Get<SizeT>("n");
-    dim = _parameters.Get<SizeT>("dim");
-  }
+      : BaseProblem(_parameters, _flag), data_slices(NULL) {}
 
   /**
    * @brief KNN Problem default destructor
@@ -308,6 +297,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
+
+    // Assign the parameters to problem
+    this->k = this->parameters.template Get<SizeT>("k");
+    this->num_points = this->parameters.template Get<SizeT>("n");
+    this->dim = this->parameters.template Get<SizeT>("dim");
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
