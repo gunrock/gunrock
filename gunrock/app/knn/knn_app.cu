@@ -27,9 +27,9 @@
 #include <gunrock/app/test_base.cuh>
 
 // KNN includes
+#include <gunrock/app/knn/knn_helpers.cuh>
 #include <gunrock/app/knn/knn_enactor.cuh>
 #include <gunrock/app/knn/knn_test.cuh>
-
 
 namespace gunrock {
 namespace app {

@@ -20,7 +20,6 @@
 #include <gunrock/oprtr/oprtr.cuh>
 
 #include <gunrock/app/knn/knn_problem.cuh>
-#include <gunrock/app/knn/knn_helpers.cuh>
 #include <gunrock/util/scan_device.cuh>
 #include <gunrock/util/sort_device.cuh>
 
@@ -95,7 +94,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // List of points
     auto &points = data_slice.points;
-    auto &row_offsets = data_slice.row_offsets;
+    auto &offsets = data_slice.offsets;
 
     // CUB Related storage
     auto &cub_temp_storage = data_slice.cub_temp_storage;
@@ -108,7 +107,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto target = util::DEVICE;
     //util::Array1D<SizeT, VertexT> *null_frontier = NULL;
 
-    auto &iteration = enactor_stats.iteration;
+    // auto &iteration = enactor_stats.iteration;
 
     // Define operations
 
@@ -118,7 +117,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         __host__ __device__ (ValueT* d, const SizeT &src){
             SizeT pos = src / (k+1);
             SizeT i = src % (k+1);
-            d[pos * (k+1) + i] = compute_dist(dim, points.GetPointer(util::DEVICE), pos, i);
+            d[pos * (k+1) + i] = euclidean_distance(dim, points, pos, i);
             keys[pos * num_points + i] = i;
         },
         num_points*(k+1), target, stream));
@@ -126,15 +125,14 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // Sort all the distance using CUB
     GUARD_CU(util::cubSegmentedSortPairs(cub_temp_storage, 
                 distance, distance_out, keys, keys_out, num_points*(k+1),
-                num_points, row_offsets));
-
-    //GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+                num_points, offsets, /* begin_bit */ 0, 
+                /* end_bit */ sizeof(ValueT) * 8, stream));
    
     GUARD_CU(distance_out.ForAll(
         [num_points, k, dim, points, keys_out] 
         __host__ __device__ (ValueT* d, const SizeT &src){
             for (SizeT i = k; i<num_points; ++i){
-                auto new_dist = compute_dist(dim, points.GetPointer(util::DEVICE), src, i);
+                auto new_dist = euclidean_distance(dim, points, src, i);
                 if (new_dist >= d[src * (k+1) + (k+1)-1]){
                     // new element is larger than the largest in distance array for "src" row
                     continue;
@@ -142,12 +140,12 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 // new_dist < d[src * k + k]
                 SizeT current = k;
                 SizeT one_before = current-1;
-                while (current > 0){
+                while (current > 0) {
                     if (new_dist >= d[src * (k+1) + one_before]){
                         d[src * (k+1) + current] = new_dist;
                         keys_out[src * (k+1) + current] = i;
                         break;
-                    }else{
+                    } else {
                         //new_dist < d[src * k + one_before]
                         d[src * (k+1) + current] = d[src * (k+1) + one_before];
                         keys_out[src * (k+1) + current] = keys_out[src * (k+1) + one_before];

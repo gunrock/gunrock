@@ -53,7 +53,7 @@ template <
         typename SizeT,
         typename ValueT>
 double CPU_Reference(
-        ValueT* points,    // points
+        util::Array1D<SizeT, ValueT> &points,    // points
         SizeT n,           // number of points
         SizeT dim,         // number of dimension
         SizeT k,           // number of nearest neighbor
@@ -75,7 +75,7 @@ double CPU_Reference(
     //#pragma omp parallel for
     for (SizeT p1 = 0; p1 < n; ++p1){
         for (SizeT p2 = p1+1; p2 < n; ++p2){
-            ValueT d = compute_dist(dim, points, p1, p2);
+            ValueT d = euclidean_distance(dim, points, p1, p2);
             distance0[p1][p2] = d;
             distance0[p2][p1] = d;
         }
@@ -126,16 +126,14 @@ double CPU_Reference(
  * @param[in]  verbose       Whether to output detail comparsions
  * \return     GraphT::SizeT Number of errors
  */
-template <typename GraphT, typename ArrayT>
+template <typename GraphT, typename SizeT, typename ValueT>
 typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
                     GraphT &graph,
-                    typename GraphT::SizeT *h_knns,
-                    typename GraphT::SizeT *ref_knns,
-                    ArrayT& points,
+                    SizeT *h_knns,
+                    SizeT *ref_knns,
+                    util::Array1D<SizeT, ValueT> points,
                     bool verbose = true) {
 
-  typedef typename GraphT::ValueT ValueT;
-  typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::CsrT CsrT;
 
   SizeT num_errors = 0;
@@ -169,8 +167,8 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
           SizeT w1 =   h_knns[v * k + i];
           SizeT w2 = ref_knns[v * k + i];
           if (w1 != w2){
-              ValueT dist1 = compute_dist(dim, points, v, w1);
-              ValueT dist2 = compute_dist(dim, points, v, w2);
+              ValueT dist1 = euclidean_distance(dim, points, v, w1);
+              ValueT dist2 = euclidean_distance(dim, points, v, w2);
               if (dist1 != dist2){
                   if (notyet){
                       util::PrintMsg("[" + std::to_string(v) + "] ", !quiet);

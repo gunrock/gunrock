@@ -174,7 +174,8 @@ cudaError_t ReadLabelsStream(FILE *f_in, util::Parameters &parameters,
 }
 
 template <typename SizeT, typename ValueT>
-cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters, util::Array1D<SizeT, ValueT>& labels) {
+cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters, 
+                              util::Array1D<SizeT, ValueT>& labels) {
 
   cudaError_t retval = cudaSuccess;
   bool quiet = parameters.Get<bool>("quiet");
@@ -336,7 +337,7 @@ template <typename SizeT, typename ValueT>
 cudaError_t BuildLabelsArray(std::string filename, 
         util::Parameters &parameters, 
         util::Array1D<SizeT, ValueT> &labels) {
-
+          
   cudaError_t retval = cudaSuccess;
   bool quiet = parameters.Get<bool>("quiet");
 
@@ -348,9 +349,7 @@ cudaError_t BuildLabelsArray(std::string filename,
       Labels.close();
       return retval;
     }
-  }
-
-  else {
+  } else {
     return util::GRError("Unable to open file " + filename, __FILE__, __LINE__);
   }
   return retval;
@@ -392,10 +391,9 @@ cudaError_t Read(util::Parameters &parameters, ArrayT &labels_a,
   return retval;
 }
 
-template <typename SizeT, typename ValueT, typename GraphT>
+template <typename SizeT, typename ValueT>
 cudaError_t Read(util::Parameters &parameters, 
-        util::Array1D<SizeT, ValueT> &labels,
-        GraphT& graph){
+        util::Array1D<SizeT, ValueT> &labels) {
 
     // TO DO initialized graph
   cudaError_t retval = cudaSuccess;
@@ -422,8 +420,7 @@ cudaError_t Read(util::Parameters &parameters,
     parameters.Set("dataset", file);
   }
 
-  if (retval = BuildLabelsArray(filename, parameters, labels)){
-  }
+  GUARD_CU(BuildLabelsArray(filename, parameters, labels));
   return retval;
 }
 

@@ -30,6 +30,28 @@ using namespace gunrock;
 
 namespace APP_NAMESPACE = app::knn;
 
+/**
+ * @brief Compute euclidean distance
+ * @param dim Number of dimensions (2D, 3D ... ND)
+ * @param points Points array to get the x, y, z...
+ * @param p1 and p2 points to be compared
+ * info \return distance value
+ */
+ template<typename SizeT, typename ValueT>
+ __device__ __host__
+ ValueT distances(const SizeT dim, ValueT* points, SizeT p1, SizeT p2) {
+     // Get dimensional of labels
+     ValueT result = (ValueT) 0;
+     // p1 = (x_1, x_2, ..., x_dim)
+     // p2 = (y_1, y_2, ..., y_dim)
+     for (int i=0; i<dim; ++i){
+         //(x_i - y_i)^2
+         ValueT diff = points[p1 * dim + i] - points[p2 * dim + i];
+         result += diff*diff;
+     }
+     return result;
+ }
+
 /******************************************************************************
  * Main
  ******************************************************************************/
@@ -59,11 +81,6 @@ struct main_struct {
     // Get n dimension tuplets
     std::string labels_file = parameters.Get<std::string>("labels-file");
     util::PrintMsg("Points File Input: " + labels_file, !quiet);
-    std::ifstream lfile(labels_file.c_str());
-    if (labels_file == "" || !lfile.is_open()){
-        util::PrintMsg("file cannot be open\n", !quiet);
-        return (cudaError_t)1; 
-    }
 
     typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_CSR>
         GraphT;
@@ -80,7 +97,7 @@ struct main_struct {
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
     // graphio::labels is setting "n" and "dim"
-    retval = gunrock::graphio::labels::Read(parameters, points, graph);
+    retval = gunrock::graphio::labels::Read(parameters, points);
     if (retval){
         util::PrintMsg("Reading error\n");
         return retval;
@@ -114,7 +131,6 @@ struct main_struct {
     }
 #endif
 
-
     // Reference result on CPU
     SizeT* ref_knns = NULL;
     SizeT* h_knns = (SizeT*)malloc(sizeof(SizeT) * n * k);
@@ -128,7 +144,7 @@ struct main_struct {
       util::PrintMsg("______ CPU Reference _____", !quiet);
 
       float elapsed = app::knn::CPU_Reference<VertexT, SizeT, ValueT>(
-              points.GetPointer(util::HOST), n, dim, k, ref_knns, quiet);
+              points, n, dim, k, ref_knns, quiet);
 
       util::PrintMsg("--------------------------\n Elapsed: " + 
               std::to_string(elapsed), !quiet);
