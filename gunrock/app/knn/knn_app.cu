@@ -31,6 +31,13 @@
 #include <gunrock/app/knn/knn_enactor.cuh>
 #include <gunrock/app/knn/knn_test.cuh>
 
+//#define KNN_APP_DEBUG
+#ifdef KNN_APP_DEBUG
+    #define debug(a...) printf(a)
+#else
+    #define debug(a...)
+#endif
+
 namespace gunrock {
 namespace app {
 namespace knn {
@@ -54,7 +61,7 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(parameters.Use<int>(
       "dim",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      0, "Dimensional of space", __FILE__, __LINE__));
+      2, "Dimensions of space", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
       "k",
@@ -136,6 +143,16 @@ cudaError_t RunTests(util::Parameters &parameters,
 
     if (validation == "each") {
       GUARD_CU(problem.Extract(h_knns));
+#ifdef KNN_APP_DEBUG
+      debug("extracted knns:\n");
+      for (int i=0; i<n; ++i){
+          debug("point %d\n", i);
+          for (int j=0; j<k; ++j){
+              debug("%d ", h_knns[i*k + j]);
+          }
+          debug("\n");
+      }
+#endif
       SizeT num_errors =
           Validate_Results(parameters, graph, h_knns, ref_knns, points, false);
     }
@@ -144,6 +161,17 @@ cudaError_t RunTests(util::Parameters &parameters,
   cpu_timer.Start();
 
   GUARD_CU(problem.Extract(h_knns));
+#ifdef KNN_APP_DEBUG
+      debug("extracted knns:\n");
+      for (int i=0; i<n; ++i){
+          debug("point %d\n", i);
+          for (int j=0; j<k; ++j){
+              debug("%d ", h_knns[i*k + j]);
+          }
+          debug("\n");
+      }
+#endif
+
   if (validation == "last") {
     SizeT num_errors =
         Validate_Results(parameters, graph, h_knns, ref_knns, points, false);
