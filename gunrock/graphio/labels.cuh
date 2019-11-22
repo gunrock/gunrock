@@ -183,6 +183,7 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
   long long num_labels;
   long long labels_read = -1;
   time_t mark0 = time(NULL);
+  long long ll_node = 0;
 
   while (true) {
       std::string line;
@@ -239,7 +240,6 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
           break;
       }
 
-      long long ll_node = 0;
       int d = 0;
       while (!ss.eof()){
           if (d > dim){
@@ -266,9 +266,13 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
                       __FILE__, __LINE__);
           }
           labels[ll_node * dim + d] = ll_label;
-          ++ll_node;
+          //debug, do not remove
+          //std::cout << "read value: " << lf_label << " put under index " << ll_node * dim + d << "\t";
           ++d;
       } // -> while reading line
+      ++ll_node;
+      //debug, do not remove
+      //std::cout << "\n";
       if (d < dim){
               return util::GRError(
                       "Error parsing LABELS: "
