@@ -19,6 +19,8 @@
 #include <vector>
 #include <algorithm>
 
+#define debug(a...) printf(a)
+
 namespace gunrock {
 namespace app {
 namespace knn {
@@ -71,8 +73,12 @@ double CPU_Reference(
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
 
+    omp_set_num_threads(32);
+
+    printf("number of threads: %d\n", omp_get_num_threads());
+
     // CPU reference implementation
-    //#pragma omp parallel for
+    #pragma omp parallel for //num_threads(16)
     for (SizeT p1 = 0; p1 < n; ++p1){
         for (SizeT p2 = p1+1; p2 < n; ++p2){
             ValueT d = euclidean_distance(dim, points, p1, p2);
@@ -80,13 +86,19 @@ double CPU_Reference(
             distance0[p2][p1] = d;
         }
     }
+    debug("insertion to distance0 is done\n");
+#pragma omp barrier
     
     std::vector<std::multimap<ValueT, SizeT, comp>> distance;
     distance.resize(n);
+    #pragma omp parallel for //num_threads(16)
     for (SizeT p=0; p<n; ++p){
         distance[p] = flip_map(distance0[p]);
     }
+#pragma omp barrier
+    debug("insertion to distance is done\n");
    
+    #pragma omp parallel for //num_threads(16)
     for (SizeT p = 0; p < n; ++p) {
         int i = 0;
         for (auto& dd :distance[p]){
@@ -96,6 +108,8 @@ double CPU_Reference(
                 break;
         }
     }
+    debug("insertion to knns is done\n");
+#pragma omp barrier
 
 #ifdef KNN_DEBUG
     //debug of knns
@@ -147,14 +161,20 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
 
   for (SizeT v = 0; v < num_points; ++v) {
       for (SizeT i = 0; i < k; ++i) {
-          if (h_knns[v * k + i] != ref_knns[v * k + i]) {
-            util::PrintMsg(
+          SizeT w1 = h_knns[v * k + i];
+          SizeT w2 = ref_knns[v * k + i];
+          if (w1 != w2) {
+              ValueT dist1 = euclidean_distance(dim, points, v, w1);
+              ValueT dist2 = euclidean_distance(dim, points, v, w2);
+              if (dist1 != dist2){
+                  util::PrintMsg(
                     "point::nearest-neighbor = [gpu]" + 
                     std::to_string(v) + "::" + std::to_string(h_knns[v * k + i]) + 
                     " !=  [cpu]" + 
                     std::to_string(v) + "::" + std::to_string(ref_knns[v * k + i]), 
                     !quiet);
-            ++num_errors;
+                  ++num_errors;
+              }
           }
       }
   }
