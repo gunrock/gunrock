@@ -28,6 +28,14 @@
 
 #include <cstdio>
 
+//do not remove debug
+//#define KNN_ENACTOR_DEBUG
+#ifdef KNN_ENACTOR_DEBUG
+    #define debug(a...) printf(a)
+#else
+    #define debug(a...)
+#endif
+
 namespace gunrock {
 namespace app {
 namespace knn {
@@ -109,6 +117,22 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // Define operations
  
     auto k_ = k + 1;
+
+#ifdef KNN_ENACTOR_DEBUG
+    GUARD_CU(points.ForAll(
+                [num_points, dim]
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            for (int i=0; i<num_points; ++i){
+                debug("point %d: ", i);
+                for (int j=0; j<dim; ++j){
+                    debug("%lf ", d[i*dim + j]);
+                }
+                debug("\n");
+            }
+        },
+        1, target, stream));
+#endif
+
     // Compute the distance array and define keys
     GUARD_CU(distance.ForAll(
         [num_points, dim, points, keys, k_] 
@@ -121,11 +145,43 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             keys[pos * k_ + i] = i;
         },
         num_points*k_, target, stream));
-   
+ 
+#ifdef KNN_ENACTOR_DEBUG
+    GUARD_CU(distance.ForAll(
+        [num_points, k_] 
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            debug("distances\n");
+            for (int i=0; i<num_points; ++i){
+                debug("point %d: ", i);
+                for (int j=0; j<k_; ++j){
+                    debug("%.lf ", d[i*k_ + j]);
+                }
+                debug("\n");
+            }
+        },
+        1, target, stream));
+#endif
+  
     // Sort all the distance using CUB
     GUARD_CU(util::cubSegmentedSortPairs(cub_temp_storage, 
                 distance, distance_out, keys, keys_out, num_points*(k+1),
                 num_points, offsets, 0, sizeof(ValueT) * 8, stream));
+
+#ifdef KNN_ENACTOR_DEBUG
+    GUARD_CU(distance_out.ForAll(
+        [num_points, k_] 
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            debug("distances after sorting\n");
+            for (int i=0; i<num_points; ++i){
+                debug("point %d: ", i);
+                for (int j=0; j<k_; ++j){
+                    debug("%.lf ", d[i*k_ + j]);
+                }
+                debug("\n");
+            }
+        },
+        1, target, stream));
+#endif
 
     GUARD_CU(distance_out.ForAll(
         [num_points, k_, dim, points, keys_out] 
@@ -159,7 +215,23 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             }
         },
         num_points, target, stream));
-     
+ 
+#ifdef KNN_ENACTOR_DEBUG
+    GUARD_CU(distance_out.ForAll(
+        [num_points, k_] 
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            debug("sorted distances with included n-k next points\n");
+            for (int i=0; i<num_points; ++i){
+                debug("point %d: ", i);
+                for (int j=0; j<k_; ++j){
+                    debug("%.lf ", d[i*k_ + j]);
+                }
+                debug("\n");
+            }
+        },
+        1, target, stream));
+#endif
+    
     // Choose k nearest neighbors for each node
     GUARD_CU(knns.ForAll(
         [num_points, k, keys_out] 
@@ -169,7 +241,23 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             knns_[pos * k + i] = keys_out[pos * (k+1) + i+1];
         },
         num_points*k, target, stream));
-        
+
+#ifdef KNN_ENACTOR_DEBUG
+    GUARD_CU(knns.ForAll(
+        [num_points, k, keys_out] 
+        __host__ __device__(SizeT* knns_, const SizeT &src){
+            debug("knns output:\n");
+            for (int i=0; i<num_points; ++i){
+                debug("point %d\n", i);
+                for (int j=0; j<k; ++j){
+                    debug("%d ", knns_[i*k + j]);
+                }
+                debug("\n");
+            }
+        },
+        1, target, stream));
+ 
+#endif
     return retval;
   }
 

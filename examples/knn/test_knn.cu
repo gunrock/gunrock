@@ -19,8 +19,8 @@
 // App and test base includes
 #include <gunrock/app/test_base.cuh>
 
-//#define KNN_DEBUG 1
-#ifdef KNN_DEBUG
+//#define KNN_TEST_DEBUG 
+#ifdef KNN_TEST_DEBUG
     #define debug(a...) fprintf(stderr, a)
 #else
     #define debug(a...)
@@ -29,28 +29,6 @@
 using namespace gunrock;
 
 namespace APP_NAMESPACE = app::knn;
-
-/**
- * @brief Compute euclidean distance
- * @param dim Number of dimensions (2D, 3D ... ND)
- * @param points Points array to get the x, y, z...
- * @param p1 and p2 points to be compared
- * info \return distance value
- */
- template<typename SizeT, typename ValueT>
- __device__ __host__
- ValueT distances(const SizeT dim, ValueT* points, SizeT p1, SizeT p2) {
-     // Get dimensional of labels
-     ValueT result = (ValueT) 0;
-     // p1 = (x_1, x_2, ..., x_dim)
-     // p2 = (y_1, y_2, ..., y_dim)
-     for (int i=0; i<dim; ++i){
-         //(x_i - y_i)^2
-         ValueT diff = points[p1 * dim + i] - points[p2 * dim + i];
-         result += diff*diff;
-     }
-     return result;
- }
 
 /******************************************************************************
  * Main
@@ -82,12 +60,18 @@ struct main_struct {
     std::string labels_file = parameters.Get<std::string>("labels-file");
     util::PrintMsg("Points File Input: " + labels_file, !quiet);
 
+    cudaError_t retval = cudaSuccess;
+    
+    std::ifstream lfile(labels_file.c_str());
+    if (labels_file == "" || !lfile.is_open()){
+        util::PrintMsg("File cannot be open\n", !quiet);
+        return retval; 
+    }
+
     typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_CSR>
         GraphT;
     // Creating empty graph
     GraphT graph;
-
-    cudaError_t retval = cudaSuccess;
 
     // Initialization of the points array
     util::Array1D<SizeT, ValueT> points;
@@ -119,7 +103,7 @@ struct main_struct {
         return retval;
     }
  
-#ifdef KNN_DEBUG
+#ifdef KNN_TEST_DEBUG
     // Debug of points:
     debug("debug points\n");
     for (int i=0; i<n; ++i){
@@ -131,9 +115,10 @@ struct main_struct {
     }
 #endif
 
+    util::PrintMsg("number of points " + std::to_string(n) + ", k " + std::to_string(k), !quiet); 
     // Reference result on CPU
     SizeT* ref_knns = NULL;
-    SizeT* h_knns = (SizeT*)malloc(sizeof(SizeT) * n * k);
+    SizeT* h_knns = (SizeT*)malloc(sizeof(SizeT) * n * (k+1));
 
     if (!quick) {
       // Init datastructures for reference result on GPU
