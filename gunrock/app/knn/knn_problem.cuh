@@ -272,7 +272,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         GUARD_CU(util::SetDevice(this->gpu_idx[0]));
         // Extract KNNs
         // knns array
-        GUARD_CU(data_slice.knns.SetPointer(h_knns,num_points*k,util::HOST));
+        GUARD_CU(data_slice.knns.SetPointer(h_knns,num_points*(k+1),util::HOST));
         GUARD_CU(data_slice.knns.Move(util::DEVICE, util::HOST));
       }
 
