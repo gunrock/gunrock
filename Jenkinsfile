@@ -14,7 +14,7 @@ def init_git() {
 // build gunrock using cmake
 def cmake_build() {
   checkout scm
-  retry(5) {
+  retry(1) {
     timeout(time: 20, unit: 'MINUTES') {
       sh 'mkdir -p build'
       // MGPU not fully supported in v1.0.0
