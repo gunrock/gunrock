@@ -24,7 +24,7 @@
 // JSON includes
 #include <gunrock/util/info_rapidjson.cuh>
 
-//#define SNN_DEBUG 1
+//#define SNN_DEBUG
 #ifdef SNN_DEBUG
     #define debug(a...) fprintf(stderr, a)
 #else
@@ -85,7 +85,7 @@ struct main_struct {
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
     // graphio::labels is setting "n" and "dim"
-    retval = gunrock::graphio::labels::Read(parameters, points, graph);
+    retval = gunrock::graphio::labels::Read(parameters, points);
     if (retval){
         util::PrintMsg("Reading error\n");
         return retval;
@@ -148,8 +148,14 @@ struct main_struct {
     cpu_timer.Stop();
 
     // Extract kNN
+    SizeT* h_knns0 = (SizeT*) malloc(sizeof(SizeT)*num_points*(k+1));
+    GUARD_CU(knn_problem.Extract(h_knns0));
     SizeT* h_knns = (SizeT*) malloc(sizeof(SizeT)*num_points*k);
-    GUARD_CU(knn_problem.Extract(h_knns));
+    for (int i=0; i<num_points; ++i){
+        for (int j = 0; j<k; ++j){
+            h_knns[i*k+j] = h_knns0[i*k+j];
+        }
+    }
 
 #ifdef SNN_DEBUG
     for (SizeT x = 0; x < num_points; ++x){
@@ -211,6 +217,7 @@ struct main_struct {
 
     if (!quick) {
       delete[] h_knns;
+      delete[] h_knns0;
       delete[] ref_cluster;
       delete[] ref_core_point_counter;
       delete[] ref_cluster_counter;

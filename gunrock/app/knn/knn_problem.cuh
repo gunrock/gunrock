@@ -282,7 +282,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           [] __host__ __device__(const SizeT &device_val, SizeT &host_val) {
             host_val = device_val;
           },
-          num_points * k, util::HOST));
+          num_points * (k+1), util::HOST));
     }
     return retval;
   }
