@@ -35,7 +35,7 @@ ValueT euclidean_distance(const SizeT dim,
     PointT p1, PointT p2) {
 
     // Get dimensional of labels
-    ValueT result = (ValueT) 0;
+    auto result = 0;
     // p1 = (x_1, x_2, ..., x_dim)
     // p2 = (y_1, y_2, ..., y_dim)
     for (int i=0; i<dim; ++i){
@@ -43,7 +43,7 @@ ValueT euclidean_distance(const SizeT dim,
         ValueT diff = points[p1 * dim + i] - points[p2 * dim + i];
         result += diff*diff;
     }
-    return result;
+    return sqrt(result);
 }
 
 }  // namespace knn
