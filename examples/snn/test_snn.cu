@@ -99,19 +99,15 @@ struct main_struct {
     SizeT dim = parameters.Get<SizeT>("dim");
     // Get number of nearest neighbors, default k = 10
     SizeT k = parameters.Get<int>("k");
+    if (k >= num_points)
+      return util::GRError("K must be < N", __FILE__, __LINE__);
+
     // Get number of neighbors two close points should share
     SizeT eps = parameters.Get<SizeT>("eps");
     // Get the min density
     SizeT min_pts = parameters.Get<SizeT>("min-pts");
-
-    if (k >= num_points){
-      util::PrintMsg("k can be at most n-1", !quiet);
-      return retval;
-    }
-    if (min_pts > k) {
-      util::PrintMsg("Min pts should be smaller than k", true);
-      return retval;
-    }
+    if (min_pts > k)
+      return util::GRError("Min-Pts must be < K", __FILE__, __LINE__);
 
 #ifdef SNN_DEBUG
     // Debug of points:
@@ -147,16 +143,15 @@ struct main_struct {
     GUARD_CU(knn_enactor.Enact());
     cpu_timer.Stop();
 
-    // Extract kNN
-    SizeT* h_knns0 = (SizeT*) malloc(sizeof(SizeT)*num_points*(k+1));
-    GUARD_CU(knn_problem.Extract(h_knns0));
-    SizeT* h_knns = (SizeT*) malloc(sizeof(SizeT)*num_points*k);
-    for (int i=0; i<num_points; ++i){
-        for (int j = 0; j<k; ++j){
-            h_knns[i*k+j] = h_knns0[i*k+j];
-        }
-    }
+    util::PrintMsg("KNN Elapsed: " 
+              + std::to_string(cpu_timer.ElapsedMillis()), !quiet);
+    // util::PrintMsg("__________________________", !quiet);
+    // parameters.Set("knn-elapsed", cpu_timer.ElapsedMillis());
 
+    // Extract kNN
+    SizeT* h_knns = (SizeT*) malloc(sizeof(SizeT)*num_points*k);
+    GUARD_CU(knn_problem.Extract(h_knns));
+    
 #ifdef SNN_DEBUG
     for (SizeT x = 0; x < num_points; ++x){
         debug("knn[%d]: ", x);
@@ -217,7 +212,6 @@ struct main_struct {
 
     if (!quick) {
       delete[] h_knns;
-      delete[] h_knns0;
       delete[] ref_cluster;
       delete[] ref_core_point_counter;
       delete[] ref_cluster_counter;
