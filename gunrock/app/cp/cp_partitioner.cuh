@@ -170,24 +170,24 @@ struct ClusterPartitioner : PartitionerBase<VertexId,SizeT,Value/*,
           EndId = row_offsets[t_node + 1];
           // printf("t_node = %d\t",t_node);fflush(stdout);
           for (VertexId i = StartId; i < EndId; i++) {
-            VertexId neibor = column_indices[i];
-            if (marker[neibor] == node) continue;
-            if (tpartition_table[neibor] < this->num_gpus) {
+            VertexId neighbour = column_indices[i];
+            if (marker[neighbour] == node) continue;
+            if (tpartition_table[neighbour] < this->num_gpus) {
               if (level < n1) {
-                counter[tpartition_table[neibor]]++;
+                counter[tpartition_table[neighbour]]++;
                 total_count++;
               }
             } else {
               if (level < n2) {
                 counter[this->num_gpus]++;
-                tpartition_table[neibor] = this->num_gpus + 1;
-                // printf("%d\t",neibor);
+                tpartition_table[neighbour] = this->num_gpus + 1;
+                // printf("%d\t",neighbour);
               }
               if (level < n1) total_count++;
             }
-            marker[neibor] = node;
+            marker[neighbour] = node;
             tail++;
-            t_queue[tail] = neibor;
+            t_queue[tail] = neighbour;
           }
           // current ++;
         }

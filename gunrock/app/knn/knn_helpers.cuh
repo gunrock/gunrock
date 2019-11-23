@@ -15,11 +15,17 @@
 #pragma once
 
 #include <map>
+#include <cmath>
 #include <gunrock/util/array_utils.cuh>
 
 namespace gunrock {
 namespace app {
 namespace knn {
+
+template <typename ValueT>
+__device__ __host__ ValueT _sqrt(const ValueT &a) {
+    return (ValueT) sqrtf((float)a);
+}
 
 /**
  * @brief Compute euclidean distance
@@ -43,7 +49,7 @@ ValueT euclidean_distance(const SizeT dim,
         ValueT diff = points[p1 * dim + i] - points[p2 * dim + i];
         result += diff*diff;
     }
-    return result;
+    return _sqrt(result);
 }
 
 }  // namespace knn

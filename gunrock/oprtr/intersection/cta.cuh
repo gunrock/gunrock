@@ -80,7 +80,8 @@ __device__ int BinarySearch(VertexId* keys, SizeT count, VertexId key) {
   return 0;
 }
 
-__device__ unsigned ilog2(unsigned int v) {
+template <typename T>
+__device__ unsigned ilog2(T v) {
   register unsigned int t, tt;
   if (tt = v >> 16)
     return ((t = tt >> 8) ? 24 + logtable[t] : 16 + logtable[tt]);

@@ -112,7 +112,13 @@ double CPU_Reference(util::Parameters &parameters,
         __host__ __device__ (ValueT* d, const SizeT &src){
             auto pos = src / n;
             auto i = src % n;
-            auto dist = euclidean_distance(dim, points, pos, i);
+            // auto dist = euclidean_distance(dim, points, pos, i);
+            ValueT dist = 0;
+            if (pos == i) {
+                dist = util::PreDefinedValues<ValueT>::MaxValue;
+            } else {
+                dist = euclidean_distance(dim, points, pos, i);
+            }
             d[src] = dist;
             keys[src] = i;
         },
@@ -156,7 +162,7 @@ double CPU_Reference(util::Parameters &parameters,
         __host__ __device__(SizeT* knns_, const SizeT &src){
             auto pos = src / k;
             auto i = src % k;
-            knns_[pos * k + i] = keys_out[pos * n + i+1];
+            knns_[pos * k + i] = keys_out[pos * n + i];
         },
         n*k, util::DEVICE));
 

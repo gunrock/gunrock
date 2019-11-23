@@ -441,18 +441,20 @@ cudaError_t WriteBinary(util::Parameters &parameters, GraphT &graph,
  * @{
  */
 
-cudaError_t UseParameters(util::Parameters &parameters,
+template<typename ParametersT>
+cudaError_t UseParameters(ParametersT &parameters,
                           std::string graph_prefix = "") {
   cudaError_t retval = cudaSuccess;
 
   return retval;
 }
 
-cudaError_t WriteMeta(util::Parameters &parameters, std::string filename,
+template<typename ParametersT>
+cudaError_t WriteMeta(ParametersT &parameters, std::string filename,
                       MetaData &meta_data) {
   cudaError_t retval = cudaSuccess;
   std::ofstream fout;
-  bool quiet = parameters.Get<bool>("quiet");
+  bool quiet = parameters.template Get<bool>("quiet");
   fout.open((filename + ".meta"));
   if (!fout.is_open()) return cudaErrorUnknown;
   util::PrintMsg("  Writing meta data into " + filename + ".meta", !quiet);
@@ -464,11 +466,12 @@ cudaError_t WriteMeta(util::Parameters &parameters, std::string filename,
   return retval;
 }
 
-cudaError_t ReadMeta(util::Parameters &parameters, std::string filename,
+template<typename ParametersT>
+cudaError_t ReadMeta(ParametersT &parameters, std::string filename,
                      MetaData &meta_data) {
   cudaError_t retval = cudaSuccess;
   std::ifstream fin;
-  bool quiet = parameters.Get<bool>("quiet");
+  bool quiet = parameters.template Get<bool>("quiet");
   fin.open((filename + ".meta"));
   if (!fin.is_open()) return cudaErrorUnknown;
   util::PrintMsg("  Reading meta data from " + filename + ".meta", !quiet);

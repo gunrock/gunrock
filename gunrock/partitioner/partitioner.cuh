@@ -27,10 +27,11 @@
 namespace gunrock {
 namespace partitioner {
 
-cudaError_t UseParameters(util::Parameters &parameters) {
+template <typename ParametersT>
+cudaError_t UseParameters(ParametersT &parameters) {
   cudaError_t retval = cudaSuccess;
 
-  retval = parameters.Use<std::string>(
+  retval = parameters.template Use<std::string>(
       "partition-method",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       "random",
@@ -39,13 +40,13 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       __FILE__, __LINE__);
   if (retval) return retval;
 
-  retval = parameters.Use<float>(
+  retval = parameters.template Use<float>(
       "partition-factor",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0.5, "partitioning factor", __FILE__, __LINE__);
   if (retval) return retval;
 
-  retval = parameters.Use<int>(
+  retval = parameters.template Use<int>(
       "partition-seed",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0, "partitioning seed, default is time(NULL)", __FILE__, __LINE__);

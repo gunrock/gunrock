@@ -177,7 +177,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   }
 
 // compute running statistics
-// info.ComputeTraversalStats(enactor, h_distances);
+info.ComputeTraversalStats(enactor, (VertexT *)NULL);
 // Display_Memory_Usage(problem);
 #ifdef ENABLE_PERFORMANCE_PROFILING
   // Display_Performance_Profiling(enactor);

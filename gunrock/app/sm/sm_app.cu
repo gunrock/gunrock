@@ -24,6 +24,11 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_enactor(parameters));
   GUARD_CU(UseParameters_test(parameters));
 
+  GUARD_CU(parameters.Use<unsigned int>(
+              "num-subgraphs",
+              util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
+              0, "number of matched subgraphs", __FILE__, __LINE__));
+
   return retval;
 }
 
@@ -33,26 +38,33 @@ cudaError_t UseParameters(util::Parameters &parameters) {
 
 /*
  * @brief Simple interface take in graph as CSR format
- * @param[in]  num_nodes   Number of veritces in the input graph
- * @param[in]  num_edges   Number of edges in the input graph
- * @param[in]  row_offsets CSR-formatted graph input row offsets
- * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  edge_values CSR-formatted graph input edge weights
- * @param[in]  num_runs    Number of runs to perform SM
- * @param[out] subgraphs   Return number of subgraphs
- * \return     double      Return accumulated elapsed times for all runs
+ * @param[in]  num_nodes         Number of veritces in the input data graph
+ * @param[in]  num_edges         Number of edges in the input data graph
+ * @param[in]  row_offsets       CSR-formatted data graph input row offsets
+ * @param[in]  col_indices       CSR-formatted data graph input column indices
+ * @param[in]  num_query_nodes   Number of veritces in the input query graph
+ * @param[in]  num_query_edges   Number of edges in the input query graph
+ * @param[in]  query_row_offsets CSR-formatted graph input query row offsets
+ * @param[in]  query_col_indices CSR-formatted graph input query column indices
+ * @param[in]  num_runs          Number of runs to perform SM
+ * @param[out] subgraphs         Return number of subgraphs
+ * \return     double            Return accumulated elapsed times for all runs
  */
 double sm(
     const int            num_nodes,
     const int            num_edges,
     const int           *row_offsets,
     const int           *col_indices,
-    const unsigned long *edge_values,
+    const int            num_query_nodes,
+    const int            num_query_edges,
+    const int           *query_row_offsets,
+    const int           *query_col_indices,
     const int            num_runs,
           int           *subgraphs)
 {
-    return sm(num_nodes, num_edges, row_offsets, col_indices,
-        edge_values, 1 /* num_runs */, subgraphs);
+    return sm_template(num_nodes, num_edges, row_offsets, col_indices,
+        num_query_nodes, num_query_edges, query_row_offsets,
+        query_col_indices, 1 /* num_runs */, subgraphs);
 }
 
 // Leave this at the end of the file

@@ -33,6 +33,9 @@
 // bug:: malloc_consolidate(): invalid chunk size
 //#include "test_lib_pr.h"
 
+// Tests Subgraph Matching
+#include "test_lib_sm.h"
+
 // Tests the RepeatFor Operator
 #include "test_repeatfor.h"
 

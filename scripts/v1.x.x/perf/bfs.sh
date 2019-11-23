@@ -9,15 +9,14 @@ DATADIR=${2:-"/data/gunrock_dataset/large"}
 DEVICE=${3:-"0"}
 TAG=${4:-""}
 
-SUFFIX=${TAG}
 APPLICATION="bfs"
 EXECUTION="$EXEDIR/$APPLICATION"
 
 ORG_OPTIONS=""
 ORG_OPTIONS="$ORG_OPTIONS --num-runs=10"
-ORG_OPTIONS="$ORG_OPTIONS --validation=each"
+# ORG_OPTIONS="$ORG_OPTIONS --validation=each"
+ORG_OPTIONS="$ORG_OPTIONS --quick"
 ORG_OPTIONS="$ORG_OPTIONS --device=$DEVICE"
-ORG_OPTIONS="$ORG_OPTIONS --jsondir=./eval/$SUFFIX"
 ORG_OPTIONS="$ORG_OPTIONS --src=random"
 ORG_OPTIONS="$ORG_OPTIONS --64bit-SizeT=false,true"
 ORG_OPTIONS="$ORG_OPTIONS --64bit-VertexT=false,true"
@@ -25,6 +24,9 @@ ORG_OPTIONS="$ORG_OPTIONS --idempotence=false,true"
 ORG_OPTIONS="$ORG_OPTIONS --mark-pred=false,true"
 ORG_OPTIONS="$ORG_OPTIONS --direction-optimized=true,false"
 ORG_OPTIONS="$ORG_OPTIONS --advance-mode=LB_CULL,LB,TWC"
+ORG_OPTIONS="$ORG_OPTIONS --tag=$TAG"
+
+EVAL_DIR="BFS"
 
 NAME[ 0]="ak2010"            &&  OPT_DIR[ 0]=""
 
@@ -104,12 +106,15 @@ NAME[71]="road_central"      && OPT_UDIR[71]="--do-a=0.1      --do-b=0.00001 --q
 #NAME[41]="tweets"            && OPT_DIR[41]="--queue-factor=5.00" && I_SIZE_DIR[41]="2.00" && OPT_UDIR[41]="--queue-factor=5.00" && I_SIZE_UDIR[41]="2.00" 
 #NAME[42]="bitcoin"           && OPT_DIR[42]="--queue-factor=5.00" && I_SIZE_DIR[42]="2.00" && OPT_UDIR[42]="--queue-factor=10.0" && I_SIZE_UDIR[42]="2.00" 
 
-mkdir -p eval/$SUFFIX
+mkdir -p $EVAL_DIR
 
 for i in {0..71}; do
     if [ "${NAME[$i]}" = "" ]; then
         continue
     fi
+
+    SUFFIX=${NAME[$i]}
+    mkdir -p $EVAL_DIR/$SUFFIX
 
     for undirected in "true" "false"; do
         OPTIONS=$ORG_OPTIONS
@@ -132,8 +137,8 @@ for i in {0..71}; do
             MARKS="DIR"
         fi
 
-        echo $EXECUTION $GRAPH_ $OPTIONS_ "> ./eval/$SUFFIX/${NAME[$i]}.${MARKS}.txt"
-             $EXECUTION $GRAPH_ $OPTIONS_  > ./eval/$SUFFIX/${NAME[$i]}.${MARKS}.txt
+        echo $EXECUTION $GRAPH_ $OPTIONS_ --jsondir=./$EVAL_DIR/$SUFFIX "> ./$EVAL_DIR/$SUFFIX/${NAME[$i]}.${MARKS}.txt"
+             $EXECUTION $GRAPH_ $OPTIONS_ --jsondir=./$EVAL_DIR/$SUFFIX  > ./$EVAL_DIR/$SUFFIX/${NAME[$i]}.${MARKS}.txt
         sleep 1
     done
 done

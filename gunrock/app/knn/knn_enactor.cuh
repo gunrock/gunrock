@@ -29,7 +29,7 @@
 #include <cstdio>
 
 //do not remove debug
-//#define KNN_ENACTOR_DEBUG
+// #define KNN_ENACTOR_DEBUG
 #ifdef KNN_ENACTOR_DEBUG
     #define debug(a...) printf(a)
 #else
@@ -116,7 +116,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // Define operations
  
-    auto k_ = k + 1;
+    // auto k = k + 1;
 
 #ifdef KNN_ENACTOR_DEBUG
     GUARD_CU(points.ForAll(
@@ -135,26 +135,32 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // Compute the distance array and define keys
     GUARD_CU(distance.ForAll(
-        [num_points, dim, points, keys, k_] 
+        [num_points, dim, points, keys, k] 
         __host__ __device__ (ValueT* d, const SizeT &src){
-            auto pos = src / k_;
-            auto i = src % k_;
-            auto dist = euclidean_distance(dim, points, pos, i);
+            auto pos = src / k;
+            auto i = src % k;
+            ValueT dist = 0;
+            if (pos == i) {
+                dist = util::PreDefinedValues<ValueT>::MaxValue;
+            } else {
+                dist = euclidean_distance(dim, points, pos, i);
+            }
+            // auto dist = euclidean_distance(dim, points, pos, i);
             // printf("distance: %d %d = %lf\n", pos, i, dist);
-            d[pos * k_ + i] = dist;
-            keys[pos * k_ + i] = i;
+            d[pos * k + i] = dist;
+            keys[pos * k + i] = i;
         },
-        num_points*k_, target, stream));
+        num_points*k, target, stream));
  
 #ifdef KNN_ENACTOR_DEBUG
     GUARD_CU(distance.ForAll(
-        [num_points, k_] 
+        [num_points, k] 
         __host__ __device__ (ValueT* d, const SizeT &src){
             debug("distances\n");
             for (int i=0; i<num_points; ++i){
                 debug("point %d: ", i);
-                for (int j=0; j<k_; ++j){
-                    debug("%.lf ", d[i*k_ + j]);
+                for (int j=0; j<k; ++j){
+                    debug("%.lf ", d[i*k + j]);
                 }
                 debug("\n");
             }
@@ -164,18 +170,18 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
   
     // Sort all the distance using CUB
     GUARD_CU(util::cubSegmentedSortPairs(cub_temp_storage, 
-                distance, distance_out, keys, keys_out, num_points*(k+1),
+                distance, distance_out, keys, keys_out, num_points*k,
                 num_points, offsets, 0, sizeof(ValueT) * 8, stream));
 
 #ifdef KNN_ENACTOR_DEBUG
     GUARD_CU(distance_out.ForAll(
-        [num_points, k_] 
+        [num_points, k] 
         __host__ __device__ (ValueT* d, const SizeT &src){
             debug("distances after sorting\n");
             for (int i=0; i<num_points; ++i){
                 debug("point %d: ", i);
-                for (int j=0; j<k_; ++j){
-                    debug("%.lf ", d[i*k_ + j]);
+                for (int j=0; j<k; ++j){
+                    debug("%.lf ", d[i*k + j]);
                 }
                 debug("\n");
             }
@@ -184,31 +190,37 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 #endif
 
     GUARD_CU(distance_out.ForAll(
-        [num_points, k_, dim, points, keys_out] 
+        [num_points, k, dim, points, keys_out] 
         __host__ __device__ (ValueT* d, const SizeT &src){
-            for (SizeT i = k_; i<num_points; ++i){
-                auto new_dist = euclidean_distance(dim, points, src, i);
-                if (new_dist >= d[src * k_ + k_-1]) {
+            for (SizeT i = k; i<num_points; ++i){
+                ValueT new_dist = 0;
+                if (src == i) {
+                    new_dist = util::PreDefinedValues<ValueT>::MaxValue;
+                } else {
+                    new_dist = euclidean_distance(dim, points, src, i);
+                }
+                // auto new_dist = euclidean_distance(dim, points, src, i);
+                if (new_dist >= d[src * k + k-1]) {
                     // new element is larger than the largest in distance array for "src" row
                     continue;
                 }
                 // new_dist < d[src * k + k]
-                SizeT current = k_-1;
+                SizeT current = k-1;
                 SizeT one_before = current-1;
                 while (current > 0) {
-                    if (new_dist >= d[src * k_ + one_before]){
-                        d[src * k_ + current] = new_dist;
-                        keys_out[src * k_ + current] = i;
+                    if (new_dist >= d[src * k + one_before]){
+                        d[src * k + current] = new_dist;
+                        keys_out[src * k + current] = i;
                         break;
                     } else {
                         //new_dist < d[src * k + one_before]
-                        d[src * k_ + current] = d[src * k_ + one_before];
-                        keys_out[src * k_ + current] = keys_out[src * k_ + one_before];
+                        d[src * k + current] = d[src * k + one_before];
+                        keys_out[src * k + current] = keys_out[src * k + one_before];
                         --current;
                         --one_before;
                         if (current == (SizeT)0){
-                            d[src * k_] = new_dist;
-                            keys_out[src * k_] = i;
+                            d[src * k] = new_dist;
+                            keys_out[src * k] = i;
                         }
                     }
                 }
@@ -218,13 +230,13 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
  
 #ifdef KNN_ENACTOR_DEBUG
     GUARD_CU(distance_out.ForAll(
-        [num_points, k_] 
+        [num_points, k] 
         __host__ __device__ (ValueT* d, const SizeT &src){
             debug("sorted distances with included n-k next points\n");
             for (int i=0; i<num_points; ++i){
                 debug("point %d: ", i);
-                for (int j=0; j<k_; ++j){
-                    debug("%.lf ", d[i*k_ + j]);
+                for (int j=0; j<k; ++j){
+                    debug("%.lf ", d[i*k + j]);
                 }
                 debug("\n");
             }
@@ -238,7 +250,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         __host__ __device__(SizeT* knns_, const SizeT &src){
             auto pos = src/k;
             auto i = src%k;
-            knns_[pos * k + i] = keys_out[pos * (k+1) + i+1];
+            knns_[pos * k + i] = keys_out[pos * k + i];
         },
         num_points*k, target, stream));
 

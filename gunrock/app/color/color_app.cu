@@ -44,55 +44,9 @@ cudaError_t UseParameters(util::Parameters &parameters) {
         util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
         0, "number of output colors", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<bool>(
-      "loop-color", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
-      "Serially compare rand to all node neighbor, disable to use advance \
-      neighbor reduce (default=false)",
-      __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<bool>(
-      "min-color", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
-      "Enable coloring with minimum independent set as well as \
-      maximum(default=true)",
-      __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<bool>(
-      "test-run", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, true,
-      "Perform test run to atomically generate max iteration (default=true)",
-      __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<int>(
-      "user-iter",
-      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-      3, "Number of iterations color should run for (default=3).", __FILE__,
-      __LINE__));
-
-  GUARD_CU(parameters.Use<bool>(
-      "JPL", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
-      "Use JPL exact coloring method (true=use JPL).", __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<int>(
-      "no-conflict", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0,
-      "Resolve color conflict, 0 to skip check, 1 to check at end of\
-      every iteration with random,\
-      2 to check at end of every iteration with degree(default = 0).",
-      __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<int>(
-      "prohibit-size", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0,
-      "Needed to allocate memory for hash function, if parameter is\
-      positive,\
-      hash coloring is used instead of random coloring (default = 0).",
-      __FILE__, __LINE__));
-
   GUARD_CU(parameters.Use<int>(
       "seed", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, time(NULL),
       "seed for random number generator", __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<bool>(
-      "LBCOLOR", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, false,
-      "load balancing enabled for graph coloring (true=neighbor_reduce)",
-      __FILE__, __LINE__));
 
   return retval;
 }
@@ -109,7 +63,7 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  */
 template <typename GraphT>
 cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
-                     bool color_balance, typename GraphT::VertexT *ref_colors,
+                     typename GraphT::VertexT *ref_colors,
                      util::Location target) {
   cudaError_t retval = cudaSuccess;
 
@@ -160,7 +114,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
     if (validation == "each") {
       GUARD_CU(problem.Extract(h_colors));
       SizeT num_errors = Validate_Results(parameters, graph, h_colors,
-                                          ref_colors, &num_colors, false);
+                                          ref_colors, false);
     }
   }
 
@@ -169,13 +123,22 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   GUARD_CU(problem.Extract(h_colors));
   if (validation == "last") {
     SizeT num_errors = Validate_Results(parameters, graph, h_colors, ref_colors,
-                                        &num_colors, false);
+                                        false);
   }
-  printf("Number of colors needed: %d\n", num_colors);
 
-  UseParameters_test(parameters);
+  // count number of colors
+  std::unordered_set<int> set;
+  for (SizeT v = 0; v < graph.nodes; v++) {
+    int c = h_colors[v];
+    if (set.find(c) == set.end()) {
+      set.insert(c);
+      num_colors++;
+    }
+  }
+  
+  util::PrintMsg("Number of colors needed: " + num_colors, !quiet_mode);
   parameters.Set("num-colors", num_colors);
-
+  
   // compute running statistics
   info.ComputeTraversalStats(enactor, (VertexT *)NULL);
 // Display_Memory_Usage(problem);
