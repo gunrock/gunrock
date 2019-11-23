@@ -129,7 +129,7 @@ struct main_struct {
       util::PrintMsg("______ CPU Reference _____", !quiet);
 
       float elapsed = app::knn::CPU_Reference<VertexT, SizeT, ValueT>(
-              points, n, dim, k, ref_knns, quiet);
+              parameters, points, n, dim, k, ref_knns, quiet);
 
       util::PrintMsg("--------------------------\n Elapsed: " + 
               std::to_string(elapsed), !quiet);
