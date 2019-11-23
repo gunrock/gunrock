@@ -19,7 +19,7 @@
 #include <vector>
 #include <algorithm>
 
-#define debug(a...) printf(a)
+//#define debug(a...) printf(a)
 
 namespace gunrock {
 namespace app {
