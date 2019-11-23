@@ -148,14 +148,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       dim = dim_;
 
       //keys need for cub sorting, the same size like distance array
-      GUARD_CU(keys.Allocate((k+1)*num_points, target));
-      GUARD_CU(keys_out.Allocate((k+1)*num_points, target));
+      GUARD_CU(keys.Allocate(k*num_points, target));
+      GUARD_CU(keys_out.Allocate(k*num_points, target));
       
-      GUARD_CU(distance.Allocate((k+1) * num_points, target));
-      GUARD_CU(distance_out.Allocate((k+1) * num_points, target));
+      GUARD_CU(distance.Allocate(k * num_points, target));
+      GUARD_CU(distance_out.Allocate(k * num_points, target));
 
       // k-nearest neighbors
-      GUARD_CU(knns.Allocate((k+1) * num_points, target));
+      GUARD_CU(knns.Allocate(k * num_points, target));
 
       // GUARD_CU(cub_temp_storage.Allocate(1, target));
 
@@ -176,37 +176,37 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       typedef typename GraphT::CsrT CsrT;
 
       // Ensure data are allocated
-      GUARD_CU(keys.EnsureSize_((k+1) * num_points, target));
-      GUARD_CU(keys_out.EnsureSize_((k+1) * num_points, target)); 
+      GUARD_CU(keys.EnsureSize_(k * num_points, target));
+      GUARD_CU(keys_out.EnsureSize_(k * num_points, target)); 
       // GUARD_CU(cub_temp_storage.EnsureSize_(1, target));
       
-      GUARD_CU(distance.EnsureSize_((k+1) * num_points, target));
+      GUARD_CU(distance.EnsureSize_(k * num_points, target));
       GUARD_CU(distance.ForAll(
             [] __host__ __device__(ValueT * d, const SizeT &p) { 
                 d[p] = util::PreDefinedValues<ValueT>::InvalidValue;
             },
-            (k+1) * num_points, target, this->stream));
+            k * num_points, target, this->stream));
 
       // K-Nearest Neighbors
-      GUARD_CU(knns.EnsureSize_((k+1) * num_points, target));
+      GUARD_CU(knns.EnsureSize_(k * num_points, target));
       GUARD_CU(knns.ForAll(
           [] __host__ __device__(SizeT * k_, const SizeT &p) { 
             k_[p] = util::PreDefinedValues<SizeT>::InvalidValue;
           },
-          (k+1) * num_points, target, this->stream));
+          k * num_points, target, this->stream));
 
-      GUARD_CU(distance_out.EnsureSize_((k+1) * num_points, target));
+      GUARD_CU(distance_out.EnsureSize_(k * num_points, target));
       GUARD_CU(distance_out.ForAll(
             [] __host__ __device__(ValueT * d, const SizeT &p) { 
                 d[p] = util::PreDefinedValues<ValueT>::InvalidValue;
             },
-            (k+1) * num_points, target, this->stream));
+            k * num_points, target, this->stream));
    
       auto k_ = k;
       GUARD_CU(offsets.EnsureSize_(num_points+1, target));
       GUARD_CU(offsets.ForAll(
         [k_] __host__ __device__ (SizeT *ro, const SizeT &pos){
-            ro[pos] = pos*(k_+1);
+            ro[pos] = pos*(k_);
         }, num_points+1, target, this->stream));
 
       GUARD_CU(util::SetDevice(this->gpu_idx));
@@ -272,7 +272,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         GUARD_CU(util::SetDevice(this->gpu_idx[0]));
         // Extract KNNs
         // knns array
-        GUARD_CU(data_slice.knns.SetPointer(h_knns,num_points*(k+1),util::HOST));
+        GUARD_CU(data_slice.knns.SetPointer(h_knns,num_points*k,util::HOST));
         GUARD_CU(data_slice.knns.Move(util::DEVICE, util::HOST));
       }
 
@@ -282,7 +282,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           [] __host__ __device__(const SizeT &device_val, SizeT &host_val) {
             host_val = device_val;
           },
-          num_points * (k+1), util::HOST));
+          num_points * k, util::HOST));
     }
     return retval;
   }

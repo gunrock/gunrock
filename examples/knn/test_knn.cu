@@ -118,7 +118,7 @@ struct main_struct {
     util::PrintMsg("number of points " + std::to_string(n) + ", k " + std::to_string(k), !quiet); 
     // Reference result on CPU
     SizeT* ref_knns = NULL;
-    SizeT* h_knns = (SizeT*)malloc(sizeof(SizeT) * n * (k+1));
+    SizeT* h_knns = (SizeT*)malloc(sizeof(SizeT) * n * k);
 
     if (!quick) {
       // Init datastructures for reference result on GPU
