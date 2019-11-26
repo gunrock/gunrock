@@ -17,7 +17,6 @@
 #include <gunrock/oprtr/1D_oprtr/1D_scalar.cuh>
 #include <gunrock/oprtr/oprtr_base.cuh>
 #include <gunrock/oprtr/oprtr_parameters.cuh>
-#include <gunrock/util/scan_device.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -38,6 +37,23 @@ __device__ __host__ __forceinline__ OutKeyT ProcessNeighbor(
     ValueT *reduce_values_out, OpT op) {
   OutKeyT out_key = 0;
   if (op(src, dest, edge_id, input_item, input_pos, output_pos)) {
+    // if (reduce_values_in != NULL)
+    //{
+    //    ValueT reduce_value;
+    //    if ((FLAG & ReduceType_Vertex))
+    //    {
+    //        reduce_value = reduce_values_in[dest];
+    //    } else if ((FLAG & ReduceType_Edge))
+    //    {
+    //        reduce_value = reduce_values_in[edge_id];
+    //    } else if ((FLAG & ReduceType_Mask))
+    //    {
+    //        // use user-specified function to generate value to reduce
+    //    }
+    //    util::io::ModifiedStore<QUEUE_WRITE_MODIFIER>::St(
+    //        reduce_value, reduce_values_out + output_pos);
+    //}
+
     if ((FLAG & OprtrType_V2E) != 0 || (FLAG & OprtrType_E2E) != 0) {
       out_key = (OutKeyT)edge_id;
     } else
@@ -50,9 +66,20 @@ __device__ __host__ __forceinline__ OutKeyT ProcessNeighbor(
     }
   } else {
     out_key = util::PreDefinedValues<OutKeyT>::InvalidValue;
+
+    // if (reduce_values_in != NULL)
+    //    util::io::ModifiedStore<QUEUE_WRITE_MODIFIER>::St(
+    //        Reduce<ValueT, FLAG & ReduceOp_Mask>::Identity,
+    //        reduce_values_out + output_pos);
   }
 
   if (keys_out != NULL) {
+    // if (util::isValid(out_key))
+    // printf("(%3d, %3d) src = %llu, dest = %llu, edge = %llu, out_key = %llu,
+    // output_pos = %llu\n",
+    //    blockIdx.x, threadIdx.x, (unsigned long long)src,
+    //    (unsigned long long)dest, (unsigned long long)edge_id,
+    //    (unsigned long long)out_key, (unsigned long long)output_pos);
     util::io::ModifiedStore<QUEUE_WRITE_MODIFIER>::St(out_key,
                                                       keys_out + output_pos);
   }
@@ -105,6 +132,9 @@ __global__ void GetEdgeCounts(const GraphT graph, const InKeyT *keys_in,
     else
       v = graph.GetEdgeDest((keys_in == NULL) ? i : keys_in[i]);
     edge_counts[i] = graph.GetNeighborListLength(v);
+    // printf("(%3d, %3d) v = %lld, edge_counts[%lld] = %lld\n",
+    //    blockIdx.x, threadIdx.x, (unsigned long long)v,
+    //    (unsigned long long)i, (unsigned long long)(edge_counts[i]));
   }
 }
 
@@ -123,10 +153,18 @@ cudaError_t ComputeOutputLength(const GraphT graph,
   typedef typename FrontierInT::ValueT InKeyT;
   cudaError_t retval = cudaSuccess;
   if (parameters.frontier->queue_length == 0) {
+    // printf("setting output_length to 0");
     oprtr::Set_Kernel<<<1, 1, 0, parameters.stream>>>(
         parameters.frontier->output_length.GetPointer(util::DEVICE), 0, 1);
     return retval;
   }
+
+  // util::PrintMsg("output_offsets.size() = "
+  //    + std::to_string(parameters.frontier -> output_offsets.GetSize())
+  //    + ", queue_length = "
+  //    + std::to_string(parameters.frontier -> queue_length)
+  //    + ", queue_size = "
+  //    + std::to_string(frontier_in == NULL ? 0 : frontier_in -> GetSize()));
 
   int block_size = 512;
   SizeT num_blocks = parameters.frontier->queue_length / block_size + 1;
@@ -135,22 +173,20 @@ cudaError_t ComputeOutputLength(const GraphT graph,
       graph,
       (frontier_in == NULL) ? (InKeyT *)NULL
                             : frontier_in->GetPointer(util::DEVICE),
-      parameters.frontier->queue_length,
+      parameters.frontier->queue_length,  // TODO: +1?
       parameters.frontier->output_offsets.GetPointer(util::DEVICE), FLAG);
+  // util::DisplayDeviceResults(partitioned_scanned_edges,
+  // frontier_attribute->queue_length);
 
-  util::cubInclusiveSum(parameters.frontier->cub_temp_space,
-                        /*d_in=*/parameters.frontier->output_offsets,
-                        /*d_out=*/parameters.frontier->output_offsets,
-                        /*num_items=*/parameters.frontier->queue_length);
+  mgpu::Scan<mgpu::MgpuScanTypeInc>(
+      parameters.frontier->output_offsets.GetPointer(util::DEVICE),
+      parameters.frontier->queue_length,  // TODO: +1?
+      (SizeT)0, mgpu::plus<SizeT>(),
+      parameters.frontier->output_length.GetPointer(util::DEVICE),
+      (SizeT *)NULL,
+      parameters.frontier->output_offsets.GetPointer(util::DEVICE),
+      parameters.context[0]);
 
-  // This is annoying, but since cub does not support the output of reduction results
-  // along with scan results, we have to explicitly do the data movement here.
-  // TODO(yzhwang): find a way to put reduction results directly into output_length inside cub scan.
-  parameters.frontier->output_offsets.Move(util::DEVICE, util::HOST, 1, parameters.frontier->queue_length-1);
-  SizeT output_length = parameters.frontier->output_offsets.GetPointer(util::HOST)[0];
-  parameters.frontier->output_length[0] = output_length;
-  parameters.frontier->output_length.Move(util::HOST, util::DEVICE, 1, 0);
-  
   return retval;
 }
 
