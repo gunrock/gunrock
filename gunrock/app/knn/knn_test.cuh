@@ -19,7 +19,13 @@
 #include <vector>
 #include <algorithm>
 
-//#define debug(a...) printf(a)
+//#define KNN_TEST_DEBUG
+
+#ifdef KNN_TEST_DEBUG
+    #define debug(a...) printf(a)
+#else
+    #define debug(a...)
+#endif
 
 namespace gunrock {
 namespace app {
@@ -126,6 +132,22 @@ double CPU_Reference(util::Parameters &parameters,
 
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
 
+#ifdef KNN_TEST_DEBUG
+    GUARD_CU(distance.ForAll(
+        [n, dim, points, keys, k] 
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            debug("distances for all\n");
+            for (int pos=0; pos<n; ++pos){
+                debug("point %d: ", pos);
+                for (int i = 0; i<n; ++i){
+                    debug("%.lf ", d[pos*n+i]);
+                }
+                debug("\n");
+            }
+        },
+        1, util::DEVICE));
+#endif
+
     util::Array1D<uint64_t, char> temp_storage;
     util::Array1D<SizeT, ValueT> distance_out;
     util::Array1D<SizeT, SizeT>  keys_out;
@@ -149,6 +171,39 @@ double CPU_Reference(util::Parameters &parameters,
 
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
 
+#ifdef KNN_TEST_DEBUG
+    GUARD_CU(distance_out.ForAll(
+        [n, dim, points, keys, k] 
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            debug("distances_out for all\n");
+            for (int pos=0; pos<n; ++pos){
+                debug("point %d: ", pos);
+                for (int i = 0; i<n; ++i){
+                    debug("%.lf ", d[pos*n+i]);
+                }
+                debug("\n");
+            }
+        },
+        1, util::DEVICE));
+#endif
+
+#ifdef KNN_TEST_DEBUG
+    GUARD_CU(keys_out.ForAll(
+        [n, dim, points, keys, k] 
+        __host__ __device__ (SizeT* d, const SizeT &src){
+            debug("keys_out for all\n");
+            for (int pos=0; pos<n; ++pos){
+                debug("point %d: ", pos);
+                for (int i = 0; i<n; ++i){
+                    debug("%d ", d[pos*n+i]);
+                }
+                debug("\n");
+            }
+        },
+        1, util::DEVICE));
+#endif
+
+
     keys.Release(util::DEVICE);
     distance.Release(util::DEVICE);
     distance_out.Release(util::DEVICE);
@@ -165,6 +220,23 @@ double CPU_Reference(util::Parameters &parameters,
             knns_[pos * k + i] = keys_out[pos * n + i];
         },
         n*k, util::DEVICE));
+
+#ifdef KNN_TEST_DEBUG
+    GUARD_CU(knns_d.ForAll(
+        [n, dim, points, keys, k] 
+        __host__ __device__ (SizeT* d, const SizeT &src){
+            debug("knns output cpu\n");
+            for (int pos=0; pos<n; ++pos){
+                debug("point %d: ", pos);
+                for (int i = 0; i<k; ++i){
+                    debug("%d ", d[pos*k+i]);
+                }
+                debug("\n");
+            }
+        },
+        1, util::DEVICE));
+#endif
+
 
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
 
@@ -211,7 +283,7 @@ double CPU_Reference(util::Parameters &parameters,
     // debug("insertion to knns is done\n");
     // #pragma omp barrier
     
-#ifdef KNN_DEBUG
+#ifdef KNN_TEST_DEBUG
     //debug of knns
     debug("nearest neighbors\n");
     for (SizeT p = 0; p < n; ++p) {

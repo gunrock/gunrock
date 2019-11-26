@@ -154,6 +154,8 @@ cudaError_t RunTests(util::Parameters &parameters,
           debug("\n");
       }
 #endif
+
+      util::PrintMsg("-------------Validation-----------");
       SizeT num_errors =
           Validate_Results(parameters, graph, h_knns, ref_knns, points, false);
     }
@@ -174,6 +176,7 @@ cudaError_t RunTests(util::Parameters &parameters,
 #endif
 
   if (validation == "last") {
+      util::PrintMsg("-------------Validation-----------");
     SizeT num_errors =
         Validate_Results(parameters, graph, h_knns, ref_knns, points, false);
   }
