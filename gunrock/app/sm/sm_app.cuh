@@ -29,8 +29,8 @@ namespace gunrock {
 namespace app {
 namespace sm {
 
-template <typename ParametersT>
-cudaError_t UseParameters(ParametersT &parameters);
+// template <typename ParametersT>
+cudaError_t UseParameters(util::Parameters &parameters);
 
 /**
  * @brief Run SM tests
@@ -162,14 +162,14 @@ double gunrock_sm(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    problem.Init(data_graph, target);
+    problem.Init(data_graph, query_graph, target);
     enactor.Init(problem   , target);
 
     int num_runs = parameters.Get<int>("num-runs");
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
         problem.Reset(target);
-        enactor.Reset(target);
+        enactor.Reset(data_graph.edges, target);
 
         cpu_timer.Start();
         enactor.Enact();

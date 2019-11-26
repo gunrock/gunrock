@@ -26,15 +26,14 @@
 #include <gunrock/oprtr/1D_oprtr/for.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
-//#define KNN_DEBUG 1
+#include <cstdio>
 
-#define debug2(a...)
-//#define debug2(a...) printf(a)
-
-#ifdef KNN_DEBUG
-#define debug(a...) printf(a)
+//do not remove debug
+// #define KNN_ENACTOR_DEBUG
+#ifdef KNN_ENACTOR_DEBUG
+    #define debug(a...) printf(a)
 #else
-#define debug(a...)
+    #define debug(a...)
 #endif
 
 namespace gunrock {
@@ -85,96 +84,192 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
 
     auto &enactor_stats = enactor_slice.enactor_stats;
-    auto &graph = data_slice.sub_graph[0];
-    auto nodes = graph.nodes;
-    auto edges = graph.edges;
     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
-    auto &iteration = enactor_stats.iteration;
-
-    // struct Point()
     auto &keys = data_slice.keys;
-    auto &distances = data_slice.distances;
+    auto &distance = data_slice.distance;
 
     // K-Nearest Neighbors
     auto &knns = data_slice.knns;
 
     // Number of KNNs
     auto k = data_slice.k;
+    // Number of points
+    auto num_points = data_slice.num_points;
+    // Dimension of labels
+    auto dim = data_slice.dim;
 
-    // Reference Point
-    auto ref_src = data_slice.point_x;
-    auto ref_dest = data_slice.point_y;
+    // List of points
+    auto &points = data_slice.points;
+    auto &offsets = data_slice.offsets;
 
     // CUB Related storage
     auto &cub_temp_storage = data_slice.cub_temp_storage;
 
     // Sorted arrays
     auto &keys_out = data_slice.keys_out;
-    auto &distances_out = data_slice.distances;
+    auto &distance_out = data_slice.distance_out;
 
     cudaStream_t stream = oprtr_parameters.stream;
     auto target = util::DEVICE;
-    util::Array1D<SizeT, VertexT> *null_frontier = NULL;
 
     // Define operations
+ 
+    // auto k = k + 1;
 
-    // advance operation
-    auto distance_op = [keys, distances, ref_src, ref_dest] __host__ __device__(
-                           const VertexT &src, VertexT &dest,
-                           const SizeT &edge_id, const VertexT &input_item,
-                           const SizeT &input_pos, SizeT &output_pos) -> bool {
-      // Calculate distance between src to edge vertex ref: (x,y)
-      VertexT distance = (src - ref_src) * (src - ref_src) +
-                         (dest - ref_dest) * (dest - ref_dest);
-
-      // struct Point()
-      keys[edge_id] = edge_id;
-      distances[edge_id] = distance;
-      return true;
-    };
-
-    oprtr_parameters.advance_mode = "ALL_EDGES";
-
-    // Compute distances
-    GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-        graph.csr(), null_frontier, null_frontier, oprtr_parameters,
-        distance_op));
-
-    // Sort all the distances using CUB
-    GUARD_CU(util::cubSegmentedSortPairs(cub_temp_storage, distances,
-                                         distances_out, keys, keys_out, edges,
-                                         nodes, graph.CsrT::row_offsets, 0,
-                                         std::ceil(std::log2(nodes)), stream));
-
-    // Get reverse keys_out array
-    GUARD_CU(keys.ForAll(
-        [keys_out] __host__ __device__(SizeT * k, const SizeT &pos) {
-          k[keys_out[pos]] = pos;
+#ifdef KNN_ENACTOR_DEBUG
+    GUARD_CU(points.ForAll(
+                [num_points, dim]
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            for (int i=0; i<num_points; ++i){
+                debug("point %d: ", i);
+                for (int j=0; j<dim; ++j){
+                    debug("%lf ", d[i*dim + j]);
+                }
+                debug("\n");
+            }
         },
-        edges, target, stream));
+        1, target, stream));
+#endif
 
+    // Compute the distance array and define keys
+    GUARD_CU(distance.ForAll(
+        [num_points, dim, points, keys, k] 
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            auto pos = src / k;
+            auto i = src % k;
+            ValueT dist = 0;
+            if (pos == i) {
+                dist = util::PreDefinedValues<ValueT>::MaxValue;
+            } else {
+                dist = euclidean_distance(dim, points, pos, i);
+            }
+            // auto dist = euclidean_distance(dim, points, pos, i);
+            // printf("distance: %d %d = %lf\n", pos, i, dist);
+            d[pos * k + i] = dist;
+            keys[pos * k + i] = i;
+        },
+        num_points*k, target, stream));
+ 
+#ifdef KNN_ENACTOR_DEBUG
+    GUARD_CU(distance.ForAll(
+        [num_points, k] 
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            debug("distances\n");
+            for (int i=0; i<num_points; ++i){
+                debug("point %d: ", i);
+                for (int j=0; j<k; ++j){
+                    debug("%.lf ", d[i*k + j]);
+                }
+                debug("\n");
+            }
+        },
+        1, target, stream));
+#endif
+  
+    // Sort all the distance using CUB
+    GUARD_CU(util::cubSegmentedSortPairs(cub_temp_storage, 
+                distance, distance_out, keys, keys_out, num_points*k,
+                num_points, offsets, 0, sizeof(ValueT) * 8, stream));
+
+#ifdef KNN_ENACTOR_DEBUG
+    GUARD_CU(distance_out.ForAll(
+        [num_points, k] 
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            debug("distances after sorting\n");
+            for (int i=0; i<num_points; ++i){
+                debug("point %d: ", i);
+                for (int j=0; j<k; ++j){
+                    debug("%.lf ", d[i*k + j]);
+                }
+                debug("\n");
+            }
+        },
+        1, target, stream));
+#endif
+
+    GUARD_CU(distance_out.ForAll(
+        [num_points, k, dim, points, keys_out] 
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            for (SizeT i = k; i<num_points; ++i){
+                ValueT new_dist = 0;
+                if (src == i) {
+                    new_dist = util::PreDefinedValues<ValueT>::MaxValue;
+                } else {
+                    new_dist = euclidean_distance(dim, points, src, i);
+                }
+                // auto new_dist = euclidean_distance(dim, points, src, i);
+                if (new_dist >= d[src * k + k-1]) {
+                    // new element is larger than the largest in distance array for "src" row
+                    continue;
+                }
+                // new_dist < d[src * k + k]
+                SizeT current = k-1;
+                SizeT one_before = current-1;
+                while (current > 0) {
+                    if (new_dist >= d[src * k + one_before]){
+                        d[src * k + current] = new_dist;
+                        keys_out[src * k + current] = i;
+                        break;
+                    } else {
+                        //new_dist < d[src * k + one_before]
+                        d[src * k + current] = d[src * k + one_before];
+                        keys_out[src * k + current] = keys_out[src * k + one_before];
+                        --current;
+                        --one_before;
+                        if (current == (SizeT)0){
+                            d[src * k] = new_dist;
+                            keys_out[src * k] = i;
+                        }
+                    }
+                }
+            }
+        },
+        num_points, target, stream));
+ 
+#ifdef KNN_ENACTOR_DEBUG
+    GUARD_CU(distance_out.ForAll(
+        [num_points, k] 
+        __host__ __device__ (ValueT* d, const SizeT &src){
+            debug("sorted distances with included n-k next points\n");
+            for (int i=0; i<num_points; ++i){
+                debug("point %d: ", i);
+                for (int j=0; j<k; ++j){
+                    debug("%.lf ", d[i*k + j]);
+                }
+                debug("\n");
+            }
+        },
+        1, target, stream));
+#endif
+    
     // Choose k nearest neighbors for each node
     GUARD_CU(knns.ForAll(
-        [graph, k, keys, keys_out, nodes] __host__ __device__(
-            SizeT * knns_, const SizeT &src) {
-          auto pos = src / nodes;
-          auto i = src % nodes;
-          // go to first nearest neighbor
-          auto e_start = graph.CsrT::GetNeighborListOffset(pos);
-          auto num_neighbors = graph.CsrT::GetNeighborListLength(pos);
-          if (i < k && i < num_neighbors) {
-            auto e = e_start + i;
-            auto m = graph.CsrT::GetEdgeDest(keys_out[keys[e]]);
-            knns_[k * pos + i] = m;
-          }
+        [num_points, k, keys_out] 
+        __host__ __device__(SizeT* knns_, const SizeT &src){
+            auto pos = src/k;
+            auto i = src%k;
+            knns_[pos * k + i] = keys_out[pos * k + i];
         },
-        nodes * nodes, target, stream));
+        num_points*k, target, stream));
 
-    GUARD_CU(frontier.work_progress.GetQueueLength(
-        frontier.queue_index, frontier.queue_length, false, stream, true));
-
+#ifdef KNN_ENACTOR_DEBUG
+    GUARD_CU(knns.ForAll(
+        [num_points, k, keys_out] 
+        __host__ __device__(SizeT* knns_, const SizeT &src){
+            debug("knns output:\n");
+            for (int i=0; i<num_points; ++i){
+                debug("point %d\n", i);
+                for (int j=0; j<k; ++j){
+                    debug("%d ", knns_[i*k + j]);
+                }
+                debug("\n");
+            }
+        },
+        1, target, stream));
+ 
+#endif
     return retval;
   }
 
@@ -198,17 +293,17 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
     // auto iteration = enactor_slice.enactor_stats.iteration;
     // TODO: add problem specific data alias here, e.g.:
-    // auto         &distances          =   data_slice.distances;
+    // auto         &distance          =   data_slice.distance;
 
     auto expand_op = [
                          // TODO: pass data used by the lambda, e.g.:
-                         // distances
+                         // distance
     ] __host__ __device__(VertexT & key, const SizeT &in_pos,
                           VertexT *vertex_associate_ins,
                           ValueT *value__associate_ins) -> bool {
       // TODO: fill in the lambda to combine received and local data, e.g.:
       // ValueT in_val  = value__associate_ins[in_pos];
-      // ValueT old_val = atomicMin(distances + key, in_val);
+      // ValueT old_val = atomicMin(distance + key, in_val);
       // if (old_val <= in_val)
       //     return false;
       return true;
@@ -294,19 +389,16 @@ class Enactor
   cudaError_t Init(Problem &problem, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     this->problem = &problem;
+    SizeT num_points = problem.num_points;
+    SizeT neighbors = num_points * num_points;
 
     // Lazy initialization
-    GUARD_CU(BaseEnactor::Init(
-        problem, Enactor_None,
-        // <TODO> change to how many frontier queues, and their types
-        2, NULL,
-        // </TODO>
-        target, false));
+    GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL,target, false));
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       auto &enactor_slice = this->enactor_slices[gpu * this->num_gpus + 0];
       auto &graph = problem.sub_graphs[gpu];
-      GUARD_CU(enactor_slice.frontier.Allocate(graph.nodes, graph.edges,
+      GUARD_CU(enactor_slice.frontier.Allocate(num_points, neighbors,
                                                this->queue_factors));
     }
 
@@ -339,13 +431,14 @@ class Enactor
    * @param[in] target Target location of data
    * \return cudaError_t error message(s), if any
    */
-  cudaError_t Reset(util::Location target = util::DEVICE) {
+  cudaError_t Reset(SizeT n, SizeT k, util::Location target = util::DEVICE) {
     typedef typename GraphT::GpT GpT;
+    typedef typename GraphT::VertexT VertexT;
     cudaError_t retval = cudaSuccess;
 
     GUARD_CU(BaseEnactor::Reset(target));
 
-    SizeT nodes = this->problem->data_slices[0][0].sub_graph[0].nodes;
+    SizeT nodes = n;
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       if (this->num_gpus == 1) {
@@ -366,7 +459,6 @@ class Enactor
                 tmp,
                 [] __host__ __device__(VertexT & v, VertexT & i) { v = i; },
                 nodes, target, 0));
-
             tmp.Release();
           }
         }
