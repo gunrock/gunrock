@@ -169,7 +169,7 @@ double gunrock_sm(
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
         problem.Reset(target);
-        enactor.Reset(data_graph.edges, target);
+        enactor.Reset(target);
 
         cpu_timer.Start();
         enactor.Enact();
