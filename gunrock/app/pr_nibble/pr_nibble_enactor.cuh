@@ -86,7 +86,6 @@ struct PRNibbleIterationLoop
     auto &alpha = data_slice.alpha;
     auto &rho = data_slice.rho;
     auto &eps = data_slice.eps;
-    auto &max_iter = data_slice.max_iter;
 
     auto &src_node = data_slice.src;
     auto &src_neib = data_slice.src_neib;
