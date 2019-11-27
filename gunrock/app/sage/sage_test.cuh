@@ -101,24 +101,12 @@ double CPU_Reference(util::Parameters &para, const GraphT &graph,
   cpu_timer.Start();
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::SizeT SizeT;
-  // typedef std::pair<VertexT, ValueT> PairT;
-  // struct GreaterT
-  //{
-  //    bool operator()(const PairT& lhs, const PairT& rhs)
-  //    {
-  //        return lhs.second > rhs.second;
-  //    }
-  //};
-  // typedef std::priority_queue<PairT, std::vector<PairT>, GreaterT> PqT;
-  // auto &para = this -> parameters;
 
   int batch_size = para.template Get<int>("batch-size");
   int feature_column = para.template Get<int>("feature-column");
   int num_children_per_source =
       para.template Get<int>("num-children-per-source");
-  int Wf1_dim0 = feature_column;
   int Wf1_dim1 = para.template Get<int>("Wf1-dim1");
-  int Wa1_dim0 = feature_column;
   int Wa1_dim1 = para.template Get<int>("Wa1-dim1");
   int Wf2_dim0 = Wf1_dim1 + Wa1_dim1;
   int Wf2_dim1 = para.template Get<int>("Wf2-dim1");
@@ -135,9 +123,6 @@ double CPU_Reference(util::Parameters &para, const GraphT &graph,
   if (!util::isValid(rand_seed)) rand_seed = time(NULL);
   util::PrintMsg("rand-seed = " + std::to_string(rand_seed), !quiet);
 
-  // util::PrintMsg("CPU_Reference entered", !quiet);
-  // int num_batch = graph.nodes / batch_size ;
-  // int off_site = graph.nodes - num_batch * batch_size ;
   // batch of nodes
   SizeT num_dangling_vertices = 0;
   for (VertexT source_start = 0; source_start < graph.nodes;
