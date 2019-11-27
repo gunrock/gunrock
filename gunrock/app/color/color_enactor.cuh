@@ -100,7 +100,6 @@ struct ColorIterationLoop
     auto stream = oprtr_parameters.stream;
     util::Array1D<SizeT, VertexT> *null_frontier = NULL;
     auto null_ptr = null_frontier;
-    auto user_iter = data_slice.user_iter;
     auto gen = data_slice.gen;
 
     //======================================================================//
