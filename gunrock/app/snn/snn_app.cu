@@ -105,6 +105,7 @@ cudaError_t RunTests(
     SizeT *h_knns,
     SizeT *h_cluster, SizeT *ref_cluster,
     SizeT *h_core_point_counter, SizeT *ref_core_point_counter,
+    SizeT *h_noise_point_counter, SizeT *ref_noise_point_counter, 
     SizeT *h_cluster_counter, SizeT *ref_cluster_counter, 
     util::Location target) {
   cudaError_t retval = cudaSuccess;
@@ -153,10 +154,12 @@ cudaError_t RunTests(
 
     if (validation == "each") {
       GUARD_CU(problem.Extract(num_points, k, h_cluster, h_core_point_counter,
-                  h_cluster_counter));
+                  h_noise_point_counter, h_cluster_counter));
       SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
-                               h_core_point_counter, h_cluster_counter,
+                               h_core_point_counter, h_noise_point_counter, 
+                               h_cluster_counter,
                                ref_cluster, ref_core_point_counter, 
+                               ref_noise_point_counter, 
                                ref_cluster_counter, false);
     }
   }
@@ -164,12 +167,14 @@ cudaError_t RunTests(
   cpu_timer.Start();
 
   GUARD_CU(problem.Extract(num_points, k, h_cluster, h_core_point_counter, 
-              h_cluster_counter));
+              h_noise_point_counter, h_cluster_counter));
   if (validation == "last") {
     SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
-                                h_core_point_counter, h_cluster_counter,
+                                h_core_point_counter, h_noise_point_counter, 
+                                h_cluster_counter,
                                 ref_cluster, ref_core_point_counter, 
-                                ref_cluster_counter, /*h_knns, ref_knns,*/false);
+                                ref_noise_point_counter, 
+                                ref_cluster_counter, false);
   }
 
   // compute running statistics

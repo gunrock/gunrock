@@ -141,13 +141,17 @@ __device__ static double atomicAdd(double* addr, double val) {
 #else
 #endif
 
+__device__ static uint64_t atomicCAS(uint64_t* addr, uint64_t comp, uint64_t val) {
+  return (uint64_t)atomicCAS((unsigned long long*)addr,
+                              (unsigned long long)comp,
+                              (unsigned long long)val);
+}
 __device__ static long long atomicCAS(long long* addr, long long comp,
                                       long long val) {
   return (long long)atomicCAS((unsigned long long*)addr,
                               (unsigned long long)comp,
                               (unsigned long long)val);
 }
-
 __device__ static float atomicCAS(float* addr, float comp, float val) {
   return __int_as_float(
       atomicCAS((int*)addr, __float_as_int(comp), __float_as_int(val)));
@@ -163,7 +167,11 @@ __device__ static long long atomicAdd(long long* addr, long long val) {
   return (long long)atomicAdd((unsigned long long*)addr,
                               (unsigned long long)val);
 }
-
+/*
+__device__ static uint64_t atomicAdd(uint64_t* addr, uint64_t val) {
+  return (uint64_t)atomicAdd((unsigned long long*)addr,
+                              (unsigned long long)val);
+}*/
 #if ULONG_MAX == ULLONG_MAX
 __device__ static unsigned long atomicAdd(unsigned long* addr,
                                           unsigned long val) {
@@ -188,6 +196,10 @@ break; if (old_value == pre_value) break; pre_value = old_value;
     return old_value;
 }*/
 #endif
+__device__ static uint64_t atomicExch(uint64_t* addr, uint64_t val) {
+  return (uint64_t)atomicExch((unsigned long long int*)addr,
+                             (unsigned long long int)val);
+}
 
 //#if UINT64_MAX != ULLONG_MAX
 __device__ static uint64_t atomicMin(uint64_t* addr, uint64_t val) {

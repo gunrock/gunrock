@@ -76,7 +76,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, SizeT> core_point_mark_0;
     util::Array1D<SizeT, SizeT> core_point_mark;
     util::Array1D<SizeT, SizeT, util::PINNED> core_points_counter;
+    util::Array1D<SizeT, SizeT> noise_points;
     util::Array1D<SizeT, SizeT> core_points;
+    util::Array1D<SizeT, char> visited;
 
     // Nearest Neighbors
     util::Array1D<SizeT, SizeT> knns;
@@ -101,11 +103,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       core_point_mark_0.SetName("core_point_mark_0");
       core_points.SetName("core_points");
       core_points_counter.SetName("core_points_counter");
+      noise_points.SetName("noise_points");
       cluster_id.SetName("cluster_id");
       snn_density.SetName("snn_density");
       cub_temp_storage.SetName("cub_temp_storage");
       knns_out.SetName("knns_out");
       offsets.SetName("offsets");
+      visited.SetName("visited");
     }
 
     /*
@@ -125,6 +129,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(core_point_mark_0.Release(target));
       GUARD_CU(core_point_mark.Release(target));
       GUARD_CU(core_points_counter.Release(target | util::HOST));
+      GUARD_CU(noise_points.Release(target | util::HOST));
       GUARD_CU(cluster_id.Release(target));
       GUARD_CU(snn_density.Release(target));
       GUARD_CU(knns.Release(target));
@@ -132,6 +137,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(knns_out.Release(target));
       GUARD_CU(BaseDataSlice ::Release(target));
       GUARD_CU(offsets.Release(target));
+      GUARD_CU(visited.Release(target));
       return retval;
     }
 
@@ -164,9 +170,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(core_point_mark_0.Allocate(num_points, target));
       GUARD_CU(core_point_mark.Allocate(num_points, target));
       GUARD_CU(core_points_counter.Allocate(1, target | util::HOST));
+      GUARD_CU(noise_points.Allocate(1, target | util::HOST));
       GUARD_CU(cub_temp_storage.Allocate(1, target));
       GUARD_CU(knns_out.Allocate(k * num_points, target));
       GUARD_CU(offsets.Allocate(num_points+1, target));
+      GUARD_CU(visited.Allocate(num_points, target));
 //      if (target & util::DEVICE) {
 //        GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
 //      }
@@ -218,11 +226,23 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           },
           num_points, util::DEVICE, this->stream));
 
+      GUARD_CU(visited.EnsureSize_(num_points, target));
+      GUARD_CU(visited.ForAll(
+          [] __host__ __device__ (char *v, const SizeT &p){
+            v[p] = (char)0;
+          },
+          num_points, util::DEVICE, this->stream));
+
       GUARD_CU(core_points_counter.EnsureSize_(1, target | util::HOST));
       GUARD_CU(core_points_counter.ForAll(
           [] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = 0; }, 1,
           util::DEVICE, this->stream));
 
+      GUARD_CU(noise_points.EnsureSize_(1, target | util::HOST));
+      GUARD_CU(noise_points.ForAll(
+          [] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = 0; }, 1,
+          util::DEVICE, this->stream));
+      
       GUARD_CU(knns_out.EnsureSize_(num_points*k, target));
 
       GUARD_CU(offsets.EnsureSize_(num_points+1, target));
@@ -293,13 +313,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * \return     cudaError_t Error message(s), if any
    */
   cudaError_t Extract(SizeT num_points, SizeT k, SizeT *h_cluster,
-                      SizeT *h_core_point_counter, SizeT *h_cluster_counter,
+                      SizeT *h_core_point_counter, SizeT *h_noise_point_counter,
+                      SizeT *h_cluster_counter,
                       util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     auto &data_slice = data_slices[0][0];
 
     auto cluster_id = data_slice.cluster_id;
     auto core_points = data_slice.core_points;
+    auto noise_points = data_slice.noise_points;
 
     if (this->num_gpus == 1) {
       // Set device
@@ -333,8 +355,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         delete[] h_core_points;
 
         h_core_point_counter[0] = data_slice.core_points_counter[0];
+        GUARD_CU(noise_points.SetPointer(h_noise_point_counter, 1, util::HOST));
+        GUARD_CU(noise_points.Move(util::DEVICE, util::HOST));
         util::PrintMsg("[GPU] Core points: " + 
                 std::to_string(h_core_point_counter[0]) +
+                " Noise points: " + 
+                std::to_string(h_noise_point_counter[0]) +
                 ". Clusters: " + std::to_string(h_cluster_counter[0]),false);
       }
     } else if (target == util::HOST) {

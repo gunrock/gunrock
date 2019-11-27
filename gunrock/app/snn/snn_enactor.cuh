@@ -110,6 +110,8 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &core_points_counter = data_slice.core_points_counter;
     auto &core_point_mark_0 = data_slice.core_point_mark_0;
     auto &core_point_mark = data_slice.core_point_mark;
+    auto &visited = data_slice.visited;
+    auto &noise_points = data_slice.noise_points;
 
     // CUB Related storage
     auto &cub_temp_storage = data_slice.cub_temp_storage;
@@ -120,6 +122,21 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto target = util::DEVICE;
     util::Array1D<SizeT, VertexT> *null_frontier = NULL;
     oprtr_parameters.advance_mode = "ALL_EDGES";
+
+
+    GUARD_CU(knns.ForAll(
+          [num_points, k, noise_points] 
+          __host__ __device__(SizeT * knns_, const SizeT &pos) {
+          noise_points[0] = 0;
+          printf("noise point = %d\n", noise_points[0]);
+          for (int i=0; i<num_points; ++i){
+            for (int j=0; j<k; ++j){
+                assert(knns_[i*k + j] != i);
+
+            }
+          }
+          }, 1, target, stream));
+    
 
 #ifdef SNN_DEBUG
     // DEBUG ONLY
@@ -141,6 +158,15 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     GUARD_CU(util::SegmentedSort(knns, knns_sorted, num_points*k,
                 num_points, offsets));
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+    GUARD_CU2(cudaStreamSynchronize(stream), "cudaDeviceSynchronize failed.");
+    
+    GUARD_CU(knns_sorted.ForAll(
+          [num_points, k] 
+          __host__ __device__(SizeT * knns_, const SizeT &pos) {
+            auto i = pos/k;
+            auto j = pos%k;
+            assert(knns_[i*k + j] != i);
+          }, num_points*k, target, stream));
 
 #ifdef SNN_DEBUG
     // DEBUG ONLY
@@ -160,9 +186,9 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           
     // SNN density of each point
     auto density_op = 
-        [num_points, k, eps, min_pts, knns_sorted, snn_density]
+        [num_points, k, eps, min_pts, knns_sorted, snn_density, visited]
         __host__ __device__ (VertexT *v, const SizeT &pos){
-     //     for (int pos = 0; pos < k*num_points; ++pos){ //uncomment for debug
+//          for (int pos = 0; pos < k*num_points; ++pos){                       //uncomment for debug
           auto x = pos/k;
           auto q = knns_sorted[x * k + (pos%k)];
           //   continue;
@@ -173,19 +199,22 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           for (int i = 0; i < k; ++i){
             if (knns_sorted[q * k + i] == x){
               auto similarity = SNNsimilarity(x, q, knns_sorted, eps, k);
-              if (similarity >= eps){
+              if (similarity > eps){
                   // x and q are SNN
                   atomicAdd(&snn_density[x], 1);
+                  visited[x] = 1;
               }
               break;
             }
           }
-    //      }       //uncomment for debug
+//          }                                                                   //uncomment for debug
         };
     // Find density of each point
     GUARD_CU(frontier.V_Q()->ForAll(density_op, num_points*k, target, stream));
-    //uncomment for debug
-    //GUARD_CU(frontier.V_Q()->ForAll(density_op, 1, target, stream)); 
+//    GUARD_CU(frontier.V_Q()->ForAll(density_op, 1, target, stream));         //uncomment for debug
+    GUARD_CU2(cudaStreamSynchronize(stream), "cudaDeviceSynchronize failed.");
+    GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
+    
  
 /*    auto intersect_op =
         [num_points, k, eps, min_pts, knns_sorted, snn_density]
@@ -207,16 +236,20 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
          
     // Mark core points
     GUARD_CU(core_point_mark_0.ForAll(
-        [snn_density, min_pts] 
+        [snn_density, min_pts, cluster_id, visited] 
         __host__ __device__(SizeT* cp, const SizeT &pos) {
-          if (snn_density[pos] >= min_pts) {
+          if (visited[pos] && snn_density[pos] >= min_pts) {
             cp[pos] = 1;
+            cluster_id[pos] = pos;
           }
         }, num_points, target, stream));
 
     GUARD_CU(util::cubInclusiveSum(cub_temp_storage, core_point_mark_0,
                                      core_point_mark, num_points, stream));
 
+     
+    GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
+    GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
     GUARD_CU(core_points.ForAll(
         [num_points, core_point_mark, core_points_counter] 
         __host__ __device__(SizeT * cps, const SizeT &pos) {
@@ -248,6 +281,7 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         [num_points, eps, k, core_point_mark, core_points, core_points_counter,
         knns_sorted, cluster_id]
         __host__ __device__ (const int &cos, const SizeT &pos){
+          assert(core_points_counter[0] > pos/k);
           // x core point
           auto x = core_points[pos/k];
           auto q = knns_sorted[x * k + (pos%k)];
@@ -265,17 +299,20 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
               // x is k nearest neighbor of q as well then ...
               auto SNNsm = SNNsimilarity(x, q, knns_sorted, eps, k);
               debug("%d and %d share %d neighbors\n", x, q, SNNsm);
-              if (SNNsm >= eps){
+              if (SNNsm > eps){
                 // ... if x and q are shared nearest neighbors then merge them
                 auto cluster_id_x = cluster_id[x];
                 if (!util::isValid(cluster_id_x))
-                    cluster_id_x = x;
+                    atomicCAS(cluster_id + x, cluster_id_x, x);
                 auto cluster_id_q = cluster_id[q];
                 if (!util::isValid(cluster_id_q))
-                    cluster_id_q = q;
+                    atomicCAS(cluster_id + q, cluster_id_q, q);
+                cluster_id_x = cluster_id[x];
+                cluster_id_q = cluster_id[q];
                 auto cluster_min = min(cluster_id_x, cluster_id_q);
                 atomicMin(cluster_id + x, cluster_min);
                 atomicMin(cluster_id + q, cluster_min);
+                debug("merge %d and %d to cluster %d\n", x, q, cluster_min);
               }
               break;
             }
@@ -284,6 +321,7 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
      GUARD_CU(core_points_counter.Move(util::DEVICE, util::HOST, 1, 0, stream));
      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+     GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
      
      printf("GPU number of core points found: %d\n", core_points_counter[0]);
 
@@ -296,9 +334,24 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
          util::PreDefinedValues<int>::InvalidValue,  // block_size
          2);
      
+     GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+     GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
+ 
+#ifdef SNN_DEBUG
+     // DEBUG ONLY: write down densities:
+    GUARD_CU(cluster_id.ForAll(
+        [num_points, k]
+        __host__ __device__ (SizeT* c_id, const SizeT &pos){
+          debug("clusters after merging core points: \n");
+          for (int i=0; i<num_points; ++i){
+            debug("cluster[%d] = %d\n", i, c_id[i]);
+          }
+        }, 1, target, stream));
+#endif
+     
      // Assign other non-core and non-noise points to clusters
      auto clustering_op = 
-        [core_point_mark, eps, k, cluster_id, min_pts, knns_sorted] 
+        [core_point_mark, eps, k, cluster_id, min_pts, knns_sorted, noise_points] 
         __host__ __device__(VertexT * v_q, const SizeT &src) {
           // only non-core points
           if ((src == 0 && core_point_mark[src] == 1) || 
@@ -318,25 +371,27 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             }
           }
           // only non-noise points
-          if (util::isValid(max_y) && counterMax >= eps){
+          if (util::isValid(max_y) && counterMax > eps){
             auto c_id = cluster_id[max_y];
-            if (!util::isValid(c_id))
-                c_id = max_y;
-            cluster_id[src] = c_id;
+            cluster_id[src] = cluster_id[max_y];
           }else{
             cluster_id[src] = util::PreDefinedValues<SizeT>::InvalidValue;
+            atomicAdd(&noise_points[0], 1);
           }
         };
 
      // Assign other non-core and non-noise points to clusters
      GUARD_CU(frontier.V_Q()->ForAll(clustering_op, num_points, target, stream));
 
+     GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+     GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
+     
 #ifdef SNN_DEBUG
      // DEBUG ONLY: write down densities:
     GUARD_CU(cluster_id.ForAll(
         [num_points, k]
         __host__ __device__ (SizeT* c_id, const SizeT &pos){
-          debug("clusters: \n");
+          debug("clusters after adding non core points: \n");
           for (int i=0; i<num_points; ++i){
             debug("cluster[%d] = %d\n", i, c_id[i]);
           }

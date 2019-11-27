@@ -168,11 +168,13 @@ struct main_struct {
     // Reference result on CPU
     SizeT* ref_cluster = NULL;
     SizeT* ref_core_point_counter = NULL;
+    SizeT* ref_noise_point_counter = NULL;
     SizeT* ref_cluster_counter = NULL;
 
     // Result on GPU
     SizeT* h_cluster = (SizeT*)malloc(sizeof(SizeT) * num_points);
     SizeT* h_core_point_counter = (SizeT*)malloc(sizeof(SizeT));
+    SizeT* h_noise_point_counter = (SizeT*)malloc(sizeof(SizeT));
     SizeT* h_cluster_counter = (SizeT*)malloc(sizeof(SizeT));
 
     if (!quick) {
@@ -180,6 +182,7 @@ struct main_struct {
       ref_cluster = (SizeT*)malloc(sizeof(SizeT) * num_points);
       for (auto i = 0; i < num_points; ++i) ref_cluster[i] = i;
       ref_core_point_counter = (SizeT*)malloc(sizeof(SizeT));
+      ref_noise_point_counter = (SizeT*)malloc(sizeof(SizeT));
       ref_cluster_counter = (SizeT*)malloc(sizeof(SizeT));
 
       // If not in `quick` mode, compute CPU reference implementation
@@ -188,7 +191,7 @@ struct main_struct {
 
       float elapsed = app::snn::CPU_Reference(graph.csr(), num_points, k, 
               eps, min_pts, h_knns, ref_cluster, ref_core_point_counter,
-              ref_cluster_counter, !quiet);
+              ref_noise_point_counter, ref_cluster_counter, !quiet);
 
       util::PrintMsg("--------------------------\n Elapsed: " 
               + std::to_string(elapsed), !quiet);
@@ -200,13 +203,13 @@ struct main_struct {
 
     GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
         [num_points, k, eps, min_pts, h_knns, h_cluster, h_core_point_counter,
-         h_cluster_counter, ref_core_point_counter, ref_cluster_counter,
-         ref_cluster]
+         h_noise_point_counter, h_cluster_counter, ref_core_point_counter, 
+         ref_noise_point_counter, ref_cluster_counter, ref_cluster]
          (util::Parameters& parameters, GraphT& graph) {
           return app::snn::RunTests(parameters, graph, num_points, k, eps, 
-                  min_pts, 
-                  h_knns, h_cluster, ref_cluster, h_core_point_counter,
-                  ref_core_point_counter, h_cluster_counter,
+                  min_pts, h_knns, h_cluster, ref_cluster, h_core_point_counter,
+                  ref_core_point_counter, h_noise_point_counter,  
+                  ref_noise_point_counter, h_cluster_counter,
                   ref_cluster_counter, util::DEVICE);
         }));
 
@@ -214,6 +217,7 @@ struct main_struct {
       delete[] h_knns;
       delete[] ref_cluster;
       delete[] ref_core_point_counter;
+      delete[] ref_noise_point_counter;
       delete[] ref_cluster_counter;
     }
 
@@ -224,7 +228,7 @@ struct main_struct {
 
 int main(int argc, char** argv) {
   cudaError_t retval = cudaSuccess;
-  util::Parameters parameters("test knn");
+  util::Parameters parameters("test snn");
   GUARD_CU(graphio::UseParameters(parameters));
   GUARD_CU(app::snn::UseParameters(parameters));
   GUARD_CU(app::UseParameters_test(parameters));
@@ -237,7 +241,7 @@ int main(int argc, char** argv) {
 
   return app::Switch_Types<app::VERTEXT_U32B | app::VERTEXT_U64B |
                            app::SIZET_U32B | app::SIZET_U64B |
-                           app::VALUET_S64B | app::DIRECTED | app::UNDIRECTED>(
+                           app::VALUET_F64B | app::UNDIRECTED>(
       parameters, main_struct());
 }
 
