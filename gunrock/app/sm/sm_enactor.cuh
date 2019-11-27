@@ -209,10 +209,11 @@ struct SMIterationLoop : public IterationLoopBase
         size_t pointer_head = 0;
         for (int iter = 0; iter < 1; ++iter) {
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-                graph.csr(), complete_graph, complete_graph,
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
                 oprtr_parameters, advance_op));
         }
 
+	frontier.queue_reset = false;
         for (int iter = 0; iter < nodes_query; ++iter) {
             // set counter to be equal to iter
             GUARD_CU(counter.ForAll([iter]
@@ -223,7 +224,7 @@ struct SMIterationLoop : public IterationLoopBase
             counter.Print();
 
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-                graph.csr(), complete_graph, complete_graph,
+                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
                 oprtr_parameters, prune_op));
 
             if (iter > 0) {
@@ -437,39 +438,42 @@ public:
      * @param[in] target Target location of data
      * \return cudaError_t error message(s), if any
      */
-    cudaError_t Reset(
-          SizeT num_srcs,
-          VertexT src = 0,
-          util::Location target = util::DEVICE) {
+    cudaError_t Reset(util::Location target = util::DEVICE) {
         typedef typename GraphT::GpT GpT;
         cudaError_t retval = cudaSuccess;
+
         GUARD_CU(BaseEnactor::Reset(target));
 
-        // <TODO> Initialize frontiers according to the algorithm:
-        // In this case, we add a single `src` to the frontier
+        SizeT nodes = this->problem->data_slices[0][0].sub_graph[0].nodes;
+        std::cout << nodes << std::endl;
+
         for (int gpu = 0; gpu < this->num_gpus; gpu++) {
-          if ((this->num_gpus == 1) ||
-              (gpu == this->problem->org_graph->GpT::partition_table[src])) {
-            this->thread_slices[gpu].init_size = 1;
+          if (this->num_gpus == 1) {
+            this->thread_slices[gpu].init_size = nodes;
             for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
               auto &frontier =
                   this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
-              frontier.queue_length = (peer_ == 0) ? 1 : 0;
+              frontier.queue_length = (peer_ == 0) ? nodes : 0;
               if (peer_ == 0) {
+                util::Array1D<SizeT, VertexT> tmp;
+                tmp.Allocate(nodes, target | util::HOST);
+                for (SizeT i = 0; i < nodes; ++i) {
+                    tmp[i] = (VertexT)i % nodes;
+                }
+                GUARD_CU(tmp.Move(util::HOST, target));
+
                 GUARD_CU(frontier.V_Q()->ForEach(
-                    [src] __host__ __device__(VertexT & v) { v = src; }, 1, target,
-                    0));
+                    tmp,
+                    [] __host__ __device__(VertexT & v, VertexT & i) { v = i; },
+                    nodes, target, 0));
+
+                tmp.Release();
               }
             }
           } else {
-            this->thread_slices[gpu].init_size = 0;
-            for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
-              this->enactor_slices[gpu * this->num_gpus + peer_]
-                  .frontier.queue_length = 0;
-            }
+            // MULTI_GPU INCOMPLETE
           }
         }
-        // </TODO>
 
         GUARD_CU(BaseEnactor::Sync());
         return retval;
