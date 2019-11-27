@@ -141,7 +141,7 @@ struct SMIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            if (src < 0 || src >= nodes_data)
+            if (util::lessThanZero(src) || src >= nodes_data)
                 return false;
             if ((!isValid[src]) || (!isValid[dest])) {
                 return false;
