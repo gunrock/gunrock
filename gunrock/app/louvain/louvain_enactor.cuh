@@ -160,7 +160,6 @@ struct LouvainIterationLoop
     auto &num_new_comms = data_slice.num_new_comms;
     auto &num_new_edges = data_slice.num_new_edges;
     auto &iter_gain = data_slice.iter_gain;
-    auto &pass_communities = data_slice.pass_communities;
     cudaStream_t stream = oprtr_parameters.stream;
     auto target = util::DEVICE;
     util::Array1D<SizeT, VertexT> *null_frontier = NULL;
