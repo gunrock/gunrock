@@ -163,8 +163,6 @@ double CPU_Reference(
           debug("\n");
       }
       if (visited[x] && snns[x].size() >= min_pts){
-          //if (x == 66498 || x == 89359)
-          //    debug2("CPU: %d is core point\n", x);
           core_points.insert(x);
           debug("%d is core_point\n", x);
           cluster[x] = x;
