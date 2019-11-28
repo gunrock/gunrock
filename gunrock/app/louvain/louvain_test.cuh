@@ -1101,7 +1101,7 @@ typename GraphT::SizeT Validate_Results(
 
   for (VertexT v = 0; v < graph.nodes; v++) {
     auto c = ref_communities[v];
-    if (util::lessThanZero(0) || c >= graph.nodes) {
+    if (util::lessThanZero(c) || c >= graph.nodes) {
       num_errors++;
       continue;
     }

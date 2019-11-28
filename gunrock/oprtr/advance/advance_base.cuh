@@ -137,6 +137,9 @@ cudaError_t ComputeOutputLength(const GraphT graph,
                         /*d_in=*/parameters.frontier->output_offsets,
                         /*d_out=*/parameters.frontier->output_offsets,
                         /*num_items=*/parameters.frontier->queue_length);
+  // TODO(yzhwang): Add Move() that supports memcpy between different Array1D objects.
+  // alternative solution: Modify cub implementation so that it can take in a device pointer
+  // that stores the reduction result.
   GUARD_CU2(
           cudaMemcpy(parameters.frontier->output_length.GetPointer(util::DEVICE),
                      parameters.frontier->output_offsets.GetPointer(util::DEVICE) + parameters.frontier->queue_length-1, sizeof(SizeT), cudaMemcpyDeviceToDevice),
