@@ -351,6 +351,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           }
         }
         debug("\n");
+/*
+        printf("gpu clusters ids: ");
+        for (auto x :set){
+            printf("%d ", x);
+        }
+        printf("\n");*/
           
         delete[] h_core_points;
 
