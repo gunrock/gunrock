@@ -31,8 +31,8 @@
 #include <gunrock/app/knn/knn_enactor.cuh>
 #include <gunrock/app/knn/knn_test.cuh>
 
+//#define SNN_ASSERT 1
 //#define SNN_DEBUG 1
-
 #ifdef SNN_DEBUG
     #define debug(a...) printf(a)
 #else
@@ -123,20 +123,17 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     util::Array1D<SizeT, VertexT> *null_frontier = NULL;
     oprtr_parameters.advance_mode = "ALL_EDGES";
 
-
+#ifdef SNN_ASSERT
     GUARD_CU(knns.ForAll(
           [num_points, k, noise_points] 
           __host__ __device__(SizeT * knns_, const SizeT &pos) {
-          noise_points[0] = 0;
-          printf("noise point = %d\n", noise_points[0]);
           for (int i=0; i<num_points; ++i){
             for (int j=0; j<k; ++j){
                 assert(knns_[i*k + j] != i);
-
             }
           }
           }, 1, target, stream));
-    
+#endif
 
 #ifdef SNN_DEBUG
     // DEBUG ONLY
@@ -157,9 +154,10 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // Sort all the knns using CUB
     GUARD_CU(util::SegmentedSort(knns, knns_sorted, num_points*k,
                 num_points, offsets));
+    // Do not remove cudaDeviceSynchronize, CUB is running on different stream and Device synchronization is required
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
-    GUARD_CU2(cudaStreamSynchronize(stream), "cudaDeviceSynchronize failed.");
-    
+
+#ifdef SNN_DEBUG
     GUARD_CU(knns_sorted.ForAll(
           [num_points, k] 
           __host__ __device__(SizeT * knns_, const SizeT &pos) {
@@ -167,6 +165,7 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             auto j = pos%k;
             assert(knns_[i*k + j] != i);
           }, num_points*k, target, stream));
+#endif
 
 #ifdef SNN_DEBUG
     // DEBUG ONLY
@@ -188,13 +187,11 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto density_op = 
         [num_points, k, eps, min_pts, knns_sorted, snn_density, visited]
         __host__ __device__ (VertexT *v, const SizeT &pos){
-//          for (int pos = 0; pos < k*num_points; ++pos){                       //uncomment for debug
+          //for (int pos = 0; pos < k*num_points; ++pos){                       //uncomment for debug
           auto x = pos/k;
           auto q = knns_sorted[x * k + (pos%k)];
-          //   continue;
           // Checking SNN similarity
           // knns are sorted, counting intersection of knns[x] and knns[q]
-          
           #pragma unroll  // all iterations are independent
           for (int i = 0; i < k; ++i){
             if (knns_sorted[q * k + i] == x){
@@ -207,21 +204,13 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
               break;
             }
           }
-//          }                                                                   //uncomment for debug
+          //}                                                                   //uncomment for debug
         };
     // Find density of each point
     GUARD_CU(frontier.V_Q()->ForAll(density_op, num_points*k, target, stream));
 //    GUARD_CU(frontier.V_Q()->ForAll(density_op, 1, target, stream));         //uncomment for debug
     GUARD_CU2(cudaStreamSynchronize(stream), "cudaDeviceSynchronize failed.");
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
     
- 
-/*    auto intersect_op =
-        [num_points, k, eps, min_pts, knns_sorted, snn_density]
-        __host__ __device__ (VertexT *v, const VertexT* edge){
-          atomicAdd(&snn_density[x], 1);
-        };*/
-
 #ifdef SNN_DEBUG
     // DEBUG ONLY: write down densities:
     GUARD_CU(snn_density.ForAll(
@@ -246,17 +235,16 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     GUARD_CU(util::cubInclusiveSum(cub_temp_storage, core_point_mark_0,
                                      core_point_mark, num_points, stream));
-
      
+    // Do not remove cudaDeviceSynchronize, CUB is running on different stream and Device synchronization is required
     GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
-    GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+    
     GUARD_CU(core_points.ForAll(
         [num_points, core_point_mark, core_points_counter] 
         __host__ __device__(SizeT * cps, const SizeT &pos) {
           if ((pos == 0 && core_point_mark[pos] != 0) ||
             (pos > 0 && core_point_mark[pos] != core_point_mark[pos - 1])) {
             cps[core_point_mark[pos] - 1] = pos;
-            //printf("%d core point go to %d\n", pos, core_point_mark[pos] - 1);
           }
           if (pos == num_points - 1) 
             core_points_counter[0] = core_point_mark[pos];
@@ -320,22 +308,22 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         };
 
      GUARD_CU(core_points_counter.Move(util::DEVICE, util::HOST, 1, 0, stream));
+     // Do not remove, needed by Move
      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
-     GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
      
      printf("GPU number of core points found: %d\n", core_points_counter[0]);
 
      // Assign core points to clusters
      SizeT loop_size = core_points_counter[0] * k;
-     SizeT num_repeats = log2(core_points_counter[0]);
+     SizeT num_repeats = 10*log2(core_points_counter[0]);
      gunrock::oprtr::RepeatFor(
          merging_op, num_repeats, loop_size, util::DEVICE, stream,
          util::PreDefinedValues<int>::InvalidValue,  // grid_size
          util::PreDefinedValues<int>::InvalidValue,  // block_size
          2);
      
-     GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
-     GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
+     //GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+//     GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
  
 #ifdef SNN_DEBUG
      // DEBUG ONLY: write down densities:
@@ -348,7 +336,8 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           }
         }, 1, target, stream));
 #endif
-     
+    
+    debug("gpu noise points: ");
      // Assign other non-core and non-noise points to clusters
      auto clustering_op = 
         [core_point_mark, eps, k, cluster_id, min_pts, knns_sorted, noise_points] 
@@ -377,14 +366,16 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           }else{
             cluster_id[src] = util::PreDefinedValues<SizeT>::InvalidValue;
             atomicAdd(&noise_points[0], 1);
+            debug("%d ", src);
           }
         };
+     debug("\n");
 
      // Assign other non-core and non-noise points to clusters
      GUARD_CU(frontier.V_Q()->ForAll(clustering_op, num_points, target, stream));
 
-     GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
-     GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
+     //GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+//     GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
      
 #ifdef SNN_DEBUG
      // DEBUG ONLY: write down densities:
