@@ -14,12 +14,19 @@
 
 #pragma once
 
-//#define SNN_DEBUG 1
 
+//#define SNN_DEBUG 1
 #ifdef SNN_DEBUG
     #define debug(a...) fprintf(stderr, a)
 #else
     #define debug(a...)
+#endif
+
+//#define SNN_DEBUG2
+#ifdef SNN_DEBUG2
+    #define debug2(a...) fprintf(stderr, a)
+#else
+    #define debug2(a...)
 #endif
 
 #include <iostream>
@@ -75,7 +82,7 @@ double CPU_Reference(
     cluster[x] = util::PreDefinedValues<SizeT>::InvalidValue;
   }
 
-  printf("step 0\n");
+  debug2("step 0\n");
 
   // For each point make a binary search tree of its k nearest neighbors 
   std::vector<std::set<SizeT>> knns_set; knns_set.resize(num_points);
@@ -83,7 +90,7 @@ double CPU_Reference(
     knns_set[x] = std::set<SizeT>(knns + (x*k), knns + ((x+1)*k));
   }
 
-  printf("step 1\n");
+  debug2("step 1\n");
 #ifdef SNN_DEBUG
   for (auto x = 0; x < num_points; ++x){
       debug("knns[%d]: ", x);
@@ -144,7 +151,7 @@ double CPU_Reference(
       }
   }
 
-  printf("step 2\n");
+  debug2("step 2\n");
   // Find core points:
   for (SizeT x = 0; x < num_points; ++x){
       if (visited[x] && snns[x].size() > 0){
@@ -156,8 +163,11 @@ double CPU_Reference(
           debug("\n");
       }
       if (visited[x] && snns[x].size() >= min_pts){
+          //if (x == 66498 || x == 89359)
+          //    debug2("CPU: %d is core point\n", x);
           core_points.insert(x);
           debug("%d is core_point\n", x);
+          cluster[x] = x;
       }else
           debug("%d is not core_point\n", x);
   }
@@ -165,7 +175,7 @@ double CPU_Reference(
   // Set core points counter
   *core_point_counter = core_points.size();
 
-  printf("step 3\n");
+  debug2("step 3\n");
 #if SNN_DEBUG
   debug("core points (%d): ", core_points.size());
   for (auto cpb = core_points.begin(); cpb != core_points.end(); ++cpb) {
@@ -177,11 +187,13 @@ double CPU_Reference(
   // Create empty clusters:
   DisjointSet<SizeT> clusters(num_points);
 
+  int iter = 0;
   // Find clusters. Union core points
   for (auto c1 : core_points){
     for (auto c2 : core_points){
       if (snns[c1].find(c2) != snns[c1].end()){
-          printf("union %d %d\n", c1, c2);
+          if ((iter++) % 100000 == 0)
+              debug2("union %d %d\n", c1, c2);
         clusters.Union(c1, c2);
         cluster[c1] = clusters.Find(c1);
         cluster[c2] = clusters.Find(c1);
@@ -189,7 +201,7 @@ double CPU_Reference(
     }
   }
 
-  printf("step 4\n");
+  debug2("step 4\n");
 #if SNN_DEBUG
   debug("clusters after union core points:\n");
   for (int i = 0; i < num_points; ++i) 
@@ -198,6 +210,7 @@ double CPU_Reference(
 
   noise_point_counter[0] = 0;
 
+  debug2("cpu noise points: ");
   debug("assign non core points\n");
   // Assign non core points
   for (SizeT x = 0; x < num_points; ++x){
@@ -225,15 +238,18 @@ double CPU_Reference(
               similarity_to_nearest_core_point > eps){
         // x is not a noise point
         clusters.Union(x, nearest_core_point);
-        cluster[x] = cluster[nearest_core_point] = clusters.Find(nearest_core_point);
+        cluster[x] = clusters.Find(nearest_core_point);
+        cluster[nearest_core_point] = clusters.Find(nearest_core_point);
       }else{
         cluster[x] = util::PreDefinedValues<SizeT>::InvalidValue;
         noise_point_counter[0]++;
+        debug2("%d ", x);
       }
     }
   }
+  debug2("\n");
 
-  printf("step 5\n");
+  debug2("step 5\n");
 #if SNN_DEBUG
   debug("clusters after assigne non core points\n");
   for (int i = 0; i < num_points; ++i) 
@@ -246,9 +262,14 @@ double CPU_Reference(
       cluster_set.insert(clusters.Find(x)); // have to be clusters.Find(x) because array stores not updated cluster numbers
     }
   }
+  debug2("cpu clusters ids:\n");
+  for (auto x: cluster_set){
+      debug2("%d ", x);
+  }
+  debug2("\n");
 
 
-  printf("step 6\n");
+  debug2("step 6\n");
 #if SNN_DEBUG
   debug("cpu clusters: ");
   for (SizeT x = 0; x < num_points; ++x){
@@ -264,7 +285,7 @@ double CPU_Reference(
   // Set cluster counter
   *cluster_counter = cluster_set.size();
 
-  printf("step 7\n");
+  debug2("step 7\n");
   cpu_timer.Stop();
   float elapsed = cpu_timer.ElapsedMillis();
   return elapsed;
@@ -303,7 +324,13 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
   SizeT eps = parameters.Get<int>("eps");
   SizeT min_pts = parameters.Get<int>("min-pts");
 
-  if (quick) return num_errors;
+  if (quick){
+      printf("number of points: %d\n", num_points);
+      printf("gpu core point counter %d\n", *h_core_point_counter);
+      printf("gpu noise point counter %d\n", *h_noise_point_counter);
+      printf("gpu cluster counter %d\n", *h_cluster_counter);
+      return num_errors;
+  }
 
   printf("Validate results start, num_errors so far %d\n", num_errors);
 
@@ -342,7 +369,7 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
         if (not unvisited_cluster_of[j]) continue;
         if (ref_cluster[j] == ref_cluster_of_i){
           if (h_cluster[j] != h_cluster_of_i){
-            printf("error: gpu %d and %d supposed to be in one cluster but are: %d != %d\n", i, j, h_cluster[i], h_cluster[j]);
+            printf("error: gpu %d and %d supposed to be in one cluster but are: %d != %d, on CPU %d and %d are in one cluster %d\n", i, j, h_cluster[i], h_cluster[j], i, j, ref_cluster_of_i);
             ++num_errors;
           }
           unvisited_cluster_of[j] = false;
