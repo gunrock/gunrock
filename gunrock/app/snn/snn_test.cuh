@@ -221,14 +221,16 @@ double CPU_Reference(
         debug("%d, knn of %d\n", q);
         if (core_points.find(q) != core_points.end()){
           debug("\t%d is core point\n", q);
-          // q is core point
-          auto it = std::set_intersection(knns_set[x].begin(), knns_set[x].end(),
+          if (knns_set[q].find(x) != knns_set[q].end()){
+            // q is core point
+            auto it = std::set_intersection(knns_set[x].begin(), knns_set[x].end(),
                   knns_set[q].begin(), knns_set[q].end(), common_knns.begin());
-          common_knns.resize(it-common_knns.begin());
-          if (!util::isValid(nearest_core_point) || 
+            common_knns.resize(it-common_knns.begin());
+            if (!util::isValid(nearest_core_point) || 
                   common_knns.size() > similarity_to_nearest_core_point){
-            similarity_to_nearest_core_point = common_knns.size();
-            nearest_core_point = q;
+              similarity_to_nearest_core_point = common_knns.size();
+              nearest_core_point = q;
+            }
           }
         }
       }

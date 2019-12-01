@@ -182,10 +182,16 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           }
           }, 1, target, stream));
 #endif
+
+    GUARD_CU(knns.ForAll(
+        []
+        __host__ __device__(SizeT * knns_, const SizeT &pos) {
+            knns_[pos] = util::PreDefinedValues<SizeT>::InvalidValue;
+          }, num_points*k, target, stream));
           
     // SNN density of each point
     auto density_op = 
-        [num_points, k, eps, min_pts, knns_sorted, snn_density, visited]
+        [num_points, k, eps, min_pts, knns, knns_sorted, snn_density, visited]
         __host__ __device__ (VertexT *v, const SizeT &pos){
           //for (int pos = 0; pos < k*num_points; ++pos){                       //uncomment for debug
           auto x = pos/k;
@@ -200,6 +206,7 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                   // x and q are SNN
                   atomicAdd(&snn_density[x], 1);
                   visited[x] = 1;
+                  knns[x * k + (pos%k)] = similarity;
               }
               break;
             }
@@ -267,7 +274,7 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // Core points merging
     auto merging_op = 
         [num_points, eps, k, core_point_mark, core_points, core_points_counter,
-        knns_sorted, cluster_id]
+        knns_sorted, cluster_id, visited, snn_density, min_pts, knns]
         __host__ __device__ (const int &cos, const SizeT &pos){
           assert(core_points_counter[0] > pos/k);
           // x core point
@@ -276,34 +283,33 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           // q is k nearest neighbor of x and ...
           if (x <= q)
             return;
-          if ((q == 0 && core_point_mark[q] != 1) || 
-            (q > 0 && core_point_mark[q] == core_point_mark[q-1])){
+          if (!util::isValid(cluster_id[q])){
+          //if (!visited[q] || snn_density[q] < min_pts){
+          //if ((q == 0 && core_point_mark[q] != 1) || 
+          //  (q > 0 && core_point_mark[q] == core_point_mark[q-1])){
             // ... q is non core point
             return;
           }
+          /*if (cluster_id[x] == cluster_id[q]){
+            // already merged
+            return;
+          }*/
           // then if 
-          for (int i = 0; i < k; ++i){
-            if (knns_sorted[q * k + i] == x){
-              // x is k nearest neighbor of q as well then ...
-              auto SNNsm = SNNsimilarity(x, q, knns_sorted, eps, k);
-              debug("%d and %d share %d neighbors\n", x, q, SNNsm);
-              if (SNNsm > eps){
+          auto SNNsm = knns[x * k + (pos%k)];
+          if (util::isValid(SNNsm)){
                 // ... if x and q are shared nearest neighbors then merge them
                 auto cluster_id_x = cluster_id[x];
-                if (!util::isValid(cluster_id_x))
-                    atomicCAS(cluster_id + x, cluster_id_x, x);
+         //       if (!util::isValid(cluster_id_x))
+         //           atomicCAS(cluster_id + x, cluster_id_x, x);
                 auto cluster_id_q = cluster_id[q];
-                if (!util::isValid(cluster_id_q))
-                    atomicCAS(cluster_id + q, cluster_id_q, q);
-                cluster_id_x = cluster_id[x];
-                cluster_id_q = cluster_id[q];
+         //       if (!util::isValid(cluster_id_q))
+         //           atomicCAS(cluster_id + q, cluster_id_q, q);
+         //       cluster_id_x = cluster_id[x];
+         //       cluster_id_q = cluster_id[q];
                 auto cluster_min = min(cluster_id_x, cluster_id_q);
                 atomicMin(cluster_id + x, cluster_min);
                 atomicMin(cluster_id + q, cluster_min);
                 debug("merge %d and %d to cluster %d\n", x, q, cluster_min);
-              }
-              break;
-            }
           }
         };
 
@@ -340,28 +346,31 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     debug("gpu noise points: ");
      // Assign other non-core and non-noise points to clusters
      auto clustering_op = 
-        [core_point_mark, eps, k, cluster_id, min_pts, knns_sorted, noise_points] 
+        [core_point_mark, eps, k, cluster_id, min_pts, knns_sorted, noise_points, knns, 
+        visited, snn_density] 
         __host__ __device__(VertexT * v_q, const SizeT &src) {
           // only non-core points
-          if ((src == 0 && core_point_mark[src] == 1) || 
-            (src > 0 && core_point_mark[src - 1] != core_point_mark[src])) 
+          if (visited[src] && snn_density[src] >= min_pts)
+          //if ((src == 0 && core_point_mark[src] == 1) || 
+          //  (src > 0 && core_point_mark[src - 1] != core_point_mark[src])) 
             return;
           SizeT counterMax = 0;
           SizeT max_y = util::PreDefinedValues<SizeT>::InvalidValue;;
           for (int i = 0; i < k; ++i){
             SizeT y = knns_sorted[src * k + i];
-            if ((y == 0 && core_point_mark[y] == 1) || 
-              (y > 0 && core_point_mark[y - 1] != core_point_mark[y])){
-              SizeT res = SNNsimilarity(src, y, knns_sorted, eps, k, false);
-              if (!util::isValid(max_y) || res > counterMax){
-                counterMax = res;
+            if (visited[y] && snn_density[y] >= min_pts){
+            //if ((y == 0 && core_point_mark[y] == 1) || 
+            //  (y > 0 && core_point_mark[y - 1] != core_point_mark[y])){
+            SizeT SNNsm = knns[src * k + i];
+            if (util::isValid(SNNsm) && SNNsm > counterMax){
+                counterMax = SNNsm;
                 max_y = y;
               }
             }
           }
           // only non-noise points
-          if (util::isValid(max_y) && counterMax > eps){
-            auto c_id = cluster_id[max_y];
+          if (util::isValid(max_y)){ 
+                  //&& counterMax > eps //counterMax is greater than eps
             cluster_id[src] = cluster_id[max_y];
           }else{
             cluster_id[src] = util::PreDefinedValues<SizeT>::InvalidValue;
@@ -512,7 +521,8 @@ class Enactor
       GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       auto &enactor_slice = this->enactor_slices[gpu * this->num_gpus + 0];
       auto &graph = problem.sub_graphs[gpu];
-      GUARD_CU(enactor_slice.frontier.Allocate(num_points, 
+//      GUARD_CU(enactor_slice.frontier.Allocate(1, 1, this->queue_factors));
+      GUARD_CU(enactor_slice.frontier.Allocate(num_points, \
                   num_points*num_points, this->queue_factors));
     }
 
