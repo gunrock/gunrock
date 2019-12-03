@@ -188,10 +188,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG>
             GUARD_CU(constrain      .Allocate(1, util::HOST | util::DEVICE));
             GUARD_CU(NG             .Allocate(2 * num_query_node, util::HOST | util::DEVICE));
             // non-tree edges only exist in the following condition; double the size to store nodes for duplicate edges
-            if(num_query_edge - num_query_node + 1 > 0) {
-                GUARD_CU(NG_src     .Allocate((num_query_edge - num_query_node + 1) * 2, util::HOST | util::DEVICE));
-                GUARD_CU(NG_dest    .Allocate((num_query_edge - num_query_node + 1) * 2, util::HOST | util::DEVICE));
-            }
+            size_t size = 0;
+            if(num_query_edge - num_query_node + 1 > 0)
+                size = (num_query_edge - num_query_node + 1) * 2;
+            else
+                size = 1;
+            GUARD_CU(NG_src     .Allocate(size, util::HOST | util::DEVICE));
+            GUARD_CU(NG_dest    .Allocate(size, util::HOST | util::DEVICE));
             // partial results storage: as much as possible
             GUARD_CU(partial        .Allocate(num_query_node * sub_graph.edges,  util::DEVICE));
             GUARD_CU(flags          .Allocate(sub_graph.nodes,  util::DEVICE));

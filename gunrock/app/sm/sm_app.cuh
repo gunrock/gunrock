@@ -236,14 +236,12 @@ double sm_template(
     data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, target);
 
     data_graph.FromCsr(data_graph.csr(), target, 0, quiet, true);
-    gunrock::graphio::LoadGraph(parameters, data_graph);
 
     query_graph.CsrT::Allocate(num_query_nodes, num_query_edges, target);
     query_graph.CsrT::row_offsets   .SetPointer((SizeT *)query_row_offsets, num_query_nodes + 1, target);
     query_graph.CsrT::column_indices.SetPointer((VertexT *)query_col_indices, num_query_edges, target);
 
     query_graph.FromCsr(query_graph.csr(), target, 0, quiet, true);
-    gunrock::graphio::LoadGraph(parameters, query_graph, "pattern-");
 
     // Run the SM
     double elapsed_time = gunrock_sm(parameters, data_graph, query_graph, subgraphs);

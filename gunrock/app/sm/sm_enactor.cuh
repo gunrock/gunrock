@@ -221,7 +221,6 @@ struct SMIterationLoop : public IterationLoopBase
                 {
                     counter_[v] = iter;
                 }, 1, target, stream));
-            counter.Print();
 
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
                 graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
