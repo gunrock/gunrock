@@ -76,6 +76,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, SizeT> core_point_mark_0;
     util::Array1D<SizeT, SizeT> core_point_mark;
     util::Array1D<SizeT, SizeT, util::PINNED> core_points_counter;
+    util::Array1D<SizeT, SizeT, util::PINNED> flag;
     util::Array1D<SizeT, SizeT> noise_points;
     util::Array1D<SizeT, SizeT> core_points;
     util::Array1D<SizeT, char> visited;
@@ -103,6 +104,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       core_point_mark_0.SetName("core_point_mark_0");
       core_points.SetName("core_points");
       core_points_counter.SetName("core_points_counter");
+      flag.SetName("flag");
       noise_points.SetName("noise_points");
       cluster_id.SetName("cluster_id");
       snn_density.SetName("snn_density");
@@ -129,6 +131,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(core_point_mark_0.Release(target));
       GUARD_CU(core_point_mark.Release(target));
       GUARD_CU(core_points_counter.Release(target | util::HOST));
+      GUARD_CU(flag.Release(target | util::HOST));
       GUARD_CU(noise_points.Release(target | util::HOST));
       GUARD_CU(cluster_id.Release(target));
       GUARD_CU(snn_density.Release(target));
@@ -153,10 +156,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             SizeT num_points_, SizeT k_, SizeT eps_, SizeT min_pts_, 
             int num_gpus = 1, int gpu_idx = 0,
             util::Location target=util::DEVICE, 
-            ProblemFlag flag = Problem_None) {
+            ProblemFlag flag_ = Problem_None) {
       cudaError_t retval = cudaSuccess;
 
-      GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
+      GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag_));
 
       num_points = num_points_;
       k = k_;
@@ -170,6 +173,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(core_point_mark_0.Allocate(num_points, target));
       GUARD_CU(core_point_mark.Allocate(num_points, target));
       GUARD_CU(core_points_counter.Allocate(1, target | util::HOST));
+      GUARD_CU(flag.Allocate(1, target | util::HOST));
       GUARD_CU(noise_points.Allocate(1, target | util::HOST));
       GUARD_CU(cub_temp_storage.Allocate(1, target));
       GUARD_CU(knns_out.Allocate(k * num_points, target));
@@ -233,6 +237,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           },
           num_points, util::DEVICE, this->stream));
 
+      GUARD_CU(flag.EnsureSize_(1, target | util::HOST));
       GUARD_CU(core_points_counter.EnsureSize_(1, target | util::HOST));
       GUARD_CU(core_points_counter.ForAll(
           [] __host__ __device__(SizeT * c, const SizeT &p) { c[p] = 0; }, 1,
