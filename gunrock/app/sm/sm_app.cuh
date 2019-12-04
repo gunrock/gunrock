@@ -77,7 +77,7 @@ cudaError_t RunTests(
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
         GUARD_CU(problem.Reset(target));
-        GUARD_CU(enactor.Reset(data_graph.edges, target));
+        GUARD_CU(enactor.Reset(target));
         util::PrintMsg("__________________________", !quiet_mode);
 
         cpu_timer.Start();
@@ -169,7 +169,7 @@ double gunrock_sm(
     for (int run_num = 0; run_num < num_runs; ++run_num)
     {
         problem.Reset(target);
-        enactor.Reset(data_graph.edges, target);
+        enactor.Reset(target);
 
         cpu_timer.Start();
         enactor.Enact();
@@ -236,14 +236,12 @@ double sm_template(
     data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, target);
 
     data_graph.FromCsr(data_graph.csr(), target, 0, quiet, true);
-    gunrock::graphio::LoadGraph(parameters, data_graph);
 
     query_graph.CsrT::Allocate(num_query_nodes, num_query_edges, target);
     query_graph.CsrT::row_offsets   .SetPointer((SizeT *)query_row_offsets, num_query_nodes + 1, target);
     query_graph.CsrT::column_indices.SetPointer((VertexT *)query_col_indices, num_query_edges, target);
 
     query_graph.FromCsr(query_graph.csr(), target, 0, quiet, true);
-    gunrock::graphio::LoadGraph(parameters, query_graph, "pattern-");
 
     // Run the SM
     double elapsed_time = gunrock_sm(parameters, data_graph, query_graph, subgraphs);
