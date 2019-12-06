@@ -100,7 +100,6 @@ struct ColorIterationLoop
     auto stream = oprtr_parameters.stream;
     util::Array1D<SizeT, VertexT> *null_frontier = NULL;
     auto null_ptr = null_frontier;
-    auto user_iter = data_slice.user_iter;
     auto gen = data_slice.gen;
 
     //======================================================================//
@@ -150,25 +149,8 @@ struct ColorIterationLoop
               }
             };
 
-#if 0  // (RepeatFor Implementation)
-// #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600
-        SizeT loop_size = frontier.queue_length;
-        gunrock::oprtr::RepeatFor(
-            jpl_color_op,                              /* lambda */
-            user_iter,                                 /* num_repeats (int) */
-            loop_size,                                 /* ForIterT loop_size */
-            util::DEVICE,                              /* target */
-            stream,                                    /* stream */
-            util::PreDefinedValues<int>::InvalidValue, /* grid_size */
-            util::PreDefinedValues<int>::InvalidValue, /* block_size */
-            2 /* mode: stacked kernels */);
-// #else
-#endif
-
         GUARD_CU(frontier.V_Q()->ForAll(jpl_color_op, frontier.queue_length,
                                         util::DEVICE, stream));
-        // #endif
-
       }
 
       else {

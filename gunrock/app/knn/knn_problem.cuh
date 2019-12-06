@@ -171,9 +171,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     cudaError_t Reset(VertexT point_x_, VertexT point_y_, SizeT k_,
                       util::Location target = util::DEVICE) {
       cudaError_t retval = cudaSuccess;
-      SizeT nodes = this->sub_graph->nodes;
       SizeT edges = this->sub_graph->edges;
-      auto &graph = this->sub_graph[0];
       typedef typename GraphT::CsrT CsrT;
 
       // Number of knns

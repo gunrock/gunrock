@@ -57,7 +57,6 @@ struct TCIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
    */
   cudaError_t Core(int peer_ = 0) {
     // Data tc works on
-    auto &enactor = this->enactor[0];
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
     auto &enactor_slice =
         this->enactor
@@ -65,14 +64,9 @@ struct TCIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &enactor_stats = enactor_slice.enactor_stats;
     auto &graph = data_slice.sub_graph[0];
     auto &tc_counts = data_slice.tc_counts;
-    auto &row_offsets = graph.CsrT::row_offsets;
-    auto &col_indices = graph.CsrT::column_indices;
     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
-    auto &stream = oprtr_parameters.stream;
-    auto &iteration = enactor_stats.iteration;
-    auto target = util::DEVICE;
 
     auto intersect_op = [tc_counts] __host__ __device__(
                             VertexT & comm_node, VertexT & edge) -> bool {
@@ -85,7 +79,6 @@ struct TCIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
         graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
         intersect_op));
-    // tc_counts = tc_counts/3
 
     return retval;
   }
