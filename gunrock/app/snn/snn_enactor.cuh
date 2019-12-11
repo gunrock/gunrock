@@ -154,11 +154,12 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 #endif
 
     // Sort all the knns using CUB
-    GUARD_CU(util::SegmentedSort(knns, knns_sorted, num_points * k, num_points,
-                                 offsets));
-    // Do not remove cudaDeviceSynchronize, CUB is running on different stream
-    // and Device synchronization is required
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+    GUARD_CU(util::SegmentedSort(knns, knns_sorted, num_points*k,
+                num_points, offsets, /* int begin_bit = */ 0, 
+                /* int end_bit = */ sizeof(SizeT) * 8,
+                stream));
+    // Do not remove cudaDeviceSynchronize, CUB is running on different stream and Device synchronization is required
+    // GUARD_CU2(cudaStreamSynchronize(stream), "cudaDeviceSynchronize failed.");
 
 #ifdef SNN_DEBUG
     GUARD_CU(knns_sorted.ForAll(
@@ -236,10 +237,10 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     };
     
     // Find density of each point
-    GUARD_CU(knns.ForAll(density_op, num_points * k, target, stream));
-    // GUARD_CU(knns.ForAll(density_op, 1, target, stream));//uncomment for debug
+    GUARD_CU(knns.ForAll(density_op, num_points*k, target, stream));
+//    GUARD_CU(frontier.V_Q()->ForAll(density_op, 1, target, stream));         //uncomment for debug
     GUARD_CU2(cudaStreamSynchronize(stream), "cudaDeviceSynchronize failed.");
-
+    
 #ifdef SNN_DEBUG
     // DEBUG ONLY: write down densities:
     GUARD_CU(snn_density.ForAll(
@@ -264,12 +265,11 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         num_points, target, stream));
 
     GUARD_CU(util::cubInclusiveSum(cub_temp_storage, core_point_mark_0,
-                                   core_point_mark, num_points, stream));
-
-    // Do not remove cudaDeviceSynchronize, CUB is running on different stream
-    // and Device synchronization is required
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaStreamSynchronize failed");
-
+                                     core_point_mark, num_points, stream));
+     
+    // Do not remove cudaDeviceSynchronize, CUB is running on different stream and Device synchronization is required
+    GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed.");
+    
     GUARD_CU(core_points.ForAll(
         [num_points, core_point_mark, core_points_counter, visited, snn_density, min_pts] 
         __host__ __device__(SizeT * cps, const SizeT &pos) {
@@ -536,9 +536,6 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         },
         1, target, stream));
 #endif
-
-    GUARD_CU(frontier.work_progress.GetQueueLength(
-        frontier.queue_index, frontier.queue_length, false, stream, true));
 
     return retval;
   }
