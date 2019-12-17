@@ -21,6 +21,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <unordered_map>
 
 #include <gunrock/util/parameters.h>
 #include <gunrock/graph/coo.cuh>
@@ -32,7 +33,8 @@ namespace csv {
 typedef std::map<std::string, std::string> MetaData;
 
 /**
- * @brief Reads a comma-separated value graph from an input-stream into a CSR sparse format
+ * @brief Reads a comma-separated value graph from an input-stream
+ *        into a CSR sparse format
  *
  * @param[in] parameters    Running parameters
  * @param[in] graph         Graph object to store the graph data.
@@ -56,30 +58,25 @@ cudaError_t ReadCSVStream(util::Parameters &parameters,
   bool quiet = parameters.Get<bool>("quiet");
 
   // Conditional read from file or stdin
-  bool from_stdin = false;
-  std::ifstream file;
+  std::ifstream input_stream;
   std::string filename =
       parameters.Get<std::string>(graph_prefix + "graph-file");
   if (filename == "") {  // Read from stdin
-    util::PrintMsg("  Reading from stdin:", !quiet);
-    from_stdin = true;
+    return util::GRError(cudaErrorUnknown,
+                             "Error parsing csv graph: "
+                             "empty filename.",
+                             __FILE__, __LINE__);
   } else {  // Read from file
-    file.open(filename.c_str(), std::ios::in);
-    if (!file.is_open()) {
+    input_stream.open(filename.c_str(), std::ios::in);
+    if (!input_stream.is_open()) {
       return util::GRError(cudaErrorUnknown, "Unable to open file " + filename,
                            __FILE__, __LINE__);
     }
     util::PrintMsg("  Reading from " + filename + ":", !quiet);
   }
-  std::istream &input_stream = (from_stdin) ? std::cin : file;
 
   auto &edge_pairs = graph.CooT::edge_pairs;
-  SizeT nodes = 0;
-  SizeT edges = 0;
   bool got_edge_values = false;
-  bool symmetric = false;  // whether the graph is undirected
-  bool skew = false;  // whether edge values are inverse for symmetric matrices
-  bool array = false;  // whether the mtx file is in dense array format
 
   time_t mark0 = time(NULL);
   util::PrintMsg("  Parsing CSV format", !quiet, false);
@@ -105,7 +102,7 @@ cudaError_t ReadCSVStream(util::Parameters &parameters,
       num_input = sscanf(line.c_str(), "%lld,%lld,%lf", &src_id, &dst_id,
       &lf_value);
 
-      if (array || num_input < 2) {
+      if (num_input < 2) {
         GUARD_CU(graph.CooT::Release());
         return util::GRError(cudaErrorUnknown,
                              "Error parsing csv graph: "
@@ -124,7 +121,7 @@ cudaError_t ReadCSVStream(util::Parameters &parameters,
       }
     } else { // if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
       num_input = sscanf(line.c_str(), "%lld,%lld", &src_id, &dst_id);
-      if (array || (num_input != 2)) {
+      if (num_input != 2) {
           GUARD_CU(graph.CooT::Release());
           return util::GRError(cudaErrorUnknown,
                                "Error parsing csv graph: "
@@ -150,30 +147,29 @@ cudaError_t ReadCSVStream(util::Parameters &parameters,
                              "invalid format",
                              __FILE__, __LINE__);
   }
-
+  input_stream.clear();
+  input_stream.seekg(0, std::ios::beg);
   for (int i = 0; i < edge_count; ++i) {
-    std::string line;
     std::getline(input_stream, line);
+    if (input_stream.fail() || ('\0' == line[0])) {
+      continue;
+    }
 
-    long long ll_row, ll_col;
-    ValueT ll_value;  // used for parse float / double
-    double lf_value;  // used to sscanf value variable types
+    long long src_id, dst_id;
+    ValueT ll_value;
+    double lf_value;
     int num_input;
     if (GraphT::FLAG & graph::HAS_EDGE_VALUES) {
-      num_input = sscanf(line.c_str(), "%lld %lld %lf", &ll_row, &ll_col,
+      num_input = sscanf(line.c_str(), "%lld,%lld,%lf", &src_id, &dst_id,
       &lf_value);
 
-      if (array && (num_input == 1)) {
-        ll_value = ll_row;
-        ll_col = i / nodes;
-        ll_row = i - nodes * ll_col;
-      } else if (array || num_input < 2) {
-          GUARD_CU(graph.CooT::Release());
-          return util::GRError(cudaErrorUnknown,
-                               "Error parsing MARKET graph: "
-                               "badly formed edge",
-                               __FILE__, __LINE__);
-        } else if (num_input == 2) {
+      if (num_input < 2) {
+        GUARD_CU(graph.CooT::Release());
+        return util::GRError(cudaErrorUnknown,
+                             "Error parsing csv graph: "
+                             "badly formed edge",
+                             __FILE__, __LINE__);
+      } else if (num_input == 2) {
         ll_value = 1;
       } else if (num_input > 2) {
         if (typeid(ValueT) == typeid(float) ||
@@ -184,25 +180,19 @@ cudaError_t ReadCSVStream(util::Parameters &parameters,
           ll_value = (ValueT)(lf_value + 1e-10);
         got_edge_values = true;
       }
-
     } else { // if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
-      num_input = sscanf(line.c_str(), "%lld %lld", &ll_row, &ll_col);
-
-      if (array && (num_input == 1)) {
-        ll_value = ll_row;
-        ll_col = i / nodes;
-        ll_row = i - nodes * ll_col;
-      } else if (array || (num_input != 2)) {
+      num_input = sscanf(line.c_str(), "%lld,%lld", &src_id, &dst_id);
+      if (num_input != 2) {
           GUARD_CU(graph.CooT::Release());
           return util::GRError(cudaErrorUnknown,
-                               "Error parsing MARKET graph: "
+                               "Error parsing csv graph: "
                                "badly formed edge",
                                __FILE__, __LINE__);
       }
     }
 
-    edge_pairs[i].x = ll_row;  // zero-based array
-    edge_pairs[i].y = ll_col;  // zero-based array
+    edge_pairs[i].x = vid_mapper[std::to_string(src_id)];  // zero-based array
+    edge_pairs[i].y = vid_mapper[std::to_string(dst_id)];  // zero-based array
 
     if (GraphT::FLAG & graph::HAS_EDGE_VALUES) {
       graph.CooT::edge_values[i] = ll_value;
@@ -213,15 +203,12 @@ cudaError_t ReadCSVStream(util::Parameters &parameters,
   util::PrintMsg("  Done (" + std::to_string(mark1 - mark0) + " s).", !quiet);
 
   if (filename != "") {
-    file.close();
+    input_stream.close();
   }
 
-  meta_data["symmetric"] = symmetric ? "true" : "false";
-  meta_data["array"] = array ? "true" : "false";
-  meta_data["skew"] = skew ? "true" : "false";
   meta_data["got_edge_values"] = got_edge_values ? "true" : "false";
-  meta_data["num_edges"] = std::to_string(edges);
-  meta_data["num_vertices"] = std::to_string(nodes);
+  meta_data["num_edges"] = std::to_string(edge_count);
+  meta_data["num_vertices"] = std::to_string(node_count);
   return retval;
 }
 
@@ -387,7 +374,7 @@ cudaError_t Read(util::Parameters &parameters, GraphT &graph,
   util::CpuTimer timer;
   timer.Start();
 
-  util::PrintMsg("Loading Matrix-market coordinate-formatted " + graph_prefix +
+  util::PrintMsg("Loading Comma-separated value-formatted " + graph_prefix +
                      "graph ...",
                  !quiet);
 
@@ -431,7 +418,7 @@ cudaError_t Read(util::Parameters &parameters, GraphT &graph,
             parameters.Set("dataset", file);
         }
 #endif
-    GUARD_CU(ReadMarketStream(parameters, graph, meta_data, graph_prefix));
+    GUARD_CU(ReadCSVStream(parameters, graph, meta_data, graph_prefix));
 
     if (parameters.Get<bool>(graph_prefix + "store-to-binary")) {
       retval = WriteMeta(parameters, filename, meta_data);
@@ -467,16 +454,6 @@ cudaError_t Read(util::Parameters &parameters, GraphT &graph,
     }
   }
   // GUARD_CU(graph.Display());
-
-  if (parameters.Get<bool>(graph_prefix + "vertex-start-from-zero")) {
-    util::PrintMsg("  Substracting 1 from node Ids...", !quiet);
-    GUARD_CU(graph.edge_pairs.ForEach(
-        [] __host__ __device__(typename GraphT::EdgePairT & edge_pair) {
-          edge_pair.x -= 1;
-          edge_pair.y -= 1;
-        },
-        graph.edges, util::HOST));
-  }
 
   if (parameters.Get<bool>(graph_prefix + "undirected") ||
       meta_data["symmetric"] == "true") {
@@ -553,7 +530,7 @@ cudaError_t Write(util::Parameters &parameters, GraphT &graph,
 
   bool quiet = parameters.Get<bool>("quiet");
   util::PrintMsg(
-      "Saving Matrix-market coordinate-formatted " + graph_prefix + "graph ...",
+      "Saving Comma-separated value-formatted " + graph_prefix + "graph ...",
       !quiet);
 
   std::string filename =
@@ -562,17 +539,11 @@ cudaError_t Write(util::Parameters &parameters, GraphT &graph,
   std::ofstream fout;
   fout.open(filename.c_str());
   if (fout.is_open()) {
-    fout << "%%MatrixMarket matrix coordinate pattern";
-    if (graph.undirected) fout << " symmetric";
-    fout << std::endl;
-    fout << graph.nodes << " " << graph.nodes << " " << graph.edges
-         << std::endl;
     for (SizeT e = 0; e < graph.edges; e++) {
       EdgePairT &edge_pair = graph.CooT::edge_pairs[e];
-      if (graph.undirected && edge_pair.x > edge_pair.y) continue;
-      fout << edge_pair.x << " " << edge_pair.y;
+      fout << edge_pair.x << "," << edge_pair.y;
       if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
-        fout << " " << graph.CooT::edge_values[e];
+        fout << "," << graph.CooT::edge_values[e];
       fout << std::endl;
     }
     fout.close();
@@ -584,7 +555,7 @@ cudaError_t Write(util::Parameters &parameters, GraphT &graph,
 }
 /**@}*/
 
-}  // namespace market
+}  // namespace csv
 }  // namespace graphio
 }  // namespace gunrock
 

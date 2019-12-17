@@ -19,6 +19,7 @@
 #include <gunrock/graph/coo.cuh>
 #include <gunrock/graph/csc.cuh>
 #include <gunrock/graph/gp.cuh>
+#include <gunrock/graphio/csv.cuh>
 #include <gunrock/graphio/market.cuh>
 #include <gunrock/graphio/rmat.cuh>
 #include <gunrock/graphio/rgg.cuh>
@@ -200,6 +201,12 @@ cudaError_t LoadGraph(util::Parameters &parameters, GraphT &graph,
   if (graph_type == "market")  // Matrix-market graph
   {
     GUARD_CU(market::Load(parameters, graph, graph_prefix));
+  }
+
+  else if (graph_type == "csv") // comma-separated values graph
+  {
+      parameters.Set("vertex-start-from-zero", false);
+      GUARD_CU(csv::Load(parameters, graph, graph_prefix));
   }
 
   else if (graph_type == "rmat") {
