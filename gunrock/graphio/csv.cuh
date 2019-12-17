@@ -199,6 +199,20 @@ cudaError_t ReadCSVStream(util::Parameters &parameters,
     }
   } // endfor
 
+  // Write VID mapping to file
+  ofstream output_stream;
+  output_stream.open(filename+".vid-map", std::ios::out);
+  if (!output_stream.good()) {
+    return util::GRError(cudaErrorUnknown,
+                               "Error opening vid-map file",
+                               __FILE__, __LINE__);
+  }
+  output_stream << "VID, mapped_id\n";
+  for (std::pair<std::string, VertexT> element : vid_mapper) {
+    output_stream << element.first << ", " << element.second << std::endl;
+  }
+  output_stream.close();
+  
   time_t mark1 = time(NULL);
   util::PrintMsg("  Done (" + std::to_string(mark1 - mark0) + " s).", !quiet);
 
