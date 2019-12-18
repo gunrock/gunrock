@@ -30,8 +30,6 @@ namespace simplified_advance {
  * architectures and problem types.
  *
  * @tparam _ProblemData                 Problem data type.
- * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code
- * for.
  * @tparam _INSTRUMENT                  Whether or not we want instrumentation
  * logic generated
  * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have
@@ -40,8 +38,6 @@ namespace simplified_advance {
  * @tparam _LOG_THREADS                 Number of threads per CTA (log).
  */
 template <typename _ProblemData,
-          // Machine parameters
-          int _CUDA_ARCH,
           // Tunable parameters
           int _MIN_CTA_OCCUPANCY, int _LOG_THREADS, int _LOG_BLOCKS,
           int _LIGHT_EDGE_THRESHOLD>
@@ -57,8 +53,6 @@ struct KernelPolicy {
   typedef typename ProblemData::Value Value;
 
   enum {
-
-    CUDA_ARCH = _CUDA_ARCH,
     LOG_THREADS = _LOG_THREADS,
     THREADS = 1 << LOG_THREADS,
     LOG_BLOCKS = _LOG_BLOCKS,
@@ -84,10 +78,10 @@ struct KernelPolicy {
   };
 
   enum {
-    THREAD_OCCUPANCY = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
-    SMEM_OCCUPANCY = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
+    THREAD_OCCUPANCY = GR_SM_THREADS(GR_CUDA_ARCH) >> LOG_THREADS,
+    SMEM_OCCUPANCY = GR_SMEM_BYTES(GR_CUDA_ARCH) / sizeof(SmemStorage),
     CTA_OCCUPANCY = GR_MIN(_MIN_CTA_OCCUPANCY,
-                           GR_MIN(GR_SM_CTAS(CUDA_ARCH),
+                           GR_MIN(GR_SM_CTAS(GR_CUDA_ARCH),
                                   GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
 
     VALID = (CTA_OCCUPANCY > 0),

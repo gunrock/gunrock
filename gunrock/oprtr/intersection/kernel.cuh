@@ -48,11 +48,11 @@ namespace intersection {
 template <OprtrFlag FLAG, typename InKeyT, typename OutKeyT, typename SizeT,
           typename ValueT, typename VertexT, typename InterOpt,
           bool VALID =
-#ifndef __CUDA_ARCH__
-              false
+#ifdef __CUDA_ARCH__
+              true
 #else
-              (__CUDA_ARCH__ >= CUDA_ARCH)
-#endif
+              false
+#endif 
           >
 struct Dispatch {
 };

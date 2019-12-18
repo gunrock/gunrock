@@ -25,12 +25,6 @@ template <OprtrFlag _FLAG,
           // typename _VertexT,      // Data types
           typename _InKeyT, typename _OutKeyT, typename _SizeT,
           typename _ValueT, typename _LabelT, typename _FilterOpT,
-          // int _CUDA_ARCH, // Machine parameters
-          // bool _INSTRUMENT,
-
-          // int  _SATURATION_QUIT,      // Behavioral control parameters
-          // bool _DEQUEUE_PROBLEM_SIZE,
-
           // Tunable parameters
           int _MAX_CTA_OCCUPANCY, int _LOG_THREADS, int _LOG_LOAD_VEC_SIZE,
           int _LOG_LOADS_PER_TILE, int _LOG_RAKING_THREADS,
@@ -51,13 +45,6 @@ struct KernelPolicy {
   typedef _FilterOpT FilterOpT;
 
   enum {
-    // MODE                            = _MODE,
-    // CUDA_ARCH                       = _CUDA_ARCH,
-    // SATURATION_QUIT                 = _SATURATION_QUIT,
-    // DEQUEUE_PROBLEM_SIZE            = _DEQUEUE_PROBLEM_SIZE,
-
-    // INSTRUMENT                      = _INSTRUMENT,
-
     LOG_THREADS = _LOG_THREADS,
     THREADS = 1 << LOG_THREADS,
 
@@ -70,7 +57,7 @@ struct KernelPolicy {
     LOG_RAKING_THREADS = _LOG_RAKING_THREADS,
     RAKING_THREADS = 1 << LOG_RAKING_THREADS,
 
-    LOG_WARPS = LOG_THREADS - GR_LOG_WARP_THREADS(CUDA_ARCH),
+    LOG_WARPS = LOG_THREADS - GR_LOG_WARP_THREADS(GR_CUDA_ARCH),
     WARPS = 1 << LOG_WARPS,
 
     LOG_TILE_ELEMENTS_PER_THREAD = LOG_LOAD_VEC_SIZE + LOG_LOADS_PER_TILE,
@@ -86,7 +73,7 @@ struct KernelPolicy {
   };
 
   // Prefix sum raking grid for contraction allocations
-  typedef util::RakingGrid<CUDA_ARCH,
+  typedef util::RakingGrid<GR_CUDA_ARCH,
                            SizeT,        // Partial type (valid counts)
                            LOG_THREADS,  // Depositing threads (the CTA size)
                            LOG_LOADS_PER_TILE,  // Lanes (the number of loads)
@@ -113,7 +100,7 @@ struct KernelPolicy {
       util::CtaWorkDistribution<SizeT> work_decomposition;
 
       // Storage for scanning local ranks
-      SizeT warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
+      SizeT warpscan[2][GR_WARP_THREADS(GR_CUDA_ARCH)];
 
       // General pool for prefix sum
       union {
@@ -126,7 +113,7 @@ struct KernelPolicy {
     enum {
       // Amount of storage we can use for hashing scratch space under target
       // occupancy
-      FULL_OCCUPANCY_BYTES = (GR_SMEM_BYTES(CUDA_ARCH) / _MAX_CTA_OCCUPANCY) -
+      FULL_OCCUPANCY_BYTES = (GR_SMEM_BYTES(GR_CUDA_ARCH) / _MAX_CTA_OCCUPANCY) -
                              sizeof(State) -
                              128,  // Fudge-factor to guarantee occupancy
       HISTORY_HASH_ELEMENTS = FULL_OCCUPANCY_BYTES / sizeof(InKeyT),  // 256,
@@ -140,10 +127,10 @@ struct KernelPolicy {
   };
 
   enum {
-    THREAD_OCCUPANCY = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
-    SMEM_OCCUPANCY = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
+    THREAD_OCCUPANCY = GR_SM_THREADS(GR_CUDA_ARCH) >> LOG_THREADS,
+    SMEM_OCCUPANCY = GR_SMEM_BYTES(GR_CUDA_ARCH) / sizeof(SmemStorage),
     CTA_OCCUPANCY = GR_MIN(_MAX_CTA_OCCUPANCY,
-                           GR_MIN(GR_SM_CTAS(CUDA_ARCH),
+                           GR_MIN(GR_SM_CTAS(GR_CUDA_ARCH),
                                   GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
     VALID = (CTA_OCCUPANCY > 0),
     // Bitmask for masking off the upper control bits in element identifier
