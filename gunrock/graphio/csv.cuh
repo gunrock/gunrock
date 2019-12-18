@@ -95,39 +95,13 @@ cudaError_t ReadCSVStream(util::Parameters &parameters,
     }
 
     long long src_id, dst_id;
-    ValueT ll_value;
-    double lf_value;
-    int num_input;
-    if (GraphT::FLAG & graph::HAS_EDGE_VALUES) {
-      num_input = sscanf(line.c_str(), "%lld,%lld,%lf", &src_id, &dst_id,
-      &lf_value);
-
-      if (num_input < 2) {
+    int num_input = sscanf(line.c_str(), "%lld,%lld", &src_id, &dst_id);
+    if (num_input != 2) {
         GUARD_CU(graph.CooT::Release());
         return util::GRError(cudaErrorUnknown,
-                             "Error parsing csv graph: "
-                             "badly formed edge",
-                             __FILE__, __LINE__);
-      } else if (num_input == 2) {
-        ll_value = 1;
-      } else if (num_input > 2) {
-        if (typeid(ValueT) == typeid(float) ||
-            typeid(ValueT) == typeid(double) ||
-            typeid(ValueT) == typeid(long double))
-          ll_value = (ValueT)lf_value;
-        else
-          ll_value = (ValueT)(lf_value + 1e-10);
-        got_edge_values = true;
-      }
-    } else { // if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
-      num_input = sscanf(line.c_str(), "%lld,%lld", &src_id, &dst_id);
-      if (num_input != 2) {
-          GUARD_CU(graph.CooT::Release());
-          return util::GRError(cudaErrorUnknown,
-                               "Error parsing csv graph: "
-                               "badly formed edge",
-                               __FILE__, __LINE__);
-      }
+                              "Error parsing csv graph: "
+                              "badly formed edge",
+                              __FILE__, __LINE__);
     }
     if (vid_mapper.find(std::to_string(src_id)) == vid_mapper.end()) {
       vid_mapper[std::to_string(src_id)] = node_count++;
@@ -212,7 +186,7 @@ cudaError_t ReadCSVStream(util::Parameters &parameters,
     output_stream << element.first << ", " << element.second << std::endl;
   }
   output_stream.close();
-  
+
   time_t mark1 = time(NULL);
   util::PrintMsg("  Done (" + std::to_string(mark1 - mark0) + " s).", !quiet);
 
