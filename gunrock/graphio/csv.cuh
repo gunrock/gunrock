@@ -174,7 +174,7 @@ cudaError_t ReadCSVStream(util::Parameters &parameters,
   } // endfor
 
   // Write VID mapping to file
-  ofstream output_stream;
+  std::ofstream output_stream;
   output_stream.open(filename+".vid-map", std::ios::out);
   if (!output_stream.good()) {
     return util::GRError(cudaErrorUnknown,
