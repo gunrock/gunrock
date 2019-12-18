@@ -37,7 +37,7 @@ cudaError_t UseParameters(ParametersT &parameters,
       graph_prefix + "graph-type",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
       "",
-      graph_prefix + " graph type, be one of market, rgg,"
+      graph_prefix + " graph type, be one of market, csv, rgg,"
                      " rmat, grmat or smallworld",
       __FILE__, __LINE__));
 
