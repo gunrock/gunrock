@@ -84,7 +84,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
 
     auto &enactor_stats = enactor_slice.enactor_stats;
-    auto &frontier = enactor_slice.frontier;
+    // auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
     auto &keys = data_slice.keys;
@@ -412,8 +412,7 @@ class Enactor
       GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       auto &enactor_slice = this->enactor_slices[gpu * this->num_gpus + 0];
       auto &graph = problem.sub_graphs[gpu];
-      GUARD_CU(enactor_slice.frontier.Allocate(num_points, neighbors,
-                                               this->queue_factors));
+      GUARD_CU(enactor_slice.frontier.Allocate(1, 1, this->queue_factors));
     }
 
     iterations = new IterationT[this->num_gpus];
@@ -452,28 +451,17 @@ class Enactor
 
     GUARD_CU(BaseEnactor::Reset(target));
 
-    SizeT nodes = n;
-
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       if (this->num_gpus == 1) {
-        this->thread_slices[gpu].init_size = nodes;
+        this->thread_slices[gpu].init_size = 1;
         for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
           auto &frontier =
               this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
-          frontier.queue_length = (peer_ == 0) ? nodes : 0;
+          frontier.queue_length = (peer_ == 0) ? 1 : 0;
           if (peer_ == 0) {
-            util::Array1D<SizeT, VertexT> tmp;
-            tmp.Allocate(nodes, target | util::HOST);
-            for (SizeT i = 0; i < nodes; ++i) {
-              tmp[i] = (VertexT)i % nodes;
-            }
-            GUARD_CU(tmp.Move(util::HOST, target));
-
             GUARD_CU(frontier.V_Q()->ForEach(
-                tmp,
-                [] __host__ __device__(VertexT & v, VertexT & i) { v = i; },
-                nodes, target, 0));
-            tmp.Release();
+                [] __host__ __device__(VertexT & v) { v = 0; },
+                1, target, 0));
           }
         }
       } else {
