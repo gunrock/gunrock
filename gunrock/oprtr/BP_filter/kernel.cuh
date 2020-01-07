@@ -29,10 +29,10 @@ namespace BP {
  */
 template <OprtrFlag FLAG, typename InKeyT, typename OutKeyT, typename SizeT,
           bool VALID =
-#ifndef __CUDA_ARCH__
-              false
+#ifdef __CUDA_ARCH__
+              true
 #else
-              (__CUDA_ARCH__ >= CUDA_ARCH)
+              false
 #endif
           >
 struct Dispatch {

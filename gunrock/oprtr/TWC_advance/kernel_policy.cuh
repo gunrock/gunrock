@@ -34,8 +34,6 @@ namespace TWC {
  * architectures and problem types.
  *
  * @tparam _ProblemData                 Problem data type.
- * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code
- * for.
  * @tparam _INSTRUMENT                  Whether or not we want instrumentation
  * logic generated
  * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have
@@ -84,7 +82,6 @@ struct KernelPolicy {
 
   enum {
     FLAG = _FLAG,
-    // CUDA_ARCH                       = _CUDA_ARCH,
     // INSTRUMENT                      = _INSTRUMENT,
 
     LOG_THREADS = _LOG_THREADS,
@@ -117,7 +114,7 @@ struct KernelPolicy {
 
   // Prefix sum raking grid for coarse-grained expansion allocations
   typedef gunrock::util::RakingGrid<
-      CUDA_ARCH,
+      GR_CUDA_ARCH,
       SizeT,               // Partial type
       LOG_THREADS,         // Depositing threads (the CTA size)
       LOG_LOADS_PER_TILE,  // Lanes (the number of loads)
@@ -127,7 +124,7 @@ struct KernelPolicy {
 
   // Prefix sum raking grid for fine-grained expansion allocations
   typedef gunrock::util::RakingGrid<
-      CUDA_ARCH,
+      GR_CUDA_ARCH,
       SizeT,               // Partial type
       LOG_THREADS,         // Depositing threads (the CTA size)
       LOG_LOADS_PER_TILE,  // Lanes (the number of loads)
@@ -200,7 +197,7 @@ struct KernelPolicy {
       // Amount of storage we can use for hashing scratch space under target
       // occupancy
       MAX_SCRATCH_BYTES_PER_CTA =
-          (GR_SMEM_BYTES(CUDA_ARCH) / _MIN_CTA_OCCUPANCY) - sizeof(State) -
+          (GR_SMEM_BYTES(GR_CUDA_ARCH) / _MIN_CTA_OCCUPANCY) - sizeof(State) -
           128,  // Fudge-factor to guarantee occupancy
 
       SCRATCH_ELEMENT_SIZE =
@@ -231,10 +228,10 @@ struct KernelPolicy {
   };
 
   enum {
-    THREAD_OCCUPANCY = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
-    SMEM_OCCUPANCY = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
+    THREAD_OCCUPANCY = GR_SM_THREADS(GR_CUDA_ARCH) >> LOG_THREADS,
+    SMEM_OCCUPANCY = GR_SMEM_BYTES(GR_CUDA_ARCH) / sizeof(SmemStorage),
     CTA_OCCUPANCY = GR_MIN(_MIN_CTA_OCCUPANCY,
-                           GR_MIN(GR_SM_CTAS(CUDA_ARCH),
+                           GR_MIN(GR_SM_CTAS(GR_CUDA_ARCH),
                                   GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
 
     VALID = (CTA_OCCUPANCY > 0),

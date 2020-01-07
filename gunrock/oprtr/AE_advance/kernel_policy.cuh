@@ -51,7 +51,6 @@ struct KernelPolicy {
   typedef _ValueT ValueT;
 
   enum {
-    // CUDA_ARCH                       = _CUDA_ARCH,
     LOG_THREADS = _LOG_THREADS,
     THREADS = 1 << LOG_THREADS,
     LOG_BLOCKS = _LOG_BLOCKS,
@@ -73,10 +72,10 @@ struct KernelPolicy {
   };
 
   enum {
-    THREAD_OCCUPANCY = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
-    SMEM_OCCUPANCY = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
+    THREAD_OCCUPANCY = GR_SM_THREADS(GR_CUDA_ARCH) >> LOG_THREADS,
+    SMEM_OCCUPANCY = GR_SMEM_BYTES(GR_CUDA_ARCH) / sizeof(SmemStorage),
     CTA_OCCUPANCY = GR_MIN(_MAX_CTA_OCCUPANCY,
-                           GR_MIN(GR_SM_CTAS(CUDA_ARCH),
+                           GR_MIN(GR_SM_CTAS(GR_CUDA_ARCH),
                                   GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
     VALID = (CTA_OCCUPANCY > 0),
   };

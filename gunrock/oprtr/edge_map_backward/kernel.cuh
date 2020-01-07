@@ -94,7 +94,13 @@ struct Sweep {
  * @tparam VALID
  */
 template <typename KernelPolicy, typename ProblemData, typename Functor,
-          bool VALID = (__GR_CUDA_ARCH__ >= KernelPolicy::CUDA_ARCH)>
+          bool VALID =
+#ifdef __CUDA_ARCH__
+              true
+#else
+              false
+#endif
+          >
 struct Dispatch {
   typedef typename KernelPolicy::VertexId VertexId;
   typedef typename KernelPolicy::SizeT SizeT;
