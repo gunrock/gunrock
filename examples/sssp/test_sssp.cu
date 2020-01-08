@@ -78,7 +78,7 @@ struct main_struct {
         VertexT src = srcs[i];
         util::PrintMsg("__________________________", !quiet);
         float elapsed = app::sssp::CPU_Reference(graph.csr(), ref_distances[i],
-                                                 NULL, src, quiet, false);
+                                                 (VertexT*)NULL, src, quiet, false);
         util::PrintMsg("--------------------------\nRun " + std::to_string(i) +
                            " elapsed: " + std::to_string(elapsed) +
                            " ms, src = " + std::to_string(src),
@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
 
   return app::Switch_Types<app::VERTEXT_U32B | app::VERTEXT_U64B |
                            app::SIZET_U32B | app::SIZET_U64B |
-                           app::VALUET_U32B | app::DIRECTED | app::UNDIRECTED>(
+                           app::VALUET_S32B | app::DIRECTED | app::UNDIRECTED>(
       parameters, main_struct());
 }
 

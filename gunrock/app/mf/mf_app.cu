@@ -185,7 +185,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
 // Display_Memory_Usage(problem);
 #ifdef ENABLE_PERFORMANCE_PROFILING
-  // Display_Performance_Profiling(enactor);
+  // Display_Performance_Profiling(&enactor);
 #endif
 
   // Clean up

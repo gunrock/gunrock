@@ -1185,7 +1185,7 @@ class CCEnactor
 
   typedef gunrock::oprtr::advance::KernelPolicy<
       Problem,   // Problem data type
-      300,       // CUDA_ARCH
+      GR_CUDA_ARCH,       // CUDA_ARCH
       8,         // MIN_CTA_OCCUPANCY,
       8,         // LOG_THREADS,
       8,         // LOG_BLOCKS,

@@ -48,11 +48,11 @@ namespace intersection {
 template <OprtrFlag FLAG, typename InKeyT, typename OutKeyT, typename SizeT,
           typename ValueT, typename VertexT, typename InterOpt,
           bool VALID =
-#ifndef __CUDA_ARCH__
-              false
+#ifdef __CUDA_ARCH__
+              true
 #else
-              (__CUDA_ARCH__ >= CUDA_ARCH)
-#endif
+              false
+#endif 
           >
 struct Dispatch {
 };
@@ -86,7 +86,6 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true> {
       SizeT dst_nl_size = dst_end - dst_it;
       SizeT min_nl = (src_nl_size > dst_nl_size) ? dst_nl_size : src_nl_size;
       SizeT max_nl = (src_nl_size < dst_nl_size) ? dst_nl_size : src_nl_size;
-      SizeT total = min_nl + max_nl;
       if (min_nl * ilog2((unsigned int)(max_nl)) * 10 < min_nl + max_nl) {
         // search
         SizeT min_it = (src_nl_size < dst_nl_size) ? src_it : dst_it;
@@ -198,7 +197,7 @@ cudaError_t Launch(const GraphT &graph, const FrontierInT *frontier_in,
           frontier_out->GetPointer(util::DEVICE), input_length, stride,
           num_vertex, num_edges, inter_op);
 
-  return cudaSuccess;  //(float)tc_count / (float)total;
+  return cudaSuccess;
 }
 
 }  // namespace intersection

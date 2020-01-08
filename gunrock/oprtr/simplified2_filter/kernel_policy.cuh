@@ -21,9 +21,6 @@ namespace oprtr {
 namespace simplified2_filter {
 
 template <typename _Problem,
-
-          // Machine parameters
-          int _CUDA_ARCH,
           // bool _INSTRUMENT,
           // Behavioral control parameters
           int _SATURATION_QUIT, bool _DEQUEUE_PROBLEM_SIZE,
@@ -34,7 +31,7 @@ template <typename _Problem,
           int _END_BITMASK_CULL, int _LOG_SCHEDULE_GRANULARITY, int _MODE>
 struct KernelPolicy
     : public gunrock::oprtr::cull_filter::KernelPolicy<
-          _Problem, _CUDA_ARCH, _SATURATION_QUIT, _DEQUEUE_PROBLEM_SIZE,
+          _Problem, _SATURATION_QUIT, _DEQUEUE_PROBLEM_SIZE,
           _MIN_CTA_OCCUPANCY, _LOG_THREADS, _LOG_LOAD_VEC_SIZE,
           _LOG_LOADS_PER_TILE, _LOG_RAKING_THREADS, _END_BITMASK_CULL,
           _LOG_SCHEDULE_GRANULARITY, _MODE> {

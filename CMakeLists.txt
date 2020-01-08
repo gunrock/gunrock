@@ -256,17 +256,17 @@ option(GUNROCK_GENCODE_SM52
 if (CUDA_VERSION VERSION_EQUAL "8.0" OR CUDA_VERSION VERSION_GREATER "8.0")
   option(GUNROCK_GENCODE_SM60
     "ON to generate code for Compute Capability 6.0 devices (e.g. Tesla P100)"
-    ON)
+    OFF)
   option(GUNROCK_GENCODE_SM61
     "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1080)"
-    ON)
+    OFF)
 endif ()
 
 #Volta Architecture: CUDA 9
 if (CUDA_VERSION VERSION_EQUAL "9.0" OR CUDA_VERSION VERSION_GREATER "9.0")
   option(GUNROCK_GENCODE_SM70
     "ON to generate code for Compute Capability 7.0 devices (e.g. Volta V100)"
-    ON)
+    OFF)
   option(GUNROCK_GENCODE_SM72
     "ON to generate code for Compute Capability 7.2 devices (e.g. Jetson AGX Xavier)"
     OFF)
@@ -276,12 +276,21 @@ endif ()
 if (CUDA_VERSION VERSION_EQUAL "10.0" OR CUDA_VERSION VERSION_GREATER "10.0")
   option(GUNROCK_GENCODE_SM75
     "ON to generate code for Compute Capability 7.5 devices (e.g. GTX 1160 or RTX 2080)"
-    ON)
+    OFF)
 endif ()
+
+option (CUDA_AUTODETECT_GENCODE
+  "On to enable autodetection of appropriate gencode=X options for each detected device"
+  ON)
 
 option(CUDA_VERBOSE_PTXAS
   "On to enable verbose output from the PTXAS assembler."
   OFF)
+
+if (CUDA_AUTODETECT_GENCODE)
+  include(${CMAKE_SOURCE_DIR}/cmake/AutoDetectCudaArch.cmake)
+  set(GENCODE ${GENCODE} ${CUDA_ARCHS})
+endif ()
 
 if (GUNROCK_GENCODE_SM10)
   set(GENCODE ${GENCODE} ${GENCODE_SM10})
@@ -334,6 +343,11 @@ endif(GUNROCK_GENCODE_SM72)
 if (GUNROCK_GENCODE_SM75)
   set(GENCODE ${GENCODE} ${GENCODE_SM75})
 endif(GUNROCK_GENCODE_SM75)
+
+message(STATUS "Listing chosen GENCODE commands")
+foreach(code IN LISTS GENCODE)
+    message(STATUS "${code}")
+endforeach() 
 
 if (CUDA_VERBOSE_PTXAS)
   set(VERBOSE_PTXAS --ptxas-options=-v)

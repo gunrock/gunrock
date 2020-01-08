@@ -30,7 +30,13 @@ namespace oprtr {
 namespace simplified_filter {
 
 template <typename KernelPolicy, typename Problem, typename Functor,
-          bool VALID = (__GR_CUDA_ARCH__ >= KernelPolicy::CUDA_ARCH)>
+          bool VALID =
+#ifdef __CUDA_ARCH__
+              true
+#else
+              false
+#endif
+          >
 struct Dispatch {};
 
 template <typename KernelPolicy, typename Problem, typename Functor>

@@ -62,7 +62,6 @@ struct SMIterationLoop : public IterationLoopBase
      */
     cudaError_t Core(int peer_ = 0)
     {
-        auto         &enactor            =   this -> enactor[0];
         auto         &data_slice         =   this -> enactor ->
             problem -> data_slices[this -> gpu_num][0];
         auto         &enactor_slice      =   this -> enactor ->
@@ -84,8 +83,6 @@ struct SMIterationLoop : public IterationLoopBase
         auto         &num_subs           =   data_slice.num_subs;
         auto         &results            =   data_slice.results;
         auto         &row_offsets        =   graph.CsrT::row_offsets;
-        auto         &col_indices        =   graph.CsrT::column_indices;
-        auto         &frontier           =   enactor_slice.frontier;
         auto         &oprtr_parameters   =   enactor_slice.oprtr_parameters;
         auto         &retval             =   enactor_stats.retval;
         auto         &stream             =   oprtr_parameters.stream;
@@ -104,9 +101,6 @@ struct SMIterationLoop : public IterationLoopBase
 	    printf("Frontier @ %u = %u\n", pos, v);
 	    return;
 	};
-
-//	GUARD_CU(frontier.V_Q()->ForAll(print_frontier , frontier.queue_length, util::DEVICE, stream));
-//	GUARD_CU(frontier.Next_V_Q()->ForAll(print_frontier , frontier.queue_length, util::DEVICE, stream));
 
         // Store data graph degrees to subgraphs
         GUARD_CU(subgraphs.ForAll([row_offsets]
@@ -147,7 +141,7 @@ struct SMIterationLoop : public IterationLoopBase
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool
         {
-            if (src < 0 || src >= nodes_data)
+            if (util::lessThanZero(src) || src >= nodes_data)
                 return false;
             if ((!isValid[src]) || (!isValid[dest])) {
                 return false;

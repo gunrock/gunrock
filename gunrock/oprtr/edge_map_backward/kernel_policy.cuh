@@ -42,8 +42,6 @@ namespace edge_map_backward {
  * architectures and problem types.
  *
  * @tparam _ProblemData                 Problem data type.
- * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code
- * for.
  * @tparam _INSTRUMENT                  Whether or not we want instrumentation
  * logic generated
  * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have
@@ -69,7 +67,6 @@ namespace edge_map_backward {
  */
 template <typename _ProblemData,
           // Machine parameters
-          int _CUDA_ARCH,
           // Behavioral control parameters
           // bool _INSTRUMENT,
           // Tunable parameters
@@ -88,10 +85,6 @@ struct KernelPolicy {
   typedef typename ProblemData::SizeT SizeT;
 
   enum {
-
-    CUDA_ARCH = _CUDA_ARCH,
-    // INSTRUMENT                      = _INSTRUMENT,
-
     LOG_THREADS = _LOG_THREADS,
     THREADS = 1 << LOG_THREADS,
 
@@ -104,7 +97,7 @@ struct KernelPolicy {
     LOG_RAKING_THREADS = _LOG_RAKING_THREADS,
     RAKING_THREADS = 1 << LOG_RAKING_THREADS,
 
-    LOG_WARPS = LOG_THREADS - GR_LOG_WARP_THREADS(CUDA_ARCH),
+    LOG_WARPS = LOG_THREADS - GR_LOG_WARP_THREADS(GR_CUDA_ARCH),
     WARPS = 1 << LOG_WARPS,
 
     LOG_TILE_ELEMENTS_PER_THREAD = LOG_LOAD_VEC_SIZE + LOG_LOADS_PER_TILE,
@@ -121,12 +114,12 @@ struct KernelPolicy {
   };
 
   // Prefix sum raking grid for coarse-grained expansion allocations
-  typedef util::RakingGrid<CUDA_ARCH, SizeT, LOG_THREADS, LOG_LOADS_PER_TILE,
+  typedef util::RakingGrid<GR_CUDA_ARCH, SizeT, LOG_THREADS, LOG_LOADS_PER_TILE,
                            LOG_RAKING_THREADS, true>
       CoarseGrid;
 
   // Prefix sum raking grid for fine-grained expansion allocations
-  typedef util::RakingGrid<CUDA_ARCH, SizeT, LOG_THREADS, LOG_LOADS_PER_TILE,
+  typedef util::RakingGrid<GR_CUDA_ARCH, SizeT, LOG_THREADS, LOG_LOADS_PER_TILE,
                            LOG_RAKING_THREADS, true>
       FineGrid;
 
@@ -181,8 +174,8 @@ struct KernelPolicy {
       int cta_comm;
 
       // Storage for scanning local contract-expand ranks
-      SizeT coarse_warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
-      SizeT fine_warpscan[2][GR_WARP_THREADS(CUDA_ARCH)];
+      SizeT coarse_warpscan[2][GR_WARP_THREADS(GR_CUDA_ARCH)];
+      SizeT fine_warpscan[2][GR_WARP_THREADS(GR_CUDA_ARCH)];
 
       // Enqueue offset for neighbors of the current tile
       SizeT coarse_enqueue_offset;
@@ -194,7 +187,7 @@ struct KernelPolicy {
       // Amount of storage we can use for hashing scratch space under target
       // occupancy
       MAX_SCRATCH_BYTES_PER_CTA =
-          (GR_SMEM_BYTES(CUDA_ARCH) / _MIN_CTA_OCCUPANCY) - sizeof(State) -
+          (GR_SMEM_BYTES(GR_CUDA_ARCH) / _MIN_CTA_OCCUPANCY) - sizeof(State) -
           128,  // Fudge-factor to guarantee occupancy
 
       SCRATCH_ELEMENT_SIZE =
@@ -222,10 +215,10 @@ struct KernelPolicy {
   };
 
   enum {
-    THREAD_OCCUPANCY = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
-    SMEM_OCCUPANCY = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
+    THREAD_OCCUPANCY = GR_SM_THREADS(GR_CUDA_ARCH) >> LOG_THREADS,
+    SMEM_OCCUPANCY = GR_SMEM_BYTES(GR_CUDA_ARCH) / sizeof(SmemStorage),
     CTA_OCCUPANCY = GR_MIN(_MIN_CTA_OCCUPANCY,
-                           GR_MIN(GR_SM_CTAS(CUDA_ARCH),
+                           GR_MIN(GR_SM_CTAS(GR_CUDA_ARCH),
                                   GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
 
     VALID = (CTA_OCCUPANCY > 0),
