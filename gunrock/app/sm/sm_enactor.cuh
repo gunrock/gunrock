@@ -203,11 +203,10 @@ struct SMIterationLoop : public IterationLoopBase
         size_t pointer_head = 0;
         for (int iter = 0; iter < 1; ++iter) {
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                graph.csr(), complete_graph, complete_graph,
                 oprtr_parameters, advance_op));
         }
 
-	frontier.queue_reset = false;
         for (int iter = 0; iter < nodes_query; ++iter) {
             // set counter to be equal to iter
             GUARD_CU(counter.ForAll([iter]
@@ -217,7 +216,7 @@ struct SMIterationLoop : public IterationLoopBase
                 }, 1, target, stream));
 
             GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-                graph.csr(), frontier.V_Q(), frontier.Next_V_Q(),
+                graph.csr(), complete_graph, complete_graph,
                 oprtr_parameters, prune_op));
 
             if (iter > 0) {
