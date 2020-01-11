@@ -17,6 +17,7 @@
 #include <gunrock/oprtr/1D_oprtr/1D_scalar.cuh>
 #include <gunrock/oprtr/oprtr_base.cuh>
 #include <gunrock/oprtr/oprtr_parameters.cuh>
+#include <gunrock/util/scan_device.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -178,14 +179,11 @@ cudaError_t ComputeOutputLength(const GraphT graph,
   // util::DisplayDeviceResults(partitioned_scanned_edges,
   // frontier_attribute->queue_length);
 
-  mgpu::Scan<mgpu::MgpuScanTypeInc>(
-      parameters.frontier->output_offsets.GetPointer(util::DEVICE),
-      parameters.frontier->queue_length,  // TODO: +1?
-      (SizeT)0, mgpu::plus<SizeT>(),
-      parameters.frontier->output_length.GetPointer(util::DEVICE),
-      (SizeT *)NULL,
-      parameters.frontier->output_offsets.GetPointer(util::DEVICE),
-      parameters.context[0]);
+  util::Scan(parameters.frontier->output_offsets,  // Input
+    parameters.frontier->queue_length,    // Num_Items
+    parameters.frontier->output_offsets,  // Output
+    parameters.frontier->output_length.GetPointer(util::DEVICE), //); // Reduction It.
+    parameters.context);
 
   return retval;
 }
