@@ -263,12 +263,7 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
 
   std::cerr << "Validate_Results" << std::endl;
 
-  for (SizeT v =0; v < data_graph.nodes; v++) {
-    (*num_subgraphs) += h_subgraphs[v];
-  }
-  *num_subgraphs = *num_subgraphs / query_graph.nodes;
-
-  h_subgraphs[0] = *num_subgraphs;
+  *num_subgraphs = h_subgraphs[0];
 
   bool quiet = parameters.Get<bool>("quiet");
   if (!quiet && verbose) {

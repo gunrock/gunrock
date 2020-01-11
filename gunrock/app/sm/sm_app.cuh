@@ -63,7 +63,7 @@ cudaError_t RunTests(
     std::string validation = parameters.Get<std::string>("validation");
     util::Info info("SM", parameters, data_graph); // initialize Info structure
 
-    VertexT *h_subgraphs = new VertexT[data_graph.nodes];
+    VertexT *h_subgraphs = new VertexT[1];
 
     ProblemT problem(parameters);
     EnactorT enactor;
