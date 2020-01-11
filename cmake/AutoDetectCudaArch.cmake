@@ -33,35 +33,34 @@ if(NOT DEFINED CUDA_ARCHS)
 		"				fprintf(stderr, \"-gencode=arch=compute_%d%d,code=compute_%d%d;\", prop.major, prop.minor, prop.major, prop.minor);\n"
 		"			}\n"
 		"		}\n"
-		"		else { return -1; }\n"
 		"	}\n"
 		"	return 0; \n"
 		"}\n")	
-		
-		execute_process(COMMAND "${CUDA_NVCC_EXECUTABLE}" "--run" "${cuda_arch_autodetect_file}"
-						#WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/CMakeFiles/"	
-						RESULT_VARIABLE CUDA_RETURN_CODE	
-						OUTPUT_VARIABLE dummy
-						ERROR_VARIABLE fprintf_output					
-						OUTPUT_STRIP_TRAILING_WHITESPACE)							
-		
+	
+		execute_process(COMMAND "${CUDA_NVCC_EXECUTABLE}" "-ccbin=${CMAKE_C_COMPILER}" "--run" "${cuda_arch_autodetect_file}"
+							#WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/CMakeFiles/"	
+							RESULT_VARIABLE CUDA_RETURN_CODE	
+							OUTPUT_VARIABLE dummy
+							ERROR_VARIABLE fprintf_output					
+							OUTPUT_STRIP_TRAILING_WHITESPACE)							
+
 		if(CUDA_RETURN_CODE EQUAL 0)			
 			set(CUDA_ARCHS ${fprintf_output} CACHE STRING "CUDA Arch")
 		else()
-			message(STATUS "GPU architectures auto-detect failed. Will build for all possible architectures.")      
-			set(CUDA_ARCHS -gencode=arch=compute_30,code=sm_30
-			               -gencode=arch=compute_35,code=sm_35
-			               -gencode=arch=compute_37,code=sm_37
-			               -gencode=arch=compute_50,code=sm_50
-			               -gencode=arch=compute_52,code=sm_52
-			               -gencode=arch=compute_60,code=sm_60
-			               -gencode=arch=compute_61,code=sm_61
-			               -gencode=arch=compute_70,code=sm_70
-			               -gencode=arch=compute_72,code=sm_72
-			               -gencode=arch=compute_75,code=sm_75
-						   CACHE STRING "CUDA Arch")			
-		endif()  
+				message(STATUS "GPU architectures auto-detect failed. Will build for all possible architectures.")      
+				set(CUDA_ARCHS -gencode=arch=compute_30,code=sm_30
+				               -gencode=arch=compute_35,code=sm_35
+				               -gencode=arch=compute_37,code=sm_37
+				               -gencode=arch=compute_50,code=sm_50
+				               -gencode=arch=compute_52,code=sm_52
+				               -gencode=arch=compute_60,code=sm_60
+				               -gencode=arch=compute_61,code=sm_61
+				               -gencode=arch=compute_70,code=sm_70
+				               -gencode=arch=compute_72,code=sm_72
+				               -gencode=arch=compute_75,code=sm_75
+							   CACHE STRING "CUDA Arch")
+		endif()
+		message(STATUS "CUDA Autodetected, setting CUDA_ARCHS=" ${CUDA_ARCHS})	
 	endif()
-	message(STATUS "CUDA Autodetected, setting CUDA_ARCHS=" ${CUDA_ARCHS})	
 endif()
 ###################################################################################
