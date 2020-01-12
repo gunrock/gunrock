@@ -195,7 +195,6 @@ struct SMIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
       // Checks finished, add dest to combination and write to new flags pos in
       // write_op
       write_to[dest] = true;
-      printf("src: %d, dest:%d\n", src, dest);
       return true;
     };  // prune_op
 
@@ -219,6 +218,7 @@ struct SMIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           advance_op));
     }
 
+    int total = 1;
     for (int iter = 0; iter < nodes_query; ++iter) {
       // set counter to be equal to iter
       GUARD_CU(counter.ForAll(
@@ -232,6 +232,8 @@ struct SMIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             graph.csr(), complete_graph, complete_graph, oprtr_parameters,
             prune_op));
       } else {
+        // total is the largest combination value this iteration could have
+        total = total * nodes_data;
         // move last iteration's flags_write results to flags_read; reset
         // flags_write
         GUARD_CU(flags_read.ForAll(
@@ -244,10 +246,6 @@ struct SMIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             [] __device__(bool *x, const SizeT &pos) { x[pos] = false; },
             pow(nodes_data, nodes_query), target, stream));
 
-        int total = 1;
-        for (int i = 0; i < counter[0]; ++i) {
-          total = total * nodes_data;
-        }
         for (int val = 0; val < total; ++val) {
           // set value to be equal to val
           GUARD_CU(value.ForAll(
@@ -271,7 +269,6 @@ struct SMIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
               graph.csr(), complete_graph, complete_graph, oprtr_parameters,
               write_op));
         }
-        flags_write.Print();
       }
     }  // flags_write contains final results
 
