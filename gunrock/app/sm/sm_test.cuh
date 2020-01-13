@@ -26,9 +26,11 @@
 #include <unordered_map>
 #include <set>
 #include <queue>
-#include <vector>
 #include <utility>
 #endif
+#include <vector>
+
+using namespace std;
 
 namespace gunrock {
 namespace app {
@@ -80,6 +82,35 @@ void DisplaySolution(T *array, SizeT length) {
  * SM Testing Routines
  *****************************************************************************/
 
+#ifdef BOOST_FOUND
+using namespace boost;
+// User defined counting callback
+template <typename Graph1, typename Graph2>
+struct vf2_count_callback {
+  vf2_count_callback(const Graph1 &graph1, const Graph2 &graph2)
+      : graph1_(graph1), graph2_(graph2) {}
+
+  template <typename CorrespondenceMap1To2, typename CorrespondenceMap2To1>
+  bool operator()(CorrespondenceMap1To2 f, CorrespondenceMap2To1) {
+    // Listing all matches from isomorphism map
+    vector<int> listing;
+    BGL_FORALL_VERTICES_T(v, graph1_, Graph1) {
+      listing.push_back(get(vertex_index_t(), graph1_, get(f, v)));
+    }
+    sort(listing.begin(), listing.end());
+    listings_.push_back(listing);
+    return true;
+  }
+
+ private:
+  const Graph1 &graph1_;
+  const Graph2 &graph2_;
+
+ public:
+  vector<vector<int>> listings_;
+};
+#endif
+
 /**
  * @brief Simple CPU-based reference SM implementations
  * @tparam      GraphT        Type of the graph
@@ -99,73 +130,64 @@ double CPU_Reference(util::Parameters &parameters, GraphT &data_graph,
   typedef typename GraphT::SizeT SizeT;
 
 #ifdef BOOST_FOUND
-  using namespace boost;
-  // User defined counting callback
-  template <typename Graph1,
-            typename Graph2>
-  struct vf2_count_callback {
-  vf2_count_callback(const Graph1& graph1, const Graph2& graph2)
-      : graph1_(graph1), graph2_(graph2), count_(0) {
-      }
-
-      template<typename CorrespondenceMap1To2,
-               typename CorrespondenceMap2To1>
-      bool operator()(CorrespondenceMap1To2 f, CorrespondenceMap2To1) {
-          // Count number of matches from isomorphism map
-          count_++;
-          return true;
-      }
-  private:
-      const Graph1& graph1_;
-      const Graph2& graph2_;
-  public:
-      size_t count_;
-  };
-
-  typedef typename GraphT::VertexT VertexT;
-  typedef typename GraphT::CsrT CsrT;
-
   bool undirected = parameters.Get<bool>("undirected");
 
   if (undirected) {
-      // Prepare boost datatype and data structure
-      typedef adjacency_list<setS, vecS, bidirectionalS> BGraphT;
+    // Prepare boost datatype and data structure
+    typedef adjacency_list<setS, vecS, bidirectionalS> BGraphT;
 
-      // Build query graph
-      BGraphT b_query(query_graph.nodes);
-      for (SizeT e = 0; e < query_graph.edges; ++e) {
-        auto &pair = query_graph.CooT::edge_pairs[e];
-        add_edge(pair.x, pair.y, b_query);
+    // Build query graph
+    BGraphT b_query(query_graph.nodes);
+    for (SizeT e = 0; e < query_graph.edges; ++e) {
+      auto &pair = query_graph.coo().edge_pairs[e];
+      add_edge(pair.x, pair.y, b_query);
+    }
+
+    // Build data graph
+    BGraphT b_data(data_graph.nodes);
+    for (SizeT e = 0; e < data_graph.edges; ++e) {
+      auto &pair = data_graph.coo().edge_pairs[e];
+      add_edge(pair.x, pair.y, b_data);
+    }
+
+    printf("CPU_Reference (boost): start\n");
+
+    // Compute subgraph matching
+    util::CpuTimer cpu_timer;
+    cpu_timer.Start();
+
+    // Create call back to print mappings
+    vf2_count_callback<BGraphT, BGraphT> callback(b_query, b_data);
+
+    vf2_subgraph_iso(b_query, b_data, std::ref(callback));
+
+    cpu_timer.Stop();
+
+    float elapsed = cpu_timer.ElapsedMillis();
+
+    auto results = callback.listings_;
+    sort(results.begin(), results.end());
+    auto itr = unique(results.begin(), results.end());
+    results.resize(distance(results.begin(), itr));
+    subgraphs[0] = results.size();
+    // For debugging to output cpu reference results
+    /*printf("CPU reference listings:\n");
+    for (int i = 0; i < results.size(); ++i) {
+      for (int j = 0; j < results[i].size(); ++j) {
+        cout << results[i][j] << " ";
       }
+      cout << endl;
+    }*/
 
-      // Build data graph
-      BGraphT b_data(data_graph.nodes);
-      for (SizeT e = 0; e < data_graph.edges; ++e) {
-        auto &pair = data_graph.CooT::edge_pairs[e];
-        add_edge(pair.x, pair.y, b_data);
-      }
+    printf("CPU_Reference (boost): done\n");
 
-      // Compute subgraph matching
-      CpuTimer cpu_timer;
-      cpu_timer.Start();
-
-      // Create call back to print mappings
-      vf2_print_callback<BGraphT, BGraphT> callback(b_query, b_data);
-
-      vf2_subgraph_iso(b_query, b_data, std::ref(callback));
-
-      cpu_timer.Stop();
-
-      float elapsed = cpu_timer.ElapsedMillis();
-
-      subgraphs[0] = callback.count_;
-      return elapsed;
+    return elapsed;
   }
 #endif
 
   printf("CPU_Reference: start\n");
 
-  // In pseudocode:
+  // In pseudocode: note that this pseudocode is only for triangle counting
   //
   // Init subgraphs[i] = degree(i)
   // For (u, v) in graph:
@@ -173,7 +195,6 @@ double CPU_Reference(util::Parameters &parameters, GraphT &data_graph,
   //   v_neibs = get_neibs(v)
   //   For n in intersect(u_neibs, v_neibs):
   //     subgraphs[n] += 1
-
 
   util::CpuTimer cpu_timer;
   float total_time = 0.0;
@@ -188,21 +209,23 @@ double CPU_Reference(util::Parameters &parameters, GraphT &data_graph,
 
     // For each node
     for (VertexT src = 0; src < data_graph.nodes; src++) {
-      SizeT src_num_neighbors = data_graph.GetNeighborListLength(src);
+      SizeT src_num_neighbors = data_graph.csr().GetNeighborListLength(src);
       if (src_num_neighbors > 0) {
-        SizeT src_edge_start = data_graph.GetNeighborListOffset(src);
+        SizeT src_edge_start = data_graph.csr().GetNeighborListOffset(src);
         SizeT src_edge_end = src_edge_start + src_num_neighbors;
 
         // Iterate over outgoing edges
         for (SizeT src_edge_idx = src_edge_start; src_edge_idx < src_edge_end;
              src_edge_idx++) {
-          VertexT dst = data_graph.GetEdgeDest(src_edge_idx);
+          VertexT dst = data_graph.csr().GetEdgeDest(src_edge_idx);
           if (src < dst) {  // Avoid double counting.  This also implies we only
                             // support undirected graphs.
 
-            SizeT dst_num_neighbors = data_graph.GetNeighborListLength(dst);
+            SizeT dst_num_neighbors =
+                data_graph.csr().GetNeighborListLength(dst);
             if (dst_num_neighbors > 0) {
-              SizeT dst_edge_start = data_graph.GetNeighborListOffset(dst);
+              SizeT dst_edge_start =
+                  data_graph.csr().GetNeighborListOffset(dst);
               SizeT dst_edge_end = dst_edge_start + dst_num_neighbors;
 
               // Find nodes that are neighbors of both `src` and `dst`
@@ -210,8 +233,8 @@ double CPU_Reference(util::Parameters &parameters, GraphT &data_graph,
               int src_offset = src_edge_start;
               int dst_offset = dst_edge_start;
               while (dst_offset < dst_edge_end && src_offset < src_edge_end) {
-                VertexT dst_neib = data_graph.GetEdgeDest(dst_offset);
-                VertexT src_neib = data_graph.GetEdgeDest(src_offset);
+                VertexT dst_neib = data_graph.csr().GetEdgeDest(dst_offset);
+                VertexT src_neib = data_graph.csr().GetEdgeDest(src_offset);
                 if (dst_neib == src_neib) {
                   subgraphs[src_neib]++;
                   dst_offset++;
@@ -227,7 +250,10 @@ double CPU_Reference(util::Parameters &parameters, GraphT &data_graph,
         }
       }
     }
-    subgraphs[0] = std::accumulate(subgraphs+1, subgraphs+data_graph.nodes-1, subgraphs[0]) / query_graph.nodes;
+    subgraphs[0] =
+        std::accumulate(subgraphs + 1, subgraphs + data_graph.nodes - 1,
+                        subgraphs[0]) /
+        query_graph.nodes;
     cpu_timer.Stop();
     total_time += cpu_timer.ElapsedMillis();
   }
@@ -277,8 +303,7 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
 
   // Verify the result
   util::PrintMsg("Subgraph Matching Validity: ", !quiet, false);
-  num_errors = util::CompareResults(h_subgraphs, ref_subgraphs,
-                                    1, true, quiet);
+  num_errors = util::CompareResults(h_subgraphs, ref_subgraphs, 1, true, quiet);
 
   if (num_errors > 0) {
     util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);

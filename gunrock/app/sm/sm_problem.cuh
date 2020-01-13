@@ -450,14 +450,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       vector<vector<int>>::iterator itr =
           unique(combinations.begin(), combinations.end());
       combinations.resize(distance(combinations.begin(), itr));
-      cout << "Listing matched subgraphs:" << endl;
+      // For debugging to output gunrock results
+      /*cout << "Listing matched subgraphs:" << endl;
       for (int x = 0; x < combinations.size(); ++x) {
         for (int y = 0; y < combinations[x].size(); ++y) {
           cout << combinations[x][y] << " ";
         }
         cout << endl;
       }
-      cout << endl;
+      cout << endl;*/
       h_subgraphs[0] = combinations.size();
       // TODO: export combinations to output
       delete[] h_results;
