@@ -172,38 +172,22 @@ __device__ static unsigned long atomicAdd(unsigned long* addr,
 }
 #endif
 
-#if __GR_CUDA_ARCH__ <= 300
-// TODO: only works if both *addr and val are non-negetive
-/*__device__ static signed long long int atomicMin(signed long long int* addr,
-signed long long int val)
-{
-    unsigned long long int pre_value = (unsigned long long int)val;
-    unsigned long long int old_value = (unsigned long long int)val;
-    while (true)
-    {
-        old_value = atomicCAS((unsigned long long int*)addr, pre_value,
-(unsigned long long int)val); if (old_value <= (unsigned long long int)val)
-break; if (old_value == pre_value) break; pre_value = old_value;
-    }
-    return old_value;
-}*/
-#endif
-
-//#if UINT64_MAX != ULLONG_MAX
 __device__ static uint64_t atomicMin(uint64_t* addr, uint64_t val) {
+#if GR_CUDA_ARCH >= 350
   return (uint64_t)atomicMin((unsigned long long int*)addr,
                              (unsigned long long int)val);
-  //    unsigned long long int old = (unsigned long long int)(*addr);
-  //    unsigned long long int expected;
-  //    do {
-  //        expected = old;
-  //        old = atomicCAS(
-  //            (unsigned long long int*)addr,
-  //            expected, min((unsigned long long int)val, expected));
-  //    } while (expected != old);
-  //    return old;
+#else
+  unsigned long long int old = (unsigned long long int)(*addr);
+  unsigned long long int expected;
+  do {
+      expected = old;
+      old = atomicCAS(
+          (unsigned long long int*)addr,
+          expected, min((unsigned long long int)val, expected));
+  } while (expected != old);
+  return old;
+#endif
 }
-//#endif
 
 __device__ static float atomicMin(float* addr, float val) {
   int* addr_as_int = (int*)addr;
@@ -258,7 +242,7 @@ __device__ static double atomicMax(double* addr, double val) {
 template <typename T>
 __device__ __host__ __forceinline__ T _ldg(T* addr) {
 #ifdef __CUDA_ARCH__
-#if __GR_CUDA_ARCH__ >= 350
+#if GR_CUDA_ARCH >= 350
   return __ldg(addr);
 #else
   return *addr;

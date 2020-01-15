@@ -74,13 +74,13 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true> {
     for (VertexT idx = start; idx < input_length;
          idx += KernelPolicyT::BLOCKS * KernelPolicyT::THREADS) {
       // get nls start and end index for two ids
-      VertexT sid = __ldg(d_src_node_ids + idx);
-      VertexT did = __ldg(d_dst_node_ids + idx);
+      VertexT sid = _ldg(d_src_node_ids + idx);
+      VertexT did = _ldg(d_dst_node_ids + idx);
       if (sid >= did) continue;
-      SizeT src_it = __ldg(d_row_offsets + sid);
-      SizeT src_end = __ldg(d_row_offsets + sid + 1);
-      SizeT dst_it = __ldg(d_row_offsets + did);
-      SizeT dst_end = __ldg(d_row_offsets + did + 1);
+      SizeT src_it = _ldg(d_row_offsets + sid);
+      SizeT src_end = _ldg(d_row_offsets + sid + 1);
+      SizeT dst_it = _ldg(d_row_offsets + did);
+      SizeT dst_end = _ldg(d_row_offsets + did + 1);
       if (src_it >= src_end || dst_it >= dst_end) continue;
       SizeT src_nl_size = src_end - src_it;
       SizeT dst_nl_size = dst_end - dst_it;
@@ -99,17 +99,17 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true> {
           }
         }
       } else {
-        VertexT src_edge = __ldg(d_column_indices + src_it);
-        VertexT dst_edge = __ldg(d_column_indices + dst_it);
+        VertexT src_edge = _ldg(d_column_indices + src_it);
+        VertexT dst_edge = _ldg(d_column_indices + dst_it);
         while (src_it < src_end && dst_it < dst_end) {
           int diff = src_edge - dst_edge;
           if (diff == 0) {
             inter_op(src_edge, idx);
           }
           src_edge =
-              (diff <= 0) ? __ldg(d_column_indices + (++src_it)) : src_edge;
+              (diff <= 0) ? _ldg(d_column_indices + (++src_it)) : src_edge;
           dst_edge =
-              (diff >= 0) ? __ldg(d_column_indices + (++dst_it)) : dst_edge;
+              (diff >= 0) ? _ldg(d_column_indices + (++dst_it)) : dst_edge;
         }
       }
     }
