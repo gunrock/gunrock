@@ -37,7 +37,7 @@ __device__ __host__ ValueT _sqrt(const ValueT &a) {
 template<typename SizeT, typename ValueT, typename PointT>
 __device__ __host__
 ValueT euclidean_distance(const SizeT dim, 
-    util::Array1D<SizeT, ValueT> points, 
+    ValueT* points, 
     PointT p1, PointT p2) {
 
     // Get dimensional of labels

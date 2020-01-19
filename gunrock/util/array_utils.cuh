@@ -26,7 +26,7 @@
 namespace gunrock {
 namespace util {
 
-//#define ENABLE_ARRAY_DEBUG
+// #define ENABLE_ARRAY_DEBUG
 
 /**
  * @brief location flags
@@ -451,10 +451,18 @@ Location_to_string(HOST) +
       sizeof(ValueT)) + " bytes, pointer =\t " + std::to_string(d_pointer));
       #endif*/
       if (size != 0) {
-        retval = GRError(
+        if ((FLAG & UNIFIED) == UNIFIED) {
+          if(retval = util::GRError(cudaMallocManaged((void **)&(d_pointer), 
+                            sizeof(ValueT) * size),
+                            std::string(name) + " cudaMallocManaged failed", 
+                            __FILE__, __LINE__))
+            return retval;
+        } else {
+          retval = GRError(
             cudaMalloc((void **)&(d_pointer), sizeof(ValueT) * size),
             std::string(name) + " cudaMalloc failed", __FILE__, __LINE__);
-        if (retval) return retval;
+          if (retval) return retval;
+        }
       }
       allocated = allocated | DEVICE;
 #ifdef ENABLE_ARRAY_DEBUG

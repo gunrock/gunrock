@@ -143,7 +143,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             if (pos == i) {
                 dist = util::PreDefinedValues<ValueT>::MaxValue;
             } else {
-                dist = euclidean_distance(dim, points, pos, i);
+                dist = euclidean_distance(dim, points.GetPointer(util::DEVICE), pos, i);
             }
             debug("d[%d-%d] = %lf\n", pos, i, dist);
             // auto dist = euclidean_distance(dim, points, pos, i);
@@ -205,7 +205,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                     new_dist = util::PreDefinedValues<ValueT>::MaxValue;
                     debug("point %d, new point %d, new dist: %lf [line src==i]\n", src, i, new_dist);
                 } else {
-                    new_dist = euclidean_distance(dim, points, src, i);
+                    new_dist = euclidean_distance(dim, points.GetPointer(util::DEVICE), src, i);
                     debug("point %d, new point %d, new dist: %lf [line src!=i]\n", src, i, new_dist);
                 }
                 // auto new_dist = euclidean_distance(dim, points, src, i);
