@@ -102,11 +102,17 @@ double CPU_Reference(util::Parameters &parameters,
 
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
     
-    int num_devices;
-    int MAX_DATA = 10;
-    cudaError_t retvals[40];
-
+    int num_devices /*= 1*/;
     cudaGetDeviceCount(&num_devices);
+
+    /*
+     ***************************************
+     *  [TODO] Consider boundary conditions*
+     ***************************************
+     */
+    int MAX_DATA = 1; 
+
+    cudaError_t retvals[1024];
     cudaStream_t stream[1024];
     cudaEvent_t  event[1024];
      
@@ -116,6 +122,12 @@ double CPU_Reference(util::Parameters &parameters,
     GUARD_CU(distance   .Allocate(num_devices*MAX_DATA, util::HOST));
     GUARD_CU(keys       .Allocate(num_devices*MAX_DATA, util::HOST));
 
+    // CUB Temporary arrays
+    util::Array1D<SizeT, util::Array1D<SizeT, ValueT>> cub_distance;
+    util::Array1D<SizeT, util::Array1D<SizeT, SizeT>>  cub_keys;
+
+    GUARD_CU(cub_distance   .Allocate(num_devices*MAX_DATA, util::HOST));
+    GUARD_CU(cub_keys       .Allocate(num_devices*MAX_DATA, util::HOST));
     
     for(int dev = 0; dev < num_devices; dev++) {
         GUARD_CU2(cudaSetDevice(dev), "cudaSetDevice failed.");
@@ -141,6 +153,9 @@ double CPU_Reference(util::Parameters &parameters,
 
             GUARD_CU(distance[(dev*MAX_DATA) + d]    .Allocate(n, util::DEVICE));
             GUARD_CU(keys[(dev*MAX_DATA) + d]        .Allocate(n, util::DEVICE));
+
+            GUARD_CU(cub_distance[(dev*MAX_DATA) + d]    .Allocate(n, util::DEVICE));
+            GUARD_CU(cub_keys[(dev*MAX_DATA) + d]        .Allocate(n, util::DEVICE));
         }
         GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
     }
@@ -153,69 +168,67 @@ double CPU_Reference(util::Parameters &parameters,
 
     // Find K nearest neighbors for each point in the dataset
     // Can use multi-gpu to speed up the computation
-    for (SizeT m = 0; m < n; m+(num_devices*MAX_DATA)) {
-        // #pragma omp parallel for 
-        for (int dev = 0; dev < num_devices; dev++) {            
+    for (SizeT m = 0; m < n; m = m + (num_devices*MAX_DATA)) {
+        #pragma omp parallel for 
+        for (int dev = 0; dev < num_devices; dev++) {
             util::GRError(cudaSetDevice(dev), "cudaSetDevice failed.");
-            
-            auto &error = retvals[dev];
-            
-            /*
-             ***************************************
-             * [TODO] Fix illegal memory access.
-             ***************************************
-             */
-
-            // Calculate N distances for each point
-            auto distance_op = [n, dim, data, keys, k, m, distance, MAX_DATA, dev] 
-                __host__ __device__ (const SizeT &i) {
-                    auto pos = i % MAX_DATA;        // position in data'th array
-                    auto id = i % n;
-                    auto row = (dev*MAX_DATA)+pos;
-                    auto v = m+row;
-                    ValueT dist = 0;
-                    if (i == m) {
-                        dist = util::PreDefinedValues<ValueT>::MaxValue;
-                    } else {
-                        dist = euclidean_distance(dim, data.GetPointer(util::DEVICE), v, id);
-                    }
-                    distance[row][id] = dist;
-                    keys[row][id] = id;
-                };
-
-            error = oprtr::For(distance_op, n*MAX_DATA, util::DEVICE, stream[dev]);
 
             #pragma omp parallel for
             for(int x = 0; x < MAX_DATA; x++) {
-                error = util::GRError(cudaStreamWaitEvent(stream[(dev*MAX_DATA) + x], event[dev], 0),
-                    "cudaStreamWaitEvent failed", __FILE__, __LINE__);
+
+                auto row = (dev*MAX_DATA) + x;
+                auto v = (dev*MAX_DATA) + m;
+                auto &error = retvals[row];
+
+                auto &ith_distances = distance[row];
+                auto &ith_keys = keys[row];
+
+                // Calculate N distances for each point
+                auto distance_op = [n, dim, data, ith_keys, ith_distances, row, v] 
+                    __host__ __device__ (const SizeT &i) {
+                        ValueT dist = 0;
+                        if (i == v) {
+                            dist = util::PreDefinedValues<ValueT>::MaxValue;
+                        } else {
+                            dist = euclidean_distance(dim, data.GetPointer(util::DEVICE), v, i);
+                        }
+                        ith_distances[i] = dist;
+                        ith_keys[i] = i;
+                    };
+
+                error = oprtr::For(distance_op, n, util::DEVICE, stream[row]);
+
+                error = util::GRError(cudaStreamSynchronize(stream[row]),
+                    "cudaStreamSynchronize failed", __FILE__, __LINE__);
 
                 util::CUBRadixSort(true, n, 
-                        distance[(dev*MAX_DATA) + x].GetPointer(util::DEVICE),
-                        keys[(dev*MAX_DATA) + x].GetPointer(util::DEVICE), 
-                        (ValueT*)NULL, (SizeT*)NULL, 
-                        (void*)NULL, (size_t)0, stream[(dev*MAX_DATA) + x]);
+                        ith_distances.GetPointer(util::DEVICE),
+                        ith_keys.GetPointer(util::DEVICE), 
+                        cub_distance[row].GetPointer(util::DEVICE),
+                        cub_keys[row].GetPointer(util::DEVICE),
+                        (void*)NULL, (size_t)0, stream[row]);
                         
-                error = util::GRError(cudaStreamWaitEvent(stream[dev], event[(dev*MAX_DATA) + x], 0),
-                    "cudaStreamWaitEvent failed", __FILE__, __LINE__);
+                error = util::GRError(cudaStreamSynchronize(stream[row]),
+                    "cudaStreamSynchronize failed", __FILE__, __LINE__);
+
+                // Choose k nearest neighbors for each node
+                auto knns_op = [m, k, knns_d, ith_keys, row, v]
+                    __host__ __device__ (const SizeT &i) {     
+                        knns_d[(v * k) + i] = ith_keys[i];
+                    };
+                    
+                error = oprtr::For(knns_op, k, util::DEVICE, stream[row]);
+
+                error = util::GRError(cudaStreamSynchronize(stream[row]),
+                            "cudaStreamSynchronize failed", __FILE__, __LINE__);
             }
-
-            // Choose k nearest neighbors for each node
-            auto knns_op = [m, k, knns_d, keys, MAX_DATA, dev]
-                __host__ __device__ (const SizeT &i){                
-                    auto pos = i % MAX_DATA;        // position in data'th array
-                    auto id = i % k;
-                    auto row = (dev*MAX_DATA)+pos;
-                    auto v = m+row;
-
-                    knns_d[(v*k) + id] = keys[row][id];
-                };
-                
-            error = oprtr::For(knns_op, k*MAX_DATA, util::DEVICE, stream[dev]);
-
-            error = util::GRError(cudaStreamSynchronize(stream[dev]),
-                        "cudaStreamSynchronize failed", __FILE__, __LINE__); 
         }
+    }
+
+    for (int dev = 0; dev < num_devices; dev++) {
+        util::GRError(cudaSetDevice(dev), "cudaSetDevice failed.");
+        retvals[dev] = util::GRError(cudaDeviceSynchronize(),
+                            "cudaDeviceSynchronize failed", __FILE__, __LINE__);
     }
 
     // Move data to CPU
@@ -226,10 +239,21 @@ double CPU_Reference(util::Parameters &parameters,
     for (int dev = 0; dev < num_devices; dev++) {
         GUARD_CU2(cudaSetDevice(dev), "cudaSetDevice failed.");
         for(int x = 0; x < MAX_DATA; x++) {
-            GUARD_CU(keys[(dev*MAX_DATA) + x].Release(util::DEVICE));
-            GUARD_CU(distance[(dev*MAX_DATA) + x].Release(util::DEVICE));
+            auto row = (dev*MAX_DATA) + x;
+            GUARD_CU(keys[row].Release(util::DEVICE));
+            GUARD_CU(distance[row].Release(util::DEVICE));
+            
+            GUARD_CU(cub_keys[row].Release(util::DEVICE));
+            GUARD_CU(cub_distance[row].Release(util::DEVICE));
+
             GUARD_CU2(cudaStreamDestroy(stream[(dev*MAX_DATA) + x]), "cudaStreamDestroy failed.");
         }
+
+        GUARD_CU(keys.Release(util::DEVICE));
+        GUARD_CU(distance.Release(util::DEVICE));
+        
+        GUARD_CU(cub_keys.Release(util::DEVICE));
+        GUARD_CU(cub_distance.Release(util::DEVICE));
     }
     
     GUARD_CU2(cudaSetDevice(0), "cudaSetDevice failed.");
