@@ -17,6 +17,29 @@
 namespace gunrock {
 namespace util {
 
+bool IsDevicePointer(const void *ptr)
+{
+    cudaPointerAttributes attributes;
+    auto err = cudaPointerGetAttributes(&attributes, ptr);
+
+    // An error here indicates the memory was LIKELY
+    // allocated on the host or the pointer is gibberish.
+    if(err != cudaSuccess)
+    {
+        // Clear out the last cuda error. We expected this error
+        // because it implies we have a host side pointer.
+        cudaGetLastError();
+        return false;
+    }
+
+    if(attributes.devicePointer != nullptr)
+    {
+        return true;
+    }
+
+    return false;
+}
+
 /******************************************************************************
  * Device initialization
  ******************************************************************************/
