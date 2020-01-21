@@ -170,6 +170,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       int num_query_edge = query_graph.edges / 2;
       int num_query_node = query_graph.nodes;
 
+      // show memory usage of GPU
+      size_t free_byte ;
+      size_t total_byte ;
+      cudaError_t cuda_status = cudaMemGetInfo( &free_byte, &total_byte ) ;
+      if ( cudaSuccess != cuda_status ){
+          printf("Error: cudaMemGetInfo fails, %s \n", cudaGetErrorString(cuda_status) );
+          exit(1);
+      }
+      double free_db = (double)free_byte ;
+      double total_db = (double)total_byte ;
+      double used_db = total_db - free_db ;
+      printf("Before allocation GPU memory usage: used = %f, free = %f MB, total = %f MB\n",
+          used_db/1024.0/1024.0, free_db/1024.0/1024.0, total_db/1024.0/1024.0);
+
       printf("subgraph nodes: %d, query graph nodes:%d\n", sub_graph.nodes,
              query_graph.nodes);
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
@@ -186,10 +200,51 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(NT.Allocate(num_query_edge, util::HOST | util::DEVICE));
       GUARD_CU(
           NT_offset.Allocate(num_query_node + 1, util::HOST | util::DEVICE));
+
+      free_byte = 0;
+      total_byte = 0;
+      cuda_status = cudaMemGetInfo( &free_byte, &total_byte ) ;
+      if ( cudaSuccess != cuda_status ){
+          printf("Error: cudaMemGetInfo fails, %s \n", cudaGetErrorString(cuda_status) );
+          exit(1);
+      }
+      free_db = (double)free_byte ;
+      total_db = (double)total_byte ;
+      used_db = total_db - free_db ;
+      printf("Before flags_read GPU memory usage: used = %f, free = %f MB, total = %f MB\n",
+          used_db/1024.0/1024.0, free_db/1024.0/1024.0, total_db/1024.0/1024.0);
+
       GUARD_CU(flags_read.Allocate(pow(sub_graph.nodes, num_query_node),
                                    util::DEVICE));
+
+      free_byte = 0;
+      total_byte = 0;
+      cuda_status = cudaMemGetInfo( &free_byte, &total_byte ) ;
+      if ( cudaSuccess != cuda_status ){
+          printf("Error: cudaMemGetInfo fails, %s \n", cudaGetErrorString(cuda_status) );
+          exit(1);
+      }
+      free_db = (double)free_byte ;
+      total_db = (double)total_byte ;
+      used_db = total_db - free_db ;
+      printf("Before flags_write GPU memory usage: used = %f, free = %f MB, total = %f MB\n",
+          used_db/1024.0/1024.0, free_db/1024.0/1024.0, total_db/1024.0/1024.0);
+
       GUARD_CU(flags_write.Allocate(pow(sub_graph.nodes, num_query_node),
                                     util::DEVICE));
+
+      free_byte = 0;
+      total_byte = 0;
+      cuda_status = cudaMemGetInfo( &free_byte, &total_byte ) ;
+      if ( cudaSuccess != cuda_status ){
+          printf("Error: cudaMemGetInfo fails, %s \n", cudaGetErrorString(cuda_status) );
+          exit(1);
+      }
+      free_db = (double)free_byte ;
+      total_db = (double)total_byte ;
+      used_db = total_db - free_db ;
+      printf("After flags_write GPU memory usage: used = %f, free = %f MB, total = %f MB\n",
+          used_db/1024.0/1024.0, free_db/1024.0/1024.0, total_db/1024.0/1024.0);
 
       // Initialize query graph node degree by row offsets
       // neighbor node encoding = sum of neighbor node labels

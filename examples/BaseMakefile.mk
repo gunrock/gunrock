@@ -15,7 +15,7 @@ use_metis = 0
 # -g -G failed? uncomment the maxregisters:
 # maxregisters = 32
 
-use_boost = 0
+use_boost = 1
 NVCC = "$(shell which nvcc)"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
@@ -61,7 +61,7 @@ BOOST_INC =
 BOOST_LINK =
 ifeq ($(use_boost), 1)
     BOOST_INC = -I"/usr/local/include"
-    BOOST_LINK = -Xcompiler -DBOOST_FOUND -L"/usr/local/lib" -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
+    BOOST_LINK = -Xcompiler -DBOOST_FOUND -L"/usr/local/lib" -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem -I"../../externals/rapidjson/include"
 else
     BOOST_INC = -I"../../externals/rapidjson/include"
 endif

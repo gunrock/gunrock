@@ -442,7 +442,6 @@ class Enactor
     GUARD_CU(BaseEnactor::Reset(target));
 
     SizeT nodes = this->problem->data_slices[0][0].sub_graph[0].nodes;
-    std::cout << nodes << std::endl;
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       if (this->num_gpus == 1) {
