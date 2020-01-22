@@ -111,6 +111,7 @@ double CPU_Reference(util::Parameters &parameters,
      ***************************************
      */
     int MAX_DATA = 10;
+    int CHUNK = MAX_DATA*num_devices;
 
     cudaError_t retvals[1024];
     cudaStream_t stream[1024];
@@ -119,26 +120,26 @@ double CPU_Reference(util::Parameters &parameters,
     util::Array1D<SizeT, util::Array1D<SizeT, ValueT>> distance;
     util::Array1D<SizeT, util::Array1D<SizeT, SizeT>>  keys;
 
-    GUARD_CU(distance   .Allocate(num_devices*MAX_DATA, util::HOST));
-    GUARD_CU(keys       .Allocate(num_devices*MAX_DATA, util::HOST));
+    GUARD_CU(distance   .Allocate(CHUNK, util::HOST));
+    GUARD_CU(keys       .Allocate(CHUNK, util::HOST));
 
     // CUB Temporary arrays
     util::Array1D<SizeT, util::Array1D<SizeT, ValueT>> cub_distance;
     util::Array1D<SizeT, util::Array1D<SizeT, SizeT>>  cub_keys;
 
-    GUARD_CU(cub_distance   .Allocate(num_devices*MAX_DATA, util::HOST));
-    GUARD_CU(cub_keys       .Allocate(num_devices*MAX_DATA, util::HOST));
+    GUARD_CU(cub_distance   .Allocate(CHUNK, util::HOST));
+    GUARD_CU(cub_keys       .Allocate(CHUNK, util::HOST));
     
     util::Array1D<SizeT, util::Array1D<SizeT, SizeT>>  knns_d;
     GUARD_CU(knns_d   .Allocate(n, util::HOST));
 
     util::PrintMsg("Host Allocation done.");
 
-    for (int p = 0; p < ((n+1)/(num_devices*MAX_DATA)); p++) {
+    for (int p = 0; p < ((n+(CHUNK-1))/CHUNK); p++) {
         for (int dev = 0; dev < num_devices; dev++) {
             GUARD_CU2(cudaSetDevice(dev), "cudaSetDevice failed.");
             for(int d = 0; d < MAX_DATA; d++) {
-                auto jump = (p*num_devices*MAX_DATA);
+                auto jump = (p*CHUNK);
                 auto index =  jump + ((dev*MAX_DATA) + d);
                 if (index >= n) break;
                 GUARD_CU(knns_d[index]  .Allocate(k, util::HOST | util::DEVICE));
@@ -165,7 +166,7 @@ double CPU_Reference(util::Parameters &parameters,
 
         for(int d = 0; d < MAX_DATA; d++) {
             auto row = (dev*MAX_DATA) + d;
-            if (row >= num_devices*MAX_DATA) break;
+            if (row >= CHUNK) break;
             GUARD_CU2(cudaStreamCreateWithFlags(&stream[row], 
                 cudaStreamNonBlocking), "cudaStreamCreateWithFlags failed.");
             GUARD_CU2(cudaEventCreate(&event[row]), 
@@ -187,7 +188,7 @@ double CPU_Reference(util::Parameters &parameters,
     
     // Find K nearest neighbors for each point in the dataset
     // Can use multi-gpu to speed up the computation
-    for (SizeT m = 0; m < ((n+1)/(num_devices*MAX_DATA)); m++) {
+    for (SizeT m = 0; m < ((n+(CHUNK-1))/(CHUNK)); m++) {
         // #pragma omp parallel for 
         for (int dev = 0; dev < num_devices; dev++) {
             util::GRError(cudaSetDevice(dev), "cudaSetDevice failed.");
@@ -195,9 +196,9 @@ double CPU_Reference(util::Parameters &parameters,
             // #pragma omp parallel for
             for(int x = 0; x < MAX_DATA; x++) {
                 auto row = (dev*MAX_DATA) + x;
-                auto v = (m*num_devices*MAX_DATA) + row;
+                auto v = (m*CHUNK) + row;
                 if (v >= n) break;
-                if(row >= num_devices*MAX_DATA) break;
+                if(row >= CHUNK) break;
                 auto &error = retvals[row];
 
                 auto &ith_distances = distance[row];
@@ -256,11 +257,11 @@ double CPU_Reference(util::Parameters &parameters,
 
     util::PrintMsg("Synchronized all GPUs.");
 
-    for (int p = 0; p < ((n+1)/(num_devices*MAX_DATA)); p++) {
+    for (int p = 0; p < ((n+(CHUNK-1))/(CHUNK)); p++) {
         for (int dev = 0; dev < num_devices; dev++) {
             GUARD_CU2(cudaSetDevice(dev), "cudaSetDevice failed.");
             for(int d = 0; d < MAX_DATA; d++) {
-                auto jump = (p*num_devices*MAX_DATA);
+                auto jump = (p*CHUNK);
                 auto index =  jump + ((dev*MAX_DATA) + d);
                 if (index >= n) break;
                 GUARD_CU(knns_d[index]  .Move(util::DEVICE, util::HOST));
@@ -291,7 +292,7 @@ double CPU_Reference(util::Parameters &parameters,
         GUARD_CU2(cudaSetDevice(dev), "cudaSetDevice failed.");
         for(int x = 0; x < MAX_DATA; x++) {
             auto row = (dev*MAX_DATA) + x;
-            if (row >= num_devices*MAX_DATA) break;
+            if (row >= CHUNK) break;
             GUARD_CU(keys[row].Release(util::DEVICE));
             GUARD_CU(distance[row].Release(util::DEVICE));
             
@@ -312,11 +313,11 @@ double CPU_Reference(util::Parameters &parameters,
 
     util::PrintMsg("Clean-up CPU Arrays:: keys, distance done.");
     
-    for (int p = 0; p < ((n+1)/(num_devices*MAX_DATA)); p++) {
+    for (int p = 0; p < ((n+(CHUNK-1))/(CHUNK)); p++) {
         for (int dev = 0; dev < num_devices; dev++) {
             GUARD_CU2(cudaSetDevice(dev), "cudaSetDevice failed.");
             for(int d = 0; d < MAX_DATA; d++) {
-                auto jump = (p*num_devices*MAX_DATA);
+                auto jump = (p*CHUNK);
                 auto index =  jump + ((dev*MAX_DATA) + d);
                 if (index >= n) break;
                 GUARD_CU(knns_d[index]  .Release(util::DEVICE | util::HOST));
