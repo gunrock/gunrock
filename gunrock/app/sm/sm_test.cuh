@@ -287,12 +287,11 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::CsrT CsrT;
 
-  std::cerr << "Validate_Results" << std::endl;
-
   *num_subgraphs = h_subgraphs[0];
 
   bool quiet = parameters.Get<bool>("quiet");
-  if (!quiet && verbose) {
+  bool quick = parameters.Get<bool>("quick");
+  if (!quiet && (!quick) && verbose) {
     for (int i = 0; i < 1; i++) {
       std::cerr << i << " " << ref_subgraphs[i] << " " << h_subgraphs[i]
                 << std::endl;
@@ -302,17 +301,17 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
   SizeT num_errors = 0;
 
   // Verify the result
-  util::PrintMsg("Subgraph Matching Validity: ", !quiet, false);
-  num_errors = util::CompareResults(h_subgraphs, ref_subgraphs, 1, true, quiet);
+  util::PrintMsg("Subgraph Matching Validity: ", (!quiet && (!quick)), false);
+  num_errors = util::CompareResults(h_subgraphs, ref_subgraphs, 1, true, (quiet || quick));
 
   if (num_errors > 0) {
-    util::PrintMsg(std::to_string(num_errors) + " errors occurred.", !quiet);
+    util::PrintMsg(std::to_string(num_errors) + " errors occurred.", (!quiet && (!quick)));
     return num_errors;
   } else {
-    util::PrintMsg("PASS", !quiet);
+    util::PrintMsg("PASS", (!quiet && !quick));
   }
 
-  if (!quiet && verbose) {
+  if ((!quiet) && (!quick) && verbose) {
     util::PrintMsg("number of subgraphs: ");
     DisplaySolution(h_subgraphs, 1);
   }
