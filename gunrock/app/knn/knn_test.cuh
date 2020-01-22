@@ -102,20 +102,20 @@ double CPU_Reference(util::Parameters &parameters,
 
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
     
-    int num_devices = 3;
-    // cudaGetDeviceCount(&num_devices);
+    int num_devices; // = 3;
+    cudaGetDeviceCount(&num_devices);
 
     /*
      ***************************************
      *  [TODO] Consider boundary conditions*
      ***************************************
      */
-    int MAX_DATA = 10;
+    int MAX_DATA = 1024;
     int CHUNK = MAX_DATA*num_devices;
 
-    cudaError_t retvals[1024];
-    cudaStream_t stream[1024];
-    cudaEvent_t  event[1024];
+    cudaError_t retvals[CHUNK];
+    cudaStream_t stream[CHUNK];
+    cudaEvent_t  event[CHUNK];
      
     util::Array1D<SizeT, util::Array1D<SizeT, ValueT>> distance;
     util::Array1D<SizeT, util::Array1D<SizeT, SizeT>>  keys;
