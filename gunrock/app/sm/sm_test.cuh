@@ -287,8 +287,6 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::CsrT CsrT;
 
-  std::cerr << "Validate_Results" << std::endl;
-
   *num_subgraphs = h_subgraphs[0];
 
   bool quiet = parameters.Get<bool>("quiet");
@@ -320,7 +318,7 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
   util::PrintMsg("PASS", !quiet);
   //}
 
-  if (!quiet && verbose) {
+  if ((!quiet) && (!quick) && verbose) {
     util::PrintMsg("number of subgraphs: ");
     DisplaySolution(h_subgraphs, 1);
   }

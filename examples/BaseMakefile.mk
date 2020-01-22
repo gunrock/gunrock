@@ -15,7 +15,7 @@ use_metis = 0
 # -g -G failed? uncomment the maxregisters:
 # maxregisters = 32
 
-use_boost = 1
+use_boost = 0
 NVCC = "$(shell which nvcc)"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
