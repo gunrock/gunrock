@@ -110,7 +110,7 @@ double CPU_Reference(util::Parameters &parameters,
      *  [TODO] Consider boundary conditions*
      ***************************************
      */
-    int MAX_DATA = 1024;
+    int MAX_DATA = 200;
     int CHUNK = MAX_DATA*num_devices;
 
     cudaError_t retvals[CHUNK];
@@ -185,64 +185,66 @@ double CPU_Reference(util::Parameters &parameters,
     }
 
     util::PrintMsg("Distance/Keys and Device management done.");
-    
+   
+ 
     // Find K nearest neighbors for each point in the dataset
     // Can use multi-gpu to speed up the computation
     for (SizeT m = 0; m < ((n+(CHUNK-1))/(CHUNK)); m++) {
-        // #pragma omp parallel for 
+        #pragma omp parallel for
         for (int dev = 0; dev < num_devices; dev++) {
             util::GRError(cudaSetDevice(dev), "cudaSetDevice failed.");
-
-            // #pragma omp parallel for
+           // #pragma omp parallel for
             for(int x = 0; x < MAX_DATA; x++) {
                 auto row = (dev*MAX_DATA) + x;
                 auto v = (m*CHUNK) + row;
-                if (v >= n) break;
-                if(row >= CHUNK) break;
-                auto &error = retvals[row];
+                if (v < n && row < CHUNK){
+                    if (v%1000 == 0)
+                        printf("proceeding %d point\n", v);
+                
+                    auto &error = retvals[row];
+                    auto &ith_distances = distance[row];
+                    auto &ith_keys = keys[row];
 
-                auto &ith_distances = distance[row];
-                auto &ith_keys = keys[row];
+                    // Calculate N distances for each point
+                    auto distance_op = [n, dim, data, ith_keys, ith_distances, row, v] 
+                        __host__ __device__ (const SizeT &i) {
+                            ValueT dist = 0;
+                            if (i == v) {
+                                dist = util::PreDefinedValues<ValueT>::MaxValue;
+                            } else {
+                                dist = euclidean_distance(dim, data.GetPointer(util::DEVICE), v, i);
+                            }
+                            ith_distances[i] = dist;
+                            ith_keys[i] = i;
+                        };
 
-                // Calculate N distances for each point
-                auto distance_op = [n, dim, data, ith_keys, ith_distances, row, v] 
-                    __host__ __device__ (const SizeT &i) {
-                        ValueT dist = 0;
-                        if (i == v) {
-                            dist = util::PreDefinedValues<ValueT>::MaxValue;
-                        } else {
-                            dist = euclidean_distance(dim, data.GetPointer(util::DEVICE), v, i);
-                        }
-                        ith_distances[i] = dist;
-                        ith_keys[i] = i;
-                    };
+                    error = oprtr::For(distance_op, n, util::DEVICE, stream[row]);
 
-                error = oprtr::For(distance_op, n, util::DEVICE, stream[row]);
+                    error = util::GRError(cudaStreamSynchronize(stream[row]),
+                        "cudaStreamSynchronize failed", __FILE__, __LINE__);
 
-                error = util::GRError(cudaStreamSynchronize(stream[row]),
-                    "cudaStreamSynchronize failed", __FILE__, __LINE__);
+                    util::CUBRadixSort(true, n, 
+                            ith_distances.GetPointer(util::DEVICE),
+                            ith_keys.GetPointer(util::DEVICE), 
+                            cub_distance[row].GetPointer(util::DEVICE),
+                            cub_keys[row].GetPointer(util::DEVICE),
+                            (void*)NULL, (size_t)0, stream[row]);
+                            
+                    error = util::GRError(cudaStreamSynchronize(stream[row]),
+                        "cudaStreamSynchronize failed", __FILE__, __LINE__);
 
-                util::CUBRadixSort(true, n, 
-                        ith_distances.GetPointer(util::DEVICE),
-                        ith_keys.GetPointer(util::DEVICE), 
-                        cub_distance[row].GetPointer(util::DEVICE),
-                        cub_keys[row].GetPointer(util::DEVICE),
-                        (void*)NULL, (size_t)0, stream[row]);
+                    // Choose k nearest neighbors for each node
+                    auto &ith_knns = knns_d[v];
+                    auto knns_op = [m, k, ith_knns, ith_keys, row, v]
+                        __host__ __device__ (const SizeT &i) {     
+                            ith_knns[i] = ith_keys[i];
+                        };
                         
-                error = util::GRError(cudaStreamSynchronize(stream[row]),
-                    "cudaStreamSynchronize failed", __FILE__, __LINE__);
+                    error = oprtr::For(knns_op, k, util::DEVICE, stream[row]);
 
-                // Choose k nearest neighbors for each node
-                auto &ith_knns = knns_d[v];
-                auto knns_op = [m, k, ith_knns, ith_keys, row, v]
-                    __host__ __device__ (const SizeT &i) {     
-                        ith_knns[i] = ith_keys[i];
-                    };
-                    
-                error = oprtr::For(knns_op, k, util::DEVICE, stream[row]);
-
-                error = util::GRError(cudaStreamSynchronize(stream[row]),
-                            "cudaStreamSynchronize failed", __FILE__, __LINE__);
+                    error = util::GRError(cudaStreamSynchronize(stream[row]),
+                                "cudaStreamSynchronize failed", __FILE__, __LINE__);
+                }
             }
         }
     }
