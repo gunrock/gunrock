@@ -110,7 +110,7 @@ double CPU_Reference(util::Parameters &parameters,
      *  [TODO] Consider boundary conditions*
      ***************************************
      */
-    int MAX_DATA = 200;
+    int MAX_DATA = 2;
     int CHUNK = MAX_DATA*num_devices;
 
     cudaError_t retvals[CHUNK];
@@ -198,9 +198,6 @@ double CPU_Reference(util::Parameters &parameters,
                 auto row = (dev*MAX_DATA) + x;
                 auto v = (m*CHUNK) + row;
                 if (v < n && row < CHUNK){
-                    if (v%1000 == 0)
-                        printf("proceeding %d point\n", v);
-                
                     auto &error = retvals[row];
                     auto &ith_distances = distance[row];
                     auto &ith_keys = keys[row];
