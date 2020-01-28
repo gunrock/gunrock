@@ -59,7 +59,9 @@ struct OprtrParameters {
   LabelT label;
   int max_grid_size;
 
-  OprtrParameters() { Init(); }
+  // Set print_prop to false to hide output
+  OprtrParameters() : context(false)
+    { Init(); }
 
   ~OprtrParameters() { Init(); }
 
