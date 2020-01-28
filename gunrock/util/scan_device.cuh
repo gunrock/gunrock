@@ -67,7 +67,19 @@ cudaError_t Scan(util::Array1D<SizeT, InputT> &d_in, SizeT num_items,
   cudaError_t retval = cudaSuccess; 
 //   cudaStream_t stream = 0;
 //   mgpu::standard_context_t context(false, stream);
-  mgpu::scan<mgpu::scan_type_inc>(d_in.GetPointer(util::DEVICE), num_items, 
+
+  // TODO: Experiment with these values and choose the best ones. We
+  // could even choose to make them a parameter of util::Scan and choose
+  // based on our usage
+  typedef mgpu::launch_box_t<
+      mgpu::arch_30_cta<256, 7>,
+      mgpu::arch_35_cta<256, 7>,
+      mgpu::arch_50_cta<256, 7>,
+      mgpu::arch_60_cta<256, 7>,
+      mgpu::arch_70_cta<256, 7>,
+      mgpu::arch_75_cta<256, 7>
+      > launch_t;
+  mgpu::scan<mgpu::scan_type_inc, launch_t>(d_in.GetPointer(util::DEVICE), num_items,
                                   d_out.GetPointer(util::DEVICE),
                                   mgpu::plus_t<InputT>(), r,
                                   context);
