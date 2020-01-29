@@ -14,9 +14,9 @@
 
 #pragma once
 
-#include <moderngpu.cuh>
 #include <gunrock/app/frontier.cuh>
 #include <gunrock/oprtr/oprtr_base.cuh>
+#include <moderngpu/context.hxx>
 
 namespace gunrock {
 namespace oprtr {
@@ -45,8 +45,11 @@ struct OprtrParameters {
   // bool    *d_backward_frontier_map_out;
   // SizeT         max_in;
   // SizeT         max_out;
-  mgpu::ContextPtr context;
   cudaStream_t stream;
+
+  // TODO: Attach stream to the context
+  mgpu::standard_context_t context;
+
   bool get_output_length;
   bool reduce_reset;
   std::string advance_mode;
@@ -56,7 +59,9 @@ struct OprtrParameters {
   LabelT label;
   int max_grid_size;
 
-  OprtrParameters() { Init(); }
+  // Set print_prop to false to hide output
+  OprtrParameters() : context(false)
+    { Init(); }
 
   ~OprtrParameters() { Init(); }
 
