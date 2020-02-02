@@ -378,10 +378,10 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
               ValueT dist2 = euclidean_distance(dim, points.GetPointer(util::HOST), v, w2);
               if (dist1 != dist2){
                   util::PrintMsg(
-                    "point::nearest-neighbor = [gpu]" + 
-                    std::to_string(v) + "::" + std::to_string(h_knns[v * k + i]) + 
-                    " !=  [cpu]" + 
-                    std::to_string(v) + "::" + std::to_string(ref_knns[v * k + i]), 
+                    "point::nearest-neighbor, gpu_knn(" + 
+                    std::to_string(v) + ")=" + std::to_string(h_knns[v * k + i]) + 
+                    " !=  cpu_knn(" + 
+                    std::to_string(v) + ")=" + std::to_string(ref_knns[v * k + i]), 
                     !quiet);
                   ++num_errors;
               }
