@@ -20,7 +20,6 @@
 #include <gunrock/app/enactor_kernel.cuh>
 #include <gunrock/app/enactor_helper.cuh>
 #include <gunrock/util/latency_utils.cuh>
-#include <moderngpu.cuh>
 
 /* this is the "stringize macro macro" hack */
 #define STR(x) #x

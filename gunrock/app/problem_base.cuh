@@ -45,7 +45,7 @@ cudaError_t UseParameters_problem(ParametersT &parameters) {
   cudaError_t retval = cudaSuccess;
 
   GUARD_CU(partitioner::UseParameters(parameters));
-  if (!parameters.template Have("device"))
+  if (!parameters.Have("device"))
     GUARD_CU(parameters.template Use<int>(
         "device",
         util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,

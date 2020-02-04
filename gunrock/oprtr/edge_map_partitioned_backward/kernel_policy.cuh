@@ -54,8 +54,6 @@ namespace edge_map_partitioned_backward {
  * algorithms
  */
 template <typename _ProblemData,
-          // Machine parameters
-          int _CUDA_ARCH,
           // Behavioral control parameters
           // bool _INSTRUMENT,
           // Tunable parameters
@@ -72,10 +70,6 @@ struct KernelPolicy {
   typedef typename ProblemData::SizeT SizeT;
 
   enum {
-
-    CUDA_ARCH = _CUDA_ARCH,
-    // INSTRUMENT                      = _INSTRUMENT,
-
     LOG_THREADS = _LOG_THREADS,
     THREADS = 1 << LOG_THREADS,
     LOG_BLOCKS = _LOG_BLOCKS,
@@ -91,7 +85,7 @@ struct KernelPolicy {
       // Amount of storage we can use for hashing scratch space under target
       // occupancy
       MAX_SCRATCH_BYTES_PER_CTA =
-          (GR_SMEM_BYTES(CUDA_ARCH) / _MIN_CTA_OCCUPANCY) -
+          (GR_SMEM_BYTES(GR_CUDA_ARCH) / _MIN_CTA_OCCUPANCY) -
           128,  // Fudge-factor to guarantee occupancy
 
       SCRATCH_ELEMENT_SIZE = sizeof(SizeT) + sizeof(VertexId) * 2,
@@ -111,10 +105,10 @@ struct KernelPolicy {
   };
 
   enum {
-    THREAD_OCCUPANCY = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
-    SMEM_OCCUPANCY = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
+    THREAD_OCCUPANCY = GR_SM_THREADS(GR_CUDA_ARCH) >> LOG_THREADS,
+    SMEM_OCCUPANCY = GR_SMEM_BYTES(GR_CUDA_ARCH) / sizeof(SmemStorage),
     CTA_OCCUPANCY = GR_MIN(_MIN_CTA_OCCUPANCY,
-                           GR_MIN(GR_SM_CTAS(CUDA_ARCH),
+                           GR_MIN(GR_SM_CTAS(GR_CUDA_ARCH),
                                   GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
 
     VALID = (CTA_OCCUPANCY > 0),

@@ -38,8 +38,6 @@ enum MODE { CULL, SIMPLIFIED, SIMPLIFIED2, COMPACTED_CULL, BY_PASS };
  * architectures and problem types.
  *
  * @tparam _ProblemData                 Problem data type.
- * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code
- * for.
  * @tparam _INSTRUMENT                  Whether or not we want instrumentation
  * logic generated
  * @tparam _SATURATION_QUIT             If positive, signal that we're done with
@@ -66,7 +64,6 @@ enum MODE { CULL, SIMPLIFIED, SIMPLIFIED2, COMPACTED_CULL, BY_PASS };
 template <typename _Problem,
 
           // Machine parameters
-          int _CUDA_ARCH,
           // bool _INSTRUMENT,
           // Behavioral control parameters
           int _SATURATION_QUIT, bool _DEQUEUE_PROBLEM_SIZE,
@@ -78,36 +75,35 @@ template <typename _Problem,
           MODE _FILTER_MODE = CULL>
 struct KernelPolicy {
   static const MODE FILTER_MODE = _FILTER_MODE;
-  static const int CUDA_ARCH = _CUDA_ARCH;
 
   typedef gunrock::oprtr::cull_filter::KernelPolicy<
-      _Problem, _CUDA_ARCH, _SATURATION_QUIT, _DEQUEUE_PROBLEM_SIZE,
+      _Problem, _SATURATION_QUIT, _DEQUEUE_PROBLEM_SIZE,
       _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_LOAD_VEC_SIZE, _LOG_LOADS_PER_TILE,
       _LOG_RAKING_THREADS, _END_BITMASK_CULL, _LOG_SCHEDULE_GRANULARITY,
       _FILTER_MODE>
       CULL_FILTER;
 
   typedef gunrock::oprtr::simplified_filter::KernelPolicy<
-      _Problem, _CUDA_ARCH, _SATURATION_QUIT, _DEQUEUE_PROBLEM_SIZE,
+      _Problem, _SATURATION_QUIT, _DEQUEUE_PROBLEM_SIZE,
       _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_LOAD_VEC_SIZE, _LOG_LOADS_PER_TILE,
       _LOG_RAKING_THREADS, _END_BITMASK_CULL, _LOG_SCHEDULE_GRANULARITY,
       _FILTER_MODE>
       SIMPLIFIED_FILTER;
 
   typedef gunrock::oprtr::simplified2_filter::KernelPolicy<
-      _Problem, _CUDA_ARCH, _SATURATION_QUIT, _DEQUEUE_PROBLEM_SIZE,
+      _Problem, _SATURATION_QUIT, _DEQUEUE_PROBLEM_SIZE,
       _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_LOAD_VEC_SIZE, _LOG_LOADS_PER_TILE,
       _LOG_RAKING_THREADS, _END_BITMASK_CULL, _LOG_SCHEDULE_GRANULARITY,
       _FILTER_MODE>
       SIMPLIFIED2_FILTER;
 
   typedef gunrock::oprtr::compacted_cull_filter::KernelPolicy<
-      _Problem, _CUDA_ARCH, _MAX_CTA_OCCUPANCY, _LOG_THREADS,
+      _Problem, _MAX_CTA_OCCUPANCY, _LOG_THREADS,
       _LOG_LOAD_VEC_SIZE + _LOG_LOADS_PER_TILE, _FILTER_MODE>
       COMPACTED_CULL_FILTER;
 
   typedef gunrock::oprtr::cull_filter::KernelPolicy<
-      _Problem, _CUDA_ARCH, _SATURATION_QUIT, _DEQUEUE_PROBLEM_SIZE,
+      _Problem, _SATURATION_QUIT, _DEQUEUE_PROBLEM_SIZE,
       _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_LOAD_VEC_SIZE, _LOG_LOADS_PER_TILE,
       _LOG_RAKING_THREADS, _END_BITMASK_CULL, _LOG_SCHEDULE_GRANULARITY,
       _FILTER_MODE>

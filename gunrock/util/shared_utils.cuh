@@ -108,21 +108,21 @@ void Display_Performance_Profiling(Enactor *enactor) {
 
       for (int peer = 0; peer < num_gpus; peer++) {
         std::vector<SizeT> &iter_in_length =
-            enactor->enactor_stats[gpu * num_gpus + peer].iter_in_length[i];
+            enactor->enactor_slices[gpu * num_gpus + peer].enactor_stats.iter_in_length[i];
         if (iter_in_length.size() != 0) {
           V2Str(iter_in_length, str);
           printf("%d\t %d\t In length %d\t %s\n", i, gpu, peer, str.c_str());
         }
 
         std::vector<SizeT> &iter_nodes_queued =
-            enactor->enactor_stats[gpu * num_gpus + peer].iter_nodes_queued[i];
+            enactor->enactor_slices[gpu * num_gpus + peer].enactor_stats.iter_nodes_queued[i];
         if (iter_nodes_queued.size() != 0) {
           V2Str(iter_nodes_queued, str);
           printf("%d\t %d\t Nodes queued %d\t %s\n", i, gpu, peer, str.c_str());
         }
 
         std::vector<SizeT> &iter_edges_queued =
-            enactor->enactor_stats[gpu * num_gpus + peer].iter_edges_queued[i];
+            enactor->enactor_slices[gpu * num_gpus + peer].enactor_stats.iter_edges_queued[i];
         if (iter_edges_queued.size() != 0) {
           V2Str(iter_edges_queued, str);
           printf("%d\t %d\t Edges queued %d\t %s\n", i, gpu, peer, str.c_str());
@@ -177,7 +177,7 @@ void Display_Performance_Profiling(Enactor *enactor) {
 
       for (int peer = 0; peer < num_gpus; peer++) {
         std::vector<SizeT> &iter_out_length =
-            enactor->enactor_stats[gpu * num_gpus + peer].iter_out_length[i];
+            enactor->enactor_slices[gpu * num_gpus + peer].enactor_stats.iter_out_length[i];
         if (iter_out_length.size() != 0) {
           V2Str(iter_out_length, str);
           printf("%d\t %d\t Out length %d\t %s\n", i, gpu, peer, str.c_str());
