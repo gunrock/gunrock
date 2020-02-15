@@ -56,6 +56,17 @@ SM_TARGETS = $(GEN_SM70)
 CUDA_INC = -I"$(shell dirname $(NVCC))/../include"
 MGPU_INC = -I"../../externals/moderngpu/include"
 CUB_INC = -I"../../externals/cub"
+KMCUDA_INC = -I"/home/agnes/kmcuda/src"
+KMCUDA_LINK = -L"/home/agnes/kmcuda/src" -l KMCUDA
+
+CUML_INC = -I/home/agnes/cuml/cpp/include -I/home/agnes/cuml/cpp/src -I/home/agnes/cuml/cpp/src_prims -I/home/agnes/cuml/thirdparty
+CUML_LINK = -L"/home/agnes/cuml/cpp/build" -l cuml++
+
+SWEET_KNN_CUML_INC = -I/home/agnes/sweet_knn_cuml/cpp/include -I/home/agnes/sweet_knn_cuml/cpp/src -I/home/agnes/sweet_knn_cuml/cpp/src_prims -I/home/agnes/sweet_knn_cuml/thirdparty
+SWEET_KNN_CUML_LINK = -L"/home/agnes/sweet_knn_cuml/cpp/build" -l cuml++
+
+FAISS_INC = -I/home/agnes/faiss/
+FAISS_LINK = -L/home/agnes/faiss/ -lfaiss
 
 BOOST_INC =
 BOOST_LINK =
@@ -85,8 +96,8 @@ else
 endif
 
 GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=1.1.0
-LINK = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
-INC = $(CUDA_INC) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(BOOST_INC) -I.. -I../.. $(LINK)
+LINK = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF) $(KMCUDA_LINK) $(CUML_LINK) $(SWEET_KNN_CUML_LINK) $(FAISS_LINK)
+INC = $(CUDA_INC) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(BOOST_INC) -I.. -I../.. $(LINK) $(KMCUDA_INC) $(CUML_INC) $(SWEET_KNN_CUML_INC) $(FAISS_INC)
 
 #-------------------------------------------------------------------------------
 # Defines
