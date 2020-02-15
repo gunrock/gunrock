@@ -91,6 +91,7 @@ double CPU_Reference(util::Parameters &parameters,
     cpu_timer.Start();
 
     GUARD_CU(points.Move(util::HOST, util::DEVICE, n*dim));
+    bool transpose = parameters.Get<bool>("transpose");
 
     util::Array1D<SizeT, ValueT, util::UNIFIED> data;
     GUARD_CU(data   .Allocate(n*dim, util::DEVICE));
@@ -110,7 +111,7 @@ double CPU_Reference(util::Parameters &parameters,
      *  [TODO] Consider boundary conditions*
      ***************************************
      */
-    int MAX_DATA = 200;
+    int MAX_DATA = 100;
     int CHUNK = MAX_DATA*num_devices;
 
     cudaError_t retvals[CHUNK];
@@ -190,7 +191,7 @@ double CPU_Reference(util::Parameters &parameters,
     // Find K nearest neighbors for each point in the dataset
     // Can use multi-gpu to speed up the computation
     for (SizeT m = 0; m < ((n+(CHUNK-1))/(CHUNK)); m++) {
-        #pragma omp parallel for
+        //#pragma omp parallel for
         for (int dev = 0; dev < num_devices; dev++) {
             util::GRError(cudaSetDevice(dev), "cudaSetDevice failed.");
            // #pragma omp parallel for
@@ -206,13 +207,13 @@ double CPU_Reference(util::Parameters &parameters,
                     auto &ith_keys = keys[row];
 
                     // Calculate N distances for each point
-                    auto distance_op = [n, dim, data, ith_keys, ith_distances, row, v] 
+                    auto distance_op = [n, dim, data, ith_keys, ith_distances, row, v, transpose] 
                         __host__ __device__ (const SizeT &i) {
                             ValueT dist = 0;
                             if (i == v) {
                                 dist = util::PreDefinedValues<ValueT>::MaxValue;
                             } else {
-                                dist = euclidean_distance(dim, data.GetPointer(util::DEVICE), v, i);
+                                dist = euclidean_distance(dim, n, data.GetPointer(util::DEVICE), v, i, transpose);
                             }
                             ith_distances[i] = dist;
                             ith_keys[i] = i;
@@ -366,6 +367,7 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
   SizeT k = parameters.Get<SizeT>("k");
   SizeT num_points = parameters.Get<SizeT>("n");
   SizeT dim = parameters.Get<SizeT>("dim");
+  bool transpose = parameters.Get<bool>("transpose");
 
   if (quick) return num_errors;
 
@@ -374,8 +376,8 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
           SizeT w1 = h_knns[v * k + i];
           SizeT w2 = ref_knns[v * k + i];
           if (w1 != w2) {
-              ValueT dist1 = euclidean_distance(dim, points.GetPointer(util::HOST), v, w1);
-              ValueT dist2 = euclidean_distance(dim, points.GetPointer(util::HOST), v, w2);
+              ValueT dist1 = euclidean_distance(dim, num_points, points.GetPointer(util::HOST), v, w1, transpose);
+              ValueT dist2 = euclidean_distance(dim, num_points, points.GetPointer(util::HOST), v, w2, transpose);
               if (dist1 != dist2){
                   util::PrintMsg(
                     "point::nearest-neighbor, gpu_knn(" + 
