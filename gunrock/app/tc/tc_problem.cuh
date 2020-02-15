@@ -119,7 +119,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     cudaError_t Reset(util::Location target = util::DEVICE) {
       cudaError_t retval = cudaSuccess;
       SizeT num_nodes = this->sub_graph->nodes;
-      SizeT num_edges = this->sub_graph->edges;
 
       // Ensure data are allocated
       GUARD_CU(tc_counts.EnsureSize_(num_nodes, target));

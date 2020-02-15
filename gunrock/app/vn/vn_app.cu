@@ -146,7 +146,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
       GUARD_CU(problem.Extract(h_distances, h_preds));
       SizeT num_errors = app::vn::Validate_Results(
           parameters, graph, srcs, h_distances, h_preds,
-          ref_distances == NULL ? NULL : ref_distances[run_num], NULL, false);
+          ref_distances == NULL ? NULL : ref_distances[run_num], (VertexT*)NULL, false);
     }
   }
 
@@ -162,7 +162,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   info.ComputeTraversalStats(enactor, h_distances);
 // Display_Memory_Usage(problem);
 #ifdef ENABLE_PERFORMANCE_PROFILING
-  // Display_Performance_Profiling(enactor);
+  // Display_Performance_Profiling(&enactor);
 #endif
 
   // Clean up

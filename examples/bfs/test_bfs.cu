@@ -74,7 +74,7 @@ struct main_struct {
         VertexT num_iters = 0;
         util::PrintMsg("__________________________", !quiet);
         float elapsed = app::bfs::CPU_Reference(graph, src, quiet, false,
-                                                ref_labels[i], NULL, num_iters);
+                                                ref_labels[i], (VertexT*)NULL, num_iters);
         util::PrintMsg("--------------------------\nRun " + std::to_string(i) +
                            " elapsed: " + std::to_string(elapsed) +
                            " ms, src = " + std::to_string(src) +
@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
 
   return app::Switch_Types<app::VERTEXT_U32B | app::VERTEXT_U64B |
                            app::SIZET_U32B | app::SIZET_U64B |
-                           app::VALUET_U32B | app::DIRECTED | app::UNDIRECTED>(
+                           app::VALUET_S32B | app::DIRECTED | app::UNDIRECTED>(
       parameters, main_struct());
 }
 

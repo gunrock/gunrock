@@ -57,7 +57,6 @@ struct SSIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
    */
   cudaError_t Core(int peer_ = 0) {
     // Data ss works on
-    auto &enactor = this->enactor[0];
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
     auto &enactor_slice =
         this->enactor
@@ -66,12 +65,10 @@ struct SSIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &graph = data_slice.sub_graph[0];
     auto &scan_stats = data_slice.scan_stats;
     auto &row_offsets = graph.CsrT::row_offsets;
-    auto &col_indices = graph.CsrT::column_indices;
     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
     auto &stream = oprtr_parameters.stream;
-    auto &iteration = enactor_stats.iteration;
     auto target = util::DEVICE;
 
     // First add degrees to scan statistics

@@ -47,6 +47,17 @@
 namespace gunrock {
 namespace util {
 
+/**
+ * Do we have a host or device side pointer?
+ * 
+ * Return true if the given ptr was allocated on device, 
+ * false if on the host. 
+ * 
+ * More info:
+ * https://stackoverflow.com/questions/50116861/why-is-cudapointergetattributes-returning-invalid-argument-for-host-pointer
+ */
+bool IsDevicePointer(const void *ptr);
+
 /******************************************************************************
  * Command-line parsing functionality
  ******************************************************************************/

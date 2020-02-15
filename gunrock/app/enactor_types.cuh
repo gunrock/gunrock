@@ -15,7 +15,7 @@
 #pragma once
 
 #include <time.h>
-#include <moderngpu.cuh>
+// #include <moderngpu/context.hxx>
 #include <gunrock/util/multithreading.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/parameters.h>
@@ -235,7 +235,7 @@ class EnactorSlice {
   typedef oprtr::OprtrParameters<GraphT, FrontierT, LabelT> OprtrParametersT;
 
   cudaStream_t stream, stream2;
-  mgpu::ContextPtr context;
+  // mgpu::standard_context_t context;
   EnactorStats<SizeT> enactor_stats;
   FrontierT frontier;
   OprtrParametersT oprtr_parameters;
@@ -266,7 +266,7 @@ class EnactorSlice {
 
       int gpu_idx;
       GUARD_CU2(cudaGetDevice(&gpu_idx), "cudaGetDevice failed.");
-      context = mgpu::CreateCudaDeviceAttachStream(gpu_idx, stream);
+      // context.stream(stream); // = stream;
       // util::PrintMsg("Stream and context allocated on GPU " +
       // std::to_string(gpu_idx));
     }
@@ -276,7 +276,7 @@ class EnactorSlice {
     GUARD_CU(oprtr_parameters.Init());
 
     oprtr_parameters.stream = stream;
-    oprtr_parameters.context = context;
+    // oprtr_parameters.context = context;
     oprtr_parameters.frontier = &frontier;
     oprtr_parameters.cuda_props = cuda_properties;
     oprtr_parameters.advance_mode = advance_mode;

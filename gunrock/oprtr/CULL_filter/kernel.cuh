@@ -102,10 +102,10 @@ struct SweepPass {
 template <OprtrFlag FLAG, typename InKeyT, typename OutKeyT, typename SizeT,
           typename ValueT, typename LabelT, typename FilterOpT,
           bool VALID =
-#ifndef __CUDA_ARCH__
-              false
+#ifdef __CUDA_ARCH__
+              true
 #else
-              (__CUDA_ARCH__ >= CUDA_ARCH)
+              false
 #endif
           >
 struct Dispatch {
@@ -115,11 +115,6 @@ template <OprtrFlag FLAG, typename InKeyT, typename OutKeyT, typename SizeT,
           typename ValueT, typename LabelT, typename FilterOpT>
 struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, LabelT, FilterOpT, true> {
   typedef KernelPolicy<FLAG, InKeyT, OutKeyT, SizeT, ValueT, LabelT, FilterOpT,
-                       //#ifdef __CUDA_ARCH__
-                       //    __CUDA_ARCH__,                      // CUDA_ARCH
-                       //#else
-                       //    0,
-                       //#endif
                        sizeof(InKeyT) == 4 ? 8 : 4,  // MAX_CTA_OCCUPANCY
                        8,                            // LOG_THREADS
                        1,                            // LOG_LOAD_VEC_SIZE

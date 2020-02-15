@@ -54,7 +54,7 @@ SM_TARGETS = $(GEN_SM70)
 #-------------------------------------------------------------------------------
 
 CUDA_INC = -I"$(shell dirname $(NVCC))/../include"
-MGPU_INC = -I"../../externals/moderngpu/include"
+MGPU_INC = -I"../../externals/moderngpu/src"
 CUB_INC = -I"../../externals/cub"
 KMCUDA_INC = -I"/home/agnes/kmcuda/src"
 KMCUDA_LINK = -L"/home/agnes/kmcuda/src" -l KMCUDA
@@ -143,9 +143,8 @@ endif
 EXTRA_SOURCE_ = ../../gunrock/util/str_to_T.cu \
 	../../gunrock/util/test_utils.cu \
 	../../gunrock/util/error_utils.cu \
-	../../externals/moderngpu/src/mgpucontext.cu \
-	../../externals/moderngpu/src/mgpuutil.cpp \
 	../../gunrock/util/gitsha1make.c
+	# ../../externals/moderngpu/src/moderngpu/context.hxx \
 
 ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
     EXTRA_SOURCE = $(EXTRA_SOURCE_) \

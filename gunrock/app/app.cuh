@@ -17,6 +17,7 @@
 
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
+#include <gunrock/util/shared_utils.cuh>
 
 // Graph definations
 #include <gunrock/graphio/graphio.cuh>
