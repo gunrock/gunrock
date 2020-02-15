@@ -62,8 +62,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   struct DataSlice : BaseDataSlice {
     
     util::Array1D<SizeT, ValueT> points;
-    util::Array1D<SizeT, SizeT> keys;
-    util::Array1D<SizeT, ValueT> distance;
+
+    //util::Array1D<SizeT, SizeT> keys;
+    //util::Array1D<SizeT, ValueT> distance;
     util::Array1D<SizeT, SizeT> offsets;
 
     // Nearest Neighbors
@@ -80,7 +81,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<uint64_t, char> cub_temp_storage;
 
     // Sorted
-    util::Array1D<SizeT, SizeT> keys_out;
+    //util::Array1D<SizeT, SizeT> keys_out;
     util::Array1D<SizeT, ValueT> distance_out;
 
     /*
@@ -88,12 +89,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      */
     DataSlice() : BaseDataSlice() {
       points.SetName("points");
-      keys.SetName("keys");
-      distance.SetName("distance");
+      //keys.SetName("keys");
+      //distance.SetName("distance");
       offsets.SetName("offsets");
       knns.SetName("knns");
       cub_temp_storage.SetName("cub_temp_storage");
-      keys_out.SetName("keys_out");
+      //keys_out.SetName("keys_out");
       distance_out.SetName("distance_out");
     }
 
@@ -111,12 +112,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cudaError_t retval = cudaSuccess;
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx));
 
-      GUARD_CU(keys.Release(target));
-      GUARD_CU(distance.Release(target));
+      //GUARD_CU(keys.Release(target));
+      //GUARD_CU(distance.Release(target));
       GUARD_CU(offsets.Release(target));
       GUARD_CU(knns.Release(target));
       GUARD_CU(cub_temp_storage.Release(target));
-      GUARD_CU(keys_out.Release(target));
+      //GUARD_CU(keys_out.Release(target));
       GUARD_CU(distance_out.Release(target));
 
       GUARD_CU(BaseDataSlice ::Release(target));
@@ -148,10 +149,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       dim = dim_;
 
       //keys need for cub sorting, the same size like distance array
-      GUARD_CU(keys.Allocate(k*num_points, target));
-      GUARD_CU(keys_out.Allocate(k*num_points, target));
+      //GUARD_CU(keys.Allocate(k*num_points, target));
+      //GUARD_CU(keys_out.Allocate(k*num_points, target));
       
-      GUARD_CU(distance.Allocate(k * num_points, target));
+      //GUARD_CU(distance.Allocate(k * num_points, target));
       GUARD_CU(distance_out.Allocate(k * num_points, target));
 
       // k-nearest neighbors
@@ -176,16 +177,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       typedef typename GraphT::CsrT CsrT;
 
       // Ensure data are allocated
-      GUARD_CU(keys.EnsureSize_(k * num_points, target));
-      GUARD_CU(keys_out.EnsureSize_(k * num_points, target)); 
-      // GUARD_CU(cub_temp_storage.EnsureSize_(1, target));
-      
-      GUARD_CU(distance.EnsureSize_(k * num_points, target));
+      //GUARD_CU(keys.EnsureSize_(k * num_points, target));
+      //GUARD_CU(keys_out.EnsureSize_(k * num_points, target)); 
+      /*GUARD_CU(keys_out.ForAll(
+            [] __host__ __device__(SizeT * k, const SizeT &p) { 
+                k[p] = util::PreDefinedValues<ValueT>::InvalidValue;
+            },
+            k * num_points, target, this->stream));*/
+
+      /*GUARD_CU(distance.EnsureSize_(k * num_points, target));
       GUARD_CU(distance.ForAll(
             [] __host__ __device__(ValueT * d, const SizeT &p) { 
                 d[p] = util::PreDefinedValues<ValueT>::InvalidValue;
             },
-            k * num_points, target, this->stream));
+            k * num_points, target, this->stream));*/
 
       // K-Nearest Neighbors
       GUARD_CU(knns.EnsureSize_(k * num_points, target));
@@ -198,7 +203,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(distance_out.EnsureSize_(k * num_points, target));
       GUARD_CU(distance_out.ForAll(
             [] __host__ __device__(ValueT * d, const SizeT &p) { 
-                d[p] = util::PreDefinedValues<ValueT>::InvalidValue;
+                d[p] = util::PreDefinedValues<ValueT>::MaxValue;
             },
             k * num_points, target, this->stream));
  
@@ -222,6 +227,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   SizeT k;
   SizeT num_points;
   SizeT dim;
+  bool transpose;
+  int THREADS;
 
   // ----------------------------------------------------------------
   // Problem Methods
@@ -302,6 +309,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     this->k = this->parameters.template Get<SizeT>("k");
     this->num_points = this->parameters.template Get<SizeT>("n");
     this->dim = this->parameters.template Get<SizeT>("dim");
+    this->transpose = this->parameters.template Get <bool>("transpose");
+    this->THREADS = this->parameters.template Get <int>("NUM-THREADS");
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
