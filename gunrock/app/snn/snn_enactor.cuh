@@ -225,6 +225,7 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
       // Checking SNN similarity
       // knns are sorted, counting intersection of knns[x] and knns[q]
       auto similarity = SNNsimilarity(x, q, knns_sorted, eps, k);
+      //printf("similarity of %d and %d is %d, what about eps %d\n", x, q, similarity, eps);
       if (similarity > eps) {
           // x and q are SNN
           atomicAdd(&snn_density[x], 1);
@@ -239,7 +240,7 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // Find density of each point
     GUARD_CU(knns.ForAll(density_op, num_points*k, target, stream));
 //    GUARD_CU(frontier.V_Q()->ForAll(density_op, 1, target, stream));         //uncomment for debug
-    GUARD_CU2(cudaStreamSynchronize(stream), "cudaDeviceSynchronize failed.");
+    GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed.");
     
 #ifdef SNN_DEBUG
     // DEBUG ONLY: write down densities:
