@@ -81,7 +81,12 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(parameters.Use<int>(
       "NUM-THREADS",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      32, "Number of threads running per block.", __FILE__, __LINE__));
+      128, "Number of threads running per block.", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<bool>(
+      "use-shared-mem",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      false, "True if kernel must use shared memory.", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<bool>(
       "save-knn-results",
