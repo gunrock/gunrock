@@ -38,7 +38,7 @@ template<typename SizeT, typename ValueT, typename PointT>
 __device__ __host__
 ValueT euclidean_distance(const SizeT dim, const SizeT N, 
     ValueT* points, 
-    const PointT p1, const PointT p2, bool transpose) {
+    PointT p1, PointT p2, bool transpose) {
 
     // Get dimensional of labels
     ValueT result = (ValueT) 0;
@@ -57,6 +57,27 @@ ValueT euclidean_distance(const SizeT dim, const SizeT N,
     return _sqrt(result);
 }
 
+template<typename SizeT, typename ValueT, typename PointT>
+__device__ __host__
+ValueT euclidean_distance(const SizeT dim, const SizeT N, 
+    ValueT* points, const PointT p1, ValueT* sh_point, bool transpose) {
+
+    // Get dimensional of labels
+    ValueT result = (ValueT) 0;
+    // p1 = (x_1, x_2, ..., x_dim)
+    // p2 = (y_1, y_2, ..., y_dim)
+    for (int i=0; i<dim; ++i){
+        //(x_i - y_i)^2
+        ValueT diff = (ValueT)0;
+        if (! transpose){
+            diff = points[p1 * dim + i] - sh_point[i];
+        }else{
+            diff = points[i * N + p1] - sh_point[i];
+        }
+        result += diff*diff;
+    }
+    return _sqrt(result);
+}
 template<typename SizeT, typename ValueT, typename PointT>
 __device__ __host__
 ValueT euclidean_distance(const SizeT dim, const SizeT N, 

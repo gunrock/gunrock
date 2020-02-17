@@ -56,9 +56,9 @@ __global__ void ForAllDebug_Kernel(ArrayT array, ApplyLambda apply, SizeT length
   const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
   SizeT i = (SizeT)blockDim.x * blockIdx.x + threadIdx.x;
   while (i < length) {
-    if (blockDim.x * blockIdx.x + threadIdx.x == 0){
+/*    if (blockDim.x * blockIdx.x + threadIdx.x == 0){
         printf("%d points done\n", i);
-    }
+    }*/
     apply(array + 0, i);
     i += STRIDE;
   }
@@ -73,10 +73,10 @@ __global__ void SharedForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT lengt
   SizeT aligned_length = ((length + blockDim.x - 1)/blockDim.x) * blockDim.x;
   for (; i < aligned_length; i += STRIDE){
     apply(array + 0, i, shared_array);
-    __syncthreads();
+/*    __syncthreads();
     if (blockDim.x * blockIdx.x + threadIdx.x == 0){
         printf("%d points done\n", i);
-    }
+    }*/
   }
 }
 

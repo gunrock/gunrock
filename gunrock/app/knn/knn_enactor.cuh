@@ -30,6 +30,9 @@
 #include <cstdio>
 
 #include <cub/cub.cuh>
+#include <cub/block/block_load.cuh>
+#include <cub/block/block_store.cuh>
+#include <cub/block/block_radix_sort.cuh>
 
 //do not remove debug
 //#define KNN_ENACTOR_DEBUG
@@ -152,7 +155,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     printf("Used threads %d, single data_size %d, shared memory %u, %d\n", block_size, data_size, shared_mem_size, sizeof(ValueT));
     printf("points size = %d, dist_size = %d, keys_size = %d, shared_point_size = %d\n", points_size, 
             dist_size, keys_size, shared_point_size);
-    if (dim == 3){
+    /*if (dim == 3){
         printf("3 dim version of sharedforall operator\n");
 
         // Points is not transposed
@@ -218,10 +221,10 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                     //reinterpret_cast<double2*>(sh_point)[j] = reinterpret_cast<double2*>(points + (i * dim))[j];
                     reinterpret_cast<double3*>(sh_point)[0] = reinterpret_cast<double3*>(points + (i * dim))[0];
                 }
-                /*
-                if (threadIdx.x == 0 && dim%2 == 1){
-                    sh_point[dim - 1] = points[(i * dim) + dim - 1];
-                }*/
+                //
+                //if (threadIdx.x == 0 && dim%2 == 1){
+                //    sh_point[dim - 1] = points[(i * dim) + dim - 1];
+                //}
                 __syncthreads();
                 
                 ValueT new_dist = 0;
@@ -276,29 +279,36 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         num_points, target, stream, shared_mem_size, dim3(grid_size, 1, 1), dim3(block_size, 1, 1)), "shared for all failed");
 
         
-    }else if (THREADS == 0){
+    }else*/ if (THREADS == 0){
     // Checking rest of n-k points to choose k nearest.
     // Insertion n-k elements into sorted list
-    GUARD_CU(distance_out.ForAllDebug(
+    GUARD_CU(distance_out.ForAll(
         [num_points, k, dim, points, keys_out, transpose] 
-        __device__ (ValueT* d, const SizeT &src){
+        __global__ (ValueT* d, const SizeT &src){
+
+            __shared__ ValueT new_dist[128];
+            __shared__ int dist_key[128];
+            dist_key[threadIdx.x] = src;
+
             for (SizeT i = 0; i<num_points; ++i){
-                ValueT new_dist = 0;
+
+                new_dist[threadIdx.x] = 0;
                 if (src == i) {
-                    new_dist = util::PreDefinedValues<ValueT>::MaxValue;
+                    new_dist[threadIdx.x] = util::PreDefinedValues<ValueT>::MaxValue;
                 } else {
-                    new_dist = euclidean_distance(dim, num_points, points.GetPointer(util::DEVICE), src, i, transpose);
+                    new_dist[threadIdx.x] = euclidean_distance(dim, num_points, points.GetPointer(util::DEVICE), src, i, transpose);
                 } 
-                if (new_dist >= d[src * k + k - 1]) {
+                if (new_dist[threadIdx.x] >= d[src * k + k - 1]) {
                     // new element is larger than the largest in distance array for "src" row
                     continue;
                 }
                 // new_dist < d[src * k + k]
                 SizeT current = k - 1;
+                #pragma enroll
                 for (; current > 0; --current){
                     SizeT one_before = current - 1;
-                    if (new_dist >= d[src * k + one_before]){
-                        d[src * k + current] = new_dist;
+                    if (new_dist[threadIdx.x] >= d[src * k + one_before]){
+                        d[src * k + current] = new_dist[threadIdx.x];
                         keys_out[src * k + current] = i;
                         break;
                     } else {
@@ -307,12 +317,22 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                     }
                 }
                 if (current == (SizeT)0){
-                    d[src * k] = new_dist;
+                    d[src * k] = new_dist[threadIdx.x];
                     keys_out[src * k] = i;
                 }
+                __syncthreads();
+                
+                typedef cub::BlockRadixSort<double, 128, 1> BlockRadixSort;
+                __shared__ typename BlockRadixSort::TempStorage temp_storage;
+                BlockRadixSort(temp_storage).Sort(new_dist);//, dist_key);
+
             }
         },
-        num_points, target, stream));
+        //num_points, target, stream, 64, 1024)); //time 82 min
+        //num_points, target, stream, 128, 512)); //time 51.6 min
+        //num_points, target, stream, 256, 256)); //time 44.12 min
+        num_points, target, stream, 512, 128)); //time 41.32 min
+        //num_points, target, stream, shared_point_size, 512, 128)); //time 44.03 min
     }else{
 
         if (transpose){
@@ -327,8 +347,8 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // Checking rest of n-k points to choose k nearest.
     // Insertion n-k elements into sorted list
-    GUARD_CU2(/*frontier.V_Q()*/distance_out.SharedForAll(
-        [num_points, k, dim, points, /*distance_out,*/ keys_out, data_size, points_size, dist_size, keys_size] 
+    GUARD_CU2(distance_out.SharedForAll(
+        [num_points, k, dim, points, keys_out, data_size, points_size, dist_size, keys_size] 
         __device__ (ValueT* d, const SizeT &src, char* shared_mem){
                        
             ValueT* dist = (ValueT*) shared_mem;
@@ -336,14 +356,6 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             int* keys = (int*) (shared_mem + dist_size + points_size);
             ValueT* sh_point = (ValueT*)(shared_mem + dist_size + points_size + keys_size);
             
-           /* if (threadIdx.x == 0 && blockIdx.x == 0){
-            printf("data_size %d\n", data_size);
-            printf("dist start size %x\n", dist);
-            printf("b_sh_points start size %x\n", b_sh_points);
-            printf("keys start size %x\n", keys);
-            printf("sh_point start size %x\n", sh_point);
-            }*/
-
             __shared__ int firstPoint;
             if (threadIdx.x == 0){
                 firstPoint = src;
@@ -356,7 +368,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 b_sh_points[idx] = ptr[threadIdx.x];
             }
 
-            __syncthreads();
+            //__syncthreads();
 
             ptr += num_points;
             double value = util::PreDefinedValues<int>::InvalidValue;
@@ -438,15 +450,12 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                     }
                 }
             }
-            __shared__ int firstPointIdx;
-            if (threadIdx.x == 0)
-                firstPointIdx = src;
             __syncthreads();
 
             #pragma unroll
             for (int i=0; i<blockDim.x; ++i){
                 if (threadIdx.x < k){
-                    keys_out[(firstPointIdx + i) * k + threadIdx.x] = (ValueT)keys[threadIdx.x * (blockDim.x+1) + i];
+                    keys_out[(firstPoint + i) * k + threadIdx.x] = (ValueT)keys[threadIdx.x * (blockDim.x+1) + i];
                 }
             }
             
@@ -481,25 +490,21 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             }
             __syncthreads();
 
-            int maximum = (firstPoint + blockDim.x > num_points ? num_points : firstPoint + blockDim.x);
-
             // Initializations of basic points
             // 7217ms 
             double array[100];
 
             // Copying to shared memory
-            #pragma unroll
-            /*for (SizeT j = 0; j < blockDim.x; ++j){
+            if (dim%2 == 0){
                 #pragma unroll
-                for (SizeT i = threadIdx.x; i < dim/2; i += blockDim.x){
-                    reinterpret_cast<double2*>(b_sh_points + (j * dim))[i] = reinterpret_cast<double2*>(points + ((firstPoint + j) * dim))[i];
+                for (SizeT j = threadIdx.x; j < (blockDim.x * dim)/2; j += blockDim.x){
+                    reinterpret_cast<double2*>(b_sh_points)[j] = reinterpret_cast<double2*>(points + firstPoint*dim)[j];
                 }
-                if (threadIdx.x == 1 && dim%2 != 0){
-                    b_sh_points[j * dim + dim - 1] = points[((firstPoint + j) * dim) + dim - 1];
+            }else{
+                #pragma unroll
+                for (SizeT j = threadIdx.x; j < blockDim.x * dim; j += blockDim.x){
+                    b_sh_points[j] = points[firstPoint*dim + j];
                 }
-            }*/
-            for (SizeT j = threadIdx.x; j < (blockDim.x * dim)/2; j += blockDim.x){
-                reinterpret_cast<double2*>(b_sh_points)[j] = reinterpret_cast<double2*>(points + firstPoint*dim)[j];
             }
 
             __syncthreads();
@@ -531,13 +536,18 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 
                 // Initialization of shared points (points [i...i*blocDim.x] in sh_points)
                 // Proceeding points[[0..dim] * num_points + i];
-                #pragma unroll
-                for (SizeT j=threadIdx.x; j<dim/2; j+=blockDim.x){
-                    // Doing better with fetching int4 data
-                    reinterpret_cast<double2*>(sh_point)[j] = reinterpret_cast<double2*>(points + (i * dim))[j];
-                }
-                if (threadIdx.x == 0 && dim%2 == 1){
-                    sh_point[dim - 1] = points[(i * dim) + dim - 1];
+                if (dim%2 == 0){
+                    #pragma unroll
+                    for (SizeT j=threadIdx.x; j<dim/2; j+=blockDim.x){
+                        // Doing better with fetching int4 data
+                        reinterpret_cast<double2*>(sh_point)[j] = reinterpret_cast<double2*>(points + (i * dim))[j];
+                    }
+                }else{
+                    #pragma unroll
+                    for (SizeT j=threadIdx.x; j<dim; j+=blockDim.x){
+                        // Doing better with fetching int4 data
+                        sh_point[j] = points[i * dim + j];
+                    }
                 }
                 __syncthreads();
                 
@@ -583,9 +593,16 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
             __syncthreads();
 
-            #pragma unroll
-            for (SizeT i=threadIdx.x; i<(blockDim.x*k)/2; i+=blockDim.x){
-                reinterpret_cast<int2*>(keys_out + firstPoint*k)[i] = reinterpret_cast<int2*>(keys)[i];
+            if (k%2 == 0){
+                #pragma unroll
+                for (SizeT i=threadIdx.x; i<(blockDim.x*k)/2; i+=blockDim.x){
+                    reinterpret_cast<int2*>(keys_out + firstPoint*k)[i] = reinterpret_cast<int2*>(keys)[i];
+                }
+            }else{
+                #pragma unroll
+                for (SizeT i=threadIdx.x; i<blockDim.x*k; i+=blockDim.x){
+                    keys_out[firstPoint*k + i] = keys[i];
+                }
             }
            
             __syncthreads();
