@@ -333,6 +333,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 }
                 __syncthreads();
                 //__shared__ typename BlockRadixSortT::TempStorage temp_storage;
+                typedef cub::BlockRadixSort<ValueT, 128, 1> BlockRadixSortT;
                 BlockRadixSortT(temp_storage).Sort(array);
 
             }
