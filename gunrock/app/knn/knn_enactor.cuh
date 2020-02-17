@@ -294,7 +294,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
             for (SizeT i = 0; i<num_points; ++i){
 
-                new_dist[threadIdx.x] = 0;
+                new_dist[threadIdx.x] = (ValueT)0;
                 if (src == i) {
                     new_dist[threadIdx.x] = util::PreDefinedValues<ValueT>::MaxValue;
                 } else {
@@ -306,7 +306,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 }
                 // new_dist < d[src * k + k]
                 SizeT current = k - 1;
-                #pragma enroll
+                #pragma unroll
                 for (; current > 0; --current){
                     SizeT one_before = current - 1;
                     if (new_dist[threadIdx.x] >= d[src * k + one_before]){
@@ -324,9 +324,15 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 }
                 __syncthreads();
 
-                typedef cub::BlockRadixSort<double, 128, 1> BlockRadixSortT;
+                ValueT array[128];
+                if (threadIdx.x == 0){
+                    for (int j=0; j<128; ++j){
+                        array[j] = new_dist[j];
+                    }
+                }
+                typedef cub::BlockRadixSort<ValueT, 128, 1> BlockRadixSortT;
                 __shared__ typename BlockRadixSortT::TempStorage temp_storage;
-                BlockRadixSortT(temp_storage).Sort(new_dist);//, dist_key);
+                BlockRadixSortT(temp_storage).Sort(array);//, dist_key);
 
             }
         },

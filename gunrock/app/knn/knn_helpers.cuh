@@ -24,7 +24,7 @@ namespace knn {
 
 template <typename ValueT>
 __device__ __host__ ValueT _sqrt(const ValueT &a) {
-    return (ValueT) sqrtf(a);//((float)a);
+    return sqrt(a);
 }
 
 /**
