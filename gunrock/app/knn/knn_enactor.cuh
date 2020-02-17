@@ -282,12 +282,14 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     }else*/ if (THREADS == 0){
     // Checking rest of n-k points to choose k nearest.
     // Insertion n-k elements into sorted list
-    GUARD_CU(distance_out.ForAll(
+    GUARD_CU(distance_out.SharedForAll(
         [num_points, k, dim, points, keys_out, transpose] 
-        __global__ (ValueT* d, const SizeT &src){
+        __device__ (ValueT* d, const SizeT &src, char* shared){
 
-            __shared__ ValueT new_dist[128];
-            __shared__ int dist_key[128];
+          /*  __shared__ ValueT new_dist[128];
+            __shared__ int dist_key[128];*/
+            ValueT* new_dist = (ValueT*)shared;
+            int* dist_key = (int*)(shared + (blockDim.x * 8));
             dist_key[threadIdx.x] = src;
 
             for (SizeT i = 0; i<num_points; ++i){
@@ -321,17 +323,17 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                     keys_out[src * k] = i;
                 }
                 __syncthreads();
-
+/*
                 typedef cub::BlockRadixSort<double, 128, 1> BlockRadixSortT;
                 __shared__ typename BlockRadixSortT::TempStorage temp_storage;
                 BlockRadixSortT(temp_storage).Sort(new_dist);//, dist_key);
-
+*/
             }
         },
         //num_points, target, stream, 64, 1024)); //time 82 min
         //num_points, target, stream, 128, 512)); //time 51.6 min
         //num_points, target, stream, 256, 256)); //time 44.12 min
-        num_points, target, stream, 512, 128)); //time 41.32 min
+        num_points, target, stream, 128*12, 512, 128)); //time 41.32 min
         //num_points, target, stream, shared_point_size, 512, 128)); //time 44.03 min
     }else{
 
@@ -347,6 +349,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     // Checking rest of n-k points to choose k nearest.
     // Insertion n-k elements into sorted list
+            /*
     GUARD_CU2(distance_out.SharedForAll(
         [num_points, k, dim, points, keys_out, data_size, points_size, dist_size, keys_size] 
         __device__ (ValueT* d, const SizeT &src, char* shared_mem){
@@ -388,13 +391,6 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 }
             }
 
-            /*#pragma unroll
-            for (SizeT i = 0; i < dim; ++i){
-                int idx = i * (blockDim.x + 1) + threadIdx.x;
-                if (src < num_points){
-                    b_sh_points[idx] =  points[i * num_points + src];
-                }
-            }*/
 
             // Initializations of dist and keys
             #pragma unroll
@@ -462,7 +458,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             __syncthreads();
         },
         num_points, target, stream, shared_mem_size, dim3(grid_size, 1, 1), dim3(block_size, 1, 1)), "shared for all failed");
-
+*/
     }else{
         // Points is not transposed
               //N M
