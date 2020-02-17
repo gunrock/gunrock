@@ -323,11 +323,11 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                     keys_out[src * k] = i;
                 }
                 __syncthreads();
-/*
+
                 typedef cub::BlockRadixSort<double, 128, 1> BlockRadixSortT;
                 __shared__ typename BlockRadixSortT::TempStorage temp_storage;
                 BlockRadixSortT(temp_storage).Sort(new_dist);//, dist_key);
-*/
+
             }
         },
         //num_points, target, stream, 64, 1024)); //time 82 min
