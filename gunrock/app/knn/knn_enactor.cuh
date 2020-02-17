@@ -284,7 +284,8 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // Insertion n-k elements into sorted list
     GUARD_CU(distance_out.SharedForAll(
         [num_points, k, dim, points, keys_out, transpose] 
-        __device__ (ValueT* d, const SizeT &src, char* shared){
+        __device__ (ValueT* d, const SizeT &src, char* shared, 
+            cub::BlockRadixSort<ValueT, 128, 1>::TempStorage* temp_storage){
 
           /*  __shared__ ValueT new_dist[128];
             __shared__ int dist_key[128];*/
@@ -324,15 +325,15 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 }
                 __syncthreads();
 
-                ValueT array[128];
+                double array[128];
                 if (threadIdx.x == 0){
                     for (int j=0; j<128; ++j){
-                        array[j] = new_dist[j];
+                        array[j] = (double)new_dist[j];
                     }
                 }
-                typedef cub::BlockRadixSort<ValueT, 128, 1, int> BlockRadixSortT;
-                __shared__ typename BlockRadixSortT::TempStorage temp_storage;
-                BlockRadixSortT(temp_storage).Sort(array, dist_key);
+                __syncthreads();
+                //__shared__ typename BlockRadixSortT::TempStorage temp_storage;
+                BlockRadixSortT(temp_storage).Sort(array);
 
             }
         },
