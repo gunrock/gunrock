@@ -42,7 +42,7 @@ template<
     GraphFlag _FLAG   = GRAPH_NONE,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault,
     bool VALID = true>
-struct DynamicGraph 
+struct Dyn 
 {
     typedef _VertexT VertexT;
     typedef _SizeT   SizeT;
@@ -52,11 +52,10 @@ struct DynamicGraph
         util::If_Val<(FLAG & GRAPH_PINNED) != 0, (FLAG & ARRAY_RESERVE) | util::PINNED,
             FLAG & ARRAY_RESERVE>::Value;
 
-    typedef DynamicGraph<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag> DynamicGraphT;
     typedef dynamic_graph<VertexT, ValueT, SizeT, SlabHashTypeT::ConcurrentMap> HashTableMapsT;
     typedef dynamic_graph<VertexT, ValueT, SizeT, SlabHashTypeT::ConcurrentSet> HashTableSetsT;
 
-    typedef typename util::If<(FLAG & STORE_EDGE_VALUES) != 0, HashTableMapsT, HashTableSetsT>::Type HashTableT;
+    typedef typename util::If<(FLAG & HAS_EDGE_VALUES) != 0, HashTableMapsT, HashTableSetsT>::Type HashTableT;
     HashTableT GpuGraph;
 
     SizeT edges, nodes;
@@ -65,7 +64,7 @@ struct DynamicGraph
      * @brief DynamicGraph Constructor
      *
      */
-    DynamicGraph()
+    Dyn()
     {
     }
 
@@ -73,7 +72,7 @@ struct DynamicGraph
      * @brief Dyn destructor
      */
     __host__ __device__
-    ~DynamicGraph()
+    ~Dyn()
     {
         //Release();
     }
@@ -127,7 +126,7 @@ struct DynamicGraph
         //bool  reversed = false,
         bool  quiet = false)
     {
-   
+        cudaError_t retval = cudaSuccess;
 
         return retval;
     }
@@ -136,11 +135,15 @@ struct DynamicGraph
      * @brief Build DYN graph from CSR graph, sorted or unsorted
      * @param[in] quiet Don't print out anything.
      */
-    template <typename GraphT>
+    template <
+        typename VertexT_in, typename SizeT_in,
+        typename ValueT_in, GraphFlag FLAG_in,
+        unsigned int cudaHostRegisterFlag_in>
     cudaError_t FromCsr(
-        GraphT &source,
-        float load_factor,
-        uint32_t batch_size,
+        Csr<VertexT_in, SizeT_in, ValueT_in, FLAG_in,
+            cudaHostRegisterFlag_in> &source,
+        float load_factor = 0.7,
+        uint32_t batch_size = 0,
         util::Location target = util::LOCATION_DEFAULT,
         int deviceId = 0,
         cudaStream_t stream = 0,
@@ -149,7 +152,7 @@ struct DynamicGraph
         //bool  reversed = false,
         bool  quiet = false)
     {
-
+        cudaError_t retval = cudaSuccess;
 
         return retval;
 
@@ -169,7 +172,7 @@ template<
     typename ValueT ,
     GraphFlag _FLAG ,
     unsigned int cudaHostRegisterFlag>
-struct DynamicGraph<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
+struct Dyn<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag, false>
 {
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {

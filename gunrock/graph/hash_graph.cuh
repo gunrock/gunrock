@@ -11,7 +11,7 @@
  *
  * @brief hash_graph
  */
-#include <SlabHash/src/slab_hash_global.cuh>
+#include <slab_hash_global.cuh>
 
 namespace gunrock {
 namespace graph {

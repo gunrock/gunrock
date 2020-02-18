@@ -12,6 +12,16 @@
  * @brief Simple test driver program for dynamic graph building.
  */
 
+#include <gunrock/gunrock.h>
+
+
+// Utilities and correctness-checking
+#include <gunrock/util/test_utils.cuh>
+
+// Graph defintions
+#include <gunrock/graphio/graphio.cuh>
+#include <gunrock/app/app_base.cuh>
+
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
@@ -76,10 +86,16 @@ int main(int argc, char **argv) {
   }
   GUARD_CU(parameters.Check_Required());
 
-  return app::Switch_Types<app::VERTEXT_U32B | app::VERTEXT_U64B |
-                           app::SIZET_U32B | app::SIZET_U64B |
+  return app::Switch_Types<app::VERTEXT_U32B |
+                           app::SIZET_U32B | 
                            app::VALUET_S32B | app::DIRECTED | app::UNDIRECTED>(
       parameters, main_struct());
+
+
+  //return app::Switch_Types<app::VERTEXT_U32B | app::VERTEXT_U64B |
+  //                         app::SIZET_U32B | app::SIZET_U64B |
+  //                         app::VALUET_S32B | app::DIRECTED | app::UNDIRECTED>(
+  //    parameters, main_struct());
 }
 
 // Leave this at the end of the file

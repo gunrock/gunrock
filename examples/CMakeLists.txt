@@ -29,6 +29,7 @@ if(GUNROCK_BUILD_APPLICATIONS)
   #add_subdirectory(topk)
   add_subdirectory(vn)
   #add_subdirectory(wtf)
+  add_subdirectory(dynamic_graph)
 
   # TUTORIAL SUBDIRECTORIES
   #add_subdirectory(gtc)
@@ -150,6 +151,10 @@ else(GUNROCK_BUILD_APPLICATIONS)
   # if(GUNROCK_APP_GTC)
   #   add_subdirectory(gtc)
   # endif(GUNROCK_APP_GTC)
+
+  if(GUNROCK_APP_DYNAMIC_GRAPH)
+    add_subdirectory(dynamic_graph)
+  endif(GUNROCK_APP_DYNAMIC_GRAPH)
 
 endif(GUNROCK_BUILD_APPLICATIONS)
 # end /* Add premitives' subdirectories */

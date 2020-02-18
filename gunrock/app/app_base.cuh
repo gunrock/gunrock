@@ -149,6 +149,8 @@ struct TestGraph
   CscT &csc() { return (static_cast<CscT *>(this))[0]; }
 
   CooT &coo() { return (static_cast<CooT *>(this))[0]; }
+  
+  DynT &dyn() { return (static_cast<DynT *>(this))[0]; }
 
   double GetStddevDegree() {
     double retval = 0;

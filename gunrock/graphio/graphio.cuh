@@ -19,6 +19,7 @@
 #include <gunrock/graph/coo.cuh>
 #include <gunrock/graph/csc.cuh>
 #include <gunrock/graph/gp.cuh>
+#include <gunrock/graph/dyn.cuh>
 #include <gunrock/graphio/market.cuh>
 #include <gunrock/graphio/rmat.cuh>
 #include <gunrock/graphio/rgg.cuh>

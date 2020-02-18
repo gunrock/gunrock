@@ -539,7 +539,7 @@ struct CooSwitch<GraphT, false> {
     GUARD_CU(graph.FromCoo(coo, util::HOST, 0, quiet, false));
     GUARD_CU(coo.Release());
     if((GraphT::FLAG & graph::HAS_DYN) != 0){
-      graph::DynT.FromCsr(graph::CsrT);
+      graph.dyn().FromCsr(graph.csr());
     }
     return retval;
   }
