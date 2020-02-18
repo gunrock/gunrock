@@ -40,8 +40,8 @@ echo "./bin/test_snn_10.2_x86_64 --device=$device --knn-version=$knn market --la
 ./bin/test_snn_10.2_x86_64 --device=$device --knn-version=$knn market --labels-file ~/clustering_dataset/Font/dim11/DGF2M11d --k=50 --eps=20 --min-pts=25 --quick --NUM-THREADS=1024 --transpose=true --jsonfile JSON/$json/DGF2M11d.json
 
 # MPAGB23K3d (Berton 8M, 3d, k=30, eps=12, min-pts=15)
-echo "./bin/test_snn_10.2_x86_64 --device=$device --knn-version=$knn market --labels-file ~/clustering_dataset/Berton/dim3/MPAGB8M3d_0 --k=30 --eps=12 --min-pts=15 --quick --jsonfile JSON/$json/MPAGB8M3d_0.json"
-./bin/test_snn_10.2_x86_64 --device=$device --knn-version=$knn market --labels-file ~/clustering_dataset/Berton/dim3/MPAGB8M3d_0 --k=30 --eps=12 --min-pts=15 --quick --NUM-THREADS=1024 --transpose=true --jsonfile JSON/$json/MPAGB8M3d_0.json
+echo "./bin/test_snn_10.2_x86_64 --device=$device --knn-version=$knn market --labels-file ~/clustering_dataset/Berton/dim3/MPAGB23K3d_0 --k=30 --eps=12 --min-pts=15 --quick --jsonfile JSON/$json/MPAGB23K3d_0.json"
+./bin/test_snn_10.2_x86_64 --device=$device --knn-version=$knn market --labels-file ~/clustering_dataset/Berton/dim3/MPAGB23K3d_0 --k=30 --eps=12 --min-pts=15 --quick --NUM-THREADS=1024 --transpose=true --jsonfile JSON/$json/MPAGB23K3d_0.json
 
 # MPAGB8M3d (Berton 8M, 3d, k=50, eps=20, min-pts=25)
 echo "./bin/test_snn_10.2_x86_64 --device=$device --knn-version=$knn market --labels-file ~/clustering_dataset/Berton/dim3/MPAGB8M3d_0 --k=50 --eps=20 --min-pts=25 --quick --jsonfile JSON/$json/MPAGB8M3d_0.json"
