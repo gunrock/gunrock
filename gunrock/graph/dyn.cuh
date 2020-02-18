@@ -14,8 +14,6 @@
 
 #pragma once
 
-#pragma once
-
 #include <gunrock/util/array_utils.cuh>
 #include <gunrock/graph/csr.cuh>
 #include <gunrock/util/binary_search.cuh>
@@ -42,7 +40,7 @@ template<
     GraphFlag _FLAG   = GRAPH_NONE,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault,
     bool VALID = true>
-struct Dyn 
+struct Dyn
 {
     typedef _VertexT VertexT;
     typedef _SizeT   SizeT;
