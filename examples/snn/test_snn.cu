@@ -131,7 +131,7 @@ struct main_struct {
     SizeT min_pts = parameters.Get<SizeT>("min-pts");
     if (min_pts > k)
       return util::GRError("Min-Pts must be < K", __FILE__, __LINE__);
-
+/*
 #ifdef SNN_DEBUG
     // Debug of points:
     debug("debug points\n");
@@ -145,7 +145,7 @@ struct main_struct {
         }
         debug("\n");
     }
-#endif
+#endif*/
 
     util::PrintMsg("num_points = " + std::to_string(num_points) +
             ", k = " + std::to_string(k) +
@@ -409,14 +409,12 @@ struct main_struct {
         }
     */
  
+        cudaDeviceSynchronize();
 #ifdef SNN_DEBUG
-    for (SizeT x = 0; x < num_points; ++x){
+    for (SizeT x = 0; x < 100;/*num_points;*/ ++x){
         debug("knn[%d]: ", x);
         for (int i = 0; i < k; ++i){
-            if (typeid(ValueT) == typeid(double))
-                debug("%lf ", h_knns[x * k + i]);
-            else
-                debug("%d ", h_knns[x * k + i]);
+            debug("%d ", h_knns[x * k + i]);
         }
         debug("\n");
     }
