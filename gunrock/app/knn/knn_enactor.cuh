@@ -173,23 +173,15 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             SizeT* new_keys = (SizeT*)(shared + (blockDim.x * 8));
             __shared__ int firstId;
             if (threadIdx.x == 0){
-                firstId = (src/(blockDim.x * gridDim.x))*(blockDim.x * gridDim.x);
+                firstId = src;
                 if (blockIdx.x == 0){
                     printf("firstID == %d\n", firstId);
                 }
             }
             __syncthreads();
 
-            for (SizeT i0 = firstId; i0<num_points; ++i0){
-                SizeT i = (i0 + blockIdx.x);
-                if (i >= num_points){
-                    i = firstId + (i%(num_points-firstId)); //possible overflow 
-                }
+            for (SizeT i = firstId; i<num_points; ++i){
                 assert(i < num_points);
-
-                //if(blockIdx.x == 0 && threadIdx.x == 0 && i0%10000==0)
-                //if(i0 > 140000 && threadIdx.x == 0 && i0%1000==0)\
-                    printf("pair %d, first id = %d, i0 = %d, i = %d\n", src, firstId, i0, i);
 
                 if (i != src && src < num_points) {
                     new_dist[threadIdx.x] = euclidean_distance(dim, num_points, points.GetPointer(util::DEVICE), src, i, transpose);
@@ -202,26 +194,27 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 acquire_semaphore(sem.GetPointer(util::DEVICE), src);
                 __threadfence();
 
-                if (src < num_points && new_dist[threadIdx.x] < *((volatile int*)(&d[src * k + k - 1]))) {
+                if (src < num_points && *((volatile ValueT*)(&new_dist[threadIdx.x])) < *((volatile ValueT*)(&d[src * k + k - 1]))) {
                     // new element is smaller than the largest in distance array for "src" row
                     SizeT current = k - 1;
                     #pragma unroll
                     for (; current > 0; --current){
                         SizeT one_before = current - 1;
-                        if (new_dist[threadIdx.x] >= *((volatile int*)(&d[src * k + one_before]))){
-                            *((volatile int*)(&d[src * k + current])) = new_dist[threadIdx.x];
-                            *((volatile int*)(&keys_out[src * k + current])) = i;
+                        if (*((volatile ValueT*)(&new_dist[threadIdx.x])) >= *((volatile ValueT*)(&d[src * k + one_before]))){
+                            *((volatile ValueT*)(&d[src * k + current])) = (volatile ValueT)new_dist[threadIdx.x];
+                            *((volatile int*)(&keys_out[src * k + current])) = (volatile int)i;
                             break;
                         } else {
-                            *((volatile int*)(&d[src * k + current])) = *((volatile int*)(&d[src * k + one_before]));
+                            *((volatile ValueT*)(&d[src * k + current])) = *((volatile ValueT*)(&d[src * k + one_before]));
                             *((volatile int*)(&keys_out[src * k + current])) = *((volatile int*)(&keys_out[src * k + one_before]));
                         }
                     }
                     if (current == (SizeT)0){
-                        *((volatile int*)(&d[src * k])) = new_dist[threadIdx.x];
-                        *((volatile int*)(&keys_out[src * k])) = i;
+                        *((volatile ValueT*)(&d[src * k])) = (volatile ValueT)new_dist[threadIdx.x];
+                        *((volatile int*)(&keys_out[src * k])) = (volatile int)i;
                     }
                 }
+
 
                 __threadfence();
                 release_semaphore(sem.GetPointer(util::DEVICE), src);
@@ -229,9 +222,8 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
                 __syncthreads();
 
-                if (i >= firstId+(gridDim.x * blockDim.x) && i < num_points){
+                if (i >= firstId+(blockDim.x) && i < num_points){
  
-                    __threadfence();
                     __syncthreads();
                 
                     // Bitonic sort on new_dist array:
@@ -255,7 +247,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                         for (int x = 0; x + y < k;){
                             assert((i * k + x) < k*num_points);
                             assert(y < blockDim.x);
-                            if (new_dist[y] <= d[i * k + x]){
+                            if (*((volatile ValueT*)(&new_dist[y])) <= *((volatile ValueT*)(&d[i * k + x]))){
                                 ++y;
                             }else{
                                 ++x;
@@ -265,30 +257,23 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                         for (int j = 0; y + j < k; ++j){
                             assert((i * k + j) < k * num_points);
                             assert((y + j) < blockDim.x);
-                            new_dist[y + j] = d[i * k + j];
-                            new_keys[y + j] = keys_out[i * k + j];
-                        }
-                        //if (blockIdx.x == 0 && threadIdx.x == 0 && i%10000==0){
-                        //if(i0 > 140000 && threadIdx.x == 0 && i0%1000==0){\
-                            printf("doing pair row %d, col %d, i0 = %d\n", src, i, i0);\
+                            *((volatile ValueT*)(&new_dist[y + j])) = *((volatile ValueT*)(&d[i * k + j]));
+                            *((volatile int*)(&new_keys[y + j])) = *((volatile int*)(&keys_out[i * k + j]));
                         }
                     }
 
-                    //__threadfence_system();
                     __syncthreads();
 
                     // Bitonic sort on new_dist array:
                     bitonic_sort(new_dist, new_keys);
                   
-                    //__threadfence_system();
                     __syncthreads();
                     #pragma unroll
                     for (int j = threadIdx.x; j<k; j += blockDim.x){
-                        *((volatile int*)(&d[i * k + j])) = new_dist[j];
-                        *((volatile int*)(&keys_out[i * k + j])) = new_keys[j];
+                        *((volatile ValueT*)(&d[i * k + j])) = *((volatile ValueT*)(&new_dist[j]));
+                        *((volatile int*)(&keys_out[i * k + j])) = *((volatile int*)(&new_keys[j]));
                     }
 
-                    //__threadfence_system();
                     __syncthreads();
                     
                     __threadfence();
