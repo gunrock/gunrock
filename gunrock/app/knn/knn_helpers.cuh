@@ -27,6 +27,52 @@ __device__ __host__ ValueT _sqrt(const ValueT &a) {
     return sqrt(a);
 }
 
+template <typename ValueT, typename SizeT>
+__device__ void bitonic_sort(ValueT* new_dist, SizeT* new_keys){
+    // Bitonic sort on new_dist array:
+    for (int offset = 2; offset <= blockDim.x; offset *= 2){
+        #pragma unroll
+        for (int p = offset/2; p > 0; p /= 2){
+            int step = threadIdx.x ^ p;
+            if (step > threadIdx.x){
+                if ((threadIdx.x & offset) == 0){
+                    assert(step < blockDim.x);
+                    if (new_dist[threadIdx.x] > new_dist[step]){
+                        auto tmp = new_dist[step];
+                        new_dist[step] = new_dist[threadIdx.x];
+                        new_dist[threadIdx.x] = tmp;
+                        auto tmp2 = new_keys[step];
+                        new_keys[step] = new_keys[threadIdx.x];
+                        new_keys[threadIdx.x] = tmp2;
+                    }
+                }else{
+                    assert(step < blockDim.x);
+                    if (new_dist[threadIdx.x] < new_dist[step]){
+                        auto tmp = new_dist[step];
+                        new_dist[step] = new_dist[threadIdx.x];
+                        new_dist[threadIdx.x] = tmp;
+                        auto tmp2 = new_keys[step];
+                        new_keys[step] = new_keys[threadIdx.x];
+                        new_keys[threadIdx.x] = tmp2;
+                    }
+                }
+            }
+            __threadfence();
+            __syncthreads();
+        }
+    }
+}
+
+__device__ void acquire_semaphore(int* lock, int i){
+    while (atomicCAS(&lock[i], 0, 1) != 0);
+}
+
+__device__ void release_semaphore(int* lock, int i){
+    if (atomicExch(&lock[i], 0) != 1){
+        printf("threadIdx.x = %d\n", threadIdx.x);
+        asm("trap;");
+    }
+}
 /**
  * @brief Compute euclidean distance
  * @param dim Number of dimensions (2D, 3D ... ND)
