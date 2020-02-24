@@ -170,95 +170,66 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             __device__ (ValueT* d, const SizeT &src, char* shared){
 
             ValueT* new_dist = (ValueT*)shared;
-            int* new_keys = (int*)(shared + (blockDim.x * 8));
-            __shared__ int firstId;
-            if (threadIdx.x == 0){
-                firstId = (src/(blockDim.x * gridDim.x))*(blockDim.x * gridDim.x);
-            }
-            __syncthreads;
-
-            for (SizeT i0 = firstId; i0<num_points; ++i0){
-                SizeT i = firstId + ((i0 + blockIdx.x)%(num_points-firstId - firstId));
-                if(blockIdx.x == 0 && threadIdx.x == 0 && i0%10000==0)\
-                    printf("pair %d, first id = %d, i = %d\n", src, firstId, i);
+            SizeT* new_keys = (SizeT*)(shared + (blockDim.x * 8));
+            
+            int offset = (src/(blockDim.x*gridDim.x))*blockDim.x*gridDim.x;
+            for (SizeT i0 = offset; i0<num_points; ++i0){
+                SizeT i = offset + ((i0 + blockIdx.x)%(num_points-offset));
 
                 if (i != src && src < num_points) {
                     new_dist[threadIdx.x] = euclidean_distance(dim, num_points, points.GetPointer(util::DEVICE), src, i, transpose);
+                    new_keys[threadIdx.x] = src;
                 }else{
-                    new_dist[threadIdx.x] = (ValueT)util::PreDefinedValues<ValueT>::MaxValue;
+                    new_dist[threadIdx.x] = util::PreDefinedValues<ValueT>::MaxValue;
+                    new_keys[threadIdx.x] = util::PreDefinedValues<SizeT>::InvalidValue;
                 }
 
-                if (src < num_points && new_dist[threadIdx.x] < d[src * k + k - 1]) {
-                    // new element is smaller than the largest in distance array for "src" row
+                //__syncthreads();
+                acquire_semaphore(sem.GetPointer(util::DEVICE), src);
+
+                if (src < num_points && new_dist[threadIdx.x] < *((volatile ValueT*)(&d[src * k + k - 1]))) {
                     SizeT current = k - 1;
                     #pragma unroll
                     for (; current > 0; --current){
                         SizeT one_before = current - 1;
-                        if (new_dist[threadIdx.x] >= d[src * k + one_before]){
-                            d[src * k + current] = new_dist[threadIdx.x];
-                            keys_out[src * k + current] = i;
+                        if (new_dist[threadIdx.x] >= *((volatile ValueT*)(&d[src * k + one_before]))){
+                            *((volatile ValueT*)(&d[src * k + current])) = new_dist[threadIdx.x];
+                            *((volatile int*)(&keys_out[src * k + current])) = i;
                             break;
                         } else {
-                            d[src * k + current] = d[src * k + one_before];
-                            keys_out[src * k + current] = keys_out[src * k + one_before];
+                            *((volatile ValueT*)(&d[src * k + current])) = *((volatile ValueT*)(&d[src * k + one_before]));
+                            *((volatile int*)(&keys_out[src * k + current])) = *((volatile int*)(&keys_out[src * k + one_before]));
                         }
                     }
                     if (current == (SizeT)0){
-                        d[src * k] = new_dist[threadIdx.x];
-                        keys_out[src * k] = i;
+                        *((volatile ValueT*)(&d[src * k])) = new_dist[threadIdx.x];
+                        *((volatile int*)(&keys_out[src * k])) = i;
                     }
                 }
 
+                release_semaphore(sem.GetPointer(util::DEVICE), src);
                 __syncthreads();
 
-                if (i >= firstId+(gridDim.x * blockDim.x)){
- 
-                    new_keys[threadIdx.x] = threadIdx.x;
+                if (i >= offset+(blockDim.x*gridDim.x) && i < num_points){
  
                     __syncthreads();
                 
                     // Bitonic sort on new_dist array:
-                    for (int offset = 2; offset <= blockDim.x; offset *= 2){
-                        #pragma unroll
-                        for (int p = offset/2; p > 0; p /= 2){
-                            int step = threadIdx.x ^ p;
-                            if (step > threadIdx.x){
-                                if ((threadIdx.x & offset) == 0){
-                                    if (new_dist[threadIdx.x] > new_dist[step]){
-                                        auto tmp = new_dist[step];
-                                        new_dist[step] = new_dist[threadIdx.x];
-                                        new_dist[threadIdx.x] = tmp;
-                                        int tmp2 = new_keys[step];
-                                        new_keys[step] = new_keys[threadIdx.x];
-                                        new_keys[threadIdx.x] = tmp2;
-                                    }
-                                }else{
-                                    if (new_dist[threadIdx.x] < new_dist[step]){
-                                        auto tmp = new_dist[step];
-                                        new_dist[step] = new_dist[threadIdx.x];
-                                        new_dist[threadIdx.x] = tmp;
-                                        int tmp2 = new_keys[step];
-                                        new_keys[step] = new_keys[threadIdx.x];
-                                        new_keys[threadIdx.x] = tmp2;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    bitonic_sort(new_dist, new_keys, blockDim.x);
                    
                     __syncthreads();
 
+                    // Close semaphore for i row
                     if (threadIdx.x == 0){
-                        acquire_semaphore(sem + i);
+                        acquire_semaphore(sem.GetPointer(util::DEVICE), i);
                     }
 
-                    __syncthreads();
-
+                    // Find k smallest elements and merge them together to one array.
                     if (threadIdx.x == 0){
                         int y = 0;
                         #pragma unroll
                         for (int x = 0; x + y < k;){
-                            if (new_dist[y] < d[i * k + x]){
+                            if (new_dist[y] <= *((volatile ValueT*)(&d[i * k + x]))){
                                 ++y;
                             }else{
                                 ++x;
@@ -266,58 +237,27 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                         }
                         #pragma unroll
                         for (int j = 0; y + j < k; ++j){
-                            new_dist[y + j] = d[i * k + j];
-                            new_keys[y + j] = keys_out[i * k + j];
-                        }
-                        if (blockIdx.x == 0 && threadIdx.x == 0 && i%10000==0){\
-                            printf("doing pair row %d, col %d\n", src, i);\
+                            new_dist[y + j] = *((volatile ValueT*)(&d[i * k + j]));
+                            new_keys[y + j] = *((volatile int*)(&keys_out[i * k + j]));
                         }
                     }
 
                     __syncthreads();
 
-                    if (threadIdx.x < k){
                     // Bitonic sort on new_dist array:
-                    for (int offset = 2; offset <= k; offset *= 2){
-                        #pragma unroll
-                        for (int p = offset/2; p > 0; p /= 2){
-                            int step = threadIdx.x ^ p;
-                            if (step > threadIdx.x){
-                                if ((threadIdx.x & offset) == 0){
-                                    if (new_dist[threadIdx.x] > new_dist[step]){
-                                        auto tmp = new_dist[step];
-                                        new_dist[step] = new_dist[threadIdx.x];
-                                        new_dist[threadIdx.x] = tmp;
-                                        int tmp2 = new_keys[step];
-                                        new_keys[step] = new_keys[threadIdx.x];
-                                        new_keys[threadIdx.x] = tmp2;
-                                    }
-                                }else{
-                                    if (new_dist[threadIdx.x] < new_dist[step]){
-                                        auto tmp = new_dist[step];
-                                        new_dist[step] = new_dist[threadIdx.x];
-                                        new_dist[threadIdx.x] = tmp;
-                                        int tmp2 = new_keys[step];
-                                        new_keys[step] = new_keys[threadIdx.x];
-                                        new_keys[threadIdx.x] = tmp2;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    }
-
+                    bitonic_sort(new_dist, new_keys, blockDim.x);
+                  
                     __syncthreads();
                     #pragma unroll
                     for (int j = threadIdx.x; j<k; j += blockDim.x){
-                        d[i * k + j] = new_dist[j];
-                        keys_out[i * k + j] = new_keys[j];
+                        *((volatile ValueT*)(&d[i * k + j])) = new_dist[j];
+                        *((volatile int*)(&keys_out[i * k + j])) = new_keys[j];
                     }
-                    __threadfence_system();
+
                     __syncthreads();
                     
                     if (threadIdx.x == 0){
-                        release_semaphore(sem + i);
+                        release_semaphore(sem.GetPointer(util::DEVICE), i);
                     }
                 }
             }
@@ -329,19 +269,19 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         
         // Calculating theoretical occupancy
         int maxActiveBlocks;
-        cudaOccupancyMaxActiveBlocksPerMultiprocessor(&maxActiveBlocks, oprtr::SharedForAll_Kernel<decltype(distance_out), SizeT, decltype(knn_general_op)>, block_size, 0);
-        //cudaOccupancyMaxActiveBlocksPerMultiprocessor(&maxActiveBlocks, oprtr::SharedForAll_Kernel<decltype(distance_out), SizeT, decltype(knn_half_op)>, block_size, (block_size * 12));
+        //cudaOccupancyMaxActiveBlocksPerMultiprocessor(&maxActiveBlocks, oprtr::SharedForAll_Kernel<decltype(distance_out), SizeT, decltype(knn_general_op)>, block_size, 0);
+        cudaOccupancyMaxActiveBlocksPerMultiprocessor(&maxActiveBlocks, oprtr::SharedForAll_Kernel<decltype(distance_out), SizeT, decltype(knn_half_op)>, block_size, (block_size * 12));
 
     printf("occupancy of SM is %d\n", maxActiveBlocks);
 
         // Checking rest of n-k points to choose k nearest.
         // Insertion n-k elements into sorted list
-        GUARD_CU(distance_out.SharedForAll(knn_general_op,
-        //GUARD_CU(distance_out.SharedForAll(knn_half_op,
+       // GUARD_CU(distance_out.SharedForAll(knn_general_op,
+        GUARD_CU(distance_out.SharedForAll(knn_half_op,
             //num_points, target, stream, 64, 1024)); //time 82 min
             //num_points, target, stream, 128, 512)); //time 51.6 min
             //num_points, target, stream, 256, 256)); //time 44.12 min
-            num_points, target, stream, 128*12, grid_size, block_size)); //time 41.32 min
+            num_points, target, stream, block_size*(sizeof(ValueT)+sizeof(SizeT)), grid_size, block_size)); //time 41.32 min
             //num_points, target, stream, (block_size*8) + (block_size*4), grid_size, block_size)); //time 41.32 min
             //num_points, target, stream, shared_point_size, 512, 128)); //time 44.03 min
 
