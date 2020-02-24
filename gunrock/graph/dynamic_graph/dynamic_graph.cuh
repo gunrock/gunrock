@@ -11,16 +11,25 @@
  *
  * @brief DYN (Dynamic) Graph Data Structure
  */
-
 #pragma once
 
 #include <gunrock/graph/dynamic_graph/dynamic_graph_base.cuh>
-#include <gunrock/graph/dynamic_graph/dynamic_graph_unweighted.cuh>
-#include <gunrock/graph/dynamic_graph/dynamic_graph_weighted.cuh>
+#include <gunrock/graph/graph_base.cuh>
 
 
-// Leave this at the end of the file
-// Local Variables:
-// mode:c++
-// c-file-style: "NVIDIA"
-// End:
+namespace gunrock {
+namespace graph {
+
+template<
+    typename _VertexT = int,
+    typename _SizeT   = _VertexT,
+    typename _ValueT  = _VertexT,
+    GraphFlag _FLAG   = GRAPH_NONE,
+    unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault,
+    bool VALID = true,
+    bool HAS_VALUES = ((_FLAG & HAS_EDGE_VALUES) != 0)>
+struct Dyn : DynamicGraphBase<_VertexT, _SizeT, _ValueT, _FLAG> {};
+
+
+} // namespace graph
+} // namespace gunrock

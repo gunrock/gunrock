@@ -7,10 +7,25 @@
 
 /**
  * @file
- * hash_graph_set.cuh
+ * hash_graph_base.cuh
  *
- * @brief Dynamic graph using Concurrent Hash Sets
+ * @brief Hash graph Graph Data Structure
  */
 #pragma once
 
-#include <slab_hash.cuh>
+namespace gunrock {
+namespace graph {
+
+template<
+    typename _VertexT,
+    typename _SizeT,
+    typename _ValueT,
+    GraphFlag FLAG>
+struct HashGraphBase
+{   
+
+};
+
+
+} // namespace graph
+} // namespace gunrock
