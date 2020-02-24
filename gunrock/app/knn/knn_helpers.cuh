@@ -27,6 +27,16 @@ __device__ __host__ ValueT _sqrt(const ValueT &a) {
     return sqrt(a);
 }
 
+template <typename ValueT>
+__device__ void acquire_semaphore(volatile ValueT* lock){
+    while (atomicCAS((ValueT*)lock, (ValueT)0, (ValueT)1) != (ValueT)0);
+}
+
+template <typename ValueT>
+__device__ void release_semaphore(volatile ValueT* lock){
+    *lock = (ValueT)0;
+    __threadfence_system();
+}
 /**
  * @brief Compute euclidean distance
  * @param dim Number of dimensions (2D, 3D ... ND)

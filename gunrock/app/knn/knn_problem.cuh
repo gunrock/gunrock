@@ -66,6 +66,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
     // Nearest Neighbors
     util::Array1D<SizeT, SizeT> knns;
+    
+    util::Array1D<SizeT, int> sem;
 
     // Number of neighbors
     SizeT k;
@@ -83,6 +85,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     DataSlice() : BaseDataSlice() {
       points.SetName("points");
       knns.SetName("knns");
+      sem.SetName("sem");
       distance_out.SetName("distance_out");
     }
 
@@ -102,6 +105,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(knns.Release(target));
       GUARD_CU(distance_out.Release(target));
+      GUARD_CU(sem.Release(target));
 
       GUARD_CU(BaseDataSlice ::Release(target));
       return retval;
@@ -134,6 +138,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // k-nearest neighbors
       GUARD_CU(knns.Allocate(k * num_points, target));
       GUARD_CU(distance_out.Allocate(k * num_points, target));
+      GUARD_CU(sem.Allocate(num_points, target));
 
       return retval;
     }
@@ -164,6 +169,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             },
             k * num_points, target, this->stream));
  
+      GUARD_CU(sem.EnsureSize_(num_points, target));
+      GUARD_CU(sem.ForAll(
+            [] __host__ __device__(int* d, const SizeT &p) { 
+                d[p] = 0;
+            },
+            num_points, target, this->stream));
+
       int k_ = k;
 
       GUARD_CU(util::SetDevice(this->gpu_idx));
@@ -305,8 +317,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         }
     }
     int grid_size = 65536/block_size;
-
-   
 
     this->use_shared_mem = use_shared_mem;
     this->num_threads = num_threads;
