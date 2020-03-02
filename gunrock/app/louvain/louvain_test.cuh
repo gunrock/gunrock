@@ -683,7 +683,6 @@ double OMP_Reference(util::Parameters &parameters, GraphT &graph,
                                (w_v2_v - w_c2[org_comm]) * w_v2_v / m2;
             //- w_v2_v * w_v2_v / m2;
             ValueT max_gain = 0;
-            ValueT max_w_v2c_c = 0;
 
             for (VertexT i = 0; i < num_neighbor_comms; i++) {
               VertexT c = neighbor_comms[i];
@@ -694,19 +693,14 @@ double OMP_Reference(util::Parameters &parameters, GraphT &graph,
               ValueT w_v2c_c = w_v2c[c];
               w_v2c[c] = util::PreDefinedValues<ValueT>::InvalidValue;
               ValueT gain = gain_base + w_v2c_c - w_c2[c] * w_v2_v / m2;
-              //- (w_c2[c] - w_c2[org_comm]) * w_v2_v / m2;
 
               if (gain > max_gain) {
                 max_gain = gain;
                 new_comm = c;
-                max_w_v2c_c = w_v2c_c;
               }
             }
 
             if (new_comm != current_communities[v]) {
-              // max_gain = w_v2self[v] - w_v2c_org + max_w_v2c_c
-              //    - (w_v2_v - w_c2[org_comm] + w_c2[new_comm]) * w_v2_v / m2;
-
               if (max_gain > 0) {
                 current_communities[v] = new_comm;
 #pragma omp atomic
@@ -1071,7 +1065,7 @@ typename GraphT::SizeT Validate_Results(
   // Verify the result
   for (VertexT v = 0; v < graph.nodes; v++) {
     auto c = communities[v];
-    if (c < 0 || c >= graph.nodes) {
+    if (util::lessThanZero(c) || c >= graph.nodes) {
       util::PrintMsg("FAIL: communties[" + std::to_string(v) +
                          "] = " + std::to_string(c) + " out of bound",
                      (!quiet) && (num_errors == 0));
@@ -1107,7 +1101,7 @@ typename GraphT::SizeT Validate_Results(
 
   for (VertexT v = 0; v < graph.nodes; v++) {
     auto c = ref_communities[v];
-    if (c < 0 || c >= graph.nodes) {
+    if (util::lessThanZero(c) || c >= graph.nodes) {
       num_errors++;
       continue;
     }

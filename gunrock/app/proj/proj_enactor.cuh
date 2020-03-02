@@ -73,7 +73,6 @@ struct projIterationLoop
     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
-    auto &iteration = enactor_stats.iteration;
 
     auto &projections = data_slice.projections;
 

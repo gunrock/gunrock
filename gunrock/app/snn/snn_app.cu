@@ -12,6 +12,7 @@
  */
 
 #include <cstdio>
+#include <iostream>
 
 // Gunrock api
 #include <gunrock/gunrock.h>
@@ -29,7 +30,7 @@
 // JSON includes
 #include <gunrock/util/info_rapidjson.cuh>
 
-// KNN includes
+// SNN includes
 #include <gunrock/app/snn/snn_enactor.cuh>
 #include <gunrock/app/snn/snn_test.cuh>
 
@@ -47,6 +48,16 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       "labels-file",
       util::REQUIRED_ARGUMENT | util::REQUIRED_PARAMETER, 
       "", "List of points of dim-dimensional space", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<bool>(
+      "transpose",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      false, "False if lables are not transpose", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<std::string>(
+      "knn-version",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      "gunrock", "Version of knn: \"gunrock\" or \"kmcuda\" or \"cuml\" or \"faiss\"", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<std::string>(
       "snn-tag", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, "",
@@ -81,9 +92,33 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       "point\n",
       __FILE__, __LINE__));
 
+  GUARD_CU(parameters.Use<int>(
+      "NUM-THREADS",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      128, "Number of threads running per block.", __FILE__, __LINE__));
+ 
+  GUARD_CU(parameters.Use<bool>(
+      "use-shared-mem",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      false, "True if kernel must use shared memory.", __FILE__, __LINE__));
+ 
   GUARD_CU(parameters.Use<float>(
       "cpu-elapsed", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0.0f,
       "CPU implementation, elapsed time (ms) for JSON.", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<float>(
+      "knn-elapsed", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0.0f,
+      "KNN Gunrock implementation, elapsed time (ms) for JSON.", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<bool>(
+      "save-snn-results",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      false, "Save cluster assignments to file", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<std::string>(
+      "snn-output-file",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      "snn_results.output", "Filename of snn output", __FILE__, __LINE__));
 
   return retval;
 }
@@ -118,6 +153,8 @@ cudaError_t RunTests(
   // CLI parameters
   bool quiet_mode = parameters.Get<bool>("quiet");
   int num_runs = parameters.Get<int>("num-runs");
+  bool save_snn_results = parameters.Get<bool>("save-snn-results");
+  std::string snn_output_file = parameters.Get<std::string>("snn-output-file");
   std::string validation = parameters.Get<std::string>("validation");
   util::Info info("snn", parameters, graph);
 
@@ -188,9 +225,17 @@ cudaError_t RunTests(
 
   // For JSON output
   info.SetVal("num-corepoints", std::to_string(h_core_point_counter[0]));
+  info.SetVal("num-noisepoints", std::to_string(h_noise_point_counter[0]));
   info.SetVal("num-clusters", std::to_string(h_cluster_counter[0]));
   // info.SetVal("cpu-elapsed",
   // std::to_string(parameters.Get<float>("cpu-elapsed")));
+  if (save_snn_results){
+    std::ofstream output(snn_output_file);
+    for (int i=0; i<num_points; ++i){
+        output << h_cluster[i] << "\n";
+    }
+    output.close();
+  }
 
   // Clean up
   GUARD_CU(enactor.Release(target));

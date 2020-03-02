@@ -24,7 +24,13 @@ namespace compacted_cull_filter {
 extern __device__ __host__ void Error_UnsupportedCUDAArchitecture();
 
 template <typename KernelPolicy, typename Problem, typename Functor,
-          bool VALID = (__GR_CUDA_ARCH__ >= KernelPolicy::CUDA_ARCH)>
+          bool VALID = 
+#ifdef __CUDA_ARCH__
+              true
+#else
+              false
+#endif
+          >
 struct Dispatch {
   typedef typename KernelPolicy::VertexId VertexId;
   typedef typename KernelPolicy::SizeT SizeT;

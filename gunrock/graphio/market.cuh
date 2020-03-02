@@ -19,10 +19,11 @@
 #include <stdio.h>
 #include <libgen.h>
 #include <iostream>
+#include <fstream>
+#include <string>
 
 #include <gunrock/util/parameters.h>
 #include <gunrock/graph/coo.cuh>
-//#include <gunrock/graphio/utils.cuh>
 
 namespace gunrock {
 namespace graphio {
@@ -50,16 +51,16 @@ typedef std::map<std::string, std::string> MetaData;
  *
  * Indices are 1-based i.2. A(1,1) is the first element.
  *
- * @param[in] f_in          Input MARKET graph file.
- * @param[in] output_file   Output file name for binary i/o.
- * @param[in] csr_graph     Csr graph object to store the graph data.
- * @param[in] undirected    Is the graph undirected or not?
- * @param[in] reversed      Whether or not the graph is inversed.
+ * @param[in] parameters    Running parameters
+ * @param[in] graph         Graph object to store the graph data.
+ * @param[in] meta_data     Meta data that stores graph attributes.
+ * @param[in] graph_prefix  Prefix to show graph attributes.
  *
  * \return If there is any File I/O error along the way.
  */
 template <typename GraphT>
-cudaError_t ReadMarketStream(util::Parameters &parameters, GraphT &graph,
+cudaError_t ReadMarketStream(util::Parameters &parameters,
+                             GraphT &graph,
                              MetaData &meta_data,
                              std::string graph_prefix = "") {
   typedef typename GraphT::VertexT VertexT;
@@ -70,264 +71,155 @@ cudaError_t ReadMarketStream(util::Parameters &parameters, GraphT &graph,
 
   cudaError_t retval = cudaSuccess;
   bool quiet = parameters.Get<bool>("quiet");
-  FILE *f_in = NULL;
+
+  // Conditional read from file or stdin
+  bool from_stdin = false;
+  std::ifstream file;
   std::string filename =
       parameters.Get<std::string>(graph_prefix + "graph-file");
   if (filename == "") {  // Read from stdin
     util::PrintMsg("  Reading from stdin:", !quiet);
-    f_in = stdin;
-  }
-
-  else {  // Read from file
-    f_in = fopen(filename.c_str(), "r");
-    if (f_in == NULL) {
+    from_stdin = true;
+  } else {  // Read from file
+    file.open(filename.c_str(), std::ios::in);
+    if (!file.is_open()) {
       return util::GRError(cudaErrorUnknown, "Unable to open file " + filename,
                            __FILE__, __LINE__);
     }
     util::PrintMsg("  Reading from " + filename + ":", !quiet);
   }
-
-  // bool undirected             = parameters.Get<bool>(
-  //    graph_prefix + "undirected");
-  // bool random_edge_values = parameters.Get<bool>(
-  //    graph_prefix + "random-edge-values");
-  // ValueT edge_value_min       = parameters.Get<ValueT>(
-  //    graph_prefix + "edge-value-min");
-  // ValueT edge_value_range     = parameters.Get<ValueT>(
-  //    graph_prefix + "edge-value-range");
-  // bool vertex_start_from_zero = parameters.Get<bool>(
-  //    graph_prefix + "vertex-start-from-zero");
-  // long edge_value_seed        = parameters.Get<long>(
-  //    graph_prefix + "edge-value-seed");
-  // if (parameters.UseDefault(graph_prefix + "edge-value-seed"))
-  //    edge_value_seed = time(NULL);
-  // bool read_from_binary       = parameters.Get<bool>(
-  //    graph_prefix + "read-from-binary");
-  // bool store_to_binary        = parameters.Get<bool>(
-  //    graph_prefix + "store-to-binary");
-  // std::string binary_prefix   =
-  //    parameters.UseDefault(graph_prefix + "binary-prefix") ?
+  std::istream &input_stream = (from_stdin) ? std::cin : file;
 
   auto &edge_pairs = graph.CooT::edge_pairs;
-  SizeT edges_read = util::PreDefinedValues<SizeT>::InvalidValue;  //-1;
   SizeT nodes = 0;
   SizeT edges = 0;
-  // util::Array1D<SizeT, EdgePairT> temp_edge_pairs;
-  // temp_edge_pairs.SetName("graphio::market::ReadMarketStream::temp_edge_pairs");
-  // EdgeTupleType *coo = NULL; // read in COO format
   bool got_edge_values = false;
   bool symmetric = false;  // whether the graph is undirected
-  bool skew =
-      false;  // whether edge values are the inverse for symmetric matrices
+  bool skew = false;  // whether edge values are inverse for symmetric matrices
   bool array = false;  // whether the mtx file is in dense array format
 
   time_t mark0 = time(NULL);
-  util::PrintMsg(
-      "  Parsing MARKET COO format"  //+ (
-                                     //(GraphT::FLAG & graph::HAS_EDGE_VALUES) ?
-                                     //" edge-value-seed = " +
-                                     //std::to_string(edge_value_seed) : "")
-      ,
-      !quiet, false);
-  // if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
-  //    srand(edge_value_seed);
+  util::PrintMsg("  Parsing MARKET COO format", !quiet, false);
 
-  char line[1024];
-
-  // bool ordered_rows = true;
   GUARD_CU(graph.CooT::Release());
 
+  // Read file head
+  std::string line;
   while (true) {
-    if (fscanf(f_in, "%[^\n]\n", line) <= 0) {
+    std::getline(input_stream, line);
+    if (line[0] != '%') {
       break;
-    }
-
-    if (line[0] == '%') {  // Comment
-      if (strlen(line) >= 2 && line[1] == '%') {
-        symmetric = (strstr(line, "symmetric") != NULL);
-        skew = (strstr(line, "skew") != NULL);
-        array = (strstr(line, "array") != NULL);
+    } else {  // Comment
+      if (strlen(line.c_str()) >= 2 && line[1] == '%') {
+        symmetric = (strstr(line.c_str(), "symmetric") != NULL);
+        skew = (strstr(line.c_str(), "skew") != NULL);
+        array = (strstr(line.c_str(), "array") != NULL);
       }
     }
+  }
 
-    else if (!util::isValid(edges_read))  //(edges_read == -1)
-    {                                     // Problem description
-      long long ll_nodes_x, ll_nodes_y, ll_edges;
-      int items_scanned =
-          sscanf(line, "%lld %lld %lld", &ll_nodes_x, &ll_nodes_y, &ll_edges);
+  // Get file meta-data: matrix row/col and number of entries(edges)
+  long long ll_nodes_x, ll_nodes_y, ll_edges;
+  int items_scanned =
+          sscanf(line.c_str(), "%lld %lld %lld", &ll_nodes_x, &ll_nodes_y, &ll_edges);
 
-      if (array && items_scanned == 2) {
-        ll_edges = ll_nodes_x * ll_nodes_y;
-      }
-
-      else if (!array && items_scanned == 3) {
-        if (ll_nodes_x != ll_nodes_y) {
-          return util::GRError(cudaErrorUnknown,
-                               "Error parsing MARKET graph: not square (" +
-                                   std::to_string(ll_nodes_x) + ", " +
-                                   std::to_string(ll_nodes_y) + ")",
-                               __FILE__, __LINE__);
-        }
-        // if (undirected) ll_edges *=2;
-      }
-
-      else {
-        return util::GRError(cudaErrorUnknown,
-                             "Error parsing MARKET graph:"
-                             " invalid problem description.",
-                             __FILE__, __LINE__);
-      }
-
-      nodes = ll_nodes_x;
-      edges = ll_edges;
-
-      util::PrintMsg(" (" + std::to_string(ll_nodes_x) + " nodes, " +
-                         std::to_string(ll_edges) + " directed edges)... ",
-                     !quiet, false);
-
-      // Allocate coo graph
-      GUARD_CU(graph.CooT::Allocate(nodes
-                                    //+ ((vertex_start_from_zero) ? 0 : 1)
-                                    ,
-                                    edges, util::HOST));
-
-      edges_read = 0;
+  if (array && items_scanned == 2) {
+    ll_edges = ll_nodes_x * ll_nodes_y;
+  } else if (!array && items_scanned == 3) {
+    if (ll_nodes_x != ll_nodes_y) {
+      return util::GRError(cudaErrorUnknown,
+                            "Error parsing MARKET graph: not square (" +
+                                std::to_string(ll_nodes_x) + ", " +
+                                std::to_string(ll_nodes_y) + ")",
+                            __FILE__, __LINE__);
     }
+  } else {
+    return util::GRError(cudaErrorUnknown,
+                          "Error parsing MARKET graph:"
+                          " invalid problem description.",
+                          __FILE__, __LINE__);
+  }
 
-    else {  // Edge description (v -> w)
-      if (edge_pairs.GetPointer(util::HOST) == NULL) {
+  nodes = ll_nodes_x;
+  edges = ll_edges;
+
+  util::PrintMsg(" (" + std::to_string(ll_nodes_x) + " nodes, " +
+                      std::to_string(ll_edges) + " directed edges)... ",
+                  !quiet, false);
+
+  // Allocate coo graph
+  GUARD_CU(graph.CooT::Allocate(nodes, edges, util::HOST));
+
+  if (edge_pairs.GetPointer(util::HOST) == NULL) {
         return util::GRError(cudaErrorUnknown,
                              "Error parsing MARKET graph: "
                              "invalid format",
                              __FILE__, __LINE__);
-      }
-      if (edges_read >= edges) {
-        GUARD_CU(graph.CooT::Release());
-        return util::GRError(cudaErrorUnknown,
-                             "Error parsing MARKET graph: "
-                             "encountered more than " +
-                                 std::to_string(edges) + " edges",
-                             __FILE__, __LINE__);
-      }
+  }
 
-      long long ll_row, ll_col;
-      ValueT ll_value;  // used for parse float / double
-      double lf_value;  // used to sscanf value variable types
-      int num_input;
-      if (GraphT::FLAG & graph::HAS_EDGE_VALUES) {
-        num_input = sscanf(line, "%lld %lld %lf", &ll_row, &ll_col, &lf_value);
+  for (int i = 0; i < edges; ++i) {
+    std::string line;
+    std::getline(input_stream, line);
 
-        if (array && (num_input == 1)) {
-          ll_value = ll_row;
-          ll_col = edges_read / nodes;
-          ll_row = edges_read - nodes * ll_col;
-          // printf("%f\n", ll_value);
-        }
+    long long ll_row, ll_col;
+    ValueT ll_value;  // used for parse float / double
+    double lf_value;  // used to sscanf value variable types
+    int num_input;
+    if (GraphT::FLAG & graph::HAS_EDGE_VALUES) {
+      num_input = sscanf(line.c_str(), "%lld %lld %lf", &ll_row, &ll_col,
+      &lf_value);
 
-        else if (array || num_input < 2) {
+      if (array && (num_input == 1)) {
+        ll_value = ll_row;
+        ll_col = i / nodes;
+        ll_row = i - nodes * ll_col;
+      } else if (array || num_input < 2) {
           GUARD_CU(graph.CooT::Release());
           return util::GRError(cudaErrorUnknown,
                                "Error parsing MARKET graph: "
                                "badly formed edge",
                                __FILE__, __LINE__);
-        }
+        } else if (num_input == 2) {
+        ll_value = 1;
+      } else if (num_input > 2) {
+        if (typeid(ValueT) == typeid(float) ||
+            typeid(ValueT) == typeid(double) ||
+            typeid(ValueT) == typeid(long double))
+          ll_value = (ValueT)lf_value;
+        else
+          ll_value = (ValueT)(lf_value + 1e-10);
+        got_edge_values = true;
+      }
 
-        else if (num_input == 2) {
-          // if (random_edge_values)
-          //{
-          //    auto x = rand();
-          //    double int_x = 0;
-          //    std::modf(x * 1.0 / edge_value_range, &int_x);
-          //    ll_value = x - int_x * edge_value_range;
-          //    ll_value += edge_value_min;
-          //}
-          // else
-          //{
-          ll_value = 1;
-          //}
-        } else if (num_input > 2) {
-          if (typeid(ValueT) == typeid(float) ||
-              typeid(ValueT) == typeid(double) ||
-              typeid(ValueT) == typeid(long double))
-            ll_value = (ValueT)lf_value;
-          else
-            ll_value = (ValueT)(lf_value + 1e-10);
-          got_edge_values = true;
-        }
-      } else {
-        num_input = sscanf(line, "%lld %lld", &ll_row, &ll_col);
+    } else { // if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
+      num_input = sscanf(line.c_str(), "%lld %lld", &ll_row, &ll_col);
 
-        if (array && (num_input == 1)) {
-          ll_value = ll_row;
-          ll_col = edges_read / nodes;
-          ll_row = edges_read - nodes * ll_col;
-        }
-
-        else if (array || (num_input != 2)) {
+      if (array && (num_input == 1)) {
+        ll_value = ll_row;
+        ll_col = i / nodes;
+        ll_row = i - nodes * ll_col;
+      } else if (array || (num_input != 2)) {
           GUARD_CU(graph.CooT::Release());
           return util::GRError(cudaErrorUnknown,
                                "Error parsing MARKET graph: "
                                "badly formed edge",
                                __FILE__, __LINE__);
-        }
       }
-
-      edge_pairs[edges_read].x = ll_row;  // zero-based array
-      edge_pairs[edges_read].y = ll_col;  // zero-based array
-      // ordered_rows = false;
-
-      if (GraphT::FLAG & graph::HAS_EDGE_VALUES) {
-        graph.CooT::edge_values[edges_read] = ll_value;  // * (skew ? -1 : 1);
-      }
-
-      edges_read++;
-
-      /*if (undirected)
-      {
-          // Go ahead and insert reverse edge
-          edge_pairs[edges_read].x = ll_col;       // zero-based array
-          edge_pairs[edges_read].y = ll_row;       // zero-based array
-
-          if (GraphT::FLAG & graph::HAS_EDGE_VALUES)
-          {
-              graph.CooT::edge_values[edges_read] = ll_value * (skew ? -1 : 1);
-          }
-
-          //ordered_rows = false;
-          edges_read++;
-      }*/
     }
-  }
 
-  if (edge_pairs.GetPointer(util::HOST) == NULL) {
-    return util::GRError(cudaErrorUnknown, "No graph found", __FILE__,
-                         __LINE__);
-  }
+    edge_pairs[i].x = ll_row;  // zero-based array
+    edge_pairs[i].y = ll_col;  // zero-based array
 
-  if (edges_read != edges) {
-    GUARD_CU(graph.CooT::Release());
-    return util::GRError(cudaErrorUnknown,
-                         "Error parsing MARKET graph: "
-                         "only " +
-                             std::to_string(edges_read) + "/" +
-                             std::to_string(edges) + " edges read",
-                         __FILE__, __LINE__);
-  }
-
-  // if (vertex_start_from_zero)
-  //{
-  //    GUARD_CU(edge_pairs.ForEach(
-  //        []__host__ __device__ (EdgePairT &edge_pair){
-  //            edge_pair.x -= 1;
-  //            edge_pair.y -= 1;
-  //        }, edges, util::HOST));
-  //}
+    if (GraphT::FLAG & graph::HAS_EDGE_VALUES) {
+      graph.CooT::edge_values[i] = ll_value;
+    }
+  } // endfor
 
   time_t mark1 = time(NULL);
   util::PrintMsg("  Done (" + std::to_string(mark1 - mark0) + " s).", !quiet);
 
-  if (filename == "") {
-    fclose(f_in);
+  if (filename != "") {
+    file.close();
   }
 
   meta_data["symmetric"] = symmetric ? "true" : "false";

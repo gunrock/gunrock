@@ -252,6 +252,24 @@ struct Array1D {
                      int grid_size = PreDefinedValues<int>::InvalidValue,
                      int block_size = PreDefinedValues<int>::InvalidValue);
 
+  template <typename ApplyLambda>
+  cudaError_t ForAllDebug(ApplyLambda apply,
+                     SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+                     Location target = LOCATION_DEFAULT,
+                     cudaStream_t stream = 0,
+                     int grid_size = PreDefinedValues<int>::InvalidValue,
+                     int block_size = PreDefinedValues<int>::InvalidValue);
+
+
+  template <typename ApplyLambda>
+  cudaError_t SharedForAll(ApplyLambda apply,
+                     SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+                     Location target = LOCATION_DEFAULT,
+                     cudaStream_t stream = 0,
+                     unsigned sh_mem_size = 0,
+                     dim3 grid_size = PreDefinedValues<int>::InvalidValue,
+                     dim3 block_size = PreDefinedValues<int>::InvalidValue);
+
   template <typename ArrayT_in, typename ApplyLambda>
   cudaError_t ForAll(ArrayT_in &array_in, ApplyLambda apply,
                      SizeT length = PreDefinedValues<SizeT>::InvalidValue,

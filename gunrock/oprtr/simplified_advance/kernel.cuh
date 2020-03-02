@@ -39,7 +39,13 @@ template <typename KernelPolicy, typename ProblemData, typename Functor,
           gunrock::oprtr::advance::TYPE ADVANCE_TYPE,
           gunrock::oprtr::advance::REDUCE_TYPE R_TYPE,
           gunrock::oprtr::advance::REDUCE_OP R_OP,
-          bool VALID = (__GR_CUDA_ARCH__ >= KernelPolicy::CUDA_ARCH)>
+          bool VALID =
+#ifdef __CUDA_ARCH__
+              true
+#else
+              false
+#endif
+          >
 struct Dispatch {};
 
 /*

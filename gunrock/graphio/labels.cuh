@@ -179,6 +179,11 @@ cudaError_t ReadLabelsStream(FILE *f_in, util::Parameters &parameters,
 
   cudaError_t retval = cudaSuccess;
   bool quiet = parameters.Get<bool>("quiet");
+  bool transpose = parameters.Get<bool>("transpose");
+  if (transpose)
+      printf("table is gonna be tranposed\n");
+  else
+      printf("table is not tranposed\n");
   long long dim; 
   long long num_labels;
   long long labels_read = -1;
@@ -267,7 +272,23 @@ cudaError_t ReadLabelsStream(FILE *f_in, util::Parameters &parameters,
                       std::to_string(ll_label),
                       __FILE__, __LINE__);
           }
-          labels[ll_node * dim + d] = ll_label;
+          if (!transpose){
+              //N M
+              //   DA  DB  .. DM 
+              //I1 L1A L1B .. L1M
+              //I2 L2A L2B .. L2M
+              //.. ..  ..  .. ..
+              //IN LNA LNB .. LNM
+              labels[ll_node * dim + d] = ll_label;
+          }else{
+              //N M
+              //   I1  I2  .. IN 
+              //DA L1A L2A .. LNA
+              //DB L1B L2B .. LNB
+              //.. ..  ..  .. ..
+              //DM L1M L2M .. LNM
+              labels[d * num_labels + ll_node] = ll_label;
+          }
           ++d;
       } // -> while reading line
       ++ll_node;

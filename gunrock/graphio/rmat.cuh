@@ -291,7 +291,6 @@ cudaError_t Build(
 
     if (!grmat) {
         cpu_timer.Start();
-        util::Location  target        = util::HOST;
         #pragma omp parallel
         {
             int thread_num  = omp_get_thread_num();

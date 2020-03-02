@@ -38,8 +38,6 @@ namespace advance {
  * architectures and problem types.
  *
  * @tparam _ProblemData                 Problem data type.
- * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code
- * for.
  * @tparam _INSTRUMENT                  Whether or not we want instrumentation
  * logic generated
  * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have
@@ -69,10 +67,6 @@ namespace advance {
  * advance operator we use: TWC_FORWARD, TWC_BACKWARD, LB)
  */
 template <typename _Problem,
-          // Machine parameters
-          int _CUDA_ARCH,
-          // Behavioral control parameters
-          // bool _INSTRUMENT,
           // Tunable parameters
           int _MAX_CTA_OCCUPANCY, int _LOG_THREADS, int _LOG_BLOCKS,
           int _LIGHT_EDGE_THRESHOLD, int _LOG_LOAD_VEC_SIZE,
@@ -90,48 +84,41 @@ struct KernelPolicy {
   static const MODE ADVANCE_MODE = _ADVANCE_MODE;
 
   enum {
-    CUDA_ARCH = _CUDA_ARCH,
     LOG_THREADS = _LOG_THREADS,
     THREADS = 1 << LOG_THREADS,
   };
 
   typedef gunrock::oprtr::edge_map_forward::KernelPolicy<
-      _Problem, _CUDA_ARCH,
-      //_INSTRUMENT,
+      _Problem,
       _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_LOAD_VEC_SIZE, _LOG_LOADS_PER_TILE,
       _LOG_RAKING_THREADS, _WARP_GATHER_THRESHOLD, _CTA_GATHER_THRESHOLD,
       _LOG_SCHEDULE_GRANULARITY>
       THREAD_WARP_CTA_FORWARD;
 
   typedef gunrock::oprtr::edge_map_backward::KernelPolicy<
-      _Problem, _CUDA_ARCH,
-      //_INSTRUMENT,
+      _Problem,
       _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_LOAD_VEC_SIZE, _LOG_LOADS_PER_TILE,
       _LOG_RAKING_THREADS, _WARP_GATHER_THRESHOLD, _CTA_GATHER_THRESHOLD,
       _LOG_SCHEDULE_GRANULARITY>
       THREAD_WARP_CTA_BACKWARD;
 
   typedef gunrock::oprtr::edge_map_partitioned::KernelPolicy<
-      _Problem, _CUDA_ARCH,
-      //_INSTRUMENT,
+      _Problem,
       _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_BLOCKS, _LIGHT_EDGE_THRESHOLD>
       LOAD_BALANCED;
 
   typedef gunrock::oprtr::edge_map_partitioned_backward::KernelPolicy<
-      _Problem, _CUDA_ARCH,
-      //_INSTRUMENT,
+      _Problem,
       _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_BLOCKS, _LIGHT_EDGE_THRESHOLD>
       LOAD_BALANCED_BACKWARD;
 
   typedef gunrock::oprtr::edge_map_partitioned_cull::KernelPolicy<
-      _Problem, _CUDA_ARCH,
-      //_INSTRUMENT,
+      _Problem,
       _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_BLOCKS, _LIGHT_EDGE_THRESHOLD>
       LOAD_BALANCED_CULL;
 
   typedef gunrock::oprtr::all_edges_advance::KernelPolicy<
-      _Problem, _CUDA_ARCH,
-      //_INSTRUMENT,
+      _Problem,
       _MAX_CTA_OCCUPANCY, _LOG_THREADS, _LOG_BLOCKS>
       EDGES;
 

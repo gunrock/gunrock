@@ -410,16 +410,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         // th_distances[gpu] = data_slice.distances.GetPointer(util::HOST);
       }  // end for(gpu)
 
-      for (VertexT v = 0; v < nodes; v++) {
-        int gpu = this->org_graph->GpT::partition_table[v];
-        VertexT v_ = v;
-        if ((GraphT::FLAG & gunrock::partitioner::Keep_Node_Num) != 0)
-          v_ = this->org_graph->GpT::convertion_table[v];
-
-        // h_distances[v] = th_distances[gpu][v_];
-      }
-
-      // GUARD_CU(th_distances.Release());
     }  // end if
 
     // Clearn-up

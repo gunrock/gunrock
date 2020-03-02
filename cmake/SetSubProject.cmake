@@ -18,8 +18,7 @@ else()
 endif()
 
 set (mgpu_SOURCE_FILES
-  ${mgpu_SOURCE_DIRS}/mgpucontext.cu
-  ${mgpu_SOURCE_DIRS}/mgpuutil.cpp)
+  ${mgpu_SOURCE_DIRS}/context.hxx)
 # end /* moderngpu include directories */
 
 # begin /* CUB include directories */

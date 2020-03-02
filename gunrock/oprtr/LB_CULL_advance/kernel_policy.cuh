@@ -33,8 +33,6 @@ namespace LB_CULL {
  * architectures and problem types.
  *
  * @tparam _ProblemData                 Problem data type.
- * @tparam _CUDA_ARCH                   CUDA SM architecture to generate code
- * for.
  * @tparam _INSTRUMENT                  Whether or not we want instrumentation
  * logic generated
  * @tparam _MIN_CTA_OCCUPANCY           Lower bound on number of CTAs to have
@@ -48,7 +46,6 @@ template <
     typename _VertexT,  // Data types
     typename _InKeyT, typename _OutKeyT, typename _SizeT, typename _ValueT,
     typename _LabelT,
-    // int _CUDA_ARCH,         // Machine parameters
     // int _MIN_CTA_OCCUPANCY, // Tunable parameters
     int _MAX_CTA_OCCUPANCY, int _LOG_THREADS, int _LOG_BLOCKS,
     int _LIGHT_EDGE_THRESHOLD>
@@ -68,7 +65,6 @@ class KernelPolicy {
 
   enum {
     FLAG = _FLAG,
-    // CUDA_ARCH                       = _CUDA_ARCH,
     // INSTRUMENT                      = _INSTRUMENT,
 
     LOG_THREADS = _LOG_THREADS,
@@ -76,7 +72,7 @@ class KernelPolicy {
     LOG_BLOCKS = _LOG_BLOCKS,
     BLOCKS = 1 << LOG_BLOCKS,
     LIGHT_EDGE_THRESHOLD = _LIGHT_EDGE_THRESHOLD,
-    WARP_SIZE = GR_WARP_THREADS(CUDA_ARCH),
+    WARP_SIZE = GR_WARP_THREADS(GR_CUDA_ARCH),
     LOG_WARP_SIZE = 5,
     WARP_SIZE_MASK = WARP_SIZE - 1,
     WARPS = THREADS / WARP_SIZE,
@@ -195,10 +191,10 @@ class KernelPolicy {
   };
 
   enum {
-    THREAD_OCCUPANCY = GR_SM_THREADS(CUDA_ARCH) >> LOG_THREADS,
-    SMEM_OCCUPANCY = GR_SMEM_BYTES(CUDA_ARCH) / sizeof(SmemStorage),
+    THREAD_OCCUPANCY = GR_SM_THREADS(GR_CUDA_ARCH) >> LOG_THREADS,
+    SMEM_OCCUPANCY = GR_SMEM_BYTES(GR_CUDA_ARCH) / sizeof(SmemStorage),
     CTA_OCCUPANCY = GR_MIN(_MAX_CTA_OCCUPANCY,
-                           GR_MIN(GR_SM_CTAS(CUDA_ARCH),
+                           GR_MIN(GR_SM_CTAS(GR_CUDA_ARCH),
                                   GR_MIN(THREAD_OCCUPANCY, SMEM_OCCUPANCY))),
 
     VALID = (CTA_OCCUPANCY > 0),

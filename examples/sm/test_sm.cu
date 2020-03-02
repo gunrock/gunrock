@@ -37,10 +37,11 @@ struct main_struct {
   template <typename VertexT,  // Use int as the vertex identifier
             typename SizeT,    // Use int as the graph size type
             typename ValueT>   // Use float as the value type
-  cudaError_t
-  operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val) {
+  cudaError_t operator()(util::Parameters &parameters, VertexT v, SizeT s,
+                         ValueT val) {
     typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-                                    graph::HAS_EDGE_VALUES | graph::HAS_CSR>
+                                    graph::HAS_EDGE_VALUES | graph::HAS_CSR |
+                                        graph::HAS_COO>
         GraphT;
 
     cudaError_t retval = cudaSuccess;
@@ -70,9 +71,8 @@ struct main_struct {
     if (!quick) {
       util::PrintMsg("__________________________", !quiet);
 
-      float elapsed =
-          app::sm::CPU_Reference(parameters, data_graph.csr(),
-                                 pattern_graph.csr(), ref_subgraph_match);
+      float elapsed = app::sm::CPU_Reference(parameters, data_graph,
+                                             pattern_graph, ref_subgraph_match);
 
       util::PrintMsg("__________________________\nRun CPU Reference Avg. in " +
                          std::to_string(num_runs) + " iterations elapsed: " +
