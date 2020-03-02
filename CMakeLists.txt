@@ -78,7 +78,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/FindCUB.cmake)
 # end /* Include moderngpu & cub */
 
 # begin /* Include googletest & googlemock */
-option(GUNROCK_GOOGLE_TESTS "Use Googletest as testing framework (default: OFF)." ON)
+option(GUNROCK_GOOGLE_TESTS "Use Googletest as testing framework (default: OFF)." OFF)
 
 if (GUNROCK_GOOGLE_TESTS)
   include(${CMAKE_SOURCE_DIR}/cmake/FindGoogleTest.cmake)
