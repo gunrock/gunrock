@@ -187,7 +187,6 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 new_keys[threadIdx.x] = util::PreDefinedValues<SizeT>::InvalidValue;
             }
 
-            //__syncthreads();
             acquire_semaphore(sem.GetPointer(util::DEVICE), src);
 
             if (src < num_points && new_dist[threadIdx.x] < *((volatile ValueT*)(&d[src * k + k - 1]))) {
@@ -420,8 +419,6 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             b_sh_points[idx] = ptr[threadIdx.x];
         }
 
-        //__syncthreads();
-
         ptr += num_points;
         double value = util::PreDefinedValues<int>::InvalidValue;
         if (firstPoint + threadIdx.x < num_points){
@@ -509,13 +506,13 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     if (! USE_SHARED_MEM){
     
-        printf("Used block size %d, grid size %d\n", block_size, grid_size);
+        debug("Used block size %d, grid size %d\n", block_size, grid_size);
         
         // Calculating theoretical occupancy
         int maxActiveBlocks;
         //cudaOccupancyMaxActiveBlocksPerMultiprocessor(&maxActiveBlocks, oprtr::SharedForAll_Kernel<decltype(distance_out), SizeT, decltype(knn_general_op)>, block_size, 0);
         cudaOccupancyMaxActiveBlocksPerMultiprocessor(&maxActiveBlocks, oprtr::SharedForAll_Kernel<decltype(distance_out), SizeT, decltype(knn_half_op)>, block_size, (block_size * 12));
-        printf("occupancy of SM is %d\n", maxActiveBlocks);
+        debug("occupancy of SM is %d\n", maxActiveBlocks);
 
         // Checking rest of n-k points to choose k nearest.
         // Insertion n-k elements into sorted list
