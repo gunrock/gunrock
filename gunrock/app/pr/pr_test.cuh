@@ -397,9 +397,14 @@ typename GraphT::SizeT Validate_Results(
   if (ref_node_ids != NULL && ref_ranks != NULL) {
     double ref_total_rank = 0;
     double max_diff = 0;
-    VertexT max_diff_pos = nodes;
+    // TODO: Temporary workaround, max_diff_pos if set to nodes
+    // ends up causing a SegFault when ref_node_id[max_diff_pos] = some random
+    // memory access, which could be greater than num_nodes. And later in the
+    // PrintMsg, we perform `unorder_ranks[ref_node_ids[max_diff_pos]]`, which
+    // is where the SegFault will happen randomly.
+    VertexT max_diff_pos = nodes-1;
     double max_rdiff = 0;
-    VertexT max_rdiff_pos = nodes;
+    VertexT max_rdiff_pos = nodes-1;
     for (VertexT v_ = 0; v_ < nodes; v_++) {
       VertexT v = ref_node_ids[v_];
       if (util::lessThanZero(v) || v >= nodes) {
