@@ -111,7 +111,7 @@ double CPU_Reference(util::Parameters &parameters,
      *  [TODO] Consider boundary conditions*
      ***************************************
      */
-    int MAX_DATA = 100;
+    int MAX_DATA = 2;
     int CHUNK = MAX_DATA*num_devices;
 
     cudaError_t retvals[CHUNK];

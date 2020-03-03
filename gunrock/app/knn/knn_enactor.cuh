@@ -123,145 +123,389 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto USE_SHARED_MEM = this->enactor->problem->use_shared_mem;
     int block_size = this->enactor->problem->block_size;
     int grid_size = this->enactor->problem->grid_size;
+    int data_size = this->enactor->problem->data_size;
+    int points_size = this->enactor->problem->points_size;
+    int dist_size = this->enactor->problem->dist_size;
+    int keys_size = this->enactor->problem->keys_size;
+    int shared_point_size = this->enactor->problem->shared_point_size;
+    int shared_mem_size = this->enactor->problem->shared_mem_size;
 
-        auto knn_general_op = 
-            [num_points, k, dim, points, keys_out, transpose] 
-            __device__ (ValueT* d, const SizeT &src, char* shared){
+    /* Operators */
+    auto knn_general_op = 
+    [num_points, k, dim, points, keys_out, transpose] 
+    __device__ (ValueT* d, const SizeT &src, char* shared){
+        ValueT* new_dist = (ValueT*)shared;
+        int* dist_key = (int*)(shared + (blockDim.x * 8));
+        dist_key[threadIdx.x] = src;
+        for (SizeT i = 0; i<num_points; ++i){
+            new_dist[threadIdx.x] = (ValueT)0;
+            if (src == i || src >= num_points) {
+                new_dist[threadIdx.x] = util::PreDefinedValues<ValueT>::MaxValue;
+            } else {
+                new_dist[threadIdx.x] = euclidean_distance(dim, num_points, points.GetPointer(util::DEVICE), src, i, transpose);
+            }
 
-            ValueT* new_dist = (ValueT*)shared;
-            int* dist_key = (int*)(shared + (blockDim.x * 8));
-            dist_key[threadIdx.x] = src;
-
-            for (SizeT i = 0; i<num_points; ++i){
-
-                new_dist[threadIdx.x] = (ValueT)0;
-                if (src == i || src >= num_points) {
-                    new_dist[threadIdx.x] = util::PreDefinedValues<ValueT>::MaxValue;
-                } else {
-                    new_dist[threadIdx.x] = euclidean_distance(dim, num_points, points.GetPointer(util::DEVICE), src, i, transpose);
+            if (src < num_points && new_dist[threadIdx.x] < d[src * k + k - 1]) {
+                // new element is smaller than the largest in distance array for "src" row
+                SizeT current = k - 1;
+                #pragma unroll
+                for (; current > 0; --current){
+                    SizeT one_before = current - 1;
+                    if (new_dist[threadIdx.x] >= d[src * k + one_before]){
+                        d[src * k + current] = new_dist[threadIdx.x];
+                        keys_out[src * k + current] = i;
+                        break;
+                    } else {
+                        d[src * k + current] = d[src * k + one_before];
+                        keys_out[src * k + current] = keys_out[src * k + one_before];
+                    }
+                }
+                if (current == (SizeT)0){
+                    d[src * k] = new_dist[threadIdx.x];
+                    keys_out[src * k] = i;
                 }
 
-                if (src < num_points && new_dist[threadIdx.x] < d[src * k + k - 1]) {
-                    // new element is smaller than the largest in distance array for "src" row
-                    SizeT current = k - 1;
-                    #pragma unroll
-                    for (; current > 0; --current){
-                        SizeT one_before = current - 1;
-                        if (new_dist[threadIdx.x] >= d[src * k + one_before]){
-                            d[src * k + current] = new_dist[threadIdx.x];
-                            keys_out[src * k + current] = i;
-                            break;
-                        } else {
-                            d[src * k + current] = d[src * k + one_before];
-                            keys_out[src * k + current] = keys_out[src * k + one_before];
-                        }
-                    }
-                    if (current == (SizeT)0){
-                        d[src * k] = new_dist[threadIdx.x];
-                        keys_out[src * k] = i;
-                    }
+            }
+        }
+    };
+    
+    auto knn_half_op = 
+    [num_points, k, dim, points, keys_out, transpose, sem] 
+    __device__ (ValueT* d, const SizeT &src, char* shared){
+        ValueT* new_dist = (ValueT*)shared;
+        SizeT* new_keys = (SizeT*)(shared + (blockDim.x * 8));
+        
+        int offset = (src/(blockDim.x*gridDim.x))*blockDim.x*gridDim.x;
+        for (SizeT i0 = offset; i0<num_points; ++i0){
+            SizeT i = offset + ((i0 + blockIdx.x)%(num_points-offset));
 
+            if (i != src && src < num_points) {
+                new_dist[threadIdx.x] = euclidean_distance(dim, num_points, points.GetPointer(util::DEVICE), src, i, transpose);
+                new_keys[threadIdx.x] = src;
+            }else{
+                new_dist[threadIdx.x] = util::PreDefinedValues<ValueT>::MaxValue;
+                new_keys[threadIdx.x] = util::PreDefinedValues<SizeT>::InvalidValue;
+            }
+
+            //__syncthreads();
+            acquire_semaphore(sem.GetPointer(util::DEVICE), src);
+
+            if (src < num_points && new_dist[threadIdx.x] < *((volatile ValueT*)(&d[src * k + k - 1]))) {
+                SizeT current = k - 1;
+                #pragma unroll
+                for (; current > 0; --current){
+                    SizeT one_before = current - 1;
+                    if (new_dist[threadIdx.x] >= *((volatile ValueT*)(&d[src * k + one_before]))){
+                        *((volatile ValueT*)(&d[src * k + current])) = new_dist[threadIdx.x];
+                        *((volatile int*)(&keys_out[src * k + current])) = i;
+                        break;
+                    } else {
+                        *((volatile ValueT*)(&d[src * k + current])) = *((volatile ValueT*)(&d[src * k + one_before]));
+                        *((volatile int*)(&keys_out[src * k + current])) = *((volatile int*)(&keys_out[src * k + one_before]));
+                    }
+                }
+                if (current == (SizeT)0){
+                    *((volatile ValueT*)(&d[src * k])) = new_dist[threadIdx.x];
+                    *((volatile int*)(&keys_out[src * k])) = i;
                 }
             }
-            };
 
-        auto knn_half_op = 
-            [num_points, k, dim, points, keys_out, transpose, sem] 
-            __device__ (ValueT* d, const SizeT &src, char* shared){
+            release_semaphore(sem.GetPointer(util::DEVICE), src);
+            __syncthreads();
 
-            ValueT* new_dist = (ValueT*)shared;
-            SizeT* new_keys = (SizeT*)(shared + (blockDim.x * 8));
+            if (i >= offset+(blockDim.x*gridDim.x) && i < num_points){
+ 
+                __syncthreads();
             
-            int offset = (src/(blockDim.x*gridDim.x))*blockDim.x*gridDim.x;
-            for (SizeT i0 = offset; i0<num_points; ++i0){
-                SizeT i = offset + ((i0 + blockIdx.x)%(num_points-offset));
-
-                if (i != src && src < num_points) {
-                    new_dist[threadIdx.x] = euclidean_distance(dim, num_points, points.GetPointer(util::DEVICE), src, i, transpose);
-                    new_keys[threadIdx.x] = src;
-                }else{
-                    new_dist[threadIdx.x] = util::PreDefinedValues<ValueT>::MaxValue;
-                    new_keys[threadIdx.x] = util::PreDefinedValues<SizeT>::InvalidValue;
-                }
-
-                //__syncthreads();
-                acquire_semaphore(sem.GetPointer(util::DEVICE), src);
-
-                if (src < num_points && new_dist[threadIdx.x] < *((volatile ValueT*)(&d[src * k + k - 1]))) {
-                    SizeT current = k - 1;
-                    #pragma unroll
-                    for (; current > 0; --current){
-                        SizeT one_before = current - 1;
-                        if (new_dist[threadIdx.x] >= *((volatile ValueT*)(&d[src * k + one_before]))){
-                            *((volatile ValueT*)(&d[src * k + current])) = new_dist[threadIdx.x];
-                            *((volatile int*)(&keys_out[src * k + current])) = i;
-                            break;
-                        } else {
-                            *((volatile ValueT*)(&d[src * k + current])) = *((volatile ValueT*)(&d[src * k + one_before]));
-                            *((volatile int*)(&keys_out[src * k + current])) = *((volatile int*)(&keys_out[src * k + one_before]));
-                        }
-                    }
-                    if (current == (SizeT)0){
-                        *((volatile ValueT*)(&d[src * k])) = new_dist[threadIdx.x];
-                        *((volatile int*)(&keys_out[src * k])) = i;
-                    }
-                }
-
-                release_semaphore(sem.GetPointer(util::DEVICE), src);
+                // Bitonic sort on new_dist array:
+                bitonic_sort(new_dist, new_keys, blockDim.x);
+               
                 __syncthreads();
 
-                if (i >= offset+(blockDim.x*gridDim.x) && i < num_points){
- 
-                    __syncthreads();
-                
-                    // Bitonic sort on new_dist array:
-                    bitonic_sort(new_dist, new_keys, blockDim.x);
-                   
-                    __syncthreads();
+                // Close semaphore for i row
+                if (threadIdx.x == 0){
+                    acquire_semaphore(sem.GetPointer(util::DEVICE), i);
+                }
 
-                    // Close semaphore for i row
-                    if (threadIdx.x == 0){
-                        acquire_semaphore(sem.GetPointer(util::DEVICE), i);
-                    }
-
-                    // Find k smallest elements and merge them together to one array.
-                    if (threadIdx.x == 0){
-                        int y = 0;
-                        #pragma unroll
-                        for (int x = 0; x + y < k;){
-                            if (new_dist[y] <= *((volatile ValueT*)(&d[i * k + x]))){
-                                ++y;
-                            }else{
-                                ++x;
-                            }
-                        }
-                        #pragma unroll
-                        for (int j = 0; y + j < k; ++j){
-                            new_dist[y + j] = *((volatile ValueT*)(&d[i * k + j]));
-                            new_keys[y + j] = *((volatile int*)(&keys_out[i * k + j]));
-                        }
-                    }
-
-                    __syncthreads();
-
-                    // Bitonic sort on new_dist array:
-                    bitonic_sort(new_dist, new_keys, blockDim.x);
-                  
-                    __syncthreads();
+                // Find k smallest elements and merge them together to one array.
+                if (threadIdx.x == 0){
+                    int y = 0;
                     #pragma unroll
-                    for (int j = threadIdx.x; j<k; j += blockDim.x){
-                        *((volatile ValueT*)(&d[i * k + j])) = new_dist[j];
-                        *((volatile int*)(&keys_out[i * k + j])) = new_keys[j];
+                    for (int x = 0; x + y < k;){
+                        if (new_dist[y] <= *((volatile ValueT*)(&d[i * k + x]))){
+                            ++y;
+                        }else{
+                            ++x;
+                        }
                     }
-
-                    __syncthreads();
-                    
-                    if (threadIdx.x == 0){
-                        release_semaphore(sem.GetPointer(util::DEVICE), i);
+                    #pragma unroll
+                    for (int j = 0; y + j < k; ++j){
+                        new_dist[y + j] = *((volatile ValueT*)(&d[i * k + j]));
+                        new_keys[y + j] = *((volatile int*)(&keys_out[i * k + j]));
                     }
                 }
+
+                __syncthreads();
+
+                // Bitonic sort on new_dist array:
+                bitonic_sort(new_dist, new_keys, blockDim.x);
+              
+                __syncthreads();
+                #pragma unroll
+                for (int j = threadIdx.x; j<k; j += blockDim.x){
+                    *((volatile ValueT*)(&d[i * k + j])) = new_dist[j];
+                    *((volatile int*)(&keys_out[i * k + j])) = new_keys[j];
+                }
+
+                __syncthreads();
+                
+                if (threadIdx.x == 0){
+                    release_semaphore(sem.GetPointer(util::DEVICE), i);
+                }
             }
-        };
+        }
+    };
+
+    auto knn_shared_not_transpose_op = 
+    [num_points, k, dim, points, keys_out, data_size, points_size, dist_size, keys_size] 
+    __device__ (ValueT* d, const SizeT &src, char* shared_mem){
+
+        // Get pointers to shared memory arrays
+        ValueT* dist = (ValueT*) (shared_mem);
+        ValueT* b_sh_points = (ValueT*) (shared_mem + dist_size);
+        int* keys = (int*) (shared_mem + dist_size + points_size);
+        ValueT* sh_point = (ValueT*) (shared_mem + dist_size + points_size + keys_size);
+
+        __shared__ SizeT firstPoint;
+        if (threadIdx.x == 0){
+            firstPoint = src;
+        }
+        __syncthreads();
+
+        // Initializations of basic points
+        // 7217ms 
+        double array[100];
+
+        // Copying to shared memory
+        if (dim%2 == 0){
+            #pragma unroll
+            for (SizeT j = threadIdx.x; j < (blockDim.x * dim)/2; j += blockDim.x){
+                reinterpret_cast<double2*>(b_sh_points)[j] = reinterpret_cast<double2*>(points + firstPoint*dim)[j];
+            }
+        }else{
+            #pragma unroll
+            for (SizeT j = threadIdx.x; j < blockDim.x * dim; j += blockDim.x){
+                b_sh_points[j] = points[firstPoint*dim + j];
+            }
+        }
+
+        __syncthreads();
+        
+        // Copying shared memory to registers
+        #pragma unroll
+        for (SizeT j = 0; j < dim; ++j){
+            array[j] = b_sh_points[threadIdx.x * dim + j];
+        }
+        __syncthreads();
+
+        // Transpose to shared memory
+        #pragma unroll
+        for (SizeT j = 0; j<dim; ++j){
+            b_sh_points[j * (blockDim.x+1) + threadIdx.x] = array[j];
+        }
+
+        // Initializations of dist and keys
+        #pragma unroll
+        for (int i = 0; i < k; ++i){
+            int idx = i * (blockDim.x+1) + threadIdx.x;
+            dist[idx] = util::PreDefinedValues<ValueT>::MaxValue;
+            //keys[idx] = util::PreDefinedValues<int>::InvalidValue;
+        }
+
+        __syncthreads();
+
+        for (SizeT i = 0; i<num_points; ++i){
+            
+            // Initialization of shared points (points [i...i*blocDim.x] in sh_points)
+            // Proceeding points[[0..dim] * num_points + i];
+            if (dim%2 == 0){
+                #pragma unroll
+                for (SizeT j=threadIdx.x; j<dim/2; j+=blockDim.x){
+                    // Doing better with fetching int4 data
+                    reinterpret_cast<double2*>(sh_point)[j] = reinterpret_cast<double2*>(points + (i * dim))[j];
+                }
+            }else{
+                #pragma unroll
+                for (SizeT j=threadIdx.x; j<dim; j+=blockDim.x){
+                    // Doing better with fetching int4 data
+                    sh_point[j] = points[i * dim + j];
+                }
+            }
+            __syncthreads();
+            
+            ValueT new_dist = 0;
+            if (src == i || src >= num_points) {
+                new_dist = util::PreDefinedValues<ValueT>::MaxValue;
+            } else {
+                new_dist = euclidean_distance(dim, b_sh_points, (int)threadIdx.x, sh_point);
+            } 
+            if (new_dist < dist[((k-1) * (blockDim.x + 1)) + threadIdx.x]) {
+                // new element is larger than the largest in distance array for "src" row
+                // new_dist < dist[(k-1) * blockDim.x + threadIdx.x]
+                SizeT current = k-1;
+                #pragma unroll
+                for (; current > 0; --current){
+                    SizeT one_before = current-1;
+                    if (new_dist >= dist[(one_before * (blockDim.x + 1)) + threadIdx.x]){
+                        dist[(current * (blockDim.x + 1)) + threadIdx.x] = new_dist;
+                        keys[(current * (blockDim.x + 1)) + threadIdx.x] = i;
+                        break;
+                    } else {
+                        dist[(current * (blockDim.x + 1)) + threadIdx.x] = dist[(one_before * (blockDim.x + 1)) + threadIdx.x];
+                        keys[(current * (blockDim.x + 1)) + threadIdx.x] = keys[(one_before * (blockDim.x + 1)) + threadIdx.x];
+                    }
+                }
+                if (current == (SizeT)0){
+                    dist[threadIdx.x] = new_dist;
+                    keys[threadIdx.x] = i;
+                }
+            }
+            __syncthreads();
+        }
+
+        #pragma unroll
+        for (int i=0; i<k; ++i){
+            array[i] = keys[i * (blockDim.x+1) + threadIdx.x];
+        }
+
+        #pragma unroll
+        for (int i=0; i<k; ++i){
+            keys[threadIdx.x * k + i] = array[i];
+        }
+
+        __syncthreads();
+
+        if (k%2 == 0){
+            #pragma unroll
+            for (SizeT i=threadIdx.x; i<(blockDim.x*k)/2; i+=blockDim.x){
+                reinterpret_cast<int2*>(keys_out + firstPoint*k)[i] = reinterpret_cast<int2*>(keys)[i];
+            }
+        }else{
+            #pragma unroll
+            for (SizeT i=threadIdx.x; i<blockDim.x*k; i+=blockDim.x){
+                keys_out[firstPoint*k + i] = keys[i];
+            }
+        }
+        __syncthreads();
+    };
+
+    auto knn_shared_transpose_op = 
+    [num_points, k, dim, points, keys_out, data_size, points_size, dist_size, keys_size] 
+    __device__ (ValueT* d, const SizeT &src, char* shared_mem){
+                   
+        ValueT* dist = (ValueT*) shared_mem;
+        ValueT* b_sh_points = (ValueT*) (shared_mem + dist_size);
+        int* keys = (int*) (shared_mem + dist_size + points_size);
+        ValueT* sh_point = (ValueT*)(shared_mem + dist_size + points_size + keys_size);
+        
+        __shared__ int firstPoint;
+        if (threadIdx.x == 0){
+            firstPoint = src;
+        }
+        __syncthreads();
+
+        double* ptr = points + firstPoint;
+        int idx = threadIdx.x;
+        if (firstPoint + threadIdx.x < num_points){
+            b_sh_points[idx] = ptr[threadIdx.x];
+        }
+
+        //__syncthreads();
+
+        ptr += num_points;
+        double value = util::PreDefinedValues<int>::InvalidValue;
+        if (firstPoint + threadIdx.x < num_points){
+            value = ptr[threadIdx.x];
+        }
+
+        // Initializations of basic points
+        #pragma unroll
+        for (SizeT i = 1; i < dim; ++i){
+            ptr += num_points;
+            int idx = i * (blockDim.x+1) + threadIdx.x;
+            b_sh_points[idx] = value;
+            value = util::PreDefinedValues<int>::InvalidValue;
+            if (firstPoint + threadIdx.x < num_points){
+            value = ptr[threadIdx.x];
+            }
+        }
+
+
+        // Initializations of dist and keys
+        #pragma unroll
+        for (int i = 0; i < k; ++i){
+            int idx = i * (blockDim.x+1) + threadIdx.x;
+            dist[idx] = util::PreDefinedValues<ValueT>::MaxValue;
+            keys[idx] = util::PreDefinedValues<int>::InvalidValue;
+        }
+
+        #pragma unroll
+        for (SizeT i = 0; i<num_points; ++i){
+
+            // Initialization of shared points (points [i...i*blocDim.x] in sh_points)
+            // Proceeding points[[0..dim] * num_points + i];
+            #pragma unroll 
+            for (SizeT j=threadIdx.x; j<dim; j+=blockDim.x){
+                // Doing better with fetching int4 data
+                sh_point[j] = //b_sh_points[j];
+                              points[j * num_points + i]; //from 500ms to 3500ms (transpose?)
+                              //  points[i * dim + j]; //from 500ms to 3500ms (transpose?)
+            }
+            __syncthreads();
+            
+            ValueT new_dist = 0;
+            if (src == i || src >= num_points) {
+                new_dist = util::PreDefinedValues<ValueT>::MaxValue;
+            } else {
+                new_dist = euclidean_distance(dim, b_sh_points, (int)threadIdx.x, sh_point);
+            } 
+
+            //dist[threadIdx.x] = new_dist;
+            // sorting 609ms to 5400ms 
+            
+            if (new_dist < dist[((k-1) * (blockDim.x+1)) + threadIdx.x]) {
+                // new element is larger than the largest in distance array for "src" row
+                // new_dist < dist[(k-1) * blockDim.x + threadIdx.x]
+                SizeT current = k-1;
+                #pragma unroll
+                for (; current > 0; --current){
+                    SizeT one_before = current-1;
+                    if (new_dist >= dist[(one_before * (blockDim.x+1)) + threadIdx.x]){
+                        dist[(current * (blockDim.x+1)) + threadIdx.x] = new_dist;
+                        keys[(current * (blockDim.x+1)) + threadIdx.x] = i;
+                        break;
+                    } else {
+                        dist[(current * (blockDim.x+1)) + threadIdx.x] = dist[(one_before * (blockDim.x+1)) + threadIdx.x];
+                        keys[(current * (blockDim.x+1)) + threadIdx.x] = keys[(one_before * (blockDim.x+1)) + threadIdx.x];
+                    }
+                }
+                if (current == (SizeT)0){
+                    dist[threadIdx.x] = new_dist;
+                    keys[threadIdx.x] = i;
+                }
+            }
+        }
+        __syncthreads();
+
+        #pragma unroll
+        for (int i=0; i<blockDim.x; ++i){
+            if (threadIdx.x < k){
+                keys_out[(firstPoint + i) * k + threadIdx.x] = (ValueT)keys[threadIdx.x * (blockDim.x+1) + i];
+            }
+        }
+        
+        __syncthreads();
+    };
 
     if (! USE_SHARED_MEM){
     
@@ -271,12 +515,11 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         int maxActiveBlocks;
         //cudaOccupancyMaxActiveBlocksPerMultiprocessor(&maxActiveBlocks, oprtr::SharedForAll_Kernel<decltype(distance_out), SizeT, decltype(knn_general_op)>, block_size, 0);
         cudaOccupancyMaxActiveBlocksPerMultiprocessor(&maxActiveBlocks, oprtr::SharedForAll_Kernel<decltype(distance_out), SizeT, decltype(knn_half_op)>, block_size, (block_size * 12));
-
-    printf("occupancy of SM is %d\n", maxActiveBlocks);
+        printf("occupancy of SM is %d\n", maxActiveBlocks);
 
         // Checking rest of n-k points to choose k nearest.
         // Insertion n-k elements into sorted list
-       // GUARD_CU(distance_out.SharedForAll(knn_general_op,
+        // GUARD_CU(distance_out.SharedForAll(knn_general_op,
         GUARD_CU(distance_out.SharedForAll(knn_half_op,
             //num_points, target, stream, 64, 1024)); //time 82 min
             //num_points, target, stream, 128, 512)); //time 51.6 min
@@ -287,293 +530,41 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     }else{
         
-        int data_size = this->enactor->problem->data_size;
-        int points_size = this->enactor->problem->points_size;
-        int dist_size = this->enactor->problem->dist_size;
-        int keys_size = this->enactor->problem->keys_size;
-        int shared_point_size = this->enactor->problem->shared_point_size;
-        int shared_mem_size = this->enactor->problem->shared_mem_size;
-
         debug("Used threads %d, single data_size %d, shared memory %u, %d\n", block_size, data_size, shared_mem_size, sizeof(ValueT));
         debug("points size = %d, dist_size = %d, keys_size = %d, shared_point_size = %d\n", points_size, 
-            dist_size, keys_size, shared_point_size);
-
-        auto knn_shared_not_transpose_op = 
-        [num_points, k, dim, points, keys_out, data_size, points_size, dist_size, keys_size] 
-        __device__ (ValueT* d, const SizeT &src, char* shared_mem){
-
-            // Get pointers to shared memory arrays
-            ValueT* dist = (ValueT*) (shared_mem);
-            ValueT* b_sh_points = (ValueT*) (shared_mem + dist_size);
-            int* keys = (int*) (shared_mem + dist_size + points_size);
-            ValueT* sh_point = (ValueT*) (shared_mem + dist_size + points_size + keys_size);
-
-            __shared__ SizeT firstPoint;
-            if (threadIdx.x == 0){
-                firstPoint = src;
-            }
-            __syncthreads();
-
-            // Initializations of basic points
-            // 7217ms 
-            double array[100];
-
-            // Copying to shared memory
-            if (dim%2 == 0){
-                #pragma unroll
-                for (SizeT j = threadIdx.x; j < (blockDim.x * dim)/2; j += blockDim.x){
-                    reinterpret_cast<double2*>(b_sh_points)[j] = reinterpret_cast<double2*>(points + firstPoint*dim)[j];
-                }
-            }else{
-                #pragma unroll
-                for (SizeT j = threadIdx.x; j < blockDim.x * dim; j += blockDim.x){
-                    b_sh_points[j] = points[firstPoint*dim + j];
-                }
-            }
-
-            __syncthreads();
-            
-            // Copying shared memory to registers
-            #pragma unroll
-            for (SizeT j = 0; j < dim; ++j){
-                array[j] = b_sh_points[threadIdx.x * dim + j];
-            }
-            __syncthreads();
-
-            // Transpose to shared memory
-            #pragma unroll
-            for (SizeT j = 0; j<dim; ++j){
-                b_sh_points[j * (blockDim.x+1) + threadIdx.x] = array[j];
-            }
-
-            // Initializations of dist and keys
-            #pragma unroll
-            for (int i = 0; i < k; ++i){
-                int idx = i * (blockDim.x+1) + threadIdx.x;
-                dist[idx] = util::PreDefinedValues<ValueT>::MaxValue;
-                //keys[idx] = util::PreDefinedValues<int>::InvalidValue;
-            }
-
-            __syncthreads();
-
-            for (SizeT i = 0; i<num_points; ++i){
-                
-                // Initialization of shared points (points [i...i*blocDim.x] in sh_points)
-                // Proceeding points[[0..dim] * num_points + i];
-                if (dim%2 == 0){
-                    #pragma unroll
-                    for (SizeT j=threadIdx.x; j<dim/2; j+=blockDim.x){
-                        // Doing better with fetching int4 data
-                        reinterpret_cast<double2*>(sh_point)[j] = reinterpret_cast<double2*>(points + (i * dim))[j];
-                    }
-                }else{
-                    #pragma unroll
-                    for (SizeT j=threadIdx.x; j<dim; j+=blockDim.x){
-                        // Doing better with fetching int4 data
-                        sh_point[j] = points[i * dim + j];
-                    }
-                }
-                __syncthreads();
-                
-                ValueT new_dist = 0;
-                if (src == i || src >= num_points) {
-                    new_dist = util::PreDefinedValues<ValueT>::MaxValue;
-                } else {
-                    new_dist = euclidean_distance(dim, b_sh_points, (int)threadIdx.x, sh_point);
-                } 
-                if (new_dist < dist[((k-1) * (blockDim.x + 1)) + threadIdx.x]) {
-                    // new element is larger than the largest in distance array for "src" row
-                    // new_dist < dist[(k-1) * blockDim.x + threadIdx.x]
-                    SizeT current = k-1;
-                    #pragma unroll
-                    for (; current > 0; --current){
-                        SizeT one_before = current-1;
-                        if (new_dist >= dist[(one_before * (blockDim.x + 1)) + threadIdx.x]){
-                            dist[(current * (blockDim.x + 1)) + threadIdx.x] = new_dist;
-                            keys[(current * (blockDim.x + 1)) + threadIdx.x] = i;
-                            break;
-                        } else {
-                            dist[(current * (blockDim.x + 1)) + threadIdx.x] = dist[(one_before * (blockDim.x + 1)) + threadIdx.x];
-                            keys[(current * (blockDim.x + 1)) + threadIdx.x] = keys[(one_before * (blockDim.x + 1)) + threadIdx.x];
-                        }
-                    }
-                    if (current == (SizeT)0){
-                        dist[threadIdx.x] = new_dist;
-                        keys[threadIdx.x] = i;
-                    }
-                }
-                __syncthreads();
-            }
-
-            #pragma unroll
-            for (int i=0; i<k; ++i){
-                array[i] = keys[i * (blockDim.x+1) + threadIdx.x];
-            }
-
-            #pragma unroll
-            for (int i=0; i<k; ++i){
-                keys[threadIdx.x * k + i] = array[i];
-            }
-
-            __syncthreads();
-
-            if (k%2 == 0){
-                #pragma unroll
-                for (SizeT i=threadIdx.x; i<(blockDim.x*k)/2; i+=blockDim.x){
-                    reinterpret_cast<int2*>(keys_out + firstPoint*k)[i] = reinterpret_cast<int2*>(keys)[i];
-                }
-            }else{
-                #pragma unroll
-                for (SizeT i=threadIdx.x; i<blockDim.x*k; i+=blockDim.x){
-                    keys_out[firstPoint*k + i] = keys[i];
-                }
-            }
-            __syncthreads();
-        };
-
+        dist_size, keys_size, shared_point_size);
 
         if (transpose){
-
-    // Points is transposed
-              //N M
-              //   I1  I2  .. IN 
-              //DA L1A L2A .. LNA
-              //DB L1B L2B .. LNB
-              //.. ..  ..  .. ..
-              //DM L1M L2M .. LNM
-
-    // Checking rest of n-k points to choose k nearest.
-    // Insertion n-k elements into sorted list
-            /*
-    GUARD_CU2(distance_out.SharedForAll(
-        [num_points, k, dim, points, keys_out, data_size, points_size, dist_size, keys_size] 
-        __device__ (ValueT* d, const SizeT &src, char* shared_mem){
-                       
-            ValueT* dist = (ValueT*) shared_mem;
-            ValueT* b_sh_points = (ValueT*) (shared_mem + dist_size);
-            int* keys = (int*) (shared_mem + dist_size + points_size);
-            ValueT* sh_point = (ValueT*)(shared_mem + dist_size + points_size + keys_size);
             
-            __shared__ int firstPoint;
-            if (threadIdx.x == 0){
-                firstPoint = src;
-            }
-            __syncthreads();
+            // Points is transposed
+            //N M
+            //   I1  I2  .. IN 
+            //DA L1A L2A .. LNA
+            //DB L1B L2B .. LNB
+            //.. ..  ..  .. ..
+            //DM L1M L2M .. LNM
 
-            double* ptr = points + firstPoint;
-            int idx = threadIdx.x;
-            if (firstPoint + threadIdx.x < num_points){
-                b_sh_points[idx] = ptr[threadIdx.x];
-            }
-
-            //__syncthreads();
-
-            ptr += num_points;
-            double value = util::PreDefinedValues<int>::InvalidValue;
-            if (firstPoint + threadIdx.x < num_points){
-                value = ptr[threadIdx.x];
-            }
-
-            // Initializations of basic points
-            #pragma unroll
-            for (SizeT i = 1; i < dim; ++i){
-                ptr += num_points;
-                int idx = i * (blockDim.x+1) + threadIdx.x;
-                b_sh_points[idx] = value;
-                value = util::PreDefinedValues<int>::InvalidValue;
-                if (firstPoint + threadIdx.x < num_points){
-                value = ptr[threadIdx.x];
-                }
-            }
-
-
-            // Initializations of dist and keys
-            #pragma unroll
-            for (int i = 0; i < k; ++i){
-                int idx = i * (blockDim.x+1) + threadIdx.x;
-                dist[idx] = util::PreDefinedValues<ValueT>::MaxValue;
-                keys[idx] = util::PreDefinedValues<int>::InvalidValue;
-            }
-
-            #pragma unroll
-            for (SizeT i = 0; i<num_points; ++i){
-
-                // Initialization of shared points (points [i...i*blocDim.x] in sh_points)
-                // Proceeding points[[0..dim] * num_points + i];
-                #pragma unroll 
-                for (SizeT j=threadIdx.x; j<dim; j+=blockDim.x){
-                    // Doing better with fetching int4 data
-                    sh_point[j] = //b_sh_points[j];
-                                  points[j * num_points + i]; //from 500ms to 3500ms (transpose?)
-                                  //  points[i * dim + j]; //from 500ms to 3500ms (transpose?)
-                }
-                __syncthreads();
-                
-                ValueT new_dist = 0;
-                if (src == i || src >= num_points) {
-                    new_dist = util::PreDefinedValues<ValueT>::MaxValue;
-                } else {
-                    new_dist = euclidean_distance(dim, b_sh_points, (int)threadIdx.x, sh_point);
-                } 
-
-                //dist[threadIdx.x] = new_dist;
-                // sorting 609ms to 5400ms 
-                
-                if (new_dist < dist[((k-1) * (blockDim.x+1)) + threadIdx.x]) {
-                    // new element is larger than the largest in distance array for "src" row
-                    // new_dist < dist[(k-1) * blockDim.x + threadIdx.x]
-                    SizeT current = k-1;
-                    #pragma unroll
-                    for (; current > 0; --current){
-                        SizeT one_before = current-1;
-                        if (new_dist >= dist[(one_before * (blockDim.x+1)) + threadIdx.x]){
-                            dist[(current * (blockDim.x+1)) + threadIdx.x] = new_dist;
-                            keys[(current * (blockDim.x+1)) + threadIdx.x] = i;
-                            break;
-                        } else {
-                            dist[(current * (blockDim.x+1)) + threadIdx.x] = dist[(one_before * (blockDim.x+1)) + threadIdx.x];
-                            keys[(current * (blockDim.x+1)) + threadIdx.x] = keys[(one_before * (blockDim.x+1)) + threadIdx.x];
-                        }
-                    }
-                    if (current == (SizeT)0){
-                        dist[threadIdx.x] = new_dist;
-                        keys[threadIdx.x] = i;
-                    }
-                }
-            }
-            __syncthreads();
-
-            #pragma unroll
-            for (int i=0; i<blockDim.x; ++i){
-                if (threadIdx.x < k){
-                    keys_out[(firstPoint + i) * k + threadIdx.x] = (ValueT)keys[threadIdx.x * (blockDim.x+1) + i];
-                }
-            }
-            
-            __syncthreads();
-        },
-        num_points, target, stream, shared_mem_size, dim3(grid_size, 1, 1), dim3(block_size, 1, 1)), "shared for all failed");
-*/
+            // Checking rest of n-k points to choose k nearest.
+            // Insertion n-k elements into sorted list
+            GUARD_CU2(distance_out.SharedForAll(knn_shared_transpose_op, num_points, target, stream, shared_mem_size, dim3(grid_size, 1, 1), dim3(block_size, 1, 1)), "shared for all failed");
         }else{
-        // Points is not transposed
-              //N M
-              //   DA  DB  .. DM 
-              //I1 L1A L1B .. L1M
-              //I2 L2A L2B .. L2M
-              //.. ..  ..  .. ..
-              //IN LNA LNB .. LNM
+        
+            // Points is not transposed
+            //N M
+            //   DA  DB  .. DM 
+            //I1 L1A L1B .. L1M
+            //I2 L2A L2B .. L2M
+            //.. ..  ..  .. ..
+            //IN LNA LNB .. LNM
 
-/*
-        // Calculating theoretical occupancy
-        int maxActiveBlocks;
-        cudaOccupancyMaxActiveBlocksPerMultiprocessor(&maxActiveBlocks, oprtr::SharedForAll_Kernel<decltype(distance_out), SizeT, decltype(knn_shared_not_transpose_op)>, block_size, shared_mem_size);
+            // Calculating theoretical occupancy
+            int maxActiveBlocks;
+            cudaOccupancyMaxActiveBlocksPerMultiprocessor(&maxActiveBlocks, oprtr::SharedForAll_Kernel<decltype(distance_out), SizeT, decltype(knn_shared_not_transpose_op)>, block_size, shared_mem_size);
+            debug("occupancy of SM is %d\n", maxActiveBlocks);
 
-    debug("occupancy of SM is %d\n", maxActiveBlocks);*/
-
-        // Checking rest of n-k points to choose k nearest.
-        // Insertion n-k elements into sorted list
-        GUARD_CU2(distance_out.SharedForAll(
-                knn_shared_not_transpose_op, num_points, target, stream, shared_mem_size, grid_size, block_size), "shared for all failed");
+            // Checking rest of n-k points to choose k nearest.
+            // Insertion n-k elements into sorted list
+            GUARD_CU2(distance_out.SharedForAll(knn_shared_not_transpose_op, num_points, target, stream, shared_mem_size, grid_size, block_size), "shared for all failed");
         }
     }
 
