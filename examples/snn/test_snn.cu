@@ -15,7 +15,6 @@
 #include <gunrock/app/snn/snn_app.cu>
 #include <gunrock/graphio/labels.cuh>
 #include <gunrock/app/test_base.cuh>
-//#include <gunrock/app/problem_base.cuh>
 
 // KNN includes
 // Gunrock KNN app
@@ -94,10 +93,8 @@ struct main_struct {
 
     auto target = util::DEVICE;
 
-    // Initialization of the points array
+    // points initialization is moved to gunrock::graphio::labels::Read ... ReadLabelsStream
     util::Array1D<SizeT, ValueT> points;
-    //Initialization is moved to gunrock::graphio::labels::Read ... ReadLabelsStream
-    //GUARD_CU(points.Allocate(n*dim, util::HOST));
  
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
@@ -125,7 +122,7 @@ struct main_struct {
     SizeT min_pts = parameters.Get<SizeT>("min-pts");
     if (min_pts > k)
       return util::GRError("Min-Pts must be < K", __FILE__, __LINE__);
-/*
+
 #ifdef SNN_DEBUG
     // Debug of points:
     debug("debug points\n");
@@ -139,7 +136,7 @@ struct main_struct {
         }
         debug("\n");
     }
-#endif*/
+#endif
 
     util::PrintMsg("num_points = " + std::to_string(num_points) +
             ", k = " + std::to_string(k) +
@@ -204,7 +201,12 @@ struct main_struct {
         delete [] knn_res;
         cudaFree(res_I);
         cudaFree(res_D);
-#endif // FAISS_FOUND
+#else 
+        // FAISS_FOUND
+        delete [] h_knns;
+        return util::GRError("FAISS library not found", __FILE__, __LINE__);
+#endif 
+
     }else{
         /* --------------  Gunrock KNN ---------------------------------*/
         typedef app::knn::Problem<GraphT> ProblemKNN;
@@ -291,13 +293,13 @@ struct main_struct {
         }));
 
     if (!quick) {
-      delete[] h_knns;
       delete[] ref_cluster;
       delete[] ref_core_point_counter;
       delete[] ref_noise_point_counter;
       delete[] ref_cluster_counter;
     }
-
+      
+    delete[] h_knns;
     delete[] h_cluster;
     return retval;
   }
