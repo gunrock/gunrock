@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------------
-#  Gunrock: Sub-Project k-Nearest Neighbor (& Shared Nearest Neighbor)
+#  Gunrock: Sub-Project k-Nearest Neighbor
 # ------------------------------------------------------------------------
 project(knn)
 message("-- Project Added: ${PROJECT_NAME}")

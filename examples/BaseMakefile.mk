@@ -57,8 +57,8 @@ CUDA_INC = -I"$(shell dirname $(NVCC))/../include"
 MGPU_INC = -I"../../externals/moderngpu/src"
 CUB_INC = -I"../../externals/cub"
 
-FAISS_INC = -I/home/agnes/faiss/
-FAISS_LINK = -L/home/agnes/faiss/ -lfaiss
+# FAISS_INC = -I/home/agnes/faiss/
+# FAISS_LINK = -L/home/agnes/faiss/ -lfaiss
 
 BOOST_INC =
 BOOST_LINK =
@@ -88,8 +88,8 @@ else
 endif
 
 GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=1.1.0
-LINK = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF) $(FAISS_LINK)
-INC = $(CUDA_INC) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(BOOST_INC) -I.. -I../.. $(LINK) $(FAISS_INC)
+LINK = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF) # $(FAISS_LINK)
+INC = $(CUDA_INC) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(BOOST_INC) -I.. -I../.. $(LINK) #$(FAISS_INC)
 
 #-------------------------------------------------------------------------------
 # Defines
