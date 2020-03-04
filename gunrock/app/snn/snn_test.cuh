@@ -117,7 +117,6 @@ double CPU_Reference(
 
   debug("Looking for snns\n");
   for (SizeT x = 0; x < num_points; ++x){
-      int snn_density = 0;
       //for each q in kNN(x)
       debug("Snn of %d\n", x);
       for (SizeT i = 0; i < k; ++i){

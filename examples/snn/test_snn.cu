@@ -15,7 +15,7 @@
 #include <gunrock/app/snn/snn_app.cu>
 #include <gunrock/graphio/labels.cuh>
 #include <gunrock/app/test_base.cuh>
-#include <gunrock/app/problem_base.cuh>
+//#include <gunrock/app/problem_base.cuh>
 
 // KNN includes
 // Gunrock KNN app
@@ -26,16 +26,18 @@
 #include <gunrock/app/knn/knn_test.cuh>
 
 // FAISS knn
-#include <faiss/gpu/GpuDistance.h>
-#include <faiss/gpu/GpuIndexFlat.h>
-#include <faiss/gpu/GpuResources.h>
-#include <faiss/gpu/StandardGpuResources.h>
-#include <faiss/utils/Heap.h>
-#include <faiss/gpu/utils/Limits.cuh>
-#include <faiss/gpu/utils/Select.cuh>
+#ifdef FAISS_FOUND
+    #include <faiss/gpu/GpuDistance.h>
+    #include <faiss/gpu/GpuIndexFlat.h>
+    #include <faiss/gpu/GpuResources.h>
+    #include <faiss/gpu/StandardGpuResources.h>
+    #include <faiss/utils/Heap.h>
+    #include <faiss/gpu/utils/Limits.cuh>
+    #include <faiss/gpu/utils/Select.cuh>
+#endif
 
 // JSON includes
-#include <gunrock/util/info_rapidjson.cuh>
+//#include <gunrock/util/info_rapidjson.cuh>
 
 //#define SNN_DEBUG
 #ifdef SNN_DEBUG
@@ -148,6 +150,7 @@ struct main_struct {
     SizeT* h_knns = (SizeT*) malloc(sizeof(SizeT)*num_points*k);
 
     if (knn_version.compare("faiss") == 0){
+#ifdef FAISS_FOUND
         //* -------------------- FAISS KNN ------------------------*
         long* res_I;
         GUARD_CU(cudaMalloc((void**)&res_I, sizeof(long)*num_points*(k+1)));
@@ -201,7 +204,7 @@ struct main_struct {
         delete [] knn_res;
         cudaFree(res_I);
         cudaFree(res_D);
-
+#endif // FAISS_FOUND
     }else{
         /* --------------  Gunrock KNN ---------------------------------*/
         typedef app::knn::Problem<GraphT> ProblemKNN;

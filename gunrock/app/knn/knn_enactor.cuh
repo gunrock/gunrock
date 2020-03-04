@@ -92,7 +92,6 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
 
     auto &enactor_stats = enactor_slice.enactor_stats;
-     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
     
@@ -127,7 +126,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     int points_size = this->enactor->problem->points_size;
     int dist_size = this->enactor->problem->dist_size;
     int keys_size = this->enactor->problem->keys_size;
-    int shared_point_size = this->enactor->problem->shared_point_size;
+    //int shared_point_size = this->enactor->problem->shared_point_size;
     int shared_mem_size = this->enactor->problem->shared_mem_size;
 
     /* Operators */
@@ -684,8 +683,6 @@ class Enactor
   cudaError_t Init(Problem &problem, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     this->problem = &problem;
-    SizeT num_points = problem.num_points;
-    SizeT neighbors = num_points * num_points;
 
     // Lazy initialization
     GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL,target, false));

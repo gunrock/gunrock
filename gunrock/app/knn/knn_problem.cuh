@@ -176,7 +176,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             },
             num_points, target, this->stream));
 
-      int k_ = k;
+      //int k_ = k;
 
       GUARD_CU(util::SetDevice(this->gpu_idx));
       GUARD_CU(points.SetPointer(h_points, num_points*dim, util::HOST));

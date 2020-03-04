@@ -87,10 +87,8 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
 
     auto &enactor_stats = enactor_slice.enactor_stats;
-    auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
-    auto &iteration = enactor_stats.iteration;
     auto num_points = data_slice.num_points;
 
     // K-Nearest Neighbors data
@@ -121,7 +119,7 @@ struct snnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     cudaStream_t stream = oprtr_parameters.stream;
     auto target = util::DEVICE;
-    util::Array1D<SizeT, VertexT> *null_frontier = NULL;
+    //util::Array1D<SizeT, VertexT> *null_frontier = NULL;
     oprtr_parameters.advance_mode = "ALL_EDGES";
 
 #ifdef SNN_ASSERT
@@ -649,7 +647,7 @@ class Enactor
   cudaError_t Init(Problem &problem, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     this->problem = &problem;
-    SizeT num_points = problem.num_points;
+    //SizeT num_points = problem.num_points;
 
     // Lazy initialization
     GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target, false));

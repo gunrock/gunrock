@@ -194,7 +194,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     cudaError_t Reset(SizeT* h_knns, util::Location target = util::DEVICE) {
       cudaError_t retval = cudaSuccess;
       auto &cluster_id = this->cluster_id;
-      auto &graph = this->sub_graph[0];
       typedef typename GraphT::CsrT CsrT;
 
       auto k_number = k;
