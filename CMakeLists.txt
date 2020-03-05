@@ -75,6 +75,7 @@ include_directories(${gunrock_INCLUDE_DIRS})
 include(${CMAKE_SOURCE_DIR}/cmake/FindRapidJson.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindModernGPU.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindCUB.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/FindSlabHash.cmake)
 # end /* Include moderngpu & cub */
 
 # begin /* Include googletest & googlemock */
