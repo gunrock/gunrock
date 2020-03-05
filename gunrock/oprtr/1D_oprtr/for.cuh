@@ -16,6 +16,7 @@
 
 #include <cooperative_groups.h>
 #include <gunrock/util/array_utils.cuh>
+#include <gunrock/util/cuda_properties.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -55,6 +56,7 @@ cudaError_t For(OpT op, ForIterT loop_size, util::Location target,
   return retval;
 }
 
+#if (GR_CUDA_ARCH >= 600)
 template <typename OpT>
 __global__ void RepeatFor0_Kernel(int num_repeats, ForIterT loop_size, OpT op) {
   const ForIterT STRIDE = (ForIterT)blockDim.x * gridDim.x;
@@ -105,6 +107,7 @@ cudaError_t RepeatFor0(
   }
   return retval;
 }
+#endif
 
 #if (__CUDACC_VER_MAJOR__ >= 10)
 template <typename OpT>
@@ -214,20 +217,32 @@ cudaError_t RepeatFor(
     int method = 2) {
   cudaError_t retval = cudaSuccess;
 
-  if (method == 0 || target == util::HOST)
+
+  if (method == 0 || target == util::HOST) {
+#if (GR_CUDA_ARCH >= 600)
     retval = RepeatFor0(op, num_repeats, loop_size, target, stream, grid_size,
                         block_size);
-  else if (method == 1)
+#else
+    util::PrintMsg("Cannot use RepeatFor0 when compiling for SM version < 6.0 - defaulting to RepeatFor2");
+    retval = RepeatFor2(op, num_repeats, loop_size, target, stream, grid_size,
+	                block_size);
+#endif
+  }
+
+  else if (method == 1) {
 #if (__CUDACC_VER_MAJOR__ >= 10)
     retval = RepeatFor1(op, num_repeats, loop_size, target, stream, grid_size,
                         block_size);
 #else
+    util::PrintMsg("Cannot use RepeatFor1 when CUDACC < 10 - defaulting to RepeatFor2");
     retval = RepeatFor2(op, num_repeats, loop_size, target, stream, grid_size,
                         block_size);
 #endif
-  else if (method == 2)
+  }
+  else if (method == 2) {
     retval = RepeatFor2(op, num_repeats, loop_size, target, stream, grid_size,
                         block_size);
+  }
 
   return retval;
 }
