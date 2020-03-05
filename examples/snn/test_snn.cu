@@ -75,7 +75,6 @@ struct main_struct {
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
     auto knn_version = parameters.Get<std::string>("knn-version");
-    util::PrintMsg("KNN version: " + knn_version);
 
     // Get n dimension tuplets
     std::string labels_file = parameters.Get<std::string>("labels-file");
@@ -147,6 +146,8 @@ struct main_struct {
     SizeT* h_knns = (SizeT*) malloc(sizeof(SizeT)*num_points*k);
 
     if (knn_version.compare("faiss") == 0){
+
+        util::PrintMsg("KNN version: " + knn_version);
 #ifdef FAISS_FOUND
         //* -------------------- FAISS KNN ------------------------*
         long* res_I;
@@ -208,6 +209,8 @@ struct main_struct {
 #endif 
 
     }else{
+    
+        util::PrintMsg("KNN version: gunrock");
         /* --------------  Gunrock KNN ---------------------------------*/
         typedef app::knn::Problem<GraphT> ProblemKNN;
         typedef app::knn::Enactor<ProblemKNN> EnactorKNN;
