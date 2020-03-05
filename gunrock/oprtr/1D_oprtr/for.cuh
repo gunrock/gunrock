@@ -56,9 +56,9 @@ cudaError_t For(OpT op, ForIterT loop_size, util::Location target,
   return retval;
 }
 
-#if (GR_CUDA_ARCH >= 600)
 template <typename OpT>
 __global__ void RepeatFor0_Kernel(int num_repeats, ForIterT loop_size, OpT op) {
+#if (GR_CUDA_ARCH >= 600)
   const ForIterT STRIDE = (ForIterT)blockDim.x * gridDim.x;
   auto grid = cooperative_groups::this_grid();
 
@@ -68,6 +68,7 @@ __global__ void RepeatFor0_Kernel(int num_repeats, ForIterT loop_size, OpT op) {
       op(r, i);
     grid.sync();
   }
+#endif
 }
 
 template <typename OpT>
@@ -107,7 +108,6 @@ cudaError_t RepeatFor0(
   }
   return retval;
 }
-#endif
 
 #if (__CUDACC_VER_MAJOR__ >= 10)
 template <typename OpT>
