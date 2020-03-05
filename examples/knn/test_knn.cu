@@ -73,10 +73,8 @@ struct main_struct {
     // Creating empty graph
     GraphT graph;
 
-    // Initialization of the points array
-    util::Array1D<SizeT, ValueT> points;
     //Initialization is moved to gunrock::graphio::labels::Read ... ReadLabelsStream
-    //GUARD_CU(points.Allocate(n*dim, util::HOST));
+    util::Array1D<SizeT, ValueT> points;
     
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
