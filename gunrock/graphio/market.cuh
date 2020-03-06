@@ -520,6 +520,10 @@ struct CooSwitch {
     GUARD_CU(Read(parameters, graph.coo(), graph_prefix));
     bool quiet = parameters.Get<bool>("quiet");
     GUARD_CU(graph.FromCoo(graph, util::HOST, 0, quiet, true));
+
+    if((GraphT::FLAG & graph::HAS_DYN) != 0){
+      graph.dyn().FromCsr(graph.csr());
+    } 
     return retval;
   }
 };

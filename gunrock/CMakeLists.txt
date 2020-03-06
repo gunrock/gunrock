@@ -20,6 +20,18 @@ else()
   message(SEND_ERROR "CUB library include directory not set.")
 endif()
 
+if(slabhash_INCLUDE_DIRS)
+  include_directories(${slabhash_INCLUDE_DIRS})
+else()
+  message(SEND_ERROR "SlabHash library include directory not set.")
+endif()
+
+if (slaballoc_INCLUDE_DIRS)
+  include_directories(${slaballoc_INCLUDE_DIRS})
+else()
+  message(SEND_ERROR "SlabAlloc include directory not set.")
+endif()
+
 set (mgpu_SOURCE_FILES
   ${mgpu_SOURCE_DIRS}/context.hxx)
 

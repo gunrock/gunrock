@@ -9,12 +9,12 @@
  * @file
  * hash_graph_set.cuh
  *
- * @brief Dynamic graph using Concurrent Hash Maps
+ * @brief Dynamic graph using Concurrent Hash Sets
  */
 #pragma once
 
 #include <slab_hash.cuh>
-#include <gunrock/graph/dynamic_graph/hash_graph_base.cuh>
+#include <gunrock/graph/dynamic_graph/slabhash_graph_base.cuh>
 #include <gunrock/util/array_utils.cuh>
 
 namespace gunrock {
@@ -24,18 +24,31 @@ template<
     typename VertexT,
     typename SizeT,
     typename ValueT,
-    GraphFlag FLAG,
+    bool REQUIRE_VALUES,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
-struct HashGraphMap : HashGraphBase<VertexT, SizeT, ValueT, FLAG> {
+struct HashGraphSet : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
 
 
-    cudaError_t InsertEdgesBatch(VertexT* src, 
-                                 VertexT* dst,
-                                 ValueT val,
-                                 SizeT batchSize,
-                                 util::Location target = util::DEVICE){
+    template<typename PairT>
+    cudaError_t InsertEdgesBatch(PairT* d_edges,
+                                 SizeT batchSize){
 
         return cudaSuccess;
+    }
+
+    cudaError_t BulkBuildFromCsr(SizeT* d_row_offsets,
+                                VertexT* d_col_indices,
+                                ValueT* d_node_values = nullptr){
+        return cudaSuccess;
+        
+    }
+
+    cudaError_t ToCsr(SizeT* d_row_offsets,
+                      VertexT* d_col_indices,
+                      SizeT num_nodes_,
+                      SizeT num_edges_){
+        return cudaSuccess;
+        
     }
 };
 

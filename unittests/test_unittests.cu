@@ -47,6 +47,9 @@
 
 #include "test_pointer_location.h"
 
+// Tests dynamic graph operations
+#include "test_dynamic_graph.h"
+
 using namespace gunrock;
 
 cudaError_t UseParameters(util::Parameters &parameters) {

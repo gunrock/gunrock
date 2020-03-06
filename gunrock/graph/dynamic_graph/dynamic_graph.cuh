@@ -28,7 +28,7 @@ template<
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault,
     bool VALID = true,
     bool HAS_VALUES = ((_FLAG & HAS_EDGE_VALUES) != 0)>
-struct Dyn : DynamicGraphBase<_VertexT, _SizeT, _ValueT, _FLAG> {};
+struct Dyn : public DynamicGraphBase<_VertexT, _SizeT, _ValueT, _FLAG> {};
 
 
 } // namespace graph

@@ -48,29 +48,71 @@ struct main_struct {
             typename ValueT>   // Use int as the value type
   cudaError_t
   operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val) {
-    typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-                                    graph::HAS_EDGE_VALUES | graph::HAS_CSR | graph::HAS_DYN>
-        GraphT;
-    typedef typename GraphT::CsrT CsrT;
-    typedef typename GraphT::DynT DynT;
+    
+    using WeightedGraphT = app::TestGraph<VertexT, SizeT, ValueT,
+                                    graph::HAS_EDGE_VALUES | 
+                                    graph::HAS_CSR | 
+                                    graph::HAS_COO |
+                                    graph::HAS_DYN>;
+
+    using UnweightedGraphT = app::TestGraph<VertexT, SizeT, ValueT,
+                                    graph::HAS_CSR | 
+                                    graph::HAS_COO |
+                                    graph::HAS_DYN>;
+
+    using CSRGraphT = app::TestGraph<VertexT, SizeT, ValueT,
+                                    graph::HAS_EDGE_VALUES | 
+                                    graph::HAS_CSR>;
 
     cudaError_t retval = cudaSuccess;
     util::CpuTimer cpu_timer;
-    GraphT graph;  // graph we process on
+    
+    WeightedGraphT weighted_graph;
+    //UnweightedGraphT unweighted_graph;
 
     cpu_timer.Start();
-    GUARD_CU(graphio::LoadGraph(parameters, graph));
-    // force edge values to be 1, don't enable this unless you really want to
-    // for (SizeT e=0; e < graph.edges; e++)
-    //    graph.CsrT::edge_values[e] = 1;
+    GUARD_CU(graphio::LoadGraph(parameters, weighted_graph));
+    //GUARD_CU(graphio::LoadGraph(parameters, unweighted_graph));
     cpu_timer.Stop();
     parameters.Set("load-time", cpu_timer.ElapsedMillis());
-    // GUARD_CU(graph.CsrT::edge_values.Print("", 100));
-    // util::PrintMsg("sizeof(VertexT) = " + std::to_string(sizeof(VertexT))
-    //    + ", sizeof(SizeT) = " + std::to_string(sizeof(SizeT))
-    //    + ", sizeof(ValueT) = " + std::to_string(sizeof(ValueT)));
 
 
+    CSRGraphT csr_graph;
+
+    SizeT nodes = weighted_graph.csr().nodes;
+    SizeT edges = weighted_graph.csr().edges;
+
+    csr_graph.csr().Allocate(nodes, edges, util::DEVICE | util::HOST);
+
+    weighted_graph.dyn().ToCsr(csr_graph.csr());
+
+    csr_graph.csr().Move(util::DEVICE, util::HOST);
+
+    auto ref_graph = weighted_graph.csr();
+    auto res_graph = csr_graph.csr();
+
+    ref_graph.Sort();
+    res_graph.Sort();
+
+
+    for(SizeT node = 0; node < nodes; node++){
+    	SizeT ref_start = ref_graph.row_offsets[node];
+    	SizeT ref_end   = ref_graph.row_offsets[node + 1];
+
+    	SizeT res_start = res_graph.row_offsets[node];
+    	SizeT res_end   = res_graph.row_offsets[node + 1];
+
+    	printf("%i:[ %i - %i] =? ",node, ref_start, ref_end);
+    	printf("[ %i - %i] \n", res_start, res_end);
+
+    	//
+    	for(VertexT eid = ref_start; eid <= ref_end; eid++){
+    		VertexT e_ref = ref_graph.column_indices[eid];
+    		VertexT e_res = ref_graph.column_indices[eid];
+        	printf("E: %i:[ %i =? %i] \n",eid, e_ref, e_res);
+
+    	}
+    }
     return retval;
   }
 };

@@ -16,9 +16,9 @@
 #include <gunrock/util/array_utils.cuh>
 #include <gunrock/graph/csr.cuh>
 
-#include <gunrock/graph/dynamic_graph/hash_graph_base.cuh>
-#include <gunrock/graph/dynamic_graph/hash_graph_map.cuh>
-#include <gunrock/graph/dynamic_graph/hash_graph_set.cuh>
+#include <gunrock/graph/dynamic_graph/slabhash_graph_base.cuh>
+#include <gunrock/graph/dynamic_graph/slabhash_graph_map.cuh>
+#include <gunrock/graph/dynamic_graph/slabhash_graph_set.cuh>
 
 namespace gunrock {
 namespace graph {
@@ -38,8 +38,8 @@ struct DynamicGraphBase
     using SizeT = _SizeT;
     using ValueT = _ValueT;
 
-    using HashGraphMapT = HashGraphMap<VertexT, SizeT, ValueT, FLAG>;
-    using HashGraphSetT = HashGraphSet<VertexT, SizeT, ValueT, FLAG>;
+    using HashGraphMapT = HashGraphMap<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
+    using HashGraphSetT = HashGraphSet<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
 
     //Only one choice now
     using DynamicGraphT = typename std::conditional<REQUIRE_SORTING,
@@ -47,6 +47,14 @@ struct DynamicGraphBase
                                         typename std::conditional<REQUIRE_EDGES_VALUES, HashGraphMapT, HashGraphSetT>::type>::type;
 
     DynamicGraphT dynamicGraph;
+
+
+    cudaError_t Release(util::Location target = util::LOCATION_ALL)
+    {
+        //make sure target is only DEVICE
+        dynamicGraph.Release();
+        return cudaSuccess;
+    }
 };
 
 
