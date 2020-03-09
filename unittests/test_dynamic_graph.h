@@ -71,7 +71,7 @@ TEST(dynamicGraph, buildWeighted) {
     result_csr_graph.Sort();
     ref_csr_graph.Sort();
 
-    //compare
+    //Compare
     EXPECT_EQ(ref_csr_graph.row_offsets[nodes], result_csr_graph.row_offsets[nodes]);
 
     for(auto v = 0; v < nodes; v++){

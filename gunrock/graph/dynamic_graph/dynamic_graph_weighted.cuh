@@ -29,13 +29,20 @@ template<
 struct Dyn<_VertexT, _SizeT, _ValueT, _FLAG, cudaHostRegisterFlag, true, true> : public DynamicGraphBase<_VertexT, _SizeT, _ValueT, _FLAG> {
 
 
-    template<typename VertexT,typename SizeT, typename ValueT>
-    cudaError_t InsertEdgesBatch(util::Array1D<SizeT, VertexT> src, 
-                                 util::Array1D<SizeT, VertexT> dst,
+    template<typename VertexT,typename SizeT, typename ValueT, typename PairT>
+    cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> edges,
                                  util::Array1D<SizeT, ValueT> vals,
                                  SizeT batchSize,
                                  util::Location target = util::DEVICE){
 
+        //make sure everything is on the GPU
+        edges.Move(util::HOST, util::DEVICE);
+        vals.Move(util::HOST, util::DEVICE);
+
+        this->dynamicGraph.InsertEdgesBatch(edges.GetPointer(util::DEVICE),
+                                            vals.GetPointer(util::DEVICE),
+                                            batchSize,
+                                            this->is_directed);
         return cudaSuccess;
     }
 
@@ -51,6 +58,7 @@ struct Dyn<_VertexT, _SizeT, _ValueT, _FLAG, cudaHostRegisterFlag, true, true> :
                                             csr.column_indices.GetPointer(util::HOST),
                                             csr.edge_values.GetPointer(util::HOST),
                                             csr.nodes,
+                                            csr.directed, //input graph must respect that. no checks for it is done inside
                                             csr.node_values.GetPointer(util::HOST));
         return cudaSuccess;
     }

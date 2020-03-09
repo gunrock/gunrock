@@ -49,6 +49,7 @@ struct Dyn<_VertexT, _SizeT, _ValueT, _FLAG, cudaHostRegisterFlag, true, false> 
     {
         this->dynamicGraph.BulkBuildFromCsr(csr.row_offsets.GetPointer(util::HOST),
                                       csr.column_indices.GetPointer(util::HOST),
+                                      csr.directed, //input graph must respect that. no checks for it is done inside
                                       csr.edge_values.GetPointer(util::HOST));
         return cudaSuccess;
     }

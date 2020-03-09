@@ -38,7 +38,9 @@ struct HashGraphSet : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
 
     cudaError_t BulkBuildFromCsr(SizeT* d_row_offsets,
                                 VertexT* d_col_indices,
+                                bool is_directed_,
                                 ValueT* d_node_values = nullptr){
+        this->directed = is_directed_;
         return cudaSuccess;
         
     }

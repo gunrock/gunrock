@@ -19,37 +19,23 @@
 namespace gunrock {
 namespace graph {
 namespace slabhash_map_kernels{
-    
     template <typename PairT, typename ValueT, typename SizeT, typename ContextT>
-    __global__ void InsertEdges(PairT* d_edges,
-                                ValueT* d_values, 
-                                ContextT* hashContexts, 
-                                SizeT num_edges,
-                                SizeT* d_edges_per_vertex,
-                                SizeT* d_edges_per_bucket,
-                                SizeT* d_buckets_offset)
+    __device__ void insertWarpEdges(PairT& thread_edge,
+                                    ValueT& thread_value, 
+                                    ContextT*& hashContexts, 
+                                    SizeT*& d_edges_per_vertex,
+                                    SizeT*& d_edges_per_bucket,
+                                    SizeT*& d_buckets_offset,
+                                    uint32_t& laneId,
+                                    bool to_insert,
+                                    AllocatorContextT& local_allocator_ctx)
     {
-        uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
-        uint32_t laneId = threadIdx.x & 0x1F;
-
-        if ((tid - laneId) >= num_edges){
-            return;
-        }
-
-        PairT thread_edge;
-        ValueT thread_value;
         uint32_t dst_bucket;
-        bool to_insert = false; 
-        if (tid < num_edges){
-            thread_edge = d_edges[tid];
-            thread_value = d_values[tid];
+        
+        if(to_insert){
             dst_bucket = hashContexts[thread_edge.x].computeBucket(thread_edge.y);
-            to_insert = (thread_edge.x != thread_edge.y);
         }
-        
-        AllocatorContextT local_allocator_ctx(hashContexts[0].getAllocatorContext());
-        local_allocator_ctx.initAllocator(tid, laneId);
-        
+
         uint32_t work_queue;
         while(work_queue = __ballot_sync(0xFFFFFFFF, to_insert)){
             uint32_t cur_lane = __ffs(work_queue) - 1;
@@ -66,7 +52,6 @@ namespace slabhash_map_kernels{
 
             bool success = hashContexts[cur_src].insertPairUnique(same_src, laneId, thread_edge.y,
                                                     thread_value, dst_bucket, local_allocator_ctx);
-
             //if(tmp_same)
             //    printf("inserting (%i->%i)[%i] = %i\n", cur_src, thread_edge.y, thread_value, success);
             uint32_t added_count = __popc(__ballot_sync(0xFFFFFFFF, success)); 
@@ -74,6 +59,59 @@ namespace slabhash_map_kernels{
                 atomicAdd(&d_edges_per_vertex[cur_src], added_count);
             }
         }
+    }    
+    template <typename PairT, typename ValueT, typename SizeT, typename ContextT>
+    __global__ void InsertEdges(PairT* d_edges,
+                                ValueT* d_values, 
+                                ContextT* hashContexts, 
+                                SizeT num_edges,
+                                SizeT* d_edges_per_vertex,
+                                SizeT* d_edges_per_bucket,
+                                SizeT* d_buckets_offset,
+                                bool make_batch_undirected)
+    {
+        uint32_t tid = threadIdx.x + blockIdx.x * blockDim.x;
+        uint32_t laneId = threadIdx.x & 0x1F;
+
+        if ((tid - laneId) >= num_edges){
+            return;
+        }
+
+        PairT thread_edge;
+        ValueT thread_value;
+        bool to_insert = false; 
+        if (tid < num_edges){
+            thread_edge = d_edges[tid];
+            thread_value = d_values[tid];
+            to_insert = (thread_edge.x != thread_edge.y);
+        }
+        
+        AllocatorContextT local_allocator_ctx(hashContexts[0].getAllocatorContext());
+        local_allocator_ctx.initAllocator(tid, laneId);
+
+        insertWarpEdges(thread_edge,
+                        thread_value, 
+                        hashContexts, 
+                        d_edges_per_vertex,
+                        d_edges_per_bucket,
+                        d_buckets_offset,
+                        laneId,
+                        to_insert,
+                        local_allocator_ctx);
+
+        if(make_batch_undirected){
+            PairT reverse_edge = make_uint2(thread_edge.y, thread_edge.y);
+            insertWarpEdges(reverse_edge,
+                            thread_value, 
+                            hashContexts, 
+                            d_edges_per_vertex,
+                            d_edges_per_bucket,
+                            d_buckets_offset,
+                            laneId,
+                            to_insert,
+                            local_allocator_ctx);
+        }
+
     }
 
 

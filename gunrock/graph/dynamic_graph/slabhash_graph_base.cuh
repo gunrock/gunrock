@@ -61,8 +61,8 @@ struct HashGraphBase
         std::fill(buckets_per_table.begin(), buckets_per_table.end(), 0);
 
         h_hash_context = new HashContextT[nodes_capacity];
-
-      	CHECK_ERROR(cudaMalloc((void**)&d_hash_context, sizeof(HashContextT) * nodes_capacity));
+        
+        CHECK_ERROR(cudaMalloc((void**)&d_hash_context, sizeof(HashContextT) * nodes_capacity));
       	CHECK_ERROR(cudaMalloc((void**)&d_edges_per_node, sizeof(SizeT) * nodes_capacity));
       	CHECK_ERROR(cudaMalloc((void**)&d_edges_per_bucket, sizeof(SizeT) * buckets_capacity));
       	CHECK_ERROR(cudaMalloc((void**)&d_buckets_offset, sizeof(SizeT) * buckets_capacity));
@@ -160,6 +160,8 @@ struct HashGraphBase
         cudaFree(d_base_slabs);
         return cudaSuccess;
     }
+
+    bool is_directed;
 
     SizeT num_nodes;
     SizeT num_edges;

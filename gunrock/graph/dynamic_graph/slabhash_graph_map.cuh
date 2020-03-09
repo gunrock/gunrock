@@ -37,7 +37,8 @@ struct HashGraphMap : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
     template<typename PairT>
     cudaError_t InsertEdgesBatch(PairT* d_edges, 
                                  ValueT* d_values,
-                                 SizeT batch_size){
+                                 SizeT batch_size,
+                                 bool double_batch_edges){
                                      
                                      
         const uint32_t block_size = 128;                    
@@ -49,7 +50,8 @@ struct HashGraphMap : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
                                                 batch_size,
                                                 this->d_edges_per_node,
                                                 this->d_edges_per_bucket,
-                                                this->d_buckets_offset);
+                                                this->d_buckets_offset,
+                                                double_batch_edges);
         return cudaSuccess;
     }
 
@@ -57,10 +59,12 @@ struct HashGraphMap : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
                                 VertexT* h_col_indices,
                                 ValueT* h_edge_values,
                                 SizeT num_nodes_,
+                                bool is_directed_,
                                 ValueT* h_node_values = nullptr){
         using PairT = uint2;                     
         SizeT num_edges_ = h_row_offsets[num_nodes_];
         PairT* d_edges_pairs;
+        this->is_directed = is_directed_;
         this->Init(h_row_offsets,
                     num_nodes_,
                     num_edges_,
@@ -77,7 +81,8 @@ struct HashGraphMap : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
 
         InsertEdgesBatch(d_edges_pairs,
                          d_edge_values,
-                         num_edges_);
+                         num_edges_,
+                         false);
 
         CHECK_ERROR(cudaFree(d_edge_values));
         return cudaSuccess;
