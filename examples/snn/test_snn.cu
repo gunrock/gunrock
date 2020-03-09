@@ -204,8 +204,9 @@ struct main_struct {
         cudaFree(res_D);
 #else 
         // FAISS_FOUND
+        util::PrintMsg("FAISS library not found.");
         delete [] h_knns;
-        return util::GRError("FAISS library not found", __FILE__, __LINE__);
+        return util::GRError("FAISS library not found.", __FILE__, __LINE__);
 #endif 
 
     }else{
