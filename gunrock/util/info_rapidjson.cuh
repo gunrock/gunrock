@@ -183,7 +183,6 @@ struct Info {
     SetVal("time", time_str);
     SetVal("gunrock-version", XSTR(GUNROCKVERSION));
     SetVal("git-commit-sha", g_GIT_SHA1);
-    // SetVal("load-time", parameters.Get<float>("load-time"));
     SetVal("primitive", algorithm_name);
 
     SetVal("stddev-degree", graph::GetStddevDegree(graph));
