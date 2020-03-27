@@ -21,19 +21,19 @@ namespace graph {
 
 
 template<
-    typename _VertexT,
-    typename _SizeT,
-    typename _ValueT,
-    GraphFlag _FLAG,
+    typename VertexT,
+    typename SizeT,
+    typename ValueT,
+    GraphFlag FLAG,
     unsigned int cudaHostRegisterFlag>
-struct Dyn<_VertexT, _SizeT, _ValueT, _FLAG, cudaHostRegisterFlag, true, true> : public DynamicGraphBase<_VertexT, _SizeT, _ValueT, _FLAG> {
+struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, true> : public DynamicGraphBase<VertexT, SizeT, ValueT, FLAG> {
 
+    //using PairT = uint2;
 
-    template<typename VertexT,typename SizeT, typename ValueT, typename PairT>
-    cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> edges,
-                                 util::Array1D<SizeT, ValueT> vals,
-                                 SizeT batchSize,
-                                 util::Location target = util::DEVICE){
+    template <typename PairT>
+    cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT>& edges,
+                                 util::Array1D<SizeT, ValueT>& vals,
+                                 SizeT batchSize){
 
         //make sure everything is on the GPU
         edges.Move(util::HOST, util::DEVICE);
@@ -42,7 +42,7 @@ struct Dyn<_VertexT, _SizeT, _ValueT, _FLAG, cudaHostRegisterFlag, true, true> :
         this->dynamicGraph.InsertEdgesBatch(edges.GetPointer(util::DEVICE),
                                             vals.GetPointer(util::DEVICE),
                                             batchSize,
-                                            this->is_directed);
+                                            !this->is_directed);
         return cudaSuccess;
     }
 
@@ -53,7 +53,7 @@ struct Dyn<_VertexT, _SizeT, _ValueT, _FLAG, cudaHostRegisterFlag, true, true> :
         cudaStream_t stream = 0,
         bool quiet = false)
     {
-        //csr.Move(util::HOST, util::DEVICE, stream); //make sure everything is on device
+        this->is_directed = csr.directed;
         this->dynamicGraph.BulkBuildFromCsr(csr.row_offsets.GetPointer(util::HOST),
                                             csr.column_indices.GetPointer(util::HOST),
                                             csr.edge_values.GetPointer(util::HOST),
@@ -96,16 +96,15 @@ struct Dyn<_VertexT, _SizeT, _ValueT, _FLAG, cudaHostRegisterFlag, true, true> :
 
 
 template<
-    typename _VertexT,
-    typename _SizeT,
-    typename _ValueT,
-    GraphFlag _FLAG,
+    typename VertexT,
+    typename SizeT,
+    typename ValueT,
+    GraphFlag FLAG,
     unsigned int cudaHostRegisterFlag>
-struct Dyn<_VertexT, _SizeT, _ValueT, _FLAG, cudaHostRegisterFlag, false, true> {
+struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, false, true> {
 
-    template<typename VertexT,typename SizeT, typename ValueT>
-    cudaError_t InsertEdgesBatch(util::Array1D<SizeT, VertexT> src, 
-                                 util::Array1D<SizeT, VertexT> dst,
+    template <typename PairT>
+    cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> src, 
                                  util::Array1D<SizeT, ValueT> vals,
                                  SizeT batchSize,
                                  util::Location target = util::DEVICE){

@@ -21,17 +21,15 @@ namespace gunrock {
 namespace graph {
 
 template<
-    typename _VertexT,
-    typename _SizeT,
-    typename _ValueT,
-    GraphFlag _FLAG,
+    typename VertexT,
+    typename SizeT,
+    typename ValueT,
+    GraphFlag FLAG,
     unsigned int cudaHostRegisterFlag>
-struct Dyn<_VertexT, _SizeT, _ValueT, _FLAG, cudaHostRegisterFlag, true, false> : public DynamicGraphBase<_VertexT, _SizeT, _ValueT, _FLAG> {
+struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, false> : public DynamicGraphBase<VertexT, SizeT, ValueT, FLAG> {
 
-
-    template<typename VertexT,typename SizeT>
-    cudaError_t InsertEdgesBatch(util::Array1D<SizeT, VertexT> src, 
-                                 util::Array1D<SizeT, VertexT> dst,
+    template <typename PairT>    
+    cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> edges, 
                                  SizeT batchSize,
                                  util::Location target = util::DEVICE){
         
@@ -87,21 +85,20 @@ struct Dyn<_VertexT, _SizeT, _ValueT, _FLAG, cudaHostRegisterFlag, true, false> 
 
 
 template<
-    typename _VertexT,
-    typename _SizeT,
-    typename _ValueT,
-    GraphFlag _FLAG,
+    typename VertexT,
+    typename SizeT,
+    typename ValueT,
+    GraphFlag FLAG,
     unsigned int cudaHostRegisterFlag>
-struct Dyn<_VertexT, _SizeT, _ValueT, _FLAG, cudaHostRegisterFlag, false, false> {
+struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, false, false> {
    
-    template<typename VertexT,typename SizeT>
-    cudaError_t InsertEdgesBatch(util::Array1D<SizeT, VertexT> src, 
-                                 util::Array1D<SizeT, VertexT> dst,
+    template <typename PairT>    
+    cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> edges, 
                                  SizeT batchSize,
                                  util::Location target = util::DEVICE){
-
         return cudaSuccess;
     }
+
     template <typename CsrT_in>
     cudaError_t FromCsr(
         CsrT_in &csr,

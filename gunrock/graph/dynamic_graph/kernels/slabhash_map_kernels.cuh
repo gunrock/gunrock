@@ -100,7 +100,7 @@ namespace slabhash_map_kernels{
                         local_allocator_ctx);
 
         if(make_batch_undirected){
-            PairT reverse_edge = make_uint2(thread_edge.y, thread_edge.y);
+            PairT reverse_edge = make_uint2(thread_edge.y, thread_edge.x);
             insertWarpEdges(reverse_edge,
                             thread_value, 
                             hashContexts, 

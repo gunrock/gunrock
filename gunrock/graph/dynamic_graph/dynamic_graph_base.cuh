@@ -24,19 +24,15 @@ namespace gunrock {
 namespace graph {
 
 template<
-    typename _VertexT,
-    typename _SizeT,
-    typename _ValueT,
+    typename VertexT,
+    typename SizeT,
+    typename ValueT,
     GraphFlag FLAG>
 struct DynamicGraphBase
 {   
     public:
     static constexpr bool REQUIRE_SORTING = (FLAG /*& IS_SORTED*/) != 0;
     static constexpr bool REQUIRE_EDGES_VALUES = (FLAG & HAS_EDGE_VALUES) != 0;
-
-    using VertexT = _VertexT;
-    using SizeT = _SizeT;
-    using ValueT = _ValueT;
 
     using HashGraphMapT = HashGraphMap<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
     using HashGraphSetT = HashGraphSet<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
@@ -55,6 +51,8 @@ struct DynamicGraphBase
         dynamicGraph.Release();
         return cudaSuccess;
     }
+
+    bool is_directed;
 };
 
 
