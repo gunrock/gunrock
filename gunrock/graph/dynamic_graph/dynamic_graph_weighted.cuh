@@ -19,7 +19,15 @@
 namespace gunrock {
 namespace graph {
 
-
+/**
+ * @brief Weighted dynamic graph data structure which uses
+ * a per-vertex data structure based on the graph flags.
+ *
+ * @tparam VertexT Vertex identifier type.
+ * @tparam SizeT Graph size type.
+ * @tparam ValueT Associated value type.
+ * @tparam GraphFlag graph flag
+ */
 template<
     typename VertexT,
     typename SizeT,
@@ -32,16 +40,23 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, true> : pub
     template <typename PairT>
     cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT>& edges,
                                  util::Array1D<SizeT, ValueT>& vals,
-                                 SizeT batchSize){
+                                 SizeT batchSize,
+                                 util::Location target = util::DEVICE){
 
-        //make sure everything is on the GPU
-        edges.Move(util::HOST, util::DEVICE);
-        vals.Move(util::HOST, util::DEVICE);
+        if(target != util::DEVICE){
+            edges.Move(util::HOST, util::DEVICE);
+            vals.Move(util::HOST, util::DEVICE);
+        }
 
         this->dynamicGraph.InsertEdgesBatch(edges.GetPointer(util::DEVICE),
                                             vals.GetPointer(util::DEVICE),
                                             batchSize,
                                             !this->is_directed);
+
+        if(target != util::DEVICE){
+            edges.Release(util::DEVICE);
+            vals.Release(util::DEVICE);
+        }
         return cudaSuccess;
     }
 
@@ -57,7 +72,7 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, true> : pub
                                             csr.column_indices.GetPointer(util::HOST),
                                             csr.edge_values.GetPointer(util::HOST),
                                             csr.nodes,
-                                            csr.directed, //input graph must respect that. no checks for it is done inside
+                                            csr.directed,
                                             csr.node_values.GetPointer(util::HOST));
         return cudaSuccess;
     }
@@ -76,17 +91,6 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, true> : pub
                                  csr.nodes,
                                  csr.edges,
                                  csr.node_values.GetPointer(util::DEVICE));
-        return cudaSuccess;
-    }
-
-
-    template <typename GraphT>
-    cudaError_t FromCsrAndCoo(
-        GraphT &graph_in,
-        util::Location target = util::LOCATION_DEFAULT,
-        cudaStream_t stream = 0,
-        bool quiet = false)
-    {
         return cudaSuccess;
     }
 };
@@ -120,18 +124,7 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, false, true> {
         return cudaSuccess;
     }
  
-    template <typename GraphT>
-    cudaError_t FromCsrAndCoo(
-        GraphT &graph_in,
-        util::Location target = util::LOCATION_DEFAULT,
-        cudaStream_t stream = 0,
-        bool quiet = false)
-    {
-        return cudaSuccess;
-    }   
-
-
-     template <typename CsrT_in>
+    template <typename CsrT_in>
     cudaError_t ToCsr(
         CsrT_in &csr,
         util::Location target = util::LOCATION_DEFAULT,

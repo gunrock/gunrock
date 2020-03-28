@@ -23,6 +23,14 @@
 namespace gunrock {
 namespace graph {
 
+/**
+ * @brief DynamicGraphBase data structure to store basic info about a graph.
+ *
+ * @tparam VertexT Vertex identifier type.
+ * @tparam SizeT Graph size type.
+ * @tparam ValueT Associated value type.
+ * @tparam GraphFlag graph flag
+ */
 template<
     typename VertexT,
     typename SizeT,
@@ -31,7 +39,7 @@ template<
 struct DynamicGraphBase
 {   
     public:
-    static constexpr bool REQUIRE_SORTING = (FLAG /*& IS_SORTED*/) != 0;
+    static constexpr bool REQUIRE_SORTING = false;
     static constexpr bool REQUIRE_EDGES_VALUES = (FLAG & HAS_EDGE_VALUES) != 0;
 
     using HashGraphMapT = HashGraphMap<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
@@ -45,7 +53,7 @@ struct DynamicGraphBase
     DynamicGraphT dynamicGraph;
 
 
-    cudaError_t Release(util::Location target = util::LOCATION_ALL)
+    cudaError_t Release()
     {
         dynamicGraph.Release();
         return cudaSuccess;

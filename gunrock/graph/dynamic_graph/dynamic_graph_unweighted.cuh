@@ -20,6 +20,15 @@
 namespace gunrock {
 namespace graph {
 
+/**
+ * @brief Unweighted dynamic graph data structure which uses
+ * a per-vertex data structure based on the graph flags.
+ *
+ * @tparam VertexT Vertex identifier type.
+ * @tparam SizeT Graph size type.
+ * @tparam ValueT Associated value type.
+ * @tparam GraphFlag graph flag
+ */
 template<
     typename VertexT,
     typename SizeT,
@@ -67,18 +76,6 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, false> : pu
                                  csr.edges);
         return cudaSuccess;
     }
-
-    template <typename GraphT>
-    cudaError_t FromCsrAndCoo(
-        GraphT &graph_in,
-        util::Location target = util::LOCATION_DEFAULT,
-        cudaStream_t stream = 0,
-        bool quiet = false)
-    {
-        return cudaSuccess;
-    } 
-
-
 };
 
 
@@ -108,17 +105,6 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, false, false> {
     {
         return cudaSuccess;
     } 
-
-
-    template <typename GraphT>
-    cudaError_t FromCsrAndCoo(
-        GraphT &graph_in,
-        util::Location target = util::LOCATION_DEFAULT,
-        cudaStream_t stream = 0,
-        bool quiet = false)
-    {
-        return cudaSuccess;
-    }
 
     template <typename CsrT_in>
     cudaError_t ToCsr(

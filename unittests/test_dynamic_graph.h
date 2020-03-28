@@ -220,9 +220,15 @@ TEST(dynamicGraph, insertUndirectedWeighted) {
         edges_batch_values[e] = 1;
     }
 
+    //move to GPU
+    edges_batch.Move(util::HOST, util::DEVICE);
+    edges_batch_values.Move(util::HOST, util::DEVICE);
+
+    //insert the edges batch
     result_dynamic_graph.InsertEdgesBatch(edges_batch,
                                           edges_batch_values, 
-                                          batch_size);
+                                          batch_size,
+                                          util::DEVICE);
 
     //Apply batch to host graph & generate values as well
     SizeT new_edges_count = edges;

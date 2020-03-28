@@ -7,7 +7,7 @@
 
 /**
  * @file
- * hash_graph_set.cuh
+ * slabhash_graph_set.cuh
  *
  * @brief Dynamic graph using Concurrent Hash Sets
  */
@@ -22,6 +22,15 @@
 namespace gunrock {
 namespace graph {
 
+/**
+ * @brief HashGraphSet data structure to store an unweighted graph using
+ * a per-vertex slab hash
+ *
+ * @tparam VertexT Vertex identifier type.
+ * @tparam SizeT Graph size type.
+ * @tparam ValueT Associated value type.
+ * @tparam REQUIRE_VALUES whether the graph is weighted or not
+ */
 template<
     typename VertexT,
     typename SizeT,

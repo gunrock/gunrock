@@ -26,6 +26,15 @@
 namespace gunrock {
 namespace graph {
 
+/**
+ * @brief HashGraphMap data structure to store an weighted graph using
+ * a per-vertex slab hash
+ *
+ * @tparam VertexT Vertex identifier type.
+ * @tparam SizeT Graph size type.
+ * @tparam ValueT Associated value type.
+ * @tparam REQUIRE_VALUES whether the graph is weighted or not
+ */
 template<
     typename VertexT,
     typename SizeT,

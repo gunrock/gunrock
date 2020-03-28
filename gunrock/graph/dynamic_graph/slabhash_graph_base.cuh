@@ -20,6 +20,15 @@
 namespace gunrock {
 namespace graph {
 
+/**
+ * @brief SlabHashGraphBase data structure to store basic info about a graph
+ * and allocate the required GPU memory
+ *
+ * @tparam VertexT Vertex identifier type.
+ * @tparam SizeT Graph size type.
+ * @tparam ValueT Associated value type.
+ * @tparam REQUIRE_EDGE_VALUES whether the graph is weighted or not
+ */
 template<
     typename VertexT,
     typename SizeT,
@@ -118,8 +127,6 @@ struct HashGraphBase
                 total_num_edges++;
             }
 
-            //std::cout << node_edges << "," << h_row_offsets[i] << std::endl;
-
             assert(total_num_buckets < buckets_capacity && "Capcity lower than required number of base slabs");
 
             h_hash_context[i].initParameters(buckets_per_table[i],
@@ -147,7 +154,6 @@ struct HashGraphBase
     }
 
     cudaError_t ExtendCapacity(){
-        //todo
         return cudaSuccess;
     }
 
@@ -158,6 +164,8 @@ struct HashGraphBase
         cudaFree(d_hash_context);
         cudaFree(d_edges_per_node);
         cudaFree(d_base_slabs);
+        cudaFree(d_edges_per_bucket);
+        cudaFree(d_buckets_offset);
         return cudaSuccess;
     }
 

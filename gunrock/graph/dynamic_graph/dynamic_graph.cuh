@@ -16,10 +16,19 @@
 #include <gunrock/graph/dynamic_graph/dynamic_graph_base.cuh>
 #include <gunrock/graph/graph_base.cuh>
 
-
 namespace gunrock {
 namespace graph {
 
+/**
+ * @brief Dynamic graph data structure which uses
+ * a per-vertex data structure based on the graph flags.
+ * Specialized for weighted or unweighted graphs
+ *  
+ * @tparam VertexT Vertex identifier type.
+ * @tparam SizeT Graph size type.
+ * @tparam ValueT Associated value type.
+ * @tparam GraphFlag graph flag
+ */
 template<
     typename _VertexT = int,
     typename _SizeT   = _VertexT,
