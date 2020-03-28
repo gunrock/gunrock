@@ -135,7 +135,7 @@ TEST(dynamicGraph, buildDirectedWeighted) {
 
     CompareWeightedCSRs(ref_graph, result_graph);
 
-    result_dynamic_graph.Release(util::HOST | util::DEVICE);
+    result_dynamic_graph.Release();
     ref_graph.Release(util::HOST | util::DEVICE);
 
 }
@@ -174,7 +174,7 @@ TEST(dynamicGraph, buildUndirectedWeighted) {
 
     CompareWeightedCSRs(ref_graph, result_graph);
 
-    result_dynamic_graph.Release(util::HOST | util::DEVICE);
+    result_dynamic_graph.Release();
     ref_graph.Release(util::HOST | util::DEVICE);
 }
 
@@ -257,7 +257,7 @@ TEST(dynamicGraph, insertUndirectedWeighted) {
 
     CompareWeightedCSRs(ref_graph_updated, result_graph);
 
-    result_dynamic_graph.Release(util::HOST | util::DEVICE);
+    result_dynamic_graph.Release();
     ref_graph.Release(util::HOST | util::DEVICE);
     ref_graph_updated.Release(util::HOST | util::DEVICE);
 
