@@ -28,7 +28,6 @@ template<
     unsigned int cudaHostRegisterFlag>
 struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, true> : public DynamicGraphBase<VertexT, SizeT, ValueT, FLAG> {
 
-    //using PairT = uint2;
 
     template <typename PairT>
     cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT>& edges,

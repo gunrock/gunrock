@@ -94,8 +94,6 @@ void CompareWeightedCSRs(WeightedCSRGraphT& ref_graph, WeightedDYNGraphT& result
         auto end_eid = ref_csr_graph.row_offsets[v + 1];
 
         for(auto eid = start_eid; eid < end_eid; eid++){
-        	//std::cout <<  v << " "<< eid << ": " << ref_csr_graph.column_indices[eid] << " " << result_csr_graph.column_indices[eid] <<std::endl;
-        	//std::cout <<  v << " "<< eid << ": " << ref_csr_graph.edge_values[eid] << " " << result_csr_graph.edge_values[eid] <<std::endl;
             EXPECT_EQ(ref_csr_graph.column_indices[eid], result_csr_graph.column_indices[eid]);
             EXPECT_EQ(ref_csr_graph.edge_values[eid], result_csr_graph.edge_values[eid]);
         }
@@ -225,7 +223,6 @@ TEST(dynamicGraph, insertUndirectedWeighted) {
     result_dynamic_graph.InsertEdgesBatch(edges_batch,
                                           edges_batch_values, 
                                           batch_size);
-    //result_dynamic_graph.InsertEdgesBatch();
 
     //Apply batch to host graph & generate values as well
     SizeT new_edges_count = edges;

@@ -47,7 +47,6 @@ struct DynamicGraphBase
 
     cudaError_t Release(util::Location target = util::LOCATION_ALL)
     {
-        //make sure target is only DEVICE
         dynamicGraph.Release();
         return cudaSuccess;
     }

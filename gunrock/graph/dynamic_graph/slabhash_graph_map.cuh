@@ -19,7 +19,8 @@
 #include <cub/cub.cuh>
 
 #include <gunrock/graph/dynamic_graph/slabhash_graph_base.cuh>
-#include <gunrock/graph/dynamic_graph/kernels/slabhash_map_kernels.cuh>
+#include <gunrock/graph/dynamic_graph/kernels/map/insert.cuh>
+#include <gunrock/graph/dynamic_graph/kernels/map/helper.cuh>
 #include <gunrock/util/array_utils.cuh>
 
 namespace gunrock {
@@ -104,16 +105,6 @@ struct HashGraphMap : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
         CHECK_ERROR(cudaMalloc(&d_temp_storage, temp_storage_bytes));
         cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, this->d_edges_per_node, d_node_edges_offset, num_nodes_);
         
-        
-        //SizeT num_edges_found = 0;
-        //CHECK_ERROR(cudaMemcpy(&num_edges_found, &d_node_edges_offset[num_nodes_ - 1], sizeof(SizeT), cudaMemcpyDeviceToHost));
-        //std::vector<SizeT> h_node_edges_offset(num_nodes_);
-        //CHECK_ERROR(cudaMemcpy(h_node_edges_offset.data(), d_node_edges_offset, sizeof(SizeT) * num_nodes_, cudaMemcpyDeviceToHost));
-        //for(auto nc : h_node_edges_offset)
-        //	std::cout << nc << std::endl;
-        //std::cout << "Dynamic graph has: " <<  num_edges_found << std::endl;
-        //std::cout << "Expected: " <<  num_edges_ << std::endl;
-
         const uint32_t block_size = 128;                    
         const uint32_t num_blocks = (num_nodes_ * 32 + block_size - 1) / block_size;
 
@@ -125,11 +116,6 @@ struct HashGraphMap : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
                                                 d_col_indices,
                                                 d_edge_values);
 
-    
-        //std::vector<SizeT> h_node_edges_offset_res(num_nodes_ + 1);
-        //CHECK_ERROR(cudaMemcpy(h_node_edges_offset_res.data(), d_row_offsets, sizeof(SizeT) * (num_nodes_ + 1), cudaMemcpyDeviceToHost));
-        //for(auto nc : h_node_edges_offset_res)
-        //	std::cout << nc << std::endl;
 
         return cudaSuccess;
         

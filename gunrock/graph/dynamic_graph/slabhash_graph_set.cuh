@@ -15,6 +15,8 @@
 
 #include <slab_hash.cuh>
 #include <gunrock/graph/dynamic_graph/slabhash_graph_base.cuh>
+#include <gunrock/graph/dynamic_graph/kernels/set/insert.cuh>
+
 #include <gunrock/util/array_utils.cuh>
 
 namespace gunrock {
