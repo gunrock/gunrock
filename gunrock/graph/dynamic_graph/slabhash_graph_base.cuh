@@ -58,9 +58,9 @@ struct HashGraphBase
     /**
     * @brief Allocate maximum capacity memory for SlabHash graph.
     *
-    * @param[in] ..
+    * @param[in] max_nodes Maximum number of nodes that the graph can store
+    * @param[in] max_buckets Maximum number of buckets that the graph will use
     */
-    //__host__
     HashGraphBase(SizeT max_nodes = 1 << 20, SizeT max_buckets = 1 << 25){
         memory_allocator = new DynamicAllocatorT;
 
@@ -87,17 +87,20 @@ struct HashGraphBase
 
     }
 
-    //__host__
     ~HashGraphBase(){}
 
     /**
-    * @brief Converts CSR to COO and Allocate GPU memory for input pairs
+    * @brief Converts CSR to Dynamic graph and Allocate GPU memory for input pairs
     *
-    * @param[in] ..
-    * @param[out] d_edges_pairs device pointer 
+    * @param[in] h_row_offsets host pointer to CSR row offsets
+    * @param[in] num_nodes_ number of nodes in the input CSR graph
+    * @param[in] num_edges_ number of edges in the input CSR graph
+    * @param[in] edges_per_slab number of edges per slab (15 for hashmap, 31 for hashset)
+    * @param[in] loadfactor load factor per hash table
+    * @param[in] h_col_indices host pointer to CSR column indices
+    * @param[in] d_edges_pairs device pointer to COO generated edge pairs
     */
     template<typename PairT>
-    //__host__
     cudaError_t Init(SizeT* h_row_offsets, SizeT num_nodes_, SizeT num_edges_, SizeT edges_per_slab, float load_factor,
                      VertexT* h_col_indices, PairT*& d_edges_pairs){
         assert(num_nodes_ < nodes_capacity && "Capcity lower than required number of nodes");
@@ -146,13 +149,28 @@ struct HashGraphBase
         return cudaSuccess;
     }
 
+    /**
+    * @brief Query the graph maximun nodes capacity
+    *
+    * @param[out] the graph maximum nodes capacity
+    */
     SizeT GetNodesCapacity(){
         return nodes_capacity;
     }
+
+    /**
+    * @brief Query the graph maximun buckets capacity
+    *
+    * @param[out] the graph maximum buckets capacity
+    */
     SizeT GetSlabsCapacity(){
         return buckets_capacity;
     }
 
+    /**
+    * @brief Extend the capcity of the graph vertices
+    *
+    */
     cudaError_t ExtendCapacity(){
         return cudaSuccess;
     }

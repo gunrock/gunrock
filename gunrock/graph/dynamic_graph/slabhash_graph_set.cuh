@@ -40,15 +40,33 @@ template<
 struct HashGraphSet : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
 
 
+    /**
+    * @brief Insert a batch of edges into weighted slab hash graph
+    *
+    * @param[in] d_edges Device pointer to pairs of edges
+    * @param[in] batch_size Size of the inserted batch 
+    * @param[in] double_batch_edges Double the edges in undirected graph
+    */
     template<typename PairT>
     cudaError_t InsertEdgesBatch(PairT* d_edges,
-                                 SizeT batchSize){
+                                 SizeT batchSize,
+                                 bool double_batch_edges){
 
         return cudaSuccess;
     }
 
+    /**
+    * @brief Converts CSR to Dynamic graph
+    *
+    * @param[in] h_row_offsets Host pointer to CSR row offsets
+    * @param[in] h_col_indices Host pointer to CSR column indices
+    * @param[in] num_nodes_ Number of nodes in the input CSR graph
+    * @param[in] is_directed_ Whether the graph is directed or not
+    * @param[in] h_node_values Value per node
+    */
     cudaError_t BulkBuildFromCsr(SizeT* d_row_offsets,
                                 VertexT* d_col_indices,
+                                SizeT num_nodes_,
                                 bool is_directed_,
                                 ValueT* d_node_values = nullptr){
         this->directed = is_directed_;
@@ -56,10 +74,21 @@ struct HashGraphSet : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
         
     }
 
+    /**
+    * @brief Converts Dynamic graph to CSR
+    *
+    * @param[out] d_row_offsets Deice pointer to CSR row offsets
+    * @param[out] d_col_indices Deice pointer to CSR column indices
+    * @param[out] d_edge_values Deice pointer to CSR edges values
+    * @param[in] num_nodes_ Number of nodes in the  graph
+    * @param[in] num_edges_ Number of edges in the  graph
+    * @param[in] d_node_values Device pointer fo value per node
+    */
     cudaError_t ToCsr(SizeT* d_row_offsets,
                       VertexT* d_col_indices,
                       SizeT num_nodes_,
-                      SizeT num_edges_){
+                      SizeT num_edges_,
+                      ValueT* d_node_values = nullptr){
         return cudaSuccess;
         
     }

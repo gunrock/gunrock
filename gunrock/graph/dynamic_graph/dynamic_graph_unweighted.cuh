@@ -37,6 +37,13 @@ template<
     unsigned int cudaHostRegisterFlag>
 struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, false> : public DynamicGraphBase<VertexT, SizeT, ValueT, FLAG> {
 
+    /**
+    * @brief Insert a batch of edges into weighted slab hash graph
+    *
+    * @param[in] edges Pointer to pairs of edges
+    * @param[in] batch_size Size of the inserted batch 
+    * @param[in] target Location of the edges data
+    */
     template <typename PairT>    
     cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> edges, 
                                  SizeT batchSize,
@@ -47,26 +54,46 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, false> : pu
         return cudaSuccess;
     }
     
+    /**
+    * @brief Converts CSR to Dynamic graph
+    *
+    * @param[in] csr Input Gunrock CSR graph
+    * @param[in] target Location of CSR graph
+    * @param[in] stream Stream id
+    * @param[in] quiet Whether to log conversion steps or not 
+    */
     template <typename CsrT_in>
     cudaError_t FromCsr(
         CsrT_in &csr,
-        util::Location target = util::LOCATION_DEFAULT,
+        util::Location target = util::HOST,
         cudaStream_t stream = 0,
         bool quiet = false)
     {
+        if(target != util::HOST){
+            csr.Move(util::DEVICE, util::HOST);
+        }
         this->dynamicGraph.BulkBuildFromCsr(csr.row_offsets.GetPointer(util::HOST),
                                       csr.column_indices.GetPointer(util::HOST),
+                                      csr.nodes,
                                       csr.directed,
                                       csr.edge_values.GetPointer(util::HOST));
+        if(target != util::HOST){
+            csr.Release(util::HOST);
+        }
         return cudaSuccess;
     }
 
    
-
+    /**
+    * @brief Converts Dynamic graph to CSR
+    *
+    * @param[out] csr Output Gunrock CSR data structure
+    * @param[in] stream Stream id
+    * @param[in] quiet Whether to log conversion steps or not 
+    */
     template <typename CsrT_in>
     cudaError_t ToCsr(
         CsrT_in &csr,
-        util::Location target = util::LOCATION_DEFAULT,
         cudaStream_t stream = 0,
         bool quiet = false)
     {
@@ -109,7 +136,6 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, false, false> {
     template <typename CsrT_in>
     cudaError_t ToCsr(
         CsrT_in &csr,
-        util::Location target = util::LOCATION_DEFAULT,
         cudaStream_t stream = 0,
         bool quiet = false)
     {
