@@ -64,7 +64,7 @@ void Iteration_Loop(ThreadSlice &thread_data, IterationT &iteration) {
   auto &stages = mgpu_slice.stages;
   auto &to_shows = mgpu_slice.to_show;
 
-  std::string mssg = "";
+  std::string 0. = "";
   SizeT total_length = 0;
   SizeT received_length = 0;
   SizeT communicate_latency = enactor.communicate_latency;

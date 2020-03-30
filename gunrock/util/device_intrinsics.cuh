@@ -219,7 +219,20 @@ __device__ static float atomicMax(float* addr, float val) {
   int old = *addr_as_int;
   int expected;
   do {
+    // expect it to be equal to old
     expected = old;
+    // compare and swap the value 
+    // here the value at the address should be set to the value which is maximum between val and current
+    // the main operation is the compare and swap
+    // compare and swap is an atomic operation provided by nvidia and this is how we use it to do crazy things
+    // which here is to ensure that we set the value at the address to max of *addr, val
+    // the max of expected and val needs to be stored in the addr
+    // and a swap only occurs in CAS when the first two supplied values are equal
+    // thus only when the value at addr_as_int and expected are equal 
+    // will we know for sure that the max has been successfully saved
+    
+    // we always get the old value here, but someone else might change it so
+    // we need to compare it with the value at hand
     old = ::atomicCAS(addr_as_int, expected,
                       __float_as_int(::fmaxf(val, __int_as_float(expected))));
   } while (expected != old);

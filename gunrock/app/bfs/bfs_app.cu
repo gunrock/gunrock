@@ -92,6 +92,9 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   // perform BFS
   VertexT src;
+  // oh so we are not doing num of runs * srcs, instead or num of runs remains the same its just that we use different sources
+  // that makes sense I guess when we have random sources
+  
   for (int run_num = 0; run_num < num_runs; ++run_num) {
     src = srcs[run_num % num_srcs];
     GUARD_CU(problem.Reset(src, target));

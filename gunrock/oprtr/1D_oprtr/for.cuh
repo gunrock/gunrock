@@ -37,6 +37,10 @@ __global__ void For_Kernel(ForIterT loop_size, OpT op) {
 }
 
 template <typename OpT>
+// operator, loopsize, target
+// the op is carried out with just the information i (loop counter)
+// so embarrasingly parallel operations are best mapped to this for loop
+// but we can specify the grid and block size that works best for us
 cudaError_t For(OpT op, ForIterT loop_size, util::Location target,
                 cudaStream_t stream = 0,
                 int grid_size = util::PreDefinedValues<int>::InvalidValue,
@@ -113,7 +117,7 @@ cudaError_t RepeatFor0(
 
 #if (__CUDACC_VER_MAJOR__ >= 10)
 template <typename OpT>
-__global__ void RepeatFor1_Kernel(int r, ForIterT loop_size, OpT op) {
+__global__ void RepeatFor1_]Kernel(int r, ForIterT loop_size, OpT op) {
   const ForIterT STRIDE = (ForIterT)blockDim.x * gridDim.x;
   // auto grid = cooperative_groups::this_grid();
 

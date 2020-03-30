@@ -362,6 +362,9 @@ struct Array1D {
     return cudaSuccess;
   }
 
+
+  // what does this allocate function do?
+  // array, size, target
   cudaError_t Allocate(SizeT size, Location target = ARRAY_DEFAULT_TARGET) {
     cudaError_t retval = cudaSuccess;
 
@@ -568,6 +571,7 @@ DEVICE)); #endif } else {*/
     PrintMsg(std::string(name) + " EnsureSize : " + std::to_string(this->size) +
              " -> " + std::to_string(size));
 #endif
+    // so basically we want an array to be atleast as big as size?
     if (this->size >= size) return cudaSuccess;
 
     /*#ifdef ENABLE_ARRAY_DEBUG
