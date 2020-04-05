@@ -7,7 +7,7 @@
 
 /**
  * @file
- * slabhash_map_kernels.cuh
+ * insert.cuh
  *
  * @brief SlabHash graph Graph Data Structure map insertion kernels
  */
@@ -113,3 +113,9 @@ namespace slabhash_map_kernels{
 }
 }
 }
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

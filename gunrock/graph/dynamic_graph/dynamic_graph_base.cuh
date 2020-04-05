@@ -7,7 +7,7 @@
 
 /**
  * @file
- * dyn.cuh
+ * dynamic_graph_base.cuh
  *
  * @brief DYN (Dynamic) Graph Data Structure
  */
@@ -39,19 +39,15 @@ template<
 struct DynamicGraphBase
 {   
     public:
-    static constexpr bool REQUIRE_SORTING = false;
     static constexpr bool REQUIRE_EDGES_VALUES = (FLAG & HAS_EDGE_VALUES) != 0;
 
-    using HashGraphMapT = HashGraphMap<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
-    using HashGraphSetT = HashGraphSet<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
+    using SlabHashGraphMapT = SlabHashGraphMap<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
+    using SlabHashGraphSetT = SlabHashGraphSet<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
 
     //Only one choice now
-    using DynamicGraphT = typename std::conditional<REQUIRE_SORTING,
-                                        typename std::conditional<REQUIRE_EDGES_VALUES, HashGraphMapT, HashGraphSetT>::type,
-                                        typename std::conditional<REQUIRE_EDGES_VALUES, HashGraphMapT, HashGraphSetT>::type>::type;
+    using DynamicGraphT = typename std::conditional<REQUIRE_EDGES_VALUES, SlabHashGraphMapT, SlabHashGraphSetT>::type;
 
     DynamicGraphT dynamicGraph;
-
 
     cudaError_t Release()
     {
@@ -65,3 +61,9 @@ struct DynamicGraphBase
 
 } // namespace graph
 } // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

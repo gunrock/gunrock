@@ -7,7 +7,7 @@
 
 /**
  * @file
- * dyn.cuh
+ * dynamic_graph_weighted.cuh
  *
  * @brief DYN (Dynamic) Graph Data Structure
  */
@@ -141,7 +141,11 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, false, true> {
     }
 
 };
-
-
 } // namespace graph
 } // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

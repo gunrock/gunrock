@@ -7,7 +7,7 @@
 
 /**
  * @file
- * slabhash_map_kernels.cuh
+ * helper.cuh
  *
  * @brief SlabHash graph Graph Data Structure map kernels
  */
@@ -19,7 +19,6 @@
 namespace gunrock {
 namespace graph {
 namespace slabhash_map_kernels{
-    
     template <typename VertexT, typename ValueT, typename SizeT, typename ContextT>
     __global__ void ToCsr(SizeT num_nodes,
                           ContextT* hashContexts, 
@@ -88,3 +87,9 @@ namespace slabhash_map_kernels{
 }
 }
 }
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

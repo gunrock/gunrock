@@ -7,7 +7,7 @@
 
 /**
  * @file
- * dyn.cuh
+ * dynamic_graph.cuh
  *
  * @brief DYN (Dynamic) Graph Data Structure
  */
@@ -42,3 +42,9 @@ struct Dyn : public DynamicGraphBase<_VertexT, _SizeT, _ValueT, _FLAG> {};
 
 } // namespace graph
 } // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

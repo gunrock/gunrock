@@ -7,7 +7,7 @@
 
 /**
  * @file
- * hash_graph_base.cuh
+ * slabhash_graph_base.cuh
  *
  * @brief Hash graph Graph Data Structure
  */
@@ -34,7 +34,7 @@ template<
     typename SizeT,
     typename ValueT,
     bool REQUIRE_EDGE_VALUES>
-struct HashGraphBase
+struct SlabHashGraphBase
 {   
     using HashContextT = typename std::conditional<REQUIRE_EDGE_VALUES,
                             GpuSlabHashContext<VertexT, ValueT, SlabHashTypeT::ConcurrentMap>,
@@ -61,7 +61,7 @@ struct HashGraphBase
     * @param[in] max_nodes Maximum number of nodes that the graph can store
     * @param[in] max_buckets Maximum number of buckets that the graph will use
     */
-    HashGraphBase(SizeT max_nodes = 1 << 20, SizeT max_buckets = 1 << 25){
+    SlabHashGraphBase(SizeT max_nodes = 1 << 20, SizeT max_buckets = 1 << 25){
         memory_allocator = new DynamicAllocatorT;
 
         nodes_capacity = max_nodes;
@@ -87,7 +87,7 @@ struct HashGraphBase
 
     }
 
-    ~HashGraphBase(){}
+    ~SlabHashGraphBase(){}
 
     /**
     * @brief Converts CSR to Dynamic graph and Allocate GPU memory for input pairs
@@ -198,7 +198,11 @@ struct HashGraphBase
     static constexpr uint32_t PRIME_DIVISOR_ = 4294967291u;
 
 };
-
-
 } // namespace graph
 } // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

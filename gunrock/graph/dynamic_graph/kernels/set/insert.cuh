@@ -47,10 +47,9 @@ namespace slabhash_set_kernels{
             }
 
             to_insert &= !same_src;
-            //todo: add insertion for set
-            bool success = false;
-            //bool success = hashContexts[cur_src].insertPairUnique(same_src, laneId, thread_edge.y, 
-            //                                                        dst_bucket, local_allocator_ctx);
+            bool success = true;
+            hashContexts[cur_src].insertPairUnique(same_src, laneId, thread_edge.y, 
+                                                    dst_bucket, local_allocator_ctx);
             uint32_t added_count = __popc(__ballot_sync(0xFFFFFFFF, success)); 
             if(laneId == 0){
                 atomicAdd(&d_edges_per_vertex[cur_src], added_count);
@@ -108,3 +107,9 @@ namespace slabhash_set_kernels{
 }
 }
 }
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

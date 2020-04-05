@@ -7,7 +7,7 @@
 
 /**
  * @file
- * hash_graph_set.cuh
+ * slabhash_graph_map.cuh
  *
  * @brief Dynamic graph using Concurrent Hash Maps
  */
@@ -41,7 +41,7 @@ template<
     typename ValueT,
     bool REQUIRE_VALUES,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
-struct HashGraphMap : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
+struct SlabHashGraphMap : SlabHashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
 
 
     /**
@@ -166,3 +166,9 @@ struct HashGraphMap : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
 
 } // namespace graph
 } // namespace gunrock
+
+// Leave this at the end of the file
+// Local Variables:
+// mode:c++
+// c-file-style: "NVIDIA"
+// End:

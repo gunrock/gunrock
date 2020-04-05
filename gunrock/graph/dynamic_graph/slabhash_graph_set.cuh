@@ -37,7 +37,7 @@ template<
     typename ValueT,
     bool REQUIRE_VALUES,
     unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
-struct HashGraphSet : HashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
+struct SlabHashGraphSet : SlabHashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
 
 
     /**
