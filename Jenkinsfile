@@ -6,7 +6,7 @@ def init_git() {
   checkout scm
   retry(5) {
     timeout(time: 2, unit: 'MINUTES') {
-      sh 'git submodule update --init'
+      sh 'git submodule update --init --recursive'
     }
   }
 }
