@@ -55,10 +55,6 @@ struct main_struct {
                                     graph::HAS_COO |
                                     graph::HAS_DYN>;
 
-    using CSRGraphT = app::TestGraph<VertexT, SizeT, ValueT,
-                                    graph::HAS_EDGE_VALUES | 
-                                    graph::HAS_CSR>;
-
     cudaError_t retval = cudaSuccess;
     util::CpuTimer cpu_timer;
     
