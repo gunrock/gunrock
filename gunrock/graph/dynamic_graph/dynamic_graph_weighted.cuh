@@ -34,7 +34,7 @@ template<
     typename ValueT,
     GraphFlag FLAG,
     unsigned int cudaHostRegisterFlag>
-struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, true> : public DynamicGraphBase<VertexT, SizeT, ValueT, FLAG> {
+struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, true> : DynamicGraphBase<VertexT, SizeT, ValueT, FLAG> {
 
 
     template <typename PairT>

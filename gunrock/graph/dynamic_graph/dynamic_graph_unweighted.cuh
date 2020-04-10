@@ -35,7 +35,7 @@ template<
     typename ValueT,
     GraphFlag FLAG,
     unsigned int cudaHostRegisterFlag>
-struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, false> : public DynamicGraphBase<VertexT, SizeT, ValueT, FLAG> {
+struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, false> : DynamicGraphBase<VertexT, SizeT, ValueT, FLAG> {
 
     /**
     * @brief Insert a batch of edges into weighted slab hash graph
