@@ -75,6 +75,7 @@ include_directories(${gunrock_INCLUDE_DIRS})
 include(${CMAKE_SOURCE_DIR}/cmake/FindRapidJson.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindModernGPU.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindCUB.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/FindSlabHash.cmake)
 # end /* Include moderngpu & cub */
 
 # begin /* Include googletest & googlemock */
@@ -208,6 +209,10 @@ option(GUNROCK_APP_COLOR
   "If on, builds only COLOR application."
   OFF)
 
+option(GUNROCK_APP_DYNAMIC_GRAPH
+  "If on, builds only dynamic graph examples."
+  OFF)
+  
 #option(GUNROCK_APP_SAMPLE
 #  "If on, builds only SAMPLE application."
 #  OFF)

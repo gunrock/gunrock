@@ -56,6 +56,8 @@ SM_TARGETS = $(GEN_SM70)
 CUDA_INC = -I"$(shell dirname $(NVCC))/../include"
 MGPU_INC = -I"../../externals/moderngpu/src"
 CUB_INC = -I"../../externals/cub"
+SLABHASH_INC = -I"../../externals/SlabHash/src"
+SLABALLOC_INC = -I"../../externals/SlabHash/SlabAlloc/src"
 
 BOOST_INC =
 BOOST_LINK =
@@ -86,7 +88,7 @@ endif
 
 GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=1.1.0
 LINK = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
-INC = $(CUDA_INC) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(BOOST_INC) -I.. -I../.. $(LINK)
+INC = $(CUDA_INC) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(SLABHASH_INC) $(SLABALLOC_INC) $(BOOST_INC) -I.. -I../.. $(LINK)
 
 #-------------------------------------------------------------------------------
 # Defines

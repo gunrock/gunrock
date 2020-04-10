@@ -13,3 +13,6 @@
 [submodule "externals/rapidjson"]
 	path = externals/rapidjson
 	url = https://github.com/Tencent/rapidjson.git
+[submodule "externals/SlabHash"]
+	path = externals/SlabHash
+	url = https://github.com/owensgroup/SlabHash

@@ -37,6 +37,7 @@ enum : GraphFlag {
   HAS_CSC = 0x0200,
   HAS_COO = 0x0400,
   HAS_GP = 0x0800,
+  HAS_DYN = 0x2000,
 
   GRAPH_PINNED = 0x1000,
 };

@@ -29,6 +29,22 @@ else()
 endif()
 # end /* CUB include directories */
 
+# begin /* SlabHash include directories */
+if (slabhash_INCLUDE_DIRS)
+  include_directories(${slabhash_INCLUDE_DIRS})
+else()
+  message(SEND_ERROR "SlabHash include directory not set.")
+endif()
+# end /* SlabHash include directories */
+
+# begin /* SlabAlloc include directories */
+if (slaballoc_INCLUDE_DIRS)
+  include_directories(${slaballoc_INCLUDE_DIRS})
+else()
+  message(SEND_ERROR "SlabAlloc include directory not set.")
+endif()
+# end /* SlabAlloc include directories */
+
 # begin /* Add CUDA executables */
 CUDA_ADD_EXECUTABLE(${PROJECT_NAME}
   test_${PROJECT_NAME}.cu
