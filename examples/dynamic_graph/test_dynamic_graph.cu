@@ -14,7 +14,6 @@
 
 #include <gunrock/gunrock.h>
 
-
 // Utilities and correctness-checking
 #include <gunrock/util/test_utils.cuh>
 
@@ -46,18 +45,16 @@ struct main_struct {
   template <typename VertexT,  // Use int as the vertex identifier
             typename SizeT,    // Use int as the graph size type
             typename ValueT>   // Use int as the value type
-  cudaError_t
-  operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val) {
-    
-    using WeightedGraphT = app::TestGraph<VertexT, SizeT, ValueT,
-                                    graph::HAS_EDGE_VALUES | 
-                                    graph::HAS_CSR | 
-                                    graph::HAS_COO |
-                                    graph::HAS_DYN>;
+  cudaError_t operator()(util::Parameters &parameters, VertexT v, SizeT s,
+                         ValueT val) {
+    using WeightedGraphT =
+        app::TestGraph<VertexT, SizeT, ValueT,
+                       graph::HAS_EDGE_VALUES | graph::HAS_CSR |
+                           graph::HAS_COO | graph::HAS_DYN>;
 
     cudaError_t retval = cudaSuccess;
     util::CpuTimer cpu_timer;
-    
+
     WeightedGraphT weighted_graph;
 
     cpu_timer.Start();
@@ -80,8 +77,7 @@ int main(int argc, char **argv) {
   }
   GUARD_CU(parameters.Check_Required());
 
-  return app::Switch_Types<app::VERTEXT_U32B |
-                           app::SIZET_U32B | 
+  return app::Switch_Types<app::VERTEXT_U32B | app::SIZET_U32B |
                            app::VALUET_S32B | app::DIRECTED | app::UNDIRECTED>(
       parameters, main_struct());
 }
