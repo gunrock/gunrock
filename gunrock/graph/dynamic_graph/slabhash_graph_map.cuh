@@ -20,6 +20,7 @@
 
 #include <gunrock/graph/dynamic_graph/slabhash_graph_base.cuh>
 #include <gunrock/graph/dynamic_graph/kernels/map/insert.cuh>
+#include <gunrock/graph/dynamic_graph/kernels/map/delete.cuh>
 #include <gunrock/graph/dynamic_graph/kernels/map/helper.cuh>
 #include <gunrock/util/array_utils.cuh>
 
@@ -61,6 +62,24 @@ struct SlabHashGraphMap
     return cudaSuccess;
   }
 
+  /**
+   * @brief Deletes a batch of edges from a weighted slab hash graph
+   *
+   * @param[in] d_edges Device pointer to pairs of edges
+   * @param[in] batch_size Size of the inserted batch
+   * @param[in] double_batch_edges Double the edges in undirected graph
+   */
+  template <typename PairT>
+  cudaError_t DeleteEdgesBatch(PairT* d_edges, SizeT batch_size,
+                               bool double_batch_edges) {
+    const uint32_t block_size = 128;
+    const uint32_t num_blocks = (batch_size + block_size - 1) / block_size;
+
+    slabhash_map_kernels::DeleteEdges<<<num_blocks, block_size>>>(
+        d_edges, this->d_hash_context, batch_size, this->d_edges_per_node,
+        this->d_edges_per_bucket, this->d_buckets_offset, double_batch_edges);
+    return cudaSuccess;
+  }
   /**
    * @brief Converts CSR to Dynamic graph
    *

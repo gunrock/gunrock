@@ -37,7 +37,7 @@ template <typename VertexT, typename SizeT, typename ValueT,
 struct SlabHashGraphSet
     : SlabHashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
   /**
-   * @brief Insert a batch of edges into weighted slab hash graph
+   * @brief Insert a batch of edges into unweighted slab hash graph
    *
    * @param[in] d_edges Device pointer to pairs of edges
    * @param[in] batch_size Size of the inserted batch
@@ -49,6 +49,18 @@ struct SlabHashGraphSet
     return cudaSuccess;
   }
 
+  /**
+   * @brief Deletes a batch of edges from an unweighted slab hash graph
+   *
+   * @param[in] d_edges Device pointer to pairs of edges
+   * @param[in] batch_size Size of the inserted batch
+   * @param[in] double_batch_edges Double the edges in undirected graph
+   */
+  template <typename PairT>
+  cudaError_t DeleteEdgesBatch(PairT* d_edges, SizeT batch_size,
+                               bool double_batch_edges) {
+    return cudaSuccess;
+  }
   /**
    * @brief Converts CSR to Dynamic graph
    *

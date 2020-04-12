@@ -48,6 +48,30 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, false>
   }
 
   /**
+   * @brief Deletes a batch of edges from a weighted slab hash graph
+   *
+   * @param[in] edges Pointer to pairs of edges
+   * @param[in] batch_size Size of the inserted batch
+   * @param[in] target Location of the edges data
+   */
+  template <typename PairT>
+  cudaError_t DeleteEdgesBatch(util::Array1D<SizeT, PairT> &edges,
+                               SizeT batchSize,
+                               util::Location target = util::DEVICE) {
+    if (target != util::DEVICE) {
+      edges.Move(util::HOST, util::DEVICE);
+    }
+
+    this->dynamicGraph.DeleteEdgesBatch(edges.GetPointer(util::DEVICE),
+                                        batchSize, !this->is_directed);
+
+    if (target != util::DEVICE) {
+      edges.Release(util::DEVICE);
+    }
+    return cudaSuccess;
+  }
+
+  /**
    * @brief Converts CSR to Dynamic graph
    *
    * @param[in] csr Input Gunrock CSR graph

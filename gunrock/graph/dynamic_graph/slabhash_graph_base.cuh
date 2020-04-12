@@ -57,7 +57,7 @@ struct SlabHashGraphBase {
    * @param[in] max_nodes Maximum number of nodes that the graph can store
    * @param[in] max_buckets Maximum number of buckets that the graph will use
    */
-  SlabHashGraphBase(SizeT max_nodes = 1 << 20, SizeT max_buckets = 1 << 25) {
+  SlabHashGraphBase(SizeT max_nodes = 1 << 20, SizeT max_buckets = 1 << 20) {
     memory_allocator = new DynamicAllocatorT;
 
     nodes_capacity = max_nodes;

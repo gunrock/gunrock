@@ -53,6 +53,23 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, true>
     return cudaSuccess;
   }
 
+  template <typename PairT>
+  cudaError_t DeleteEdgesBatch(util::Array1D<SizeT, PairT> &edges,
+                               SizeT batchSize,
+                               util::Location target = util::DEVICE) {
+    if (target != util::DEVICE) {
+      edges.Move(util::HOST, util::DEVICE);
+    }
+
+    this->dynamicGraph.DeleteEdgesBatch(edges.GetPointer(util::DEVICE),
+                                        batchSize, !this->is_directed);
+
+    if (target != util::DEVICE) {
+      edges.Release(util::DEVICE);
+    }
+    return cudaSuccess;
+  }
+
   template <typename CsrT_in>
   cudaError_t FromCsr(CsrT_in &csr,
                       util::Location target = util::LOCATION_DEFAULT,
