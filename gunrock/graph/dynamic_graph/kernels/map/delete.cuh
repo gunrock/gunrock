@@ -41,9 +41,8 @@ __device__ void deleteWarpEdges(PairT& thread_edge, ContextT*& hashContexts,
       atomicSub(&d_edges_per_bucket[bucket_offset + dst_bucket], 1);
     }
     to_delete &= !same_src;
-    bool success = to_delete;
-    hashContexts[cur_src].deleteKey(same_src, laneId, thread_edge.y,
-                                    dst_bucket);
+    bool success = hashContexts[cur_src].deleteKey(same_src, laneId,
+                                                   thread_edge.y, dst_bucket);
 
     uint32_t deleted_count = __popc(__ballot_sync(0xFFFFFFFF, success));
     if (laneId == 0) {

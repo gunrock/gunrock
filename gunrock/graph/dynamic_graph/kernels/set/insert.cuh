@@ -43,9 +43,8 @@ __device__ void insertWarpEdges(PairT& thread_edge, ContextT*& hashContexts,
     }
 
     to_insert &= !same_src;
-    bool success = true;
-    hashContexts[cur_src].insertPairUnique(same_src, laneId, thread_edge.y,
-                                           dst_bucket, local_allocator_ctx);
+    bool success = hashContexts[cur_src].insertPairUnique(
+        same_src, laneId, thread_edge.y, dst_bucket, local_allocator_ctx);
     uint32_t added_count = __popc(__ballot_sync(0xFFFFFFFF, success));
     if (laneId == 0) {
       atomicAdd(&d_edges_per_vertex[cur_src], added_count);
