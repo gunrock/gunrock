@@ -31,36 +31,33 @@ namespace graph {
  * @tparam ValueT Associated value type.
  * @tparam GraphFlag graph flag
  */
-template<
-    typename VertexT,
-    typename SizeT,
-    typename ValueT,
-    GraphFlag FLAG>
-struct DynamicGraphBase
-{   
-    public:
-    static constexpr bool REQUIRE_EDGES_VALUES = (FLAG & HAS_EDGE_VALUES) != 0;
+template <typename VertexT, typename SizeT, typename ValueT, GraphFlag FLAG>
+struct DynamicGraphBase {
+ public:
+  static constexpr bool REQUIRE_EDGES_VALUES = (FLAG & HAS_EDGE_VALUES) != 0;
 
-    using SlabHashGraphMapT = SlabHashGraphMap<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
-    using SlabHashGraphSetT = SlabHashGraphSet<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
+  using SlabHashGraphMapT =
+      SlabHashGraphMap<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
+  using SlabHashGraphSetT =
+      SlabHashGraphSet<VertexT, SizeT, ValueT, REQUIRE_EDGES_VALUES>;
 
-    //Only one choice now
-    using DynamicGraphT = typename std::conditional<REQUIRE_EDGES_VALUES, SlabHashGraphMapT, SlabHashGraphSetT>::type;
+  // Only one choice now
+  using DynamicGraphT =
+      typename std::conditional<REQUIRE_EDGES_VALUES, SlabHashGraphMapT,
+                                SlabHashGraphSetT>::type;
 
-    DynamicGraphT dynamicGraph;
+  DynamicGraphT dynamicGraph;
 
-    cudaError_t Release()
-    {
-        dynamicGraph.Release();
-        return cudaSuccess;
-    }
+  cudaError_t Release() {
+    dynamicGraph.Release();
+    return cudaSuccess;
+  }
 
-    bool is_directed;
+  bool is_directed;
 };
 
-
-} // namespace graph
-} // namespace gunrock
+}  // namespace graph
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

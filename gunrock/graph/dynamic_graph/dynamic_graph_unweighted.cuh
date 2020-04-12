@@ -29,129 +29,93 @@ namespace graph {
  * @tparam ValueT Associated value type.
  * @tparam GraphFlag graph flag
  */
-template<
-    typename VertexT,
-    typename SizeT,
-    typename ValueT,
-    GraphFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
-struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, false> : DynamicGraphBase<VertexT, SizeT, ValueT, FLAG> {
+template <typename VertexT, typename SizeT, typename ValueT, GraphFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
+struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, false>
+    : DynamicGraphBase<VertexT, SizeT, ValueT, FLAG> {
+  /**
+   * @brief Insert a batch of edges into weighted slab hash graph
+   *
+   * @param[in] edges Pointer to pairs of edges
+   * @param[in] batch_size Size of the inserted batch
+   * @param[in] target Location of the edges data
+   */
+  template <typename PairT>
+  cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> edges,
+                               SizeT batchSize,
+                               util::Location target = util::DEVICE) {
+    return cudaSuccess;
+  }
 
-    /**
-    * @brief Insert a batch of edges into weighted slab hash graph
-    *
-    * @param[in] edges Pointer to pairs of edges
-    * @param[in] batch_size Size of the inserted batch 
-    * @param[in] target Location of the edges data
-    */
-    template <typename PairT>    
-    cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> edges, 
-                                 SizeT batchSize,
-                                 util::Location target = util::DEVICE){
-        
-
-
-        return cudaSuccess;
+  /**
+   * @brief Converts CSR to Dynamic graph
+   *
+   * @param[in] csr Input Gunrock CSR graph
+   * @param[in] target Location of CSR graph
+   * @param[in] stream Stream id
+   * @param[in] quiet Whether to log conversion steps or not
+   */
+  template <typename CsrT_in>
+  cudaError_t FromCsr(CsrT_in &csr, util::Location target = util::HOST,
+                      cudaStream_t stream = 0, bool quiet = false) {
+    if (target != util::HOST) {
+      csr.Move(util::DEVICE, util::HOST);
     }
-    
-    /**
-    * @brief Converts CSR to Dynamic graph
-    *
-    * @param[in] csr Input Gunrock CSR graph
-    * @param[in] target Location of CSR graph
-    * @param[in] stream Stream id
-    * @param[in] quiet Whether to log conversion steps or not 
-    */
-    template <typename CsrT_in>
-    cudaError_t FromCsr(
-        CsrT_in &csr,
-        util::Location target = util::HOST,
-        cudaStream_t stream = 0,
-        bool quiet = false)
-    {
-        if(target != util::HOST){
-            csr.Move(util::DEVICE, util::HOST);
-        }
-        this->dynamicGraph.BulkBuildFromCsr(csr.row_offsets.GetPointer(util::HOST),
-                                      csr.column_indices.GetPointer(util::HOST),
-                                      csr.nodes,
-                                      csr.directed,
-                                      csr.edge_values.GetPointer(util::HOST));
-        if(target != util::HOST){
-            csr.Release(util::HOST);
-        }
-        return cudaSuccess;
+    this->dynamicGraph.BulkBuildFromCsr(
+        csr.row_offsets.GetPointer(util::HOST),
+        csr.column_indices.GetPointer(util::HOST), csr.nodes, csr.directed,
+        csr.edge_values.GetPointer(util::HOST));
+    if (target != util::HOST) {
+      csr.Release(util::HOST);
     }
+    return cudaSuccess;
+  }
 
-   
-    /**
-    * @brief Converts Dynamic graph to CSR
-    *
-    * @param[out] csr Output Gunrock CSR data structure
-    * @param[in] stream Stream id
-    * @param[in] quiet Whether to log conversion steps or not 
-    */
-    template <typename CsrT_in>
-    cudaError_t ToCsr(
-        CsrT_in &csr,
-        cudaStream_t stream = 0,
-        bool quiet = false)
-    {
-        this->dynamicGraph.ToCsr(csr.row_offsets.GetPointer(util::DEVICE),
-                                 csr.column_indices.GetPointer(util::DEVICE),
-                                 csr.nodes,
-                                 csr.edges);
-        return cudaSuccess;
-    }
+  /**
+   * @brief Converts Dynamic graph to CSR
+   *
+   * @param[out] csr Output Gunrock CSR data structure
+   * @param[in] stream Stream id
+   * @param[in] quiet Whether to log conversion steps or not
+   */
+  template <typename CsrT_in>
+  cudaError_t ToCsr(CsrT_in &csr, cudaStream_t stream = 0, bool quiet = false) {
+    this->dynamicGraph.ToCsr(csr.row_offsets.GetPointer(util::DEVICE),
+                             csr.column_indices.GetPointer(util::DEVICE),
+                             csr.nodes, csr.edges);
+    return cudaSuccess;
+  }
 };
 
-
-
-
-template<
-    typename VertexT,
-    typename SizeT,
-    typename ValueT,
-    GraphFlag FLAG,
-    unsigned int cudaHostRegisterFlag>
+template <typename VertexT, typename SizeT, typename ValueT, GraphFlag FLAG,
+          unsigned int cudaHostRegisterFlag>
 struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, false, false> {
-   
-    template <typename PairT>    
-    cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> edges, 
-                                 SizeT batchSize,
-                                 util::Location target = util::DEVICE){
-        return cudaSuccess;
-    }
+  template <typename PairT>
+  cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> edges,
+                               SizeT batchSize,
+                               util::Location target = util::DEVICE) {
+    return cudaSuccess;
+  }
 
-    template <typename CsrT_in>
-    cudaError_t FromCsr(
-        CsrT_in &csr,
-        util::Location target = util::LOCATION_DEFAULT,
-        cudaStream_t stream = 0,
-        bool quiet = false)
-    {
-        return cudaSuccess;
-    } 
+  template <typename CsrT_in>
+  cudaError_t FromCsr(CsrT_in &csr,
+                      util::Location target = util::LOCATION_DEFAULT,
+                      cudaStream_t stream = 0, bool quiet = false) {
+    return cudaSuccess;
+  }
 
-    template <typename CsrT_in>
-    cudaError_t ToCsr(
-        CsrT_in &csr,
-        cudaStream_t stream = 0,
-        bool quiet = false)
-    {
-        return cudaSuccess;
-    }
+  template <typename CsrT_in>
+  cudaError_t ToCsr(CsrT_in &csr, cudaStream_t stream = 0, bool quiet = false) {
+    return cudaSuccess;
+  }
 
-    cudaError_t Release(util::Location target = util::LOCATION_ALL)
-    {
-        return cudaSuccess;
-    }
-
+  cudaError_t Release(util::Location target = util::LOCATION_ALL) {
+    return cudaSuccess;
+  }
 };
 
-
-} // namespace graph
-} // namespace gunrock
+}  // namespace graph
+}  // namespace gunrock
 
 // Leave this at the end of the file
 // Local Variables:

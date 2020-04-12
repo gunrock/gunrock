@@ -56,7 +56,7 @@ struct TestGraph
                         _cudaHostRegisterFlag, (_FLAG & graph::HAS_CSC) != 0>,
       public graph::Dyn<_VertexT, _SizeT, _ValueT,
                         _FLAG &(~(graph::TypeMask - graph::HAS_DYN)),
-                        _cudaHostRegisterFlag, (_FLAG & graph::HAS_DYN) != 0>,                        
+                        _cudaHostRegisterFlag, (_FLAG & graph::HAS_DYN) != 0>,
       public graph::Gp<_VertexT, _SizeT, _ValueT, _FLAG,
                        _cudaHostRegisterFlag> {
   typedef _VertexT VertexT;
@@ -82,11 +82,11 @@ struct TestGraph
   typedef graph::Dyn<_VertexT, _SizeT, _ValueT,
                      _FLAG &(~(graph::TypeMask - graph::HAS_DYN)),
                      _cudaHostRegisterFlag, (_FLAG & graph::HAS_DYN) != 0>
-      DynT;      
+      DynT;
   typedef graph::Gp<_VertexT, _SizeT, _ValueT, _FLAG, _cudaHostRegisterFlag>
       GpT;
 
-  SizeT nodes=0, edges=0;
+  SizeT nodes = 0, edges = 0;
 
   template <typename CooT_in>
   cudaError_t FromCoo(CooT_in &coo,
@@ -149,7 +149,7 @@ struct TestGraph
   CscT &csc() { return (static_cast<CscT *>(this))[0]; }
 
   CooT &coo() { return (static_cast<CooT *>(this))[0]; }
-  
+
   DynT &dyn() { return (static_cast<DynT *>(this))[0]; }
 
   double GetStddevDegree() {
