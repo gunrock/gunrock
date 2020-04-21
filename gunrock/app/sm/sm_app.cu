@@ -47,7 +47,9 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  * @param[in]  query_row_offsets CSR-formatted graph input query row offsets
  * @param[in]  query_col_indices CSR-formatted graph input query column indices
  * @param[in]  num_runs          Number of runs to perform SM
+ * @param[in]  device            input and output target device
  * @param[out] subgraphs         Return number of subgraphs
+ * @param[in]
  * \return     double            Return accumulated elapsed times for all runs
  */
 double sm(
@@ -60,11 +62,12 @@ double sm(
     const int           *query_row_offsets,
     const int           *query_col_indices,
     const int            num_runs,
+       string            device,
           int           *subgraphs)
 {
     return sm_template(num_nodes, num_edges, row_offsets, col_indices,
         num_query_nodes, num_query_edges, query_row_offsets,
-        query_col_indices, num_runs, subgraphs);
+        query_col_indices, num_runs, device, subgraphs);
 }
 
 // Leave this at the end of the file

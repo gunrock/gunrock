@@ -419,14 +419,16 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
   /**
    * @brief Copy result distancess computed on GPUs back to host-side arrays.
-   * @param[out] h_distances Host array to store computed vertex distances from
-   * the source.
-   * @param[out] h_preds     Host array to store computed vertex predecessors.
-   * @param[in]  target where the results are stored
+   * @param[out] count_subgraphs Host/Device array to store subgraph counts.
+   * @param[out] list_subgraphs  Host/Device array to store subgraph combinations.
+   * @param[in]  target where the results are computed
+   * @param[in]  device where the results are stored
    * \return     cudaError_t Error message(s), if any
    */
-  cudaError_t Extract(VertexT *h_subgraphs,
-                      util::Location target = util::DEVICE) {
+  cudaError_t Extract(VertexT *count_subgraphs,
+                      VertexT *list_subgraphs,
+                      util::Location target = util::DEVICE,
+                      string device = "CPU") {
     cudaError_t retval = cudaSuccess;
     unsigned long nodes = this->org_graph->nodes;
     unsigned long edges = this->org_graph->edges;
@@ -445,7 +447,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         GUARD_CU(data_slice.temp_count.Move(util::DEVICE, util::HOST));
       }
 
-      // further extract combination from h_results to h_subgraphs
+      // further extract combination from h_results
       vector<vector<int>> combinations;
       for (int i = 0; i < data_slice.temp_count[0]; ++i) {
         unsigned long key = data_slice.results[i];
@@ -473,9 +475,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         cout << endl;
       }
       cout << endl;*/
-      h_subgraphs[0] = combinations.size();
-      // TODO: export combinations to output
-
+      // returning results will be stored on the CPU
+      if (device == "CPU") {
+        count_subgraphs[0] = combinations.size();
+        list_subgraphs = new VertexT[combinations.size()];
+        std::copy(combinations.begin(), combinations.end(), list_subgraphs);
+      } else { // returning results will be stored on the GPU
+        VertexT *h_subgraphs = new VertexT[1];
+        h_subgraphs[0] = combinations.size();
+        GUARD_CU(cudaMemcpy(count_subgraphs, h_subgraphs, 1, cudaMemcpyHostToDevice));
+        GUARD_CU(cudaMalloc(list_subgraphs, combinations.side()));
+        GUARD_CU(cudaMemcpy(list_subgraphs, combinations, combinations.size(), cudaMemcpyHostToDevice));
+      }
     } else {  // num_gpus != 1
 
       // !! MultiGPU not implemented
