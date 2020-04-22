@@ -53,21 +53,22 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  * \return     double            Return accumulated elapsed times for all runs
  */
 double sm(
-    const int            num_nodes,
-    const int            num_edges,
-    const int           *row_offsets,
-    const int           *col_indices,
-    const int            num_query_nodes,
-    const int            num_query_edges,
-    const int           *query_row_offsets,
-    const int           *query_col_indices,
-    const int            num_runs,
-       string            device,
-          int           *subgraphs)
+    const int                 num_nodes,
+    const int                 num_edges,
+    const int                *row_offsets,
+    const int                *col_indices,
+    const int                 num_query_nodes,
+    const int                 num_query_edges,
+    const int                *query_row_offsets,
+    const int                *query_col_indices,
+    const int                 num_runs,
+    gunrock::util::Location   device,
+          int                *subgraphs,
+          int                *list_subgraphs)
 {
     return sm_template(num_nodes, num_edges, row_offsets, col_indices,
         num_query_nodes, num_query_edges, query_row_offsets,
-        query_col_indices, num_runs, device, subgraphs);
+        query_col_indices, num_runs, device, subgraphs, list_subgraphs);
 }
 
 // Leave this at the end of the file

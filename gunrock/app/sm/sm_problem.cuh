@@ -428,7 +428,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   cudaError_t Extract(VertexT *count_subgraphs,
                       VertexT *list_subgraphs,
                       util::Location target = util::DEVICE,
-                      string device = "CPU") {
+                      util::Location device = util::HOST) {
     cudaError_t retval = cudaSuccess;
     unsigned long nodes = this->org_graph->nodes;
     unsigned long edges = this->org_graph->edges;
@@ -476,7 +476,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       }
       cout << endl;*/
       // returning results will be stored on the CPU
-      if (device == "CPU") {
+      if (device == util::HOST) {
         count_subgraphs[0] = combinations.size();
         list_subgraphs = new VertexT[combinations.size()];
         std::copy(combinations.begin(), combinations.end(), list_subgraphs);
