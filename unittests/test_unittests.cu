@@ -37,7 +37,7 @@
 #include "test_lib_sm.h"
 
 // Tests the RepeatFor Operator
- #include "test_repeatfor.h"
+#include "test_repeatfor.h"
 
 // Tests Segmented Reduction (device)
 #include "test_segreduce.h"
@@ -49,6 +49,9 @@
 
 // Tests dynamic graph operations
 #include "test_dynamic_graph.h"
+
+// Tests simple advance
+#include "test_simple_advance.h"
 
 using namespace gunrock;
 
@@ -82,8 +85,8 @@ struct main_struct {
   template <typename VertexT,  // Use int as the vertex identifier
             typename SizeT,    // Use int as the graph size type
             typename ValueT>   // Use int as the value type
-  cudaError_t
-  operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val) {
+  cudaError_t operator()(util::Parameters &parameters, VertexT v, SizeT s,
+                         ValueT val) {
     // CLI parameters
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
