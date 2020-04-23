@@ -98,7 +98,7 @@ struct SlabHashGraphMap
     SizeT num_edges_ = h_row_offsets[num_nodes_];
     PairT* d_edges_pairs;
     this->is_directed = is_directed_;
-    this->Init(h_row_offsets, num_nodes_, num_edges_, mapEdgesPerSlab,
+    this->Init(h_row_offsets, num_nodes_, num_edges_, edgesPerSlab,
                globalLoadFactor, h_col_indices, d_edges_pairs);
 
     ValueT* d_edge_values;
@@ -151,7 +151,7 @@ struct SlabHashGraphMap
     return cudaSuccess;
   }
 
-  static constexpr uint32_t mapEdgesPerSlab = 15;
+  static constexpr uint32_t edgesPerSlab = 15;
   static constexpr float globalLoadFactor = 0.7;
 };
 

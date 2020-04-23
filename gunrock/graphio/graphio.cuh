@@ -19,6 +19,7 @@
 #include <gunrock/graph/coo.cuh>
 #include <gunrock/graph/csc.cuh>
 #include <gunrock/graph/gp.cuh>
+#include <gunrock/graph/graph_iterator.cuh>
 #include <gunrock/graph/dynamic_graph/dynamic_graph_unweighted.cuh>
 #include <gunrock/graph/dynamic_graph/dynamic_graph_weighted.cuh>
 #include <gunrock/graphio/market.cuh>

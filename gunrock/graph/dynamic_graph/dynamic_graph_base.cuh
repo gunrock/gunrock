@@ -31,9 +31,14 @@ namespace graph {
  * @tparam ValueT Associated value type.
  * @tparam GraphFlag graph flag
  */
-template <typename VertexT, typename SizeT, typename ValueT, GraphFlag FLAG>
+template <typename _VertexT, typename _SizeT, typename _ValueT, GraphFlag _FLAG>
 struct DynamicGraphBase {
  public:
+  using VertexT = _VertexT;
+  using ValueT = _ValueT;
+  using SizeT = _SizeT;
+
+  static constexpr GraphFlag FLAG = _FLAG;
   static constexpr bool REQUIRE_EDGES_VALUES = (FLAG & HAS_EDGE_VALUES) != 0;
 
   using SlabHashGraphMapT =
@@ -46,14 +51,36 @@ struct DynamicGraphBase {
       typename std::conditional<REQUIRE_EDGES_VALUES, SlabHashGraphMapT,
                                 SlabHashGraphSetT>::type;
 
-  DynamicGraphT dynamicGraph;
+  mutable DynamicGraphT dynamicGraph;
 
   cudaError_t Release() {
     dynamicGraph.Release();
     return cudaSuccess;
   }
+  __device__ __forceinline__ SizeT
+  GetNeighborListLength(const VertexT &v) const {
+    return dynamicGraph.GetNeighborsCount(v);
+  }
 
   bool is_directed;
+  // These are initial nodes and edges count and not currenlty maintained after
+  // updates
+  SizeT nodes;
+  SizeT edges;
+
+  // The following code is for the old API (just for compiling)
+  __device__ __host__ __forceinline__ void GetEdgeSrcDest(const SizeT &e,
+                                                          VertexT &src,
+                                                          VertexT &dest) const {
+  }
+  __device__ __host__ __forceinline__ SizeT
+  GetSrcDestEdge(const VertexT &src, const VertexT &dest) {
+    return util::PreDefinedValues<SizeT>::InvalidValue;
+  }
+  __device__ __host__ __forceinline__ VertexT
+  GetEdgeDest(const SizeT &e) const {
+    return util::PreDefinedValues<VertexT>::InvalidValue;
+  }
 };
 
 }  // namespace graph
