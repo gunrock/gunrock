@@ -75,11 +75,14 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, true>
                       util::Location target = util::LOCATION_DEFAULT,
                       cudaStream_t stream = 0, bool quiet = false) {
     this->is_directed = csr.directed;
+    this->dynamicGraph.Allocate();
     this->dynamicGraph.BulkBuildFromCsr(
         csr.row_offsets.GetPointer(util::HOST),
         csr.column_indices.GetPointer(util::HOST),
         csr.edge_values.GetPointer(util::HOST), csr.nodes, csr.directed,
         csr.node_values.GetPointer(util::HOST));
+    this->nodes = csr.nodes;
+    this->edges = csr.edges;
     return cudaSuccess;
   }
 
