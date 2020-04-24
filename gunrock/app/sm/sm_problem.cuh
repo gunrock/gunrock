@@ -438,54 +438,51 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       SizeT nodes_query = data_slice.nodes_query;
       unsigned long mem_limit = nodes * nodes;
 
-      // Set device
-      if (target == util::DEVICE) {
-        GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-
-        GUARD_CU(data_slice.results.Move(util::DEVICE, util::HOST));
-
-        GUARD_CU(data_slice.temp_count.Move(util::DEVICE, util::HOST));
-      }
-
-      // further extract combination from h_results
-      vector<vector<int>> combinations;
-      for (int i = 0; i < data_slice.temp_count[0]; ++i) {
-        unsigned long key = data_slice.results[i];
-        unsigned long stride = pow(nodes, nodes_query);
-        vector<int> combination;
-        for (int j = 0; j < nodes_query; ++j) {
-          stride = stride / nodes;
-          int elem = key / stride;
-          combination.push_back(elem);
-          key = key - elem * stride;
-        }
-        sort(combination.begin(), combination.end());
-        combinations.push_back(combination);
-      }
-      sort(combinations.begin(), combinations.end());
-      vector<vector<int>>::iterator itr =
-          unique(combinations.begin(), combinations.end());
-      combinations.resize(distance(combinations.begin(), itr));
-      // For debugging to output gunrock results
-      /*cout << "Listing matched subgraphs:" << endl;
-      for (int x = 0; x < combinations.size(); ++x) {
-        for (int y = 0; y < combinations[x].size(); ++y) {
-          cout << combinations[x][y] << " ";
-        }
-        cout << endl;
-      }
-      cout << endl;*/
       // returning results will be stored on the CPU
       if (device == util::HOST) {
-        count_subgraphs[0] = combinations.size();
-        list_subgraphs = new VertexT[combinations.size()];
-        std::copy(combinations.begin(), combinations.end(), list_subgraphs);
+        // Set device
+        if (target == util::DEVICE) {
+          GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+          GUARD_CU(data_slice.results.Move(util::DEVICE, util::HOST));
+          GUARD_CU(data_slice.temp_count.Move(util::DEVICE, util::HOST));
+        }
+
+        // further extract combination from h_results
+        vector<vector<int>> combinations;
+        for (int i = 0; i < data_slice.temp_count[0]; ++i) {
+          unsigned long key = data_slice.results[i];
+          unsigned long stride = pow(nodes, nodes_query);
+          vector<int> combination;
+          for (int j = 0; j < nodes_query; ++j) {
+            stride = stride / nodes;
+            int elem = key / stride;
+            combination.push_back(elem);
+            key = key - elem * stride;
+          }
+          sort(combination.begin(), combination.end());
+          combinations.push_back(combination);
+        }
+        sort(combinations.begin(), combinations.end());
+        vector<vector<int>>::iterator itr =
+            unique(combinations.begin(), combinations.end());
+        combinations.resize(distance(combinations.begin(), itr));
+        // For debugging to output gunrock results
+        /*cout << "Listing matched subgraphs:" << endl;
+        for (int x = 0; x < combinations.size(); ++x) {
+          for (int y = 0; y < combinations[x].size(); ++y) {
+            cout << combinations[x][y] << " ";
+          }
+          cout << endl;
+        }
+        cout << endl;*/
+          count_subgraphs[0] = combinations.size();
+          list_subgraphs = new VertexT[combinations.size()];
+          std::copy(combinations.begin(), combinations.end(), list_subgraphs);
       } else { // returning results will be stored on the GPU
-        VertexT *h_subgraphs = new VertexT[1];
-        h_subgraphs[0] = combinations.size();
-        GUARD_CU(cudaMemcpy(count_subgraphs, h_subgraphs, 1, cudaMemcpyHostToDevice));
-        GUARD_CU(cudaMalloc(list_subgraphs, combinations.side()));
-        GUARD_CU(cudaMemcpy(list_subgraphs, combinations, combinations.size(), cudaMemcpyHostToDevice));
+        if (target == util::DEVICE) {
+          count_subgraphs = data_slice.temp_count.GetPointer(util::DEVICE);
+          list_subgraphs = data_slice.results.GetPointer(util::DEVICE);
+        }
       }
     } else {  // num_gpus != 1
 
