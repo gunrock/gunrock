@@ -23,8 +23,8 @@ using WeightedDYNGraphT =
 
 using DynamicHostGraphT = std::vector<std::unordered_set<VertexT>>;
 
-void RandomWeightedGraphToCsr(DynamicHostGraphT& ref_dyn,
-                              WeightedCSRGraphT& ref_graph,
+void RandomWeightedGraphToCsr(DynamicHostGraphT &ref_dyn,
+                              WeightedCSRGraphT &ref_graph,
                               int const_weights = 0) {
   // rng
   std::mt19937 rng(0);
@@ -34,9 +34,9 @@ void RandomWeightedGraphToCsr(DynamicHostGraphT& ref_dyn,
   // Populate the CSR with the adj. list
   SizeT cur_offset = 0;
   for (auto v = 0; v < ref_dyn.size(); v++) {
-    auto& v_edges = ref_dyn[v];
+    auto &v_edges = ref_dyn[v];
     ref_csr_graph.row_offsets[v] = cur_offset;
-    for (const auto& e : v_edges) {
+    for (const auto &e : v_edges) {
       ref_csr_graph.column_indices[cur_offset] = e;
       if (const_weights == 0)
         ref_csr_graph.edge_values[cur_offset] = rng();
@@ -48,7 +48,7 @@ void RandomWeightedGraphToCsr(DynamicHostGraphT& ref_dyn,
   }
   ref_csr_graph.row_offsets[ref_dyn.size()] = cur_offset;
 }
-void GenerateRandomWeightedGraph(DynamicHostGraphT& ref_dyn, SizeT nodes,
+void GenerateRandomWeightedGraph(DynamicHostGraphT &ref_dyn, SizeT nodes,
                                  SizeT edges, SizeT edges_per_node,
                                  bool undirected_graph) {
   // rng
@@ -56,7 +56,7 @@ void GenerateRandomWeightedGraph(DynamicHostGraphT& ref_dyn, SizeT nodes,
 
   // generate a random reference  graph
   for (VertexT v = 0; v < nodes; v++) {
-    auto& v_edges = ref_dyn[v];
+    auto &v_edges = ref_dyn[v];
     SizeT added_edges = 0;
     do {
       VertexT random_edge = rng() % nodes;
@@ -72,11 +72,11 @@ void GenerateRandomWeightedGraph(DynamicHostGraphT& ref_dyn, SizeT nodes,
     } while (added_edges != edges_per_node);
   }
 }
-void CompareWeightedCSRs(WeightedCSRGraphT& ref_graph,
-                         WeightedDYNGraphT& result_graph) {
+void CompareWeightedCSRs(WeightedCSRGraphT &ref_graph,
+                         WeightedDYNGraphT &result_graph) {
   // sort both CSR graphs
-  auto& result_csr_graph = result_graph.csr();
-  auto& ref_csr_graph = ref_graph.csr();
+  auto &result_csr_graph = result_graph.csr();
+  auto &ref_csr_graph = ref_graph.csr();
 
   result_csr_graph.Sort();
   ref_csr_graph.Sort();
@@ -100,4 +100,77 @@ void CompareWeightedCSRs(WeightedCSRGraphT& ref_graph,
                 result_csr_graph.edge_values[eid]);
     }
   }
+}
+
+// Note: Lambda functions are not in TEST function to avoid this error:
+// error: The enclosing parent function ("TestBody") for an extended __host__
+// __device__ lambda cannot have private or protected access within its class
+template <typename FrontierT, typename VertexT>
+void InitFrontierSrc(FrontierT &test_frontier, VertexT &advance_src) {
+  test_frontier.V_Q()->ForEach(
+      [advance_src] __host__ __device__(VertexT & v) { v = advance_src; }, 1,
+      util::DEVICE, 0);
+}
+
+template <typename GraphT, typename FrontierT, typename ParameterT>
+void CallAdvanceOprtr(GraphT &ref_csr_graph, FrontierT &test_frontier,
+                      ParameterT &oprtr_parameters) {
+  // the advance operation
+  auto advance_op = [] __host__ __device__(
+                        const VertexT &src, VertexT &dest,
+                        const ValueT &edge_value, const VertexT &input_item,
+                        const SizeT &input_pos,
+                        SizeT &output_pos) -> bool { return true; };
+  oprtr::Advance<oprtr::OprtrType_V2V>(ref_csr_graph, test_frontier.V_Q(),
+                                       test_frontier.Next_V_Q(),
+                                       oprtr_parameters, advance_op);
+}
+template <typename GraphT, typename VertexT>
+void advanceTester(std::string advance_mode, GraphT &graph, VertexT advance_src,
+                   std::vector<VertexT> &result_frontier) {
+  using FrontierT = app::Frontier<VertexT, SizeT>;
+
+  // build a frontier with one source vertex
+  FrontierT test_frontier;
+  unsigned int num_queues = 2;
+  std::vector<app::FrontierType> frontier_type(
+      2, app::FrontierType::VERTEX_FRONTIER);
+  std::string frontier_name = "test_frontier";
+  test_frontier.Init(num_queues, frontier_type.data(), frontier_name,
+                     util::DEVICE);
+
+  std::vector<double> queue_factors(num_queues, 2);
+  test_frontier.Allocate(graph.nodes, graph.edges, queue_factors);
+  test_frontier.Reset(util::DEVICE);
+
+  // generate initial frontier
+  SizeT num_srcs = 1;
+  test_frontier.queue_length = num_srcs;
+  InitFrontierSrc(test_frontier, advance_src);
+
+  // setup operator parameters
+  oprtr::OprtrParameters<GraphT, FrontierT, VertexT> oprtr_parameters;
+  oprtr_parameters.Init();
+  oprtr_parameters.advance_mode = advance_mode;
+  oprtr_parameters.frontier = &test_frontier;
+
+  // call the advance operator
+  CallAdvanceOprtr(graph, test_frontier, oprtr_parameters);
+
+  // Get back the resulted frontier length
+  test_frontier.work_progress.GetQueueLength(test_frontier.queue_index,
+                                             test_frontier.queue_length, false,
+                                             oprtr_parameters.stream, true);
+  auto output_queue = *test_frontier.V_Q();
+  auto output_queue_len = test_frontier.queue_length;
+  output_queue.Move(util::DEVICE, util::HOST);
+
+  // store results
+  result_frontier.resize(output_queue_len);
+  for (SizeT v = 0; v < output_queue_len; v++) {
+    result_frontier[v] = output_queue[v];
+    // printf("output_queue[%i] = %i\n", v, output_queue[v]);
+  }
+
+  test_frontier.Release();
 }
