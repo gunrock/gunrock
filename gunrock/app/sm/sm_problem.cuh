@@ -191,19 +191,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(results.Allocate(mem_limit, util::HOST | util::DEVICE));
       GUARD_CU(flags_write.Allocate(mem_limit, util::DEVICE));
 
-      free_byte = 0;
-      total_byte = 0;
-      cuda_status = cudaMemGetInfo( &free_byte, &total_byte ) ;
-      if ( cudaSuccess != cuda_status ){
-          printf("Error: cudaMemGetInfo fails, %s \n", cudaGetErrorString(cuda_status) );
-          exit(1);
-      }
-      free_db = (double)free_byte ;
-      total_db = (double)total_byte ;
-      used_db = total_db - free_db ;
-      printf("After flags_write GPU memory usage: used = %f, free = %f MB, total = %f MB\n",
-          used_db/1024.0/1024.0, free_db/1024.0/1024.0, total_db/1024.0/1024.0);
-
       // Initialize query graph node degree by row offsets
       // neighbor node encoding = sum of neighbor node labels
 
