@@ -169,7 +169,6 @@ void advanceTester(std::string advance_mode, GraphT &graph, VertexT advance_src,
   result_frontier.resize(output_queue_len);
   for (SizeT v = 0; v < output_queue_len; v++) {
     result_frontier[v] = output_queue[v];
-    // printf("output_queue[%i] = %i\n", v, output_queue[v]);
   }
 
   test_frontier.Release();
