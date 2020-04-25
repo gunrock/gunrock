@@ -21,10 +21,6 @@ namespace gunrock {
 namespace oprtr {
 namespace SimpleAdvance {
 
-/**
- * Arch dispatch
- */
-
 template <typename GraphT, typename InKeyT, typename OutKeyT,
           typename AdvanceOpT>
 __global__ void Kernel(
@@ -116,8 +112,6 @@ cudaError_t Launch_CSR_DYN(const GraphT &graph, const FrontierInT *frontier_in,
   typedef typename GraphT::ValueT ValueT;
   typedef typename FrontierInT ::ValueT InKeyT;
   typedef typename FrontierOutT::ValueT OutKeyT;
-  // typedef typename Dispatch<FLAG, GraphT, InKeyT, OutKeyT, true>
-  //    ::KernelPolicyT KernelPolicyT;
 
   cudaError_t retval = cudaSuccess;
 
@@ -126,7 +120,6 @@ cudaError_t Launch_CSR_DYN(const GraphT &graph, const FrontierInT *frontier_in,
   uint32_t num_blocks = (queue_length + block_size - 1) / block_size;
 
   if (parameters.get_output_length) {
-    // util::PrintMsg("getting output length");
     GUARD_CU(ComputeOutputLength<FLAG>(graph, frontier_in, parameters));
     GUARD_CU(parameters.frontier->output_length.Move(util::DEVICE, util::HOST,
                                                      1, 0, parameters.stream));
