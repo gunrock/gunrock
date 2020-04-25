@@ -79,6 +79,7 @@ struct ParallelIterator<VertexT, SizeT, ValueT, FLAG, HAS_DYN> {
           graph->dynamicGraph.d_edges_per_bucket[bid + v_buckets_offset];
       num_slabs += (b_edges + graph->dynamicGraph.edgesPerSlab - 1) /
                    graph->dynamicGraph.edgesPerSlab;
+      num_slabs = b_edges == 0 ? ++num_slabs : num_slabs;
     }
     return num_slabs *= graph->dynamicGraph.keysPerSlab;
   }
@@ -86,19 +87,53 @@ struct ParallelIterator<VertexT, SizeT, ValueT, FLAG, HAS_DYN> {
   __device__ VertexT neighbor(const SizeT& idx) {
     // tuples are dereferenced starting with base slabs then collision slabs
     SizeT slabId = (idx / graph->dynamicGraph.keysPerSlab);
-    bool is_base_slab =
-        slabId < graph->dynamicGraph.d_hash_context[v].getNumBuckets();
+    SizeT num_buckets = graph->dynamicGraph.d_hash_context[v].getNumBuckets();
+    bool is_base_slab = slabId < num_buckets;
     uint32_t laneId = threadIdx.x & 0x1F;
     uint32_t lane_data = EMPTY_KEY;
     if (is_base_slab) {
       lane_data = *(graph->dynamicGraph.d_hash_context[v].getPointerFromBucket(
           slabId, laneId));
     } else {
-      // iterate to find the keys
+      // iterate to find the base slab
+      slabId -= num_buckets;  // base slabs are dereferenced by now
+      SizeT prev_collision_slabs = 0;
+      SizeT num_collision_slabs = 0;
+      SizeT bid;
+      const SizeT v_buckets_offset = graph->dynamicGraph.d_buckets_offset[v];
+      for (bid = 0; bid < num_buckets; ++bid) {
+        SizeT b_edges =
+            graph->dynamicGraph.d_edges_per_bucket[bid + v_buckets_offset];
+        num_collision_slabs +=
+            (b_edges + graph->dynamicGraph.edgesPerSlab - 1) /
+            graph->dynamicGraph.edgesPerSlab;
+        num_collision_slabs =
+            b_edges == 0 ? ++num_collision_slabs : num_collision_slabs;
+        num_collision_slabs--;
+
+        if (slabId >= prev_collision_slabs && slabId < num_collision_slabs) {
+          slabId -= prev_collision_slabs;
+          break;  // fond the base slab
+        } else {
+          prev_collision_slabs = num_collision_slabs;
+        }
+      }
+
+      // now iterate to find the slab pointer
+      uint32_t ptr = *(
+          graph->dynamicGraph.d_hash_context[v].getPointerFromBucket(bid, 31));
+
+      for (SizeT sid = 0; sid < slabId; sid++) {
+        ptr = *(
+            graph->dynamicGraph.d_hash_context[v].getPointerFromSlab(ptr, 31));
+      }
+      lane_data = *(graph->dynamicGraph.d_hash_context[v].getPointerFromSlab(
+          ptr, laneId));
     }
 
     nodeReader<VertexT, ValueT, FLAG & HAS_EDGE_VALUES>::readNode(
         lane_data, neighborId, neighborVal, laneId);
+    slab_not_cached = false;
     return neighborId;
   }
 
