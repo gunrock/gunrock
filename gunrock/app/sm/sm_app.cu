@@ -63,8 +63,8 @@ double sm(
     const int                *query_col_indices,
     const int                 num_runs,
     gunrock::util::Location   device,
-          int                *subgraphs,
-          int                *list_subgraphs)
+    unsigned long            *subgraphs,
+    unsigned long            *list_subgraphs)
 {
     return sm_template(num_nodes, num_edges, row_offsets, col_indices,
         num_query_nodes, num_query_edges, query_row_offsets,

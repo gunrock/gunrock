@@ -412,8 +412,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @param[in]  device where the results are stored
    * \return     cudaError_t Error message(s), if any
    */
-  cudaError_t Extract(VertexT *count_subgraphs,
-                      VertexT *list_subgraphs,
+  cudaError_t Extract(unsigned long *count_subgraphs,
+                      unsigned long *list_subgraphs,
                       util::Location target = util::DEVICE,
                       util::Location device = util::HOST) {
     cudaError_t retval = cudaSuccess;
@@ -435,14 +435,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         }
 
         // further extract combination from h_results
-        vector<vector<int>> combinations;
+        vector<vector<unsigned long>> combinations;
         for (int i = 0; i < data_slice.temp_count[0]; ++i) {
           unsigned long key = data_slice.results[i];
           unsigned long stride = pow(nodes, nodes_query);
-          vector<int> combination;
+          vector<unsigned long> combination;
           for (int j = 0; j < nodes_query; ++j) {
             stride = stride / nodes;
-            int elem = key / stride;
+            unsigned long elem = key / stride;
             combination.push_back(elem);
             key = key - elem * stride;
           }
@@ -450,21 +450,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           combinations.push_back(combination);
         }
         sort(combinations.begin(), combinations.end());
-        vector<vector<int>>::iterator itr =
+        vector<vector<unsigned long>>::iterator itr =
             unique(combinations.begin(), combinations.end());
         combinations.resize(distance(combinations.begin(), itr));
-        // For debugging to output gunrock results
-        /*cout << "Listing matched subgraphs:" << endl;
-        for (int x = 0; x < combinations.size(); ++x) {
-          for (int y = 0; y < combinations[x].size(); ++y) {
-            cout << combinations[x][y] << " ";
+        count_subgraphs[0] = combinations.size();
+        list_subgraphs = new unsigned long[combinations.size() * nodes_query];
+        size_t iter = 0;
+        for (size_t i = 0; i < combinations.size(); ++i) {
+          for (size_t j = 0; j < nodes_query; ++j) {
+            list_subgraphs[iter++] = combinations[i][j];
           }
-          cout << endl;
         }
-        cout << endl;*/
-          count_subgraphs[0] = combinations.size();
-          list_subgraphs = new VertexT[combinations.size()];
-          std::copy(combinations.begin(), combinations.end(), list_subgraphs);
       } else { // returning results will be stored on the GPU
         if (target == util::DEVICE) {
           count_subgraphs = data_slice.temp_count.GetPointer(util::DEVICE);

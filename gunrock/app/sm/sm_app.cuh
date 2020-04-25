@@ -44,7 +44,7 @@ cudaError_t UseParameters(util::Parameters &parameters);
  */
 template <typename GraphT, typename VertexT = typename GraphT::VertexT>
 cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
-                     GraphT &query_graph, VertexT *ref_subgraphs,
+                     GraphT &query_graph, unsigned long *ref_subgraphs,
                      util::Location target = util::DEVICE) {
   cudaError_t retval = cudaSuccess;
   typedef typename GraphT::SizeT SizeT;
@@ -60,8 +60,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
   std::string validation = parameters.Get<std::string>("validation");
   util::Info info("SM", parameters, data_graph);  // initialize Info structure
 
-  VertexT *count_subgraphs = new VertexT[1];
-  VertexT *list_subgraphs;
+  unsigned long *count_subgraphs = new unsigned long[1];
+  unsigned long *list_subgraphs;
 
   ProblemT problem(parameters);
   EnactorT enactor;
@@ -70,7 +70,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
   cpu_timer.Stop();
   parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
-  int num_subgraphs = 0;
+  unsigned long num_subgraphs = 0;
   // perform SM
   for (int run_num = 0; run_num < num_runs; ++run_num) {
     GUARD_CU(problem.Reset(target));
@@ -147,7 +147,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_sm(gunrock::util::Parameters &parameters, GraphT &data_graph,
                   GraphT &query_graph, gunrock::util::Location device,
-                  typename GraphT::VertexT *subgraphs, typename GraphT::VertexT *list_subgraphs) {
+                  unsigned long *subgraphs, unsigned long *list_subgraphs) {
   typedef typename GraphT::VertexT VertexT;
   typedef gunrock::app::sm::Problem<GraphT> ProblemT;
   typedef gunrock::app::sm::Enactor<ProblemT> EnactorT;
@@ -202,7 +202,7 @@ double sm_template(const SizeT num_nodes, const SizeT num_edges,
                    const SizeT num_query_nodes, const SizeT num_query_edges,
                    const SizeT *query_row_offsets,
                    const VertexT *query_col_indices, const int num_runs,
-                   gunrock::util::Location device, VertexT *subgraphs, VertexT *list_subgraphs) {
+                   gunrock::util::Location device, unsigned long *subgraphs, unsigned long *list_subgraphs) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, VertexT,
                                            gunrock::graph::HAS_CSR>
       GraphT;
