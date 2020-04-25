@@ -113,7 +113,7 @@ struct ParallelIterator<VertexT, SizeT, ValueT, FLAG, HAS_DYN> {
 
         if (slabId >= prev_collision_slabs && slabId < num_collision_slabs) {
           slabId -= prev_collision_slabs;
-          break;  // fond the base slab
+          break;  // found the base slab
         } else {
           prev_collision_slabs = num_collision_slabs;
         }
