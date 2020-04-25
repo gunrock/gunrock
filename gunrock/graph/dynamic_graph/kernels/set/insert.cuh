@@ -37,17 +37,17 @@ __device__ void insertWarpEdges(PairT& thread_edge, ContextT*& hashContexts,
     uint32_t cur_src = __shfl_sync(0xFFFFFFFF, thread_edge.x, cur_lane, 32);
     bool same_src = (cur_src == thread_edge.x) && to_insert;
 
-    if (same_src) {
-      SizeT bucket_offset = d_buckets_offset[cur_src];
-      atomicAdd(&d_edges_per_bucket[bucket_offset + dst_bucket], 1);
-    }
-
     to_insert &= !same_src;
     bool success = hashContexts[cur_src].insertPairUnique(
         same_src, laneId, thread_edge.y, dst_bucket, local_allocator_ctx);
     uint32_t added_count = __popc(__ballot_sync(0xFFFFFFFF, success));
+
     if (laneId == 0) {
       atomicAdd(&d_edges_per_vertex[cur_src], added_count);
+    }
+    if (success) {
+      SizeT bucket_offset = d_buckets_offset[cur_src];
+      atomicAdd(&d_edges_per_bucket[bucket_offset + dst_bucket], 1);
     }
   }
 }
