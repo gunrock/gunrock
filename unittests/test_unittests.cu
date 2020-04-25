@@ -53,6 +53,9 @@
 // Tests simple advance
 #include "test_simple_advance.h"
 
+// Tests graph iterator
+#include "test_graph_iterator.h"
+
 using namespace gunrock;
 
 cudaError_t UseParameters(util::Parameters &parameters) {
