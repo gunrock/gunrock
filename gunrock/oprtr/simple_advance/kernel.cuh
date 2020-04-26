@@ -96,9 +96,7 @@ __global__ void Kernel(
     }
 
     if (laneId == src_lane) to_advance = false;
-
-    uint32_t newWorkQueue = __ballot_sync(WARP_MASK, to_advance);
-    work_queue = newWorkQueue;
+    work_queue = __ballot_sync(WARP_MASK, to_advance);
   }
 }
 
