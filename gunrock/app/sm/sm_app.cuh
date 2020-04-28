@@ -211,6 +211,10 @@ double sm_template(const SizeT num_nodes, const SizeT num_edges,
       GraphT;
   typedef typename GraphT::CsrT CsrT;
 
+  // redefining invalid device to HOST
+  if (device != gunrock::util::HOST && device != gunrock::util::DEVICE) {
+    device = gunrock::util::HOST;
+  }
   // Setup parameters
   gunrock::util::Parameters parameters("sm");
   gunrock::graphio::UseParameters(parameters);
