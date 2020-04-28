@@ -17,8 +17,7 @@ int main(int argc, char *argv[]) {
   unsigned int device = 0x01;  // CPU
 
   unsigned long *sm_counts = (unsigned long *)malloc(sizeof(unsigned long));
-  unsigned long *list_sm = (unsigned long *)malloc(
-      sizeof(unsigned long) * num_query_nodes * num_data_nodes);
+  unsigned long *list_sm;
 
   double elapsed =
       sm(num_data_nodes, num_data_edges, data_row_offsets, data_col_indices,

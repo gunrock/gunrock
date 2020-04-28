@@ -13,7 +13,7 @@ TEST(sharedlibrary, sm) {
   int query_col_indices[6] = {1, 2, 0, 2, 0, 1};
 
   unsigned long *sm_counts = new unsigned long[1];
-  unsigned long *list_sm = new unsigned long[num_data_nodes * num_query_nodes];
+  unsigned long *list_sm;
   unsigned int device = 0x01;  // CPU
 
   double elapsed = sm(num_data_nodes, num_data_edges, data_row_offsets,
