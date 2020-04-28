@@ -142,12 +142,14 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
  * @param[in]  query_graph     Input query graph
  * @param[out] subgraphs       Return number of matched subgraphs
  * @param[out] list_subgraphs  Return list of matched subgraph combinations
- * \return     double      Return accumulated elapsed times for all runs
+ * @param[in]  device          Target device where inputs and outputs are stored
+ * \return     double          Return accumulated elapsed times for all runs
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_sm(gunrock::util::Parameters &parameters, GraphT &data_graph,
-                  GraphT &query_graph, gunrock::util::Location device,
-                  unsigned long *subgraphs, unsigned long *list_subgraphs) {
+                  GraphT &query_graph, unsigned long *subgraphs,
+                  unsigned long *list_subgraphs,
+                  gunrock::util::Location device = gunrock::util::HOST) {
   typedef typename GraphT::VertexT VertexT;
   typedef gunrock::app::sm::Problem<GraphT> ProblemT;
   typedef gunrock::app::sm::Enactor<ProblemT> EnactorT;
@@ -191,9 +193,9 @@ double gunrock_sm(gunrock::util::Parameters &parameters, GraphT &data_graph,
  * @param[in]  query_row_offsets CSR-formatted query graph input row offsets
  * @param[in]  query_col_indices CSR-formatted query graph input column indices
  * @param[in]  num_runs          Number of runs to perform SM
- * @param[in]  device            Target device where inputs and outputs are stored
  * @param[out] subgraphs         Return number of subgraphs
  * @param[out] list_subgraphs    Return list of subgraph combinations
+ * @param[in]  device            Target device where inputs and outputs are stored
  * \return     double            Return accumulated elapsed times for all runs
  */
 template <typename VertexT, typename SizeT>
@@ -202,7 +204,8 @@ double sm_template(const SizeT num_nodes, const SizeT num_edges,
                    const SizeT num_query_nodes, const SizeT num_query_edges,
                    const SizeT *query_row_offsets,
                    const VertexT *query_col_indices, const int num_runs,
-                   gunrock::util::Location device, unsigned long *subgraphs, unsigned long *list_subgraphs) {
+                   unsigned long *subgraphs, unsigned long *list_subgraphs,
+                   gunrock::util::Location device = gunrock::util::HOST) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, VertexT,
                                            gunrock::graph::HAS_CSR>
       GraphT;
@@ -245,7 +248,7 @@ double sm_template(const SizeT num_nodes, const SizeT num_edges,
 
   // Run the SM
   double elapsed_time =
-      gunrock_sm(parameters, data_graph, query_graph, device, subgraphs, list_subgraphs);
+      gunrock_sm(parameters, data_graph, query_graph, subgraphs, list_subgraphs, device);
   // Cleanup
   data_graph.Release();
   query_graph.Release();

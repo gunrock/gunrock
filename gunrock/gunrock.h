@@ -398,6 +398,8 @@ double color(
  * @param[in]  query_col_indices CSR-formatted query graph input column indices
  * @param[in]  num_runs          Number of runs to perform SM
  * @param[out] subgraphs         Return number of subgraphs
+ * @param[out] list_subgraphs    Return list of subgraphs
+ * @param[in]  device            Target device to store inputs and outputs
  * \return     double            Return accumulated elapsed times for all runs
  */
 double sm(
@@ -410,7 +412,10 @@ double sm(
     const int           *query_row_offsets,
     const int           *query_col_indices,
     const int            num_runs,
-          int            *subgraphs);
+    unsigned long       *subgraphs,
+    unsigned long       *list_subgraphs,
+    unsigned int         device
+);
 
  /*
  * @brief HITS simple public interface.
