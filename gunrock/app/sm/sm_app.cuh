@@ -119,9 +119,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
   GUARD_CU(enactor.Release(target));
   GUARD_CU(problem.Release(target));
   delete[] count_subgraphs;
-  delete[] list_subgraphs;
   count_subgraphs = NULL;
-  list_subgraphs = NULL;
   cpu_timer.Stop();
   total_timer.Stop();
 
