@@ -27,7 +27,6 @@ int main(int argc, char *argv[]) {
   printf("Number matched subgraphs: [%d]\n", sm_counts[0]);
 
   if (sm_counts) free(sm_counts);
-  if (list_sm) free(list_sm);
 
   return 0;
 }

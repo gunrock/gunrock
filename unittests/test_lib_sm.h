@@ -28,6 +28,4 @@ TEST(sharedlibrary, sm) {
 
   delete[] sm_counts;
   sm_counts = NULL;
-  delete[] list_sm;
-  list_sm = NULL;
 }
