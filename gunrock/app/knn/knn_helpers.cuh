@@ -36,7 +36,6 @@ __device__ void bitonic_sort(ValueT* new_dist, SizeT* new_keys, int length){
             int step = threadIdx.x ^ p;
             if (step > threadIdx.x){
                 if ((threadIdx.x & offset) == 0){
-                    //assert(step < blockDim.x);
                     if (new_dist[threadIdx.x] > new_dist[step]){
                         auto tmp = new_dist[step];
                         new_dist[step] = new_dist[threadIdx.x];
@@ -46,7 +45,6 @@ __device__ void bitonic_sort(ValueT* new_dist, SizeT* new_keys, int length){
                         new_keys[threadIdx.x] = tmp2;
                     }
                 }else{
-                    //assert(step < blockDim.x);
                     if (new_dist[threadIdx.x] < new_dist[step]){
                         auto tmp = new_dist[step];
                         new_dist[step] = new_dist[threadIdx.x];
@@ -74,15 +72,17 @@ __device__ void release_semaphore(int* lock, int i){
 /**
  * @brief Compute euclidean distance
  * @param dim Number of dimensions (2D, 3D ... ND)
+ * @param N Number of points
  * @param points Points array to get the x, y, z...
  * @param p1 and p2 points to be compared
+ * @param transpose is true if points array is transposed
  * info \return distance value
+ * Use in operator knn_general_op, knn_half_op, 
  */
 template<typename SizeT, typename ValueT, typename PointT>
 __device__ __host__
 ValueT euclidean_distance(const SizeT dim, const SizeT N, 
-    ValueT* points, 
-    PointT p1, PointT p2, bool transpose) {
+    ValueT* points, PointT p1, PointT p2, bool transpose) {
 
     // Get dimensional of labels
     ValueT result = (ValueT) 0;
@@ -96,79 +96,16 @@ ValueT euclidean_distance(const SizeT dim, const SizeT N,
         }else{
             diff = points[i * N + p1] - points[i * N + p2];
         }
+        assert(std::abs(diff) < std::abs(util::PreDefinedValues<ValueT>::MaxValue/diff));
+        assert(result < (util::PreDefinedValues<ValueT>::MaxValue - (diff*diff)));
         result += diff*diff;
     }
     return _sqrt(result);
 }
-
-template<typename SizeT, typename ValueT, typename PointT>
-__device__ __host__
-ValueT euclidean_distance(const SizeT dim, const SizeT N, 
-    ValueT* points, const PointT p1, ValueT* sh_point, bool transpose) {
-
-    // Get dimensional of labels
-    ValueT result = (ValueT) 0;
-    // p1 = (x_1, x_2, ..., x_dim)
-    // p2 = (y_1, y_2, ..., y_dim)
-    for (int i=0; i<dim; ++i){
-        //(x_i - y_i)^2
-        ValueT diff = (ValueT)0;
-        if (! transpose){
-            diff = points[p1 * dim + i] - sh_point[i];
-        }else{
-            diff = points[i * N + p1] - sh_point[i];
-        }
-        result += diff*diff;
-    }
-    return _sqrt(result);
-}
-template<typename SizeT, typename ValueT, typename PointT>
-__device__ __host__
-ValueT euclidean_distance(const SizeT dim, const SizeT N, 
-    ValueT* b_point, PointT p1, ValueT* points, PointT p2){
-
-    // Get dimensional of labels
-    ValueT result = (ValueT) 0;
-    // p1 = (x_1, x_2, ..., x_dim)
-    // p2 = (y_1, y_2, ..., y_dim)
-    for (int i=0; i<dim; ++i){
-        //(x_i - y_i)^2
-        ValueT diff = (ValueT)0;
-        diff = b_point[i * (blockDim.x+1) + p1] - points[i * N + p2];
-        result += diff*diff;
-    }
-    return _sqrt(result);
-}
+// Use in operator knn_shared_not_transpose_op, knn_shared_transpose_op
 template<typename SizeT, typename ValueT, typename PointT>
 __device__
-ValueT euclidean_distance(const SizeT dim, 
-        ValueT* b_points, PointT p1, 
-        ValueT* sh_points, PointT p2){
-
-    // Get dimensional of labels
-    ValueT result = (ValueT) 0;
-    // p1 = (x_1, x_2, ..., x_dim)
-    // p2 = (y_1, y_2, ..., y_dim)
-    for (int i=0; i<dim; ++i){
-        //(x_i - y_i)^2
-        ValueT diff = b_points[i * blockDim.x + p1] - sh_points[i * blockDim.x + p2];
-        result += diff*diff;
-    }
-    return _sqrt(result);
-}
-
-template<typename SizeT, typename ValueT>
-__global__
-void init(ValueT arraySH, ValueT arrayG, SizeT cols, SizeT row0, SizeT num_rows){
-    for (int i = 0; i<num_rows; ++i){
-        arraySH[threadIdx.x * (num_rows+1) + i] = arrayG[(row0 + i) * cols + threadIdx.x];
-    }
-}
- 
-template<typename SizeT, typename ValueT, typename PointT>
-__device__
-ValueT euclidean_distance(const SizeT dim, 
-        ValueT* b_points, PointT p1, 
+ValueT euclidean_distance(const SizeT dim, ValueT* b_points, PointT p1, 
         ValueT* sh_point){
 
     // Get dimensional of labels
@@ -178,55 +115,13 @@ ValueT euclidean_distance(const SizeT dim,
     for (int i=0; i<dim; ++i){
         //(x_i - y_i)^2
         ValueT diff = b_points[i * (blockDim.x+1) + p1] - sh_point[i];
+        assert(std::abs(diff) < std::abs(util::PreDefinedValues<ValueT>::MaxValue/diff));
+        assert(result < (util::PreDefinedValues<ValueT>::MaxValue - (diff*diff)));
         result += diff*diff;
     }
     return _sqrt(result);
 }
 
-template<typename SizeT, typename ValueT>
-__global__ 
-void euclidean_distanceDim1024(const SizeT dim, const SizeT N, const SizeT k,
-    ValueT* points, const SizeT p1, const SizeT p2, ValueT* distance) {
-
-    __shared__ float values[2];
-
- //   printf("threads (%d, %d), block (%d, %d)\n",
- //           blockDim.x, blockDim.y, gridDim.x, gridDim.y);
-
-    if (threadIdx.x < dim){
-        float diff = (float)(points[(threadIdx.x * N) + p1] - points[(threadIdx.x * N) + p2]);
-        values[threadIdx.x] = diff*diff; 
-    }else{
-        values[threadIdx.x] = (float)0;
-    }
-    __syncthreads();
-/*
-    if (threadIdx.x == 0){
-        for (int i = 0; i<dim; ++i){
-            printf("(%.lf - %.lf)^2 = values[%d] = %.f\n", points[i * N + p1], points[i * N + p2], i, values[i]);
-        }
-    }
-*/
-
-    for (int i = 1; i < dim; i*=2){
-        float diff = (float)0;
-        if (threadIdx.x + i < dim){
-            diff = values[threadIdx.x + i];
-        }
-        __syncthreads();
-        values[threadIdx.x] += diff;
-        __syncthreads();
-    }
-
-    __syncthreads();
-
-    if (threadIdx.x == 0){
-        distance[p1 * (k+1) + k] = _sqrt(values[0]);
-        //printf("dist (%d, %d) = %.f\n", p1, p2, distance[p1*(k+1) + k]);
-    }
-
-    return;
-}
 }  // namespace knn
 }  // namespace app
 }  // namespace gunrock

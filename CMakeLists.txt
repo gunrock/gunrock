@@ -30,9 +30,9 @@ else (ENABLE_WARNINGS)
 endif (ENABLE_WARNINGS)
 # end /* Suppress all warnings from gcc */
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++14 -fPIC")
 
 option(CMAKE_VERBOSE_MAKEFILE OFF)
 

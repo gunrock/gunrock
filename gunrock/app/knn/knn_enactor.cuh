@@ -280,15 +280,17 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         }
         __syncthreads();
 
-        // Initializations of basic points
-        // 7217ms 
-        double array[100];
-
         // Copying to shared memory
         if (dim%2 == 0){
             #pragma unroll
             for (SizeT j = threadIdx.x; j < (blockDim.x * dim)/2; j += blockDim.x){
-                reinterpret_cast<double2*>(b_sh_points)[j] = reinterpret_cast<double2*>(points + firstPoint*dim)[j];
+                if constexpr(sizeof(ValueT) == 8){
+                    // ValueT == double
+                    reinterpret_cast<double2*>(b_sh_points)[j] = reinterpret_cast<double2*>(points + firstPoint*dim)[j];
+                }else{
+                    // ValueT == float
+                    reinterpret_cast<float2*>(b_sh_points)[j] = reinterpret_cast<float2*>(points + firstPoint*dim)[j];
+                }
             }
         }else{
             #pragma unroll
@@ -299,6 +301,10 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
         __syncthreads();
         
+        // Initializations of basic points
+        // 7217ms 
+        ValueT array[100];
+
         // Copying shared memory to registers
         #pragma unroll
         for (SizeT j = 0; j < dim; ++j){
@@ -330,7 +336,13 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                 #pragma unroll
                 for (SizeT j=threadIdx.x; j<dim/2; j+=blockDim.x){
                     // Doing better with fetching int4 data
-                    reinterpret_cast<double2*>(sh_point)[j] = reinterpret_cast<double2*>(points + (i * dim))[j];
+                    if constexpr(sizeof(ValueT) == 8){
+                        // ValueT == double
+                        reinterpret_cast<double2*>(sh_point)[j] = reinterpret_cast<double2*>(points + (i * dim))[j];
+                    }else{
+                        // ValueT == float
+                        reinterpret_cast<float2*>(sh_point)[j] = reinterpret_cast<float2*>(points + (i * dim))[j];
+                    }
                 }
             }else{
                 #pragma unroll
@@ -412,14 +424,14 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         }
         __syncthreads();
 
-        double* ptr = points + firstPoint;
+        ValueT* ptr = points + firstPoint;
         int idx = threadIdx.x;
         if (firstPoint + threadIdx.x < num_points){
             b_sh_points[idx] = ptr[threadIdx.x];
         }
 
         ptr += num_points;
-        double value = util::PreDefinedValues<int>::InvalidValue;
+        ValueT value = util::PreDefinedValues<ValueT>::InvalidValue;
         if (firstPoint + threadIdx.x < num_points){
             value = ptr[threadIdx.x];
         }

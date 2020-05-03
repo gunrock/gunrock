@@ -293,6 +293,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     int block_size = (num_points < num_threads ? num_points : num_threads);
 
     int data_size = sizeof(ValueT);
+    printf("data_size = %d\n", data_size);
     int points_size =  ((((block_size + 1) * dim * data_size) + 127)/128) * 128;
     int dist_size =    ((((block_size + 1) * k * data_size) + 127)/128) * 128;
     int keys_size =    ((((block_size + 1) * k * sizeof(int)) + 127)/128) * 128;
