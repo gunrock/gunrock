@@ -13,6 +13,11 @@ enum order_t
 
 namespace radix
 {
+
+  namespace host {
+    // XXX: CPU radix sort
+  } // namespace: host
+
   namespace device {
 
   // XXX: Make DoubleBuffer optional, and add support from thrust/mgpu.
