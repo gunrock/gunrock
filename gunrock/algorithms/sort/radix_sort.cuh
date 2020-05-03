@@ -31,7 +31,7 @@ namespace radix
   error_t sort(const key_t* keys_in,
                key_t* keys_out,
                int num_items,
-               storage_t* d_temp_storage = NULL,
+               storage_t* temp_storage = NULL,
                size_t& temp_storage_bytes = 0,
                int begin_bit = 0,
                int end_bit = sizeof(key_t) * 8,
@@ -44,28 +44,28 @@ namespace radix
     if (order == order_t::ascending) {
       // Determine temporary device storage requirements
       cub::DeviceRadixSort::SortKeys(
-        d_temp_storage, temp_storage_bytes, keys, num_items);
+        temp_storage, temp_storage_bytes, keys, num_items);
 
       // Allocate temporary storage
-      cudaMalloc(&d_temp_storage, temp_storage_bytes);
+      cudaMalloc(&temp_storage, temp_storage_bytes);
 
       // Run sorting operation
       cub::DeviceRadixSort::SortKeys(
-        d_temp_storage, temp_storage_bytes, keys, num_items);
+        temp_storage, temp_storage_bytes, keys, num_items);
     }
 
     else // order_t::descending
     {
       // Determine temporary device storage requirements
       cub::DeviceRadixSort::SortKeysDescending(
-        d_temp_storage, temp_storage_bytes, keys, num_items);
+        temp_storage, temp_storage_bytes, keys, num_items);
 
       // Allocate temporary storage
-      cudaMalloc(&d_temp_storage, temp_storage_bytes);
+      cudaMalloc(&temp_storage, temp_storage_bytes);
 
       // Run sorting operation
       cub::DeviceRadixSort::SortKeysDescending(
-        d_temp_storage, temp_storage_bytes, keys, num_items);
+        temp_storage, temp_storage_bytes, keys, num_items);
     }
 
     if (keys.Current() != keys_out) {
@@ -90,7 +90,7 @@ namespace radix
                      const value_t* values_in,
                      value_t* values_out,
                      int num_items,
-                     storage_t* d_temp_storage = NULL,
+                     storage_t* temp_storage = NULL,
                      size_t& temp_storage_bytes = 0,
                      int begin_bit = 0,
                      int end_bit = sizeof(key_t) * 8,
@@ -104,28 +104,28 @@ namespace radix
     if (order == order_t::ascending) {
       // Determine temporary device storage requirements
       cub::DeviceRadixSort::SortPairs(
-        d_temp_storage, temp_storage_bytes, keys, values, num_items);
+        temp_storage, temp_storage_bytes, keys, values, num_items);
 
       // Allocate temporary storage
-      cudaMalloc(&d_temp_storage, temp_storage_bytes);
+      cudaMalloc(&temp_storage, temp_storage_bytes);
 
       // Run sorting operation
       cub::DeviceRadixSort::SortPairs(
-        d_temp_storage, temp_storage_bytes, keys, values, num_items);
+        temp_storage, temp_storage_bytes, keys, values, num_items);
     }
 
     else // order_t::descending
     {
       // Determine temporary device storage requirements
       cub::DeviceRadixSort::SortPairsDescending(
-        d_temp_storage, temp_storage_bytes, keys, values, num_items);
+        temp_storage, temp_storage_bytes, keys, values, num_items);
 
       // Allocate temporary storage
-      cudaMalloc(&d_temp_storage, temp_storage_bytes);
+      cudaMalloc(&temp_storage, temp_storage_bytes);
 
       // Run sorting operation
       cub::DeviceRadixSort::SortPairsDescending(
-        d_temp_storage, temp_storage_bytes, keys, values, num_items);
+        temp_storage, temp_storage_bytes, keys, values, num_items);
     }
 
     if (keys.Current() != keys_out) {
@@ -156,7 +156,7 @@ namespace radix
                         int num_segments,
                         offset_t* begin_offset,
                         offset_t* end_offsets = (begin_offset + 1),
-                        storage_t* d_temp_storage = NULL,
+                        storage_t* temp_storage = NULL,
                         size_t& temp_storage_bytes = 0,
                         int begin_bit = 0,
                         int end_bit = sizeof(key_t) * 8,
@@ -168,7 +168,7 @@ namespace radix
 
     if (order == order_t::ascending) {
       // Determine temporary device storage requirements
-      cub::DeviceSegmentedRadixSort::SortKeys(d_temp_storage,
+      cub::DeviceSegmentedRadixSort::SortKeys(temp_storage,
                                               temp_storage_bytes,
                                               num_items,
                                               num_segments,
@@ -176,10 +176,10 @@ namespace radix
                                               d_offsets + 1);
 
       // Allocate temporary storage
-      cudaMalloc(&d_temp_storage, temp_storage_bytes);
+      cudaMalloc(&temp_storage, temp_storage_bytes);
 
       // Run sorting operation
-      cub::DeviceSegmentedRadixSort::SortKeys(d_temp_storage,
+      cub::DeviceSegmentedRadixSort::SortKeys(temp_storage,
                                               temp_storage_bytes,
                                               num_items,
                                               num_segments,
@@ -190,7 +190,7 @@ namespace radix
     else // order_t::descending
     {
       // Determine temporary device storage requirements
-      cub::DeviceSegmentedRadixSort::SortKeysDescending(d_temp_storage,
+      cub::DeviceSegmentedRadixSort::SortKeysDescending(temp_storage,
                                                         temp_storage_bytes,
                                                         num_items,
                                                         num_segments,
@@ -198,10 +198,10 @@ namespace radix
                                                         d_offsets + 1);
 
       // Allocate temporary storage
-      cudaMalloc(&d_temp_storage, temp_storage_bytes);
+      cudaMalloc(&temp_storage, temp_storage_bytes);
 
       // Run sorting operation
-      cub::DeviceSegmentedRadixSort::SortKeysDescending(d_temp_storage,
+      cub::DeviceSegmentedRadixSort::SortKeysDescending(temp_storage,
                                                         temp_storage_bytes,
                                                         num_items,
                                                         num_segments,
@@ -235,7 +235,7 @@ namespace radix
                               int num_segments,
                               offset_t* begin_offset,
                               offset_t* end_offsets = (begin_offset + 1),
-                              storage_t* d_temp_storage = NULL,
+                              storage_t* temp_storage = NULL,
                               size_t& temp_storage_bytes = 0,
                               int begin_bit = 0,
                               int end_bit = sizeof(key_t) * 8,
@@ -247,7 +247,7 @@ namespace radix
 
     if (order == order_t::ascending) {
       // Determine temporary device storage requirements
-      cub::DeviceSegmentedRadixSort::SortKeys(d_temp_storage,
+      cub::DeviceSegmentedRadixSort::SortKeys(temp_storage,
                                               temp_storage_bytes,
                                               num_items,
                                               num_segments,
@@ -255,10 +255,10 @@ namespace radix
                                               d_offsets + 1);
 
       // Allocate temporary storage
-      cudaMalloc(&d_temp_storage, temp_storage_bytes);
+      cudaMalloc(&temp_storage, temp_storage_bytes);
 
       // Run sorting operation
-      cub::DeviceSegmentedRadixSort::SortKeys(d_temp_storage,
+      cub::DeviceSegmentedRadixSort::SortKeys(temp_storage,
                                               temp_storage_bytes,
                                               num_items,
                                               num_segments,
@@ -269,7 +269,7 @@ namespace radix
     else // order_t::descending
     {
       // Determine temporary device storage requirements
-      cub::DeviceSegmentedRadixSort::SortKeysDescending(d_temp_storage,
+      cub::DeviceSegmentedRadixSort::SortKeysDescending(temp_storage,
                                                         temp_storage_bytes,
                                                         num_items,
                                                         num_segments,
@@ -277,10 +277,10 @@ namespace radix
                                                         d_offsets + 1);
 
       // Allocate temporary storage
-      cudaMalloc(&d_temp_storage, temp_storage_bytes);
+      cudaMalloc(&temp_storage, temp_storage_bytes);
 
       // Run sorting operation
-      cub::DeviceSegmentedRadixSort::SortKeysDescending(d_temp_storage,
+      cub::DeviceSegmentedRadixSort::SortKeysDescending(temp_storage,
                                                         temp_storage_bytes,
                                                         num_items,
                                                         num_segments,
