@@ -1,5 +1,6 @@
 
 #pragma once
+#include <cstddef>
 #include <cub/cub.cuh>
 
 namespace gunrock {
@@ -16,21 +17,43 @@ enum select_t
 
 namespace device
 {
+    
+//   template<select_t select_type = select_t::unique,
+//            typename error_t,
+//            typename storage_t,
+//            typename input_t,
+//            typename output_t,
+//            typename flag_t,
+//            typename op_t,
+//            typename select_out_t,
+//            typename int_t,
+//            typename stream_t>
+//   error_t select(input_t * input,
+//                  output_t * output,
+//                  select_out_t * selected,
+//                  int_t count,
+//                  storage_t * temp_storage = NULL,
+//                  size_t & temp_storage_bytes = 0,
+//                  flag_t * flags = std::nullptr,
+//                  op_t op = std::nullptr;
+//                  stream_t stream = 0, // XXX: generalize
+//                  bool sync = false)
+//   {}
 
   template<typename error_t,
            typename storage_t,
            typename input_t,
            typename output_t,
            typename flag_t,
-           typename select_t,
+           typename select_out_t,
            typename int_t,
            typename stream_t>
   error_t select_flagged(input_t * input,
                          flag_t * flags,
                          output_t * output,
-                         select_t * selected,
+                         select_out_t * selected,
                          int_t count,
-                         storage_t temp_storage = NULL,
+                         storage_t * temp_storage = NULL,
                          size_t & temp_storage_bytes = 0,
                          stream_t stream = 0, // XXX: generalize
                          bool sync = false)
@@ -70,15 +93,15 @@ namespace device
            typename input_t,
            typename output_t,
            typename op_t,
-           typename select_t,
+           typename select_out_t,
            typename int_t,
            typename stream_t>
   error_t select_if(input_t * input,
                     output_t * output,
-                    select_t * selected,
+                    select_out_t * selected,
                     int_t count,
                     op_t op,
-                    storage_t temp_storage = NULL,
+                    storage_t * temp_storage = NULL,
                     size_t & temp_storage_bytes = 0,
                     stream_t stream = 0, // XXX: generalize
                     bool sync = false)
@@ -117,14 +140,14 @@ namespace device
            typename storage_t,
            typename input_t,
            typename output_t,
-           typename select_t,
+           typename select_out_t,
            typename int_t,
            typename stream_t>
   error_t select_unique(input_t * input,
                         output_t * output,
-                        select_t * selected,
+                        select_out_t * selected,
                         int_t count,
-                        storage_t temp_storage = NULL,
+                        storage_t * temp_storage = NULL,
                         size_t & temp_storage_bytes = 0,
                         stream_t stream = 0, // XXX: generalize
                         bool sync = false)
