@@ -7,8 +7,8 @@ namespace sort {
 
 enum order_t
 {
-  ASCENDING,
-  DESCENDING
+  ascending,
+  descending
 }
 
 namespace radix
@@ -36,7 +36,7 @@ namespace radix
     // Create a set of DoubleBuffers to wrap pairs of device pointers
     cub::DoubleBuffer<key_t> keys(keys_in, keys_out);
 
-    if (order == order_t::ASCENDING) {
+    if (order == order_t::ascending) {
       // Determine temporary device storage requirements
       cub::DeviceRadixSort::SortKeys(
         d_temp_storage, temp_storage_bytes, keys, num_items);
@@ -49,7 +49,7 @@ namespace radix
         d_temp_storage, temp_storage_bytes, keys, num_items);
     }
 
-    else // order_t::DESCENDING
+    else // order_t::descending
     {
       // Determine temporary device storage requirements
       cub::DeviceRadixSort::SortKeysDescending(
@@ -96,7 +96,7 @@ namespace radix
     cub::DoubleBuffer<key_t> keys(keys_in, keys_out);
     cub::DoubleBuffer<value_t> values(values_in, values_out);
 
-    if (order == order_t::ASCENDING) {
+    if (order == order_t::ascending) {
       // Determine temporary device storage requirements
       cub::DeviceRadixSort::SortPairs(
         d_temp_storage, temp_storage_bytes, keys, values, num_items);
@@ -109,7 +109,7 @@ namespace radix
         d_temp_storage, temp_storage_bytes, keys, values, num_items);
     }
 
-    else // order_t::DESCENDING
+    else // order_t::descending
     {
       // Determine temporary device storage requirements
       cub::DeviceRadixSort::SortPairsDescending(
@@ -161,7 +161,7 @@ namespace radix
     // Create a set of DoubleBuffers to wrap pairs of device pointers
     cub::DoubleBuffer<key_t> keys(keys_in, keys_out);
 
-    if (order == order_t::ASCENDING) {
+    if (order == order_t::ascending) {
       // Determine temporary device storage requirements
       cub::DeviceSegmentedRadixSort::SortKeys(d_temp_storage,
                                               temp_storage_bytes,
@@ -182,7 +182,7 @@ namespace radix
                                               d_offsets + 1);
     }
 
-    else // order_t::DESCENDING
+    else // order_t::descending
     {
       // Determine temporary device storage requirements
       cub::DeviceSegmentedRadixSort::SortKeysDescending(d_temp_storage,
@@ -240,7 +240,7 @@ namespace radix
     // Create a set of DoubleBuffers to wrap pairs of device pointers
     cub::DoubleBuffer<key_t> keys(keys_in, keys_out);
 
-    if (order == order_t::ASCENDING) {
+    if (order == order_t::ascending) {
       // Determine temporary device storage requirements
       cub::DeviceSegmentedRadixSort::SortKeys(d_temp_storage,
                                               temp_storage_bytes,
@@ -261,7 +261,7 @@ namespace radix
                                               d_offsets + 1);
     }
 
-    else // order_t::DESCENDING
+    else // order_t::descending
     {
       // Determine temporary device storage requirements
       cub::DeviceSegmentedRadixSort::SortKeysDescending(d_temp_storage,
