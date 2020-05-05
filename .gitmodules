@@ -1,0 +1,9 @@
+[submodule "externals/cuda-api-wrappers"]
+	path = externals/cuda-api-wrappers
+	url = git@github.com:eyalroz/cuda-api-wrappers.git
+[submodule "externals/cub"]
+	path = externals/cub
+	url = git@github.com:NVlabs/cub.git
+[submodule "externals/moderngpu"]
+	path = externals/moderngpu
+	url = git@github.com:moderngpu/moderngpu.git
