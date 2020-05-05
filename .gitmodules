@@ -7,3 +7,6 @@
 [submodule "externals/moderngpu"]
 	path = externals/moderngpu
 	url = git@github.com:moderngpu/moderngpu.git
+[submodule "externals/rapidjson"]
+	path = externals/rapidjson
+	url = git@github.com:Tencent/rapidjson.git
