@@ -1,4 +1,4 @@
-// using cuda-api-wrappers
+// includes: cuda-api-wrappers
 #include <cuda/api/memory.hpp>
 
 namespace gunrock {
@@ -91,7 +91,7 @@ namespace dense
 
     // With no location specified, it will free() all
     // allocations for the array_t.
-    free(location_t target = this->allocated)
+    void free(location_t target = this->allocated)
     {
       if (is_location_set(target, location_t::host)) {
         cuda::memory::host::free(this->h_pointer);
@@ -160,7 +160,7 @@ namespace dense
     }
 
     // XXX: should this be CUDA_HOST_DEVICE?
-    void set_pointer(type_t* p,
+    CUDA_HOST_DEVICE void set_pointer(type_t* p,
                      int_t size,
                      location_t target = location_t::default)
     {}
