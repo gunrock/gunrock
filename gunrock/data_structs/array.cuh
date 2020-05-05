@@ -6,9 +6,9 @@ namespace datastruct {
 
 enum location_t
 {
-  none = 1 << 0; 
-  
-  host = 1 << 1; 
+  none = 1 << 0;
+
+  host = 1 << 1;
   device = 1 << 2;
 
   all = 1 << 4;
@@ -35,10 +35,13 @@ namespace dense
     type_t* h_pointer;
     type_t* d_pointer;
 
-    // static constexpr type_t& reference(const type& t, size_t n) noexcept   {
-    // return const_cast<type_t&>(t[n]); }
-
     location_t allocated;
+
+    static constexpr reference_t reference(const reference_t p,
+                                           size_t n) noexcept
+    {
+      return const_cast<reference_t>(p[n]);
+    }
 
     __inline__ bool is_location_set(location_t targets, location_t check) const
     {
@@ -104,74 +107,356 @@ namespace dense
       }
     }
 
-    // pointers::
-    CUDA_HOST_DEVICE constexpr pointer_t data(
-      location_t target = location_t::default) noexcept
-    {
-      // Return pointer of array on host-side
-      if (target == location_t::host)
-        return const_cast<pointer_t>(h_pointer);
+    /*
+     * pointers::
+     */
 
-      // Default location is always device:
-      return const_cast<pointer_t>(d_pointer);
+    // Return pointer of array on host or device-side
+    CUDA_HOST_DEVICE constexpr pointer_t data() noexcept
+    {
+
+#ifdef __CUDA_ARCH__
+      return const_cast<pointer_t>(this->d_pointer);
+#else
+      return const_cast<pointer_t>(this->h_pointer);
+#endif
     }
 
-    CUDA_HOST_DEVICE constexpr const_pointer_t data(
-      location_t target = location_t::default) noexcept
+    // Return a const pointer of array on host or device-side
+    CUDA_HOST_DEVICE constexpr const_pointer_t data() const noexcept
     {
-      // Return const pointer of array on host-side
-      if (target == location_t::host)
-        return const_cast<const_pointer_t>(h_pointer);
-
-      // Default location is always device:
-      return const_cast<const_pointer_t>(d_pointer);
+#ifdef __CUDA_ARCH__
+      return const_cast<const_pointer_t>(this->d_pointer);
+#else
+      return const_cast<const_pointer_t>(this->h_pointer);
+#endif
     }
 
-    // capacity::
-    CUDA_HOST_DEVICE constexpr _int_t size() const noexcept { return N; }
-    CUDA_HOST_DEVICE constexpr bool empty() const noexcept
+    CUDA_HOST_DEVICE constexpr pointer_t data(location_t target) noexcept
     {
-      return (size() == 0);
-    }
 
-    // XXX
-    resize(_int_t new_size) {}
+      if (is_location_set(target, location_t::device)) {
+        return const_cast<pointer_t>(this->d_pointer);
+      }
 
-    // XXX: deep copy
-    copy() {}
-    move() {}
-
-    CUDA_HOST_DEVICE constexpr bool is_allocated(_int_t size,
-                                                 location_t target) noexcept {
-      // XXX: maybe needs an explicit memory check?
-      return ((is_location_set(this->allocated, target)) && (size() == size))
-    }
-
-    CUDA_HOST_DEVICE __forceinline__ pointer
-      pointer(location_t target = location_t::default) const
-    {
-      if (is_location_set(target, location_t::device))
-        return d_pointer;
-
-      if (is_location_set(target, location_t::host))
-        return h_pointer;
+      if (is_location_set(target, location_t::host)) {
+        return const_cast<pointer_t>(this->h_pointer);
+      }
 
       return std::nullptr;
     }
 
-    // XXX: should this be CUDA_HOST_DEVICE?
-    CUDA_HOST_DEVICE void set_pointer(type_t* p,
-                     int_t size,
-                     location_t target = location_t::default)
-    {}
+    CUDA_HOST_DEVICE constexpr const_pointer_t data(
+      location_t target) noexcept const
+    {
 
-    // Scalar/Vector Operations
+      if (is_location_set(target, location_t::device)) {
+        return const_cast<const_pointer_t>(this->d_pointer);
+      }
+
+      if (is_location_set(target, location_t::host)) {
+        return const_cast<const_pointer_t>(this->h_pointer);
+      }
+
+      return std::nullptr;
+    }
+
+    /*
+     * operators::
+     */
+
+    // XXX: Is this safe?
+    constexpr pointer_t operator=(pointer_t ptr,
+                                  _int_t size,
+                                  location_t target) noexcept
+    {
+      if (is_location_set(target, location_t::device)) {
+        this->d_pointer = const_cast<pointer_t>(ptr);
+        this->size = size;
+        return data(location_t::device);
+      }
+
+      if (is_location_set(target, location_t::host)) {
+        this->h_pointer = const_cast<pointer_t>(ptr);
+        this->size = size;
+        return data(location_t::host);
+      }
+    }
+
+    // XXX: Is this safe?
+    constexpr const_pointer_t operator=(const_pointer_t ptr,
+                                        _int_t size,
+                                        location_t target) noexcept const
+    {
+      if (is_location_set(target, location_t::device)) {
+        this->d_pointer = const_cast<const_pointer_t>(ptr);
+        this->size = size;
+        return data(location_t::device);
+      }
+
+      if (is_location_set(target, location_t::host)) {
+        this->h_pointer = const_cast<const_pointer_t>(ptr);
+        this->size = size;
+        return data(location_t::host);
+      }
+    }
+
+    CUDA_HOST_DEVICE constexpr reference_t operator[](_int_t n) noexcept
+    {
+#ifdef __CUDA_ARCH__
+      return reference(this->d_pointer, n);
+#else
+      return reference(this->h_pointer, n);
+#endif
+    }
+
+    CUDA_HOST_DEVICE constexpr const_reference operator[](_int_t n) const
+      noexcept
+    {
+#ifdef __CUDA_ARCH__
+      return reference(this->d_pointer, n);
+#else
+      return reference(this->h_pointer, n);
+#endif
+    }
+
+    CUDA_HOST_DEVICE constexpr pointer_t operator->() noexcept
+    {
+#ifdef __CUDA_ARCH__
+      return data();
+#else
+      return data();
+#endif
+    }
+
+    CUDA_HOST_DEVICE constexpr const_pointer_t operator->() const noexcept
+    {
+#ifdef __CUDA_ARCH__
+      return data();
+#else
+      return data();
+#endif
+    }
+
+    template<typename scalar_t>
+    __host__ __device__ __forceinline__ ValueT* operator+(
+      const scalar_t& offset) const noexcept
+    {
+#ifdef __CUDA_ARCH__
+      return data() + offset;
+#else
+      return data() + offset;
+#endif
+    }
+
+    template<typename scalar_t>
+    __host__ __device__ __forceinline__ ValueT* operator+(
+      const scalar_t& offset) const noexcept
+    {
+#ifdef __CUDA_ARCH__
+      return data() + offset;
+#else
+      return data() + offset;
+#endif
+    }
+
+    // XXX: add other operators-,/,*,+=,-=,*=,/=...
+
+    // XXX: __device__ __host__? How do we set host
+    // pointers on device and vice-versa?
+    // Another option is a partial set, which means
+    // you will check if you are on CUDA_ARCH, and
+    // only set device, otherwise, you will set host
+    // and device.
+    array_t& operator=(const array_t& other)
+    {
+      this->size = other.size;
+      this->allocated = other.allocated;
+      this->h_pointer = other.h_pointer;
+      this->d_pointer = other.d_pointer;
+      return *this;
+    }
+
+    /*
+     * capacity::
+     */
+
+    CUDA_HOST_DEVICE constexpr _int_t size() const noexcept { return N; }
+
+    // XXX: return (size() == 0);?
+    CUDA_HOST_DEVICE constexpr bool empty() const noexcept
+    {
+#ifdef __CUDA_ARCH__
+      return (this->d_pointer == std::nullptr) ? true : false;
+#else
+      return (this->h_pointer == std::nullptr) ? true : false;
+#endif
+    }
+
+    CUDA_HOST_DEVICE constexpr bool is_allocated(
+      location_t target,
+      _int_t size = this->size) noexcept {
+      // XXX: maybe needs an explicit memory check?
+      return ((is_location_set(this->allocated, target)) &&
+              (size() == this->size))
+    }
+
+    /*
+     * memory management::
+     */
+
+    // synchronous copy
+    copy(pointer_t source, pointer_t destination, size_t bytes)
+    {
+      // cuda-api-wrappers goes to-from, size.
+      cuda::memory::copy(destination, source, bytes);
+    }
+
+    // asynchronous copy
+    template<typename stream_t>
+    copy(pointer_t source, pointer_t destination, size_t bytes, stream_t stream)
+    {
+      // cuda-api-wrappers goes to-from, size.
+      cuda::memory::async::copy(destination, source, bytes, stream);
+    }
+
+    // should move issue a free?
+    // we don't need size here.
+    void move(location_t source, location_t destination)
+    {
+      cuda::memory::copy(this->data(destination),
+                         this->data(source),
+                         this->size * sizeof(type_t));
+    }
+
+    template<typename stream_t>
+    move(location_t source, location_t destination)
+    {
+      cuda::memory::async::copy(this->data(destination),
+                                this->data(source),
+                                this->size * sizeof(type_t),
+                                stream);
+    }
+
+    void resize(_int_t new_size)
+    {
+      array<type_t, new_size> temp;
+      location_t temp_target;
+
+      if (is_allocated(location_t::device)) {
+        set_location(temp_target, location_t::device);
+      }
+
+      if (is_allocated(location_t::host)) {
+        set_location(temp_target, location_t::host);
+      }
+
+      temp.allocate(new_size, temp_target);
+
+      // shrink
+      // warning, you lose data on a shrink
+      if (this->size > new_size) {
+        // XXX: I shouldn't have to do this check
+        if (is_location_set(temp_target, location_t::host)) {
+          this->copy(this->data(location_t::host),
+                     temp->data(location_t::host),
+                     new_size * sizeof(type_t));
+        }
+
+        if (is_location_set(temp_target, location_t::device)) {
+          this->copy(this->data(location_t::device),
+                     temp->data(location_t::device),
+                     new_size * sizeof(type_t));
+        }
+      }
+
+      // expand
+      else {
+        if (is_location_set(temp_target, location_t::host)) {
+          this->copy(this->data(location_t::host),
+                     temp->data(location_t::host),
+                     this->size * sizeof(type_t));
+        }
+
+        if (is_location_set(temp_target, location_t::device)) {
+          this->copy(this->data(location_t::device),
+                     temp->data(location_t::device),
+                     this->size * sizeof(type_t));
+        }
+      }
+
+      this->size = new_size;
+      temp.free(temp_target);
+    }
+
+    /*
+     * algorithms::
+     */
+
+    // for pointer at target, set the values to byte_value,
+    // for size = bytes.
+    void set(location_t target, int byte_value, size_t bytes)
+    {
+      if (is_location_set(target, location_t::host) &&
+          is_allocated(location_t::host)) {
+        cuda::memory::set(this->data(location_t::host), byte_value, bytes);
+      }
+
+      if (is_location_set(target, location_t::device) &&
+          is_allocated(location_t::device)) {
+        cuda::memory::set(this->data(location_t::device), byte_value, bytes);
+      }
+    }
+
+    void zero(location_t target, size_t bytes)
+    {
+      if (is_location_set(target, location_t::host) &&
+          is_allocated(location_t::host)) {
+        this->set(this->data(location_t::host), 0, bytes);
+      }
+
+      if (is_location_set(target, location_t::device) &&
+          is_allocated(location_t::device)) {
+        this->set(this->data(location_t::device), 0, bytes);
+      }
+    }
+
+    // asynchronous set and zero
+    // XXX: should this still set host?
+    template<typename stream_t>
+    void set(location_t target, int byte_value, size_t bytes, stream_t stream)
+    {
+      if (is_location_set(target, location_t::host) &&
+          is_allocated(location_t::host)) {
+        cuda::memory::set(this->data(location_t::host), byte_value, bytes);
+      }
+
+      if (is_location_set(target, location_t::device) &&
+          is_allocated(location_t::device)) {
+        cuda::memory::async::set(
+          this->data(location_t::device), byte_value, bytes, stream);
+      }
+    }
+
+    template<typename stream_t>
+    void zero(location_t target, size_t bytes, stream_t stream)
+    {
+      if (is_location_set(target, location_t::host) &&
+          is_allocated(location_t::host)) {
+        this->set(this->data(location_t::host), 0, bytes);
+      }
+
+      if (is_location_set(target, location_t::device) &&
+          is_allocated(location_t::device)) {
+        this->set(this->data(location_t::device), 0, bytes, stream);
+      }
+    }
+
+    void swap() {}
 
     // XXX: generalize using a lambda
-    set() {}
-    swap() {}
-    fill() {}
-    zero() {}
+    void fill() {}
+    void zero() {}
 
   } // struct: array
 }
