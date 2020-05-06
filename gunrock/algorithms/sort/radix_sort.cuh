@@ -1,3 +1,10 @@
+/*
+ * XXX: error handling within methods,
+ * remove return error_t it adds unnecessary
+ * work for users to handle every return
+ * statement by each of these functions.
+ */
+
 #pragma once
 #include <cub/cub.cuh>
 
@@ -15,7 +22,7 @@ namespace radix
 {
 
   namespace host {
-    // XXX: CPU radix sort
+  // XXX: CPU radix sort
   } // namespace: host
 
   namespace device {

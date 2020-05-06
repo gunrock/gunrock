@@ -1,3 +1,10 @@
+/*
+ * XXX: error handling within methods,
+ * remove return error_t it adds unnecessary
+ * work for users to handle every return
+ * statement by each of these functions.
+ */
+
 #pragma once
 #include <moderngpu/kernel_sortedsearch.hxx>
 
@@ -49,7 +56,7 @@ namespace sorted
         haystack,
         num_haystack,
         indices,
-        mgpu::less_t<needle_t>(),   // XXX: generalize
+        mgpu::less_t<needle_t>(), // XXX: generalize
         context);
 
     } else { // bounds == bound_t::upper
@@ -59,7 +66,7 @@ namespace sorted
         haystack,
         num_haystack,
         indices,
-        mgpu::less_t<needle_t>(),   // XXX: generalize
+        mgpu::less_t<needle_t>(), // XXX: generalize
         context);
     }
 
