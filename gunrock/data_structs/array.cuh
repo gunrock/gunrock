@@ -1,5 +1,7 @@
+#pragma once
+
 // includes: cuda-api-wrappers
-#include <cuda/api/memory.hpp>
+#include <cuda/api_wrappers.hpp>
 
 namespace gunrock {
 namespace datastruct {
@@ -36,6 +38,23 @@ namespace dense
     type_t* d_pointer;
 
     location_t allocated;
+
+    __global__ void _for(pointer_t x, const type_t& value, _int_t size)
+    {
+      const _int_t STRIDE = (_int_t)blockDim.x * gridDim.x;
+      for (_int_t i = (_int_t)blockDim.x * blockIdx.x + threadIdx.x; i < size;
+           i += STRIDE)
+        x[i] = value;
+    }
+
+    template<typename op_t>
+    __global__ void _for(pointer_t x, op_t udf, _int_t size)
+    {
+      const _int_t STRIDE = (_int_t)blockDim.x * gridDim.x;
+      for (_int_t i = (_int_t)blockDim.x * blockIdx.x + threadIdx.x; i < size;
+           i += STRIDE)
+        x[i] = udf();
+    }
 
     static constexpr reference_t reference(const reference_t p,
                                            size_t n) noexcept
@@ -295,7 +314,8 @@ namespace dense
 
     CUDA_HOST_DEVICE constexpr bool is_allocated(
       location_t target,
-      _int_t size = this->size) noexcept {
+      _int_t size = this->size) noexcept
+    {
       // XXX: maybe needs an explicit memory check?
       return ((is_location_set(this->allocated, target)) &&
               (size() == this->size))
@@ -306,7 +326,7 @@ namespace dense
      */
 
     // synchronous copy
-    copy(pointer_t source, pointer_t destination, size_t bytes)
+    void copy(pointer_t source, pointer_t destination, size_t bytes) noexcept
     {
       // cuda-api-wrappers goes to-from, size.
       cuda::memory::copy(destination, source, bytes);
@@ -314,10 +334,22 @@ namespace dense
 
     // asynchronous copy
     template<typename stream_t>
-    copy(pointer_t source, pointer_t destination, size_t bytes, stream_t stream)
+    void copy(pointer_t source,
+              pointer_t destination,
+              size_t bytes,
+              stream_t stream) noexcept
     {
       // cuda-api-wrappers goes to-from, size.
       cuda::memory::async::copy(destination, source, bytes, stream);
+    }
+
+    void copy(array_t& source) noexcept
+    {
+      // copy over array_t contents to destination array_t
+      this->size = source->size;
+      this->allocated = source->allocated;
+      copy(source->h_pointer, this->h_pointer, this->size * sizeof(type_t));
+      copy(source->d_pointer, this->d_pointer, this->size * sizeof(type_t));
     }
 
     // should move issue a free?
@@ -330,7 +362,7 @@ namespace dense
     }
 
     template<typename stream_t>
-    move(location_t source, location_t destination)
+    void move(location_t source, location_t destination)
     {
       cuda::memory::async::copy(this->data(destination),
                                 this->data(source),
@@ -386,7 +418,7 @@ namespace dense
       }
 
       this->size = new_size;
-      temp.free(temp_target);
+      temp->free();
     }
 
     /*
@@ -452,11 +484,65 @@ namespace dense
       }
     }
 
-    void swap() {}
+    void swap(array_t& other) noexcept
+    {
+      array<type_t, this->size> temp;
 
-    // XXX: generalize using a lambda
-    void fill() {}
-    void zero() {}
+      temp->copy(*this);  // copy current array to temp
+      this->copy(&other); // copy other to current array
+      other->copy(&temp); // copy temp to other array
+      temp->free();       // free temp
+    }
+
+    // generalized using a lambda
+    // udf = []() { return (type_t)value;}
+    template<typename op_t, typename stream_t>
+    void fill(op_t udf,
+              location_t target == location_t::default,
+              stream_t stream = 0)
+    {
+      if (is_location_set(target, location_t::device) &&
+          is_allocated(location_t::device)) {
+        const int threads = 256;
+        const int blocks = 512;
+        cuda::launch(_for,
+                     cuda::launch_configuration_t(blocks, threads, 0, stream),
+                     this->d_pointer,
+                     udf,
+                     size);
+      }
+
+      if (is_location_set(target, location_t::host) &&
+          is_allocated(location_t::host)) {
+        for (_int_t i = 0; i < this->size; i++) {
+          h_pointer[i] = udf();
+        }
+      }
+    }
+
+    template<typename stream_t>
+    void fill(const type_t& value,
+              location_t target == location_t::default,
+              stream_t stream = 0)
+    {
+      if (is_location_set(target, location_t::device) &&
+          is_allocated(location_t::device)) {
+        const int threads = 256;
+        const int blocks = 512;
+        cuda::launch(_for,
+                     cuda::launch_configuration_t(blocks, threads, 0, stream),
+                     this->d_pointer,
+                     value,
+                     size);
+      }
+
+      if (is_location_set(target, location_t::host) &&
+          is_allocated(location_t::host)) {
+        for (_int_t i = 0; i < this->size; i++) {
+          h_pointer[i] = value;
+        }
+      }
+    }
 
   } // struct: array
 }
