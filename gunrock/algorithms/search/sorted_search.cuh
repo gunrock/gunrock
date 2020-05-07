@@ -36,7 +36,7 @@ namespace sorted
                            bool sync = false)
   {
 
-    cudaError_t retval = cudaSuccess;
+    cudaError_t status = util::error::success;
 
     // XXX: Experiment with these values and choose the best ones. We
     // could even choose to make them a parameter of util::SortedSearch
@@ -74,7 +74,7 @@ namespace sorted
       // XXX: implement sync
     }
 
-    return retval;
+    return status;
   }
 
   } // namespace: device

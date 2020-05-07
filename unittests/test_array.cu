@@ -8,11 +8,11 @@ test_array()
 {
   using namespace gunrock;
 
-  error_t retval = cudaSuccess;
+  error_t status = util::error::success;
   size_t N = 128;
   gunrock::datastruct::dense::array<int, N> a;
 
-  return retval;
+  return status;
 }
 
 int
