@@ -1,3 +1,5 @@
+#pragma once
+
 // includes: cuda-api-wrappers
 #include <cuda/api_wrappers.hpp>
 
@@ -8,6 +10,13 @@ typedef cuda::status_t error_t;
 
 // XXX: Should this be under util or just gunrock::error?
 namespace util {
+
+/**
+ * @namespace error
+ * Error utilities for exception handling within device and host code. Wrapper
+ * around some useful error handling features within cuda-api-wrappers @ref
+ * cuda.
+ */
 namespace error {
 
 typedef cuda::status::success success;
@@ -36,7 +45,6 @@ _throw(error_t status, std::string message)
 {
   return cuda::throw_if_error(status, message);
 }
-
 }
 }
 }
