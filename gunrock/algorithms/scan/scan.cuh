@@ -44,7 +44,7 @@ scan(input_t* input,
      bool sync = false)
 {
 
-  cudaError_t retval = cudaSuccess;
+  error_t status = util::error:success;
 
   // XXX: Experiment with these values and choose the best ones. We
   // could even choose to make them a parameter of util::Scan and choose
@@ -68,7 +68,7 @@ scan(input_t* input,
   if (sync) {
     // XXX: cuda sync
   }
-  return retval;
+  return status;
 }
 
 namespace block {

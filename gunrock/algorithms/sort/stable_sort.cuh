@@ -36,7 +36,7 @@ namespace stable
            typename stream_t>
   error_t sort(key_t* keys, int num_items)
   {
-    error_t retval = cudaSuccess;
+    error_t status = util::error::success;
     if (order == order_t::descending) {
       thrust::stable_sort(keys, keys + num_items, thrust::greater<int>());
     }
@@ -45,7 +45,7 @@ namespace stable
       thrust::stable_sort(keys, keys + num_items);
     }
 
-    return retval;
+    return status;
   }
 
   // key-value pairs
@@ -53,7 +53,7 @@ namespace stable
   template<order_t order = order_t::ascending, typename key_t, typename value_t>
   error_t sort_pairs(key_t* keys, value_t* values, int num_items)
   {
-    error_t retval = cudaSuccess;
+    error_t status = util::error::success;
     if (order == order_t::descending) {
       thrust::stable_sort_by_key(
         keys, keys + num_items, values, thrust::greater<int>());
@@ -63,7 +63,7 @@ namespace stable
       thrust::stable_sort_by_key(keys, keys + num_items, values);
     }
 
-    return retval;
+    return status;
   }
 
   } // namespace device

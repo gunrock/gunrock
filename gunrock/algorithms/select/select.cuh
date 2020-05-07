@@ -65,7 +65,7 @@ namespace device
                          stream_t stream = 0, // XXX: generalize
                          bool sync = false)
   {
-    error_t retval = cudaSuccess;
+    error_t status = util::error::success;
 
     // Determine temporary device storage requirements
     cub::DeviceSelect::Flagged(temp_storage,
@@ -92,7 +92,7 @@ namespace device
                                stream,
                                sync);
 
-    return retval;
+    return status;
   }
 
   template<typename error_t,
@@ -113,7 +113,7 @@ namespace device
                     stream_t stream = 0, // XXX: generalize
                     bool sync = false)
   {
-    error_t retval = cudaSuccess;
+    error_t status = util::error::success;
 
     // Determine temporary device storage requirements
     cub::DeviceSelect::If(temp_storage,
@@ -140,7 +140,7 @@ namespace device
                           stream,
                           sync);
 
-    return retval;
+    return status;
   }
 
   template<typename error_t,
@@ -159,7 +159,7 @@ namespace device
                         stream_t stream = 0, // XXX: generalize
                         bool sync = false)
   {
-    error_t retval = cudaSuccess;
+    error_t status = util::error::success;
 
     // Determine temporary device storage requirements
     cub::DeviceSelect::Unique(temp_storage,
@@ -184,7 +184,7 @@ namespace device
                               stream,
                               sync);
 
-    return retval;
+    return status;
   }
 
 } // namespace: device

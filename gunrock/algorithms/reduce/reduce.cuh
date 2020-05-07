@@ -32,7 +32,7 @@ reduce(input_t* input,
        op_t op = mgpu::plus_t<input_t>(), // XXX: generalize
        bool sync = false)
 {
-  error_t retval = cudaSuccess;
+  error_t status = util::error::success;
 
   // XXX: Experiment with these values and choose the best ones.
   typedef mgpu::launch_box_t<mgpu::arch_30_cta<256, 8>,
@@ -49,7 +49,7 @@ reduce(input_t* input,
     // XXX: cuda sync
   }
 
-  return retval;
+  return status;
 }
 
 template<typename error_t,
@@ -80,7 +80,7 @@ reduce_segments(input_t input,
                              mgpu::arch_75_cta<128, 11, 8>>
     launch_t;
 
-  error_t retval = cudaSuccess;
+  error_t status = util::error::success;
   mgpu::segreduce<launch_t>(
     input, count, segments, num_segments, output, op, init, context);
 
@@ -88,7 +88,7 @@ reduce_segments(input_t input,
     // XXX: cuda sync
   }
 
-  return retval;
+  return status;
 }
 
 namespace block {

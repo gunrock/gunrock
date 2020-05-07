@@ -10,6 +10,8 @@ typedef cuda::status_t error_t;
 namespace util {
 namespace error {
 
+typedef cuda::status::success success;
+
 constexpr inline bool
 is_success(error_t status)
 {

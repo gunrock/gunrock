@@ -30,7 +30,6 @@ namespace dense
     typedef const type_t& const_reference_t;
 
     typedef array<type_t, N> array_t;
-    typedef cudaError_t error_t;
 
   private:
     _int_t size;
