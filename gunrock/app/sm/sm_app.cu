@@ -49,7 +49,7 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  * @param[in]  num_runs          Number of runs to perform SM
  * @param[out] subgraphs         Return number of subgraphs
  * @param[out] list_subgraphs    Return list of subgraphs
- * @param[in]  device            input and output target device, by default CPU
+ * @param[in]  allocated_on      Input and output target device, by default CPU
  * \return     double            Return accumulated elapsed times for all runs
  */
 double sm(
@@ -64,11 +64,11 @@ double sm(
     const int                 num_runs,
     unsigned long            *subgraphs,
     unsigned long            *list_subgraphs,
-    gunrock::util::Location   device = gunrock::util::HOST)
+    gunrock::util::Location   allocated_on = gunrock::util::HOST)
 {
     return sm_template(num_nodes, num_edges, row_offsets, col_indices,
         num_query_nodes, num_query_edges, query_row_offsets,
-        query_col_indices, num_runs, subgraphs, list_subgraphs, device);
+        query_col_indices, num_runs, subgraphs, list_subgraphs, allocated_on);
 }
 
 // Leave this at the end of the file

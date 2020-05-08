@@ -193,7 +193,7 @@ double gunrock_sm(gunrock::util::Parameters &parameters, GraphT &data_graph,
  * @param[in]  num_runs          Number of runs to perform SM
  * @param[out] subgraphs         Return number of subgraphs
  * @param[out] list_subgraphs    Return list of subgraph combinations
- * @param[in]  device            Target device where inputs and outputs are stored
+ * @param[in]  allocated_on      Target device where inputs and outputs are stored
  * \return     double            Return accumulated elapsed times for all runs
  */
 template <typename VertexT, typename SizeT>
@@ -203,7 +203,7 @@ double sm_template(const SizeT num_nodes, const SizeT num_edges,
                    const SizeT *query_row_offsets,
                    const VertexT *query_col_indices, const int num_runs,
                    unsigned long *subgraphs, unsigned long *list_subgraphs,
-                   gunrock::util::Location device = gunrock::util::HOST) {
+                   gunrock::util::Location allocated_on = gunrock::util::HOST) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, VertexT,
                                            gunrock::graph::HAS_CSR>
       GraphT;
@@ -223,7 +223,7 @@ double sm_template(const SizeT num_nodes, const SizeT num_edges,
 
   gunrock::util::Location target = gunrock::util::HOST;
 
-  if (device == gunrock::util::DEVICE) {
+  if (allocated_on == gunrock::util::DEVICE) {
     target = gunrock::util::DEVICE;
   }
 
@@ -246,7 +246,7 @@ double sm_template(const SizeT num_nodes, const SizeT num_edges,
 
   // Run the SM
   double elapsed_time =
-      gunrock_sm(parameters, data_graph, query_graph, subgraphs, list_subgraphs, device);
+      gunrock_sm(parameters, data_graph, query_graph, subgraphs, list_subgraphs, allocated_on);
   // Cleanup
   data_graph.Release();
   query_graph.Release();
