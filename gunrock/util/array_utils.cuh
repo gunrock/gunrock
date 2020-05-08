@@ -1614,12 +1614,10 @@ DEVICE)); #endif } else {*/
       str = str + " " + std::to_string(h_array[i]);
     }
 
-    if(print_location == stdout)
-    {
+    if(print_location == stdout) {
       PrintMsg(str);
     }
-    else
-    {
+    else {
       fprintf(print_location, "%s", str.c_str());
     }
 
