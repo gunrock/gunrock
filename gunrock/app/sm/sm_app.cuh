@@ -140,14 +140,14 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
  * @param[in]  query_graph     Input query graph
  * @param[out] subgraphs       Return number of matched subgraphs
  * @param[out] list_subgraphs  Return list of matched subgraph combinations
- * @param[in]  device          Target device where inputs and outputs are stored
+ * @param[in]  allocated_on    Target device where inputs and outputs are stored
  * \return     double          Return accumulated elapsed times for all runs
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_sm(gunrock::util::Parameters &parameters, GraphT &data_graph,
                   GraphT &query_graph, unsigned long *subgraphs,
                   unsigned long *list_subgraphs,
-                  gunrock::util::Location device = gunrock::util::HOST) {
+                  gunrock::util::Location allocated_on = gunrock::util::HOST) {
   typedef typename GraphT::VertexT VertexT;
   typedef gunrock::app::sm::Problem<GraphT> ProblemT;
   typedef gunrock::app::sm::Enactor<ProblemT> EnactorT;
@@ -172,7 +172,7 @@ double gunrock_sm(gunrock::util::Parameters &parameters, GraphT &data_graph,
     cpu_timer.Stop();
 
     total_time += cpu_timer.ElapsedMillis();
-    problem.Extract(subgraphs, list_subgraphs, target, device);
+    problem.Extract(subgraphs, list_subgraphs, target, allocated_on);
   }
 
   enactor.Release(target);
