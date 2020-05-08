@@ -1582,7 +1582,8 @@ DEVICE)); #endif } else {*/
   cudaError_t Print(std::string message = "",
                     SizeT limit = PreDefinedValues<SizeT>::InvalidValue,
                     Location target = LOCATION_DEFAULT,
-                    cudaStream_t stream = 0, FILE *print_location = stdout) {
+                    cudaStream_t stream = 0,
+                    FILE *print_location = stdout) {
     cudaError_t retval = cudaSuccess;
 
     if (message == "") message = std::string(name) + " : ";
