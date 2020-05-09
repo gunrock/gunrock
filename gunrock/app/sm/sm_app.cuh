@@ -44,7 +44,7 @@ cudaError_t UseParameters(util::Parameters &parameters);
  */
 template <typename GraphT, typename VertexT = typename GraphT::VertexT>
 cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
-                     GraphT &query_graph, VertexT *ref_subgraphs,
+                     GraphT &query_graph, unsigned long *ref_subgraphs,
                      util::Location target = util::DEVICE) {
   cudaError_t retval = cudaSuccess;
   typedef typename GraphT::SizeT SizeT;
@@ -60,7 +60,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
   std::string validation = parameters.Get<std::string>("validation");
   util::Info info("SM", parameters, data_graph);  // initialize Info structure
 
-  VertexT *h_subgraphs = new VertexT[1];
+  unsigned long *count_subgraphs = new unsigned long[1];
+  unsigned long *list_subgraphs;
 
   ProblemT problem(parameters);
   EnactorT enactor;
@@ -69,7 +70,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
   cpu_timer.Stop();
   parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
-  int num_subgraphs = 0;
+  unsigned long num_subgraphs = 0;
   // perform SM
   for (int run_num = 0; run_num < num_runs; ++run_num) {
     GUARD_CU(problem.Reset(target));
@@ -89,19 +90,19 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
         !quiet_mode);
 
     if (validation == "each") {
-      GUARD_CU(problem.Extract(h_subgraphs));
+      GUARD_CU(problem.Extract(count_subgraphs, list_subgraphs));
       SizeT num_errors = app::sm::Validate_Results(
-          parameters, data_graph, query_graph, h_subgraphs, ref_subgraphs,
+          parameters, data_graph, query_graph, count_subgraphs, ref_subgraphs,
           &num_subgraphs, false);
     }
   }
 
   cpu_timer.Start();
   // Copy out results
-  GUARD_CU(problem.Extract(h_subgraphs));
+  GUARD_CU(problem.Extract(count_subgraphs, list_subgraphs));
   if (validation == "last") {
     SizeT num_errors = app::sm::Validate_Results(
-        parameters, data_graph, query_graph, h_subgraphs, ref_subgraphs,
+        parameters, data_graph, query_graph, count_subgraphs, ref_subgraphs,
         &num_subgraphs, false);
   }
 
@@ -117,8 +118,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
   // Clean up
   GUARD_CU(enactor.Release(target));
   GUARD_CU(problem.Release(target));
-  delete[] h_subgraphs;
-  h_subgraphs = NULL;
+  delete[] count_subgraphs;
+  count_subgraphs = NULL;
   cpu_timer.Stop();
   total_timer.Stop();
 
@@ -132,17 +133,21 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
 
 /*
  * @brief Entry of gunrock_sm function
- * @tparam     GraphT     Type of the graph
- * @tparam     ValueT     Type of the distances
- * @param[in]  parameters Excution parameters
- * @param[in]  graph      Input graph
- * @param[out] distances  Return shortest distance to source per vertex
- * @param[out] preds      Return predecessors of each vertex
- * \return     double     Return accumulated elapsed times for all runs
+ * @tparam     GraphT          Type of the graph
+ * @tparam     ValueT          Type of the distances
+ * @param[in]  parameters      Excution parameters
+ * @param[in]  data_graph      Input data graph
+ * @param[in]  query_graph     Input query graph
+ * @param[out] subgraphs       Return number of matched subgraphs
+ * @param[out] list_subgraphs  Return list of matched subgraph combinations
+ * @param[in]  allocated_on    Target device where inputs and outputs are stored
+ * \return     double          Return accumulated elapsed times for all runs
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_sm(gunrock::util::Parameters &parameters, GraphT &data_graph,
-                  GraphT &query_graph, typename GraphT::VertexT *subgraphs) {
+                  GraphT &query_graph, unsigned long *subgraphs,
+                  unsigned long *list_subgraphs,
+                  gunrock::util::Location allocated_on = gunrock::util::HOST) {
   typedef typename GraphT::VertexT VertexT;
   typedef gunrock::app::sm::Problem<GraphT> ProblemT;
   typedef gunrock::app::sm::Enactor<ProblemT> EnactorT;
@@ -167,7 +172,7 @@ double gunrock_sm(gunrock::util::Parameters &parameters, GraphT &data_graph,
     cpu_timer.Stop();
 
     total_time += cpu_timer.ElapsedMillis();
-    problem.Extract(subgraphs, target);
+    problem.Extract(subgraphs, list_subgraphs, target, allocated_on);
   }
 
   enactor.Release(target);
@@ -187,6 +192,8 @@ double gunrock_sm(gunrock::util::Parameters &parameters, GraphT &data_graph,
  * @param[in]  query_col_indices CSR-formatted query graph input column indices
  * @param[in]  num_runs          Number of runs to perform SM
  * @param[out] subgraphs         Return number of subgraphs
+ * @param[out] list_subgraphs    Return list of subgraph combinations
+ * @param[in]  allocated_on      Target device where inputs and outputs are stored
  * \return     double            Return accumulated elapsed times for all runs
  */
 template <typename VertexT, typename SizeT>
@@ -195,7 +202,8 @@ double sm_template(const SizeT num_nodes, const SizeT num_edges,
                    const SizeT num_query_nodes, const SizeT num_query_edges,
                    const SizeT *query_row_offsets,
                    const VertexT *query_col_indices, const int num_runs,
-                   VertexT *subgraphs) {
+                   unsigned long *subgraphs, unsigned long *list_subgraphs,
+                   gunrock::util::Location allocated_on = gunrock::util::HOST) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, VertexT,
                                            gunrock::graph::HAS_CSR>
       GraphT;
@@ -214,6 +222,11 @@ double sm_template(const SizeT num_nodes, const SizeT num_edges,
   GraphT query_graph;
 
   gunrock::util::Location target = gunrock::util::HOST;
+
+  if (allocated_on == gunrock::util::DEVICE) {
+    target = gunrock::util::DEVICE;
+  }
+
   // Assign pointers into gunrock graph format
   data_graph.CsrT::Allocate(num_nodes, num_edges, target);
   data_graph.CsrT::row_offsets.SetPointer((SizeT *)row_offsets, num_nodes + 1,
@@ -233,7 +246,7 @@ double sm_template(const SizeT num_nodes, const SizeT num_edges,
 
   // Run the SM
   double elapsed_time =
-      gunrock_sm(parameters, data_graph, query_graph, subgraphs);
+      gunrock_sm(parameters, data_graph, query_graph, subgraphs, list_subgraphs, allocated_on);
   // Cleanup
   data_graph.Release();
   query_graph.Release();
