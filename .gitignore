@@ -48,3 +48,6 @@ gunrock/util/gitsha1.c
 
 # Ignore build directory
 build
+
+# Ignore vscode files
+*.vscode*
