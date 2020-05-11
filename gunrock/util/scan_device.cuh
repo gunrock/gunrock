@@ -14,6 +14,7 @@
 
 #pragma once
 #include <cub/cub.cuh>
+#include <moderngpu/kernel_scan.hxx>
 #include <gunrock/util/array_utils.cuh>
 
 namespace gunrock {
@@ -52,6 +53,39 @@ cudaError_t cubInclusiveSum(util::Array1D<uint64_t, char> &cub_temp_space,
       stream, debug_synchronous);
 
   if (retval) return retval;
+
+  return retval;
+}
+
+template <typename InputT, typename OutputT, 
+          typename ReduceT, typename SizeT>
+cudaError_t Scan(util::Array1D<SizeT, InputT> &d_in, SizeT num_items,
+                 util::Array1D<SizeT, OutputT> &d_out,
+                 ReduceT *r, mgpu::context_t *context,
+                 bool debug_synchronous = false) {
+
+  if (context == nullptr) {
+      return cudaErrorInvalidValue;
+  }
+  cudaError_t retval = cudaSuccess; 
+
+  // TODO: Experiment with these values and choose the best ones. We
+  // could even choose to make them a parameter of util::Scan and choose
+  // based on our usage
+  typedef mgpu::launch_box_t<
+      mgpu::arch_30_cta<256, 7>,
+      mgpu::arch_35_cta<256, 7>,
+      mgpu::arch_50_cta<256, 7>,
+      mgpu::arch_60_cta<256, 7>,
+      mgpu::arch_70_cta<256, 7>,
+      mgpu::arch_75_cta<256, 7>
+      > launch_t;
+  mgpu::scan<mgpu::scan_type_inc, launch_t>(d_in.GetPointer(util::DEVICE), num_items,
+                                  d_out.GetPointer(util::DEVICE),
+                                  mgpu::plus_t<InputT>(), r,
+                                  *context);
+
+  if (debug_synchronous) GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
 
   return retval;
 }

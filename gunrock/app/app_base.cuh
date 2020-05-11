@@ -79,7 +79,7 @@ struct TestGraph
   typedef graph::Gp<_VertexT, _SizeT, _ValueT, _FLAG, _cudaHostRegisterFlag>
       GpT;
 
-  SizeT nodes, edges;
+  SizeT nodes=0, edges=0;
 
   template <typename CooT_in>
   cudaError_t FromCoo(CooT_in &coo,

@@ -49,11 +49,9 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::VertexT VertexT;
   curandGenerator_t gen;
-  auto usr_iter = parameters.Get<int>("user-iter");
-  auto seed = parameters.Get<int>("seed");
-  auto use_jpl = parameters.Get<bool>("JPL");
-  auto no_conflict = parameters.Get<int>("no-conflict");
 
+  auto seed = parameters.Get<int>("seed");
+  
   util::CpuTimer cpu_timer;
   cpu_timer.Start();
 
@@ -66,63 +64,39 @@ double CPU_Reference(util::Parameters &parameters, const GraphT &graph,
   curandSetPseudoRandomGeneratorSeed(gen, seed);
   curandGenerateUniform(gen, rand.GetPointer(util::HOST), graph.nodes);
 
-  if (use_jpl) {
-    for (int iteration = 0; iteration < usr_iter; iteration++) {
-      for (VertexT v = 0; v < graph.nodes; v++) {
-        if (colors[v] != -1) continue;
-        SizeT start_edge = graph.GetNeighborListOffset(v);
-        SizeT num_neighbors = graph.GetNeighborListLength(v);
-        float temp = rand[v];
-        bool colormax = true;
-        bool colormin = true;
-        for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-          VertexT u = graph.GetEdgeDest(e);
-          if ((colors[u] == -1) && (rand[u] >= temp)) {
-            //  printf("Max: Node %d with %f defeated by node %d with %f\n", v,
-            // rand[v], u, rand[u]);
-            colormax = false;
-          }
-
-          if ((colors[u] == -1) && (rand[u] <= temp)) {
-            // printf("Min: Node %d with %f defeated by node %d with %f\n", v,
-            // rand[v], u, rand[u]);
-            colormin = false;
-          }
+  bool colored = false;
+  int iteration = 0;
+  while (!colored) {
+    for (VertexT v = 0; v < graph.nodes; v++) {
+      if (colors[v] != -1) continue;
+      SizeT start_edge = graph.GetNeighborListOffset(v);
+      SizeT num_neighbors = graph.GetNeighborListLength(v);
+      float temp = rand[v];
+      bool colormax = true;
+      bool colormin = true;
+      for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+        VertexT u = graph.GetEdgeDest(e);
+        if ((colors[u] == -1) && (rand[u] >= temp)) {
+          colormax = false;
         }
 
-        if (colormax) colors[v] = iteration * 2 + 1;
-        if (colormin) colors[v] = iteration * 2 + 2;
-      }
-    }
-  } else {
-    for (int iteration = 0; iteration < usr_iter; iteration++) {
-      for (VertexT v = 0; v < graph.nodes; v++) {
-        SizeT start_edge = graph.GetNeighborListOffset(v);
-        SizeT num_neighbors = graph.GetNeighborListLength(v);
-
-        VertexT max = v;
-        VertexT min = v;
-        float temp = rand[v];
-
-        for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-          VertexT u = graph.GetEdgeDest(e);
-          if (rand[u] > temp) max = u;
-
-          if (rand[u] < temp) min = u;
-
-          // printf("Let's see what rand[u] = %f\n", rand[u]);
-          temp = rand[u];
+        if ((colors[u] == -1) && (rand[u] <= temp)) {
+          colormin = false;
         }
-
-        if (colors[max] == -1) colors[max] = iteration * 2 + 1;
-
-        if (colors[min] == -1) colors[min] = iteration * 2 + 2;
-
-        // printf("iteration number = %u\n", iteration);
-        // printf("colors[%u, %u] = [%u, %u]\n", min, max, colors[min],
-        //       colors[max]);
       }
+
+      if (colormax) colors[v] = iteration * 2 + 1;
+      if (colormin) colors[v] = iteration * 2 + 2;
     }
+
+    for(VertexT v = 0; v < graph.nodes; v++) {
+      if (colors[v] == -1) {
+        break;
+      } else if (v == graph.nodes - 1) {
+        colored = true;
+      } else {}
+    }
+    iteration++;
   }
 
   cpu_timer.Stop();
@@ -155,8 +129,8 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
 
   // validating result with cpu and check for conflict
   if (!quick) {
-    printf("Validating result ...  \n");
-    printf("Comparison: <node idx, gunrock, cpu>\n");
+    util::PrintMsg("Validating result ...", !quiet);
+    util::PrintMsg("Comparison: <node idx, gunrock, cpu>", !quiet);
     for (SizeT v = 0; v < graph.nodes; v++) {
       SizeT start_edge = graph.GetNeighborListOffset(v);
       SizeT num_neighbors = graph.GetNeighborListLength(v);
@@ -165,8 +139,11 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
         VertexT u = graph.GetEdgeDest(e);
         if (h_colors[u] == h_colors[v] || h_colors[v] == -1) {
           num_errors += 1;
-          printf("neighbor id  %d, neighbor color %d, my id %d,  my color %d\n",
-                 u, h_colors[u], v, h_colors[v]);
+          util::PrintMsg("neighbor id  [ "\
+                          + std::to_string(u) + " ], neighbor color [ " \
+                          + std::to_string(h_colors[u]) + " ], my id [ " \
+                          + std::to_string(v) + " ],  my color [ " \
+                          + std::to_string(h_colors[v]) + " ]", !quiet);
         }
       }
     }

@@ -17,6 +17,7 @@
 #include <gunrock/util/cta_work_progress.cuh>
 #include <gunrock/util/kernel_runtime_stats.cuh>
 #include <gunrock/util/device_intrinsics.cuh>
+#include <gunrock/util/sorted_search.cuh>
 
 #include <gunrock/oprtr/1D_oprtr/1D_scalar.cuh>
 #include <gunrock/oprtr/advance/advance_base.cuh>
@@ -561,13 +562,14 @@ cudaError_t Launch_CSR_CSC(const GraphT &graph, const FrontierInT *frontier_in,
     oprtr::SetIdx_Kernel<<<1, 256, 0, parameters.stream>>>(
         parameters.frontier->block_output_starts.GetPointer(util::DEVICE),
         outputs_per_block, num_blocks);
-    mgpu::SortedSearch<mgpu::MgpuBoundsLower>(
-        parameters.frontier->block_output_starts.GetPointer(util::DEVICE),
-        num_blocks,
-        parameters.frontier->output_offsets.GetPointer(util::DEVICE),
-        parameters.frontier->queue_length,
-        parameters.frontier->block_input_starts.GetPointer(util::DEVICE),
-        parameters.context[0]);
+
+    util::SortedSearch(
+      parameters.frontier->block_output_starts,
+      (SizeT)num_blocks,
+      parameters.frontier->output_offsets,
+      (SizeT)parameters.frontier->queue_length,
+      parameters.frontier->block_input_starts,
+      parameters.context);
 
     RelaxPartitionedEdges2<FLAG, GraphT, InKeyT, OutKeyT>
         <<<num_blocks, KernelPolicyT::THREADS, 0, parameters.stream>>>(

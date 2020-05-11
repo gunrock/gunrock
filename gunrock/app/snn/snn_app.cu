@@ -6,73 +6,85 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file knn_app.cu
+ * @file snn_app.cu
  *
  * @brief Simple Gunrock Application
  */
+
+#include <cstdio>
 
 // Gunrock api
 #include <gunrock/gunrock.h>
 
 // Test utils
 #include <gunrock/util/test_utils.cuh>
-#include <gunrock/util/array_utils.cuh>
 
 // Graphio include
 #include <gunrock/graphio/graphio.cuh>
-#include <gunrock/graphio/labels.cuh>
 
 // App and test base includes
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
-// KNN includes
-#include <gunrock/app/knn/knn_helpers.cuh>
-#include <gunrock/app/knn/knn_enactor.cuh>
-#include <gunrock/app/knn/knn_test.cuh>
+// JSON includes
+#include <gunrock/util/info_rapidjson.cuh>
 
-//#define KNN_APP_DEBUG
-#ifdef KNN_APP_DEBUG
-    #define debug(a...) printf(a)
-#else
-    #define debug(a...)
-#endif
+// KNN includes
+#include <gunrock/app/snn/snn_enactor.cuh>
+#include <gunrock/app/snn/snn_test.cuh>
 
 namespace gunrock {
 namespace app {
-namespace knn {
+namespace snn {
 
 cudaError_t UseParameters(util::Parameters &parameters) {
   cudaError_t retval = cudaSuccess;
   GUARD_CU(UseParameters_app(parameters));
   GUARD_CU(UseParameters_problem(parameters));
   GUARD_CU(UseParameters_enactor(parameters));
-  GUARD_CU(UseParameters_test(parameters));
-
-  GUARD_CU(parameters.Use<int>(
-      "n",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      0, "Number of points in dim-dimensional space", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<std::string>(
       "labels-file",
       util::REQUIRED_ARGUMENT | util::REQUIRED_PARAMETER, 
       "", "List of points of dim-dimensional space", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.Use<std::string>(
+      "snn-tag", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, "",
+      "snn-tag info for json string", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<uint32_t>(
+      "n",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      10, "Numbers of points", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<uint32_t>(
       "dim",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      2, "Dimensions of space", __FILE__, __LINE__));
+      10, "Dimension of labels", __FILE__, __LINE__));
 
-  GUARD_CU(parameters.Use<int>(
+  GUARD_CU(parameters.Use<uint32_t>(
       "k",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      10, "Number of k neighbors.", __FILE__, __LINE__));
+      10, "Numbers of k neighbors.", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<uint32_t>(
+      "eps",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 0,
+      "The minimum number of neighbors two points should share\n"
+      "to be considered close to each other",
+      __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<uint32_t>(
+      "min-pts",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 0,
+      "The minimum density that a point should have to be considered a core "
+      "point\n",
+      __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<float>(
-      "cpu-elapsed", 
-      util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0.0f,
+      "cpu-elapsed", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0.0f,
       "CPU implementation, elapsed time (ms) for JSON.", __FILE__, __LINE__));
+
   return retval;
 }
 
@@ -86,22 +98,19 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  * @param[in]  target        where to perform the app
  * \return cudaError_t error message(s), if any
  */
-template <typename GraphT, typename ArrayT>
-cudaError_t RunTests(util::Parameters &parameters,
-        ArrayT& points,
-        GraphT& graph,
-        typename GraphT::SizeT n,
-        typename GraphT::SizeT dim,
-        typename GraphT::SizeT k,
-        typename GraphT::SizeT *h_knns,
-        typename GraphT::SizeT *ref_knns,
-        util::Location target) {
-  
+template <typename GraphT, typename SizeT = typename GraphT::SizeT>
+cudaError_t RunTests(
+    util::Parameters &parameters, GraphT &graph, SizeT num_points, SizeT k,
+    SizeT eps, SizeT min_pts,
+    SizeT *h_knns,
+    SizeT *h_cluster, SizeT *ref_cluster,
+    SizeT *h_core_point_counter, SizeT *ref_core_point_counter,
+    SizeT *h_cluster_counter, SizeT *ref_cluster_counter, 
+    util::Location target) {
   cudaError_t retval = cudaSuccess;
 
+  //typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::ValueT ValueT;
-  typedef typename GraphT::SizeT SizeT; 
-
   typedef Problem<GraphT> ProblemT;
   typedef Enactor<ProblemT> EnactorT;
 
@@ -109,7 +118,7 @@ cudaError_t RunTests(util::Parameters &parameters,
   bool quiet_mode = parameters.Get<bool>("quiet");
   int num_runs = parameters.Get<int>("num-runs");
   std::string validation = parameters.Get<std::string>("validation");
-  util::Info info("knn", parameters, graph);
+  util::Info info("snn", parameters, graph);
 
   util::CpuTimer cpu_timer, total_timer;
   cpu_timer.Start();
@@ -125,8 +134,8 @@ cudaError_t RunTests(util::Parameters &parameters,
   parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
   for (int run_num = 0; run_num < num_runs; ++run_num) {
-    GUARD_CU(problem.Reset(points.GetPointer(util::HOST), target));
-    GUARD_CU(enactor.Reset(n, k, target));
+    GUARD_CU(problem.Reset(h_knns, target));
+    GUARD_CU(enactor.Reset(target));
 
     util::PrintMsg("__________________________", !quiet_mode);
 
@@ -143,47 +152,40 @@ cudaError_t RunTests(util::Parameters &parameters,
         !quiet_mode);
 
     if (validation == "each") {
-      GUARD_CU(problem.Extract(h_knns));
-#ifdef KNN_APP_DEBUG
-      debug("extracted knns:\n");
-      for (int i=0; i<n; ++i){
-          debug("point %d\n", i);
-          for (int j=0; j<k; ++j){
-              debug("%d ", h_knns[i*k + j]);
-          }
-          debug("\n");
-      }
-#endif
-      SizeT num_errors =
-          Validate_Results(parameters, graph, h_knns, ref_knns, points, false);
+      GUARD_CU(problem.Extract(num_points, k, h_cluster, h_core_point_counter,
+                  h_cluster_counter));
+      SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
+                               h_core_point_counter, h_cluster_counter,
+                               ref_cluster, ref_core_point_counter, 
+                               ref_cluster_counter, false);
     }
   }
 
   cpu_timer.Start();
 
-  GUARD_CU(problem.Extract(h_knns));
-#ifdef KNN_APP_DEBUG
-      debug("extracted knns:\n");
-      for (int i=0; i<n; ++i){
-          debug("point %d\n", i);
-          for (int j=0; j<k; ++j){
-              debug("%d ", h_knns[i*k + j]);
-          }
-          debug("\n");
-      }
-#endif
-
+  GUARD_CU(problem.Extract(num_points, k, h_cluster, h_core_point_counter, 
+              h_cluster_counter));
   if (validation == "last") {
-    SizeT num_errors =
-        Validate_Results(parameters, graph, h_knns, ref_knns, points, false);
+    SizeT num_errors = Validate_Results(parameters, graph, h_cluster,
+                                h_core_point_counter, h_cluster_counter,
+                                ref_cluster, ref_core_point_counter, 
+                                ref_cluster_counter, /*h_knns, ref_knns,*/false);
   }
 
   // compute running statistics
+  // Change NULL to problem specific per-vertex visited marker, e.g.
+  // h_distances
   info.ComputeTraversalStats(enactor, (SizeT *)NULL);
   // Display_Memory_Usage(problem);
 #ifdef ENABLE_PERFORMANCE_PROFILING
-  // Display_Performance_Profiling(&enactor);
+  // Display_Performance_Profiling(enactor);
 #endif
+
+  // For JSON output
+  info.SetVal("num-corepoints", std::to_string(h_core_point_counter[0]));
+  info.SetVal("num-clusters", std::to_string(h_cluster_counter[0]));
+  // info.SetVal("cpu-elapsed",
+  // std::to_string(parameters.Get<float>("cpu-elapsed")));
 
   // Clean up
   GUARD_CU(enactor.Release(target));
