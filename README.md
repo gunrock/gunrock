@@ -41,7 +41,7 @@ make test
 - Tutorial: [How to write a graph primitive within Gunrock?](https://gunrock.github.io/docs/#/devs/)
 - Comprehensive [list](https://gunrock.github.io/docs/#/gunrock/gunrock_applications) of test applications and primitives for most the functionality of Gunrock.
 - [API Reference documentation](https://gunrock.github.io/gunrock) (generated using doxygen).
-- Find our [publications](https://gunrock.github.io/docs/#/gunrock/publications_and_presentations), [presentations](https://gunrock.github.io/docs/#/gunrock/publications_and_presentations?id=presentations), and [performance analysis](https://gunrock.github.io/docs/#/results).
+- Find our [publications](https://gunrock.github.io/docs/#/gunrock/publications_and_presentations), [presentations](https://gunrock.github.io/docs/#/gunrock/publications_and_presentations?id=presentations), and [performance analysis](https://gunrock.github.io/docs/#/analysis/results).
 
 ## Copyright and License
 
