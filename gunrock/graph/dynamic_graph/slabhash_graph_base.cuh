@@ -174,7 +174,7 @@ struct SlabHashGraphBase {
    * @param[in] v Query vertex
    * @return v's neghbor's count
    */
-  __device__ __forceinline__ SizeT GetNeighborsCount(const VertexT& v) {
+  __device__ __forceinline__ SizeT GetNeighborsCount(const VertexT& v) const {
     return d_edges_per_node[v];
   }
 
@@ -183,14 +183,14 @@ struct SlabHashGraphBase {
    *
    * @param[out] the graph maximum nodes capacity
    */
-  SizeT GetNodesCapacity() { return nodes_capacity; }
+  SizeT GetNodesCapacity() const { return nodes_capacity; }
 
   /**
    * @brief Query the graph maximun buckets capacity
    *
    * @param[out] the graph maximum buckets capacity
    */
-  SizeT GetSlabsCapacity() { return buckets_capacity; }
+  SizeT GetSlabsCapacity() const { return buckets_capacity; }
 
   /**
    * @brief Extend the capcity of the graph vertices

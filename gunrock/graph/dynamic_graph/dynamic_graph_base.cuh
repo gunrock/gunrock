@@ -51,7 +51,7 @@ struct DynamicGraphBase {
       typename std::conditional<REQUIRE_EDGES_VALUES, SlabHashGraphMapT,
                                 SlabHashGraphSetT>::type;
 
-  mutable DynamicGraphT dynamicGraph;
+  DynamicGraphT dynamicGraph;
 
   cudaError_t Release() {
     dynamicGraph.Release();
@@ -74,7 +74,7 @@ struct DynamicGraphBase {
                                                           VertexT &dest) const {
   }
   __device__ __host__ __forceinline__ SizeT
-  GetSrcDestEdge(const VertexT &src, const VertexT &dest) {
+  GetSrcDestEdge(const VertexT &src, const VertexT &dest) const {
     return util::PreDefinedValues<SizeT>::InvalidValue;
   }
   __device__ __host__ __forceinline__ VertexT
