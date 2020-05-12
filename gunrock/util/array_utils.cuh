@@ -1582,7 +1582,8 @@ DEVICE)); #endif } else {*/
   cudaError_t Print(std::string message = "",
                     SizeT limit = PreDefinedValues<SizeT>::InvalidValue,
                     Location target = LOCATION_DEFAULT,
-                    cudaStream_t stream = 0) {
+                    cudaStream_t stream = 0,
+                    FILE *print_location = stdout) {
     cudaError_t retval = cudaSuccess;
 
     if (message == "") message = std::string(name) + " : ";
@@ -1613,7 +1614,13 @@ DEVICE)); #endif } else {*/
       if ((i % 10) == 0) str = str + " |(" + std::to_string(i) + ")";
       str = str + " " + std::to_string(h_array[i]);
     }
-    PrintMsg(str);
+
+    if(print_location == stdout) {
+      PrintMsg(str);
+    }
+    else {
+      fprintf(print_location, "%s", str.c_str());
+    }
 
     if (temp_allocated) {
       delete[] h_array;

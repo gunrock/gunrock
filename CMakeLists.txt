@@ -364,6 +364,12 @@ endif (CUDA_VERBOSE_PTXAS)
 set(CUDA_NVCC_FLAGS --expt-extended-lambda -rdc=true -lcudadevrt)
 set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_curand_LIBRARY})
 
+# begin /* Suppress all warnings from nvcc */
+if (NOT ENABLE_WARNINGS)
+  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -w")
+endif (NOT ENABLE_WARNINGS)
+# end /* Suppress all warnings from nvcc */
+
 if(GUNROCK_BUILD_LIB)
   if(GUNROCK_BUILD_SHARED_LIBS)
     set(LIB_TYPE SHARED)

@@ -61,12 +61,13 @@ template <typename InputT, typename OutputT,
           typename ReduceT, typename SizeT>
 cudaError_t Scan(util::Array1D<SizeT, InputT> &d_in, SizeT num_items,
                  util::Array1D<SizeT, OutputT> &d_out,
-                 ReduceT *r, mgpu::context_t &context,
+                 ReduceT *r, mgpu::context_t *context,
                  bool debug_synchronous = false) {
 
+  if (context == nullptr) {
+      return cudaErrorInvalidValue;
+  }
   cudaError_t retval = cudaSuccess; 
-//   cudaStream_t stream = 0;
-//   mgpu::standard_context_t context(false, stream);
 
   // TODO: Experiment with these values and choose the best ones. We
   // could even choose to make them a parameter of util::Scan and choose
@@ -82,7 +83,7 @@ cudaError_t Scan(util::Array1D<SizeT, InputT> &d_in, SizeT num_items,
   mgpu::scan<mgpu::scan_type_inc, launch_t>(d_in.GetPointer(util::DEVICE), num_items,
                                   d_out.GetPointer(util::DEVICE),
                                   mgpu::plus_t<InputT>(), r,
-                                  context);
+                                  *context);
 
   if (debug_synchronous) GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
 
