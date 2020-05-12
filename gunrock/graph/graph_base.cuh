@@ -26,20 +26,25 @@ namespace graph {
  */
 using GraphFlag = uint32_t;
 enum : GraphFlag {
-  ARRAY_RESERVE = 0x000F,
+  ARRAY_RESERVE = 0x0000F,
 
-  GRAPH_NONE = 0x0000,
-  HAS_EDGE_VALUES = 0x0010,
-  HAS_NODE_VALUES = 0x0020,
+  GRAPH_NONE = 0x00000,
+  HAS_EDGE_VALUES = 0x00010,
+  HAS_NODE_VALUES = 0x00020,
 
-  TypeMask = 0x0F00,
-  HAS_CSR = 0x0100,
-  HAS_CSC = 0x0200,
-  HAS_COO = 0x0400,
-  HAS_GP = 0x0800,
-  HAS_DYN = 0x2000,
+  TypeMask = 0x0FF00,
+  HAS_CSR = 0x00100,
+  HAS_CSC = 0x00200,
+  HAS_COO = 0x00400,
+  HAS_GP = 0x00800,
+  HAS_DYN = 0x01000,
 
-  GRAPH_PINNED = 0x1000,
+  HAS_CSR_MASK = ~(TypeMask - HAS_CSR),
+  HAS_CSC_MASK = ~(TypeMask - HAS_CSC),
+  HAS_COO_MASK = ~(TypeMask - HAS_COO),
+  HAS_DYN_MASK = ~(TypeMask - HAS_DYN),
+
+  GRAPH_PINNED = 0x10000,
 };
 
 template <GraphFlag FLAG>

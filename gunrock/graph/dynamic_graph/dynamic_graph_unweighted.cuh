@@ -85,6 +85,7 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, false>
     if (target != util::HOST) {
       csr.Move(util::DEVICE, util::HOST);
     }
+    this->dynamicGraph.Allocate();
     this->dynamicGraph.BulkBuildFromCsr(
         csr.row_offsets.GetPointer(util::HOST),
         csr.column_indices.GetPointer(util::HOST), csr.nodes, csr.directed,
@@ -92,6 +93,8 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, false>
     if (target != util::HOST) {
       csr.Release(util::HOST);
     }
+    this->nodes = csr.nodes;
+    this->edges = csr.edges;
     return cudaSuccess;
   }
 

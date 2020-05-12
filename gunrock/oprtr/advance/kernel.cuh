@@ -19,6 +19,7 @@
 #include <gunrock/oprtr/LB_CULL_advance/kernel.cuh>
 #include <gunrock/oprtr/TWC_advance/kernel.cuh>
 #include <gunrock/oprtr/AE_advance/kernel.cuh>
+#include <gunrock/oprtr/simple_advance/kernel.cuh>
 
 namespace gunrock {
 namespace oprtr {
@@ -384,6 +385,9 @@ cudaError_t Launch(const GraphT &graph, const FrontierInT *frontier_in,
   if (parameters.advance_mode == "ALL_EDGES")
     return AE::Launch<FLAG>(graph, frontier_in, frontier_out, parameters,
                             advance_op, filter_op);
+  if (parameters.advance_mode == "SIMPLE")
+    return SimpleAdvance::Launch<FLAG>(graph, frontier_in, frontier_out,
+                                       parameters, advance_op, filter_op);
 
   return util::GRError(cudaErrorInvalidValue,
                        "AdvanceMode " + parameters.advance_mode + " undefined.",

@@ -45,17 +45,13 @@ template <typename _VertexT = uint32_t, typename _SizeT = _VertexT,
           graph::GraphFlag _FLAG = graph::GRAPH_NONE,
           unsigned int _cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct TestGraph
-    : public graph::Csr<_VertexT, _SizeT, _ValueT,
-                        _FLAG &(~(graph::TypeMask - graph::HAS_CSR)),
+    : public graph::Csr<_VertexT, _SizeT, _ValueT, _FLAG & graph::HAS_CSR_MASK,
                         _cudaHostRegisterFlag, (_FLAG & graph::HAS_CSR) != 0>,
-      public graph::Coo<_VertexT, _SizeT, _ValueT,
-                        _FLAG &(~(graph::TypeMask - graph::HAS_COO)),
+      public graph::Coo<_VertexT, _SizeT, _ValueT, _FLAG & graph::HAS_COO_MASK,
                         _cudaHostRegisterFlag, (_FLAG & graph::HAS_COO) != 0>,
-      public graph::Csc<_VertexT, _SizeT, _ValueT,
-                        _FLAG &(~(graph::TypeMask - graph::HAS_CSC)),
+      public graph::Csc<_VertexT, _SizeT, _ValueT, _FLAG & graph::HAS_CSC_MASK,
                         _cudaHostRegisterFlag, (_FLAG & graph::HAS_CSC) != 0>,
-      public graph::Dyn<_VertexT, _SizeT, _ValueT,
-                        _FLAG &(~(graph::TypeMask - graph::HAS_DYN)),
+      public graph::Dyn<_VertexT, _SizeT, _ValueT, _FLAG & graph::HAS_DYN_MASK,
                         _cudaHostRegisterFlag, (_FLAG & graph::HAS_DYN) != 0>,
       public graph::Gp<_VertexT, _SizeT, _ValueT, _FLAG,
                        _cudaHostRegisterFlag> {
@@ -67,20 +63,16 @@ struct TestGraph
   // typedef Csr<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CsrT;
   // typedef Coo<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CooT;
   // typedef Csc<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> CscT;
-  typedef graph::Csr<_VertexT, _SizeT, _ValueT,
-                     _FLAG &(~(graph::TypeMask - graph::HAS_CSR)),
+  typedef graph::Csr<_VertexT, _SizeT, _ValueT, _FLAG & graph::HAS_CSR_MASK,
                      _cudaHostRegisterFlag, (_FLAG & graph::HAS_CSR) != 0>
       CsrT;
-  typedef graph::Csc<_VertexT, _SizeT, _ValueT,
-                     _FLAG &(~(graph::TypeMask - graph::HAS_CSC)),
+  typedef graph::Csc<_VertexT, _SizeT, _ValueT, _FLAG & graph::HAS_CSC_MASK,
                      _cudaHostRegisterFlag, (_FLAG & graph::HAS_CSC) != 0>
       CscT;
-  typedef graph::Coo<_VertexT, _SizeT, _ValueT,
-                     _FLAG &(~(graph::TypeMask - graph::HAS_COO)),
+  typedef graph::Coo<_VertexT, _SizeT, _ValueT, _FLAG & graph::HAS_COO_MASK,
                      _cudaHostRegisterFlag, (_FLAG & graph::HAS_COO) != 0>
       CooT;
-  typedef graph::Dyn<_VertexT, _SizeT, _ValueT,
-                     _FLAG &(~(graph::TypeMask - graph::HAS_DYN)),
+  typedef graph::Dyn<_VertexT, _SizeT, _ValueT, _FLAG & graph::HAS_DYN_MASK,
                      _cudaHostRegisterFlag, (_FLAG & graph::HAS_DYN) != 0>
       DynT;
   typedef graph::Gp<_VertexT, _SizeT, _ValueT, _FLAG, _cudaHostRegisterFlag>

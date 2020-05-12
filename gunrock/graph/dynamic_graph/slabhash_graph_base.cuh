@@ -42,7 +42,7 @@ struct SlabHashGraphBase {
   HashContextT* h_hash_context;
   HashContextT* d_hash_context;
 
-  std::vector<SizeT> buckets_per_table;
+  SizeT* buckets_per_table;
 
   SizeT* d_edges_per_node;
   int8_t* d_base_slabs;
@@ -50,6 +50,7 @@ struct SlabHashGraphBase {
   SizeT* d_edges_per_bucket;
   SizeT* d_buckets_offset;
 
+  SlabHashGraphBase(){};
   // todo: add node values
   /**
    * @brief Allocate maximum capacity memory for SlabHash graph.
@@ -57,13 +58,14 @@ struct SlabHashGraphBase {
    * @param[in] max_nodes Maximum number of nodes that the graph can store
    * @param[in] max_buckets Maximum number of buckets that the graph will use
    */
-  SlabHashGraphBase(SizeT max_nodes = 1 << 20, SizeT max_buckets = 1 << 20) {
+  void Allocate(SizeT max_nodes = 1 << 20, SizeT max_buckets = 1 << 20) {
     memory_allocator = new DynamicAllocatorT;
 
     nodes_capacity = max_nodes;
     buckets_capacity = max_buckets;
-    buckets_per_table.resize(nodes_capacity);
-    std::fill(buckets_per_table.begin(), buckets_per_table.end(), 0);
+    buckets_per_table = new SizeT[nodes_capacity];
+
+    std::memset(buckets_per_table, 0, sizeof(SizeT) * nodes_capacity);
 
     h_hash_context = new HashContextT[nodes_capacity];
 
@@ -159,7 +161,21 @@ struct SlabHashGraphBase {
     CHECK_ERROR(cudaMemcpy(d_hash_context, h_hash_context,
                            sizeof(HashContextT) * num_nodes,
                            cudaMemcpyHostToDevice));
+
+    CHECK_ERROR(cudaMemcpy(d_buckets_offset, h_buckets_offset.data(),
+                           sizeof(SizeT) * buckets_capacity,
+                           cudaMemcpyHostToDevice));
     return cudaSuccess;
+  }
+
+  /**
+   * @brief Query a graph vertex neghbor's count
+   *
+   * @param[in] v Query vertex
+   * @return v's neghbor's count
+   */
+  __device__ __forceinline__ SizeT GetNeighborsCount(const VertexT& v) const {
+    return d_edges_per_node[v];
   }
 
   /**
@@ -167,14 +183,14 @@ struct SlabHashGraphBase {
    *
    * @param[out] the graph maximum nodes capacity
    */
-  SizeT GetNodesCapacity() { return nodes_capacity; }
+  SizeT GetNodesCapacity() const { return nodes_capacity; }
 
   /**
    * @brief Query the graph maximun buckets capacity
    *
    * @param[out] the graph maximum buckets capacity
    */
-  SizeT GetSlabsCapacity() { return buckets_capacity; }
+  SizeT GetSlabsCapacity() const { return buckets_capacity; }
 
   /**
    * @brief Extend the capcity of the graph vertices
@@ -184,6 +200,7 @@ struct SlabHashGraphBase {
 
   cudaError_t Release() {
     delete[] h_hash_context;
+    delete[] buckets_per_table;
     delete memory_allocator;
 
     cudaFree(d_hash_context);
@@ -203,6 +220,7 @@ struct SlabHashGraphBase {
   SizeT buckets_capacity;
 
   static constexpr uint32_t PRIME_DIVISOR_ = 4294967291u;
+  static constexpr uint32_t keysPerSlab = 32;
 };
 }  // namespace graph
 }  // namespace gunrock
