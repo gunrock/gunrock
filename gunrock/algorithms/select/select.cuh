@@ -1,8 +1,14 @@
-/*
- * XXX: error handling within methods,
- * remove return error_t it adds unnecessary
- * work for users to handle every return
- * statement by each of these functions.
+/**
+ * @file select.cuh
+ *
+ * @brief
+ *
+ * @todo error handling within methods, remove return error_t it adds
+ * unnecessary work for users to handle every return statement by each of these
+ * functions.
+ *
+ * Maybe the file-ext needs to be .hxx instead of .cuh for faster compilation.
+ *
  */
 
 #pragma once
@@ -11,6 +17,16 @@
 
 namespace gunrock {
 namespace algo {
+
+/**
+ * @namespace select
+ * Namespace for select related algorithms. The three selects we support are
+ * select if, select flagged, and select unique. They are not divided into
+ * further namespaces, because we don't have different implementations of these.
+ *
+ * @todo maybe a good idea to further break select into namespaces if, flagged
+ * and unique.
+ */
 namespace select {
 
 // XXX: condense code using enum

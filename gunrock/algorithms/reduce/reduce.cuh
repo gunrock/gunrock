@@ -1,8 +1,14 @@
-/*
- * XXX: error handling within methods, 
- * remove return error_t it adds unnecessary
- * work for users to handle every return 
- * statement by each of these functions.
+/**
+ * @file reduce.cuh
+ *
+ * @brief
+ *
+ * @todo error handling within methods, remove return error_t it adds
+ * unnecessary work for users to handle every return statement by each of these
+ * functions.
+ *
+ * Maybe the file-ext needs to be .hxx instead of .cuh for faster compilation.
+ *
  */
 
 #pragma once
@@ -10,13 +16,34 @@
 #include <moderngpu/kernel_reduce.hxx>
 
 namespace gunrock {
+
+/**
+ * @namespace algo
+ * A collection of parallel algorithms/primitives, often used as building blocks
+ * for much more sophisticated problems. These algorithms include reduce, sort,
+ * select, scan, etc.
+ */
 namespace algo {
+
+/**
+ * @namespace reduce
+ * Namespace for reduce algorithm, includes reduction on host and device, and on
+ * different hierarchy of the device (blocks, warps, threads).
+ */
 namespace reduce {
 
+/**
+ * @namespace host
+ * Namespace for host (CPU, system) related functions. These maybe serial or
+ * parallel using openmp.
+ */
 namespace host {
 // XXX: CPU reduce
 } // namespace: host
 
+/**
+ * @namespace device Namespace for device (GPU) related functions.
+ */
 namespace device {
 
 template<typename error_t,

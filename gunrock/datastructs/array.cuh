@@ -1,9 +1,31 @@
+/**
+ * @file array.cuh
+ *
+ * @brief
+ *
+ * @todo extended array support for display, print (std::out and file::out),
+ * etc. features. These have proven very useful in the gunrock v1 and prior
+ * versions and we would like to continue to support them in the future.
+ *
+ * need to support iterators for dense::array.
+ *
+ */
+
 #pragma once
 
 // includes: cuda-api-wrappers
 #include <cuda/api_wrappers.hpp>
 
 namespace gunrock {
+
+/**
+ * @namespace datastructs
+ * Data structures supported within gunrock, includes host and device support
+ * for various useful data structures such as a basic static dense array
+ * (std::array), sparse array and dynamic array. Data structures are the other
+ * fundamental part of algorithms ( @see algo for the other half of what is
+ * supported).
+ */
 namespace datastruct {
 
 enum location_t
@@ -17,6 +39,14 @@ enum location_t
   default = 1 << 5;
 }
 
+/**
+ * @namespace dense
+ * Namespace for dense data structures supported within gunrock. Note that the
+ * array structure is modeled exactly after std::array, this is to make it
+ * easier for users to familiarize themselves with the code.
+ * gunrock::datastruct::dense have further support for extended features that
+ * are not available within the standard.
+ */
 namespace dense
 {
 
@@ -90,16 +120,16 @@ namespace dense
     void allocate(_int_t N, location_t target = location_t::default) noexcept
     {
       if (is_location_set(location_t::host)) {
-        // XXX: host allocate
-        // h_pointer = cuda::memory::host::make_unique<type_t>(size);
+        // host allocate
         this->h_pointer =
           const_cast<pointer_t>(cuda::memory::host::allocate(N));
         this->allocated = set_location(this->allocated, location_t::host);
-        // XXX: location_t::pinned
+        // XXX: location_t::pinned - pinned is technically not a location, it is
+        // a characteristic of the underlying memory chunk.
       }
 
       if (is_location_set(location_t::device)) {
-        // XXX: device allocate
+        // device allocate
         // XXX: For multi-GPU, do we want a seamless allocate in
         // the allocate layer, or do we want it to be outside the
         // array() struct?

@@ -1,8 +1,15 @@
-/*
- * XXX: error handling within methods, 
- * remove return error_t it adds unnecessary
- * work for users to handle every return 
- * statement by each of these functions.
+/**
+ * @file scan.cuh
+ *
+ * @brief
+ *
+ * @todo error handling within methods, remove return error_t it adds
+ * unnecessary work for users to handle every return statement by each of these
+ * functions.
+ *
+ * Maybe the file-ext needs to be .hxx instead of .cuh for faster compilation.
+ *
+ *
  */
 
 #pragma once
@@ -12,6 +19,12 @@
 
 namespace gunrock {
 namespace algo {
+
+/**
+ * @namespace scan
+ * Namespace for scan algorithm, includes scan on host and device, and on
+ * different hierarchy of the device (blocks, warps, threads).
+ */
 namespace scan {
 
 enum scan_t
@@ -44,7 +57,7 @@ scan(input_t* input,
      bool sync = false)
 {
 
-  error_t status = util::error:success;
+  error_t status = util::error : success;
 
   // XXX: Experiment with these values and choose the best ones. We
   // could even choose to make them a parameter of util::Scan and choose

@@ -1,8 +1,14 @@
-/*
- * XXX: error handling within methods,
- * remove return error_t it adds unnecessary
- * work for users to handle every return
- * statement by each of these functions.
+/**
+ * @file radix_sort.cuh
+ *
+ * @brief
+ *
+ * @todo error handling within methods, remove return error_t it adds
+ * unnecessary work for users to handle every return statement by each of these
+ * functions.
+ *
+ * Maybe the file-ext needs to be .hxx instead of .cuh for faster compilation.
+ *
  */
 
 #pragma once
@@ -10,6 +16,14 @@
 
 namespace gunrock {
 namespace algo {
+
+/**
+ * @namespace sort
+ * Namespace for sort algorithm, includes sort on host and device. Algorithms
+ * such as radix sort and stable sort (std::sort uses stable sort). We also
+ * support segmented sort, which relies on load-balancing for various different
+ * irregular problems.
+ */
 namespace sort {
 
 enum order_t
@@ -18,6 +32,11 @@ enum order_t
   descending
 }
 
+/**
+ * @namespace radix
+ * Namespace for radix sort algorithms on host and device. Supports sorting
+ * keys, key-value pairs and segments.
+ */
 namespace radix
 {
 

@@ -1,8 +1,14 @@
-/*
- * XXX: error handling within methods,
- * remove return error_t it adds unnecessary
- * work for users to handle every return
- * statement by each of these functions.
+/**
+ * @file stable_sort.cuh
+ *
+ * @brief
+ *
+ * @todo error handling within methods, remove return error_t it adds
+ * unnecessary work for users to handle every return statement by each of these
+ * functions.
+ *
+ * Maybe the file-ext needs to be .hxx instead of .cuh for faster compilation.
+ *
  */
 
 #pragma once
@@ -18,6 +24,13 @@ enum order_t
   descending
 }
 
+/**
+ * @namespace stable
+ * Namespace for stable sort algorithms on host and device. Supports sorting
+ * keys, key-value pairs and segments. Note, std::sort in C++ uses stable sort.
+ * Thrust is modeled around some of the standard libraries and therefore
+ * uses/implements stable sort for the GPU based on std::sort.
+ */
 namespace stable
 {
 

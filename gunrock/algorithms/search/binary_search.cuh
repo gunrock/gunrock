@@ -1,14 +1,27 @@
-/*
- * XXX: error handling within methods,
- * remove return error_t it adds unnecessary
- * work for users to handle every return
- * statement by each of these functions.
+/**
+ * @file binary_search.cuh
+ *
+ * @brief
+ *
+ * @todo error handling within methods, remove return error_t it adds
+ * unnecessary work for users to handle every return statement by each of these
+ * functions.
+ *
+ * Maybe the file-ext needs to be .hxx instead of .cuh for faster compilation.
+ *
  */
 
 #pragma once
 
 namespace gunrock {
 namespace algo {
+
+/**
+ * @namespace search
+ * Namespace for search algorithm, includes search on host and device.
+ * Algorithms such as binary search and sorted search (see:
+ * https://moderngpu.github.io/sortedsearch.html).
+ */
 namespace search {
 
 enum bound_t
@@ -17,6 +30,10 @@ enum bound_t
   lower
 }
 
+/**
+ * @namespace binary
+ * Namespace for binary search implementations on host and device.
+ */
 namespace binary
 {
   namespace host {

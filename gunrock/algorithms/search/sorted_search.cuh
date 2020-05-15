@@ -1,8 +1,14 @@
-/*
- * XXX: error handling within methods,
- * remove return error_t it adds unnecessary
- * work for users to handle every return
- * statement by each of these functions.
+/**
+ * @file sorted_search.cuh
+ *
+ * @brief
+ *
+ * @todo error handling within methods, remove return error_t it adds
+ * unnecessary work for users to handle every return statement by each of these
+ * functions.
+ *
+ * Maybe the file-ext needs to be .hxx instead of .cuh for faster compilation.
+ *
  */
 
 #pragma once
@@ -18,6 +24,15 @@ enum bound_t
   lower
 }
 
+/**
+ * @namespace sorted
+ * Namespace for sorted search algorithm on device. (see:
+ * https://moderngpu.github.io/sortedsearch.html).
+ *
+ * @todo there is no host side implementation, besides the one provided in
+ * moderngpu docs as a pseudoalgorithm. It may be a good idea to implement one
+ * for gunrock.
+ */
 namespace sorted
 {
   namespace device {
