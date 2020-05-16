@@ -114,7 +114,7 @@ namespace dense
     }
 
     // XXX: there's no default
-    CUDA_HOST_DEVICE virtual ~array() noexcept = default;
+    GUNROCK_HOST_DEVICE virtual ~array() noexcept = default;
 
     // allocate, free::
     void allocate(_int_t N, location_t target = location_t::default) noexcept
@@ -160,7 +160,7 @@ namespace dense
      */
 
     // Return pointer of array on host or device-side
-    CUDA_HOST_DEVICE constexpr pointer_t data() noexcept
+    GUNROCK_HOST_DEVICE constexpr pointer_t data() noexcept
     {
 
 #ifdef __CUDA_ARCH__
@@ -171,7 +171,7 @@ namespace dense
     }
 
     // Return a const pointer of array on host or device-side
-    CUDA_HOST_DEVICE constexpr const_pointer_t data() const noexcept
+    GUNROCK_HOST_DEVICE constexpr const_pointer_t data() const noexcept
     {
 #ifdef __CUDA_ARCH__
       return const_cast<const_pointer_t>(this->d_pointer);
@@ -180,7 +180,7 @@ namespace dense
 #endif
     }
 
-    CUDA_HOST_DEVICE constexpr pointer_t data(location_t target) noexcept
+    GUNROCK_HOST_DEVICE constexpr pointer_t data(location_t target) noexcept
     {
 
       if (is_location_set(target, location_t::device)) {
@@ -194,7 +194,7 @@ namespace dense
       return std::nullptr;
     }
 
-    CUDA_HOST_DEVICE constexpr const_pointer_t data(
+    GUNROCK_HOST_DEVICE constexpr const_pointer_t data(
       location_t target) noexcept const
     {
 
@@ -249,7 +249,7 @@ namespace dense
       }
     }
 
-    CUDA_HOST_DEVICE constexpr reference_t operator[](_int_t n) noexcept
+    GUNROCK_HOST_DEVICE constexpr reference_t operator[](_int_t n) noexcept
     {
 #ifdef __CUDA_ARCH__
       return reference(this->d_pointer, n);
@@ -258,7 +258,7 @@ namespace dense
 #endif
     }
 
-    CUDA_HOST_DEVICE constexpr const_reference operator[](_int_t n) const
+    GUNROCK_HOST_DEVICE constexpr const_reference operator[](_int_t n) const
       noexcept
     {
 #ifdef __CUDA_ARCH__
@@ -268,7 +268,7 @@ namespace dense
 #endif
     }
 
-    CUDA_HOST_DEVICE constexpr pointer_t operator->() noexcept
+    GUNROCK_HOST_DEVICE constexpr pointer_t operator->() noexcept
     {
 #ifdef __CUDA_ARCH__
       return data();
@@ -277,7 +277,7 @@ namespace dense
 #endif
     }
 
-    CUDA_HOST_DEVICE constexpr const_pointer_t operator->() const noexcept
+    GUNROCK_HOST_DEVICE constexpr const_pointer_t operator->() const noexcept
     {
 #ifdef __CUDA_ARCH__
       return data();
@@ -287,7 +287,7 @@ namespace dense
     }
 
     template<typename scalar_t>
-    __host__ __device__ __forceinline__ ValueT* operator+(
+    GUNROCK_HOST_DEVICE ValueT* operator+(
       const scalar_t& offset) const noexcept
     {
 #ifdef __CUDA_ARCH__
@@ -298,7 +298,7 @@ namespace dense
     }
 
     template<typename scalar_t>
-    __host__ __device__ __forceinline__ ValueT* operator+(
+    GUNROCK_HOST_DEVICE ValueT* operator+(
       const scalar_t& offset) const noexcept
     {
 #ifdef __CUDA_ARCH__
@@ -310,7 +310,7 @@ namespace dense
 
     // XXX: add other operators-,/,*,+=,-=,*=,/=...
 
-    // XXX: __device__ __host__? How do we set host
+    // XXX: GUNROCK_HOST_DEVICE? How do we set host
     // pointers on device and vice-versa?
     // Another option is a partial set, which means
     // you will check if you are on CUDA_ARCH, and
@@ -329,10 +329,10 @@ namespace dense
      * capacity::
      */
 
-    CUDA_HOST_DEVICE constexpr _int_t size() const noexcept { return N; }
+    GUNROCK_HOST_DEVICE constexpr _int_t size() const noexcept { return N; }
 
     // XXX: return (size() == 0);?
-    CUDA_HOST_DEVICE constexpr bool empty() const noexcept
+    GUNROCK_HOST_DEVICE constexpr bool empty() const noexcept
     {
 #ifdef __CUDA_ARCH__
       return (this->d_pointer == std::nullptr) ? true : false;
@@ -341,7 +341,7 @@ namespace dense
 #endif
     }
 
-    CUDA_HOST_DEVICE constexpr bool is_allocated(
+    GUNROCK_HOST_DEVICE constexpr bool is_allocated(
       location_t target,
       _int_t size = this->size) noexcept
     {
