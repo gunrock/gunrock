@@ -1,6 +1,7 @@
 [submodule "externals/cuda-api-wrappers"]
 	path = externals/cuda-api-wrappers
 	url = git@github.com:eyalroz/cuda-api-wrappers.git
+	branch = development
 [submodule "externals/cub"]
 	path = externals/cub
 	url = git@github.com:NVlabs/cub.git
