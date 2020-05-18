@@ -30,7 +30,7 @@ enum order_t
 {
   ascending,
   descending
-}
+};
 
 /**
  * @namespace radix

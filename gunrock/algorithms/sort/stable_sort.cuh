@@ -18,12 +18,6 @@ namespace gunrock {
 namespace algo {
 namespace sort {
 
-enum order_t
-{
-  ascending,
-  descending
-}
-
 /**
  * @namespace stable
  * Namespace for stable sort algorithms on host and device. Supports sorting

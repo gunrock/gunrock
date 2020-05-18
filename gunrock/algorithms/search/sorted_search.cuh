@@ -18,12 +18,6 @@ namespace gunrock {
 namespace algo {
 namespace search {
 
-enum bound_t
-{
-  upper,
-  lower
-}
-
 /**
  * @namespace sorted
  * Namespace for sorted search algorithm on device. (see:

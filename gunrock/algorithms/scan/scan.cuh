@@ -31,7 +31,7 @@ enum scan_t
 {
   inclusive,
   exclusive
-}
+};
 
 namespace host
 {

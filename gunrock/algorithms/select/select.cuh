@@ -35,7 +35,7 @@ enum select_t
   flagged,
   if,
   unique
-}
+};
 
 namespace device
 {

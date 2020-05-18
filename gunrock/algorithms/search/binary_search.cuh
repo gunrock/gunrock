@@ -28,7 +28,7 @@ enum bound_t
 {
   upper,
   lower
-}
+};
 
 /**
  * @namespace binary
