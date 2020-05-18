@@ -105,6 +105,7 @@ namespace dense
     }
 
   public:
+    // Constructor should allocate an array of size = N
     array() noexcept
       : h_pointer(std::nullptr)
       , d_pointer(std::nullptr)
@@ -113,8 +114,8 @@ namespace dense
       allocate(0, location_t::none);
     }
 
-    // XXX: there's no default
-    GUNROCK_HOST_DEVICE virtual ~array() noexcept = default;
+    // XXX: Destructor needs to call free()
+    virtual ~array() noexcept = default;
 
     // allocate, free::
     void allocate(_int_t N, location_t target = location_t::default) noexcept
@@ -287,8 +288,7 @@ namespace dense
     }
 
     template<typename scalar_t>
-    GUNROCK_HOST_DEVICE ValueT* operator+(
-      const scalar_t& offset) const noexcept
+    GUNROCK_HOST_DEVICE ValueT* operator+(const scalar_t& offset) const noexcept
     {
 #ifdef __CUDA_ARCH__
       return data() + offset;
@@ -298,8 +298,7 @@ namespace dense
     }
 
     template<typename scalar_t>
-    GUNROCK_HOST_DEVICE ValueT* operator+(
-      const scalar_t& offset) const noexcept
+    GUNROCK_HOST_DEVICE ValueT* operator+(const scalar_t& offset) const noexcept
     {
 #ifdef __CUDA_ARCH__
       return data() + offset;
