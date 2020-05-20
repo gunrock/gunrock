@@ -45,6 +45,7 @@ _throw(error_t status, std::string message)
 {
   return cuda::throw_if_error(status, message);
 }
-}
-}
-}
+
+} // namespace error
+} // namespace util
+} // namespace gunrock
