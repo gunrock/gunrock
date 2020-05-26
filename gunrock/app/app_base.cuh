@@ -132,6 +132,7 @@ struct TestGraph
     GUARD_CU(this->CooT::Release(target));
     GUARD_CU(this->CsrT::Release(target));
     GUARD_CU(this->CscT::Release(target));
+    GUARD_CU(this->DynT::Release());
     GUARD_CU(this->GpT::Release(target));
     return retval;
   }

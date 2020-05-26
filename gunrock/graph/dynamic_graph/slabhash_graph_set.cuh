@@ -16,6 +16,7 @@
 #include <slab_hash.cuh>
 #include <gunrock/graph/dynamic_graph/slabhash_graph_base.cuh>
 #include <gunrock/graph/dynamic_graph/kernels/set/insert.cuh>
+#include <gunrock/graph/dynamic_graph/slabhash_graph_parallel_iterator.cuh>
 
 #include <gunrock/util/array_utils.cuh>
 
@@ -36,6 +37,11 @@ template <typename VertexT, typename SizeT, typename ValueT,
           unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct SlabHashGraphSet
     : SlabHashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
+  using SlabHashGraphParallelIteratorT = SlabHashGraphParallelIterator<
+      SlabHashGraphSet<VertexT, SizeT, ValueT, REQUIRE_VALUES,
+                       cudaHostRegisterFlag>,
+      REQUIRE_VALUES>;
+
   /**
    * @brief Insert a batch of edges into unweighted slab hash graph
    *

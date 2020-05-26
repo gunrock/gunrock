@@ -56,7 +56,7 @@ TEST(dynamicGraphIterator, MultipleBuckets) {
   for (int i = 0; i < result_frontier.size(); i++)
     EXPECT_EQ(result_frontier[i], expected_frontier[i]);
 
-  ref_dynamic_graph.Release();
+  dynamic_graph.Release();
   ref_graph.Release(util::HOST | util::DEVICE);
 }
 
@@ -140,7 +140,7 @@ TEST(dynamicGraphIterator, SingleBucketMultipleChains) {
   for (auto e_f : expected_frontier) {
     EXPECT_EQ(result_frontier[i++], e_f);
   }
-  ref_dynamic_graph.Release();
+  dynamic_graph.Release(util::HOST | util::DEVICE);
   ref_graph.Release(util::HOST | util::DEVICE);
 }
 
@@ -224,6 +224,6 @@ TEST(dynamicGraphIterator, MultipleBucketMultipleChains) {
   for (auto e_f : expected_frontier) {
     EXPECT_EQ(result_frontier[i++], e_f);
   }
-  ref_dynamic_graph.Release();
+  dynamic_graph.Release(util::HOST | util::DEVICE);
   ref_graph.Release(util::HOST | util::DEVICE);
 }

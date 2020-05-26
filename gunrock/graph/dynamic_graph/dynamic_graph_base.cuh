@@ -19,6 +19,7 @@
 #include <gunrock/graph/dynamic_graph/slabhash_graph_base.cuh>
 #include <gunrock/graph/dynamic_graph/slabhash_graph_map.cuh>
 #include <gunrock/graph/dynamic_graph/slabhash_graph_set.cuh>
+#include <gunrock/graph/dynamic_graph/slabhash_graph_parallel_iterator.cuh>
 
 namespace gunrock {
 namespace graph {
@@ -50,6 +51,8 @@ struct DynamicGraphBase {
   using DynamicGraphT =
       typename std::conditional<REQUIRE_EDGES_VALUES, SlabHashGraphMapT,
                                 SlabHashGraphSetT>::type;
+  using DynamicGraphParallelIterator =
+      typename DynamicGraphT::SlabHashGraphParallelIteratorT;
 
   DynamicGraphT dynamicGraph;
 
