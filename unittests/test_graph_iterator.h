@@ -56,7 +56,7 @@ TEST(dynamicGraphIterator, MultipleBuckets) {
   for (int i = 0; i < result_frontier.size(); i++)
     EXPECT_EQ(result_frontier[i], expected_frontier[i]);
 
-  dynamic_graph.Release();
+  dynamic_graph.Release(util::HOST | util::DEVICE);
   ref_graph.Release(util::HOST | util::DEVICE);
 }
 
