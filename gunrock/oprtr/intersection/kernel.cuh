@@ -50,7 +50,7 @@ template <OprtrFlag FLAG, typename InKeyT, typename OutKeyT, typename SizeT,
               true
 #else
               false
-#endif 
+#endif
           >
 struct Dispatch {
 };
@@ -164,38 +164,69 @@ __launch_bounds__(Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT,
                                           num_vertex, num_edge, inter_op);
 }
 
+template <typename GraphT, bool VALID>
+struct GraphT_Switch {
+  template <OprtrFlag FLAG, typename FrontierInT, typename FrontierOutT,
+            typename ParametersT, typename InterOpT>
+  static cudaError_t Launch_CSR(const GraphT &graph,
+                                const FrontierInT *frontier_in,
+                                FrontierOutT *frontier_out,
+                                ParametersT &parameters, InterOpT inter_op) {
+    return util::GRError(cudaErrorInvalidDeviceFunction,
+                         "Intersect is not implemented for the given "
+                         "graph representation.");
+  }
+};
+
+template <typename GraphT>
+struct GraphT_Switch<GraphT, true> {
+  template <OprtrFlag FLAG, typename FrontierInT, typename FrontierOutT,
+            typename ParametersT, typename InterOpT>
+  static cudaError_t Launch_CSR(const GraphT &graph,
+                                const FrontierInT *frontier_in,
+                                FrontierOutT *frontier_out,
+                                ParametersT &parameters, InterOpT inter_op) {
+    typedef typename GraphT ::CsrT CsrT;
+    typedef typename FrontierInT ::ValueT InKeyT;
+    typedef typename FrontierOutT::ValueT OutKeyT;
+    typedef typename ParametersT ::SizeT SizeT;
+    typedef typename ParametersT ::ValueT ValueT;
+    typedef typename ParametersT ::VertexT VertexT;
+    typedef typename ParametersT ::LabelT LabelT;
+    typedef typename Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT,
+                              InterOpT, true>::KernelPolicyT KernelPolicyT;
+
+    size_t input_length = graph.edges;
+    size_t stride =
+        (input_length + KernelPolicyT::BLOCKS * KernelPolicyT::THREADS - 1) >>
+        (KernelPolicyT::LOG_THREADS + KernelPolicyT::LOG_BLOCKS);
+    SizeT num_vertex = graph.nodes;
+    SizeT num_edges = graph.edges;
+
+    IntersectTwoSmallNL<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
+        <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS, 0,
+           parameters.stream>>>(
+            graph.CsrT::row_offsets.GetPointer(util::DEVICE),
+            graph.CsrT::column_indices.GetPointer(util::DEVICE),
+            frontier_in->GetPointer(util::DEVICE),
+            graph.CsrT::column_indices.GetPointer(util::DEVICE),
+            frontier_out->GetPointer(util::DEVICE), input_length, stride,
+            num_vertex, num_edges, inter_op);
+
+    return cudaSuccess;
+  }
+};
+
 template <OprtrFlag FLAG, typename GraphT, typename FrontierInT,
           typename FrontierOutT, typename ParametersT, typename InterOpT>
 cudaError_t Launch(const GraphT &graph, const FrontierInT *frontier_in,
                    FrontierOutT *frontier_out, ParametersT &parameters,
                    InterOpT inter_op) {
-  typedef typename GraphT ::CsrT CsrT;
-  typedef typename FrontierInT ::ValueT InKeyT;
-  typedef typename FrontierOutT::ValueT OutKeyT;
-  typedef typename ParametersT ::SizeT SizeT;
-  typedef typename ParametersT ::ValueT ValueT;
-  typedef typename ParametersT ::VertexT VertexT;
-  typedef typename ParametersT ::LabelT LabelT;
-  typedef typename Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT,
-                            InterOpT, true>::KernelPolicyT KernelPolicyT;
-
-  size_t input_length = graph.edges;
-  size_t stride =
-      (input_length + KernelPolicyT::BLOCKS * KernelPolicyT::THREADS - 1) >>
-      (KernelPolicyT::LOG_THREADS + KernelPolicyT::LOG_BLOCKS);
-  SizeT num_vertex = graph.nodes;
-  SizeT num_edges = graph.edges;
-
-  IntersectTwoSmallNL<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
-      <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS, 0, parameters.stream>>>(
-          graph.CsrT::row_offsets.GetPointer(util::DEVICE),
-          graph.CsrT::column_indices.GetPointer(util::DEVICE),
-          frontier_in->GetPointer(util::DEVICE),
-          graph.CsrT::column_indices.GetPointer(util::DEVICE),
-          frontier_out->GetPointer(util::DEVICE), input_length, stride,
-          num_vertex, num_edges, inter_op);
-
-  return cudaSuccess;
+  cudaError_t retval = cudaSuccess;
+  retval = GraphT_Switch<GraphT, (GraphT::FLAG & gunrock::graph::HAS_CSR)>::
+      template Launch_CSR<FLAG>(graph, frontier_in, frontier_out, parameters,
+                                inter_op);
+  return retval;
 }
 
 }  // namespace intersection
