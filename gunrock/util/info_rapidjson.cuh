@@ -14,12 +14,16 @@
 
 #pragma once
 
+#define RAPIDJSON_HAS_STDSTRING 1
+
 #include <cstdio>
 #include <vector>
 #include <ctime>
+#include <cmath>
 #include <time.h>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/filewritestream.h>
+#include <rapidjson/document.h>
 #include <gunrock/util/gitsha1.h>
 #include <gunrock/util/sysinfo_rapidjson.h>
 
@@ -56,11 +60,6 @@ cudaError_t UseParameters_info(ParametersT &parameters) {
       "", "Tag to better describe and identify json outputs", __FILE__,
       __LINE__));
 
-  // GUARD_CU(parameters.template Use<uint64_t>(
-  //   "filtered-srcs",
-  //   util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::INTERNAL_PARAMETER, 0,
-  //   "Array of filtered source vertices", __FILE__, __LINE__));
-
   return retval;
 }
 
@@ -88,7 +87,6 @@ struct Info {
   int64_t edges_queued;
   double nodes_redundance;
   double edges_redundance;
-  // double     load_time;
   double preprocess_time;
   double postprocess_time;
   double write_time;
@@ -99,10 +97,9 @@ struct Info {
   util::Parameters *parameters;
   std::string json_filename;
   std::FILE *json_file;
-  char *json_buffer;
-  size_t buff_size;
-  rapidjson::FileWriteStream *json_stream;
-  rapidjson::PrettyWriter<rapidjson::FileWriteStream> *json_writer;
+  rapidjson::StringBuffer *json_stream;
+  rapidjson::PrettyWriter<rapidjson::StringBuffer> *json_writer;
+  rapidjson::Document *json_document;
 
  public:
   /**
@@ -120,11 +117,10 @@ struct Info {
   void AssignInitValues() {
     parameters = NULL;
     json_filename = "";
-    json_buffer = NULL;
-    buff_size = 0;
     json_stream = NULL;
     json_writer = NULL;
     json_file = NULL;
+    json_document = NULL;
   }
 
   ~Info() { Release(); }
@@ -132,13 +128,66 @@ struct Info {
   cudaError_t Release() {
     parameters = NULL;
     json_filename = "";
-    delete[] json_buffer;
-    json_buffer = NULL;
     delete json_stream;
     json_stream = NULL;
     delete json_writer;
     json_writer = NULL;
+    delete json_document;
+    json_document = NULL;
     return cudaSuccess;
+  }
+
+
+  template <typename GraphT>
+  void SetBaseInfo(std::string algorithm_name, util::Parameters &parameters,
+                   GraphT &graph, bool final_file = false) {
+    // If this is not the final version of the file, we want to denote it
+    // as invalid somehow.
+    if (!final_file) {
+      SetVal("avg-process-time", -1);
+    }
+
+    SetVal("engine", "Gunrock");
+    SetVal("command-line", parameters.Get_CommandLine());
+
+    // Update this date when JSON Schema is changed:
+    SetVal("json-schema", "2019-09-20");
+
+#ifdef BOOST_FOUND
+#if BOOST_COMP_CLANG
+    SetVal("compiler", BOOST_COMP_CLANG_NAME);
+    SetVal("compiler-version", BOOST_COMP_CLANG_DETECTION);
+#elif BOOST_COMP_GNUC
+    SetVal("compiler", BOOST_COMP_GNUC_NAME);
+    SetVal("compiler-version", BOOST_COMP_GNUC_DETECTION);
+#endif
+#else
+#ifdef __clang__
+    SetVal("compiler", "Clang");
+    SetVal("compiler-version", (__clang_major__ % 100) * 10000000 +
+                                   (__clang_minor__ % 100) * 100000 +
+                                   (__clang_patchlevel__ % 100000));
+#else
+    SetVal("compiler", "Gnu GCC C/C++");
+#ifdef __GNUC_PATCHLEVEL__
+    SetVal("compiler-version", (__GNUC__ % 100) * 10000000 +
+                                   (__GNUC_MINOR__ % 100) * 100000 +
+                                   (__GNUC_PATCHLEVEL__ % 100000));
+#else
+    SetVal("compiler-version",
+           (__GNUC__ % 100) * 10000000 + (__GNUC_MINOR__ % 100) * 100000);
+#endif
+#endif
+#endif
+
+    SetVal("time", time_str);
+    SetVal("gunrock-version", XSTR(GUNROCKVERSION));
+    SetVal("git-commit-sha", g_GIT_SHA1);
+    SetVal("primitive", algorithm_name);
+
+    SetVal("stddev-degree", graph::GetStddevDegree(graph));
+    SetVal("num-vertices", graph.nodes);
+    SetVal("num-edges", graph.edges);
   }
 
   /**
@@ -196,68 +245,13 @@ struct Info {
       for (unsigned int i = 0; i < strlen(bad_chars); ++i) {
         json_filename.erase(std::remove(json_filename.begin(),
                                         json_filename.end(), bad_chars[i]),
-                            		json_filename.end());
+                            json_filename.end());
       }
     } else {
       return;
     }
-
-    buff_size = 65536;
-    if (json_buffer == NULL) json_buffer = new char[buff_size];
-    if (json_filename != "") {
-      json_file = std::fopen(json_filename.c_str(), "w");
-    } else {
-      json_file = stdout;
-    }
-    json_stream =
-        new rapidjson::FileWriteStream(json_file, json_buffer, buff_size);
-    json_writer =
-        new rapidjson::PrettyWriter<rapidjson::FileWriteStream>(*json_stream);
-    json_writer->StartObject();
-
-    SetVal("engine", "Gunrock");
-    SetVal("command-line", parameters.Get_CommandLine());
-    
-    // Update this date when JSON Schema is changed:
-    SetVal("json-schema", "2019-09-20");  
-    
-    // SetVal("sysinfo", sysinfo.getSysinfo());
-    // SetVal("gpuinfo", gpuinfo.getGpuinfo());
-    // SetVal("userinfo", userinfo.getUserinfo());
-
-#ifdef BOOST_FOUND
-#if BOOST_COMP_CLANG
-    SetVal("compiler", BOOST_COMP_CLANG_NAME);
-    SetVal("compiler-version", BOOST_COMP_CLANG_DETECTION);
-#elif BOOST_COMP_GNUC
-    SetVal("compiler", BOOST_COMP_GNUC_NAME);
-    SetVal("compiler-version", BOOST_COMP_GNUC_DETECTION);
-#endif
-#else
-#ifdef __clang__
-    SetVal("compiler", "Clang");
-    SetVal("compiler-version", (__clang_major__ % 100) * 10000000 +
-                                   (__clang_minor__ % 100) * 100000 +
-                                   (__clang_patchlevel__ % 100000));
-#else
-    SetVal("compiler", "Gnu GCC C/C++");
-#ifdef __GNUC_PATCHLEVEL__
-    SetVal("compiler-version", (__GNUC__ % 100) * 10000000 +
-                                   (__GNUC_MINOR__ % 100) * 100000 +
-                                   (__GNUC_PATCHLEVEL__ % 100000));
-#else
-    SetVal("compiler-version",
-           (__GNUC__ % 100) * 10000000 + (__GNUC_MINOR__ % 100) * 100000);
-#endif
-#endif
-#endif
-
-    SetVal("time", time_str);
-    SetVal("gunrock-version", XSTR(GUNROCKVERSION));
-    SetVal("git-commit-sha", g_GIT_SHA1);
-    SetVal("load-time", parameters.Get<float>("load-time"));
-    SetVal("primitive", algorithm_name);
   }
+
 
   /**
    * @brief Initialization process for Info.
@@ -269,149 +263,255 @@ struct Info {
   void Init(std::string algorithm_name, util::Parameters &parameters,
             GraphT &graph) {
     InitBase(algorithm_name, parameters);
-    // if not set or something is wrong, set it to the largest vertex ID
-    // if (info["destination_vertex"].get_int64() < 0 ||
-    //    info["destination_vertex"].get_int64() >= graph.nodes)
-    //    info["destination_vertex"] = graph.nodes - 1;
 
-    SetVal("stddev-degree", graph::GetStddevDegree(graph));
-    SetVal("num-vertices", graph.nodes);
-    SetVal("num-edges", graph.edges);
-  }
+    json_document = new rapidjson::Document();
+    json_document->SetObject();
 
-  template <typename DummyT, typename T>
-  void SetBool(DummyT name, const T &val) {
-    // util::PrintMsg("Escape val, name = " + name);
-    if (json_writer != NULL) json_writer->Null();
-  }
+    // Use a StringBuffer to hold the file data. This requires we manually
+    // fputs the data from the stream to a file, but it's unlikely we would
+    // ever write incomplete files. With a FileWriteStream, rapidjson will
+    // decide to start writing whenever the buffer we provide is full
+    json_stream =
+      new rapidjson::StringBuffer();
+    json_writer =
+      new rapidjson::PrettyWriter<rapidjson::StringBuffer>(*json_stream);
 
-  template <typename DummyT>
-  void SetBool(DummyT name, const bool &val) {
-    if (json_writer != NULL) json_writer->Bool(val);
-  }
+    // Write the initial copy of the file with an invalid avg-process-time
+    SetBaseInfo(algorithm_name, parameters, graph, false);
 
-  template <typename DummyT, typename T>
-  void SetInt(DummyT name, const T &val) {
-    // util::PrintMsg("Escape val, name = " + name);
-    if (json_writer != NULL) json_writer->Null();
-  }
+    // Traverse the document for writing events
+    if (json_writer != NULL) {
+      json_document->Accept(*json_writer);
+      assert(json_writer->IsComplete());
+    }
+    if (json_filename != "") {
+      json_file = std::fopen(json_filename.c_str(), "w");
+      std::fputs(json_stream->GetString(), json_file);
+      std::fclose(json_file);
+    }
 
-  template <typename DummyT>
-  void SetInt(DummyT name, const int &val) {
-    if (json_writer != NULL) json_writer->Int(val);
-  }
+    // We now start over with a new stream and writer. We can't reuse them.
+    // We also reset the document and rewrite our initial data - this time
+    // without the invalid time.
+    delete json_stream;
+    delete json_writer;
 
-  template <typename DummyT, typename T>
-  void SetUint(DummyT name, const T &val) {
-    // util::PrintMsg("Escape val, name = " + name);
-    if (json_writer != NULL) json_writer->Null();
-  }
+    json_stream =
+      new rapidjson::StringBuffer();
+    json_writer =
+      new rapidjson::PrettyWriter<rapidjson::StringBuffer>(*json_stream);
 
-  template <typename DummyT>
-  void SetUint(DummyT name, const unsigned int &val) {
-    if (json_writer != NULL) json_writer->Uint(val);
-  }
-
-  template <typename DummyT, typename T>
-  void SetInt64(DummyT name, const T &val) {
-    // util::PrintMsg("Escape val, name = " + name);
-    if (json_writer != NULL) json_writer->Null();
-  }
-
-  template <typename DummyT>
-  void SetInt64(DummyT name, const int64_t &val) {
-    if (json_writer != NULL) json_writer->Int64(val);
-  }
-
-  template <typename DummyT, typename T>
-  void SetUint64(DummyT name, const T &val) {
-    // util::PrintMsg("Escape val, name = " + name);
-    if (json_writer != NULL) json_writer->Null();
-  }
-
-  template <typename DummyT>
-  void SetUint64(DummyT name, const uint64_t &val) {
-    if (json_writer != NULL) json_writer->Uint64(val);
-  }
-
-  template <typename DummyT, typename T>
-  void SetDouble(DummyT name, const T &val) {
-    // util::PrintMsg("Escape val, name = " + name);
-    if (json_writer != NULL) json_writer->Null();
-  }
-
-  template <typename DummyT>
-  void SetDouble(DummyT name, const float &val) {
-    if (json_writer != NULL) json_writer->Double(double(val));
-  }
-
-  template <typename DummyT>
-  void SetDouble(DummyT name, const double &val) {
-    if (json_writer != NULL) json_writer->Double(val);
+    json_document->SetObject();
+    SetBaseInfo(algorithm_name, parameters, graph, true);
   }
 
   template <typename T>
-  void SetVal(std::string name, const T &val, bool write_name = true) {
-    if (json_writer == NULL) return;
-    if (write_name) json_writer->Key(name.c_str());
+  rapidjson::Value GetRapidjsonValue(const T& val) {
+    return rapidjson::Value(val);
+  }
+
+  rapidjson::Value GetRapidjsonValue(const std::string& str) {
+      if (json_document == NULL) return rapidjson::Value();
+      else {
+          return rapidjson::Value(str, json_document->GetAllocator());
+      }
+
+  }
+
+  rapidjson::Value GetRapidjsonValue(char* const str) {
+      if (json_document == NULL) return rapidjson::Value();
+      else {
+          return rapidjson::Value(str, json_document->GetAllocator());
+      }
+  }
+
+  template <typename T>
+  void SetBool(std::string name, const T &val, rapidjson::Value& json_object) {
+    std::cerr << "Attempt to SetVal with unknown type for key \""
+              << name << std::endl;
+  }
+
+  void SetBool(std::string name, const bool &val, rapidjson::Value& json_object) {
+    if (json_document != NULL) {
+      rapidjson::Value key(name, json_document->GetAllocator());
+      json_object.AddMember(key, val, json_document->GetAllocator());
+    }
+  }
+
+  template <typename T>
+  void SetInt(std::string name, const T &val, rapidjson::Value& json_object) {
+    std::cerr << "Attempt to SetVal with unknown type for key \"" <<
+                 name << std::endl;
+  }
+
+  void SetInt(std::string name, const int &val, rapidjson::Value& json_object) {
+    if (json_document != NULL) {
+      rapidjson::Value key(name, json_document->GetAllocator());
+      json_object.AddMember(key, val, json_document->GetAllocator());
+    }
+  }
+
+  template <typename T>
+  void SetUint(std::string name, const T &val, rapidjson::Value& json_object) {
+    std::cerr << "Attempt to SetVal with unknown type for key \""
+              << name << std::endl;
+  }
+
+  void SetUint(std::string name, const unsigned int &val, rapidjson::Value& json_object) {
+    if (json_document != NULL) {
+      rapidjson::Value key(name, json_document->GetAllocator());
+      json_object.AddMember(key, val, json_document->GetAllocator());
+    }
+  }
+
+  template <typename T>
+  void SetInt64(std::string name, const T &val, rapidjson::Value& json_object) {
+    std::cerr << "writing unknown type for key \""
+              << name << std::endl;
+  }
+
+  void SetInt64(std::string name, const int64_t &val, rapidjson::Value& json_object) {
+    if (json_document != NULL) {
+      rapidjson::Value key(name, json_document->GetAllocator());
+      json_object.AddMember(key, val, json_document->GetAllocator());
+    }
+  }
+
+  template <typename T>
+  void SetUint64(std::string name, const T &val, rapidjson::Value& json_object) {
+    std::cerr << "writing unknown type for key \""
+              << name << std::endl;
+  }
+
+  void SetUint64(std::string name, const uint64_t &val, rapidjson::Value& json_object) {
+    if (json_document != NULL) {
+      rapidjson::Value key(name, json_document->GetAllocator());
+      json_object.AddMember(key, val, json_document->GetAllocator());
+    }
+  }
+
+  template <typename T>
+  void SetDouble(std::string name, const T &val, rapidjson::Value& json_object) {
+    std::cerr << "writing unknown type for key \""
+              << name << std::endl;
+  }
+
+  void SetDouble(std::string name, const float &val, rapidjson::Value& json_object) {
+    if (json_document != NULL) {
+      rapidjson::Value key(name, json_document->GetAllocator());
+
+      // Doubles and floats have an edge case. INF and NAN are valid values for a
+      // double, but JSON doesn't allow them in the official spec. Some json formats
+      // still allow them. We have to choose a behavior here, so let's output the value
+      // as a string
+      if (std::isinf(val) || std::isnan(val)) {
+        rapidjson::Value null_val(rapidjson::kNullType);
+        json_object.AddMember(key, null_val, json_document->GetAllocator());
+      } else {
+        json_object.AddMember(key, val, json_document->GetAllocator());
+      }
+    }
+  }
+
+  void SetDouble(std::string name, const double &val, rapidjson::Value& json_object) {
+    if (json_document != NULL) {
+      rapidjson::Value key(name, json_document->GetAllocator());
+
+      if (std::isinf(val) || std::isnan(val)) {
+        rapidjson::Value null_val(rapidjson::kNullType);
+        json_object.AddMember(key, null_val, json_document->GetAllocator());
+      } else {
+        json_object.AddMember(key, val, json_document->GetAllocator());
+      }
+    }
+  }
+
+  // Attach a key with name, "name" and value "val" to the JSON object
+  // "json_object"
+  template <typename T>
+  void SetVal(std::string name, const T &val, rapidjson::Value& json_object) {
+    if (json_document == NULL) return;
+
     auto tidx = std::type_index(typeid(T));
 
+    // TODO: Use constexpr if for this instead of the runtime check
+    // Then we won't need the filler functions above for a generic
+    // template parameter T
     if (tidx == std::type_index(typeid(bool)))
-      SetBool(name, val);
+      SetBool(name, val, json_object);
     else if (tidx == std::type_index(typeid(char)) ||
              tidx == std::type_index(typeid(signed char)) ||
              tidx == std::type_index(typeid(short)) ||
              tidx == std::type_index(typeid(int)))
-      SetInt(name, val);
+      SetInt(name, val, json_object);
     else if (tidx == std::type_index(typeid(unsigned char)) ||
              tidx == std::type_index(typeid(unsigned short)) ||
              tidx == std::type_index(typeid(unsigned int)))
-      SetUint(name, val);
+      SetUint(name, val, json_object);
     else if (tidx == std::type_index(typeid(long)) ||
              tidx == std::type_index(typeid(long long)))
-      SetInt64(name, val);
+      SetInt64(name, val, json_object);
     else if (tidx == std::type_index(typeid(unsigned long)) ||
              tidx == std::type_index(typeid(unsigned long long)))
-      SetUint64(name, val);
+      SetUint64(name, val, json_object);
     else if (tidx == std::type_index(typeid(float)) ||
              tidx == std::type_index(typeid(double)) ||
              tidx == std::type_index(typeid(long double)))
-      SetDouble(name, val);
+      SetDouble(name, val, json_object);
     else {
       std::ostringstream ostr;
       ostr << val;
       std::string str = ostr.str();
-      json_writer->String(str.c_str());
+
+      rapidjson::Value key(name, json_document->GetAllocator());
+      json_object.AddMember(key, str, json_document->GetAllocator());
     }
   }
 
   template <typename T>
-  void SetVal(std::string name, const std::vector<T> &vec) {
-    if (json_writer == NULL) return;
+  void SetVal(std::string name, const std::vector<T> &vec,
+              rapidjson::Value& json_object) {
     // TODO: update parameters to support "ALWAYS_ARRAY" type
     // currently using a hack to make sure tag is always an 
     // array in JSON. This is also required for fields such
     // as srcs, process-times, etc.
+    if (json_document == NULL) return;
+
     if (vec.size() == 1 && (name.compare("tag") != 0)) {
-      SetVal(name, vec.front());
+        SetVal(name, vec.front(), json_object);
     } else {
-      json_writer->Key(name.c_str());
-      json_writer->StartArray();
-      for (auto it = vec.begin(); it != vec.end(); it++)
-        SetVal(name, *it, false);
-      json_writer->EndArray();
+        rapidjson::Value arr(rapidjson::kArrayType);
+        for (const T& i : vec) {
+            rapidjson::Value val = GetRapidjsonValue(i);
+
+            arr.PushBack(val, json_document->GetAllocator());
+        }
+
+        rapidjson::Value key(name, json_document->GetAllocator());
+        json_object.AddMember(key, arr, json_document->GetAllocator());
     }
   }
 
   template <typename T>
-  void SetVal(std::string name, const std::vector<std::pair<T, T>> &vec) {
-    if (json_writer == NULL) return;
-    json_writer->Key(name.c_str());
-    json_writer->StartObject();
+  void SetVal(std::string name, const std::vector<std::pair<T, T>> &vec,
+              rapidjson::Value& json_object) {
+    if (json_document == NULL) return;
+
+    rapidjson::Value key(name, json_document->GetAllocator());
+
+    rapidjson::Value child_object(rapidjson::kObjectType);
     for (auto it = vec.begin(); it != vec.end(); it++) {
-      SetVal(it->first.c_str(), it->second);
+        SetVal(it->first.c_str(), it->second, child_object);
     }
-    json_writer->EndObject();
+
+    json_object.AddMember(key, child_object, json_document->GetAllocator());
+  }
+
+  template <typename T>
+  void SetVal(std::string name, const T& val) {
+    if (json_document == NULL) return;
+
+    SetVal(name, val, *json_document);
   }
 
   void CollectSingleRun(double single_elapsed) {
@@ -432,6 +532,7 @@ struct Info {
   cudaError_t ComputeCommonStats(EnactorT &enactor, const T *labels = NULL,
                                  bool get_traversal_stats = false) {
     cudaError_t retval = cudaSuccess;
+
     double total_lifetimes = 0;
     double total_runtimes = 0;
 
@@ -705,24 +806,40 @@ struct Info {
     int dev = 0;
     cudaGetDevice(&dev);
     cudaGetDeviceProperties(&devProps, dev);
-    if (json_writer == NULL) return;
-    json_writer->Key("gpuinfo");
-    json_writer->StartObject();
-    SetVal("name", devProps.name);
-    SetVal("total_global_mem", int64_t(devProps.totalGlobalMem));
-    SetVal("major", std::to_string(devProps.major));
-    SetVal("minor", std::to_string(devProps.minor));
-    SetVal("clock_rate", devProps.clockRate);
-    SetVal("multi_processor_count", devProps.multiProcessorCount);
+
+    // We create a new rapidjson::Value as an JSON Object
+    // Then we can add it to the base Document when we are finished
+    // with it.
+    if (json_document == NULL) return;
+    rapidjson::Value gpuinfo(rapidjson::kObjectType);
+
+    SetVal("name", devProps.name, gpuinfo);
+    SetVal("total_global_mem", int64_t(devProps.totalGlobalMem), gpuinfo);
+    SetVal("major", std::to_string(devProps.major), gpuinfo);
+    SetVal("minor", std::to_string(devProps.minor), gpuinfo);
+    SetVal("clock_rate", devProps.clockRate, gpuinfo);
+    SetVal("multi_processor_count", devProps.multiProcessorCount, gpuinfo);
 
     int runtimeVersion, driverVersion;
     cudaRuntimeGetVersion(&runtimeVersion);
     cudaDriverGetVersion(&driverVersion);
-    SetVal("driver_api", std::to_string(CUDA_VERSION));
-    SetVal("driver_version", std::to_string(driverVersion));
-    SetVal("runtime_version", std::to_string(runtimeVersion));
-    SetVal("compute_version", std::to_string((devProps.major * 10 + devProps.minor)));
-    json_writer->EndObject();
+    SetVal("driver_api", std::to_string(CUDA_VERSION), gpuinfo);
+    SetVal("driver_version", std::to_string(driverVersion), gpuinfo);
+    SetVal("runtime_version", std::to_string(runtimeVersion), gpuinfo);
+    SetVal("compute_version", std::to_string((devProps.major * 10 + devProps.minor)), gpuinfo);
+
+    json_document->AddMember("gpuinfo", gpuinfo, json_document->GetAllocator());
+  }
+
+  void Sort(rapidjson::Value& json_object) {
+      struct NameComparator {
+          bool operator()(const rapidjson::Value::Member &lhs, const rapidjson::Value::Member &rhs) const {
+              const std::string& lhs_str = lhs.name.GetString();
+              const std::string& rhs_str = rhs.name.GetString();
+              return lhs_str.compare(rhs_str) < 0;
+          }
+      };
+      std::sort(json_object.MemberBegin(), json_object.MemberEnd(), NameComparator());
   }
 
   void Finalize(double postprocess_time, double total_time) {
@@ -740,12 +857,11 @@ struct Info {
       min_m_teps = m_teps;
       max_m_teps = m_teps;
     }
-    
+
     preprocess_time = parameters->Get<double>("preprocess-time");
     SetVal("process-times", process_times);
     SetVal("filtered-process-times", _process_times);
     SetVal("stddev-process-time", stddev_process_time);
-    SetVal("avg-process-time", elapsed);
     SetVal("min-process-time", min_elapsed);
     SetVal("max-process-time", max_elapsed);
     SetVal("postprocess-time", postprocess_time);
@@ -754,6 +870,13 @@ struct Info {
     SetVal("min-mteps", min_m_teps);
     SetVal("max-mteps", max_m_teps);
 
+    auto process_time = json_document->FindMember("avg-process-time");
+    if (process_time == json_document->MemberEnd()) {
+      SetVal("avg-process-time", elapsed);
+    } else {
+      process_time->value = elapsed;
+    }
+
     this->postprocess_time = postprocess_time;
     this->total_time = total_time;
 
@@ -761,8 +884,6 @@ struct Info {
     SetVal("sysinfo", sysinfo.getSysinfo());
 
     getGpuinfo();
-    // util::Gpuinfo gpuinfo;
-    // SetVal("gpuinfo", gpuinfo.getGpuinfo());
 
     util::Userinfo userinfo;
     SetVal("userinfo", userinfo.getUserinfo());
@@ -770,8 +891,23 @@ struct Info {
     // Add all the parameters to JSON
     this->parameters->List(*this);
 
-    if (json_writer != NULL) json_writer->EndObject();
-    
+    Sort(*json_document);
+
+    //  Accept traverses the document and generates events that
+    //  write to the json_stream
+    if (json_writer != NULL) {
+      json_document->Accept(*json_writer);
+      assert(json_writer->IsComplete());
+    }
+
+    if (json_filename != "") {
+      json_file = std::fopen(json_filename.c_str(), "w");
+
+      // Write the stream to file
+      std::fputs(json_stream->GetString(), json_file);
+      std::fclose(json_file);
+    }
+
     if (!quiet) {
       DisplayStats();
     }

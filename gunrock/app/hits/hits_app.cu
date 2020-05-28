@@ -33,15 +33,14 @@ cudaError_t UseParameters(ParametersT &parameters) {
 } // namespace gunrock
 
 /*
- * @brief Simple interface take in graph as CSR format
+ * @brief Simple interface take in a graph in CSR format and return vertex hub and authority scores
  * @param[in]  num_nodes   Number of veritces in the input graph
  * @param[in]  num_edges   Number of edges in the input graph
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  edge_values CSR-formatted graph input edge weights
- * @param[in]  num_runs    Number of runs to perform SM
- * @param[out] subgraphs   Return number of subgraphs
- * \return     double      Return accumulated elapsed times for all runs
+ * @param[out] hub_ranks   Vertex hub scores
+ * @param[out] auth ranks  Vertex authority scores
+ * \return     double      Return accumulated elapsed times for all iterations
  */
 double hits(
     const int        num_nodes,
@@ -52,7 +51,7 @@ double hits(
     float            *hub_ranks,
     float            *auth_ranks)
 {
-    return hits(num_nodes, num_edges, row_offsets, col_indices,
+      return hits_template(num_nodes, num_edges, row_offsets, col_indices,
          num_iter, hub_ranks, auth_ranks);
 }
 

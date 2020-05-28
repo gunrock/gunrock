@@ -16,17 +16,27 @@
 
 // Test utils
 #include <gunrock/util/test_utils.cuh>
+#include <gunrock/util/array_utils.cuh>
 
 // Graphio include
 #include <gunrock/graphio/graphio.cuh>
+#include <gunrock/graphio/labels.cuh>
 
 // App and test base includes
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
 
 // KNN includes
+#include <gunrock/app/knn/knn_helpers.cuh>
 #include <gunrock/app/knn/knn_enactor.cuh>
 #include <gunrock/app/knn/knn_test.cuh>
+
+//#define KNN_APP_DEBUG
+#ifdef KNN_APP_DEBUG
+    #define debug(a...) printf(a)
+#else
+    #define debug(a...)
+#endif
 
 namespace gunrock {
 namespace app {
@@ -37,26 +47,32 @@ cudaError_t UseParameters(util::Parameters &parameters) {
   GUARD_CU(UseParameters_app(parameters));
   GUARD_CU(UseParameters_problem(parameters));
   GUARD_CU(UseParameters_enactor(parameters));
+  GUARD_CU(UseParameters_test(parameters));
+
+  GUARD_CU(parameters.Use<int>(
+      "n",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      0, "Number of points in dim-dimensional space", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<std::string>(
+      "labels-file",
+      util::REQUIRED_ARGUMENT | util::REQUIRED_PARAMETER, 
+      "", "List of points of dim-dimensional space", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<int>(
+      "dim",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      2, "Dimensions of space", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int>(
       "k",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      10, "Numbers of k neighbors.", __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<int>(
-      "x",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 0,
-      "Index of reference point.", __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<int>(
-      "y",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 0,
-      "Index of reference point.", __FILE__, __LINE__));
+      10, "Number of k neighbors.", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<float>(
-      "cpu-elapsed", util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0.0f,
+      "cpu-elapsed", 
+      util::REQUIRED_ARGUMENT | util::OPTIONAL_PARAMETER, 0.0f,
       "CPU implementation, elapsed time (ms) for JSON.", __FILE__, __LINE__));
-
   return retval;
 }
 
@@ -70,15 +86,22 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  * @param[in]  target        where to perform the app
  * \return cudaError_t error message(s), if any
  */
-template <typename GraphT>
-cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
-                     typename GraphT::SizeT k, typename GraphT::SizeT *h_knns,
-                     typename GraphT::SizeT *ref_knns, util::Location target) {
+template <typename GraphT, typename ArrayT>
+cudaError_t RunTests(util::Parameters &parameters,
+        ArrayT& points,
+        GraphT& graph,
+        typename GraphT::SizeT n,
+        typename GraphT::SizeT dim,
+        typename GraphT::SizeT k,
+        typename GraphT::SizeT *h_knns,
+        typename GraphT::SizeT *ref_knns,
+        util::Location target) {
+  
   cudaError_t retval = cudaSuccess;
 
-  typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::ValueT ValueT;
-  typedef typename GraphT::SizeT SizeT;
+  typedef typename GraphT::SizeT SizeT; 
+
   typedef Problem<GraphT> ProblemT;
   typedef Enactor<ProblemT> EnactorT;
 
@@ -88,9 +111,6 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   std::string validation = parameters.Get<std::string>("validation");
   util::Info info("knn", parameters, graph);
 
-  VertexT point_x = parameters.Get<int>("x");
-  VertexT point_y = parameters.Get<int>("y");
-
   util::CpuTimer cpu_timer, total_timer;
   cpu_timer.Start();
   total_timer.Start();
@@ -98,15 +118,15 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
-  GUARD_CU(problem.Init(graph, k, target));
+  GUARD_CU(problem.Init(graph, target));
   GUARD_CU(enactor.Init(problem, target));
 
   cpu_timer.Stop();
   parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
   for (int run_num = 0; run_num < num_runs; ++run_num) {
-    GUARD_CU(problem.Reset(point_x, point_y, k, target));
-    GUARD_CU(enactor.Reset(target));
+    GUARD_CU(problem.Reset(points.GetPointer(util::HOST), target));
+    GUARD_CU(enactor.Reset(n, k, target));
 
     util::PrintMsg("__________________________", !quiet_mode);
 
@@ -123,24 +143,43 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
         !quiet_mode);
 
     if (validation == "each") {
-      GUARD_CU(problem.Extract(graph.nodes, k, h_knns));
+      GUARD_CU(problem.Extract(h_knns));
+#ifdef KNN_APP_DEBUG
+      debug("extracted knns:\n");
+      for (int i=0; i<n; ++i){
+          debug("point %d\n", i);
+          for (int j=0; j<k; ++j){
+              debug("%d ", h_knns[i*k + j]);
+          }
+          debug("\n");
+      }
+#endif
       SizeT num_errors =
-          Validate_Results(parameters, graph, h_knns, ref_knns, false);
+          Validate_Results(parameters, graph, h_knns, ref_knns, points, false);
     }
   }
 
   cpu_timer.Start();
 
-  GUARD_CU(problem.Extract(graph.nodes, k, h_knns));
+  GUARD_CU(problem.Extract(h_knns));
+#ifdef KNN_APP_DEBUG
+      debug("extracted knns:\n");
+      for (int i=0; i<n; ++i){
+          debug("point %d\n", i);
+          for (int j=0; j<k; ++j){
+              debug("%d ", h_knns[i*k + j]);
+          }
+          debug("\n");
+      }
+#endif
+
   if (validation == "last") {
     SizeT num_errors =
-        Validate_Results(parameters, graph, h_knns, ref_knns, false);
+        Validate_Results(parameters, graph, h_knns, ref_knns, points, false);
   }
 
   // compute running statistics
-  // Change NULL to problem specific per-vertex visited marker, e.g.
-  // h_distances
-  info.ComputeTraversalStats(enactor, (VertexT *)NULL);
+  info.ComputeTraversalStats(enactor, (SizeT *)NULL);
   // Display_Memory_Usage(problem);
 #ifdef ENABLE_PERFORMANCE_PROFILING
   // Display_Performance_Profiling(&enactor);

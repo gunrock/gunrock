@@ -21,8 +21,7 @@ else()
 endif()
 
 set (mgpu_SOURCE_FILES
-  ${mgpu_SOURCE_DIRS}/mgpucontext.cu
-  ${mgpu_SOURCE_DIRS}/mgpuutil.cpp)
+  ${mgpu_SOURCE_DIRS}/context.hxx)
 
 set(HFILES_PUBLIC
   gunrock.h)
@@ -35,7 +34,7 @@ set(CUFILES
   app/pr/pr_app.cu
   app/hits/hits_app.cu
   app/sm/sm_app.cu
-  #app/sssp/sssp_app.cu
+  app/sssp/sssp_app.cu
   #app/louvain/louvain_app.cu
   #app/color/color_app.cu
   util/test_utils.cu

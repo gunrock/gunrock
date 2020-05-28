@@ -48,23 +48,27 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  * @param[in]  query_col_indices CSR-formatted graph input query column indices
  * @param[in]  num_runs          Number of runs to perform SM
  * @param[out] subgraphs         Return number of subgraphs
+ * @param[out] list_subgraphs    Return list of subgraphs
+ * @param[in]  allocated_on      Input and output target device, by default CPU
  * \return     double            Return accumulated elapsed times for all runs
  */
 double sm(
-    const int            num_nodes,
-    const int            num_edges,
-    const int           *row_offsets,
-    const int           *col_indices,
-    const int            num_query_nodes,
-    const int            num_query_edges,
-    const int           *query_row_offsets,
-    const int           *query_col_indices,
-    const int            num_runs,
-          int           *subgraphs)
+    const int                 num_nodes,
+    const int                 num_edges,
+    const int                *row_offsets,
+    const int                *col_indices,
+    const int                 num_query_nodes,
+    const int                 num_query_edges,
+    const int                *query_row_offsets,
+    const int                *query_col_indices,
+    const int                 num_runs,
+    unsigned long            *subgraphs,
+    unsigned long            *list_subgraphs,
+    gunrock::util::Location   allocated_on = gunrock::util::HOST)
 {
-    return sm(num_nodes, num_edges, row_offsets, col_indices,
+    return sm_template(num_nodes, num_edges, row_offsets, col_indices,
         num_query_nodes, num_query_edges, query_row_offsets,
-        query_col_indices, 1 /* num_runs */, subgraphs);
+        query_col_indices, num_runs, subgraphs, list_subgraphs, allocated_on);
 }
 
 // Leave this at the end of the file

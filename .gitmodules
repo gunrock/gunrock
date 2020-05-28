@@ -6,10 +6,6 @@
 	path = externals/moderngpu
 	url = https://github.com/NVlabs/moderngpu.git
 	branch = branch_1.1
-[submodule "docs"]
-	path = docs
-	url = https://github.com/gunrock/docs.git
-	branch = master
 [submodule "externals/rapidjson"]
 	path = externals/rapidjson
 	url = https://github.com/Tencent/rapidjson.git
