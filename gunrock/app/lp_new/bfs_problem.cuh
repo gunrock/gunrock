@@ -88,7 +88,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, MaskT> old_mask;
     util::Array1D<SizeT, MaskT *> in_masks;
     util::Array1D<SizeT, Direction> direction_votes;
-
+    // need two arrays
+    // store data array containing labels
+    // store segment information
+    // store the count of segments
+    // max segment size is frontier size
+    // max data array is sum of top frontier size neighbours lengths
+    util::Array1D<SizeT, LabelT> data;
+    util::Array1D<SizeT, int> segments;
+    SizeT data_size, segments_size;
     SizeT num_visited_vertices, num_unvisited_vertices;
     bool been_in_backward;
     Direction current_direction, previous_direction;
@@ -111,6 +119,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       visited_masks.SetName("visited_masks");
       old_mask.SetName("old_mask");
       in_masks.SetName("in_masks");
+      // need two arrays
+      // store data array containing labels
+      data.SetName("data");
+      // store segment information
+      segments.SetName("segments");
+      // store the count of elements in data array
+      // max data array is sum of top frontier size neighbours lengths
+      data_size.SetName("data_size");
+      // store the count of segments
+      // max segment size is frontier size
+      segments_size.SetName("segments_size");
     }
 
     /*
@@ -136,6 +155,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(visited_masks.Release(target));
       GUARD_CU(old_mask.Release(target));
       GUARD_CU(in_masks.Release(target));
+      GUARD_CU(in_masks.Release(target));
+      GUARD_CU(data.Release(target));
+      GUARD_CU(segments.Release(target));
       GUARD_CU(BaseDataSlice ::Release(target));
       return retval;
     }
@@ -164,6 +186,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(unvisited_vertices[0].Allocate(sub_graph.nodes, target));
       GUARD_CU(unvisited_vertices[1].Allocate(sub_graph.nodes, target));
+      // I would like to dynamically allocate resources here based on the graph
+      // how many neighbours are there
+      // frontier size
       GUARD_CU(split_lengths.Allocate(2, util::HOST | target));
       GUARD_CU(direction_votes.Allocate(4, util::HOST));
 

@@ -265,6 +265,12 @@ struct LPIterationLoop
     auto &graph = data_slice.sub_graph[0];
     auto &labels = data_slice.labels;
   
+
+    auto &data = data_slice.data;
+    auto &segments = data_slice.segments;
+    auto &data_size = data_slice.data_size;
+    auto &segments_size = data_slice.segments_size;
+
     // do we need predecessors?
     // we dont but can be used for shortcutting however lets not bother about this
   
@@ -309,54 +315,105 @@ struct LPIterationLoop
         util::PrintMsg("Forward Advance begin", gpu_num, iteration, peer_);
 
       LabelT label = iteration + 1;
+      segments_size = 0;
+      data_size = 0;
+
+      auto compute_op = [const VertexT &src, segments, segments_size] __host__
+      __device__(VertexT * v, const SizeT &i) {
+            // data[data_size++];
+            segments[segments_size++] = src.Neighbours.length;
+
+      };
+
+      auto compute_op = [const VertexT &src, const VertexT &dest, segments, data, segments_size, data_size] __host__
+                      __device__(VertexT * v, const SizeT &i) {
+        data[data_size++] = labels[dest];
+      };
+
+      auto segmented_mode = ;//
+
+      // extr
+
+      // run a segmented sort
+      // get max for each segment
+      // run the vertex frontier again
+      // set the new labels
+      // reuse the segments data structure to store the new labels
+      
+      // how to map a vertex to the segments
+      // will they be in order?
+
+      // what do the vertex v and i in the () parameter list signify
+      // is that the data we can extract from the compute_op
+
+      // use functors instead of compute if applicable
+      auto compute_op = [const VertexT &src, segments] __host__
+      __device__(VertexT * v, const SizeT &i) {
+          labels[src] = segments[frontier index];
+        
+      };
+
+      // we would want to advance on a vertex if its label changes
+      // so create a new int label to store the old label
+      // -1 initially
       auto advance_op =
-          [idempotence, labels, label, mark_preds, preds,
+          // [idempotence, labels, label, mark_preds, preds,
+          [idempotence, labels, label, preds,
            original_vertex] __host__
           __device__(const VertexT &src, VertexT &dest, const SizeT &edge_id,
                      const VertexT &input_item, const SizeT &input_pos,
                      SizeT &output_pos) -> bool {
-        if (!idempotence) {
-          // Check if the destination node has been claimed as someone's child
+        // if (!idempotence) {
+        //   // Check if the destination node has been claimed as someone's child
 
-          // @Achal fact check this
-          // so if we are not doing idempotence it will mean that we
-          // are on less writing computes that means pull (as it involves race-free reading )
-          // so keep that in mind
+        //   // @Achal fact check this
+        //   // so if we are not doing idempotence it will mean that we
+        //   // are on less writing computes that means pull (as it involves race-free reading )
+        //   // so keep that in mind
 
 
         
-          // ensures that the label is minimum 
-          // this is an atomic operation and hence idempotence has been used 
-          // to get rid of it
-          // however
-          // for us its an atomic add
-          // which is still alright
-          // we cannot ignore the value, so we cannot choose to do something like
-          // if this then false
-          // for example right now I am still going with min_reduce array of label frequency counts
-          // hence lets 
+        //   // ensures that the label is minimum 
+        //   // this is an atomic operation and hence idempotence has been used 
+        //   // to get rid of it
+        //   // however
+        //   // for us its an atomic add
+        //   // which is still alright
+        //   // we cannot ignore the value, so we cannot choose to do something like
+        //   // if this then false
+        //   // for example right now I am still going with min_reduce array of label frequency counts
+        //   // hence lets 
 
-          // label is outside
-          // but why do we need an edge frontier?
-          // is this always the case?
-          // I think so!
-          // need to push or pull values accordingly
-          // if need to push
-          // I need to send src label to child label 
+        //   // label is outside
+        //   // but why do we need an edge frontier?
+        //   // is this always the case?
+        //   // I think so!
+        //   // need to push or pull values accordingly
+        //   // if need to push
+        //   // I need to send src label to child label 
 
-          LabelT old_label = _atomicMin(labels + dest, label);
-          if (label >= old_label) return false;
+        //   LabelT old_label = _atomicMin(labels + dest, label);
+        //   if (label >= old_label) return false;
 
-          // set predecessors
-          // if (mark_preds) {
-          //   VertexT pred = src;
-          //   if (original_vertex + 0 != NULL) pred = original_vertex[src];
-          //   Store(preds + dest, pred);
-          // }
-        }
+        //   // set predecessors
+        //   // if (mark_preds) {
+        //   //   VertexT pred = src;
+        //   //   if (original_vertex + 0 != NULL) pred = original_vertex[src];
+        //   //   Store(preds + dest, pred);
+        //   // }
+        // }
+
+        // as we need to return true everytime
+        // scope for two optimisations
+        // 1. if we can count all the neighbouring vertices with the same label, we can just update an integer and return false
+        // 2. is it possible there can be a point when we know for sure that a neighbour is not going to affect a vertex's label
+
         return true;
       };
-
+      
+      // I don't quite understand the importance of the filter operation as we already have an advance operation
+      // is there additional information available here?
+      // is this faster, slower, smarter than advance?
       auto filter_op =
           [idempotence, mark_preds, preds, original_vertex] __host__ __device__(
               const VertexT &src, VertexT &dest, const SizeT &edge_id,
