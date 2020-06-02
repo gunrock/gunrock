@@ -57,7 +57,7 @@ struct SlabHashGraphParallelIterator {
   using ValueT = typename GraphT::ValueT;
   using SizeT = typename GraphT::SizeT;
 
-  __device__ SlabHashGraphParallelIterator(const VertexT v, const GraphT* graph)
+  __device__ SlabHashGraphParallelIterator(const VertexT v, GraphT* graph)
       : v(v), graph(graph), slab_not_cached(true) {}
 
   __device__ SizeT size() {
@@ -130,7 +130,7 @@ struct SlabHashGraphParallelIterator {
 
  private:
   const VertexT v;
-  const GraphT* graph;
+  GraphT* graph;
   bool slab_not_cached;
   VertexT neighborId;
   ValueT neighborVal;

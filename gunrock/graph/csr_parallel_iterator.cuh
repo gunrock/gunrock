@@ -34,7 +34,7 @@ struct ParallelIterator<VertexT, SizeT, ValueT, FLAG, HAS_CSR> {
       graph::Csr<VertexT, SizeT, ValueT, FLAG & graph::HAS_CSR_MASK,
                  cudaHostRegisterDefault, (FLAG & graph::HAS_CSR) != 0>;
 
-  __host__ __device__ ParallelIterator(const VertexT v, const CsrT* graph)
+  __host__ __device__ ParallelIterator(const VertexT v, CsrT* graph)
       : v(v), graph(graph) {
     v_offset = graph->row_offsets[v];
   }
@@ -53,7 +53,7 @@ struct ParallelIterator<VertexT, SizeT, ValueT, FLAG, HAS_CSR> {
  private:
   const VertexT v;
   SizeT v_offset;
-  const CsrT* graph;
+  CsrT* graph;
 };
 
 }  // namespace graph

@@ -41,7 +41,7 @@ struct ParallelIterator<VertexT, SizeT, ValueT, FLAG, HAS_DYN>
       graph::Dyn<VertexT, SizeT, ValueT, FLAG & graph::HAS_DYN_MASK,
                  cudaHostRegisterDefault, (FLAG & graph::HAS_DYN) != 0>;
 
-  __device__ ParallelIterator(VertexT v, DynT* graph)
+  __device__ ParallelIterator(const VertexT v, DynT* graph)
       : DynT::DynamicGraphParallelIterator(v, &graph->dynamicGraph) {}
 };
 
