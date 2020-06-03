@@ -23,6 +23,10 @@
 #define GUNROCK_DEVICE __device__
 #endif
 
+#ifndef GUNROCK_F_DEVICE
+#define GUNROCK_F_DEVICE __forceinline__ __device__
+#endif
+
 // Requires --extended-lambda (-extended-lambda) flag.
 // Allow __host__, __device__ annotations in lambda declarations.
 #ifndef GUNROCK_LAMBDA

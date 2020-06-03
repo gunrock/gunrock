@@ -11,12 +11,14 @@
 
 /**
  *  @see externals/cuda-api-wrappers/src/cuda/api/device_properties.hpp
- *     cuda::device::compute_capability_t cc;
+ *     cuda::device::compute_architecture_t
  */
 #include <cuda/api/device_properties.hpp>
 
 namespace gunrock {
 namespace util {
+
+typedef cuda::device::compute_architecture_t architecture_t;
 
 /**
  * @namespace properties
