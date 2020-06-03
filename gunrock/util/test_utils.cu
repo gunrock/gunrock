@@ -82,5 +82,10 @@ cudaError_t SetDevice(int dev) {
                        __LINE__);
 }
 
+cudaError_t GetDevice(int* dev) {
+  return util::GRError(cudaGetDevice(dev), "cudaGetDevice failed.", __FILE__,
+                      __LINE__);
+}
+
 }  // namespace util
 }  // namespace gunrock
