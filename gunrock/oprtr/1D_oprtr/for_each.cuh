@@ -224,6 +224,22 @@ cudaError_t ForEach(T *elements, ApplyLambda apply, SizeT length,
   return retval;
 }
 
+template <typename T, typename SizeT, typename ApplyLambda>
+cudaError_t ForEach(T *elements, ApplyLambda apply, SizeT length,
+                    util::Location target = util::DEVICE,
+                    cudaStream_t stream = 0) {
+  cudaError_t retval = cudaSuccess;
+  // if ((target & util::HOST) == util::HOST) {
+#pragma omp parallel for
+    for (SizeT i = 0; i < length; i++) apply(elements[i], i);
+  // }
+
+  // if ((target & util::DEVICE) == util::DEVICE) {
+  //   ForEach_Kernel<<<256, 256, 0, stream>>>(elements, apply, length);
+  // }
+  return retval;
+}
+
 template <typename T_out, typename T_in, typename SizeT, typename ApplyLambda>
 cudaError_t ForEach(T_out *elements_out, T_in *elements_in, ApplyLambda apply,
                     SizeT length, util::Location target = util::DEVICE,

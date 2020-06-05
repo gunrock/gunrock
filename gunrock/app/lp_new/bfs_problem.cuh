@@ -124,6 +124,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       data.SetName("data");
       // store segment information
       segments.SetName("segments");
+      cub_temp_storage.SetName("cub_temp_storage");
+
+      segments_temp.SetName("segments_temp");
+
       // store the count of elements in data array
       // max data array is sum of top frontier size neighbours lengths
       data_size.SetName("data_size");
@@ -158,6 +162,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(in_masks.Release(target));
       GUARD_CU(data.Release(target));
       GUARD_CU(segments.Release(target));
+      GUARD_CU(segments_temp.Release(target));
+      GUARD_CU(cub_temp_storage.Release(target));
       GUARD_CU(BaseDataSlice ::Release(target));
       return retval;
     }
@@ -179,6 +185,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
       GUARD_CU(labels.Allocate(sub_graph.nodes, target));
+      GUARD_CU(segments.Allocate(sub_graph.nodes, target));
+      GUARD_CU(segments_temp.Allocate(sub_graph.nodes, target));
+      GUARD_CU(cub_temp_storage.Allocate(1, target));
+      // all the remaining space should be taken by data
+      // can we preallocate something like that?
+      // we cannot currently dynamically allocate space
+      // so the maximum is the best but then cuda malloc calls can be slow
+      GUARD_CU(data.Allocate(1000000, target));
       if (flag & Mark_Predecessors) {
         GUARD_CU(preds.Allocate(sub_graph.nodes, target));
         // GUARD_CU(temp_preds .Allocate(sub_graph.nodes, target));

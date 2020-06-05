@@ -86,7 +86,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, MaskT> old_mask;
     util::Array1D<SizeT, MaskT *> in_masks;
     util::Array1D<SizeT, Direction> direction_votes;
-
+    
     SizeT num_visited_vertices, num_unvisited_vertices;
     bool been_in_backward;
     Direction current_direction, previous_direction;

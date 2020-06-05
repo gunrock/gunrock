@@ -267,6 +267,7 @@ struct LPIterationLoop
   
 
     auto &data = data_slice.data;
+    auto &segments_temp = data_slice.segments_temp;
     auto &segments = data_slice.segments;
     auto &data_size = data_slice.data_size;
     auto &segments_size = data_slice.segments_size;
@@ -314,24 +315,79 @@ struct LPIterationLoop
       if (debug)
         util::PrintMsg("Forward Advance begin", gpu_num, iteration, peer_);
 
-      LabelT label = iteration + 1;
+      // LabelT label = iteration + 1;
+      util::Array1D<SizeT, VertexT> *null_frontier = NULL;
+      frontier.queue_length = graph.nodes;
+      frontier.queue_reset = true;
+  
       segments_size = 0;
       data_size = 0;
-
-      auto compute_op = [const VertexT &src, segments, segments_size] __host__
+      
+      auto compute_op = [const VertexT &src, segments_temp, segments_size, graph] __host__
       __device__(VertexT * v, const SizeT &i) {
             // data[data_size++];
-            segments[segments_size++] = src.Neighbours.length;
+            segments_temp[i] = graph.CsrT::GetNeighborListLength(v);
+            atomicAdd(&segments_size, 1);
 
       };
 
-      auto compute_op = [const VertexT &src, const VertexT &dest, segments, data, segments_size, data_size] __host__
-                      __device__(VertexT * v, const SizeT &i) {
-        data[data_size++] = labels[dest];
-      };
+      GUARD_CU(util::cubInclusiveSum(cub_temp_storage, segments_temp,
+        segments, segments_size, stream));
+      // auto update_segment_op = [segments] __host__ __device__(int &v) {
+      //   if(segments != v){ // first element
+      //     *v = segments[]
+      //   }
+      //   };
+      // segments->ForEach(convergence_op, frontier.queue_length,
+      //   util::DEVICE, oprtr_parameters.stream)
+      
+      // GUARD_CU(frontier.V_Q()->ForEach(
+      //   [segments] __host__ __device__(VertexT & v, int index) { 
+      //     if(index != 0){
+      //       segments[index] += segments[index-1]
+      //     }
+      //   }, frontier.queue_length, target,
+      //   0));
+      
 
-      auto segmented_mode = ;//
+      GUARD_CU(frontier.V_Q()->ForEach(
+        [segments, data, segments_size, data_size, labels] __host__ __device__(VertexT & v, int index) { 
+          // get the neighbours 
+          // start populating the data array with the information 
+          // from the segments array
 
+          SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
+          SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+    
+          bool colormax = true;
+          bool colormin = true;
+          int start_fill = segments[index];
+          int i = 0;
+          for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+            
+            VertexT u = graph.CsrT::GetEdgeDest(e);
+            data[start_fill + (i++)] = labels[u];
+          // for each neighbour in the neighbour list
+          // populate data
+          // data[segments[index]+neighbour_index]= neighbour.GetLabel();
+            
+          }
+        }, frontier.queue_length, target,
+        0));
+
+      // // so now we iterate through the neighbours of this and start 
+      // auto compute_op = [const VertexT &src, const VertexT &dest, segments, data, segments_size, data_size] __host__
+      //                 __device__(VertexT * v, const SizeT &i) {
+      //   data[data_size++] = labels[dest];
+
+      // };
+      
+      // TODO incorporate the segmented mode here
+      // auto segmented_mode = ;//
+      // make the segmented mode work such that the output of the operation is just the labels
+      // in the same order as the original segments
+      // this should be easy given that the operation is a one to one mapping from the segments.count_best array 
+      // to the output array
       // extr
 
       // run a segmented sort
@@ -339,7 +395,17 @@ struct LPIterationLoop
       // run the vertex frontier again
       // set the new labels
       // reuse the segments data structure to store the new labels
-      
+      GUARD_CU(frontier.V_Q()->ForEach(
+        [segments, labels] __host__ __device__(VertexT & v, int index) { 
+         
+          
+          labels[v] = segments[index];
+          
+            
+          }
+        }, frontier.queue_length, target,
+        0));
+
       // how to map a vertex to the segments
       // will they be in order?
 
@@ -347,11 +413,11 @@ struct LPIterationLoop
       // is that the data we can extract from the compute_op
 
       // use functors instead of compute if applicable
-      auto compute_op = [const VertexT &src, segments] __host__
-      __device__(VertexT * v, const SizeT &i) {
-          labels[src] = segments[frontier index];
+      // auto compute_op = [const VertexT &src, segments] __host__
+      // __device__(VertexT * v, const SizeT &i) {
+      //     labels[src] = segments[frontier index];
         
-      };
+      // };
 
       // we would want to advance on a vertex if its label changes
       // so create a new int label to store the old label
