@@ -265,7 +265,7 @@ struct LPIterationLoop
     auto &graph = data_slice.sub_graph[0];
     auto &labels = data_slice.labels;
   
-
+    auto &old_labels = data_slice.old_labels;
     auto &data = data_slice.data;
     auto &segments_temp = data_slice.segments_temp;
     auto &segments = data_slice.segments;
@@ -396,9 +396,9 @@ struct LPIterationLoop
       // set the new labels
       // reuse the segments data structure to store the new labels
       GUARD_CU(frontier.V_Q()->ForEach(
-        [segments, labels] __host__ __device__(VertexT & v, int index) { 
+        [segments, labels, old_labels] __host__ __device__(VertexT & v, int index) { 
          
-          
+          old_labels[i] = labels[v];
           labels[v] = segments[index];
           
             
@@ -419,16 +419,33 @@ struct LPIterationLoop
         
       // };
 
+      auto filter_op =
+          [old_labels, labels] __host__ __device__(
+              const VertexT &v, SizeT &i,) -> bool {
+                // this somehow uses the 
+        // TODO is this just for internal checks
+        // why would a user care for isValid?
+        // what does this check?
+        return (old_labels[i] != labels[i])
+
+        // if (idempotence && mark_preds) {
+        //   VertexT pred = src;
+        //   if (original_vertex + 0 != NULL) pred = original_vertex[src];
+        //   Store(preds + dest, pred);
+        // }
+        // return true;
+      };
       // we would want to advance on a vertex if its label changes
       // so create a new int label to store the old label
       // -1 initially
       auto advance_op =
           // [idempotence, labels, label, mark_preds, preds,
-          [idempotence, labels, label, preds,
-           original_vertex] __host__
+          [] __host__
           __device__(const VertexT &src, VertexT &dest, const SizeT &edge_id,
                      const VertexT &input_item, const SizeT &input_pos,
                      SizeT &output_pos) -> bool {
+
+            
         // if (!idempotence) {
         //   // Check if the destination node has been claimed as someone's child
 
@@ -480,24 +497,24 @@ struct LPIterationLoop
       // I don't quite understand the importance of the filter operation as we already have an advance operation
       // is there additional information available here?
       // is this faster, slower, smarter than advance?
-      auto filter_op =
-          [idempotence, mark_preds, preds, original_vertex] __host__ __device__(
-              const VertexT &src, VertexT &dest, const SizeT &edge_id,
-              const VertexT &input_item, const SizeT &input_pos,
-              SizeT &output_pos) -> bool {
-                // this somehow uses the 
-        // TODO is this just for internal checks
-        // why would a user care for isValid?
-        // what does this check?
-        if (!util::isValid(dest)) return false;
+      // auto filter_op =
+      //     [idempotence, mark_preds, preds, original_vertex] __host__ __device__(
+      //         const VertexT &src, VertexT &dest, const SizeT &edge_id,
+      //         const VertexT &input_item, const SizeT &input_pos,
+      //         SizeT &output_pos) -> bool {
+      //           // this somehow uses the 
+      //   // TODO is this just for internal checks
+      //   // why would a user care for isValid?
+      //   // what does this check?
+      //   if (!util::isValid(dest)) return false;
 
-        // if (idempotence && mark_preds) {
-        //   VertexT pred = src;
-        //   if (original_vertex + 0 != NULL) pred = original_vertex[src];
-        //   Store(preds + dest, pred);
-        // }
-        return true;
-      };
+      //   // if (idempotence && mark_preds) {
+      //   //   VertexT pred = src;
+      //   //   if (original_vertex + 0 != NULL) pred = original_vertex[src];
+      //   //   Store(preds + dest, pred);
+      //   // }
+      //   return true;
+      // };
 
 // Edge Map
 #ifdef RECORD_PER_ITERATION_STATS

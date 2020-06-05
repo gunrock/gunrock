@@ -86,7 +86,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, MaskT> old_mask;
     util::Array1D<SizeT, MaskT *> in_masks;
     util::Array1D<SizeT, Direction> direction_votes;
-    
+
     SizeT num_visited_vertices, num_unvisited_vertices;
     bool been_in_backward;
     Direction current_direction, previous_direction;
@@ -97,6 +97,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     DataSlice() : BaseDataSlice() {
       // original_vertex        .SetName("original_vertex"      );
       labels.SetName("labels");
+      old_labels.SetName("old_labels");
       preds.SetName("preds");
       temp_preds.SetName("temp_preds");
       vertex_markers[0].SetName("vertex_markers[0]");
@@ -122,6 +123,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       // GUARD_CU(original_vertex      .Release(target));
       GUARD_CU(labels.Release(target));
+      GUARD_CU(old_labels.Release(target));
       GUARD_CU(preds.Release(target));
       GUARD_CU(temp_preds.Release(target));
       GUARD_CU(vertex_markers[0].Release(target));
@@ -155,6 +157,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
       GUARD_CU(labels.Allocate(sub_graph.nodes, target));
+      GUARD_CU(old_labels.Allocate(sub_graph.nodes, target));
       if (flag & Mark_Predecessors) {
         GUARD_CU(preds.Allocate(sub_graph.nodes, target));
         // GUARD_CU(temp_preds .Allocate(sub_graph.nodes, target));
