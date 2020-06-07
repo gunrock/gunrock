@@ -10,7 +10,7 @@ test_array()
 
   error_t status = util::error::success;
   size_t N = 128;
-  gunrock::datastruct::dense::array<int, N> a;
+  gunrock::container::dense::array<int, N> a;
 
   return status;
 }

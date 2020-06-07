@@ -19,14 +19,14 @@
 namespace gunrock {
 
 /**
- * @namespace datastructs
- * Data structures supported within gunrock, includes host and device support
+ * @namespace container
+ * Containers supported within gunrock, includes host and device support
  * for various useful data structures such as a basic static dense array
- * (std::array), sparse array and dynamic array. Data structures are the other
+ * (std::array), sparse array and dynamic array. Ccontainers are the other
  * fundamental part of algorithms ( @see algo for the other half of what is
  * supported).
  */
-namespace datastruct {
+namespace container {
 
 enum location_t
 {
@@ -37,14 +37,14 @@ enum location_t
 
   all = 1 << 4;
   default = 1 << 5;
-}
+};
 
 /**
  * @namespace dense
  * Namespace for dense data structures supported within gunrock. Note that the
  * array structure is modeled exactly after std::array, this is to make it
  * easier for users to familiarize themselves with the code.
- * gunrock::datastruct::dense have further support for extended features that
+ * gunrock::container::dense have further support for extended features that
  * are not available within the standard.
  */
 namespace dense
@@ -574,5 +574,5 @@ namespace dense
 
   } // struct: array
 }
-} // namespace: datastruct
+} // namespace: container
 } // namespace: gunrock
