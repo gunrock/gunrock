@@ -225,7 +225,7 @@ cudaError_t ForEach(T *elements, ApplyLambda apply, SizeT length,
 }
 
 template <typename T, typename SizeT, typename ApplyLambda>
-cudaError_t ForEach(T *elements, ApplyLambda apply, SizeT length,
+cudaError_t ForEach_index(T *elements, ApplyLambda apply, SizeT length,
                     util::Location target = util::DEVICE,
                     cudaStream_t stream = 0) {
   cudaError_t retval = cudaSuccess;

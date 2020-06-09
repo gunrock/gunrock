@@ -298,6 +298,11 @@ struct Array1D {
                       Location target = LOCATION_DEFAULT,
                       cudaStream_t stream = 0);
 
+  template <typename ArrayT_in, typename ApplyLambda>
+  cudaError_t ForEach_index(ArrayT_in &elements, ApplyLambda apply, SizeT length,
+                      Location target = LOCATION_DEFAULT,
+                      cudaStream_t stream = 0);
+                      
   template <typename ArrayT_in1, typename ArrayT_in2, typename ApplyLambda>
   cudaError_t ForEach(ArrayT_in1 &array_in1, ArrayT_in2 &array_in2,
                       ApplyLambda apply,

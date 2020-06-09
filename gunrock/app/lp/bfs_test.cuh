@@ -7,7 +7,7 @@
 
 /**
  * @file
- * bfs_test.cu
+ * lp_test.cu
  *
  * @brief Test related functions for BFS
  */
@@ -18,7 +18,7 @@
 
 namespace gunrock {
 namespace app {
-namespace bfs {
+namespace lp {
 
 /******************************************************************************
  * Housekeeping Routines

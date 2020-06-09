@@ -115,7 +115,7 @@ cudaError_t RepeatFor0(
 
 #if (__CUDACC_VER_MAJOR__ >= 10)
 template <typename OpT>
-__global__ void RepeatFor1_]Kernel(int r, ForIterT loop_size, OpT op) {
+__global__ void RepeatFor1_Kernel(int r, ForIterT loop_size, OpT op) {
   const ForIterT STRIDE = (ForIterT)blockDim.x * gridDim.x;
   {
     for (ForIterT i = (ForIterT)blockDim.x * blockIdx.x + threadIdx.x;

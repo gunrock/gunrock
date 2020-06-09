@@ -18,7 +18,7 @@
 
 namespace gunrock {
 namespace app {
-namespace bfs {
+namespace lp {
 
 enum Direction {
   FORWARD = 0,
@@ -78,6 +78,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     // util::Array1D<SizeT, VertexT> original_vertex;
     util::Array1D<SizeT, LabelT>
         labels;  // labels to mark latest iteration the vertex been visited
+    util::Array1D<SizeT, LabelT>
+    old_labels;
     util::Array1D<SizeT, VertexT> preds;       // predecessors of vertices
     util::Array1D<SizeT, VertexT> temp_preds;  // predecessors of vertices
     util::Array1D<SizeT, SizeT> vertex_markers[2];
@@ -96,7 +98,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     // max data array is sum of top frontier size neighbours lengths
     util::Array1D<SizeT, LabelT> data;
     util::Array1D<SizeT, int> segments;
-    SizeT data_size, segments_size;
+    util::Array1D<SizeT, int> segments_temp;
+    util::Array1D<uint64_t, char> cub_temp_storage;
+    // do I have to make these an array?
+    // they are just one variable but I need to call atomicAdd on them
+    util::Array1D<SizeT, int> data_size;
+    util::Array1D<SizeT, int> segments_size;
+    // SizeT data_size, segments_size;
     SizeT num_visited_vertices, num_unvisited_vertices;
     bool been_in_backward;
     Direction current_direction, previous_direction;
@@ -107,6 +115,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     DataSlice() : BaseDataSlice() {
       // original_vertex        .SetName("original_vertex"      );
       labels.SetName("labels");
+      old_labels.SetName("old_labels");
+
       preds.SetName("preds");
       temp_preds.SetName("temp_preds");
       vertex_markers[0].SetName("vertex_markers[0]");
@@ -122,18 +132,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // need two arrays
       // store data array containing labels
       data.SetName("data");
+      data.SetName("data_size");
       // store segment information
       segments.SetName("segments");
+      segments.SetName("segments_size");
       cub_temp_storage.SetName("cub_temp_storage");
 
       segments_temp.SetName("segments_temp");
 
       // store the count of elements in data array
       // max data array is sum of top frontier size neighbours lengths
-      data_size.SetName("data_size");
+      // data_size.SetName("data_size");
       // store the count of segments
       // max segment size is frontier size
-      segments_size.SetName("segments_size");
+      // segments_size.SetName("segments_size");
     }
 
     /*
@@ -147,6 +159,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       // GUARD_CU(original_vertex      .Release(target));
       GUARD_CU(labels.Release(target));
+      GUARD_CU(old_labels.Release(target));
       GUARD_CU(preds.Release(target));
       GUARD_CU(temp_preds.Release(target));
       GUARD_CU(vertex_markers[0].Release(target));
@@ -161,6 +174,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(in_masks.Release(target));
       GUARD_CU(in_masks.Release(target));
       GUARD_CU(data.Release(target));
+      GUARD_CU(data_size.Release(target));
+      GUARD_CU(segments_size.Release(target));
       GUARD_CU(segments.Release(target));
       GUARD_CU(segments_temp.Release(target));
       GUARD_CU(cub_temp_storage.Release(target));
@@ -185,8 +200,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
 
       GUARD_CU(labels.Allocate(sub_graph.nodes, target));
+      GUARD_CU(old_labels.Allocate(sub_graph.nodes, target));
       GUARD_CU(segments.Allocate(sub_graph.nodes, target));
       GUARD_CU(segments_temp.Allocate(sub_graph.nodes, target));
+      GUARD_CU(segments_size.Allocate(1, target));
+      GUARD_CU(data_size.Allocate(1, target));
       GUARD_CU(cub_temp_storage.Allocate(1, target));
       // all the remaining space should be taken by data
       // can we preallocate something like that?
@@ -263,7 +281,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       previous_direction = FORWARD;
 
       GUARD_CU(util::SetDevice(this->gpu_idx));
-      for (int i = 0; i < 4; i++) direction_votes[i] = UNDECIDED;
+      // for (int i = 0; i < 4; i++) direction_votes[i] = UNDECIDED;
 
       // Allocate output labels if necessary
       GUARD_CU(labels.EnsureSize_(nodes, target));

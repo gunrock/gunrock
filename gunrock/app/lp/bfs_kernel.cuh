@@ -16,7 +16,7 @@
 
 namespace gunrock {
 namespace app {
-namespace bfs {
+namespace lp {
 
 /**
  * @brief forms unvisited vertices queue, when switching from top-down to

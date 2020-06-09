@@ -17,14 +17,18 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-#include <gunrock/app/bfs/bfs_problem.cuh>
+#include <gunrock/app/lp/bfs_problem.cuh>
+// #include <gunrock/app/lp/bfs_app.cu>
 #include <gunrock/oprtr/oprtr.cuh>
 #include <gunrock/util/track_utils.cuh>
-#include <gunrock/app/bfs/bfs_kernel.cuh>
-
+#include <gunrock/app/lp/bfs_kernel.cuh>
+#include <gunrock/util/scan_device.cuh>
+#include <gunrock/oprtr/1D_oprtr/for_each.cuh>
+#include <gunrock/oprtr/oprtr.cuh>
+#include <gunrock/util/array_utils.cuh>
 namespace gunrock {
 namespace app {
-namespace bfs {
+namespace lp {
 
 /**
  * @brief Speciflying parameters for BFS Enactor
@@ -140,13 +144,16 @@ struct LPIterationLoop
       }
     } else
       data_slice.direction_votes[iteration_] = FORWARD;
-    data_slice.direction_votes[(iteration_ + 1) % 4] = UNDECIDED;
-
+    // data_slice.direction_votes[(iteration_ + 1) % 4] = UNDECIDED;
+    data_slice.direction_votes[(iteration_ + 1) % 4] = FORWARD;
     if (this->enactor->num_gpus > 1 && enactor_stats.iteration != 0 &&
         this->enactor->direction_optimized) {
+      // while ( this->enactor->problem->data_slices[0]->direction_votes[iteration_] ==
+      //     UNDECIDED) 
       while (
           this->enactor->problem->data_slices[0]->direction_votes[iteration_] ==
-          UNDECIDED) {
+          FORWARD) 
+      {
         sleep(0);
       }
       data_slice.current_direction =
@@ -207,7 +214,6 @@ struct LPIterationLoop
     auto &retval = enactor_stats.retval;
     auto &graph = this->enactor->problem->sub_graphs[this->gpu_num];
     bool over_sized = false;
-
     if (this->enactor->flag & Debug) {
       util::PrintMsg(
           "queue_size = " + std::to_string(frontier.Next_V_Q()->GetSize()) +
@@ -218,11 +224,11 @@ struct LPIterationLoop
     if ((this->enactor->flag & Size_Check) == 0 &&
         (this->flag & Skip_PreScan) != 0) {
       frontier.output_length[0] = 0;
-    } else  // if
+    } else{  // if
             // (!gunrock::oprtr::advance::isFused<AdvanceKernelPolicy::ADVANCE_MODE>())
     //(AdvanceKernelPolicy::ADVANCE_MODE != gunrock::oprtr::advance::LB_CULL)
-    {
-      retval = <SizeT, VertexT>(
+    // {
+      retval = CheckSize<SizeT, VertexT>(
           true, "queue3", request_length, frontier.Next_V_Q(), over_sized,
           this->gpu_num, iteration, peer_, false);
       if (retval) return retval;
@@ -264,7 +270,7 @@ struct LPIterationLoop
     auto &enactor_stats = enactor_slice.enactor_stats;
     auto &graph = data_slice.sub_graph[0];
     auto &labels = data_slice.labels;
-  
+    auto &cub_temp_storage = data_slice.cub_temp_storage;
     auto &old_labels = data_slice.old_labels;
     auto &data = data_slice.data;
     auto &segments_temp = data_slice.segments_temp;
@@ -320,19 +326,19 @@ struct LPIterationLoop
       frontier.queue_length = graph.nodes;
       frontier.queue_reset = true;
   
-      segments_size = 0;
+      segments_size[0] = 0;
       data_size = 0;
       
-      auto compute_op = [const VertexT &src, segments_temp, segments_size, graph] __host__
+      auto compute_op = [segments_temp, segments_size, graph] __host__
       __device__(VertexT * v, const SizeT &i) {
             // data[data_size++];
-            segments_temp[i] = graph.CsrT::GetNeighborListLength(v);
-            atomicAdd(&segments_size, 1);
+            segments_temp[i] = graph.CsrT::GetNeighborListLength(v[i]);
+            atomicAdd(&segments_size[0], 1);
 
       };
 
       GUARD_CU(util::cubInclusiveSum(cub_temp_storage, segments_temp,
-        segments, segments_size, stream));
+        segments, segments_size[0], stream));
       // auto update_segment_op = [segments] __host__ __device__(int &v) {
       //   if(segments != v){ // first element
       //     *v = segments[]
@@ -349,31 +355,53 @@ struct LPIterationLoop
       //   }, frontier.queue_length, target,
       //   0));
       
+      // TODO
+      // Uncomment the ForEach_Index below 
+    auto elements = frontier.V_Q();
+    auto apply_op =  [segments, data, segments_size, data_size, labels, graph] __host__ __device__(VertexT & v, int index) { 
+      // get the neighbours 
+      // start populating the data array with the information 
+      // from the segments array
 
-      GUARD_CU(frontier.V_Q()->ForEach(
-        [segments, data, segments_size, data_size, labels] __host__ __device__(VertexT & v, int index) { 
-          // get the neighbours 
-          // start populating the data array with the information 
-          // from the segments array
+      SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
+      SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
 
-          SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
-          SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-    
-          bool colormax = true;
-          bool colormin = true;
-          int start_fill = segments[index];
-          int i = 0;
-          for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+      int start_fill = segments[index];
+      int i = 0;
+      for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+        
+        VertexT u = graph.CsrT::GetEdgeDest(e);
+        data[start_fill + (i++)] = labels[u];
+      // for each neighbour in the neighbour list
+      // populate data
+      // data[segments[index]+neighbour_index]= neighbour.GetLabel();
+        
+      }};
+
+    #pragma omp parallel for
+    for (SizeT i = 0; i < frontier.queue_length; i++) apply_op(elements[0][i], i);
+
+      // GUARD_CU(frontier.V_Q()->ForEach_index([segments, data, segments_size, data_size, labels, graph] __host__ __device__(VertexT & v, int index) { 
+      //     // get the neighbours 
+      //     // start populating the data array with the information 
+      //     // from the segments array
+
+      //     SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
+      //     SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+ 
+      //     int start_fill = segments[index];
+      //     int i = 0;
+      //     for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
             
-            VertexT u = graph.CsrT::GetEdgeDest(e);
-            data[start_fill + (i++)] = labels[u];
-          // for each neighbour in the neighbour list
-          // populate data
-          // data[segments[index]+neighbour_index]= neighbour.GetLabel();
+      //       VertexT u = graph.CsrT::GetEdgeDest(e);
+      //       data[start_fill + (i++)] = labels[u];
+      //     // for each neighbour in the neighbour list
+      //     // populate data
+      //     // data[segments[index]+neighbour_index]= neighbour.GetLabel();
             
-          }
-        }, frontier.queue_length, target,
-        0));
+      //     }
+      //   }, frontier.queue_length, target,
+      //   0));
 
       // // so now we iterate through the neighbours of this and start 
       // auto compute_op = [const VertexT &src, const VertexT &dest, segments, data, segments_size, data_size] __host__
@@ -395,16 +423,26 @@ struct LPIterationLoop
       // run the vertex frontier again
       // set the new labels
       // reuse the segments data structure to store the new labels
-      GUARD_CU(frontier.V_Q()->ForEach(
-        [segments, labels, old_labels] __host__ __device__(VertexT & v, int index) { 
+      // TODO uncomment the foreach_index below
+      auto apply_op2 = [segments, labels, old_labels] __host__ __device__(VertexT & v, int index) { 
          
-          old_labels[i] = labels[v];
+          old_labels[index] = labels[v];
           labels[v] = segments[index];
           
             
-          }
-        }, frontier.queue_length, target,
-        0));
+          };
+      #pragma omp parallel for
+      for (SizeT i = 0; i < frontier.queue_length; i++) apply_op2(elements[0][i], i);
+
+      // GUARD_CU(frontier.V_Q()->ForEach_index([segments, labels, old_labels] __host__ __device__(VertexT & v, int index) { 
+         
+      //     old_labels[index] = labels[v];
+      //     labels[v] = segments[index];
+          
+            
+      //     }
+      //   , frontier.queue_length, target,
+      //   0));
 
       // how to map a vertex to the segments
       // will they be in order?
@@ -421,12 +459,14 @@ struct LPIterationLoop
 
       auto filter_op =
           [old_labels, labels] __host__ __device__(
-              const VertexT &v, SizeT &i,) -> bool {
+              const VertexT &src, VertexT &dest, const SizeT &edge_id,
+              const VertexT &input_item, const SizeT &input_pos,
+              SizeT &output_pos) -> bool {
                 // this somehow uses the 
         // TODO is this just for internal checks
         // why would a user care for isValid?
         // what does this check?
-        return (old_labels[i] != labels[i])
+        return (old_labels[input_pos] != labels[input_pos]);
 
         // if (idempotence && mark_preds) {
         //   VertexT pred = src;
@@ -581,143 +621,144 @@ struct LPIterationLoop
       GUARD_CU(frontier.work_progress.GetQueueLength(
           frontier.queue_index, frontier.queue_length, false,
           oprtr_parameters.stream, true));
-    }  // end of forward
+      // end of forward
+  };
 
-    else {  // backward
-      SizeT num_blocks = 0;
-      if (data_slice.previous_direction == FORWARD) {
-        GUARD_CU(data_slice.split_lengths.ForEach(
-            [] __host__ __device__(SizeT & length) { length = 0; }, 1, target,
-            stream));
+//     else {  // backward
+//       SizeT num_blocks = 0;
+//       if (data_slice.previous_direction == FORWARD) {
+//         GUARD_CU(data_slice.split_lengths.ForEach(
+//             [] __host__ __device__(SizeT & length) { length = 0; }, 1, target,
+//             stream));
 
-        if (this->enactor->num_gpus == 1) {
-          if (idempotence) {
-            num_blocks =
-                (graph.nodes >> (2 + sizeof(MaskT))) / (1 << LOG_THREADS) + 1;
-            if (num_blocks > 480) num_blocks = 480;
-            From_Unvisited_Queue_IDEM<ProblemT, LOG_THREADS>
-                <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
-                    graph.nodes,
-                    data_slice.split_lengths.GetPointer(util::DEVICE),
-                    data_slice.unvisited_vertices[frontier.queue_index % 2]
-                        .GetPointer(util::DEVICE),
-                    data_slice.visited_masks.GetPointer(util::DEVICE),
-                    data_slice.labels.GetPointer(util::DEVICE));
-          }
+//         if (this->enactor->num_gpus == 1) {
+//           if (idempotence) {
+//             num_blocks =
+//                 (graph.nodes >> (2 + sizeof(MaskT))) / (1 << LOG_THREADS) + 1;
+//             if (num_blocks > 480) num_blocks = 480;
+//             From_Unvisited_Queue_IDEM<ProblemT, LOG_THREADS>
+//                 <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
+//                     graph.nodes,
+//                     data_slice.split_lengths.GetPointer(util::DEVICE),
+//                     data_slice.unvisited_vertices[frontier.queue_index % 2]
+//                         .GetPointer(util::DEVICE),
+//                     data_slice.visited_masks.GetPointer(util::DEVICE),
+//                     data_slice.labels.GetPointer(util::DEVICE));
+//           }
 
-          else {
-            num_blocks = graph.nodes / (1 << LOG_THREADS) + 1;
-            if (num_blocks > 480) num_blocks = 480;
-            From_Unvisited_Queue<ProblemT, LOG_THREADS>
-                <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
-                    graph.nodes,
-                    data_slice.split_lengths.GetPointer(util::DEVICE),
-                    data_slice.unvisited_vertices[frontier.queue_index % 2]
-                        .GetPointer(util::DEVICE),
-                    data_slice.labels.GetPointer(util::DEVICE));
-          }
-        }  // end of num_gpus == 1
+//           else {
+//             num_blocks = graph.nodes / (1 << LOG_THREADS) + 1;
+//             if (num_blocks > 480) num_blocks = 480;
+//             From_Unvisited_Queue<ProblemT, LOG_THREADS>
+//                 <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
+//                     graph.nodes,
+//                     data_slice.split_lengths.GetPointer(util::DEVICE),
+//                     data_slice.unvisited_vertices[frontier.queue_index % 2]
+//                         .GetPointer(util::DEVICE),
+//                     data_slice.labels.GetPointer(util::DEVICE));
+//           }
+//         }  // end of num_gpus == 1
 
-        else {  // num_gpus != 1
-          num_blocks =
-              data_slice.local_vertices.GetSize() / (1 << LOG_THREADS) + 1;
-          if (num_blocks > 480) num_blocks = 480;
-          if (idempotence) {
-            From_Unvisited_Queue_Local_IDEM<ProblemT, LOG_THREADS>
-                <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
-                    data_slice.local_vertices.GetSize(),
-                    data_slice.local_vertices.GetPointer(util::DEVICE),
-                    data_slice.split_lengths.GetPointer(util::DEVICE),
-                    data_slice.unvisited_vertices[frontier.queue_index % 2]
-                        .GetPointer(util::DEVICE),
-                    data_slice.visited_masks.GetPointer(util::DEVICE),
-                    data_slice.labels.GetPointer(util::DEVICE));
-          }
+//         else {  // num_gpus != 1
+//           num_blocks =
+//               data_slice.local_vertices.GetSize() / (1 << LOG_THREADS) + 1;
+//           if (num_blocks > 480) num_blocks = 480;
+//           if (idempotence) {
+//             From_Unvisited_Queue_Local_IDEM<ProblemT, LOG_THREADS>
+//                 <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
+//                     data_slice.local_vertices.GetSize(),
+//                     data_slice.local_vertices.GetPointer(util::DEVICE),
+//                     data_slice.split_lengths.GetPointer(util::DEVICE),
+//                     data_slice.unvisited_vertices[frontier.queue_index % 2]
+//                         .GetPointer(util::DEVICE),
+//                     data_slice.visited_masks.GetPointer(util::DEVICE),
+//                     data_slice.labels.GetPointer(util::DEVICE));
+//           }
 
-          else {
-            From_Unvisited_Queue_Local<ProblemT, LOG_THREADS>
-                <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
-                    data_slice.local_vertices.GetSize(),
-                    data_slice.local_vertices.GetPointer(util::DEVICE),
-                    data_slice.split_lengths.GetPointer(util::DEVICE),
-                    data_slice.unvisited_vertices[frontier.queue_index % 2]
-                        .GetPointer(util::DEVICE),
-                    data_slice.labels.GetPointer(util::DEVICE));
-          }
-        }
+//           else {
+//             From_Unvisited_Queue_Local<ProblemT, LOG_THREADS>
+//                 <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
+//                     data_slice.local_vertices.GetSize(),
+//                     data_slice.local_vertices.GetPointer(util::DEVICE),
+//                     data_slice.split_lengths.GetPointer(util::DEVICE),
+//                     data_slice.unvisited_vertices[frontier.queue_index % 2]
+//                         .GetPointer(util::DEVICE),
+//                     data_slice.labels.GetPointer(util::DEVICE));
+//           }
+//         }
 
-        GUARD_CU(data_slice.split_lengths.Move(util::DEVICE, util::HOST, 1, 0,
-                                               stream));
-        GUARD_CU2(cudaStreamSynchronize(stream),
-                  "cudaStreamSynchronize failed");
-        data_slice.num_unvisited_vertices = data_slice.split_lengths[0];
-        data_slice.num_visited_vertices =
-            graph.nodes - data_slice.num_unvisited_vertices;
-        if (debug)
-          util::PrintMsg(
-              "Changing from forward to backward, #unvisited_vertices =" +
-              std::to_string(data_slice.num_unvisited_vertices));
+//         GUARD_CU(data_slice.split_lengths.Move(util::DEVICE, util::HOST, 1, 0,
+//                                                stream));
+//         GUARD_CU2(cudaStreamSynchronize(stream),
+//                   "cudaStreamSynchronize failed");
+//         data_slice.num_unvisited_vertices = data_slice.split_lengths[0];
+//         data_slice.num_visited_vertices =
+//             graph.nodes - data_slice.num_unvisited_vertices;
+//         if (debug)
+//           util::PrintMsg(
+//               "Changing from forward to backward, #unvisited_vertices =" +
+//               std::to_string(data_slice.num_unvisited_vertices));
 
-      } else {
-        data_slice.num_unvisited_vertices = data_slice.split_lengths[0];
-      }
+//       } else {
+//         data_slice.num_unvisited_vertices = data_slice.split_lengths[0];
+//       }
 
-      GUARD_CU(data_slice.split_lengths.ForEach(
-          [] __host__ __device__(SizeT & length) { length = 0; }, 2, target,
-          stream));
-      enactor_stats.nodes_queued[0] += data_slice.num_unvisited_vertices;
-      num_blocks = data_slice.num_unvisited_vertices / (1 << LOG_THREADS) + 1;
-      if (num_blocks > 480) num_blocks = 480;
+//       GUARD_CU(data_slice.split_lengths.ForEach(
+//           [] __host__ __device__(SizeT & length) { length = 0; }, 2, target,
+//           stream));
+//       enactor_stats.nodes_queued[0] += data_slice.num_unvisited_vertices;
+//       num_blocks = data_slice.num_unvisited_vertices / (1 << LOG_THREADS) + 1;
+//       if (num_blocks > 480) num_blocks = 480;
 
-#ifdef RECORD_PER_ITERATION_STATS
-      gpu_timer.Start();
-#endif
+// #ifdef RECORD_PER_ITERATION_STATS
+//       gpu_timer.Start();
+// #endif
 
-      Inverse_Expand<ProblemT, LOG_THREADS>
-          <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
-              graph, data_slice.num_unvisited_vertices,
-              enactor_stats.iteration + 1, idempotence,
-              data_slice.unvisited_vertices[frontier.queue_index % 2]
-                  .GetPointer(util::DEVICE),
-              data_slice.split_lengths.GetPointer(util::DEVICE),
-              data_slice.unvisited_vertices[(frontier.queue_index + 1) % 2]
-                  .GetPointer(util::DEVICE),
-              frontier.Next_V_Q()->GetPointer(util::DEVICE),
-              data_slice.visited_masks.GetPointer(util::DEVICE),
-              data_slice.labels.GetPointer(util::DEVICE),
-              data_slice.preds.GetPointer(util::DEVICE));
+//       Inverse_Expand<ProblemT, LOG_THREADS>
+//           <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
+//               graph, data_slice.num_unvisited_vertices,
+//               enactor_stats.iteration + 1, idempotence,
+//               data_slice.unvisited_vertices[frontier.queue_index % 2]
+//                   .GetPointer(util::DEVICE),
+//               data_slice.split_lengths.GetPointer(util::DEVICE),
+//               data_slice.unvisited_vertices[(frontier.queue_index + 1) % 2]
+//                   .GetPointer(util::DEVICE),
+//               frontier.Next_V_Q()->GetPointer(util::DEVICE),
+//               data_slice.visited_masks.GetPointer(util::DEVICE),
+//               data_slice.labels.GetPointer(util::DEVICE),
+//               data_slice.preds.GetPointer(util::DEVICE));
 
-#ifdef RECORD_PER_ITERATION_STATS
-      gpu_timer.Stop();
-      float elapsed = gpu_timer.ElapsedMillis();
-      enactor_stats.per_iteration_advance_time.push_back(elapsed);
-      enactor_stats.per_iteration_advance_mteps.push_back(-1.0f);
-      enactor_stats.per_iteration_advance_input_edges.push_back(-1.0f);
-      enactor_stats.per_iteration_advance_output_edges.push_back(-1.0f);
-      enactor_stats.per_iteration_advance_direction.push_back(false);
-#endif
+// #ifdef RECORD_PER_ITERATION_STATS
+//       gpu_timer.Stop();
+//       float elapsed = gpu_timer.ElapsedMillis();
+//       enactor_stats.per_iteration_advance_time.push_back(elapsed);
+//       enactor_stats.per_iteration_advance_mteps.push_back(-1.0f);
+//       enactor_stats.per_iteration_advance_input_edges.push_back(-1.0f);
+//       enactor_stats.per_iteration_advance_output_edges.push_back(-1.0f);
+//       enactor_stats.per_iteration_advance_direction.push_back(false);
+// #endif
 
-      data_slice.split_lengths.Move(target, util::HOST, 2, 0, stream);
-      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
-      if (debug)
-        util::PrintMsg("#unvisited v = " +
-                       std::to_string(data_slice.num_unvisited_vertices) +
-                       ", #newly visited = " +
-                       std::to_string(data_slice.split_lengths[1]) +
-                       ", #still unvisited = " +
-                       std::to_string(data_slice.split_lengths[0]));
+//       data_slice.split_lengths.Move(target, util::HOST, 2, 0, stream);
+//       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
+//       if (debug)
+//         util::PrintMsg("#unvisited v = " +
+//                        std::to_string(data_slice.num_unvisited_vertices) +
+//                        ", #newly visited = " +
+//                        std::to_string(data_slice.split_lengths[1]) +
+//                        ", #still unvisited = " +
+//                        std::to_string(data_slice.split_lengths[0]));
 
-      frontier.queue_length = data_slice.split_lengths[1];
-      data_slice.num_visited_vertices =
-          graph.nodes - data_slice.num_unvisited_vertices;
-      enactor_stats.edges_queued[0] += frontier.output_length[0];
-      frontier.queue_reset = false;
-      frontier.queue_index++;
-    }  // end of backward
+//       frontier.queue_length = data_slice.split_lengths[1];
+//       data_slice.num_visited_vertices =
+//           graph.nodes - data_slice.num_unvisited_vertices;
+//       enactor_stats.edges_queued[0] += frontier.output_length[0];
+//       frontier.queue_reset = false;
+//       frontier.queue_index++;
+//     }  // end of backward
 
-    data_slice.previous_direction = data_slice.current_direction;
+  //   data_slice.previous_direction = data_slice.current_direction;
 
-    return retval;
+  //   return retval;
   }
 
   cudaError_t UpdatePreds(SizeT num_elements) { return cudaSuccess; }
@@ -808,7 +849,7 @@ class Enactor
   typedef EnactorBase<GraphT, LabelT, ValueT, ARRAY_FLAG, cudaHostRegisterFlag>
       BaseEnactor;
   typedef Enactor<Problem, ARRAY_FLAG, cudaHostRegisterFlag> EnactorT;
-  typedef BFSIterationLoop<EnactorT> IterationT;
+  typedef LPIterationLoop<EnactorT> IterationT;
 
   // Members
   Problem *problem;
@@ -899,8 +940,8 @@ class Enactor
       GUARD_CU(iterations[gpu].Init(this, gpu));
     }
 
-    GUARD_CU(this->Init_Threads(
-        this, (CUT_THREADROUTINE) & (GunrockThread<EnactorT>)));
+    // GUARD_CU(this->Init_Threads(
+    //     this, (CUT_THREADROUTINE) & (GunrockThread<EnactorT>)));
     return retval;
   }
 
@@ -971,7 +1012,7 @@ class Enactor
   /** @} */
 };  // end of enactor
 
-}  // namespace bfs
+}  // namespace lp
 }  // namespace app
 }  // namespace gunrock
 
