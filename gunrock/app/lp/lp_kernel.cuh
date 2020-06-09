@@ -7,7 +7,7 @@
 
 /**
  * @file
- * bfs_kernel.cuh
+ * lp_kernel.cuh
  *
  * @brief BFS GPU kernels
  */

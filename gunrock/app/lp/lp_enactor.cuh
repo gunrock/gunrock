@@ -7,7 +7,7 @@
 
 /**
  * @file
- * bfs_enactor.cuh
+ * lp_enactor.cuh
  *
  * @brief BFS Problem Enactor
  */
@@ -17,11 +17,11 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-#include <gunrock/app/lp/bfs_problem.cuh>
+#include <gunrock/app/lp/lp_problem.cuh>
 // #include <gunrock/app/lp/bfs_app.cu>
 #include <gunrock/oprtr/oprtr.cuh>
 #include <gunrock/util/track_utils.cuh>
-#include <gunrock/app/lp/bfs_kernel.cuh>
+#include <gunrock/app/lp/lp_kernel.cuh>
 #include <gunrock/util/scan_device.cuh>
 #include <gunrock/oprtr/1D_oprtr/for_each.cuh>
 #include <gunrock/oprtr/oprtr.cuh>

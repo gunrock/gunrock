@@ -14,9 +14,9 @@
 #include <gunrock/app/app.cuh>
 
 // breadth-first search includes
-#include <gunrock/app/lp/bfs_problem.cuh>
-#include <gunrock/app/lp/bfs_enactor.cuh>
-#include <gunrock/app/lp/bfs_test.cuh>
+#include <gunrock/app/lp/lp_cuh>
+#include <gunrock/app/lp/lp_enactor.cuh>
+#include <gunrock/app/lp/lp_test.cuh>
 
 namespace gunrock {
 namespace app {

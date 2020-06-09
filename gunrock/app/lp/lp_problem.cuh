@@ -7,7 +7,7 @@
 
 /**
  * @file
- * bfs_problem.cuh
+ * lp_problem.cuh
  *
  * @brief GPU Storage management Structure for BFS Problem Data
  */
