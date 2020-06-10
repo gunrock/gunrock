@@ -23,6 +23,7 @@
 #include <gunrock/graph/dynamic_graph/kernels/map/delete.cuh>
 #include <gunrock/graph/dynamic_graph/kernels/map/helper.cuh>
 #include <gunrock/util/array_utils.cuh>
+#include <gunrock/graph/dynamic_graph/slabhash_graph_parallel_iterator.cuh>
 
 namespace gunrock {
 namespace graph {
@@ -41,6 +42,11 @@ template <typename VertexT, typename SizeT, typename ValueT,
           unsigned int cudaHostRegisterFlag = cudaHostRegisterDefault>
 struct SlabHashGraphMap
     : SlabHashGraphBase<VertexT, SizeT, ValueT, REQUIRE_VALUES> {
+  using SlabHashGraphParallelIteratorT = SlabHashGraphParallelIterator<
+      SlabHashGraphMap<VertexT, SizeT, ValueT, REQUIRE_VALUES,
+                       cudaHostRegisterFlag>,
+      REQUIRE_VALUES>;
+
   /**
    * @brief Insert a batch of edges into weighted slab hash graph
    *

@@ -33,27 +33,49 @@ struct ParallelIterator<VertexT, SizeT, ValueT, FLAG, HAS_CSR> {
   using CsrT =
       graph::Csr<VertexT, SizeT, ValueT, FLAG & graph::HAS_CSR_MASK,
                  cudaHostRegisterDefault, (FLAG & graph::HAS_CSR) != 0>;
-
-  __host__ __device__ ParallelIterator(VertexT v, CsrT* graph)
-      : v(v), graph(graph) {
-    v_offset = graph->row_offsets[v];
+  /**
+   * @brief Construct CSR ParallelIterator and store the row offset of the input
+   * vertex.
+   *
+   * @param[in] v Input vertex.
+   * @param[in] graph Input graph.
+   */
+  __host__ __device__ ParallelIterator(const VertexT v, CsrT* graph)
+      : v_(v), graph_(graph) {
+    v_offset_ = graph_->row_offsets[v_];
   }
 
+  /**
+   * @brief Find the number of neighbor of the input vertex.
+   *
+   * @return Size of vertex neighbors list.
+   */
   __host__ __device__ SizeT size() {
-    return graph->row_offsets[v + 1] - v_offset;
+    return graph_->row_offsets[v_ + 1] - v_offset_;
   }
-
+  /**
+   * @brief Find the neighbor vertex id given an input index.
+   *
+   * @param[in] idx Input index ranges between 0 and size().
+   * @return Neighbor vertex stored at index.
+   */
   __host__ __device__ VertexT neighbor(const SizeT& idx) {
-    return graph->column_indices[idx + v_offset];
+    return graph_->column_indices[idx + v_offset_];
   }
+  /**
+   * @brief Find the neighbor edge value given an input index.
+   *
+   * @param[in] idx Input index ranges between 0 and size().
+   * @return Neighbor edge value stored at index.
+   */
   __host__ __device__ ValueT value(const SizeT& idx) {
-    return graph->edge_values[idx + v_offset];
+    return graph_->edge_values[idx + v_offset_];
   }
 
  private:
-  VertexT v;
-  SizeT v_offset;
-  CsrT* graph;
+  const VertexT v_;
+  SizeT v_offset_;
+  CsrT* graph_;
 };
 
 }  // namespace graph

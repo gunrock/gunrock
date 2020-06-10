@@ -32,7 +32,7 @@ template <typename VertexT, typename SizeT, typename ValueT, GraphFlag FLAG,
           GraphFlag GraphType = FLAG& TypeMask>
 struct ParallelIterator {
   template <typename GraphT>
-  __host__ __device__ ParallelIterator(VertexT v, GraphT* graph) {}
+  __host__ __device__ ParallelIterator(const VertexT v, GraphT* graph) {}
   __host__ __device__ SizeT size() { return 0; }
   __host__ __device__ VertexT neighbor(const SizeT& idx) { return 0; }
   __host__ __device__ ValueT value(const SizeT& idx) { return 0; }

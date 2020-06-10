@@ -16,6 +16,7 @@
 #include <vector>
 
 #include <slab_hash.cuh>
+#include <gunrock/graph/dynamic_graph/slabhash_graph_parallel_iterator.cuh>
 
 namespace gunrock {
 namespace graph {
@@ -29,9 +30,13 @@ namespace graph {
  * @tparam ValueT Associated value type.
  * @tparam REQUIRE_EDGE_VALUES whether the graph is weighted or not
  */
-template <typename VertexT, typename SizeT, typename ValueT,
+template <typename _VertexT, typename _SizeT, typename _ValueT,
           bool REQUIRE_EDGE_VALUES>
 struct SlabHashGraphBase {
+  using VertexT = _VertexT;
+  using ValueT = _ValueT;
+  using SizeT = _SizeT;
+
   using HashContextT = typename std::conditional<
       REQUIRE_EDGE_VALUES,
       GpuSlabHashContext<VertexT, ValueT, SlabHashTypeT::ConcurrentMap>,

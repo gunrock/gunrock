@@ -11,7 +11,6 @@
 
 using namespace gunrock;
 
-
 TEST(simpleAdvance, UsingCSRGraph) {
   // rng
   std::mt19937 rng(0);
@@ -53,6 +52,8 @@ TEST(simpleAdvance, UsingCSRGraph) {
 
   for (int i = 0; i < result_frontier.size(); i++)
     EXPECT_EQ(result_frontier[i], expected_frontier[i]);
+
+  ref_graph.Release(util::HOST | util::DEVICE);
 }
 
 TEST(simpleAdvance, UsingDYNGraph) {
@@ -99,4 +100,7 @@ TEST(simpleAdvance, UsingDYNGraph) {
 
   for (int i = 0; i < result_frontier.size(); i++)
     EXPECT_EQ(result_frontier[i], expected_frontier[i]);
+
+  ref_graph.Release(util::HOST | util::DEVICE);
+  dynamic_graph.Release(util::HOST | util::DEVICE);
 }
