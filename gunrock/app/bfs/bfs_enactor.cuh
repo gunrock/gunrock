@@ -342,7 +342,12 @@ struct BFSIterationLoop
             counter[0] = 0;
           },
           1, util::DEVICE, oprtr_parameters.stream, 1, 1));
-      GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+            GUARD_CU(frontier.V_Q()->Print("Frontier: ",
+                    frontier.queue_length,
+                    util::DEVICE,
+                    stream));
+      
+          GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
           graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
           advance_op, filter_op));
 

@@ -326,9 +326,11 @@ struct LPIterationLoop
       frontier.queue_length = graph.nodes;
       frontier.queue_reset = true;
   
-      segments_size[0] = 0;
+      // segments_size[0] = 0;
       data_size = 0;
-      
+    
+      auto frontier_elements = frontier.V_Q();
+
       auto compute_op = [segments_temp, segments_size, graph] __host__
       __device__(VertexT * v, const SizeT &i) {
             // data[data_size++];
@@ -337,8 +339,25 @@ struct LPIterationLoop
 
       };
 
-      GUARD_CU(util::cubInclusiveSum(cub_temp_storage, segments_temp,
-        segments, segments_size[0], stream));
+      GUARD_CU(frontier.V_Q()->ForAll(compute_op, frontier.queue_length, target, stream));
+
+      GUARD_CU(frontier.V_Q()->Print("Frontier: ",
+                    frontier.queue_length,
+                    util::DEVICE,
+                    stream));
+      //TODO
+      // check segments size
+      // typecast or add template param
+      // this gave an error because I was trying to access the host_pointer
+      // GUARD_CU(util::cubInclusiveSum(cub_temp_storage, segments_temp,
+      //   segments, (SizeT)segments_size.d_pointer, stream));
+              GUARD_CU(util::cubExclusiveSum(cub_temp_storage, segments_temp,
+        segments, frontier.queue_length , stream));
+
+        
+      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+             "cudaStreamSynchronize failed.");
       // auto update_segment_op = [segments] __host__ __device__(int &v) {
       //   if(segments != v){ // first element
       //     *v = segments[]
@@ -358,6 +377,9 @@ struct LPIterationLoop
       // TODO
       // Uncomment the ForEach_Index below 
     auto elements = frontier.V_Q();
+    // frontier.V_Q()->GetPointer(util::DEVICE)
+
+    // TODO use advance operator
     auto apply_op =  [segments, data, segments_size, data_size, labels, graph] __host__ __device__(VertexT & v, int index) { 
       // get the neighbours 
       // start populating the data array with the information 
@@ -378,6 +400,9 @@ struct LPIterationLoop
         
       }};
 
+      // TODO
+      // use FORALL
+      // cuda version wont be an issue
     #pragma omp parallel for
     for (SizeT i = 0; i < frontier.queue_length; i++) apply_op(elements[0][i], i);
 
@@ -424,6 +449,9 @@ struct LPIterationLoop
       // set the new labels
       // reuse the segments data structure to store the new labels
       // TODO uncomment the foreach_index below
+
+      // TODO
+      // FORALL
       auto apply_op2 = [segments, labels, old_labels] __host__ __device__(VertexT & v, int index) { 
          
           old_labels[index] = labels[v];
@@ -525,7 +553,6 @@ struct LPIterationLoop
         //   //   Store(preds + dest, pred);
         //   // }
         // }
-
         // as we need to return true everytime
         // scope for two optimisations
         // 1. if we can count all the neighbouring vertices with the same label, we can just update an integer and return false
@@ -575,9 +602,14 @@ struct LPIterationLoop
             counter[0] = 0;
           },
           1, util::DEVICE, oprtr_parameters.stream, 1, 1));
-      GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-          graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
-          advance_op, filter_op));
+      
+      // Call Filter first
+      // Then call advance
+          // TODO
+          // can we optimise this by fusing the two
+          // GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+          // graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+          // advance_op, filter_op));
 
 #ifdef RECORD_PER_ITERATION_STATS
       gpu_timer.Stop();
@@ -905,7 +937,8 @@ class Enactor
     util::Parameters &parameters = problem.parameters;
 
     GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target, false));
-    direction_optimized = parameters.Get<bool>("direction-optimized");
+    // direction_optimized 
+    // direction_optimized = parameters.Get<bool>("direction-optimized");
     do_a = parameters.Get<float>("do-a");
     do_b = parameters.Get<float>("do-b");
 
@@ -940,8 +973,8 @@ class Enactor
       GUARD_CU(iterations[gpu].Init(this, gpu));
     }
 
-    // GUARD_CU(this->Init_Threads(
-    //     this, (CUT_THREADROUTINE) & (GunrockThread<EnactorT>)));
+    GUARD_CU(this->Init_Threads(
+        this, (CUT_THREADROUTINE) & (GunrockThread<EnactorT>)));
     return retval;
   }
 
@@ -955,6 +988,9 @@ class Enactor
     typedef typename GraphT::GpT GpT;
     cudaError_t retval = cudaSuccess;
     GUARD_CU(BaseEnactor::Reset(target));
+
+    SizeT num_nodes = this->problem->data_slices[0][0].sub_graph[0].nodes;
+
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       if ((this->num_gpus == 1) ||
           (gpu == this->problem->org_graph->GpT::partition_table[src])) {
@@ -962,11 +998,12 @@ class Enactor
         for (int peer_ = 0; peer_ < this->num_gpus; peer_++) {
           auto &frontier =
               this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
-          frontier.queue_length = (peer_ == 0) ? 1 : 0;
+          frontier.queue_length = (peer_ == 0) ?  num_nodes: 0;
           if (peer_ == 0) {
-            GUARD_CU(frontier.V_Q()->ForEach(
-                [src] __host__ __device__(VertexT & v) { v = src; }, 1, target,
-                0));
+           GUARD_CU(frontier.V_Q()->ForAll(
+            [] __host__ __device__ (VertexT * v, const SizeT &i) {
+              v[i] = i;
+            }, frontier.queue_length, target, 0));
           }
         }
       }

@@ -36,10 +36,10 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
 
   GUARD_CU(gunrock::app::UseParameters_problem(parameters));
   // @Achal maybe I need to mark pred if shortcutting is required?
-  // GUARD_CU(parameters.Use<bool>(
-  //     "mark-pred",
-  //     util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-  //     false, "Whether to mark predecessor info.", __FILE__, __LINE__));
+  GUARD_CU(parameters.Use<bool>(
+      "mark-pred",
+      util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      false, "Whether to mark predecessor info.", __FILE__, __LINE__));
 
   return retval;
 }
@@ -449,8 +449,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
-    if (this->parameters.template Get<bool>("mark-pred"))
-      this->flag = this->flag | Mark_Predecessors;
+    // if (this->parameters.template Get<bool>("mark-pred"))
+    //   this->flag = this->flag | Mark_Predecessors;
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
