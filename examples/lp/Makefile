@@ -12,7 +12,7 @@
 include ../BaseMakefile.mk
 ALGO = lp
 EXEC = bin/$(ALGO)_main_$(NVCC_VERSION)_$(ARCH_SUFFIX)
-SRC = $(ALGO)_main.cu
+SRC = test_$(ALGO).cu
 
 test: $(EXEC)
 
@@ -23,7 +23,7 @@ $(EXEC) : $(SRC) $(DEPS)
 a : $(SRC) $(DEPS)
 	mkdir -p bin
 	rm -f $(EXEC)
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) $(SRC) $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3 > a.txt 2>&1 || true
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) $(SRC) $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -g -G > a.txt 2>&1 || true
 	grep rror: a.txt; grep arn a.txt
 
 .DEFAULT_GOAL := test

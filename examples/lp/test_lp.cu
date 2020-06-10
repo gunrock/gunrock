@@ -13,7 +13,7 @@
  */
 
  #include <vector>
- #include <gunrock/app/lp/bfs_app.cu>
+ #include <gunrock/app/lp/lp_app.cu>
  #include <gunrock/app/test_base.cuh>
  
  using namespace gunrock;
@@ -73,7 +73,7 @@
          auto src = srcs[i];
          VertexT num_iters = 0;
          util::PrintMsg("__________________________", !quiet);
-         float elapsed = app::bfs::CPU_Reference(graph, src, quiet, false,
+         float elapsed = app::lp::CPU_Reference(graph, src, quiet, false,
                                                  ref_labels[i], (VertexT*)NULL, num_iters);
          util::PrintMsg("--------------------------\nRun " + std::to_string(i) +
                             " elapsed: " + std::to_string(elapsed) +
@@ -84,12 +84,12 @@
      }
  
      std::vector<std::string> switches{
-         "mark-pred", "advance-mode", "direction-optimized",
+         "mark-pred", "advance-mode", 
          "do-a",      "do-b",         "idempotence"};
      GUARD_CU(app::Switch_Parameters(
          parameters, graph, switches,
          [ref_labels](util::Parameters &parameters, GraphT &graph) {
-           return app::bfs::RunTests(parameters, graph, ref_labels);
+           return app::lp::RunTests(parameters, graph, ref_labels);
          }));
  
      if (!quick) {
@@ -108,7 +108,7 @@
    cudaError_t retval = cudaSuccess;
    util::Parameters parameters("test lp");
    GUARD_CU(graphio::UseParameters(parameters));
-   GUARD_CU(app::bfs::UseParameters(parameters));
+   GUARD_CU(app::lp::UseParameters(parameters));
    GUARD_CU(app::UseParameters_test(parameters));
    GUARD_CU(parameters.Parse_CommandLine(argc, argv));
    if (parameters.Get<bool>("help")) {
