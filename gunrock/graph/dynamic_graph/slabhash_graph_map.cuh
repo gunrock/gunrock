@@ -89,34 +89,50 @@ struct SlabHashGraphMap
   /**
    * @brief Converts CSR to Dynamic graph
    *
-   * @param[in] h_row_offsets Host pointer to CSR row offsets
-   * @param[in] h_col_indices Host pointer to CSR column indices
-   * @param[in] h_edge_values Host pointer to CSR edges values
-   * @param[in] num_nodes_ Number of nodes in the input CSR graph
-   * @param[in] is_directed_ Whether the graph is directed or not
-   * @param[in] h_node_values Value per node
+   * @param[in] h_row_offsets_csr Host pointer to CSR row offsets
+   * @param[in] h_col_indices_csr Host pointer to CSR column indices
+   * @param[in] h_edge_values_csr Host pointer to CSR edges values
+   * @param[in] num_nodes_csr Number of nodes in the input CSR graph
+   * @param[in] is_directed_csr Whether the graph is directed or not
+   * @param[in] h_node_values_csr Value per node
    */
-  cudaError_t BulkBuildFromCsr(SizeT* h_row_offsets, VertexT* h_col_indices,
-                               ValueT* h_edge_values, SizeT num_nodes_,
-                               bool is_directed_,
-                               ValueT* h_node_values = nullptr) {
+  cudaError_t BulkBuildFromCsr(SizeT* h_row_offsets_csr,
+                               VertexT* h_col_indices_csr,
+                               ValueT* h_edge_values_csr, SizeT num_nodes_csr,
+                               bool is_directed_csr,
+                               ValueT* h_node_values_csr = nullptr) {
     using PairT = uint2;
-    SizeT num_edges_ = h_row_offsets[num_nodes_];
+    SizeT num_edges_csr = h_row_offsets_csr[num_nodes_csr];
+    this->is_directed = is_directed_csr;
+    this->InitHashTables(num_nodes_csr, globalLoadFactor, h_row_offsets_csr);
+
+    std::vector<PairT> h_edges_pairs;
+    h_edges_pairs.reserve(num_edges_csr);
+    for (SizeT v = 0; v < num_nodes_csr; v++) {
+      for (SizeT e = h_row_offsets_csr[v]; e < h_row_offsets_csr[v + 1]; e++) {
+        h_edges_pairs.push_back(make_uint2(v, h_col_indices_csr[e]));
+      }
+    }
+
     PairT* d_edges_pairs;
-    this->is_directed = is_directed_;
-    this->Init(h_row_offsets, num_nodes_, num_edges_, edgesPerSlab,
-               globalLoadFactor, h_col_indices, d_edges_pairs);
+
+    CHECK_ERROR(
+        cudaMalloc((void**)&d_edges_pairs, sizeof(PairT) * num_edges_csr));
+    CHECK_ERROR(cudaMemcpy(d_edges_pairs, h_edges_pairs.data(),
+                           sizeof(PairT) * num_edges_csr,
+                           cudaMemcpyHostToDevice));
 
     ValueT* d_edge_values;
     CHECK_ERROR(
-        cudaMalloc((void**)&d_edge_values, sizeof(ValueT) * num_edges_));
-    CHECK_ERROR(cudaMemcpy(d_edge_values, h_edge_values,
-                           sizeof(ValueT) * num_edges_,
+        cudaMalloc((void**)&d_edge_values, sizeof(ValueT) * num_edges_csr));
+    CHECK_ERROR(cudaMemcpy(d_edge_values, h_edge_values_csr,
+                           sizeof(ValueT) * num_edges_csr,
                            cudaMemcpyHostToDevice));
 
-    InsertEdgesBatch(d_edges_pairs, d_edge_values, num_edges_, false);
+    InsertEdgesBatch(d_edges_pairs, d_edge_values, num_edges_csr, false);
 
     CHECK_ERROR(cudaFree(d_edge_values));
+    CHECK_ERROR(cudaFree(d_edges_pairs));
     return cudaSuccess;
   }
 
@@ -157,7 +173,6 @@ struct SlabHashGraphMap
     return cudaSuccess;
   }
 
-  static constexpr uint32_t edgesPerSlab = 15;
   static constexpr float globalLoadFactor = 0.7;
 };
 

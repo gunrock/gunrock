@@ -98,8 +98,6 @@ struct SlabHashGraphSet
                     ValueT* d_node_values = nullptr) {
     return cudaSuccess;
   }
-
-  static constexpr uint32_t edgesPerSlab = 30;
 };
 
 }  // namespace graph

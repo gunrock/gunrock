@@ -56,6 +56,10 @@ struct DynamicGraphBase {
 
   DynamicGraphT dynamicGraph;
 
+  cudaError_t Allocate(SizeT max_nodes) {
+    dynamicGraph.Allocate(max_nodes);
+    return cudaSuccess;
+  }
   cudaError_t Release() {
     dynamicGraph.Release();
     return cudaSuccess;
