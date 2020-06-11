@@ -103,7 +103,7 @@ struct LPIterationLoop
   LPIterationLoop() : BaseIterationLoop() {}
 
 
-  // TODO Understand this bfs and remove the undecided part
+
   cudaError_t Gather(int peer_) {
     cudaError_t retval = cudaSuccess;
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
@@ -236,7 +236,7 @@ struct LPIterationLoop
                                          frontier.V_Q(), over_sized,
                                          this->gpu_num, iteration, peer_, true);
       if (retval) return retval;
-      // TODO
+     
       // if (enactor->problem->use_double_buffer)
       //{
       //    if (enactor_stats->retval = Check_Size<SizeT, Value>(
@@ -327,7 +327,7 @@ struct LPIterationLoop
       frontier.queue_reset = true;
   
       // segments_size[0] = 0;
-      data_size = 0;
+      // data_size = 0;
     
       auto frontier_elements = frontier.V_Q();
 
@@ -345,7 +345,6 @@ struct LPIterationLoop
                     frontier.queue_length,
                     util::DEVICE,
                     stream));
-      //TODO
       // check segments size
       // typecast or add template param
       // this gave an error because I was trying to access the host_pointer
@@ -380,13 +379,14 @@ struct LPIterationLoop
     // frontier.V_Q()->GetPointer(util::DEVICE)
 
     // TODO use advance operator
-    auto apply_op =  [segments, data, segments_size, data_size, labels, graph] __host__ __device__(VertexT & v, int index) { 
-      // get the neighbours 
-      // start populating the data array with the information 
-      // from the segments array
+    // as its better for nested for loops as the parallelism can have load balancing issues
 
-      SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
-      SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+    GUARD_CU(frontier.V_Q()->ForAll(
+      [segments, data, segments_size, data_size, labels, graph] __host__ __device__(
+        const VertexT *v, const SizeT &index) {
+      VertexT idx = v[index];
+      SizeT start_edge = graph.CsrT::GetNeighborListOffset(idx);
+      SizeT num_neighbors = graph.CsrT::GetNeighborListLength(idx);
 
       int start_fill = segments[index];
       int i = 0;
@@ -398,13 +398,39 @@ struct LPIterationLoop
       // populate data
       // data[segments[index]+neighbour_index]= neighbour.GetLabel();
         
-      }};
+      };
+      },
+      frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+
+      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+             "cudaStreamSynchronize failed.");
+    // auto apply_op =  [segments, data, segments_size, data_size, labels, graph] __host__ __device__(VertexT & v, int index) { 
+    //   // get the neighbours 
+    //   // start populating the data array with the information 
+    //   // from the segments array
+
+    //   SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
+    //   SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
+
+    //   int start_fill = segments[index];
+    //   int i = 0;
+    //   for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+        
+    //     VertexT u = graph.CsrT::GetEdgeDest(e);
+    //     data[start_fill + (i++)] = labels[u];
+    //   // for each neighbour in the neighbour list
+    //   // populate data
+    //   // data[segments[index]+neighbour_index]= neighbour.GetLabel();
+        
+    //   }};
 
       // TODO
+      // BUG Use CUDA kernel as everything is in internal memory anyway
       // use FORALL
       // cuda version wont be an issue
-    #pragma omp parallel for
-    for (SizeT i = 0; i < frontier.queue_length; i++) apply_op(elements[0][i], i);
+    // #pragma omp parallel for
+    // for (SizeT i = 0; i < frontier.queue_length; i++) apply_op(elements[0][i], i);
 
       // GUARD_CU(frontier.V_Q()->ForEach_index([segments, data, segments_size, data_size, labels, graph] __host__ __device__(VertexT & v, int index) { 
       //     // get the neighbours 
@@ -452,15 +478,29 @@ struct LPIterationLoop
 
       // TODO
       // FORALL
-      auto apply_op2 = [segments, labels, old_labels] __host__ __device__(VertexT & v, int index) { 
+      GUARD_CU(frontier.V_Q()->ForAll(
+        [segments, labels, old_labels] __host__ __device__(
+          const VertexT *v, const SizeT &index) {
+
+          old_labels[index] = labels[index];
+          labels[index] = segments[index];
+  
+        },
+        frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+
+
+        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+             "cudaStreamSynchronize failed.");
+      // auto apply_op2 = [segments, labels, old_labels] __host__ __device__(VertexT & v, int index) { 
          
-          old_labels[index] = labels[v];
-          labels[v] = segments[index];
+      //     old_labels[index] = labels[v];
+      //     labels[v] = segments[index];
           
             
-          };
-      #pragma omp parallel for
-      for (SizeT i = 0; i < frontier.queue_length; i++) apply_op2(elements[0][i], i);
+      //     };
+      // #pragma omp parallel for
+      // for (SizeT i = 0; i < frontier.queue_length; i++) apply_op2(elements[0][i], i);
 
       // GUARD_CU(frontier.V_Q()->ForEach_index([segments, labels, old_labels] __host__ __device__(VertexT & v, int index) { 
          
@@ -513,7 +553,7 @@ struct LPIterationLoop
                      const VertexT &input_item, const SizeT &input_pos,
                      SizeT &output_pos) -> bool {
 
-            
+            printf("Source is %d, and destination is %d", src, dest);
         // if (!idempotence) {
         //   // Check if the destination node has been claimed as someone's child
 
@@ -603,6 +643,17 @@ struct LPIterationLoop
           },
           1, util::DEVICE, oprtr_parameters.stream, 1, 1));
       
+      
+      GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+        graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters, 
+        filter_op));
+
+      GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+        graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters, 
+        advance_op));
+
+      
+
       // Call Filter first
       // Then call advance
           // TODO
