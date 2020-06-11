@@ -148,10 +148,6 @@ int main(int argc, char **argv) {
       "load-factor",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
       0.7, "Global Load Factor.", __FILE__, __LINE__);
-  parameters.Use<bool>(
-      "quite",
-      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-      false, "Global Load Factor.", __FILE__, __LINE__);
 
   GUARD_CU(graphio::UseParameters(parameters));
   GUARD_CU(app::UseParameters_test(parameters));
