@@ -121,14 +121,14 @@ struct main_struct {
         bool failed =
             CompareWeightedDynCSR(input_graph_csr, result_dyn_graph, quiet);
         if (failed) {
-          util::PrintMsg("Validation failed.", !quiet);
+          util::PrintMsg("FAILED", !quiet);
           std::exit(EXIT_FAILURE);
         }
       }
       result_dyn_graph.Release();
     }
 
-    util::PrintMsg("Success.", !quiet);
+    util::PrintMsg("PASSED", !quiet);
     cpu_timer.Start();
 
     input_graph.Release(util::HOST | util::DEVICE);
