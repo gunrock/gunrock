@@ -26,6 +26,8 @@
 #include <gunrock/oprtr/1D_oprtr/for_each.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 #include <gunrock/util/array_utils.cuh>
+#include <moderngpu/kernel_segsort.hxx>
+
 namespace gunrock {
 namespace app {
 namespace lp {
@@ -394,6 +396,7 @@ struct LPIterationLoop
         
         VertexT u = graph.CsrT::GetEdgeDest(e);
         data[start_fill + (i++)] = labels[u];
+        atomicAdd(&data_size[0], 1);
       // for each neighbour in the neighbour list
       // populate data
       // data[segments[index]+neighbour_index]= neighbour.GetLabel();
@@ -401,6 +404,8 @@ struct LPIterationLoop
       };
       },
       frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+      
+      data_size.Move(util::DEVICE, util::HOST, 1, 0 , stream);
 
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
@@ -424,7 +429,19 @@ struct LPIterationLoop
     //   // data[segments[index]+neighbour_index]= neighbour.GetLabel();
         
     //   }};
+      int* modes = mgpu::segmented_mode(((int*)(data.GetPointer(util::DEVICE))), 
+                            ((int*)data_size.GetPointer(util::HOST))[0],
+                            ((int*)(segments.GetPointer(util::DEVICE))), 
+                            (int)frontier.queue_length, 
+                            mgpu::less_t<int>(), 
+                            *oprtr_parameters.context);
 
+      segments.SetPointer(modes,
+        (SizeT)frontier.queue_length,
+        util::HOST);
+      segments.Move(util::HOST, util::DEVICE, frontier.queue_length, 0 , stream);
+
+      
       // TODO
       // BUG Use CUDA kernel as everything is in internal memory anyway
       // use FORALL
@@ -633,6 +650,7 @@ struct LPIterationLoop
       auto queue_index = frontier.queue_index;
       // how does the for operation work?
       //
+
       GUARD_CU(oprtr::For(
         // these are the two variables that need to be present in the threads during the for op
         // there is the sizeT i which is the loop variable

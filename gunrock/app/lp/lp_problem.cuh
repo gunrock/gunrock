@@ -204,7 +204,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(segments.Allocate(sub_graph.nodes, target));
       GUARD_CU(segments_temp.Allocate(sub_graph.nodes, target));
       GUARD_CU(segments_size.Allocate(1, target));
-      GUARD_CU(data_size.Allocate(1, target));
+      GUARD_CU(data_size.Allocate(1,  util::DEVICE | util::HOST));
       GUARD_CU(cub_temp_storage.Allocate(1, target));
       // all the remaining space should be taken by data
       // can we preallocate something like that?
@@ -285,11 +285,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       // Allocate output labels if necessary
       GUARD_CU(labels.EnsureSize_(nodes, target));
-      GUARD_CU(labels.ForEach(
-          [] __host__ __device__(LabelT & label) {
-            label = util::PreDefinedValues<LabelT>::MaxValue;
-          },
-          nodes, target, this->stream));
+
+      // TODO
+      // Set label to the vertex id
+      // GUARD_CU(labels.ForEach(
+      //     [] __host__ __device__(LabelT & label) {
+      //       label = util::PreDefinedValues<LabelT>::MaxValue;
+      //     },
+      //     nodes, target, this->stream));
 
       if (this->flag & Mark_Predecessors) {
         // Allocate preds if necessary
