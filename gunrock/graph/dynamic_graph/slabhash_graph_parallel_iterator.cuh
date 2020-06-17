@@ -114,14 +114,15 @@ struct SlabHashGraphParallelIterator {
     for (int bid = 0; bid < num_buckets; ++bid) {
       SizeT b_edges = graph_->d_edges_per_bucket[bid + v_buckets_offset];
       // compute the number of slabs in this bucket
-      num_slabs += (b_edges + graph_->edgesPerSlab - 1) / graph_->edgesPerSlab;
+      num_slabs +=
+          (b_edges + graph_->kEdgesPerSlab - 1) / graph_->kEdgesPerSlab;
       // Make sure we have a minimum of 1 slab. Base slab is allocated if there
       // are no edges stored
       num_slabs = b_edges == 0 ? ++num_slabs : num_slabs;
     }
     // Capacity is the total number of slabs * the total number of keys per
     // slab
-    return num_slabs *= graph_->keysPerSlab;
+    return num_slabs *= graph_->kKeysPerSlab;
   }
 
   /**
@@ -139,7 +140,7 @@ struct SlabHashGraphParallelIterator {
     // | 1 |->[ 5 ]
     // | 2 |->[ 6 ] -> [ 7 ]
 
-    SizeT slab_id = (idx / graph_->keysPerSlab);
+    SizeT slab_id = (idx / graph_->kKeysPerSlab);
     SizeT num_buckets = graph_->d_hash_context[v_].getNumBuckets();
     bool is_base_slab = slab_id < num_buckets;
     uint32_t lane_id = threadIdx.x & 0x1F;
@@ -158,7 +159,7 @@ struct SlabHashGraphParallelIterator {
         SizeT b_edges = graph_->d_edges_per_bucket[bid + v_buckets_offset];
         // increment by counting all the number of slabs for this bucket
         num_collision_slabs +=
-            (b_edges + graph_->edgesPerSlab - 1) / graph_->edgesPerSlab;
+            (b_edges + graph_->kEdgesPerSlab - 1) / graph_->kEdgesPerSlab;
         // decrement the number of slabs by one to account for base slab. Only
         // do so if the number of edges is greater than one (i.e. previous
         // increment accounted for the base slab)

@@ -36,13 +36,13 @@ struct SlabHashGraphBase {
   using VertexT = _VertexT;
   using ValueT = _ValueT;
   using SizeT = _SizeT;
-  
+
   using HashContextT = typename std::conditional<
       REQUIRE_EDGE_VALUES,
       GpuSlabHashContext<VertexT, ValueT, SlabHashTypeT::ConcurrentMap>,
       GpuSlabHashContext<VertexT, ValueT, SlabHashTypeT::ConcurrentSet>>::type;
 
-  static constexpr uint32_t edgesPerSlab = REQUIRE_EDGE_VALUES ? 15 : 30;
+  static constexpr uint32_t kEdgesPerSlab = REQUIRE_EDGE_VALUES ? 15 : 30;
 
   DynamicAllocatorT* memory_allocator;
 
@@ -124,9 +124,9 @@ struct SlabHashGraphBase {
 
     uint32_t hash_func_x, hash_func_y;
     std::mt19937 rng(time(0));
-    hash_func_x = rng() % PRIME_DIVISOR_;
+    hash_func_x = rng() % kPrimeDivisor;
     if (hash_func_x < 1) hash_func_x = 1;
-    hash_func_y = rng() % PRIME_DIVISOR_;
+    hash_func_y = rng() % kPrimeDivisor;
 
     using SlabT = typename ConcurrentMapT<VertexT, ValueT>::SlabTypeT;
     SlabT* d_base_slabs32 = reinterpret_cast<SlabT*>(d_base_slabs);
@@ -139,7 +139,7 @@ struct SlabHashGraphBase {
         node_edges = 0;
       }
       buckets_per_table[i] =
-          ceil(node_edges / (load_factor * float(edgesPerSlab)));
+          ceil(node_edges / (load_factor * float(kEdgesPerSlab)));
       buckets_per_table[i] = std::max(buckets_per_table[i], SizeT(1));
 
       assert(total_num_buckets < buckets_capacity &&
@@ -214,8 +214,8 @@ struct SlabHashGraphBase {
   SizeT nodes_capacity;
   SizeT buckets_capacity;
 
-  static constexpr uint32_t PRIME_DIVISOR_ = 4294967291u;
-  static constexpr uint32_t keysPerSlab = 32;
+  static constexpr uint32_t kPrimeDivisor = 4294967291u;
+  static constexpr uint32_t kKeysPerSlab = 32;
 };
 }  // namespace graph
 }  // namespace gunrock
