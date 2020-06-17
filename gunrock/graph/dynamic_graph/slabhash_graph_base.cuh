@@ -42,6 +42,8 @@ struct SlabHashGraphBase {
       GpuSlabHashContext<VertexT, ValueT, SlabHashTypeT::ConcurrentMap>,
       GpuSlabHashContext<VertexT, ValueT, SlabHashTypeT::ConcurrentSet>>::type;
 
+  static constexpr uint32_t kEdgesPerSlab = REQUIRE_EDGE_VALUES ? 15 : 30;
+
   DynamicAllocatorT* memory_allocator;
 
   HashContextT* h_hash_context;
@@ -58,7 +60,7 @@ struct SlabHashGraphBase {
   SlabHashGraphBase(){};
   // todo: add node values
   /**
-   * @brief Allocate maximum capacity memory for SlabHash graph.
+   * @brief Allocate maximum capacity memory for SlabHash graph .
    *
    * @param[in] max_nodes Maximum number of nodes that the graph can store
    * @param[in] max_buckets Maximum number of buckets that the graph will use
@@ -102,49 +104,43 @@ struct SlabHashGraphBase {
   ~SlabHashGraphBase() {}
 
   /**
-   * @brief Converts CSR to Dynamic graph and Allocate GPU memory for input
-   * pairs
+   * @brief Initialize the dynamic graph for a number of nodes.
    *
-   * @param[in] h_row_offsets host pointer to CSR row offsets
-   * @param[in] num_nodes_ number of nodes in the input CSR graph
-   * @param[in] num_edges_ number of edges in the input CSR graph
-   * @param[in] edges_per_slab number of edges per slab (15 for hashmap, 31 for
-   * hashset)
-   * @param[in] loadfactor load factor per hash table
-   * @param[in] h_col_indices host pointer to CSR column indices
-   * @param[in] d_edges_pairs device pointer to COO generated edge pairs
+   * @param[in] num_init_nodes Number of nodes to initialize the dynamic graph
+   * for.
+   * @param[in] load_factor Load factor per hash table
+   * @param[in] h_row_offsets_hint Optional hint array to a row offset CSR style
+   * array for hints on number of edges per node. If not provided each hash
+   * table has a single bucket.
    */
-  template <typename PairT>
-  cudaError_t Init(SizeT* h_row_offsets, SizeT num_nodes_, SizeT num_edges_,
-                   SizeT edges_per_slab, float load_factor,
-                   VertexT* h_col_indices, PairT*& d_edges_pairs) {
-    assert(num_nodes_ < nodes_capacity &&
+  cudaError_t InitHashTables(SizeT num_init_nodes, float load_factor,
+                             SizeT* h_row_offsets_hint = nullptr) {
+    assert(num_init_nodes <= nodes_capacity &&
            "Capcity lower than required number of nodes");
     SizeT total_num_buckets = 0;
-    SizeT total_num_edges = 0;
-    num_nodes = num_nodes_;
+    num_nodes = num_init_nodes;
 
-    std::vector<PairT> h_edges_pairs(num_edges_);
     std::vector<SizeT> h_buckets_offset(buckets_capacity);
 
     uint32_t hash_func_x, hash_func_y;
     std::mt19937 rng(time(0));
-    hash_func_x = rng() % PRIME_DIVISOR_;
+    hash_func_x = rng() % kPrimeDivisor;
     if (hash_func_x < 1) hash_func_x = 1;
-    hash_func_y = rng() % PRIME_DIVISOR_;
+    hash_func_y = rng() % kPrimeDivisor;
 
     using SlabT = typename ConcurrentMapT<VertexT, ValueT>::SlabTypeT;
     SlabT* d_base_slabs32 = reinterpret_cast<SlabT*>(d_base_slabs);
 
     for (SizeT i = 0; i < num_nodes; i++) {
-      SizeT node_edges = h_row_offsets[i + 1] - h_row_offsets[i];
-      buckets_per_table[i] =
-          ceil(node_edges / (load_factor * float(edges_per_slab)));
-      buckets_per_table[i] = std::max(buckets_per_table[i], SizeT(1));
-      for (VertexT v = h_row_offsets[i]; v < h_row_offsets[i + 1]; v++) {
-        h_edges_pairs[total_num_edges] = make_uint2(i, h_col_indices[v]);
-        total_num_edges++;
+      SizeT node_edges;
+      if (h_row_offsets_hint) {
+        node_edges = h_row_offsets_hint[i + 1] - h_row_offsets_hint[i];
+      } else {
+        node_edges = 0;
       }
+      buckets_per_table[i] =
+          ceil(node_edges / (load_factor * float(kEdgesPerSlab)));
+      buckets_per_table[i] = std::max(buckets_per_table[i], SizeT(1));
 
       assert(total_num_buckets < buckets_capacity &&
              "Capcity lower than required number of base slabs");
@@ -156,12 +152,6 @@ struct SlabHashGraphBase {
       h_buckets_offset[i] = total_num_buckets;
       total_num_buckets += buckets_per_table[i];
     }
-    assert(total_num_edges == num_edges_ &&
-           "Edges in the graph mismatch the expected count");
-
-    CHECK_ERROR(cudaMalloc((void**)&d_edges_pairs, sizeof(PairT) * num_edges_));
-    CHECK_ERROR(cudaMemcpy(d_edges_pairs, h_edges_pairs.data(),
-                           sizeof(PairT) * num_edges_, cudaMemcpyHostToDevice));
 
     CHECK_ERROR(cudaMemcpy(d_hash_context, h_hash_context,
                            sizeof(HashContextT) * num_nodes,
@@ -224,8 +214,8 @@ struct SlabHashGraphBase {
   SizeT nodes_capacity;
   SizeT buckets_capacity;
 
-  static constexpr uint32_t PRIME_DIVISOR_ = 4294967291u;
-  static constexpr uint32_t keysPerSlab = 32;
+  static constexpr uint32_t kPrimeDivisor = 4294967291u;
+  static constexpr uint32_t kKeysPerSlab = 32;
 };
 }  // namespace graph
 }  // namespace gunrock
