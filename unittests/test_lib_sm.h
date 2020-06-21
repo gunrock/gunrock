@@ -13,7 +13,7 @@ TEST(sharedlibrary, sm) {
   int query_col_indices[6] = {1, 2, 0, 2, 0, 1};
 
   unsigned long *sm_counts = new unsigned long[1];
-  unsigned long *list_sm;
+  unsigned long **list_sm = new unsigned long*[1];
   unsigned int device = 0x01;  // CPU
 
   double elapsed = sm(num_data_nodes, num_data_edges, data_row_offsets,
@@ -21,11 +21,19 @@ TEST(sharedlibrary, sm) {
                       query_row_offsets, query_col_indices, 1, sm_counts,
                       list_sm, device);
 
-  double counts[1] = {1};
 
-  EXPECT_EQ(sm_counts[0], counts[0])
+  EXPECT_EQ(sm_counts[0], 1)
       << "Number of matched subgraphs are different";
+
+  unsigned long expected[] = {0, 1, 3};
+  for (int i=0; i < 3; i++) {
+    EXPECT_EQ((*list_sm)[i], expected[i]);
+  }
 
   delete[] sm_counts;
   sm_counts = NULL;
+
+  delete[] (*list_sm);
+  delete[] list_sm;
+  list_sm = NULL;
 }

@@ -413,7 +413,7 @@ double sm(
     const int           *query_col_indices,
     const int            num_runs,
     unsigned long       *subgraphs,
-    unsigned long       *list_subgraphs,
+    unsigned long       **list_subgraphs,
     unsigned int         device
 );
 
