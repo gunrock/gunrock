@@ -59,10 +59,15 @@ struct main_struct {
     LabelT **ref_labels = NULL;
     int num_srcs = 0;
     bool quick = parameters.Get<bool>("quick");
+    std::string validation = parameters.Get<std::string>("validation");
+    if (quick && (parameters.UseDefault("validation") == false && validation != "none")) {
+      util::PrintMsg("Invalid options --quick and --validation=" + validation +
+		     ", no CPU reference result to validate");
+      return retval;
+    }
     // compute reference CPU BFS solution for source-distance
     if (!quick) {
       bool quiet = parameters.Get<bool>("quiet");
-      std::string validation = parameters.Get<std::string>("validation");
       util::PrintMsg("Computing reference value ...", !quiet);
       std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
       num_srcs = srcs.size();

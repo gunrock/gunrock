@@ -78,6 +78,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   total_timer.Start();
 
   // parse configurations from parameters
+  bool quick_mode = parameters.Get<bool>("quick");
   bool quiet = parameters.Get<bool>("quiet");
   int num_runs = parameters.Get<int>("num-runs");
   std::string validation = parameters.Get<std::string>("validation");
@@ -119,7 +120,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
             " ms, src = " + std::to_string(src) + ", #iterations = " +
             std::to_string(enactor.enactor_slices[0].enactor_stats.iteration),
         !quiet);
-    if (validation == "each") {
+    if (!quick_mode && validation == "each") {
       GUARD_CU(enactor.Extract());
       GUARD_CU(problem.Extract(h_node_ids, h_ranks));
       ValueT total_rank = 0;
@@ -137,7 +138,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   }
 
   cpu_timer.Start();
-  if (validation == "last") {
+  if (!quick_mode && validation == "last") {
     // Copy out results
     GUARD_CU(enactor.Extract());
     GUARD_CU(problem.Extract(h_node_ids, h_ranks));

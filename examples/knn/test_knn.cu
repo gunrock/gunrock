@@ -52,15 +52,22 @@ struct main_struct {
             typename ValueT>   // Use int as the value type
   cudaError_t
   operator()(util::Parameters& parameters, VertexT v, SizeT s, ValueT val) {
+    cudaError_t retval = cudaSuccess;
+
     // CLI parameters
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
 
+    std::string validation = parameters.Get<std::string>("validation");
+    if (quick && (parameters.UseDefault("validation") == false && validation != "none")) {
+      util::PrintMsg("Invalid options --quick and --validation=" + validation +
+                     ", no CPU reference result to validate");
+      return retval;
+    }
+
     // Get n dimension tuplets
     std::string labels_file = parameters.Get<std::string>("labels-file");
     util::PrintMsg("Points File Input: " + labels_file, !quiet);
-
-    cudaError_t retval = cudaSuccess;
     
     std::ifstream lfile(labels_file.c_str());
     if (labels_file == "" || !lfile.is_open()){

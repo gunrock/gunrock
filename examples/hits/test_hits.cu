@@ -41,6 +41,8 @@ struct main_struct {
             typename ValueT>   // Use int as the value type
   cudaError_t
   operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val) {
+    cudaError_t retval = cudaSuccess;
+
     // CLI parameters
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
@@ -58,12 +60,17 @@ struct main_struct {
       parameters.Set("hits-norm", hits_norm);
     }
 
+    std::string validation = parameters.Get<std::string>("validation");
+    if (quick && (parameters.UseDefault("validation") == false && validation != "none")) {
+      util::PrintMsg("Invalid options --quick and --validation=" + validation +
+                     ", no CPU reference result to validate");
+      return retval;
+    }
     // TODO: Do we need HAS_COO?
     typedef typename app::TestGraph<VertexT, SizeT, ValueT,
                                     graph::HAS_CSR | graph::HAS_COO>
         GraphT;
 
-    cudaError_t retval = cudaSuccess;
     util::CpuTimer cpu_timer;
     GraphT graph;
 

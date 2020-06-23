@@ -62,9 +62,14 @@ struct main_struct {
 
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
+    std::string validation = parameters.Get<std::string>("validation");
+    if (quick && (parameters.UseDefault("validation") == false && validation != "none")) {
+      util::PrintMsg("Invalid options --quick and --validation=" + validation +
+                     ", no CPU reference result to validate");
+      return retval;
+    }
 
-    if (!quick) {
-      // std::string validation = parameters.Get<std::string>("validation");
+    if (!quick) { 
       util::PrintMsg("Computing reference value ...", !quiet);
       std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
       num_srcs = srcs.size();
