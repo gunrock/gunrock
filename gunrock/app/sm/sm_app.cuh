@@ -61,7 +61,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
   util::Info info("SM", parameters, data_graph);  // initialize Info structure
 
   unsigned long *count_subgraphs = new unsigned long[1];
-  unsigned long *list_subgraphs;
+  unsigned long **list_subgraphs = new unsigned long*[1];
 
   ProblemT problem(parameters);
   EnactorT enactor;
@@ -146,7 +146,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &data_graph,
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_sm(gunrock::util::Parameters &parameters, GraphT &data_graph,
                   GraphT &query_graph, unsigned long *subgraphs,
-                  unsigned long *list_subgraphs,
+                  unsigned long **list_subgraphs,
                   gunrock::util::Location allocated_on = gunrock::util::HOST) {
   typedef typename GraphT::VertexT VertexT;
   typedef gunrock::app::sm::Problem<GraphT> ProblemT;
@@ -202,7 +202,7 @@ double sm_template(const SizeT num_nodes, const SizeT num_edges,
                    const SizeT num_query_nodes, const SizeT num_query_edges,
                    const SizeT *query_row_offsets,
                    const VertexT *query_col_indices, const int num_runs,
-                   unsigned long *subgraphs, unsigned long *list_subgraphs,
+                   unsigned long *subgraphs, unsigned long **list_subgraphs,
                    gunrock::util::Location allocated_on = gunrock::util::HOST) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, VertexT,
                                            gunrock::graph::HAS_CSR>
