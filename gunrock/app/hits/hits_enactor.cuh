@@ -91,7 +91,7 @@ struct hitsIterationLoop
 
     // Set the frontier to NULL to specify that it should include
     // all vertices
-    util::Array1D<SizeT, VertexT> *null_frontier = NULL;
+    util::Array1D<SizeT, VertexT> *null_frontier = NULL; // TODO: Check that I'm doing this correctly
     frontier.queue_length = graph.nodes;
     frontier.queue_reset = true;
 
@@ -121,7 +121,7 @@ struct hitsIterationLoop
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool {
       // Update the hub and authority scores.
-      // Look into NeighborReduce for speed improvements
+      // TODO: Look into NeighborReduce for speed improvements
       atomicAdd(&hrank_next[src], arank_curr[dest]);
       atomicAdd(&arank_next[dest], hrank_curr[src]);
 
@@ -139,52 +139,94 @@ struct hitsIterationLoop
     // either after every N iterations (user-specified, default=1),
     // or at the last iteration
     if (((iteration + 1) % normalize_n == 0) || iteration == (max_iter - 1)) {
-      // 1) Square each element
-      auto square_op = [hrank_next, arank_next] __host__ __device__(
-                           VertexT * v_q, const SizeT &pos) {
-        hrank_next[pos] = hrank_next[pos] * hrank_next[pos];
-        arank_next[pos] = arank_next[pos] * arank_next[pos];
-      };
 
-      GUARD_CU(frontier.V_Q()->ForAll(square_op, graph.nodes));
+      if(hits_norm == 2) { // The default
+        // Square each element
+        auto square_op = [hrank_next, arank_next] __host__ __device__(
+          VertexT * v_q, const SizeT &pos) {
+          hrank_next[pos] = hrank_next[pos] * hrank_next[pos];
+          arank_next[pos] = arank_next[pos] * arank_next[pos];
+        };
 
-      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+        GUARD_CU(frontier.V_Q()->ForAll(square_op, graph.nodes));
+        GUARD_CU2(cudaStreamSynchronize(stream),
+                    "cudaStreamSynchronize Failed");
 
-      // 2) Sum all squared scores in each array
-      GUARD_CU(util::cubReduce(
+        // Sum all squared scores in each array
+        GUARD_CU(util::cubReduce(
           cub_temp_space, hrank_next, hrank_mag, graph.nodes,
           [] __host__ __device__(const ValueT &a, const ValueT &b) {
             return a + b;
           },
           ValueT(0), stream));
 
-      GUARD_CU(util::cubReduce(
-          cub_temp_space, arank_next, arank_mag, graph.nodes,
+        GUARD_CU(util::cubReduce(
+            cub_temp_space, arank_next, arank_mag, graph.nodes,
+            [] __host__ __device__(const ValueT &a, const ValueT &b) {
+              return a + b;
+            },
+            ValueT(0), stream));
+
+        GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+
+        auto normalize_divide_square_op =
+        [hrank_next, arank_next, hrank_mag, arank_mag] __host__ __device__(
+            VertexT * v_q, const SizeT &pos) {
+          if (hrank_mag[0] > 0) {
+            hrank_next[pos] = sqrt(hrank_next[pos]) / sqrt(hrank_mag[0]);
+          }
+
+          if (arank_mag[0] > 0) {
+            arank_next[pos] = sqrt(arank_next[pos]) / sqrt(arank_mag[0]);
+          }
+        };
+        // Divide all elements by the square root of their squared sums.
+        // Note: take sqrt of x in denominator because x^2 was done in place.
+        GUARD_CU(frontier.V_Q()->ForAll(normalize_divide_square_op, graph.nodes));
+
+        GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+      }
+      else if(hits_norm == 1) {
+        // Sum all scores in each array
+        GUARD_CU(util::cubReduce(
+          cub_temp_space, hrank_next, hrank_mag, graph.nodes,
           [] __host__ __device__(const ValueT &a, const ValueT &b) {
-            return a + b;
+            return abs(a) + abs(b);
           },
           ValueT(0), stream));
 
-      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+        GUARD_CU(util::cubReduce(
+            cub_temp_space, arank_next, arank_mag, graph.nodes,
+            [] __host__ __device__(const ValueT &a, const ValueT &b) {
+              return abs(a) + abs(b);
+            },
+            ValueT(0), stream));
 
-      auto normalize_divide_op =
-          [hrank_next, arank_next, hrank_mag, arank_mag] __host__ __device__(
-              VertexT * v_q, const SizeT &pos) {
-            if (hrank_mag[0] > 0) {
-              hrank_next[pos] = sqrt(hrank_next[pos]) / sqrt(hrank_mag[0]);
-            }
+        GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
 
-            if (arank_mag[0] > 0) {
-              arank_next[pos] = sqrt(arank_next[pos]) / sqrt(arank_mag[0]);
-            }
-          };
-      // Divide all elements by the square root of their squared sums.
-      // Note: take sqrt of x in denominator because x^2 was done in place.
-      GUARD_CU(frontier.V_Q()->ForAll(normalize_divide_op, graph.nodes));
+        auto normalize_divide_op =
+        [hrank_next, arank_next, hrank_mag, arank_mag] __host__ __device__(
+            VertexT * v_q, const SizeT &pos) {
+          if (hrank_mag[0] > 0) {
+            hrank_next[pos] = hrank_next[pos] / hrank_mag[0];
+          }
 
-      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+          if (arank_mag[0] > 0) {
+            arank_next[pos] = arank_next[pos] / arank_mag[0];
+          }
+        };
+        // Divide all elements by the square root of their squared sums.
+        // Note: take sqrt of x in denominator because x^2 was done in place.
+        GUARD_CU(frontier.V_Q()->ForAll(normalize_divide_op, graph.nodes));
+
+        GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+      }
+      else {
+        assert(false); // TODO: Handle errors case
+      }
     }
-    // After normalization, swap the next and current vectors
+    // After normalization, swap the next and current vectors.
+    // TODO: Make sure this is using pointers
     auto hrank_temp = hrank_curr;
     hrank_curr = hrank_next;
     hrank_next = hrank_temp;
