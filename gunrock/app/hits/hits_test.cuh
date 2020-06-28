@@ -223,7 +223,7 @@ typename GraphT::SizeT Validate_Results(
   bool quiet = parameters.Get<bool>("quiet");
   bool quick = parameters.Get<bool>("quick");
 
-  printf("Tol: %f\n", tol);
+  util::PrintMsg("Tol: " + std::to_string(tol), !quiet);
 
   if (!quick) {
     for (SizeT v = 0; v < graph.nodes; v++) {
