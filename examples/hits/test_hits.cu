@@ -45,7 +45,9 @@ struct main_struct {
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
     int max_iter = parameters.Get<SizeT>("max-iter");
+    int hits_norm = parameters.Get<SizeT>("hits-norm");
 
+    // TODO: Do we need HAS_COO?
     typedef typename app::TestGraph<VertexT, SizeT, ValueT,
                                     graph::HAS_CSR | graph::HAS_COO>
         GraphT;
@@ -72,7 +74,7 @@ struct main_struct {
       util::PrintMsg("__________________________", !quiet);
 
       float elapsed = app::hits::CPU_Reference(graph.coo(), ref_hrank,
-                                               ref_arank, max_iter, quiet);
+                                               ref_arank, max_iter, hits_norm, quiet);
 
       util::PrintMsg("--------------------------\n CPU Elapsed: " +
                          std::to_string(elapsed),

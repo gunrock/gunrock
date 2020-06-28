@@ -38,6 +38,8 @@ cudaError_t UseParameters(ParametersT &parameters) {
  * @param[in]  num_edges   Number of edges in the input graph
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  num_iter    Number of HITS iterations to perform
+ * @param[in]  hits_norm   Normalization method [1 = normalize by the sum of absolute values, 2 = normalize by the square root of the sum of squares]
  * @param[out] hub_ranks   Vertex hub scores
  * @param[out] auth ranks  Vertex authority scores
  * \return     double      Return accumulated elapsed times for all iterations
@@ -46,13 +48,14 @@ double hits(
     const int        num_nodes,
     const int        num_edges,
     const int       *row_offsets,
-    const int     *col_indices,
-    const int          num_iter,
-    float            *hub_ranks,
-    float            *auth_ranks)
+    const int       *col_indices,
+    const int        num_iter,
+    const int        hits_norm, 
+    float           *hub_ranks,
+    float           *auth_ranks)
 {
       return hits_template(num_nodes, num_edges, row_offsets, col_indices,
-         num_iter, hub_ranks, auth_ranks);
+         num_iter, hits_norm, hub_ranks, auth_ranks);
 }
 
 // Leave this at the end of the file

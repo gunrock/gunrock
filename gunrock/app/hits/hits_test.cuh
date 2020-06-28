@@ -33,7 +33,7 @@ namespace hits {
 template <typename GraphT>
 double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
                      typename GraphT::ValueT *ref_arank,
-                     typename GraphT::SizeT max_iter, bool quiet) {
+                     typename GraphT::SizeT max_iter, typename GraphT::SizeT hits_norm, bool quiet) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::ValueT ValueT;
   typedef typename GraphT::SizeT SizeT;

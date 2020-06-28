@@ -207,6 +207,7 @@ double gunrock_hits(
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
  * @param[in]  num_iter    Number of iterations to perform HITS
+ * @param[in]  hits_norm   Normalization method [1 = normalize by the sum of absolute values, 2 = normalize by the square root of the sum of squares]
  * @param[out] hub_ranks   Vertex hub scores
  * @param[out] auth ranks  Vertex authority scores
  * \return     double      Return accumulated elapsed times for all iterations
@@ -221,8 +222,9 @@ double hits_template(
     const SizeT       *row_offsets,
     const VertexT     *col_indices,
     const int          num_iter,
-    GValueT            *hub_ranks,
-    GValueT            *auth_ranks)
+    const int          hits_norm,
+    GValueT           *hub_ranks,
+    GValueT           *auth_ranks)
 {
 
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,

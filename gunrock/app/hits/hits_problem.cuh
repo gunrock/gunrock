@@ -36,6 +36,11 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
       100, "Number of HITS iterations.", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int64_t>(
+      "hits-norm",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      2, "Normalization method [1 = normalize by the sum of absolute values, 2 = normalize by the square root of the sum of squares (default)].", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<int64_t>(
       "normalize-n",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 1,
       "Normalize HITS scores every N iterations.", __FILE__, __LINE__));
@@ -84,11 +89,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, ValueT> hrank_mag;
     util::Array1D<SizeT, ValueT> arank_mag;
     SizeT max_iter;     // Maximum number of HITS iterations to perform
+    SizeT hits_norm;
     SizeT normalize_n;  // Normalize every N iterations
     /*
      * @brief Default constructor
      */
-    DataSlice() : BaseDataSlice(), max_iter(0), normalize_n(0) {
+    DataSlice() : BaseDataSlice(), max_iter(0), hits_norm(2), normalize_n(0) {
       // Name of the problem specific arrays:
       hrank_curr.SetName("hrank_curr");
       arank_curr.SetName("arank_curr");
@@ -312,6 +318,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       auto &data_slice = data_slices[gpu][0];
 
       data_slice.max_iter = this->parameters.template Get<SizeT>("max-iter");
+      data_slice.hits_norm = this->parameters.template Get<SizeT>("hits-norm");
 
       data_slice.normalize_n =
           this->parameters.template Get<SizeT>("normalize-n");

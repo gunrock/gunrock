@@ -18,7 +18,8 @@ int main(int argc, char *argv[]) {
   float *hub_ranks = (float *)malloc(sizeof(float) * num_nodes);
   float *auth_ranks = (float *)malloc(sizeof(float) * num_nodes);
   int num_iter = 10;
-  double elapsed_hits = hits(num_nodes, num_edges, row_offsets, col_indices, num_iter, hub_ranks, auth_ranks);
+  int hits_norm = 2;
+  double elapsed_hits = hits(num_nodes, num_edges, row_offsets, col_indices, num_iter, hits_norm, hub_ranks, auth_ranks);
 
   for (int node = 0; node < num_nodes; ++node)
     printf("Node_ID: [%d], Hub Score: [%f], Auth Score: [%f]\n", node, hub_ranks[node], auth_ranks[node]);

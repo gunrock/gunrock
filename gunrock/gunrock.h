@@ -425,6 +425,7 @@ double sm(
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
  * @param[in]  num_iter    Number of iterations to perform HITS
+ * @param[in]  hits_norm   Normalization method
  * @param[out] hub_ranks   Vertex hub scores
  * @param[out] auth ranks  Vertex authority scores
  * \return     double      Elapsed run time in milliseconds
@@ -435,6 +436,7 @@ double hits(
     const int           *row_offsets,
     const int           *col_indices, 
     const int            num_iter,
+    const int            hits_norm,
     float               *hub_ranks,
     float               *auth_ranks);     
 

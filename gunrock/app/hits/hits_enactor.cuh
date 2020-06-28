@@ -97,6 +97,7 @@ struct hitsIterationLoop
 
     // Number of times to iterate the HITS algorithm
     auto max_iter = data_slice.max_iter;
+    auto hits_norm = data_slice.hits_norm;
 
     // Normalize the HITS scores every N iterations.
     // Provides speedup at the risk of data overflow
