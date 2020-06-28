@@ -38,7 +38,7 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
   GUARD_CU(parameters.Use<int64_t>(
       "hits-norm",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      2, "Normalization method [1 = normalize by the sum of absolute values, 2 = normalize by the square root of the sum of squares (default)].", __FILE__, __LINE__));
+      2, "Normalization method [1 = normalize by the sum of absolute values, 2 = normalize by the square root of the sum of squares].", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int64_t>(
       "normalize-n",
