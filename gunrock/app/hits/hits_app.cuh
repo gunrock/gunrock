@@ -160,6 +160,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
  * @param[in]  graph      Input graph
  * @param[out] hub_ranks   Vertex hub scores
  * @param[out] auth ranks  Vertex authority scores
+ * @param[in]  allocated_on    Target device where inputs and outputs are stored
  * \return     double     Return accumulated elapsed times for all iterations
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
@@ -167,7 +168,8 @@ double gunrock_hits(
     gunrock::util::Parameters &parameters,
     GraphT &data_graph,
     ValueT *hub_ranks,
-    ValueT *auth_ranks)
+    ValueT *auth_ranks,
+    gunrock::util::Location allocated_on = gunrock::util::HOST)
 {
     typedef typename GraphT::VertexT VertexT;
     typedef gunrock::app::hits::Problem<GraphT  > ProblemT;
@@ -192,7 +194,7 @@ double gunrock_hits(
     cpu_timer.Stop();
 
     total_time += cpu_timer.ElapsedMillis();
-    problem.Extract(hub_ranks, auth_ranks);
+    problem.Extract(hub_ranks, auth_ranks, allocated_on);
     
 
     enactor.Release(target);
@@ -210,6 +212,7 @@ double gunrock_hits(
  * @param[in]  hits_norm   Normalization method [1 = normalize by the sum of absolute values, 2 = normalize by the square root of the sum of squares]
  * @param[out] hub_ranks   Vertex hub scores
  * @param[out] auth ranks  Vertex authority scores
+ * @param[in]  allocated_on      Target device where inputs and outputs are stored
  * \return     double      Return accumulated elapsed times for all iterations
  */
 template <
@@ -224,7 +227,8 @@ double hits_template(
     const int          num_iter,
     const int          hits_norm,
     GValueT           *hub_ranks,
-    GValueT           *auth_ranks)
+    GValueT           *auth_ranks,
+    gunrock::util::Location allocated_on = gunrock::util::HOST)
 {
 
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
@@ -245,6 +249,11 @@ double hits_template(
 
     // Assign pointers into gunrock graph format
     gunrock::util::Location target = gunrock::util::HOST;
+
+    if (allocated_on == gunrock::util::DEVICE) {
+      target = gunrock::util::DEVICE;
+    }
+
     data_graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
     data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, target);
     data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, target);
@@ -253,7 +262,7 @@ double hits_template(
     gunrock::graphio::LoadGraph(parameters, data_graph);
 
     // Run HITS
-    double elapsed_time = gunrock_hits(parameters, data_graph, hub_ranks, auth_ranks);
+    double elapsed_time = gunrock_hits(parameters, data_graph, hub_ranks, auth_ranks, allocated_on);
 
     // Cleanup
     data_graph.Release();

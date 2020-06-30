@@ -428,6 +428,7 @@ double sm(
  * @param[in]  hits_norm   Normalization method
  * @param[out] hub_ranks   Vertex hub scores
  * @param[out] auth ranks  Vertex authority scores
+ * @param[in]  device      Target device to store inputs and outputs
  * \return     double      Elapsed run time in milliseconds
  */
 double hits(
@@ -438,7 +439,8 @@ double hits(
     const int            num_iter,
     const int            hits_norm,
     float               *hub_ranks,
-    float               *auth_ranks);     
+    float               *auth_ranks,
+    unsigned int         device);     
 
 #ifdef __cplusplus
 }
