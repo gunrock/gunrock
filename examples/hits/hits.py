@@ -15,7 +15,7 @@ graph_mtx = mmread(sys.argv[1])
 
 graph_nx = nx.from_scipy_sparse_matrix(graph_mtx)
 # print(nx.is_directed(graph_nx))
-max_iter = 1
+max_iter = 100
 tol = 100
 hubs_nx, auths_nx = nx.hits(graph_nx, max_iter, tol, normalized=True)
 
@@ -64,9 +64,9 @@ for i in range(0, graph_coo.shape[0]):
     hubs_np[i] = curr_hrank[i]
     auths_np[i] = curr_arank[i]
 
-# print("Hubs: ")
-# for key, val in sorted(hubs_nx.items(), key=lambda x: x[1], reverse=True):
-#     print(key, val, hubs_np[key])
-# print("Authorities: ")
-# for key, val in sorted(auths_nx.items(), key=lambda x: x[1], reverse=True):
-#     print(key, val, auths_np[key])
+print("Hubs: ")
+for key, val in sorted(hubs_nx.items(), key=lambda x: x[1], reverse=True):
+    print(key, val, hubs_np[key])
+print("Authorities: ")
+for key, val in sorted(auths_nx.items(), key=lambda x: x[1], reverse=True):
+    print(key, val, auths_np[key])
