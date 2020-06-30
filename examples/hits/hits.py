@@ -9,60 +9,55 @@ if len(sys.argv) != 2:
     print("Usage: python3 ./hits.py <file.mtx>")
     exit()
 
-graph_mtx = mmread(sys.argv[1])
+graph_coo = mmread(sys.argv[1])
+print("Loading COO matrix")
+print(graph_coo.nnz, " edges")
 
-# print(graph_mtx.nnz)
+graph_nx = nx.DiGraph(graph_coo)
 
-graph_nx = nx.from_scipy_sparse_matrix(graph_mtx)
-# print(nx.is_directed(graph_nx))
+print("Creating NetworkX Graph")
+print("NetworkX is Directed: ", nx.is_directed(graph_nx))
+print("NetworkX Graph has ", graph_nx.number_of_edges(), " edges")
+
 max_iter = 100
 tol = 100
 hubs_nx, auths_nx = nx.hits(graph_nx, max_iter, tol, normalized=True)
 
 # Numpy implementation
-curr_hrank = np.zeros((graph_mtx.shape[0], 1))
-curr_arank = np.zeros((graph_mtx.shape[0], 1))
+hrank = np.zeros((graph_coo.shape[0], 1))
+arank = np.zeros((graph_coo.shape[0], 1))
 
-graph_coo = coo_matrix(graph_mtx)
-curr_hrank += 1/graph_coo.shape[0]
-curr_arank += 1/graph_coo.shape[0]
-
-print(curr_hrank)
-print(curr_arank)
+hrank += 1/graph_coo.shape[0]
+arank += 1/graph_coo.shape[0]
 
 for _ in range(0, max_iter):
-    next_hrank = np.zeros((graph_coo.shape[0], 1))
-    next_arank = np.zeros((graph_coo.shape[0], 1))
+    hlast = hrank.copy()
+    hrank = np.zeros((graph_coo.shape[0], 1))
+    arank = np.zeros((graph_coo.shape[0], 1))
 
     for edge in range(0, graph_coo.nnz):
         src = int(graph_coo.row[edge])
         dest = int(graph_coo.col[edge])
-        next_hrank[src] += curr_arank[dest]
-        next_arank[dest] += curr_hrank[src]
+        arank[dest] += hlast[src]
+
+    for edge in range(0, graph_coo.nnz):
+        src = int(graph_coo.row[edge])
+        dest = int(graph_coo.col[edge])
+        hrank[src] += arank[dest]
+        
 
     # Normalize
-
-    print(next_hrank)
-    print(next_arank)
-    next_hrank = next_hrank / np.max(next_hrank)
-    next_arank = next_arank / np.max(next_arank)
-    next_hrank = next_hrank / np.linalg.norm(next_hrank, ord=1)
-    next_arank = next_arank / np.linalg.norm(next_arank, ord=1)
-
-    temp_hrank = next_hrank
-    next_hrank = curr_hrank
-    curr_hrank = temp_hrank
-
-    temp_arank = next_arank
-    next_arank = curr_arank
-    curr_arank = temp_arank
+    hrank = hrank / np.max(hrank)
+    arank = arank / np.max(arank)
+    hrank = hrank / np.linalg.norm(hrank, ord=1)
+    arank = arank / np.linalg.norm(arank, ord=1)
 
 hubs_np = {}
 auths_np = {}
 
 for i in range(0, graph_coo.shape[0]):
-    hubs_np[i] = curr_hrank[i]
-    auths_np[i] = curr_arank[i]
+    hubs_np[i] = hrank[i]
+    auths_np[i] = arank[i]
 
 print("Hubs: ")
 for key, val in sorted(hubs_nx.items(), key=lambda x: x[1], reverse=True):
