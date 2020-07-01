@@ -94,9 +94,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         cub_temp_space;  // Temporary space for normalization addition
     util::Array1D<SizeT, ValueT> hrank_mag;
     util::Array1D<SizeT, ValueT> arank_mag;
+
+    util::Array1D<SizeT, ValueT> cur_error; // Current iteration error
+
     SizeT max_iter;     // Maximum number of HITS iterations to perform
     SizeT hits_norm;
-    double hits_tol;
+    ValueT hits_tol;
     SizeT normalize_n;  // Normalize every N iterations
     /*
      * @brief Default constructor
@@ -110,6 +113,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cub_temp_space.SetName("cub_temp_space");
       hrank_mag.SetName("hrank_mag");
       arank_mag.SetName("arank_mag");
+      cur_error.SetName("cur_error");
     }
 
     /*
@@ -134,6 +138,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(cub_temp_space.Release(target));
       GUARD_CU(hrank_mag.Release(target));
       GUARD_CU(arank_mag.Release(target));
+      GUARD_CU(cur_error.Release(target));
       GUARD_CU(BaseDataSlice ::Release(target));
       return retval;
     }
@@ -162,6 +167,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(hrank_mag.Allocate(1, target | util::HOST));
       GUARD_CU(arank_mag.Allocate(1, target | util::HOST));
 
+      GUARD_CU(cur_error.Allocate(1, target | util::HOST));
+
       if (target & util::DEVICE) {
         GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
       }
@@ -187,6 +194,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(cub_temp_space.EnsureSize_(1, target));
       GUARD_CU(hrank_mag.EnsureSize_(1, target));
       GUARD_CU(arank_mag.EnsureSize_(1, target));
+      GUARD_CU(cur_error.EnsureSize_(1, target));
 
       // Reset data
 
@@ -215,6 +223,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(arank_mag.ForEach(
           [] __host__ __device__(ValueT & x) { x = (ValueT)0.0; }, 1, target,
           this->stream));
+
+      GUARD_CU(cur_error.ForEach(
+        [] __host__ __device__(ValueT & x) { x = (ValueT)0.0; }, 1, target,
+        this->stream));
 
       return retval;
     }
@@ -321,7 +333,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       data_slice.max_iter = this->parameters.template Get<SizeT>("max-iter");
       data_slice.hits_norm = this->parameters.template Get<SizeT>("hits-norm");
-      data_slice.hits_tol = this->parameters.template Get<double>("hits-tol");
+      data_slice.hits_tol = this->parameters.template Get<ValueT>("hits-tol");
 
       data_slice.normalize_n =
           this->parameters.template Get<SizeT>("normalize-n");

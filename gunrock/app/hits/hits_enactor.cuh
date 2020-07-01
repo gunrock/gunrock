@@ -89,6 +89,8 @@ struct hitsIterationLoop
     auto &hrank_mag = data_slice.hrank_mag;
     auto &arank_mag = data_slice.arank_mag;
 
+    auto &cur_error = data_slice.cur_error;
+
     // Set the frontier to NULL to specify that it should include
     // all vertices
     util::Array1D<SizeT, VertexT> *null_frontier = NULL; // TODO: Check that I'm doing this correctly
@@ -226,7 +228,6 @@ struct hitsIterationLoop
       }
     }
     // After normalization, swap the next and current vectors.
-    // TODO: Make sure this is using pointers
     auto hrank_temp = hrank_curr;
     hrank_curr = hrank_next;
     hrank_next = hrank_temp;
@@ -239,17 +240,53 @@ struct hitsIterationLoop
     // for potential speed improvements. Additionally, look into
     // NeighborReduce for adding host and auth scores
 
+    // hrank_next is now temp space, since it will be overwritten with 0s on the next iteration. Use this as temp space for the forall to compute error
+    auto err_op = [hrank_next, hrank_curr] __host__ __device__(
+      VertexT * v_q, const SizeT &pos) {
+      hrank_next[pos] = abs(hrank_next[pos] - hrank_curr[pos]);
+      // printf("Error for %d = %f\n", pos, hrank_next[pos]);
+    };
+
+    GUARD_CU(frontier.V_Q()->ForAll(err_op, graph.nodes));
+    GUARD_CU2(cudaStreamSynchronize(stream),
+                "cudaStreamSynchronize Failed");
+
+    // How perform the reduction to compute the error
+    GUARD_CU(util::cubReduce(
+      cub_temp_space, hrank_next, cur_error, graph.nodes,
+      [] __host__ __device__(const ValueT &a, const ValueT &b) {
+        return abs(a) + abs(b);
+      },
+      ValueT(0), stream));
+
+    GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+
     return retval;
   }
 
   bool Stop_Condition(int gpu_num = 0) {
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
     auto &enactor_slices = this->enactor->enactor_slices;
-    auto iter = enactor_slices[0].enactor_stats.iteration;
-    auto user_iter = data_slice.max_iter;
+    auto &iter = enactor_slices[0].enactor_stats.iteration;
+    auto &user_iter = data_slice.max_iter;
+    auto &tol = data_slice.hits_tol;
+
+    // We haven't done any real work yet
+    if(iter == 0) return false;
 
     // user defined stop condition
-    if (iter == user_iter) return true;
+    data_slice.cur_error.Move(util::DEVICE, util::HOST);
+
+    if(data_slice.cur_error[0] < tol) {
+      printf("GPU converged after %d iterations with an error of %f and a tolerance of %f\n", iter, data_slice.cur_error[0], tol);
+      return true;
+    }
+
+    if (iter == user_iter) {
+      printf("WARNING: GPU failed to converge after %d iterations\n", iter);
+      return true;
+    }
+
     return false;
   }
 
