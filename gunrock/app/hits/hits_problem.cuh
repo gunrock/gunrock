@@ -46,9 +46,15 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
       "Normalize HITS scores every N iterations.", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<double>(
-      "tol",
+      "compare-tol",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
       1e-6, "Floating-point tolerance for CPU/GPU rank comparison.", __FILE__,
+      __LINE__));
+
+  GUARD_CU(parameters.Use<double>(
+      "hits-tol",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      1e-6, "Tolerance for HITS algorithm convergence.", __FILE__,
       __LINE__));
 
   return retval;

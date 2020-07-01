@@ -21,7 +21,7 @@ namespace hits {
 /******************************************************************************
  * HITS Testing Routines
  *****************************************************************************/
-
+// TODO document this
 /**
  * @brief Simple CPU-based reference hits ranking implementations
  * @tparam      GraphT        Type of the graph
@@ -33,7 +33,7 @@ namespace hits {
 template <typename GraphT>
 double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
                      typename GraphT::ValueT *ref_arank,
-                     typename GraphT::SizeT max_iter, typename GraphT::SizeT hits_norm, bool quiet) {
+                     typename GraphT::SizeT max_iter, typename GraphT::SizeT tol, typename GraphT::SizeT hits_norm, bool quiet) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::ValueT ValueT;
   typedef typename GraphT::SizeT SizeT;
@@ -97,7 +97,7 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
       next_arank[v] /= a_norm;
     }
 
-    // Swap current and next
+    // Swap current and next. TODO: check if pointers are needed
     auto curr_hrank_temp = curr_hrank;
     curr_hrank = next_hrank;
     next_hrank = curr_hrank_temp;
@@ -105,6 +105,16 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
     auto curr_arank_temp = curr_arank;
     curr_arank = next_arank;
     next_arank = curr_arank_temp;
+
+    // Break for the tolerance check here
+    int err = 0;
+    for(int v = 0; v < graph.nodes; v++) {
+      err += abs(next_hrank - curr_hrank);
+    }
+
+    if (err < tol) {
+      break;
+    }
   }
 
   // Copy to ref

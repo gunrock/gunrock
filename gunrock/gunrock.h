@@ -424,7 +424,8 @@ double sm(
  * @param[in]  num_edges   Number of edges in the input graph
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  num_iter    Number of iterations to perform HITS
+ * @param[in]  max_iter    Maximum number of iterations to perform HITS
+ * @param[in]  tol         Convergence tolerance for termination
  * @param[in]  hits_norm   Normalization method
  * @param[out] hub_ranks   Vertex hub scores
  * @param[out] auth ranks  Vertex authority scores
@@ -436,7 +437,8 @@ double hits(
     const int            num_edges,
     const int           *row_offsets,
     const int           *col_indices, 
-    const int            num_iter,
+    const int            max_iter,
+    const float          tol,
     const int            hits_norm,
     float               *hub_ranks,
     float               *auth_ranks,

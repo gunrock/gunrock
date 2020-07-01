@@ -59,7 +59,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   bool quiet_mode = parameters.Get<bool>("quiet");
   bool quick_mode = parameters.Get<bool>("quick");
   int num_runs = parameters.Get<int>("num-runs");
-  double tol = parameters.Get<double>("tol");
+  double compare_tol = parameters.Get<double>("compare-tol");
   std::string validation = parameters.Get<std::string>("validation");
   util::Info info("HITS", parameters, graph);
 
@@ -101,7 +101,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
     if (validation == "each") {
       GUARD_CU(problem.Extract(h_hrank, h_arank));
       SizeT num_errors = Validate_Results(parameters, graph, h_hrank, h_arank,
-                                          ref_hrank, ref_arank, false);
+                                          ref_hrank, ref_arank, compare_tol, false);
     }
   }
 
@@ -111,7 +111,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   if (validation == "last") {
     SizeT num_errors = Validate_Results(parameters, graph, h_hrank, h_arank,
-                                        ref_hrank, ref_arank, tol, false);
+                                        ref_hrank, ref_arank, compare_tol, false);
 
     // num_errors stores how many positions are mismatched
     // Makes sense to keep this? Would need to sort first.
@@ -208,7 +208,8 @@ double gunrock_hits(
  * @param[in]  num_edges   Number of edges in the input graph
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  num_iter    Number of iterations to perform HITS
+ * @param[in]  max_iter    Maximum number of iterations to perform HITS
+ * @param[in]  tol         Algorithm termination tolerance
  * @param[in]  hits_norm   Normalization method [1 = normalize by the sum of absolute values, 2 = normalize by the square root of the sum of squares]
  * @param[out] hub_ranks   Vertex hub scores
  * @param[out] auth ranks  Vertex authority scores
@@ -224,7 +225,8 @@ double hits_template(
     const SizeT        num_edges,
     const SizeT       *row_offsets,
     const VertexT     *col_indices,
-    const int          num_iter,
+    const int          max_iter,
+    const float        tol,
     const int          hits_norm,
     GValueT           *hub_ranks,
     GValueT           *auth_ranks,
@@ -243,7 +245,8 @@ double hits_template(
     gunrock::app::UseParameters_test(parameters);
     parameters.Parse_CommandLine(0, NULL);
     parameters.Set("graph-type", "by-pass");
-    parameters.Set("max-iter", num_iter);
+    parameters.Set("max-iter", max_iter);
+    parameters.Set("hits-tol", tol);
     bool quiet = parameters.Get<bool>("quiet");
     GraphT data_graph;
 
