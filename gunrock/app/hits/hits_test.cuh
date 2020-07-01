@@ -119,13 +119,13 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
     }
 
     if (err < tol) {
-      util::PrintMsg("CPU Reference converged after " + std::to_string(iterCount+1) + " iterations");
+      // util::PrintMsg("CPU Reference converged after " + std::to_string(iterCount+1) + " iterations", !quiet);
       break;
     }
   }
 
   if(iterCount == max_iter) {
-    util::PrintMsg("WARNING: CPU Reference did not converge to a tolerance of " + std::to_string(tol) + " within " + std::to_string(max_iter) + " iterations");
+    // util::PrintMsg("WARNING: CPU Reference did not converge to a tolerance of " + std::to_string(tol) + " within " + std::to_string(max_iter) + " iterations");
   }
 
   // Copy to ref

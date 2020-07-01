@@ -59,7 +59,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   bool quiet_mode = parameters.Get<bool>("quiet");
   bool quick_mode = parameters.Get<bool>("quick");
   int num_runs = parameters.Get<int>("num-runs");
-  double compare_tol = parameters.Get<double>("compare-tol");
+  double compare_tol = parameters.Get<double>("hits-compare-tol");
   std::string validation = parameters.Get<std::string>("validation");
   util::Info info("HITS", parameters, graph);
 
@@ -245,7 +245,7 @@ double hits_template(
     gunrock::app::UseParameters_test(parameters);
     parameters.Parse_CommandLine(0, NULL);
     parameters.Set("graph-type", "by-pass");
-    parameters.Set("max-iter", max_iter);
+    parameters.Set("hits-max-iter", max_iter);
     parameters.Set("hits-tol", tol);
     bool quiet = parameters.Get<bool>("quiet");
     GraphT data_graph;

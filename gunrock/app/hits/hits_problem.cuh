@@ -31,28 +31,28 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
   GUARD_CU(gunrock::app::UseParameters_problem(parameters));
 
   GUARD_CU(parameters.Use<int64_t>(
-      "max-iter",
+      "hits-max-iter",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      100, "Number of HITS iterations.", __FILE__, __LINE__));
+      10000, "Number of HITS iterations.", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int64_t>(
       "hits-norm",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      2, "Normalization method [1 = normalize by the sum of absolute values, 2 = normalize by the square root of the sum of squares].", __FILE__, __LINE__));
+      1, "Normalization method. 1 = normalize by the sum of absolute values (default), 2 = normalize by the square root of the sum of squares.", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int64_t>(
-      "normalize-n",
+      "hits-normalize-n",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 1,
       "Normalize HITS scores every N iterations.", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<double>(
-      "compare-tol",
+      "hits-compare-tol",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
       1e-6, "Floating-point tolerance for CPU/GPU rank comparison.", __FILE__,
       __LINE__));
 
   GUARD_CU(parameters.Use<double>(
-      "hits-tol",
+      "hits-term-tol",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
       1e-6, "Tolerance for HITS algorithm convergence.", __FILE__,
       __LINE__));
@@ -98,8 +98,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, ValueT> cur_error; // Current iteration error
 
     SizeT max_iter;     // Maximum number of HITS iterations to perform
-    SizeT hits_norm;
-    ValueT hits_tol;
+    SizeT hits_norm;    // Normalization method
+    ValueT hits_tol;    // Termination tolerance
     SizeT normalize_n;  // Normalize every N iterations
     /*
      * @brief Default constructor
@@ -331,12 +331,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
       auto &data_slice = data_slices[gpu][0];
 
-      data_slice.max_iter = this->parameters.template Get<SizeT>("max-iter");
+      data_slice.max_iter = this->parameters.template Get<SizeT>("hits-max-iter");
       data_slice.hits_norm = this->parameters.template Get<SizeT>("hits-norm");
-      data_slice.hits_tol = this->parameters.template Get<ValueT>("hits-tol");
+      data_slice.hits_tol = this->parameters.template Get<ValueT>("hits-term-tol");
 
       data_slice.normalize_n =
-          this->parameters.template Get<SizeT>("normalize-n");
+          this->parameters.template Get<SizeT>("hits-normalize-n");
 
       GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
                                this->gpu_idx[gpu], target, this->flag));

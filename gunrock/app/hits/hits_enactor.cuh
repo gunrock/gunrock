@@ -226,6 +226,26 @@ struct hitsIterationLoop
       else {
         assert(false); // TODO: Handle errors case
       }
+
+      // hrank_curr is now temp space, since it will be overwritten with 0s on the next iteration. Use this as temp space for the forall to compute error
+      auto err_op = [hrank_next, hrank_curr] __host__ __device__(
+        VertexT * v_q, const SizeT &pos) {
+        hrank_curr[pos] = abs(hrank_next[pos] - hrank_curr[pos]);
+      };
+
+      GUARD_CU(frontier.V_Q()->ForAll(err_op, graph.nodes));
+      GUARD_CU2(cudaStreamSynchronize(stream),
+                  "cudaStreamSynchronize Failed");
+
+      // How perform the reduction to compute the error
+      GUARD_CU(util::cubReduce(
+        cub_temp_space, hrank_curr, cur_error, graph.nodes,
+        [] __host__ __device__(const ValueT &a, const ValueT &b) {
+          return abs(a) + abs(b);
+        },
+        ValueT(0), stream));
+
+      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
     }
     // After normalization, swap the next and current vectors.
     auto hrank_temp = hrank_curr;
@@ -240,27 +260,6 @@ struct hitsIterationLoop
     // for potential speed improvements. Additionally, look into
     // NeighborReduce for adding host and auth scores
 
-    // hrank_next is now temp space, since it will be overwritten with 0s on the next iteration. Use this as temp space for the forall to compute error
-    auto err_op = [hrank_next, hrank_curr] __host__ __device__(
-      VertexT * v_q, const SizeT &pos) {
-      hrank_next[pos] = abs(hrank_next[pos] - hrank_curr[pos]);
-      // printf("Error for %d = %f\n", pos, hrank_next[pos]);
-    };
-
-    GUARD_CU(frontier.V_Q()->ForAll(err_op, graph.nodes));
-    GUARD_CU2(cudaStreamSynchronize(stream),
-                "cudaStreamSynchronize Failed");
-
-    // How perform the reduction to compute the error
-    GUARD_CU(util::cubReduce(
-      cub_temp_space, hrank_next, cur_error, graph.nodes,
-      [] __host__ __device__(const ValueT &a, const ValueT &b) {
-        return abs(a) + abs(b);
-      },
-      ValueT(0), stream));
-
-    GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
-
     return retval;
   }
 
@@ -271,6 +270,8 @@ struct hitsIterationLoop
     auto &user_iter = data_slice.max_iter;
     auto &tol = data_slice.hits_tol;
 
+    bool quiet = this->enactor->problem->parameters.template Get<bool>("quiet");
+
     // We haven't done any real work yet
     if(iter == 0) return false;
 
@@ -278,12 +279,10 @@ struct hitsIterationLoop
     data_slice.cur_error.Move(util::DEVICE, util::HOST);
 
     if(data_slice.cur_error[0] < tol) {
-      printf("GPU converged after %d iterations with an error of %f and a tolerance of %f\n", iter, data_slice.cur_error[0], tol);
       return true;
     }
 
     if (iter == user_iter) {
-      printf("WARNING: GPU failed to converge after %d iterations\n", iter);
       return true;
     }
 
