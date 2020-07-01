@@ -33,7 +33,7 @@ namespace hits {
 template <typename GraphT>
 double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
                      typename GraphT::ValueT *ref_arank,
-                     typename GraphT::SizeT max_iter, typename GraphT::SizeT tol, typename GraphT::SizeT hits_norm, bool quiet) {
+                     typename GraphT::SizeT max_iter, float tol, typename GraphT::SizeT hits_norm, bool quiet) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::ValueT ValueT;
   typedef typename GraphT::SizeT SizeT;
@@ -47,13 +47,19 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
   ValueT *next_hrank = new ValueT[graph.nodes];
   ValueT *next_arank = new ValueT[graph.nodes];
 
-  // Set next scores to 1 and 0
+  // Set initial scores
   for (SizeT v = 0; v < graph.nodes; v++) {
     curr_hrank[v] = 1.0/graph.nodes;
     curr_arank[v] = 1.0/graph.nodes;
   }
 
-  for (SizeT iterCount = 0; iterCount < max_iter; iterCount++) {
+  for (SizeT v = 0; v < graph.nodes; v++) {
+    next_hrank[v] = 0.0;
+    next_arank[v] = 0.0;
+  }
+
+  SizeT iterCount = 0;
+  for (iterCount = 0; iterCount < max_iter; iterCount++) {
     // Set next scores to 0
     for (SizeT v = 0; v < graph.nodes; v++) {
       next_hrank[v] = 0.0;
@@ -107,14 +113,19 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
     next_arank = curr_arank_temp;
 
     // Break for the tolerance check here
-    int err = 0;
+    double err = 0;
     for(int v = 0; v < graph.nodes; v++) {
-      err += abs(next_hrank - curr_hrank);
+      err += abs(next_hrank[v] - curr_hrank[v]);
     }
 
     if (err < tol) {
+      util::PrintMsg("CPU Reference converged after " + std::to_string(iterCount+1) + " iterations");
       break;
     }
+  }
+
+  if(iterCount == max_iter) {
+    util::PrintMsg("WARNING: CPU Reference did not converge to a tolerance of " + std::to_string(tol) + " within " + std::to_string(max_iter) + " iterations");
   }
 
   // Copy to ref

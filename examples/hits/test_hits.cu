@@ -45,7 +45,7 @@ struct main_struct {
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
     int max_iter = parameters.Get<SizeT>("max-iter");
-    int tol = parameters.Get<SizeT>("hits-tol");
+    double tol = parameters.Get<double>("hits-tol");
     int hits_norm = parameters.Get<SizeT>("hits-norm");
 
     // TODO: Do we need HAS_COO?

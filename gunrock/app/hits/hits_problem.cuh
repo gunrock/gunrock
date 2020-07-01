@@ -96,11 +96,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, ValueT> arank_mag;
     SizeT max_iter;     // Maximum number of HITS iterations to perform
     SizeT hits_norm;
+    double hits_tol;
     SizeT normalize_n;  // Normalize every N iterations
     /*
      * @brief Default constructor
      */
-    DataSlice() : BaseDataSlice(), max_iter(0), hits_norm(2), normalize_n(0) {
+    DataSlice() : BaseDataSlice(), max_iter(0), hits_norm(2), hits_tol(1e-6), normalize_n(0) {
       // Name of the problem specific arrays:
       hrank_curr.SetName("hrank_curr");
       arank_curr.SetName("arank_curr");
@@ -320,6 +321,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       data_slice.max_iter = this->parameters.template Get<SizeT>("max-iter");
       data_slice.hits_norm = this->parameters.template Get<SizeT>("hits-norm");
+      data_slice.hits_tol = this->parameters.template Get<double>("hits-tol");
 
       data_slice.normalize_n =
           this->parameters.template Get<SizeT>("normalize-n");
