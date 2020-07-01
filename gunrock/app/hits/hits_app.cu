@@ -40,7 +40,7 @@ cudaError_t UseParameters(ParametersT &parameters) {
  * @param[in]  col_indices    CSR-formatted graph input column indices
  * @param[in]  max_iter       Maximum number of HITS iterations to perform
  * @param[in]  tol            Algorithm termination tolerance
- * @param[in]  hits_norm      Normalization method [1 = normalize by the sum of absolute values, 2 = normalize by the square root of the sum of squares]
+ * @param[in]  hits_norm      Normalization method
  * @param[out] hub_ranks      Vertex hub scores
  * @param[out] auth ranks     Vertex authority scores
  * @param[in]  allocated_on   Input and output target device, by default CPU

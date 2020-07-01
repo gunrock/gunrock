@@ -27,7 +27,11 @@ namespace hits {
  * @tparam      GraphT        Type of the graph
  * @tparam      ValueT        Type of the values
  * @param[in]   graph         Input graph
-...
+ * @param[out]  ref_hrank     Vertex hub scores
+ * @param[out]  ref_arank     Vertex authority scores
+ * @param[in]   max_iter      Maximum number of iterations to perform HITS
+ * @param[in]   tol           Convergence tolerance for termination
+ * @param[in]   hits_norm     Normalization method
  * @param[in]   quiet         Whether to print out anything to stdout
  */
 template <typename GraphT>

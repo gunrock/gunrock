@@ -38,7 +38,8 @@ cudaError_t UseParameters(ParametersT &parameters);
  * @tparam     ValueT        Type of the distances
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
-...
+ * @param[in]  ref_hrank     Vertex hub scores
+ * @param[in]  ref_arank     Vertex authority scores
  * @param[in]  target        where to perform the app
  * \return cudaError_t error message(s), if any
  */
