@@ -195,8 +195,7 @@ double gunrock_hits(
     cpu_timer.Stop();
 
     total_time += cpu_timer.ElapsedMillis();
-    problem.Extract(hub_ranks, auth_ranks, allocated_on);
-    
+    problem.Extract(hub_ranks, auth_ranks, allocated_on);    
 
     enactor.Release(target);
     problem.Release(target);
@@ -247,7 +246,7 @@ double hits_template(
     parameters.Parse_CommandLine(0, NULL);
     parameters.Set("graph-type", "by-pass");
     parameters.Set("hits-max-iter", max_iter);
-    parameters.Set("hits-tol", tol);
+    parameters.Set("hits-term-tol", tol);
     bool quiet = parameters.Get<bool>("quiet");
     GraphT data_graph;
 
