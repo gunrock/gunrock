@@ -158,6 +158,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
       // Allocate problem specific data here
 
+      // TODO: Don't need to allocate space if we already have space on the GPU?
       GUARD_CU(hrank_curr.Allocate(sub_graph.nodes, target));
       GUARD_CU(arank_curr.Allocate(sub_graph.nodes, target));
       GUARD_CU(hrank_next.Allocate(sub_graph.nodes, target));
@@ -169,9 +170,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(cur_error.Allocate(1, target | util::HOST));
 
-      if (target & util::DEVICE) {
-        GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
-      }
+      // TODO: only call this if the csr matrix is already on the host. Not needed if allocated_on == GPU
+      // if (target & util::DEVICE) {
+      //   GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
+      // }
       return retval;
     }
 
@@ -185,7 +187,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       SizeT nodes = this->sub_graph->nodes;
 
       // Ensure data are allocated
-
+      // TODO again, don't need to do allocation here if it's on the GPU
       GUARD_CU(hrank_curr.EnsureSize_(nodes, target));
       GUARD_CU(arank_curr.EnsureSize_(nodes, target));
       GUARD_CU(hrank_next.EnsureSize_(nodes, target));
@@ -286,33 +288,35 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     if (this->num_gpus == 1) {
       auto &data_slice = data_slices[0][0];
 
-      // Set device
-      if (target == util::DEVICE) {
-        GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+      if(device == util::HOST) { // Store on the CPU
+        if (target == util::HOST) { // Compute on the CPU
+          // Not yet implemented
+        } else if (target == util::DEVICE) { // Compute on the GPU
+          GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-        // Extract the results from a single GPU
-        GUARD_CU(
-            data_slice.hrank_curr.SetPointer(h_hrank_curr, nodes, util::HOST));
-        GUARD_CU(data_slice.hrank_curr.Move(util::DEVICE, util::HOST));
-
-        GUARD_CU(
-            data_slice.arank_curr.SetPointer(h_arank_curr, nodes, util::HOST));
-        GUARD_CU(data_slice.arank_curr.Move(util::DEVICE, util::HOST));
-      } else if (target == util::HOST) {
-        // Extract the results from single CPU, e.g.:
-        GUARD_CU(data_slice.hrank_curr.ForEach(
-            h_hrank_curr,
-            [] __host__ __device__(const ValueT &device_val, ValueT &host_val) {
-              host_val = device_val;
-            },
-            nodes, util::HOST));
-
-        GUARD_CU(data_slice.arank_curr.ForEach(
-            h_arank_curr,
-            [] __host__ __device__(const ValueT &device_val, ValueT &host_val) {
-              host_val = device_val;
-            },
-            nodes, util::HOST));
+          // Extract the results from a single GPU
+          GUARD_CU(
+              data_slice.hrank_curr.SetPointer(h_hrank_curr, nodes, util::HOST));
+          GUARD_CU(data_slice.hrank_curr.Move(util::DEVICE, util::HOST));
+  
+          GUARD_CU(
+              data_slice.arank_curr.SetPointer(h_arank_curr, nodes, util::HOST));
+          GUARD_CU(data_slice.arank_curr.Move(util::DEVICE, util::HOST));
+        } else { // Unsupported option
+          assert(false);
+        }
+      } else if (device == util::DEVICE) { // Store on the GPU
+        if (target == util::HOST) { // Compute on the CPU
+          // Not yet implemented
+        } else if (target == util::DEVICE) { // Compute on the GPU
+          data_slice.hrank_curr.Print("HRANK_Curr: ", nodes);
+          h_hrank_curr = data_slice.hrank_curr.GetPointer(util::DEVICE);
+          h_arank_curr = data_slice.arank_curr.GetPointer(util::DEVICE);
+        } else { // Unsupported option
+          assert(false);
+        }
+      } else { // Unsupported option
+        assert(false);
       }
     } else {  // Incomplete multi-gpu
     }
@@ -364,7 +368,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       GUARD_CU(data_slices[gpu]->Reset(target));
-      GUARD_CU(data_slices[gpu].Move(util::HOST, target));
+      GUARD_CU(data_slices[gpu].Move(util::HOST, target)); // TODO: Only perform this move if data is not already on the GPU
     }
 
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");

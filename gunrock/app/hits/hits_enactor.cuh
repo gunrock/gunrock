@@ -251,7 +251,7 @@ struct hitsIterationLoop
     auto hrank_temp = hrank_curr;
     hrank_curr = hrank_next;
     hrank_next = hrank_temp;
-
+    hrank_curr.Print("HRANK_Curr Enactor: ", graph.nodes);
     auto arank_temp = arank_curr;
     arank_curr = arank_next;
     arank_next = arank_temp;

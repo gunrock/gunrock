@@ -27,23 +27,23 @@ int main(int argc, char** argv) {
   //
   //  Host call
   //
-  printf("host memory call\n");
-  hits(num_verts, num_edges, graph_offsets.data(), graph_indices.data(), 10, 0.1, 1, hub_ranks.data(), auth_ranks.data(), 1);
+  // printf("host memory call\n");
+  // hits(num_verts, num_edges, graph_offsets.data(), graph_indices.data(), 10, 0.1, 1, hub_ranks.data(), auth_ranks.data(), 1);
 
-  for (int i = 0 ; i < num_verts ; ++i)
-    printf("  [%d]: (%g, %g)\n", i, hub_ranks[i], auth_ranks[i]);
+  // for (int i = 0 ; i < num_verts ; ++i)
+  //   printf("  [%d]: (%g, %g)\n", i, hub_ranks[i], auth_ranks[i]);
 
   //
   //  Device call
   //
-  // printf("device memory call\n");
-  // hits(num_verts, num_edges, graph_offsets_d.data().get(), graph_indices_d.data().get(), 10, 0.1, 1, d_hub_ranks, d_auth_ranks, 2);
+  printf("device memory call\n");
+  hits(num_verts, num_edges, graph_offsets_d.data().get(), graph_indices_d.data().get(), 10, 0.1, 1, d_hub_ranks, d_auth_ranks, 2);
 
-  // thrust::for_each(thrust::device,
-  //                  thrust::make_counting_iterator<int>(0),
-  //                  thrust::make_counting_iterator<int>(1),
-  //                  [num_verts, d_hub_ranks, d_auth_ranks] __device__ (int) {
-  //                    for (int i = 0 ; i < num_verts ; ++i)
-  //                      printf("  [%d]: (%g, %g)\n", i, d_hub_ranks[i], d_auth_ranks[i]);
-  //                  });
+  thrust::for_each(thrust::device,
+                   thrust::make_counting_iterator<int>(0),
+                   thrust::make_counting_iterator<int>(1),
+                   [num_verts, d_hub_ranks, d_auth_ranks] __device__ (int) {
+                     for (int i = 0 ; i < num_verts ; ++i)
+                       printf("  [%d]: (%g, %g)\n", i, d_hub_ranks[i], d_auth_ranks[i]);
+                   });
 }

@@ -195,7 +195,7 @@ double gunrock_hits(
     cpu_timer.Stop();
 
     total_time += cpu_timer.ElapsedMillis();
-    problem.Extract(hub_ranks, auth_ranks, gunrock::util::DEVICE, allocated_on);    
+    problem.Extract(hub_ranks, auth_ranks, target, allocated_on);    
 
     enactor.Release(target);
     problem.Release(target);
@@ -257,12 +257,12 @@ double hits_template(
       target = gunrock::util::DEVICE;
     }
 
-    data_graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
+    data_graph.CsrT::Allocate(num_nodes, num_edges, target);
     data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, target);
     data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, target);
 
     data_graph.FromCsr(data_graph.csr(), target, 0, quiet, true);
-    gunrock::graphio::LoadGraph(parameters, data_graph);
+    // gunrock::graphio::LoadGraph(parameters, data_graph);
 
     // Run HITS
     double elapsed_time = gunrock_hits(parameters, data_graph, hub_ranks, auth_ranks, allocated_on);
