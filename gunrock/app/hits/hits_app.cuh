@@ -195,7 +195,7 @@ double gunrock_hits(
     cpu_timer.Stop();
 
     total_time += cpu_timer.ElapsedMillis();
-    problem.Extract(hub_ranks, auth_ranks, allocated_on);    
+    problem.Extract(hub_ranks, auth_ranks, gunrock::util::DEVICE, allocated_on);    
 
     enactor.Release(target);
     problem.Release(target);

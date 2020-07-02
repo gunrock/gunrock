@@ -283,29 +283,36 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     cudaError_t retval = cudaSuccess;
     SizeT nodes = this->org_graph->nodes;
 
-    if (this->num_gpus == 1) { 
+    if (this->num_gpus == 1) {
       auto &data_slice = data_slices[0][0];
 
-      if(device == util::HOST){ // returning results stored on the CPU
-        if (target == util::DEVICE) { // If computing on GPU, copy to CPU
-          GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-          GUARD_CU(
-            data_slice.hrank_curr.SetPointer(h_hrank_curr, nodes, util::HOST));
-          GUARD_CU(data_slice.hrank_curr.Move(util::DEVICE, util::HOST));
+      // Set device
+      if (target == util::DEVICE) {
+        GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-          GUARD_CU(
+        // Extract the results from a single GPU
+        GUARD_CU(
+            data_slice.hrank_curr.SetPointer(h_hrank_curr, nodes, util::HOST));
+        GUARD_CU(data_slice.hrank_curr.Move(util::DEVICE, util::HOST));
+
+        GUARD_CU(
             data_slice.arank_curr.SetPointer(h_arank_curr, nodes, util::HOST));
-          GUARD_CU(data_slice.arank_curr.Move(util::DEVICE, util::HOST))
-        }
-      } else { // returning results stored on the GPU
-        if (target == util::DEVICE) { // Computing on GPU
-          // returning results will be stored on the GPU
-          GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-          h_hrank_curr = data_slice.hrank_curr.GetPointer(util::DEVICE);
-          h_arank_curr = data_slice.arank_curr.GetPointer(util::DEVICE);
-        } else {
-          // Compute on CPU and store on GPU not implemented
-        }
+        GUARD_CU(data_slice.arank_curr.Move(util::DEVICE, util::HOST));
+      } else if (target == util::HOST) {
+        // Extract the results from single CPU, e.g.:
+        GUARD_CU(data_slice.hrank_curr.ForEach(
+            h_hrank_curr,
+            [] __host__ __device__(const ValueT &device_val, ValueT &host_val) {
+              host_val = device_val;
+            },
+            nodes, util::HOST));
+
+        GUARD_CU(data_slice.arank_curr.ForEach(
+            h_arank_curr,
+            [] __host__ __device__(const ValueT &device_val, ValueT &host_val) {
+              host_val = device_val;
+            },
+            nodes, util::HOST));
       }
     } else {  // Incomplete multi-gpu
     }
