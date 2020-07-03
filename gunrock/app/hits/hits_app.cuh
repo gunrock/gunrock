@@ -184,7 +184,7 @@ double gunrock_hits(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    problem.Init(data_graph, target);
+    problem.Init(data_graph, allocated_on, target);
     enactor.Init(problem   , target);
 
     problem.Reset(target);

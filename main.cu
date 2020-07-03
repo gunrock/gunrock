@@ -27,11 +27,11 @@ int main(int argc, char** argv) {
   //
   //  Host call
   //
-  // printf("host memory call\n");
-  // hits(num_verts, num_edges, graph_offsets.data(), graph_indices.data(), 10, 0.1, 1, hub_ranks.data(), auth_ranks.data(), 1);
+  printf("host memory call\n");
+  hits(num_verts, num_edges, graph_offsets.data(), graph_indices.data(), 10, 0.1, 1, hub_ranks.data(), auth_ranks.data(), 1);
 
-  // for (int i = 0 ; i < num_verts ; ++i)
-  //   printf("  [%d]: (%g, %g)\n", i, hub_ranks[i], auth_ranks[i]);
+  for (int i = 0 ; i < num_verts ; ++i)
+    printf("  [%d]: (%g, %g)\n", i, hub_ranks[i], auth_ranks[i]);
 
   //
   //  Device call
