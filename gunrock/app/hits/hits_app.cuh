@@ -75,7 +75,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
-  GUARD_CU(problem.Init(graph, target));
+  GUARD_CU(problem.Init(graph, gunrock::util::HOST, target));
   GUARD_CU(enactor.Init(problem, target));
 
   cpu_timer.Stop();
