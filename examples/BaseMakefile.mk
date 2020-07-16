@@ -54,14 +54,15 @@ SM_TARGETS = $(GEN_SM70)
 #-------------------------------------------------------------------------------
 
 CUDA_INC = -I"$(shell dirname $(NVCC))/../include"
-MGPU_INC = -I"../../externals/moderngpu/src"
+# MGPU_INC = -I"../../externals/moderngpu/src"
 CUB_INC = -I"../../externals/cub"
+MGPU_INC = -I"../../../moderngpu/src"
 
 BOOST_INC =
 BOOST_LINK =
 ifeq ($(use_boost), 1)
     BOOST_INC = -I"/usr/local/include"
-    BOOST_LINK = -Xcompiler -DBOOST_FOUND -L"/usr/local/lib" -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem
+    BOOST_LINK = -Xcompiler -DBOOST_FOUND -L"/usr/local/lib" -Xlinker -lboost_system -Xlinker -lboost_chrono -Xlinker -lboost_timer -Xlinker -lboost_filesystem -I"../../externals/rapidjson/include"
 else
     BOOST_INC = -I"../../externals/rapidjson/include"
 endif

@@ -176,9 +176,15 @@ struct ProblemBase {
   cudaError_t Release(util::Location target = util::LOCATION_ALL) {
     cudaError_t retval = cudaSuccess;
     // Cleanup graph slices on the heap
-    if (sub_graphs.GetPointer(util::HOST) != NULL && num_gpus != 1) {
+    if (sub_graphs.GetPointer(util::HOST) != NULL) {
+      // We should have the same number of sub_graphs as GPUs
+      assert(num_gpus == sub_graphs.GetSize());
+
       for (int i = 0; i < num_gpus; ++i) {
-        if (target & util::DEVICE) GUARD_CU(util::SetDevice(gpu_idx[i]));
+        if (num_gpus != 1 && (target & util::DEVICE))
+        {
+          GUARD_CU(util::SetDevice(gpu_idx[i]));
+        }
         GUARD_CU(sub_graphs[i].Release(target));
       }
       GUARD_CU(sub_graphs.Release(target));

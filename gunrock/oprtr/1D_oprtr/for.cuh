@@ -35,6 +35,10 @@ __global__ void For_Kernel(ForIterT loop_size, OpT op) {
 }
 
 template <typename OpT>
+// operator, loopsize, target
+// the op is carried out with just the information i (loop counter)
+// so embarrasingly parallel operations are best mapped to this for loop
+// but we can specify the grid and block size that works best for us
 cudaError_t For(OpT op, ForIterT loop_size, util::Location target,
                 cudaStream_t stream = 0,
                 int grid_size = util::PreDefinedValues<int>::InvalidValue,

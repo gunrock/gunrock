@@ -67,7 +67,7 @@ struct main_struct {
         !quiet);
 
     // counts of matched subgraphs
-    VertexT *ref_subgraph_match = new VertexT[data_graph.nodes];
+    unsigned long *ref_subgraph_match = new unsigned long[data_graph.nodes];
     if (!quick) {
       util::PrintMsg("__________________________", !quiet);
 

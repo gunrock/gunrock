@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file bfs_app.cu
+ * @file lp_app.cu
  *
  * @brief Gunrock breadth-first search (BFS) application
  */
@@ -14,16 +14,13 @@
 #include <gunrock/app/app.cuh>
 
 // breadth-first search includes
-// #include <gunrock/app/lp/bfs_problem.cuh>
-#include <gunrock/app/bfs/bfs_problem.cuh>
-#include <gunrock/app/bfs/bfs_enactor.cuh>
-// #include <gunrock/app/lp/bfs_test.cuh>
-// #include <gunrock/app/lp/bfs_enactor.cuh>
-#include <gunrock/app/bfs/bfs_test.cuh>
+#include <gunrock/app/lp/lp_problem.cuh>
+#include <gunrock/app/lp/lp_enactor.cuh>
+#include <gunrock/app/lp/lp_test.cuh>
 
 namespace gunrock {
 namespace app {
-namespace bfs {
+namespace lp {
 
 cudaError_t UseParameters(util::Parameters &parameters) {
   cudaError_t retval = cudaSuccess;
@@ -117,7 +114,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
         !quiet_mode);
     if (validation == "each") {
       GUARD_CU(problem.Extract(h_labels, h_preds));
-      SizeT num_errors = app::bfs::Validate_Results(
+      SizeT num_errors = app::lp::Validate_Results(
           parameters, graph, src, h_labels, h_preds,
           ref_labels == NULL ? NULL : ref_labels[run_num % num_srcs], (VertexT*)NULL,
           false);
@@ -128,7 +125,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   // Copy out results
   GUARD_CU(problem.Extract(h_labels, h_preds));
   if (validation == "last") {
-    SizeT num_errors = app::bfs::Validate_Results(
+    SizeT num_errors = app::lp::Validate_Results(
         parameters, graph, src, h_labels, h_preds,
         ref_labels == NULL ? NULL : ref_labels[(num_runs - 1) % num_srcs]);
   }
@@ -169,11 +166,11 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
  * \return     double     Return accumulated elapsed times for all runs
  */
 template <typename GraphT, typename LabelT = typename GraphT::VertexT>
-double gunrock_bfs(gunrock::util::Parameters &parameters, GraphT &graph,
+double gunrock_lp(gunrock::util::Parameters &parameters, GraphT &graph,
                    LabelT **labels, typename GraphT::VertexT **preds = NULL) {
   typedef typename GraphT::VertexT VertexT;
-  typedef gunrock::app::bfs::Problem<GraphT> ProblemT;
-  typedef gunrock::app::bfs::Enactor<ProblemT> EnactorT;
+  typedef gunrock::app::lp::Problem<GraphT> ProblemT;
+  typedef gunrock::app::lp::Enactor<ProblemT> EnactorT;
   gunrock::util::CpuTimer cpu_timer;
   gunrock::util::Location target = gunrock::util::DEVICE;
   double total_time = 0;
@@ -224,7 +221,7 @@ double gunrock_bfs(gunrock::util::Parameters &parameters, GraphT &graph,
  */
 template <typename VertexT = int, typename SizeT = int,
           typename LabelT = VertexT>
-double bfs(const SizeT num_nodes, const SizeT num_edges,
+double lp(const SizeT num_nodes, const SizeT num_edges,
            const SizeT *row_offsets, const VertexT *col_indices,
            const int num_runs, VertexT *sources, const bool mark_pred,
            const bool direction_optimized, const bool idempotence,
@@ -236,9 +233,9 @@ double bfs(const SizeT num_nodes, const SizeT num_edges,
   typedef typename GraphT::CsrT CsrT;
 
   // Setup parameters
-  gunrock::util::Parameters parameters("bfs");
+  gunrock::util::Parameters parameters("lp");
   gunrock::graphio::UseParameters(parameters);
-  gunrock::app::bfs::UseParameters(parameters);
+  gunrock::app::lp::UseParameters(parameters);
   gunrock::app::UseParameters_test(parameters);
   parameters.Parse_CommandLine(0, NULL);
   parameters.Set("graph-type", "by-pass");
@@ -263,7 +260,7 @@ double bfs(const SizeT num_nodes, const SizeT num_edges,
   gunrock::graphio::LoadGraph(parameters, graph);
 
   // Run the BFS
-  double elapsed_time = gunrock_bfs(parameters, graph, labels, preds);
+  double elapsed_time = gunrock_lp(parameters, graph, labels, preds);
 
   // Cleanup
   graph.Release();
@@ -286,11 +283,11 @@ double bfs(const SizeT num_nodes, const SizeT num_edges,
  * @param[out] preds       Return predecessors of each vertex
  * \return     double      Return accumulated elapsed times for all runs
  */
-double bfs(const int num_nodes, const int num_edges, const int *row_offsets,
+double lp(const int num_nodes, const int num_edges, const int *row_offsets,
            const int *col_indices, int source, const bool mark_pred,
            const bool direction_optimized, const bool idempotence,
            int *distances, int *preds) {
-  return bfs(num_nodes, num_edges, row_offsets, col_indices, 1, &source,
+  return lp(num_nodes, num_edges, row_offsets, col_indices, 1, &source,
              mark_pred, direction_optimized, idempotence, &distances, &preds);
 }
 

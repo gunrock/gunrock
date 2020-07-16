@@ -126,7 +126,7 @@ struct vf2_count_callback {
 // TODO: change CPU reference code to count subgraphs instead of triangles
 template <typename GraphT, typename VertexT = typename GraphT::VertexT>
 double CPU_Reference(util::Parameters &parameters, GraphT &data_graph,
-                     GraphT &query_graph, VertexT *subgraphs) {
+                     GraphT &query_graph, unsigned long *subgraphs) {
   typedef typename GraphT::SizeT SizeT;
 
 #ifdef BOOST_FOUND
@@ -265,33 +265,30 @@ double CPU_Reference(util::Parameters &parameters, GraphT &data_graph,
 
 /**
  * @brief Validation of SM results
- * @tparam     GraphT        Type of the graph
- * @tparam     ValueT        Type of the distances
- * @param[in]  parameters    Excution parameters
- * @param[in]  graph         Input graph
- * @param[in]  src           The source vertex
- * @param[in]  h_distances   Computed distances from the source to each vertex
- * @param[in]  h_preds       Computed predecessors for each vertex
- * @param[in]  ref_distances Reference distances from the source to each vertex
- * @param[in]  ref_preds     Reference predecessors for each vertex
- * @param[in]  verbose       Whether to output detail comparsions
- * \return     GraphT::SizeT Number of errors
+ * @tparam     GraphT            Type of the graph
+ * @tparam     ValueT            Type of the distances
+ * @param[in]  parameters        Excution parameters
+ * @param[in]  data_graph        Input data graph
+ * @param[in]  query_graph       Input query graph
+ * @param[in]  h_subgraphs       Computed number of subgraphs
+ * @param[in]  ref_subgraphs     Reference number of subgraphs
+ * @param[in]  verbose           Whether to output detail comparsions
+ * \return     GraphT::SizeT     Number of errors
  */
 template <typename GraphT, typename VertexT = typename GraphT::VertexT>
 typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
                                         GraphT &data_graph, GraphT &query_graph,
-                                        VertexT *h_subgraphs,
-                                        VertexT *ref_subgraphs,
-                                        int *num_subgraphs,
+                                        unsigned long *h_subgraphs,
+                                        unsigned long *ref_subgraphs,
+                                        unsigned long *num_subgraphs,
                                         bool verbose = true) {
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::CsrT CsrT;
 
-  std::cerr << "Validate_Results" << std::endl;
-
   *num_subgraphs = h_subgraphs[0];
 
   bool quiet = parameters.Get<bool>("quiet");
+  bool quick = parameters.Get<bool>("quick");
   /*if (!quiet && verbose) {
     for (int i = 0; i < 1; i++) {
       std::cerr << i << " " << ref_subgraphs[i] << " " << h_subgraphs[i]
@@ -320,7 +317,7 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
   util::PrintMsg("PASS", !quiet);
   //}
 
-  if (!quiet && verbose) {
+  if ((!quiet) && (!quick) && verbose) {
     util::PrintMsg("number of subgraphs: ");
     DisplaySolution(h_subgraphs, 1);
   }
