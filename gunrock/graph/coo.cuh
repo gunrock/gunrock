@@ -425,8 +425,21 @@ struct Coo : public GraphBase<_VertexT, _SizeT, _ValueT, _FLAG | HAS_COO,
         old_edge_pairs;
     typename util::If<(FLAG & HAS_EDGE_VALUES) != 0, Array_ValueT,
                       Array_NValueT>::Type old_edge_values;
+
+    // Note: Calling omp parallel resets the device context set in cudaSetDevice
+    // We save the device before spawning new threads, and have each thread set
+    // its device again.
+    //
+    // https://devblogs.nvidia.com/cuda-pro-tip-always-set-current-device-avoid-multithreading-bugs/
+    int original_device = -1;
+    GUARD_CU(util::GetDevice(&original_device));
+
 #pragma omp parallel
     {
+      // GUARD_CU doesn't work in omp parallel blocks
+      retval = util::GRError(util::SetDevice(original_device), 
+                            "error encountered", __FILE__, __LINE__);
+
       int num_threads = omp_get_num_threads();
       int thread_num = omp_get_thread_num();
       SizeT edge_start = this->edges / num_threads * thread_num;
