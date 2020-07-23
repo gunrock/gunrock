@@ -10,3 +10,5 @@ add_test(NAME TEST_LOUVAIN COMMAND louvain market
 	--omp-threads=32 --advance-mode=ALL_EDGES --unify-segments=true)
 set_tests_properties(TEST_LOUVAIN PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+add_test(NAME TEST_LOUVAIN_HELP COMMAND louvain --help)
+

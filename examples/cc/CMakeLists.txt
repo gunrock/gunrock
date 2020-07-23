@@ -9,6 +9,8 @@ add_test(NAME TEST_CC COMMAND cc market
   ${gunrock_INCLUDE_DIRS}/dataset/small/bips98_606.mtx)
 set_tests_properties(TEST_CC PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 
+add_test(NAME TEST_CC COMMAND cc --help)
+
 if(GUNROCK_MGPU_TESTS)
   add_test(NAME TEST_MGPU_CC COMMAND cc market
     ${gunrock_INCLUDE_DIRS}/dataset/small/bips98_606.mtx ${DEVICES})

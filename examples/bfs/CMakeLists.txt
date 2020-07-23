@@ -9,6 +9,8 @@ add_test(NAME TEST_BFS COMMAND bfs market
   ${gunrock_INCLUDE_DIRS}/dataset/small/bips98_606.mtx --undirected --src=0)
 set_tests_properties(TEST_BFS PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
 
+add_test(NAME TEST_BFS_HELP COMMAND bfs --help)
+
 if(GUNROCK_MGPU_TESTS)
   add_test(NAME TEST_MGPU_BFS COMMAND bfs market
     ${gunrock_INCLUDE_DIRS}/dataset/small/bips98_606.mtx ${DEVICES} --undirected --src=0)

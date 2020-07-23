@@ -5,6 +5,8 @@ project(sm)
 message("-- Project Added: ${PROJECT_NAME}")
 include(${CMAKE_SOURCE_DIR}/cmake/SetSubProject.cmake)
 
+add_test(NAME TEST_SM_HELP COMMAND sm --help)
+
 add_test(NAME TEST_SM COMMAND sm market
 	${gunrock_INCLUDE_DIRS}/dataset/small/tree.mtx --pattern-graph-type=market
 	--pattern-graph-file=${gunrock_INCLUDE_DIRS}/dataset/small/query_sm.mtx 

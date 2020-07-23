@@ -5,6 +5,8 @@ project(sssp)
 message("-- Project Added: ${PROJECT_NAME}")
 include(${CMAKE_SOURCE_DIR}/cmake/SetSubProject.cmake)
 
+add_test(NAME TEST_SSSP_HELP COMMAND sssp --help)
+
 add_test(NAME TEST_SSSP COMMAND sssp market
   ${gunrock_INCLUDE_DIRS}/dataset/small/chesapeake.mtx --undirected --src=0)
 set_tests_properties(TEST_SSSP PROPERTIES FAIL_REGULAR_EXPRESSION "INCORRECT")
