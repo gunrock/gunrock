@@ -8,7 +8,7 @@
 /**
  * @file lp_app.cu
  *
- * @brief Gunrock breadth-first search (BFS) application
+ * @brief Gunrock breadth-first search (LP) application
  */
 
 #include <gunrock/app/app.cuh>
@@ -47,13 +47,13 @@ cudaError_t UseParameters(util::Parameters &parameters) {
 }
 
 /**
- * @brief Run BFS tests
+ * @brief Run LP tests
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the distances
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
  * @param[in]  ref_labels    Reference labels
- * @param[in]  target        Whether to perform the BFS
+ * @param[in]  target        Whether to perform the LP
  * \return cudaError_t error message(s), if any
  */
 template <typename GraphT, typename LabelT = typename GraphT::VertexT>
@@ -76,7 +76,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   std::string validation = parameters.Get<std::string>("validation");
   std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
   int num_srcs = srcs.size();
-  util::Info info("BFS", parameters, graph);  // initialize Info structure
+  util::Info info("LP", parameters, graph);  // initialize Info structure
 
   // Allocate host-side array (for both reference and GPU-computed results)
   LabelT *h_labels = new LabelT[graph.nodes];
@@ -90,7 +90,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   cpu_timer.Stop();
   parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
-  // perform BFS
+  // perform LP
   VertexT src;
   // oh so we are not doing num of runs * srcs, instead or num of runs remains the same its just that we use different sources
   // that makes sense I guess when we have random sources
@@ -151,12 +151,12 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   return retval;
 }
 
-}  // namespace bfs
+}  // namespace lp
 }  // namespace app
 }  // namespace gunrock
 
 /*
- * @brief Entry of gunrock_bfs function
+ * @brief Entry of gunrock_lp function
  * @tparam     GraphT     Type of the graph
  * @tparam     LabelT     Type of the labels
  * @param[in]  parameters Excution parameters
@@ -224,8 +224,7 @@ template <typename VertexT = int, typename SizeT = int,
 double lp(const SizeT num_nodes, const SizeT num_edges,
            const SizeT *row_offsets, const VertexT *col_indices,
            const int num_runs, VertexT *sources, const bool mark_pred,
-           const bool direction_optimized, const bool idempotence,
-           LabelT **labels, VertexT **preds = NULL) {
+           const bool idempotence, LabelT **labels, VertexT **preds = NULL) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, VertexT,
                                            gunrock::graph::HAS_CSR |
                                                gunrock::graph::HAS_CSC>
@@ -241,7 +240,6 @@ double lp(const SizeT num_nodes, const SizeT num_edges,
   parameters.Set("graph-type", "by-pass");
   parameters.Set("mark-pred", mark_pred);
   parameters.Set("num-runs", num_runs);
-  parameters.Set("direction-optimized", direction_optimized);
   parameters.Set("idempotence", idempotence);
 
   std::vector<VertexT> srcs;
@@ -259,7 +257,7 @@ double lp(const SizeT num_nodes, const SizeT num_edges,
   graph.FromCsr(graph.csr(), gunrock::util::HOST, 0, quiet, true);
   gunrock::graphio::LoadGraph(parameters, graph);
 
-  // Run the BFS
+  // Run the LP
   double elapsed_time = gunrock_lp(parameters, graph, labels, preds);
 
   // Cleanup
@@ -277,18 +275,16 @@ double lp(const SizeT num_nodes, const SizeT num_edges,
  * @param[in]  col_indices CSR-formatted graph input column indices
  * @param[in]  source      Source to begin traverse
  * @param[in]  mark_preds  Whether to output predecessor info
- * @param[in]  direction_optimized Whether to use directional optimizing BFS
  * @param[in]  idempotence Whether to use idempotence
  * @param[out] labels      Return shortest hop distances to source per vertex
  * @param[out] preds       Return predecessors of each vertex
  * \return     double      Return accumulated elapsed times for all runs
  */
 double lp(const int num_nodes, const int num_edges, const int *row_offsets,
-           const int *col_indices, int source, const bool mark_pred,
-           const bool direction_optimized, const bool idempotence,
+           const int *col_indices, int source, const bool mark_pred, const bool idempotence,
            int *distances, int *preds) {
   return lp(num_nodes, num_edges, row_offsets, col_indices, 1, &source,
-             mark_pred, direction_optimized, idempotence, &distances, &preds);
+             mark_pred, idempotence, &distances, &preds);
 }
 
 // Leave this at the end of the file

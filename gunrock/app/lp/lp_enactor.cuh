@@ -9,7 +9,7 @@
  * @file
  * lp_enactor.cuh
  *
- * @brief BFS Problem Enactor
+ * @brief LP Problem Enactor
  */
 
 #pragma once
@@ -18,7 +18,6 @@
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/app/lp/lp_problem.cuh>
-// #include <gunrock/app/lp/bfs_app.cu>
 #include <gunrock/oprtr/oprtr.cuh>
 #include <gunrock/util/track_utils.cuh>
 #include <gunrock/app/lp/lp_kernel.cuh>
@@ -26,14 +25,14 @@
 #include <gunrock/oprtr/1D_oprtr/for_each.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 #include <gunrock/util/array_utils.cuh>
-#include <moderngpu/kernel_segsort.hxx>
+#include <gunrock/util/kernel_segmode.hxx>
 
 namespace gunrock {
 namespace app {
 namespace lp {
 
 /**
- * @brief Speciflying parameters for BFS Enactor
+ * @brief Speciflying parameters for LP Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter
  * info \return cudaError_t error message(s), if any
  */
@@ -50,39 +49,15 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
       util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
       false, "Whether to enable idempotence optimization", __FILE__, __LINE__));
 
-    
-  // optional argument as user can choose to not supply
-  // however its a required field, and by default we do pull?
-  // makes sense to do push as we will be moving from push to pull
-  GUARD_CU(parameters.Use<bool>(
-      "pull",
-      util::OPTIONAL_ARGUMENT | util::REQUIRED_PARAMETER,
-      false, "Whether to enable direction optimizing BFS", __FILE__, __LINE__));
-
-  // will be needing a few variables to decide between quality - time tradeoff?
-  // to switch from pull to push
-
-  GUARD_CU(parameters.Use<float>(
-      "do-a",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      0.001, "Threshold to switch from forward-push to backward-pull in DOBFS",
-      __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<float>(
-      "do-b",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      0.200, "Threshold to switch from backward-pull to forward-push in DOBFS",
-      __FILE__, __LINE__));
 
   return retval;
 }
 
 /**
- * @brief defination of BFS iteration loop
+ * @brief defination of LP iteration loop
  * @tparam EnactorT Type of enactor
  */
 
- // does it not have to be Push/Pull flag here?
 template <typename EnactorT>
 struct LPIterationLoop
     : public IterationLoopBase<EnactorT, Use_FullQ | Push | 0x0> {
@@ -108,63 +83,6 @@ struct LPIterationLoop
 
   cudaError_t Gather(int peer_) {
     cudaError_t retval = cudaSuccess;
-    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
-    auto &graph = data_slice.sub_graph[0];
-    auto &enactor_slice =
-        this->enactor
-            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
-    auto &enactor_stats = enactor_slice.enactor_stats;
-    auto &frontier = enactor_slice.frontier;
-
-    data_slice.num_visited_vertices += frontier.queue_length;
-    data_slice.num_unvisited_vertices =
-        graph.nodes - data_slice.num_visited_vertices;
-    float predicted_backward_visits =
-        (data_slice.num_visited_vertices == 0)
-            ? (std::numeric_limits<float>::infinity())
-            : (data_slice.num_unvisited_vertices * 1.0 * graph.nodes /
-               data_slice.num_visited_vertices);
-    float predicted_forward_visits =
-        frontier.queue_length * 1.0 * graph.edges / graph.nodes;
-
-    auto iteration_ = enactor_stats.iteration % 4;
-    if (this->enactor->direction_optimized) {
-      if (data_slice.previous_direction == FORWARD) {
-        if (predicted_forward_visits >
-                predicted_backward_visits * this->enactor->do_a &&
-            !data_slice.been_in_backward)
-          data_slice.direction_votes[iteration_] = BACKWARD;
-        else
-          data_slice.direction_votes[iteration_] = FORWARD;
-      } else {
-        data_slice.been_in_backward = true;
-        if (predicted_forward_visits >
-            predicted_backward_visits * this->enactor->do_b)
-          data_slice.direction_votes[iteration_] = BACKWARD;
-        else
-          data_slice.direction_votes[iteration_] = FORWARD;
-      }
-    } else
-      data_slice.direction_votes[iteration_] = FORWARD;
-    // data_slice.direction_votes[(iteration_ + 1) % 4] = UNDECIDED;
-    data_slice.direction_votes[(iteration_ + 1) % 4] = FORWARD;
-    if (this->enactor->num_gpus > 1 && enactor_stats.iteration != 0 &&
-        this->enactor->direction_optimized) {
-      // while ( this->enactor->problem->data_slices[0]->direction_votes[iteration_] ==
-      //     UNDECIDED) 
-      while (
-          this->enactor->problem->data_slices[0]->direction_votes[iteration_] ==
-          FORWARD) 
-      {
-        sleep(0);
-      }
-      data_slice.current_direction =
-          this->enactor->problem->data_slices[0]->direction_votes[iteration_];
-    } else if (enactor_stats.iteration == 0)
-      data_slice.direction_votes[iteration_] = FORWARD;
-    else {
-      data_slice.current_direction = data_slice.direction_votes[iteration_];
-    }
 
     return retval;
   }
@@ -180,10 +98,7 @@ struct LPIterationLoop
     auto &graph = this->enactor->problem->sub_graphs[this->gpu_num];
 
     if (((this->enactor->flag & Size_Check) == 0 &&
-         ((this->flag & Skip_PreScan) != 0)) ||
-        (this->enactor->problem->data_slices[0]->current_direction == BACKWARD))
-    //(AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_FORWARD ||
-    // AdvanceKernelPolicy::ADVANCE_MODE == oprtr::advance::TWC_BACKWARD))
+         ((this->flag & Skip_PreScan) != 0)))
     {
       frontier.output_length[0] = 0;
     }
@@ -194,6 +109,7 @@ struct LPIterationLoop
           this->enactor->flag & Size_Check, "scanned_edges",
           frontier.queue_length + 2, &frontier.output_offsets, over_sized, -1,
           -1, -1, false);
+
       if (retval) return retval;
 
       GUARD_CU(oprtr::ComputeOutputLength<oprtr::OprtrType_V2V>(
@@ -239,27 +155,14 @@ struct LPIterationLoop
                                          this->gpu_num, iteration, peer_, true);
       if (retval) return retval;
      
-      // if (enactor->problem->use_double_buffer)
-      //{
-      //    if (enactor_stats->retval = Check_Size<SizeT, Value>(
-      //        true, "queue3", request_length,
-      //        &frontier_queue->values[selector ^ 1], over_sized, thread_num,
-      //        iteration, peer_, false))
-      //        return;
-      //    if (enactor_stats->retval = Check_Size<SizeT, Value>(
-      //        true, "queue3", graph_slice->nodes + 2,
-      //        &frontier_queue->values[selector], over_sized, thread_num,
-      //        iteration, peer_, true))
-      //        return;
-      //}
-    }  // else {
-    //}
+  
+    } 
 
     return retval;
   }
 
   /**
-   * @brief Core computation of bfs, one iteration
+   * @brief Core computation of lp, one iteration
    * @param[in] peer_ Which GPU peers to work on, 0 means local
    * \return cudaError_t error message(s), if any
    */
@@ -284,8 +187,7 @@ struct LPIterationLoop
     // we dont but can be used for shortcutting however lets not bother about this
   
     auto &preds = data_slice.preds;
-    // @Achal this is information related to the partitioned graph,
-    // see if its required in our context
+    // information related to the partitioned graph,
     auto &original_vertex = graph.GpT::original_vertex;
     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
@@ -293,16 +195,9 @@ struct LPIterationLoop
     auto &stream = enactor_slice.stream;
     auto &iteration = enactor_stats.iteration;
     bool debug = ((this->enactor->flag & Debug) != 0);
-    // @Achal mark_preds needs to be enabled here too
-    // bool mark_preds = ((this->enactor->problem->flag & Mark_Predecessors) != 0);
-    // idempotence depends on whether we are doing push/pull
-    // so might as well change how we set this flag
-    //idempotence=Pull
     bool idempotence =
         ((this->enactor->problem->flag & Enable_Idempotence) != 0);
     auto target = util::DEVICE;
-    // so we have the peer and the current gpu
-    // do all enactors have this two way shells?
     auto &gpu_num = this->gpu_num;
 
 #if TO_TRACK
@@ -314,9 +209,6 @@ struct LPIterationLoop
     GpuTimer gpu_timer;
 #endif
     
-    // data_slice is common for all 
-    // is current direction a field thats specifically for bfs?
-    if (data_slice.current_direction == FORWARD) {
       frontier.queue_reset = true;
       enactor_stats.nodes_queued[0] += frontier.queue_length;
 
@@ -359,30 +251,9 @@ struct LPIterationLoop
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
-      // auto update_segment_op = [segments] __host__ __device__(int &v) {
-      //   if(segments != v){ // first element
-      //     *v = segments[]
-      //   }
-      //   };
-      // segments->ForEach(convergence_op, frontier.queue_length,
-      //   util::DEVICE, oprtr_parameters.stream)
-      
-      // GUARD_CU(frontier.V_Q()->ForEach(
-      //   [segments] __host__ __device__(VertexT & v, int index) { 
-      //     if(index != 0){
-      //       segments[index] += segments[index-1]
-      //     }
-      //   }, frontier.queue_length, target,
-      //   0));
-      
-      // TODO
-      // Uncomment the ForEach_Index below 
+    
     auto elements = frontier.V_Q();
-    // frontier.V_Q()->GetPointer(util::DEVICE)
-
-    // TODO use advance operator
-    // as its better for nested for loops as the parallelism can have load balancing issues
-
+   
     GUARD_CU(frontier.V_Q()->ForAll(
       [segments, data, segments_size, data_size, labels, graph] __host__ __device__(
         const VertexT *v, const SizeT &index) {
@@ -390,16 +261,12 @@ struct LPIterationLoop
       SizeT start_edge = graph.CsrT::GetNeighborListOffset(idx);
       SizeT num_neighbors = graph.CsrT::GetNeighborListLength(idx);
 
-      int start_fill = segments[index];
-      int i = 0;
+      int offset = segments[index];
       for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
         
         VertexT u = graph.CsrT::GetEdgeDest(e);
-        data[start_fill + (i++)] = labels[u];
+        data[offset++] = labels[u];
         atomicAdd(&data_size[0], 1);
-      // for each neighbour in the neighbour list
-      // populate data
-      // data[segments[index]+neighbour_index]= neighbour.GetLabel();
         
       };
       },
@@ -410,26 +277,8 @@ struct LPIterationLoop
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
-    // auto apply_op =  [segments, data, segments_size, data_size, labels, graph] __host__ __device__(VertexT & v, int index) { 
-    //   // get the neighbours 
-    //   // start populating the data array with the information 
-    //   // from the segments array
-
-    //   SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
-    //   SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
-
-    //   int start_fill = segments[index];
-    //   int i = 0;
-    //   for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-        
-    //     VertexT u = graph.CsrT::GetEdgeDest(e);
-    //     data[start_fill + (i++)] = labels[u];
-    //   // for each neighbour in the neighbour list
-    //   // populate data
-    //   // data[segments[index]+neighbour_index]= neighbour.GetLabel();
-        
-    //   }};
-      int* modes = mgpu::segmented_mode(((int*)(data.GetPointer(util::DEVICE))), 
+   
+      int* modes = util::segmented_mode(((int*)(data.GetPointer(util::DEVICE))), 
                             ((int*)data_size.GetPointer(util::HOST))[0],
                             ((int*)(segments.GetPointer(util::DEVICE))), 
                             (int)frontier.queue_length, 
@@ -441,128 +290,19 @@ struct LPIterationLoop
         util::HOST);
       segments.Move(util::HOST, util::DEVICE, frontier.queue_length, 0 , stream);
 
-      
-      // TODO
-      // BUG Use CUDA kernel as everything is in internal memory anyway
-      // use FORALL
-      // cuda version wont be an issue
-    // #pragma omp parallel for
-    // for (SizeT i = 0; i < frontier.queue_length; i++) apply_op(elements[0][i], i);
-
-      // GUARD_CU(frontier.V_Q()->ForEach_index([segments, data, segments_size, data_size, labels, graph] __host__ __device__(VertexT & v, int index) { 
-      //     // get the neighbours 
-      //     // start populating the data array with the information 
-      //     // from the segments array
-
-      //     SizeT start_edge = graph.CsrT::GetNeighborListOffset(v);
-      //     SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
- 
-      //     int start_fill = segments[index];
-      //     int i = 0;
-      //     for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-            
-      //       VertexT u = graph.CsrT::GetEdgeDest(e);
-      //       data[start_fill + (i++)] = labels[u];
-      //     // for each neighbour in the neighbour list
-      //     // populate data
-      //     // data[segments[index]+neighbour_index]= neighbour.GetLabel();
-            
-      //     }
-      //   }, frontier.queue_length, target,
-      //   0));
-
-      // // so now we iterate through the neighbours of this and start 
-      // auto compute_op = [const VertexT &src, const VertexT &dest, segments, data, segments_size, data_size] __host__
-      //                 __device__(VertexT * v, const SizeT &i) {
-      //   data[data_size++] = labels[dest];
-
-      // };
-      
-      // TODO incorporate the segmented mode here
-      // auto segmented_mode = ;//
-      // make the segmented mode work such that the output of the operation is just the labels
-      // in the same order as the original segments
-      // this should be easy given that the operation is a one to one mapping from the segments.count_best array 
-      // to the output array
-      // extr
-
-      // run a segmented sort
-      // get max for each segment
-      // run the vertex frontier again
-      // set the new labels
-      // reuse the segments data structure to store the new labels
-      // TODO uncomment the foreach_index below
-
-      // TODO
-      // FORALL
-      GUARD_CU(frontier.V_Q()->ForAll(
-        [segments, labels, old_labels] __host__ __device__(
-          const VertexT *v, const SizeT &index) {
-
-          old_labels[index] = labels[index];
-          labels[index] = segments[index];
-  
-        },
-        frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
-
-
-        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
-      GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-             "cudaStreamSynchronize failed.");
-      // auto apply_op2 = [segments, labels, old_labels] __host__ __device__(VertexT & v, int index) { 
-         
-      //     old_labels[index] = labels[v];
-      //     labels[v] = segments[index];
-          
-            
-      //     };
-      // #pragma omp parallel for
-      // for (SizeT i = 0; i < frontier.queue_length; i++) apply_op2(elements[0][i], i);
-
-      // GUARD_CU(frontier.V_Q()->ForEach_index([segments, labels, old_labels] __host__ __device__(VertexT & v, int index) { 
-         
-      //     old_labels[index] = labels[v];
-      //     labels[v] = segments[index];
-          
-            
-      //     }
-      //   , frontier.queue_length, target,
-      //   0));
-
-      // how to map a vertex to the segments
-      // will they be in order?
-
-      // what do the vertex v and i in the () parameter list signify
-      // is that the data we can extract from the compute_op
-
-      // use functors instead of compute if applicable
-      // auto compute_op = [const VertexT &src, segments] __host__
-      // __device__(VertexT * v, const SizeT &i) {
-      //     labels[src] = segments[frontier index];
-        
-      // };
-
       auto filter_op =
-          [old_labels, labels] __host__ __device__(
+          [old_labels, labels, segments] __host__ __device__(
               const VertexT &src, VertexT &dest, const SizeT &edge_id,
               const VertexT &input_item, const SizeT &input_pos,
               SizeT &output_pos) -> bool {
-                // this somehow uses the 
-        // TODO is this just for internal checks
-        // why would a user care for isValid?
-        // what does this check?
+
+        old_labels[input_pos] = labels[input_pos];
+        labels[input_pos] = segments[input_pos];
+
         return (old_labels[input_pos] != labels[input_pos]);
 
-        // if (idempotence && mark_preds) {
-        //   VertexT pred = src;
-        //   if (original_vertex + 0 != NULL) pred = original_vertex[src];
-        //   Store(preds + dest, pred);
-        // }
-        // return true;
       };
-      // we would want to advance on a vertex if its label changes
-      // so create a new int label to store the old label
-      // -1 initially
+
       auto advance_op =
           // [idempotence, labels, label, mark_preds, preds,
           [] __host__
@@ -570,86 +310,17 @@ struct LPIterationLoop
                      const VertexT &input_item, const SizeT &input_pos,
                      SizeT &output_pos) -> bool {
 
-            printf("Source is %d, and destination is %d", src, dest);
-        // if (!idempotence) {
-        //   // Check if the destination node has been claimed as someone's child
+                      return true;
 
-        //   // @Achal fact check this
-        //   // so if we are not doing idempotence it will mean that we
-        //   // are on less writing computes that means pull (as it involves race-free reading )
-        //   // so keep that in mind
-
-
-        
-        //   // ensures that the label is minimum 
-        //   // this is an atomic operation and hence idempotence has been used 
-        //   // to get rid of it
-        //   // however
-        //   // for us its an atomic add
-        //   // which is still alright
-        //   // we cannot ignore the value, so we cannot choose to do something like
-        //   // if this then false
-        //   // for example right now I am still going with min_reduce array of label frequency counts
-        //   // hence lets 
-
-        //   // label is outside
-        //   // but why do we need an edge frontier?
-        //   // is this always the case?
-        //   // I think so!
-        //   // need to push or pull values accordingly
-        //   // if need to push
-        //   // I need to send src label to child label 
-
-        //   LabelT old_label = _atomicMin(labels + dest, label);
-        //   if (label >= old_label) return false;
-
-        //   // set predecessors
-        //   // if (mark_preds) {
-        //   //   VertexT pred = src;
-        //   //   if (original_vertex + 0 != NULL) pred = original_vertex[src];
-        //   //   Store(preds + dest, pred);
-        //   // }
-        // }
-        // as we need to return true everytime
-        // scope for two optimisations
-        // 1. if we can count all the neighbouring vertices with the same label, we can just update an integer and return false
-        // 2. is it possible there can be a point when we know for sure that a neighbour is not going to affect a vertex's label
-
-        return true;
-      };
+                    };
       
-      // I don't quite understand the importance of the filter operation as we already have an advance operation
-      // is there additional information available here?
-      // is this faster, slower, smarter than advance?
-      // auto filter_op =
-      //     [idempotence, mark_preds, preds, original_vertex] __host__ __device__(
-      //         const VertexT &src, VertexT &dest, const SizeT &edge_id,
-      //         const VertexT &input_item, const SizeT &input_pos,
-      //         SizeT &output_pos) -> bool {
-      //           // this somehow uses the 
-      //   // TODO is this just for internal checks
-      //   // why would a user care for isValid?
-      //   // what does this check?
-      //   if (!util::isValid(dest)) return false;
-
-      //   // if (idempotence && mark_preds) {
-      //   //   VertexT pred = src;
-      //   //   if (original_vertex + 0 != NULL) pred = original_vertex[src];
-      //   //   Store(preds + dest, pred);
-      //   // }
-      //   return true;
-      // };
-
-// Edge Map
+     
 #ifdef RECORD_PER_ITERATION_STATS
       gpu_timer.Start();
 #endif
 
-      // TODO
       auto &work_progress = frontier.work_progress;
       auto queue_index = frontier.queue_index;
-      // how does the for operation work?
-      //
 
       GUARD_CU(oprtr::For(
         // these are the two variables that need to be present in the threads during the for op
@@ -671,15 +342,6 @@ struct LPIterationLoop
         advance_op));
 
       
-
-      // Call Filter first
-      // Then call advance
-          // TODO
-          // can we optimise this by fusing the two
-          // GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-          // graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
-          // advance_op, filter_op));
-
 #ifdef RECORD_PER_ITERATION_STATS
       gpu_timer.Stop();
       float elapsed = gpu_timer.ElapsedMillis();
@@ -696,170 +358,12 @@ struct LPIterationLoop
         util::PrintMsg("Forward Advance end", gpu_num, iteration, peer_);
 
       frontier.queue_reset = false;
-      // if (gunrock::oprtr::advance::hasPreScan<
-      //      AdvanceKernelPolicy::ADVANCE_MODE>())
-      //{
-      //    enactor_stats.edges_queued[0] +=
-      //        frontier_attribute.output_length[0];
-      //} else {
-      //    enactor_stats.AccumulateEdges(
-      //    work_progress->template GetQueueLengthPointer<unsigned int>(
-      //        frontier.queue_index), oprtr_parameters.tream);
-      //}
-      
-      if (oprtr_parameters.advance_mode != "LB_CULL" &&
-          oprtr_parameters.advance_mode != "LB_LIGHT_CULL") {
-        // Filter
-        if (debug) util::PrintMsg("Filter begin.", gpu_num, iteration, peer_);
-
-        GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-            graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
-            filter_op));
-        if (debug) util::PrintMsg("Filter end.", gpu_num, iteration, peer_);
-      }
-
-      // Get back the resulted frontier length
+     
       GUARD_CU(frontier.work_progress.GetQueueLength(
           frontier.queue_index, frontier.queue_length, false,
           oprtr_parameters.stream, true));
       // end of forward
-  };
 
-//     else {  // backward
-//       SizeT num_blocks = 0;
-//       if (data_slice.previous_direction == FORWARD) {
-//         GUARD_CU(data_slice.split_lengths.ForEach(
-//             [] __host__ __device__(SizeT & length) { length = 0; }, 1, target,
-//             stream));
-
-//         if (this->enactor->num_gpus == 1) {
-//           if (idempotence) {
-//             num_blocks =
-//                 (graph.nodes >> (2 + sizeof(MaskT))) / (1 << LOG_THREADS) + 1;
-//             if (num_blocks > 480) num_blocks = 480;
-//             From_Unvisited_Queue_IDEM<ProblemT, LOG_THREADS>
-//                 <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
-//                     graph.nodes,
-//                     data_slice.split_lengths.GetPointer(util::DEVICE),
-//                     data_slice.unvisited_vertices[frontier.queue_index % 2]
-//                         .GetPointer(util::DEVICE),
-//                     data_slice.visited_masks.GetPointer(util::DEVICE),
-//                     data_slice.labels.GetPointer(util::DEVICE));
-//           }
-
-//           else {
-//             num_blocks = graph.nodes / (1 << LOG_THREADS) + 1;
-//             if (num_blocks > 480) num_blocks = 480;
-//             From_Unvisited_Queue<ProblemT, LOG_THREADS>
-//                 <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
-//                     graph.nodes,
-//                     data_slice.split_lengths.GetPointer(util::DEVICE),
-//                     data_slice.unvisited_vertices[frontier.queue_index % 2]
-//                         .GetPointer(util::DEVICE),
-//                     data_slice.labels.GetPointer(util::DEVICE));
-//           }
-//         }  // end of num_gpus == 1
-
-//         else {  // num_gpus != 1
-//           num_blocks =
-//               data_slice.local_vertices.GetSize() / (1 << LOG_THREADS) + 1;
-//           if (num_blocks > 480) num_blocks = 480;
-//           if (idempotence) {
-//             From_Unvisited_Queue_Local_IDEM<ProblemT, LOG_THREADS>
-//                 <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
-//                     data_slice.local_vertices.GetSize(),
-//                     data_slice.local_vertices.GetPointer(util::DEVICE),
-//                     data_slice.split_lengths.GetPointer(util::DEVICE),
-//                     data_slice.unvisited_vertices[frontier.queue_index % 2]
-//                         .GetPointer(util::DEVICE),
-//                     data_slice.visited_masks.GetPointer(util::DEVICE),
-//                     data_slice.labels.GetPointer(util::DEVICE));
-//           }
-
-//           else {
-//             From_Unvisited_Queue_Local<ProblemT, LOG_THREADS>
-//                 <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
-//                     data_slice.local_vertices.GetSize(),
-//                     data_slice.local_vertices.GetPointer(util::DEVICE),
-//                     data_slice.split_lengths.GetPointer(util::DEVICE),
-//                     data_slice.unvisited_vertices[frontier.queue_index % 2]
-//                         .GetPointer(util::DEVICE),
-//                     data_slice.labels.GetPointer(util::DEVICE));
-//           }
-//         }
-
-//         GUARD_CU(data_slice.split_lengths.Move(util::DEVICE, util::HOST, 1, 0,
-//                                                stream));
-//         GUARD_CU2(cudaStreamSynchronize(stream),
-//                   "cudaStreamSynchronize failed");
-//         data_slice.num_unvisited_vertices = data_slice.split_lengths[0];
-//         data_slice.num_visited_vertices =
-//             graph.nodes - data_slice.num_unvisited_vertices;
-//         if (debug)
-//           util::PrintMsg(
-//               "Changing from forward to backward, #unvisited_vertices =" +
-//               std::to_string(data_slice.num_unvisited_vertices));
-
-//       } else {
-//         data_slice.num_unvisited_vertices = data_slice.split_lengths[0];
-//       }
-
-//       GUARD_CU(data_slice.split_lengths.ForEach(
-//           [] __host__ __device__(SizeT & length) { length = 0; }, 2, target,
-//           stream));
-//       enactor_stats.nodes_queued[0] += data_slice.num_unvisited_vertices;
-//       num_blocks = data_slice.num_unvisited_vertices / (1 << LOG_THREADS) + 1;
-//       if (num_blocks > 480) num_blocks = 480;
-
-// #ifdef RECORD_PER_ITERATION_STATS
-//       gpu_timer.Start();
-// #endif
-
-//       Inverse_Expand<ProblemT, LOG_THREADS>
-//           <<<num_blocks, 1 << LOG_THREADS, 0, stream>>>(
-//               graph, data_slice.num_unvisited_vertices,
-//               enactor_stats.iteration + 1, idempotence,
-//               data_slice.unvisited_vertices[frontier.queue_index % 2]
-//                   .GetPointer(util::DEVICE),
-//               data_slice.split_lengths.GetPointer(util::DEVICE),
-//               data_slice.unvisited_vertices[(frontier.queue_index + 1) % 2]
-//                   .GetPointer(util::DEVICE),
-//               frontier.Next_V_Q()->GetPointer(util::DEVICE),
-//               data_slice.visited_masks.GetPointer(util::DEVICE),
-//               data_slice.labels.GetPointer(util::DEVICE),
-//               data_slice.preds.GetPointer(util::DEVICE));
-
-// #ifdef RECORD_PER_ITERATION_STATS
-//       gpu_timer.Stop();
-//       float elapsed = gpu_timer.ElapsedMillis();
-//       enactor_stats.per_iteration_advance_time.push_back(elapsed);
-//       enactor_stats.per_iteration_advance_mteps.push_back(-1.0f);
-//       enactor_stats.per_iteration_advance_input_edges.push_back(-1.0f);
-//       enactor_stats.per_iteration_advance_output_edges.push_back(-1.0f);
-//       enactor_stats.per_iteration_advance_direction.push_back(false);
-// #endif
-
-//       data_slice.split_lengths.Move(target, util::HOST, 2, 0, stream);
-//       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
-//       if (debug)
-//         util::PrintMsg("#unvisited v = " +
-//                        std::to_string(data_slice.num_unvisited_vertices) +
-//                        ", #newly visited = " +
-//                        std::to_string(data_slice.split_lengths[1]) +
-//                        ", #still unvisited = " +
-//                        std::to_string(data_slice.split_lengths[0]));
-
-//       frontier.queue_length = data_slice.split_lengths[1];
-//       data_slice.num_visited_vertices =
-//           graph.nodes - data_slice.num_unvisited_vertices;
-//       enactor_stats.edges_queued[0] += frontier.output_length[0];
-//       frontier.queue_reset = false;
-//       frontier.queue_index++;
-//     }  // end of backward
-
-  //   data_slice.previous_direction = data_slice.current_direction;
-
-  //   return retval;
   }
 
   cudaError_t UpdatePreds(SizeT num_elements) { return cudaSuccess; }
@@ -925,11 +429,11 @@ struct LPIterationLoop
             received_length, peer_, expand_op);
     return retval;
   }
-};  // end of BFSIteration
+};  // end of LPIteration
 
 /**
- * @brief BFS enactor class.
- * @tparam _Problem             BFS problem type
+ * @brief LP enactor class.
+ * @tparam _Problem             LP problem type
  * @tparam ARRAY_FLAG           Flags for util::Array1D used in the enactor
  * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
  */
@@ -956,25 +460,22 @@ class Enactor
   Problem *problem;
   IterationT *iterations;
 
-  bool direction_optimized;
-  float do_a, do_b;
-
   /**
    * \addtogroup PublicInterface
    * @{
    */
 
   /**
-   * @brief BFSEnactor constructor
+   * @brief LPEnactor constructor
    */
-  Enactor() : BaseEnactor("bfs"), problem(NULL) {
+  Enactor() : BaseEnactor("lp"), problem(NULL) {
     this->max_num_vertex_associates =
         (Problem::FLAG & Mark_Predecessors) != 0 ? 1 : 0;
     this->max_num_value__associates = 0;
   }
 
   /**
-   * @brief BFSEnactor destructor
+   * @brief LPEnactor destructor
    */
   virtual ~Enactor() {
     // Release();
@@ -1006,10 +507,6 @@ class Enactor
     util::Parameters &parameters = problem.parameters;
 
     GUARD_CU(BaseEnactor::Init(problem, Enactor_None, 2, NULL, target, false));
-    // direction_optimized 
-    // direction_optimized = parameters.Get<bool>("direction-optimized");
-    do_a = parameters.Get<float>("do-a");
-    do_b = parameters.Get<float>("do-b");
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       
@@ -1030,7 +527,6 @@ class Enactor
       // not allocated but pointer referenced
 
       // each enactor slice's operator parameter labels have data slices belonging to the specific gpu
-      // this is strange?
       for (int peer = 0; peer < this->num_gpus; peer++) {
         this->enactor_slices[gpu * this->num_gpus + peer]
             .oprtr_parameters.labels = &(problem.data_slices[gpu]->labels);
@@ -1090,7 +586,7 @@ class Enactor
   }
 
   /**
-   * @brief one run of bfs, to be called within GunrockThread
+   * @brief one run of lp, to be called within GunrockThread
    * @param thread_data Data for the CPU thread
    * \return cudaError_t error message(s), if any
    */
@@ -1104,14 +600,14 @@ class Enactor
   }
 
   /**
-   * @brief Enacts a BFS computing on the specified graph.
+   * @brief Enacts a LP computing on the specified graph.
    * @param[in] src Source node to start primitive.
    * \return cudaError_t error message(s), if any
    */
   cudaError_t Enact(VertexT src) {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(this->Run_Threads(this));
-    util::PrintMsg("GPU BFS Done.", this->flag & Debug);
+    util::PrintMsg("GPU LP Done.", this->flag & Debug);
     return retval;
   }
 

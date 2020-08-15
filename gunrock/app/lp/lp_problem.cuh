@@ -20,12 +20,6 @@ namespace gunrock {
 namespace app {
 namespace lp {
 
-enum Direction {
-  FORWARD = 0,
-  BACKWARD = 1,
-  // UNDECIDED = 2,
-};
-
 /**
  * @brief  Speciflying parameters for BFS Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter
@@ -35,7 +29,7 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
   cudaError_t retval = cudaSuccess;
 
   GUARD_CU(gunrock::app::UseParameters_problem(parameters));
-  // @Achal maybe I need to mark pred if shortcutting is required?
+
   GUARD_CU(parameters.Use<bool>(
       "mark-pred",
       util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
@@ -89,7 +83,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, MaskT> visited_masks;
     util::Array1D<SizeT, MaskT> old_mask;
     util::Array1D<SizeT, MaskT *> in_masks;
-    util::Array1D<SizeT, Direction> direction_votes;
     // need two arrays
     // store data array containing labels
     // store segment information
@@ -107,7 +100,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     // SizeT data_size, segments_size;
     SizeT num_visited_vertices, num_unvisited_vertices;
     bool been_in_backward;
-    Direction current_direction, previous_direction;
 
     /*
      * @brief Default constructor
@@ -125,27 +117,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       unvisited_vertices[1].SetName("unvisited_vertices[1]");
       local_vertices.SetName("local_vertices");
       split_lengths.SetName("split_length");
-      direction_votes.SetName("direction_votes");
       visited_masks.SetName("visited_masks");
       old_mask.SetName("old_mask");
       in_masks.SetName("in_masks");
-      // need two arrays
-      // store data array containing labels
+  
       data.SetName("data");
       data.SetName("data_size");
-      // store segment information
+
       segments.SetName("segments");
       segments.SetName("segments_size");
       cub_temp_storage.SetName("cub_temp_storage");
-
       segments_temp.SetName("segments_temp");
-
-      // store the count of elements in data array
-      // max data array is sum of top frontier size neighbours lengths
-      // data_size.SetName("data_size");
-      // store the count of segments
-      // max segment size is frontier size
-      // segments_size.SetName("segments_size");
     }
 
     /*
@@ -168,7 +150,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(unvisited_vertices[1].Release(target));
       GUARD_CU(split_lengths.Release(target));
       GUARD_CU(local_vertices.Release(target));
-      GUARD_CU(direction_votes.Release(target));
       GUARD_CU(visited_masks.Release(target));
       GUARD_CU(old_mask.Release(target));
       GUARD_CU(in_masks.Release(target));
@@ -206,23 +187,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(segments_size.Allocate(1, target));
       GUARD_CU(data_size.Allocate(1,  util::DEVICE | util::HOST));
       GUARD_CU(cub_temp_storage.Allocate(1, target));
+      
+      // TODO
       // all the remaining space should be taken by data
       // can we preallocate something like that?
       // we cannot currently dynamically allocate space
       // so the maximum is the best but then cuda malloc calls can be slow
+      
       GUARD_CU(data.Allocate(1000000, target));
       if (flag & Mark_Predecessors) {
         GUARD_CU(preds.Allocate(sub_graph.nodes, target));
-        // GUARD_CU(temp_preds .Allocate(sub_graph.nodes, target));
       }
 
       GUARD_CU(unvisited_vertices[0].Allocate(sub_graph.nodes, target));
       GUARD_CU(unvisited_vertices[1].Allocate(sub_graph.nodes, target));
-      // I would like to dynamically allocate resources here based on the graph
-      // how many neighbours are there
-      // frontier size
       GUARD_CU(split_lengths.Allocate(2, util::HOST | target));
-      GUARD_CU(direction_votes.Allocate(4, util::HOST));
 
       if (flag & Enable_Idempotence) {
         GUARD_CU(visited_masks.Allocate(
@@ -231,19 +210,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       }
 
       if (num_gpus > 1) {
-        /*if (flag & Mark_Predecessors)
-        {
-            this->vertex_associate_orgs[0] = preds.GetPointer(target);
-            if (!keep_node_num)
-            {
-                original_vertex.SetPointer(
-                    graph_slice->original_vertex.GetPointer(target),
-                    graph_slice->original_vertex.GetSize(), target);
-            }
-        }
-
-        GUARD_CU(this->vertex_associate_orgs.Move(util::HOST, target));
-        */
 
         SizeT local_counter = 0;
         for (VertexT v = 0; v < sub_graph.nodes; v++)
@@ -277,22 +243,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       num_visited_vertices = 0;
       num_unvisited_vertices = 0;
       been_in_backward = false;
-      current_direction = FORWARD;
-      previous_direction = FORWARD;
 
       GUARD_CU(util::SetDevice(this->gpu_idx));
-      // for (int i = 0; i < 4; i++) direction_votes[i] = UNDECIDED;
 
       // Allocate output labels if necessary
       GUARD_CU(labels.EnsureSize_(nodes, target));
-
-      // TODO
-      // Set label to the vertex id
-      // GUARD_CU(labels.ForEach(
-      //     [] __host__ __device__(LabelT & label) {
-      //       label = util::PreDefinedValues<LabelT>::MaxValue;
-      //     },
-      //     nodes, target, this->stream));
 
       if (this->flag & Mark_Predecessors) {
         // Allocate preds if necessary
@@ -407,8 +362,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     else {  // num_gpus != 1
       util::Array1D<SizeT, LabelT *> th_labels;
       util::Array1D<SizeT, VertexT *> th_preds;
-      th_labels.SetName("bfs::Problem::Extract::th_labels");
-      th_preds.SetName("bfs::Problem::Extract::th_preds");
+      th_labels.SetName("lp::Problem::Extract::th_labels");
+      th_preds.SetName("lp::Problem::Extract::th_preds");
       GUARD_CU(th_labels.Allocate(this->num_gpus, util::HOST));
       GUARD_CU(th_preds.Allocate(this->num_gpus, util::HOST));
 
@@ -483,7 +438,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(data_slices[gpu].Move(util::HOST, target));
     }
 
-    // Fillin the initial input_queue for BFS problem
+    // Fillin the initial input_queue
     int gpu;
     VertexT src_;
     if (this->num_gpus <= 1) {
