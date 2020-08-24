@@ -40,10 +40,6 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
   cudaError_t retval = cudaSuccess;
   GUARD_CU(app::UseParameters_enactor(parameters));
 
-  // both push and pull label propagation doesn't care about multiple operations being carried out
-  // but in push we will be writing a lot of times and that means its a lot of 
-  // atomic writes
-  // thus we can disable this initially and then enable it for pull communications
   GUARD_CU(parameters.Use<bool>(
       "idempotence",
       util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
@@ -54,13 +50,13 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
 }
 
 /**
- * @brief defination of LP iteration loop
+ * @brief definition of LP iteration loop
  * @tparam EnactorT Type of enactor
  */
 
 template <typename EnactorT>
 struct LPIterationLoop
-    : public IterationLoopBase<EnactorT, Use_FullQ | Push | 0x0> {
+    : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
   typedef typename EnactorT::VertexT VertexT;
   typedef typename EnactorT::SizeT SizeT;
   typedef typename EnactorT::ValueT ValueT;
@@ -71,10 +67,7 @@ struct LPIterationLoop
   typedef typename ProblemT::LabelT LabelT;
 
   typedef IterationLoopBase<EnactorT,
-                            Use_FullQ | Push |
-                                (((ProblemT::FLAG & Mark_Predecessors) != 0)
-                                     ? Update_Predecessors
-                                     : 0x0)>
+                            Use_FullQ | Push>
       BaseIterationLoop;
 
   LPIterationLoop() : BaseIterationLoop() {}
@@ -138,14 +131,10 @@ struct LPIterationLoop
               "output_length = " + std::to_string(request_length),
           this->gpu_num, iteration, peer_);
     }
-
     if ((this->enactor->flag & Size_Check) == 0 &&
         (this->flag & Skip_PreScan) != 0) {
       frontier.output_length[0] = 0;
-    } else{  // if
-            // (!gunrock::oprtr::advance::isFused<AdvanceKernelPolicy::ADVANCE_MODE>())
-    //(AdvanceKernelPolicy::ADVANCE_MODE != gunrock::oprtr::advance::LB_CULL)
-    // {
+    } else { 
       retval = CheckSize<SizeT, VertexT>(
           true, "queue3", request_length, frontier.Next_V_Q(), over_sized,
           this->gpu_num, iteration, peer_, false);
@@ -154,10 +143,7 @@ struct LPIterationLoop
                                          frontier.V_Q(), over_sized,
                                          this->gpu_num, iteration, peer_, true);
       if (retval) return retval;
-     
-  
     } 
-
     return retval;
   }
 
@@ -227,7 +213,7 @@ struct LPIterationLoop
 
       auto compute_op = [segments_temp, segments_size, graph] __host__
       __device__(VertexT * v, const SizeT &i) {
-            // data[data_size++];
+        
             segments_temp[i] = graph.CsrT::GetNeighborListLength(v[i]);
             atomicAdd(&segments_size[0], 1);
 
@@ -252,25 +238,25 @@ struct LPIterationLoop
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
     
-    auto elements = frontier.V_Q();
+      auto elements = frontier.V_Q();
    
-    GUARD_CU(frontier.V_Q()->ForAll(
-      [segments, data, segments_size, data_size, labels, graph] __host__ __device__(
+      GUARD_CU(frontier.V_Q()->ForAll(
+        [segments, data, segments_size, data_size, labels, graph] __host__ __device__(
         const VertexT *v, const SizeT &index) {
-      VertexT idx = v[index];
-      SizeT start_edge = graph.CsrT::GetNeighborListOffset(idx);
-      SizeT num_neighbors = graph.CsrT::GetNeighborListLength(idx);
+          VertexT idx = v[index];
+          SizeT start_edge = graph.CsrT::GetNeighborListOffset(idx);
+          SizeT num_neighbors = graph.CsrT::GetNeighborListLength(idx);
 
-      int offset = segments[index];
-      for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-        
-        VertexT u = graph.CsrT::GetEdgeDest(e);
-        data[offset++] = labels[u];
-        atomicAdd(&data_size[0], 1);
-        
-      };
-      },
-      frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+          int offset = segments[index];
+          for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+
+            VertexT u = graph.CsrT::GetEdgeDest(e);
+            data[offset++] = labels[u];
+            atomicAdd(&data_size[0], 1);
+
+          };
+        },
+        frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
       
       data_size.Move(util::DEVICE, util::HOST, 1, 0 , stream);
 
@@ -308,14 +294,10 @@ struct LPIterationLoop
           __device__(const VertexT &src, VertexT &dest, const SizeT &edge_id,
                      const VertexT &input_item, const SizeT &input_pos,
                      SizeT &output_pos) -> bool {
-                      
-                      // return old_labels[dest] != labels[dest];
-
+                      // intentional no-op
                       return true;
-
                     };
       
-     
 #ifdef RECORD_PER_ITERATION_STATS
       gpu_timer.Start();
 #endif
@@ -352,14 +334,6 @@ struct LPIterationLoop
         printf("%d", labels[index]);
       }
       printf("\n");
-      // GUARD_CU(labels->Print("Labels: ",
-      //             frontier.queue_length,
-      //             util::DEVICE,
-      //             stream));
-      // GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
-      //   graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters, 
-      //   advance_op));
-
 
 #ifdef RECORD_PER_ITERATION_STATS
       gpu_timer.Stop();
@@ -376,7 +350,6 @@ struct LPIterationLoop
       if (debug)
         util::PrintMsg("Forward Advance end", gpu_num, iteration, peer_);
 
-      // frontier.queue_reset = false;
       printf("Frontier queue length before work progress: %d\n", frontier.queue_length);
 
       GUARD_CU(frontier.work_progress.GetQueueLength(
@@ -491,8 +464,7 @@ class Enactor
    * @brief LPEnactor constructor
    */
   Enactor() : BaseEnactor("lp"), problem(NULL) {
-    this->max_num_vertex_associates =
-        (Problem::FLAG & Mark_Predecessors) != 0 ? 1 : 0;
+    this->max_num_vertex_associates = 0;
     this->max_num_value__associates = 0;
   }
 
