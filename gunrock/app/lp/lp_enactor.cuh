@@ -18,14 +18,14 @@
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/app/lp/lp_problem.cuh>
-#include <gunrock/oprtr/oprtr.cuh>
-#include <gunrock/util/track_utils.cuh>
 #include <gunrock/app/lp/lp_kernel.cuh>
-#include <gunrock/util/scan_device.cuh>
 #include <gunrock/oprtr/1D_oprtr/for_each.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 #include <gunrock/util/array_utils.cuh>
 #include <gunrock/util/kernel_segmode.hxx>
+#include <gunrock/util/scan_device.cuh>
+#include <gunrock/util/track_utils.cuh>
+
 
 namespace gunrock {
 namespace app {
