@@ -93,7 +93,7 @@ struct hitsIterationLoop
 
     // Set the frontier to NULL to specify that it should include
     // all vertices
-    util::Array1D<SizeT, VertexT> *null_frontier = NULL; // TODO: Check that I'm doing this correctly
+    util::Array1D<SizeT, VertexT> *null_frontier = NULL;
     frontier.queue_length = graph.nodes;
     frontier.queue_reset = true;
 
