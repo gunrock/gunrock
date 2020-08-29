@@ -62,7 +62,7 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
     next_arank[v] = 0.0;
   }
 
-  SizeT iterCount = 0;
+  SizeT iterCount;
   for (iterCount = 0; iterCount < max_iter; iterCount++) {
     // Set next scores to 0
     for (SizeT v = 0; v < graph.nodes; v++) {
