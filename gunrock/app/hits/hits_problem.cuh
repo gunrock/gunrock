@@ -199,8 +199,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       // Reset data
 
-      // Initialize current hrank and arank to 1/nodes .
-      // Initialize next ranks to 0 (will be updated).
+      // Initialize current hrank and arank to 1/nodes to match the NetworkX
+      // implementation's default values.
+      // Initialize next ranks to 0 (will be updated by the algorithm).
       GUARD_CU(hrank_curr.ForEach(
           [nodes] __host__ __device__(ValueT & x) { x = (ValueT)1.0/(ValueT)nodes; }, nodes,
           target, this->stream));
