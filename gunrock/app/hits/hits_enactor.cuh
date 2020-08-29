@@ -247,7 +247,7 @@ struct hitsIterationLoop
 
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
     }
-    // After normalization, swap the next and current vectors.
+    // After normalization, swap the next and current vectors
     auto hrank_temp = hrank_curr;
     hrank_curr = hrank_next;
     hrank_next = hrank_temp;
