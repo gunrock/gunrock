@@ -43,7 +43,7 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
   GUARD_CU(parameters.Use<int64_t>(
       "hits-normalize-n",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 1,
-      "Normalize HITS scores and perform convergence checks every N iterations.", __FILE__, __LINE__));
+      "Normalize HITS scores and check for convergence every N iterations.", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<double>(
       "hits-compare-tol",
