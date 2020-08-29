@@ -262,7 +262,6 @@ double hits_template(
     data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, target);
 
     data_graph.FromCsr(data_graph.csr(), target, 0, quiet, true);
-    // gunrock::graphio::LoadGraph(parameters, data_graph);
 
     // Run HITS
     double elapsed_time = gunrock_hits(parameters, data_graph, hub_ranks, auth_ranks, allocated_on);
