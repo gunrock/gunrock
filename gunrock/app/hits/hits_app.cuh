@@ -258,7 +258,7 @@ double hits_template(
     }
 
     data_graph.CsrT::Allocate(num_nodes, num_edges, target);
-    data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, target);
+    data_graph.CsrT::row_offsets.SetPointer((SizeT *)row_offsets, num_nodes + 1, target);
     data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, target);
 
     data_graph.FromCsr(data_graph.csr(), target, 0, quiet, true);
