@@ -21,7 +21,7 @@ namespace hits {
 /******************************************************************************
  * HITS Testing Routines
  *****************************************************************************/
-// TODO document this
+
 /**
  * @brief Simple CPU-based reference hits ranking implementations
  * @tparam      GraphT        Type of the graph
