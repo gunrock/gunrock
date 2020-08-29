@@ -1,6 +1,6 @@
 /**
  * @brief HITS test for shared library advanced interface
- * @file shared_lib_hits.c
+ * @file shared_lib_hits.cu
  */
 
 #include <stdio.h>
