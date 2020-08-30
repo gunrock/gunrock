@@ -1,14 +1,18 @@
 // XXX: dummy template for unit testing
 
+#define THRUST_IGNORE_CUB_VERSION_CHECK
+
 #include <gunrock/container/array.cuh>
 typedef cudaError_t test_error_t;
 
 template<typename T>
-__global__ void kernel(T data) {
+__global__ void kernel(T a) 
+{
   int idx = threadIdx.x + (blockDim.x * blockIdx.x);
-  if (idx >= data.size()) return;
-  data[idx] = idx;
-  printf("data[%i] = %i\n", idx, data[idx]);
+  if (idx > a.size()) return;
+
+  a[idx] = (float)idx;
+  printf("a[%i] = %f\n", idx, a[idx]);
 }
 
 test_error_t
@@ -16,18 +20,25 @@ test_array()
 {
   using namespace gunrock;
   using namespace container::dense;
-  typedef array<int, size_t> array_t;
 
-  test_error_t status = cudaSuccess;
-  size_t N = 128;
-  
-  array_t a(N);
+  test_error_t status         = cudaSuccess;
+  const std::size_t N         = 10;
 
-  dim3 dimBlock(N);
-  dim3 dimGrid(1);
+  array<float, N>               a;
 
-  kernel<<<dimGrid, dimBlock>>>(a);
+  float* pointer              = a.data();
+  const float* const_pointer  = a.data();
+
+  std::size_t size            = a.size();
+  std::size_t max_size        = a.max_size();
+  bool is_empty               = a.empty();
+
   cudaDeviceSynchronize();
+  kernel<<<1, N>>>(a);
+  cudaDeviceSynchronize();
+
+  // Segmentation fault; no host support
+  // a[0] = 0;
 
   return status;
 }
