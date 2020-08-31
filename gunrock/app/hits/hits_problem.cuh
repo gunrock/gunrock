@@ -105,7 +105,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     /*
      * @brief Default constructor
      */
-    DataSlice() : BaseDataSlice(), max_iter(0), hits_norm(HITS_NORMALIZATION_METHOD_2), hits_tol(1e-6), normalize_n(0) {
+    DataSlice() : BaseDataSlice(), max_iter(0), hits_norm(HITS_NORMALIZATION_METHOD_1), hits_tol(1e-6), normalize_n(0) {
       // Name of the problem specific arrays:
       hrank_curr.SetName("hrank_curr");
       arank_curr.SetName("arank_curr");
