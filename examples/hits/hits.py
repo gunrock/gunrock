@@ -62,7 +62,7 @@ for i in range(0, graph_coo.shape[0]):
 
 print("Hubs: ")
 for key, val in sorted(hubs_nx.items(), key=lambda x: x[1], reverse=True):
-    print(key, val, hubs_np[key])
+    print(key, val, hubs_nx[key])
 print("Authorities: ")
 for key, val in sorted(auths_nx.items(), key=lambda x: x[1], reverse=True):
-    print(key, val, auths_np[key])
+    print(key, val, auths_nx[key])

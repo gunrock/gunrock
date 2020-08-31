@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
 
   int max_iter = 1000;
   float tol = 0.0001;
-  int hits_norm = 1;
+  int hits_norm = HITS_NORMALIZATION_METHOD_1;
 
   int HOST = 1;
   int DEVICE = 2;

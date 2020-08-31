@@ -48,6 +48,16 @@ struct main_struct {
     double tol = parameters.Get<double>("hits-term-tol");
     int hits_norm = parameters.Get<SizeT>("hits-norm");
 
+    // Convert from a command-line int to the enum
+    if (hits_norm == 1) {
+      hits_norm = HITS_NORMALIZATION_METHOD_1;
+      parameters.Set("hits-norm", hits_norm);
+    }
+    else if (hits_norm == 2) {
+      hits_norm = HITS_NORMALIZATION_METHOD_2;
+      parameters.Set("hits-norm", hits_norm);
+    }
+
     // TODO: Do we need HAS_COO?
     typedef typename app::TestGraph<VertexT, SizeT, ValueT,
                                     graph::HAS_CSR | graph::HAS_COO>

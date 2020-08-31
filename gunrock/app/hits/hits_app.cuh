@@ -247,6 +247,7 @@ double hits_template(
     parameters.Set("graph-type", "by-pass");
     parameters.Set("hits-max-iter", max_iter);
     parameters.Set("hits-term-tol", tol);
+    parameters.Set("hits-norm", hits_norm);
     bool quiet = parameters.Get<bool>("quiet");
     GraphT data_graph;
 

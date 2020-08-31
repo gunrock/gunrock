@@ -142,7 +142,7 @@ struct hitsIterationLoop
     // or at the last iteration
     if (((iteration + 1) % normalize_n == 0) || iteration == (max_iter - 1)) {
 
-      if(hits_norm == 2) { // The default
+      if(hits_norm == HITS_NORMALIZATION_METHOD_2) { // The default
         // Square each element
         auto square_op = [hrank_next, arank_next] __host__ __device__(
           VertexT * v_q, const SizeT &pos) {
@@ -188,7 +188,7 @@ struct hitsIterationLoop
 
         GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
       }
-      else if(hits_norm == 1) {
+      else if(hits_norm == HITS_NORMALIZATION_METHOD_1) {
         // Sum all scores in each array
         GUARD_CU(util::cubReduce(
           cub_temp_space, hrank_next, hrank_mag, graph.nodes,
@@ -224,7 +224,7 @@ struct hitsIterationLoop
         GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
       }
       else {
-        assert(false); // TODO: Handle errors case
+        assert(false); // TODO: How does gunrock handle error cases?
       }
 
       // hrank_curr is now temp space, since it will be overwritten with 0s on the next iteration. Use this as temp space for the forall to compute error

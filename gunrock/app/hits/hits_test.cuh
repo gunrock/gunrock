@@ -83,13 +83,13 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
     ValueT h_norm = 0.0;
     ValueT a_norm = 0.0;
 
-    if(hits_norm == 1) {
+    if(hits_norm == HITS_NORMALIZATION_METHOD_1) {
       for (SizeT v = 0; v < graph.nodes; v++) {
         h_norm += abs(next_hrank[v]);
         a_norm += abs(next_arank[v]);
       }
     }
-    else if(hits_norm == 2) {
+    else if(hits_norm == HITS_NORMALIZATION_METHOD_2) {
       for (SizeT v = 0; v < graph.nodes; v++) {
         h_norm += pow(next_hrank[v], 2.0);
         a_norm += pow(next_arank[v], 2.0);

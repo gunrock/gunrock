@@ -417,6 +417,14 @@ double sm(
     unsigned int         device
 );
 
+/**
+ * @brief HITS_NORMALIZATION_METHOD Normalization method for the HITS algorithm
+ */
+enum HITS_NORMALIZATION_METHOD { // Integer
+  HITS_NORMALIZATION_METHOD_1=1,  // 1-Norm (Sum of absolute values)
+  HITS_NORMALIZATION_METHOD_2=2   // 2-Norm (Square root of the sum of squares)
+};
+
  /*
  * @brief HITS simple public interface.
  *

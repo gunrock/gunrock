@@ -38,7 +38,7 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
   GUARD_CU(parameters.Use<int64_t>(
       "hits-norm",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      1, "Normalization method. 1 = normalize by the sum of absolute values (default), 2 = normalize by the square root of the sum of squares.", __FILE__, __LINE__));
+      HITS_NORMALIZATION_METHOD_1, "Normalization method. 1 = normalize by the sum of absolute values (1-Norm, default), 2 = normalize by the square root of the sum of squares (2-Norm).", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int64_t>(
       "hits-normalize-n",
@@ -98,13 +98,14 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, ValueT> cur_error; // Current iteration error
 
     SizeT max_iter;     // Maximum number of HITS iterations to perform
+
     SizeT hits_norm;    // Normalization method
     ValueT hits_tol;    // Termination tolerance
     SizeT normalize_n;  // Normalize every N iterations
     /*
      * @brief Default constructor
      */
-    DataSlice() : BaseDataSlice(), max_iter(0), hits_norm(2), hits_tol(1e-6), normalize_n(0) {
+    DataSlice() : BaseDataSlice(), max_iter(0), hits_norm(HITS_NORMALIZATION_METHOD_2), hits_tol(1e-6), normalize_n(0) {
       // Name of the problem specific arrays:
       hrank_curr.SetName("hrank_curr");
       arank_curr.SetName("arank_curr");
