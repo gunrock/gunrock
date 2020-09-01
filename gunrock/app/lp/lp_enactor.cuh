@@ -40,12 +40,6 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
   cudaError_t retval = cudaSuccess;
   GUARD_CU(app::UseParameters_enactor(parameters));
 
-  GUARD_CU(parameters.Use<bool>(
-      "idempotence",
-      util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      false, "Whether to enable idempotence optimization", __FILE__, __LINE__));
-
-
   return retval;
 }
 
@@ -163,16 +157,12 @@ struct LPIterationLoop
     auto &labels = data_slice.labels;
     auto &cub_temp_storage = data_slice.cub_temp_storage;
     auto &old_labels = data_slice.old_labels;
-    auto &data = data_slice.data;
+    auto &neighbour_labels = data_slice.neighbour_labels;
     auto &segments_temp = data_slice.segments_temp;
     auto &segments = data_slice.segments;
-    auto &data_size = data_slice.data_size;
+    auto &neighbour_labels_size = data_slice.neighbour_labels_size;
     auto &segments_size = data_slice.segments_size;
 
-    // do we need predecessors?
-    // we dont but can be used for shortcutting however lets not bother about this
-  
-    auto &preds = data_slice.preds;
     // information related to the partitioned graph,
     auto &original_vertex = graph.GpT::original_vertex;
     auto &frontier = enactor_slice.frontier;
@@ -181,8 +171,6 @@ struct LPIterationLoop
     auto &stream = enactor_slice.stream;
     auto &iteration = enactor_stats.iteration;
     bool debug = ((this->enactor->flag & Debug) != 0);
-    bool idempotence =
-        ((this->enactor->problem->flag & Enable_Idempotence) != 0);
     auto target = util::DEVICE;
     auto &gpu_num = this->gpu_num;
 
@@ -201,14 +189,10 @@ struct LPIterationLoop
       if (debug)
         util::PrintMsg("Forward Advance begin", gpu_num, iteration, peer_);
 
-      // LabelT label = iteration + 1;
       util::Array1D<SizeT, VertexT> *null_frontier = NULL;
       frontier.queue_length = graph.nodes;
       frontier.queue_reset = true;
   
-      // segments_size[0] = 0;
-      // data_size = 0;
-    
       auto frontier_elements = frontier.V_Q();
 
       auto compute_op = [segments_temp, segments_size, graph] __host__
@@ -225,11 +209,6 @@ struct LPIterationLoop
                     frontier.queue_length,
                     util::DEVICE,
                     stream));
-      // check segments size
-      // typecast or add template param
-      // this gave an error because I was trying to access the host_pointer
-      // GUARD_CU(util::cubInclusiveSum(cub_temp_storage, segments_temp,
-      //   segments, (SizeT)segments_size.d_pointer, stream));
       GUARD_CU(util::cubExclusiveSum(cub_temp_storage, segments_temp,
         segments, frontier.queue_length , stream));
 
@@ -241,7 +220,7 @@ struct LPIterationLoop
       auto elements = frontier.V_Q();
    
       GUARD_CU(frontier.V_Q()->ForAll(
-        [segments, data, segments_size, data_size, labels, graph] __host__ __device__(
+        [segments, neighbour_labels, segments_size, neighbour_labels_size, labels, graph] __host__ __device__(
         const VertexT *v, const SizeT &index) {
           VertexT idx = v[index];
           SizeT start_edge = graph.CsrT::GetNeighborListOffset(idx);
@@ -251,21 +230,21 @@ struct LPIterationLoop
           for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
 
             VertexT u = graph.CsrT::GetEdgeDest(e);
-            data[offset++] = labels[u];
-            atomicAdd(&data_size[0], 1);
+            neighbour_labels[offset++] = labels[u];
+            atomicAdd(&neighbour_labels_size[0], 1);
 
           };
         },
         frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
       
-      data_size.Move(util::DEVICE, util::HOST, 1, 0 , stream);
+      neighbour_labels_size.Move(util::DEVICE, util::HOST, 1, 0 , stream);
 
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
    
-      int* modes = util::segmented_mode(((int*)(data.GetPointer(util::DEVICE))), 
-                            ((int*)data_size.GetPointer(util::HOST))[0],
+      int* modes = util::segmented_mode(((int*)(neighbour_labels.GetPointer(util::DEVICE))), 
+                            ((int*)neighbour_labels_size.GetPointer(util::HOST))[0],
                             ((int*)(segments.GetPointer(util::DEVICE))), 
                             (int)frontier.queue_length, 
                             mgpu::less_t<int>(), 
@@ -306,9 +285,6 @@ struct LPIterationLoop
       auto queue_index = frontier.queue_index;
 
       GUARD_CU(oprtr::For(
-        // these are the two variables that need to be present in the threads during the for op
-        // there is the sizeT i which is the loop variable
-        // and that is a function arg to the op
           [work_progress, queue_index] __host__ __device__(SizeT i) {
             SizeT *counter = work_progress.GetQueueCounter(queue_index + 1);
             counter[0] = 0;
@@ -383,38 +359,20 @@ struct LPIterationLoop
     auto iteration = enactor_slice.enactor_stats.iteration;
     auto &labels = data_slice.labels;
     auto &masks = data_slice.visited_masks;
-    auto &preds = data_slice.preds;
-    auto label = this->enactor->mgpu_slices[this->gpu_num]
-                     .in_iteration[iteration % 2][peer_];
-    bool idempotence =
-        ((this->enactor->problem->flag & Enable_Idempotence) != 0);
-    bool mark_preds = ((ProblemT::FLAG & Mark_Predecessors) != 0);
 
     auto expand_op =
-        [labels, label, preds, masks, idempotence, mark_preds] __host__
+        [labels, label, masks] __host__
         __device__(VertexT & key, const SizeT &in_pos,
                    VertexT *vertex_associate_ins,
                    ValueT *value__associate_ins) -> bool {
       SizeT mask_pos = util::PreDefinedValues<SizeT>::InvalidValue;
       MaskT mask_bit = util::PreDefinedValues<MaskT>::InvalidValue;
 
-      if (idempotence) {
-        mask_pos = (key  //& (~(1ULL<<(sizeof(VertexT)*8-2)))
-                         // LB_CULL::KernelPolicy::ELEMENT_ID_MASK
-                    ) >>
-                   (2 + sizeof(MaskT));
-        MaskT mask_byte = _ldg(masks + mask_pos);
-        mask_bit = 1 << (key & ((1 << (2 + sizeof(MaskT))) - 1));
-        if ((mask_bit & mask_byte) != 0) return false;
-      }
-
       if (_ldg(labels + key) != util::PreDefinedValues<LabelT>::MaxValue)
         return false;
 
       labels[key] = label;
-      if (idempotence) masks[mask_pos] |= mask_bit;
 
-      if (mark_preds) preds[key] = vertex_associate_ins[in_pos];
       return true;
     };
 
@@ -509,18 +467,10 @@ class Enactor
       // for each gpu the slice is initialised to the starting point (peer = 0)
       auto &enactor_slice = this->enactor_slices[gpu * this->num_gpus + 0];
       auto &graph = problem.sub_graphs[gpu];
-      
-      // TODO
-      // does this allocate function duplicate data on each gpu?
-      // no it is agnostic to that as the partition should have handled that 
-      // and anyway we call this once for each gpu not for each enactor slice
+
       GUARD_CU(enactor_slice.frontier.Allocate(graph.nodes, graph.edges,
                                                this->queue_factors));
       
-      // this is where we will have the enactor slice data allocated
-      // not allocated but pointer referenced
-
-      // each enactor slice's operator parameter labels have data slices belonging to the specific gpu
       for (int peer = 0; peer < this->num_gpus; peer++) {
         this->enactor_slices[gpu * this->num_gpus + peer]
             .oprtr_parameters.labels = &(problem.data_slices[gpu]->labels);
@@ -588,7 +538,7 @@ class Enactor
     // so each iteration loop gets 
     // thread data 
     gunrock::app::Iteration_Loop<
-        ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0, 0,
+        (Enactor::Problem::FLAG != 0) ? 1 : 0, 0,
         IterationT>(thread_data, iterations[thread_data.thread_num]);
     return cudaSuccess;
   }

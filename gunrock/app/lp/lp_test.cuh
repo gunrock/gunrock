@@ -50,27 +50,22 @@ void DisplaySolution(T *values, SizeT length) {
  * @param[in]   graph         Input graph
  * @param[in]   src           The source vertex
  * @param[in]   quiet         Whether to print out anything to stdout
- * @param[in]   mark_preds    Whether to compute predecessor info
  * @param[out]  labels        Computed hop distances from the source to each
  * vertex
- * @param[out]  preds         Computed predecessors for each vertex
  * \return      double        Time taken for the BFS
  */
 template <typename GraphT, typename LabelT = typename GraphT::VertexT>
 double CPU_Reference(const GraphT &graph, typename GraphT::VertexT src,
-                     bool quiet, bool mark_preds, LabelT *labels,
-                     typename GraphT::VertexT *preds,
+                     bool quiet, LabelT *labels,
                      typename GraphT::VertexT &num_iters) {
   typedef typename GraphT::CsrT CsrT;
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::SizeT SizeT;
 
-  if (preds == NULL) mark_preds = false;
 
   // Initialize labels
   for (VertexT v = 0; v < graph.nodes; v++) {
     labels[v] = util::PreDefinedValues<LabelT>::MaxValue;
-    if (mark_preds) preds[v] = util::PreDefinedValues<VertexT>::InvalidValue;
   }
   labels[src] = 0;
 
@@ -96,7 +91,6 @@ double CPU_Reference(const GraphT &graph, typename GraphT::VertexT src,
         VertexT u = graph.CsrT::GetEdgeDest(e);
         if (iter < labels[u]) {
           labels[u] = iter;
-          if (mark_preds && preds != NULL) preds[u] = v;
           next_frontier.push_back(u);
         }
       }
@@ -122,17 +116,14 @@ double CPU_Reference(const GraphT &graph, typename GraphT::VertexT src,
  * @param[in]  src           The source vertex
  * @param[in]  h_labels      Computed hop distances from the source to each
  * vertex
- * @param[in]  h_preds       Computed predecessors for each vertex
  * @param[in]  ref_labels    Reference labels from the source to each vertex
- * @param[in]  ref_preds     Reference predecessors for each vertex
  * @param[in]  verbose       Whether to output detail comparsions
  * \return     GraphT::SizeT Number of errors
  */
 template <typename GraphT, typename LabelT = typename GraphT::LabelT>
 typename GraphT::SizeT Validate_Results(
     util::Parameters &parameters, GraphT &graph, typename GraphT::VertexT src,
-    LabelT *h_labels, typename GraphT::VertexT *h_preds,
-    LabelT *ref_labels = NULL, typename GraphT::VertexT *ref_preds = NULL,
+    LabelT *h_labels, LabelT *ref_labels = NULL,
     bool verbose = true) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::SizeT SizeT;
@@ -141,7 +132,6 @@ typename GraphT::SizeT Validate_Results(
   SizeT num_errors = 0;
   // bool quick = parameters.Get<bool>("quick");
   bool quiet = parameters.Get<bool>("quiet");
-  bool mark_pred = parameters.Get<bool>("mark-pred");
 
   // Verify the labels
   if (ref_labels != NULL) {
@@ -210,54 +200,7 @@ typename GraphT::SizeT Validate_Results(
     util::PrintMsg("");
   }
 
-  if (mark_pred) {
-    util::PrintMsg("Predecessors Validity: ", !quiet, false);
-    SizeT errors_num = 0;
-    for (VertexT v = 0; v < graph.nodes; v++) {
-      VertexT pred = h_preds[v];
-      if (!util::isValid(pred) || v == src) continue;
-      LabelT v_label = h_labels[v];
-      if (!util::isValid(v_label)) continue;
-      LabelT pred_label = h_labels[pred];
-      bool edge_found = false;
-      SizeT edge_start = graph.CsrT::GetNeighborListOffset(pred);
-      SizeT num_neighbors = graph.CsrT::GetNeighborListLength(pred);
-
-      for (SizeT e = edge_start; e < edge_start + num_neighbors; e++) {
-        if (v == graph.CsrT::GetEdgeDest(e) && (pred_label + 1 == v_label)) {
-          edge_found = true;
-          break;
-        }
-      }
-      if (edge_found) continue;
-      errors_num++;
-      if (errors_num > 1) continue;
-
-      util::PrintMsg("FAIL: [" + std::to_string(pred) + "] (" +
-                         std::to_string(pred_label) + ") -> [" +
-                         std::to_string(v) + "] (" + std::to_string(v_label) +
-                         ") can't find the corresponding edge.",
-                     !quiet);
-    }
-    if (errors_num > 0) {
-      util::PrintMsg(std::to_string(errors_num) + " errors occurred.", !quiet);
-      num_errors += errors_num;
-    } else {
-      util::PrintMsg("PASS", !quiet);
-    }
-  }
-
-  if (!quiet && mark_pred && verbose) {
-    util::PrintMsg("First 40 preds of the GPU result:");
-    DisplaySolution(h_preds, graph.nodes);
-    if (ref_preds != NULL) {
-      util::PrintMsg(
-          "First 40 preds of the reference CPU result "
-          "(could be different because the paths are not unique):");
-      DisplaySolution(ref_preds, graph.nodes);
-    }
-    util::PrintMsg("");
-  }
+  
 
   return num_errors;
 }
