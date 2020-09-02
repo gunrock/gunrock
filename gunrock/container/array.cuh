@@ -63,7 +63,9 @@ namespace dense
 
   public:
 
-    // // Constructor
+    /*
+     * constructor::
+     */
     array() : 
       _storage(NumElements),
       _ptr(_storage.data().get())
