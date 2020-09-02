@@ -63,15 +63,15 @@ namespace dense
 
   public:
 
-    // Constructor
+    // // Constructor
     array() : 
       _storage(NumElements),
-      _ptr(thrust::raw_pointer_cast(_storage.data()))
+      _ptr(_storage.data().get())
       {}
 
     //  Define an empty destructor to explicitly specify
     //  its execution space qualifier.
-    __host__ ~array(void) {}
+    // __host__ ~array(void) {}
 
     /*
      * pointers::

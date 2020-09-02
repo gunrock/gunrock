@@ -5,11 +5,11 @@
 #include <gunrock/container/array.cuh>
 typedef cudaError_t test_error_t;
 
-template<typename T>
+template<std::size_t N, typename T>
 __global__ void kernel(T a) 
 {
   int idx = threadIdx.x + (blockDim.x * blockIdx.x);
-  if (idx > a.size()) return;
+  if (idx > N) return;
 
   a[idx] = (float)idx;
   printf("a[%i] = %f\n", idx, a[idx]);
@@ -22,7 +22,7 @@ test_array()
   using namespace container::dense;
 
   test_error_t status         = cudaSuccess;
-  const std::size_t N         = 10;
+  constexpr std::size_t N     = 10;
 
   array<float, N>               a;
 
@@ -34,10 +34,16 @@ test_array()
   bool is_empty               = a.empty();
 
   cudaDeviceSynchronize();
-  kernel<<<1, N>>>(a);
+  kernel<N><<<1, N>>>(a);
   cudaDeviceSynchronize();
 
   // Segmentation fault; no host support
+  // XXX: this is trivial to add using
+  // a thrust::host_vector, but we have
+  // to handle move symantics ourselves,
+  // and that is when things get really
+  // complicated. I will consider this if
+  // find it useful.
   // a[0] = 0;
 
   return status;
