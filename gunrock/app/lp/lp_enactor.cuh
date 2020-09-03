@@ -18,7 +18,6 @@
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
 #include <gunrock/app/lp/lp_problem.cuh>
-#include <gunrock/app/lp/lp_kernel.cuh>
 #include <gunrock/oprtr/1D_oprtr/for_each.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 #include <gunrock/util/array_utils.cuh>
@@ -361,7 +360,7 @@ struct LPIterationLoop
     auto &masks = data_slice.visited_masks;
 
     auto expand_op =
-        [labels, label, masks] __host__
+        [labels, masks] __host__
         __device__(VertexT & key, const SizeT &in_pos,
                    VertexT *vertex_associate_ins,
                    ValueT *value__associate_ins) -> bool {
@@ -370,9 +369,8 @@ struct LPIterationLoop
 
       if (_ldg(labels + key) != util::PreDefinedValues<LabelT>::MaxValue)
         return false;
-
-      labels[key] = label;
-
+      
+      // else
       return true;
     };
 

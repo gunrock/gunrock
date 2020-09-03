@@ -73,8 +73,7 @@
          auto src = srcs[i];
          VertexT num_iters = 0;
          util::PrintMsg("__________________________", !quiet);
-         float elapsed = app::lp::CPU_Reference(graph, src, quiet, false,
-                                                 ref_labels[i], (VertexT*)NULL, num_iters);
+         float elapsed = app::lp::CPU_Reference(graph, src, quiet, ref_labels[i], num_iters);
          util::PrintMsg("--------------------------\nRun " + std::to_string(i) +
                             " elapsed: " + std::to_string(elapsed) +
                             " ms, src = " + std::to_string(src) +
@@ -83,9 +82,7 @@
        }
      }
  
-     std::vector<std::string> switches{
-         "mark-pred", "advance-mode", 
-         "idempotence"};
+     std::vector<std::string> switches{};
      GUARD_CU(app::Switch_Parameters(
          parameters, graph, switches,
          [ref_labels](util::Parameters &parameters, GraphT &graph) {
