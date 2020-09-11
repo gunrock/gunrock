@@ -212,9 +212,6 @@ struct LPIterationLoop
         segments, frontier.queue_length , stream));
 
         
-      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
-      GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-             "cudaStreamSynchronize failed.");
     
       auto elements = frontier.V_Q();
    
@@ -224,11 +221,14 @@ struct LPIterationLoop
           VertexT idx = v[index];
           SizeT start_edge = graph.CsrT::GetNeighborListOffset(idx);
           SizeT num_neighbors = graph.CsrT::GetNeighborListLength(idx);
-
           int offset = segments[index];
-          for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+        
+          // printf("The vertex is %d and offset is %d\n", idx, offset); 
 
+          for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
+            
             VertexT u = graph.CsrT::GetEdgeDest(e);
+            // printf("The vertex being inserted at position %d is %d", offset, u);
             neighbour_labels[offset++] = labels[u];
             atomicAdd(&neighbour_labels_size[0], 1);
 
@@ -237,22 +237,27 @@ struct LPIterationLoop
         frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
       
       neighbour_labels_size.Move(util::DEVICE, util::HOST, 1, 0 , stream);
-
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
-   
+
       int* modes = util::segmented_mode(((int*)(neighbour_labels.GetPointer(util::DEVICE))), 
                             ((int*)neighbour_labels_size.GetPointer(util::HOST))[0],
                             ((int*)(segments.GetPointer(util::DEVICE))), 
                             (int)frontier.queue_length, 
                             mgpu::less_t<int>(), 
                             *oprtr_parameters.context);
-
+      
+     
       segments.SetPointer(modes,
         (SizeT)frontier.queue_length,
         util::HOST);
+
       segments.Move(util::HOST, util::DEVICE, frontier.queue_length, 0 , stream);
+
+      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+             "cudaStreamSynchronize failed.");
 
       auto filter_op =
           [old_labels, labels, segments] __host__ __device__(
@@ -260,8 +265,21 @@ struct LPIterationLoop
               const VertexT &input_item, const SizeT &input_pos,
               SizeT &output_pos) -> bool {
 
-        old_labels[input_pos] = labels[input_pos];
-        labels[input_pos] = segments[input_pos];
+//        old_labels[input_pos] = labels[input_pos];
+	if (segments[input_pos] > -1){
+        	
+		old_labels[input_pos] = labels[input_pos];
+        	labels[input_pos] = segments[input_pos];
+
+	}
+
+	else{
+		//printf("old label was %d", old_labels[input_pos]);
+		old_labels[input_pos] = labels[input_pos];
+    		labels[input_pos] = labels[input_pos];
+		// check whether the old labels are here
+//		printf("The label for %d doesn't change, it is %d at position %d", src, labels[input_pos], input_pos);
+	}
 
         return (old_labels[input_pos] != labels[input_pos]);
 
@@ -299,17 +317,18 @@ struct LPIterationLoop
         filter_op));
 
       
-      labels.Move(util::DEVICE, util::HOST);
+      labels.Move(util::DEVICE, util::HOST, 11, 0 , stream);
 
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
       printf("\n");
-      for( int index = 0; index < 10; index +=1 ){
-        printf("%d", labels[index]);
+      for( int index = 0; index < 11; index +=1 ){
+        printf("%d ", labels[index]);
       }
       printf("\n");
 
+      labels.Move(util::HOST, util::DEVICE, 11, 0, stream);
 #ifdef RECORD_PER_ITERATION_STATS
       gpu_timer.Stop();
       float elapsed = gpu_timer.ElapsedMillis();

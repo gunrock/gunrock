@@ -9,7 +9,7 @@
  * @file
  * lp_problem.cuh
  *
- * @brief GPU Storage management Structure for BFS Problem Data
+ * @brief GPU Storage management Structure for LP Problem Data
  */
 
 #pragma once
@@ -21,7 +21,7 @@ namespace app {
 namespace lp {
 
 /**
- * @brief  Speciflying parameters for BFS Problem
+ * @brief  Speciflying parameters for LP Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter
  * info \return cudaError_t error message(s), if any
  */
@@ -173,7 +173,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // TODO
       // Need to maximize the space allocation to neighbour_labels
             
-      GUARD_CU(neighbour_labels.Allocate(1000000, target));
+      GUARD_CU(neighbour_labels.Allocate(1000, target));
 
       GUARD_CU(unvisited_vertices[0].Allocate(sub_graph.nodes, target));
       GUARD_CU(unvisited_vertices[1].Allocate(sub_graph.nodes, target));
@@ -230,13 +230,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   // Methods
 
   /**
-   * @brief BFSProblem default constructor
+   * @brief LPProblem default constructor
    */
   Problem(util::Parameters &_parameters, ProblemFlag _flag = Problem_None)
       : BaseProblem(_parameters, _flag), data_slices(NULL) {}
 
   /**
-   * @brief BFSProblem default destructor
+   * @brief LPProblem default destructor
    */
   virtual ~Problem() { Release(); }
 
@@ -386,15 +386,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     if (target & util::HOST) {
       data_slices[gpu]->labels[src_] = 0;
     }
+    printf("This is where the util:DEVICE=2 is checked with target %d\n", target);
 
     if (target & util::DEVICE) {
       GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
-      GUARD_CU(data_slices[gpu]->labels.ForAll(
-          [src_] __host__ __device__(LabelT * labels, const SizeT &v) {
-            labels[src_] = int(src_);
-          },
-          1, util::DEVICE));
+      //GUARD_CU(data_slices[gpu]->labels.ForAll(
+      //    [src_] __host__ __device__(LabelT * labels, const SizeT &v) {
+      //      labels[v] = int(v);
+      //    },
+      //    1, util::DEVICE));
+
+      GUARD_CU(data_slices[gpu]->labels.SetIdx());
 
 
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
@@ -407,7 +410,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
 };  // end of problem
 
-}  // namespace bfs
+}  // namespace lp 
 }  // namespace app
 }  // namespace gunrock
 
