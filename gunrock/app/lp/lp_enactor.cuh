@@ -163,7 +163,7 @@ struct LPIterationLoop
     auto &segments_size = data_slice.segments_size;
 
     // information related to the partitioned graph,
-    auto &original_vertex = graph.GpT::original_vertex;
+    // auto &original_vertex = graph.GpT::original_vertex;
     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
@@ -173,6 +173,8 @@ struct LPIterationLoop
     auto target = util::DEVICE;
     auto &gpu_num = this->gpu_num;
 
+    auto &visited = data_slice.visited;
+    
 #if TO_TRACK
     util::PrintMsg(
         "Core queue_length = " + std::to_string(frontier.queue_length), gpu_num,
@@ -227,7 +229,10 @@ struct LPIterationLoop
 
           for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
             
+
             VertexT u = graph.CsrT::GetEdgeDest(e);
+            // printf("The vertex %d, has a neighbour %d\n", idx, u);
+
             // printf("The vertex being inserted at position %d is %d", offset, u);
             neighbour_labels[offset++] = labels[u];
             atomicAdd(&neighbour_labels_size[0], 1);
@@ -258,40 +263,69 @@ struct LPIterationLoop
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
+      
+      neighbour_labels_size.Move(util::HOST, util::DEVICE, 1, 0 , stream);
+
+      GUARD_CU(frontier.V_Q()->ForAll(
+      [segments, labels, graph, old_labels] __host__ __device__(
+      const VertexT *v, const SizeT &index) {
+        VertexT idx = v[index];
+
+        if (segments[index] > -1){
+        	
+          old_labels[idx] = labels[idx];
+          labels[idx] = segments[index];
+      
+        }
+      
+        else{
+          //printf("old label was %d", old_labels[input_pos]);
+          old_labels[idx] = labels[idx];
+          labels[idx] = labels[idx];
+          // check whether the old labels are here
+      //		printf("The label for %d doesn't change, it is %d at position %d", src, labels[input_pos], input_pos);
+        }
+      },
+      frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
 
       auto filter_op =
-          [old_labels, labels, segments] __host__ __device__(
+          [old_labels, labels] __host__ __device__(
               const VertexT &src, VertexT &dest, const SizeT &edge_id,
               const VertexT &input_item, const SizeT &input_pos,
               SizeT &output_pos) -> bool {
 
 //        old_labels[input_pos] = labels[input_pos];
-	if (segments[input_pos] > -1){
+// 	if (segments[input_pos] > -1){
         	
-		old_labels[input_pos] = labels[input_pos];
-        	labels[input_pos] = segments[input_pos];
+// 	  old_labels[input_pos] = labels[input_pos];
+//     labels[input_pos] = segments[input_pos];
 
-	}
+// 	}
 
-	else{
-		//printf("old label was %d", old_labels[input_pos]);
-		old_labels[input_pos] = labels[input_pos];
-    		labels[input_pos] = labels[input_pos];
-		// check whether the old labels are here
-//		printf("The label for %d doesn't change, it is %d at position %d", src, labels[input_pos], input_pos);
-	}
-
-        return (old_labels[input_pos] != labels[input_pos]);
-
+// 	else{
+// 		//printf("old label was %d", old_labels[input_pos]);
+// 		old_labels[input_pos] = labels[input_pos];
+//     labels[input_pos] = labels[input_pos];
+// 		// check whether the old labels are here
+// //		printf("The label for %d doesn't change, it is %d at position %d", src, labels[input_pos], input_pos);
+// 	}
+        // printf("%d was %d, and is %d", dest, labels[dest], old_labels[dest]);
+        return old_labels[dest] != labels[dest];
+        // old_labels[dest] = labels[dest];
+        // old_labels[src] = labels[src];
+        // return flag;
       };
 
       auto advance_op =
-          [old_labels, labels] __host__
+          [visited] __host__
           __device__(const VertexT &src, VertexT &dest, const SizeT &edge_id,
                      const VertexT &input_item, const SizeT &input_pos,
                      SizeT &output_pos) -> bool {
                       // intentional no-op
-                      return true;
+                      printf("Vertex being added is %d", dest);
+                      // return true;
+                      bool already_visited = atomicMax(visited + dest, 1) == 1;
+                      return !already_visited;
                     };
       
 #ifdef RECORD_PER_ITERATION_STATS
@@ -312,23 +346,29 @@ struct LPIterationLoop
         graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
         advance_op, filter_op));
       
-      GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-        graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters, 
-        filter_op));
+      // GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+      //   graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters, 
+      //   filter_op));
 
       
-      labels.Move(util::DEVICE, util::HOST, 11, 0 , stream);
+      labels.Move(util::DEVICE, util::HOST, 4, 0 , stream);
+      old_labels.Move(util::DEVICE, util::HOST, 4, 0 , stream);
 
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
       printf("\n");
-      for( int index = 0; index < 11; index +=1 ){
+      for( int index = 0; index < 4; index +=1 ){
         printf("%d ", labels[index]);
+      }
+      printf("\n Old: \n");
+      for( int index = 0; index < 4; index +=1 ){
+        printf("%d ", old_labels[index]);
       }
       printf("\n");
 
-      labels.Move(util::HOST, util::DEVICE, 11, 0, stream);
+      labels.Move(util::HOST, util::DEVICE, 4, 0, stream);
+      old_labels.Move(util::HOST, util::DEVICE, 4, 0, stream);
 #ifdef RECORD_PER_ITERATION_STATS
       gpu_timer.Stop();
       float elapsed = gpu_timer.ElapsedMillis();

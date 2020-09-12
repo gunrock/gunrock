@@ -67,7 +67,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, LabelT> labels;  // labels (in the current iteration) for each vertex 
     util::Array1D<SizeT, LabelT> old_labels; // labels (in the previous iteration) for each vertex
     util::Array1D<SizeT, SizeT> vertex_markers[2];
-    util::Array1D<SizeT, VertexT> unvisited_vertices[2];
     util::Array1D<SizeT, SizeT, util::PINNED> split_lengths;
     util::Array1D<SizeT, VertexT> local_vertices;
     util::Array1D<SizeT, MaskT> visited_masks;
@@ -84,9 +83,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, int> segments_size;
 
     util::Array1D<uint64_t, char> cub_temp_storage;
-    SizeT num_visited_vertices, num_unvisited_vertices;
     bool been_in_backward;
 
+    util::Array1D<SizeT, int> visited;
     /*
      * @brief Default constructor
      */
@@ -96,8 +95,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       old_labels.SetName("old_labels");
       vertex_markers[0].SetName("vertex_markers[0]");
       vertex_markers[1].SetName("vertex_markers[1]");
-      unvisited_vertices[0].SetName("unvisited_vertices[0]");
-      unvisited_vertices[1].SetName("unvisited_vertices[1]");
       local_vertices.SetName("local_vertices");
       split_lengths.SetName("split_length");
       visited_masks.SetName("visited_masks");
@@ -112,6 +109,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       segments_temp.SetName("segments_temp");
       cub_temp_storage.SetName("cub_temp_storage");
 
+      visited.SetName("visited");
     }
 
     /*
@@ -123,13 +121,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cudaError_t retval = cudaSuccess;
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx));
 
-      // GUARD_CU(original_vertex      .Release(target));
+      GUARD_CU(visited.Release(target));
+      // GUARD_CU(original_vertex.Release(target));
       GUARD_CU(labels.Release(target));
       GUARD_CU(old_labels.Release(target));
       GUARD_CU(vertex_markers[0].Release(target));
       GUARD_CU(vertex_markers[1].Release(target));
-      GUARD_CU(unvisited_vertices[0].Release(target));
-      GUARD_CU(unvisited_vertices[1].Release(target));
       GUARD_CU(split_lengths.Release(target));
       GUARD_CU(local_vertices.Release(target));
       GUARD_CU(visited_masks.Release(target));
@@ -169,14 +166,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(segments_size.Allocate(1, target));
       GUARD_CU(neighbour_labels_size.Allocate(1,  util::DEVICE | util::HOST));
       GUARD_CU(cub_temp_storage.Allocate(1, target));
+      GUARD_CU(visited.Allocate(sub_graph.nodes, target));
       
       // TODO
       // Need to maximize the space allocation to neighbour_labels
             
       GUARD_CU(neighbour_labels.Allocate(1000, target));
-
-      GUARD_CU(unvisited_vertices[0].Allocate(sub_graph.nodes, target));
-      GUARD_CU(unvisited_vertices[1].Allocate(sub_graph.nodes, target));
+      
       GUARD_CU(split_lengths.Allocate(2, util::HOST | target));
 
       if (num_gpus > 1) {
@@ -210,14 +206,25 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cudaError_t retval = cudaSuccess;
 
       SizeT nodes = this->sub_graph->nodes;
-      num_visited_vertices = 0;
-      num_unvisited_vertices = 0;
+
       been_in_backward = false;
 
       GUARD_CU(util::SetDevice(this->gpu_idx));
 
       // Allocate output labels if necessary
       GUARD_CU(labels.EnsureSize_(nodes, target));
+      GUARD_CU(visited.EnsureSize_(nodes, target));
+
+      GUARD_CU(visited.ForEach( [] __host__ __device__(int &x) { x = (int)0; }, nodes, target, this->stream));
+      GUARD_CU(neighbour_labels_size.ForEach( [] __host__ __device__(int &x) { x = (int)0; }, nodes, target, this->stream));
+      GUARD_CU(segments_size.ForEach( [] __host__ __device__(int &x) { x = (int)0; }, nodes, target, this->stream));
+
+      // GUARD_CU(neighbour_labels_size.ForAll(
+      //   [] __host__ __device__(SizeT * x, const VertexT &pos) { x[pos] = 0; },
+      //   1, target, this->stream));
+      // GUARD_CU(segments_size.ForAll(
+      //   [] __host__ __device__(SizeT * x, const VertexT &pos) { x[pos] = 0; },
+      //   1, target, this->stream));
 
       return retval;
     }  // end of Reset
@@ -331,7 +338,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
   /**
    * @brief initialization function.
-   * @param     graph       The graph that SSSP processes on
+   * @param     graph       The graph that LP processes on
    * @param[in] Location    Memory location to work on
    * \return    cudaError_t Error message(s), if any
    */
@@ -361,6 +368,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   cudaError_t Reset(VertexT src, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
+
 
     for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
       // Set device
@@ -398,7 +406,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       //    1, util::DEVICE));
 
       GUARD_CU(data_slices[gpu]->labels.SetIdx());
-
 
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
     }
