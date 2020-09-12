@@ -240,7 +240,9 @@ struct LPIterationLoop
           };
         },
         frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
-      
+        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+               "cudaStreamSynchronize failed.");
       neighbour_labels_size.Move(util::DEVICE, util::HOST, 1, 0 , stream);
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
