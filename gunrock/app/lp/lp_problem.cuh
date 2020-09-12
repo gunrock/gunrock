@@ -126,7 +126,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx));
 
       GUARD_CU(visited.Release(target));
-      // GUARD_CU(original_vertex.Release(target));
       GUARD_CU(labels.Release(target));
       GUARD_CU(old_labels.Release(target));
       GUARD_CU(vertex_markers[0].Release(target));
@@ -224,13 +223,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(visited.ForEach( [] __host__ __device__(int &x) { x = (int)0; }, nodes, target, this->stream));
       GUARD_CU(neighbour_labels_size.ForEach( [] __host__ __device__(int &x) { x = (int)0; }, nodes, target, this->stream));
       GUARD_CU(segments_size.ForEach( [] __host__ __device__(int &x) { x = (int)0; }, nodes, target, this->stream));
-
-      // GUARD_CU(neighbour_labels_size.ForAll(
-      //   [] __host__ __device__(SizeT * x, const VertexT &pos) { x[pos] = 0; },
-      //   1, target, this->stream));
-      // GUARD_CU(segments_size.ForAll(
-      //   [] __host__ __device__(SizeT * x, const VertexT &pos) { x[pos] = 0; },
-      //   1, target, this->stream));
 
       return retval;
     }  // end of Reset
@@ -405,11 +397,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     if (target & util::DEVICE) {
       GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
-      //GUARD_CU(data_slices[gpu]->labels.ForAll(
-      //    [src_] __host__ __device__(LabelT * labels, const SizeT &v) {
-      //      labels[v] = int(v);
-      //    },
-      //    1, util::DEVICE));
 
       GUARD_CU(data_slices[gpu]->labels.SetIdx());
 

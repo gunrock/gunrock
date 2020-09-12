@@ -163,7 +163,6 @@ struct LPIterationLoop
     auto &segments_size = data_slice.segments_size;
 
     // information related to the partitioned graph,
-    // auto &original_vertex = graph.GpT::original_vertex;
     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
@@ -211,11 +210,9 @@ struct LPIterationLoop
                     util::DEVICE,
                     stream));
 
-
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
               "cudaStreamSynchronize failed.");
-
 
       GUARD_CU(util::cubExclusiveSum(cub_temp_storage, segments_temp,
         segments, frontier.queue_length , stream));
@@ -234,26 +231,23 @@ struct LPIterationLoop
           SizeT start_edge = graph.CsrT::GetNeighborListOffset(idx);
           SizeT num_neighbors = graph.CsrT::GetNeighborListLength(idx);
           int offset = segments[index];
-        
-          // printf("The vertex is %d and offset is %d\n", idx, offset); 
-
+      
           for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
-            
 
-            VertexT u = graph.CsrT::GetEdgeDest(e);
-            // printf("The vertex %d, has a neighbour %d\n", idx, u);
-            
-            printf("The vertex being inserted at position %d is %d comes from %d\n", offset, u, idx);
+            VertexT u = graph.CsrT::GetEdgeDest(e);            
             neighbour_labels[offset++] = labels[u];
             atomicAdd(&neighbour_labels_size[0], 1);
 
           };
         },
-        frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
-        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
-        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-               "cudaStreamSynchronize failed.");
+      frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+
+      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+              "cudaStreamSynchronize failed.");
+
       neighbour_labels_size.Move(util::DEVICE, util::HOST, 1, 0 , stream);
+
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
@@ -275,9 +269,7 @@ struct LPIterationLoop
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
-      
-     // neighbour_labels_size.Move(util::HOST, util::DEVICE, 1, 0 , stream);
-      
+            
       GUARD_CU(frontier.V_Q()->ForAll(
       [segments, labels, graph, old_labels] __host__ __device__(
       const VertexT *v, const SizeT &index) {         
@@ -285,18 +277,13 @@ struct LPIterationLoop
         VertexT idx = v[index];
         
         if (segments[index] > -1){
-        	
           old_labels[idx] = labels[idx];
           labels[idx] = segments[index];
-          printf("The label of vertex %d is changed to %d from %d\n", idx, labels[idx], old_labels[idx]);    
         }
       
-        else{
-          //printf("old label was %d", old_labels[input_pos]);
+        else {
           old_labels[idx] = labels[idx];
           labels[idx] = labels[idx];
-          // check whether the old labels are here
-      //		printf("The label for %d doesn't change, it is %d at position %d", src, labels[input_pos], input_pos);
         }
       },
       frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
@@ -307,40 +294,13 @@ struct LPIterationLoop
               const VertexT &input_item, const SizeT &input_pos,
               SizeT &output_pos) -> bool {
 
-//        old_labels[input_pos] = labels[input_pos];
-// 	if (segments[input_pos] > -1){
-        	
-// 	  old_labels[input_pos] = labels[input_pos];
-//     labels[input_pos] = segments[input_pos];
-
-// 	}
-
-// 	else{
-// 		//printf("old label was %d", old_labels[input_pos]);
-// 		old_labels[input_pos] = labels[input_pos];
-//     labels[input_pos] = labels[input_pos];
-// 		// check whether the old labels are here
-// //		printf("The label for %d doesn't change, it is %d at position %d", src, labels[input_pos], input_pos);
-// 	}
-        // printf("%d was %d, and is %d", dest, labels[dest], old_labels[dest]);
-
         if (old_labels[dest] == labels[dest]){
-          printf("The vertex that has the same label is %d\n", dest);
           return false;
         }
         else {
           bool already_added = atomicMax(visited + dest, 1) == 1;
-          if (already_added){
-            printf("The vertex that is not being readded is %d\n", dest);
-          }
-            return !already_added;
-
-          // return !(atomicMax(visited + dest, 1) == 1);
+          return !already_added;
         }
-        // return old_labels[dest] != labels[dest];
-        // old_labels[dest] = labels[dest];
-        // old_labels[src] = labels[src];
-        // return flag;
       };
 
       auto advance_op =
@@ -349,10 +309,7 @@ struct LPIterationLoop
                      const VertexT &input_item, const SizeT &input_pos,
                      SizeT &output_pos) -> bool {
                       // intentional no-op
-                      printf("%d is a Vertex candidate for the next frontier\n", dest);
                       return true;
-                      // bool already_visited = atomicMax(visited + dest, 1) == 1;
-                      // return !already_visited;
                     };
       
 #ifdef RECORD_PER_ITERATION_STATS
