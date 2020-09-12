@@ -71,6 +71,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, VertexT> local_vertices;
     util::Array1D<SizeT, MaskT> visited_masks;
     util::Array1D<SizeT, MaskT> old_mask;
+    util::Array1D<SizeT, VertexT> unvisited_vertices[2];
     util::Array1D<SizeT, MaskT *> in_masks;
 
     
@@ -83,6 +84,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, int> segments_size;
 
     util::Array1D<uint64_t, char> cub_temp_storage;
+    SizeT num_visited_vertices, num_unvisited_vertices;
     bool been_in_backward;
 
     util::Array1D<SizeT, int> visited;
@@ -95,6 +97,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       old_labels.SetName("old_labels");
       vertex_markers[0].SetName("vertex_markers[0]");
       vertex_markers[1].SetName("vertex_markers[1]");
+      unvisited_vertices[0].SetName("unvisited_vertices[0]");
+      unvisited_vertices[1].SetName("unvisited_vertices[1]");
       local_vertices.SetName("local_vertices");
       split_lengths.SetName("split_length");
       visited_masks.SetName("visited_masks");
@@ -130,6 +134,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(split_lengths.Release(target));
       GUARD_CU(local_vertices.Release(target));
       GUARD_CU(visited_masks.Release(target));
+      GUARD_CU(unvisited_vertices[0].Release(target));
+      GUARD_CU(unvisited_vertices[1].Release(target));
       GUARD_CU(old_mask.Release(target));
       GUARD_CU(in_masks.Release(target));
       GUARD_CU(in_masks.Release(target));

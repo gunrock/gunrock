@@ -233,7 +233,6 @@ struct LPIterationLoop
           VertexT idx = v[index];
           SizeT start_edge = graph.CsrT::GetNeighborListOffset(idx);
           SizeT num_neighbors = graph.CsrT::GetNeighborListLength(idx);
-	  printf("The index is %d", index);
           int offset = segments[index];
         
           // printf("The vertex is %d and offset is %d\n", idx, offset); 
@@ -243,19 +242,19 @@ struct LPIterationLoop
 
             VertexT u = graph.CsrT::GetEdgeDest(e);
             // printf("The vertex %d, has a neighbour %d\n", idx, u);
-
-            // printf("The vertex being inserted at position %d is %d", offset, u);
+            
+            printf("The vertex being inserted at position %d is %d comes from %d\n", offset, u, idx);
             neighbour_labels[offset++] = labels[u];
             atomicAdd(&neighbour_labels_size[0], 1);
 
           };
         },
         frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
-        // GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
         GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
                "cudaStreamSynchronize failed.");
       neighbour_labels_size.Move(util::DEVICE, util::HOST, 1, 0 , stream);
-      // GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
 
@@ -273,22 +272,23 @@ struct LPIterationLoop
 
       segments.Move(util::HOST, util::DEVICE, frontier.queue_length, 0 , stream);
 
-      // GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
       
      // neighbour_labels_size.Move(util::HOST, util::DEVICE, 1, 0 , stream);
-
+      
       GUARD_CU(frontier.V_Q()->ForAll(
       [segments, labels, graph, old_labels] __host__ __device__(
-      const VertexT *v, const SizeT &index) {
-        VertexT idx = v[index];
+      const VertexT *v, const SizeT &index) {         
 
+        VertexT idx = v[index];
+        
         if (segments[index] > -1){
         	
           old_labels[idx] = labels[idx];
           labels[idx] = segments[index];
-      
+          printf("The label of vertex %d is changed to %d from %d\n", idx, labels[idx], old_labels[idx]);    
         }
       
         else{
@@ -302,7 +302,7 @@ struct LPIterationLoop
       frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
 
       auto filter_op =
-          [old_labels, labels] __host__ __device__(
+          [old_labels, labels, visited] __host__ __device__(
               const VertexT &src, VertexT &dest, const SizeT &edge_id,
               const VertexT &input_item, const SizeT &input_pos,
               SizeT &output_pos) -> bool {
@@ -323,7 +323,21 @@ struct LPIterationLoop
 // //		printf("The label for %d doesn't change, it is %d at position %d", src, labels[input_pos], input_pos);
 // 	}
         // printf("%d was %d, and is %d", dest, labels[dest], old_labels[dest]);
-        return old_labels[dest] != labels[dest];
+
+        if (old_labels[dest] == labels[dest]){
+          printf("The vertex that has the same label is %d\n", dest);
+          return false;
+        }
+        else {
+          bool already_added = atomicMax(visited + dest, 1) == 1;
+          if (already_added){
+            printf("The vertex that is not being readded is %d\n", dest);
+          }
+            return !already_added;
+
+          // return !(atomicMax(visited + dest, 1) == 1);
+        }
+        // return old_labels[dest] != labels[dest];
         // old_labels[dest] = labels[dest];
         // old_labels[src] = labels[src];
         // return flag;
@@ -335,10 +349,10 @@ struct LPIterationLoop
                      const VertexT &input_item, const SizeT &input_pos,
                      SizeT &output_pos) -> bool {
                       // intentional no-op
-                      printf("Vertex being added is %d", dest);
-                      // return true;
-                      bool already_visited = atomicMax(visited + dest, 1) == 1;
-                      return !already_visited;
+                      printf("%d is a Vertex candidate for the next frontier\n", dest);
+                      return true;
+                      // bool already_visited = atomicMax(visited + dest, 1) == 1;
+                      // return !already_visited;
                     };
       
 #ifdef RECORD_PER_ITERATION_STATS
@@ -359,9 +373,9 @@ struct LPIterationLoop
         graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
         advance_op, filter_op));
       
-      // GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
-      //   graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters, 
-      //   filter_op));
+      GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+        graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters, 
+        filter_op));
 
       
       labels.Move(util::DEVICE, util::HOST, 4, 0 , stream);
