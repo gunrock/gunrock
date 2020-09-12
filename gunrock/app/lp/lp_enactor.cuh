@@ -210,9 +210,19 @@ struct LPIterationLoop
                     frontier.queue_length,
                     util::DEVICE,
                     stream));
+
+
+      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+              "cudaStreamSynchronize failed.");
+
+
       GUARD_CU(util::cubExclusiveSum(cub_temp_storage, segments_temp,
         segments, frontier.queue_length , stream));
 
+      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
+              "cudaStreamSynchronize failed.");
         
     
       auto elements = frontier.V_Q();
@@ -223,6 +233,7 @@ struct LPIterationLoop
           VertexT idx = v[index];
           SizeT start_edge = graph.CsrT::GetNeighborListOffset(idx);
           SizeT num_neighbors = graph.CsrT::GetNeighborListLength(idx);
+	  printf("The index is %d", index);
           int offset = segments[index];
         
           // printf("The vertex is %d and offset is %d\n", idx, offset); 
@@ -240,11 +251,11 @@ struct LPIterationLoop
           };
         },
         frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
-        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+        // GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
         GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
                "cudaStreamSynchronize failed.");
       neighbour_labels_size.Move(util::DEVICE, util::HOST, 1, 0 , stream);
-      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      // GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
 
@@ -262,11 +273,11 @@ struct LPIterationLoop
 
       segments.Move(util::HOST, util::DEVICE, frontier.queue_length, 0 , stream);
 
-      GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
+      // GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
              "cudaStreamSynchronize failed.");
       
-      neighbour_labels_size.Move(util::HOST, util::DEVICE, 1, 0 , stream);
+     // neighbour_labels_size.Move(util::HOST, util::DEVICE, 1, 0 , stream);
 
       GUARD_CU(frontier.V_Q()->ForAll(
       [segments, labels, graph, old_labels] __host__ __device__(
