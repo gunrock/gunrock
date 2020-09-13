@@ -172,11 +172,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(neighbour_labels_size.Allocate(1,  util::DEVICE | util::HOST));
       GUARD_CU(cub_temp_storage.Allocate(1, target));
       GUARD_CU(visited.Allocate(sub_graph.nodes, target));
-      
-      // TODO
-      // Need to maximize the space allocation to neighbour_labels
-            
-      GUARD_CU(neighbour_labels.Allocate(1000, target));
+      GUARD_CU(neighbour_labels.Allocate(sub_graph.edges+1, target));
       
       GUARD_CU(split_lengths.Allocate(2, util::HOST | target));
 

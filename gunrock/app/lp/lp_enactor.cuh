@@ -235,7 +235,6 @@ struct LPIterationLoop
           for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
 
             VertexT u = graph.CsrT::GetEdgeDest(e);   
-            printf("The vertex being inserted at position %d is %d comes from %d\n", offset, u, idx);
          
             neighbour_labels[offset++] = labels[u];
             atomicAdd(&neighbour_labels_size[0], 1);
@@ -281,8 +280,6 @@ struct LPIterationLoop
         if (segments[index] > -1){
           old_labels[idx] = labels[idx];
           labels[idx] = segments[index];
-
-          printf("The label of vertex %d is changed to %d from %d\n", idx, labels[idx], old_labels[idx]);
         }
       
         else {
@@ -299,17 +296,11 @@ struct LPIterationLoop
               SizeT &output_pos) -> bool {
 
         if (old_labels[dest] == labels[dest]){
-          printf("The vertex that has the same label is %d\n", dest);
           return false;
         }
         else {
-          // bool already_added = atomicMax(visited + dest, 1) == 1;
-          // return !already_added;
           bool already_added = atomicMax(visited + dest, 1) == 1;
-          if (already_added){
-            printf("The vertex that is not being readded is %d\n", dest);
-          }
-           return !already_added;
+          return !already_added;
         }
       };
 
@@ -319,8 +310,6 @@ struct LPIterationLoop
                      const VertexT &input_item, const SizeT &input_pos,
                      SizeT &output_pos) -> bool {
                       // intentional no-op
-                      printf("%d is a Vertex candidate for the next frontier\n", dest);
-
                       return true;
                     };
       
@@ -345,25 +334,6 @@ struct LPIterationLoop
       GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
         graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters, 
         filter_op));
-
-        labels.Move(util::DEVICE, util::HOST, 11, 0 , stream);
-        old_labels.Move(util::DEVICE, util::HOST, 11, 0 , stream);
-  
-        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
-        GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
-               "cudaStreamSynchronize failed.");
-        printf("\n");
-        for( int index = 0; index < 11; index +=1 ){
-          printf("%d ", labels[index]);
-        }
-        printf("\n Old: \n");
-        for( int index = 0; index < 11; index +=1 ){
-          printf("%d ", old_labels[index]);
-        }
-        printf("\n");
-  
-        labels.Move(util::HOST, util::DEVICE, 11, 0, stream);
-        old_labels.Move(util::HOST, util::DEVICE, 11, 0, stream);
 
 #ifdef RECORD_PER_ITERATION_STATS
       gpu_timer.Stop();
