@@ -6,7 +6,7 @@ message("-- Project Added: ${PROJECT_NAME}")
 include(${CMAKE_SOURCE_DIR}/cmake/SetSubProject.cmake)
 
 add_test(NAME TEST_LP COMMAND lp market
-	${gunrock_INCLUDE_DIRS}/dataset/small/lp_test_1.mtx
+	${gunrock_INCLUDE_DIRS}/dataset/small/test_lp_1.mtx
      --test=1 --remove-self-loops=false)
 
 # TODO: Add another test
