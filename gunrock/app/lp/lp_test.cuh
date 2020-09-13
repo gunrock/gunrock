@@ -129,6 +129,20 @@ typename GraphT::SizeT Validate_Results(
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::CsrT CsrT;
 
+  int test = parameters.Get<int>("test");
+
+  if (test == 1) {
+    // run test for test_lp_1.mtx
+    ref_labels = (LabelT*)malloc(4*sizeof(LabelT));
+    for (int i = 0; i < 4; i++) {
+      ref_labels[i] = 0;
+    }   
+  }
+  else if (test == 2) {
+    // TODO
+    // create another test for disconnected components
+  }
+
   SizeT num_errors = 0;
   // bool quick = parameters.Get<bool>("quick");
   bool quiet = parameters.Get<bool>("quiet");

@@ -42,6 +42,14 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       util::PreDefinedValues<int>::InvalidValue,
       "seed to generate random sources", __FILE__, __LINE__));
 
+  GUARD_CU(parameters.Use<int>(
+    "test",
+    util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+    -1,
+    "test id for validation", __FILE__, __LINE__));
+  
+  
+
   return retval;
 }
 
@@ -70,7 +78,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   // parse configurations from parameters
   bool quiet_mode = parameters.Get<bool>("quiet");
-   int num_runs = parameters.Get<int>("num-runs");
+  int num_runs = parameters.Get<int>("num-runs");
   std::string validation = parameters.Get<std::string>("validation");
   std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
   int num_srcs = srcs.size();
@@ -89,7 +97,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   // perform LP
   VertexT src;
-  
+
   for (int run_num = 0; run_num < num_runs; ++run_num) {
     src = srcs[run_num % num_srcs];
     GUARD_CU(problem.Reset(src, target));
@@ -167,7 +175,6 @@ double gunrock_lp(gunrock::util::Parameters &parameters, GraphT &graph,
   gunrock::util::Location target = gunrock::util::DEVICE;
   double total_time = 0;
   if (parameters.UseDefault("quiet")) parameters.Set("quiet", true);
-
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
@@ -226,7 +233,7 @@ double lp(const SizeT num_nodes, const SizeT num_edges,
   parameters.Parse_CommandLine(0, NULL);
   parameters.Set("graph-type", "by-pass");
   parameters.Set("num-runs", num_runs);
-
+  parameters.Set("test", -1);
   std::vector<VertexT> srcs;
   for (int i = 0; i < num_runs; i++) srcs.push_back(sources[i]);
   parameters.Set("srcs", srcs);
