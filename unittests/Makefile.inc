@@ -62,7 +62,7 @@ DEFINES 	= -DGIT_SHA1="\"$(shell git rev-parse HEAD)\""
 # 	ARCH = -m64
 # endif
 
-NVCCFLAGS = -lineinfo --std=c++11 --expt-extended-lambda -rdc=true --expt-relaxed-constexpr
+NVCCFLAGS = -lineinfo --std=c++14 --expt-extended-lambda -rdc=true --expt-relaxed-constexpr
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500

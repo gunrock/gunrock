@@ -6,7 +6,7 @@
 # ----------------------------------------------------------------
 
 include ../Makefile.inc
-ALGO = array
+ALGO = memory
 EXEC = bin/test_$(ALGO)
 
 test: $(EXEC)
