@@ -24,7 +24,7 @@ namespace algo {
  */
 namespace search {
 
-enum bound_t
+enum class bound_t
 {
   upper,
   lower
@@ -47,14 +47,14 @@ namespace binary
            typename key_t,
            typename int_t,
            typename comp_t>
-  __host__ int_t search(const key_t* keys,
-                        const key_t key,
-                        int_t count,
-                        int_t begin = 0,
-                        int_t end = count,
-                        comp_t comp = [](const key_t& a, const key_t& b) {
-                          return a < b;
-                        })
+  int_t search(const key_t& keys,
+               const key_t key,
+               int_t count,
+               int_t begin = 0,
+               int_t end = count,
+               comp_t comp = [](const key_t& a, const key_t& b) {
+                return a < b;
+               })
   {
     while (begin < end) {
       int_t mid = (begin + end) / 2;
@@ -78,14 +78,14 @@ namespace binary
            typename key_t,
            typename int_t,
            typename comp_t>
-  __host__ int_t leftmost(const key_t* keys,
-                          const key_t key,
-                          int_t count,
-                          int_t begin = 0,
-                          int_t end = count,
-                          comp_t less = [](const key_t& a, const key_t& b) {
-                            return a < b;
-                          })
+  int_t leftmost(const key_t& keys,
+                 const key_t key,
+                 int_t count,
+                 int_t begin = 0,
+                 int_t end = count,
+                 comp_t less = [](const key_t& a, const key_t& b) {
+                  return a < b;
+                 })
   {
     while (begin < end) {
       int_t mid = floor((begin + end) / 2);
@@ -109,14 +109,14 @@ namespace binary
            typename key_t,
            typename int_t,
            typename comp_t>
-  __host__ int_t rightmost(const key_t* keys,
-                           const key_t key,
-                           int_t count,
-                           int_t begin = 0,
-                           int_t end = count,
-                           comp_t greater = [](const key_t& a, const key_t& b) {
-                             return a > b;
-                           })
+  int_t rightmost(const key_t& keys,
+                  const key_t key,
+                  int_t count,
+                  int_t begin = 0,
+                  int_t end = count,
+                  comp_t greater = [](const key_t& a, const key_t& b) {
+                    return a > b;
+                  })
   {
     while (begin < end) {
       int_t mid = floor((begin + end) / 2);
@@ -145,7 +145,7 @@ namespace binary
            typename key_t,
            typename int_t,
            typename comp_t>
-  __device__ int_t search(const key_t* keys,
+  __device__ int_t search(const key_t& keys,
                           const key_t key,
                           int_t count,
                           int_t begin = 0,
@@ -176,7 +176,7 @@ namespace binary
            typename key_t,
            typename int_t,
            typename comp_t>
-  __device__ int_t leftmost(const key_t* keys,
+  __device__ int_t leftmost(const key_t& keys,
                             const key_t key,
                             int_t count,
                             int_t begin = 0,
@@ -207,7 +207,7 @@ namespace binary
            typename key_t,
            typename int_t,
            typename comp_t>
-  __device__ int_t rightmost(const key_t* keys,
+  __device__ int_t rightmost(const key_t& keys,
                              const key_t key,
                              int_t count,
                              int_t begin = 0,

@@ -47,18 +47,14 @@ template<scan_t scan_type,
          typename reduce_t,
          typename int_t,
          typename op_t>
-error_t
-scan(input_t* input,
-     int_t num_items,
-     output_t* output,
-     reduce_t* reduction,
-     mgpu::context_t& context,          // XXX: generalize
-     op_t op = mgpu::plus_t<input_t>(), // XXX: generalize
-     bool sync = false)
+void scan(input_t          &input,
+          int_t            num_items,
+          output_t         &output,
+          reduce_t         &reduction,
+          mgpu::context_t  &context,                      // XXX: generalize
+          op_t             op = mgpu::plus_t<input_t>(), // XXX: generalize
+          bool             sync = false)
 {
-
-  error_t status = util::error : success;
-
   // XXX: Experiment with these values and choose the best ones. We
   // could even choose to make them a parameter of util::Scan and choose
   // based on our usage
@@ -81,7 +77,6 @@ scan(input_t* input,
   if (sync) {
     // XXX: cuda sync
   }
-  return status;
 }
 
 namespace block {

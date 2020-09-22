@@ -36,13 +36,13 @@ namespace sorted
            typename haystack_t,
            typename pos_t,
            typename int_t>
-  cudaError_t SortedSearch(needle_t* needles,
-                           int_t num_needles,
-                           haystack_t* haystack,
-                           int_t num_haystack,
-                           pos_t* indices,
-                           mgpu::context_t& context,
-                           bool sync = false)
+  void search(needle_t& needles,
+              int_t num_needles,
+              haystack_t& haystack,
+              int_t num_haystack,
+              pos_t& indices,
+              mgpu::context_t& context,
+              bool sync = false)
   {
 
     cudaError_t status = util::error::success;
@@ -82,8 +82,6 @@ namespace sorted
     if (sync) {
       // XXX: implement sync
     }
-
-    return status;
   }
 
   } // namespace: device
