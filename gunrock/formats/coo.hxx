@@ -18,9 +18,9 @@ struct coo_t {
     index_t num_columns;
     index_t num_nonzeros;
 
-    thrust::host_vector<index_t> I; // row indices
-    thrust::host_vector<index_t> J; // column indices
-    thrust::host_vector<value_t> V; // nonzero values
+    std::shared_ptr<index_t> I; // row indices
+    std::shared_ptr<index_t> J; // column indices
+    std::shared_ptr<value_t> V; // nonzero values
 
     coo_t() : 
         num_rows(0),

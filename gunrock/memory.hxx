@@ -10,6 +10,12 @@ namespace memory {
  * @brief memory space; cuda (device) or host.
  * Can be extended to support uvm and multi-gpu.
  * 
+ * @todo change this enum to support cudaMemoryType
+ * (see ref;  std::underlying_type<cudaMemoryType>::type)
+ * instead of some random enums, we can rely
+ * on cudaMemoryTypeHost/Device/Unregistered/Managed
+ * for this.
+ *
  */
 enum memory_space_t {
     device,
@@ -19,35 +25,35 @@ enum memory_space_t {
 /**
  * @brief allocate a pointer with size on a specfied memory space.
  * 
- * @tparam T 
- * @param size 
- * @param space 
- * @return T* 
+ * @tparam T return type of the pointer being allocated.
+ * @param size size in bytes (bytes to be allocated).
+ * @param space memory space domain where the allocation should happen.
+ * @return T* return allocated T* pointer. 
  */
 template<typename T>
-T* allocate(std::size_t size, memory_space_t space) {
-    void *p = nullptr;
+inline T* allocate(std::size_t size, memory_space_t space) {
+    void *pointer = nullptr;
     if(size) {
         error::error_t status = (device == space) ?
-            cudaMalloc(&p, size) : cudaMallocHost(&p, size);
+            cudaMalloc(&pointer, size) : cudaMallocHost(&pointer, size);
         if (status != cudaSuccess) throw error::exception_t(status);
     }
 
-    return reinterpret_cast<T*>(p);
+    return reinterpret_cast<T*>(pointer);
 }
 
 /**
  * @brief free allocated memory on memory space.
  * 
- * @tparam T 
- * @param p 
- * @param space 
+ * @tparam T type of the pointer.
+ * @param pointer pointer to free memory of.
+ * @param space memory space domain where the pointer was allocated.
  */
 template<typename T>
-void free(T* p, memory_space_t space) {
-    if(p) {
+inline void free(T* pointer, memory_space_t space) {
+    if(pointer) {
         error::error_t status = (device == space) ? 
-        cudaFree((void*)p) : cudaFreeHost((void*)p);    // XXX: reinterpret_cast?
+        cudaFree((void*)pointer) : cudaFreeHost((void*)pointer);    // XXX: reinterpret_cast?
         if(cudaSuccess != status) throw error::exception_t(status);
     }
 }

@@ -3,25 +3,25 @@
 #define THRUST_IGNORE_CUB_VERSION_CHECK
 
 #include <gunrock/container/array.cuh>
-typedef cudaError_t test_error_t;
+#include <gunrock/error.hxx>
 
 template<std::size_t N, typename T>
 __global__ void kernel(T a) 
 {
   int idx = threadIdx.x + (blockDim.x * blockIdx.x);
-  if (idx > N) return;
+  if (idx >= N) return;
 
   a[idx] = (float)idx;
   printf("a[%i] = %f\n", idx, a[idx]);
 }
 
-test_error_t
-test_array()
+void test_array()
 {
   using namespace gunrock;
   using namespace container::dense;
 
-  test_error_t status         = cudaSuccess;
+  error::error_t status = cudaSuccess;
+
   constexpr std::size_t N     = 10;
 
   array<float, N>               a;
@@ -33,9 +33,13 @@ test_array()
   std::size_t max_size        = a.max_size();
   bool is_empty               = a.empty();
 
-  cudaDeviceSynchronize();
+  status = cudaDeviceSynchronize();
+  if(cudaSuccess != status) throw error::exception_t(status);
+
   kernel<N><<<1, N>>>(a);
-  cudaDeviceSynchronize();
+  
+  status = cudaDeviceSynchronize();
+  if(cudaSuccess != status) throw error::exception_t(status);
 
   // Segmentation fault; no host support
   // XXX: this is trivial to add using
@@ -45,12 +49,11 @@ test_array()
   // complicated. I will consider this if
   // find it useful.
   // a[0] = 0;
-
-  return status;
 }
 
 int
 main(int argc, char** argv)
 {
-  return test_array();
+  test_array();
+  return;
 }

@@ -147,12 +147,12 @@ struct graph_coo_t : public graph_base_t<vertex_t, edge_t, weight_t> {
                 vertex_t number_of_vertices, 
                 edge_t number_of_edges) : 
         graph_base_t<vertex_t, edge_t, weight_t>(number_of_vertices, number_of_edges),
-        coo.I(std::vector<vertex_t>(std::begin(src_indices), std::end(src_indices))),
-        coo.J(std::vector<vertex_t>(std::begin(dst_indices), std::end(dst_indices))),
-        coo.V(std::vector<weight_t>(std::begin(weights), std::end(weights))),
-        coo.num_rows(number_of_vertices),
-        coo.num_columns(number_of_vertices),  // XXX: num_columns = number_of_vertices?
-        coo.num_nonzeros(number_of_edges) {}
+        I(src_indices), 
+        J(dst_indices), 
+        V(weights),
+        num_rows(number_of_vertices), 
+        num_columns(number_of_vertices), 
+        num_nonzeros(number_of_edges) {}
 
     private:
         coo_t<vertex_t, weight_t> coo;
