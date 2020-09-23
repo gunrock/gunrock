@@ -1,7 +1,6 @@
 #define THRUST_IGNORE_CUB_VERSION_CHECK
 
 #include <gunrock/memory.hxx>
-#include <memory>
 
 template<std::size_t N>
 __global__ void kernel(int* a) 

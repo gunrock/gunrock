@@ -1,6 +1,8 @@
 #pragma once
 
 #include <iostream>
+#include <memory>
+
 #include <gunrock/error.hxx>
 
 namespace gunrock {
