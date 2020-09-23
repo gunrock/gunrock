@@ -27,9 +27,15 @@ void test_csr()
   // V         = [ 5 8 3 6 ]
   // COL_INDEX = [ 0 1 2 1 ]
   // ROW_INDEX = [ 0 0 2 3 4 ]
-  offset_t Ap[] = {0, 0, 2, 3, 4};
-  index_t Aj[] = {0, 1, 2, 1};
-  value_t Ax[] = {5, 8, 3, 6};
+  offset_t *Ap = memory::allocate<offset_t>((r+1)*sizeof(offset_t), location);
+  index_t *Aj = memory::allocate<index_t>((nnz)*sizeof(index_t), location);
+  value_t *Ax = memory::allocate<value_t>((nnz)*sizeof(value_t), location);
+
+  // XXX: ugly way to initialize these, but it works.
+  Ap[0] = 0; Ap[1] = 0; Ap[2] = 2; Ap[3] = 3; Ap[4] = 4;
+  Aj[0] = 0; Aj[1] = 1; Aj[2] = 2; Aj[3] = 3;
+  Ax[0] = 5; Ax[1] = 8; Ax[2] = 3; Ax[3] = 6;
+
   csr_t<offset_t, index_t, value_t> __csr(r, c, nnz,
     Ap, Aj, Ax, location);
 }
