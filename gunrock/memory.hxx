@@ -36,6 +36,7 @@ enum memory_space_t {
 template<typename T>
 inline T* allocate(std::size_t size, memory_space_t space) {
     void *pointer = nullptr;
+    if(space == unknown) throw error::exception_t(cudaErrorUnknown);
     if(size) {
         error::error_t status = (device == space) ?
             cudaMalloc(&pointer, size) : cudaMallocHost(&pointer, size);
@@ -54,6 +55,7 @@ inline T* allocate(std::size_t size, memory_space_t space) {
  */
 template<typename T>
 inline void free(T* pointer, memory_space_t space) {
+    if(space == unknown) throw error::exception_t(cudaErrorUnknown);
     if(pointer) {
         error::error_t status = (device == space) ? 
         cudaFree((void*)pointer) : cudaFreeHost((void*)pointer);    // XXX: reinterpret_cast?
