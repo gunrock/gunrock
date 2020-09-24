@@ -53,6 +53,7 @@ struct csr_t {
             [&](value_t* ptr) { memory::free(ptr, location); }) {}
 
     // Wrapper over existing pointers
+    // allocated in the known memory space
     csr_t(index_t r, index_t c, index_t nnz,
           offset_t* Ap, index_t* Aj, value_t* Ax,
           memory::memory_space_t loc) :
@@ -63,6 +64,18 @@ struct csr_t {
         row_offsets(Ap, [&](offset_t* ptr) { memory::free(ptr, location); }),
         column_indices(Aj, [&](index_t* ptr) { memory::free(ptr, location); }),
         nonzero_values(Ax, [&](value_t* ptr) { memory::free(ptr, location); }) {}
+
+    // Wrapper over existing pointers
+    // allocated in the unknown memory space
+    csr_t(index_t r, index_t c, index_t nnz,
+          offset_t* Ap, index_t* Aj, value_t* Ax) :
+        num_rows(r),
+        num_columns(c),
+        num_nonzeros(nnz),
+        location(memory::memory_space_t::unknown),
+        row_offsets(Ap),
+        column_indices(Aj),
+        nonzero_values(Ax) {}
 
 }; // struct csr_t
 

@@ -38,6 +38,18 @@ void test_csr()
 
   csr_t<offset_t, index_t, value_t> __csr(r, c, nnz,
     Ap, Aj, Ax, location);
+
+  // CSR array with unknown memory space
+  // this is bad practice, the reason being, we are passing
+  // a raw pointer, allocated using new, into the constructor, which
+  // turns the raw pointer into a shared_ptr<>(), and if this raw pointer
+  // was used in multiple shared_ptrs<>(), both shared pointers will attempt
+  // to free the same raw pointer twice, and will cause an issue (delete twice).
+  // source: https://shawnliu.me/post/creating-shared-ptr-from-raw-pointer-in-c++/
+  offset_t *_Ap = new offset_t[r+1];
+  index_t *_Aj = new index_t[nnz];
+  value_t *_Ax = new value_t[nnz];
+  csr_t<offset_t, index_t, value_t> ___csr(r, c, nnz, _Ap, _Aj, _Ax);
 }
 
 int

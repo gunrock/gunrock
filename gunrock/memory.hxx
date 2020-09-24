@@ -21,7 +21,8 @@ namespace memory {
  */
 enum memory_space_t {
     device,
-    host
+    host,
+    unknown
 };
 
 /**
