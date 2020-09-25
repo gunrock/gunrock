@@ -2,8 +2,8 @@
 
 #define THRUST_IGNORE_CUB_VERSION_CHECK
 
-#include <gunrock/container/array.cuh>
 #include <gunrock/error.hxx>
+#include <gunrock/container/array.cuh>
 
 template<std::size_t N, typename T>
 __global__ void kernel(T a) 

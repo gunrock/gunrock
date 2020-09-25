@@ -1,6 +1,6 @@
 #pragma once
 
-#include <gunrock/container/vector.cuh>
+#include <gunrock/memory.hxx>
 
 namespace gunrock {
 namespace format {
@@ -9,14 +9,18 @@ namespace format {
  * @brief Coordinate (COO) format.
  * 
  * @tparam index_t 
+ * @tparam nz_size_t
  * @tparam value_t
  */
 template <typename index_t,
+          typename nz_size_t,
           typename value_t>
 struct coo_t {
     index_t num_rows;
     index_t num_columns;
-    index_t num_nonzeros;
+    nz_size_t num_nonzeros;
+
+    memory::memory_space_t location;
 
     std::shared_ptr<index_t> I; // row indices
     std::shared_ptr<index_t> J; // column indices
@@ -32,7 +36,7 @@ struct coo_t {
         V(std::make_shared<value_t>()) {}
 
     // Build using r, c, nnz
-    coo_t(index_t r, index_t c, index_t nnz,
+    coo_t(index_t r, index_t c, nz_size_t nnz,
           memory::memory_space_t loc = memory::memory_space_t::device) :
         num_rows(r),
         num_columns(c),
@@ -47,7 +51,7 @@ struct coo_t {
 
     // Wrapper over existing pointers
     // allocated in the known (cudaMallocHost, cudaMalloc ...) memory space
-    coo_t(index_t r, index_t c, index_t nnz,
+    coo_t(index_t r, index_t c, nz_size_t nnz,
           index_t* _I, index_t* _J, value_t* _V,
           memory::memory_space_t loc) :
         num_rows(r),
@@ -60,7 +64,7 @@ struct coo_t {
 
     // Wrapper over existing pointers
     // allocated in the unknown memory space
-    coo_t(index_t r, index_t c, index_t nnz,
+    coo_t(index_t r, index_t c, nz_size_t nnz,
           index_t* _I, index_t* _J, value_t* _V) :
         num_rows(r),
         num_columns(c),

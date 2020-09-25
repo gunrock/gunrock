@@ -19,6 +19,8 @@ struct csc_t {
     index_t num_columns;
     index_t num_nonzeros;
 
+    memory::memory_space_t location;
+
     std::shared_ptr<offset_t> column_offsets; // Aj
     std::shared_ptr<index_t> row_indices; // Ap
     std::shared_ptr<value_t> nonzero_values; // Ax

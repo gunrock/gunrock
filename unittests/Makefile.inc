@@ -39,7 +39,7 @@ CUB_INC 	= -I"../../externals/cub"
 CUDA_CPP 	= -I"../../externals/cuda-api-wrappers/src"
 R_JSON		= -I"../../externals/rapidjson/include"
 
-GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=1.1.0
+GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=2.0.0
 LINK = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
 INC = $(CUDA_CPP) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(R_JSON) $(CUDA_INC) -I.. -I../.. $(LINK)
 
@@ -107,5 +107,5 @@ DEPS = ./Makefile \
 #-------------------------------------------------------------------------------
 
 clean :
-	rm -f bin/*_*
+	rm -rf bin
 	rm -f *.i* *.cubin *.cu.c *.cudafe* *.fatbin.c *.ptx *.hash *.cu.cpp *.o

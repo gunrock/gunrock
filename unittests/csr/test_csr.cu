@@ -2,6 +2,7 @@
 
 #define THRUST_IGNORE_CUB_VERSION_CHECK
 
+#include <gunrock/error.hxx>
 #include <gunrock/formats/csr.hxx>
 
 void test_csr()

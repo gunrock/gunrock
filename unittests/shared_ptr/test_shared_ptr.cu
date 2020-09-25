@@ -1,5 +1,6 @@
 #define THRUST_IGNORE_CUB_VERSION_CHECK
 
+#include <gunrock/error.hxx>
 #include <gunrock/memory.hxx>
 
 template<std::size_t N>
