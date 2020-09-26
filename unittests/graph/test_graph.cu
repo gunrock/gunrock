@@ -13,7 +13,7 @@ void test_graph()
   using edge_t    = int;
   using weight_t  = float;
 
-  constexpr bool HAS_CSR = true;
+  constexpr bool HAS_CSR = false;
   constexpr bool HAS_CSC = false;
   constexpr bool HAS_COO = false;
 

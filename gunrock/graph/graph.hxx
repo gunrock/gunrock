@@ -24,7 +24,7 @@ struct graph_properties_t {
 };
 
 template <typename vertex_t, typename edge_t, typename weight_t>
-struct graph_base_t {
+class graph_base_t {
 
     using vertex_type = vertex_t;
     using edge_type   = edge_t;
@@ -35,40 +35,41 @@ struct graph_base_t {
 
     using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
 
-    graph_base_t() : 
-        _number_of_vertices(0), 
-        _number_of_edges(0), 
-        _properties() {}
+    public:
+        graph_base_t() : 
+            _number_of_vertices(0), 
+            _number_of_edges(0), 
+            _properties() {}
 
-    graph_base_t(vertex_type number_of_vertices, edge_type number_of_edges) :
-        _number_of_vertices(number_of_vertices),
-        _number_of_edges(number_of_edges),
-        _properties() {}
+        graph_base_t(vertex_type number_of_vertices, edge_type number_of_edges) :
+            _number_of_vertices(number_of_vertices),
+            _number_of_edges(number_of_edges),
+            _properties() {}
 
-    graph_base_t(vertex_type number_of_vertices, edge_type number_of_edges, properties_type properties) :
-        _number_of_vertices(number_of_vertices),
-        _number_of_edges(number_of_edges),
-        _properties(properties) {}
+        graph_base_t(vertex_type number_of_vertices, edge_type number_of_edges, properties_type properties) :
+            _number_of_vertices(number_of_vertices),
+            _number_of_edges(number_of_edges),
+            _properties(properties) {}
 
-    vertex_type number_of_vertices() { return _number_of_vertices; }
-    edge_type number_of_edges() { return _number_of_edges; }
-    bool is_directed() { return _properties.directed; }
+        vertex_type number_of_vertices() { return _number_of_vertices; }
+        edge_type number_of_edges() { return _number_of_edges; }
+        bool is_directed() { return _properties.directed; }
 
-    // Pure Virtual Functions:: must be implemented in derived classes
-    __host__ __device__ __forceinline__
-    virtual edge_type get_neighbor_list_length(const vertex_type& v) const = 0;
-    
-    __host__ __device__ __forceinline__
-    virtual vertex_type get_source_vertex(const edge_type& e) const = 0;
-    
-    __host__ __device__ __forceinline__
-    virtual vertex_type get_destination_vertex(const edge_type& e) const = 0;
-    
-    __host__ __device__ __forceinline__
-    virtual vertex_pair_type get_source_and_destination_vertices(const edge_type& e) const = 0; // XXX: return type?
-    
-    __host__ __device__ __forceinline__
-    virtual edge_type get_edge(const vertex_type& source, const vertex_type& destination) const = 0;
+        // Pure Virtual Functions:: must be implemented in derived classes
+        __host__ __device__ __forceinline__
+        virtual edge_type get_neighbor_list_length(const vertex_type& v) const = 0;
+        
+        __host__ __device__ __forceinline__
+        virtual vertex_type get_source_vertex(const edge_type& e) const = 0;
+        
+        __host__ __device__ __forceinline__
+        virtual vertex_type get_destination_vertex(const edge_type& e) const = 0;
+        
+        __host__ __device__ __forceinline__
+        virtual vertex_pair_type get_source_and_destination_vertices(const edge_type& e) const = 0; // XXX: return type?
+        
+        __host__ __device__ __forceinline__
+        virtual edge_type get_edge(const vertex_type& source, const vertex_type& destination) const = 0;
 
     protected:
         vertex_type     _number_of_vertices;
@@ -79,7 +80,7 @@ struct graph_base_t {
 }; // struct graph_base_t
 
 template <typename vertex_t, typename edge_t, typename weight_t> 
-struct graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
+class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
     
     using vertex_type = vertex_t;
     using edge_type   = edge_t;
@@ -91,66 +92,67 @@ struct graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
     using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
     using csr_type        = csr_t<vertex_type, edge_type, weight_type>;
 
-    graph_csr_t() : graph_base_type() {}
+    public:
+        graph_csr_t() : graph_base_type() {}
 
-    graph_csr_t(edge_type* offsets, 
-                vertex_type* indices, 
-                weight_type* weights, 
-                vertex_type number_of_vertices, 
-                edge_type number_of_edges) : 
-        graph_base_type(
-            number_of_vertices, 
-            number_of_edges),
-        csr(
-            number_of_vertices, 
-            number_of_vertices, 
-            number_of_edges, 
-            offsets, 
-            indices, 
-            weights) {}
-    
-    // Override pure virtual functions
-    // Must use [override] keyword to identify functions that are
-    // overriding the derived class
-    __host__ __device__ __forceinline__
-    edge_type get_neighbor_list_length(const vertex_type& v) const override {
-        assert(v < graph_base_type::_number_of_vertices);
-        auto offsets = csr.row_offsets.get();
-        return (offsets[v+1] - offsets[v]);
-    }
+        graph_csr_t(edge_type* offsets, 
+                    vertex_type* indices, 
+                    weight_type* weights, 
+                    vertex_type number_of_vertices, 
+                    edge_type number_of_edges) : 
+            graph_base_type(
+                number_of_vertices, 
+                number_of_edges),
+            csr(
+                number_of_vertices, 
+                number_of_vertices, 
+                number_of_edges, 
+                offsets, 
+                indices, 
+                weights) {}
+        
+        // Override pure virtual functions
+        // Must use [override] keyword to identify functions that are
+        // overriding the derived class
+        __host__ __device__ __forceinline__
+        edge_type get_neighbor_list_length(const vertex_type& v) const override {
+            assert(v < graph_base_type::_number_of_vertices);
+            auto offsets = csr.row_offsets.get();
+            return (offsets[v+1] - offsets[v]);
+        }
 
-    __host__ __device__ __forceinline__
-    vertex_type get_source_vertex(const edge_type& e) const override {
-        assert(e < graph_base_type::_number_of_edges);
-        // return (algo::search::binary::device::block::rightmost(
-        //     csr.row_offsets.get(), e, 
-        //     graph_base_type::_number_of_vertices));
-    }
-    
-    __host__ __device__ __forceinline__
-    vertex_type get_destination_vertex(const edge_type& e) const override { 
+        __host__ __device__ __forceinline__
+        vertex_type get_source_vertex(const edge_type& e) const override {
+            assert(e < graph_base_type::_number_of_edges);
+            // return (algo::search::binary::device::block::rightmost(
+            //     csr.row_offsets.get(), e, 
+            //     graph_base_type::_number_of_vertices));
+        }
+        
+        __host__ __device__ __forceinline__
+        vertex_type get_destination_vertex(const edge_type& e) const override { 
 
-    }
-    __host__ __device__ __forceinline__
-    vertex_pair_type get_source_and_destination_vertices(const edge_type& e) const override {
+        }
+        __host__ __device__ __forceinline__
+        vertex_pair_type get_source_and_destination_vertices(const edge_type& e) const override {
 
-    }
-    
-    __host__ __device__ __forceinline__
-    edge_type get_edge(const vertex_type& source, 
-                       const vertex_type& destination) const override {
+        }
+        
+        __host__ __device__ __forceinline__
+        edge_type get_edge(const vertex_type& source, 
+                        const vertex_type& destination) const override {
 
-    }
+        }
 
-    // Representation specific functions
-    // ...
+        // Representation specific functions
+        // ...
 
     private:
         csr_type csr;
 };  // struct graph_csr_t
 
 template <typename vertex_t, typename edge_t, typename weight_t> 
-struct graph_csc_t : public graph_base_t<vertex_t, edge_t, weight_t> {
+class graph_csc_t : public graph_base_t<vertex_t, edge_t, weight_t> {
 
     using vertex_type = vertex_t;
     using edge_type   = edge_t;
@@ -162,61 +164,62 @@ struct graph_csc_t : public graph_base_t<vertex_t, edge_t, weight_t> {
     using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
     using csc_type        = csc_t<vertex_type, edge_type, weight_type>;
     
-    graph_csc_t() : graph_base_type() {}
+    public:
+        graph_csc_t() : graph_base_type() {}
 
-    graph_csc_t(edge_type* offsets, 
-                vertex_type* indices, 
-                weight_type* weights, 
-                vertex_type number_of_vertices, 
-                edge_type number_of_edges) : 
-        graph_base_type(
-            number_of_vertices, 
-            number_of_edges),
-        csc(
-            number_of_vertices, 
-            number_of_vertices, 
-            number_of_edges, 
-            offsets, 
-            indices, 
-            weights) {}
-    
-    // Override pure virtual functions
-    // Must use [override] keyword to identify functions that are
-    // overriding the derived class
-    __host__ __device__ __forceinline__
-    edge_type get_neighbor_list_length(const vertex_type& v) const override {
+        graph_csc_t(edge_type* offsets, 
+                    vertex_type* indices, 
+                    weight_type* weights, 
+                    vertex_type number_of_vertices, 
+                    edge_type number_of_edges) : 
+            graph_base_type(
+                number_of_vertices, 
+                number_of_edges),
+            csc(
+                number_of_vertices, 
+                number_of_vertices, 
+                number_of_edges, 
+                offsets, 
+                indices, 
+                weights) {}
+        
+        // Override pure virtual functions
+        // Must use [override] keyword to identify functions that are
+        // overriding the derived class
+        __host__ __device__ __forceinline__
+        edge_type get_neighbor_list_length(const vertex_type& v) const override {
 
-    }
+        }
 
-    __host__ __device__ __forceinline__
-    vertex_type get_source_vertex(const edge_type& e) const override {
+        __host__ __device__ __forceinline__
+        vertex_type get_source_vertex(const edge_type& e) const override {
 
-    }
-    
-    __host__ __device__ __forceinline__
-    vertex_type get_destination_vertex(const edge_type& e) const override { 
+        }
+        
+        __host__ __device__ __forceinline__
+        vertex_type get_destination_vertex(const edge_type& e) const override { 
 
-    }
-    __host__ __device__ __forceinline__
-    vertex_pair_type get_source_and_destination_vertices(const edge_type& e) const override {
+        }
+        __host__ __device__ __forceinline__
+        vertex_pair_type get_source_and_destination_vertices(const edge_type& e) const override {
 
-    }
-    
-    __host__ __device__ __forceinline__
-    edge_type get_edge(const vertex_type& source, 
-                       const vertex_type& destination) const override {
+        }
+        
+        __host__ __device__ __forceinline__
+        edge_type get_edge(const vertex_type& source, 
+                        const vertex_type& destination) const override {
 
-    }
+        }
 
-    // Representation specific functions
-    // ...
+        // Representation specific functions
+        // ...
 
     private:
         csc_type csc;
 };  // struct graph_csc_t
 
 template <typename vertex_t, typename edge_t, typename weight_t> 
-struct graph_coo_t : public graph_base_t<vertex_t, edge_t, weight_t> {
+class graph_coo_t : public graph_base_t<vertex_t, edge_t, weight_t> {
 
     using vertex_type = vertex_t;
     using edge_type   = edge_t;
@@ -228,53 +231,58 @@ struct graph_coo_t : public graph_base_t<vertex_t, edge_t, weight_t> {
     using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
     using coo_type        = coo_t<vertex_type, edge_type, weight_type>;
     
-    graph_coo_t() : graph_base_type() {}
+    public:
+        graph_coo_t() : graph_base_type() {}
 
-    graph_coo_t(edge_type* row_indices,
-                edge_type* column_indices, 
-                weight_type* weights,
-                vertex_type number_of_vertices,
-                edge_type number_of_edges) : 
-        graph_base_type(
-            number_of_vertices, 
-            number_of_edges),
-        coo(number_of_vertices, 
-            number_of_vertices, 
-            number_of_edges, 
-            row_indices, 
-            column_indices, 
-            weights) {}
-    
-    // Override pure virtual functions
-    // Must use [override] keyword to identify functions that are
-    // overriding the derived class
-    __host__ __device__ __forceinline__
-    edge_type get_neighbor_list_length(const vertex_type& v) const override {
+        graph_coo_t(edge_type* row_indices,
+                    edge_type* column_indices, 
+                    weight_type* weights,
+                    vertex_type number_of_vertices,
+                    edge_type number_of_edges) : 
+            graph_base_type(
+                number_of_vertices, 
+                number_of_edges),
+            coo(number_of_vertices, 
+                number_of_vertices, 
+                number_of_edges, 
+                row_indices, 
+                column_indices, 
+                weights) {}
+        
+        // Override pure virtual functions
+        // Must use [override] keyword to identify functions that are
+        // overriding the derived class
+        __host__ __device__ __forceinline__
+        edge_type get_neighbor_list_length(const vertex_type& v) const override {
 
-    }
+        }
 
-    __host__ __device__ __forceinline__
-    vertex_type get_source_vertex(const edge_type& e) const override {
-        return coo.I[e];
-    }
-    
-    __host__ __device__ __forceinline__
-    vertex_type get_destination_vertex(const edge_type& e) const override { 
-        return coo.J[e];
-    }
-    __host__ __device__ __forceinline__
-    vertex_pair_type get_source_and_destination_vertices(const edge_type& e) const override {
-        return {coo.I[e], coo.J[e]};
-    }
-    
-    __host__ __device__ __forceinline__
-    edge_type get_edge(const vertex_type& source, 
-                       const vertex_type& destination) const override {
+        __host__ __device__ __forceinline__
+        vertex_type get_source_vertex(const edge_type& e) const override {
+            auto source_indices = coo.I.get();
+            return source_indices[e];
+        }
+        
+        __host__ __device__ __forceinline__
+        vertex_type get_destination_vertex(const edge_type& e) const override {
+            auto destination_indices = coo.J.get(); 
+            return destination_indices[e];
+        }
+        __host__ __device__ __forceinline__
+        vertex_pair_type get_source_and_destination_vertices(const edge_type& e) const override {
+            auto source_indices = coo.I.get();
+            auto destination_indices = coo.J.get();
+            return {source_indices[e], destination_indices[e]};
+        }
+        
+        __host__ __device__ __forceinline__
+        edge_type get_edge(const vertex_type& source, 
+                        const vertex_type& destination) const override {
 
-    }
+        }
 
-    // Representation specific functions
-    // ...
+        // Representation specific functions
+        // ...
 
     private:
         coo_type coo;
@@ -282,10 +290,10 @@ struct graph_coo_t : public graph_base_t<vertex_t, edge_t, weight_t> {
 
 template <bool HAS_COO, bool HAS_CSR, bool HAS_CSC,
           typename vertex_t, typename edge_t, typename weight_t> 
-struct graph_t : 
-    public /*std::enable_if_t<HAS_CSR, */graph_csr_t<vertex_t, edge_t, weight_t> /*>,
+class graph_t : 
+    public std::enable_if_t<HAS_CSR, graph_csr_t<vertex_t, edge_t, weight_t>>,
     public graph_csc_t<vertex_t, edge_t, weight_t>,
-    public graph_coo_t<vertex_t, edge_t, weight_t>*/ {
+    public graph_coo_t<vertex_t, edge_t, weight_t> {
 
     using vertex_type = vertex_t;
     using edge_type   = edge_t;
@@ -302,6 +310,7 @@ struct graph_t :
     // using g_coo_t     = typename std::conditional<HAS_COO, 
     //                     graph_coo_t<vertex_type, edge_type, weight_type>, 
     //                     std::nullptr_t>;
+
 };  // struct graph_t
 
 
