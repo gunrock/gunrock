@@ -20,7 +20,7 @@ void test_csr()
   csr_t<offset_t, index_t, value_t> csr;
 
   // CSR array with space allocated (4x4x4)
-  std::size_t r, c, nnz = 4;
+  std::size_t r = 4, c = 4, nnz = 4;
   memory::memory_space_t location = memory::memory_space_t::host;
   csr_t<offset_t, index_t, value_t> _csr(r, c, nnz, location);
 
