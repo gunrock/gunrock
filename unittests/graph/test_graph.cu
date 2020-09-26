@@ -19,8 +19,10 @@ void test_graph()
 
   error::error_t status = cudaSuccess;
 
-  graph::graph_t<HAS_COO, HAS_CSR, HAS_CSC,
-          vertex_t, edge_t, weight_t> graph;
+  // graph::graph_t<HAS_COO, HAS_CSR, HAS_CSC,
+  //         vertex_t, edge_t, weight_t> graph;
+
+  graph::graph_t<graph::graph_csr_t<vertex_t, edge_t, weight_t>> graph;
 
 }
 

@@ -288,28 +288,39 @@ class graph_coo_t : public graph_base_t<vertex_t, edge_t, weight_t> {
         coo_type coo;
 };  // struct graph_coo_t
 
-template <bool HAS_COO, bool HAS_CSR, bool HAS_CSC,
-          typename vertex_t, typename edge_t, typename weight_t> 
-class graph_t : 
-    public std::enable_if_t<HAS_CSR, graph_csr_t<vertex_t, edge_t, weight_t>>,
-    public graph_csc_t<vertex_t, edge_t, weight_t>,
-    public graph_coo_t<vertex_t, edge_t, weight_t> {
+// Empty type for conditional
+// struct empty_t{};
 
-    using vertex_type = vertex_t;
-    using edge_type   = edge_t;
-    using weight_type = weight_t;
+// // Boolean based conditional inheritence
+// // Relies on empty_t{};
+// template <bool HAS_COO, bool HAS_CSR, bool HAS_CSC,
+//           typename vertex_t, typename edge_t, typename weight_t> 
+// class graph_t : 
+//     public std::conditional_t<HAS_CSR, graph_csr_t<vertex_t, edge_t, weight_t>, empty_t>,
+//     public graph_csc_t<vertex_t, edge_t, weight_t>,
+//     public graph_coo_t<vertex_t, edge_t, weight_t> {
 
-    using vertex_pair_type = vertex_pair_t<vertex_t>;
+//     using vertex_type = vertex_t;
+//     using edge_type   = edge_t;
+//     using weight_type = weight_t;
 
-    // using g_csr_t     = typename std::conditional<HAS_CSR, 
-    //                     graph_csr_t<vertex_type, edge_type, weight_type>, 
-    //                     std::nullptr_t>;
-    // using g_csc_t     = typename std::conditional<HAS_CSC, 
-    //                     graph_csc_t<vertex_type, edge_type, weight_type>, 
-    //                     std::nullptr_t>;
-    // using g_coo_t     = typename std::conditional<HAS_COO, 
-    //                     graph_coo_t<vertex_type, edge_type, weight_type>, 
-    //                     std::nullptr_t>;
+//     using vertex_pair_type = vertex_pair_t<vertex_t>;
+
+//     // using g_csr_t     = typename std::conditional<HAS_CSR, 
+//     //                     graph_csr_t<vertex_type, edge_type, weight_type>, 
+//     //                     std::nullptr_t>;
+//     // using g_csc_t     = typename std::conditional<HAS_CSC, 
+//     //                     graph_csc_t<vertex_type, edge_type, weight_type>, 
+//     //                     std::nullptr_t>;
+//     // using g_coo_t     = typename std::conditional<HAS_COO, 
+//     //                     graph_coo_t<vertex_type, edge_type, weight_type>, 
+//     //                     std::nullptr_t>;
+
+// };  // struct graph_t
+
+// Variadic inheritence, inherit only what you need
+template<class... graph_view_t> 
+class graph_t : public graph_view_t... {
 
 };  // struct graph_t
 
