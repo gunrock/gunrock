@@ -9,10 +9,11 @@ namespace format {
  * @brief Compressed Sparse Column (CSC) format.
  * 
  * @tparam index_t 
+ * @tparam offset_t
  * @tparam value_t
  */
-template <typename offset_t,
-          typename index_t,
+template <typename index_t,
+          typename offset_t,
           typename value_t>
 struct csc_t {
     index_t num_rows;

@@ -13,6 +13,8 @@
 
 #pragma once
 
+#include <thrust/binary_search.h>
+
 namespace gunrock {
 namespace algo {
 
@@ -36,6 +38,53 @@ enum class bound_t
  */
 namespace binary
 {
+
+  template<typename iterator_t, typename comp_t, typename T> 
+  __host__ __device__ 
+  iterator_t lower_bound(iterator_t first, 
+                         iterator_t last,
+                         const T &value,
+                         comp_t comp = [](const T& a, const T& b) { 
+                           return a < b; // less_than_comparable 
+                          }) 
+  {
+    return thrust::lower_bound(thrust::seq, first, last, value, comp);
+  }
+
+  template<typename iterator_t, typename comp_t, typename T> 
+  __host__ __device__ 
+  iterator_t upper_bound(iterator_t first, 
+                         iterator_t last,
+                         const T &value,
+                         comp_t comp = [](const T& a, const T& b) { 
+                           return a > b; // greater_than_comparable 
+                          }) 
+  {
+    return thrust::upper_bound(thrust::seq, first, last, value, comp);
+  }
+
+  template<typename key_t,
+           typename int_t>
+  int_t rightmost(const key_t* keys,
+                  const key_t& key,
+                  const int_t count)
+  {
+    int_t begin = 0;
+    int_t end = count;
+    while (begin < end) {
+      int_t mid = floor((begin + end) / 2);
+      key_t key_ = keys[mid];
+      bool pred = key_ > key;
+      if (pred) {
+        end = mid;
+      } else {
+        begin = mid + 1;
+      }
+    }
+    return end - 1;
+  }
+
+/*
   namespace host {
 
   // Perform binary search to find an element in an array
@@ -232,6 +281,8 @@ namespace binary
 
   } // namespace: block
   } // namespace: device
+  */
+
 } // namespace: binary
 } // namespace: search
 } // namespace: algo

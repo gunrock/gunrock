@@ -31,12 +31,27 @@ void test_graph()
   std::size_t r = 4, c = 4, nnz = 4;
   memory::memory_space_t location = memory::memory_space_t::host;
 
-  // V         = [ 5 8 3 6 ]
-  // COL_INDEX = [ 0 1 2 1 ]
-  // ROW_INDEX = [ 0 0 2 3 4 ]
+  // CSR Matrix Representation
+  // V            = [ 5 8 3 6 ]
+  // COL_INDEX    = [ 0 1 2 1 ]
+  // ROW_OFFSETS  = [ 0 0 2 3 4 ]
   edge_t *Ap = memory::allocate<edge_t>((r+1)*sizeof(edge_t), location);
   vertex_t *Aj = memory::allocate<vertex_t>((nnz)*sizeof(vertex_t), location);
   weight_t *Ax = memory::allocate<weight_t>((nnz)*sizeof(weight_t), location);
+
+  // Logical Matrix Representation
+  // r/c  0 1 2 3
+  //  0 [ 0 0 0 0 ]
+  //  1 [ 5 8 0 0 ]
+  //  2 [ 0 0 3 0 ]
+  //  3 [ 0 6 0 0 ]
+
+  // Logical Graph Representation
+  // (i, j) [w]
+  // (1, 0) [5]
+  // (1, 1) [8]
+  // (2, 2) [3]
+  // (3, 1) [6]
 
   // XXX: ugly way to initialize these, but it works.
   Ap[0] = 0; Ap[1] = 0; Ap[2] = 2; Ap[3] = 3; Ap[4] = 4;
@@ -53,16 +68,20 @@ void test_graph()
   std::cout << "Contains CSR Representation? " << std::boolalpha
             << graph_slice.contains_representation<g_csr_t>() << std::endl;
 
-  vertex_t source = 2;
-  vertex_t num_vertices = graph_slice.get_number_of_vertices();
-  edge_t num_edges = graph_slice.get_number_of_edges();
-  edge_t num_neighbors = graph_slice.get_neighbor_list_length(source);
+  vertex_t source = 1;
+  vertex_t edge = 1;
 
-  std::cout << "Number of vertices: " << num_vertices << std::endl;
-  std::cout << "Number of edges: " << num_edges << std::endl;
-  std::cout << "Number of neighbors: " << num_neighbors 
-            << " (source = " << source << ")" << std::endl;
+  vertex_t num_vertices   = graph_slice.get_number_of_vertices();
+  edge_t num_edges        = graph_slice.get_number_of_edges();
+  edge_t num_neighbors    = graph_slice.get_neighbor_list_length(source);
+  vertex_t source_vertex  = graph_slice.get_source_vertex(edge);
 
+  std::cout << "Number of vertices: "   << num_vertices   << std::endl;
+  std::cout << "Number of edges: "      << num_edges      << std::endl;
+  std::cout << "Number of neighbors: "  << num_neighbors 
+            << " (source = "            << source << ")"  << std::endl;
+  std::cout << "Source vertex: "        << source_vertex 
+            << " (edge = "              << edge   << ")"  << std::endl;
 }
 
 int

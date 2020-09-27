@@ -22,7 +22,7 @@ void test_csr()
   // CSR array with space allocated (4x4x4)
   std::size_t r = 4, c = 4, nnz = 4;
   memory::memory_space_t location = memory::memory_space_t::host;
-  csr_t<offset_t, index_t, value_t> _csr(r, c, nnz, location);
+  csr_t<index_t, offset_t, value_t> _csr(r, c, nnz, location);
 
   // CSR array with pre-populated pointers (4x4x4)
   // V         = [ 5 8 3 6 ]
@@ -37,8 +37,7 @@ void test_csr()
   Aj[0] = 0; Aj[1] = 1; Aj[2] = 2; Aj[3] = 3;
   Ax[0] = 5; Ax[1] = 8; Ax[2] = 3; Ax[3] = 6;
 
-  csr_t<offset_t, index_t, value_t> __csr(r, c, nnz,
-    Ap, Aj, Ax, location);
+  csr_t<index_t, offset_t, value_t> __csr(r, c, nnz, Ap, Aj, Ax, location);
 
   // CSR array with unknown memory space
   // this is bad practice, the reason being, we are passing
@@ -50,7 +49,7 @@ void test_csr()
   offset_t *_Ap = new offset_t[r+1];
   index_t *_Aj = new index_t[nnz];
   value_t *_Ax = new value_t[nnz];
-  csr_t<offset_t, index_t, value_t> ___csr(r, c, nnz, _Ap, _Aj, _Ax);
+  csr_t<index_t, offset_t, value_t> ___csr(r, c, nnz, _Ap, _Aj, _Ax);
 }
 
 int
