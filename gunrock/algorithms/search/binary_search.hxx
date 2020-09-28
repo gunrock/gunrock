@@ -39,59 +39,12 @@ enum class bound_t
 namespace binary
 {
 
-  template<typename iterator_t, typename comp_t, typename T> 
-  __host__ __device__ 
-  iterator_t lower_bound(iterator_t first, 
-                         iterator_t last,
-                         const T &value,
-                         comp_t comp = [](const T& a, const T& b) { 
-                           return a < b; // less_than_comparable 
-                          }) 
-  {
-    return thrust::lower_bound(thrust::seq, first, last, value, comp);
-  }
-
-  template<typename iterator_t, typename comp_t, typename T> 
-  __host__ __device__ 
-  iterator_t upper_bound(iterator_t first, 
-                         iterator_t last,
-                         const T &value,
-                         comp_t comp = [](const T& a, const T& b) { 
-                           return a > b; // greater_than_comparable 
-                          }) 
-  {
-    return thrust::upper_bound(thrust::seq, first, last, value, comp);
-  }
-
-  template<typename key_t,
-           typename int_t>
-  int_t rightmost(const key_t* keys,
-                  const key_t& key,
-                  const int_t count)
-  {
-    int_t begin = 0;
-    int_t end = count;
-    while (begin < end) {
-      int_t mid = floor((begin + end) / 2);
-      key_t key_ = keys[mid];
-      bool pred = key_ > key;
-      if (pred) {
-        end = mid;
-      } else {
-        begin = mid + 1;
-      }
-    }
-    return end - 1;
-  }
-
-/*
-  namespace host {
-
   // Perform binary search to find an element in an array
   // Specify bounds using begin and end positions.
   // Default will search the whole array of size counts.
   // If duplicate items exists, this does not guarantee
   // that the element found will be leftmost or rightmost element.
+  //XXX: Implement Search
   template<bound_t bounds = bound_t::upper,
            typename key_t,
            typename int_t,
@@ -118,35 +71,22 @@ namespace binary
     return begin;
   }
 
+
   // Find the leftmost element in an array.
   // Specify bounds using begin and end positions.
   // Default will search the whole array of size counts.
   // Guarantees that the element found will be the one at the
   // corner (left or right most position) of the array.
-  template<bound_t bounds = bound_t::upper,
-           typename key_t,
-           typename int_t,
-           typename comp_t>
-  int_t leftmost(const key_t& keys,
-                 const key_t key,
-                 int_t count,
-                 int_t begin = 0,
-                 comp_t less = [](const key_t& a, const key_t& b) {
-                  return a < b;
-                 })
+  template<typename iterator_t, typename comp_t, typename T> 
+  __host__ __device__ 
+  iterator_t lower_bound(iterator_t first, 
+                         iterator_t last,
+                         const T &value,
+                         comp_t comp = [](const T& a, const T& b) { 
+                           return a < b; // less_than_comparable 
+                          }) 
   {
-    int_t end = count;
-    while (begin < end) {
-      int_t mid = floor((begin + end) / 2);
-      key_t key_ = keys[mid];
-      bool pred = less(key_, key);
-      if (pred) {
-        begin = mid + 1;
-      } else {
-        end = mid;
-      }
-    }
-    return begin;
+    return thrust::lower_bound(thrust::seq, first, last, value, comp);
   }
 
   // Find the rightmost element in an array.
@@ -154,23 +94,46 @@ namespace binary
   // Default will search the whole array of size counts.
   // Guarantees that the element found will be the one at the
   // corner (left or right most position) of the array.
-  template<bound_t bounds = bound_t::upper,
-           typename key_t,
-           typename int_t,
-           typename comp_t>
-  int_t rightmost(const key_t& keys,
-                  const key_t key,
-                  int_t count,
-                  int_t begin = 0,
-                  comp_t greater = [](const key_t& a, const key_t& b) {
-                    return a > b;
-                  })
+  template<typename iterator_t, typename comp_t, typename key_t> 
+  __host__ __device__ 
+  iterator_t upper_bound(iterator_t first, 
+                         iterator_t last,
+                         const key_t &value,
+                         comp_t comp = [](const key_t& a, const key_t& b) { 
+                           return a > b; // greater_than_comparable 
+                          }) 
   {
-    int_t end = count;
+    return thrust::upper_bound(thrust::seq, first, last, value, comp);
+  }
+
+  template<typename key_t, typename index_t>
+  key_t upper_bound(const key_t* keys,
+                    const key_t& key,
+                    const index_t size)
+  {
+    auto it = algo::search::binary::upper_bound(
+                thrust::counting_iterator<key_t>(0),
+                thrust::counting_iterator<key_t>(size),
+                key, 
+                [keys] __host__ __device__ (const key_t& pivot,
+                                            const key_t& key) {
+                    return keys[pivot] < key;
+                });
+    return *it;
+  }
+
+  template<typename key_t,
+           typename index_t>
+  index_t rightmost(const key_t* keys,
+                    const key_t& key,
+                    const index_t count)
+  {
+    index_t begin = 0;
+    index_t end = count;
     while (begin < end) {
-      int_t mid = floor((begin + end) / 2);
+      index_t mid = floor((begin + end) / 2);
       key_t key_ = keys[mid];
-      bool pred = greater(key_, key);
+      bool pred = key_ > key;
       if (pred) {
         end = mid;
       } else {
@@ -179,109 +142,6 @@ namespace binary
     }
     return end - 1;
   }
-
-  } // namespace: host
-
-  namespace device {
-  namespace block {
-
-  // Perform binary search to find an element in an array
-  // Specify bounds using begin and end positions.
-  // Default will search the whole array of size counts.
-  // If duplicate items exists, this does not guarantee
-  // that the element found will be leftmost or rightmost element.
-  template<bound_t bounds = bound_t::upper,
-           typename key_t,
-           typename int_t,
-           typename comp_t>
-  __device__ int_t search(const key_t& keys,
-                          const key_t key,
-                          int_t count,
-                          int_t begin = 0,
-                          comp_t comp = [](const key_t& a, const key_t& b) {
-                            return a < b;
-                          })
-  {
-    int_t end = count;
-    while (begin < end) {
-      int_t mid = (begin + end) / 2;
-      key_t key_ = keys[mid];
-      bool pred =
-        (bounds == bound_t::upper) ? !comp(key, key_) : comp(key_, key);
-      if (pred)
-        begin = mid + 1;
-      else
-        end = mid;
-    }
-    return begin;
-  }
-
-  // Find the leftmost element in an array.
-  // Specify bounds using begin and end positions.
-  // Default will search the whole array of size counts.
-  // Guarantees that the element found will be the one at the
-  // corner (left or right most position) of the array.
-  template<bound_t bounds = bound_t::upper,
-           typename key_t,
-           typename int_t,
-           typename comp_t>
-  __device__ int_t leftmost(const key_t& keys,
-                            const key_t key,
-                            int_t count,
-                            int_t begin = 0,
-                            comp_t less = [](const key_t& a, const key_t& b) {
-                              return a < b;
-                            })
-  {
-    int_t end = count;
-    while (begin < end) {
-      int_t mid = floor((begin + end) / 2);
-      key_t key_ = keys[mid];
-      bool pred = less(key_, key);
-      if (pred) {
-        begin = mid + 1;
-      } else {
-        end = mid;
-      }
-    }
-    return begin;
-  }
-
-  // Find the rightmost element in an array.
-  // Specify bounds using begin and end positions.
-  // Default will search the whole array of size counts.
-  // Guarantees that the element found will be the one at the
-  // corner (left or right most position) of the array.
-  template<bound_t bounds = bound_t::upper,
-           typename key_t,
-           typename int_t,
-           typename comp_t>
-  __device__ int_t rightmost(const key_t& keys,
-                             const key_t key,
-                             int_t count,
-                             int_t begin = 0,
-                             comp_t greater = [](const key_t& a,
-                                                 const key_t& b) {
-                               return a > b;
-                             })
-  {
-    int_t end = count;
-    while (begin < end) {
-      int_t mid = floor((begin + end) / 2);
-      key_t key_ = keys[mid];
-      bool pred = greater(key_, key);
-      if (pred) {
-        end = mid;
-      } else {
-        begin = mid + 1;
-      }
-    }
-    return end - 1;
-  }
-
-  } // namespace: block
-  } // namespace: device
-  */
 
 } // namespace: binary
 } // namespace: search

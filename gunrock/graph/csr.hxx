@@ -69,20 +69,8 @@ class graph_csr_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
         vertex_type get_source_vertex(const edge_type& e) const override {
             assert(e < graph_base_type::_number_of_edges);
             const edge_type* offsets = csr.row_offsets.get();
-            // XXX: thrust doesn't work right now
-            // auto it = algo::search::binary::lower_bound(
-            //     thrust::counting_iterator<edge_type>(0),
-            //     thrust::counting_iterator<edge_type>(
-            //         graph_base_type::_number_of_vertices),
-            //     e, 
-            //     [offsets] __host__ __device__ (const edge_type& e,
-            //                                    const edge_type& mid) {
-            //         return offsets[mid] > e;
-            //     });
-            // return *it;
-
-            // Use custom implementation for now
-            return algo::search::binary::rightmost(offsets, e, graph_base_type::_number_of_vertices);
+            // XXX: I am dumb, idk if this is upper or lower bound?
+            return algo::search::binary::upper_bound(offsets, e, graph_base_type::_number_of_vertices);
         }
         
         // __host__ __device__ __forceinline__
