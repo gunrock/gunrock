@@ -51,21 +51,6 @@ __global__ void ForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length) {
 }
 
 template <typename ArrayT, typename SizeT, typename ApplyLambda>
-__global__ void ForAllDebug_Kernel(ArrayT array, ApplyLambda apply, SizeT length) {
-  // typedef typename ArrayT::SizeT SizeT;
-  const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
-  SizeT i = (SizeT)blockDim.x * blockIdx.x + threadIdx.x;
-  while (i < length) {
-/*    if (blockDim.x * blockIdx.x + threadIdx.x == 0){
-        printf("%d points done\n", i);
-    }*/
-    apply(array + 0, i);
-    i += STRIDE;
-  }
-}
-
-
-template <typename ArrayT, typename SizeT, typename ApplyLambda>
 __global__ void SharedForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length){
   extern __shared__ char shared_array[];
   const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
@@ -363,36 +348,6 @@ cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::SharedForAll(
     //if (!util::isValid(block_size)) block_size = FORALL_BLOCKSIZE;
 
     oprtr::SharedForAll_Kernel<<<grid_size, block_size, sh_mem_size, stream>>>((*this), apply,
-                                                               length);
-  }
-  return retval;
-}
-
-template <typename SizeT, typename ValueT, ArrayFlag FLAG,
-          unsigned int cudaHostRegisterFlag>
-template <typename ApplyLambda>
-cudaError_t Array1D<SizeT, ValueT, FLAG, cudaHostRegisterFlag>::ForAllDebug(
-    // ArrayT       array,
-    ApplyLambda apply,
-    SizeT length,         //= PreDefinedValues<SizeT>::InvalidValue,
-    Location target,      // = util::LOCATION_DEFAULT,
-    cudaStream_t stream,  // = 0,
-    int grid_size,        // = util::PreDefinedValues<int>::InvalidValue
-    int block_size)       // = util::PreDefinedValues<int>::InvalidValue
-{
-  cudaError_t retval = cudaSuccess;
-  if (length == PreDefinedValues<SizeT>::InvalidValue) length = this->GetSize();
-  if (target == LOCATION_DEFAULT) target = this->setted | this->allocated;
-
-  if ((target & HOST) == HOST) {
-#pragma omp parallel for
-    for (SizeT i = 0; i < length; i++) apply((*this) + 0, i);
-  }
-
-  if ((target & DEVICE) == DEVICE) {
-    if (!util::isValid(grid_size)) grid_size = FORALL_GRIDSIZE;
-    if (!util::isValid(block_size)) block_size = FORALL_BLOCKSIZE;
-    oprtr::ForAllDebug_Kernel<<<grid_size, block_size, 0, stream>>>((*this), apply,
                                                                length);
   }
   return retval;

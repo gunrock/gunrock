@@ -30,9 +30,9 @@ endif()
 # end /* CUB include directories */
 
 # begin /* FAISS include directories */
-if (FAISS_INCLUDE_DIRS)
-  include_directories(${FAISS_INCLUDE_DIRS})
-endif()
+#if (FAISS_INCLUDE_DIRS)
+#  include_directories(${FAISS_INCLUDE_DIRS})
+#endif()
 # end /* FAISS include directories */
 
 # begin /* Add CUDA executables */

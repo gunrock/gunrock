@@ -35,9 +35,6 @@
     #include <faiss/gpu/utils/Select.cuh>
 #endif
 
-// JSON includes
-//#include <gunrock/util/info_rapidjson.cuh>
-
 //#define SNN_DEBUG
 #ifdef SNN_DEBUG
     #define debug(a...) fprintf(stderr, a)
@@ -325,7 +322,6 @@ int main(int argc, char** argv) {
   return app::Switch_Types<app::VERTEXT_U32B | app::VERTEXT_U64B |
                            app::SIZET_U32B | app::SIZET_U64B |
                            app::VALUET_F32B | app::VALUET_F64B | app::UNDIRECTED>(
-                           //app::VALUET_F64B | app::UNDIRECTED>(
       parameters, main_struct());
 }
 
