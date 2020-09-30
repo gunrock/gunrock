@@ -89,6 +89,8 @@ struct hitsIterationLoop
     auto &hrank_mag = data_slice.hrank_mag;
     auto &arank_mag = data_slice.arank_mag;
 
+    auto &cur_error = data_slice.cur_error;
+
     // Set the frontier to NULL to specify that it should include
     // all vertices
     util::Array1D<SizeT, VertexT> *null_frontier = NULL;
@@ -97,6 +99,7 @@ struct hitsIterationLoop
 
     // Number of times to iterate the HITS algorithm
     auto max_iter = data_slice.max_iter;
+    auto hits_norm = data_slice.hits_norm;
 
     // Normalize the HITS scores every N iterations.
     // Provides speedup at the risk of data overflow
@@ -120,7 +123,7 @@ struct hitsIterationLoop
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool {
       // Update the hub and authority scores.
-      // Look into NeighborReduce for speed improvements
+      // TODO: Look into NeighborReduce for speed improvements
       atomicAdd(&hrank_next[src], arank_curr[dest]);
       atomicAdd(&arank_next[dest], hrank_curr[src]);
 
@@ -138,48 +141,109 @@ struct hitsIterationLoop
     // either after every N iterations (user-specified, default=1),
     // or at the last iteration
     if (((iteration + 1) % normalize_n == 0) || iteration == (max_iter - 1)) {
-      // 1) Square each element
-      auto square_op = [hrank_next, arank_next] __host__ __device__(
-                           VertexT * v_q, const SizeT &pos) {
-        hrank_next[pos] = hrank_next[pos] * hrank_next[pos];
-        arank_next[pos] = arank_next[pos] * arank_next[pos];
-      };
 
-      GUARD_CU(frontier.V_Q()->ForAll(square_op, graph.nodes));
+      if(hits_norm == HITS_NORMALIZATION_METHOD_2) { // The default
+        // Square each element
+        auto square_op = [hrank_next, arank_next] __host__ __device__(
+          VertexT * v_q, const SizeT &pos) {
+          hrank_next[pos] = hrank_next[pos] * hrank_next[pos];
+          arank_next[pos] = arank_next[pos] * arank_next[pos];
+        };
 
-      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+        GUARD_CU(frontier.V_Q()->ForAll(square_op, graph.nodes));
+        GUARD_CU2(cudaStreamSynchronize(stream),
+                    "cudaStreamSynchronize Failed");
 
-      // 2) Sum all squared scores in each array
-      GUARD_CU(util::cubReduce(
+        // Sum all squared scores in each array
+        GUARD_CU(util::cubReduce(
           cub_temp_space, hrank_next, hrank_mag, graph.nodes,
           [] __host__ __device__(const ValueT &a, const ValueT &b) {
             return a + b;
           },
           ValueT(0), stream));
 
-      GUARD_CU(util::cubReduce(
-          cub_temp_space, arank_next, arank_mag, graph.nodes,
+        GUARD_CU(util::cubReduce(
+            cub_temp_space, arank_next, arank_mag, graph.nodes,
+            [] __host__ __device__(const ValueT &a, const ValueT &b) {
+              return a + b;
+            },
+            ValueT(0), stream));
+
+        GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+
+        auto normalize_divide_square_op =
+        [hrank_next, arank_next, hrank_mag, arank_mag] __host__ __device__(
+            VertexT * v_q, const SizeT &pos) {
+          if (hrank_mag[0] > 0) {
+            hrank_next[pos] = sqrt(hrank_next[pos]) / sqrt(hrank_mag[0]);
+          }
+
+          if (arank_mag[0] > 0) {
+            arank_next[pos] = sqrt(arank_next[pos]) / sqrt(arank_mag[0]);
+          }
+        };
+        // Divide all elements by the square root of their squared sums.
+        // Note: take sqrt of x in denominator because x^2 was done in place.
+        GUARD_CU(frontier.V_Q()->ForAll(normalize_divide_square_op, graph.nodes));
+
+        GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+      }
+      else if(hits_norm == HITS_NORMALIZATION_METHOD_1) {
+        // Sum all scores in each array
+        GUARD_CU(util::cubReduce(
+          cub_temp_space, hrank_next, hrank_mag, graph.nodes,
           [] __host__ __device__(const ValueT &a, const ValueT &b) {
-            return a + b;
+            return abs(a) + abs(b);
           },
           ValueT(0), stream));
 
-      GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+        GUARD_CU(util::cubReduce(
+            cub_temp_space, arank_next, arank_mag, graph.nodes,
+            [] __host__ __device__(const ValueT &a, const ValueT &b) {
+              return abs(a) + abs(b);
+            },
+            ValueT(0), stream));
 
-      auto normalize_divide_op =
-          [hrank_next, arank_next, hrank_mag, arank_mag] __host__ __device__(
-              VertexT * v_q, const SizeT &pos) {
-            if (hrank_mag[0] > 0) {
-              hrank_next[pos] = sqrt(hrank_next[pos]) / sqrt(hrank_mag[0]);
-            }
+        GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
 
-            if (arank_mag[0] > 0) {
-              arank_next[pos] = sqrt(arank_next[pos]) / sqrt(arank_mag[0]);
-            }
-          };
-      // Divide all elements by the square root of their squared sums.
-      // Note: take sqrt of x in denominator because x^2 was done in place.
-      GUARD_CU(frontier.V_Q()->ForAll(normalize_divide_op, graph.nodes));
+        auto normalize_divide_op =
+        [hrank_next, arank_next, hrank_mag, arank_mag] __host__ __device__(
+            VertexT * v_q, const SizeT &pos) {
+          if (hrank_mag[0] > 0) {
+            hrank_next[pos] = hrank_next[pos] / hrank_mag[0];
+          }
+
+          if (arank_mag[0] > 0) {
+            arank_next[pos] = arank_next[pos] / arank_mag[0];
+          }
+        };
+        // Divide all elements by the square root of their squared sums.
+        // Note: take sqrt of x in denominator because x^2 was done in place.
+        GUARD_CU(frontier.V_Q()->ForAll(normalize_divide_op, graph.nodes));
+
+        GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
+      }
+      else {
+        assert(false); // TODO: How does gunrock handle error cases?
+      }
+
+      // hrank_curr is now temp space, since it will be overwritten with 0s on the next iteration. Use this as temp space for the forall to compute error
+      auto err_op = [hrank_next, hrank_curr] __host__ __device__(
+        VertexT * v_q, const SizeT &pos) {
+        hrank_curr[pos] = abs(hrank_next[pos] - hrank_curr[pos]);
+      };
+
+      GUARD_CU(frontier.V_Q()->ForAll(err_op, graph.nodes));
+      GUARD_CU2(cudaStreamSynchronize(stream),
+                  "cudaStreamSynchronize Failed");
+
+      // How perform the reduction to compute the error
+      GUARD_CU(util::cubReduce(
+        cub_temp_space, hrank_curr, cur_error, graph.nodes,
+        [] __host__ __device__(const ValueT &a, const ValueT &b) {
+          return abs(a) + abs(b);
+        },
+        ValueT(0), stream));
 
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize Failed");
     }
@@ -202,11 +266,26 @@ struct hitsIterationLoop
   bool Stop_Condition(int gpu_num = 0) {
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
     auto &enactor_slices = this->enactor->enactor_slices;
-    auto iter = enactor_slices[0].enactor_stats.iteration;
-    auto user_iter = data_slice.max_iter;
+    auto &iter = enactor_slices[0].enactor_stats.iteration;
+    auto &user_iter = data_slice.max_iter;
+    auto &tol = data_slice.hits_tol;
+
+    bool quiet = this->enactor->problem->parameters.template Get<bool>("quiet");
+
+    // We haven't done any real work yet
+    if(iter == 0) return false;
 
     // user defined stop condition
-    if (iter == user_iter) return true;
+    data_slice.cur_error.Move(util::DEVICE, util::HOST);
+
+    if(data_slice.cur_error[0] < tol) {
+      return true;
+    }
+
+    if (iter == user_iter) {
+      return true;
+    }
+
     return false;
   }
 

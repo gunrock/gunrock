@@ -107,9 +107,9 @@ cudaError_t CheckSize(bool size_check, const char *name, SizeT target_length,
   if (array == NULL) return retval;
 
   if (target_length > array->GetSize()) {
-    printf("%d\t %d\t %d\t %s \t oversize :\t %lld ->\t %lld\n", thread_num,
-           iteration, peer_, name, (long long)array->GetSize(),
-           (long long)target_length);
+    // printf("%d\t %d\t %d\t %s \t oversize :\t %lld ->\t %lld\n", thread_num,
+    //       iteration, peer_, name, (long long)array->GetSize(),
+    //       (long long)target_length);
     // fflush(stdout);
     oversized = true;
     if (size_check) {

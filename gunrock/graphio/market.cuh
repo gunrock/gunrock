@@ -401,7 +401,12 @@ cudaError_t Read(util::Parameters &parameters, GraphT &graph,
       parameters.Get<std::string>(graph_prefix + "graph-file");
 
   bool read_done = false;
-  retval = ReadMeta(parameters, filename, meta_data);
+
+  bool read_from_binary = parameters.Get<bool>(graph_prefix + "read-from-binary");
+
+  if (read_from_binary) {
+    retval = ReadMeta(parameters, filename, meta_data);
+  }
 
   if (parameters.UseDefault("dataset")) {
     std::string dir, file, extension;
@@ -409,7 +414,7 @@ cudaError_t Read(util::Parameters &parameters, GraphT &graph,
     parameters.Set("dataset", file);
   }
 
-  if (retval == cudaSuccess) {
+  if (retval == cudaSuccess && read_from_binary) {
     auto num_vertices = util::strtoT<SizeT>(meta_data["num_vertices"]);
     auto num_edges = util::strtoT<SizeT>(meta_data["num_edges"]);
     GUARD_CU(graph.Allocate(num_vertices, num_edges, util::HOST));

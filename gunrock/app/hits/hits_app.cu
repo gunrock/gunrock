@@ -34,25 +34,32 @@ cudaError_t UseParameters(ParametersT &parameters) {
 
 /*
  * @brief Simple interface take in a graph in CSR format and return vertex hub and authority scores
- * @param[in]  num_nodes   Number of veritces in the input graph
- * @param[in]  num_edges   Number of edges in the input graph
- * @param[in]  row_offsets CSR-formatted graph input row offsets
- * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[out] hub_ranks   Vertex hub scores
- * @param[out] auth ranks  Vertex authority scores
- * \return     double      Return accumulated elapsed times for all iterations
+ * @param[in]  num_nodes      Number of veritces in the input graph
+ * @param[in]  num_edges      Number of edges in the input graph
+ * @param[in]  row_offsets    CSR-formatted graph input row offsets
+ * @param[in]  col_indices    CSR-formatted graph input column indices
+ * @param[in]  max_iter       Maximum number of HITS iterations to perform
+ * @param[in]  tol            Algorithm termination tolerance
+ * @param[in]  hits_norm      Normalization method
+ * @param[out] hub_ranks      Vertex hub scores
+ * @param[out] auth ranks     Vertex authority scores
+ * @param[in]  allocated_on   Input and output target device, by default CPU
+ * \return     double         Return accumulated elapsed times for all iterations
  */
 double hits(
-    const int        num_nodes,
-    const int        num_edges,
-    const int       *row_offsets,
-    const int     *col_indices,
-    const int          num_iter,
-    float            *hub_ranks,
-    float            *auth_ranks)
+    const int                 num_nodes,
+    const int                 num_edges,
+    const int                 *row_offsets,
+    const int                 *col_indices,
+    const int                 max_iter,
+    const float               tol,
+    const int                 hits_norm, 
+    float                     *hub_ranks,
+    float                     *auth_ranks,
+    gunrock::util::Location   allocated_on = gunrock::util::HOST)
 {
       return hits_template(num_nodes, num_edges, row_offsets, col_indices,
-         num_iter, hub_ranks, auth_ranks);
+         max_iter, tol, hits_norm, hub_ranks, auth_ranks, allocated_on);
 }
 
 // Leave this at the end of the file

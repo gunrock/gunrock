@@ -27,13 +27,17 @@ namespace hits {
  * @tparam      GraphT        Type of the graph
  * @tparam      ValueT        Type of the values
  * @param[in]   graph         Input graph
-...
+ * @param[out]  ref_hrank     Vertex hub scores
+ * @param[out]  ref_arank     Vertex authority scores
+ * @param[in]   max_iter      Maximum number of iterations to perform HITS
+ * @param[in]   tol           Convergence tolerance for termination
+ * @param[in]   hits_norm     Normalization method
  * @param[in]   quiet         Whether to print out anything to stdout
  */
 template <typename GraphT>
 double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
                      typename GraphT::ValueT *ref_arank,
-                     typename GraphT::SizeT max_iter, bool quiet) {
+                     typename GraphT::SizeT max_iter, float tol, typename GraphT::SizeT hits_norm, bool quiet) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::ValueT ValueT;
   typedef typename GraphT::SizeT SizeT;
@@ -47,14 +51,20 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
   ValueT *next_hrank = new ValueT[graph.nodes];
   ValueT *next_arank = new ValueT[graph.nodes];
 
-  // Set next scores to 1 and 0
+  // Set initial scores
   for (SizeT v = 0; v < graph.nodes; v++) {
-    curr_hrank[v] = 1.0;
-    curr_arank[v] = 1.0;
+    curr_hrank[v] = 1.0/graph.nodes;
+    curr_arank[v] = 1.0/graph.nodes;
   }
 
-  for (SizeT iterCount = 0; iterCount < max_iter; iterCount++) {
-    // Set next scores to 1 and 0
+  for (SizeT v = 0; v < graph.nodes; v++) {
+    next_hrank[v] = 0.0;
+    next_arank[v] = 0.0;
+  }
+
+  SizeT iterCount;
+  for (iterCount = 0; iterCount < max_iter; iterCount++) {
+    // Set next scores to 0
     for (SizeT v = 0; v < graph.nodes; v++) {
       next_hrank[v] = 0.0;
       next_arank[v] = 0.0;
@@ -73,20 +83,31 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
     ValueT h_norm = 0.0;
     ValueT a_norm = 0.0;
 
-    for (SizeT v = 0; v < graph.nodes; v++) {
-      h_norm += pow(next_hrank[v], 2.0);
-      a_norm += pow(next_arank[v], 2.0);
+    if(hits_norm == HITS_NORMALIZATION_METHOD_1) {
+      for (SizeT v = 0; v < graph.nodes; v++) {
+        h_norm += abs(next_hrank[v]);
+        a_norm += abs(next_arank[v]);
+      }
     }
-
-    h_norm = sqrt(h_norm);
-    a_norm = sqrt(a_norm);
+    else if(hits_norm == HITS_NORMALIZATION_METHOD_2) {
+      for (SizeT v = 0; v < graph.nodes; v++) {
+        h_norm += pow(next_hrank[v], 2.0);
+        a_norm += pow(next_arank[v], 2.0);
+      }
+  
+      h_norm = sqrt(h_norm);
+      a_norm = sqrt(a_norm);
+    }
+    else {
+      assert(false); // TODO: Add an error message here
+    }
 
     for (SizeT v = 0; v < graph.nodes; v++) {
       next_hrank[v] /= h_norm;
       next_arank[v] /= a_norm;
     }
 
-    // Swap current and next
+    // Swap current and next. TODO: check if pointers are needed
     auto curr_hrank_temp = curr_hrank;
     curr_hrank = next_hrank;
     next_hrank = curr_hrank_temp;
@@ -94,6 +115,21 @@ double CPU_Reference(const GraphT &graph, typename GraphT::ValueT *ref_hrank,
     auto curr_arank_temp = curr_arank;
     curr_arank = next_arank;
     next_arank = curr_arank_temp;
+
+    // Break for the tolerance check here
+    double err = 0;
+    for(int v = 0; v < graph.nodes; v++) {
+      err += abs(next_hrank[v] - curr_hrank[v]);
+    }
+
+    if (err < tol) {
+      // util::PrintMsg("CPU Reference converged after " + std::to_string(iterCount+1) + " iterations", !quiet);
+      break;
+    }
+  }
+
+  if(iterCount == max_iter) {
+    // util::PrintMsg("WARNING: CPU Reference did not converge to a tolerance of " + std::to_string(tol) + " within " + std::to_string(max_iter) + " iterations");
   }
 
   // Copy to ref
@@ -223,7 +259,7 @@ typename GraphT::SizeT Validate_Results(
   bool quiet = parameters.Get<bool>("quiet");
   bool quick = parameters.Get<bool>("quick");
 
-  printf("Tol: %f\n", tol);
+  util::PrintMsg("Tol: " + std::to_string(tol), !quiet);
 
   if (!quick) {
     for (SizeT v = 0; v < graph.nodes; v++) {
