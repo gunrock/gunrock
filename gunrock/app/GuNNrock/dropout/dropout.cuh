@@ -4,7 +4,7 @@
 #ifndef DROPOUT_H
 #define DROPOUT_H
 
-#include <gunrock/app/gcn/module.h>
+#include <gunrock/app/GuNNrock/module.h>
 #include <gunrock/util/array_utils.cuh>
 
 template <typename SizeT, typename ValueT>

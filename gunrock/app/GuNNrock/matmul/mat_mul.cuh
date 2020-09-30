@@ -1,7 +1,7 @@
 #ifndef MAT_MUL_CUH
 #define MAT_MUL_CUH
 
-#include <gunrock/app/gcn/module.h>
+#include <gunrock/app/GuNNrock/module.h>
 #include <gunrock/util/array_utils.cuh>
 
 using namespace gunrock;

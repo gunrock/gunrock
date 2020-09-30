@@ -22,7 +22,7 @@
 #include <gunrock/app/test_base.cuh>
 
 // single-source shortest path includes
-#include <gunrock/app/gcn/gcn_enactor.cuh>
+#include <gunrock/app/GuNNrock/gcn_enactor.cuh>
 
 /**
  * @brief      graphsum layer of GCN

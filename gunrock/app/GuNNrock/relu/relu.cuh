@@ -4,7 +4,7 @@
 #ifndef RELU_H
 #define RELU_H
 
-#include <gunrock/app/gcn/module.h>
+#include <gunrock/app/GuNNrock/module.h>
 #include <gunrock/util/array_utils.cuh>
 
 using namespace gunrock;

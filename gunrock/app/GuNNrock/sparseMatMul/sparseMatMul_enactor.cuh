@@ -17,7 +17,7 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-#include <gunrock/app/gcn/sparseMatMul/sparseMatMul_problem.cuh>
+#include <gunrock/app/GuNNrock/sparseMatMul/sparseMatMul_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
 namespace gunrock {
@@ -78,6 +78,8 @@ struct SpmultIterationLoop
     auto &forward = data_slice.forward;
 
     // The advance operation
+
+    // the graph contains the adjacency matrix
     auto forward_lambda =
         [in, out, graph, out_dim, weights] __host__ __device__(
             const VertexT &src, VertexT &dest, const SizeT &edge_id,

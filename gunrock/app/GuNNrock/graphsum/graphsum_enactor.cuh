@@ -17,7 +17,7 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-#include <gunrock/app/gcn/graphsum/graphsum_problem.cuh>
+#include <gunrock/app/GuNNrock/graphsum/graphsum_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
 namespace gunrock {
@@ -83,8 +83,18 @@ struct GraphsumIterationLoop
             SizeT &output_pos) -> bool {
       ValueT coef = (long long)graph.GetNeighborListLength(src) *
           graph.GetNeighborListLength(dest);
+
+      // this yields the D(-1/2) A() D(-1/2) matrix
       coef = 1.0 / sqrt(coef);
+
       for (int i = 0; i < dim; i++)
+        // dim is the hidden dimension
+        // out is the resulting A * (X * W), so out's dimension is (Nodes x hidden_dim)
+        // src is the current vertex
+        // in is the input (X * W) matrix, so in's dimension is (Nodes x hidden_dim)
+        // dest is the vertex where the current edge of the current vertex points to
+        // coef is the computed coeffecient to make it coherent with D*AD* (* is the square root inverse)
+
         atomicAdd(out + src * dim + i, *(in + dest * dim + i) * coef);
       return true;
     };
@@ -93,6 +103,9 @@ struct GraphsumIterationLoop
             const VertexT &src, VertexT &dest, const SizeT &edge_id,
             const VertexT &input_item, const SizeT &input_pos,
             SizeT &output_pos) -> bool {
+      // this yields the D(-1/2) A() D(-1/2) matrix
+      // in the backprop this multiplication factor remains
+      // do it by hand and prove 
       ValueT coef = (long long)graph.GetNeighborListLength(src) *
           graph.GetNeighborListLength(dest);
       coef = 1.0 / sqrt(coef);

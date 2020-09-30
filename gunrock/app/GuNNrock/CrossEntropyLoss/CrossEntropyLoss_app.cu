@@ -22,8 +22,8 @@
 #include <gunrock/app/test_base.cuh>
 
 // single-source shortest path includes
-#include <gunrock/app/gcn/CrossEntropyLoss/CrossEntropyLoss_enactor.cuh>
-#include <gunrock/app/gcn/CrossEntropyLoss/CrossEntropyLoss_test.cuh>
+#include <gunrock/app/GuNNrock/CrossEntropyLoss/CrossEntropyLoss_enactor.cuh>
+#include <gunrock/app/GuNNrock/CrossEntropyLoss/CrossEntropyLoss_test.cuh>
 
 /**
  * @brief      graphsum layer of GCN

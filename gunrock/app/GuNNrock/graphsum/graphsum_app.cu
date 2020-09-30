@@ -22,9 +22,9 @@
 #include <gunrock/app/test_base.cuh>
 
 // single-source shortest path includes
-#include <gunrock/app/gcn/graphsum/graphsum_enactor.cuh>
+#include <gunrock/app/GuNNrock/graphsum/graphsum_enactor.cuh>
 
-#include <gunrock/app/gcn/module.h>
+#include <gunrock/app/GuNNrock/module.h>
 
 /**
  * @brief      graphsum layer of GCN
@@ -108,6 +108,7 @@ struct graph_sum : module {
     timer.Start ();
     // so here the b array is used to create the new c array
     // infact the c array is just b into the coef
+    // the a subgraph needs to have a grad
     problem->Reset(1, b, c);
     enactor->Reset();
     enactor->Enact();

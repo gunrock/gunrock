@@ -17,7 +17,7 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-#include <gunrock/app/gcn/gcn_problem.cuh>
+#include <gunrock/app/GuNNrock/gcn_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
 #define PRINT_TIMER_AVERAGE(T, E) printf(#T " average time: %.3fms\n", T / E)

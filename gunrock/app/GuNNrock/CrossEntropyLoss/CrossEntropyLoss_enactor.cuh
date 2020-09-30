@@ -17,7 +17,7 @@
 #include <gunrock/app/enactor_base.cuh>
 #include <gunrock/app/enactor_iteration.cuh>
 #include <gunrock/app/enactor_loop.cuh>
-#include <gunrock/app/gcn/CrossEntropyLoss/CrossEntropyLoss_problem.cuh>
+#include <gunrock/app/GuNNrock/CrossEntropyLoss/CrossEntropyLoss_problem.cuh>
 #include <gunrock/oprtr/oprtr.cuh>
 
 namespace gunrock {

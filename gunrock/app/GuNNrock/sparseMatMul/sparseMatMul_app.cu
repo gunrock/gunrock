@@ -22,10 +22,10 @@
 #include <gunrock/app/test_base.cuh>
 
 // single-source shortest path includes
-#include <gunrock/app/gcn/sparseMatMul/sparseMatMul_enactor.cuh>
-#include <gunrock/app/gcn/sparseMatMul/sparseMatMul_test.cuh>
+#include <gunrock/app/GuNNrock/sparseMatMul/sparseMatMul_enactor.cuh>
+#include <gunrock/app/GuNNrock/sparseMatMul/sparseMatMul_test.cuh>
 
-#include <gunrock/app/gcn/module.h>
+#include <gunrock/app/GuNNrock/module.h>
 
 /**
  * @brief      graphsum layer of GCN
@@ -91,6 +91,7 @@ struct sprmul : module {
   EnactorT *enactor;
   int num_nodes, in_dim, out_dim;
   float *fw_time, *bw_time;
+
 
   sprmul(util::Parameters &p, SpmatT &_a, util::Array1D<SizeT, ValueT> &_b, util::Array1D<SizeT, ValueT> &_b_grad,
       util::Array1D<SizeT, ValueT> &_c, util::Array1D<SizeT, ValueT> &_c_grad, int _in_dim, int _out_dim,

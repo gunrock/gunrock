@@ -15,12 +15,12 @@
 #pragma once
 
 #include <gunrock/app/problem_base.cuh>
-#include <gunrock/app/gcn/sparseMatMul/sparseMatMul_app.cu>
-#include <gunrock/app/gcn/graphsum/graphsum_app.cu>
-#include <gunrock/app/gcn/CrossEntropyLoss/CrossEntropyLoss_app.cu>
-#include <gunrock/app/gcn/dropout/dropout.cuh>
-#include <gunrock/app/gcn/matmul/mat_mul.cuh>
-#include <gunrock/app/gcn/relu/relu.cuh>
+#include <gunrock/app/GuNNrock/sparseMatMul/sparseMatMul_app.cu>
+#include <gunrock/app/GuNNrock/graphsum/graphsum_app.cu>
+#include <gunrock/app/GuNNrock/CrossEntropyLoss/CrossEntropyLoss_app.cu>
+#include <gunrock/app/GuNNrock/dropout/dropout.cuh>
+#include <gunrock/app/GuNNrock/matmul/mat_mul.cuh>
+#include <gunrock/app/GuNNrock/relu/relu.cuh>
 
 namespace gunrock {
 namespace app {
@@ -240,6 +240,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       Array *dummy = nullptr;
       modules.push_back(new dropout<SizeT, ValueT>(x.edge_values, dummy, 0.5, &gen, &fw_dropout, &bw_dropout));
       modules.push_back(new sprmul<SizeT, ValueT, SpmatT>(parameters, x, w0, w0_grad, xw0, xw0_grad, in_dim, hid_dim, &fw_sprmul, &bw_sprmul));
+      // need to add subgraph (A) grad
       modules.push_back(new graph_sum<SizeT, ValueT, GraphT>(parameters, sub_graph, xw0, xw0_grad, Axw0, Axw0_grad, hid_dim, &fw_graphsum, &bw_graphsum));
       modules.push_back(new relu<SizeT, ValueT>(Axw0, Axw0_grad, num_nodes * hid_dim, &fw_relu, &bw_relu));
       modules.push_back(new dropout<SizeT, ValueT>(Axw0, &Axw0_grad, 0.5, &gen, &fw_dropout, &bw_dropout));
