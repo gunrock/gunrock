@@ -66,7 +66,7 @@ struct LCCIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &lcc_counts = data_slice.lcc_counts;
     // TODO Populate degrees in the Init!
     auto &degrees = data_slice.degrees;
-    auto &clustering_coeffecients = data_slice.clustering_coeffecients;
+    auto &clustering_coefficients = data_slice.clustering_coefficients;
     auto &frontier = enactor_slice.frontier;
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
@@ -87,7 +87,7 @@ struct LCCIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // TODO I need a synchronize!? Maybe not if there is no host <--> device synchronization required
 //    GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), "cudaStreamSync failed");
 
-    GUARD_CU(clustering_coeffecients.ForAll([degrees, lcc_counts] __host__ __device__(ValueT* coeffs, const SizeT &pos){
+    GUARD_CU(clustering_coefficients.ForAll([degrees, lcc_counts] __host__ __device__(ValueT* coeffs, const SizeT &pos){
 	
 		if(degrees[pos] >=2){
 			coeffs[pos] = 2 * lcc_counts[pos] / (degrees[pos] * (degrees[pos]-1));

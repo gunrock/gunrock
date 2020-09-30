@@ -66,7 +66,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     // lcc-specific storage arrays
     util::Array1D<SizeT, VertexT> lcc_counts;  // triangle counting values
     util::Array1D<SizeT, SizeT> degrees;
-    util::Array1D<SizeT, ValueT> clustering_coeffecients; 
+    util::Array1D<SizeT, ValueT> clustering_coefficients; 
     /*
      * @brief Default constructor
      */
@@ -74,7 +74,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 	
 	    lcc_counts.SetName("lcc_counts");
   	    degrees.SetName("degrees");
-	    clustering_coeffecients.SetName("clustering_coeffecients");
+	    clustering_coefficients.SetName("clustering_coefficients");
 	    
     }
 
@@ -94,7 +94,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(lcc_counts.Release(target));
       GUARD_CU(degrees.Release(target));
-      GUARD_CU(clustering_coeffecients.Release(target));
+      GUARD_CU(clustering_coefficients.Release(target));
       GUARD_CU(BaseDataSlice ::Release(target));
       return retval;
     }
@@ -116,7 +116,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
       GUARD_CU(lcc_counts.Allocate(sub_graph.nodes, target));
       GUARD_CU(degrees.Allocate(sub_graph.nodes+1, target));
-      GUARD_CU(clustering_coeffecients.Allocate(sub_graph.nodes, target));
+      GUARD_CU(clustering_coefficients.Allocate(sub_graph.nodes, target));
       if (target & util::DEVICE) {
         GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
       }
@@ -214,11 +214,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
         GUARD_CU(
             //data_slice.lcc_counts.SetPointer(h_lcc_counts, nodes, util::HOST));
-            data_slice.clustering_coeffecients.SetPointer(h_lcc_counts, nodes, util::HOST));
+            data_slice.clustering_coefficients.SetPointer(h_lcc_counts, nodes, util::HOST));
         // GUARD_CU(data_slice.lcc_counts.Move(util::DEVICE, util::HOST));
-        GUARD_CU(data_slice.clustering_coeffecients.Move(util::DEVICE, util::HOST));
+        GUARD_CU(data_slice.clustering_coefficients.Move(util::DEVICE, util::HOST));
       } else if (target == util::HOST) {
-        GUARD_CU(data_slice.clustering_coeffecients.ForEach(
+        GUARD_CU(data_slice.clustering_coefficients.ForEach(
             h_lcc_counts,
             [] __host__ __device__(const ValueT &d_x, ValueT &h_x) {
               h_x = d_x;
