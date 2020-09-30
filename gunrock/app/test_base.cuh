@@ -709,6 +709,11 @@ struct Switch_VertexT<OpT, FLAG, VERTEXT_U32B | VERTEXT_U64B> {
 template <SwitchFlag FLAG, typename OpT>
 cudaError_t Switch_Types(util::Parameters &parameters, OpT op) {
   cudaError_t retval = cudaSuccess;
+
+  // Ensure we set the proper device before any other operations take place
+  auto gpu_idx = parameters.Get<std::vector<int>>("device");
+  if (gpu_idx.size() > 0) GUARD_CU(util::SetDevice(gpu_idx[0]));
+
   retval = Switch_VertexT<OpT, FLAG, FLAG & VERTEXT_BASE>::Act(parameters, op);
   return retval;
 }

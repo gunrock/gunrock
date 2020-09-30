@@ -180,6 +180,7 @@ class CommandLineArgs {
 
 void DeviceInit(CommandLineArgs &args);
 cudaError_t SetDevice(int dev);
+cudaError_t GetDevice(int* dev);
 
 template <typename T>
 void CommandLineArgs::GetCmdLineArgument(const char *arg_name, T &val) {

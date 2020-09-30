@@ -413,7 +413,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * \return     cudaError_t Error message(s), if any
    */
   cudaError_t Extract(unsigned long *count_subgraphs,
-                      unsigned long *list_subgraphs,
+                      unsigned long **list_subgraphs,
                       util::Location target = util::DEVICE,
                       util::Location device = util::HOST) {
     cudaError_t retval = cudaSuccess;
@@ -454,17 +454,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
             unique(combinations.begin(), combinations.end());
         combinations.resize(distance(combinations.begin(), itr));
         count_subgraphs[0] = combinations.size();
-        list_subgraphs = new unsigned long[combinations.size() * nodes_query];
+        *list_subgraphs = new unsigned long[combinations.size() * nodes_query];
         size_t iter = 0;
         for (size_t i = 0; i < combinations.size(); ++i) {
           for (size_t j = 0; j < nodes_query; ++j) {
-            list_subgraphs[iter++] = combinations[i][j];
+            (*list_subgraphs)[iter++] = combinations[i][j];
           }
         }
       } else { // returning results will be stored on the GPU
         if (target == util::DEVICE) {
           count_subgraphs = data_slice.temp_count.GetPointer(util::DEVICE);
-          list_subgraphs = data_slice.results.GetPointer(util::DEVICE);
+          *list_subgraphs = data_slice.results.GetPointer(util::DEVICE);
         }
       }
     } else {  // num_gpus != 1
