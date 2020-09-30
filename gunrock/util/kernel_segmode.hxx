@@ -71,7 +71,6 @@ struct perform_t: public std::binary_function<quad, type_t, quad> {
     // they don't overlap
     // which means we need to compare the two bests for the bests
     else if (b.left_element != a.right_element){
-      //  if(a.best_element == 28 && b.best_element==43)printf("Ever here?");
       a.best_element = a.best_count >= b.best_count?a.best_element:b.best_element;
       a.best_count = max(a.best_count, b.best_count);
     }
@@ -1105,19 +1104,14 @@ struct segsort_t {
           copy_status_data[partition] = !merge_op;
           if(merge_op)
           {
-            printf("DOING MERGE");
             merge_list_data[shared.merge_offset + merge_scan.scan] = range;
           }
           else if(copy_op){
             copy_list_data[shared.copy_offset + copy_scan.scan] = partition;
-             printf("DOING COPY");
-          }
-          else{
-            printf("DOING NOTHING");
           }
         }
         // printf("xx%d, \n", head_flags_saved_data[tid]);
-        if (!tid)        printf("%d,%d \n", op_counters_data[pass].x, op_counters_data[pass].y);
+        // if (!tid)        printf("%d,%d \n", op_counters_data[pass].x, op_counters_data[pass].y);
 
       };
       mgpu::cta_launch<nt>(partition_k, num_partition_ctas, context);
@@ -1207,7 +1201,7 @@ struct segsort_t {
       };
       mgpu::cta_launch<launch_t>(merge_k, &op_counters_data[pass].x, context);
         // printf("%d, \n", head_flags_saved_data[tid]);
-        printf("%d,%d \n", &op_counters_data[pass].x, &op_counters_data[pass].y);
+        // printf("%d,%d \n", &op_counters_data[pass].x, &op_counters_data[pass].y);
 
       auto copy_k = [=] MGPU_DEVICE(int tid, int cta) {
         typedef typename launch_t::sm_ptx params_t;

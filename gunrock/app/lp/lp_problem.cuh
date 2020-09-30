@@ -9,7 +9,7 @@
  * @file
  * lp_problem.cuh
  *
- * @brief GPU Storage management Structure for BFS Problem Data
+ * @brief GPU Storage management Structure for LP Problem Data
  */
 
 #pragma once
@@ -21,7 +21,7 @@ namespace app {
 namespace lp {
 
 /**
- * @brief  Speciflying parameters for BFS Problem
+ * @brief  Speciflying parameters for LP Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter
  * info \return cudaError_t error message(s), if any
  */
@@ -30,16 +30,11 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
 
   GUARD_CU(gunrock::app::UseParameters_problem(parameters));
 
-  GUARD_CU(parameters.Use<bool>(
-      "mark-pred",
-      util::OPTIONAL_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      false, "Whether to mark predecessor info.", __FILE__, __LINE__));
-
   return retval;
 }
 
 /**
- * @brief Breadth-First Search Problem structure
+ * @brief Label Propagation Problem structure
  * @tparam _GraphT  Type of the graph
  * @tparam _LabelT  Type of labels used in sssp
  * @tparam _ValueT  Type of per-vertex distance values
@@ -65,52 +60,41 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
   // Helper structures
   /**
-   * @brief Data slice structure containing BFS-specific data on indiviual GPU
+   * @brief Data slice structure containing LP-specific data on indiviual GPU
    */
   struct DataSlice : BaseDataSlice {
-    // TODO remove unneccesary fields from here
-    // util::Array1D<SizeT, VertexT> original_vertex;
-    util::Array1D<SizeT, LabelT>
-        labels;  // labels to mark latest iteration the vertex been visited
-    util::Array1D<SizeT, LabelT>
-    old_labels;
-    util::Array1D<SizeT, VertexT> preds;       // predecessors of vertices
-    util::Array1D<SizeT, VertexT> temp_preds;  // predecessors of vertices
+
+    util::Array1D<SizeT, LabelT> labels;  // labels (in the current iteration) for each vertex 
+    util::Array1D<SizeT, LabelT> old_labels; // labels (in the previous iteration) for each vertex
     util::Array1D<SizeT, SizeT> vertex_markers[2];
-    util::Array1D<SizeT, VertexT> unvisited_vertices[2];
     util::Array1D<SizeT, SizeT, util::PINNED> split_lengths;
     util::Array1D<SizeT, VertexT> local_vertices;
     util::Array1D<SizeT, MaskT> visited_masks;
     util::Array1D<SizeT, MaskT> old_mask;
+    util::Array1D<SizeT, VertexT> unvisited_vertices[2];
     util::Array1D<SizeT, MaskT *> in_masks;
-    // need two arrays
-    // store data array containing labels
-    // store segment information
-    // store the count of segments
-    // max segment size is frontier size
-    // max data array is sum of top frontier size neighbours lengths
-    util::Array1D<SizeT, LabelT> data;
+
+    
+    util::Array1D<SizeT, LabelT> neighbour_labels;
+    util::Array1D<SizeT, int> neighbour_labels_size;
+
+    // segments_temp stores the relative segments, and segments stores the (cumulative scan) absolute segments
     util::Array1D<SizeT, int> segments;
     util::Array1D<SizeT, int> segments_temp;
-    util::Array1D<uint64_t, char> cub_temp_storage;
-    // do I have to make these an array?
-    // they are just one variable but I need to call atomicAdd on them
-    util::Array1D<SizeT, int> data_size;
     util::Array1D<SizeT, int> segments_size;
-    // SizeT data_size, segments_size;
+
+    util::Array1D<uint64_t, char> cub_temp_storage;
     SizeT num_visited_vertices, num_unvisited_vertices;
     bool been_in_backward;
 
+    util::Array1D<SizeT, int> visited;
     /*
      * @brief Default constructor
      */
     DataSlice() : BaseDataSlice() {
-      // original_vertex        .SetName("original_vertex"      );
+
       labels.SetName("labels");
       old_labels.SetName("old_labels");
-
-      preds.SetName("preds");
-      temp_preds.SetName("temp_preds");
       vertex_markers[0].SetName("vertex_markers[0]");
       vertex_markers[1].SetName("vertex_markers[1]");
       unvisited_vertices[0].SetName("unvisited_vertices[0]");
@@ -121,13 +105,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       old_mask.SetName("old_mask");
       in_masks.SetName("in_masks");
   
-      data.SetName("data");
-      data.SetName("data_size");
+      neighbour_labels.SetName("neighbour_labels");
+      neighbour_labels_size.SetName("neighbour_labels_size");
 
       segments.SetName("segments");
-      segments.SetName("segments_size");
-      cub_temp_storage.SetName("cub_temp_storage");
+      segments_size.SetName("segments_size");
       segments_temp.SetName("segments_temp");
+      cub_temp_storage.SetName("cub_temp_storage");
+
+      visited.SetName("visited");
     }
 
     /*
@@ -139,23 +125,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cudaError_t retval = cudaSuccess;
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx));
 
-      // GUARD_CU(original_vertex      .Release(target));
+      GUARD_CU(visited.Release(target));
       GUARD_CU(labels.Release(target));
       GUARD_CU(old_labels.Release(target));
-      GUARD_CU(preds.Release(target));
-      GUARD_CU(temp_preds.Release(target));
       GUARD_CU(vertex_markers[0].Release(target));
       GUARD_CU(vertex_markers[1].Release(target));
-      GUARD_CU(unvisited_vertices[0].Release(target));
-      GUARD_CU(unvisited_vertices[1].Release(target));
       GUARD_CU(split_lengths.Release(target));
       GUARD_CU(local_vertices.Release(target));
       GUARD_CU(visited_masks.Release(target));
+      GUARD_CU(unvisited_vertices[0].Release(target));
+      GUARD_CU(unvisited_vertices[1].Release(target));
       GUARD_CU(old_mask.Release(target));
       GUARD_CU(in_masks.Release(target));
       GUARD_CU(in_masks.Release(target));
-      GUARD_CU(data.Release(target));
-      GUARD_CU(data_size.Release(target));
+      GUARD_CU(neighbour_labels.Release(target));
+      GUARD_CU(neighbour_labels_size.Release(target));
       GUARD_CU(segments_size.Release(target));
       GUARD_CU(segments.Release(target));
       GUARD_CU(segments_temp.Release(target));
@@ -165,7 +149,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     }
 
     /**
-     * @brief initializing sssp-specific data on each gpu
+     * @brief initializing lp-specific data on each gpu
      * @param     sub_graph   Sub graph on the GPU.
      * @param[in] num_gpus    Number of GPUs
      * @param[in] gpu_idx     GPU device index
@@ -185,29 +169,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(segments.Allocate(sub_graph.nodes, target));
       GUARD_CU(segments_temp.Allocate(sub_graph.nodes, target));
       GUARD_CU(segments_size.Allocate(1, target));
-      GUARD_CU(data_size.Allocate(1,  util::DEVICE | util::HOST));
+      GUARD_CU(neighbour_labels_size.Allocate(1,  util::DEVICE | util::HOST));
       GUARD_CU(cub_temp_storage.Allocate(1, target));
+      GUARD_CU(visited.Allocate(sub_graph.nodes, target));
+      GUARD_CU(neighbour_labels.Allocate(sub_graph.edges+1, target));
       
-      // TODO
-      // all the remaining space should be taken by data
-      // can we preallocate something like that?
-      // we cannot currently dynamically allocate space
-      // so the maximum is the best but then cuda malloc calls can be slow
-      
-      GUARD_CU(data.Allocate(1000000, target));
-      if (flag & Mark_Predecessors) {
-        GUARD_CU(preds.Allocate(sub_graph.nodes, target));
-      }
-
-      GUARD_CU(unvisited_vertices[0].Allocate(sub_graph.nodes, target));
-      GUARD_CU(unvisited_vertices[1].Allocate(sub_graph.nodes, target));
       GUARD_CU(split_lengths.Allocate(2, util::HOST | target));
-
-      if (flag & Enable_Idempotence) {
-        GUARD_CU(visited_masks.Allocate(
-            sub_graph.nodes / (sizeof(MaskT) * 8) + 2 * sizeof(VertexT),
-            target));
-      }
 
       if (num_gpus > 1) {
 
@@ -240,30 +207,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cudaError_t retval = cudaSuccess;
 
       SizeT nodes = this->sub_graph->nodes;
-      num_visited_vertices = 0;
-      num_unvisited_vertices = 0;
+
       been_in_backward = false;
 
       GUARD_CU(util::SetDevice(this->gpu_idx));
 
       // Allocate output labels if necessary
       GUARD_CU(labels.EnsureSize_(nodes, target));
+      GUARD_CU(visited.EnsureSize_(nodes, target));
 
-      if (this->flag & Mark_Predecessors) {
-        // Allocate preds if necessary
-        GUARD_CU(preds.EnsureSize_(nodes, target));
-        GUARD_CU(preds.ForEach(
-            [] __host__ __device__(VertexT & pred) {
-              pred = util::PreDefinedValues<VertexT>::InvalidValue;
-            },
-            nodes, target, this->stream));
-      }
-
-      if (this->flag & Enable_Idempotence) {
-        GUARD_CU(visited_masks.ForEach(
-            [] __host__ __device__(MaskT & mask) { mask = 0; },
-            util::PreDefinedValues<SizeT>::InvalidValue, target, this->stream));
-      }
+      GUARD_CU(visited.ForEach( [] __host__ __device__(int &x) { x = (int)0; }, nodes, target, this->stream));
+      GUARD_CU(neighbour_labels_size.ForEach( [] __host__ __device__(int &x) { x = (int)0; }, nodes, target, this->stream));
+      GUARD_CU(segments_size.ForEach( [] __host__ __device__(int &x) { x = (int)0; }, nodes, target, this->stream));
 
       return retval;
     }  // end of Reset
@@ -276,13 +231,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   // Methods
 
   /**
-   * @brief BFSProblem default constructor
+   * @brief LPProblem default constructor
    */
   Problem(util::Parameters &_parameters, ProblemFlag _flag = Problem_None)
       : BaseProblem(_parameters, _flag), data_slices(NULL) {}
 
   /**
-   * @brief BFSProblem default destructor
+   * @brief LPProblem default destructor
    */
   virtual ~Problem() { Release(); }
 
@@ -313,14 +268,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
 
   /**
-   * @brief Copy result labels and/or predecessors computed on the GPU back to
+   * @brief Copy result labels computed on the GPU back to
    *host-side vectors.
    * @param[out] h_labels Host array to store computed vertex labels
-   * @param[out] h_preds  Host array to store computed vertex predecessors
    * @param[in]  target where the results are stored
    * \return     cudaError_t Error message(s), if any
    */
-  cudaError_t Extract(LabelT *h_labels, VertexT *h_preds = NULL,
+  cudaError_t Extract(LabelT *h_labels,
                       util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     SizeT nodes = this->org_graph->nodes;
@@ -335,10 +289,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         GUARD_CU(data_slice.labels.SetPointer(h_labels, nodes, util::HOST));
         GUARD_CU(data_slice.labels.Move(util::DEVICE, util::HOST));
 
-        if (this->flag & Mark_Predecessors) {
-          GUARD_CU(data_slice.preds.SetPointer(h_preds, nodes, util::HOST));
-          GUARD_CU(data_slice.preds.Move(util::DEVICE, util::HOST));
-        }
       }
 
       else if (target == util::HOST) {
@@ -348,35 +298,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
               h_labels[v] = labels[v];
             },
             nodes, util::HOST));
-
-        if (this->flag & Mark_Predecessors)
-          GUARD_CU(data_slice.preds.ForAll(
-              [h_preds] __host__ __device__(const VertexT *preds,
-                                            const VertexT &v) {
-                h_preds[v] = preds[v];
-              },
-              nodes, util::HOST));
       }
     }
 
     else {  // num_gpus != 1
       util::Array1D<SizeT, LabelT *> th_labels;
-      util::Array1D<SizeT, VertexT *> th_preds;
       th_labels.SetName("lp::Problem::Extract::th_labels");
-      th_preds.SetName("lp::Problem::Extract::th_preds");
       GUARD_CU(th_labels.Allocate(this->num_gpus, util::HOST));
-      GUARD_CU(th_preds.Allocate(this->num_gpus, util::HOST));
 
       for (int gpu = 0; gpu < this->num_gpus; gpu++) {
         auto &data_slice = data_slices[gpu][0];
         if (target == util::DEVICE) {
           GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
           GUARD_CU(data_slice.labels.Move(util::DEVICE, util::HOST));
-          if (this->flag & Mark_Predecessors)
-            GUARD_CU(data_slice.preds.Move(util::DEVICE, util::HOST));
         }
         th_labels[gpu] = data_slice.labels.GetPointer(util::HOST);
-        th_preds[gpu] = data_slice.preds.GetPointer(util::HOST);
       }  // end for(gpu)
 
       for (VertexT v = 0; v < nodes; v++) {
@@ -386,11 +322,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           v_ = this->org_graph->GpT::convertion_table[v];
 
         h_labels[v] = th_labels[gpu][v_];
-        if (this->flag & Mark_Predecessors) h_preds[v] = th_preds[gpu][v_];
       }
 
       GUARD_CU(th_labels.Release());
-      GUARD_CU(th_preds.Release());
     }  // end if (num_gpus ==1)
 
     return retval;
@@ -398,7 +332,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
   /**
    * @brief initialization function.
-   * @param     graph       The graph that SSSP processes on
+   * @param     graph       The graph that LP processes on
    * @param[in] Location    Memory location to work on
    * \return    cudaError_t Error message(s), if any
    */
@@ -407,8 +341,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
 
-    // if (this->parameters.template Get<bool>("mark-pred"))
-    //   this->flag = this->flag | Mark_Predecessors;
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
@@ -430,6 +362,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   cudaError_t Reset(VertexT src, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
+
 
     for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
       // Set device
@@ -454,42 +387,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
     if (target & util::HOST) {
       data_slices[gpu]->labels[src_] = 0;
-      if (this->flag & Mark_Predecessors)
-        data_slices[gpu]->preds[src_] =
-            util::PreDefinedValues<VertexT>::InvalidValue;
-      if (this->flag & Enable_Idempotence) {
-        VertexT mask_pos = src_ / (8 * sizeof(MaskT));
-        data_slices[gpu]->visited_masks[mask_pos] =
-            1 << (src_ % (8 * sizeof(MaskT)));
-      }
     }
+    printf("This is where the util:DEVICE=2 is checked with target %d\n", target);
 
     if (target & util::DEVICE) {
       GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
-      GUARD_CU(data_slices[gpu]->labels.ForAll(
-          [src_] __host__ __device__(LabelT * labels, const SizeT &v) {
-            labels[src_] = 0;
-          },
-          1, util::DEVICE));
 
-      if (this->flag & Mark_Predecessors) {
-        GUARD_CU(data_slices[gpu]->preds.ForAll(
-            [src_] __host__ __device__(VertexT * preds, const SizeT &v) {
-              preds[src_] = util::PreDefinedValues<VertexT>::InvalidValue;
-            },
-            1, util::DEVICE));
-      }
+      GUARD_CU(data_slices[gpu]->labels.SetIdx());
 
-      if (this->flag & Enable_Idempotence) {
-        VertexT mask_pos = src_ / (8 * sizeof(MaskT));
-        GUARD_CU(data_slices[gpu]->visited_masks.ForAll(
-            [mask_pos, src_] __host__ __device__(MaskT * masks,
-                                                 const SizeT &v) {
-              masks[mask_pos] = 1 << (src_ % (8 * sizeof(MaskT)));
-            },
-            1, util::DEVICE));
-      }
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
     }
 
@@ -500,7 +406,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
 };  // end of problem
 
-}  // namespace bfs
+}  // namespace lp 
 }  // namespace app
 }  // namespace gunrock
 

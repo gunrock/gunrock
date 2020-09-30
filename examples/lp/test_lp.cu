@@ -62,19 +62,20 @@
      // compute reference CPU BFS solution for source-distance
      if (!quick) {
        bool quiet = parameters.Get<bool>("quiet");
+       int test = parameters.Get<int>("test");
        std::string validation = parameters.Get<std::string>("validation");
        util::PrintMsg("Computing reference value ...", !quiet);
        std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
        num_srcs = srcs.size();
        SizeT nodes = graph.nodes;
        ref_labels = new LabelT *[num_srcs];
+
        for (int i = 0; i < num_srcs; i++) {
          ref_labels[i] = (LabelT *)malloc(sizeof(LabelT) * nodes);
          auto src = srcs[i];
          VertexT num_iters = 0;
          util::PrintMsg("__________________________", !quiet);
-         float elapsed = app::lp::CPU_Reference(graph, src, quiet, false,
-                                                 ref_labels[i], (VertexT*)NULL, num_iters);
+         float elapsed = app::lp::CPU_Reference(graph, src, quiet, ref_labels[i], num_iters);
          util::PrintMsg("--------------------------\nRun " + std::to_string(i) +
                             " elapsed: " + std::to_string(elapsed) +
                             " ms, src = " + std::to_string(src) +
@@ -83,9 +84,7 @@
        }
      }
  
-     std::vector<std::string> switches{
-         "mark-pred", "advance-mode", 
-         "do-a",      "do-b",         "idempotence"};
+     std::vector<std::string> switches{};
      GUARD_CU(app::Switch_Parameters(
          parameters, graph, switches,
          [ref_labels](util::Parameters &parameters, GraphT &graph) {
@@ -116,7 +115,7 @@
      return cudaSuccess;
    }
    GUARD_CU(parameters.Check_Required());
- 
+      
    return app::Switch_Types<app::VERTEXT_U32B | app::VERTEXT_U64B |
                             app::SIZET_U32B | app::SIZET_U64B |
                             app::VALUET_S32B | app::DIRECTED | app::UNDIRECTED>(

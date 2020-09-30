@@ -85,6 +85,7 @@ cudaError_t cubExclusiveSum(util::Array1D<uint64_t, char> &cub_temp_space,
   return retval;
 }
 
+
 template <typename InputT, typename OutputT, 
           typename ReduceT, typename SizeT>
 cudaError_t Scan(util::Array1D<SizeT, InputT> &d_in, SizeT num_items,
