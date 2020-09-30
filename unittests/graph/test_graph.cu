@@ -87,7 +87,12 @@ void test_graph()
   edge_t num_edges        = graph_slice.get_number_of_edges();
   edge_t num_neighbors    = graph_slice.get_neighbor_list_length(source);
   vertex_t source_vertex  = graph_slice.get_source_vertex(edge);
+  double average_degree   = graph::get_average_degree(graph_slice);
+  double degree_std_dev   = graph::get_degree_standard_deviation(graph_slice);
 
+  
+  std::cout << "Average Degree: "       << average_degree << std::endl;
+  std::cout << "Degree Std. Deviation: "<< degree_std_dev << std::endl;
   std::cout << "Number of vertices: "   << num_vertices   << std::endl;
   std::cout << "Number of edges: "      << num_edges      << std::endl;
   std::cout << "Number of neighbors: "  << num_neighbors 

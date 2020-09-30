@@ -24,20 +24,6 @@ namespace graph {
 using namespace format;
 using namespace detail;
 
-// // Empty type for conditional
-// struct empty_t{};
-
-// // Boolean based conditional inheritence
-// // Relies on empty_t{};
-// template <bool HAS_COO, bool HAS_CSR, bool HAS_CSC,
-//           typename vertex_t, typename edge_t, typename weight_t> 
-// class graph_t : 
-//     public std::conditional_t<HAS_CSR, graph_csr_t<vertex_t, edge_t, weight_t>, empty_t>,
-//     public graph_csc_t<vertex_t, edge_t, weight_t>,
-//     public graph_coo_t<vertex_t, edge_t, weight_t> {
-
-// };  // struct graph_t
-
 // Variadic inheritence, inherit only what you need
 template<typename vertex_t, typename edge_t, typename weight_t, class... graph_view_t> 
 class graph_t : public graph_view_t... {
@@ -52,6 +38,8 @@ class graph_t : public graph_view_t... {
                                 std::tuple<graph_view_t...> >::type;
 
     public:
+        // XXX: add support for per-view based methods
+        // template<typename view_t = first_view_t>
         __host__ __device__ __forceinline__
         edge_type get_neighbor_list_length(const vertex_type& v) const override {
             return first_view_t::get_neighbor_list_length(v);
@@ -84,6 +72,78 @@ class graph_t : public graph_view_t... {
         static constexpr std::size_t number_of_formats_inherited = sizeof...(graph_view_t);
 
 };  // struct graph_t
+
+/**
+ * @brief Get the average degree of a graph.
+ * 
+ * @tparam graph_type 
+ * @param graph 
+ * @return double 
+ */
+template<typename graph_type>
+double get_average_degree(graph_type &graph) {
+  auto sum = 0;
+  for (auto v = 0; v < graph.get_number_of_vertices(); ++v)
+    sum += graph.get_neighbor_list_length(v);
+
+  return (sum / graph.get_number_of_vertices());
+}
+
+/**
+ * @brief Get the degree standard deviation of a graph.
+ * This method uses population standard deviation,
+ * therefore measuring the standard deviation over
+ * the entire population (all nodes). This can be
+ * sped up by only taking a small sample and using
+ * sqrt(accum / graph.get_number_of_vertices() - 1)
+ * as the result.
+ * 
+ * @tparam graph_type 
+ * @param graph 
+ * @return double 
+ */
+template <typename graph_type>
+double get_degree_standard_deviation(graph_type &graph) {
+
+  auto average_degree = get_average_degree(graph);
+
+  double accum = 0.0;
+  for (auto v = 0; v < graph.get_number_of_vertices(); ++v) {
+    double d = graph.get_neighbor_list_length(v);
+    accum += (d - average_degree) * (d - average_degree);
+  }
+  return sqrt(accum / graph.get_number_of_vertices());
+}
+
+/**
+ * @brief build a log-scale degree histogram of a graph.
+ * 
+ * @tparam graph_type 
+ * @tparam histogram_t 
+ * @param graph 
+ * @return histogram_t* 
+ */
+// template <typename graph_type, typename histogram_t>
+// histogram_t* get_degree_histogram(graph_type &graph) {
+//   using vertex_t = graph_type::vertex_t;
+//   auto length = sizeof(vertex_t) * 8 + 1;
+
+//   thrust::device_vector<vertex_t> histogram(length);
+
+//   auto build_histogram = [graph] __device__ (vertex_t* counts, vertex_t i) {
+//       auto degree = graph.get_neighbor_list_length(i);
+//       while (num_neighbors >= (1 << log_length))
+//         log_length++;
+
+//       operation::atomic::add(&counts[log_length], (vertex_t)1);
+//   };
+
+//   auto begin = 0;
+//   auto end = graph.get_number_of_vertices();
+//   operator::for_all(thrust::device, histogram.data(), begin, end, build_histogram);
+  
+//   return histogram.data.get();
+// }
 
 
 } // namespace graph
