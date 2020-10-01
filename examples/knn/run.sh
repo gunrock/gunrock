@@ -17,35 +17,71 @@ do
 done
 
 EXECUTION=$exe_file
+DEVICE=0
+
+DATASETS_FOLDER="$HOME/clustering_dataset" #/data/clustering_dataset/
+
+mkdir JSON
 
 # addresses
-DATADIR="/data/gunrock_dataset/large"
+PATH[0]="${DATASETS_FOLDER}/KDDCUP04Bio"
+PATH[1]="${DATASETS_FOLDER}/3DRN"
+PATH[2]="${DATASETS_FOLDER}/Font"
+PATH[3]="${DATASETS_FOLDER}/Halo"
+PATH[4]="${DATASETS_FOLDER}/Halo"
+PATH[5]="${DATASETS_FOLDER}/Font"
+PATH[6]="${DATASETS_FOLDER}/Berton"
+PATH[7]="${DATASETS_FOLDER}/Berton"
+PATH[8]="${DATASETS_FOLDER}/Bower"
+PATH[9]="${DATASETS_FOLDER}/FOF"
+PATH[10]="${DATASETS_FOLDER}/FOF"
+PATH[11]="${DATASETS_FOLDER}/FOF"
+PATH[12]="${DATASETS_FOLDER}/FOF"
+PATH[13]="${DATASETS_FOLDER}/FOF"
+PATH[14]="${DATASETS_FOLDER}/FOF"
+PATH[15]="${DATASETS_FOLDER}/FOF"
 
-# graphs
-NAME[0]="soc-LiveJournal1" 	&& K[0]="10" && EPS[0]="5" && MINPTS[0]="7"
-NAME[1]="soc-orkut" 		&& K[1]="10" && EPS[1]="5" && MINPTS[1]="7"
-NAME[2]="hollywood-2009" 	&& K[2]="10" && EPS[2]="5" && MINPTS[2]="7"
-NAME[3]="indochina-2004" 	&& K[3]="2"  && EPS[3]="1" && MINPTS[3]="1"
-NAME[4]="road_usa" 		&& K[4]="2"  && EPS[4]="1" && MINPTS[4]="1"
+# datasets
+NAME[0]="KDDCUP04Bio.txt"           && K[0]="30"     && EPS[0]="5"   && MINPTS[0]="5"
+NAME[1]="3DRN"                      && K[1]="30"     && EPS[1]="12"  && MINPTS[1]="15"
+NAME[2]="DGF572K11d" 		        && K[2]="30"     && EPS[2]="12"  && MINPTS[2]="15"
+NAME[3]="MPAH1M9d" 	                && K[3]="40"     && EPS[3]="15"  && MINPTS[3]="20"
+NAME[4]="MPAH1.5M9d" 	            && K[4]="40"     && EPS[4]="15"  && MINPTS[4]="20"
+NAME[5]="DGF2M11d" 		            && K[5]="50"     && EPS[5]="20"  && MINPTS[5]="25"
+NAME[6]="MPAGB23K3d" 		        && K[6]="30"     && EPS[6]="12"  && MINPTS[6]="15"
+NAME[7]="MPAGB8M3d" 		        && K[7]="50"     && EPS[7]="20"  && MINPTS[7]="25"
+NAME[8]="DGB8M3d"   		        && K[8]="50"     && EPS[8]="20"  && MINPTS[8]="25"
+NAME[9]="FOF11M3d" 		            && K[9]="30"     && EPS[9]="12"  && MINPTS[9]="15"
+NAME[10]="FOF20M3d" 		        && K[10]="30"    && EPS[10]="12" && MINPTS[10]="15"
+NAME[11]="FOF22M3d" 		        && K[11]="30"    && EPS[11]="12" && MINPTS[11]="15"
+NAME[12]="FOF25M3d" 		        && K[12]="30"    && EPS[12]="12" && MINPTS[12]="15"
+NAME[13]="FOF30M3d" 		        && K[13]="30"    && EPS[13]="12" && MINPTS[13]="15"
+NAME[14]="FOF57M3d" 		        && K[14]="30"    && EPS[14]="12" && MINPTS[14]="15"
+NAME[15]="FOF113M3d" 		        && K[15]="30"    && EPS[15]="12" && MINPTS[15]="15"
 
-# network graphs
+# shared memory
+SHMEM[0]="true"     && TRANSPOSE[0]="false"
+SHMEM[1]="false"    && TRANSPOSE[1]="true"
 
-GRAPH[0]="market $DATADIR/${NAME[0]}/${NAME[0]}.mtx"
-GRAPH[1]="market $DATADIR/${NAME[1]}/${NAME[1]}.mtx"
-GRAPH[2]="market $DATADIR/${NAME[2]}/${NAME[2]}.mtx"
-GRAPH[3]="market $DATADIR/${NAME[3]}/${NAME[3]}.mtx"
-GRAPH[4]="market $DATADIR/${NAME[4]}/${NAME[4]}.mtx"
+# number of threads
+TH[0]="32"
+TH[1]="64"
+TH[2]="128"
+TH[3]="256"
+TH[4]="512"
 
-# parameters
-OPTIONS="--undirected --snn=true --quick --tag=Gunrock/SNN_GRAPL19"
+# common parameters
+OPTIONS="--quick=true --device=$DEVICE --NUM-THREADS=128 --tag=GUNROCK_KNN"
 
-for i in {0..4}
-do
-    SUFFIX="V100_Ubuntu_18-04"
-    mkdir -p eval/$SUFFIX
-    DEVICE="2"
+for i in {0..15}; do
+    for s in {0..1}; do
+        for t in {0..1}; do
+            mkdir -p ./JSON/${NAME[$i]}
+            DATASET="${PATH[$i]}/${NAME[$i]}"
 
-    echo $EXECUTION ${GRAPH[$i]} --k=${K[$i]} --eps=${EPS[$i]} --min-pts=${MINPTS[$i]} $OPTIONS --device=$DEVICE --jsondir=./eval/$SUFFIX "> ./eval/$SUFFIX/${NAME[$i]}.txt"
-    $EXECUTION ${GRAPH[$i]} --k=${K[$i]} --eps=${EPS[$i]} --min-pts=${MINPTS[$i]} $OPTIONS --device=$DEVICE --jsondir=./eval/$SUFFIX  > ./eval/$SUFFIX/${NAME[$i]}.txt
-    sleep 1
+            echo $EXECUTION market --labels-file $DATASET --k=${K[$i]} $OPTIONS --transpose=${TRANSPOSE[$t]} --use-shared-mem=${SHMEM[$s]} --jsondir=./JSON/${NAME[$i]}/ "> ./JSON/${NAME[$i]}.txt"
+            
+            $EXECUTION market --labels-file $DATASET --k=${K[$i]} $OPTIONS --transpose=${TRANSPOSE[$t]} --use-shared-mem=${SHMEM[$s]} --jsondir=./JSON/${NAME[$i]}/ > ./JSON/${NAME[$i]}_console.txt
+        done
+    done
 done

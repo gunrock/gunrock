@@ -30,9 +30,9 @@ else (ENABLE_WARNINGS)
 endif (ENABLE_WARNINGS)
 # end /* Suppress all warnings from gcc */
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++14 -fPIC")
 
 option(CMAKE_VERBOSE_MAKEFILE OFF)
 
@@ -55,6 +55,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/FindOpenMP.cmake)
 if (METIS_LIBRARY)
   include(${CMAKE_SOURCE_DIR}/cmake/FindMetis.cmake)
 endif()
+include(${CMAKE_SOURCE_DIR}/cmake/FindFAISS.cmake)
 # end /* Include Boost, OpenMP & Metis */
 
 # begin /* How can I pass git SHA1 to compiler as definition using cmake? */
@@ -266,7 +267,7 @@ endif ()
 if (CUDA_VERSION VERSION_EQUAL "9.0" OR CUDA_VERSION VERSION_GREATER "9.0")
   option(GUNROCK_GENCODE_SM70
     "ON to generate code for Compute Capability 7.0 devices (e.g. Volta V100)"
-    OFF)
+    ON)
   option(GUNROCK_GENCODE_SM72
     "ON to generate code for Compute Capability 7.2 devices (e.g. Jetson AGX Xavier)"
     OFF)
@@ -281,7 +282,7 @@ endif ()
 
 option (CUDA_AUTODETECT_GENCODE
   "On to enable autodetection of appropriate gencode=X options for each detected device"
-  ON)
+  OFF)
 
 option(CUDA_VERBOSE_PTXAS
   "On to enable verbose output from the PTXAS assembler."

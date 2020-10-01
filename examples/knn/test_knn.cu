@@ -73,10 +73,8 @@ struct main_struct {
     // Creating empty graph
     GraphT graph;
 
-    // Initialization of the points array
-    util::Array1D<SizeT, ValueT> points;
     //Initialization is moved to gunrock::graphio::labels::Read ... ReadLabelsStream
-    //GUARD_CU(points.Allocate(n*dim, util::HOST));
+    util::Array1D<SizeT, ValueT> points;
     
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
@@ -169,7 +167,8 @@ int main(int argc, char** argv) {
 
   app::Switch_Types<app::VERTEXT_U32B | app::VERTEXT_U64B |
                            app::SIZET_U32B | app::SIZET_U64B |
-                           app::VALUET_F32B | app::UNDIRECTED>(
+                           //app::VALUET_F64B | app::UNDIRECTED>(
+                           app::VALUET_F32B | app::VALUET_F64B | app::UNDIRECTED>(
       parameters, main_struct());
 }
 

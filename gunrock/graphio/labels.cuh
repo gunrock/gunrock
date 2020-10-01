@@ -174,37 +174,43 @@ cudaError_t ReadLabelsStream(FILE *f_in, util::Parameters &parameters,
 }
 
 template <typename SizeT, typename ValueT>
-cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters, 
+cudaError_t ReadLabelsStream(FILE *f_in, util::Parameters &parameters,
                               util::Array1D<SizeT, ValueT>& labels) {
 
   cudaError_t retval = cudaSuccess;
   bool quiet = parameters.Get<bool>("quiet");
+  bool transpose = parameters.Get<bool>("transpose");
+  if (transpose)
+      printf("table is gonna be tranposed\n");
+  else
+      printf("table is not tranposed\n");
   long long dim; 
   long long num_labels;
   long long labels_read = -1;
   time_t mark0 = time(NULL);
   long long ll_node = 0;
 
+  char line[10000];
+
   while (true) {
-      std::string line;
-      std::getline(Labels, line);
+      if (fscanf(f_in, "%[^\n]\n", line) <= 0){
+        break;
+      }
 
 #if DEBUG_LABEL
       std::cerr << line << std::endl;
 #endif
-      std::stringstream ss(line);
 
       if (line[0] == '%' || line[0] == '#') {  // Comment
-          if (line.length() >= 2 && line[1] == '%') {
-              // Header -> Can be used to extract info for labels
+          if (strlen(line) >= 2 && line[1] == '%'){
           }
       }  // -> if comment
 
       else if (!util::isValid(labels_read)) {  // Problem description-> First line
           // with nodes and labels info
           long long ll_num_labels, ll_dim;
-          ss >> ll_num_labels;
-          ss >> ll_dim;
+          int items_scanned = 
+              sscanf(line, "%lld %lld", &ll_num_labels, &ll_dim);
           if ((!util::isValid(ll_num_labels)) or (!util::isValid(ll_dim))){
               return util::GRError(
                       "Error parsing LABELS, problem description invalid (" +
@@ -241,15 +247,16 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
       }
 
       int d = 0;
-      while (!ss.eof()){
-          if (d > dim){
-              return util::GRError(
-                      "Error parsing LABELS: "
-                      "Invalid length of label: " + std::to_string(d),
-                      __FILE__, __LINE__);
-          }
+      while (d < dim){
+          
           double lf_label = util::PreDefinedValues<ValueT>::InvalidValue;
-          ss >> lf_label;
+          int num_input = sscanf(line, "%lf", &lf_label);
+          if (d < dim-1){
+              int i=0; 
+              while (line[i] != ' ' && line[i] != '\n') ++i;
+              memmove(line, line+i+1, 10000-(i+2));
+          }
+
           ValueT ll_label;
           if (typeid(ValueT) == typeid(float) || typeid(ValueT) == typeid(double) ||
           typeid(ValueT) == typeid(long double)) {
@@ -265,14 +272,26 @@ cudaError_t ReadLabelsStream(std::ifstream& Labels, util::Parameters &parameters
                       std::to_string(ll_label),
                       __FILE__, __LINE__);
           }
-          labels[ll_node * dim + d] = ll_label;
-          //debug, do not remove
-          //std::cout << "read value: " << lf_label << " put under index " << ll_node * dim + d << "\t";
+          if (!transpose){
+              //N M
+              //   DA  DB  .. DM 
+              //I1 L1A L1B .. L1M
+              //I2 L2A L2B .. L2M
+              //.. ..  ..  .. ..
+              //IN LNA LNB .. LNM
+              labels[ll_node * dim + d] = ll_label;
+          }else{
+              //N M
+              //   I1  I2  .. IN 
+              //DA L1A L2A .. LNA
+              //DB L1B L2B .. LNB
+              //.. ..  ..  .. ..
+              //DM L1M L2M .. LNM
+              labels[d * num_labels + ll_node] = ll_label;
+          }
           ++d;
       } // -> while reading line
       ++ll_node;
-      //debug, do not remove
-      //std::cout << "\n";
       if (d < dim){
               return util::GRError(
                       "Error parsing LABELS: "
@@ -345,12 +364,11 @@ cudaError_t BuildLabelsArray(std::string filename,
   cudaError_t retval = cudaSuccess;
   bool quiet = parameters.Get<bool>("quiet");
 
-  std::ifstream Labels;
-  Labels.open(filename);
-  if (Labels.is_open()) {
+  FILE *f_in = fopen(filename.c_str(), "r");
+  if (f_in) {
     util::PrintMsg("Reading from " + filename + ":", !quiet);
-    if (retval = ReadLabelsStream(Labels, parameters, labels)) {
-      Labels.close();
+    if (retval = ReadLabelsStream(f_in, parameters, labels)) {
+      fclose(f_in);
       return retval;
     }
   } else {
