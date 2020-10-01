@@ -128,7 +128,7 @@ double get_degree_standard_deviation(graph_type &graph) {
  * @return histogram_t* 
  */
 // template <typename graph_type, typename histogram_t>
-// histogram_t* get_degree_histogram(graph_type &graph) {
+// histogram_t* build_degree_histogram(graph_type &graph) {
 //   using vertex_t = graph_type::vertex_t;
 //   auto length = sizeof(vertex_t) * 8 + 1;
 
