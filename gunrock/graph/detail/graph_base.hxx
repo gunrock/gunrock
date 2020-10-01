@@ -44,8 +44,13 @@ class graph_base_t {
             _number_of_edges(number_of_edges),
             _properties(properties) {}
 
-        vertex_type get_number_of_vertices() { return _number_of_vertices; }
-        edge_type get_number_of_edges() { return _number_of_edges; }
+        __host__ __device__ __forceinline__
+        const vertex_type get_number_of_vertices() const { return _number_of_vertices; }
+
+        __host__ __device__ __forceinline__
+        const edge_type get_number_of_edges() const { return _number_of_edges; }
+
+
         bool is_directed() { return _properties.directed; }
 
         // Pure Virtual Functions:: must be implemented in derived classes

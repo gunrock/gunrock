@@ -31,22 +31,23 @@ template< typename vertex_t, typename edge_t, typename weight_t,
           memory_space_t space, class... graph_view_t> 
 class graph_t : public graph_view_t... {
 
-    using vertex_type = vertex_t;
-    using edge_type   = edge_t;
-    using weight_type = weight_t;
-
-    // Base graph type, always exists.
-    using graph_base_type   = graph_base_t<vertex_type, edge_type, weight_type>;
-
-    // Different supported graph representation views.
-    using graph_csr_view    = graph_csr_t<vertex_type, edge_type, weight_type, space>;
-    using graph_csc_view    = graph_csc_t<vertex_type, edge_type, weight_type, space>;
-    using graph_coo_view    = graph_coo_t<vertex_type, edge_type, weight_type, space>;
-    
+    // Default view (graph representation) if no view is specified
     using first_view_t      = typename std::tuple_element<0, // get first type
                                 std::tuple<graph_view_t...> >::type;
 
     public:
+        using vertex_type = vertex_t;
+        using edge_type   = edge_t;
+        using weight_type = weight_t;
+
+        // Base graph type, always exists.
+        using graph_base_type   = graph_base_t<vertex_type, edge_type, weight_type>;
+
+        // Different supported graph representation views.
+        using graph_csr_view    = graph_csr_t<vertex_type, edge_type, weight_type, space>;
+        using graph_csc_view    = graph_csc_t<vertex_type, edge_type, weight_type, space>;
+        using graph_coo_view    = graph_coo_t<vertex_type, edge_type, weight_type, space>;
+        
         // XXX: add support for per-view based methods
         // template<typename view_t = first_view_t>
         __host__ __device__ __forceinline__
@@ -85,6 +86,7 @@ class graph_t : public graph_view_t... {
  * @return double 
  */
 template<typename graph_type>
+__host__ __device__
 double get_average_degree(graph_type &graph) {
   auto sum = 0;
   for (auto v = 0; v < graph.get_number_of_vertices(); ++v)
@@ -107,6 +109,7 @@ double get_average_degree(graph_type &graph) {
  * @return double 
  */
 template <typename graph_type>
+__host__ __device__
 double get_degree_standard_deviation(graph_type &graph) {
 
   auto average_degree = get_average_degree(graph);

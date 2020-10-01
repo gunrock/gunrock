@@ -1,18 +1,15 @@
-# ----------------------------------------------------------------
-# Gunrock -- Fast and Efficient GPU Graph Library
-# ----------------------------------------------------------------
-# This source code is distributed under the terms of LICENSE.TXT
-# in the root directory of this source distribution.
-# ----------------------------------------------------------------
-
 include ../Makefile.inc
-ALGO = format
-EXEC = bin/test_$(ALGO)
 
-test: $(EXEC)
+APP = format
 
-$(EXEC) : test_$(ALGO).cu $(DEPS)
+test: bin/$(APP)
+
+bin/$(APP) : test_$(APP).cu $(DEPS)
 	mkdir -p bin
-	$(NVCC) -w $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3
+	$(NVCC) -ccbin=${CXX} ${NVCCFLAGS} ${NVCCOPT} --compiler-options "${CXXFLAGS} ${CXXOPT}" -o bin/$(APP) test_$(APP).cu $(SOURCE) $(ARCH) $(INC)
+
+debug : test_$(APP).cu $(DEPS)
+	mkdir -p bin
+	$(NVCC) -ccbin=${CXX} ${NVCCFLAGS} ${NVCCDEBUG} --compiler-options "${CXXFLAGS} ${CXXDEBUG}" -o bin/$(APP) test_$(APP).cu $(SOURCE) $(ARCH) $(INC)
 
 .DEFAULT_GOAL := test

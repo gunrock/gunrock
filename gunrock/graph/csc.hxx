@@ -51,10 +51,10 @@ class graph_csc_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
         // Override pure virtual functions
         // Must use [override] keyword to identify functions that are
         // overriding the derived class
-        __host__ __device__ __forceinline__
-        edge_type get_neighbor_list_length(const vertex_type& v) const override {
+        // __host__ __device__ __forceinline__
+        // edge_type get_neighbor_list_length(const vertex_type& v) const override {
 
-        }
+        // }
 
         // __host__ __device__ __forceinline__
         // vertex_type get_source_vertex(const edge_type& e) const override {

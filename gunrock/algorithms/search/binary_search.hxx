@@ -50,6 +50,7 @@ namespace binary
            typename key_t,
            typename int_t,
            typename comp_t>
+  __host__ __device__ 
   int_t search(const key_t& keys,
                const key_t key,
                int_t count,
@@ -111,8 +112,9 @@ namespace binary
     return thrust::upper_bound(thrust::seq, first, last, value, comp);
   }
 
-  template<typename key_t, typename index_t>
-  key_t upper_bound(const key_t* keys,
+  template<typename key_pointer_t, typename key_t, typename index_t>
+  __host__ __device__ 
+  key_t upper_bound(const key_pointer_t keys,
                     const key_t& key,
                     const index_t size)
   {
@@ -129,6 +131,7 @@ namespace binary
 
   template<typename key_t,
            typename index_t>
+  __host__ __device__ 
   index_t rightmost(const key_t* keys,
                     const key_t& key,
                     const index_t count)

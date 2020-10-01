@@ -28,6 +28,8 @@ struct csr_t {
     typename gunrock::vector<index_t, space>::type column_indices; // Aj
     typename gunrock::vector<value_t, space>::type nonzero_values; // Ax
 
+    ~csr_t() {}
+
 }; // struct csr_t
 
 } // namespace format

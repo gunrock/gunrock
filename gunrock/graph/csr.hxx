@@ -31,6 +31,10 @@ class graph_csr_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
     using edge_type   = edge_t;
     using weight_type = weight_t;
 
+    using vertex_pointer_t  = std::conditional_t<space == memory_space_t::host, vertex_t*, thrust::device_ptr<vertex_t>>;
+    using edge_pointer_t    = std::conditional_t<space == memory_space_t::host, edge_type*, thrust::device_ptr<edge_type>>;
+    using weight_pointer_t  = std::conditional_t<space == memory_space_t::host, weight_type*, thrust::device_ptr<weight_type>>;
+
     using vertex_pair_type = vertex_pair_t<vertex_t>;
     using properties_type = graph_properties_t;
 
@@ -55,6 +59,10 @@ class graph_csr_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
                 number_of_vertices, 
                 number_of_edges) {
             csr = rhs;
+
+            row_offsets     = csr->row_offsets.data();
+            column_indices  = csr->column_indices.data();
+            weights         = csr->nonzero_values.data();
         }
         
         // Override pure virtual functions
@@ -62,29 +70,19 @@ class graph_csr_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
         // overriding the derived class
         __host__ __device__ __forceinline__
         edge_type get_neighbor_list_length(const vertex_type& v) const override {
-            assert(v < graph_base_type::_number_of_vertices);
-            auto offsets = csr->row_offsets.data();
+            assert(v < graph_base_type::get_number_of_vertices());
+            auto offsets = get_row_offsets();
             return (offsets[v+1] - offsets[v]);
         }
 
         __host__ __device__ __forceinline__
         vertex_type get_source_vertex(const edge_type& e) const override {
-            assert(e < graph_base_type::_number_of_edges);
-            auto offsets = csr->row_offsets;
-            auto comp = [] __host__ __device__ (const edge_type& key, 
-                                                const edge_type& pivot) {
-                                        return pivot < key;
-            };
-            // auto offsets = thrust::raw_pointer_cast(csr->row_offsets.data());
+            assert(e < graph_base_type::get_number_of_edges());
+
             // XXX: I am dumb, idk if this is upper or lower bound?
-            // note that this returns an iterator, we need to dereference it to
-            // return the vertex_type source_vertex.
-            // return (vertex_type) algo::search::binary::upper_bound(offsets.data(), e, offsets.size());
-            return (vertex_type) *(algo::search::binary::lower_bound(
-                                    offsets.begin(), 
-                                    offsets.end(), 
-                                    e, 
-                                    comp));
+            return (vertex_type) algo::search::binary::upper_bound(
+                get_row_offsets(), e, 
+                graph_base_type::get_number_of_vertices());
         }
         
         // __host__ __device__ __forceinline__
@@ -107,12 +105,44 @@ class graph_csr_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
 
     protected:
         __host__ __device__ __forceinline__
+        auto get_row_offsets() const {
+            return row_offsets;
+        }
+
+        __host__ __device__ __forceinline__
+        auto get_row_offsets_size() const {
+            return csr->row_offsets.size();
+        }
+
+        __host__ __forceinline__
+        auto get_row_offsets_iterator() const {
+            return csr->row_offsets.begin();
+        }
+
+        __host__ __forceinline__
+        auto get_row_offsets_iterator_end() const {
+            return csr->row_offsets.end();
+        }
+
+        __host__ __forceinline__
         void set(std::shared_ptr<csr_type> rhs) {
             csr = rhs;
+            row_offsets     = csr->row_offsets.data();
+            column_indices  = csr->column_indices.data();
+            weights         = csr->nonzero_values.data();
         }
 
     private:
+        // Underlying data storage
         std::shared_ptr<csr_type> csr;
+        
+        // XXX: Maybe use these to hold thrust pointers?
+        // I don't know if this is safe, even when using
+        // shared pointers.
+        vertex_pointer_t   column_indices;
+        edge_pointer_t     row_offsets;
+        weight_pointer_t   weights;
+        
 };  // struct graph_csr_t
 
 }   // namespace graph
