@@ -1,6 +1,8 @@
 NVCC = "$(shell which nvcc)"
 NVCC_VERSION = $(strip $(shell nvcc --version | grep release | sed 's/.*release //' |  sed 's/,.*//'))
 
+CXX = g++
+
 #-------------------------------------------------------------------------------
 # Gen targets
 #-------------------------------------------------------------------------------
@@ -34,14 +36,17 @@ else
 endif
 
 CUDA_INC 	= -I"$(shell dirname $(NVCC))/../include"
-MGPU_INC 	= -I"../../externals/moderngpu/include"
-CUB_INC 	= -I"../../externals/cub"
-CUDA_CPP 	= -I"../../externals/cuda-api-wrappers/src"
-R_JSON		= -I"../../externals/rapidjson/include"
+EXT_INC     = ../../externals
+MGPU_INC 	= -I"$(EXT_INC)/moderngpu/src"
+JSON_INC    = -I"$(EXT_INC)/rapidjson/include"
+MTX_INC     = -I"$(EXT_INC)/mtx"
+
+CUB         = -lcub
+CUSPARSE    = -lcusparse
 
 GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=2.0.0
-LINK = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
-INC = $(CUDA_CPP) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(R_JSON) $(CUDA_INC) -I.. -I../.. $(LINK)
+LINK        = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
+INC         = $(CUDA_CPP) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(JSON_INC) $(CUDA_INC) -I.. -I../.. $(LINK)
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -62,18 +67,24 @@ DEFINES 	= -DGIT_SHA1="\"$(shell git rev-parse HEAD)\""
 # 	ARCH = -m64
 # endif
 
-NVCCFLAGS = -lineinfo --std=c++14 --expt-extended-lambda -rdc=true --expt-relaxed-constexpr
+NVCCFLAGS   += -std=c++14
+NVCCFLAGS   += $(SM_TARGETS)
+NVCCFLAGS   += --expt-extended-lambda --expt-relaxed-constexpr --use_fast_math --ptxas-options -v --relocatable-device-code true
+
+CXXFLAGS    += -std=c++14
+CXXFLAGS    += -Wall
+CXXFLAGS    += -Wno-unused-local-typedefs -Wno-strict-aliasing -Wno-unused-function -Wno-format-security
+
+# Optimization Flags
+NVCCOPT     = -O3 --generate-line-info
+CXXOPT      = -O3
+
+# Debug Flags
+NVCCDEBUG   = --debug --device-debug
+CXXDEBUG    = -g
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500
-endif
-
-ifeq ($(verbose), 1)
-    NVCCFLAGS += -v
-endif
-
-ifeq ($(keep), 1)
-    NVCCFLAGS += -keep
 endif
 
 ifdef maxregisters
@@ -83,14 +94,15 @@ endif
 #-------------------------------------------------------------------------------
 # Dependency Lists
 #-------------------------------------------------------------------------------
-EXTRA_SOURCE_ = ../../gunrock/util/gitsha1make.c
+EXTRA_SOURCE += ../../gunrock/util/gitsha1make.c
+EXTRA_SOURCE += $(EXT_INC)/mtx/mmio.cpp
 
-ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
-    EXTRA_SOURCE = $(EXTRA_SOURCE_) \
-	    ../../gunrock/util/misc_utils.cu
-else
-    EXTRA_SOURCE = $(EXTRA_SOURCE_)
-endif
+# ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
+#     EXTRA_SOURCE = $(EXTRA_SOURCE_) \
+# 	    ../../gunrock/util/misc_utils.cu
+# else
+#     EXTRA_SOURCE = $(EXTRA_SOURCE_)
+# endif
 
 DEPS = ./Makefile \
     ../Makefile.inc \

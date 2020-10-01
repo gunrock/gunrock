@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* 
 *   Matrix Market I/O library for ANSI C
 *
@@ -12,7 +16,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 
-#include "mmio.h"
+#include "mmio.hxx"
 
 int mm_read_unsymmetric_sparse(const char *fname, int *M_, int *N_, int *nz_,
                 double **val_, int **I_, int **J_)
@@ -508,3 +512,7 @@ char  *mm_typecode_to_str(MM_typecode matcode)
     return mm_strdup(buffer);
 
 }
+
+#ifdef __cplusplus
+}
+#endif

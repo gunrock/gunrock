@@ -1,4 +1,6 @@
-#include <gunrock/error.hxx>
+#include <cstdlib>                      // EXIT_SUCCESS
+
+#include <gunrock/error.hxx>            // error checking
 #include <gunrock/container/array.cuh>
 
 template<std::size_t N, typename T>
@@ -28,6 +30,10 @@ void test_array()
   std::size_t max_size        = a.max_size();
   bool is_empty               = a.empty();
 
+  std::cout << "Array.size() = " << size << std::endl;
+  std::cout << "Array.max_size() = " << max_size << std::endl;
+  std::cout << "Is Array Empty? " << std::boolalpha << is_empty << std::endl;
+
   status = cudaDeviceSynchronize();
   if(cudaSuccess != status) throw error::exception_t(status);
 
@@ -50,5 +56,5 @@ int
 main(int argc, char** argv)
 {
   test_array();
-  return;
+  return EXIT_SUCCESS;
 }

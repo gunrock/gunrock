@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* 
 *   Matrix Market I/O library for ANSI C
 *
@@ -130,4 +134,8 @@ int mm_read_unsymmetric_sparse(const char *fname, int *M_, int *N_, int *nz_,
 
 
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif

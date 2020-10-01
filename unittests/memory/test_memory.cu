@@ -1,4 +1,6 @@
-#include <gunrock/error.hxx>
+#include <cstdlib>                      // EXIT_SUCCESS
+
+#include <gunrock/error.hxx>            // error checking
 #include <gunrock/memory.hxx>
 
 template<std::size_t N>
@@ -43,5 +45,5 @@ int
 main(int argc, char** argv)
 {
   test_memory();
-  return;
+  return EXIT_SUCCESS;
 }
