@@ -18,7 +18,6 @@ __global__ void kernel(T a)
 void test_array()
 {
   using namespace gunrock;
-  using namespace container::dense;
 
   error::error_t status = cudaSuccess;
 
