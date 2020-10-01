@@ -5,6 +5,9 @@
 
 #include <gunrock/util/type_traits.hxx>
 
+#include <gunrock/memory.hxx>
+#include <gunrock/util/type_traits.hxx>
+
 #include <gunrock/formats/formats.hxx>
 
 #include <gunrock/graph/properties.hxx>
@@ -18,7 +21,8 @@ namespace graph {
 using namespace format;
 using namespace detail;
 
-template <typename vertex_t, typename edge_t, typename weight_t> 
+template <typename vertex_t, typename edge_t, typename weight_t, 
+          memory_space_t space = memory_space_t::host> 
 class graph_csc_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
 
     using vertex_type = vertex_t;
@@ -29,26 +33,20 @@ class graph_csc_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
     using properties_type = graph_properties_t;
 
     using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
-    using csc_type        = csc_t<vertex_type, edge_type, weight_type>;
+    using csc_type        = csc_t<vertex_type, edge_type, weight_type, space>;
     
     public:
-        graph_csc_t() : graph_base_type() {}
+        graph_csc_t() : graph_base_type(),
+            csc(std::make_shared<csc_type>()) {}
 
-        graph_csc_t(edge_type* offsets, 
-                    vertex_type* indices, 
-                    weight_type* weights, 
-                    vertex_type number_of_vertices, 
-                    edge_type number_of_edges) : 
+        graph_csc_t(vertex_type number_of_vertices, 
+                    edge_type number_of_edges,
+                    std::shared_ptr<csc_type> rhs) : 
             graph_base_type(
                 number_of_vertices, 
-                number_of_edges),
-            csc(
-                number_of_vertices, 
-                number_of_vertices, 
-                number_of_edges, 
-                offsets, 
-                indices, 
-                weights) {}
+                number_of_edges) {
+            csc = rhs;
+        }
         
         // Override pure virtual functions
         // Must use [override] keyword to identify functions that are
@@ -82,7 +80,7 @@ class graph_csc_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
         // ...
 
     private:
-        csc_type csc;
+        std::shared_ptr<csc_type> csc;
 };  // struct graph_csc_t
 
 }   // namespace graph

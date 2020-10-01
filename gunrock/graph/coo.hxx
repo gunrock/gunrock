@@ -3,6 +3,7 @@
 #include <cassert>
 #include <tuple>
 
+#include <gunrock/memory.hxx>
 #include <gunrock/util/type_traits.hxx>
 
 #include <gunrock/formats/formats.hxx>
@@ -18,7 +19,8 @@ namespace graph {
 using namespace format;
 using namespace detail;
 
-template <typename vertex_t, typename edge_t, typename weight_t> 
+template <typename vertex_t, typename edge_t, typename weight_t, 
+          memory_space_t space = memory_space_t::host>
 class graph_coo_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
 
     using vertex_type = vertex_t;
@@ -29,25 +31,20 @@ class graph_coo_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
     using properties_type = graph_properties_t;
 
     using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
-    using coo_type        = coo_t<vertex_type, edge_type, weight_type>;
+    using coo_type        = coo_t<vertex_type, edge_type, weight_type, space>;
     
     public:
-        graph_coo_t() : graph_base_type() {}
+        graph_coo_t() : graph_base_type(),
+            coo(std::make_shared<coo_type>()) {}
 
-        graph_coo_t(edge_type* row_indices,
-                    edge_type* column_indices, 
-                    weight_type* weights,
-                    vertex_type number_of_vertices,
-                    edge_type number_of_edges) : 
+        graph_coo_t(vertex_type number_of_vertices,
+                    edge_type number_of_edges,
+                    std::shared_ptr<coo_type> rhs) : 
             graph_base_type(
                 number_of_vertices, 
-                number_of_edges),
-            coo(number_of_vertices, 
-                number_of_vertices, 
-                number_of_edges, 
-                row_indices, 
-                column_indices, 
-                weights) {}
+                number_of_edges) {
+            coo = rhs;
+        }
         
         // Override pure virtual functions
         // Must use [override] keyword to identify functions that are
@@ -86,7 +83,7 @@ class graph_coo_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
         // ...
 
     private:
-        coo_type coo;
+        std::shared_ptr<coo_type> coo;
 };  // struct graph_coo_t
 
 }   // namespace graph

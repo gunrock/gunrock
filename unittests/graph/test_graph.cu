@@ -14,14 +14,16 @@ void test_graph()
   using edge_t    = int;
   using weight_t  = float;
 
-  using g_csr_t   = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
-  using g_csc_t   = graph::graph_csc_t<vertex_t, edge_t, weight_t>;
-  using g_coo_t   = graph::graph_coo_t<vertex_t, edge_t, weight_t>;
-
   error::error_t status = cudaSuccess;
 
   // XXX: (hide behind load) CSR array with space allocated (4x4x4)
-  memory::memory_space_t location = memory::memory_space_t::host;
+  constexpr memory::memory_space_t space = memory::memory_space_t::device;
+
+  using g_csr_t   = graph::graph_csr_t<vertex_t, edge_t, weight_t, space>;
+  using g_csc_t   = graph::graph_csc_t<vertex_t, edge_t, weight_t, space>;
+  using g_coo_t   = graph::graph_coo_t<vertex_t, edge_t, weight_t, space>;
+
+  using csr_type = format::csr_t<edge_t, vertex_t, weight_t, space>;
 
   // Logical Matrix Representation
   // r/c  0 1 2 3
@@ -41,40 +43,32 @@ void test_graph()
   // V            = [ 5 8 3 6 ]
   // COL_INDEX    = [ 0 1 2 1 ]
   // ROW_OFFSETS  = [ 0 0 2 3 4 ]
+  vertex_t r = 4, c = 4, nnz = 4;
 
-  using csr_t = format::csr_t<edge_t, vertex_t, weight_t>;
+  // let's use thrust vector<type_t> for initial arrays
+  thrust::host_vector<edge_t>   _Ap(r+1);
+  thrust::host_vector<vertex_t> _Aj(nnz);
+  thrust::host_vector<weight_t> _Ax(nnz);
 
-  // XXX: ugly way to initialize these, but it works.
-  csr_t csr;
-
-  csr.num_rows = csr.num_columns = csr.num_nonzeros = 4;
-
-  csr.row_offsets = std::shared_ptr<edge_t>(
-                      memory::allocate<edge_t>(
-                        (csr.num_rows+1)*sizeof(edge_t), location),
-                      [&](edge_t* ptr){ memory::free(ptr, location); });
-
-  csr.column_indices = std::shared_ptr<vertex_t>(
-                        memory::allocate<vertex_t>(
-                          (csr.num_nonzeros)*sizeof(vertex_t), location),
-                        [&](vertex_t* ptr){ memory::free(ptr, location); });
-
-  csr.nonzero_values = std::shared_ptr<weight_t>(
-                        memory::allocate<weight_t>(
-                          (csr.num_nonzeros)*sizeof(weight_t), location),
-                        [&](weight_t* ptr){ memory::free(ptr, location); });
-  
-  auto Ap = csr.row_offsets.get();
-  auto Aj = csr.column_indices.get();
-  auto Ax = csr.nonzero_values.get();
+  auto Ap = _Ap.data();
+  auto Aj = _Aj.data();
+  auto Ax = _Ax.data();
 
   Ap[0] = 0; Ap[1] = 0; Ap[2] = 2; Ap[3] = 3; Ap[4] = 4;
   Aj[0] = 0; Aj[1] = 1; Aj[2] = 2; Aj[3] = 3;
   Ax[0] = 5; Ax[1] = 8; Ax[2] = 3; Ax[3] = 6;
 
-  graph::graph_t<vertex_t, edge_t, weight_t, g_csr_t, g_csc_t /* , g_coo_t*/> graph_slice;
+  thrust::device_vector<edge_t> row_offsets       = _Ap;
+  thrust::device_vector<vertex_t> column_indices  = _Aj;
+  thrust::device_vector<weight_t> nonzero_values  = _Ax;
 
-  graph_slice.from_csr_t(csr);
+  // wrap it with shared_ptr<csr_t>
+  std::shared_ptr<csr_type> csr_ptr(
+    new csr_type{ r, c, nnz, row_offsets, column_indices, nonzero_values });
+
+  graph::graph_t<vertex_t, edge_t, weight_t, space, g_csr_t, g_csc_t /* , g_coo_t*/> graph_slice;
+
+  graph_slice.from_csr_t<csr_type>(csr_ptr);
   std::cout << "Number of Graph Representations = " 
             << graph_slice.number_of_graph_representations() << std::endl;
   std::cout << "Contains CSR Representation? " << std::boolalpha
@@ -86,7 +80,7 @@ void test_graph()
   vertex_t num_vertices   = graph_slice.get_number_of_vertices();
   edge_t num_edges        = graph_slice.get_number_of_edges();
   edge_t num_neighbors    = graph_slice.get_neighbor_list_length(source);
-  vertex_t source_vertex  = graph_slice.get_source_vertex(edge);
+  // vertex_t source_vertex  = graph_slice.get_source_vertex(edge);
   double average_degree   = graph::get_average_degree(graph_slice);
   double degree_std_dev   = graph::get_degree_standard_deviation(graph_slice);
 
@@ -97,8 +91,8 @@ void test_graph()
   std::cout << "Number of edges: "      << num_edges      << std::endl;
   std::cout << "Number of neighbors: "  << num_neighbors 
             << " (source = "            << source << ")"  << std::endl;
-  std::cout << "Source vertex: "        << source_vertex 
-            << " (edge = "              << edge   << ")"  << std::endl;
+  // std::cout << "Source vertex: "        << source_vertex 
+            // << " (edge = "              << edge   << ")"  << std::endl;
 }
 
 int

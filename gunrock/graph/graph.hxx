@@ -3,6 +3,7 @@
 #include <cassert>
 #include <tuple>
 
+#include <gunrock/memory.hxx>
 #include <gunrock/util/type_traits.hxx>
 
 #include <gunrock/formats/formats.hxx>
@@ -23,17 +24,25 @@ namespace graph {
 
 using namespace format;
 using namespace detail;
+using namespace memory;
 
 // Variadic inheritence, inherit only what you need
-template<typename vertex_t, typename edge_t, typename weight_t, class... graph_view_t> 
+template< typename vertex_t, typename edge_t, typename weight_t, 
+          memory_space_t space, class... graph_view_t> 
 class graph_t : public graph_view_t... {
 
     using vertex_type = vertex_t;
     using edge_type   = edge_t;
     using weight_type = weight_t;
 
+    // Base graph type, always exists.
     using graph_base_type   = graph_base_t<vertex_type, edge_type, weight_type>;
-    using graph_csr_type    = graph_csr_t<vertex_type, edge_type, weight_type>;
+
+    // Different supported graph representation views.
+    using graph_csr_view    = graph_csr_t<vertex_type, edge_type, weight_type, space>;
+    using graph_csc_view    = graph_csc_t<vertex_type, edge_type, weight_type, space>;
+    using graph_coo_view    = graph_coo_t<vertex_type, edge_type, weight_type, space>;
+    
     using first_view_t      = typename std::tuple_element<0, // get first type
                                 std::tuple<graph_view_t...> >::type;
 
@@ -46,16 +55,11 @@ class graph_t : public graph_view_t... {
         }
 
         template<typename csr_matrix_t>
-        void from_csr_t(csr_matrix_t& _csr) {
-            graph_base_type::_number_of_vertices = _csr.num_rows;
-            graph_base_type::_number_of_edges = _csr.num_nonzeros;
+        void from_csr_t(std::shared_ptr<csr_matrix_t> rhs) {
+            graph_base_type::_number_of_vertices = rhs->num_rows;
+            graph_base_type::_number_of_edges = rhs->num_nonzeros;
 
-            graph_csr_type::set(_csr.num_rows,
-                                _csr.num_columns,
-                                _csr.num_nonzeros,
-                                _csr.row_offsets, 
-                                _csr.column_indices, 
-                                _csr.nonzero_values);
+            graph_csr_view::set(rhs);
         }
 
         __host__ __device__ __forceinline__
