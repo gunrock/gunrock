@@ -17,7 +17,7 @@ void test_graph()
   error::error_t status = cudaSuccess;
 
   // XXX: (hide behind load) CSR array with space allocated (4x4x4)
-  constexpr memory::memory_space_t space = memory::memory_space_t::device;
+  constexpr memory::memory_space_t space = memory::memory_space_t::host;
 
   using g_csr_t   = graph::graph_csr_t<vertex_t, edge_t, weight_t, space>;
   using g_csc_t   = graph::graph_csc_t<vertex_t, edge_t, weight_t, space>;
@@ -58,13 +58,16 @@ void test_graph()
   Aj[0] = 0; Aj[1] = 1; Aj[2] = 2; Aj[3] = 3;
   Ax[0] = 5; Ax[1] = 8; Ax[2] = 3; Ax[3] = 6;
 
-  thrust::device_vector<edge_t> row_offsets       = _Ap;
-  thrust::device_vector<vertex_t> column_indices  = _Aj;
-  thrust::device_vector<weight_t> nonzero_values  = _Ax;
-
-  // wrap it with shared_ptr<csr_t>
   std::shared_ptr<csr_type> csr_ptr(
-    new csr_type{ r, c, nnz, row_offsets, column_indices, nonzero_values });
+    new csr_type{ r, c, nnz, _Ap, _Aj, _Ax });
+
+  // thrust::device_vector<edge_t> row_offsets       = _Ap;
+  // thrust::device_vector<vertex_t> column_indices  = _Aj;
+  // thrust::device_vector<weight_t> nonzero_values  = _Ax;
+
+  // // wrap it with shared_ptr<csr_t> (memory_space_t::device)
+  // std::shared_ptr<csr_type> csr_ptr(
+  //   new csr_type{ r, c, nnz, row_offsets, column_indices, nonzero_values });
 
   graph::graph_t<vertex_t, edge_t, weight_t, space, g_csr_t, g_csc_t /* , g_coo_t*/> graph_slice;
 
@@ -75,12 +78,12 @@ void test_graph()
             << graph_slice.contains_representation<g_csr_t>() << std::endl;
 
   vertex_t source = 1;
-  vertex_t edge = 1;
+  vertex_t edge = 3;
 
   vertex_t num_vertices   = graph_slice.get_number_of_vertices();
   edge_t num_edges        = graph_slice.get_number_of_edges();
   edge_t num_neighbors    = graph_slice.get_neighbor_list_length(source);
-  // vertex_t source_vertex  = graph_slice.get_source_vertex(edge);
+  vertex_t source_vertex  = graph_slice.get_source_vertex(edge);  // XXX: doesn't work
   double average_degree   = graph::get_average_degree(graph_slice);
   double degree_std_dev   = graph::get_degree_standard_deviation(graph_slice);
 
@@ -91,8 +94,8 @@ void test_graph()
   std::cout << "Number of edges: "      << num_edges      << std::endl;
   std::cout << "Number of neighbors: "  << num_neighbors 
             << " (source = "            << source << ")"  << std::endl;
-  // std::cout << "Source vertex: "        << source_vertex 
-            // << " (edge = "              << edge   << ")"  << std::endl;
+  std::cout << "Source vertex: "        << source_vertex 
+            << " (edge = "              << edge   << ")"  << std::endl;
 }
 
 int

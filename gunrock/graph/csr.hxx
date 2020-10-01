@@ -67,13 +67,25 @@ class graph_csr_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
             return (offsets[v+1] - offsets[v]);
         }
 
-        // __host__ __device__ __forceinline__
-        // vertex_type get_source_vertex(const edge_type& e) const override {
-        //     assert(e < graph_base_type::_number_of_edges);
-        //     auto offsets = thrust::raw_pointer_cast(csr->row_offsets.data());
-        //     // XXX: I am dumb, idk if this is upper or lower bound?
-        //     return algo::search::binary::upper_bound(offsets, e, graph_base_type::_number_of_vertices);
-        // }
+        __host__ __device__ __forceinline__
+        vertex_type get_source_vertex(const edge_type& e) const override {
+            assert(e < graph_base_type::_number_of_edges);
+            auto offsets = csr->row_offsets;
+            auto comp = [] __host__ __device__ (const edge_type& key, 
+                                                const edge_type& pivot) {
+                                        return pivot < key;
+            };
+            // auto offsets = thrust::raw_pointer_cast(csr->row_offsets.data());
+            // XXX: I am dumb, idk if this is upper or lower bound?
+            // note that this returns an iterator, we need to dereference it to
+            // return the vertex_type source_vertex.
+            // return (vertex_type) algo::search::binary::upper_bound(offsets.data(), e, offsets.size());
+            return (vertex_type) *(algo::search::binary::lower_bound(
+                                    offsets.begin(), 
+                                    offsets.end(), 
+                                    e, 
+                                    comp));
+        }
         
         // __host__ __device__ __forceinline__
         // vertex_type get_destination_vertex(const edge_type& e) const override { 

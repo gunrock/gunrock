@@ -52,8 +52,8 @@ class graph_base_t {
         __host__ __device__ __forceinline__
         virtual edge_type get_neighbor_list_length(const vertex_type& v) const = 0;
         
-        // __host__ __device__ __forceinline__
-        // virtual vertex_type get_source_vertex(const edge_type& e) const = 0;
+        __host__ __device__ __forceinline__
+        virtual vertex_type get_source_vertex(const edge_type& e) const = 0;
         
         // __host__ __device__ __forceinline__
         // virtual vertex_type get_destination_vertex(const edge_type& e) const = 0;

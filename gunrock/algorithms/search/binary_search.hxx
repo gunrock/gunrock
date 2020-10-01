@@ -78,14 +78,16 @@ namespace binary
   // Default will search the whole array of size counts.
   // Guarantees that the element found will be the one at the
   // corner (left or right most position) of the array.
-  template<typename iterator_t, typename comp_t, typename T> 
+  template<typename iterator_t, typename key_t, typename comp_t> 
   __host__ __device__ 
   iterator_t lower_bound(iterator_t first, 
                          iterator_t last,
-                         const T &value,
-                         comp_t comp = [](const T& a, const T& b) { 
-                           return a < b; // less_than_comparable 
-                          }) 
+                         const key_t &value,
+                         comp_t comp = 
+                          [] __host__ __device__ (const key_t& pivot, 
+                                                  const key_t& key) { 
+                           return pivot < key; // less_than_comparable 
+                         })
   {
     return thrust::lower_bound(thrust::seq, first, last, value, comp);
   }
@@ -95,13 +97,15 @@ namespace binary
   // Default will search the whole array of size counts.
   // Guarantees that the element found will be the one at the
   // corner (left or right most position) of the array.
-  template<typename iterator_t, typename comp_t, typename key_t> 
+  template<typename iterator_t, typename key_t, typename comp_t> 
   __host__ __device__ 
   iterator_t upper_bound(iterator_t first, 
                          iterator_t last,
                          const key_t &value,
-                         comp_t comp = [](const key_t& a, const key_t& b) { 
-                           return a > b; // greater_than_comparable 
+                         comp_t comp = 
+                         [] __host__ __device__ (const key_t& pivot, 
+                                                 const key_t& key) { 
+                           return !(key < pivot); // greater_than_comparable 
                           }) 
   {
     return thrust::upper_bound(thrust::seq, first, last, value, comp);
