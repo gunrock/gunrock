@@ -13,6 +13,7 @@
 
 #pragma once
 
+#include <thrust/iterator/counting_iterator.h>
 #include <thrust/binary_search.h>
 
 namespace gunrock {

@@ -4,8 +4,6 @@
 #include <tuple>
 #include <iterator>
 
-#include <thrust/iterator/counting_iterator.h>
-
 #include <gunrock/algorithms/search/binary_search.hxx>
 
 #include <gunrock/util/type_traits.hxx>
@@ -37,23 +35,24 @@ class graph_csr_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
     using csr_type        = csr_t<vertex_type, edge_type, weight_type>; // XXX: check type order
 
     public:
-        graph_csr_t() : graph_base_type() {}
+        graph_csr_t() : 
+            graph_base_type(),
+            csr(std::make_shared<csr_type>()) {}
 
-        graph_csr_t(edge_type* offsets, 
-                    vertex_type* indices, 
-                    weight_type* weights, 
-                    vertex_type number_of_vertices, 
-                    edge_type number_of_edges) : 
+        // Disable copy ctor and assignment operator.
+        // We do not want to let user copy only a slice.
+        // Explanation: https://www.geeksforgeeks.org/preventing-object-copy-in-cpp-3-different-ways/
+        graph_csr_t(const graph_csr_t& rhs) = delete;               // Copy constructor
+        graph_csr_t& operator=(const graph_csr_t& rhs) = delete;    // Copy assignment
+
+        graph_csr_t(vertex_type number_of_vertices, 
+                    edge_type number_of_edges,
+                    std::shared_ptr<csr_type> rhs) : 
             graph_base_type(
                 number_of_vertices, 
-                number_of_edges),
-            csr(
-                number_of_vertices, 
-                number_of_vertices, 
-                number_of_edges, 
-                offsets, 
-                indices, 
-                weights) {}
+                number_of_edges) {
+            csr = rhs;
+        }
         
         // Override pure virtual functions
         // Must use [override] keyword to identify functions that are
@@ -139,7 +138,7 @@ class graph_csr_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
         }
 
     private:
-        csr_type csr;
+        std::shared_ptr<csr_type> csr;
 };  // struct graph_csr_t
 
 }   // namespace graph
