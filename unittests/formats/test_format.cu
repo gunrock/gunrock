@@ -1,7 +1,3 @@
-// XXX: dummy template for unit testing
-
-#define THRUST_IGNORE_CUB_VERSION_CHECK
-
 #include <gunrock/error.hxx>
 #include <gunrock/formats/formats.hxx>
 
