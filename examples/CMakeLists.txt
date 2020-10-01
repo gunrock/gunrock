@@ -29,6 +29,7 @@ if(GUNROCK_BUILD_APPLICATIONS)
   add_subdirectory(tc)
   #add_subdirectory(topk)
   add_subdirectory(vn)
+  add_subdirectory(lp)
   #add_subdirectory(wtf)
 
   # TUTORIAL SUBDIRECTORIES

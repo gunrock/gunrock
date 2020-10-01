@@ -847,7 +847,7 @@ DEVICE)); #endif } else {*/
 
     else if (source == DEVICE && target == HOST) {
       if ((FLAG & PINNED) == PINNED && stream != 0) {
-        // printf("%s MemcpyAsync\n");
+
         retval = GRError(cudaMemcpyAsync(h_pointer + offset, d_pointer + offset,
                                          sizeof(ValueT) * size,
                                          cudaMemcpyDeviceToHost, stream),
