@@ -7,18 +7,18 @@
 using namespace gunrock;
 
 template<typename graph_type>
-__global__ void kernel(graph_type* graph) {
+__global__ void kernel(graph_type& graph) {
   using vertex_t = typename graph_type::vertex_type;
   using edge_t = typename graph_type::edge_type;
   using weight_t = typename graph_type::weight_type;
 
-  vertex_t source = 1;
-  vertex_t edge = 0;
+  // vertex_t source = 1;
+  // vertex_t edge = 0;
 
-  vertex_t num_vertices   = graph->get_number_of_vertices();
-  edge_t num_edges        = graph->get_number_of_edges();
-  edge_t num_neighbors    = graph->get_neighbor_list_length(source);
-  vertex_t source_vertex  = graph->get_source_vertex(edge);
+  vertex_t num_vertices   = graph.get_number_of_vertices();
+  // edge_t num_edges        = graph.get_number_of_edges();
+  // edge_t num_neighbors    = graph.get_neighbor_list_length(source);
+  // vertex_t source_vertex  = graph.get_source_vertex(edge);
   // double average_degree   = graph::get_average_degree(graph);
   // double degree_std_dev   = graph::get_degree_standard_deviation(graph);
 
@@ -26,9 +26,9 @@ __global__ void kernel(graph_type* graph) {
   // printf("\tAverage degree: %lf", average_degree);
   // printf("\tDegree std. deviation: %lf", degree_std_dev);
   printf("\tNumber of vertices: %i\n", num_vertices);
-  printf("\tNumber of edges: %i\n", num_edges);
-  printf("\tNumber of neighbors: %i (source = %i)\n", num_neighbors, source);
-  printf("\tSource vertex: %i (edge = %i)\n", source_vertex, edge);
+  // printf("\tNumber of edges: %i\n", num_edges);
+  // printf("\tNumber of neighbors: %i (source = %i)\n", num_neighbors, source);
+  // printf("\tSource vertex: %i (edge = %i)\n", source_vertex, edge);
 }
 
 void test_graph()
@@ -89,61 +89,63 @@ void test_graph()
   Aj[0] = 0; Aj[1] = 1; Aj[2] = 2; Aj[3] = 3;
   Ax[0] = 5; Ax[1] = 8; Ax[2] = 3; Ax[3] = 6;
 
-  // wrap it with shared_ptr<csr_t> (memory_space_t::host)
-  std::shared_ptr<host_csr_type> host_csr_ptr(
-    new host_csr_type{ r, c, nnz, _Ap, _Aj, _Ax });
+  // // wrap it with shared_ptr<csr_t> (memory_space_t::host)
+  // std::shared_ptr<host_csr_type> host_csr_ptr(std::make_shared<host_csr_type>());
 
-  graph::graph_t<vertex_t, edge_t, weight_t, 
-    host_space, host_g_csr_t, host_g_csc_t /* , host_g_coo_t*/> host_graph_slice;
+  // host_csr_ptr->num_rows = r;
+  // host_csr_ptr->num_columns = c;
+  // host_csr_ptr->num_nonzeros = nnz;
+  // host_csr_ptr->row_offsets = _Ap;
+  // host_csr_ptr->column_indices = _Aj;
+  // host_csr_ptr->nonzero_values = _Ax;
 
-  // Intialize graph using a CSR-type
-  host_graph_slice.from_csr_t<host_csr_type>(host_csr_ptr);
+  // // Intialize graph using a CSR-type
+  // graph::graph_t<vertex_t, edge_t, weight_t, 
+  //   host_space, host_g_csr_t/*, host_g_csc_t  , host_g_coo_t*/> host_graph_slice(host_csr_ptr);
 
-  vertex_t source = 1;
-  vertex_t edge = 0;
+  // vertex_t source = 1;
+  // vertex_t edge = 0;
 
-  vertex_t num_vertices   = host_graph_slice.get_number_of_vertices();
-  edge_t num_edges        = host_graph_slice.get_number_of_edges();
-  edge_t num_neighbors    = host_graph_slice.get_neighbor_list_length(source);
-  vertex_t source_vertex  = host_graph_slice.get_source_vertex(edge);
-  double average_degree   = graph::get_average_degree(host_graph_slice);
-  double degree_std_dev   = graph::get_degree_standard_deviation(host_graph_slice);
+  // vertex_t num_vertices   = host_graph_slice.get_number_of_vertices();
+  // edge_t num_edges        = host_graph_slice.get_number_of_edges();
+  // edge_t num_neighbors    = host_graph_slice.get_neighbor_list_length(source);
+  // vertex_t source_vertex  = host_graph_slice.get_source_vertex(edge);
+  // double average_degree   = graph::get_average_degree(host_graph_slice);
+  // double degree_std_dev   = graph::get_degree_standard_deviation(host_graph_slice);
 
-  // Host Output
-  std::cout << "Average Degree: "       << average_degree << std::endl;
-  std::cout << "Degree Std. Deviation: "<< degree_std_dev << std::endl;
-  std::cout << "Number of vertices: "   << num_vertices   << std::endl;
-  std::cout << "Number of edges: "      << num_edges      << std::endl;
-  std::cout << "Number of neighbors: "  << num_neighbors 
-            << " (source = "            << source << ")"  << std::endl;
-  std::cout << "Source vertex: "        << source_vertex 
-            << " (edge = "              << edge   << ")"  << std::endl;
+  // // Host Output
+  // std::cout << "Average Degree: "       << average_degree << std::endl;
+  // std::cout << "Degree Std. Deviation: "<< degree_std_dev << std::endl;
+  // std::cout << "Number of vertices: "   << num_vertices   << std::endl;
+  // std::cout << "Number of edges: "      << num_edges      << std::endl;
+  // std::cout << "Number of neighbors: "  << num_neighbors 
+  //           << " (source = "            << source << ")"  << std::endl;
+  // std::cout << "Source vertex: "        << source_vertex 
+  //           << " (edge = "              << edge   << ")"  << std::endl;
 
-  // Compile-Time Constants (device && host)
-  std::cout << "Number of Graph Representations = " 
-            << host_graph_slice.number_of_graph_representations() << std::endl;
-  std::cout << "Contains CSR Representation? " << std::boolalpha
-            << host_graph_slice.contains_representation<g_csr_t>() << std::endl;
+  // // Compile-Time Constants (device && host)
+  // std::cout << "Number of Graph Representations = " 
+  //           << host_graph_slice.number_of_graph_representations() << std::endl;
+  // std::cout << "Contains CSR Representation? " << std::boolalpha
+  //           << host_graph_slice.contains_representation<g_csr_t>() << std::endl;
 
   // wrap it with shared_ptr<csr_t> (memory_space_t::device)
-  thrust::device_vector<edge_t> row_offsets       = _Ap;
-  thrust::device_vector<vertex_t> column_indices  = _Aj;
-  thrust::device_vector<weight_t> nonzero_values  = _Ax;
+  // std::shared_ptr<csr_type> csr_ptr(std::make_shared<csr_type>());
+  csr_type csr_ptr;
 
-  std::shared_ptr<csr_type> csr_ptr(
-    new csr_type{ r, c, nnz, row_offsets, column_indices, nonzero_values });
+  csr_ptr.num_rows        = r;
+  csr_ptr.num_columns     = c;
+  csr_ptr.num_nonzeros    = nnz;
+  csr_ptr.row_offsets     = _Ap;
+  csr_ptr.column_indices  = _Aj;
+  csr_ptr.nonzero_values  = _Ax;
 
-  using graph_type = graph::graph_t<vertex_t, edge_t, weight_t, space, g_csr_t, g_csc_t /* , g_coo_t*/>;
-
-  std::shared_ptr<graph_type> graph_slice_ptr;
-  auto safe_raw_ptr = graph_slice_ptr.get();
-  
-  // Intialize graph using a CSR-type
-  safe_raw_ptr->from_csr_t<csr_type>(csr_ptr);
+  graph::graph_t<vertex_t, edge_t, weight_t, 
+    space, g_csr_t, g_csc_t /* , g_coo_t*/> graph_slice(csr_ptr);
 
   // Device Output
   cudaDeviceSynchronize();
-  kernel<<<1, 1>>>(safe_raw_ptr);
+  kernel<<<1, 1>>>(graph_slice);
   cudaDeviceSynchronize();
 }
 

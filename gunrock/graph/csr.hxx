@@ -25,7 +25,7 @@ using namespace memory;
 
 template <typename vertex_t, typename edge_t, typename weight_t, 
           memory_space_t space = memory_space_t::host> 
-class graph_csr_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
+class graph_csr_t : virtual public graph_base_t<vertex_t, edge_t, weight_t> {
     
     using vertex_type = vertex_t;
     using edge_type   = edge_t;
@@ -43,8 +43,8 @@ class graph_csr_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
 
     public:
         graph_csr_t() : 
-            graph_base_type(),
-            csr(std::make_shared<csr_type>()) {}
+            graph_base_type()/* ,
+            csr(std::make_shared<csr_type>()) */ {}
 
         // Disable copy ctor and assignment operator.
         // We do not want to let user copy only a slice.
@@ -52,18 +52,14 @@ class graph_csr_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
         graph_csr_t(const graph_csr_t& rhs) = delete;               // Copy constructor
         graph_csr_t& operator=(const graph_csr_t& rhs) = delete;    // Copy assignment
 
-        graph_csr_t(vertex_type number_of_vertices, 
-                    edge_type number_of_edges,
-                    std::shared_ptr<csr_type> rhs) : 
-            graph_base_type(
-                number_of_vertices, 
-                number_of_edges) {
-            csr = rhs;
-
-            row_offsets     = csr->row_offsets.data();
-            column_indices  = csr->column_indices.data();
-            weights         = csr->nonzero_values.data();
-        }
+        graph_csr_t(csr_type& rhs) : 
+            graph_base_type(rhs.num_rows, 
+                            rhs.num_nonzeros)/* ,
+            csr(std::make_shared<csr_type>()) */
+            /*csr(std::move(rhs)),
+            row_offsets(csr->row_offsets.data()),
+            column_indices(csr->column_indices.data()),
+            nonzero_values(csr->nonzero_values.data()) */ { set(rhs); }
         
         // Override pure virtual functions
         // Must use [override] keyword to identify functions that are
@@ -109,39 +105,49 @@ class graph_csr_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
             return row_offsets;
         }
 
-        __host__ __device__ __forceinline__
-        auto get_row_offsets_size() const {
-            return csr->row_offsets.size();
-        }
+        // __host__ __device__ __forceinline__
+        // auto get_row_offsets_size() const {
+        //     return csr->row_offsets.size();
+        // }
+
+        // __host__ __forceinline__
+        // auto get_row_offsets_iterator() const {
+        //     return csr->row_offsets.begin();
+        // }
+
+        // __host__ __forceinline__
+        // auto get_row_offsets_iterator_end() const {
+        //     return csr->row_offsets.end();
+        // }
+
+        // __host__ __forceinline__
+        // void set(std::shared_ptr<csr_type> rhs) {
+        //     csr = std::move(rhs);   // works for memory_space_t::host only
+        //     row_offsets     = csr->row_offsets.data();
+        //     column_indices  = csr->column_indices.data();
+        //     nonzero_values  = csr->nonzero_values.data();
+
+        //     graph_base_type::set_number_of_vertices(csr->num_rows);
+        //     graph_base_type::set_number_of_edges(csr->num_nonzeros);
+        // }
 
         __host__ __forceinline__
-        auto get_row_offsets_iterator() const {
-            return csr->row_offsets.begin();
-        }
-
-        __host__ __forceinline__
-        auto get_row_offsets_iterator_end() const {
-            return csr->row_offsets.end();
-        }
-
-        __host__ __forceinline__
-        void set(std::shared_ptr<csr_type> rhs) {
-            csr = rhs;
-            row_offsets     = csr->row_offsets.data();
-            column_indices  = csr->column_indices.data();
-            weights         = csr->nonzero_values.data();
+        void set(csr_type& rhs) {
+            row_offsets     = rhs.row_offsets.data();
+            column_indices  = rhs.column_indices.data();
+            nonzero_values  = rhs.nonzero_values.data();
         }
 
     private:
         // Underlying data storage
-        std::shared_ptr<csr_type> csr;
-        
+        // std::shared_ptr<csr_type> csr;
+
         // XXX: Maybe use these to hold thrust pointers?
         // I don't know if this is safe, even when using
         // shared pointers.
-        vertex_pointer_t   column_indices;
         edge_pointer_t     row_offsets;
-        weight_pointer_t   weights;
+        vertex_pointer_t   column_indices;
+        weight_pointer_t   nonzero_values;
         
 };  // struct graph_csr_t
 

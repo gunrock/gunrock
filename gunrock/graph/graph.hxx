@@ -47,6 +47,14 @@ class graph_t : public graph_view_t... {
         using graph_csr_view    = graph_csr_t<vertex_type, edge_type, weight_type, space>;
         using graph_csc_view    = graph_csc_t<vertex_type, edge_type, weight_type, space>;
         using graph_coo_view    = graph_coo_t<vertex_type, edge_type, weight_type, space>;
+
+        graph_t() : graph_base_type(), graph_view_t()... {}
+
+        template<typename csr_matrix_t>
+        graph_t(csr_matrix_t& rhs) : 
+          graph_base_type(rhs.num_rows, 
+                          rhs.num_nonzeros), 
+          first_view_t(rhs) {}
         
         // XXX: add support for per-view based methods
         // template<typename view_t = first_view_t>
@@ -57,9 +65,7 @@ class graph_t : public graph_view_t... {
 
         template<typename csr_matrix_t>
         void from_csr_t(std::shared_ptr<csr_matrix_t> rhs) {
-            graph_base_type::_number_of_vertices = rhs->num_rows;
-            graph_base_type::_number_of_edges = rhs->num_nonzeros;
-
+            assert(contains_representation<graph_csr_view>());
             graph_csr_view::set(rhs);
         }
 
@@ -87,7 +93,7 @@ class graph_t : public graph_view_t... {
  */
 template<typename graph_type>
 __host__ __device__
-double get_average_degree(graph_type &graph) {
+double get_average_degree(graph_type& graph) {
   auto sum = 0;
   for (auto v = 0; v < graph.get_number_of_vertices(); ++v)
     sum += graph.get_neighbor_list_length(v);
@@ -110,7 +116,7 @@ double get_average_degree(graph_type &graph) {
  */
 template <typename graph_type>
 __host__ __device__
-double get_degree_standard_deviation(graph_type &graph) {
+double get_degree_standard_deviation(graph_type& graph) {
 
   auto average_degree = get_average_degree(graph);
 

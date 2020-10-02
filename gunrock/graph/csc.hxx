@@ -23,7 +23,7 @@ using namespace detail;
 
 template <typename vertex_t, typename edge_t, typename weight_t, 
           memory_space_t space = memory_space_t::host> 
-class graph_csc_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
+class graph_csc_t : virtual public graph_base_t<vertex_t, edge_t, weight_t> {
 
     using vertex_type = vertex_t;
     using edge_type   = edge_t;
@@ -36,17 +36,14 @@ class graph_csc_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
     using csc_type        = csc_t<vertex_type, edge_type, weight_type, space>;
     
     public:
-        graph_csc_t() : graph_base_type(),
+        graph_csc_t() :
+            graph_base_type(),
             csc(std::make_shared<csc_type>()) {}
 
-        graph_csc_t(vertex_type number_of_vertices, 
-                    edge_type number_of_edges,
-                    std::shared_ptr<csc_type> rhs) : 
-            graph_base_type(
-                number_of_vertices, 
-                number_of_edges) {
-            csc = rhs;
-        }
+        graph_csc_t(std::shared_ptr<csc_type> rhs) :
+            graph_base_type(rhs->num_rows, 
+                            rhs->num_nonzeros), 
+            csc(std::move(rhs)) {}
         
         // Override pure virtual functions
         // Must use [override] keyword to identify functions that are

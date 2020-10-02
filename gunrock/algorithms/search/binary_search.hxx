@@ -107,7 +107,7 @@ namespace binary
                          [] __host__ __device__ (const key_t& pivot, 
                                                  const key_t& key) { 
                            return !(key < pivot); // greater_than_comparable 
-                          }) 
+                          })
   {
     return thrust::upper_bound(thrust::seq, first, last, value, comp);
   }

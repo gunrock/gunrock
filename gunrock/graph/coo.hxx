@@ -21,7 +21,7 @@ using namespace detail;
 
 template <typename vertex_t, typename edge_t, typename weight_t, 
           memory_space_t space = memory_space_t::host>
-class graph_coo_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
+class graph_coo_t : virtual public graph_base_t<vertex_t, edge_t, weight_t> {
 
     using vertex_type = vertex_t;
     using edge_type   = edge_t;
@@ -34,17 +34,14 @@ class graph_coo_t : public virtual graph_base_t<vertex_t, edge_t, weight_t> {
     using coo_type        = coo_t<vertex_type, edge_type, weight_type, space>;
     
     public:
-        graph_coo_t() : graph_base_type(),
+        graph_coo_t() : 
+            graph_base_type(),
             coo(std::make_shared<coo_type>()) {}
 
-        graph_coo_t(vertex_type number_of_vertices,
-                    edge_type number_of_edges,
-                    std::shared_ptr<coo_type> rhs) : 
-            graph_base_type(
-                number_of_vertices, 
-                number_of_edges) {
-            coo = rhs;
-        }
+        graph_coo_t(std::shared_ptr<coo_type> rhs) :
+            graph_base_type(rhs->num_rows, 
+                          rhs->num_nonzeros),  
+            coo(std::move(rhs)) {}
         
         // Override pure virtual functions
         // Must use [override] keyword to identify functions that are

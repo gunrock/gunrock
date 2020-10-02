@@ -70,6 +70,12 @@ class graph_base_t {
         // virtual edge_type get_edge(const vertex_type& source, const vertex_type& destination) const = 0;
 
     protected:
+        __host__ __device__ __forceinline__
+        void set_number_of_vertices(const vertex_type& num_vertices) { _number_of_vertices = num_vertices; }
+
+        __host__ __device__ __forceinline__
+        void set_number_of_edges(const edge_type& num_edges) { _number_of_edges = num_edges; }
+
         vertex_type     _number_of_vertices;
         edge_type       _number_of_edges;
         properties_type _properties;
