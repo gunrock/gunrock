@@ -3,6 +3,8 @@
 #include <iostream>
 #include <memory>
 
+#include <thrust/device_ptr.h>
+
 #include <gunrock/error.hxx>
 
 namespace gunrock {
@@ -33,8 +35,8 @@ enum memory_space_t {
  * @param space memory space domain where the allocation should happen.
  * @return T* return allocated T* pointer. 
  */
-template<typename T>
-inline T* allocate(std::size_t size, memory_space_t space) {
+template<typename type_t>
+inline type_t* allocate(std::size_t size, memory_space_t space) {
     void *pointer = nullptr;
     if(space == unknown) throw error::exception_t(cudaErrorUnknown);
     if(size) {
@@ -43,7 +45,7 @@ inline T* allocate(std::size_t size, memory_space_t space) {
         if (status != cudaSuccess) throw error::exception_t(status);
     }
 
-    return reinterpret_cast<T*>(pointer);
+    return reinterpret_cast<type_t*>(pointer);
 }
 
 /**
@@ -53,14 +55,24 @@ inline T* allocate(std::size_t size, memory_space_t space) {
  * @param pointer pointer to free memory of.
  * @param space memory space domain where the pointer was allocated.
  */
-template<typename T>
-inline void free(T* pointer, memory_space_t space) {
+template<typename type_t>
+inline void free(type_t* pointer, memory_space_t space) {
     if(space == unknown) throw error::exception_t(cudaErrorUnknown);
     if(pointer) {
         error::error_t status = (device == space) ? 
         cudaFree((void*)pointer) : cudaFreeHost((void*)pointer);    // XXX: reinterpret_cast?
         if(cudaSuccess != status) throw error::exception_t(status);
     }
+}
+
+template<typename type_t>
+inline type_t* raw_pointer_cast(thrust::device_ptr<type_t> pointer) {
+    return thrust::raw_pointer_cast(pointer);
+}
+
+template<typename type_t>
+inline type_t* raw_pointer_cast(type_t* pointer) {
+    return thrust::raw_pointer_cast(pointer);
 }
 
 } // namespace: memory

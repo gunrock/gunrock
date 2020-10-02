@@ -28,6 +28,21 @@ struct csr_t {
     typename gunrock::vector<index_t, space>::type column_indices; // Aj
     typename gunrock::vector<value_t, space>::type nonzero_values; // Ax
 
+    csr_t() : 
+        num_rows(0),
+        num_columns(0),
+        num_nonzeros(0) { }
+
+    csr_t(index_t r, index_t c, index_t nnz) : 
+        num_rows(r),
+        num_columns(c),
+        num_nonzeros(nnz),
+        row_offsets(r+1),
+        column_indices(nnz),
+        nonzero_values(nnz) { }
+
+    ~csr_t() { std::cout << "object destructed" << std::endl; }
+
 }; // struct csr_t
 
 } // namespace format

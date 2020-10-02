@@ -55,26 +55,26 @@ class graph_base_t {
 
         // Pure Virtual Functions:: must be implemented in derived classes
         __host__ __device__ __forceinline__
-        virtual edge_type get_neighbor_list_length(const vertex_type& v) const = 0;
+        virtual edge_type get_neighbor_list_length(vertex_type const& v) const = 0;
         
         __host__ __device__ __forceinline__
-        virtual vertex_type get_source_vertex(const edge_type& e) const = 0;
+        virtual vertex_type get_source_vertex(edge_type const& e) const = 0;
         
         // __host__ __device__ __forceinline__
-        // virtual vertex_type get_destination_vertex(const edge_type& e) const = 0;
+        // virtual vertex_type get_destination_vertex(edge_type const& e) const = 0;
         
         // __host__ __device__ __forceinline__
-        // virtual vertex_pair_type get_source_and_destination_vertices(const edge_type& e) const = 0; // XXX: return type?
+        // virtual vertex_pair_type get_source_and_destination_vertices(edge_type const& e) const = 0; // XXX: return type?
         
         // __host__ __device__ __forceinline__
-        // virtual edge_type get_edge(const vertex_type& source, const vertex_type& destination) const = 0;
+        // virtual edge_type get_edge(vertex_type const& source, vertex_type const& destination) const = 0;
 
     protected:
         __host__ __device__ __forceinline__
-        void set_number_of_vertices(const vertex_type& num_vertices) { _number_of_vertices = num_vertices; }
+        void set_number_of_vertices(vertex_type const& num_vertices) { _number_of_vertices = num_vertices; }
 
         __host__ __device__ __forceinline__
-        void set_number_of_edges(const edge_type& num_edges) { _number_of_edges = num_edges; }
+        void set_number_of_edges(edge_type const& num_edges) { _number_of_edges = num_edges; }
 
         vertex_type     _number_of_vertices;
         edge_type       _number_of_edges;

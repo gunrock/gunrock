@@ -27,8 +27,11 @@ using namespace detail;
 using namespace memory;
 
 // Variadic inheritence, inherit only what you need
-template< typename vertex_t, typename edge_t, typename weight_t, 
-          memory_space_t space, class... graph_view_t> 
+template<memory_space_t space,
+         typename vertex_t, 
+         typename edge_t, 
+         typename weight_t, 
+         class... graph_view_t> 
 class graph_t : public graph_view_t... {
 
     // Default view (graph representation) if no view is specified
@@ -44,29 +47,38 @@ class graph_t : public graph_view_t... {
         using graph_base_type   = graph_base_t<vertex_type, edge_type, weight_type>;
 
         // Different supported graph representation views.
-        using graph_csr_view    = graph_csr_t<vertex_type, edge_type, weight_type, space>;
-        using graph_csc_view    = graph_csc_t<vertex_type, edge_type, weight_type, space>;
-        using graph_coo_view    = graph_coo_t<vertex_type, edge_type, weight_type, space>;
+        using graph_csr_view    = graph_csr_t<space, vertex_type, edge_type, weight_type>;
+        using graph_csc_view    = graph_csc_t<space, vertex_type, edge_type, weight_type>;
+        using graph_coo_view    = graph_coo_t<space, vertex_type, edge_type, weight_type>;
 
         graph_t() : graph_base_type(), graph_view_t()... {}
 
-        template<typename csr_matrix_t>
-        graph_t(csr_matrix_t& rhs) : 
-          graph_base_type(rhs.num_rows, 
-                          rhs.num_nonzeros), 
-          first_view_t(rhs) {}
+        // template<typename csr_matrix_t>
+        // graph_t(csr_matrix_t& rhs) : 
+        //   graph_base_type(rhs.num_rows, 
+        //                   rhs.num_nonzeros), 
+        //   graph_csr_view(rhs) {}
+
+        template<typename edge_vector_t, 
+                 typename vertex_vector_t, 
+                 typename weight_vector_t>
+        void set(typename vertex_vector_t::value_type const& r,
+                typename vertex_vector_t::value_type const& c,
+                typename edge_vector_t::value_type const& nnz,
+                edge_vector_t& Ap, vertex_vector_t& Aj, weight_vector_t& Ax) {
+            graph_csr_view::set(r, c, nnz, Ap, Aj, Ax);
+        }
         
         // XXX: add support for per-view based methods
         // template<typename view_t = first_view_t>
         __host__ __device__ __forceinline__
-        edge_type get_neighbor_list_length(const vertex_type& v) const override {
+        edge_type get_neighbor_list_length(vertex_type const& v) const override {
             return first_view_t::get_neighbor_list_length(v);
         }
 
-        template<typename csr_matrix_t>
-        void from_csr_t(std::shared_ptr<csr_matrix_t> rhs) {
-            assert(contains_representation<graph_csr_view>());
-            graph_csr_view::set(rhs);
+         __host__ __device__ __forceinline__
+        vertex_type get_source_vertex(edge_type const& e) const override {
+            return first_view_t::get_source_vertex(e);
         }
 
         __host__ __device__ __forceinline__
@@ -83,6 +95,30 @@ class graph_t : public graph_view_t... {
         static constexpr std::size_t number_of_formats_inherited = sizeof...(graph_view_t);
 
 };  // struct graph_t
+
+namespace build {
+
+template<memory_space_t space,
+         typename edge_vector_t, 
+         typename vertex_vector_t, 
+         typename weight_vector_t>
+auto from_csr_t(typename vertex_vector_t::value_type const& r,
+                typename vertex_vector_t::value_type const& c,
+                typename edge_vector_t::value_type const& nnz,
+                edge_vector_t& Ap, vertex_vector_t& Aj, weight_vector_t& Ax) {
+    using vertex_type = typename vertex_vector_t::value_type;
+    using edge_type   = typename edge_vector_t::value_type;
+    using weight_type = typename weight_vector_t::value_type;
+
+    using g_csr_t = graph::graph_csr_t<space, vertex_type, edge_type, weight_type>;
+
+    graph::graph_t<space, vertex_type, edge_type, weight_type, g_csr_t> graph_slice;
+    graph_slice.set(r, c, nnz, Ap, Aj, Ax);
+
+    return graph_slice;
+}
+
+}
 
 /**
  * @brief Get the average degree of a graph.
