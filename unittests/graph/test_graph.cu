@@ -7,32 +7,26 @@
 using namespace gunrock;
 
 template<typename graph_type>
-__global__ void kernel(graph_type graph) {
+__global__ void kernel(graph_type G) {
   using vertex_t = typename graph_type::vertex_type;
   using edge_t = typename graph_type::edge_type;
   using weight_t = typename graph_type::weight_type;
 
-  printf("Within the Kernel (device)\n");
+  vertex_t source = 1;
+  vertex_t edge = 0;
 
-  // vertex_t source = 1;
-  // vertex_t edge = 0;
-
-  vertex_t num_vertices   = graph.get_number_of_vertices();
-  edge_t num_edges        = graph.get_number_of_edges();
-  // edge_t num_neighbors    = graph.get_neighbor_list_length(source);
-  // vertex_t source_vertex  = graph.get_source_vertex(edge);
-  // double average_degree   = graph::get_average_degree(graph);
-  // double degree_std_dev   = graph::get_degree_standard_deviation(graph);
-
-  printf("Operations Completed (device)\n");
-
-  __syncthreads();
+  vertex_t num_vertices   = G.get_number_of_vertices();
+  edge_t num_edges        = G.get_number_of_edges();
+  edge_t num_neighbors    = G.get_neighbor_list_length(source);
+  vertex_t source_vertex  = G.get_source_vertex(edge);
+  // double average_degree   = graph::get_average_degree(G);
+  // double degree_std_dev   = graph::get_degree_standard_deviation(G);
 
   printf("__device__\n");
   printf("\tNumber of vertices: %i\n", num_vertices);
   printf("\tNumber of edges: %i\n", num_edges);
-  // printf("\tNumber of neighbors: %i (source = %i)\n", num_neighbors, source);
-  // printf("\tSource vertex: %i (edge = %i)\n", source_vertex, edge);
+  printf("\tNumber of neighbors: %i (source = %i)\n", num_neighbors, source);
+  printf("\tSource vertex: %i (edge = %i)\n", source_vertex, edge);
   // printf("\tAverage degree: %lf", average_degree);
   // printf("\tDegree std. deviation: %lf", degree_std_dev);
 }
@@ -79,20 +73,20 @@ void test_graph()
   Aj[0] = 0; Aj[1] = 1; Aj[2] = 2; Aj[3] = 3;
   Ax[0] = 5; Ax[1] = 8; Ax[2] = 3; Ax[3] = 6;
 
-  /* 
+  
   // wrap it with shared_ptr<csr_t> (memory_space_t::host)
   constexpr memory::memory_space_t host_space = memory::memory_space_t::host;
-  auto host_graph_slice = graph::build::from_csr_t<host_space>(r, c, nnz, h_Ap, h_Aj, h_Ax);
+  auto h_G = graph::build::from_csr_t<host_space>(r, c, nnz, h_Ap, h_Aj, h_Ax);
 
   vertex_t source = 1;
   vertex_t edge = 0;
 
-  vertex_t num_vertices   = host_graph_slice.get_number_of_vertices();
-  edge_t num_edges        = host_graph_slice.get_number_of_edges();
-  edge_t num_neighbors    = host_graph_slice.get_neighbor_list_length(source);
-  vertex_t source_vertex  = host_graph_slice.get_source_vertex(edge);
-  double average_degree   = graph::get_average_degree(host_graph_slice);
-  double degree_std_dev   = graph::get_degree_standard_deviation(host_graph_slice);
+  vertex_t num_vertices   = h_G.get_number_of_vertices();
+  edge_t num_edges        = h_G.get_number_of_edges();
+  edge_t num_neighbors    = h_G.get_neighbor_list_length(source);
+  vertex_t source_vertex  = h_G.get_source_vertex(edge);
+  double average_degree   = graph::get_average_degree(h_G);
+  double degree_std_dev   = graph::get_degree_standard_deviation(h_G);
 
   // Host Output
   std::cout << "Average Degree: "       << average_degree << std::endl;
@@ -108,10 +102,10 @@ void test_graph()
   using type_find_t = graph::graph_csr_t<host_space, vertex_t, edge_t, weight_t>;
 
   std::cout << "Number of Graph Representations = " 
-            << host_graph_slice.number_of_graph_representations() << std::endl;
+            << h_G.number_of_graph_representations() << std::endl;
   std::cout << "Contains CSR Representation? " << std::boolalpha
-            << host_graph_slice.contains_representation<type_find_t>() << std::endl;
- */
+            << h_G.contains_representation<type_find_t>() << std::endl;
+
 
   // wrap it with shared_ptr<csr_t> (memory_space_t::device)
   constexpr memory::memory_space_t space = memory::memory_space_t::device;
@@ -120,19 +114,14 @@ void test_graph()
   thrust::device_vector<vertex_t> d_Aj = h_Aj;
   thrust::device_vector<weight_t> d_Ax = h_Ax;
 
-  auto graph_slice = graph::build::from_csr_t<space>(r, c, nnz, d_Ap, d_Aj, d_Ax);
+  auto G = graph::build::from_csr_t<space>(r, c, nnz, d_Ap, d_Aj, d_Ax);
 
   // Device Output
   status = cudaDeviceSynchronize();
   if(cudaSuccess != status) throw error::exception_t(status);
-  std::cout << "Entering Kernel (host)" << std::endl;
-
-  kernel<<<1, 1>>>(graph_slice);
-  
+  kernel<<<1, 1>>>(G);
   status = cudaDeviceSynchronize();
   if(cudaSuccess != status) throw error::exception_t(status);
-  
-  std::cout << "Kernel Exited (host)" << std::endl;
 }
 
 int

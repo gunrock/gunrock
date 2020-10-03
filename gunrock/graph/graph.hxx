@@ -51,7 +51,7 @@ class graph_t : public graph_view_t... {
         using graph_csc_view    = graph_csc_t<space, vertex_type, edge_type, weight_type>;
         using graph_coo_view    = graph_coo_t<space, vertex_type, edge_type, weight_type>;
 
-        graph_t() : graph_base_type(), graph_view_t()... {}
+        graph_t() : graph_view_t()... {}
 
         // template<typename csr_matrix_t>
         // graph_t(csr_matrix_t& rhs) : 
@@ -112,10 +112,10 @@ auto from_csr_t(typename vertex_vector_t::value_type const& r,
 
     using g_csr_t = graph::graph_csr_t<space, vertex_type, edge_type, weight_type>;
 
-    graph::graph_t<space, vertex_type, edge_type, weight_type, g_csr_t> graph_slice;
-    graph_slice.set(r, c, nnz, Ap, Aj, Ax);
+    graph::graph_t<space, vertex_type, edge_type, weight_type, g_csr_t> G;
+    G.set(r, c, nnz, Ap, Aj, Ax);
 
-    return graph_slice;
+    return G;
 }
 
 }
@@ -124,17 +124,17 @@ auto from_csr_t(typename vertex_vector_t::value_type const& r,
  * @brief Get the average degree of a graph.
  * 
  * @tparam graph_type 
- * @param graph 
+ * @param G 
  * @return double 
  */
 template<typename graph_type>
 __host__ __device__
-double get_average_degree(graph_type& graph) {
+double get_average_degree(graph_type& G) {
   auto sum = 0;
-  for (auto v = 0; v < graph.get_number_of_vertices(); ++v)
-    sum += graph.get_neighbor_list_length(v);
+  for (auto v = 0; v < G.get_number_of_vertices(); ++v)
+    sum += G.get_neighbor_list_length(v);
 
-  return (sum / graph.get_number_of_vertices());
+  return (sum / G.get_number_of_vertices());
 }
 
 /**
@@ -147,21 +147,21 @@ double get_average_degree(graph_type& graph) {
  * as the result.
  * 
  * @tparam graph_type 
- * @param graph 
+ * @param G 
  * @return double 
  */
 template <typename graph_type>
 __host__ __device__
-double get_degree_standard_deviation(graph_type& graph) {
+double get_degree_standard_deviation(graph_type& G) {
 
-  auto average_degree = get_average_degree(graph);
+  auto average_degree = get_average_degree(G);
 
   double accum = 0.0;
-  for (auto v = 0; v < graph.get_number_of_vertices(); ++v) {
-    double d = graph.get_neighbor_list_length(v);
+  for (auto v = 0; v < G.get_number_of_vertices(); ++v) {
+    double d = G.get_neighbor_list_length(v);
     accum += (d - average_degree) * (d - average_degree);
   }
-  return sqrt(accum / graph.get_number_of_vertices());
+  return sqrt(accum / G.get_number_of_vertices());
 }
 
 /**
@@ -169,7 +169,7 @@ double get_degree_standard_deviation(graph_type& graph) {
  * 
  * @tparam graph_type 
  * @tparam histogram_t 
- * @param graph 
+ * @param G 
  * @return histogram_t* 
  */
 // template <typename graph_type, typename histogram_t>

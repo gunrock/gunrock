@@ -23,8 +23,16 @@ using namespace format;
 using namespace detail;
 using namespace memory;
 
+// XXX: The ideal thing to do here is to inherit
+// base class with virtual keyword specifier, therefore
+// public virtual graph_base_t<...> {}, but according to
+// cuda's programming guide, that is not allowerd.
+// From my tests (see smart_struct) results in an illegal
+// memory error. Another important thing to note is that
+// virtual functions should also have undefined behavior,
+// but they seem to work.
 template <memory_space_t space, typename vertex_t, typename edge_t, typename weight_t> 
-class graph_csr_t : virtual public graph_base_t<vertex_t, edge_t, weight_t> {
+class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
     
     using vertex_type = vertex_t;
     using edge_type   = edge_t;
@@ -53,12 +61,8 @@ class graph_csr_t : virtual public graph_base_t<vertex_t, edge_t, weight_t> {
         // overriding the derived class
         __host__ __device__ __forceinline__
         edge_type get_neighbor_list_length(vertex_type const& v) const override {
-            // assert(v < graph_base_type::get_number_of_vertices());
-            printf("Getting neighbor list length...\n");
+            assert(v < graph_base_type::get_number_of_vertices());
             auto offsets = get_row_offsets();
-            printf("*row_offsets = %p\n", offsets);
-            printf("row_offsets[%i+1] = %i\n", v, offsets[v+1]);
-            printf("row_offsets[%i] = %i\n", v, offsets[v]);
             return (offsets[v+1] - offsets[v]);
         }
 
