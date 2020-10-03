@@ -8,12 +8,12 @@ using namespace gunrock;
 
 template<typename graph_type>
 __global__ void kernel(graph_type G) {
-  using vertex_t = typename graph_type::vertex_type;
-  using edge_t = typename graph_type::edge_type;
-  using weight_t = typename graph_type::weight_type;
+  using vertex_t  = typename graph_type::vertex_type;
+  using edge_t    = typename graph_type::edge_type;
+  using weight_t  = typename graph_type::weight_type;
 
   vertex_t source = 1;
-  vertex_t edge = 0;
+  vertex_t edge   = 0;
 
   vertex_t num_vertices   = G.get_number_of_vertices();
   edge_t num_edges        = G.get_number_of_edges();
