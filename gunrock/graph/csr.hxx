@@ -48,6 +48,7 @@ class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
     using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
 
     public:
+        __host__ __device__
         graph_csr_t() : graph_base_type() {}
 
         // Disable copy ctor and assignment operator.
@@ -60,7 +61,7 @@ class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
         // Must use [override] keyword to identify functions that are
         // overriding the derived class
         __host__ __device__ __forceinline__
-        edge_type get_neighbor_list_length(vertex_type const& v) const /* override */ {
+        edge_type get_neighbor_list_length(vertex_type const& v) const override {
             assert(v < graph_base_type::get_number_of_vertices());
             auto offsets = get_row_offsets();
             return (offsets[v+1] - offsets[v]);
@@ -99,13 +100,37 @@ class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
 
         // Representation specific functions
         // ...
-
-    protected:
         __host__ __device__ __forceinline__
         auto get_row_offsets() const {
             return row_offsets;
         }
 
+        __host__ __device__ __forceinline__
+        auto get_column_indices() const {
+            return column_indices;
+        }
+
+        __host__ __device__ __forceinline__
+        auto get_nonzero_values() const {
+            return nonzero_values;
+        }
+
+        __host__ __device__ __forceinline__
+        auto get_number_of_rows() const {
+            return number_of_rows;
+        }
+
+        __host__ __device__ __forceinline__
+        auto get_number_of_columns() const {
+            return number_of_columns;
+        }
+
+        __host__ __device__ __forceinline__
+        auto get_number_of_nonzeros() const {
+            return number_of_nonzeros;
+        }
+
+    protected:
         // __host__ __device__ __forceinline__
         // auto get_row_offsets_size() const {
         //     return csr->row_offsets.size();
@@ -130,14 +155,39 @@ class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
             graph_base_type::set_number_of_vertices(r);
             graph_base_type::set_number_of_edges(nnz);
 
+            number_of_rows = r;
+            number_of_columns = c;
+            number_of_nonzeros = nnz;
+
             // Set raw pointers
             row_offsets     = memory::raw_pointer_cast<edge_type>(Ap.data());
             column_indices  = memory::raw_pointer_cast<vertex_type>(Aj.data());
             nonzero_values  = memory::raw_pointer_cast<weight_type>(Ax.data());
         }
 
+        __host__ __device__
+        void set(vertex_type const& r, vertex_type const& c, edge_type const& nnz,
+                 edge_pointer_t Ap, vertex_pointer_t Aj, weight_pointer_t Ax) {
+            
+            // Set number of verties & edges
+            graph_base_type::set_number_of_vertices(r);
+            graph_base_type::set_number_of_edges(nnz);
+
+            number_of_rows = r;
+            number_of_columns = c;
+            number_of_nonzeros = nnz;
+
+            // Set raw pointers
+            row_offsets     = memory::raw_pointer_cast<edge_type>(Ap);
+            column_indices  = memory::raw_pointer_cast<vertex_type>(Aj);
+            nonzero_values  = memory::raw_pointer_cast<weight_type>(Ax);
+        }
+
     private:
         // Underlying data storage
+        vertex_t number_of_rows;
+        vertex_t number_of_columns;
+        edge_t number_of_nonzeros;
 
         // XXX: Maybe use these to hold thrust pointers?
         // I don't know if this is safe, even when using

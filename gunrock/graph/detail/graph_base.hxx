@@ -29,6 +29,7 @@ class graph_base_t {
     using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
 
     public:
+        __host__ __device__
         graph_base_t() : 
             _number_of_vertices(0), 
             _number_of_edges(0), 
@@ -55,7 +56,7 @@ class graph_base_t {
 
         // Pure Virtual Functions:: must be implemented in derived classes
         __host__ __device__ __forceinline__
-        edge_type get_neighbor_list_length(vertex_type const& v) const; // = 0;
+        virtual edge_type get_neighbor_list_length(vertex_type const& v) const = 0;
         
         __host__ __device__ __forceinline__
         virtual vertex_type get_source_vertex(edge_type const& e) const = 0;

@@ -71,6 +71,7 @@ inline type_t* raw_pointer_cast(thrust::device_ptr<type_t> pointer) {
 }
 
 template<typename type_t>
+__host__ __device__
 inline type_t* raw_pointer_cast(type_t* pointer) {
     return thrust::raw_pointer_cast(pointer);
 }

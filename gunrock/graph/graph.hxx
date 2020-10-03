@@ -43,6 +43,10 @@ class graph_t : public graph_view_t... {
         using edge_type   = edge_t;
         using weight_type = weight_t;
 
+        using vertex_pointer_t  = vertex_t*;
+        using edge_pointer_t    = edge_type*;
+        using weight_pointer_t  = weight_t*;
+
         using graph_type = graph_t<space, vertex_type, edge_type, weight_type, graph_view_t...>;
 
         // Base graph type, always exists.
@@ -53,6 +57,7 @@ class graph_t : public graph_view_t... {
         using graph_csc_view    = graph_csc_t<space, vertex_type, edge_type, weight_type>;
         using graph_coo_view    = graph_coo_t<space, vertex_type, edge_type, weight_type>;
 
+        __host__ __device__
         graph_t() : graph_view_t()... {}
 
         // template<typename csr_matrix_t>
@@ -70,11 +75,17 @@ class graph_t : public graph_view_t... {
                 edge_vector_t& Ap, vertex_vector_t& Aj, weight_vector_t& Ax) {
             graph_csr_view::set(r, c, nnz, Ap, Aj, Ax);
         }
+
+        __host__ __device__
+        void set(vertex_type const& r, vertex_type const& c, edge_type const& nnz,
+                 edge_pointer_t Ap, vertex_pointer_t Aj, weight_pointer_t Ax) {
+            graph_csr_view::set(r, c, nnz, Ap, Aj, Ax);
+        }
         
         // XXX: add support for per-view based methods
         // template<typename view_t = first_view_t>
         __host__ __device__ __forceinline__
-        edge_type get_neighbor_list_length(vertex_type const& v) const /* override */ {
+        edge_type get_neighbor_list_length(vertex_type const& v) const override {
             return first_view_t::get_neighbor_list_length(v);
         }
 
@@ -125,7 +136,19 @@ auto from_csr_t(typename vertex_vector_t::value_type const& r,
     return G;
 }
 
+// Possible work around while keeping
+// virtual (polymorphic behavior.)
+template<typename graph_type>
+__host__ __device__
+auto from_graph_t(graph_type& I) {
+  graph_type G;
+  G.set(I.get_number_of_rows(), I.get_number_of_columns(), I.get_number_of_nonzeros(), 
+        I.get_row_offsets(), I.get_column_indices(), I.get_nonzero_values());
+
+  return G;
 }
+
+} // namespace build
 
 /**
  * @brief Get the average degree of a graph.

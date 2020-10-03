@@ -33,6 +33,38 @@ __global__ void kernel(graph_type G) {
   printf("\tDegree std. deviation: %lf\n", degree_std_dev);
 }
 
+template<typename graph_type>
+__global__ void polymorphic_kernel(graph_type I) {
+  using vertex_t  = typename graph_type::vertex_type;
+  using edge_t    = typename graph_type::edge_type;
+  using weight_t  = typename graph_type::weight_type;
+
+  // Instantiate polymorphic inhertance within the kernel
+  // & set the existing data to it. No allocations allowed
+  // here.
+  auto G = graph::build::from_graph_t(I);
+
+  vertex_t source = 1;
+  vertex_t edge   = 0;
+
+  vertex_t num_vertices   = G.get_number_of_vertices();
+  edge_t num_edges        = G.get_number_of_edges();
+  edge_t num_neighbors    = G.get_neighbor_list_length(source);
+  vertex_t source_vertex  = G.get_source_vertex(edge);
+  weight_t edge_weight    = G.get_edge_weight(edge);
+  double average_degree   = graph::get_average_degree(G);
+  double degree_std_dev   = graph::get_degree_standard_deviation(G);
+
+  printf("__device__\n");
+  printf("\tNumber of vertices: %i\n", num_vertices);
+  printf("\tNumber of edges: %i\n", num_edges);
+  printf("\tNumber of neighbors: %i (source = %i)\n", num_neighbors, source);
+  printf("\tSource vertex: %i (edge = %i)\n", source_vertex, edge);
+  printf("\tEdge weight: %f (edge = %i)\n", edge_weight, edge);
+  printf("\tAverage degree: %lf\n", average_degree);
+  printf("\tDegree std. deviation: %lf\n", degree_std_dev);
+}
+
 void test_graph()
 {
   using vertex_t  = int;
@@ -125,7 +157,7 @@ void test_graph()
 
   // Device Output
   cudaDeviceSynchronize();
-  kernel<<<1, 1>>>(G);
+  polymorphic_kernel<<<1, 1>>>(G);
   cudaDeviceSynchronize();
   status = cudaPeekAtLastError();
   if(cudaSuccess != status) throw error::exception_t(status);
