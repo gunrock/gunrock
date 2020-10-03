@@ -43,6 +43,8 @@ class graph_t : public graph_view_t... {
         using edge_type   = edge_t;
         using weight_type = weight_t;
 
+        using graph_type = graph_t<space, vertex_type, edge_type, weight_type, graph_view_t...>;
+
         // Base graph type, always exists.
         using graph_base_type   = graph_base_t<vertex_type, edge_type, weight_type>;
 
@@ -72,13 +74,18 @@ class graph_t : public graph_view_t... {
         // XXX: add support for per-view based methods
         // template<typename view_t = first_view_t>
         __host__ __device__ __forceinline__
-        edge_type get_neighbor_list_length(vertex_type const& v) const override {
+        edge_type get_neighbor_list_length(vertex_type const& v) const /* override */ {
             return first_view_t::get_neighbor_list_length(v);
         }
 
          __host__ __device__ __forceinline__
         vertex_type get_source_vertex(edge_type const& e) const override {
             return first_view_t::get_source_vertex(e);
+        }
+
+        __host__ __device__ __forceinline__
+        weight_type get_edge_weight(edge_type const& e) const override {
+            return first_view_t::get_edge_weight(e);
         }
 
         __host__ __device__ __forceinline__
@@ -129,7 +136,7 @@ auto from_csr_t(typename vertex_vector_t::value_type const& r,
  */
 template<typename graph_type>
 __host__ __device__
-double get_average_degree(graph_type& G) {
+double get_average_degree(graph_type const& G) {
   auto sum = 0;
   for (auto v = 0; v < G.get_number_of_vertices(); ++v)
     sum += G.get_neighbor_list_length(v);
@@ -152,7 +159,7 @@ double get_average_degree(graph_type& G) {
  */
 template <typename graph_type>
 __host__ __device__
-double get_degree_standard_deviation(graph_type& G) {
+double get_degree_standard_deviation(const graph_type& G) {
 
   auto average_degree = get_average_degree(G);
 

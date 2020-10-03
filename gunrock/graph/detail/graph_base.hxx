@@ -55,7 +55,7 @@ class graph_base_t {
 
         // Pure Virtual Functions:: must be implemented in derived classes
         __host__ __device__ __forceinline__
-        virtual edge_type get_neighbor_list_length(vertex_type const& v) const = 0;
+        edge_type get_neighbor_list_length(vertex_type const& v) const; // = 0;
         
         __host__ __device__ __forceinline__
         virtual vertex_type get_source_vertex(edge_type const& e) const = 0;
@@ -68,6 +68,9 @@ class graph_base_t {
         
         // __host__ __device__ __forceinline__
         // virtual edge_type get_edge(vertex_type const& source, vertex_type const& destination) const = 0;
+
+        __host__ __device__ __forceinline__
+        virtual weight_type get_edge_weight(edge_type const& e) const = 0;
 
     protected:
         __host__ __device__ __forceinline__

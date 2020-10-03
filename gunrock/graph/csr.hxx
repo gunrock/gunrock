@@ -60,7 +60,7 @@ class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
         // Must use [override] keyword to identify functions that are
         // overriding the derived class
         __host__ __device__ __forceinline__
-        edge_type get_neighbor_list_length(vertex_type const& v) const override {
+        edge_type get_neighbor_list_length(vertex_type const& v) const /* override */ {
             assert(v < graph_base_type::get_number_of_vertices());
             auto offsets = get_row_offsets();
             return (offsets[v+1] - offsets[v]);
@@ -90,6 +90,12 @@ class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
         //                 const vertex_type& destination) const override {
 
         // }
+
+        __host__ __device__ __forceinline__
+        weight_type get_edge_weight(edge_type const& e) const override {
+            assert(e < graph_base_type::get_number_of_edges());
+            return nonzero_values[e];
+        }
 
         // Representation specific functions
         // ...

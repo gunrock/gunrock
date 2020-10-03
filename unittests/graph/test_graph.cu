@@ -19,16 +19,18 @@ __global__ void kernel(graph_type G) {
   edge_t num_edges        = G.get_number_of_edges();
   edge_t num_neighbors    = G.get_neighbor_list_length(source);
   vertex_t source_vertex  = G.get_source_vertex(edge);
-  // double average_degree   = graph::get_average_degree(G);
-  // double degree_std_dev   = graph::get_degree_standard_deviation(G);
+  weight_t edge_weight    = G.get_edge_weight(edge);
+  double average_degree   = graph::get_average_degree(G);
+  double degree_std_dev   = graph::get_degree_standard_deviation(G);
 
   printf("__device__\n");
   printf("\tNumber of vertices: %i\n", num_vertices);
   printf("\tNumber of edges: %i\n", num_edges);
   printf("\tNumber of neighbors: %i (source = %i)\n", num_neighbors, source);
   printf("\tSource vertex: %i (edge = %i)\n", source_vertex, edge);
-  // printf("\tAverage degree: %lf", average_degree);
-  // printf("\tDegree std. deviation: %lf", degree_std_dev);
+  printf("\tEdge weight: %f (edge = %i)\n", edge_weight, edge);
+  printf("\tAverage degree: %lf\n", average_degree);
+  printf("\tDegree std. deviation: %lf\n", degree_std_dev);
 }
 
 void test_graph()
@@ -85,26 +87,31 @@ void test_graph()
   edge_t num_edges        = h_G.get_number_of_edges();
   edge_t num_neighbors    = h_G.get_neighbor_list_length(source);
   vertex_t source_vertex  = h_G.get_source_vertex(edge);
+  weight_t edge_weight    = h_G.get_edge_weight(edge);
   double average_degree   = graph::get_average_degree(h_G);
   double degree_std_dev   = graph::get_degree_standard_deviation(h_G);
 
   // Host Output
-  std::cout << "Average Degree: "       << average_degree << std::endl;
-  std::cout << "Degree Std. Deviation: "<< degree_std_dev << std::endl;
-  std::cout << "Number of vertices: "   << num_vertices   << std::endl;
-  std::cout << "Number of edges: "      << num_edges      << std::endl;
-  std::cout << "Number of neighbors: "  << num_neighbors 
-            << " (source = "            << source << ")"  << std::endl;
-  std::cout << "Source vertex: "        << source_vertex 
-            << " (edge = "              << edge   << ")"  << std::endl;
+  std::cout << "__host__"                                   << std::endl;
+  std::cout << "\tNumber of vertices: "   << num_vertices   << std::endl;
+  std::cout << "\tNumber of edges: "      << num_edges      << std::endl;
+  std::cout << "\tNumber of neighbors: "  << num_neighbors 
+            << " (source = "              << source << ")"  << std::endl;
+  std::cout << "\tSource vertex: "        << source_vertex 
+            << " (edge = "                << edge   << ")"  << std::endl;
+  std::cout << "\tEdge weight: "          << edge_weight 
+            << " (edge = "                << edge   << ")"  << std::endl;
+  std::cout << "\tAverage Degree: "       << average_degree << std::endl;
+  std::cout << "\tDegree Std. Deviation: "<< degree_std_dev << std::endl;
 
   // Compile-Time Constants (device && host)
   using type_find_t = graph::graph_csr_t<host_space, vertex_t, edge_t, weight_t>;
 
-  std::cout << "Number of Graph Representations = " 
-            << h_G.number_of_graph_representations() << std::endl;
-  std::cout << "Contains CSR Representation? " << std::boolalpha
-            << h_G.contains_representation<type_find_t>() << std::endl;
+  std::cout << "\tNumber of Graph Representations = " 
+            << h_G.number_of_graph_representations()        << std::endl;
+  std::cout << "\tContains CSR Representation? " 
+            << std::boolalpha
+            << h_G.contains_representation<type_find_t>()   << std::endl;
 
 
   // wrap it with shared_ptr<csr_t> (memory_space_t::device)
@@ -117,10 +124,10 @@ void test_graph()
   auto G = graph::build::from_csr_t<space>(r, c, nnz, d_Ap, d_Aj, d_Ax);
 
   // Device Output
-  status = cudaDeviceSynchronize();
-  if(cudaSuccess != status) throw error::exception_t(status);
+  cudaDeviceSynchronize();
   kernel<<<1, 1>>>(G);
-  status = cudaDeviceSynchronize();
+  cudaDeviceSynchronize();
+  status = cudaPeekAtLastError();
   if(cudaSuccess != status) throw error::exception_t(status);
 }
 
