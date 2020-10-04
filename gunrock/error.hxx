@@ -15,11 +15,11 @@ typedef cudaError_t error_t;
 struct exception_t : std::exception {
   error_t status;
 
-  exception_t(error_t status_) : status(status_) { }
-  virtual const char* what() const noexcept { 
-    return cudaGetErrorString(status); 
+  exception_t(error_t status_) : status(status_) {}
+  virtual const char* what() const noexcept {
+    return cudaGetErrorString(status);
   }
 };
 
-} // namespace error
-} // namespace gunrock
+}  // namespace error
+}  // namespace gunrock

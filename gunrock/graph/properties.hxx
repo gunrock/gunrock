@@ -11,10 +11,10 @@ namespace graph {
  * or negative edge support, etc.
  */
 struct graph_properties_t {
-    bool directed {false};
-    bool weighted {false};
-    graph_properties_t() = default;
+  bool directed{false};
+  bool weighted{false};
+  graph_properties_t() = default;
 };
 
-}   // namespace graph
-}   // namespace gunrock
+}  // namespace graph
+}  // namespace gunrock

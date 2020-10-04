@@ -7,9 +7,9 @@ namespace graph {
 // maybe just a tuple.
 template <typename vertex_t>
 struct vertex_pair_t {
-    vertex_t source;
-    vertex_t destination;
+  vertex_t source;
+  vertex_t destination;
 };
 
-}   // namespace graph
-}   // namespace gunrock
+}  // namespace graph
+}  // namespace gunrock
