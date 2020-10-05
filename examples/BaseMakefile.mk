@@ -84,7 +84,7 @@ else
 	METIS_LINK = -Xlinker -lmetis -Xcompiler -DMETIS_FOUND
 endif
 
-GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=1.1.0
+GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=1.2.0
 LINK = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
 INC = $(CUDA_INC) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(BOOST_INC) -I.. -I../.. $(LINK)
 
