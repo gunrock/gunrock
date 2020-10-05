@@ -1,7 +1,7 @@
 #include <cstdlib>  // EXIT_SUCCESS
 
+#include <gunrock/container/array.hxx>
 #include <gunrock/error.hxx>  // error checking
-#include <gunrock/container/array.cuh>
 
 template <std::size_t N, typename T>
 __global__ void kernel(T a) {

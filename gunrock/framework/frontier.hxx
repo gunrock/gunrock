@@ -1,8 +1,26 @@
+/**
+ * @file frontier.hxx
+ * @author Muhammad Osama (mosama@ucdavis.edu)
+ * @brief Frontier structure for graph algorithms. Frontiers are one of the
+ * fundamental structure used to implement graph algorithms on the GPU for
+ * gunrock. The concept simply implies that we have either vertex or edge
+ * frontiers, and all operations are applied on the frontier rather than the
+ * graph itself. These operations (operators) are parallel, and exposes the
+ * data-centric graph abstraction within gunrock.
+ *
+ * @version 0.1
+ * @date 2020-10-05
+ *
+ * @copyright Copyright (c) 2020
+ *
+ */
+
 #pragma once
 
 #include <gunrock/graph/graph.hxx>
 
 namespace gunrock {
+namespace frontier {
 
 enum frontier_type_t {
   edge_frontier,
@@ -11,7 +29,7 @@ enum frontier_type_t {
 
 template <typename type_t>
 class frontier_t {
-  using pointer_type_t = type_t*;  // For now, use raw ptr.
+  using pointer_type_t = type_t*;  // For now, use raw ptr
 
  public:
   frontier_t()
@@ -34,6 +52,8 @@ class frontier_t {
   }
 
   // XXX: Useful writing some loaders
+  // Maybe this can be a single loader with
+  // templated over over copy
   template <typename device_vector_t>
   void load(device_vector_t& v) {
     copy::device(_data, v.data(), v.size());
@@ -66,4 +86,5 @@ class frontier_t {
   pointer_type_t _data;
 };  // struct frontier_t
 
+}  // namespace frontier
 }  // namespace gunrock
