@@ -16,6 +16,7 @@
 
 #include <gunrock/util/array_utils.cuh>
 #include <gunrock/app/problem_base.cuh>
+#include <gunrock/oprtr/1D_oprtr/for_all.cuh>
 #include <unordered_set>
 
 namespace gunrock {
@@ -62,12 +63,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   struct DataSlice : BaseDataSlice {
     
     util::Array1D<SizeT, ValueT> points;
-    util::Array1D<SizeT, SizeT> keys;
-    util::Array1D<SizeT, ValueT> distance;
-    util::Array1D<SizeT, SizeT> offsets;
 
     // Nearest Neighbors
     util::Array1D<SizeT, SizeT> knns;
+    
+    util::Array1D<SizeT, int> sem;
 
     // Number of neighbors
     SizeT k;
@@ -76,11 +76,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     // Dimension of points labels 
     SizeT dim;
 
-    // CUB Related storage
-    util::Array1D<uint64_t, char> cub_temp_storage;
-
     // Sorted
-    util::Array1D<SizeT, SizeT> keys_out;
     util::Array1D<SizeT, ValueT> distance_out;
 
     /*
@@ -88,12 +84,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      */
     DataSlice() : BaseDataSlice() {
       points.SetName("points");
-      keys.SetName("keys");
-      distance.SetName("distance");
-      offsets.SetName("offsets");
       knns.SetName("knns");
-      cub_temp_storage.SetName("cub_temp_storage");
-      keys_out.SetName("keys_out");
+      sem.SetName("sem");
       distance_out.SetName("distance_out");
     }
 
@@ -111,13 +103,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cudaError_t retval = cudaSuccess;
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx));
 
-      GUARD_CU(keys.Release(target));
-      GUARD_CU(distance.Release(target));
-      GUARD_CU(offsets.Release(target));
       GUARD_CU(knns.Release(target));
-      GUARD_CU(cub_temp_storage.Release(target));
-      GUARD_CU(keys_out.Release(target));
       GUARD_CU(distance_out.Release(target));
+      GUARD_CU(sem.Release(target));
 
       GUARD_CU(BaseDataSlice ::Release(target));
       return retval;
@@ -147,19 +135,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       k = k_;
       dim = dim_;
 
-      //keys need for cub sorting, the same size like distance array
-      GUARD_CU(keys.Allocate(k*num_points, target));
-      GUARD_CU(keys_out.Allocate(k*num_points, target));
-      
-      GUARD_CU(distance.Allocate(k * num_points, target));
-      GUARD_CU(distance_out.Allocate(k * num_points, target));
-
       // k-nearest neighbors
       GUARD_CU(knns.Allocate(k * num_points, target));
-
-      // GUARD_CU(cub_temp_storage.Allocate(1, target));
-
-      GUARD_CU(offsets.Allocate(num_points+1, target));
+      GUARD_CU(distance_out.Allocate(k * num_points, target));
+      GUARD_CU(sem.Allocate(num_points, target));
 
       return retval;
     }
@@ -175,18 +154,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       SizeT num_points = this->num_points;
       typedef typename GraphT::CsrT CsrT;
 
-      // Ensure data are allocated
-      GUARD_CU(keys.EnsureSize_(k * num_points, target));
-      GUARD_CU(keys_out.EnsureSize_(k * num_points, target)); 
-      // GUARD_CU(cub_temp_storage.EnsureSize_(1, target));
-      
-      GUARD_CU(distance.EnsureSize_(k * num_points, target));
-      GUARD_CU(distance.ForAll(
-            [] __host__ __device__(ValueT * d, const SizeT &p) { 
-                d[p] = util::PreDefinedValues<ValueT>::InvalidValue;
-            },
-            k * num_points, target, this->stream));
-
       // K-Nearest Neighbors
       GUARD_CU(knns.EnsureSize_(k * num_points, target));
       GUARD_CU(knns.ForAll(
@@ -198,16 +165,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(distance_out.EnsureSize_(k * num_points, target));
       GUARD_CU(distance_out.ForAll(
             [] __host__ __device__(ValueT * d, const SizeT &p) { 
-                d[p] = util::PreDefinedValues<ValueT>::InvalidValue;
+                d[p] = util::PreDefinedValues<ValueT>::MaxValue;
             },
             k * num_points, target, this->stream));
  
-      int k_ = k;
-      GUARD_CU(offsets.EnsureSize_(num_points+1, target));
-      GUARD_CU(offsets.ForAll(
-        [k_] __host__ __device__ (SizeT *ro, const SizeT &pos){
-            ro[pos] = pos*k_;
-        }, num_points+1, target, this->stream));
+      GUARD_CU(sem.EnsureSize_(num_points, target));
+      GUARD_CU(sem.ForAll(
+            [] __host__ __device__(int* d, const SizeT &p) { 
+                d[p] = 0;
+            },
+            num_points, target, this->stream));
+
+      //int k_ = k;
 
       GUARD_CU(util::SetDevice(this->gpu_idx));
       GUARD_CU(points.SetPointer(h_points, num_points*dim, util::HOST));
@@ -222,6 +191,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   SizeT k;
   SizeT num_points;
   SizeT dim;
+  bool transpose;
+  bool use_shared_mem;
+  
+  int num_threads;
+  int block_size;
+  int grid_size;
+
+  int data_size;
+  int points_size;
+  int dist_size;
+  int keys_size;
+  int shared_point_size;
+  int shared_mem_size;
 
   // ----------------------------------------------------------------
   // Problem Methods
@@ -302,6 +284,51 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     this->k = this->parameters.template Get<SizeT>("k");
     this->num_points = this->parameters.template Get<SizeT>("n");
     this->dim = this->parameters.template Get<SizeT>("dim");
+    this->transpose = this->parameters.template Get <bool>("transpose");
+
+    int use_shared_mem = this->parameters.template Get <bool>("use-shared-mem");
+    int num_threads = this->parameters.template Get <int>("NUM-THREADS");
+
+    if (num_threads == 0) num_threads = 128;
+    int block_size = (num_points < num_threads ? num_points : num_threads);
+
+    int data_size = sizeof(ValueT);
+    printf("data_size = %d\n", data_size);
+    int points_size =  ((((block_size + 1) * dim * data_size) + 127)/128) * 128;
+    int dist_size =    ((((block_size + 1) * k * data_size) + 127)/128) * 128;
+    int keys_size =    ((((block_size + 1) * k * sizeof(int)) + 127)/128) * 128;
+    int shared_point_size = dim * data_size;
+    int shared_mem_size = points_size + dist_size + keys_size + shared_point_size;
+
+    if (use_shared_mem){
+        auto dev = this->parameters.template Get <int>("device");
+        cudaDeviceProp deviceProp;
+        cudaGetDeviceProperties(&deviceProp, dev);
+        while (shared_mem_size > deviceProp.sharedMemPerBlock){
+            block_size -= 32;
+            points_size =  (((block_size + 1) * dim * data_size + 127)/128) * 128;
+            dist_size =    (((block_size + 1) * k * data_size + 127)/128) * 128;
+            keys_size =    (((block_size + 1) * k * sizeof(int) + 127)/128) * 128;
+            shared_point_size = dim * data_size;
+            shared_mem_size = points_size + dist_size + keys_size + shared_point_size;
+        }
+        if (block_size == 0){
+            use_shared_mem = false;
+            block_size = 128;
+        }
+    }
+    int grid_size = 65536/block_size;
+
+    this->use_shared_mem = use_shared_mem;
+    this->num_threads = num_threads;
+    this->block_size = block_size;
+    this->grid_size = grid_size;
+    this->data_size = data_size;
+    this->points_size = points_size;
+    this->dist_size = dist_size;
+    this->keys_size = keys_size;
+    this->shared_point_size = shared_point_size;
+    this->shared_mem_size = shared_mem_size;
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");

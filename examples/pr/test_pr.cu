@@ -47,6 +47,7 @@ struct main_struct {
     cudaError_t retval = cudaSuccess;
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
+    std::string validation = parameters.Get<std::string>("validation");
 
     util::CpuTimer cpu_timer;
     GraphT graph;  // graph we process on
@@ -76,13 +77,19 @@ struct main_struct {
                                         "max-iter", "pull"};
       GUARD_CU(app::Switch_Parameters(
           parameters, graph, switches,
-          [quick, quiet](util::Parameters &parameters, GraphT &graph) {
+          [quick, quiet, validation](util::Parameters &parameters, GraphT &graph) {
             cudaError_t retval = cudaSuccess;
             GUARD_CU(app::Set_Srcs(parameters, graph));
             ValueT **ref_ranks = NULL;
             VertexT **ref_vertices = NULL;
             int num_srcs = 0;
 
+            
+            if (quick && (parameters.UseDefault("validation") == false && validation != "none")) {
+              util::PrintMsg("Invalid options --quick and --validation=" + validation +
+                             ", no CPU reference result to validate");
+              return retval;
+	    } 
             // compute reference CPU SSSP solution for source-distance
             if (!quick) {
               util::PrintMsg("Computing reference value ...", !quiet);

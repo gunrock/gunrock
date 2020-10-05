@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OPTION[0]="--max-iter=100 --tol=0.000001"
+OPTION[0]="--hits-max-iter=1000 --hits-term-tol=0.000001"
 
 MARK[0]=""
 

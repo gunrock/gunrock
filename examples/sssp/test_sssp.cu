@@ -64,10 +64,15 @@ struct main_struct {
     ValueT **ref_distances = NULL;
     int num_srcs = 0;
     bool quick = parameters.Get<bool>("quick");
+    std::string validation = parameters.Get<std::string>("validation");
+    if (quick && (parameters.UseDefault("validation") == false && validation != "none")) {
+      util::PrintMsg("Invalid options --quick and --validation=" + validation +
+		     ", no CPU reference result to validate");
+      return retval;
+    }
     // compute reference CPU SSSP solution for source-distance
     if (!quick) {
-      bool quiet = parameters.Get<bool>("quiet");
-      std::string validation = parameters.Get<std::string>("validation");
+      bool quiet = parameters.Get<bool>("quiet"); 
       util::PrintMsg("Computing reference value ...", !quiet);
       std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT> >("srcs");
       num_srcs = srcs.size();

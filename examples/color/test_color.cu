@@ -56,11 +56,17 @@ struct main_struct {
     VertexT *ref_colors = NULL;
 
     bool quick = parameters.Get<bool>("quick");
+    std::string validation = parameters.Get<std::string>("validation");
+
+    if (quick && (parameters.UseDefault("validation") == false && validation != "none")) {
+      util::PrintMsg("Invalid options --quick and --validation=" + validation +
+                     ", no CPU reference result to validate");
+      return retval;
+    }
 
     // compute reference CPU coloring
     if (!quick) {
       bool quiet = parameters.Get<bool>("quiet");
-      std::string validation = parameters.Get<std::string>("validation");
       util::PrintMsg("Computing reference value ...", !quiet);
 
       // problem specific data:

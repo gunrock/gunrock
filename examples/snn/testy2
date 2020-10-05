@@ -1,4 +1,0 @@
-./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n15/delaunay_n15.mtx --k=4 --eps=1 --min-pts=2 
-./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n16/delaunay_n16.mtx --k=4 --eps=1 --min-pts=2
-./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n17/delaunay_n17.mtx --k=4 --eps=1 --min-pts=2
-./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n18/delaunay_n18.mtx --k=4 --eps=1 --min-pts=2

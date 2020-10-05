@@ -31,19 +31,30 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
   GUARD_CU(gunrock::app::UseParameters_problem(parameters));
 
   GUARD_CU(parameters.Use<int64_t>(
-      "max-iter",
+      "hits-max-iter",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      100, "Number of HITS iterations.", __FILE__, __LINE__));
+      10000, "Number of HITS iterations.", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<int64_t>(
-      "normalize-n",
+      "hits-norm",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      HITS_NORMALIZATION_METHOD_1, "Normalization method. 1 = normalize by the sum of absolute values (1-Norm, default), 2 = normalize by the square root of the sum of squares (2-Norm).", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.Use<int64_t>(
+      "hits-normalize-n",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER, 1,
-      "Normalize HITS scores every N iterations.", __FILE__, __LINE__));
+      "Normalize HITS scores and check for convergence every N iterations.", __FILE__, __LINE__));
 
   GUARD_CU(parameters.Use<double>(
-      "tol",
+      "hits-compare-tol",
       util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
       1e-6, "Floating-point tolerance for CPU/GPU rank comparison.", __FILE__,
+      __LINE__));
+
+  GUARD_CU(parameters.Use<double>(
+      "hits-term-tol",
+      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
+      1e-6, "Tolerance for HITS algorithm convergence.", __FILE__,
       __LINE__));
 
   return retval;
@@ -83,12 +94,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         cub_temp_space;  // Temporary space for normalization addition
     util::Array1D<SizeT, ValueT> hrank_mag;
     util::Array1D<SizeT, ValueT> arank_mag;
+
+    util::Array1D<SizeT, ValueT> cur_error; // Current iteration error
+
     SizeT max_iter;     // Maximum number of HITS iterations to perform
+
+    SizeT hits_norm;    // Normalization method
+    ValueT hits_tol;    // Termination tolerance
     SizeT normalize_n;  // Normalize every N iterations
     /*
      * @brief Default constructor
      */
-    DataSlice() : BaseDataSlice(), max_iter(0), normalize_n(0) {
+    DataSlice() : BaseDataSlice(), max_iter(0), hits_norm(HITS_NORMALIZATION_METHOD_1), hits_tol(1e-6), normalize_n(0) {
       // Name of the problem specific arrays:
       hrank_curr.SetName("hrank_curr");
       arank_curr.SetName("arank_curr");
@@ -97,6 +114,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       cub_temp_space.SetName("cub_temp_space");
       hrank_mag.SetName("hrank_mag");
       arank_mag.SetName("arank_mag");
+      cur_error.SetName("cur_error");
     }
 
     /*
@@ -121,6 +139,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(cub_temp_space.Release(target));
       GUARD_CU(hrank_mag.Release(target));
       GUARD_CU(arank_mag.Release(target));
+      GUARD_CU(cur_error.Release(target));
       GUARD_CU(BaseDataSlice ::Release(target));
       return retval;
     }
@@ -133,13 +152,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * @param[in] flag        Problem flag containling options
      * \return    cudaError_t Error message(s), if any
      */
-    cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,
-                     util::Location target, ProblemFlag flag) {
+    cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,  util::Location allocated_on, util::Location target, ProblemFlag flag) {
       cudaError_t retval = cudaSuccess;
 
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
       // Allocate problem specific data here
 
+      // TODO: Don't need to allocate space if we already have space on the GPU?
       GUARD_CU(hrank_curr.Allocate(sub_graph.nodes, target));
       GUARD_CU(arank_curr.Allocate(sub_graph.nodes, target));
       GUARD_CU(hrank_next.Allocate(sub_graph.nodes, target));
@@ -149,7 +168,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(hrank_mag.Allocate(1, target | util::HOST));
       GUARD_CU(arank_mag.Allocate(1, target | util::HOST));
 
-      if (target & util::DEVICE) {
+      GUARD_CU(cur_error.Allocate(1, target | util::HOST));
+
+      // TODO: only call this if the csr matrix is already on the host. Not needed if allocated_on == GPU
+      if (allocated_on == util::HOST && (target & util::DEVICE)) {
         GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
       }
       return retval;
@@ -165,7 +187,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       SizeT nodes = this->sub_graph->nodes;
 
       // Ensure data are allocated
-
+      // TODO again, don't need to do allocation here if it's on the GPU
       GUARD_CU(hrank_curr.EnsureSize_(nodes, target));
       GUARD_CU(arank_curr.EnsureSize_(nodes, target));
       GUARD_CU(hrank_next.EnsureSize_(nodes, target));
@@ -174,17 +196,19 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(cub_temp_space.EnsureSize_(1, target));
       GUARD_CU(hrank_mag.EnsureSize_(1, target));
       GUARD_CU(arank_mag.EnsureSize_(1, target));
+      GUARD_CU(cur_error.EnsureSize_(1, target));
 
       // Reset data
 
-      // Initialize current hrank and arank to 1.
-      // Initialize next ranks to 0 (will be updated).
+      // Initialize current hrank and arank to 1/nodes to match the NetworkX
+      // implementation's default values.
+      // Initialize next ranks to 0 (will be updated by the algorithm).
       GUARD_CU(hrank_curr.ForEach(
-          [] __host__ __device__(ValueT & x) { x = (ValueT)1.0; }, nodes,
+          [nodes] __host__ __device__(ValueT & x) { x = (ValueT)1.0/(ValueT)nodes; }, nodes,
           target, this->stream));
 
       GUARD_CU(arank_curr.ForEach(
-          [] __host__ __device__(ValueT & x) { x = (ValueT)1.0; }, nodes,
+          [nodes] __host__ __device__(ValueT & x) { x = (ValueT)1.0/(ValueT)nodes; }, nodes,
           target, this->stream));
 
       GUARD_CU(hrank_next.ForEach(
@@ -202,6 +226,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(arank_mag.ForEach(
           [] __host__ __device__(ValueT & x) { x = (ValueT)0.0; }, 1, target,
           this->stream));
+
+      GUARD_CU(cur_error.ForEach(
+        [] __host__ __device__(ValueT & x) { x = (ValueT)0.0; }, 1, target,
+        this->stream));
 
       return retval;
     }
@@ -248,44 +276,50 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @brief Copy result distancess computed on GPUs back to host-side arrays.
    * @param[in] h_hrank_curr The host memory to extract hub scores to
    * @param[in] h_arank_curr The host memory to extract auth scores to
-   * @param[in] target       The location to copy memory from
+   * @param[in] target       Where the results are computed
+   * @param[in] device       Where the results are stored
    * \return     cudaError_t Error message(s), if any
    */
   cudaError_t Extract(ValueT *h_hrank_curr, ValueT *h_arank_curr,
-                      util::Location target = util::DEVICE) {
+                      util::Location target = util::DEVICE,
+                      util::Location device = util::HOST) {
     cudaError_t retval = cudaSuccess;
+
     SizeT nodes = this->org_graph->nodes;
 
     if (this->num_gpus == 1) {
       auto &data_slice = data_slices[0][0];
 
-      // Set device
-      if (target == util::DEVICE) {
-        GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+      if(device == util::HOST) { // Store on the CPU
+        if (target == util::HOST) { // Compute on the CPU
+          // Not yet implemented
+        } else if (target == util::DEVICE) { // Compute on the GPU
+          GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-        // Extract the results from a single GPU
-        GUARD_CU(
-            data_slice.hrank_curr.SetPointer(h_hrank_curr, nodes, util::HOST));
-        GUARD_CU(data_slice.hrank_curr.Move(util::DEVICE, util::HOST));
+          // Extract the results from a single GPU
+          GUARD_CU(
+              data_slice.hrank_curr.SetPointer(h_hrank_curr, nodes, util::HOST));
+          GUARD_CU(data_slice.hrank_curr.Move(util::DEVICE, util::HOST));
+  
+          GUARD_CU(
+              data_slice.arank_curr.SetPointer(h_arank_curr, nodes, util::HOST));
+          GUARD_CU(data_slice.arank_curr.Move(util::DEVICE, util::HOST));
+        } else { // Unsupported option
+          assert(false);
+        }
+      } else if (device == util::DEVICE) { // Store on the GPU
+        if (target == util::HOST) { // Compute on the CPU
+          // Not yet implemented
+        } else if (target == util::DEVICE) { // Compute on the GPU
+          GUARD_CU(cudaMemcpy(h_hrank_curr, data_slice.hrank_curr.GetPointer(util::DEVICE), nodes * sizeof(ValueT), cudaMemcpyDeviceToDevice));
 
-        GUARD_CU(
-            data_slice.arank_curr.SetPointer(h_arank_curr, nodes, util::HOST));
-        GUARD_CU(data_slice.arank_curr.Move(util::DEVICE, util::HOST));
-      } else if (target == util::HOST) {
-        // Extract the results from single CPU, e.g.:
-        GUARD_CU(data_slice.hrank_curr.ForEach(
-            h_hrank_curr,
-            [] __host__ __device__(const ValueT &device_val, ValueT &host_val) {
-              host_val = device_val;
-            },
-            nodes, util::HOST));
+          GUARD_CU(cudaMemcpy(h_arank_curr, data_slice.arank_curr.GetPointer(util::DEVICE), nodes * sizeof(ValueT), cudaMemcpyDeviceToDevice));
 
-        GUARD_CU(data_slice.arank_curr.ForEach(
-            h_arank_curr,
-            [] __host__ __device__(const ValueT &device_val, ValueT &host_val) {
-              host_val = device_val;
-            },
-            nodes, util::HOST));
+        } else { // Unsupported option
+          assert(false);
+        }
+      } else { // Unsupported option
+        assert(false);
       }
     } else {  // Incomplete multi-gpu
     }
@@ -299,7 +333,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @param[in] Location    Memory location to work on
    * \return    cudaError_t Error message(s), if any
    */
-  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE) {
+  cudaError_t Init(GraphT &graph, util::Location allocated_on = util::HOST, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
@@ -311,13 +345,15 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
       auto &data_slice = data_slices[gpu][0];
 
-      data_slice.max_iter = this->parameters.template Get<SizeT>("max-iter");
+      data_slice.max_iter = this->parameters.template Get<SizeT>("hits-max-iter");
+      data_slice.hits_norm = this->parameters.template Get<SizeT>("hits-norm");
+      data_slice.hits_tol = this->parameters.template Get<ValueT>("hits-term-tol");
 
       data_slice.normalize_n =
-          this->parameters.template Get<SizeT>("normalize-n");
+          this->parameters.template Get<SizeT>("hits-normalize-n");
 
       GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
-                               this->gpu_idx[gpu], target, this->flag));
+                               this->gpu_idx[gpu], allocated_on, target, this->flag));
     }
 
     return retval;
@@ -335,7 +371,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       GUARD_CU(data_slices[gpu]->Reset(target));
-      GUARD_CU(data_slices[gpu].Move(util::HOST, target));
+      GUARD_CU(data_slices[gpu].Move(util::HOST, target)); // TODO: Only perform this move if data is not already on the GPU
     }
 
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
