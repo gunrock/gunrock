@@ -9,7 +9,7 @@
  *
  */
 
-#include <gunrock/framework/problem.hxx>
+#include <gunrock/framework/framework.hxx>
 
 #pragma once
 
@@ -18,12 +18,31 @@ namespace sssp {
 
 template <typename graph_type>
 struct sssp_problem_t : problem_t<graph_type> {
-  typename graph_type::vertex_type single_source;
+  // Get useful types from graph_type
+  using vertex_t = typename graph_type::vertex_type;
+  using weight_pointer_t = typename graph_type::weight_pointer_t;
+  using vertex_pointer_t = typename graph_type::vertex_pointer_t;
 
-  typename graph_type::weight_pointer_t distances;
-  typename graph_type::vertex_pointer_t predecessors;
+  vertex_t single_source;
+  weight_pointer_t distances;
+  vertex_pointer_t predecessors;
 
-  sssp_problem_t() {}
+  /**
+   * @brief Construct a new sssp problem t object
+   *
+   * @param _G  input graph
+   * @param _source input single source for sssp
+   * @param _distances output distance pointer
+   * @param _predecessors output predecessors pointer
+   */
+  sssp_problem_t(graph_type& _G,
+                 vertex_t& _source,
+                 weight_pointer_t _distances,
+                 vertex_pointer_t _predecessors)
+      : problem_t<graph_type>(_G),
+        single_source(_source),
+        distances(_distances),
+        predecessors(_predecessors) {}
 
   sssp_problem_t(const sssp_problem_t& rhs) = delete;
   sssp_problem_t& operator=(const sssp_problem_t& rhs) = delete;
