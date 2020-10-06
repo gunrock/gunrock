@@ -11,6 +11,9 @@
 
 #include <vector>
 
+#include <gunrock/cuda/cuda.hxx>
+#include <gunrock/util/timer.hxx>
+
 #include <gunrock/framework/frontier.hxx>
 #include <gunrock/framework/problem.hxx>
 
@@ -18,13 +21,15 @@
 
 namespace gunrock {
 
-template <typename problem_type>
+template <typename algorithm_problem_t>
 struct enactor_t {
-  using vertex_t = typename problem_type::graph_type::vertex_type;
+  using vertex_t = typename algorithm_problem_t::graph_type::vertex_type;
 
-  context_t context;
-  std::shared_ptr<problem_type> problem;
-
+  cuda::multi_context_t context;
+  // XXX: needs to be a vector to support multi-gpu timer or we can move this
+  // within the actual context.
+  util::timer_t timer;
+  std::shared_ptr<algorithm_problem_t> problem;
   std::vector<std::shared_ptr<frontier_t<vertex_t>>> frontiers;
 
   // Disable copy ctor and assignment operator.
@@ -32,7 +37,8 @@ struct enactor_t {
   enactor_t(const enactor_t& rhs) = delete;
   enactor_t& operator=(const enactor_t& rhs) = delete;
 
-  enactor_t(std::shared_ptr<problem_type> problem, context_t& context)
+  enactor_t(std::shared_ptr<algorithm_problem_t> problem,
+            cuda::multi_context_t& context)
       : problem(problem), context(context) {}
 
   /**
@@ -40,15 +46,15 @@ struct enactor_t {
    *
    * @note We can work on evolving this into a multi-gpu implementation.
    *
-   * @tparam algorithm_problem_t
-   * @param problem
-   * @param context
-   * @return float
+   * @return float time took for enactor to complete.
    */
-  float enact(std::shared_ptr<problem_type> problem, context_t& context) {
-    while (!is_converged()) {
-      loop(problem, context);
+  float enact() {
+    auto single_context = context.get_context(0);
+    timer.begin();
+    while (!is_converged(single_context)) {
+      loop(problem, single_context);
     }
+    return timer.end();
   }
 
   /**
@@ -61,7 +67,7 @@ struct enactor_t {
    *
    * @param context
    */
-  virtual void loop(context_t& context) = 0;
+  virtual void loop(cuda::standard_context_t& context) = 0;
 
   /**
    * @brief Algorithm is converged if true is returned, keep on iterating if
@@ -71,7 +77,9 @@ struct enactor_t {
    * @return true
    * @return false
    */
-  virtual bool is_converged(context_t& context) { return frontier.empty(); }
+  virtual bool is_converged(cuda::standard_context_t& context) {
+    return frontiers.empty();
+  }
 
 };  // struct enactor_t
 

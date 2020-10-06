@@ -20,7 +20,9 @@
 #include <gunrock/graph/graph.hxx>
 
 namespace gunrock {
-namespace frontier {
+
+// Maybe we use for frontier related function
+namespace frontier {}  // namespace frontier
 
 enum frontier_type_t {
   edge_frontier,
@@ -56,12 +58,7 @@ class frontier_t {
   // templated over over copy
   template <typename device_vector_t>
   void load(device_vector_t& v) {
-    copy::device(_data, v.data(), v.size());
-    set_frontier_size(v.size());
-  }
-
-  void load(std::vector<type_t>& v) {
-    copy::device(_data, v.data(), v.size());
+    // memory::copy::device(_data, v.data(), v.size());
     set_frontier_size(v.size());
   }
 
@@ -76,6 +73,8 @@ class frontier_t {
 
   pointer_type_t data() const { return _data; }
 
+  bool empty() const { return (get_frontier_size() == 0); }
+
  protected:
   void set_frontier_size(std::size_t const& s) { _size = s; }
 
@@ -86,5 +85,4 @@ class frontier_t {
   pointer_type_t _data;
 };  // struct frontier_t
 
-}  // namespace frontier
 }  // namespace gunrock

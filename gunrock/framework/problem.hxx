@@ -28,6 +28,7 @@ struct problem_t {
   std::shared_ptr<graph_type> graph_slice;
 
   problem_t() : graph_slice(std::make_shared<graph_type>()) {}
+  problem_t(graph_type& G) : graph_type(std::make_shared<graph_type>(G)) {}
 
   // Disable copy ctor and assignment operator.
   // We do not want to let user copy only a slice.
