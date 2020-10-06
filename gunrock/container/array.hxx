@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <array>  // host-side array implementation
+
 // includes: thrust
 #include <thrust/device_vector.h>  // XXX: Replace with gunrock::vector<>
 
