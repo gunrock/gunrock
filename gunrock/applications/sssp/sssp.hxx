@@ -12,6 +12,8 @@
 #include <gunrock/framework/framework.hxx>
 
 #include <gunrock/util/timer.hxx>
+#include <gunrock/memory.hxx>
+
 #include <gunrock/applications/sssp/sssp_problem.hxx>
 #include <gunrock/applications/sssp/sssp_enactor.hxx>
 
@@ -20,7 +22,7 @@
 namespace gunrock {
 namespace sssp {
 
-template <memory_space_t space,
+template <memory::memory_space_t space,
           typename vertex_t,
           typename edge_t,
           typename weight_t>
@@ -40,11 +42,12 @@ double sssp(vertex_t number_of_vertices,
                                       column_indices,      // column indices
                                       edge_values);        // nonzero values
 
-  std::shared_ptr<sssp_problem_t> sssp_problem(
-      std::make_shared<sssp_problem_t>(G, source));
+  std::shared_ptr<sssp_problem_t<decltype(G)>> sssp_problem(
+      std::make_shared<sssp_problem_t<decltype(G)>>(G, source));
 
-  std::shared_ptr<sssp_enactor_t> sssp_enactor(
-      std::make_shared<sssp_enactor_t>(G, queue_sizing));
+  std::shared_ptr<sssp_enactor_t<decltype(*sssp_problem)>> sssp_enactor(
+      std::make_shared<sssp_enactor_t<decltype(*sssp_problem)>>(G,
+                                                                queue_sizing));
 
   timer_t timer;
   timer.start();

@@ -16,11 +16,12 @@
 namespace gunrock {
 namespace sssp {
 
-struct sssp_problem_t : problem_t {
-  vertex_t source;
+template <typename graph_type>
+struct sssp_problem_t : problem_t<graph_type> {
+  typename graph_type::vertex_type single_source;
 
-  weight_pointer_t distances;
-  vertex_pointer_t predecessors;
+  typename graph_type::weight_pointer_t distances;
+  typename graph_type::vertex_pointer_t predecessors;
 
   sssp_problem_t() {}
 

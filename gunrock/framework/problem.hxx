@@ -17,13 +17,13 @@ namespace gunrock {
 
 template <typename graph_type>
 struct problem_t {
-  using vertex_t = graph_type::vertex_type;
-  using edge_t = graph_type::edge_type;
-  using weight_t = graph_type::weight_type;
+  using vertex_t = typename graph_type::vertex_type;
+  using edge_t = typename graph_type::edge_type;
+  using weight_t = typename graph_type::weight_type;
 
-  using vertex_pointer_t = graph_type::vertex_pointer_t;
-  using edge_pointer_t = graph_type::edge_pointer_t;
-  using weight_pointer_t = graph_type::weight_pointer_t;
+  using vertex_pointer_t = typename graph_type::vertex_pointer_t;
+  using edge_pointer_t = typename graph_type::edge_pointer_t;
+  using weight_pointer_t = typename graph_type::weight_pointer_t;
 
   std::shared_ptr<graph_type> graph_slice;
 

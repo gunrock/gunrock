@@ -39,8 +39,7 @@ inline type_t* allocate(std::size_t size, memory_space_t space) {
   if (size) {
     error::error_t status = (device == space) ? cudaMalloc(&pointer, size)
                                               : cudaMallocHost(&pointer, size);
-    if (status != cudaSuccess)
-      throw error::exception_t(status);
+    error::throw_if_exception(status);
   }
 
   return reinterpret_cast<type_t*>(pointer);
@@ -62,8 +61,7 @@ inline void free(type_t* pointer, memory_space_t space) {
         (device == space)
             ? cudaFree((void*)pointer)
             : cudaFreeHost((void*)pointer);  // XXX: reinterpret_cast?
-    if (cudaSuccess != status)
-      throw error::exception_t(status);
+    error::throw_if_exception(status);
   }
 }
 

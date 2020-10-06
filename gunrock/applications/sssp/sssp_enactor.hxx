@@ -17,7 +17,8 @@
 namespace gunrock {
 namespace sssp {
 
-struct sssp_enactor_t : enactor_t {
+template <typename graph_type>
+struct sssp_enactor_t : enactor_t<graph_type> {
   /**
    * @brief This is the core of the implementation for SSSP algorithm. loops
    * till the convergence condition is met (see: is_converged()). Note that this
@@ -28,7 +29,12 @@ struct sssp_enactor_t : enactor_t {
    *
    * @param context
    */
-  void loop(context_t& context) {
+  template <typename algorithm_problem_t>
+  void loop(std::shared_ptr<algorithm_problem_t> problem, context_t& context) {
+    // Data slice
+    auto distances = problem->distances;
+    auto single_source = problem->single_source;
+
     /**
      * @brief Lambda operator to advance to neighboring vertices from the
      * source vertices in the frontier, and marking the vertex to stay in the

@@ -21,5 +21,11 @@ struct exception_t : std::exception {
   }
 };
 
+// wrapper to reduce lines of code
+void throw_if_exception(error_t status) {
+  if (status != cudaSuccess)
+    throw exception_t(status);
+}
+
 }  // namespace error
 }  // namespace gunrock

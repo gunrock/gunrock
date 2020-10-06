@@ -9,6 +9,8 @@
  *
  */
 
+#include <vector>
+
 #include <gunrock/framework/frontier.hxx>
 #include <gunrock/framework/problem.hxx>
 
@@ -16,18 +18,22 @@
 
 namespace gunrock {
 
+template <typename problem_type>
 struct enactor_t {
+  using vertex_t = typename problem_type::graph_type::vertex_type;
+
   context_t context;
-  std::vector <
-      std::shared_ptr<frontier_t<vertex_t, frontier_type_t::vertex_frontier>>
-          frontiers;
+  std::shared_ptr<problem_type> problem;
+
+  std::vector<std::shared_ptr<frontier_t<vertex_t>>> frontiers;
 
   // Disable copy ctor and assignment operator.
   // We don't want to let the user copy only a slice.
   enactor_t(const enactor_t& rhs) = delete;
   enactor_t& operator=(const enactor_t& rhs) = delete;
 
-  enactor_t(context_t& context) : context(context) {}
+  enactor_t(std::shared_ptr<problem_type> problem, context_t& context)
+      : problem(problem), context(context) {}
 
   /**
    * @brief Run the enactor with the given problem and the loop.
@@ -39,9 +45,7 @@ struct enactor_t {
    * @param context
    * @return float
    */
-  template <typename algorithm_problem_t>
-  float enact(std::shared_ptr<algorithm_problem_t> problem,
-              context_t& context) {
+  float enact(std::shared_ptr<problem_type> problem, context_t& context) {
     while (!is_converged()) {
       loop(problem, context);
     }
@@ -57,9 +61,7 @@ struct enactor_t {
    *
    * @param context
    */
-  template <typename algorithm_problem_t>
-  virtual void loop(std::shared_ptr<algorithm_problem_t> problem,
-                    context_t& context){} = 0;
+  virtual void loop(context_t& context) = 0;
 
   /**
    * @brief Algorithm is converged if true is returned, keep on iterating if
@@ -69,11 +71,7 @@ struct enactor_t {
    * @return true
    * @return false
    */
-  template <typename algorithm_problem_t>
-  virtual bool is_converged(std::shared_ptr<algorithm_problem_t> problem,
-                            context_t& context) {
-    return frontier.empty();
-  }
+  virtual bool is_converged(context_t& context) { return frontier.empty(); }
 
 };  // struct enactor_t
 
