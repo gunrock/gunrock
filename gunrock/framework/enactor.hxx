@@ -52,7 +52,7 @@ struct enactor_t {
     auto single_context = context.get_context(0);
     timer.begin();
     while (!is_converged(single_context)) {
-      loop(problem, single_context);
+      loop(single_context);
     }
     return timer.end();
   }
