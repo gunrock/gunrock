@@ -8,8 +8,13 @@
  * @copyright Copyright (c) 2020
  *
  */
-
 #pragma once
+
+#include <gunrock/error.hxx>
+#include <gunrock/cuda/cuda.hxx>
+
+#include <gunrock/container/array.hxx>
+#include <gunrock/container/vector.hxx>
 
 namespace gunrock {
 namespace cuda {
@@ -22,10 +27,11 @@ struct context_t {
 
   // Disable copy ctor and assignment operator. We don't want to let the
   // user copy only a slice.
-  context_t(const context_t& rhs) = delete;
-  context_t& operator=(const context_t& rhs) = delete;
+  // context_t(const context_t& rhs) = delete;
+  // context_t& operator=(const context_t& rhs) = delete;
 
   virtual const cuda::device_properties_t& props() const = 0;
+  virtual void print_properties() = 0;
   virtual int ptx_version() const = 0;
   virtual cuda::stream_t stream() = 0;
 
@@ -48,7 +54,7 @@ class standard_context_t : public context_t {
   template <int dummy_arg = 0>
   void init() {
     cuda::function_attributes_t attr;
-    cuda::error_t status = cudaFuncGetAttributes(&attr, dummy_k<0>);
+    error::error_t status = cudaFuncGetAttributes(&attr, dummy_k<0>);
     error::throw_if_exception(status);
     _ptx_version = attr.ptxVersion;
 
@@ -69,13 +75,19 @@ class standard_context_t : public context_t {
   virtual const cuda::device_properties_t& props() const override {
     return _props;
   }
+
+  virtual void print_properties() override {
+    cuda::device::set(_ordinal);
+    cuda::properties::print(_props);
+  }
+
   virtual cuda::architecture_t ptx_version() const override {
     return _ptx_version;
   }
   virtual cuda::stream_t stream() override { return _stream; }
 
   virtual void synchronize() override {
-    cuda::error_t status =
+    error::error_t status =
         _stream ? cudaStreamSynchronize(_stream) : cudaDeviceSynchronize();
     error::throw_if_exception(status);
   }
@@ -83,7 +95,25 @@ class standard_context_t : public context_t {
   virtual cuda::event_t event() { return _event; }
 };  // class standard_context_t
 
-class multi_context_t {};  // class multi_context_t
+class multi_context_t {
+ public:
+  thrust::host_vector<standard_context_t> contexts;
+  thrust::host_vector<cuda::device_id_t> devices;
+  static constexpr std::size_t MAX_NUMBER_OF_GPUS = 1024;
+
+  multi_context_t(thrust::host_vector<cuda::device_id_t> _devices)
+      : devices(_devices) {
+    for (auto& device : _devices) {
+      standard_context_t context(device);
+      contexts.push_back(context);
+    }
+  }
+
+  auto get_context(cuda::device_id_t device) {
+    auto contexts_ptr = contexts.data();
+    return contexts_ptr[device];
+  }
+};  // class multi_context_t
 
 }  // namespace cuda
 }  // namespace gunrock

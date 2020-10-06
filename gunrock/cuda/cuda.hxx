@@ -12,11 +12,12 @@
 #pragma once
 
 namespace gunrock {
-namespace cuda {
-typedef cudaStream_t stream_t;
-
-}  // namespace cuda
+namespace cuda {}  // namespace cuda
 }  // namespace gunrock
 
+#include <gunrock/cuda/device.hxx>
+#include <gunrock/cuda/function.hxx>
+#include <gunrock/cuda/stream_management.hxx>
+#include <gunrock/cuda/event_management.hxx>
 #include <gunrock/cuda/device_properties.hxx>
 #include <gunrock/cuda/context.hxx>
