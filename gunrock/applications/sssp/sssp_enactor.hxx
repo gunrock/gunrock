@@ -19,17 +19,16 @@ namespace sssp {
 
 struct sssp_enactor_t : enactor_t {
   /**
-   * @brief This is the core of the implementation for SSSP algorithm. Enact
-   * loops till the convergence condition is met (see: is_converged()).
-   * Note that this function is on the host and is timed, so make sure you are
-   * writing the most efficient implementation possible. Avoid performing copies
-   * in this function or running API calls that are incredibly slow (such as
-   * printfs), unless they are part of your algorithms' implementation.
+   * @brief This is the core of the implementation for SSSP algorithm. loops
+   * till the convergence condition is met (see: is_converged()). Note that this
+   * function is on the host and is timed, so make sure you are writing the most
+   * efficient implementation possible. Avoid performing copies in this function
+   * or running API calls that are incredibly slow (such as printfs), unless
+   * they are part of your algorithms' implementation.
    *
-   * @param sssp_problem
    * @param context
    */
-  void enact(std::shared_ptr<sssp_problem_t> sssp_problem, context_t& context) {
+  void loop(context_t& context) {
     /**
      * @brief Lambda operator to advance to neighboring vertices from the
      * source vertices in the frontier, and marking the vertex to stay in the
@@ -50,9 +49,9 @@ struct sssp_enactor_t : enactor_t {
           math::min::atomic(distances[neighbor], distance_to_neighbor);
 
       if (distance_to_neighbor < recover_distance)
-        frontier::mark_for_keep();
+        frontier::mark_to_keep(source);
 
-      frontier::mark_for_removal();
+      frontier::mark_for_removal(source);
     };
 
     /**
@@ -63,8 +62,8 @@ struct sssp_enactor_t : enactor_t {
     auto remove_completed_paths =
         [] __host__ __device__(vertex_t const& vertex) -> bool {
       if (!frontier::marked_for_removal(vertex))
-        frontier::remove_from_frontier();
-      frontier::keep_in_frontier();
+        frontier::remove_from_frontier(vertex);
+      frontier::keep_in_frontier(vertex);
     };
 
     // Execute advance operator on the provided lambda
@@ -75,15 +74,7 @@ struct sssp_enactor_t : enactor_t {
     operator ::filter::execute(G, frontier, remove_completed_paths);
   }
 
-  /**
-   * @brief Algorithm is converged if true is returned, keep on iterating if
-   * false is returned. This function is checked at the end of every iteration
-   * of the enact().
-   *
-   * @return true
-   * @return false
-   */
-  bool is_converged() {}
+  sssp_enactor_t(context_t& context) : enactor_t(context) {}
 
   sssp_enactor_t(const sssp_enactor_t& rhs) = delete;
   sssp_enactor_t& operator=(const sssp_enactor_t& rhs) = delete;
