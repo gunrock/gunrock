@@ -28,7 +28,9 @@ struct timer_t {
     cudaEventDestroy(stop_);
   }
 
+  // Alias of each other, start the timer.
   void begin() { cudaEventRecord(start_); }
+  void start() { this->begin(); }
 
   float end() {
     cudaEventRecord(stop_);

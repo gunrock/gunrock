@@ -7,7 +7,6 @@
 #pragma once
 
 namespace gunrock {
-namespace util {
 
 /**
  * @namespace math
@@ -28,16 +27,25 @@ constexpr int log2(int n) {
 namespace atomic {
 
 template <typename type_t>
-__host__ __device__ __forceinline__ static type_t add(type_t* address,
-                                                      type_t value) {
+__host__ __device__ __forceinline__ type_t add(type_t* address,
+                                               const type_t& value) {
 #ifdef __CUDA_ARCH__
   return atomicAdd(address, value);
+#else
+  return std::plus<type_t>(*address, value);  // use std::atomic::fetch_add();
+#endif
+}
+
+template <typename type_t>
+__host__ __device__ __forceinline__ type_t min(type_t* address,
+                                               const type_t& value) {
+#ifdef __CUDA_ARCH__
+  return atomicMin(address, value);
+#else
+  return std::min<type_t>(*address, value);   // use std::atomic;
 #endif
 }
 
 }  // namespace atomic
-
 }  // namespace math
-
-}  // namespace util
 }  // namespace gunrock
