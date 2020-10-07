@@ -74,6 +74,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   // parse configurations from parameters
   bool quiet_mode = parameters.Get<bool>("quiet");
+  bool quick_mode = parameters.Get<bool>("quick");
   bool mark_pred = parameters.Get<bool>("mark-pred");
   int num_runs = parameters.Get<int>("num-runs");
   std::string validation = parameters.Get<std::string>("validation");
@@ -115,7 +116,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
             " ms, src = " + std::to_string(src) + ", #iterations = " +
             std::to_string(enactor.enactor_slices[0].enactor_stats.iteration),
         !quiet_mode);
-    if (validation == "each") {
+    if (!quick_mode && validation == "each") {
       GUARD_CU(problem.Extract(h_labels, h_preds));
       SizeT num_errors = app::bfs::Validate_Results(
           parameters, graph, src, h_labels, h_preds,
@@ -127,7 +128,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   cpu_timer.Start();
   // Copy out results
   GUARD_CU(problem.Extract(h_labels, h_preds));
-  if (validation == "last") {
+  if (!quick_mode && validation == "last") {
     SizeT num_errors = app::bfs::Validate_Results(
         parameters, graph, src, h_labels, h_preds,
         ref_labels == NULL ? NULL : ref_labels[(num_runs - 1) % num_srcs]);

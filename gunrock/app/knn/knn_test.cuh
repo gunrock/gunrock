@@ -19,7 +19,13 @@
 #include <vector>
 #include <algorithm>
 
-//#define debug(a...) printf(a)
+//#define KNN_TEST_DEBUG
+
+#ifdef KNN_TEST_DEBUG
+    #define debug(a...) printf(a)
+#else
+    #define debug(a...)
+#endif
 
 namespace gunrock {
 namespace app {
@@ -78,150 +84,252 @@ double CPU_Reference(util::Parameters &parameters,
         SizeT k,           // number of nearest neighbor
         SizeT *knns,       // knns
         bool quiet) {
+
     cudaError_t retval = cudaSuccess;
-
-    struct comp {
-        inline bool operator()(const ValueT &dist1, const ValueT &dist2) {
-            return (dist1 < dist2);
-        }
-    };
-
-    int num_threads = parameters.Get<int>("omp-threads");
-    #pragma omp parallel
-    {
-        if (num_threads == 0) num_threads = omp_get_num_threads();
-    }
-
-    util::PrintMsg("#threads = " + std::to_string(num_threads), !quiet);
 
     util::CpuTimer cpu_timer;
     cpu_timer.Start();
 
-    util::Array1D<SizeT, ValueT> distance;
-    util::Array1D<SizeT, SizeT>  keys;
-    
-    GUARD_CU(distance   .Allocate(n*n, util::DEVICE));
-    GUARD_CU(keys       .Allocate(n*n, util::DEVICE));
-
     GUARD_CU(points.Move(util::HOST, util::DEVICE, n*dim));
+    bool transpose = parameters.Get<bool>("transpose");
+
+    util::Array1D<SizeT, ValueT, util::UNIFIED> data;
+    GUARD_CU(data   .Allocate(n*dim, util::DEVICE));
+
+    GUARD_CU(data.ForAll(
+        [points] __host__ __device__ (ValueT *d, const SizeT &pos){
+            d[pos] = points[pos];
+        }, n*dim, util::DEVICE));
 
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
+    
+    int num_devices; // = 3;
+    cudaGetDeviceCount(&num_devices);
 
-    GUARD_CU(distance.ForAll(
-        [n, dim, points, keys, k] 
-        __host__ __device__ (ValueT* d, const SizeT &src){
-            auto pos = src / n;
-            auto i = src % n;
-            // auto dist = euclidean_distance(dim, points, pos, i);
-            ValueT dist = 0;
-            if (pos == i) {
-                dist = util::PreDefinedValues<ValueT>::MaxValue;
-            } else {
-                dist = euclidean_distance(dim, points, pos, i);
+    /*
+     ***************************************
+     *  [TODO] Consider boundary conditions*
+     ***************************************
+     */
+    int MAX_DATA = 2;
+    int CHUNK = MAX_DATA*num_devices;
+
+    cudaError_t retvals[CHUNK];
+    cudaStream_t stream[CHUNK];
+    cudaEvent_t  event[CHUNK];
+     
+    util::Array1D<SizeT, util::Array1D<SizeT, ValueT>> distance;
+    util::Array1D<SizeT, util::Array1D<SizeT, SizeT>>  keys;
+
+    GUARD_CU(distance   .Allocate(CHUNK, util::HOST));
+    GUARD_CU(keys       .Allocate(CHUNK, util::HOST));
+
+    // CUB Temporary arrays
+    util::Array1D<SizeT, util::Array1D<SizeT, ValueT>> cub_distance;
+    util::Array1D<SizeT, util::Array1D<SizeT, SizeT>>  cub_keys;
+
+    GUARD_CU(cub_distance   .Allocate(CHUNK, util::HOST));
+    GUARD_CU(cub_keys       .Allocate(CHUNK, util::HOST));
+    
+    util::Array1D<SizeT, util::Array1D<SizeT, SizeT>>  knns_d;
+    GUARD_CU(knns_d   .Allocate(n, util::HOST));
+
+    util::PrintMsg("Host Allocation done.");
+
+    for (int p = 0; p < ((n+(CHUNK-1))/CHUNK); p++) {
+        for (int dev = 0; dev < num_devices; dev++) {
+            GUARD_CU2(cudaSetDevice(dev), "cudaSetDevice failed.");
+            for(int d = 0; d < MAX_DATA; d++) {
+                auto jump = (p*CHUNK);
+                auto index =  jump + ((dev*MAX_DATA) + d);
+                if (index >= n) break;
+                GUARD_CU(knns_d[index]  .Allocate(k, util::HOST | util::DEVICE));
             }
-            d[src] = dist;
-            keys[src] = i;
-        },
-        n*n, util::DEVICE));
-
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
-
-    util::Array1D<uint64_t, char> temp_storage;
-    util::Array1D<SizeT, ValueT> distance_out;
-    util::Array1D<SizeT, SizeT>  keys_out;
-    util::Array1D<SizeT, SizeT>  offsets;
-    
-    GUARD_CU(distance_out   .Allocate(n*n, util::DEVICE));
-    GUARD_CU(keys_out       .Allocate(n*n, util::DEVICE));
-    GUARD_CU(offsets        .Allocate(n+1, util::DEVICE));
-
-    GUARD_CU(offsets.ForAll(
-        [n] __host__ __device__ (SizeT *ro, const SizeT &pos){
-            ro[pos] = pos*(n);
-        }, n+1, util::DEVICE));
-
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
-
-    // Sort all the distance using CUB
-    GUARD_CU(util::cubSegmentedSortPairs(temp_storage, 
-        distance, distance_out, keys, keys_out, n*n,
-        n, offsets));
-
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
-
-    keys.Release(util::DEVICE);
-    distance.Release(util::DEVICE);
-    distance_out.Release(util::DEVICE);
-
-    util::Array1D<SizeT, SizeT>  knns_d;
-    GUARD_CU(knns_d   .Allocate(n*k, util::DEVICE));
-
-    // Choose k nearest neighbors for each node
-    GUARD_CU(knns_d.ForAll(
-        [n, k, keys_out] 
-        __host__ __device__(SizeT* knns_, const SizeT &src){
-            auto pos = src / k;
-            auto i = src % k;
-            knns_[pos * k + i] = keys_out[pos * n + i];
-        },
-        n*k, util::DEVICE));
-
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
-
-    keys_out.Release(util::DEVICE);
-
-    knns_d.SetPointer(knns, n*k, util::HOST);
-    knns_d.Move(util::DEVICE, util::HOST);
-
-    // std::vector<std::map<SizeT, ValueT, comp>> distance0;
-    // distance0.resize(n);
-
-    // // CPU reference implementation
-    // #pragma omp parallel for num_threads(num_threads)
-    // for (SizeT p1 = 0; p1 < n; ++p1){
-    //     for (SizeT p2 = p1+1; p2 < n; ++p2){
-    //         ValueT d = euclidean_distance(dim, points, p1, p2);
-    //         distance0[p1][p2] = d;
-    //         distance0[p2][p1] = d;
-    //     }
-    // }
-    // debug("insertion to distance0 is done\n");
-    // #pragma omp barrier
-    
-    // std::vector<std::multimap<ValueT, SizeT, comp>> distance;
-    // distance.resize(n);
-    // #pragma omp parallel for num_threads(num_threads)
-    // for (SizeT p=0; p<n; ++p){
-    //     distance[p] = flip_map(distance0[p]);
-    // }
-    
-    // #pragma omp barrier
-    // debug("insertion to distance is done\n");
-   
-    // #pragma omp parallel for num_threads(num_threads)
-    // for (SizeT p = 0; p < n; ++p) {
-    //     int i = 0;
-    //     for (auto& dd :distance[p]){
-    //         knns[p * k + i] = dd.second;
-    //         ++i;
-    //         if (i == k)
-    //             break;
-    //     }
-    // }
-    // debug("insertion to knns is done\n");
-    // #pragma omp barrier
-    
-#ifdef KNN_DEBUG
-    //debug of knns
-    debug("nearest neighbors\n");
-    for (SizeT p = 0; p < n; ++p) {
-        debug("%d: ", (int)p);
-        for (SizeT i = 0; i < k; ++i){
-            debug("%.lf ", knns[p * k + i]);;
+            GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
         }
-        debug("\n");
     }
-#endif
+
+    util::PrintMsg("KNNs Allocation done.");
+
+    for(int dev = 0; dev < num_devices; dev++) {
+        GUARD_CU2(cudaSetDevice(dev), "cudaSetDevice failed.");
+
+        for(int peer = 0; peer < num_devices; peer++) {
+            int peer_access_avail = 0;
+            GUARD_CU2(cudaDeviceCanAccessPeer(&peer_access_avail, dev, peer),
+              "cudaDeviceCanAccessPeer failed");
+
+          if (peer_access_avail) {
+            GUARD_CU2(cudaDeviceEnablePeerAccess(peer, 0),
+                                   "cudaDeviceEnablePeerAccess failed");
+          }
+        }
+
+        for(int d = 0; d < MAX_DATA; d++) {
+            auto row = (dev*MAX_DATA) + d;
+            if (row >= CHUNK) break;
+            GUARD_CU2(cudaStreamCreateWithFlags(&stream[row], 
+                cudaStreamNonBlocking), "cudaStreamCreateWithFlags failed.");
+            GUARD_CU2(cudaEventCreate(&event[row]), 
+                "cudaEventCreate failed.");
+            GUARD_CU2(cudaEventRecord(event[row], stream[row]), 
+                "cudaEventRecord failed.");
+
+            GUARD_CU(distance[row]    .Allocate(n, util::DEVICE));
+            GUARD_CU(keys[row]        .Allocate(n, util::DEVICE));
+
+            GUARD_CU(cub_distance[row]    .Allocate(n, util::DEVICE));
+            GUARD_CU(cub_keys[row]        .Allocate(n, util::DEVICE));
+        }
+
+        GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
+    }
+
+    util::PrintMsg("Distance/Keys and Device management done.");
+   
+ 
+    // Find K nearest neighbors for each point in the dataset
+    // Can use multi-gpu to speed up the computation
+    for (SizeT m = 0; m < ((n+(CHUNK-1))/(CHUNK)); m++) {
+        //#pragma omp parallel for
+        for (int dev = 0; dev < num_devices; dev++) {
+            util::GRError(cudaSetDevice(dev), "cudaSetDevice failed.");
+           // #pragma omp parallel for
+            for(int x = 0; x < MAX_DATA; x++) {
+                auto row = (dev*MAX_DATA) + x;
+                auto v = (m*CHUNK) + row;
+                if (v < n && row < CHUNK){
+                    auto &error = retvals[row];
+                    auto &ith_distances = distance[row];
+                    auto &ith_keys = keys[row];
+
+                    // Calculate N distances for each point
+                    auto distance_op = [n, dim, data, ith_keys, ith_distances, row, v, transpose] 
+                        __host__ __device__ (const SizeT &i) {
+                            ValueT dist = 0;
+                            if (i == v) {
+                                dist = util::PreDefinedValues<ValueT>::MaxValue;
+                            } else {
+                                dist = euclidean_distance(dim, n, data.GetPointer(util::DEVICE), v, i, transpose);
+                            }
+                            ith_distances[i] = dist;
+                            ith_keys[i] = i;
+                        };
+
+                    error = oprtr::For(distance_op, n, util::DEVICE, stream[row]);
+
+                    error = util::GRError(cudaStreamSynchronize(stream[row]),
+                        "cudaStreamSynchronize failed", __FILE__, __LINE__);
+
+                    util::CUBRadixSort(true, n, 
+                            ith_distances.GetPointer(util::DEVICE),
+                            ith_keys.GetPointer(util::DEVICE), 
+                            cub_distance[row].GetPointer(util::DEVICE),
+                            cub_keys[row].GetPointer(util::DEVICE),
+                            (void*)NULL, (size_t)0, stream[row]);
+                            
+                    error = util::GRError(cudaStreamSynchronize(stream[row]),
+                        "cudaStreamSynchronize failed", __FILE__, __LINE__);
+
+                    // Choose k nearest neighbors for each node
+                    auto &ith_knns = knns_d[v];
+                    auto knns_op = [m, k, ith_knns, ith_keys, row, v]
+                        __host__ __device__ (const SizeT &i) {     
+                            ith_knns[i] = ith_keys[i];
+                        };
+                        
+                    error = oprtr::For(knns_op, k, util::DEVICE, stream[row]);
+
+                    error = util::GRError(cudaStreamSynchronize(stream[row]),
+                                "cudaStreamSynchronize failed", __FILE__, __LINE__);
+                }
+            }
+        }
+    }
+
+    util::PrintMsg("Main algroithm loop done.");
+
+    for (int dev = 0; dev < num_devices; dev++) {
+        util::GRError(cudaSetDevice(dev), "cudaSetDevice failed.");
+        retvals[dev] = util::GRError(cudaDeviceSynchronize(),
+                            "cudaDeviceSynchronize failed", __FILE__, __LINE__);
+    }
+
+    util::PrintMsg("Synchronized all GPUs.");
+
+    for (int p = 0; p < ((n+(CHUNK-1))/(CHUNK)); p++) {
+        for (int dev = 0; dev < num_devices; dev++) {
+            GUARD_CU2(cudaSetDevice(dev), "cudaSetDevice failed.");
+            for(int d = 0; d < MAX_DATA; d++) {
+                auto jump = (p*CHUNK);
+                auto index =  jump + ((dev*MAX_DATA) + d);
+                if (index >= n) break;
+                GUARD_CU(knns_d[index]  .Move(util::DEVICE, util::HOST));
+            }
+        }
+    }
+
+    for (int dev = 0; dev < num_devices; dev++) {
+        util::GRError(cudaSetDevice(dev), "cudaSetDevice failed.");
+        retvals[dev] = util::GRError(cudaDeviceSynchronize(),
+                            "cudaDeviceSynchronize failed", __FILE__, __LINE__);
+    }
+
+    util::PrintMsg("Moved KNNs from DEVICE to HOST.");
+
+    // #pragma omp parallel for
+    for (int t = 0; t < n; t++) {
+        for (int l = 0; l < k; l++) {
+            auto h_knns = knns_d[t].GetPointer(util::HOST);
+            knns[(t*k) + l] = h_knns[l];
+        }
+    }
+
+    util::PrintMsg("Copy KNNs device result to output KNNs array.");
+
+    // Clean-up
+    for (int dev = 0; dev < num_devices; dev++) {
+        GUARD_CU2(cudaSetDevice(dev), "cudaSetDevice failed.");
+        for(int x = 0; x < MAX_DATA; x++) {
+            auto row = (dev*MAX_DATA) + x;
+            if (row >= CHUNK) break;
+            GUARD_CU(keys[row].Release(util::DEVICE));
+            GUARD_CU(distance[row].Release(util::DEVICE));
+            
+            GUARD_CU(cub_keys[row].Release(util::DEVICE));
+            GUARD_CU(cub_distance[row].Release(util::DEVICE));
+
+            GUARD_CU2(cudaStreamDestroy(stream[row]), "cudaStreamDestroy failed.");
+        }
+
+        util::PrintMsg("Clean-up GPU Arrays:: keys, distance done.");
+    }
+
+    GUARD_CU(keys.Release(util::HOST));
+    GUARD_CU(distance.Release(util::HOST));
+    
+    GUARD_CU(cub_keys.Release(util::HOST));
+    GUARD_CU(cub_distance.Release(util::HOST));
+
+    util::PrintMsg("Clean-up CPU Arrays:: keys, distance done.");
+    
+    for (int p = 0; p < ((n+(CHUNK-1))/(CHUNK)); p++) {
+        for (int dev = 0; dev < num_devices; dev++) {
+            GUARD_CU2(cudaSetDevice(dev), "cudaSetDevice failed.");
+            for(int d = 0; d < MAX_DATA; d++) {
+                auto jump = (p*CHUNK);
+                auto index =  jump + ((dev*MAX_DATA) + d);
+                if (index >= n) break;
+                GUARD_CU(knns_d[index]  .Release(util::DEVICE | util::HOST));
+            }
+        }
+    }
+
+    util::PrintMsg("Clean-up CPU Arrays:: knns_d[*] done.");
+
+    GUARD_CU(knns_d  .Release(util::HOST));
+
+    util::PrintMsg("Clean-up done.");
 
     cpu_timer.Stop();
     float elapsed = cpu_timer.ElapsedMillis();
@@ -256,6 +364,7 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
   SizeT k = parameters.Get<SizeT>("k");
   SizeT num_points = parameters.Get<SizeT>("n");
   SizeT dim = parameters.Get<SizeT>("dim");
+  bool transpose = parameters.Get<bool>("transpose");
 
   if (quick) return num_errors;
 
@@ -264,14 +373,14 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
           SizeT w1 = h_knns[v * k + i];
           SizeT w2 = ref_knns[v * k + i];
           if (w1 != w2) {
-              ValueT dist1 = euclidean_distance(dim, points, v, w1);
-              ValueT dist2 = euclidean_distance(dim, points, v, w2);
+              ValueT dist1 = euclidean_distance(dim, num_points, points.GetPointer(util::HOST), v, w1, transpose);
+              ValueT dist2 = euclidean_distance(dim, num_points, points.GetPointer(util::HOST), v, w2, transpose);
               if (dist1 != dist2){
                   util::PrintMsg(
-                    "point::nearest-neighbor = [gpu]" + 
-                    std::to_string(v) + "::" + std::to_string(h_knns[v * k + i]) + 
-                    " !=  [cpu]" + 
-                    std::to_string(v) + "::" + std::to_string(ref_knns[v * k + i]), 
+                    "point::nearest-neighbor, gpu_knn(" + 
+                    std::to_string(v) + ")=" + std::to_string(h_knns[v * k + i]) + 
+                    " !=  cpu_knn(" + 
+                    std::to_string(v) + ")=" + std::to_string(ref_knns[v * k + i]), 
                     !quiet);
                   ++num_errors;
               }

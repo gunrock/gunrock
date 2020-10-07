@@ -85,7 +85,7 @@ else
 	METIS_LINK = -Xlinker -lmetis -Xcompiler -DMETIS_FOUND
 endif
 
-GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=1.1.0
+GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=1.2.0
 LINK = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
 INC = $(CUDA_INC) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(BOOST_INC) -I.. -I../.. $(LINK)
 
@@ -108,7 +108,7 @@ else
 	ARCH = -m64
 endif
 
-NVCCFLAGS = -lineinfo --std=c++11 --expt-extended-lambda -rdc=true #-ccbin=g++-4.8
+NVCCFLAGS = -lineinfo --std=c++14 --expt-extended-lambda -rdc=true #-ccbin=g++-4.8
 
 ifeq (WIN_NT, $(findstring WIN_NT, $(OSUPPER)))
 	NVCCFLAGS += -Xcompiler /bigobj -Xcompiler /Zm500

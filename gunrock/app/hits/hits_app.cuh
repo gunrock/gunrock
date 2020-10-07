@@ -38,7 +38,8 @@ cudaError_t UseParameters(ParametersT &parameters);
  * @tparam     ValueT        Type of the distances
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
-...
+ * @param[in]  ref_hrank     Vertex hub scores
+ * @param[in]  ref_arank     Vertex authority scores
  * @param[in]  target        where to perform the app
  * \return cudaError_t error message(s), if any
  */
@@ -59,7 +60,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   bool quiet_mode = parameters.Get<bool>("quiet");
   bool quick_mode = parameters.Get<bool>("quick");
   int num_runs = parameters.Get<int>("num-runs");
-  double tol = parameters.Get<double>("tol");
+  double compare_tol = parameters.Get<double>("hits-compare-tol");
   std::string validation = parameters.Get<std::string>("validation");
   util::Info info("HITS", parameters, graph);
 
@@ -74,7 +75,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
-  GUARD_CU(problem.Init(graph, target));
+  GUARD_CU(problem.Init(graph, gunrock::util::HOST, target));
   GUARD_CU(enactor.Init(problem, target));
 
   cpu_timer.Stop();
@@ -101,7 +102,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
     if (validation == "each") {
       GUARD_CU(problem.Extract(h_hrank, h_arank));
       SizeT num_errors = Validate_Results(parameters, graph, h_hrank, h_arank,
-                                          ref_hrank, ref_arank, false);
+                                          ref_hrank, ref_arank, compare_tol, false);
     }
   }
 
@@ -111,7 +112,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   if (validation == "last") {
     SizeT num_errors = Validate_Results(parameters, graph, h_hrank, h_arank,
-                                        ref_hrank, ref_arank, tol, false);
+                                        ref_hrank, ref_arank, compare_tol, false);
 
     // num_errors stores how many positions are mismatched
     // Makes sense to keep this? Would need to sort first.
@@ -160,6 +161,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
  * @param[in]  graph      Input graph
  * @param[out] hub_ranks   Vertex hub scores
  * @param[out] auth ranks  Vertex authority scores
+ * @param[in]  allocated_on    Target device where inputs and outputs are stored
  * \return     double     Return accumulated elapsed times for all iterations
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
@@ -167,7 +169,8 @@ double gunrock_hits(
     gunrock::util::Parameters &parameters,
     GraphT &data_graph,
     ValueT *hub_ranks,
-    ValueT *auth_ranks)
+    ValueT *auth_ranks,
+    gunrock::util::Location allocated_on = gunrock::util::HOST)
 {
     typedef typename GraphT::VertexT VertexT;
     typedef gunrock::app::hits::Problem<GraphT  > ProblemT;
@@ -181,7 +184,7 @@ double gunrock_hits(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    problem.Init(data_graph, target);
+    problem.Init(data_graph, allocated_on, target);
     enactor.Init(problem   , target);
 
     problem.Reset(target);
@@ -192,8 +195,7 @@ double gunrock_hits(
     cpu_timer.Stop();
 
     total_time += cpu_timer.ElapsedMillis();
-    problem.Extract(hub_ranks, auth_ranks);
-    
+    problem.Extract(hub_ranks, auth_ranks, target, allocated_on);    
 
     enactor.Release(target);
     problem.Release(target);
@@ -206,9 +208,12 @@ double gunrock_hits(
  * @param[in]  num_edges   Number of edges in the input graph
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  num_iter    Number of iterations to perform HITS
+ * @param[in]  max_iter    Maximum number of iterations to perform HITS
+ * @param[in]  tol         Algorithm termination tolerance
+ * @param[in]  hits_norm   Normalization method [1 = normalize by the sum of absolute values, 2 = normalize by the square root of the sum of squares]
  * @param[out] hub_ranks   Vertex hub scores
  * @param[out] auth ranks  Vertex authority scores
+ * @param[in]  allocated_on      Target device where inputs and outputs are stored
  * \return     double      Return accumulated elapsed times for all iterations
  */
 template <
@@ -220,9 +225,12 @@ double hits_template(
     const SizeT        num_edges,
     const SizeT       *row_offsets,
     const VertexT     *col_indices,
-    const int          num_iter,
-    GValueT            *hub_ranks,
-    GValueT            *auth_ranks)
+    const int          max_iter,
+    const float        tol,
+    const int          hits_norm,
+    GValueT           *hub_ranks,
+    GValueT           *auth_ranks,
+    gunrock::util::Location allocated_on = gunrock::util::HOST)
 {
 
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
@@ -237,21 +245,27 @@ double hits_template(
     gunrock::app::UseParameters_test(parameters);
     parameters.Parse_CommandLine(0, NULL);
     parameters.Set("graph-type", "by-pass");
-    parameters.Set("max-iter", num_iter);
+    parameters.Set("hits-max-iter", max_iter);
+    parameters.Set("hits-term-tol", tol);
+    parameters.Set("hits-norm", hits_norm);
     bool quiet = parameters.Get<bool>("quiet");
     GraphT data_graph;
 
     // Assign pointers into gunrock graph format
     gunrock::util::Location target = gunrock::util::HOST;
-    data_graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-    data_graph.CsrT::row_offsets   .SetPointer((SizeT *)row_offsets, num_nodes + 1, target);
+
+    if (allocated_on == gunrock::util::DEVICE) {
+      target = gunrock::util::DEVICE;
+    }
+
+    data_graph.CsrT::Allocate(num_nodes, num_edges, target);
+    data_graph.CsrT::row_offsets.SetPointer((SizeT *)row_offsets, num_nodes + 1, target);
     data_graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, target);
 
     data_graph.FromCsr(data_graph.csr(), target, 0, quiet, true);
-    gunrock::graphio::LoadGraph(parameters, data_graph);
 
     // Run HITS
-    double elapsed_time = gunrock_hits(parameters, data_graph, hub_ranks, auth_ranks);
+    double elapsed_time = gunrock_hits(parameters, data_graph, hub_ranks, auth_ranks, allocated_on);
 
     // Cleanup
     data_graph.Release();

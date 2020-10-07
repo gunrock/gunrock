@@ -29,6 +29,12 @@ else()
 endif()
 # end /* CUB include directories */
 
+# begin /* FAISS include directories */
+#if (FAISS_INCLUDE_DIRS)
+#  include_directories(${FAISS_INCLUDE_DIRS})
+#endif()
+# end /* FAISS include directories */
+
 # begin /* Add CUDA executables */
 CUDA_ADD_EXECUTABLE(${PROJECT_NAME}
   test_${PROJECT_NAME}.cu
@@ -45,6 +51,9 @@ CUDA_ADD_EXECUTABLE(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
 if (METIS_LIBRARY)
   target_link_libraries(${PROJECT_NAME} ${METIS_LIBRARY})
+endif()
+if (FAISS_LIBRARY)
+  target_link_libraries(${PROJECT_NAME} ${FAISS_LIBRARY})
 endif()
 # end /* Link Metis and Boost */
 

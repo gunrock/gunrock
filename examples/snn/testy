@@ -1,6 +1,0 @@
-./bin/test_knn_10.0_x86_64 market ../../dataset/small/chesapeake.mtx                        --k=4 --eps=1 --min-pts=3 --quick=true
-./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n12/delaunay_n12.mtx --k=4 --eps=1 --min-pts=2 --quick=true
-./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n13/delaunay_n13.mtx --k=4 --eps=1 --min-pts=2 --quick=true
-./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n14/delaunay_n14.mtx --k=4 --eps=1 --min-pts=2 --quick=true
-./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n15/delaunay_n15.mtx --k=4 --eps=1 --min-pts=2 --quick=true
-./bin/test_knn_10.0_x86_64 market /data/gunrock_dataset/large/delaunay_n16/delaunay_n16.mtx --k=4 --eps=1 --min-pts=2 --quick=true

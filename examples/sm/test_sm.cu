@@ -57,6 +57,13 @@ struct main_struct {
 
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
+
+    std::string validation = parameters.Get<std::string>("validation");
+    if (quick && (parameters.UseDefault("validation") == false && validation != "none")) {
+      util::PrintMsg("Invalid options --quick and --validation=" + validation +
+                     ", no CPU reference result to validate");
+      return retval;
+    }
     int num_runs = parameters.Get<int>("num-runs");
 
     util::PrintMsg(

@@ -17,8 +17,8 @@
 #include <map>
 #include <gunrock/util/array_utils.cuh>
 
-//#define SNN_DEBUG 1
-#ifdef SNN_DEBUG
+//#define SNN_HELPERS_DEBUG 1
+#ifdef SNN_HELPERS_DEBUG
     #define debug(a...) printf(a)
 #else
     #define debug(a...)
