@@ -42,8 +42,8 @@ class frontier_t {
   ~frontier_t() {}
 
   // Frontier should never be passed into the __global__ functions
-  frontier_t& operator=(const frontier_t& rhs) = delete;
-  frontier_t(const frontier_t& rhs) = delete;
+  // frontier_t& operator=(const frontier_t& rhs) = delete;
+  // frontier_t(const frontier_t& rhs) = delete;
 
   void swap(frontier_t& rhs) {
     std::swap(_size, rhs._size);
@@ -73,7 +73,6 @@ class frontier_t {
 
   bool empty() const { return (get_frontier_size() == 0); }
 
- protected:
   void set_frontier_size(std::size_t const& s) { _size = s; }
 
  private:

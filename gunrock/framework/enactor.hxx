@@ -67,9 +67,9 @@ struct enactor_t {
     timer.begin();
     std::cout << "is converged? " << std::boolalpha
               << is_converged(single_context) << std::endl;
-    while (!is_converged(single_context)) {
-      loop(single_context);
-    }
+    // while (!is_converged(single_context)) {
+    loop(single_context);
+    // }
     return timer.end();
   }
 

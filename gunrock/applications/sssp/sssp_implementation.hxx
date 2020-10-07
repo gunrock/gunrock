@@ -72,6 +72,7 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
   void loop(cuda::standard_context_t& context) {
     // Data slice
     auto P = enactor_type::get_problem_pointer();
+    auto G = P->get_graph_pointer();
     auto distances = P->distances;
     auto single_source = P->single_source;
 
@@ -108,20 +109,20 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
      * to keep.
      *
      */
-    auto remove_completed_paths =
-        [] __host__ __device__(vertex_t const& vertex) -> bool {
-      // if (!frontier::marked_for_removal(vertex))
-      //   frontier::remove_from_frontier(vertex);
-      // frontier::keep_in_frontier(vertex);
-      return false;
-    };
+    // auto remove_completed_paths =
+    //     [] __host__ __device__(vertex_t const& vertex) -> bool {
+    //   // if (!frontier::marked_for_removal(vertex))
+    //   //   frontier::remove_from_frontier(vertex);
+    //   // frontier::keep_in_frontier(vertex);
+    //   return false;
+    // };
 
     // Execute advance operator on the provided lambda
-    // operator ::advance::execute<operator ::advance_type::vertex_to_vertex>(
-    //     G, frontier, shortest_path);
+    operators::advance::execute<operators::advance_type_t::vertex_to_vertex>(
+        G, enactor_type::frontiers.data(), shortest_path);
 
     // // Execute filter operator on the provided lambda
-    // operator ::filter::execute(G, frontier, remove_completed_paths);
+    // operators::filter::execute(G, frontiers, remove_completed_paths);
   }
 
   void prepare_frontier(cuda::standard_context_t& context) {

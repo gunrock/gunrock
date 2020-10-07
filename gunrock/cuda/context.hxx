@@ -109,6 +109,8 @@ class multi_context_t {
     }
   }
 
+  ~multi_context_t() {}
+
   auto get_context(cuda::device_id_t device) {
     auto contexts_ptr = contexts.data();
     return contexts_ptr[device];

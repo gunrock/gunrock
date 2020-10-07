@@ -17,7 +17,7 @@ __global__ void kernel(graph_type* G) {
 
   vertex_t num_vertices = G->get_number_of_vertices();
   edge_t num_edges = G->get_number_of_edges();
-  edge_t num_neighbors = G->get_neighbor_list_length(source);
+  edge_t num_neighbors = G->get_number_of_neighbors(source);
   vertex_t source_vertex = G->get_source_vertex(edge);
   weight_t edge_weight = G->get_edge_weight(edge);
   double average_degree = graph::get_average_degree(*G);
@@ -92,7 +92,7 @@ void test_graph() {
 
   vertex_t num_vertices = G->get_number_of_vertices();
   edge_t num_edges = G->get_number_of_edges();
-  edge_t num_neighbors = G->get_neighbor_list_length(source);
+  edge_t num_neighbors = G->get_number_of_neighbors(source);
   vertex_t source_vertex = G->get_source_vertex(edge);
   weight_t edge_weight = G->get_edge_weight(edge);
   double average_degree = graph::get_average_degree(*G);

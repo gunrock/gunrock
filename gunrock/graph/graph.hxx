@@ -92,8 +92,8 @@ class graph_t : public graph_view_t... {
   // XXX: add support for per-view based methods
   // template<typename view_t = first_view_t>
   __host__ __device__ __forceinline__ edge_type
-  get_neighbor_list_length(vertex_type const& v) const override {
-    return first_view_t::get_neighbor_list_length(v);
+  get_number_of_neighbors(vertex_type const& v) const override {
+    return first_view_t::get_number_of_neighbors(v);
   }
 
   __host__ __device__ __forceinline__ vertex_type
@@ -124,112 +124,6 @@ class graph_t : public graph_view_t... {
 
 };  // struct graph_t
 
-namespace build {
-
-/**
- * @brief
- *
- * @tparam graph_type
- * @param I
- * @return graph
- */
-template <typename graph_type>
-__device__ __host__ auto from_graph_t(graph_type& I) {
-  graph_type G;
-  G.set(I.get_number_of_rows(),      // r
-        I.get_number_of_columns(),   // c
-        I.get_number_of_nonzeros(),  // nnz
-        I.get_row_offsets(),         // offsets
-        I.get_column_indices(),      // column indices
-        I.get_nonzero_values()       // nonzero values
-  );
-
-  return G;
-}
-
-template <typename graph_type>
-__host__ __device__ void fix_virtual_inheritance(graph_type I, graph_type* O) {
-  auto G = from_graph_t(I);
-  memcpy(O, &G, sizeof(graph_type));
-}
-
-namespace device {
-/**
- * @brief Instantiate polymorphic inhertance within the kernel & set the
- * existing data to it. No allocations allowed here.
- *
- * @tparam graph_type
- * @param I
- * @param O
- */
-template <typename graph_type>
-__global__ void kernel_virtual_inheritance(graph_type I, graph_type* O) {
-  fix_virtual_inheritance(I, O);
-}
-
-/**
- * @brief Possible work around while keeping virtual (polymorphic behavior.)
- *
- * @tparam graph_type
- * @param r
- * @param c
- * @param nnz
- * @param Ap
- * @param Aj
- * @param Ax
- * @return auto
- */
-template <typename graph_type>
-void csr_t(graph_type I, graph_type* G) {
-  kernel_virtual_inheritance<graph_type><<<1, 1>>>(I, G);
-}
-}  // namespace device
-
-namespace host {
-template <typename graph_type>
-void csr_t(graph_type I, graph_type* G) {
-  fix_virtual_inheritance(I, G);
-}
-}  // namespace host
-
-template <memory_space_t space,
-          typename edge_vector_t,
-          typename vertex_vector_t,
-          typename weight_vector_t>
-auto from_csr_t(typename vertex_vector_t::value_type const& r,
-                typename vertex_vector_t::value_type const& c,
-                typename edge_vector_t::value_type const& nnz,
-                edge_vector_t& Ap,
-                vertex_vector_t& Aj,
-                weight_vector_t& Ax) {
-  using vertex_type = typename vertex_vector_t::value_type;
-  using edge_type = typename edge_vector_t::value_type;
-  using weight_type = typename weight_vector_t::value_type;
-
-  auto Ap_ptr = memory::raw_pointer_cast(Ap.data());
-  auto Aj_ptr = memory::raw_pointer_cast(Aj.data());
-  auto Ax_ptr = memory::raw_pointer_cast(Ax.data());
-
-  using graph_type = graph::graph_t<
-      space, vertex_type, edge_type, weight_type,
-      graph::graph_csr_t<space, vertex_type, edge_type, weight_type>>;
-
-  typename vector<graph_type, space>::type O(1);
-  graph_type G;
-
-  G.set(r, c, nnz, Ap_ptr, Aj_ptr, Ax_ptr);
-
-  if (space == memory_space_t::device) {
-    device::csr_t<graph_type>(G, memory::raw_pointer_cast(O.data()));
-  } else {
-    host::csr_t<graph_type>(G, memory::raw_pointer_cast(O.data()));
-  }
-
-  return O;
-}
-
-}  // namespace build
-
 /**
  * @brief Get the average degree of a graph.
  *
@@ -241,7 +135,7 @@ template <typename graph_type>
 __host__ __device__ double get_average_degree(graph_type const& G) {
   auto sum = 0;
   for (auto v = 0; v < G.get_number_of_vertices(); ++v)
-    sum += G.get_neighbor_list_length(v);
+    sum += G.get_number_of_neighbors(v);
 
   return (sum / G.get_number_of_vertices());
 }
@@ -265,7 +159,7 @@ __host__ __device__ double get_degree_standard_deviation(const graph_type& G) {
 
   double accum = 0.0;
   for (auto v = 0; v < G.get_number_of_vertices(); ++v) {
-    double d = G.get_neighbor_list_length(v);
+    double d = G.get_number_of_neighbors(v);
     accum += (d - average_degree) * (d - average_degree);
   }
   return sqrt(accum / G.get_number_of_vertices());
@@ -304,3 +198,6 @@ __host__ __device__ double get_degree_standard_deviation(const graph_type& G) {
 
 }  // namespace graph
 }  // namespace gunrock
+
+// Build graph includes
+#include <gunrock/graph/build.hxx>

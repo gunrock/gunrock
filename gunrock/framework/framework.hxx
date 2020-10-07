@@ -14,3 +14,5 @@
 #include <gunrock/framework/frontier.hxx>
 #include <gunrock/framework/problem.hxx>
 #include <gunrock/framework/enactor.hxx>
+
+#include <gunrock/framework/operators/operators.hxx>

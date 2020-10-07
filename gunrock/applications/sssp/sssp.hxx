@@ -32,14 +32,19 @@ float sssp(graph_type* G,
   // Create contexts for all the devices
   std::vector<cuda::device_id_t> devices;
   devices.push_back(0);
-  cuda::multi_context_t multi_context(devices);
 
-  sssp_enactor_type sssp_enactor(
-      &sssp_problem,  // pass in a problem (contains data in/out)
-      multi_context);
+  auto multi_context = std::shared_ptr<cuda::multi_context_t>(
+      new cuda::multi_context_t(devices));
 
-  float elapsed = sssp_enactor.enact();
-  return elapsed;
+  cudaDeviceSynchronize();
+  error::throw_if_exception(cudaPeekAtLastError());
+
+  // sssp_enactor_type sssp_enactor(
+  //     &sssp_problem,  // pass in a problem (contains data in/out)
+  //     multi_context);
+
+  // float elapsed = sssp_enactor.enact();
+  // return elapsed;
 }
 
 template <memory::memory_space_t space,

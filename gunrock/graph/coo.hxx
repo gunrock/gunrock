@@ -39,7 +39,7 @@ class graph_coo_t : virtual public graph_base_t<vertex_t, edge_t, weight_t> {
   // Must use [override] keyword to identify functions that are
   // overriding the derived class
   // __host__ __device__ __forceinline__
-  // edge_type get_neighbor_list_length(vertex_type const& v) const override {
+  // edge_type get_number_of_neighbors(vertex_type const& v) const override {
   // }
 
   // __host__ __device__ __forceinline__
