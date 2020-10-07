@@ -23,22 +23,21 @@ namespace gunrock {
 
 template <typename algorithm_problem_t>
 struct enactor_t {
-  using vertex_t = typename algorithm_problem_t::graph_type::vertex_type;
+  using vertex_t = typename algorithm_problem_t::vertex_t;
 
   cuda::multi_context_t context;
   // XXX: needs to be a vector to support multi-gpu timer or we can move this
   // within the actual context.
   util::timer_t timer;
-  std::shared_ptr<algorithm_problem_t> problem;
-  std::vector<std::shared_ptr<frontier_t<vertex_t>>> frontiers;
+  algorithm_problem_t* problem;
+  thrust::host_vector<frontier_t<vertex_t>> frontiers;
 
   // Disable copy ctor and assignment operator.
   // We don't want to let the user copy only a slice.
   enactor_t(const enactor_t& rhs) = delete;
   enactor_t& operator=(const enactor_t& rhs) = delete;
 
-  enactor_t(std::shared_ptr<algorithm_problem_t> problem,
-            cuda::multi_context_t& context)
+  enactor_t(algorithm_problem_t* problem, cuda::multi_context_t& context)
       : problem(problem), context(context) {}
 
   /**
@@ -51,6 +50,7 @@ struct enactor_t {
   float enact() {
     auto single_context = context.get_context(0);
     timer.begin();
+    std::cout << "is converged? " << is_converged(single_context) << std::endl;
     while (!is_converged(single_context)) {
       loop(single_context);
     }

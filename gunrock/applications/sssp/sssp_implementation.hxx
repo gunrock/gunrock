@@ -35,7 +35,7 @@ struct sssp_problem_t : problem_t<graph_type> {
    * @param _distances output distance pointer
    * @param _predecessors output predecessors pointer
    */
-  sssp_problem_t(graph_type& _G,
+  sssp_problem_t(graph_type* _G,
                  vertex_t& _source,
                  weight_pointer_t _distances,
                  vertex_pointer_t _predecessors)
@@ -65,6 +65,8 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
     // Data slice
     auto distances = data_t::problem->distances;
     auto single_source = data_t::problem->single_source;
+
+    std::cout << "Single source: " << single_source << std::endl;
 
     // /**
     //  * @brief Lambda operator to advance to neighboring vertices from the
@@ -111,8 +113,7 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
     // operator ::filter::execute(G, frontier, remove_completed_paths);
   }
 
-  sssp_enactor_t(std::shared_ptr<algorithm_problem_t> problem,
-                 cuda::multi_context_t& context)
+  sssp_enactor_t(algorithm_problem_t* problem, cuda::multi_context_t& context)
       : enactor_t<algorithm_problem_t>(problem, context) {}
 
   sssp_enactor_t(const sssp_enactor_t& rhs) = delete;

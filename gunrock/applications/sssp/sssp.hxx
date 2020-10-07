@@ -23,11 +23,10 @@ float sssp(graph_type* G,
   using sssp_problem_type = sssp_problem_t<graph_type>;
   using sssp_enactor_type = sssp_enactor_t<sssp_problem_type>;
 
-  std::shared_ptr<sssp_problem_type> sssp_problem(
-      std::make_shared<sssp_problem_type>(G),  // input graph
-      source,                                  // input source
-      distances,                               // output distances
-      nullptr                                  // output predecessors
+  sssp_problem_type sssp_problem(G,          // input graph
+                                 source,     // input source
+                                 distances,  // output distances
+                                 nullptr     // output predecessors
   );
 
   // Create contexts for all the devices
@@ -35,11 +34,11 @@ float sssp(graph_type* G,
   devices.push_back(0);
   cuda::multi_context_t multi_context(devices);
 
-  std::shared_ptr<sssp_enactor_type> sssp_enactor(
-      sssp_problem,  // pass in a problem (contains data in/out)
+  sssp_enactor_type sssp_enactor(
+      &sssp_problem,  // pass in a problem (contains data in/out)
       multi_context);
 
-  float elapsed = sssp_enactor->enact();
+  float elapsed = sssp_enactor.enact();
   return elapsed;
 }
 

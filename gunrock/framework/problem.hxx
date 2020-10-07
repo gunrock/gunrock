@@ -25,10 +25,10 @@ struct problem_t {
   using edge_pointer_t = typename graph_type::edge_pointer_t;
   using weight_pointer_t = typename graph_type::weight_pointer_t;
 
-  std::shared_ptr<graph_type> graph_slice;
+  graph_type* graph_slice;
 
-  problem_t() : graph_slice(std::make_shared<graph_type>()) {}
-  problem_t(graph_type& G) : graph_type(std::make_shared<graph_type>(G)) {}
+  problem_t() : graph_slice(nullptr) {}
+  problem_t(graph_type* G) : graph_slice(G) {}
 
   // Disable copy ctor and assignment operator.
   // We do not want to let user copy only a slice.
@@ -36,8 +36,6 @@ struct problem_t {
   // https://www.geeksforgeeks.org/preventing-object-copy-in-cpp-3-different-ways/
   problem_t(const problem_t& rhs) = delete;             // Copy constructor
   problem_t& operator=(const problem_t& rhs) = delete;  // Copy assignment
-
-  problem_t(std::shared_ptr<graph_type> rhs) { graph_slice = rhs; }
 
 };  // struct problem_t
 

@@ -9,7 +9,7 @@
  *
  */
 #pragma once
-
+#include <iostream>
 #include <gunrock/cuda/device.hxx>
 
 namespace gunrock {
@@ -35,17 +35,19 @@ void print(device_properties_t& prop) {
   double memBandwidth =
       (prop.memoryClockRate * 1000.0) * (prop.memoryBusWidth / 8 * 2) / 1.0e9;
 
-  // XXX: I don't like printfs, use std::cout here
-  printf("%s : %8.3lf Mhz   (Ordinal %d)\n", prop.name, prop.clockRate / 1000.0,
-         ordinal);
-  printf("%d SMs enabled. Compute Capability sm_%d%d\n",
-         prop.multiProcessorCount, prop.major, prop.minor);
-  printf("FreeMem: %6dMB   TotalMem: %6dMB   %2d-bit pointers.\n",
-         (int)(freeMem / (1 << 20)), (int)(totalMem / (1 << 20)),
-         (int)8 * sizeof(int*));
-  printf("Mem Clock: %8.3lf Mhz x %d bits   (%5.1lf GB/s)\n",
-         prop.memoryClockRate / 1000.0, prop.memoryBusWidth, memBandwidth);
-  printf("ECC %s\n\n", prop.ECCEnabled ? "Enabled" : "Disabled");
+  std::cout << prop.name << " : " << prop.clockRate / 1000.0 << " Mhz "
+            << "(Ordinal " << ordinal << ")" << std::endl;
+  std::cout << "FreeMem: " << (int)(freeMem / (1 << 20)) << " MB "
+            << "TotalMem: " << (int)(totalMem / (1 << 20)) << " MB "
+            << ((int)8 * sizeof(int*)) << "-bit pointers." << std::endl;
+  std::cout << prop.multiProcessorCount
+            << " SMs enabled, Compute Capability sm_" << prop.major
+            << prop.minor << std::endl;
+  std::cout << "Mem Clock: " << prop.memoryClockRate / 1000.0 << " Mhz x "
+            << prop.memoryBusWidth << " bits (" << memBandwidth << " GB/s)"
+            << std::endl;
+  std::cout << "ECC " << (prop.ECCEnabled ? "Enabled" : "Disabled")
+            << std::endl;
 }
 
 inline constexpr unsigned shared_memory_banks() {
