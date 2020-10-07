@@ -50,7 +50,8 @@ struct enactor_t {
   float enact() {
     auto single_context = context.get_context(0);
     timer.begin();
-    std::cout << "is converged? " << is_converged(single_context) << std::endl;
+    std::cout << "is converged? " << std::boolalpha
+              << is_converged(single_context) << std::endl;
     while (!is_converged(single_context)) {
       loop(single_context);
     }
