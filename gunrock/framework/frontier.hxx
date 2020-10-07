@@ -35,9 +35,7 @@ class frontier_t {
 
  public:
   frontier_t()
-      : _size(0),
-        _type(frontier_type_t::vertex_frontier),
-        _data(std::make_shared<pointer_type_t>()) {}
+      : _size(0), _type(frontier_type_t::vertex_frontier), _data(nullptr) {}
 
   frontier_t(frontier_t&& rhs) : frontier_t() { swap(rhs); }
 
@@ -56,8 +54,8 @@ class frontier_t {
   // XXX: Useful writing some loaders
   // Maybe this can be a single loader with
   // templated over over copy
-  template <typename device_vector_t>
-  void load(device_vector_t& v) {
+  template <typename type_vector_t>
+  void load(type_vector_t& v) {
     // memory::copy::device(_data, v.data(), v.size());
     set_frontier_size(v.size());
   }

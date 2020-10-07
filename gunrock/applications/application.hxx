@@ -25,3 +25,7 @@
 
 // Graph includes
 #include <gunrock/graph/graph.hxx>
+
+// Container includes
+#include <gunrock/container/array.hxx>
+#include <gunrock/container/vector.hxx>

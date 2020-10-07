@@ -50,6 +50,7 @@ struct sssp_problem_t : problem_t<graph_type> {
 
 template <typename algorithm_problem_t>
 struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
+  using enactor_type = enactor_t<algorithm_problem_t>;
   /**
    * @brief This is the core of the implementation for SSSP algorithm. loops
    * till the convergence condition is met (see: is_converged()). Note that this
@@ -61,10 +62,9 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
    * @param context
    */
   void loop(cuda::standard_context_t& context) {
-    using data_t = enactor_t<algorithm_problem_t>;
     // Data slice
-    auto distances = data_t::problem->distances;
-    auto single_source = data_t::problem->single_source;
+    auto distances = enactor_type::problem->distances;
+    auto single_source = enactor_type::problem->single_source;
 
     std::cout << "Single source: " << single_source << std::endl;
 
@@ -111,6 +111,15 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
 
     // // Execute filter operator on the provided lambda
     // operator ::filter::execute(G, frontier, remove_completed_paths);
+  }
+
+  void prepare_frontier(cuda::standard_context_t& context) {
+    auto single_source = enactor_type::problem->single_source;
+    typename vector<algorithm_problem_t::vertex_t, graph->memory_space()>::type
+        frontier_data(1);
+    frontier_data.push_back(single_source);
+    auto frontier = enactor_type::frontiers.data();
+    frontier.load(frontier_data);
   }
 
   sssp_enactor_t(algorithm_problem_t* problem, cuda::multi_context_t& context)

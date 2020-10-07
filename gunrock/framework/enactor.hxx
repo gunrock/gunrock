@@ -25,6 +25,7 @@ template <typename algorithm_problem_t>
 struct enactor_t {
   using vertex_t = typename algorithm_problem_t::vertex_t;
 
+  static constexpr std::size_t number_of_buffers = 2;
   cuda::multi_context_t context;
   // XXX: needs to be a vector to support multi-gpu timer or we can move this
   // within the actual context.
@@ -38,7 +39,7 @@ struct enactor_t {
   enactor_t& operator=(const enactor_t& rhs) = delete;
 
   enactor_t(algorithm_problem_t* problem, cuda::multi_context_t& context)
-      : problem(problem), context(context) {}
+      : problem(problem), context(context), frontier(number_of_buffers) {}
 
   /**
    * @brief Run the enactor with the given problem and the loop.
@@ -69,6 +70,13 @@ struct enactor_t {
    * @param context
    */
   virtual void loop(cuda::standard_context_t& context) = 0;
+
+  /**
+   * @brief Prepare the initial frontier.
+   *
+   * @param context
+   */
+  virtual void prepare_frontier(cuda::standard_context_t& context) = 0;
 
   /**
    * @brief Algorithm is converged if true is returned, keep on iterating if

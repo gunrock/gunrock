@@ -116,6 +116,8 @@ class graph_t : public graph_view_t... {
     return std::disjunction_v<std::is_same<view_t, graph_view_t>...>;
   }
 
+  constexpr memory_space_t memory_space() const { return space; }
+
  private:
   static constexpr std::size_t number_of_formats_inherited =
       sizeof...(graph_view_t);
