@@ -9,7 +9,7 @@
  * @file
  * gtc_test.cu
  *
- * @brief Test related functions for SSSP
+ * @brief Test related functions for CrossEntropyLoss
  */
 
 #pragma once
@@ -20,7 +20,7 @@
 #include <chrono>
 
 #ifdef BOOST_FOUND
-// Boost includes for CPU Dijkstra SSSP reference algorithms
+// Boost includes for CPU CrossEntropyLoss reference algorithms
 #include <boost/config.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
@@ -43,7 +43,7 @@ namespace CrossEntropyLoss {
 
 
 /******************************************************************************
- * SSSP Testing Routines
+ * CrossEntropyLoss Testing Routines
  *****************************************************************************/
 
 void CPU_Reference(const int num_nodes, const int num_classes, const double *tmp_logits,
@@ -119,7 +119,7 @@ void rand_logits(int len, T *arr) {
 }
 
 
-}  // namespace sssp
+}  // namespace crossentropyloss
 }  // namespace app
 }  // namespace gunrock
 

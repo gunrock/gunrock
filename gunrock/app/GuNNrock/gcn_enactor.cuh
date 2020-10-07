@@ -9,7 +9,7 @@
  * @file
  * gtc_enactor.cuh
  *
- * @brief SSSP Problem Enactor
+ * @brief GCN Problem Enactor
  */
 
 #pragma once
@@ -27,7 +27,7 @@ namespace app {
 namespace gcn {
 
 /**
- * @brief Speciflying parameters for SSSP Enactor
+ * @brief Speciflying parameters for GCN Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter
  * info \return cudaError_t error message(s), if any
  */
@@ -38,7 +38,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
 }
 
 /**
- * @brief defination of SSSP iteration loop
+ * @brief defination of GCN iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
@@ -55,12 +55,12 @@ struct GCNIterationLoop
   GCNIterationLoop() : BaseIterationLoop() {}
 
   /**
-   * @brief Core computation of sssp, one iteration
+   * @brief Core computation of gcn, one iteration
    * @param[in] peer_ Which GPU peers to work on, 0 means local
    * \return cudaError_t error message(s), if any
    */
   cudaError_t Core(int peer_ = 0) {
-    // Data sssp that works on
+    // Data gcn that works on
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
     auto &enactor_slice =
         this->enactor
@@ -328,10 +328,10 @@ struct GCNIterationLoop
   cudaError_t ExpandIncoming(SizeT &received_length, int peer_) {
     return cudaSuccess;
   }
-};  // end of SSSPIteration
+};  // end of GCNIteration
 
 /**
- * @brief SSSP enactor class.
+ * @brief GCN enactor class.
  * @tparam _Problem Problem type we process on
  * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
  * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
@@ -367,13 +367,13 @@ class Enactor
   /**
    * @brief graphsumEnactor constructor
    */
-  Enactor() : BaseEnactor("sssp"), problem(NULL) {
+  Enactor() : BaseEnactor("gcn"), problem(NULL) {
     this->max_num_vertex_associates = 0;
     this->max_num_value__associates = 1;
   }
 
   /**
-   * @brief SSSPEnactor destructor
+   * @brief GCNEnactor destructor
    */
   virtual ~Enactor() {
      Release();
@@ -450,7 +450,7 @@ class Enactor
   }
 
   /**
-   * @brief one run of sssp, to be called within GunrockThread
+   * @brief one run of gcn, to be called within GunrockThread
    * @param thread_data Data for the CPU threadt
    * \return cudaError_t error message(s), if any
    */
@@ -460,7 +460,7 @@ class Enactor
   }
 
   /**
-   * @brief Enacts a SSSP computing on the specified graph.
+   * @brief Enacts a GCN computing on the specified graph.
    * @param[in] src Source node to start primitive.
    * \return cudaError_t error message(s), if any
    */

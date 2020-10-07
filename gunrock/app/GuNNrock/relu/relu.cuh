@@ -1,6 +1,6 @@
-//
-// Created by husong on 5/13/20.
-//
+// Relu activation function
+// TODO: Move to utils if separation of concerns is not an issue
+
 #ifndef RELU_H
 #define RELU_H
 

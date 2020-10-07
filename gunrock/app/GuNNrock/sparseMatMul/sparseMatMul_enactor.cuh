@@ -9,7 +9,7 @@
  * @file
  * gtc_enactor.cuh
  *
- * @brief SSSP Problem Enactor
+ * @brief sparseMatMul Problem Enactor
  */
 
 #pragma once
@@ -25,7 +25,7 @@ namespace app {
 namespace sparseMatMul {
 
 /**
- * @brief Speciflying parameters for SSSP Enactor
+ * @brief Speciflying parameters for sparseMatMul Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter
  * info \return cudaError_t error message(s), if any
  */
@@ -36,7 +36,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
 }
 
 /**
- * @brief defination of SSSP iteration loop
+ * @brief defination of sparseMatMul iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
@@ -53,12 +53,12 @@ struct SpmultIterationLoop
   SpmultIterationLoop() : BaseIterationLoop() {}
 
   /**
-   * @brief Core computation of sssp, one iteration
+   * @brief Core computation of sparseMatMul, one iteration
    * @param[in] peer_ Which GPU peers to work on, 0 means local
    * \return cudaError_t error message(s), if any
    */
   cudaError_t Core(int peer_ = 0) {
-    // Data sssp that works on
+    // Data sparseMatMul that works on
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
     auto &enactor_slice =
         this->enactor
@@ -166,10 +166,10 @@ struct SpmultIterationLoop
   cudaError_t ExpandIncoming(SizeT &received_length, int peer_) {
     return cudaSuccess;
   }
-};  // end of SSSPIteration
+};  // end of sparseMatMulIteration
 
 /**
- * @brief SSSP enactor class.
+ * @brief sparseMatMul enactor class.
  * @tparam _Problem Problem type we process on
  * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
  * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
@@ -205,13 +205,13 @@ class Enactor
   /**
    * @brief graphsumEnactor constructor
    */
-  Enactor() : BaseEnactor("sssp"), problem(NULL) {
+  Enactor() : BaseEnactor("sparseMatMul"), problem(NULL) {
     this->max_num_vertex_associates = 0;
     this->max_num_value__associates = 1;
   }
 
   /**
-   * @brief SSSPEnactor destructor
+   * @brief sparseMatMulEnactor destructor
    */
   virtual ~Enactor() {
      Release();
@@ -291,7 +291,7 @@ class Enactor
   }
 
   /**
-   * @brief one run of sssp, to be called within GunrockThread
+   * @brief one run of sparseMatMul, to be called within GunrockThread
    * @param thread_data Data for the CPU threadt
    * \return cudaError_t error message(s), if any
    */
@@ -301,7 +301,7 @@ class Enactor
   }
 
   /**
-   * @brief Enacts a SSSP computing on the specified graph.
+   * @brief Enacts a sparseMatMul computing on the specified graph.
    * @param[in] src Source node to start primitive.
    * \return cudaError_t error message(s), if any
    */

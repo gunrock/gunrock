@@ -1,6 +1,6 @@
-//
-// Created by husong on 5/13/20.
-//
+// Relu activation function
+// TODO: Move to utils if separation of concerns is not an issue
+
 #ifndef DROPOUT_H
 #define DROPOUT_H
 

@@ -9,7 +9,7 @@
  * @file
  * gtc_test.cu
  *
- * @brief Test related functions for SSSP
+ * @brief Test related functions for sparseMatMul
  */
 
 #pragma once
@@ -18,7 +18,7 @@
 #include <chrono>
 
 #ifdef BOOST_FOUND
-// Boost includes for CPU Dijkstra SSSP reference algorithms
+// Boost includes for CPU Dijkstra sparseMatMul reference algorithms
 #include <boost/config.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
@@ -34,17 +34,8 @@ namespace gunrock {
 namespace app {
 namespace sparseMatMul {
 
-/******************************************************************************
- * Housekeeping Routines
- ******************************************************************************/
-
-
-/******************************************************************************
- * SSSP Testing Routines
- *****************************************************************************/
-
 /**
- * @brief Simple CPU-based reference SSSP implementations
+ * @brief Simple CPU-based reference sparse matrix multiplication implementations
  * @tparam      GraphT        Type of the graph
  * @tparam      ValueT        Type of the distances
  * @param[in]   graph         Input graph
@@ -53,7 +44,7 @@ namespace sparseMatMul {
  * @param[in]   src           The source vertex
  * @param[in]   quiet         Whether to print out anything to stdout
  * @param[in]   mark_preds    Whether to compute predecessor info
- * \return      double        Time taken for the SSSP
+ * \return      double        Time taken for the sparseMatMul
  */
 
 void CPU_Reference(int *row_offsets, int *col_offsets, double *x_vals, const int n_rows,
@@ -80,7 +71,7 @@ void rand_weights(int in_size, int out_size, double *weights) {
 }
 
 
-}  // namespace sssp
+}  // namespace sparseMatMul
 }  // namespace app
 }  // namespace gunrock
 

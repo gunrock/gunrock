@@ -48,8 +48,7 @@ struct mat_mul : module {
     )
 
     // Calculating matrix multiplication
-    // which matrices are multiplied?
-    // TODO gunrock optimised sparse matrix multiplication to replace a manual method
+    // TODO plugin state-of-the-art optimised sparse matrix multiplication to replace the trivial method
     GUARD_CU(a.ForAll(
         [b, c, p, n]__host__ __device__(ValueT *a_, const SizeT pos) {
           // a x b = c

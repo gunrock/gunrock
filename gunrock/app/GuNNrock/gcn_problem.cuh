@@ -9,7 +9,7 @@
  * @file
  * graphsum_problem.cuh
  *
- * @brief GPU Storage management Structure for SSSP Problem Data
+ * @brief GPU Storage management Structure for GCN Problem Data
  */
 
 #pragma once
@@ -56,7 +56,7 @@ cudaError_t UseParameters_problem(util::Parameters &parameters) {
 /**
  * @brief Single-Source Shortest Path Problem structure.
  * @tparam _GraphT  Type of the graph
- * @tparam _LabelT  Type of labels used in sssp
+ * @tparam _LabelT  Type of labels used in gcn
  * @tparam _ValueT  Type of per-vertex distance values
  * @tparam _FLAG    Problem flags
  */
@@ -424,7 +424,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   /**
    * @brief      initialization function.
    *
-   * @param      graph   The graph that SSSP processes on
+   * @param      graph   The graph that GCN processes on
    * @param[in]  dim     The dimension of the feature vector
    * @param[in]  target  The target
    * @param[in]  Location  Memory location to work on

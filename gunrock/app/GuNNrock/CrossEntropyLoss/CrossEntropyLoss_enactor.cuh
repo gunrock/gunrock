@@ -9,7 +9,7 @@
  * @file
  * gtc_enactor.cuh
  *
- * @brief SSSP Problem Enactor
+ * @brief CrossEntropyLoss Problem Enactor
  */
 
 #pragma once
@@ -25,7 +25,7 @@ namespace app {
 namespace CrossEntropyLoss {
 
 /**
- * @brief Speciflying parameters for SSSP Enactor
+ * @brief Speciflying parameters for CrossEntropyLoss Enactor
  * @param parameters The util::Parameter<...> structure holding all parameter
  * info \return cudaError_t error message(s), if any
  */
@@ -36,7 +36,7 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
 }
 
 /**
- * @brief defination of SSSP iteration loop
+ * @brief defination of CrossEntropyLoss iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
@@ -188,10 +188,10 @@ struct CorssEntropyLoop
   cudaError_t ExpandIncoming(SizeT &received_length, int peer_) {
     return cudaSuccess;
   }
-};  // end of SSSPIteration
+};  // end of CrossEntropyLossIteration
 
 /**
- * @brief SSSP enactor class.
+ * @brief CrossEntropyLoss enactor class.
  * @tparam _Problem Problem type we process on
  * @tparam ARRAY_FLAG Flags for util::Array1D used in the enactor
  * @tparam cudaHostRegisterFlag Flags for util::Array1D used in the enactor
@@ -233,7 +233,7 @@ class Enactor
   }
 
   /**
-   * @brief SSSPEnactor destructor
+   * @brief CrossEntropyLossEnactor destructor
    */
   virtual ~Enactor() {
      Release();
@@ -319,7 +319,7 @@ class Enactor
   }
 
   /**
-   * @brief Enacts a SSSP computing on the specified graph.
+   * @brief Enacts a CrossEntropyLoss computing on the specified graph.
    * @param[in] src Source node to start primitive.
    * \return cudaError_t error message(s), if any
    */
