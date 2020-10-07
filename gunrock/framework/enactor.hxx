@@ -24,14 +24,15 @@ namespace gunrock {
 template <typename algorithm_problem_t>
 struct enactor_t {
   using vertex_t = typename algorithm_problem_t::vertex_t;
+  using frontier_type = frontier_t<vertex_t>;
 
   static constexpr std::size_t number_of_buffers = 2;
   cuda::multi_context_t context;
-  // XXX: needs to be a vector to support multi-gpu timer or we can move this
-  // within the actual context.
-  util::timer_t timer;
+  util::timer_t timer;  // XXX: needs to be a vector to support multi-gpu timer
+                        // or we can move this within the actual context.
   algorithm_problem_t* problem;
-  thrust::host_vector<frontier_t<vertex_t>> frontiers;
+  thrust::host_vector<frontier_type> frontiers;
+  frontier_type* active_frontier;
 
   // Disable copy ctor and assignment operator.
   // We don't want to let the user copy only a slice.
@@ -39,13 +40,26 @@ struct enactor_t {
   enactor_t& operator=(const enactor_t& rhs) = delete;
 
   enactor_t(algorithm_problem_t* problem, cuda::multi_context_t& context)
-      : problem(problem), context(context), frontier(number_of_buffers) {}
+      : problem(problem),
+        context(context),
+        frontiers(number_of_buffers),
+        active_frontier(frontiers.data()) {}
+
+  /**
+   * @brief Get the problem pointer object
+   * @return algorithm_problem_t*
+   */
+  algorithm_problem_t* get_problem_pointer() { return problem; }
+
+  /**
+   * @brief Get the frontier pointer object
+   * @return frontier_type*
+   */
+  frontier_type* get_active_frontier_buffer() { return active_frontier; }
 
   /**
    * @brief Run the enactor with the given problem and the loop.
-   *
    * @note We can work on evolving this into a multi-gpu implementation.
-   *
    * @return float time took for enactor to complete.
    */
   float enact() {

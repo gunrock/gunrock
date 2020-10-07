@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <gunrock/cuda/atomic_functions.hxx>
+
 namespace gunrock {
 
 /**
@@ -39,6 +41,7 @@ __host__ __device__ __forceinline__ type_t add(type_t* address,
 template <typename type_t>
 __host__ __device__ __forceinline__ type_t min(type_t* address,
                                                const type_t& value) {
+  using namespace cuda;  // contains support for float/double based atomic::min
 #ifdef __CUDA_ARCH__
   return atomicMin(address, value);
 #else

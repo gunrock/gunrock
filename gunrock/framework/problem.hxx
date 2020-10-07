@@ -27,6 +27,8 @@ struct problem_t {
 
   graph_type* graph_slice;
 
+  graph_type* get_graph_pointer() { return graph_slice; }
+
   problem_t() : graph_slice(nullptr) {}
   problem_t(graph_type* G) : graph_slice(G) {}
 
