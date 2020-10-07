@@ -44,6 +44,10 @@ bool All_Done(EnactorT &enactor, int gpu_num = 0) {
   // if (enactor_slices[0].enactor_stats.iteration > 2)
   //    return true;
 
+  // so gpus are equal to num_gpus into num_gpus? I don't understand this
+  // each gpu has num_gpu frontiers?
+  // TODO
+  // basically there are num_gpu * num_gpu enactor slices
   for (int gpu = 0; gpu < num_gpus * num_gpus; gpu++) {
     auto &frontier = enactor_slices[gpu].frontier;
     if (frontier.queue_length != 0)  // || frontier.has_incoming)
@@ -56,8 +60,15 @@ bool All_Done(EnactorT &enactor, int gpu_num = 0) {
 
   if (num_gpus == 1) return true;
 
+  // what we have to do for multigpus
+  // to know if we are done with all the iterations
+
+  // TODO
+  // basically all in lengths and all out lengths have to be 0
+  // there are two inlengths assuming that would be A --> B and B --> A? Or maybe it would be the two frontiers (near and far)
   auto &mgpu_slices = enactor.mgpu_slices;
   for (int gpu = 0; gpu < num_gpus; gpu++)
+  // assuming that peer=0 refers to itself
     for (int peer = 1; peer < num_gpus; peer++)
       for (int i = 0; i < 2; i++)
         if (mgpu_slices[gpu].in_length[i][peer] != 0) {
@@ -114,10 +125,13 @@ cudaError_t CheckSize(bool size_check, const char *name, SizeT target_length,
     oversized = true;
     if (size_check) {
       if (array->GetSize() != 0)
+        // it ensures that array is atleast as big as target length but if its bigger it allocates somewhere else depending on keep_content
         retval = array->EnsureSize(target_length, keep_content);
       else
         retval = array->Allocate(target_length, util::DEVICE);
     } else {
+      // here array size is more than target length
+      
       char str[256];
       // memcpy(str, name, sizeof(char) * strlen(name));
       // memcpy(str + strlen(name), temp_str, sizeof(char) * strlen(temp_str));
@@ -171,6 +185,10 @@ void PushNeighbor_Old(Enactor *enactor, int gpu, int peer,
   typedef typename Enactor::Value Value;
 
   if (peer == gpu) return;
+
+  // one of them is incremented by one
+  // TODO why
+  // 
   int gpu_ = peer < gpu ? gpu : gpu + 1;
   int peer_ = peer < gpu ? peer + 1 : peer;
   int i, t = enactor_stats->iteration % 2;

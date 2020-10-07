@@ -264,6 +264,8 @@ struct BFSIterationLoop
     bool idempotence =
         ((this->enactor->problem->flag & Enable_Idempotence) != 0);
     auto target = util::DEVICE;
+    // so we have the peer and the current gpu
+    // do all enactors have this two way shells?
     auto &gpu_num = this->gpu_num;
 
 #if TO_TRACK
@@ -274,7 +276,9 @@ struct BFSIterationLoop
 #ifdef RECORD_PER_ITERATION_STATS
     GpuTimer gpu_timer;
 #endif
-
+    
+    // data_slice is common for all 
+    // is current direction a field thats specifically for bfs?
     if (data_slice.current_direction == FORWARD) {
       frontier.queue_reset = true;
       enactor_stats.nodes_queued[0] += frontier.queue_length;
@@ -324,15 +328,26 @@ struct BFSIterationLoop
       gpu_timer.Start();
 #endif
 
+      // TODO
       auto &work_progress = frontier.work_progress;
       auto queue_index = frontier.queue_index;
+      // how does the for operation work?
+      //
       GUARD_CU(oprtr::For(
+        // these are the two variables that need to be present in the threads during the for op
+        // there is the sizeT i which is the loop variable
+        // and that is a function arg to the op
           [work_progress, queue_index] __host__ __device__(SizeT i) {
             SizeT *counter = work_progress.GetQueueCounter(queue_index + 1);
             counter[0] = 0;
           },
           1, util::DEVICE, oprtr_parameters.stream, 1, 1));
-      GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
+            GUARD_CU(frontier.V_Q()->Print("Frontier: ",
+                    frontier.queue_length,
+                    util::DEVICE,
+                    stream));
+      
+          GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
           graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
           advance_op, filter_op));
 
@@ -362,7 +377,7 @@ struct BFSIterationLoop
       //    work_progress->template GetQueueLengthPointer<unsigned int>(
       //        frontier.queue_index), oprtr_parameters.tream);
       //}
-
+      
       if (oprtr_parameters.advance_mode != "LB_CULL" &&
           oprtr_parameters.advance_mode != "LB_LIGHT_CULL") {
         // Filter
@@ -666,12 +681,25 @@ class Enactor
     do_b = parameters.Get<float>("do-b");
 
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      
       GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+
+      // for each gpu the slice is initialised to the starting point (peer = 0)
       auto &enactor_slice = this->enactor_slices[gpu * this->num_gpus + 0];
       auto &graph = problem.sub_graphs[gpu];
+      
+      // TODO
+      // does this allocate function duplicate data on each gpu?
+      // no it is agnostic to that as the partition should have handled that 
+      // and anyway we call this once for each gpu not for each enactor slice
       GUARD_CU(enactor_slice.frontier.Allocate(graph.nodes, graph.edges,
                                                this->queue_factors));
+      
+      // this is where we will have the enactor slice data allocated
+      // not allocated but pointer referenced
 
+      // each enactor slice's operator parameter labels have data slices belonging to the specific gpu
+      // this is strange?
       for (int peer = 0; peer < this->num_gpus; peer++) {
         this->enactor_slices[gpu * this->num_gpus + peer]
             .oprtr_parameters.labels = &(problem.data_slices[gpu]->labels);
@@ -732,6 +760,8 @@ class Enactor
    * \return cudaError_t error message(s), if any
    */
   cudaError_t Run(ThreadSlice &thread_data) {
+    // so each iteration loop gets 
+    // thread data 
     gunrock::app::Iteration_Loop<
         ((Enactor::Problem::FLAG & Mark_Predecessors) != 0) ? 1 : 0, 0,
         IterationT>(thread_data, iterations[thread_data.thread_num]);
