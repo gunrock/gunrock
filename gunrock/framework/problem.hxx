@@ -26,11 +26,13 @@ struct problem_t {
   using weight_pointer_t = typename graph_type::weight_pointer_t;
 
   graph_type* graph_slice;
+  std::shared_ptr<cuda::multi_context_t> context;
 
   graph_type* get_graph_pointer() { return graph_slice; }
 
   problem_t() : graph_slice(nullptr) {}
-  problem_t(graph_type* G) : graph_slice(G) {}
+  problem_t(graph_type* G, std::shared_ptr<cuda::multi_context_t> _context)
+      : graph_slice(G), context(_context) {}
 
   // Disable copy ctor and assignment operator.
   // We do not want to let user copy only a slice.

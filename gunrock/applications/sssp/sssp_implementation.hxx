@@ -39,10 +39,11 @@ struct sssp_problem_t : problem_t<graph_type> {
    * @param _predecessors output predecessors pointer
    */
   sssp_problem_t(graph_type* _G,
+                 std::shared_ptr<cuda::multi_context_t> _context,
                  vertex_t& _source,
                  weight_pointer_t _distances,
                  vertex_pointer_t _predecessors)
-      : problem_type(_G),
+      : problem_type(_G, _context),
         single_source(_source),
         distances(_distances),
         predecessors(_predecessors) {}
@@ -69,7 +70,7 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
    *
    * @param context
    */
-  void loop(cuda::standard_context_t& context) {
+  void loop(cuda::standard_context_t* context) {
     // Data slice
     auto P = enactor_type::get_problem_pointer();
     auto G = P->get_graph_pointer();
@@ -93,12 +94,12 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
       weight_t source_distance = distances[source];  // use cached::load
       weight_t distance_to_neighbor = source_distance + weight;
 
-      // Check if the destination node has been claimed as someone's child
-      weight_t recover_distance =
-          math::atomic::min(&(distances[neighbor]), distance_to_neighbor);
+      // // Check if the destination node has been claimed as someone's child
+      // weight_t recover_distance =
+      //     math::atomic::min(&(distances[neighbor]), distance_to_neighbor);
 
-      if (distance_to_neighbor < recover_distance)
-        return true;
+      // if (distance_to_neighbor < recover_distance)
+      return true;
       // frontier::mark_to_keep(source);
       return false;
       // frontier::mark_for_removal(source);
@@ -120,25 +121,27 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
     // Execute advance operator on the provided lambda
     operators::advance::execute<operators::advance_type_t::vertex_to_vertex>(
         G, enactor_type::frontiers.data(), shortest_path);
-
+    cudaDeviceSynchronize();
+    error::throw_if_exception(cudaPeekAtLastError());
     // // Execute filter operator on the provided lambda
     // operators::filter::execute(G, frontiers, remove_completed_paths);
   }
 
-  void prepare_frontier(cuda::standard_context_t& context) {
+  void prepare_frontier(cuda::standard_context_t* context) {
     auto P = enactor_type::get_problem_pointer();
     auto single_source = P->single_source;
     auto G = P->get_graph_pointer();
 
-    std::cout << G->memory_space() << std::endl;
-
-    thrust::device_vector<vertex_t> frontier_data(1);
+    thrust::device_vector<vertex_t> frontier_data;
     frontier_data.push_back(single_source);
     auto active_buffer = enactor_type::get_active_frontier_buffer();
     active_buffer->load(frontier_data);
+    cudaDeviceSynchronize();
+    error::throw_if_exception(cudaPeekAtLastError());
   }
 
-  sssp_enactor_t(algorithm_problem_t* problem, cuda::multi_context_t& context)
+  sssp_enactor_t(algorithm_problem_t* problem,
+                 std::shared_ptr<cuda::multi_context_t> context)
       : enactor_type(problem, context) {}
 
   sssp_enactor_t(const sssp_enactor_t& rhs) = delete;

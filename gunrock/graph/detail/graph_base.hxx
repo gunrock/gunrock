@@ -69,9 +69,9 @@ class graph_base_t {
   // get_source_and_destination_vertices(
   //     edge_type const& e) const = 0;  // XXX: return type?
 
-  __host__ __device__ __forceinline__ virtual edge_type get_edge(
-      vertex_type const& source,
-      vertex_type const& destination) const = 0;
+  // __host__ __device__ __forceinline__ virtual edge_type get_edge(
+  //     vertex_type const& source,
+  //     vertex_type const& destination) const = 0;
 
   __host__ __device__ __forceinline__ virtual weight_type get_edge_weight(
       edge_type const& e) const = 0;

@@ -27,7 +27,7 @@ struct enactor_t {
   using frontier_type = frontier_t<vertex_t>;
 
   static constexpr std::size_t number_of_buffers = 2;
-  cuda::multi_context_t context;
+  std::shared_ptr<cuda::multi_context_t> context;
   util::timer_t timer;  // XXX: needs to be a vector to support multi-gpu timer
                         // or we can move this within the actual context.
   algorithm_problem_t* problem;
@@ -39,9 +39,10 @@ struct enactor_t {
   enactor_t(const enactor_t& rhs) = delete;
   enactor_t& operator=(const enactor_t& rhs) = delete;
 
-  enactor_t(algorithm_problem_t* problem, cuda::multi_context_t& context)
-      : problem(problem),
-        context(context),
+  enactor_t(algorithm_problem_t* _problem,
+            std::shared_ptr<cuda::multi_context_t> _context)
+      : problem(_problem),
+        context(_context),
         frontiers(number_of_buffers),
         active_frontier(frontiers.data()) {}
 
@@ -63,7 +64,9 @@ struct enactor_t {
    * @return float time took for enactor to complete.
    */
   float enact() {
-    auto single_context = context.get_context(0);
+    auto single_context = context->get_context(0);
+    single_context->print_properties();
+    prepare_frontier(single_context);
     timer.begin();
     std::cout << "is converged? " << std::boolalpha
               << is_converged(single_context) << std::endl;
@@ -83,14 +86,14 @@ struct enactor_t {
    *
    * @param context
    */
-  virtual void loop(cuda::standard_context_t& context) = 0;
+  virtual void loop(cuda::standard_context_t* context) = 0;
 
   /**
    * @brief Prepare the initial frontier.
    *
    * @param context
    */
-  virtual void prepare_frontier(cuda::standard_context_t& context) = 0;
+  virtual void prepare_frontier(cuda::standard_context_t* context) = 0;
 
   /**
    * @brief Algorithm is converged if true is returned, keep on iterating if
@@ -100,7 +103,7 @@ struct enactor_t {
    * @return true
    * @return false
    */
-  virtual bool is_converged(cuda::standard_context_t& context) {
+  virtual bool is_converged(cuda::standard_context_t* context) {
     return frontiers.empty();
   }
 

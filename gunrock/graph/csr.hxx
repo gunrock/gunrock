@@ -96,14 +96,14 @@ class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
 
   // }
 
-  __host__ __device__ __forceinline__ edge_type
-  get_edge(const vertex_type& source,
-           const vertex_type& destination) const override {
-    auto offsets = get_row_offsets();
-    return (edge_type)algo::search::binary::execute(
-        get_column_indices(), destination, offsets[source],
-        offsets[source + 1] - 1);
-  }
+  // __host__ __device__ __forceinline__ edge_type
+  // get_edge(const vertex_type& source,
+  //          const vertex_type& destination) const override {
+  //   auto offsets = get_row_offsets();
+  //   return (edge_type)algo::search::binary::execute(
+  //       get_column_indices(), destination, offsets[source],
+  //       offsets[source + 1] - 1);
+  // }
 
   __host__ __device__ __forceinline__ weight_type
   get_edge_weight(edge_type const& e) const override {

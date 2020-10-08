@@ -11,10 +11,12 @@ void test_sssp() {
 
   constexpr memory::memory_space_t space = memory::memory_space_t::device;
 
-  // CSR Matrix Representation
-  // V            = [ 5 8 3 6 ]
-  // COL_INDEX    = [ 0 1 2 1 ]
-  // ROW_OFFSETS  = [ 0 0 2 3 4 ]
+  // Logical Graph Representation
+  // (i, j) [w]
+  // (1, 0) [5]
+  // (1, 1) [8] // Self-loop
+  // (2, 2) [3]
+  // (3, 1) [6]
   vertex_t r = 4, c = 4;
   edge_t nnz = 4;
 
@@ -50,7 +52,7 @@ void test_sssp() {
   thrust::device_vector<vertex_t> d_Aj = h_Aj;
   thrust::device_vector<weight_t> d_Ax = h_Ax;
 
-  vertex_t source = 0;
+  vertex_t source = 1;
   thrust::device_vector<weight_t> d_distances(nnz);
 
   // calling sssp

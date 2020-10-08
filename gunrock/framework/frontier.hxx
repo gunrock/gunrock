@@ -54,9 +54,10 @@ class frontier_t {
   // XXX: Useful writing some loaders
   // Maybe this can be a single loader with
   // templated over over copy
-  template <typename type_vector_t>
-  void load(type_vector_t& v) {
-    // memory::copy::device(_data, v.data(), v.size());
+  // memory::copy::device(_data, v.data(), v.size());
+  void load(thrust::device_vector<type_t>& v) {
+    _storage = v;
+    _data = memory::raw_pointer_cast(_storage.data());
     set_frontier_size(v.size());
   }
 
@@ -79,6 +80,7 @@ class frontier_t {
   std::size_t _size;
   frontier_type_t _type;
 
+  thrust::device_vector<type_t> _storage;
   pointer_type_t _data;
 };  // struct frontier_t
 

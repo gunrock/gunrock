@@ -27,8 +27,8 @@ struct context_t {
 
   // Disable copy ctor and assignment operator. We don't want to let the
   // user copy only a slice.
-  // context_t(const context_t& rhs) = delete;
-  // context_t& operator=(const context_t& rhs) = delete;
+  context_t(const context_t& rhs) = delete;
+  context_t& operator=(const context_t& rhs) = delete;
 
   virtual const cuda::device_properties_t& props() const = 0;
   virtual void print_properties() = 0;
@@ -97,15 +97,15 @@ class standard_context_t : public context_t {
 
 class multi_context_t {
  public:
-  thrust::host_vector<standard_context_t> contexts;
+  thrust::host_vector<standard_context_t*> contexts;
   thrust::host_vector<cuda::device_id_t> devices;
   static constexpr std::size_t MAX_NUMBER_OF_GPUS = 1024;
 
   multi_context_t(thrust::host_vector<cuda::device_id_t> _devices)
       : devices(_devices) {
     for (auto& device : _devices) {
-      standard_context_t context(device);
-      contexts.push_back(context);
+      standard_context_t* device_context = new standard_context_t(device);
+      contexts.push_back(device_context);
     }
   }
 
