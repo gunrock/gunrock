@@ -35,7 +35,10 @@ class frontier_t {
 
  public:
   frontier_t()
-      : _size(0), _type(frontier_type_t::vertex_frontier), _data(nullptr) {}
+      : _size(0),
+        _type(frontier_type_t::vertex_frontier),
+        _storage(),
+        _data(nullptr) {}
 
   frontier_t(frontier_t&& rhs) : frontier_t() { swap(rhs); }
 
@@ -45,12 +48,6 @@ class frontier_t {
   // frontier_t& operator=(const frontier_t& rhs) = delete;
   // frontier_t(const frontier_t& rhs) = delete;
 
-  void swap(frontier_t& rhs) {
-    std::swap(_size, rhs._size);
-    std::swap(_type, rhs._type);
-    _data->swap(rhs._data);
-  }
-
   // XXX: Useful writing some loaders
   // Maybe this can be a single loader with
   // templated over over copy
@@ -58,26 +55,45 @@ class frontier_t {
   void load(thrust::device_vector<type_t>& v) {
     _storage = v;
     _data = memory::raw_pointer_cast(_storage.data());
-    set_frontier_size(v.size());
   }
 
   frontier_t& operator=(frontier_t&& rhs) {
-    swap(rhs);
-    return *this;
+    // swap(rhs);
+    // return *this;
   }
 
   frontier_type_t get_frontier_type() const { return _type; }
 
   std::size_t get_frontier_size() const { return _size; }
 
-  pointer_type_t data() const { return _data; }
+  std::size_t get_frontier_capacity() const { return _storage.capacity(); }
+
+  pointer_type_t data() { return memory::raw_pointer_cast(_storage.data()); }
 
   bool empty() const { return (get_frontier_size() == 0); }
 
+  void push_back(type_t const& value) { _storage.push_back(value); }
+
   void set_frontier_size(std::size_t const& s) { _size = s; }
+
+  void resize(std::size_t const& s) {
+    _storage.resize(s);
+    set_frontier_size(s);
+    _data = memory::raw_pointer_cast(_storage.data());
+  }
+
+  void reserve(std::size_t const& s) {
+    _storage.reserve(s);
+    _data = memory::raw_pointer_cast(_storage.data());
+  }
+
+  void sort() {
+    thrust::sort(thrust::device, _storage.begin(), _storage.end());
+  }
 
  private:
   std::size_t _size;
+
   frontier_type_t _type;
 
   thrust::device_vector<type_t> _storage;

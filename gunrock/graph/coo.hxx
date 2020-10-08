@@ -8,9 +8,10 @@
 
 #include <gunrock/formats/formats.hxx>
 
+#include <gunrock/graph/detail/base.hxx>
+
 #include <gunrock/graph/properties.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
-#include <gunrock/graph/detail/graph_base.hxx>
 
 namespace gunrock {
 namespace graph {

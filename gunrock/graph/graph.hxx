@@ -11,10 +11,11 @@
 #include <gunrock/graph/properties.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
 
+#include <gunrock/graph/detail/base.hxx>
+
 #include <gunrock/graph/coo.hxx>
 #include <gunrock/graph/csc.hxx>
 #include <gunrock/graph/csr.hxx>
-#include <gunrock/graph/detail/graph_base.hxx>
 
 // #include <gunrock/algorithms/search/binary_search.cuh>
 

@@ -66,6 +66,11 @@ void test_sssp() {
                                        d_distances  // output distances
   );
 
+  std::cout << "Distances = ";
+  thrust::copy(d_distances.begin(), d_distances.end(),
+               std::ostream_iterator<weight_t>(std::cout, " "));
+  std::cout << std::endl;
+
   std::cout << "SSSP Elapsed Time: " << elapsed << std::endl;
 }
 

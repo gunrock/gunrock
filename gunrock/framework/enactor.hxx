@@ -33,6 +33,8 @@ struct enactor_t {
   algorithm_problem_t* problem;
   thrust::host_vector<frontier_type> frontiers;
   frontier_type* active_frontier;
+  frontier_type* inactive_frontier;
+  int buffer_selector;
 
   // Disable copy ctor and assignment operator.
   // We don't want to let the user copy only a slice.
@@ -44,7 +46,14 @@ struct enactor_t {
       : problem(_problem),
         context(_context),
         frontiers(number_of_buffers),
-        active_frontier(frontiers.data()) {}
+        active_frontier(&frontiers[0]),
+        inactive_frontier(&frontiers[1]),
+        buffer_selector(0) {
+    // Set temporary buffer to be at least the number of edges
+    auto g = problem->get_host_graph_pointer();
+    auto buffer = get_inactive_frontier_buffer();
+    buffer->reserve(g->get_number_of_edges());
+  }
 
   /**
    * @brief Get the problem pointer object
@@ -59,6 +68,20 @@ struct enactor_t {
   frontier_type* get_active_frontier_buffer() { return active_frontier; }
 
   /**
+   * @brief Get the frontier pointer object
+   * @return frontier_type*
+   */
+  frontier_type* get_inactive_frontier_buffer() { return inactive_frontier; }
+
+  void swap_frontier_buffers() {
+    buffer_selector ^= 1;
+    active_frontier = &frontiers[buffer_selector];
+    inactive_frontier = &frontiers[buffer_selector ^ 1];
+  }
+
+  enactor_t* get_enactor() { return this; }
+
+  /**
    * @brief Run the enactor with the given problem and the loop.
    * @note We can work on evolving this into a multi-gpu implementation.
    * @return float time took for enactor to complete.
@@ -67,12 +90,18 @@ struct enactor_t {
     auto single_context = context->get_context(0);
     single_context->print_properties();
     prepare_frontier(single_context);
-    timer.begin();
+
     std::cout << "is converged? " << std::boolalpha
               << is_converged(single_context) << std::endl;
-    // while (!is_converged(single_context)) {
-    loop(single_context);
-    // }
+
+    timer.begin();
+    while (!is_converged(single_context)) {
+      loop(single_context);
+    }
+
+    std::cout << "is converged? " << std::boolalpha
+              << is_converged(single_context) << std::endl;
+
     return timer.end();
   }
 
@@ -104,7 +133,7 @@ struct enactor_t {
    * @return false
    */
   virtual bool is_converged(cuda::standard_context_t* context) {
-    return frontiers.empty();
+    return active_frontier->empty();
   }
 
 };  // struct enactor_t

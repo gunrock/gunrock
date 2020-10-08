@@ -12,19 +12,20 @@
 #pragma once
 
 #include <gunrock/applications/application.hxx>
+#include <bits/stdc++.h>
 
 namespace gunrock {
 namespace sssp {
 
-template <typename graph_type>
-struct sssp_problem_t : problem_t<graph_type> {
+template <typename graph_type, typename host_graph_type>
+struct sssp_problem_t : problem_t<graph_type, host_graph_type> {
   // Get useful types from graph_type
   using vertex_t = typename graph_type::vertex_type;
   using weight_pointer_t = typename graph_type::weight_pointer_t;
   using vertex_pointer_t = typename graph_type::vertex_pointer_t;
 
   // Useful types from problem_t
-  using problem_type = problem_t<graph_type>;
+  using problem_type = problem_t<graph_type, host_graph_type>;
 
   vertex_t single_source;
   weight_pointer_t distances;
@@ -33,20 +34,23 @@ struct sssp_problem_t : problem_t<graph_type> {
   /**
    * @brief Construct a new sssp problem t object
    *
-   * @param _G  input graph
-   * @param _source input single source for sssp
-   * @param _distances output distance pointer
-   * @param _predecessors output predecessors pointer
+   * @param G graph on GPU
+   * @param g graph on CPU
+   * @param context system context
+   * @param source input single source for sssp
+   * @param dist output distance pointer
+   * @param preds output predecessors pointer
    */
-  sssp_problem_t(graph_type* _G,
-                 std::shared_ptr<cuda::multi_context_t> _context,
-                 vertex_t& _source,
-                 weight_pointer_t _distances,
-                 vertex_pointer_t _predecessors)
-      : problem_type(_G, _context),
-        single_source(_source),
-        distances(_distances),
-        predecessors(_predecessors) {}
+  sssp_problem_t(graph_type* G,
+                 host_graph_type* g,
+                 std::shared_ptr<cuda::multi_context_t> context,
+                 vertex_t& source,
+                 weight_pointer_t dist,
+                 vertex_pointer_t preds)
+      : problem_type(G, g, context),
+        single_source(source),
+        distances(dist),
+        predecessors(preds) {}
 
   sssp_problem_t(const sssp_problem_t& rhs) = delete;
   sssp_problem_t& operator=(const sssp_problem_t& rhs) = delete;
@@ -88,21 +92,25 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
      *
      */
     auto shortest_path = [distances, single_source] __host__ __device__(
-                             vertex_t const& source, vertex_t const& neighbor,
-                             edge_t const& edge,
-                             weight_t const& weight) -> bool {
+                             vertex_t const& source,    // ... source
+                             vertex_t const& neighbor,  // neighbor
+                             edge_t const& edge,        // edge
+                             weight_t const& weight     // weight (tuple).
+                             ) -> bool {
       weight_t source_distance = distances[source];  // use cached::load
       weight_t distance_to_neighbor = source_distance + weight;
+
+      printf("source = %f, dest = %f\n", source_distance, weight);
 
       // Check if the destination node has been claimed as someone's child
       weight_t recover_distance =
           math::atomic::min(&(distances[neighbor]), distance_to_neighbor);
 
+      printf("old_distance = %f\n", recover_distance);
+
       if (distance_to_neighbor < recover_distance)
-        return true;
-      // frontier::mark_to_keep(source);
-      return false;
-      // frontier::mark_for_removal(source);
+        return true;  // mark to keep
+      return false;   // mark for removal
     };
 
     /**
@@ -110,34 +118,29 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
      * to keep.
      *
      */
-    // auto remove_completed_paths =
-    //     [] __host__ __device__(vertex_t const& vertex) -> bool {
-    //   // if (!frontier::marked_for_removal(vertex))
-    //   //   frontier::remove_from_frontier(vertex);
-    //   // frontier::keep_in_frontier(vertex);
-    //   return false;
-    // };
+    auto remove_completed_paths =
+        [] __host__ __device__(vertex_t const& vertex) -> bool {
+      if (std::numeric_limits<vertex_t>::max())
+        return false;  // remove
+      return true;     // keep
+    };
 
     // Execute advance operator on the provided lambda
     operators::advance::execute<operators::advance_type_t::vertex_to_vertex>(
-        G, enactor_type::frontiers.data(), shortest_path);
-    cudaDeviceSynchronize();
-    error::throw_if_exception(cudaPeekAtLastError());
-    // // Execute filter operator on the provided lambda
-    // operators::filter::execute(G, frontiers, remove_completed_paths);
+        G, enactor_type::get_enactor(), shortest_path);
+
+    // Execute filter operator on the provided lambda
+    operators::filter::execute<operators::filter_type_t::compact>(
+        G, enactor_type::get_enactor(), remove_completed_paths);
   }
 
   void prepare_frontier(cuda::standard_context_t* context) {
     auto P = enactor_type::get_problem_pointer();
     auto single_source = P->single_source;
-    auto G = P->get_graph_pointer();
 
-    thrust::device_vector<vertex_t> frontier_data;
-    frontier_data.push_back(single_source);
-    auto active_buffer = enactor_type::get_active_frontier_buffer();
-    active_buffer->load(frontier_data);
-    cudaDeviceSynchronize();
-    error::throw_if_exception(cudaPeekAtLastError());
+    auto f = enactor_type::get_active_frontier_buffer();
+    f->push_back(single_source);
+    f->set_frontier_size(1);
   }
 
   sssp_enactor_t(algorithm_problem_t* problem,
