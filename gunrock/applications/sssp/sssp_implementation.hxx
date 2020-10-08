@@ -94,12 +94,12 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
       weight_t source_distance = distances[source];  // use cached::load
       weight_t distance_to_neighbor = source_distance + weight;
 
-      // // Check if the destination node has been claimed as someone's child
-      // weight_t recover_distance =
-      //     math::atomic::min(&(distances[neighbor]), distance_to_neighbor);
+      // Check if the destination node has been claimed as someone's child
+      weight_t recover_distance =
+          math::atomic::min(&(distances[neighbor]), distance_to_neighbor);
 
-      // if (distance_to_neighbor < recover_distance)
-      return true;
+      if (distance_to_neighbor < recover_distance)
+        return true;
       // frontier::mark_to_keep(source);
       return false;
       // frontier::mark_for_removal(source);
