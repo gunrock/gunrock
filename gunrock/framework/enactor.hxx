@@ -90,18 +90,10 @@ struct enactor_t {
     auto single_context = context->get_context(0);
     single_context->print_properties();
     prepare_frontier(single_context);
-
-    std::cout << "is converged? " << std::boolalpha
-              << is_converged(single_context) << std::endl;
-
     timer.begin();
     while (!is_converged(single_context)) {
       loop(single_context);
     }
-
-    std::cout << "is converged? " << std::boolalpha
-              << is_converged(single_context) << std::endl;
-
     return timer.end();
   }
 

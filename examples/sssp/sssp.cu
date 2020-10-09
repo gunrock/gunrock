@@ -66,7 +66,7 @@ void test_sssp() {
                                        d_distances  // output distances
   );
 
-  std::cout << "Distances = ";
+  std::cout << "Distances (output) = ";
   thrust::copy(d_distances.begin(), d_distances.end(),
                std::ostream_iterator<weight_t>(std::cout, " "));
   std::cout << std::endl;

@@ -32,6 +32,7 @@ enum frontier_type_t {
 template <typename type_t>
 class frontier_t {
   using pointer_type_t = type_t*;  // For now, use raw ptr
+  using frontier_type = frontier_t;
 
  public:
   frontier_t()
@@ -48,45 +49,71 @@ class frontier_t {
   // frontier_t& operator=(const frontier_t& rhs) = delete;
   // frontier_t(const frontier_t& rhs) = delete;
 
-  // XXX: Useful writing some loaders
-  // Maybe this can be a single loader with
-  // templated over over copy
-  // memory::copy::device(_data, v.data(), v.size());
-  void load(thrust::device_vector<type_t>& v) {
-    _storage = v;
-    _data = memory::raw_pointer_cast(_storage.data());
-  }
-
   // frontier_t& operator=(frontier_t&& rhs) {
   //   // swap(rhs);
   //   // return *this;
   // }
 
-  frontier_type_t get_frontier_type() const { return _type; }
+  // XXX: Useful writing some loaders Maybe this can be a single loader with
+  // templated over over copy memory::copy::device(_data, v.data(), v.size());
+  // void load(thrust::device_vector<type_t>& v) {
+  //   _storage = v;
+  //   _data = memory::raw_pointer_cast(_storage.data());
+  // }
 
-  std::size_t get_frontier_size() const { return _size; }
+  /**
+   * @brief Frontier type, either an edge based frontier or a vertex based
+   * frontier.
+   *
+   * @return frontier_type_t
+   */
+  frontier_type_t type() const { return _type; }
 
-  std::size_t get_frontier_capacity() const { return _storage.capacity(); }
+  // Manually managed (ugly)
+  std::size_t size() const { return _size; }
+
+  std::size_t capacity() const { return _storage.capacity(); }
 
   pointer_type_t data() { return memory::raw_pointer_cast(_storage.data()); }
 
-  bool empty() const { return (get_frontier_size() == 0); }
+  bool empty() const { return (size() == 0); }
 
-  void push_back(type_t const& value) { _storage.push_back(value); }
+  void push_back(type_t const& value) {
+    _storage.push_back(value);
+    _size++;  // XXX: ugly, manually have to update the size. :(
+  }
 
-  void set_frontier_size(std::size_t const& s) { _size = s; }
+  void set_size(std::size_t const& s) { _size = s; }
 
+  /**
+   * @brief Resize the underlying frontier storage to be exactly the size
+   * specified. Note that this actually resizes, and will now change the
+   * capacity as well as the size.
+   *
+   * @param s
+   */
   void resize(std::size_t const& s) {
     _storage.resize(s);
-    set_frontier_size(s);
+    set_size(s);
     _data = memory::raw_pointer_cast(_storage.data());
   }
 
+  /**
+   * @brief "Hints" the alocator that we need to reserve the suggested size. The
+   * capacity() will increase and report reserved() size, but size() will still
+   * report the actual size, not reserved size. See std::vector for more detail.
+   *
+   * @param s size to reserve
+   */
   void reserve(std::size_t const& s) {
     _storage.reserve(s);
     _data = memory::raw_pointer_cast(_storage.data());
   }
 
+  /**
+   * @brief Parallel sort the frontier (lowest -> highest);
+   *
+   */
   void sort() {
     thrust::sort(thrust::device, _storage.begin(), _storage.end());
   }

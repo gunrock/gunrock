@@ -3,18 +3,18 @@
 namespace gunrock {
 namespace operators {
 
-enum filter_type_t { compact };
+enum filter_type_t { predicated, uniquify };
 
 namespace filter {
 
-template <filter_type_t type = filter_type_t::compact,
+template <filter_type_t type = filter_type_t::predicated,
           typename graph_type,
           typename enactor_type,
           typename operator_type>
 void execute(graph_type* G, enactor_type* E, operator_type op) {
   auto active_buffer = E->get_active_frontier_buffer();
   auto inactive_buffer = E->get_inactive_frontier_buffer();
-  auto min_frontier_size = active_buffer->get_frontier_size();
+  auto min_frontier_size = active_buffer->size();
   inactive_buffer->resize(min_frontier_size);
   thrust::copy_if(
       thrust::device,                             // execution policy

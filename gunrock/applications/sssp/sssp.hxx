@@ -73,11 +73,6 @@ float execute(vertex_t const& number_of_rows,
   thrust::fill(thrust::device, distances.begin() + source,
                distances.begin() + source + 1, 0);
 
-  std::cout << "Distances (init) = ";
-  thrust::copy(distances.begin(), distances.end(),
-               std::ostream_iterator<weight_t>(std::cout, " "));
-  std::cout << std::endl;
-
   // Build graph structure for SSSP
   auto G =
       graph::build::from_csr_t<space>(number_of_rows,      // number of rows

@@ -26,7 +26,29 @@ using namespace format;
 using namespace detail;
 using namespace memory;
 
-// Variadic inheritence, inherit only what you need
+/**
+ * @brief Variadic inheritence based graph class, inherit only what you need
+ * from the formats implemented. See detail/base.hxx for the graph_base_t
+ * implementation. Things to consider:
+ * - Coordinate graph view is equivalent to an edge list.
+ * - Compressed sparse row/column view are equivalent to each other in terms of
+ * complexity.
+ *
+ * | Operation     | Adjacency Matrix | COO  | Adj. List    | CSR/CSC |
+ * |---------------|------------------|------|--------------|---------|
+ * | scan          | O(n^2)           | O(m) | O(m+n)       | O(m+n)  |
+ * | get neighbors | O(n)             | O(m) | O(d)         | O(d)    |
+ * | is edge       | O(1)             | O(m) | O(d)         | O(d)    |
+ * | insert edge   | O(1)             | O(1) | O(1) or O(d) | O(m+n)  | (x)
+ * | delete edge   | O(1)             | O(m) | O(d)         | O(m+n)  | (x)
+ *
+ *
+ * @tparam space
+ * @tparam vertex_t
+ * @tparam edge_t
+ * @tparam weight_t
+ * @tparam graph_view_t
+ */
 template <memory_space_t space,
           typename vertex_t,
           typename edge_t,
@@ -191,7 +213,7 @@ __host__ __device__ double get_degree_standard_deviation(const graph_type& G) {
 
 //   auto begin = 0;
 //   auto end = graph.get_number_of_vertices();
-//   operator::for_all(thrust::device, histogram.data(), begin, end,
+//   operators::for_all(thrust::device, histogram.data(), begin, end,
 //   build_histogram);
 
 //   return histogram.data.get();

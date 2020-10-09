@@ -50,7 +50,9 @@ struct sssp_problem_t : problem_t<graph_type, host_graph_type> {
       : problem_type(G, g, context),
         single_source(source),
         distances(dist),
-        predecessors(preds) {}
+        predecessors(preds) {
+    // XXX: move initializing distances[] here.
+  }
 
   sssp_problem_t(const sssp_problem_t& rhs) = delete;
   sssp_problem_t& operator=(const sssp_problem_t& rhs) = delete;
@@ -81,8 +83,6 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
     auto distances = P->distances;
     auto single_source = P->single_source;
 
-    std::cout << "Single source: " << single_source << std::endl;
-
     /**
      * @brief Lambda operator to advance to neighboring vertices from the
      * source vertices in the frontier, and marking the vertex to stay in the
@@ -100,13 +100,9 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
       weight_t source_distance = distances[source];  // use cached::load
       weight_t distance_to_neighbor = source_distance + weight;
 
-      printf("source = %f, dest = %f\n", source_distance, weight);
-
       // Check if the destination node has been claimed as someone's child
       weight_t recover_distance =
           math::atomic::min(&(distances[neighbor]), distance_to_neighbor);
-
-      printf("old_distance = %f\n", recover_distance);
 
       if (distance_to_neighbor < recover_distance)
         return true;  // mark to keep
@@ -130,7 +126,7 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
         G, enactor_type::get_enactor(), shortest_path);
 
     // Execute filter operator on the provided lambda
-    operators::filter::execute<operators::filter_type_t::compact>(
+    operators::filter::execute<operators::filter_type_t::predicated>(
         G, enactor_type::get_enactor(), remove_completed_paths);
   }
 
@@ -140,7 +136,6 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
 
     auto f = enactor_type::get_active_frontier_buffer();
     f->push_back(single_source);
-    f->set_frontier_size(1);
   }
 
   sssp_enactor_t(algorithm_problem_t* problem,
