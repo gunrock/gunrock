@@ -19,22 +19,22 @@ namespace format {
 using namespace memory;
 
 // Forward decleration
-template <typename index_t,
+template <memory_space_t space,
+          typename index_t,
           typename nz_size_t,
-          typename value_t,
-          memory_space_t space>
+          typename value_t>
 struct coo_t;
 
-template <typename offset_t,
+template <memory_space_t space,
           typename index_t,
-          typename value_t,
-          memory_space_t space>
+          typename offset_t,
+          typename value_t>
 struct csr_t;
 
-template <typename offset_t,
+template <memory_space_t space,
           typename index_t,
-          typename value_t,
-          memory_space_t space>
+          typename offset_t,
+          typename value_t>
 struct csc_t;
 
 }  // namespace format

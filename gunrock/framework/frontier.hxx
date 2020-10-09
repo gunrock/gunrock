@@ -57,10 +57,10 @@ class frontier_t {
     _data = memory::raw_pointer_cast(_storage.data());
   }
 
-  frontier_t& operator=(frontier_t&& rhs) {
-    // swap(rhs);
-    // return *this;
-  }
+  // frontier_t& operator=(frontier_t&& rhs) {
+  //   // swap(rhs);
+  //   // return *this;
+  // }
 
   frontier_type_t get_frontier_type() const { return _type; }
 
@@ -93,9 +93,7 @@ class frontier_t {
 
  private:
   std::size_t _size;
-
   frontier_type_t _type;
-
   thrust::device_vector<type_t> _storage;
   pointer_type_t _data;
 };  // struct frontier_t
