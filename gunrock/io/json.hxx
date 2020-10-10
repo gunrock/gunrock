@@ -18,17 +18,16 @@
 #include <rapidjson/filewritestream.h>
 #include <rapidjson/prettywriter.h>
 
-#include <gunrock/util/error.hxx>
+#include <gunrock/error.hxx>
 #include <gunrock/util/gitsha1.hxx>
 
 namespace gunrock {
-namespace util {
+namespace io {
 
 /**
  * @brief json data structure to build output a json to stdout or a file.
  */
-class json
-{
+class json {
   std::string _time_str;
   std::string _application_name;
 
@@ -46,36 +45,31 @@ class json
   writer_t* _writer;
   document_t* _document;
 
-public:
+ public:
   /**
    * @brief info default constructor
    */
   info()
-    : _time_str("")
-    , _application_name("")
-    , _filename("")
-    , _stream(nullptr)
-    , _writer(nullptr)
-    , _file(nullptr)
-    , _document(nullptr)
-  {}
+      : _time_str(""),
+        _application_name(""),
+        _filename(""),
+        _stream(nullptr),
+        _writer(nullptr),
+        _file(nullptr),
+        _document(nullptr) {}
 
   info(std::string application, std::string filename)
-    : _time_str("")
-    , _application_name(application)
-    , _filename(filename)
-    , _stream(nullptr)
-    , _writer(nullptr)
-    , _file(nullptr)
-    , _document(nullptr)
-  {
+      : _time_str(""),
+        _application_name(application),
+        _filename(filename),
+        _stream(nullptr),
+        _writer(nullptr),
+        _file(nullptr),
+        _document(nullptr) {
     init();
   }
 
-  ~info() { release(); }
-
-  error_t release()
-  {
+  ~info() {
     _time_str = "";
     _application_name = "";
     _filename = "";
@@ -88,7 +82,6 @@ public:
 
     delete _document;
     _document = nullptr;
-    return util::error::success;
   }
 
   /**
@@ -97,14 +90,10 @@ public:
    * @param[in] application_name application name.
    * @param[in] args Command line arguments.
    */
-  void init_base(std::string application_name)
-  {
-
+  void init_base(std::string application_name) {
     // To keep things uniform, convert application name to lower case
-    std::transform(application_name.begin(),
-                   application_name.end(),
-                   application_name.begin(),
-                   ::tolower);
+    std::transform(application_name.begin(), application_name.end(),
+                   application_name.begin(), ::tolower);
 
     this->_application_name = application_name;
 
@@ -114,14 +103,14 @@ public:
     // overwrite each other as a single filename.
     time_t now = time(NULL);
 
-    long ms;  // Milliseconds
-    time_t s; // Seconds
+    long ms;   // Milliseconds
+    time_t s;  // Seconds
     struct timespec spec;
 
     clock_gettime(CLOCK_REALTIME, &spec);
 
     s = spec.tv_sec;
-    ms = round(spec.tv_nsec / 1.0e6); // Convert nanoseconds to milliseconds
+    ms = round(spec.tv_nsec / 1.0e6);  // Convert nanoseconds to milliseconds
     if (ms > 999) {
       s++;
       ms = 0;
@@ -130,7 +119,7 @@ public:
     std::string time_s = std::string(ctime(&now));
     std::string time_ms = std::to_string(ms);
 
-    this->_time_str = time_s; // Used within json
+    this->_time_str = time_s;  // Used within json
     std::string time_str_filename = time_s.substr(0, time_s.size() - 5) +
                                     time_ms + ' ' +
                                     time_s.substr(time_s.length() - 5);
@@ -139,9 +128,7 @@ public:
   /**
    * @brief Initialization process for Info.
    */
-  void init()
-  {
-
+  void init() {
     init_base(_application_name);
     _document = new document_t();
     _document->SetObject();
@@ -186,14 +173,12 @@ public:
 
   // Get values from the json document.
   // get <start>
-  template<typename T>
-  value_t get_val(const T& val)
-  {
+  template <typename T>
+  value_t get_val(const T& val) {
     return value_t(val);
   }
 
-  value_t get_val(const std::string& str)
-  {
+  value_t get_val(const std::string& str) {
     if (_document == NULL)
       return value_t();
     else {
@@ -201,8 +186,7 @@ public:
     }
   }
 
-  value_t get_val(char* const str)
-  {
+  value_t get_val(char* const str) {
     if (_document == NULL)
       return value_t();
     else {
@@ -213,87 +197,77 @@ public:
 
   // Set values and type support.
   // set <start>
-  template<typename T>
-  void set_bool(std::string name, const T& val, value_t& json_object)
-  {
+  template <typename T>
+  void set_bool(std::string name, const T& val, value_t& json_object) {
     std::cerr << "Attempt to set_val with unknown type for key \"" << name
               << std::endl;
   }
 
-  void set_bool(std::string name, const bool& val, value_t& json_object)
-  {
+  void set_bool(std::string name, const bool& val, value_t& json_object) {
     if (_document != NULL) {
       value_t key(name, _document->GetAllocator());
       json_object.AddMember(key, val, _document->GetAllocator());
     }
   }
 
-  template<typename T>
-  void set_int(std::string name, const T& val, value_t& json_object)
-  {
+  template <typename T>
+  void set_int(std::string name, const T& val, value_t& json_object) {
     std::cerr << "Attempt to set_val with unknown type for key \"" << name
               << std::endl;
   }
 
-  void set_int(std::string name, const int& val, value_t& json_object)
-  {
+  void set_int(std::string name, const int& val, value_t& json_object) {
     if (_document != NULL) {
       value_t key(name, _document->GetAllocator());
       json_object.AddMember(key, val, _document->GetAllocator());
     }
   }
 
-  template<typename T>
-  void set_uint(std::string name, const T& val, value_t& json_object)
-  {
+  template <typename T>
+  void set_uint(std::string name, const T& val, value_t& json_object) {
     std::cerr << "Attempt to set_val with unknown type for key \"" << name
               << std::endl;
   }
 
-  void set_uint(std::string name, const unsigned int& val, value_t& json_object)
-  {
+  void set_uint(std::string name,
+                const unsigned int& val,
+                value_t& json_object) {
     if (_document != NULL) {
       value_t key(name, _document->GetAllocator());
       json_object.AddMember(key, val, _document->GetAllocator());
     }
   }
 
-  template<typename T>
-  void set_int64(std::string name, const T& val, value_t& json_object)
-  {
+  template <typename T>
+  void set_int64(std::string name, const T& val, value_t& json_object) {
     std::cerr << "writing unknown type for key \"" << name << std::endl;
   }
 
-  void set_int64(std::string name, const int64_t& val, value_t& json_object)
-  {
+  void set_int64(std::string name, const int64_t& val, value_t& json_object) {
     if (_document != NULL) {
       value_t key(name, _document->GetAllocator());
       json_object.AddMember(key, val, _document->GetAllocator());
     }
   }
 
-  template<typename T>
-  void set_uint64(std::string name, const T& val, value_t& json_object)
-  {
+  template <typename T>
+  void set_uint64(std::string name, const T& val, value_t& json_object) {
     std::cerr << "writing unknown type for key \"" << name << std::endl;
   }
 
-  void set_uint64(std::string name, const uint64_t& val, value_t& json_object)
-  {
+  void set_uint64(std::string name, const uint64_t& val, value_t& json_object) {
     if (_document != NULL) {
       value_t key(name, _document->GetAllocator());
       json_object.AddMember(key, val, _document->GetAllocator());
     }
   }
 
-  template<typename T>
-  void set_double(std::string name, const T& val, value_t& json_object)
-  {
+  template <typename T>
+  void set_double(std::string name, const T& val, value_t& json_object) {
     std::cerr << "writing unknown type for key \"" << name << std::endl;
   }
 
-  void set_double(std::string name, const float& val, value_t& json_object)
-  {
+  void set_double(std::string name, const float& val, value_t& json_object) {
     if (_document != NULL) {
       value_t key(name, _document->GetAllocator());
 
@@ -310,8 +284,7 @@ public:
     }
   }
 
-  void set_double(std::string name, const double& val, value_t& json_object)
-  {
+  void set_double(std::string name, const double& val, value_t& json_object) {
     if (_document != NULL) {
       value_t key(name, _document->GetAllocator());
 
@@ -326,9 +299,8 @@ public:
 
   // Attach a key with name, "name" and value "val" to the JSON object
   // "json_object"
-  template<typename T>
-  void set_val(std::string name, const T& val, value_t& json_object)
-  {
+  template <typename T>
+  void set_val(std::string name, const T& val, value_t& json_object) {
     if (_document == NULL)
       return;
 
@@ -368,11 +340,10 @@ public:
     }
   }
 
-  template<typename T>
+  template <typename T>
   void set_val(std::string name,
                const std::vector<T>& vec,
-               value_t& json_object)
-  {
+               value_t& json_object) {
     /*
      * @todo update parameters to support "ALWAYS_ARRAY" type currently using a
      * hack to make sure tag is always an array in JSON. This is also required
@@ -396,11 +367,10 @@ public:
     }
   }
 
-  template<typename T>
+  template <typename T>
   void set_val(std::string name,
                const std::vector<std::pair<T, T>>& vec,
-               value_t& json_object)
-  {
+               value_t& json_object) {
     if (_document == NULL)
       return;
 
@@ -414,9 +384,8 @@ public:
     json_object.AddMember(key, child_object, _document->GetAllocator());
   }
 
-  template<typename T>
-  void set_val(std::string name, const T& val)
-  {
+  template <typename T>
+  void set_val(std::string name, const T& val) {
     if (_document == NULL)
       return;
 
@@ -424,7 +393,7 @@ public:
   }
   // set <end>
 
-}; // class json
+};  // class json
 
-} // namespace util
-} // namespace gunrock
+}  // namespace io
+}  // namespace gunrock

@@ -20,26 +20,26 @@ template <memory_space_t space,
           typename nz_size_t,
           typename value_t>
 struct coo_t {
-  index_t num_rows;
-  index_t num_columns;
-  nz_size_t num_nonzeros;
+  index_t number_of_rows;
+  index_t number_of_columns;
+  nz_size_t number_of_nonzeros;
 
   typename vector<index_t, space>::type row_indices;     // I
   typename vector<index_t, space>::type column_indices;  // J
   typename vector<value_t, space>::type nonzero_values;  // V
 
   coo_t()
-      : num_rows(0),
-        num_columns(0),
-        num_nonzeros(0),
+      : number_of_rows(0),
+        number_of_columns(0),
+        number_of_nonzeros(0),
         row_indices(),
         column_indices(),
         nonzero_values() {}
 
   coo_t(index_t r, index_t c, nz_size_t nnz)
-      : num_rows(r),
-        num_columns(c),
-        num_nonzeros(nnz),
+      : number_of_rows(r),
+        number_of_columns(c),
+        number_of_nonzeros(nnz),
         row_indices(nnz),
         column_indices(nnz),
         nonzero_values(nnz) {}

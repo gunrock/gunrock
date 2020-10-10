@@ -20,26 +20,26 @@ template <memory_space_t space,
           typename offset_t,
           typename value_t>
 struct csr_t {
-  index_t num_rows;
-  index_t num_columns;
-  index_t num_nonzeros;
+  index_t number_of_rows;
+  index_t number_of_columns;
+  index_t number_of_nonzeros;
 
   typename vector<offset_t, space>::type row_offsets;    // Ap
   typename vector<index_t, space>::type column_indices;  // Aj
   typename vector<value_t, space>::type nonzero_values;  // Ax
 
   csr_t()
-      : num_rows(0),
-        num_columns(0),
-        num_nonzeros(0),
+      : number_of_rows(0),
+        number_of_columns(0),
+        number_of_nonzeros(0),
         row_offsets(),
         column_indices(),
         nonzero_values() {}
 
   csr_t(index_t r, index_t c, index_t nnz)
-      : num_rows(r),
-        num_columns(c),
-        num_nonzeros(nnz),
+      : number_of_rows(r),
+        number_of_columns(c),
+        number_of_nonzeros(nnz),
         row_offsets(r + 1),
         column_indices(nnz),
         nonzero_values(nnz) {}
