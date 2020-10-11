@@ -3,7 +3,10 @@
 namespace gunrock {
 namespace operators {
 
-enum filter_type_t { predicated, uniquify };
+enum filter_type_t {
+  predicated,  // Copy if predicate = true
+  uniquify     // Exact deduplication (100%)
+};
 
 namespace filter {
 
