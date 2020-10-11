@@ -22,8 +22,8 @@ namespace operators {
 enum load_balance_type {
   merge_based,    // Merrill & Garland (SpMV)
   bucketing,      // Davidson et al. (SSSP)
-  work_stealing,  // <find cite>
-  none            // No ;oad-balancing applied
+  work_stealing,  // <cite>
+  unbalanced      // No load-balancing applied
 };
 
 }  // namespace operators
