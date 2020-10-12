@@ -11,6 +11,8 @@
 
 #pragma once
 
+#include <string>
+
 #include <externals/mtx/mmio.hxx>
 
 #include <gunrock/util/filepath.hxx>
@@ -40,33 +42,48 @@ enum : matrix_market_code_t {
   none = 0 << 0,        // 0x00
 };
 
+/**
+ * @brief Reads a MARKET graph from an input-stream
+ * into a specified sparse format
+ *
+ * Here is an example of the matrix market format
+ * +----------------------------------------------+
+ * |%%MatrixMarket matrix coordinate real general | <--- header line
+ * |%                                             | <--+
+ * |% comments                                    |    |-- 0 or more comments
+ * |%                                             | <--+
+ * |  M N L                                       | <--- rows, columns, entries
+ * |  I1 J1 A(I1, J1)                             | <--+
+ * |  I2 J2 A(I2, J2)                             |    |
+ * |  I3 J3 A(I3, J3)                             |    |-- L lines
+ * |     . . .                                    |    |
+ * |  IL JL A(IL, JL)                             | <--+
+ * +----------------------------------------------+
+ *
+ * Indices are 1-based i.2. A(1,1) is the first element.
+ */
 template <typename vertex_t, typename edge_t, typename weight_t>
 struct matrix_market_t {
   typedef FILE* file_t;
   typedef MM_typecode mm_type_t;
 
+  std::string filename;
   std::string dataset;
-  mm_code_t types;
+  matrix_market_code_t types;
 
   matrix_market_t() {}
+  ~matrix_market_t() {}
 
   /**
-   * @brief If format was specified as coordinate,
-   *        then the size line has the form:
-   *          m n nonzeros
-   *        where
-   *          m is the number of rows in the matrix;
-   *          n is the number of columns in the matrix;
-   *          nonzeros is the number of nonzero entries
-   *          in the matrix (for general symmetry), or
-   *          the number of nonzero entries on or below
-   *          the diagonal (for symmetric or Hermitian
-   *          symmetry), or the number of nonzero entries
-   *          below the diagonal (for skew-symmetric symmetry).
+   * @brief Loads the given .mtx file into a coordinate format, and returns the
+   * coordinate array. This needs to be further extended to support dense
+   * arrays, those are the only two formats mtx are written in.
    *
-   * @param filename
+   * @param _filename input file name (.mtx)
+   * @return coordinate sparse format
    */
-  void load(std::string filename) {
+  auto load(std::string _filename) {
+    filename = _filename;
     dataset = util::extract_dataset(util::extract_filename(filename));
 
     file_t file;
@@ -83,7 +100,7 @@ struct matrix_market_t {
       exit(1);
     }
 
-    vertex_t num_rows, num_columns, num_nonzeros;
+    int num_rows, num_columns, num_nonzeros;  // XXX: requires all ints intially
     if ((mm_read_mtx_crd_size(file, &num_rows, &num_columns, &num_nonzeros)) !=
         0) {
       std::cerr << "Could not read file info (M, N, NNZ)" << std::endl;
@@ -91,8 +108,8 @@ struct matrix_market_t {
     }
 
     // mtx are generally written as coordinate formaat
-    coo_t<memory_space_t::host, vertex_t, edge_t, weight_t> coo(
-        num_rows, num_columns, num_nonzeros);
+    format::coo_t<memory_space_t::host, vertex_t, edge_t, weight_t> coo(
+        (vertex_t)num_rows, (vertex_t)num_columns, (edge_t)num_nonzeros);
 
     if (mm_is_pattern(code)) {
       types |= pattern;
@@ -168,6 +185,8 @@ struct matrix_market_t {
     }  // end symmetric case
 
     fclose(file);
+
+    return coo;
   }
 };
 

@@ -35,8 +35,8 @@ else
     OMP_LINK = -Xcompiler -fopenmp -Xlinker -lgomp
 endif
 
-CUDA_INC 	= -I"$(shell dirname $(NVCC))/../include"
 EXT_INC     = ../../externals
+CUDA_INC 	= -I"$(shell dirname $(NVCC))/../include"
 MGPU_INC 	= -I"$(EXT_INC)/moderngpu/src"
 JSON_INC    = -I"$(EXT_INC)/rapidjson/include"
 MTX_INC     = -I"$(EXT_INC)/mtx"
@@ -46,7 +46,7 @@ CUSPARSE    = -lcusparse
 
 GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=2.0.0
 LINK        = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
-INC         = $(CUDA_CPP) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(JSON_INC) $(CUDA_INC) -I.. -I../.. $(LINK)
+INC         = -I.. -I../.. $(CUDA_CPP) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(JSON_INC) $(CUDA_INC) $(MTX_INC) $(LINK)
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -94,8 +94,8 @@ endif
 #-------------------------------------------------------------------------------
 # Dependency Lists
 #-------------------------------------------------------------------------------
-EXTRA_SOURCE += ../../gunrock/util/gitsha1make.c
-EXTRA_SOURCE += $(EXT_INC)/mtx/mmio.cpp
+SOURCE = ../../gunrock/util/gitsha1make.c
+SOURCE += ../../externals/mtx/mmio.cpp
 
 # ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
 #     EXTRA_SOURCE = $(EXTRA_SOURCE_) \
@@ -106,13 +106,17 @@ EXTRA_SOURCE += $(EXT_INC)/mtx/mmio.cpp
 
 DEPS = ./Makefile \
     ../Makefile.inc \
-    $(EXTRA_SOURCE) \
-    $(wildcard ../../gunrock/algorithms/*.cuh) \
-    $(wildcard ../../gunrock/algorithms/**/*.cuh)  \
+    $(SOURCE) \
+	$(wildcard ../../gunrock/cuda/*.hxx) \
+    $(wildcard ../../gunrock/algorithms/*.hxx) \
+    $(wildcard ../../gunrock/algorithms/**/*.hxx)  \
     $(wildcard ../../gunrock/util/*.hxx) \
-	$(wildcard ../../gunrock/util/*.cuh) \
-    $(wildcard ../../gunrock/container/*.cuh) \
-	$(wildcard ../../gunrock/framework/*.cuh)
+	$(wildcard ../../gunrock/util/*.cuh)  \
+	$(wildcard ../../gunrock/io/*.hxx) \
+	$(wildcard ../../gunrock/formats/*.hxx) \
+    $(wildcard ../../gunrock/container/*.hxx) \
+	$(wildcard ../../gunrock/framework/*.hxx) \
+	$(wildcard ../../gunrock/framework/**/*.hxx)
 
 #-------------------------------------------------------------------------------
 # Clean
