@@ -71,7 +71,7 @@ void test_sssp() {
                std::ostream_iterator<weight_t>(std::cout, " "));
   std::cout << std::endl;
 
-  std::cout << "SSSP Elapsed Time: " << elapsed << std::endl;
+  std::cout << "SSSP Elapsed Time: " << elapsed << " (ms)" << std::endl;
 }
 
 int main(int argc, char** argv) {

@@ -122,8 +122,13 @@ struct matrix_market_t {
     format::coo_t<memory_space_t::host, vertex_t, edge_t, weight_t> coo(
         (vertex_t)num_rows, (vertex_t)num_columns, (edge_t)num_nonzeros);
 
+    if (mm_is_coordinate(code))
+      format = matrix_market_format_t::coordinate;
+    else
+      format = matrix_market_format_t::array;
+
     if (mm_is_pattern(code)) {
-      types |= pattern;
+      data = matrix_market_data_t::pattern;
 
       // pattern matrix defines sparsity pattern, but not values
       for (vertex_t i = 0; i < num_nonzeros; i++) {
@@ -135,7 +140,10 @@ struct matrix_market_t {
             (weight_t)1.0;  // use value 1.0 for all nonzero entries
       }
     } else if (mm_is_real(code) || mm_is_integer(code)) {
-      types |= real;
+      if (mm_is_real(code))
+        data = matrix_market_data_t::real;
+      else
+        data = matrix_market_data_t::integer;
 
       for (vertex_t i = 0; i < coo.number_of_nonzeros; i++) {
         vertex_t I, J;
@@ -153,7 +161,7 @@ struct matrix_market_t {
     }
 
     if (mm_is_symmetric(code)) {  // duplicate off diagonal entries
-      types |= symmetric;
+      scheme = matrix_market_storage_scheme_t::symmetric;
       vertex_t off_diagonals = 0;
       for (vertex_t i = 0; i < coo.number_of_nonzeros; i++) {
         if (coo.row_indices[i] != coo.column_indices[i])
