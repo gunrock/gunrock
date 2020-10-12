@@ -86,9 +86,9 @@ float execute(vertex_t const& number_of_rows,
       number_of_rows,      // number of rows
       number_of_columns,   // number of columns
       number_of_nonzeros,  // number of edges
-      row_offsets,         // row offsets
-      column_indices,      // column indices
-      edge_values);        // nonzero values
+      row_offsets,         // XXX: illegal device memory
+      column_indices,      // XXX: illegal device memory
+      edge_values);        // XXX: illegal device memory
 
   return sssp<space>(G.data().get(), g.data(), source, distances.data().get());
 }
