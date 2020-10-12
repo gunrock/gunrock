@@ -24,23 +24,27 @@ namespace io {
 
 using namespace memory;
 
-using matrix_market_code_t = uint32_t;
-enum : matrix_market_code_t {
-  matrix = 1 << 0,      // 0x01
-  sparse = 1 << 1,      // 0x02
-  coordinate = 1 << 2,  // 0x03
-  dense = 1 << 3,       // 0x04
-  array = 1 << 4,       // 0x05
-  complex = 1 << 5,     // 0x06
-  real = 1 << 6,        // 0x07
-  pattern = 1 << 7,     // 0x08
-  integer = 1 << 8,     // 0x09
-  symmetric = 1 << 9,   // 0x10
-  general = 1 << 10,    // 0x11
-  skew = 1 << 11,       // 0x12
-  hermitian = 1 << 12,  // 0x13
-  none = 0 << 0,        // 0x00
-};
+/**
+ * @brief Matrix Market format supports two kind of formats, a sparse coordinate
+ * format and a dense array format.
+ *
+ */
+enum matrix_market_format_t { coordinate, array };
+
+/**
+ * @brief Data type defines the type of data presented in the file, things like,
+ * are they real numbers, complex (real and imaginary), pattern (do not have
+ * weights/nonzero-values), etc.
+ *
+ */
+enum matrix_market_data_t { real, complex, pattern, integer };
+
+/**
+ * @brief Storage scheme defines the storage structure, symmetric matrix for
+ * example will be symmetric over the diagonal. Skew is skew symmetric. Etc.
+ *
+ */
+enum matrix_market_storage_scheme_t { general, hermitian, symmetric, skew };
 
 /**
  * @brief Reads a MARKET graph from an input-stream
@@ -64,12 +68,20 @@ enum : matrix_market_code_t {
  */
 template <typename vertex_t, typename edge_t, typename weight_t>
 struct matrix_market_t {
-  typedef FILE* file_t;
-  typedef MM_typecode mm_type_t;
+  // typedef FILE* file_t;
+  // typedef MM_typecode matrix_market_code_t;
+
+  using file_t = FILE*;
+  using matrix_market_code_t = MM_typecode;
 
   std::string filename;
   std::string dataset;
-  matrix_market_code_t types;
+
+  // Dataset characteristics
+  matrix_market_code_t code;              // (ALL INFORMATION)
+  matrix_market_format_t format;          // Sparse coordinate or dense array
+  matrix_market_data_t data;              // Data type
+  matrix_market_storage_scheme_t scheme;  // Storage scheme
 
   matrix_market_t() {}
   ~matrix_market_t() {}
@@ -87,7 +99,6 @@ struct matrix_market_t {
     dataset = util::extract_dataset(util::extract_filename(filename));
 
     file_t file;
-    mm_type_t code;
 
     // Load MTX information
     if ((file = fopen(filename.c_str(), "r")) == NULL) {

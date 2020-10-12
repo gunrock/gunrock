@@ -15,6 +15,15 @@
 
 namespace gunrock {
 
+/**
+ * @brief Inherit problem class for your custom applications' implementation.
+ * Problem describes the data slice of your aglorithm, and the data can often be
+ * replicated or partitioned to multiple instances (for example, in a multi-gpu
+ * context). In the algorithms' problem constructor, initialize your data.
+ *
+ * @tparam graph_type
+ * @tparam host_graph_type
+ */
 template <typename graph_type, typename host_graph_type>
 struct problem_t {
   using vertex_t = typename graph_type::vertex_type;

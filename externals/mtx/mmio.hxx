@@ -1,3 +1,15 @@
+/**
+ * @file mmio.hxx
+ * @author Muhammad Osama (mosama@ucdavis.edu)
+ * @brief Matrix-Market file format header file, see mmio.cpp for implementation
+ * details.
+ * @version 0.1
+ * @date 2020-10-12
+ *
+ * @copyright Copyright (c) 2020
+ *
+ */
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -83,21 +95,20 @@ int mm_is_valid(MM_typecode matcode); /* too complex for a macro */
 #define MM_LINE_TOO_LONG 16
 #define MM_COULD_NOT_WRITE_FILE 17
 
-/******************** Matrix Market internal definitions ********************
-
-   MM_matrix_typecode: 4-character sequence
-
-                                    ojbect 		sparse/   	data
- storage dense     	type        scheme
-
-   string position:	 [0]        [1]			[2]         [3]
-
-   Matrix typecode:  M(atrix)  C(oord)		R(eal)   	G(eneral)
-                                                        A(array)
- C(omplex)   H(ermitian) P(attern)   S(ymmetric) I(nteger)	K(kew)
-
- ***********************************************************************/
-
+/**
+ * @brief Matrix Market internal definitions.
+ *
+ *                  MM_matrix_typecode: 4-character sequence
+ *
+ * |                 | ojbect   | sparse/dense | data type | storage scheme |
+ * |-----------------|----------|--------------|-----------|----------------|
+ * | string position | [0]      | [1]          | [2]       | [3]            |
+ * | Matrix typecode | M(atrix) | C(oord)      | R(eal)    | G(eneral)      |
+ * |                 |          | A(rray)      | C(omplex) | H(ermitian)    |
+ * |                 |          |              | P(attern) | S(ymmetric)    |
+ * |                 |          |              | I(nteger) | K(kew)         |
+ *
+ */
 #define MM_MTX_STR "matrix"
 #define MM_ARRAY_STR "array"
 #define MM_DENSE_STR "array"
@@ -122,6 +133,7 @@ int mm_write_mtx_crd(char fname[],
                      int J[],
                      double val[],
                      MM_typecode matcode);
+
 int mm_read_mtx_crd_data(FILE* f,
                          int M,
                          int N,
@@ -130,6 +142,7 @@ int mm_read_mtx_crd_data(FILE* f,
                          int J[],
                          double val[],
                          MM_typecode matcode);
+
 int mm_read_mtx_crd_entry(FILE* f,
                           int* I,
                           int* J,

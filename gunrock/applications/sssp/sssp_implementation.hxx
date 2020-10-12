@@ -76,7 +76,7 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
    *
    * @param context
    */
-  void loop(cuda::standard_context_t* context) {
+  void loop(cuda::standard_context_t* context) override {
     // Data slice
     auto P = enactor_type::get_problem_pointer();
     auto G = P->get_graph_pointer();
@@ -130,7 +130,13 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
         G, enactor_type::get_enactor(), remove_completed_paths);
   }
 
-  void prepare_frontier(cuda::standard_context_t* context) {
+  /**
+   * @brief Populate the initial frontier with a single source node from where
+   * we begin shortest path traversal.
+   *
+   * @param context
+   */
+  void prepare_frontier(cuda::standard_context_t* context) override {
     auto P = enactor_type::get_problem_pointer();
     auto single_source = P->single_source;
 

@@ -21,6 +21,21 @@
 
 namespace gunrock {
 
+/**
+ * @brief Building block of the algorithm within gunrock. An enactor structure
+ * defines how, what and wehre the problem is going to be executed. Note that
+ * the enactor enact() function can be extended to support multi-gpu contexts
+ * (using execution policy like model). Enactor also has two pure virtual
+ * functions, which MUST be implemented within the algorithm the user is trying
+ * to write the enactor for. These functions prepare the initial frontier of the
+ * algorithm (which could be one node, the entire graph or any variation), and
+ * finally defines the main loop of iteration that iterates until the algorithm
+ * converges. Default convergence condition is when the frontier is empty, the
+ * algorithm has finished, but this convergence function can ALSO be extended to
+ * support any custom convergence condition.
+ *
+ * @tparam algorithm_problem_t algorithm specific problem type
+ */
 template <typename algorithm_problem_t>
 struct enactor_t {
   using vertex_t = typename algorithm_problem_t::vertex_t;
