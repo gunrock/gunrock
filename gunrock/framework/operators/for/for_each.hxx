@@ -7,6 +7,7 @@ namespace operators {
 
 namespace parallel_for_each {
 
+namespace detail {
 template <typename array_t, typename operator_type>
 __global__ void compute(array_t array,
                         const std::size_t begin,
@@ -18,6 +19,7 @@ __global__ void compute(array_t array,
     op(&array[i]);  // standard requires the value of array[i], but I believe
                     // reference is more useful.
 }
+}  // namespace detail
 
 template <typename array_t, typename operator_type>
 void execute(array_t array,
@@ -28,8 +30,8 @@ void execute(array_t array,
   // XXX: context should use occupancy calculator to figure this out:
   constexpr int grid_size = 256;
   constexpr int block_size = 256;
-  compute<<<grid_size, block_size, 0, context.stream()>>>(array, begin, end,
-                                                          op);
+  detail::compute<<<grid_size, block_size, 0, context.stream()>>>(array, begin,
+                                                                  end, op);
 }
 
 }  // namespace parallel_for_each

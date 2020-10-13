@@ -7,6 +7,7 @@ namespace operators {
 
 namespace parallel_for {
 
+namespace detail {
 template <typename operator_type>
 __global__ void compute(const std::size_t begin,
                         const std::size_t end,
@@ -16,6 +17,7 @@ __global__ void compute(const std::size_t begin,
        i < s; i += STRIDE)
     op(i);
 }
+}  // namespace detail
 
 template <typename operator_type>
 void execute(const std::size_t begin,
@@ -25,7 +27,8 @@ void execute(const std::size_t begin,
   // XXX: context should use occupancy calculator to figure this out:
   constexpr int grid_size = 256;
   constexpr int block_size = 256;
-  compute<<<grid_size, block_size, 0, context.stream()>>>(begin, end, op);
+  detail::compute<<<grid_size, block_size, 0, context.stream()>>>(begin, end,
+                                                                  op);
 }
 
 }  // namespace parallel_for
