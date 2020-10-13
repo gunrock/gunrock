@@ -66,13 +66,6 @@ float execute(vertex_t const& number_of_rows,
               weight_vector_t& edge_values,
               vertex_t const& source,
               weight_vector_t& distances) {
-  using weight_t = typename weight_vector_t::value_type;
-  // Set all initial distances to INFINITY
-  thrust::fill(thrust::device, distances.begin(), distances.end(),
-               std::numeric_limits<weight_t>::max());
-  thrust::fill(thrust::device, distances.begin() + source,
-               distances.begin() + source + 1, 0);
-
   // Build graph structure for SSSP
   auto G =
       graph::build::from_csr_t<space>(number_of_rows,      // number of rows

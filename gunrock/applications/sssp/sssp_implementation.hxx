@@ -21,6 +21,8 @@ template <typename graph_type, typename host_graph_type>
 struct sssp_problem_t : problem_t<graph_type, host_graph_type> {
   // Get useful types from graph_type
   using vertex_t = typename graph_type::vertex_type;
+  using weight_t = typename graph_type::weight_type;
+
   using weight_pointer_t = typename graph_type::weight_pointer_t;
   using vertex_pointer_t = typename graph_type::vertex_pointer_t;
 
@@ -51,7 +53,12 @@ struct sssp_problem_t : problem_t<graph_type, host_graph_type> {
         single_source(source),
         distances(dist),
         predecessors(preds) {
-    // XXX: move initializing distances[] here.
+    // Set all initial distances to INFINITY
+    auto d_dist = thrust::device_pointer_cast(distances);
+    thrust::fill(thrust::device, d_dist + 0, d_dist + g->get_number_of_edges(),
+                 std::numeric_limits<weight_t>::max());
+    thrust::fill(thrust::device, d_dist + single_source,
+                 d_dist + single_source + 1, 0);
   }
 
   sssp_problem_t(const sssp_problem_t& rhs) = delete;
