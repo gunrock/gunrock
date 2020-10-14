@@ -29,61 +29,108 @@
 
 #pragma once
 
-#include <array>  // host-side array implementation
-
-// includes: thrust
-#include <thrust/device_vector.h>  // XXX: Replace with gunrock::vector<>
+#include <cstddef>
+#include <cstdlib>
+#include <array>
+#include <tuple>
+#include <utility>
+#include <algorithm>
+#include <iterator>
+#include <type_traits>
 
 namespace gunrock {
 
+/**
+ * @brief Aggregate type for array structure.
+ *
+ * @tparam T
+ * @tparam NumElements
+ */
 template <typename T, std::size_t NumElements>
-struct array {
-  typedef T value_type;
-  typedef value_type* pointer_t;
-  typedef const value_type* const_pointer_t;
-  typedef value_type& reference_t;
-  typedef const value_type& const_reference_t;
+struct array_traits {
+  typedef T type[NumElements];
 
-  typedef value_type* iterator;
-  typedef const value_type* const_iterator;
-  typedef std::size_t size_type;
-  typedef std::ptrdiff_t difference_type;
-  typedef std::reverse_iterator<iterator> reverse_iterator;
-  typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
-
-  typedef array<value_type, NumElements> array_t;
-
- private:
-  thrust::device_vector<value_type> _storage;
-  pointer_t _ptr;
-
- public:
-  /*
-   * constructor::
-   */
-  array() : _storage(NumElements), _ptr(_storage.data().get()) {}
-
-  //  Define an empty destructor to explicitly specify
-  //  its execution space qualifier.
-  // __host__ ~array(void) {}
-
-  /*
-   * pointers::
-   */
-
-  // Return pointer of array on host or device-side
-  __host__ __device__ __forceinline__ pointer_t data() noexcept { return _ptr; }
-
-  // Return a const pointer of array on host or device-side
-  __host__ __device__ __forceinline__ constexpr const_pointer_t data() const
-      noexcept {
-    return const_cast<const_pointer_t>(_ptr);
+  __host__ __device__ __forceinline__ static constexpr T& reference(
+      const type& t,
+      std::size_t n) noexcept {
+    return const_cast<T&>(t[n]);
   }
 
-  /*
-   * capacity::
-   */
+  __host__ __device__ __forceinline__ static constexpr T* pointer(
+      const type& t) noexcept {
+    return const_cast<T*>(t);
+  }
+};
 
+/**
+ * @brief Used as null_type for array container.
+ *
+ * @tparam T
+ */
+template <typename T>
+struct array_traits<T, 0> {
+  struct type {};
+
+  __host__ __device__ __forceinline__ static constexpr T& reference(
+      const type&,
+      std::size_t) noexcept {
+    return *static_cast<T*>(nullptr);
+  }
+
+  __host__ __device__ __forceinline__ static constexpr T* pointer(
+      const type&) noexcept {
+    return nullptr;
+  }
+};
+
+/**
+ * @brief std::array<> based array container implementation with full
+ * device-side support.
+ *
+ * @tparam T            Type of array elements.
+ * @tparam NumElements  Number of elements in array.
+ */
+template <typename T, std::size_t NumElements>
+struct array {
+  using value_type = T;
+  using pointer_t = value_type*;
+  using const_pointer_t = const value_type*;
+  using reference_t = value_type&;
+  using const_reference_t = const value_type&;
+
+  using iterator = value_type*;
+  using const_iterator = const value_type*;
+  using size_type = std::size_t;
+  using difference_type = std::ptrdiff_t;
+  using reverse_iterator = std::reverse_iterator<iterator>;
+  using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+  using array_type = array_traits<value_type, NumElements>;
+
+  typename array_type::type elements;
+
+ public:
+  /**
+   * @brief Return pointer of array on host or device-side
+   * @return pointer_t
+   */
+  __host__ __device__ __forceinline__ constexpr pointer_t data() noexcept {
+    return array_type::pointer(elements);
+  }
+
+  /**
+   * @brief Return a const pointer of array on host or device-side
+   * @return const_pointer_t
+   */
+  __host__ __device__ __forceinline__ constexpr const_pointer_t data() const
+      noexcept {
+    return array_type::pointer(elements);
+  }
+
+  /**
+   * @brief
+   * @return size_type
+   */
   __host__ __device__ __forceinline__ constexpr size_type size() const
       noexcept {
     return NumElements;
@@ -98,19 +145,20 @@ struct array {
     return size() == 0;
   }
 
-  /*
-   * access::
+  /**
+   * @brief
+   *
+   * @param n
+   * @return reference_t
    */
-
-  // Since C++14, this may alsy be constexpr
-  __host__ __device__ __forceinline__ reference_t
-  operator[](size_type n) noexcept {
-    return _ptr[n];
+  __host__ __device__ __forceinline__ constexpr reference_t operator[](
+      size_type n) noexcept {
+    return array_type::reference(elements, n);
   }
 
-  __host__ __device__ __forceinline__ value_type constexpr operator[](
+  __host__ __device__ __forceinline__ constexpr const_reference_t operator[](
       size_type n) const noexcept {
-    return _ptr[n];
+    return array_type::reference(elements, n);
   }
 
   /*

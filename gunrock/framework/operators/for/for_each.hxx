@@ -26,7 +26,7 @@ void execute(array_t array,
              const std::size_t begin,
              const std::size_t end,
              operator_type op,
-             standard_context_t& context) {
+             cuda::standard_context_t& context) {
   // XXX: context should use occupancy calculator to figure this out:
   constexpr int grid_size = 256;
   constexpr int block_size = 256;
