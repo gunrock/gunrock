@@ -123,7 +123,7 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
      */
     auto remove_completed_paths =
         [] __host__ __device__(vertex_t const& vertex) -> bool {
-      if (std::numeric_limits<vertex_t>::max())
+      if (vertex == std::numeric_limits<vertex_t>::max())
         return false;  // remove
       return true;     // keep
     };
