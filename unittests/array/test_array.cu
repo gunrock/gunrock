@@ -51,15 +51,6 @@ void test_array() {
   status = cudaDeviceSynchronize();
   if (cudaSuccess != status)
     throw error::exception_t(status);
-
-  // Segmentation fault; no host support
-  // XXX: this is trivial to add using
-  // a thrust::host_vector, but we have
-  // to handle move symantics ourselves,
-  // and that is when things get really
-  // complicated. I will consider this if
-  // find it useful.
-  // a[0] = 0;
 }
 
 int main(int argc, char** argv) {
