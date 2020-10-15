@@ -51,7 +51,7 @@ struct color_problem_t : problem_t<graph_type, host_graph_type> {
       : problem_type(G, g, context),
         colors(_colors),
         randoms(g->get_number_of_vertices()) {
-    // Initialize d_colors to be all INVALIDs.
+    // XXX: Ugly. Initialize d_colors to be all INVALIDs.
     auto d_colors = thrust::device_pointer_cast(colors);
     thrust::fill(thrust::device, d_colors + 0,
                  d_colors + g->get_number_of_vertices(),
@@ -60,11 +60,6 @@ struct color_problem_t : problem_t<graph_type, host_graph_type> {
     // Generate random numbers.
     algo::generate::random::uniform_distribution(0, g->get_number_of_vertices(),
                                                  randoms.begin());
-
-    std::cout << "rand (output) = ";
-    thrust::copy(randoms.begin(), randoms.end(),
-                 std::ostream_iterator<vertex_t>(std::cout, " "));
-    std::cout << std::endl;
   }
 
   color_problem_t(const color_problem_t& rhs) = delete;
@@ -112,10 +107,6 @@ struct color_enactor_t : enactor_t<algorithm_problem_t> {
 
       // Color two nodes at the same time.
       int color = iteration * 2;
-      printf("%i\n", vertex);
-      printf("%i\n", colors[vertex]);
-      printf("%i\n", start_edge);
-      printf("%i\n", num_neighbors);
 
       // Main loop that goes over all the neighbors and finds the maximum or
       // minimum random number vertex.

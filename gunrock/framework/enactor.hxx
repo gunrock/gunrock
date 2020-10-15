@@ -64,7 +64,8 @@ struct enactor_t {
         frontiers(number_of_buffers),
         active_frontier(&frontiers[0]),
         inactive_frontier(&frontiers[1]),
-        buffer_selector(0) {
+        buffer_selector(0),
+        iteration(0) {
     // Set temporary buffer to be at least the number of edges
     auto g = problem->get_host_graph_pointer();
     auto buffer = get_inactive_frontier_buffer();
@@ -108,8 +109,8 @@ struct enactor_t {
     prepare_frontier(single_context);
     timer.begin();
     while (!is_converged(single_context)) {
-      iteration++;
       loop(single_context);
+      iteration++;
     }
     return timer.end();
   }

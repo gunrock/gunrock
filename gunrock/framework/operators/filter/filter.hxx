@@ -19,13 +19,17 @@ void execute(graph_type* G, enactor_type* E, operator_type op) {
   auto inactive_buffer = E->get_inactive_frontier_buffer();
   auto min_frontier_size = active_buffer->size();
   inactive_buffer->resize(min_frontier_size);
-  thrust::copy_if(
+
+  auto new_length = thrust::copy_if(
       thrust::device,                             // execution policy
       active_buffer->data(),                      // input iterator: begin
       active_buffer->data() + min_frontier_size,  // input iterator: end
       inactive_buffer->data(),                    // output iterator
       op                                          // predicate
   );
+
+  // XXX: yikes, idk if this is a good idea.
+  inactive_buffer->resize((new_length - inactive_buffer->data()));
   E->swap_frontier_buffers();
 }
 

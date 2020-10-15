@@ -118,6 +118,13 @@ class frontier_t {
     thrust::sort(thrust::device, _storage.begin(), _storage.end());
   }
 
+  void print() {
+    std::cout << "Frontier = ";
+    thrust::copy(_storage.begin(), _storage.end(),
+                 std::ostream_iterator<type_t>(std::cout, " "));
+    std::cout << std::endl;
+  }
+
  private:
   std::size_t _size;
   frontier_type_t _type;

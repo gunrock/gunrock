@@ -15,7 +15,7 @@ void test_color() {
   // (i, j) [w]
   // (1, 0) [5]
   // (1, 1) [8] // Self-loop
-  // (2, 2) [3]
+  // (2, 2) [3] // Self-loop
   // (3, 1) [6]
   vertex_t r = 4, c = 4;
   edge_t nnz = 4;
