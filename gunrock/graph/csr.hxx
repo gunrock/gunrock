@@ -80,13 +80,13 @@ class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
   }
 
   __host__ __device__ __forceinline__ vertex_type
-  get_destination_vertex(const edge_type& e) const override {
+  get_destination_vertex(edge_type const& e) const override {
     auto indices = get_column_indices();
     return indices[e];
   }
 
   __host__ __device__ __forceinline__ edge_type
-  get_starting_edge(const vertex_type& v) const {
+  get_starting_edge(vertex_type const& v) const {
     auto offsets = get_row_offsets();
     return offsets[v];
   }

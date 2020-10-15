@@ -129,6 +129,16 @@ class graph_t : public graph_view_t... {
     return first_view_t::get_edge_weight(e);
   }
 
+  __host__ __device__ __forceinline__ vertex_type
+  get_destination_vertex(edge_type const& e) const override {
+    return get_destination_vertex(e);
+  }
+
+  __host__ __device__ __forceinline__ edge_type
+  get_starting_edge(vertex_type const& v) const {
+    return first_view_t::get_starting_edge(v);
+  }
+
   __host__ __device__ __forceinline__ std::size_t
   number_of_graph_representations() const {
     return number_of_formats_inherited;

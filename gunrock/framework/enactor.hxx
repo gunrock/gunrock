@@ -50,6 +50,7 @@ struct enactor_t {
   frontier_type* active_frontier;
   frontier_type* inactive_frontier;
   int buffer_selector;
+  int iteration;
 
   // Disable copy ctor and assignment operator.
   // We don't want to let the user copy only a slice.
@@ -107,6 +108,7 @@ struct enactor_t {
     prepare_frontier(single_context);
     timer.begin();
     while (!is_converged(single_context)) {
+      iteration++;
       loop(single_context);
     }
     return timer.end();

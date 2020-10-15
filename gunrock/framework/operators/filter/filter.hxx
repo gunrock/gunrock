@@ -26,6 +26,7 @@ void execute(graph_type* G, enactor_type* E, operator_type op) {
       inactive_buffer->data(),                    // output iterator
       op                                          // predicate
   );
+  E->swap_frontier_buffers();
 }
 
 }  // namespace filter
