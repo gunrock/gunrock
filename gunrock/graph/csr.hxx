@@ -86,7 +86,7 @@ class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
   }
 
   __host__ __device__ __forceinline__ edge_type
-  get_starting_edge(vertex_type const& v) const {
+  get_starting_edge(vertex_type const& v) const override {
     auto offsets = get_row_offsets();
     return offsets[v];
   }

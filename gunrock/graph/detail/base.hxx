@@ -76,6 +76,9 @@ class graph_base_t {
   __host__ __device__ __forceinline__ virtual weight_type get_edge_weight(
       edge_type const& e) const = 0;
 
+  __host__ __device__ __forceinline__ virtual edge_type get_starting_edge(
+      vertex_type const& v) const = 0;
+
  protected:
   __host__ __device__ __forceinline__ void set_number_of_vertices(
       vertex_type const& num_vertices) {

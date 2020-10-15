@@ -131,7 +131,7 @@ class graph_t : public graph_view_t... {
 
   __host__ __device__ __forceinline__ vertex_type
   get_destination_vertex(edge_type const& e) const override {
-    return get_destination_vertex(e);
+    return first_view_t::get_destination_vertex(e);
   }
 
   __host__ __device__ __forceinline__ edge_type

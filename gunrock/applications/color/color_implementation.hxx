@@ -12,6 +12,7 @@
 #pragma once
 
 #include <bits/stdc++.h>
+#include <cstdlib>
 
 #include <gunrock/applications/application.hxx>
 
@@ -32,7 +33,7 @@ struct color_problem_t : problem_t<graph_type, host_graph_type> {
   // Useful types from problem_t
   using problem_type = problem_t<graph_type, host_graph_type>;
 
-  thrust::device_vector<vertex_t> rand;
+  thrust::device_vector<vertex_t> randoms;
   vertex_pointer_t colors;
 
   /**
@@ -49,13 +50,13 @@ struct color_problem_t : problem_t<graph_type, host_graph_type> {
                   vertex_pointer_t _colors)
       : problem_type(G, g, context),
         colors(_colors),
-        rand(g->get_number_of_vertices()) {
+        randoms(g->get_number_of_vertices()) {
     // auto d_colors = thrust::device_pointer_cast(colors);
     algo::generate::random::uniform_distribution(0, g->get_number_of_vertices(),
-                                                 rand.data().get());
+                                                 randoms.begin());
 
     std::cout << "rand (output) = ";
-    thrust::copy(rand.begin(), rand.end(),
+    thrust::copy(randoms.begin(), randoms.end(),
                  std::ostream_iterator<vertex_t>(std::cout, " "));
     std::cout << std::endl;
   }
@@ -84,7 +85,7 @@ struct color_enactor_t : enactor_t<algorithm_problem_t> {
     auto G = P->get_graph_pointer();
 
     auto colors = P->colors;
-    auto rand = P->rand.data().get();
+    auto rand = P->randoms.data().get();
     auto iteration = E->iteration;
 
     /**
