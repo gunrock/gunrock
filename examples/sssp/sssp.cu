@@ -53,7 +53,7 @@ void test_sssp() {
   thrust::device_vector<weight_t> d_Ax = h_Ax;
 
   vertex_t source = 1;
-  thrust::device_vector<weight_t> d_distances(nnz);
+  thrust::device_vector<weight_t> d_distances(r);
 
   // calling sssp
   float elapsed = sssp::execute<space>(r,           // number of vertices
