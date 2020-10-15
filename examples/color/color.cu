@@ -4,65 +4,42 @@
 
 using namespace gunrock;
 
-void test_color() {
+void test_color(int num_arguments, char** argument_array) {
   using vertex_t = int;
   using edge_t = int;
   using weight_t = float;
 
   constexpr memory::memory_space_t space = memory::memory_space_t::device;
 
-  // Logical Graph Representation
-  // (i, j) [w]
-  // (1, 0) [5]
-  // (1, 1) [8] // Self-loop
-  // (2, 2) [3] // Self-loop
-  // (3, 1) [6]
-  vertex_t r = 4, c = 4;
-  edge_t nnz = 4;
+  if (num_arguments != 2) {
+    std::cerr << "usage: ./bin/color filename.mtx" << std::endl;
+    exit(1);
+  }
 
-  // let's use thrust vector<type_t> for initial arrays
-  thrust::host_vector<edge_t> h_Ap(r + 1);
-  thrust::host_vector<vertex_t> h_Aj(nnz);
-  thrust::host_vector<weight_t> h_Ax(nnz);
+  // Load Matrix-Market file & convert the resultant COO into CSR format.
+  std::string filename = argument_array[1];
+  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+  auto coo = mm.load(filename);
+  format::csr_t<memory::memory_space_t::host, vertex_t, edge_t, weight_t> csr;
+  csr = coo;
 
-  auto Ap = h_Ap.data();
-  auto Aj = h_Aj.data();
-  auto Ax = h_Ax.data();
+  // Move data to device.
+  thrust::device_vector<edge_t> d_Ap = csr.row_offsets;
+  thrust::device_vector<vertex_t> d_Aj = csr.column_indices;
+  thrust::device_vector<weight_t> d_Ax = csr.nonzero_values;
 
-  // row offsets
-  Ap[0] = 0;
-  Ap[1] = 0;
-  Ap[2] = 2;
-  Ap[3] = 3;
-  Ap[4] = 4;
-
-  // column indices
-  Aj[0] = 0;
-  Aj[1] = 1;
-  Aj[2] = 2;
-  Aj[3] = 3;
-
-  // nonzero values (weights)
-  Ax[0] = 5;
-  Ax[1] = 8;
-  Ax[2] = 3;
-  Ax[3] = 6;
-
-  thrust::device_vector<edge_t> d_Ap = h_Ap;
-  thrust::device_vector<vertex_t> d_Aj = h_Aj;
-  thrust::device_vector<weight_t> d_Ax = h_Ax;
-
-  thrust::device_vector<vertex_t> d_colors(r);
+  thrust::device_vector<vertex_t> d_colors(csr.number_of_rows);
 
   // calling color
-  float elapsed = color::execute<space>(r,        // number of vertices
-                                        c,        // number of columns
-                                        nnz,      // number of edges
-                                        d_Ap,     // row_offsets
-                                        d_Aj,     // column_indices
-                                        d_Ax,     // nonzero values
-                                        d_colors  // output colors
-  );
+  float elapsed =
+      color::execute<space>(csr.number_of_rows,      // number of vertices
+                            csr.number_of_columns,   // number of columns
+                            csr.number_of_nonzeros,  // number of edges
+                            d_Ap,                    // row_offsets
+                            d_Aj,                    // column_indices
+                            d_Ax,                    // nonzero values
+                            d_colors                 // output colors
+      );
 
   std::cout << "Colors (output) = ";
   thrust::copy(d_colors.begin(), d_colors.end(),
@@ -73,6 +50,6 @@ void test_color() {
 }
 
 int main(int argc, char** argv) {
-  test_color();
+  test_color(argc, argv);
   return EXIT_SUCCESS;
 }

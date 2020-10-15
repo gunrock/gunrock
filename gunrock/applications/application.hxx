@@ -23,6 +23,9 @@
 // Format includes
 #include <gunrock/formats/formats.hxx>
 
+// I/O includes
+#include <gunrock/io/matrix_market.hxx>
+
 // Graph includes
 #include <gunrock/graph/graph.hxx>
 

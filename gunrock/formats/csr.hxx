@@ -65,7 +65,7 @@ struct csr_t {
 
     // Allocate space for vectors
     row_offsets.resize(number_of_rows + 1);
-    column_indices.resize(number_of_columns);
+    column_indices.resize(number_of_nonzeros);
     nonzero_values.resize(number_of_nonzeros);
 
     // compute number of non-zero entries per row of A
