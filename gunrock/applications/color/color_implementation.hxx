@@ -51,7 +51,13 @@ struct color_problem_t : problem_t<graph_type, host_graph_type> {
       : problem_type(G, g, context),
         colors(_colors),
         randoms(g->get_number_of_vertices()) {
-    // auto d_colors = thrust::device_pointer_cast(colors);
+    // Initialize d_colors to be all INVALIDs.
+    auto d_colors = thrust::device_pointer_cast(colors);
+    thrust::fill(thrust::device, d_colors + 0,
+                 d_colors + g->get_number_of_vertices(),
+                 std::numeric_limits<vertex_t>::max());
+
+    // Generate random numbers.
     algo::generate::random::uniform_distribution(0, g->get_number_of_vertices(),
                                                  randoms.begin());
 
@@ -106,6 +112,10 @@ struct color_enactor_t : enactor_t<algorithm_problem_t> {
 
       // Color two nodes at the same time.
       int color = iteration * 2;
+      printf("%i\n", vertex);
+      printf("%i\n", colors[vertex]);
+      printf("%i\n", start_edge);
+      printf("%i\n", num_neighbors);
 
       // Main loop that goes over all the neighbors and finds the maximum or
       // minimum random number vertex.
