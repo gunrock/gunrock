@@ -16,4 +16,13 @@ struct disjunction<B1, Bn...>
 template <class... B>
 constexpr bool disjunction_v =
     disjunction<B...>::value;  // C++17 supports inline constexpr bool
+
+// Supported in C++ 17 (https://en.cppreference.com/w/cpp/types/is_arithmetic)
+template <class T>
+constexpr bool is_arithmetic_v = is_arithmetic<T>::value;
+
+// Supported in C++ 17
+// (https://en.cppreference.com/w/cpp/types/is_floating_point)
+template <class T>
+constexpr bool is_floating_point_v = is_floating_point<T>::value;
 }  // namespace std
