@@ -14,7 +14,6 @@
 #include <gunrock/graph/graph.hxx>
 
 namespace gunrock {
-
 /**
  * @brief Inherit problem class for your custom applications' implementation.
  * Problem describes the data slice of your aglorithm, and the data can often be
@@ -38,8 +37,8 @@ struct problem_t {
   host_graph_type* host_graph_slice;
   std::shared_ptr<cuda::multi_context_t> context;
 
-  graph_type* get_graph_pointer() { return graph_slice; }
-  host_graph_type* get_host_graph_pointer() { return host_graph_slice; }
+  graph_type* get_graph_pointer() const { return graph_slice; }
+  host_graph_type* get_host_graph_pointer() const { return host_graph_slice; }
 
   problem_t() : graph_slice(nullptr) {}
   problem_t(graph_type* G,
