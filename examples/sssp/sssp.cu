@@ -4,66 +4,41 @@
 
 using namespace gunrock;
 
-void test_sssp() {
+void test_sssp(int num_arguments, char** argument_array) {
   using vertex_t = int;
   using edge_t = int;
   using weight_t = float;
 
-  constexpr memory::memory_space_t space = memory::memory_space_t::device;
+  if (num_arguments != 2) {
+    std::cerr << "usage: ./bin/color filename.mtx" << std::endl;
+    exit(1);
+  }
 
-  // Logical Graph Representation
-  // (i, j) [w]
-  // (1, 0) [5]
-  // (1, 1) [8] // Self-loop
-  // (2, 2) [3]
-  // (3, 1) [6]
-  vertex_t r = 4, c = 4;
-  edge_t nnz = 4;
+  // Load Matrix-Market file & convert the resultant COO into CSR format.
+  std::string filename = argument_array[1];
+  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+  auto coo = mm.load(filename);
+  format::csr_t<memory::memory_space_t::host, vertex_t, edge_t, weight_t> h_csr;
+  h_csr = coo;
 
-  // let's use thrust vector<type_t> for initial arrays
-  thrust::host_vector<edge_t> h_Ap(r + 1);
-  thrust::host_vector<vertex_t> h_Aj(nnz);
-  thrust::host_vector<weight_t> h_Ax(nnz);
+  // Move data to device.
+  format::csr_t<memory::memory_space_t::device, vertex_t, edge_t, weight_t>
+      d_csr;
 
-  auto Ap = h_Ap.data();
-  auto Aj = h_Aj.data();
-  auto Ax = h_Ax.data();
+  d_csr.number_of_rows = h_csr.number_of_rows;
+  d_csr.number_of_columns = h_csr.number_of_columns;
+  d_csr.number_of_nonzeros = h_csr.number_of_nonzeros;
+  d_csr.row_offsets = h_csr.row_offsets;
+  d_csr.column_indices = h_csr.column_indices;
+  d_csr.nonzero_values = h_csr.nonzero_values;
 
-  // row offsets
-  Ap[0] = 0;
-  Ap[1] = 0;
-  Ap[2] = 2;
-  Ap[3] = 3;
-  Ap[4] = 4;
-
-  // column indices
-  Aj[0] = 0;
-  Aj[1] = 1;
-  Aj[2] = 2;
-  Aj[3] = 3;
-
-  // nonzero values (weights)
-  Ax[0] = 5;
-  Ax[1] = 8;
-  Ax[2] = 3;
-  Ax[3] = 6;
-
-  thrust::device_vector<edge_t> d_Ap = h_Ap;
-  thrust::device_vector<vertex_t> d_Aj = h_Aj;
-  thrust::device_vector<weight_t> d_Ax = h_Ax;
-
-  vertex_t source = 1;
-  thrust::device_vector<weight_t> d_distances(r);
+  vertex_t source = 0;
+  thrust::device_vector<weight_t> d_distances(h_csr.number_of_rows);
 
   // calling sssp
-  float elapsed = sssp::execute<space>(r,           // number of vertices
-                                       c,           // number of columns
-                                       nnz,         // number of edges
-                                       d_Ap,        // row_offsets
-                                       d_Aj,        // column_indices
-                                       d_Ax,        // nonzero values
-                                       source,      // single source
-                                       d_distances  // output distances
+  float elapsed = sssp::execute(h_csr, d_csr,
+                                source,      // single source
+                                d_distances  // output distances
   );
 
   std::cout << "Distances (output) = ";
@@ -75,6 +50,6 @@ void test_sssp() {
 }
 
 int main(int argc, char** argv) {
-  test_sssp();
+  test_sssp(argc, argv);
   return EXIT_SUCCESS;
 }

@@ -18,13 +18,18 @@ namespace sssp {
 
 using namespace memory;
 
-template <memory_space_t space, typename graph_type, typename host_graph_type>
-float sssp(graph_type* G,
-           host_graph_type* g,
+template <typename graph_vector_t,
+          typename host_graph_vector_t,
+          typename graph_type = typename graph_vector_t::value_type>
+float sssp(graph_vector_t& G,
+           host_graph_vector_t& g,
            typename graph_type::vertex_type source,
            typename graph_type::weight_pointer_t distances) {
+  using host_graph_type = typename host_graph_vector_t::value_type;
+
   using sssp_problem_type = sssp_problem_t<graph_type, host_graph_type>;
   using sssp_enactor_type = sssp_enactor_t<sssp_problem_type>;
+  using weight_t = typename graph_type::weight_type;
 
   // Create contexts for all the devices
   std::vector<cuda::device_id_t> devices;
@@ -33,57 +38,50 @@ float sssp(graph_type* G,
   auto multi_context = std::shared_ptr<cuda::multi_context_t>(
       new cuda::multi_context_t(devices));
 
-  sssp_problem_type sssp_problem(G,              // input graph (GPU)
-                                 g,              // input graph (CPU)
-                                 multi_context,  // input context
-                                 source,         // input source
-                                 distances,      // output distances
-                                 nullptr         // output predecessors
-  );
+  std::shared_ptr<sssp_problem_type> sssp_problem(
+      std::make_shared<sssp_problem_type>(G.data().get(),  // input graph (GPU)
+                                          g.data(),        // input graph (CPU)
+                                          multi_context,   // input context
+                                          source,          // input source
+                                          distances,       // output distances
+                                          nullptr  // output predecessors
+                                          ));
 
-  cudaDeviceSynchronize();
-  error::throw_if_exception(cudaPeekAtLastError());
+  std::shared_ptr<sssp_enactor_type> sssp_enactor(
+      std::make_shared<sssp_enactor_type>(
+          sssp_problem.get(),  // pass in a problem (contains data in/out)
+          multi_context));
 
-  sssp_enactor_type sssp_enactor(
-      &sssp_problem,  // pass in a problem (contains data in/out)
-      multi_context);
-
-  float elapsed = sssp_enactor.enact();
+  float elapsed = sssp_enactor->enact();
   return elapsed;
 }
 
-template <memory_space_t space,
+template <typename csr_host_t,
+          typename csr_device_t,
           typename vertex_t,
-          typename edge_t,
-          typename vertex_vector_t,
-          typename edge_vector_t,
           typename weight_vector_t>
-float execute(vertex_t const& number_of_rows,
-              vertex_t const& number_of_columns,
-              edge_t const& number_of_nonzeros,
-              edge_vector_t& row_offsets,
-              vertex_vector_t& column_indices,
-              weight_vector_t& edge_values,
+float execute(csr_host_t h_csr,
+              csr_device_t d_csr,
               vertex_t const& source,
               weight_vector_t& distances) {
   // Build graph structure for SSSP
-  auto G =
-      graph::build::from_csr_t<space>(number_of_rows,      // number of rows
-                                      number_of_columns,   // number of columns
-                                      number_of_nonzeros,  // number of edges
-                                      row_offsets,         // row offsets
-                                      column_indices,      // column indices
-                                      edge_values);        // nonzero values
+  auto G = graph::build::from_csr_t<memory_space_t::device>(
+      d_csr.number_of_rows,      // number of rows
+      d_csr.number_of_columns,   // number of columns
+      d_csr.number_of_nonzeros,  // number of edges
+      d_csr.row_offsets,         // row offsets
+      d_csr.column_indices,      // column indices
+      d_csr.nonzero_values);     // nonzero values
 
   auto g = graph::build::from_csr_t<memory_space_t::host>(
-      number_of_rows,      // number of rows
-      number_of_columns,   // number of columns
-      number_of_nonzeros,  // number of edges
-      row_offsets,         // XXX: illegal device memory
-      column_indices,      // XXX: illegal device memory
-      edge_values);        // XXX: illegal device memory
+      h_csr.number_of_rows,      // number of rows
+      h_csr.number_of_columns,   // number of columns
+      h_csr.number_of_nonzeros,  // number of edges
+      h_csr.row_offsets,         // row offsets
+      h_csr.column_indices,      // column indices
+      h_csr.nonzero_values);     // nonzero values
 
-  return sssp<space>(G.data().get(), g.data(), source, distances.data().get());
+  return sssp(G, g, source, distances.data().get());
 }
 
 }  // namespace sssp

@@ -55,10 +55,10 @@ struct sssp_problem_t : problem_t<graph_type, host_graph_type> {
         predecessors(preds) {
     // Set all initial distances to INFINITY
     auto d_dist = thrust::device_pointer_cast(distances);
-    thrust::fill(thrust::device, d_dist + 0, d_dist + g->get_number_of_edges(),
+    thrust::fill(thrust::device, d_dist + 0,
+                 d_dist + g[0].get_number_of_vertices(),
                  std::numeric_limits<weight_t>::max());
-    thrust::fill(thrust::device, d_dist + single_source,
-                 d_dist + single_source + 1, 0);
+    thrust::fill(thrust::device, d_dist + source, d_dist + source + 1, 0);
   }
 
   sssp_problem_t(const sssp_problem_t& rhs) = delete;
@@ -72,6 +72,20 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
   using vertex_t = typename algorithm_problem_t::vertex_t;
   using edge_t = typename algorithm_problem_t::edge_t;
   using weight_t = typename algorithm_problem_t::weight_t;
+
+  /**
+   * @brief Populate the initial frontier with a single source node from where
+   * we begin shortest path traversal.
+   *
+   * @param context
+   */
+  void prepare_frontier(cuda::standard_context_t* context) override {
+    auto P = enactor_type::get_problem_pointer();
+    auto single_source = P->single_source;
+
+    auto f = enactor_type::get_active_frontier_buffer();
+    f->push_back(single_source);
+  }
 
   /**
    * @brief This is the core of the implementation for SSSP algorithm. loops
@@ -123,9 +137,7 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
      */
     auto remove_completed_paths =
         [] __host__ __device__(vertex_t const& vertex) -> bool {
-      if (vertex == std::numeric_limits<vertex_t>::max())
-        return false;  // remove
-      return true;     // keep
+      return vertex != std::numeric_limits<vertex_t>::max();
     };
 
     // Execute advance operator on the provided lambda
@@ -137,23 +149,9 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
         G, enactor_type::get_enactor(), remove_completed_paths);
   }
 
-  /**
-   * @brief Populate the initial frontier with a single source node from where
-   * we begin shortest path traversal.
-   *
-   * @param context
-   */
-  void prepare_frontier(cuda::standard_context_t* context) override {
-    auto P = enactor_type::get_problem_pointer();
-    auto single_source = P->single_source;
-
-    auto f = enactor_type::get_active_frontier_buffer();
-    f->push_back(single_source);
-  }
-
-  sssp_enactor_t(algorithm_problem_t* problem,
-                 std::shared_ptr<cuda::multi_context_t> context)
-      : enactor_type(problem, context) {}
+  sssp_enactor_t(algorithm_problem_t* _problem,
+                 std::shared_ptr<cuda::multi_context_t> _context)
+      : enactor_type(_problem, _context) {}
 
   sssp_enactor_t(const sssp_enactor_t& rhs) = delete;
   sssp_enactor_t& operator=(const sssp_enactor_t& rhs) = delete;
