@@ -47,6 +47,7 @@ struct enactor_t {
                         // or we can move this within the actual context.
   algorithm_problem_t* problem;
   thrust::host_vector<frontier_type> frontiers;
+  thrust::device_vector<vertex_t> scanned_row_offsets;
   frontier_type* active_frontier;
   frontier_type* inactive_frontier;
   int buffer_selector;
@@ -65,7 +66,9 @@ struct enactor_t {
         active_frontier(&frontiers[0]),
         inactive_frontier(&frontiers[1]),
         buffer_selector(0),
-        iteration(0) {
+        iteration(0),
+        scanned_row_offsets(
+            problem->get_host_graph_pointer()->get_number_of_vertices()) {
     // Set temporary buffer to be at least the number of edges
     auto g = problem->get_host_graph_pointer();
     auto buffer = get_inactive_frontier_buffer();

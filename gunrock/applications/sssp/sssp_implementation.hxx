@@ -32,6 +32,7 @@ struct sssp_problem_t : problem_t<graph_type, host_graph_type> {
   vertex_t single_source;
   weight_pointer_t distances;
   vertex_pointer_t predecessors;
+  thrust::device_vector<vertex_t> visited;
 
   /**
    * @brief Construct a new sssp problem t object
@@ -52,7 +53,8 @@ struct sssp_problem_t : problem_t<graph_type, host_graph_type> {
       : problem_type(G, g, context),
         single_source(source),
         distances(dist),
-        predecessors(preds) {
+        predecessors(preds),
+        visited(g[0].get_number_of_vertices(), -1) {
     // Set all initial distances to INFINITY
     auto d_dist = thrust::device_pointer_cast(distances);
     thrust::fill(thrust::device, d_dist + 0,
@@ -103,6 +105,8 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
     auto G = P->get_graph_pointer();
     auto distances = P->distances;
     auto single_source = P->single_source;
+    auto visited = P->visited.data().get();
+    auto iteration = enactor_type::iteration;
 
     /**
      * @brief Lambda operator to advance to neighboring vertices from the
@@ -135,9 +139,14 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
      * to keep.
      *
      */
-    auto remove_completed_paths =
-        [] __host__ __device__(vertex_t const& vertex) -> bool {
-      return vertex != std::numeric_limits<vertex_t>::max();
+    auto remove_completed_paths = [visited, iteration] __host__ __device__(
+                                      vertex_t const& vertex) -> bool {
+      if (vertex == std::numeric_limits<vertex_t>::max())
+        return false;
+      if (visited[vertex] == iteration)
+        return false;
+      visited[vertex] = iteration;
+      return true;
     };
 
     // Execute advance operator on the provided lambda
