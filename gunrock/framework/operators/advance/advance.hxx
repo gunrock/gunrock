@@ -49,7 +49,8 @@ __global__ void simple(graph_type* G,
   auto total_edges = G->get_number_of_neighbors(v);
   for (auto e = starting_edge; e < total_edges; ++e) {
     auto n = G->get_destination_vertex(e);
-    bool valid = op(v, n, e, G->get_edge_weight(e));
+    auto w = G->get_edge_weight(e);
+    bool valid = op(v, n, e, w);
     if (valid) {
       output[e] = n;
       math::atomic::add(output_size, 1);
