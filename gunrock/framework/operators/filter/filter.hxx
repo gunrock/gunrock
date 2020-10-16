@@ -17,15 +17,21 @@ template <filter_type_t type = filter_type_t::predicated,
 void execute(graph_type* G, enactor_type* E, operator_type op) {
   auto active_buffer = E->get_active_frontier_buffer();
   auto inactive_buffer = E->get_inactive_frontier_buffer();
-  auto min_frontier_size = active_buffer->size();
-  inactive_buffer->resize(min_frontier_size);
+  inactive_buffer->resize(active_buffer->size());
 
+  // Uniquify!
+  auto new_end = thrust::unique(thrust::device, active_buffer->data(),
+                                active_buffer->data() + active_buffer->size());
+
+  active_buffer->resize((new_end - active_buffer->data()));
+
+  // Copy w/ predicate!
   auto new_length = thrust::copy_if(
-      thrust::device,                             // execution policy
-      active_buffer->data(),                      // input iterator: begin
-      active_buffer->data() + min_frontier_size,  // input iterator: end
-      inactive_buffer->data(),                    // output iterator
-      op                                          // predicate
+      thrust::device,                                 // execution policy
+      active_buffer->data(),                          // input iterator: begin
+      active_buffer->data() + active_buffer->size(),  // input iterator: end
+      inactive_buffer->data(),                        // output iterator
+      op                                              // predicate
   );
 
   // XXX: yikes, idk if this is a good idea.
