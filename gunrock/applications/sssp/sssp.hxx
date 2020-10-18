@@ -56,30 +56,24 @@ float sssp(graph_vector_t& G,
   return elapsed;
 }
 
-template <typename csr_host_t,
-          typename csr_device_t,
-          typename vertex_t,
-          typename weight_vector_t>
-float execute(csr_host_t h_csr,
-              csr_device_t d_csr,
+template <typename csr_device_t, typename vertex_t, typename weight_vector_t>
+float execute(csr_device_t& csr,
               vertex_t const& source,
               weight_vector_t& distances) {
   // Build graph structure for SSSP
   auto G = graph::build::from_csr_t<memory_space_t::device>(
-      d_csr.number_of_rows,      // number of rows
-      d_csr.number_of_columns,   // number of columns
-      d_csr.number_of_nonzeros,  // number of edges
-      d_csr.row_offsets,         // row offsets
-      d_csr.column_indices,      // column indices
-      d_csr.nonzero_values);     // nonzero values
+      csr.number_of_rows,      // number of rows
+      csr.number_of_columns,   // number of columns
+      csr.number_of_nonzeros,  // number of edges
+      csr.row_offsets,         // row offsets
+      csr.column_indices,      // column indices
+      csr.nonzero_values);     // nonzero values
 
-  auto g = graph::build::from_csr_t<memory_space_t::host>(
-      h_csr.number_of_rows,      // number of rows
-      h_csr.number_of_columns,   // number of columns
-      h_csr.number_of_nonzeros,  // number of edges
-      h_csr.row_offsets,         // row offsets
-      h_csr.column_indices,      // column indices
-      h_csr.nonzero_values);     // nonzero values
+  // XXX: Rework, there should be a way to hide this:
+  auto g = graph::build::meta_graph(csr.number_of_rows,     // number of rows
+                                    csr.number_of_columns,  // number of columns
+                                    csr.number_of_nonzeros  // number of edges
+  );
 
   return sssp(G, g, source, distances.data().get());
 }

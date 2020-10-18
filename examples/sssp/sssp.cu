@@ -3,6 +3,7 @@
 #include <gunrock/applications/sssp/sssp.hxx>
 
 using namespace gunrock;
+using namespace memory;
 
 void test_sssp(int num_arguments, char** argument_array) {
   using vertex_t = int;
@@ -18,25 +19,17 @@ void test_sssp(int num_arguments, char** argument_array) {
   std::string filename = argument_array[1];
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   auto coo = mm.load(filename);
-  format::csr_t<memory::memory_space_t::host, vertex_t, edge_t, weight_t> h_csr;
-  h_csr = coo;
 
-  // Move data to device.
-  format::csr_t<memory::memory_space_t::device, vertex_t, edge_t, weight_t>
-      d_csr;
-
-  d_csr.number_of_rows = h_csr.number_of_rows;
-  d_csr.number_of_columns = h_csr.number_of_columns;
-  d_csr.number_of_nonzeros = h_csr.number_of_nonzeros;
-  d_csr.row_offsets = h_csr.row_offsets;
-  d_csr.column_indices = h_csr.column_indices;
-  d_csr.nonzero_values = h_csr.nonzero_values;
+  // convert coo to csr
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
+  csr = coo;  // Able to convert host-based coo_t to device-based csr (or host
+              // to host). As of right now, it requires coo to be host side.
 
   vertex_t source = 0;
-  thrust::device_vector<weight_t> d_distances(h_csr.number_of_rows);
+  thrust::device_vector<weight_t> d_distances(csr.number_of_rows);
 
   // calling sssp
-  float elapsed = sssp::execute(h_csr, d_csr,
+  float elapsed = sssp::execute(csr,         // device csr_t sparse data
                                 source,      // single source
                                 d_distances  // output distances
   );
