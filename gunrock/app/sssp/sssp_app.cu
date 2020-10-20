@@ -171,8 +171,7 @@ double gunrock_sssp(gunrock::util::Parameters &parameters, GraphT &graph,
   typedef gunrock::app::sssp::Problem<GraphT> ProblemT;
   typedef gunrock::app::sssp::Enactor<ProblemT> EnactorT;
   gunrock::util::CpuTimer cpu_timer;
-  //TODO: Make this an argument accepted by gunrock_sssp with default value = device
-  gunrock::util::Location ExecPolicy = gunrock::util::DEVICE;
+  gunrock::util::Location ExecPolicy = parameters.Get<gunrock::util::Location>("exec-policy");
   double total_time = 0;
   if (parameters.UseDefault("quiet")) parameters.Set("quiet", true);
 
@@ -218,6 +217,7 @@ double gunrock_sssp(gunrock::util::Parameters &parameters, GraphT &graph,
  * @param[out] distances   Return shortest distance to source per vertex
  * @param[out] preds       Return predecessors of each vertex
  * @param[in]  memspace    Location of input and desired output
+ * @param[in]  exec_policy Location where app will be run
  * \return     double      Return accumulated elapsed times for all runs
  */
 template <typename VertexT = int, typename SizeT = int,
@@ -226,7 +226,8 @@ double sssp(const SizeT num_nodes, const SizeT num_edges,
             const SizeT *row_offsets, const VertexT *col_indices,
             const GValueT *edge_values, const int num_runs, VertexT *sources,
             const bool mark_pred, SSSPValueT **distances, VertexT **preds = NULL, 
-            gunrock::util::Location memspace = gunrock::util::HOST) {
+            gunrock::util::Location memspace = gunrock::util::HOST,
+            gunrock::util::Location exec_policy = gunrock::util::DEVICE) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
                                            gunrock::graph::HAS_EDGE_VALUES |
                                                gunrock::graph::HAS_CSR>
@@ -234,8 +235,6 @@ double sssp(const SizeT num_nodes, const SizeT num_edges,
   typedef typename GraphT::CsrT CsrT;
 
   // Setup parameters
-  //TODO: Set up memspace and execpolicy as args[in] for sssp call.
-  //gunrock::util::Location memspace = gunrock::util::HOST;
   gunrock::util::Parameters parameters("sssp");
   gunrock::graphio::UseParameters(parameters);
   gunrock::app::sssp::UseParameters(parameters);
@@ -244,6 +243,8 @@ double sssp(const SizeT num_nodes, const SizeT num_edges,
   parameters.Set("graph-type", "by-pass");
   parameters.Set("mark-pred", mark_pred);
   parameters.Set("num-runs", num_runs);
+  parameters.Set("mem-space", memspace);
+  parameters.Set("exec-policy", exec_policy);
   std::vector<VertexT> srcs;
   for (int i = 0; i < num_runs; i++) srcs.push_back(sources[i]);
   parameters.Set("srcs", srcs);
@@ -284,13 +285,15 @@ double sssp(const SizeT num_nodes, const SizeT num_edges,
  * @param[out] distances   Return shortest distance to source per vertex
  * @param[out] preds       Return predecessors of each vertex
  * @param[in]  memspace    Location of input and desired output
+ * @param[in]  exec_policy Location where app will be run
  * \return     double      Return accumulated elapsed times for all runs
  */
 double sssp(const int num_nodes, const int num_edges, const int *row_offsets,
             const int *col_indices, const float *edge_values, int source,
-            const bool mark_pred, float *distances, int *preds, gunrock::util::Location memspace = gunrock::util::HOST) {
+            const bool mark_pred, float *distances, int *preds, gunrock::util::Location memspace = gunrock::util::HOST,
+            gunrock::util::Location exec_policy = gunrock::util::DEVICE) {
   return sssp(num_nodes, num_edges, row_offsets, col_indices, edge_values,
-              1 /* num_runs */, &source, mark_pred, &distances, &preds, memspace);
+              1 /* num_runs */, &source, mark_pred, &distances, &preds, memspace, exec_policy);
 }
 
 // Leave this at the end of the file

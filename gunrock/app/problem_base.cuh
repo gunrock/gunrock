@@ -168,6 +168,10 @@ struct ProblemBase {
    */
   virtual ~ProblemBase() { Release(); }
 
+  util::Parameters GetParameters(){
+    return parameters;
+  }
+
   /*
    * @brief Releasing allocated memory space
    * @param target the location to release memory from

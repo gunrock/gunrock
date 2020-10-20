@@ -37,6 +37,16 @@ cudaError_t UseParameters_app(ParametersT &parameters) {
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
       0.0, "Preprocessing time", __FILE__, __LINE__));
 
+  GUARD_CU(parameters.template Use<gunrock::util::Location>(
+    "mem-space",
+    util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
+    gunrock::util::HOST, "Location (HOST or DEVICE) of input and output data", __FILE__, __LINE__));
+
+  GUARD_CU(parameters.template Use<gunrock::util::Location>(
+    "exec-policy",
+    util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::INTERNAL_PARAMETER,
+    gunrock::util::DEVICE, "Location of where the work is being done (default: DEVICE)", __FILE__, __LINE__));
+
   return retval;
 }
 

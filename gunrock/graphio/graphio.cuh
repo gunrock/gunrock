@@ -228,7 +228,8 @@ cudaError_t LoadGraph(util::Parameters &parameters, GraphT &graph,
     graph.csr().Sort();
   }
 
-  if (!parameters.Get<bool>("quiet")) {
+  //Histogram functions assume the input data is stored on host
+  if (!parameters.Get<bool>("quiet") && parameters.Get<gunrock::util::Location>("mem-space")==gunrock::util::HOST) {
     typedef typename GraphT::SizeT SizeT;
     util::Array1D<SizeT, SizeT> histogram;
     GUARD_CU(graph::GetHistogram(graph, histogram));
