@@ -12,22 +12,12 @@
 #pragma once
 
 namespace gunrock {
-namespace operators {
-
-/**
- * @brief Load balancing type options, not all operators support load-balancing
- * or have need to balance work.
- *
- */
-enum load_balance_type {
-  merge_based,    // Merrill & Garland (SpMV)
-  bucketing,      // Davidson et al. (SSSP)
-  work_stealing,  // <cite>
-  unbalanced      // No load-balancing applied
-};
-
-}  // namespace operators
+namespace operators {}  // namespace operators
 }  // namespace gunrock
+
+#include <gunrock/framework/operators/configs.hxx>
 
 #include <gunrock/framework/operators/advance/advance.hxx>
 #include <gunrock/framework/operators/filter/filter.hxx>
+#include <gunrock/framework/operators/for/for.hxx>
+#include <gunrock/framework/operators/for/for_each.hxx>
