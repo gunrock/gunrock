@@ -150,8 +150,10 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
     };
 
     // Execute advance operator on the provided lambda
-    operators::advance::execute<operators::advance_type_t::vertex_to_vertex>(
-        G, enactor_type::get_enactor(), shortest_path);
+    operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
+                                operators::advance_direction_t::forward,
+                                operators::load_balance_t::merge_path>(
+        G, enactor_type::get_enactor(), shortest_path, context);
 
     // Execute filter operator on the provided lambda
     operators::filter::execute<operators::filter_type_t::predicated>(
