@@ -39,5 +39,10 @@ enum advance_direction_t {
   both       // Push-pull optimized
 };
 
+enum filter_type_t {
+  predicated,  // Copy if predicate = true
+  uniquify     // Exact deduplication (100%)
+};
+
 }  // namespace operators
 }  // namespace gunrock

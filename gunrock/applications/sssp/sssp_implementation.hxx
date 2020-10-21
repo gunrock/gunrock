@@ -156,8 +156,8 @@ struct sssp_enactor_t : enactor_t<algorithm_problem_t> {
         G, enactor_type::get_enactor(), shortest_path, context);
 
     // Execute filter operator on the provided lambda
-    operators::filter::execute<operators::filter_type_t::predicated>(
-        G, enactor_type::get_enactor(), remove_completed_paths);
+    operators::filter::execute<operators::filter_type_t::uniquify>(
+        G, enactor_type::get_enactor(), remove_completed_paths, context);
   }
 
   sssp_enactor_t(algorithm_problem_t* _problem,

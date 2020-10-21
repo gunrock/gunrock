@@ -12,7 +12,6 @@
 #include <vector>
 
 #include <gunrock/cuda/cuda.hxx>
-#include <gunrock/util/timer.hxx>
 
 #include <gunrock/framework/frontier.hxx>
 #include <gunrock/framework/problem.hxx>
@@ -43,8 +42,6 @@ struct enactor_t {
 
   static constexpr std::size_t number_of_buffers = 2;
   std::shared_ptr<cuda::multi_context_t> context;
-  util::timer_t timer;  // XXX: needs to be a vector to support multi-gpu timer
-                        // or we can move this within the actual context.
   algorithm_problem_t* problem;
   thrust::host_vector<frontier_type> frontiers;
   thrust::device_vector<vertex_t> scanned_work_domain;
@@ -110,6 +107,7 @@ struct enactor_t {
     auto single_context = context->get_context(0);
     single_context->print_properties();
     prepare_frontier(single_context);
+    auto timer = single_context->timer();
     timer.begin();
     while (!is_converged(single_context)) {
       loop(single_context);

@@ -12,6 +12,7 @@
 
 #include <gunrock/error.hxx>
 #include <gunrock/cuda/cuda.hxx>
+#include <gunrock/util/timer.hxx>
 
 #include <gunrock/container/array.hxx>
 #include <gunrock/container/vector.hxx>
@@ -38,6 +39,7 @@ struct context_t {
   // cudaStreamSynchronize or cudaDeviceSynchronize for stream 0.
   virtual void synchronize() = 0;
   virtual cuda::event_t event() = 0;
+  virtual util::timer_t& timer() = 0;
 };  // struct context_t
 
 class standard_context_t : public context_t {
@@ -48,6 +50,8 @@ class standard_context_t : public context_t {
   cuda::device_id_t _ordinal;
   cuda::stream_t _stream;
   cuda::event_t _event;
+
+  util::timer_t _timer;
 
   // Making this a template argument means we won't generate an instance
   // of dummy_k for each translation unit.
@@ -92,7 +96,9 @@ class standard_context_t : public context_t {
     error::throw_if_exception(status);
   }
 
-  virtual cuda::event_t event() { return _event; }
+  virtual cuda::event_t event() override { return _event; }
+
+  virtual util::timer_t& timer() override { return _timer; }
 };  // class standard_context_t
 
 class multi_context_t {
