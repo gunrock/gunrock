@@ -4,6 +4,7 @@
 #include <gunrock/framework/operators/configs.hxx>
 
 #include <gunrock/framework/operators/filter/uniquify.hxx>
+#include <gunrock/framework/operators/filter/predicated.hxx>
 
 namespace gunrock {
 namespace operators {
