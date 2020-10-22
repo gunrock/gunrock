@@ -69,7 +69,7 @@ namespace atomic {
 
 template <typename type_t>
 __host__ __device__ __forceinline__ type_t add(type_t* address,
-                                               const type_t& value) {
+                                               type_t value) {
 #ifdef __CUDA_ARCH__
   return atomicAdd(address, value);
 #else
@@ -79,11 +79,9 @@ __host__ __device__ __forceinline__ type_t add(type_t* address,
 
 template <typename type_t>
 __host__ __device__ __forceinline__ type_t min(type_t* address,
-                                               const type_t& value) {
-  // contains support for float/double based atomic::min
-  using namespace cuda;
+                                               type_t value) {
 #ifdef __CUDA_ARCH__
-  return atomicMin(address, value);
+  return cuda::atomicMin(address, value);
 #else
   return std::min<type_t>(*address, value);   // use std::atomic;
 #endif

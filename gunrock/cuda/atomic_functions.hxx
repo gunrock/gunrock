@@ -23,6 +23,20 @@ namespace cuda {
 //       __double_as_longlong(val)));
 // }
 
+
+/**
+ * @brief Wrapper around CUDA's natively supported atomicMin types.
+ * 
+ * @tparam type_t 
+ * @param address 
+ * @param value 
+ * @return type_t 
+ */
+template<typename type_t>
+__device__ static type_t atomicMin(type_t* address, type_t value) {
+  return ::atomicMin(address, value);
+}
+
 /**
  * @brief CUDA natively doesn't support atomicMin on float based addresses and
  * values. This is a workaround (as of CUDA 11.1, there've been no support).
