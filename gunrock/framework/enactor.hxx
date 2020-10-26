@@ -111,7 +111,7 @@ struct enactor_t {
     timer.begin();
     while (!is_converged(single_context)) {
       loop(single_context);
-      iteration++;
+      ++iteration;
     }
     return timer.end();
   }

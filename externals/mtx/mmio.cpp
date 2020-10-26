@@ -69,7 +69,7 @@ int mm_read_unsymmetric_sparse(const char* fname,
   /*   specifier as in "%lg", "%lf", "%le", otherwise errors will occur */
   /*  (ANSI C X3.159-1989, Sec. 4.9.6.2, p. 136 lines 13-15)            */
 
-  for (i = 0; i < nz; i++) {
+  for (i = 0; i < nz; ++i) {
     if (fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]))
       ;
     I[i]--; /* adjust from 1-based to 0-based */
@@ -111,13 +111,13 @@ int mm_read_banner(FILE* f, MM_typecode* matcode) {
              storage_scheme) != 5)
     return MM_PREMATURE_EOF;
 
-  for (p = mtx; *p != '\0'; *p = tolower(*p), p++)
+  for (p = mtx; *p != '\0'; *p = tolower(*p), ++p)
     ; /* convert to lower case */
-  for (p = crd; *p != '\0'; *p = tolower(*p), p++)
+  for (p = crd; *p != '\0'; *p = tolower(*p), ++p)
     ;
-  for (p = data_type; *p != '\0'; *p = tolower(*p), p++)
+  for (p = data_type; *p != '\0'; *p = tolower(*p), ++p)
     ;
-  for (p = storage_scheme; *p != '\0'; *p = tolower(*p), p++)
+  for (p = storage_scheme; *p != '\0'; *p = tolower(*p), ++p)
     ;
 
   /* check for banner */

@@ -112,7 +112,7 @@ class json {
     s = spec.tv_sec;
     ms = round(spec.tv_nsec / 1.0e6);  // Convert nanoseconds to milliseconds
     if (ms > 999) {
-      s++;
+      ++s;
       ms = 0;
     }
 
@@ -377,7 +377,7 @@ class json {
     value_t key(name, _document->GetAllocator());
 
     value_t child_object(rapidjson::kObjectType);
-    for (auto it = vec.begin(); it != vec.end(); it++) {
+    for (auto it = vec.begin(); it != vec.end(); ++it) {
       set_val(it->first.c_str(), it->second, child_object);
     }
 

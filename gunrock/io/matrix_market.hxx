@@ -131,7 +131,7 @@ struct matrix_market_t {
       data = matrix_market_data_t::pattern;
 
       // pattern matrix defines sparsity pattern, but not values
-      for (vertex_t i = 0; i < num_nonzeros; i++) {
+      for (vertex_t i = 0; i < num_nonzeros; ++i) {
         assert(fscanf(file, " %d %d \n", &(coo.row_indices[i]),
                       &(coo.column_indices[i])) == 2);
         coo.row_indices[i]--;  // adjust from 1-based to 0-based indexing
@@ -145,7 +145,7 @@ struct matrix_market_t {
       else
         data = matrix_market_data_t::integer;
 
-      for (vertex_t i = 0; i < coo.number_of_nonzeros; i++) {
+      for (vertex_t i = 0; i < coo.number_of_nonzeros; ++i) {
         vertex_t I, J;
         double V;  // always read in a double and convert later if necessary
 
@@ -163,9 +163,9 @@ struct matrix_market_t {
     if (mm_is_symmetric(code)) {  // duplicate off diagonal entries
       scheme = matrix_market_storage_scheme_t::symmetric;
       vertex_t off_diagonals = 0;
-      for (vertex_t i = 0; i < coo.number_of_nonzeros; i++) {
+      for (vertex_t i = 0; i < coo.number_of_nonzeros; ++i) {
         if (coo.row_indices[i] != coo.column_indices[i])
-          off_diagonals++;
+          ++off_diagonals;
       }
 
       vertex_t _nonzeros =
@@ -180,21 +180,21 @@ struct matrix_market_t {
       weight_t* _V = new_V.data();
 
       vertex_t ptr = 0;
-      for (vertex_t i = 0; i < coo.number_of_nonzeros; i++) {
+      for (vertex_t i = 0; i < coo.number_of_nonzeros; ++i) {
         if (coo.row_indices[i] != coo.column_indices[i]) {
           _I[ptr] = coo.row_indices[i];
           _J[ptr] = coo.column_indices[i];
           _V[ptr] = coo.nonzero_values[i];
-          ptr++;
+          ++ptr;
           _J[ptr] = coo.row_indices[i];
           _I[ptr] = coo.column_indices[i];
           _V[ptr] = coo.nonzero_values[i];
-          ptr++;
+          ++ptr;
         } else {
           _I[ptr] = coo.row_indices[i];
           _J[ptr] = coo.column_indices[i];
           _V[ptr] = coo.nonzero_values[i];
-          ptr++;
+          ++ptr;
         }
       }
       coo.row_indices = new_I;

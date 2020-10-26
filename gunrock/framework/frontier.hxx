@@ -80,7 +80,7 @@ class frontier_t {
 
   void push_back(type_t const& value) {
     _storage.push_back(value);
-    _size++;  // XXX: ugly, manually have to update the size. :(
+    ++_size;  // XXX: ugly, manually have to update the size.
   }
 
   void set_size(std::size_t const& s) { _size = s; }

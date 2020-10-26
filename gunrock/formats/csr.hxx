@@ -99,12 +99,12 @@ struct csr_t {
     }
 
     // compute number of non-zero entries per row of A.
-    for (offset_t n = 0; n < number_of_nonzeros; n++) {
-      Ap[coo.row_indices[n]]++;
+    for (offset_t n = 0; n < number_of_nonzeros; ++n) {
+      ++Ap[coo.row_indices[n]];
     }
 
     // cumulative sum the nnz per row to get row_offsets[].
-    for (index_t i = 0, sum = 0; i < number_of_rows; i++) {
+    for (index_t i = 0, sum = 0; i < number_of_rows; ++i) {
       index_t temp = Ap[i];
       Ap[i] = sum;
       sum += temp;
@@ -113,17 +113,17 @@ struct csr_t {
 
     // write coordinate column indices and nonzero values into CSR's
     // column indices and nonzero values.
-    for (offset_t n = 0; n < number_of_nonzeros; n++) {
+    for (offset_t n = 0; n < number_of_nonzeros; ++n) {
       index_t row = coo.row_indices[n];
       index_t dest = Ap[row];
 
       Aj[dest] = coo.column_indices[n];
       Ax[dest] = coo.nonzero_values[n];
 
-      Ap[row]++;
+      ++Ap[row];
     }
 
-    for (index_t i = 0, last = 0; i <= number_of_rows; i++) {
+    for (index_t i = 0, last = 0; i <= number_of_rows; ++i) {
       index_t temp = Ap[i];
       Ap[i] = last;
       last = temp;

@@ -216,7 +216,7 @@ __host__ __device__ double get_degree_standard_deviation(const graph_type& G) {
 //   auto build_histogram = [graph] __device__ (vertex_t* counts, vertex_t i) {
 //       auto degree = graph.get_neighbor_list_length(i);
 //       while (num_neighbors >= (1 << log_length))
-//         log_length++;
+//         ++log_length;
 
 //       operation::atomic::add(&counts[log_length], (vertex_t)1);
 //   };
