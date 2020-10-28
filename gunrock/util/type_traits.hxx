@@ -4,6 +4,7 @@
 
 namespace std {
 
+#if __cplusplus == 201402L
 // Supported in C++ 17 (https://en.cppreference.com/w/cpp/types/disjunction)
 template <class...>
 struct disjunction : std::false_type {};
@@ -25,4 +26,5 @@ constexpr bool is_arithmetic_v = is_arithmetic<T>::value;
 // (https://en.cppreference.com/w/cpp/types/is_floating_point)
 template <class T>
 constexpr bool is_floating_point_v = is_floating_point<T>::value;
+#endif
 }  // namespace std

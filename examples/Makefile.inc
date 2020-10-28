@@ -67,11 +67,11 @@ DEFINES 	= -DGIT_SHA1="\"$(shell git rev-parse HEAD)\""
 # 	ARCH = -m64
 # endif
 
-NVCCFLAGS   += -std=c++14
+NVCCFLAGS   += -std=c++17
 NVCCFLAGS   += $(SM_TARGETS)
 NVCCFLAGS   += --expt-extended-lambda --expt-relaxed-constexpr --use_fast_math --ptxas-options -v --relocatable-device-code true
 
-CXXFLAGS    += -std=c++14
+CXXFLAGS    += -std=c++17
 CXXFLAGS    += -Wall
 CXXFLAGS    += -Wno-unused-local-typedefs -Wno-strict-aliasing -Wno-unused-function -Wno-format-security
 

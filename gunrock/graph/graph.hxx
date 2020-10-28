@@ -135,7 +135,7 @@ class graph_t : public graph_view_t... {
   }
 
   __host__ __device__ __forceinline__ edge_type
-  get_starting_edge(vertex_type const& v) const {
+  get_starting_edge(vertex_type const& v) const override {
     return first_view_t::get_starting_edge(v);
   }
 
