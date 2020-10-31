@@ -11,6 +11,7 @@
 #pragma once
 #include <iostream>
 #include <gunrock/cuda/device.hxx>
+#include <gunrock/error.hxx>
 
 namespace gunrock {
 namespace cuda {
