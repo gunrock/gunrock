@@ -17,101 +17,127 @@ namespace gunrock {
 namespace cuda {
 
 typedef cudaDeviceProp device_properties_t;
-typedef struct {
-  const int cuda_arch_;
-  const int major = (int)(cuda_arch_ / 100);
-  const int minor = (cuda_arch_ / 10) % 10;
-  constexpr bool operator>=(const int &i) const { return cuda_arch_ >= i; }
-} architecture_t;
 
+typedef struct {
+  unsigned major;
+  unsigned minor;
+  constexpr unsigned as_combined_number() const {
+    return major * 10 + minor;
+  }
+  constexpr bool operator==(int i) { return (int)as_combined_number() == i; }
+  constexpr bool operator!=(int i) { return (int)as_combined_number() != i; }
+  constexpr bool operator>(int i) { return (int)as_combined_number() > i; }
+  constexpr bool operator<(int i) { return (int)as_combined_number() < i; }
+  constexpr bool operator>=(int i) { return (int)as_combined_number() >= i; }
+  constexpr bool operator<=(int i) { return (int)as_combined_number() <= i; }
+} compute_capability_t;
+
+/**
+ * @brief Get compute capability from major and minor versions.
+ */
+constexpr compute_capability_t make_compute_capability(unsigned major,
+                                                       unsigned minor) {
+  return compute_capability_t{major, minor};
+}
+
+/**
+ * @brief Get compute capability from combined major and minor version.
+ */
+constexpr compute_capability_t make_compute_capability(unsigned combined) {
+  return compute_capability_t{combined / 10, combined % 10};
+}
 /**
  * @namespace properties
  * C++ based CUDA device properties.
  */
 namespace properties {
 
+/**
+ * @brief Enums for units used by device property values.
+ */
 enum : size_t {
   KiB = 1024,
   K   = 1024
 };
 
-/**
- * Device properties retrieved from:
- * https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#features-and-technical-specifications
- */
+// Device properties retrieved from:
+// https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#features-and-technical-specifications
 
 /**
- * Maximum number of threads per block
+ * @brief Maximum number of threads per block.
  */
 inline constexpr unsigned cta_max_threads() {
   return 1 << 10;  // 1024 threads per CTA
 }
 
 /**
- * Warp size
+ * @brief Warp size (has always been 32, but is subject to change).
  */
 inline constexpr unsigned warp_max_threads() {
-  return 1 << 5;  // 32 threads per warp
+  return 1 << 5;
 }
 
 /**
- * Maximum number of resident blocks per SM
+ * @brief Maximum number of resident blocks per SM.
  */
-inline constexpr unsigned sm_max_ctas(architecture_t arch) {
+inline constexpr unsigned sm_max_ctas(compute_capability_t capability) {
   return
-    (arch >= 860) ? 16 :  // SM86+
-    (arch >= 800) ? 32 :  // SM80
-    (arch >= 750) ? 16 :  // SM75
-    (arch >= 500) ? 32 :  // SM50-SM72
-                    16 ;  // SM30-SM37
+    (capability >= 86) ? 16 :  // SM86+
+    (capability >= 80) ? 32 :  // SM80
+    (capability >= 75) ? 16 :  // SM75
+    (capability >= 50) ? 32 :  // SM50-SM72
+                         16 ;  // SM30-SM37
 }
 
 /**
- * Maximum number of resident threads per SM
+ * @brief Maximum number of resident threads per SM.
  */
-inline constexpr unsigned sm_max_threads(architecture_t arch) {
+inline constexpr unsigned sm_max_threads(compute_capability_t capability) {
   return
-    (arch >= 860) ? 1536 :  // SM86+
-    (arch >= 800) ? 2048 :  // SM80
-    (arch >= 750) ? 1024 :  // SM75
-                    2048 ;  // SM30-SM72
+    (capability >= 86) ? 1536 :  // SM86+
+    (capability >= 80) ? 2048 :  // SM80
+    (capability >= 75) ? 1024 :  // SM75
+                         2048 ;  // SM30-SM72
 }
 
 /**
- * Number of 32-bit registers per SM
+ * @brief Number of 32-bit registers per SM.
  */
-inline constexpr unsigned sm_registers(architecture_t arch) {
+inline constexpr unsigned sm_registers(compute_capability_t capability) {
   return
-    (arch >= 500) ?  64 * K :  // SM50+
-    (arch >= 370) ? 128 * K :  // SM37
-                     64 * K ;  // SM30-SM35
+    (capability >= 50) ?  64 * K :  // SM50+
+    (capability >= 37) ? 128 * K :  // SM37
+                          64 * K ;  // SM30-SM35
 }
 
 /**
- * Maximum amount of shared memory per SM
+ * @brief Maximum amount of shared memory per SM.
  */
-inline constexpr unsigned sm_max_smem_bytes(architecture_t arch) {
+inline constexpr unsigned sm_max_smem_bytes(compute_capability_t capability) {
   return
-    (arch >= 860) ? 100 * KiB :  // SM86+
-    (arch >= 800) ? 164 * KiB :  // SM80
-    (arch >= 750) ?  64 * KiB :  // SM75
-    (arch >= 700) ?  96 * KiB :  // SM70-SM72
-    (arch >= 620) ?  64 * KiB :  // SM62
-    (arch >= 610) ?  96 * KiB :  // SM61
-    (arch >= 530) ?  64 * KiB :  // SM53
-    (arch >= 520) ?  96 * KiB :  // SM52
-    (arch >= 500) ?  64 * KiB :  // SM50
-    (arch >= 370) ? 112 * KiB :  // SM37
-                     48 * KiB ;  // SM30-SM35
+    (capability >= 86) ? 100 * KiB :  // SM86+
+    (capability >= 80) ? 164 * KiB :  // SM80
+    (capability >= 75) ?  64 * KiB :  // SM75
+    (capability >= 70) ?  96 * KiB :  // SM70-SM72
+    (capability >= 62) ?  64 * KiB :  // SM62
+    (capability >= 61) ?  96 * KiB :  // SM61
+    (capability >= 53) ?  64 * KiB :  // SM53
+    (capability >= 52) ?  96 * KiB :  // SM52
+    (capability >= 50) ?  64 * KiB :  // SM50
+    (capability >= 37) ? 112 * KiB :  // SM37
+                          48 * KiB ;  // SM30-SM35
 }
 
 /**
- * Number of shared memory banks
+ * @brief Number of shared memory banks.
  */
 inline constexpr unsigned shared_memory_banks() {
   return 1 << 5;  // 32 memory banks per SM
 }
 
+/**
+ * @brief Stride length of shared memory in bytes.
+ */
 inline constexpr unsigned shared_memory_bank_stride() {
   return 1 << 2;  // 4 byte words
 }
