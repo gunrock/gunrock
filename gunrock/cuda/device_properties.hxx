@@ -128,7 +128,16 @@ inline constexpr unsigned sm_registers(compute_capability_t capability) {
 /**
  * @brief Maximum amount of shared memory per SM.
  */
-inline constexpr unsigned sm_max_smem_bytes(compute_capability_t capability) {
+inline constexpr unsigned sm_max_smem_bytes(compute_capability_t capability,
+                                            enum cudaFuncCache sm3XCacheConfig
+                                            = cudaFuncCachePreferNone) {
+  unsigned sm3XConfigurableSharedMem =
+    (sm3XCacheConfig == cudaFuncCachePreferNone)   ? 48 * KiB :
+    (sm3XCacheConfig == cudaFuncCachePreferShared) ? 48 * KiB :
+    (sm3XCacheConfig == cudaFuncCachePreferL1)     ? 16 * KiB :
+    (sm3XCacheConfig == cudaFuncCachePreferEqual)  ? 32 * KiB :
+                                                     48 * KiB ;
+
   return
     (capability >= 86) ? 100 * KiB :  // SM86+
     (capability >= 80) ? 164 * KiB :  // SM80
@@ -139,8 +148,8 @@ inline constexpr unsigned sm_max_smem_bytes(compute_capability_t capability) {
     (capability >= 53) ?  64 * KiB :  // SM53
     (capability >= 52) ?  96 * KiB :  // SM52
     (capability >= 50) ?  64 * KiB :  // SM50
-    (capability >= 37) ? 112 * KiB :  // SM37
-                          48 * KiB ;  // SM30-SM35
+    (capability >= 37) ?  64 * KiB + sm3XConfigurableSharedMem :  // SM37
+         sm3XConfigurableSharedMem ;  // SM30-SM35
 }
 
 /**
