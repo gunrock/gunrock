@@ -60,6 +60,21 @@ enum : size_t {
   K   = 1024
 };
 
+/**
+ * @brief Architecture name based on compute capability.
+ * https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#compute-capability
+ */
+inline constexpr const char* arch_name(compute_capability_t capability) {
+  return
+    (capability.major == 8) ?  "Ampere" :
+    (capability.major == 7 && capability.minor == 5) ? "Turing" :
+    (capability.major == 7) ?   "Volta" :
+    (capability.major == 6) ?  "Pascal" :
+    (capability.major == 5) ? "Maxwell" :
+    (capability.major == 3) ?  "Kepler" :
+                                nullptr ;
+}
+
 // Device properties retrieved from:
 // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#features-and-technical-specifications
 

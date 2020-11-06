@@ -6,10 +6,17 @@ int main(int argc, char** argv) {
     using namespace std;
     using namespace gunrock::cuda;
     using namespace gunrock::cuda::properties;
+
     int cc_ver = (argc > 1) ? stoi(argv[1]) : 30;
     compute_capability_t cc = make_compute_capability(cc_ver);
+    const char *arch = arch_name(cc);
+
     cout << "Compute Capability Version Major: " << cc.major << endl;
     cout << "Compute Capability Version Minor: " << cc.minor << endl;
+
+    if (arch != nullptr)
+        cout << "Compute Capability Architecture: " << arch << endl;
+
     cout << endl;
     cout << "cta_max_threads:           " << cta_max_threads() << endl;
     cout << "warp_max_threads:          " << warp_max_threads() << endl;
