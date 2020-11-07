@@ -2,10 +2,17 @@
 #include <string>
 #include <gunrock/cuda/device_properties.hxx>
 
+using namespace gunrock::cuda;
+using namespace gunrock::cuda::properties;
+
+// Making sure the CUDA API enums are known at compile time
+compute_capability_t sm30 = make_compute_capability(30);
+size_t smem_size = sm_max_smem_bytes<cudaFuncCachePreferEqual>(sm30);
+size_t smem_bank_stride =
+  shared_memory_bank_stride<cudaSharedMemBankSizeEightByte>();
+
 int main(int argc, char** argv) {
   using namespace std;
-  using namespace gunrock::cuda;
-  using namespace gunrock::cuda::properties;
 
   int cc_ver = (argc > 1) ? stoi(argv[1]) : 30;
   compute_capability_t cc = make_compute_capability(cc_ver);
