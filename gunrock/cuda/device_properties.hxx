@@ -150,7 +150,9 @@ inline constexpr unsigned sm_registers(compute_capability_t capability) {
  * @todo Test if this function can be resolved at compile time
  */
 template<enum cudaFuncCache sm3XCacheConfig = cudaFuncCachePreferNone>
-inline constexpr unsigned sm_max_smem_bytes(compute_capability_t capability) {
+inline constexpr unsigned sm_max_shared_memory_bytes(
+  compute_capability_t capability
+) {
   unsigned sm3XConfiguredSmem =
     (sm3XCacheConfig == cudaFuncCachePreferNone)   ? 48 * KiB :
     (sm3XCacheConfig == cudaFuncCachePreferShared) ? 48 * KiB :
