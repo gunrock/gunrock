@@ -34,6 +34,9 @@ typedef struct {
 
 /**
  * @brief Get compute capability from major and minor versions.
+ * @param major Compute capability major version
+ * @param minor Compute capability minor version
+ * \return compute_capability_t
  */
 constexpr compute_capability_t make_compute_capability(unsigned major,
                                                        unsigned minor) {
@@ -42,6 +45,8 @@ constexpr compute_capability_t make_compute_capability(unsigned major,
 
 /**
  * @brief Get compute capability from combined major and minor version.
+ * @param combined Combined major and minor value, e.g. 86 for 8.6
+ * \return compute_capability_t
  */
 constexpr compute_capability_t make_compute_capability(unsigned combined) {
   return compute_capability_t{combined / 10, combined % 10};
@@ -63,6 +68,8 @@ enum : size_t {
 /**
  * @brief Architecture name based on compute capability.
  * https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#compute-capability
+ * @param capability Compute capability from which to get the result
+ * \return const char* architecture name or nullptr if capability is invalid
  */
 inline constexpr const char* arch_name(compute_capability_t capability) {
   return
@@ -80,6 +87,7 @@ inline constexpr const char* arch_name(compute_capability_t capability) {
 
 /**
  * @brief Maximum number of threads per block.
+ * \return unsigned
  */
 inline constexpr unsigned cta_max_threads() {
   return 1 << 10;  // 1024 threads per CTA
@@ -87,6 +95,7 @@ inline constexpr unsigned cta_max_threads() {
 
 /**
  * @brief Warp size (has always been 32, but is subject to change).
+ * \return unsigned
  */
 inline constexpr unsigned warp_max_threads() {
   return 1 << 5;
@@ -94,6 +103,8 @@ inline constexpr unsigned warp_max_threads() {
 
 /**
  * @brief Maximum number of resident blocks per SM.
+ * @param capability Compute capability from which to get the result
+ * \return unsigned
  */
 inline constexpr unsigned sm_max_ctas(compute_capability_t capability) {
   return
@@ -106,6 +117,8 @@ inline constexpr unsigned sm_max_ctas(compute_capability_t capability) {
 
 /**
  * @brief Maximum number of resident threads per SM.
+ * @param capability Compute capability from which to get the result
+ * \return unsigned
  */
 inline constexpr unsigned sm_max_threads(compute_capability_t capability) {
   return
@@ -117,6 +130,8 @@ inline constexpr unsigned sm_max_threads(compute_capability_t capability) {
 
 /**
  * @brief Number of 32-bit registers per SM.
+ * @param capability Compute capability from which to get the result
+ * \return unsigned
  */
 inline constexpr unsigned sm_registers(compute_capability_t capability) {
   return
@@ -127,6 +142,12 @@ inline constexpr unsigned sm_registers(compute_capability_t capability) {
 
 /**
  * @brief Maximum amount of shared memory per SM.
+ * @tparam sm3XCacheConfig cudaFuncCache enum representing the shared data
+ *                         cache configuration used when called on compute
+ *                         capability 3.x
+ * @param capability       Compute capability from which to get the result
+ * \return unsigned
+ * @todo Test if this function can be resolved at compile time
  */
 template<enum cudaFuncCache sm3XCacheConfig = cudaFuncCachePreferNone>
 inline constexpr unsigned sm_max_smem_bytes(compute_capability_t capability) {
@@ -153,6 +174,7 @@ inline constexpr unsigned sm_max_smem_bytes(compute_capability_t capability) {
 
 /**
  * @brief Number of shared memory banks.
+ * \return unsigned
  */
 inline constexpr unsigned shared_memory_banks() {
   return 1 << 5;  // 32 memory banks per SM
@@ -160,6 +182,7 @@ inline constexpr unsigned shared_memory_banks() {
 
 /**
  * @brief Stride length of shared memory in bytes.
+ * \return unsigned
  */
 inline constexpr unsigned shared_memory_bank_stride() {
   return 1 << 2;  // 4 byte words
