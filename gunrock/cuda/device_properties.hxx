@@ -181,11 +181,19 @@ inline constexpr unsigned shared_memory_banks() {
 }
 
 /**
- * @brief Stride length of shared memory in bytes.
+ * @brief Stride length (number of bytes per word) of shared memory in bytes.
+ * @tparam sm3XSmemConfig cudaSharedMemConfig enum representing the shared
+ *                        memory bank size (stride) used when called on compute
+ *                        capability 3.x
  * \return unsigned
  */
+template<enum cudaSharedMemConfig sm3XSmemConfig = cudaSharedMemBankSizeDefault>
 inline constexpr unsigned shared_memory_bank_stride() {
-  return 1 << 2;  // 4 byte words
+  return
+    (sm3XSmemConfig == cudaSharedMemBankSizeDefault)   ? 1 << 2 :
+    (sm3XSmemConfig == cudaSharedMemBankSizeFourByte)  ? 1 << 2 :
+    (sm3XSmemConfig == cudaSharedMemBankSizeEightByte) ? 1 << 3 :
+                                                         1 << 2 ;
 }
 
 void print(device_properties_t& prop) {
