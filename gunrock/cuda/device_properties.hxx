@@ -189,6 +189,8 @@ inline constexpr unsigned shared_memory_banks() {
  */
 template<enum cudaSharedMemConfig sm3XSmemConfig = cudaSharedMemBankSizeDefault>
 inline constexpr unsigned shared_memory_bank_stride() {
+  // The default config on 3.x is the same constant value for later archs
+  // Only let 3.x be configurable if stride later becomes dependent on arch
   return
     (sm3XSmemConfig == cudaSharedMemBankSizeDefault)   ? 1 << 2 :
     (sm3XSmemConfig == cudaSharedMemBankSizeFourByte)  ? 1 << 2 :
