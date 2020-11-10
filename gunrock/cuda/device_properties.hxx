@@ -17,6 +17,7 @@ namespace gunrock {
 namespace cuda {
 
 typedef cudaDeviceProp device_properties_t;
+typedef int architecture_t;
 
 typedef struct {
   unsigned major;
