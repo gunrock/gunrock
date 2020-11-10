@@ -51,3 +51,7 @@ build
 
 # Ignore vscode files
 *.vscode*
+
+# Ignore dependencies
+externals/*
+!externals/.gitkeep
