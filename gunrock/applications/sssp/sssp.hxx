@@ -18,15 +18,11 @@ namespace sssp {
 
 using namespace memory;
 
-template <typename graph_vector_t,
-          typename host_graph_vector_t,
-          typename graph_type = typename graph_vector_t::value_type>
-float sssp(graph_vector_t& G,
-           host_graph_vector_t& g,
+template <typename graph_type, typename host_graph_type>
+float sssp(std::shared_ptr<graph_type>& G,
+           std::shared_ptr<host_graph_type>& g,
            typename graph_type::vertex_type source,
            typename graph_type::weight_pointer_t distances) {
-  using host_graph_type = typename host_graph_vector_t::value_type;
-
   using sssp_problem_type = sssp_problem_t<graph_type, host_graph_type>;
   using sssp_enactor_type = sssp_enactor_t<sssp_problem_type>;
   using weight_t = typename graph_type::weight_type;
@@ -39,12 +35,12 @@ float sssp(graph_vector_t& G,
       new cuda::multi_context_t(devices));
 
   std::shared_ptr<sssp_problem_type> sssp_problem(
-      std::make_shared<sssp_problem_type>(G.data().get(),  // input graph (GPU)
-                                          g.data(),        // input graph (CPU)
-                                          multi_context,   // input context
-                                          source,          // input source
-                                          distances,       // output distances
-                                          nullptr  // output predecessors
+      std::make_shared<sssp_problem_type>(G.get(),        // input graph (GPU)
+                                          g.get(),        // input graph (CPU)
+                                          multi_context,  // input context
+                                          source,         // input source
+                                          distances,      // output distances
+                                          nullptr         // output predecessors
                                           ));
 
   std::shared_ptr<sssp_enactor_type> sssp_enactor(

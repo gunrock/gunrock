@@ -103,15 +103,20 @@ auto from_csr_t(typename vertex_vector_t::value_type const& r,
       space, vertex_type, edge_type, weight_type,
       graph::graph_csr_t<space, vertex_type, edge_type, weight_type>>;
 
-  typename vector<graph_type, space>::type O(1);
+  auto deleter = [&](graph_type* ptr) { memory::free(ptr, space); };
+  std::shared_ptr<graph_type> O(
+      memory::allocate<graph_type>(sizeof(graph_type), space), deleter);
+
   graph_type G;
 
   G.set(r, c, nnz, Ap_ptr, Aj_ptr, Ax_ptr);
 
   if (space == memory_space_t::device) {
-    device::csr_t<graph_type>(G, memory::raw_pointer_cast(O.data()));
+    device::csr_t<graph_type>(G, O.get());
+    // memory::raw_pointer_cast(O.data()));
   } else {
-    host::csr_t<graph_type>(G, memory::raw_pointer_cast(O.data()));
+    host::csr_t<graph_type>(G, O.get());
+    // memory::raw_pointer_cast(O.data()));
   }
 
   return O;
@@ -129,11 +134,14 @@ auto meta_graph(vertex_t const& r, vertex_t const& c, edge_t const& nnz) {
       space, vertex_type, edge_type, weight_type,
       graph::graph_csr_t<space, vertex_type, edge_type, weight_type>>;
 
-  typename vector<graph_type, space>::type O(1);
+  auto deleter = [&](graph_type* ptr) { memory::free(ptr, space); };
+  std::shared_ptr<graph_type> O(
+      memory::allocate<graph_type>(sizeof(graph_type), space), deleter);
+
   graph_type G;
 
   G.set(r, c, nnz, nullptr, nullptr, nullptr);
-  host::csr_t<graph_type>(G, memory::raw_pointer_cast(O.data()));
+  host::csr_t<graph_type>(G, O.get());
 
   return O;
 }
