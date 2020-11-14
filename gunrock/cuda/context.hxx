@@ -33,7 +33,7 @@ struct context_t {
 
   virtual const cuda::device_properties_t& props() const = 0;
   virtual void print_properties() = 0;
-  virtual int ptx_version() const = 0;
+  virtual cuda::compute_capability_t ptx_version() const = 0;
   virtual cuda::stream_t stream() = 0;
 
   // cudaStreamSynchronize or cudaDeviceSynchronize for stream 0.
@@ -45,7 +45,7 @@ struct context_t {
 class standard_context_t : public context_t {
  protected:
   cuda::device_properties_t _props;
-  cuda::architecture_t _ptx_version;
+  cuda::compute_capability_t _ptx_version;
 
   cuda::device_id_t _ordinal;
   cuda::stream_t _stream;
@@ -60,7 +60,7 @@ class standard_context_t : public context_t {
     cuda::function_attributes_t attr;
     error::error_t status = cudaFuncGetAttributes(&attr, dummy_k<0>);
     error::throw_if_exception(status);
-    _ptx_version = attr.ptxVersion;
+    _ptx_version = cuda::make_compute_capability(attr.ptxVersion);
 
     cudaSetDevice(_ordinal);
     cudaStreamCreate(&_stream);
@@ -85,7 +85,7 @@ class standard_context_t : public context_t {
     cuda::properties::print(_props);
   }
 
-  virtual cuda::architecture_t ptx_version() const override {
+  virtual cuda::compute_capability_t ptx_version() const override {
     return _ptx_version;
   }
   virtual cuda::stream_t stream() override { return _stream; }
