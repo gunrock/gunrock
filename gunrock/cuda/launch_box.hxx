@@ -80,7 +80,7 @@ struct inherit_t;
 
 template<typename base_t, typename... base_v>
 struct inherit_t<base_t, base_v...> :
-base_t::template rebind<inherit_t<base_v...>> {};  // What does ::template do here?
+base_t::template rebind<inherit_t<base_v...>> {};
 
 template<typename base_t>
 struct inherit_t<base_t> : base_t {};
