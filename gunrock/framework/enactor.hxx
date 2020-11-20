@@ -65,9 +65,9 @@ struct enactor_t {
         buffer_selector(0),
         iteration(0),
         scanned_work_domain(
-            problem->get_host_graph_pointer()->get_number_of_vertices()) {
+            problem->get_meta_pointer()->get_number_of_vertices()) {
     // Set temporary buffer to be at least the number of edges
-    auto g = problem->get_host_graph_pointer();
+    auto g = problem->get_meta_pointer();
     auto buffer = get_inactive_frontier_buffer();
     buffer->reserve(g->get_number_of_edges());
   }

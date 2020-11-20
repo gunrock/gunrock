@@ -59,7 +59,7 @@ struct csr_t {
    * @param coo
    * @return csr_t<space, index_t, offset_t, value_t>&
    */
-  csr_t<space, index_t, offset_t, value_t>& operator=(
+  csr_t<space, index_t, offset_t, value_t>from_coo(
       const coo_t<memory_space_t::host, index_t, offset_t, value_t>& coo) {
     number_of_rows = coo.number_of_rows;
     number_of_columns = coo.number_of_columns;
