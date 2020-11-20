@@ -156,8 +156,5 @@ struct launch_box_t : inherit_t<archs_launch_params_t...> {
   typedef typename launch_box_t::ARCH_TAG launch_params;  // Launch params for the current GPU architecture
 };
 
-// Macro to get the launch params from a launch box for the current GPU architecture
-#define LAUNCH_PARAMS(launch_box) typename launch_box::ARCH_TAG  // Delete this perhaps? I don't like the idea of using macros throughout the code
-
 }  // namespace gunrock
 }  // namespace cuda
