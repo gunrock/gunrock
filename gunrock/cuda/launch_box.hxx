@@ -88,41 +88,43 @@ struct inherit_t<base_t> : base_t {};
 
 /**
  * @brief Struct holding kernel parameters will be passed in upon launch
- * @tparam blockDim_ 1D block dimensions to launch with
- * @tparam gridDim_ 1D grid dimensions to launch with
- * @tparam smemBytes_ Amount of shared memory to allocate
+ * @tparam block_dimension_ 1D block dimensions to launch with
+ * @tparam grid_dimension_ 1D grid dimensions to launch with
+ * @tparam smem_bytes_ Amount of shared memory to allocate
  */
 template<
-  unsigned int blockDim_,
-  unsigned int gridDim_,
-  unsigned int smemBytes_ = 0
+  unsigned int block_dimension_,
+  unsigned int grid_dimension_,
+  unsigned int smem_bytes_ = 0
 >
 struct launch_params_t {
   enum : unsigned int {
-    blockDim = blockDim_,
-    gridDim = gridDim_,
-    smemBytes = smemBytes_
+    block_dimension = block_dimension_,
+    grid_dimension = grid_dimension_,
+    smem_bytes = smem_bytes_
   };
 };
 
 // Create launch param structs for each architecture for use in the launch box struct
 // rebind type allows inherit_t to re-set the base class to each different arch_launch_param_t
 // Is there a way to make archname##_arch_t generic and only macro the type alias template?
-#define NAMED_ARCH_TYPES(archname)                                 \
-  template<typename launch_params_t, typename base_t = empty_t>    \
-  struct archname##_arch_t : base_t {                              \
-    typedef launch_params_t archname;                              \
+#define NAMED_ARCH_TYPES(archname)                                     \
+  template<typename launch_params_t, typename base_t = empty_t>        \
+  struct archname##_arch_t : base_t {                                  \
+    typedef launch_params_t archname;                                  \
                                                                    \
-    template<typename new_base_t>                                  \
-    using rebind = archname##_arch_t<launch_params_t, new_base_t>; \
-  };                                                               \
+    template<typename new_base_t>                                      \
+    using rebind = archname##_arch_t<launch_params_t, new_base_t>;     \
+  };                                                                   \
                                                                    \
-  template<                                                        \
-    unsigned int blockDim_,                                        \
-    unsigned int gridDim_,                                         \
-    unsigned int smemBytes_ = 0                                    \
-  >                                                                \
-  using archname = archname##_arch_t<launch_params_t<blockDim_, gridDim_, smemBytes_>>;  // launch_params_t wrapper template for each architecture
+  template<                                                            \
+    unsigned int block_dimension_,                                     \
+    unsigned int grid_dimension_,                                      \
+    unsigned int smem_bytes_ = 0                                       \
+  >                                                                    \
+  using archname = archname##_arch_t<launch_params_t<block_dimension_, \
+                                                     grid_dimension_,  \
+                                                     smem_bytes>>;  // launch_params_t wrapper template for each architecture
 
 NAMED_ARCH_TYPES(kepler)
 NAMED_ARCH_TYPES(maxwell)
