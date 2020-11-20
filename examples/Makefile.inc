@@ -28,25 +28,25 @@ SM_TARGETS = $(GEN_SM61)
 #-------------------------------------------------------------------------------
 
 ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
-    OMP_INC  = -I"/usr/local/include/libiomp"
-    OMP_LINK = -Xlinker /usr/local/lib/libiomp5.dylib
+	OMP_INC  = -I"/usr/local/include/libiomp"
+	OMP_LINK = -Xlinker /usr/local/lib/libiomp5.dylib
 else
-    OMP_INC =
-    OMP_LINK = -Xcompiler -fopenmp -Xlinker -lgomp
+	OMP_INC =
+	OMP_LINK = -Xcompiler -fopenmp -Xlinker -lgomp
 endif
 
-EXT_INC     = ../../externals
-CUDA_INC 	= -I"$(shell dirname $(NVCC))/../include"
-MGPU_INC 	= -I"$(EXT_INC)/moderngpu/src"
-JSON_INC    = -I"$(EXT_INC)/rapidjson/include"
-MTX_INC     = -I"$(EXT_INC)/mtx"
+EXT_INC		= ../../externals
+CUDA_INC	= -I"$(shell dirname $(NVCC))/../include"
+MGPU_INC	= -I"$(EXT_INC)/moderngpu/src"
+JSON_INC	= -I"$(EXT_INC)/rapidjson/include"
+MTX_INC		= -I"$(EXT_INC)/mtx"
 
-CUB         = -lcub
-CUSPARSE    = -lcusparse
+CUB			= -lcub
+CUSPARSE	= -lcusparse
 
-GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=2.0.0
-LINK        = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
-INC         = -I.. -I../.. $(CUDA_CPP) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(JSON_INC) $(CUDA_INC) $(MTX_INC) $(LINK)
+GUNROCK_DEF	= -Xcompiler -DGUNROCKVERSION=2.0.0
+LINK		= $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
+INC			= -I.. -I../.. $(CUDA_CPP) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(JSON_INC) $(CUDA_INC) $(MTX_INC) $(LINK)
 
 #-------------------------------------------------------------------------------
 # Defines

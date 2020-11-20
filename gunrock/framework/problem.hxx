@@ -20,31 +20,38 @@ namespace gunrock {
  * replicated or partitioned to multiple instances (for example, in a multi-gpu
  * context). In the algorithms' problem constructor, initialize your data.
  *
- * @tparam graph_type
- * @tparam host_graph_type
+ * @tparam graph_t
+ * @tparam meta_t
  */
-template <typename graph_type, typename host_graph_type>
+template <typename graph_t, typename meta_t, typename param_t, typename result_t>
 struct problem_t {
-  using vertex_t = typename graph_type::vertex_type;
-  using edge_t = typename graph_type::edge_type;
-  using weight_t = typename graph_type::weight_type;
+  using vertex_t = typename graph_t::vertex_type;
+  using edge_t   = typename graph_t::edge_type;
+  using weight_t = typename graph_t::weight_type;
+  
+  param_t* param;
+  result_t* result;
 
-  using vertex_pointer_t = typename graph_type::vertex_pointer_t;
-  using edge_pointer_t = typename graph_type::edge_pointer_t;
-  using weight_pointer_t = typename graph_type::weight_pointer_t;
-
-  graph_type* graph_slice;
-  host_graph_type* host_graph_slice;
+  graph_t* graph_slice;
+  meta_t* meta_slice;
   std::shared_ptr<cuda::multi_context_t> context;
 
-  graph_type* get_graph_pointer() const { return graph_slice; }
-  host_graph_type* get_host_graph_pointer() const { return host_graph_slice; }
-
+  graph_t* get_graph_pointer() const { return graph_slice; }
+  meta_t* get_meta_pointer() const { return meta_slice; }
+    
   problem_t() : graph_slice(nullptr) {}
-  problem_t(graph_type* G,
-            host_graph_type* g,
-            std::shared_ptr<cuda::multi_context_t> _context)
-      : graph_slice(G), host_graph_slice(g), context(_context) {}
+  problem_t(
+    graph_t* G,
+    meta_t* meta,
+    param_t* _param,
+    result_t* _result,
+    std::shared_ptr<cuda::multi_context_t> _context
+  ) : 
+    graph_slice(G),
+    meta_slice(meta),
+    param(_param), 
+    result(_result),
+    context(_context) { }
 
   // Disable copy ctor and assignment operator.
   // We do not want to let user copy only a slice.

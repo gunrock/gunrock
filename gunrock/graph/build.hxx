@@ -11,6 +11,8 @@
 
 #pragma once
 
+#include <tuple>
+
 namespace gunrock {
 namespace graph {
 namespace build {
@@ -82,6 +84,54 @@ void csr_t(graph_type I, graph_type* G) {
 }  // namespace host
 
 template <memory_space_t space,
+          typename edge_type,
+          typename vertex_type,
+          typename weight_type>
+auto _from_csr_t(vertex_type const& r,
+                vertex_type const& c,
+                edge_type const& nnz,
+                edge_type* Ap_ptr,
+                vertex_type* Aj_ptr,
+                weight_type* Ax_ptr) {
+      
+  using graph_type = graph::graph_t<
+      space, vertex_type, edge_type, weight_type,
+      graph::graph_csr_t<space, vertex_type, edge_type, weight_type>>;
+
+  graph_type G;
+  G.set(r, c, nnz, Ap_ptr, Aj_ptr, Ax_ptr);
+
+  auto graph_deleter = [&](graph_type* ptr) { memory::free(ptr, space); };
+  std::shared_ptr<graph_type> G_ptr(
+      memory::allocate<graph_type>(sizeof(graph_type), space), graph_deleter);
+
+  if (space == memory_space_t::device) {
+    device::csr_t<graph_type>(G, G_ptr.get());
+  } else {
+    host::csr_t<graph_type>(G, G_ptr.get());
+  }
+  
+  return G_ptr;
+}
+                
+template <memory_space_t space,
+          typename edge_type,
+          typename vertex_type,
+          typename weight_type>
+auto from_csr_t(vertex_type const& r,
+                vertex_type const& c,
+                edge_type const& nnz,
+                edge_type* Ap_ptr,
+                vertex_type* Aj_ptr,
+                weight_type* Ax_ptr) {
+  
+  // From raw pointers
+  auto G_ptr    = _from_csr_t<space>(r, c, nnz, Ap_ptr, Aj_ptr, Ax_ptr);
+  auto meta_ptr = _from_csr_t<memory_space_t::host, edge_type, vertex_type, weight_type>(r, c, nnz, nullptr, nullptr, nullptr);
+  return std::make_pair(G_ptr, meta_ptr);
+}
+
+template <memory_space_t space,
           typename edge_vector_t,
           typename vertex_vector_t,
           typename weight_vector_t>
@@ -91,59 +141,26 @@ auto from_csr_t(typename vertex_vector_t::value_type const& r,
                 edge_vector_t& Ap,
                 vertex_vector_t& Aj,
                 weight_vector_t& Ax) {
-  using vertex_type = typename vertex_vector_t::value_type;
-  using edge_type = typename edge_vector_t::value_type;
-  using weight_type = typename weight_vector_t::value_type;
-
-  auto Ap_ptr = memory::raw_pointer_cast(Ap.data());
-  auto Aj_ptr = memory::raw_pointer_cast(Aj.data());
-  auto Ax_ptr = memory::raw_pointer_cast(Ax.data());
-
-  using graph_type = graph::graph_t<
-      space, vertex_type, edge_type, weight_type,
-      graph::graph_csr_t<space, vertex_type, edge_type, weight_type>>;
-
-  auto deleter = [&](graph_type* ptr) { memory::free(ptr, space); };
-  std::shared_ptr<graph_type> O(
-      memory::allocate<graph_type>(sizeof(graph_type), space), deleter);
-
-  graph_type G;
-
-  G.set(r, c, nnz, Ap_ptr, Aj_ptr, Ax_ptr);
-
-  if (space == memory_space_t::device) {
-    device::csr_t<graph_type>(G, O.get());
-    // memory::raw_pointer_cast(O.data()));
-  } else {
-    host::csr_t<graph_type>(G, O.get());
-    // memory::raw_pointer_cast(O.data()));
-  }
-
-  return O;
+  // From thrust vectors
+  return from_csr_t<space>(
+    r, c, nnz,
+    memory::raw_pointer_cast(Ap.data()),
+    memory::raw_pointer_cast(Aj.data()),
+    memory::raw_pointer_cast(Ax.data())
+  );
 }
 
-template <typename vertex_t, typename edge_t>
-auto meta_graph(vertex_t const& r, vertex_t const& c, edge_t const& nnz) {
-  using vertex_type = vertex_t;
-  using edge_type = edge_t;
-  using weight_type = edge_t;
-
-  constexpr memory_space_t space = memory_space_t::host;
-
-  using graph_type = graph::graph_t<
-      space, vertex_type, edge_type, weight_type,
-      graph::graph_csr_t<space, vertex_type, edge_type, weight_type>>;
-
-  auto deleter = [&](graph_type* ptr) { memory::free(ptr, space); };
-  std::shared_ptr<graph_type> O(
-      memory::allocate<graph_type>(sizeof(graph_type), space), deleter);
-
-  graph_type G;
-
-  G.set(r, c, nnz, nullptr, nullptr, nullptr);
-  host::csr_t<graph_type>(G, O.get());
-
-  return O;
+template <memory_space_t space, typename csr_t>
+auto from_csr_t(csr_t* csr) {
+  // From a CSR object
+  return from_csr_t<space>(
+      csr->number_of_rows,
+      csr->number_of_columns,
+      csr->number_of_nonzeros,
+      csr->row_offsets,
+      csr->column_indices,
+      csr->nonzero_values
+  );  
 }
 
 }  // namespace build
