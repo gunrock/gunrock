@@ -13,7 +13,7 @@ int main(void) {
   > launch_t;
 
   typedef LAUNCH_PARAMS(launch_t) arch_launch_t;
-  std::cout << "blockDim:  " << arch_launch_t::blockDim  << std::endl
-            << "gridDim:   " << arch_launch_t::gridDim   << std::endl
-            << "smemBytes: " << arch_launch_t::smemBytes << std::endl;
+  std::cout << "blockDim:  " << launch_t::launch_params::blockDim  << std::endl
+            << "gridDim:   " << launch_t::launch_params::gridDim   << std::endl
+            << "smemBytes: " << launch_t::launch_params::smemBytes << std::endl;
 }
