@@ -107,9 +107,18 @@ class multi_context_t {
   thrust::host_vector<cuda::device_id_t> devices;
   static constexpr std::size_t MAX_NUMBER_OF_GPUS = 1024;
 
+  // Multiple devices.
   multi_context_t(thrust::host_vector<cuda::device_id_t> _devices)
       : devices(_devices) {
-    for (auto& device : _devices) {
+    for (auto& device : devices) {
+      standard_context_t* device_context = new standard_context_t(device);
+      contexts.push_back(device_context);
+    }
+  }
+
+  // Single device.
+  multi_context_t(cuda::device_id_t _device) : devices(1, _device) {
+    for (auto& device : devices) {
       standard_context_t* device_context = new standard_context_t(device);
       contexts.push_back(device_context);
     }

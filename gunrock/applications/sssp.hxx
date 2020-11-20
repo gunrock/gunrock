@@ -143,15 +143,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
 };  // struct enactor_t
 
-// !! Helper -- This should go somewhere else -- @neoblizz, where?
-auto get_default_context() {
-  std::vector<cuda::device_id_t> devices;
-  devices.push_back(0);
-
-  return std::shared_ptr<cuda::multi_context_t>(
-      new cuda::multi_context_t(devices));
-}
-
 template <typename graph_t, typename meta_t>
 float run(std::shared_ptr<graph_t>& G,
           std::shared_ptr<meta_t>& meta,
@@ -163,8 +154,9 @@ float run(std::shared_ptr<graph_t>& G,
   param_t<meta_t> param(single_source);
   result_t<meta_t> result(distances, predecessors);
   // </user-defined>
-  // <boiler-plate>
-  auto multi_context = get_default_context();
+
+  auto multi_context =
+      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
 
   using problem_type =
       problem_t<graph_t, meta_t, param_t<meta_t>, result_t<meta_t>>;
