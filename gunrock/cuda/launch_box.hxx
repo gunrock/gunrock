@@ -112,11 +112,11 @@ struct launch_params_t {
   template<typename launch_params_t, typename base_t = empty_t>        \
   struct archname##_arch_t : base_t {                                  \
     typedef launch_params_t archname;                                  \
-                                                                   \
+                                                                       \
     template<typename new_base_t>                                      \
     using rebind = archname##_arch_t<launch_params_t, new_base_t>;     \
   };                                                                   \
-                                                                   \
+                                                                       \
   template<                                                            \
     unsigned int block_dimension_,                                     \
     unsigned int grid_dimension_,                                      \
@@ -138,7 +138,7 @@ NAMED_ARCH_TYPES(ampere)
 template<typename... archs_launch_params_t>
 struct launch_box_t : inherit_t<archs_launch_params_t...> {
   typedef inherit_t<archs_launch_params_t...> base_t;
-  // typedef all the types in the archs_launch_params_t pack to "inherit" them
+  // typedef all the types in the archs_launch_params_t pack
   #define INHERIT_ARCH_PARAMS(archname) typedef typename base_t::archname archname;
 
   INHERIT_ARCH_PARAMS(ampere)
