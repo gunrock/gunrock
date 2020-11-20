@@ -41,7 +41,8 @@ enum advance_direction_t {
 
 enum filter_type_t {
   predicated,  // Copy if predicate = true
-  uniquify     // Exact deduplication (100%)
+  uniquify,    // Exact deduplication (100%)
+  bypass       // Marks as invalid, instead of culling
 };
 
 }  // namespace operators

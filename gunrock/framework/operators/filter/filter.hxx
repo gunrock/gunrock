@@ -5,6 +5,7 @@
 
 #include <gunrock/framework/operators/filter/uniquify.hxx>
 #include <gunrock/framework/operators/filter/predicated.hxx>
+#include <gunrock/framework/operators/filter/bypass.hxx>
 
 namespace gunrock {
 namespace operators {
@@ -22,6 +23,8 @@ void execute(graph_type* G,
     uniquify::execute(G, E, op, *context);
   else if (type == filter_type_t::predicated)
     predicated::execute(G, E, op, *context);
+  else if (type == filter_type_t::bypass)
+    bypass::execute(G, E, op, *context);
   else
     error::throw_if_exception(cudaErrorUnknown);
 }
