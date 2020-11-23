@@ -68,8 +68,7 @@ constexpr const type_t& min(const type_t& a, const type_t& b) {
 namespace atomic {
 
 template <typename type_t>
-__host__ __device__ __forceinline__ type_t add(type_t* address,
-                                               type_t value) {
+__host__ __device__ __forceinline__ type_t add(type_t* address, type_t value) {
 #ifdef __CUDA_ARCH__
   return atomicAdd(address, value);
 #else
@@ -78,12 +77,22 @@ __host__ __device__ __forceinline__ type_t add(type_t* address,
 }
 
 template <typename type_t>
-__host__ __device__ __forceinline__ type_t min(type_t* address,
-                                               type_t value) {
+__host__ __device__ __forceinline__ type_t min(type_t* address, type_t value) {
 #ifdef __CUDA_ARCH__
   return cuda::atomicMin(address, value);
 #else
   return std::min<type_t>(*address, value);   // use std::atomic;
+#endif
+}
+
+template <typename type_t>
+__host__ __device__ __forceinline__ type_t cas(type_t* address,
+                                               type_t compare,
+                                               type_t value) {
+#ifdef __CUDA_ARCH__
+  return atomicCAS(address, compare, value);
+#else
+                                              // use std::atomic;
 #endif
 }
 
