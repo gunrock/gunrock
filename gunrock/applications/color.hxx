@@ -19,7 +19,7 @@ struct result_t {
   using vertex_t = typename meta_t::vertex_type;
 
   vertex_t* colors;
-  result_t(vertex_t* colors_) { colors = colors_; }
+  result_t(vertex_t* colors_) : colors(colors_) {}
 };
 
 template <typename graph_t,
