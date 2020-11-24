@@ -141,7 +141,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
     elapsed_iterations.push_back(enactor.enactor_slices[0].enactor_stats.iteration);
   }
 
-  info.SetVal("elapsed_iterations", elapsed_iterations);
+  info.SetVal("elapsed-iterations", elapsed_iterations);
 
   cpu_timer.Start();
   if (!quick_mode && validation == "last") {
