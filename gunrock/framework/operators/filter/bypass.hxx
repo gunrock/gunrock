@@ -14,8 +14,8 @@ void execute(graph_type* G,
   using vertex_t = typename graph_type::vertex_type;
   auto active_buffer = E->get_active_frontier_buffer();
 
-  auto bypass = [op] __device__(vertex_t v) {
-    return (op(v) ? v : std::numeric_limits<vertex_t>::max());
+  auto bypass = [op] __device__(vertex_t const& v) {
+    return (op(v) ? v : gunrock::numeric_limits<vertex_t>::invalid());
   };
 
   // Filter with bypass

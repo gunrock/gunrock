@@ -18,15 +18,17 @@ void execute(graph_type* G,
   auto active_buffer = E->get_active_frontier_buffer();
   auto inactive_buffer = E->get_inactive_frontier_buffer();
 
+  using size_type = decltype(active_buffer->size());
+
   auto compact = mgpu::transform_compact(active_buffer->size(), context);
   auto input_data = active_buffer->data();
-  int stream_count = compact.upsweep([=] __device__(int idx) {
+  int stream_count = compact.upsweep([=] __device__(size_type idx) {
     auto item = input_data[idx];
-    return op(item);
+    return gunrock::util::limits::is_valid(item) ? op(item) : false;
   });
   inactive_buffer->resize(stream_count);
   auto output_data = inactive_buffer->data();
-  compact.downsweep([=] __device__(int dest_idx, int source_idx) {
+  compact.downsweep([=] __device__(size_type dest_idx, size_type source_idx) {
     output_data[dest_idx] = input_data[source_idx];
   });
   E->swap_frontier_buffers();

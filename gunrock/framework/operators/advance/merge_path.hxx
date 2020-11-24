@@ -49,9 +49,14 @@ void execute(graph_type* G,
   auto scanned_work_domain = E->scanned_work_domain.data().get();
   thrust::device_vector<int> count(1, 0);
 
-  auto segment_sizes = [G, input_data] __device__(int idx) {
+  auto segment_sizes = [G, input_data] __device__(std::size_t idx) {
     int count = 0;
     int v = input_data[idx];
+
+    // if item is invalid, skip processing.
+    if (!gunrock::util::limits::is_valid(v))
+      return 0;
+
     count = G->get_number_of_neighbors(v);
     return count;
   };
@@ -75,14 +80,21 @@ void execute(graph_type* G,
   // (merge-path based load-balancing) run the user defined advance operator on
   // the load-balanced work items.
   auto neighbors_expand = [G, op, input_data, output_data] __device__(
-                              int idx, int seg, int rank) {
+                              std::size_t idx, std::size_t seg,
+                              std::size_t rank) {
     auto v = input_data[seg];
+
+    // if item is invalid, skip processing.
+    if (!gunrock::util::limits::is_valid(v))
+      return;
+
     auto start_edge = G->get_starting_edge(v);
     auto e = start_edge + rank;
     auto n = G->get_destination_vertex(e);
     auto w = G->get_edge_weight(e);
     bool cond = op(v, n, e, w);
-    output_data[idx] = cond ? n : std::numeric_limits<decltype(v)>::max();
+    output_data[idx] =
+        cond ? n : gunrock::numeric_limits<decltype(v)>::invalid();
   };
 
   mgpu::transform_lbs(neighbors_expand, front[0], scanned_work_domain,

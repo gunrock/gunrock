@@ -42,7 +42,7 @@ struct problem_t : gunrock::problem_t<graph_t, meta_t, param_t, result_t> {
     auto n_vertices = this->get_meta_pointer()->get_number_of_vertices();
     auto d_colors = thrust::device_pointer_cast(this->result->colors);
     thrust::fill(thrust::device, d_colors + 0, d_colors + n_vertices,
-                 std::numeric_limits<vertex_t>::max());
+                 gunrock::numeric_limits<vertex_t>::invalid());
 
     // Generate random numbers.
     randoms.resize(n_vertices);
@@ -83,10 +83,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto color_me_in = [G, colors, randoms, iteration] __host__ __device__(
                            vertex_t const& vertex) -> bool {
-      // If invalid vertex, exit early.
-      if (vertex == std::numeric_limits<vertex_t>::max())
-        return false;
-
       edge_t start_edge = G->get_starting_edge(vertex);
       edge_t num_neighbors = G->get_number_of_neighbors(vertex);
 
@@ -101,7 +97,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       for (edge_t e = start_edge; e < start_edge + num_neighbors; ++e) {
         vertex_t u = G->get_destination_vertex(e);
 
-        if ((colors[u] != std::numeric_limits<vertex_t>::max()) &&
+        if (gunrock::util::limits::is_valid(colors[u]) &&
                 (colors[u] != color + 1) && (colors[u] != color + 2) ||
             (vertex == u))
           continue;

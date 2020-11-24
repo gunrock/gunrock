@@ -109,7 +109,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto remove_visited =
         [] __host__ __device__(vertex_t const& vertex) -> bool {
-      return (vertex != std::numeric_limits<vertex_t>::max());
+      // default: always filters out the invalids, keep the rest.
+      return true;
     };
 
     // Execute advance operator on the provided lambda

@@ -77,6 +77,12 @@ void execute(graph_type* G,
   auto neighbors_expand = [G, op, input_data, output_data,
                            scanned_work_domain] __device__(std::size_t idx) {
     auto v = input_data[idx];
+    output_data[idx] = v;
+
+    // if item is invalid, skip processing.
+    if (!gunrock::util::limits::is_valid(v))
+      return;
+
     auto starting_edge = G->get_starting_edge(v);
     auto total_edges = scanned_work_domain[idx];
 
@@ -84,7 +90,8 @@ void execute(graph_type* G,
       auto n = G->get_destination_vertex(e);
       auto w = G->get_edge_weight(e);
       bool cond = op(v, n, e, w);
-      output_data[e] = cond ? n : std::numeric_limits<decltype(v)>::max();
+      output_data[e] =
+          cond ? n : gunrock::numeric_limits<decltype(v)>::invalid();
     }
   };
 

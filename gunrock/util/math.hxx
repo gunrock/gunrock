@@ -92,7 +92,9 @@ __host__ __device__ __forceinline__ type_t cas(type_t* address,
 #ifdef __CUDA_ARCH__
   return atomicCAS(address, compare, value);
 #else
-                                              // use std::atomic;
+  type_t old = *address;
+  *address = (old == compare) ? value : old;  // use std::atomic;
+  return old;
 #endif
 }
 

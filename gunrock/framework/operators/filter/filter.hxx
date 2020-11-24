@@ -2,6 +2,8 @@
 
 #include <gunrock/cuda/context.hxx>
 #include <gunrock/framework/operators/configs.hxx>
+#include <gunrock/util/type_limits.hxx>
+#include <gunrock/util/type_traits.hxx>
 
 #include <gunrock/framework/operators/filter/uniquify.hxx>
 #include <gunrock/framework/operators/filter/predicated.hxx>

@@ -14,6 +14,7 @@
 #include <bits/stdc++.h>
 #include <gunrock/cuda/context.hxx>
 #include <gunrock/error.hxx>
+#include <gunrock/util/type_limits.hxx>
 
 #include <gunrock/framework/operators/configs.hxx>
 

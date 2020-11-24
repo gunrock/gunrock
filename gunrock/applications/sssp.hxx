@@ -121,8 +121,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto remove_completed_paths = [G, visited, iteration] __host__ __device__(
                                       vertex_t const& vertex) -> bool {
-      if (vertex == std::numeric_limits<vertex_t>::max())
-        return false;
       if (visited[vertex] == iteration)
         return false;
 

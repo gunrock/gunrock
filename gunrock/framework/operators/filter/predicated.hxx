@@ -14,8 +14,14 @@ void execute(graph_type* G,
   auto active_buffer = E->get_active_frontier_buffer();
   auto inactive_buffer = E->get_inactive_frontier_buffer();
 
+  using type_t = std::remove_pointer_t<decltype(active_buffer->data())>;
+
   // Allocate output size.
   inactive_buffer->resize(active_buffer->size());
+
+  auto predicate = [op] __host__ __device__(type_t const& i) -> bool {
+    return gunrock::util::limits::is_valid(i) ? op(i) : false;
+  };
 
   // Copy w/ predicate!
   auto new_length = thrust::copy_if(
@@ -23,7 +29,7 @@ void execute(graph_type* G,
       active_buffer->data(),                          // input iterator: begin
       active_buffer->data() + active_buffer->size(),  // input iterator: end
       inactive_buffer->data(),                        // output iterator
-      op                                              // predicate
+      predicate                                       // predicate
   );
 
   // XXX: yikes, idk if this is a good idea.
