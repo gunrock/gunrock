@@ -4,7 +4,7 @@
  * @brief Single-Source Shortest Path graph algorithm. This is where
  * we actually implement BFS using operators.
  * @version 0.1
- * @date 2020-10-05
+ * @date 2020-11-23
  *
  * @copyright Copyright (c) 2020
  *

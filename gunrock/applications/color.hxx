@@ -38,7 +38,6 @@ struct problem_t : gunrock::problem_t<graph_t, meta_t, param_t, result_t> {
   thrust::device_vector<vertex_t> randoms;
 
   void reset() {
-    // XXX: Ugly. Initialize d_colors to be all INVALIDs.
     auto n_vertices = this->get_meta_pointer()->get_number_of_vertices();
     auto d_colors = thrust::device_pointer_cast(this->result->colors);
     thrust::fill(thrust::device, d_colors + 0, d_colors + n_vertices,
