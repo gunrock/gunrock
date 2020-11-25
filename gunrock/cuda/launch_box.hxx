@@ -59,6 +59,31 @@ struct sm_launch_params_t : launch_params_t<
   enum : unsigned int {combined_ver = combined_ver_};
 };
 
+// Alias fallback with SM version 0 (which isn't real)
+template<
+  unsigned int block_dimensions_,
+  unsigned int grid_dimensions_,
+  unsigned int shared_memory_bytes_ = 0
+>
+struct fallback_launch_params_t : sm_launch_params_t<
+                                    0,
+                                    block_dimensions_,
+                                    grid_dimensions_,
+                                    shared_memory_bytes_
+                                  > {};
+
+// Easier declaration inside launch box template
+template<
+  unsigned int block_dimensions_,
+  unsigned int grid_dimensions_,
+  unsigned int shared_memory_bytes_ = 0
+>
+using fallback_t = fallback_launch_params_t<
+                     block_dimensions_,
+                     grid_dimensions_,
+                     shared_memory_bytes_
+                   >;
+
 // Easier declaration inside launch box template
 template<
   unsigned int combined_ver_,
@@ -107,18 +132,26 @@ SM_LAUNCH_PARAMS(30)
 template<typename... sm_lp_v>
 struct device_launch_params_t;
 
+// 1st to (N-1)th sm_launch_param_t template parameters
 template<typename sm_lp_t, typename... sm_lp_v>
 struct device_launch_params_t<sm_lp_t, sm_lp_v...> :
 std::conditional_t<
-  sm_lp_t::combined_ver == TEST_SM,
-  sm_lp_t,
-  device_launch_params_t<sm_lp_v...>
+  sm_lp_t::combined_ver == 0,
+  device_launch_params_t<sm_lp_v..., sm_lp_t>,  // If found, move fallback_launch_params_t to end of template parameter pack
+  std::conditional_t<                           // Otherwise check sm_lp_t for device's SM version
+    sm_lp_t::combined_ver == TEST_SM,
+    sm_lp_t,
+    device_launch_params_t<sm_lp_v...>
+  >
 > {};
 
+// Nth sm_launch_param_t template parameter
+// Throws an error if the launch box can't find a launch_params_t to use (no fallback and can't find corresponding SM)
+// In that case I'd think we might want to throw our own error somehow
 template<typename sm_lp_t>
 struct device_launch_params_t<sm_lp_t> :
 std::enable_if_t<
-  sm_lp_t::combined_ver == TEST_SM,
+  sm_lp_t::combined_ver == TEST_SM || sm_lp_t::combined_ver == 0,  // Throws a compile-time error (that mostly reads like jibberish) if this line is false
   sm_lp_t
 > {};
 
