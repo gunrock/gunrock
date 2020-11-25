@@ -145,14 +145,27 @@ std::conditional_t<
   >
 > {};
 
+//////////////// https://stackoverflow.com/a/3926854
+// "false" but dependent on a template parameter so the compiler can't optimize it for static_assert()
+template<typename T>
+struct always_false {
+    enum { value = false };
+};
+
+// Raises static (compile-time) assert when referenced
+template<typename T>
+struct raise_not_found_error_t {
+  static_assert(always_false<T>::value, "launch_box_t could not find valid launch_params_t");
+};
+////////////////
+
 // Nth sm_launch_param_t template parameter
-// Throws an error if the launch box can't find a launch_params_t to use (no fallback and can't find corresponding SM)
-// In that case I'd think we might want to throw our own error somehow
 template<typename sm_lp_t>
 struct device_launch_params_t<sm_lp_t> :
-std::enable_if_t<
-  sm_lp_t::combined_ver == TEST_SM || sm_lp_t::combined_ver == 0,  // Throws a compile-time error (that mostly reads like jibberish) if this line is false
-  sm_lp_t
+std::conditional_t<
+  sm_lp_t::combined_ver == TEST_SM || sm_lp_t::combined_ver == 0,
+  sm_lp_t,
+  raise_not_found_error_t<void>  // Raises a compiler error
 > {};
 
 /**
