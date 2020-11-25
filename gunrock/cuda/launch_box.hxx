@@ -71,16 +71,16 @@ using sm_t = sm_launch_params_t<
 
 // Define named sm_launch_params_t structs for each SM version
 #define SM_LAUNCH_PARAMS(combined) \
-template<                                 \
-  unsigned int block_dimensions_,         \
-  unsigned int grid_dimensions_,          \
-  unsigned int shared_memory_bytes_ = 0            \
->                                         \
+template<                                      \
+  unsigned int block_dimensions_,              \
+  unsigned int grid_dimensions_,               \
+  unsigned int shared_memory_bytes_ = 0        \
+>                                              \
 using sm_##combined##_t = sm_launch_params_t<  \
-                       combined,          \
-                       block_dimensions_, \
-                       grid_dimensions_,  \
-                       shared_memory_bytes_        \
+                       combined,               \
+                       block_dimensions_,      \
+                       grid_dimensions_,       \
+                       shared_memory_bytes_    \
                     >;
 
 SM_LAUNCH_PARAMS(86)
