@@ -51,7 +51,11 @@ template<
   unsigned int grid_dimensions_,
   unsigned int shared_memory_bytes_ = 0
 >
-struct sm_launch_params_t : launch_params_t<block_dimensions_, grid_dimensions_, shared_memory_bytes_> {
+struct sm_launch_params_t : launch_params_t<
+                              block_dimensions_,
+                              grid_dimensions_,
+                              shared_memory_bytes_
+                            > {
   enum : unsigned int {combined_ver = combined_ver_};
 };
 
@@ -63,25 +67,25 @@ template<
   unsigned int shared_memory_bytes_ = 0
 >
 using sm_t = sm_launch_params_t<
-             combined_ver_,
-             block_dimensions_,
-             grid_dimensions_,
-             shared_memory_bytes_
-           >;
+               combined_ver_,
+               block_dimensions_,
+               grid_dimensions_,
+               shared_memory_bytes_
+             >;
 
 // Define named sm_launch_params_t structs for each SM version
 #define SM_LAUNCH_PARAMS(combined) \
-template<                                      \
-  unsigned int block_dimensions_,              \
-  unsigned int grid_dimensions_,               \
-  unsigned int shared_memory_bytes_ = 0        \
->                                              \
-using sm_##combined##_t = sm_launch_params_t<  \
-                       combined,               \
-                       block_dimensions_,      \
-                       grid_dimensions_,       \
-                       shared_memory_bytes_    \
-                    >;
+template<                                        \
+  unsigned int block_dimensions_,                \
+  unsigned int grid_dimensions_,                 \
+  unsigned int shared_memory_bytes_ = 0          \
+>                                                \
+using sm_##combined##_t = sm_launch_params_t<    \
+                            combined,            \
+                            block_dimensions_,   \
+                            grid_dimensions_,    \
+                            shared_memory_bytes_ \
+                          >;
 
 SM_LAUNCH_PARAMS(86)
 SM_LAUNCH_PARAMS(80)
