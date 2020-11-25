@@ -105,18 +105,18 @@ struct device_launch_params_t;
 
 template<typename sm_lp_t, typename... sm_lp_v>
 struct device_launch_params_t<sm_lp_t, sm_lp_v...> :
-std::conditional<
+std::conditional_t<
   sm_lp_t::combined_ver == TEST_SM,
   sm_lp_t,
   device_launch_params_t<sm_lp_v...>
->::type {};
+> {};
 
 template<typename sm_lp_t>
 struct device_launch_params_t<sm_lp_t> :
-std::enable_if<
+std::enable_if_t<
   sm_lp_t::combined_ver == TEST_SM,
   sm_lp_t
->::type {};
+> {};
 
 /**
  * @brief Collection of kernel launch parameters for multiple architectures
