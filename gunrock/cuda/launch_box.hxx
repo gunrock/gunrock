@@ -16,6 +16,18 @@ namespace gunrock {
 namespace cuda {
 
 /**
+ * @brief CUDA dim3 template representation, since dim3 cannot be used as a
+ * template argument
+ * @tparam x_ Dimension in the X direction
+ * @tparam y_ Dimension in the Y direction
+ * @tparam z_ Dimension in the Z direction
+ */
+template<unsigned int x_, unsigned int y_ = 1, unsigned int z_ = 1>
+struct dim3_t {
+  enum : unsigned int { x = x_, y = y_, z = z_ };
+};
+
+/**
  * @brief Struct holding kernel parameters will be passed in upon launch
  * @tparam block_dimensions_ Block dimensions to launch with
  * @tparam grid_dimensions_ Grid dimensions to launch with
@@ -24,16 +36,14 @@ namespace cuda {
  * @todo dimensions should be dim3 instead of unsigned int
  */
 template<
-  unsigned int block_dimensions_,
-  unsigned int grid_dimensions_,
+  typename block_dimensions_,
+  typename grid_dimensions_,
   unsigned int shared_memory_bytes_ = 0
 >
 struct launch_params_t {
-  enum : unsigned int {
-    block_dimensions = block_dimensions_,
-    grid_dimensions = grid_dimensions_,
-    shared_memory_bytes = shared_memory_bytes_
-  };
+  typedef block_dimensions_ block_dimensions;
+  typedef grid_dimensions_ grid_dimensions;
+  enum : unsigned int { shared_memory_bytes = shared_memory_bytes_ };
 };
 
 #define TEST_SM 75  // Temporary until we figure out how to get cabability combined
@@ -45,31 +55,70 @@ struct launch_params_t {
  * @tparam grid_dimensions_ Grid dimensions to launch with
  * @tparam shared_memory_bytes_ Amount of shared memory to allocate
  */
-template<unsigned int combined_ver_, auto... launch_params_args_v>
-struct sm_launch_params_t : launch_params_t<launch_params_args_v...> {
+template<
+  unsigned int combined_ver_,
+  typename block_dimensions_,
+  typename grid_dimensions_,
+  unsigned int shared_memory_bytes_ = 0
+>
+struct sm_launch_params_t : launch_params_t<
+                              block_dimensions_,
+                              grid_dimensions_,
+                              shared_memory_bytes_
+                            > {
   enum : unsigned int {combined_ver = combined_ver_};
 };
 
-template<auto... launch_params_args_v>
+template<
+  typename block_dimensions_,
+  typename grid_dimensions_,
+  unsigned int shared_memory_bytes_ = 0
+>
 struct fallback_launch_params_t : sm_launch_params_t<
                                     0,
-                                    launch_params_args_v...
+                                    block_dimensions_,
+                                    grid_dimensions_,
+                                    shared_memory_bytes_
                                   > {};
 
 // Easier declaration inside launch box template
-template<auto... launch_params_args_v>
-using fallback_t = fallback_launch_params_t<launch_params_args_v...>;
+template<
+  typename block_dimensions_,
+  typename grid_dimensions_,
+  unsigned int shared_memory_bytes_ = 0
+>
+using fallback_t = fallback_launch_params_t<
+                     block_dimensions_,
+                     grid_dimensions_,
+                     shared_memory_bytes_
+                   >;
 
 // Easier declaration inside launch box template
-template<unsigned int combined_ver_, auto... launch_params_args_v>
-using sm_t = sm_launch_params_t<combined_ver_, launch_params_args_v...>;
+template<
+  unsigned int combined_ver_,
+  typename block_dimensions_,
+  typename grid_dimensions_,
+  unsigned int shared_memory_bytes_ = 0
+>
+using sm_t = sm_launch_params_t<
+               combined_ver_,
+               block_dimensions_,
+               grid_dimensions_,
+               shared_memory_bytes_
+             >;
 
 // Define named sm_launch_params_t structs for each SM version
 #define SM_LAUNCH_PARAMS(combined) \
-template<auto... launch_params_args_v>              \
-using sm_##combined##_t = sm_launch_params_t<       \
-                            combined,               \
-                            launch_params_args_v... \
+template<                                        \
+  typename block_dimensions_,                    \
+  typename grid_dimensions_,                     \
+  unsigned int shared_memory_bytes_ = 0          \
+>                                                \
+using sm_##combined##_t = sm_launch_params_t<    \
+                            combined,            \
+                            block_dimensions_,   \
+                            grid_dimensions_,    \
+                            shared_memory_bytes_ \
                           >;
 
 SM_LAUNCH_PARAMS(86)
