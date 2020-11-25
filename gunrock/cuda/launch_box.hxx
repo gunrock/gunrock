@@ -121,6 +121,7 @@ using sm_##combined##_t = sm_launch_params_t<    \
                             shared_memory_bytes_ \
                           >;
 
+// Add Hopper when the SM version number becomes known (presumably 90)
 SM_LAUNCH_PARAMS(86)
 SM_LAUNCH_PARAMS(80)
 SM_LAUNCH_PARAMS(75)
