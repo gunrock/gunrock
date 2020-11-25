@@ -10,7 +10,7 @@ int main(void) {
   typedef launch_box_t<
     sm_launch_params_t<86, 16, 64, 2>,
     sm_launch_params_t<80, 16, 32, 4>,
-    sm_launch_params_t<75, 32, 64, 8>,
+    sm_launch_params_t<75, 32, 64>,
     sm_launch_params_t<35, 64, 64, 16>
   > launch_t;
 
@@ -18,7 +18,7 @@ int main(void) {
   typedef launch_box_t<
     sm_t<86, 16, 64, 2>,
     sm_t<80, 16, 32, 4>,
-    sm_t<75, 32, 64, 8>,
+    sm_t<75, 32, 64>,
     sm_t<35, 64, 64, 16>
   > short_launch_t;
 
@@ -26,7 +26,7 @@ int main(void) {
   typedef launch_box_t<
     sm_86_t<16, 64, 2>,
     sm_80_t<16, 32, 4>,
-    sm_75_t<32, 64, 8>,
+    sm_75_t<32, 64>,
     sm_35_t<64, 64, 16>
   > named_launch_t;
 
