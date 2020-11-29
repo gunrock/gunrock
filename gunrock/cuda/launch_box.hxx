@@ -12,6 +12,10 @@
 
 #include <type_traits>
 
+#ifndef SM_TARGET
+  #define SM_TARGET 0
+#endif
+
 namespace gunrock {
 namespace cuda {
 
@@ -149,7 +153,7 @@ std::conditional_t<
   sm_lp_t::combined_ver == 0,
   device_launch_params_t<sm_lp_v..., sm_lp_t>,  // If found, move fallback_launch_params_t to end of template parameter pack
   std::conditional_t<                           // Otherwise check sm_lp_t for device's SM version
-    sm_lp_t::combined_ver == TEST_SM,
+    sm_lp_t::combined_ver == SM_TARGET,
     sm_lp_t,
     device_launch_params_t<sm_lp_v...>
   >
@@ -173,7 +177,7 @@ struct raise_not_found_error_t {
 template<typename sm_lp_t>
 struct device_launch_params_t<sm_lp_t> :
 std::conditional_t<
-  sm_lp_t::combined_ver == TEST_SM || sm_lp_t::combined_ver == 0,
+  sm_lp_t::combined_ver == SM_TARGET || sm_lp_t::combined_ver == 0,
   sm_lp_t,
   raise_not_found_error_t<void>  // Raises a compiler error
 > {};

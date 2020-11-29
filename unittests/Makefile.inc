@@ -7,15 +7,17 @@ CXX = g++
 # Gen targets
 #-------------------------------------------------------------------------------
 
-GEN_SM75 = -gencode=arch=compute_75,code=\"sm_75,compute_75\" # Turing RTX20XX
-GEN_SM70 = -gencode=arch=compute_70,code=\"sm_70,compute_70\" # Volta V100
-GEN_SM61 = -gencode=arch=compute_61,code=\"sm_61,compute_61\" # Pascal GTX10XX
-GEN_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\" # Pascal P100
-GEN_SM52 = -gencode=arch=compute_52,code=\"sm_52,compute_52\" # Maxwell M40, M60, GTX9XX
-GEN_SM50 = -gencode=arch=compute_50,code=\"sm_50,compute_50\" # Maxwell M10
-GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\" # Kepler K80
-GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" # Kepler K20, K40
-GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" # Kepler K10
+GEN_SM86 = -gencode=arch=compute_86,code=\"sm_86,compute_86\" -DSM_TARGET=86 # Ampere RTX30XX
+GEN_SM80 = -gencode=arch=compute_80,code=\"sm_80,compute_80\" -DSM_TARGET=80 # Ampere A100
+GEN_SM75 = -gencode=arch=compute_75,code=\"sm_75,compute_75\" -DSM_TARGET=75 # Turing RTX20XX
+GEN_SM70 = -gencode=arch=compute_70,code=\"sm_70,compute_70\" -DSM_TARGET=70 # Volta V100
+GEN_SM61 = -gencode=arch=compute_61,code=\"sm_61,compute_61\" -DSM_TARGET=61 # Pascal GTX10XX
+GEN_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\" -DSM_TARGET=60 # Pascal P100
+GEN_SM52 = -gencode=arch=compute_52,code=\"sm_52,compute_52\" -DSM_TARGET=52 # Maxwell M40, M60, GTX9XX
+GEN_SM50 = -gencode=arch=compute_50,code=\"sm_50,compute_50\" -DSM_TARGET=50 # Maxwell M10
+GEN_SM37 = -gencode=arch=compute_37,code=\"sm_37,compute_37\" -DSM_TARGET=37 # Kepler K80
+GEN_SM35 = -gencode=arch=compute_35,code=\"sm_35,compute_35\" -DSM_TARGET=35 # Kepler K20, K40
+GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" -DSM_TARGET=30 # Kepler K10
 
 # Note: Some of the architectures don't support Gunrock's
 # RepeatFor (Cooperative Groups), e.g: SM35
