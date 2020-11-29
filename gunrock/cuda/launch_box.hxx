@@ -50,8 +50,6 @@ struct launch_params_t {
   enum : unsigned int { shared_memory_bytes = shared_memory_bytes_ };
 };
 
-#define TEST_SM 75  // Temporary until we figure out how to get cabability combined
-
 /**
  * @brief Struct holding kernel parameters for a specific SM version
  * @tparam combined_ver_ Combined major and minor compute capability version
