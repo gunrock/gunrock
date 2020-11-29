@@ -28,7 +28,7 @@ namespace cuda {
  */
 template<unsigned int x_, unsigned int y_ = 1, unsigned int z_ = 1>
 struct dim3_t {
-  enum : unsigned int { x = x_, y = y_, z = z_ };
+  static dim3 get_dim3() { return dim3(x, y, z); }
 };
 
 /**

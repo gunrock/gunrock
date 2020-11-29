@@ -63,13 +63,16 @@ void test_define() {
     fallback_t<dim3_t<16>, dim3_t<2>, 4>
   > named_launch_t;
 
+  dim3 block_dimensions = launch_t::block_dimensions::get_dim3();
+  dim3 grid_dimensions = launch_t::grid_dimensions::get_dim3();
+
   std::cout
-  << "block_dimensions:    " << launch_t::block_dimensions::x << ", "
-                             << launch_t::block_dimensions::y << ", "
-                             << launch_t::block_dimensions::z << std::endl
-  << "grid_dimensions:     " << launch_t::grid_dimensions::x  << ", "
-                             << launch_t::grid_dimensions::y  << ", "
-                             << launch_t::grid_dimensions::z  << std::endl
+  << "block_dimensions:    " << block_dimensions.x            << ", "
+                             << block_dimensions.y            << ", "
+                             << block_dimensions.z            << std::endl
+  << "grid_dimensions:     " << grid_dimensions.x             << ", "
+                             << grid_dimensions.y             << ", "
+                             << grid_dimensions.z             << std::endl
   << "shared_memory_bytes: " << launch_t::shared_memory_bytes << std::endl;
 }
 
