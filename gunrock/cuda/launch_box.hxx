@@ -10,6 +10,8 @@
  */
 #pragma once
 
+#include <gunrock/error.hxx>
+
 #include <type_traits>
 
 #ifndef SM_TARGET
@@ -28,6 +30,7 @@ namespace cuda {
  */
 template<unsigned int x_, unsigned int y_ = 1, unsigned int z_ = 1>
 struct dim3_t {
+  enum : unsigned int { x = x_, y = y_, z = z_, size = x_ * y_ * z_ };
   static dim3 get_dim3() { return dim3(x, y, z); }
 };
 
@@ -188,6 +191,34 @@ template<typename... sm_lp_v>
 struct launch_box_t : device_launch_params_t<sm_lp_v...> {
   // Some methods to make it easy to access launch_params
 };
+
+/**
+ * @brief Calculator for ratio of active to maximum warps per multiprocessor
+ * @tparam launch_box_t Launch box for the corresponding kernel
+ * @param kernel CUDA kernel for which to calculate the occupancy
+ * \return float
+ */
+template<typename launch_box_t, typename func_t>
+float occupancy(func_t kernel) {
+  int max_active_blocks;
+  int block_size = launch_box_t::block_dimensions::size;
+  int device;
+  cudaDeviceProp props;
+
+  cudaGetDevice(&device);
+  cudaGetDeviceProperties(&props, device);
+  error::error_t status = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+    &max_active_blocks,
+    kernel,
+    block_size,
+    (size_t)0
+  );
+  error::throw_if_exception(status);
+  float occupancy = (max_active_blocks * block_size / props.warpSize) /
+                    (float)(props.maxThreadsPerMultiProcessor /
+                            props.warpSize);
+  return occupancy;
+}
 
 }  // namespace gunrock
 }  // namespace cuda

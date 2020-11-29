@@ -6,6 +6,21 @@
 
 using namespace gunrock::cuda;
 
+// First template argument signifies the SM version
+typedef launch_box_t<
+  sm_launch_params_t<86, dim3_t<16>, dim3_t<64>, 2>,
+  sm_launch_params_t<80, dim3_t<16>, dim3_t<32>, 4>,
+  sm_launch_params_t<75, dim3_t<32>, dim3_t<64>>,
+  sm_launch_params_t<35, dim3_t<64>, dim3_t<64>, 16>,
+  fallback_t<dim3_t<16>, dim3_t<2>, 4>
+> launch_t;
+
+__global__ void dummy_kernel() {}
+
+void test_occupancy_calc() {
+  std::cout << occupancy<launch_t>(dummy_kernel) << std::endl;
+}
+
 void test_fallback() {
   // Check that the launch box uses the fallback values when appropriate
   #define EXPECTED_BLOCK 16
@@ -36,15 +51,6 @@ void test_fallback() {
 }
 
 void test_define() {
-  // First template argument signifies the SM version
-  typedef launch_box_t<
-    sm_launch_params_t<86, dim3_t<16>, dim3_t<64>, 2>,
-    sm_launch_params_t<80, dim3_t<16>, dim3_t<32>, 4>,
-    sm_launch_params_t<75, dim3_t<32>, dim3_t<64>>,
-    sm_launch_params_t<35, dim3_t<64>, dim3_t<64>, 16>,
-    fallback_t<dim3_t<16>, dim3_t<2>, 4>
-  > launch_t;
-
   // They also have a short type name
   typedef launch_box_t<
     sm_t<86, dim3_t<16>, dim3_t<64>, 2>,
@@ -77,6 +83,7 @@ void test_define() {
 }
 
 int main(int argc, char** argv) {
+  test_occupancy_calc();
   test_define();
   test_fallback();
   return EXIT_SUCCESS;
