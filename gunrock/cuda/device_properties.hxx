@@ -33,7 +33,7 @@ typedef struct {
 } compute_capability_t;
 
 /**
- * @brief Get compute capability from major and minor versions.
+ * @brief Make compute capability from major and minor versions.
  * @param major Compute capability major version
  * @param minor Compute capability minor version
  * \return compute_capability_t
@@ -44,13 +44,22 @@ constexpr compute_capability_t make_compute_capability(unsigned major,
 }
 
 /**
- * @brief Get compute capability from combined major and minor version.
+ * @brief Make compute capability from combined major and minor version.
  * @param combined Combined major and minor value, e.g. 86 for 8.6
  * \return compute_capability_t
  */
 constexpr compute_capability_t make_compute_capability(unsigned combined) {
   return compute_capability_t{combined / 10, combined % 10};
 }
+
+/**
+ * @brief Get compute capability from SM_TARGET macro.
+ * \return compute_capabilty_t
+ */
+constexpr compute_capability_t get_compute_capability() {
+  return make_compute_capability(SM_TARGET);
+}
+
 /**
  * @namespace properties
  * C++ based CUDA device properties.
