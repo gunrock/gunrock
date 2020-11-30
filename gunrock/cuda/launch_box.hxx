@@ -170,7 +170,7 @@ struct always_false {
 // Raises static (compile-time) assert when referenced
 template<typename T>
 struct raise_not_found_error_t {
-  static_assert(always_false<T>::value, "launch_box_t could not find valid launch_params_t");
+  static_assert(always_false<T>::value, "Launch box could not find valid launch parameters");
 };
 ////////////////
 
