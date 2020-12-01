@@ -1,3 +1,14 @@
+/**
+ * @file color.hxx
+ * @author Muhammad Osama (mosama@ucdavis.edu)
+ * @brief Graph Coloring algorithm.
+ * @version 0.1
+ * @date 2020-11-24
+ *
+ * @copyright Copyright (c) 2020
+ *
+ */
+
 #pragma once
 
 #include <bits/stdc++.h>

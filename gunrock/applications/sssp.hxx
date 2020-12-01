@@ -1,8 +1,7 @@
 /**
  * @file sssp_implementation.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
- * @brief Single-Source Shortest Path graph algorithm. This is where
- * we actually implement SSSP using operators.
+ * @brief Single-Source Shortest Path algorithm.
  * @version 0.1
  * @date 2020-10-05
  *

@@ -25,8 +25,8 @@ namespace operators {
 namespace advance {
 namespace unbalanced {
 
-template <advance_type_t type = advance_type_t::vertex_to_vertex,
-          advance_direction_t direction = advance_direction_t::forward,
+template <advance_type_t type,
+          advance_direction_t direction,
           typename graph_type,
           typename enactor_type,
           typename operator_type>
@@ -35,7 +35,7 @@ void execute(graph_type* G,
              operator_type op,
              cuda::standard_context_t& context) {
   // XXX: should use existing context (context)
-  mgpu::standard_context_t _context(false);
+  mgpu::standard_context_t _context(false, context.stream());
 
   // Used as an input buffer (frontier)
   auto active_buffer = E->get_active_frontier_buffer();
