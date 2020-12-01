@@ -21,37 +21,24 @@ namespace gunrock {
  * context). In the algorithms' problem constructor, initialize your data.
  *
  * @tparam graph_t
- * @tparam meta_t
  */
-template <typename graph_t, typename meta_t, typename param_t, typename result_t>
+template <typename graph_container_t>
 struct problem_t {
+  using graph_t = typename graph_container_t::graph_type;
   using vertex_t = typename graph_t::vertex_type;
-  using edge_t   = typename graph_t::edge_type;
+  using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
-  
-  param_t* param;
-  result_t* result;
 
-  graph_t* graph_slice;
-  meta_t* meta_slice;
+  graph_container_t graph_slice;
   std::shared_ptr<cuda::multi_context_t> context;
 
-  graph_t* get_graph_pointer() const { return graph_slice; }
-  meta_t* get_meta_pointer() const { return meta_slice; }
-    
+  auto get_graph() { return graph_slice; }
+
   problem_t() : graph_slice(nullptr) {}
-  problem_t(
-    graph_t* G,
-    meta_t* meta,
-    param_t* _param,
-    result_t* _result,
-    std::shared_ptr<cuda::multi_context_t> _context
-  ) : 
-    graph_slice(G),
-    meta_slice(meta),
-    param(_param), 
-    result(_result),
-    context(_context) { }
+
+  problem_t(graph_container_t& G,
+            std::shared_ptr<cuda::multi_context_t> _context)
+      : graph_slice(G), context(_context) {}
 
   // Disable copy ctor and assignment operator.
   // We do not want to let user copy only a slice.

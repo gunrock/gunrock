@@ -26,10 +26,10 @@ namespace operators {
 namespace advance {
 namespace merge_path {
 template <advance_type_t type,
-          typename graph_type,
+          typename graph_container_type,
           typename enactor_type,
           typename operator_type>
-void forward(graph_type* G,
+void forward(graph_container_type& G,
              enactor_type* E,
              operator_type op,
              cuda::standard_context_t& __ignore) {
@@ -104,97 +104,38 @@ void forward(graph_type* G,
   E->swap_frontier_buffers();
 }
 
-// template <advance_type_t type,
-//           typename graph_type,
-//           typename enactor_type,
-//           typename operator_type>
-// void backward(graph_type* G,
-//               enactor_type* E,
-//               operator_type op,
-//               cuda::standard_context_t& __ignore) {
-//   // XXX: should use existing context (__ignore)
-//   mgpu::standard_context_t context(false, __ignore.stream());
-
-//   // Used as an input buffer (frontier)
-//   auto active_buffer = E->get_active_frontier_buffer();
-//   // Used as an output buffer (frontier)
-//   auto inactive_buffer = E->get_inactive_frontier_buffer();
-
-//   // Get input data of the active buffer.
-//   auto unvisited = active_buffer->data();
-
-//   // Scan over the work domain to find the output frontier's size.
-//   auto scanned_work_domain = E->scanned_work_domain.data().get();
-//   thrust::device_vector<int> count(1, 0);
-
-//   auto segment_sizes = [G, unvisited] __device__(std::size_t idx) {
-//     int count = 0;
-//     int v = unvisited[idx];
-
-//     // if item is invalid, skip processing.
-//     if (!gunrock::util::limits::is_valid(v))
-//       return 0;
-
-//     count = G->get_number_of_neighbors(v);
-//     return count;
-//   };
-
-//   mgpu::transform_scan<int>(segment_sizes, (int)active_buffer->size(),
-//                             scanned_work_domain, mgpu::plus_t<int>(),
-//                             count.data(), context);
-
-//   // If output frontier is empty, resize and return.
-//   thrust::host_vector<int> front = count;
-//   if (!front[0])
-//     return;
-
-//   // Resize the output (inactive) buffer to the new size.
-//   inactive_buffer->resize(front[0]);
-//   auto output_data = inactive_buffer->data();
-
-//   // Expand incoming neighbors, and using a load-balanced transformation
-//   // (merge-path based load-balancing) run the user defined advance operator
-//   on
-//   // the load-balanced work items.
-//   auto neighbors_expand = [G, op, unvisited, output_data] __device__(
-//                               std::size_t idx, std::size_t seg,
-//                               std::size_t rank) {
-//     auto v = unvisited[seg];
-
-//     // if item is invalid, skip processing.
-//     if (!gunrock::util::limits::is_valid(v))
-//       return;
-
-//     auto start_edge = G->get_starting_edge(v);
-//     auto e = start_edge + rank;
-//     auto n = G->get_destination_vertex(e);
-//     auto w = G->get_edge_weight(e);
-
-//     if (bitmap[n] && op(v, n, e, w)) {
-//       bitmap_out[v] = 1;
-//       unvisited[seg] = gunrock::numeric_limits<decltype(v)>::invalid();
-//     }
-//   };
-
-//   mgpu::transform_lbs(neighbors_expand, front[0], scanned_work_domain,
-//                       (int)active_buffer->size(), context);
-
-//   // Swap frontier buffers, output buffer now becomes the input buffer and
-//   // vice-versa.
-//   E->swap_frontier_buffers();
-// }
-
 template <advance_type_t type,
           advance_direction_t direction,
-          typename graph_type,
+          typename graph_container_type,
           typename enactor_type,
           typename operator_type>
-void execute(graph_type* G,
+void execute(graph_container_type& G,
              enactor_type* E,
              operator_type op,
              cuda::standard_context_t& __ignore) {
-  if (direction == advance_direction_t::forward)
+  using graph_t = typename graph_container_type::graph_type;
+  if (direction == advance_direction_t::forward) {
     forward<type>(G, E, op, __ignore);
+  } else if (direction == advance_direction_t::backward) {
+    // backward<type>(G, E, op, __ignore);
+  } else {  // both (forward + backward)
+    using find_csr_t = graph::graph_csr_t<
+        memory::memory_space_t::device, typename graph_t::vertex_type,
+        typename graph_t::edge_type, typename graph_t::weight_type>;
+
+    using find_csc_t = graph::graph_csc_t<
+        memory::memory_space_t::device, typename graph_t::vertex_type,
+        typename graph_t::edge_type, typename graph_t::weight_type>;
+
+    // std::cout << "\tContains CSR Representation? " << std::boolalpha
+    //           << G->contains_representation<find_csr_t>() << std::endl;
+
+    // static_assert(
+    //     (G->contains_representation<find_csr_t>() &&
+    //      G->contains_representation<find_csc_t>()),
+    //     "Direction optimized advance is only supported when the graph exists
+    //     " "in both CSR and CSC sparse-matrix representations.");
+  }
 }
 }  // namespace merge_path
 }  // namespace advance

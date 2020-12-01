@@ -27,10 +27,10 @@ namespace unbalanced {
 
 template <advance_type_t type,
           advance_direction_t direction,
-          typename graph_type,
+          typename graph_container_type,
           typename enactor_type,
           typename operator_type>
-void execute(graph_type* G,
+void execute(graph_container_type& G,
              enactor_type* E,
              operator_type op,
              cuda::standard_context_t& context) {

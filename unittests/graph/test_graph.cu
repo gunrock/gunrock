@@ -6,22 +6,20 @@
 
 using namespace gunrock;
 
-template <typename graph_type>
-__global__ void kernel(graph_type* G) {
-  using vertex_t = typename graph_type::vertex_type;
-  using edge_t = typename graph_type::edge_type;
-  using weight_t = typename graph_type::weight_type;
+template <typename graph_ptr_type>
+__global__ void kernel(graph_ptr_type G) {
+  using vertex_t = typename graph_ptr_type::graph_type::vertex_type;
 
   vertex_t source = 1;
-  vertex_t edge = 0;
+  auto edge = 0;
 
-  vertex_t num_vertices = G->get_number_of_vertices();
-  edge_t num_edges = G->get_number_of_edges();
-  edge_t num_neighbors = G->get_number_of_neighbors(source);
-  vertex_t source_vertex = G->get_source_vertex(edge);
-  weight_t edge_weight = G->get_edge_weight(edge);
-  double average_degree = graph::get_average_degree(*G);
-  double degree_std_dev = graph::get_degree_standard_deviation(*G);
+  auto num_vertices = G->get_number_of_vertices();
+  auto num_edges = G->get_number_of_edges();
+  auto num_neighbors = G->get_number_of_neighbors(source);
+  auto source_vertex = G->get_source_vertex(edge);
+  auto edge_weight = G->get_edge_weight(edge);
+  double average_degree = graph::get_average_degree(G);
+  double degree_std_dev = graph::get_degree_standard_deviation(G);
 
   printf("__device__\n");
   printf("\tNumber of vertices: %i\n", num_vertices);
@@ -82,11 +80,11 @@ void test_graph() {
   Ax[2] = 3;
   Ax[3] = 6;
 
-  // wrap it with shared_ptr<csr_t> (memory_space_t::host)
-  constexpr memory::memory_space_t host_space = memory::memory_space_t::host;
-  auto h_G = graph::build::from_csr_t<host_space>(r, c, nnz, h_Ap, h_Aj, h_Ax);
-  auto G = h_G.data();
+  using namespace memory;
 
+  // wrap it with shared_ptr<csr_t> (memory_space_t::host)
+  auto G = graph::build::from_csr_t<memory_space_t::host>(r, c, nnz, h_Ap, h_Aj,
+                                                          h_Ax);
   vertex_t source = 1;
   vertex_t edge = 0;
 
@@ -95,8 +93,8 @@ void test_graph() {
   edge_t num_neighbors = G->get_number_of_neighbors(source);
   vertex_t source_vertex = G->get_source_vertex(edge);
   weight_t edge_weight = G->get_edge_weight(edge);
-  double average_degree = graph::get_average_degree(*G);
-  double degree_std_dev = graph::get_degree_standard_deviation(*G);
+  double average_degree = graph::get_average_degree(G);
+  double degree_std_dev = graph::get_degree_standard_deviation(G);
 
   // Host Output
   std::cout << "__host__" << std::endl;
@@ -113,7 +111,7 @@ void test_graph() {
 
   // Compile-Time Constants (device && host)
   using type_find_t =
-      graph::graph_csr_t<host_space, vertex_t, edge_t, weight_t>;
+      graph::graph_csr_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
 
   std::cout << "\tNumber of Graph Representations = "
             << G->number_of_graph_representations() << std::endl;
@@ -121,17 +119,16 @@ void test_graph() {
             << G->contains_representation<type_find_t>() << std::endl;
 
   // wrap it with shared_ptr<csr_t> (memory_space_t::device)
-  constexpr memory::memory_space_t space = memory::memory_space_t::device;
-
   thrust::device_vector<edge_t> d_Ap = h_Ap;
   thrust::device_vector<vertex_t> d_Aj = h_Aj;
   thrust::device_vector<weight_t> d_Ax = h_Ax;
 
-  auto O = graph::build::from_csr_t<space>(r, c, nnz, d_Ap, d_Aj, d_Ax);
+  auto O = graph::build::from_csr_t<memory_space_t::device>(r, c, nnz, d_Ap,
+                                                            d_Aj, d_Ax);
 
   // Device Output
   cudaDeviceSynchronize();
-  kernel<<<1, 1>>>(O.data().get());
+  kernel<<<1, 1>>>(O);
   cudaDeviceSynchronize();
   error::throw_if_exception(cudaPeekAtLastError());
 }

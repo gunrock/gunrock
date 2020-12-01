@@ -6,8 +6,10 @@ namespace gunrock {
 namespace operators {
 namespace filter {
 namespace predicated {
-template <typename graph_type, typename enactor_type, typename operator_type>
-void execute(graph_type* G,
+template <typename graph_container_type,
+          typename enactor_type,
+          typename operator_type>
+void execute(graph_container_type& G,
              enactor_type* E,
              operator_type op,
              cuda::standard_context_t& context) {

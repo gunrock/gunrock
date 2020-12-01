@@ -158,19 +158,53 @@ class graph_t : public graph_view_t... {
 };  // struct graph_t
 
 /**
+ * @brief Container to store graph struct pointers for both
+ * host and device memory spaces.
+ *
+ * @tparam device_type
+ * @tparam host_type
+ */
+template <typename device_type, typename host_type>
+struct graph_container_t {
+ private:
+  std::shared_ptr<device_type> d;
+  std::shared_ptr<host_type> h;
+
+  // Calling .get() from __device__ isn't supported.
+  device_type* d_ptr;
+
+ public:
+  using graph_type = device_type;
+
+  graph_container_t(std::shared_ptr<device_type> _d,
+                    std::shared_ptr<host_type> _h)
+      : d(_d), h(_h), d_ptr(d.get()) {}
+
+  __host__ __device__ __forceinline__ auto operator-> () const {
+#ifdef __CUDA_ARCH__
+    return d_ptr;
+#else
+    return h.get();
+#endif
+  }
+};
+
+/**
  * @brief Get the average degree of a graph.
  *
- * @tparam graph_type
+ * @tparam graph_container_type note that the input to this function is the
+ * graph_container_type struct and not the graph_t, it takes both the device and
+ * the host pointers to a graph.
  * @param G
  * @return double
  */
-template <typename graph_type>
-__host__ __device__ double get_average_degree(graph_type const& G) {
+template <typename graph_container_type>
+__host__ __device__ double get_average_degree(graph_container_type const& G) {
   auto sum = 0;
-  for (auto v = 0; v < G.get_number_of_vertices(); ++v)
-    sum += G.get_number_of_neighbors(v);
+  for (auto v = 0; v < G->get_number_of_vertices(); ++v)
+    sum += G->get_number_of_neighbors(v);
 
-  return (sum / G.get_number_of_vertices());
+  return (sum / G->get_number_of_vertices());
 }
 
 /**
@@ -182,33 +216,39 @@ __host__ __device__ double get_average_degree(graph_type const& G) {
  * sqrt(accum / graph.get_number_of_vertices() - 1)
  * as the result.
  *
- * @tparam graph_type
+ * @tparam graph_container_type note that the input to this function is the
+ * graph_container_type struct and not the graph_t, it takes both the device and
+ * the host pointers to a graph.
  * @param G
  * @return double
  */
-template <typename graph_type>
-__host__ __device__ double get_degree_standard_deviation(const graph_type& G) {
+template <typename graph_container_type>
+__host__ __device__ double get_degree_standard_deviation(
+    graph_container_type const& G) {
   auto average_degree = get_average_degree(G);
 
   double accum = 0.0;
-  for (auto v = 0; v < G.get_number_of_vertices(); ++v) {
-    double d = G.get_number_of_neighbors(v);
+  for (auto v = 0; v < G->get_number_of_vertices(); ++v) {
+    double d = G->get_number_of_neighbors(v);
     accum += (d - average_degree) * (d - average_degree);
   }
-  return sqrt(accum / G.get_number_of_vertices());
+  return sqrt(accum / G->get_number_of_vertices());
 }
 
 /**
  * @brief build a log-scale degree histogram of a graph.
  *
- * @tparam graph_type
+ * @tparam graph_container_type note that the input to this function is the
+ * graph_container_t struct and not the graph_t, it takes both the device and
+ * the host pointers to a graph.
  * @tparam histogram_t
  * @param G
  * @return histogram_t*
  */
-// template <typename graph_type, typename histogram_t>
-// histogram_t* build_degree_histogram(graph_type &graph) {
-//   using vertex_t = graph_type::vertex_t;
+// template <typename graph_container_type, typename histogram_t>
+// histogram_t* build_degree_histogram(graph_container_type &graph) {
+//   using vertex_t = typename graph_container_type::graph_type::vertex_type;
+
 //   auto length = sizeof(vertex_t) * 8 + 1;
 
 //   thrust::device_vector<vertex_t> histogram(length);
