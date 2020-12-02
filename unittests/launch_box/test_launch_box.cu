@@ -18,7 +18,9 @@ typedef launch_box_t<
 __global__ void dummy_kernel() {}
 
 void test_occupancy_calc() {
-  std::cout << occupancy<launch_t>(dummy_kernel) << std::endl;
+  std::cout << "Test occupancy: "
+            << occupancy<launch_t>(dummy_kernel)
+            << std::endl;
 }
 
 void test_fallback() {
