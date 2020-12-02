@@ -36,11 +36,11 @@
  * @param row_offsets   Input graph CSR row offsets array
  * @param col_indices   Input graph CSR column indices array
  * @param edge_values   Input graph's values on edges (float)
- * @param num_runs      Number of runs to perform SSSP
  * @param sources       Source vertext for SSSP algorithm
  * @param mark_pred     Whether to output predecessor info or not
  * @param distances     Return shortest distance to source per vertex
  * @param preds         Return predecessors of each vertex
+ * @param num_runs      Number of runs to perform SSSP
  * @param memspace      Location of input and desired output
  * @param exec_policy   Location where app will be run
  * @return double       Return accumulated elapsed times for all runs
@@ -62,8 +62,34 @@ double sssp(const SizeT             num_nodes,
             gunrock::util::Location memspace = gunrock::util::HOST,
             gunrock::util::Location exec_policy = gunrock::util::DEVICE);
 
+/**
+ * @brief Graph Coloring algorithm based on Jones-Plassmann Luby (JPL).
+ * 
+ * @tparam VertexT 
+ * @tparam SizeT 
+ *
+ * @param num_nodes     Input graph number of nodes
+ * @param num_edges     Input graph number of edges
+ * @param row_offsets   Input graph CSR row offsets array
+ * @param col_indices   Input graph CSR column indices array
+ * @param colors        Return generated colors for each run
+ * @param num_colors    Return number of colors generated for each run
+ * @param num_runs      Number of runs to perform Color
+ * @return double       Return accumulated elapsed times for all runs
+ */
+template <typename VertexT = int, 
+          typename SizeT = int>
+double color(const SizeT    num_nodes, 
+             const SizeT    num_edges,
+             const SizeT    *row_offsets, 
+             const VertexT  *col_indices,
+             int            **colors, 
+             int            *num_colors,
+             const int      num_runs = 1);
+
 // Application Includes
 #include <gunrock/app/sssp/sssp_app.cuh>
+#include <gunrock/app/color/color_app.cuh>
 
 // Leave this at the end of the file
 // Local Variables:
