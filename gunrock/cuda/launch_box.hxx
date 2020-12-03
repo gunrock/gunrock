@@ -10,6 +10,7 @@
  */
 #pragma once
 
+#include <gunrock/cuda/device_properties.hxx>
 #include <gunrock/error.hxx>
 
 #include <type_traits>
@@ -21,6 +22,8 @@
 namespace gunrock {
 namespace cuda {
 
+namespace launch_box {
+
 /**
  * @brief CUDA dim3 template representation, since dim3 cannot be used as a
  * template argument
@@ -28,10 +31,10 @@ namespace cuda {
  * @tparam y_ Dimension in the Y direction
  * @tparam z_ Dimension in the Z direction
  */
-template<unsigned int x_, unsigned int y_ = 1, unsigned int z_ = 1>
+template<size_t x_, size_t y_ = 1, size_t z_ = 1>
 struct dim3_t {
-  enum : unsigned int { x = x_, y = y_, z = z_, size = x_ * y_ * z_ };
-  static dim3 get_dim3() { return dim3(x, y, z); }
+  enum : size_t { x = x_, y = y_, z = z_, size = x_ * y_ * z_ };
+  static constexpr dim3 get_dim3() { return dim3(x, y, z); }
 };
 
 /**
@@ -39,92 +42,68 @@ struct dim3_t {
  * @tparam block_dimensions_ Block dimensions to launch with
  * @tparam grid_dimensions_ Grid dimensions to launch with
  * @tparam shared_memory_bytes_ Amount of shared memory to allocate
- *
- * @todo dimensions should be dim3 instead of unsigned int
  */
-template<
-  typename block_dimensions_,
-  typename grid_dimensions_,
-  unsigned int shared_memory_bytes_ = 0
->
+template<typename block_dimensions_,
+         typename grid_dimensions_,
+         size_t shared_memory_bytes_ = 0>
 struct launch_params_t {
   typedef block_dimensions_ block_dimensions;
   typedef grid_dimensions_ grid_dimensions;
-  enum : unsigned int { shared_memory_bytes = shared_memory_bytes_ };
+  enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
 };
 
+typedef unsigned sm_version_t;
+
 /**
- * @brief Struct holding kernel parameters for a specific SM version
- * @tparam combined_ver_ Combined major and minor compute capability version
+ * @brief Kernel parameters for a specific SM version
+ * @tparam sm_version_ Combined major and minor compute capability version
  * @tparam block_dimensions_ Block dimensions to launch with
  * @tparam grid_dimensions_ Grid dimensions to launch with
  * @tparam shared_memory_bytes_ Amount of shared memory to allocate
  */
 template<
-  unsigned int combined_ver_,
+  sm_version_t sm_version_,
   typename block_dimensions_,
   typename grid_dimensions_,
-  unsigned int shared_memory_bytes_ = 0
+  size_t shared_memory_bytes_ = 0
 >
-struct sm_launch_params_t : launch_params_t<
-                              block_dimensions_,
+struct sm_t : launch_params_t<block_dimensions_,
                               grid_dimensions_,
-                              shared_memory_bytes_
-                            > {
-  enum : unsigned int {combined_ver = combined_ver_};
+                              shared_memory_bytes_> {
+  enum : sm_version_t {sm_version = sm_version_};
+  static constexpr compute_capability_t get_compute_capability() {
+    return make_compute_capability(sm_version);
+  }
 };
 
+/**
+  * @brief Kernel launch parmeters to fall back onto if the current device's
+  * SM version isn't found
+  * @tparam block_dimensions_ Block dimensions to launch with
+  * @tparam grid_dimensions_ Grid dimensions to launch with
+  * @tparam shared_memory_bytes_ Amount of shared memory to allocate
+  */
 template<
   typename block_dimensions_,
   typename grid_dimensions_,
-  unsigned int shared_memory_bytes_ = 0
+  size_t shared_memory_bytes_ = 0
 >
-struct fallback_launch_params_t : sm_launch_params_t<
-                                    0,
-                                    block_dimensions_,
-                                    grid_dimensions_,
-                                    shared_memory_bytes_
-                                  > {};
+struct fallback_t : sm_t<0,
+                         block_dimensions_,
+                         grid_dimensions_,
+                         shared_memory_bytes_> {};
 
-// Easier declaration inside launch box template
-template<
-  typename block_dimensions_,
-  typename grid_dimensions_,
-  unsigned int shared_memory_bytes_ = 0
->
-using fallback_t = fallback_launch_params_t<
-                     block_dimensions_,
-                     grid_dimensions_,
-                     shared_memory_bytes_
-                   >;
-
-// Easier declaration inside launch box template
-template<
-  unsigned int combined_ver_,
-  typename block_dimensions_,
-  typename grid_dimensions_,
-  unsigned int shared_memory_bytes_ = 0
->
-using sm_t = sm_launch_params_t<
-               combined_ver_,
-               block_dimensions_,
-               grid_dimensions_,
-               shared_memory_bytes_
-             >;
-
-// Define named sm_launch_params_t structs for each SM version
-#define SM_LAUNCH_PARAMS(combined) \
-template<                                        \
-  typename block_dimensions_,                    \
-  typename grid_dimensions_,                     \
-  unsigned int shared_memory_bytes_ = 0          \
->                                                \
-using sm_##combined##_t = sm_launch_params_t<    \
-                            combined,            \
-                            block_dimensions_,   \
-                            grid_dimensions_,    \
-                            shared_memory_bytes_ \
-                          >;
+// Define named sm_t structs for each SM version
+#define SM_LAUNCH_PARAMS(ver) \
+template<                                    \
+  typename block_dimensions_,                \
+  typename grid_dimensions_,                 \
+  size_t shared_memory_bytes_ = 0           \
+>                                            \
+using sm_##ver##_t = sm_t<ver,               \
+                          block_dimensions_, \
+                          grid_dimensions_,  \
+                          shared_memory_bytes_>;
 
 // Add Hopper when the SM version number becomes known (presumably 90)
 SM_LAUNCH_PARAMS(86)
@@ -147,50 +126,44 @@ SM_LAUNCH_PARAMS(30)
 template<typename... sm_lp_v>
 struct device_launch_params_t;
 
-// 1st to (N-1)th sm_launch_param_t template parameters
+// First to second to last sm_t template parameters
 template<typename sm_lp_t, typename... sm_lp_v>
 struct device_launch_params_t<sm_lp_t, sm_lp_v...> :
-std::conditional_t<
-  sm_lp_t::combined_ver == 0,
-  device_launch_params_t<sm_lp_v..., sm_lp_t>,  // If found, move fallback_launch_params_t to end of template parameter pack
-  std::conditional_t<                           // Otherwise check sm_lp_t for device's SM version
-    sm_lp_t::combined_ver == SM_TARGET,
-    sm_lp_t,
-    device_launch_params_t<sm_lp_v...>
-  >
-> {};
+std::conditional_t<sm_lp_t::sm_version == 0,
+                   device_launch_params_t<sm_lp_v..., sm_lp_t>,  // Move fallback_t to end
+                   std::conditional_t<sm_lp_t::sm_version == SM_TARGET,  // Otherwise check sm_lp_t for device's SM version
+                                      sm_lp_t,
+                                      device_launch_params_t<sm_lp_v...>>> {};
 
-//////////////// https://stackoverflow.com/a/3926854
-// "false" but dependent on a template parameter so the compiler can't optimize it for static_assert()
+// "false", but dependent on a template parameter so the compiler can't
+// optimize it for static_assert()
 template<typename T>
 struct always_false {
     enum { value = false };
 };
 
-// Raises static (compile-time) assert when referenced
+// Raises static (compile-time) assert when template is instantiated
 template<typename T>
 struct raise_not_found_error_t {
-  static_assert(always_false<T>::value, "Launch box could not find valid launch parameters");
+  static_assert(always_false<T>::value,
+                "Launch box could not find valid launch parameters");
 };
-////////////////
 
-// Nth sm_launch_param_t template parameter
+// Last sm_t template parameter
 template<typename sm_lp_t>
 struct device_launch_params_t<sm_lp_t> :
 std::conditional_t<
-  sm_lp_t::combined_ver == SM_TARGET || sm_lp_t::combined_ver == 0,
+  sm_lp_t::sm_version == SM_TARGET || sm_lp_t::sm_version == 0,
   sm_lp_t,
   raise_not_found_error_t<void>  // Raises a compiler error
 > {};
 
 /**
  * @brief Collection of kernel launch parameters for multiple architectures
- * @tparam sm_lp_v... Pack of sm_launch_params_t types for each desired arch
+ * @tparam sm_lp_v... Pack of sm_t types for each desired arch
  */
 template<typename... sm_lp_v>
-struct launch_box_t : device_launch_params_t<sm_lp_v...> {
-  // Some methods to make it easy to access launch_params
-};
+struct launch_box_t : device_launch_params_t<sm_lp_v...> {};
 
 /**
  * @brief Calculator for ratio of active to maximum warps per multiprocessor
@@ -199,7 +172,7 @@ struct launch_box_t : device_launch_params_t<sm_lp_v...> {
  * \return float
  */
 template<typename launch_box_t, typename func_t>
-float occupancy(func_t kernel) {
+inline float occupancy(func_t kernel) {
   int max_active_blocks;
   int block_size = launch_box_t::block_dimensions::size;
   int device;
@@ -219,6 +192,8 @@ float occupancy(func_t kernel) {
                             props.warpSize);
   return occupancy;
 }
+
+}  // namespace launch_box
 
 }  // namespace gunrock
 }  // namespace cuda
