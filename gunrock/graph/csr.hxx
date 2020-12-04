@@ -31,10 +31,7 @@ using namespace memory;
 // memory error. Another important thing to note is that
 // virtual functions should also have undefined behavior,
 // but they seem to work.
-template <memory_space_t space,
-          typename vertex_t,
-          typename edge_t,
-          typename weight_t>
+template <typename vertex_t, typename edge_t, typename weight_t>
 class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
   using vertex_type = vertex_t;
   using edge_type = edge_t;
@@ -134,30 +131,7 @@ class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
     return number_of_nonzeros;
   }
 
- protected:
-  template <typename vertex_vector_t,
-            typename edge_vector_t,
-            typename weight_vector_t>
-  void set(vertex_type const& r,
-           vertex_type const& c,
-           edge_type const& nnz,
-           edge_vector_t& Ap,
-           vertex_vector_t& Aj,
-           weight_vector_t& Ax) {
-    // Set number of verties & edges
-    graph_base_type::set_number_of_vertices(r);
-    graph_base_type::set_number_of_edges(nnz);
-
-    number_of_rows = r;
-    number_of_columns = c;
-    number_of_nonzeros = nnz;
-
-    // Set raw pointers
-    offsets = memory::raw_pointer_cast<edge_type>(Ap.data());
-    indices = memory::raw_pointer_cast<vertex_type>(Aj.data());
-    values = memory::raw_pointer_cast<weight_type>(Ax.data());
-  }
-
+  //  protected:
   __host__ __device__ void set(vertex_type const& r,
                                vertex_type const& c,
                                edge_type const& nnz,

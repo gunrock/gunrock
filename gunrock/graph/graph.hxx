@@ -76,12 +76,9 @@ class graph_t : public graph_view_t... {
   using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
 
   // Different supported graph representation views.
-  using graph_csr_view =
-      graph_csr_t<space, vertex_type, edge_type, weight_type>;
-  using graph_csc_view =
-      graph_csc_t<space, vertex_type, edge_type, weight_type>;
-  using graph_coo_view =
-      graph_coo_t<space, vertex_type, edge_type, weight_type>;
+  using graph_csr_view = graph_csr_t<vertex_type, edge_type, weight_type>;
+  using graph_csc_view = graph_csc_t<vertex_type, edge_type, weight_type>;
+  using graph_coo_view = graph_coo_t<vertex_type, edge_type, weight_type>;
 
   __host__ __device__ graph_t() : graph_view_t()... {}
 
@@ -91,62 +88,67 @@ class graph_t : public graph_view_t... {
   //                   rhs.num_nonzeros),
   //   graph_csr_view(rhs) {}
 
-  template <typename edge_vector_t,
-            typename vertex_vector_t,
-            typename weight_vector_t>
-  void set(typename vertex_vector_t::value_type const& r,
-           typename vertex_vector_t::value_type const& c,
-           typename edge_vector_t::value_type const& nnz,
-           edge_vector_t& Ap,
-           vertex_vector_t& Aj,
-           weight_vector_t& Ax) {
-    graph_csr_view::set(r, c, nnz, Ap, Aj, Ax);
+  // Override base class functions, CUDA does not support
+  // virtual inheritance at all.
+  __host__ __device__ __forceinline__ const vertex_type
+  get_number_of_vertices() const {
+    return first_view_t::get_number_of_vertices();
   }
 
-  __host__ __device__ void set(vertex_type const& r,
-                               vertex_type const& c,
-                               edge_type const& nnz,
-                               edge_pointer_t Ap,
-                               vertex_pointer_t Aj,
-                               weight_pointer_t Ax) {
-    graph_csr_view::set(r, c, nnz, Ap, Aj, Ax);
+  __host__ __device__ __forceinline__ const edge_type
+  get_number_of_edges() const {
+    return first_view_t::get_number_of_edges();
   }
 
-  // XXX: add support for per-view based methods
-  // template<typename view_t = first_view_t>
+  bool is_directed() { return first_view_t::is_directed(); }
+
+  // template <class input_view_t = first_view_t, typename... T>
+  // __host__ __device__ void set(T... args) {
+  //   input_view_t::set(args...);
+  // }
+
+  // Override pure virtual functions
+  // Must use [override] keyword to identify functions that are
+  // overriding the derived class
+  template <typename input_view_t = first_view_t>
   __host__ __device__ __forceinline__ edge_type
   get_number_of_neighbors(vertex_type const& v) const override {
-    return first_view_t::get_number_of_neighbors(v);
+    return input_view_t::get_number_of_neighbors(v);
   }
 
+  template <typename input_view_t = first_view_t>
   __host__ __device__ __forceinline__ vertex_type
   get_source_vertex(edge_type const& e) const override {
-    return first_view_t::get_source_vertex(e);
+    return input_view_t::get_source_vertex(e);
   }
 
+  template <typename input_view_t = first_view_t>
   __host__ __device__ __forceinline__ weight_type
   get_edge_weight(edge_type const& e) const override {
-    return first_view_t::get_edge_weight(e);
+    return input_view_t::get_edge_weight(e);
   }
 
+  template <typename input_view_t = first_view_t>
   __host__ __device__ __forceinline__ vertex_type
   get_destination_vertex(edge_type const& e) const override {
-    return first_view_t::get_destination_vertex(e);
+    return input_view_t::get_destination_vertex(e);
   }
 
+  template <typename input_view_t = first_view_t>
   __host__ __device__ __forceinline__ edge_type
   get_starting_edge(vertex_type const& v) const override {
-    return first_view_t::get_starting_edge(v);
+    return input_view_t::get_starting_edge(v);
   }
 
+  // graph_t specific methods.
   __host__ __device__ __forceinline__ std::size_t
   number_of_graph_representations() const {
     return number_of_formats_inherited;
   }
 
-  template <typename view_t>
+  template <typename input_view_t>
   constexpr bool contains_representation() {
-    return std::disjunction_v<std::is_same<view_t, graph_view_t>...>;
+    return std::disjunction_v<std::is_same<input_view_t, graph_view_t>...>;
   }
 
   constexpr memory_space_t memory_space() const { return space; }

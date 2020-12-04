@@ -22,8 +22,7 @@ namespace graph {
 using namespace format;
 using namespace detail;
 
-template <memory_space_t space,
-          typename vertex_t,
+template <typename vertex_t,
           typename edge_t,
           typename weight_t>
 class graph_coo_t : virtual public graph_base_t<vertex_t, edge_t, weight_t> {

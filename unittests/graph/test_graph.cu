@@ -9,14 +9,18 @@ using namespace gunrock;
 template <typename graph_ptr_type>
 __global__ void kernel(graph_ptr_type G) {
   using vertex_t = typename graph_ptr_type::graph_type::vertex_type;
+  using edge_t = typename graph_ptr_type::graph_type::edge_type;
+  using weight_t = typename graph_ptr_type::graph_type::weight_type;
+
+  using csr_view_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
 
   vertex_t source = 1;
   auto edge = 0;
 
   auto num_vertices = G->get_number_of_vertices();
   auto num_edges = G->get_number_of_edges();
-  auto num_neighbors = G->get_number_of_neighbors(source);
-  auto source_vertex = G->get_source_vertex(edge);
+  auto num_neighbors = G->csr_view_t::get_number_of_neighbors(source);
+  auto source_vertex = G->csr_view_t::get_source_vertex(edge);
   auto edge_weight = G->get_edge_weight(edge);
   double average_degree = graph::get_average_degree(G);
   double degree_std_dev = graph::get_degree_standard_deviation(G);
@@ -83,16 +87,20 @@ void test_graph() {
   using namespace memory;
 
   // wrap it with shared_ptr<csr_t> (memory_space_t::host)
-  auto G = graph::build::from_csr_t<memory_space_t::host>(r, c, nnz, h_Ap, h_Aj,
-                                                          h_Ax);
+  auto G = graph::build::from_csr<memory_space_t::host,
+                                  (graph::view_t::csr | graph::view_t::csc)>(
+      r, c, nnz, h_Ap.data(), h_Aj.data(), h_Ax.data());
+
+  using csr_view = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
+
   vertex_t source = 1;
   vertex_t edge = 0;
 
   vertex_t num_vertices = G->get_number_of_vertices();
   edge_t num_edges = G->get_number_of_edges();
-  edge_t num_neighbors = G->get_number_of_neighbors(source);
-  vertex_t source_vertex = G->get_source_vertex(edge);
-  weight_t edge_weight = G->get_edge_weight(edge);
+  edge_t num_neighbors = G->get_number_of_neighbors<csr_view>(source);
+  vertex_t source_vertex = G->get_source_vertex<csr_view>(edge);
+  weight_t edge_weight = G->get_edge_weight<csr_view>(edge);
   double average_degree = graph::get_average_degree(G);
   double degree_std_dev = graph::get_degree_standard_deviation(G);
 
@@ -110,21 +118,19 @@ void test_graph() {
   std::cout << "\tDegree Std. Deviation: " << degree_std_dev << std::endl;
 
   // Compile-Time Constants (device && host)
-  using type_find_t =
-      graph::graph_csr_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
-
   std::cout << "\tNumber of Graph Representations = "
             << G->number_of_graph_representations() << std::endl;
   std::cout << "\tContains CSR Representation? " << std::boolalpha
-            << G->contains_representation<type_find_t>() << std::endl;
+            << G->contains_representation<csr_view>() << std::endl;
 
   // wrap it with shared_ptr<csr_t> (memory_space_t::device)
   thrust::device_vector<edge_t> d_Ap = h_Ap;
   thrust::device_vector<vertex_t> d_Aj = h_Aj;
   thrust::device_vector<weight_t> d_Ax = h_Ax;
 
-  auto O = graph::build::from_csr_t<memory_space_t::device>(r, c, nnz, d_Ap,
-                                                            d_Aj, d_Ax);
+  auto O = graph::build::from_csr<memory_space_t::device,
+                                  (graph::view_t::csr | graph::view_t::csc)>(
+      r, c, nnz, d_Ap.data().get(), d_Aj.data().get(), d_Ax.data().get());
 
   // Device Output
   cudaDeviceSynchronize();
