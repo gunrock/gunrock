@@ -61,12 +61,10 @@ typedef unsigned sm_version_t;
  * @tparam grid_dimensions_ Grid dimensions to launch with
  * @tparam shared_memory_bytes_ Amount of shared memory to allocate
  */
-template<
-  sm_version_t sm_version_,
-  typename block_dimensions_,
-  typename grid_dimensions_,
-  size_t shared_memory_bytes_ = 0
->
+template<sm_version_t sm_version_,
+         typename block_dimensions_,
+         typename grid_dimensions_,
+         size_t shared_memory_bytes_ = 0>
 struct sm_t : launch_params_t<block_dimensions_,
                               grid_dimensions_,
                               shared_memory_bytes_> {
@@ -83,11 +81,9 @@ struct sm_t : launch_params_t<block_dimensions_,
   * @tparam grid_dimensions_ Grid dimensions to launch with
   * @tparam shared_memory_bytes_ Amount of shared memory to allocate
   */
-template<
-  typename block_dimensions_,
-  typename grid_dimensions_,
-  size_t shared_memory_bytes_ = 0
->
+template<typename block_dimensions_,
+         typename grid_dimensions_,
+         size_t shared_memory_bytes_ = 0>
 struct fallback_t : sm_t<0,
                          block_dimensions_,
                          grid_dimensions_,
@@ -95,11 +91,9 @@ struct fallback_t : sm_t<0,
 
 // Define named sm_t structs for each SM version
 #define SM_LAUNCH_PARAMS(ver) \
-template<                                    \
-  typename block_dimensions_,                \
-  typename grid_dimensions_,                 \
-  size_t shared_memory_bytes_ = 0           \
->                                            \
+template<typename block_dimensions_,         \
+         typename grid_dimensions_,          \
+         size_t shared_memory_bytes_ = 0>    \
 using sm_##ver##_t = sm_t<ver,               \
                           block_dimensions_, \
                           grid_dimensions_,  \
