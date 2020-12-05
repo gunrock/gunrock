@@ -19,6 +19,8 @@
 namespace gunrock {
 namespace graph {
 
+struct empty_csr_t {};
+
 using namespace format;
 using namespace detail;
 using namespace memory;

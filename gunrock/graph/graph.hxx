@@ -102,10 +102,10 @@ class graph_t : public graph_view_t... {
 
   bool is_directed() { return first_view_t::is_directed(); }
 
-  // template <class input_view_t = first_view_t, typename... T>
-  // __host__ __device__ void set(T... args) {
-  //   input_view_t::set(args...);
-  // }
+  template <class input_view_t = first_view_t, typename... T>
+  __host__ __device__ void set(T... args) {
+    input_view_t::set(args...);
+  }
 
   // Override pure virtual functions
   // Must use [override] keyword to identify functions that are

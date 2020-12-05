@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-APP = diamond
+APP = templated
 
 test: bin/$(APP)
 
