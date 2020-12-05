@@ -102,7 +102,8 @@ void test_graph() {
   const graph::view_t graph_views =  // graph::view_t::csr;
       graph::set(graph::view_t::csr, graph::view_t::coo);
 
-  auto G = graph::build::from_csr<memory_space_t::host, graph_views>(
+  auto G = graph::build::from_csr<memory_space_t::host,
+                                  graph::view_t::csr | graph::view_t::coo>(
       r, c, nnz, h_Ap.data(), h_Aj.data(), h_Ax.data());
 
   using csr_view_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;

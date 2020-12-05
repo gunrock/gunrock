@@ -166,6 +166,10 @@ auto from_csr(vertex_t const& r,
     convert::generate_row_indices<space>(r, nnz, Ap, I);
   }
 
+  // if constexpr (has(build_views, view_t::csc)) {
+  //   convert::generate_column_offsets<space>(r, nnz, Ap, Aj);
+  // }
+
   // Host.
   edge_t* h_Ap = Ap;
   edge_t* h_Aj = Aj;
