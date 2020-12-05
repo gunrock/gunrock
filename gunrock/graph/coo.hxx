@@ -36,7 +36,7 @@ class graph_coo_t : virtual public graph_base_t<vertex_t, edge_t, weight_t> {
   using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
 
  public:
-  graph_coo_t() : graph_base_type() {}
+  __host__ __device__ graph_coo_t() : graph_base_type() {}
 
   // Override pure virtual functions
   // Must use [override] keyword to identify functions that are

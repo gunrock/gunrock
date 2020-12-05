@@ -9,6 +9,8 @@
  *
  */
 
+#include <gunrock/graph/detail/convert.hxx>
+
 namespace gunrock {
 namespace graph {
 namespace build {
@@ -144,6 +146,80 @@ auto builder(vertex_t const& r,
 
   fix<space, build_views>(G, G_ptr.get());
   return G_ptr;
+}
+
+template <memory_space_t space,
+          view_t build_views,
+          typename edge_t,
+          typename vertex_t,
+          typename weight_t>
+auto from_csr(vertex_t const& r,
+              vertex_t const& c,
+              edge_t const& nnz,
+              edge_t* Ap,
+              vertex_t* J,
+              weight_t* X) {
+  // Build missing data.
+  vertex_t* I = nullptr;
+  edge_t* Aj = nullptr;
+
+  if constexpr (has(build_views, view_t::csc) ||
+                has(build_views, view_t::coo)) {
+    // typename vector<vertex_t, space>::type vec_I(nnz);
+    auto I_deleter = [&](vertex_t* ptr) { memory::free(ptr, space); };
+    std::shared_ptr<vertex_t> I_ptr(
+        memory::allocate<vertex_t>(nnz * sizeof(vertex_t), space), I_deleter);
+
+    I = I_ptr.get();  // memory::raw_pointer_cast(vec_I.data());
+    convert::generate_row_indices<space>(r, nnz, Ap, I);
+  }
+
+  // Host.
+  edge_t* h_Ap = Ap;
+  edge_t* h_Aj = Aj;
+
+  vertex_t* h_I = I;
+  vertex_t* h_J = J;
+  weight_t* h_X = X;
+
+  // Device.
+  edge_t* d_Ap = Ap;
+  edge_t* d_Aj = Aj;
+
+  vertex_t* d_I = I;
+  vertex_t* d_J = J;
+  weight_t* d_X = X;
+
+  // nullify space that's not needed.
+  if (space == memory_space_t::device) {
+    h_I = (vertex_t*)nullptr;
+    h_J = (vertex_t*)nullptr;
+
+    h_Ap = (edge_t*)nullptr;
+    h_Aj = (edge_t*)nullptr;
+
+    h_X = (weight_t*)nullptr;
+  } else if (space == memory_space_t::host) {
+    d_I = (vertex_t*)nullptr;
+    d_J = (vertex_t*)nullptr;
+
+    d_Ap = (edge_t*)nullptr;
+    d_Aj = (edge_t*)nullptr;
+
+    d_X = (weight_t*)nullptr;
+  } else {
+    error::throw_if_exception(cudaErrorUnknown);
+  }
+
+  auto D = builder<memory_space_t::device,  // build for device
+                   build_views              // supported views
+                   >(r, c, nnz, d_I, d_J, d_Ap, d_Aj, d_X);
+
+  auto H = builder<memory_space_t::host,  // build for host
+                   build_views            // supported views
+                   >(r, c, nnz, h_I, h_J, h_Ap, h_Aj, h_X);
+  graph_container_t G(D, H);
+  return G;
 }
 }  // namespace detail
 }  // namespace build
