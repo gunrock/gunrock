@@ -28,7 +28,10 @@ auto from_csr(vertex_t const& r,
               edge_t* Ap,
               vertex_t* J,
               weight_t* X) {
-  return detail::from_csr<space, build_views>(r, c, nnz, Ap, J, X);
+  auto I_deleter = [&](vertex_t* ptr) { memory::free(ptr, space); };
+  std::shared_ptr<vertex_t> I_ptr(
+      memory::allocate<vertex_t>(nnz * sizeof(vertex_t), space), I_deleter);
+  return detail::from_csr<space, build_views>(r, c, nnz, Ap, J, X, I_ptr.get());
 }
 
 }  // namespace build

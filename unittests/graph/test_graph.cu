@@ -24,7 +24,12 @@ __global__ void kernel(graph_ptr_type G) {
 
   // Both valid.
   auto num_neighbors = G->template get_number_of_neighbors<csr_view_t>(source);
-  auto source_vertex = G->coo_view_t::get_source_vertex(edge);
+  auto coo_source_vertex = G->template get_source_vertex<coo_view_t>(edge);
+  auto csr_source_vertex = G->template get_source_vertex<csr_view_t>(edge);
+  auto coo_destination_vertex =
+      G->template get_destination_vertex<coo_view_t>(edge);
+  auto csr_destination_vertex =
+      G->template get_destination_vertex<csr_view_t>(edge);
   auto edge_weight = G->get_edge_weight(edge);
   double average_degree = graph::get_average_degree(G);
   double degree_std_dev = graph::get_degree_standard_deviation(G);
@@ -33,7 +38,10 @@ __global__ void kernel(graph_ptr_type G) {
   printf("\tNumber of vertices: %i\n", num_vertices);
   printf("\tNumber of edges: %i\n", num_edges);
   printf("\tNumber of neighbors: %i (source = %i)\n", num_neighbors, source);
-  printf("\tSource vertex: %i (edge = %i)\n", source_vertex, edge);
+  printf("\tSource vertex: %i (csr), %i (coo) (edge = %i)\n", csr_source_vertex,
+         coo_source_vertex, edge);
+  printf("\tDestination vertex: %i (csr), %i (coo) (edge = %i)\n",
+         csr_destination_vertex, coo_destination_vertex, edge);
   printf("\tEdge weight: %f (edge = %i)\n", edge_weight, edge);
   printf("\tAverage degree: %lf\n", average_degree);
   printf("\tDegree std. deviation: %lf\n", degree_std_dev);

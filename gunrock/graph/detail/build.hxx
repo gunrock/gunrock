@@ -23,7 +23,7 @@ namespace detail {
  * @param I
  * @return graph
  */
-template <uint32_t build_views, typename graph_type>
+template <typename graph_type>
 __device__ __host__ auto from_graph_t(graph_type& I) {
   using vertex_t = typename graph_type::vertex_type;
   using edge_t = typename graph_type::edge_type;
@@ -35,7 +35,7 @@ __device__ __host__ auto from_graph_t(graph_type& I) {
 
   graph_type G;
 
-  if constexpr (has((view_t)build_views, view_t::csr))
+  if constexpr (G.template contains_representation<csr_v_t>())
     G.template set<csr_v_t>(I.csr_v_t::get_number_of_rows(),      // r
                             I.csr_v_t::get_number_of_columns(),   // c
                             I.csr_v_t::get_number_of_nonzeros(),  // nnz
@@ -44,7 +44,7 @@ __device__ __host__ auto from_graph_t(graph_type& I) {
                             I.csr_v_t::get_nonzero_values()   // nonzero values
     );
 
-  if constexpr (has((view_t)build_views, view_t::csc))
+  if constexpr (G.template contains_representation<csc_v_t>())
     G.template set<csc_v_t>(I.csc_v_t::get_number_of_rows(),      // r
                             I.csc_v_t::get_number_of_columns(),   // c
                             I.csc_v_t::get_number_of_nonzeros(),  // nnz
@@ -53,12 +53,12 @@ __device__ __host__ auto from_graph_t(graph_type& I) {
                             I.csc_v_t::get_nonzero_values()  // nonzero values
     );
 
-  if constexpr (has((view_t)build_views, view_t::coo))
+  if constexpr (G.template contains_representation<coo_v_t>())
     G.template set<coo_v_t>(I.coo_v_t::get_number_of_rows(),      // r
                             I.coo_v_t::get_number_of_columns(),   // c
                             I.coo_v_t::get_number_of_nonzeros(),  // nnz
-                            I.coo_v_t::get_row_indices(),     // column indices
-                            I.coo_v_t::get_column_indices(),  // row indices
+                            I.coo_v_t::get_row_indices(),         // row indices
+                            I.coo_v_t::get_column_indices(),  // column indices
                             I.coo_v_t::get_nonzero_values()   // nonzero values
     );
 
@@ -73,19 +73,19 @@ __device__ __host__ auto from_graph_t(graph_type& I) {
  * @param I
  * @param O
  */
-template <uint32_t build_views, typename graph_type>
+template <typename graph_type>
 __global__ void kernel_virtual_inheritance(graph_type I, graph_type* O) {
-  auto G = from_graph_t<build_views>(I);
+  auto G = from_graph_t(I);
   memcpy(O, &G, sizeof(graph_type));
 }
 
 /**
  * @brief Possible work around while keeping virtual (polymorphic behavior.)
  */
-template <memory_space_t space, view_t build_views, typename graph_type>
+template <memory_space_t space, typename graph_type>
 void fix(graph_type I, graph_type* G) {
   if constexpr (space == memory_space_t::device) {
-    kernel_virtual_inheritance<build_views><<<1, 1>>>(I, G);
+    kernel_virtual_inheritance<<<1, 1>>>(I, G);
   } else {
     memcpy(G, &I, sizeof(graph_type));
   }
@@ -144,7 +144,7 @@ auto builder(vertex_t const& r,
   std::shared_ptr<graph_type> G_ptr(
       memory::allocate<graph_type>(sizeof(graph_type), space), graph_deleter);
 
-  fix<space, build_views>(G, G_ptr.get());
+  fix<space>(G, G_ptr.get());
   return G_ptr;
 }
 
@@ -158,19 +158,11 @@ auto from_csr(vertex_t const& r,
               edge_t const& nnz,
               edge_t* Ap,
               vertex_t* J,
-              weight_t* X) {
-  // Build missing data.
-  vertex_t* I = nullptr;
-  edge_t* Aj = nullptr;
-
+              weight_t* X,
+              vertex_t* I = nullptr,
+              edge_t* Aj = nullptr) {
   if constexpr (has(build_views, view_t::csc) ||
                 has(build_views, view_t::coo)) {
-    // typename vector<vertex_t, space>::type vec_I(nnz);
-    auto I_deleter = [&](vertex_t* ptr) { memory::free(ptr, space); };
-    std::shared_ptr<vertex_t> I_ptr(
-        memory::allocate<vertex_t>(nnz * sizeof(vertex_t), space), I_deleter);
-
-    I = I_ptr.get();  // memory::raw_pointer_cast(vec_I.data());
     convert::generate_row_indices<space>(r, nnz, Ap, I);
   }
 

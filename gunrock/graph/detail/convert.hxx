@@ -51,7 +51,6 @@ void generate_row_indices(vertex_t const& r,
                  [I] __device__(edge_t * row_offsets, const vertex_t& row) {
                    edge_t e_end = row_offsets[row + 1];
                    for (edge_t e = row_offsets[row]; e < e_end; e++) {
-                     printf("%u\n", row);
                      I[e] = row;
                    }
                  },
