@@ -87,21 +87,20 @@ constexpr sm_flag_t operator&(sm_flag_t lhs, sm_flag_t rhs) {
 
 /**
  * @brief Kernel launch parameters for a specific SM version
- * @tparam sm_version_ Combined major and minor compute capability version
+ * @tparam sm_flags_ Bitwise flags indicating SM versions (sm_flag_t enum)
  * @tparam block_dimensions_ Block dimensions to launch with
  * @tparam grid_dimensions_ Grid dimensions to launch with
  * @tparam shared_memory_bytes_ Amount of shared memory to allocate
- * @tparam sm_flag_v Pack of sm_flag_t enums for one or more SM versions
  */
-template<typename block_dimensions_,
+template<sm_flag_t sm_flags_,
+         typename block_dimensions_,
          typename grid_dimensions_,
-         size_t shared_memory_bytes_ = 0,
-         sm_flag_t... sm_flag_v>
+         size_t shared_memory_bytes_ = 0>
 struct launch_params_t {
   typedef block_dimensions_ block_dimensions;
   typedef grid_dimensions_ grid_dimensions;
   enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
-  enum : unsigned { sm_flags = (sm_flag_v | ...) };  // Fold expression
+  enum : unsigned { sm_flags = sm_flags_ };
 };
 
 template<typename... lp_v>

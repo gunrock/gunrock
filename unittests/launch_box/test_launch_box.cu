@@ -7,11 +7,11 @@
 using namespace gunrock::cuda::launch_box;
 
 typedef launch_box_t<
-  launch_params_t<dim3_t<16, 2, 2>, dim3_t<64, 1, 4>, 2, sm_86, sm_80>,
-  launch_params_t<dim3_t<32, 2, 4>, dim3_t<64, 8, 8>,    sm_75, sm_70>,
-  launch_params_t<dim3_t<8, 4, 4>,  dim3_t<32, 1, 4>, 2, sm_61, sm_60>,
-  launch_params_t<dim3_t<64>,       dim3_t<64>, 16,      sm_35>,
-  launch_params_t<dim3_t<16>,       dim3_t<2>,        4, fallback>
+  launch_params_t<sm_86 | sm_80, dim3_t<16, 2, 2>, dim3_t<64, 1, 4>, 2>,
+  launch_params_t<sm_75 | sm_70, dim3_t<32, 2, 4>, dim3_t<64, 8, 8>   >,
+  launch_params_t<sm_61 | sm_60, dim3_t<8, 4, 4>,  dim3_t<32, 1, 4>, 2>,
+  launch_params_t<sm_35,         dim3_t<64>,       dim3_t<64>,       16>,
+  launch_params_t<fallback,      dim3_t<16>,       dim3_t<2>,        4>
 > launch_t;
 
 __global__ void dummy_kernel() {}
@@ -41,9 +41,9 @@ void test_fallback() {
   #endif  // TEST_SM == 86
 
   typedef launch_box_t<
-    launch_params_t<dim3_t<16>, dim3_t<64>, 2, NOT_CURRENT_SM_1>,
-    launch_params_t<dim3_t<8>, dim3_t<32>, 128, NOT_CURRENT_SM_2>,
-    launch_params_t<dim3_t<EXPECTED_BLOCK>, dim3_t<EXPECTED_GRID>, EXPECTED_SMEM, fallback>
+    launch_params_t<NOT_CURRENT_SM_1,dim3_t<16>, dim3_t<64>, 2>,
+    launch_params_t<NOT_CURRENT_SM_2, dim3_t<8>, dim3_t<32>, 128>,
+    launch_params_t<fallback, dim3_t<EXPECTED_BLOCK>, dim3_t<EXPECTED_GRID>, EXPECTED_SMEM>
   > launch_t;
 
   assert(launch_t::block_dimensions::x == EXPECTED_BLOCK &&
