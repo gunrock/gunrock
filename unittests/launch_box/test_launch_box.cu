@@ -7,11 +7,11 @@
 using namespace gunrock::cuda::launch_box;
 
 typedef launch_box_t<
-  sm_t<86, dim3_t<16>, dim3_t<64>, 2>,
-  sm_t<80, dim3_t<16>, dim3_t<32>, 4>,
-  sm_t<75, dim3_t<32>, dim3_t<64>>,
-  sm_t<35, dim3_t<64>, dim3_t<64>, 16>,
-  fallback_t<dim3_t<16>, dim3_t<2>, 4>
+  launch_params_t<dim3_t<16, 2, 2>, dim3_t<64, 1, 4>, 2, sm_86, sm_80>,
+  launch_params_t<dim3_t<32, 2, 4>, dim3_t<64, 8, 8>,    sm_75, sm_70>,
+  launch_params_t<dim3_t<8, 4, 4>,  dim3_t<32, 1, 4>, 2, sm_61, sm_60>,
+  launch_params_t<dim3_t<64>,       dim3_t<64>, 16,      sm_35>,
+  launch_params_t<dim3_t<16>,       dim3_t<2>,        4, fallback>
 > launch_t;
 
 __global__ void dummy_kernel() {}
@@ -29,21 +29,21 @@ void test_fallback() {
   #define EXPECTED_SMEM  4
 
   // Get 2 SM versions that are not the device's current one
-  #if TEST_SM == 86  // TEST_SM is a placeholder so this must change
-    #define NOT_CURRENT_SM_1 80
-    #define NOT_CURRENT_SM_2 75
-  #elif TEST_SM == 80  // TEST_SM is a placeholder so this must change
-    #define NOT_CURRENT_SM_1 86
-    #define NOT_CURRENT_SM_2 75
+  #if SM_TARGET == 86  // TEST_SM is a placeholder so this must change
+    #define NOT_CURRENT_SM_1 sm_80
+    #define NOT_CURRENT_SM_2 sm_75
+  #elif SM_TARGET == 80  // TEST_SM is a placeholder so this must change
+    #define NOT_CURRENT_SM_1 sm_86
+    #define NOT_CURRENT_SM_2 sm_75
   #else
-    #define NOT_CURRENT_SM_1 86
-    #define NOT_CURRENT_SM_2 80
+    #define NOT_CURRENT_SM_1 sm_86
+    #define NOT_CURRENT_SM_2 sm_80
   #endif  // TEST_SM == 86
 
   typedef launch_box_t<
-    sm_t<NOT_CURRENT_SM_1, dim3_t<16>, dim3_t<64>, 2>,
-    sm_t<NOT_CURRENT_SM_2, dim3_t<8>, dim3_t<32>, 128>,
-    fallback_t<dim3_t<EXPECTED_BLOCK>, dim3_t<EXPECTED_GRID>, EXPECTED_SMEM>
+    launch_params_t<dim3_t<16>, dim3_t<64>, 2, NOT_CURRENT_SM_1>,
+    launch_params_t<dim3_t<8>, dim3_t<32>, 128, NOT_CURRENT_SM_2>,
+    launch_params_t<dim3_t<EXPECTED_BLOCK>, dim3_t<EXPECTED_GRID>, EXPECTED_SMEM, fallback>
   > launch_t;
 
   assert(launch_t::block_dimensions::x == EXPECTED_BLOCK &&
@@ -52,18 +52,9 @@ void test_fallback() {
 }
 
 void test_define() {
-  // SM launch params can also be specified via their named type
-  typedef launch_box_t<
-    sm_86_t<dim3_t<16>, dim3_t<64>, 2>,
-    sm_80_t<dim3_t<16>, dim3_t<32>, 4>,
-    sm_75_t<dim3_t<32>, dim3_t<64>>,
-    sm_35_t<dim3_t<64>, dim3_t<64>, 16>,
-    fallback_t<dim3_t<16>, dim3_t<2>, 4>
-  > named_launch_t;
-
-  dim3 block_dimensions = named_launch_t::block_dimensions::get_dim3();
-  dim3 grid_dimensions = named_launch_t::grid_dimensions::get_dim3();
-  unsigned int smem = launch_t::shared_memory_bytes;
+  dim3 block_dimensions = launch_t::block_dimensions::get_dim3();
+  dim3 grid_dimensions = launch_t::grid_dimensions::get_dim3();
+  size_t smem = launch_t::shared_memory_bytes;
 
   std::cout
   << "block_dimensions:    " << block_dimensions.x << ", "
@@ -75,16 +66,9 @@ void test_define() {
   << "shared_memory_bytes: " << smem               << std::endl;
 }
 
-void test_compute_capability() {
-  std::cout << "Compute capability combined: "
-            << launch_t::get_compute_capability().as_combined_number()
-            << std::endl;
-}
-
 int main(int argc, char** argv) {
   test_occupancy_calc();
   test_define();
   test_fallback();
-  test_compute_capability();
   return EXIT_SUCCESS;
 }

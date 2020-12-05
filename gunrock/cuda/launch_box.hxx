@@ -31,133 +31,133 @@ namespace launch_box {
  * @tparam y_ Dimension in the Y direction
  * @tparam z_ Dimension in the Z direction
  */
-template<size_t x_, size_t y_ = 1, size_t z_ = 1>
+template<unsigned int x_, unsigned int y_ = 1, unsigned int z_ = 1>
 struct dim3_t {
-  enum : size_t { x = x_, y = y_, z = z_, size = x_ * y_ * z_ };
+  enum : unsigned int { x = x_, y = y_, z = z_, size = x_ * y_ * z_ };
   static constexpr dim3 get_dim3() { return dim3(x, y, z); }
 };
 
-/**
- * @brief Struct holding kernel parameters will be passed in upon launch
- * @tparam block_dimensions_ Block dimensions to launch with
- * @tparam grid_dimensions_ Grid dimensions to launch with
- * @tparam shared_memory_bytes_ Amount of shared memory to allocate
- */
-template<typename block_dimensions_,
-         typename grid_dimensions_,
-         size_t shared_memory_bytes_ = 0>
-struct launch_params_t {
-  typedef block_dimensions_ block_dimensions;
-  typedef grid_dimensions_ grid_dimensions;
-  enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
+enum sm_flag_t : unsigned {
+  fallback = 0,
+  sm_30 = 1 << 0,
+  sm_35 = 1 << 1,
+  sm_37 = 1 << 2,
+  sm_50 = 1 << 3,
+  sm_52 = 1 << 4,
+  sm_53 = 1 << 5,
+  sm_60 = 1 << 6,
+  sm_61 = 1 << 7,
+  sm_62 = 1 << 8,
+  sm_70 = 1 << 9,
+  sm_72 = 1 << 10,
+  sm_75 = 1 << 11,
+  sm_80 = 1 << 12,
+  sm_86 = 1 << 13
 };
 
-typedef unsigned sm_version_t;
+// Macro for the flag of the current device's SM version
+#define SM_TARGET_FLAG _SM_FLAG_WRAPPER(SM_TARGET)
+// "ver" will be expanded before the call to _SM_FLAG
+#define _SM_FLAG_WRAPPER(ver) _SM_FLAG(ver)
+#define _SM_FLAG(ver) sm_ ## ver
 
 /**
- * @brief Kernel parameters for a specific SM version
+ * @brief Overloaded bitwise OR operator
+ * @param lhs Left-hand side
+ * @param rhs Right-hand side
+ * \return sm_flag_t
+ */
+constexpr sm_flag_t operator|(sm_flag_t lhs, sm_flag_t rhs) {
+  return static_cast<sm_flag_t>(
+    static_cast<unsigned>(lhs) | static_cast<unsigned>(rhs)
+  );
+}
+
+/**
+ * @brief Overloaded bitwise AND operator
+ * @param lhs Left-hand side
+ * @param rhs Right-hand side
+ * \return sm_flag_t
+ */
+constexpr sm_flag_t operator&(sm_flag_t lhs, sm_flag_t rhs) {
+  return static_cast<sm_flag_t>(
+    static_cast<unsigned>(lhs) & static_cast<unsigned>(rhs)
+  );
+}
+
+/**
+ * @brief Kernel launch parameters for a specific SM version
  * @tparam sm_version_ Combined major and minor compute capability version
  * @tparam block_dimensions_ Block dimensions to launch with
  * @tparam grid_dimensions_ Grid dimensions to launch with
  * @tparam shared_memory_bytes_ Amount of shared memory to allocate
+ * @tparam sm_flag_v Pack of sm_flag_t enums for one or more SM versions
  */
-template<sm_version_t sm_version_,
-         typename block_dimensions_,
+template<typename block_dimensions_,
          typename grid_dimensions_,
-         size_t shared_memory_bytes_ = 0>
-struct sm_t : launch_params_t<block_dimensions_,
-                              grid_dimensions_,
-                              shared_memory_bytes_> {
-  enum : sm_version_t {sm_version = sm_version_};
-  static constexpr compute_capability_t get_compute_capability() {
-    return make_compute_capability(sm_version);
-  }
+         size_t shared_memory_bytes_ = 0,
+         sm_flag_t... sm_flag_v>
+struct launch_params_t {
+  typedef block_dimensions_ block_dimensions;
+  typedef grid_dimensions_ grid_dimensions;
+  enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
+  enum : unsigned { sm_flags = (sm_flag_v | ...) };  // Fold expression
+};
+
+template<typename... lp_v>
+struct device_launch_params_t;
+
+/**
+ * @brief Struct that inherits the launch parameters of the current device
+ * @tparam lp_t Launch parameters to check for match with current device
+ * @tparam lp_v Pack of launch parameters to pass down recursively
+ */
+template<typename lp_t, typename... lp_v>
+struct device_launch_params_t<lp_t, lp_v...> :
+std::conditional_t<lp_t::sm_flags == fallback,
+                   device_launch_params_t<lp_v..., lp_t>,  // Move fallback_t to end
+                   std::conditional_t<(bool)(lp_t::sm_flags & SM_TARGET_FLAG),  // Otherwise check lp_t for device's SM version
+                                      lp_t,
+                                      device_launch_params_t<lp_v...>>> {};
+
+/**
+ * @brief False value dependent on template param so compiler can't optimize
+ * @tparam T Arbitrary type
+ */
+template<typename T>
+struct always_false {
+  enum { value = false };
 };
 
 /**
-  * @brief Kernel launch parmeters to fall back onto if the current device's
-  * SM version isn't found
-  * @tparam block_dimensions_ Block dimensions to launch with
-  * @tparam grid_dimensions_ Grid dimensions to launch with
-  * @tparam shared_memory_bytes_ Amount of shared memory to allocate
-  */
-template<typename block_dimensions_,
-         typename grid_dimensions_,
-         size_t shared_memory_bytes_ = 0>
-struct fallback_t : sm_t<0,
-                         block_dimensions_,
-                         grid_dimensions_,
-                         shared_memory_bytes_> {};
-
-// Define named sm_t structs for each SM version
-#define SM_LAUNCH_PARAMS(ver) \
-template<typename block_dimensions_,         \
-         typename grid_dimensions_,          \
-         size_t shared_memory_bytes_ = 0>    \
-using sm_##ver##_t = sm_t<ver,               \
-                          block_dimensions_, \
-                          grid_dimensions_,  \
-                          shared_memory_bytes_>;
-
-// Add Hopper when the SM version number becomes known (presumably 90)
-SM_LAUNCH_PARAMS(86)
-SM_LAUNCH_PARAMS(80)
-SM_LAUNCH_PARAMS(75)
-SM_LAUNCH_PARAMS(72)
-SM_LAUNCH_PARAMS(70)
-SM_LAUNCH_PARAMS(62)
-SM_LAUNCH_PARAMS(61)
-SM_LAUNCH_PARAMS(60)
-SM_LAUNCH_PARAMS(53)
-SM_LAUNCH_PARAMS(52)
-SM_LAUNCH_PARAMS(50)
-SM_LAUNCH_PARAMS(37)
-SM_LAUNCH_PARAMS(35)
-SM_LAUNCH_PARAMS(30)
-
-#undef SM_LAUNCH_PARAMS
-
-template<typename... sm_lp_v>
-struct device_launch_params_t;
-
-// First to second to last sm_t template parameters
-template<typename sm_lp_t, typename... sm_lp_v>
-struct device_launch_params_t<sm_lp_t, sm_lp_v...> :
-std::conditional_t<sm_lp_t::sm_version == 0,
-                   device_launch_params_t<sm_lp_v..., sm_lp_t>,  // Move fallback_t to end
-                   std::conditional_t<sm_lp_t::sm_version == SM_TARGET,  // Otherwise check sm_lp_t for device's SM version
-                                      sm_lp_t,
-                                      device_launch_params_t<sm_lp_v...>>> {};
-
-// "false", but dependent on a template parameter so the compiler can't
-// optimize it for static_assert()
-template<typename T>
-struct always_false {
-    enum { value = false };
-};
-
-// Raises static (compile-time) assert when template is instantiated
+ * @brief Raises static assert when template is instantiated
+ * @tparam T Arbitrary type
+ */
 template<typename T>
 struct raise_not_found_error_t {
   static_assert(always_false<T>::value,
                 "Launch box could not find valid launch parameters");
 };
 
-// Last sm_t template parameter
-template<typename sm_lp_t>
-struct device_launch_params_t<sm_lp_t> :
+/**
+ * @brief Struct that inherits the launch parameters of the current device
+ * @tparam lp_t Launch parameters to check for match with current device or
+ * fallback
+ */
+template<typename lp_t>
+struct device_launch_params_t<lp_t> :
 std::conditional_t<
-  sm_lp_t::sm_version == SM_TARGET || sm_lp_t::sm_version == 0,
-  sm_lp_t,
+  (bool)(lp_t::sm_flags & SM_TARGET_FLAG) || lp_t::sm_flags == fallback,
+  lp_t,
   raise_not_found_error_t<void>  // Raises a compiler error
 > {};
 
 /**
  * @brief Collection of kernel launch parameters for multiple architectures
- * @tparam sm_lp_v... Pack of sm_t types for each desired arch
+ * @tparam lp_v... Pack of launch_params_t types for each desired arch
  */
-template<typename... sm_lp_v>
-struct launch_box_t : device_launch_params_t<sm_lp_v...> {};
+template<typename... lp_v>
+struct launch_box_t : device_launch_params_t<lp_v...> {};
 
 /**
  * @brief Calculator for ratio of active to maximum warps per multiprocessor
