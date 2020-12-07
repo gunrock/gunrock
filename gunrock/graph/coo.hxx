@@ -4,84 +4,66 @@
 #include <tuple>
 #include <iterator>
 
-#include <gunrock/algorithms/search/binary_search.hxx>
-
 #include <gunrock/memory.hxx>
 #include <gunrock/util/type_traits.hxx>
-
-#include <gunrock/formats/formats.hxx>
-
-#include <gunrock/graph/detail/base.hxx>
-
-#include <gunrock/graph/properties.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
+
+#include <gunrock/algorithms/search/binary_search.hxx>
 
 namespace gunrock {
 namespace graph {
 
-using namespace format;
-using namespace detail;
+using namespace memory;
 
 struct empty_coo_t {};
 
 template <typename vertex_t, typename edge_t, typename weight_t>
-class graph_coo_t : virtual public graph_base_t<vertex_t, edge_t, weight_t> {
+class graph_coo_t {
   using vertex_type = vertex_t;
   using edge_type = edge_t;
   using weight_type = weight_t;
 
-  using vertex_pair_type = vertex_pair_t<vertex_t>;
-  using properties_type = graph_properties_t;
-
-  using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
+  using vertex_pair_type = vertex_pair_t<vertex_type>;
 
  public:
-  __host__ __device__ graph_coo_t() : graph_base_type() {}
+  __host__ __device__ graph_coo_t()
+      : row_indices(nullptr), column_indices(nullptr), values(nullptr) {}
 
   // Override pure virtual functions
   // Must use [override] keyword to identify functions that are
   // overriding the derived class
   __host__ __device__ __forceinline__ edge_type
-  get_number_of_neighbors(vertex_type const& v) const override {
-    assert(v < graph_base_type::get_number_of_vertices());
+  get_number_of_neighbors(vertex_type const& v) const {
     // XXX: ...
   }
 
   __host__ __device__ __forceinline__ vertex_type
-  get_source_vertex(const edge_type& e) const override {
-    assert(e < graph_base_type::get_number_of_edges());
+  get_source_vertex(const edge_type& e) const {
     return row_indices[e];
   }
 
   __host__ __device__ __forceinline__ vertex_type
-  get_destination_vertex(const edge_type& e) const override {
-    assert(e < graph_base_type::get_number_of_edges());
+  get_destination_vertex(const edge_type& e) const {
     return column_indices[e];
   }
 
   __host__ __device__ __forceinline__ edge_type
-  get_starting_edge(vertex_type const& v) const override {
-    assert(v < graph_base_type::get_number_of_vertices());
+  get_starting_edge(vertex_type const& v) const {
     // XXX: ...
   }
 
   __host__ __device__ __forceinline__ vertex_pair_type
-  get_source_and_destination_vertices(const edge_type& e) const override {
-    assert(e < graph_base_type::get_number_of_edges());
+  get_source_and_destination_vertices(const edge_type& e) const {
     return {get_source_vertex(e), get_destination_vertex(e)};
   }
 
   __host__ __device__ __forceinline__ edge_type
-  get_edge(const vertex_type& source,
-           const vertex_type& destination) const override {
-    assert((source < graph_base_type::get_number_of_vertices()) &&
-           (destination < graph_base_type::get_number_of_vertices()));
+  get_edge(const vertex_type& source, const vertex_type& destination) const {
     // XXX: ...
   }
 
   __host__ __device__ __forceinline__ weight_type
-  get_edge_weight(edge_type const& e) const override {
-    assert(e < graph_base_type::get_number_of_edges());
+  get_edge_weight(edge_type const& e) const {
     return values[e];
   }
 
@@ -99,33 +81,14 @@ class graph_coo_t : virtual public graph_base_t<vertex_t, edge_t, weight_t> {
     return values;
   }
 
-  __host__ __device__ __forceinline__ auto get_number_of_rows() const {
-    return number_of_rows;
-  }
-
-  __host__ __device__ __forceinline__ auto get_number_of_columns() const {
-    return number_of_columns;
-  }
-
-  __host__ __device__ __forceinline__ auto get_number_of_nonzeros() const {
-    return number_of_nonzeros;
-  }
-
   //  protected:
-  __host__ __device__ void set(vertex_type const& r,
-                               vertex_type const& c,
-                               edge_type const& nnz,
+  __host__ __device__ void set(vertex_type const& _number_of_vertices,
+                               edge_type const& _number_of_edges,
                                vertex_type* I,
                                vertex_type* J,
                                weight_type* X) {
-    // Set number of verties & edges
-    graph_base_type::set_number_of_vertices(r);
-    graph_base_type::set_number_of_edges(nnz);
-
-    number_of_rows = r;
-    number_of_columns = c;
-    number_of_nonzeros = nnz;
-
+    this->number_of_vertices = _number_of_vertices;
+    this->number_of_edges = _number_of_edges;
     // Set raw pointers
     row_indices = memory::raw_pointer_cast<edge_type>(I);
     column_indices = memory::raw_pointer_cast<vertex_type>(J);
@@ -134,13 +97,9 @@ class graph_coo_t : virtual public graph_base_t<vertex_t, edge_t, weight_t> {
 
  private:
   // Underlying data storage
-  vertex_type number_of_rows;
-  vertex_type number_of_columns;
-  edge_type number_of_nonzeros;
+  vertex_type number_of_vertices;  // XXX: redundant
+  edge_type number_of_edges;       // XXX: redundant
 
-  // XXX: Maybe use these to hold thrust pointers?
-  // I don't know if this is safe, even when using
-  // shared pointers.
   vertex_type* row_indices;
   vertex_type* column_indices;
   weight_type* values;

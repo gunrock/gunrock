@@ -16,6 +16,7 @@ namespace graph {
 namespace build {
 namespace detail {
 
+#if 0
 /**
  * @brief
  *
@@ -90,6 +91,7 @@ void fix(graph_type I, graph_type* G) {
     memcpy(G, &I, sizeof(graph_type));
   }
 }
+#endif
 
 template <memory_space_t space,
           view_t build_views,
@@ -129,23 +131,23 @@ auto builder(vertex_t const& r,
   graph_type G;
 
   if constexpr (has(build_views, view_t::csr)) {
-    G.template set<csr_v_t>(r, c, nnz, Ap, J, X);
+    G.template set<csr_v_t>(r, nnz, Ap, J, X);
   }
 
   if constexpr (has(build_views, view_t::csc)) {
-    G.template set<csc_v_t>(r, c, nnz, I, Aj, X);
+    G.template set<csc_v_t>(r, nnz, Aj, I, X);
   }
 
   if constexpr (has(build_views, view_t::coo)) {
-    G.template set<coo_v_t>(r, c, nnz, I, J, X);
+    G.template set<coo_v_t>(r, nnz, I, J, X);
   }
 
-  auto graph_deleter = [&](graph_type* ptr) { memory::free(ptr, space); };
-  std::shared_ptr<graph_type> G_ptr(
-      memory::allocate<graph_type>(sizeof(graph_type), space), graph_deleter);
+  // auto graph_deleter = [&](graph_type* ptr) { memory::free(ptr, space); };
+  // std::shared_ptr<graph_type> G_ptr(
+  // memory::allocate<graph_type>(sizeof(graph_type), space), graph_deleter);
 
-  fix<space>(G, G_ptr.get());
-  return G_ptr;
+  // fix<space>(G, G_ptr.get());
+  return G;
 }
 
 template <memory_space_t space,
@@ -214,7 +216,7 @@ auto from_csr(vertex_t const& r,
   auto H = builder<memory_space_t::host,  // build for host
                    build_views            // supported views
                    >(r, c, nnz, h_I, h_J, h_Ap, h_Aj, h_X);
-  graph_container_t G(D, H);
+  graph_container_t G(&D, &H);
   return G;
 }
 }  // namespace detail

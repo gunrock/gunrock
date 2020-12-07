@@ -4,25 +4,17 @@
 #include <tuple>
 #include <iterator>
 
-#include <gunrock/algorithms/search/binary_search.hxx>
-
 #include <gunrock/memory.hxx>
 #include <gunrock/util/type_traits.hxx>
-
-#include <gunrock/formats/formats.hxx>
-
-#include <gunrock/graph/detail/base.hxx>
-
-#include <gunrock/graph/properties.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
+
+#include <gunrock/algorithms/search/binary_search.hxx>
 
 namespace gunrock {
 namespace graph {
 
 struct empty_csr_t {};
 
-using namespace format;
-using namespace detail;
 using namespace memory;
 
 // XXX: The ideal thing to do here is to inherit
@@ -34,18 +26,16 @@ using namespace memory;
 // virtual functions should also have undefined behavior,
 // but they seem to work.
 template <typename vertex_t, typename edge_t, typename weight_t>
-class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
+class graph_csr_t {
   using vertex_type = vertex_t;
   using edge_type = edge_t;
   using weight_type = weight_t;
 
-  using vertex_pair_type = vertex_pair_t<vertex_t>;
-  using properties_type = graph_properties_t;
-
-  using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
+  using vertex_pair_type = vertex_pair_t<vertex_type>;
 
  public:
-  __host__ __device__ graph_csr_t() : graph_base_type() {}
+  __host__ __device__ graph_csr_t()
+      : offsets(nullptr), indices(nullptr), values(nullptr) {}
 
   // Disable copy ctor and assignment operator.
   // We do not want to let user copy only a slice.
@@ -59,51 +49,41 @@ class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
   // Must use [override] keyword to identify functions that are
   // overriding the derived class
   __host__ __device__ __forceinline__ edge_type
-  get_number_of_neighbors(vertex_type const& v) const override {
-    assert(v < graph_base_type::get_number_of_vertices());
+  get_number_of_neighbors(vertex_type const& v) const {
     return (offsets[v + 1] - offsets[v]);
   }
 
   __host__ __device__ __forceinline__ vertex_type
-  get_source_vertex(edge_type const& e) const override {
-    assert(e < graph_base_type::get_number_of_edges());
-
+  get_source_vertex(edge_type const& e) const {
     // XXX: I am dumb, idk if this is upper or lower bound?
     return (vertex_type)algo::search::binary::upper_bound(
-        get_row_offsets(), e, graph_base_type::get_number_of_vertices());
+        get_row_offsets(), e, this->number_of_vertices);
   }
 
   __host__ __device__ __forceinline__ vertex_type
-  get_destination_vertex(edge_type const& e) const override {
-    assert(e < graph_base_type::get_number_of_edges());
+  get_destination_vertex(edge_type const& e) const {
     return indices[e];
   }
 
   __host__ __device__ __forceinline__ edge_type
-  get_starting_edge(vertex_type const& v) const override {
-    assert(v < graph_base_type::get_number_of_vertices());
+  get_starting_edge(vertex_type const& v) const {
     return offsets[v];
   }
 
   __host__ __device__ __forceinline__ vertex_pair_type
-  get_source_and_destination_vertices(const edge_type& e) const override {
-    assert(e < graph_base_type::get_number_of_edges());
+  get_source_and_destination_vertices(const edge_type& e) const {
     return {get_source_vertex(e), get_destination_vertex(e)};
   }
 
   __host__ __device__ __forceinline__ edge_type
-  get_edge(const vertex_type& source,
-           const vertex_type& destination) const override {
-    assert((source < graph_base_type::get_number_of_vertices()) &&
-           (destination < graph_base_type::get_number_of_vertices()));
+  get_edge(const vertex_type& source, const vertex_type& destination) const {
     return (edge_type)algo::search::binary::execute(
         get_column_indices(), destination, offsets[source],
         offsets[source + 1] - 1);
   }
 
   __host__ __device__ __forceinline__ weight_type
-  get_edge_weight(edge_type const& e) const override {
-    assert(e < graph_base_type::get_number_of_edges());
+  get_edge_weight(edge_type const& e) const {
     return values[e];
   }
 
@@ -121,48 +101,25 @@ class graph_csr_t : public graph_base_t<vertex_t, edge_t, weight_t> {
     return values;
   }
 
-  __host__ __device__ __forceinline__ auto get_number_of_rows() const {
-    return number_of_rows;
-  }
-
-  __host__ __device__ __forceinline__ auto get_number_of_columns() const {
-    return number_of_columns;
-  }
-
-  __host__ __device__ __forceinline__ auto get_number_of_nonzeros() const {
-    return number_of_nonzeros;
-  }
-
-  //  protected:
-  __host__ __device__ void set(vertex_type const& r,
-                               vertex_type const& c,
-                               edge_type const& nnz,
-                               edge_type* Ap,
-                               vertex_type* Aj,
+ protected:
+  __host__ __device__ void set(vertex_type const& _number_of_vertices,
+                               edge_type const& _number_of_edges,
+                               edge_type* Aj,
+                               vertex_type* Ap,
                                weight_type* Ax) {
-    // Set number of verties & edges
-    graph_base_type::set_number_of_vertices(r);
-    graph_base_type::set_number_of_edges(nnz);
-
-    number_of_rows = r;
-    number_of_columns = c;
-    number_of_nonzeros = nnz;
-
+    this->number_of_vertices = _number_of_vertices;
+    this->number_of_edges = _number_of_edges;
     // Set raw pointers
-    offsets = memory::raw_pointer_cast<edge_type>(Ap);
-    indices = memory::raw_pointer_cast<vertex_type>(Aj);
+    offsets = memory::raw_pointer_cast<edge_type>(Aj);
+    indices = memory::raw_pointer_cast<vertex_type>(Ap);
     values = memory::raw_pointer_cast<weight_type>(Ax);
   }
 
  private:
   // Underlying data storage
-  vertex_type number_of_rows;
-  vertex_type number_of_columns;
-  edge_type number_of_nonzeros;
+  vertex_type number_of_vertices;  // XXX: redundant
+  edge_type number_of_edges;       // XXX: redundant
 
-  // XXX: Maybe use these to hold thrust pointers?
-  // I don't know if this is safe, even when using
-  // shared pointers.
   edge_type* offsets;
   vertex_type* indices;
   weight_type* values;
