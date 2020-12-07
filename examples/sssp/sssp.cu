@@ -28,12 +28,16 @@ void test_sssp(int num_arguments, char** argument_array) {
   csr.from_coo(mm.load(filename));
 
   // --
-  // Build graphs container (stores host and device pointers to graph struct)
+  // Build graph
 
   auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      csr.number_of_rows, csr.number_of_columns, csr.number_of_nonzeros,
-      csr.row_offsets.data().get(), csr.column_indices.data().get(),
-      csr.nonzero_values.data().get());
+      csr.number_of_rows,               // rows
+      csr.number_of_columns,            // columns
+      csr.number_of_nonzeros,           // nonzeros
+      csr.row_offsets.data().get(),     // row_offsets
+      csr.column_indices.data().get(),  // column_indices
+      csr.nonzero_values.data().get()   // values
+  );  // supports row_indices and column_offsets (default = nullptr)
 
   // --
   // Params and memory allocation

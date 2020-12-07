@@ -187,39 +187,9 @@ class graph_t : public graph_view_t... {
 };  // struct graph_t
 
 /**
- * @brief Container to store graph struct pointers for both
- * host and device memory spaces.
- *
- * @tparam device_type
- * @tparam host_type
- */
-template <typename device_type, typename host_type>
-struct graph_container_t {
- private:
-  // Calling .get() from __device__ isn't supported.
-  host_type* h;
-  device_type* d;
-
- public:
-  using graph_type = device_type;
-
-  graph_container_t(device_type* _d, host_type* _h) : d(_d), h(_h) {}
-
-  __host__ __device__ __forceinline__ auto operator-> () const {
-#ifdef __CUDA_ARCH__
-    return d;
-#else
-    return h;
-#endif
-  }
-};
-
-/**
  * @brief Get the average degree of a graph.
  *
- * @tparam graph_container_type note that the input to this function is the
- * graph_container_type struct and not the graph_t, it takes both the device and
- * the host pointers to a graph.
+ * @tparam graph_type
  * @param G
  * @return double
  */
@@ -241,9 +211,7 @@ __host__ __device__ double get_average_degree(graph_type const& G) {
  * sqrt(accum / graph.get_number_of_vertices() - 1)
  * as the result.
  *
- * @tparam graph_container_type note that the input to this function is the
- * graph_container_type struct and not the graph_t, it takes both the device and
- * the host pointers to a graph.
+ * @tparam graph_type
  * @param G
  * @return double
  */
@@ -262,16 +230,14 @@ __host__ __device__ double get_degree_standard_deviation(graph_type const& G) {
 /**
  * @brief build a log-scale degree histogram of a graph.
  *
- * @tparam graph_container_type note that the input to this function is the
- * graph_container_t struct and not the graph_t, it takes both the device and
- * the host pointers to a graph.
+ * @tparam graph_type
  * @tparam histogram_t
  * @param G
  * @return histogram_t*
  */
-// template <typename graph_container_type, typename histogram_t>
-// histogram_t* build_degree_histogram(graph_container_type &graph) {
-//   using vertex_t = typename graph_container_type::graph_type::vertex_type;
+// template <typename graph_type, typename histogram_t>
+// histogram_t* build_degree_histogram(graph_type &graph) {
+//   using vertex_t = typename graph_type::vertex_type;
 
 //   auto length = sizeof(vertex_t) * 8 + 1;
 
