@@ -5,32 +5,54 @@
 #include <gunrock/formats/formats.hxx>  // csr support
 
 using namespace gunrock;
+using namespace memory;
 
 template <typename graph_type>
-__global__ void kernel(graph_type* G) {
+__host__ __device__ void use_graph(graph_type G) {
   using vertex_t = typename graph_type::vertex_type;
   using edge_t = typename graph_type::edge_type;
   using weight_t = typename graph_type::weight_type;
 
-  vertex_t source = 1;
-  vertex_t edge = 0;
+  using csr_view_t = typename graph_type::graph_csr_view_t;
+  using csc_view_t = typename graph_type::graph_csc_view_t;
+  using coo_view_t = typename graph_type::graph_coo_view_t;
 
-  vertex_t num_vertices = G->get_number_of_vertices();
-  edge_t num_edges = G->get_number_of_edges();
-  edge_t num_neighbors = G->get_number_of_neighbors(source);
-  vertex_t source_vertex = G->get_source_vertex(edge);
-  weight_t edge_weight = G->get_edge_weight(edge);
-  double average_degree = graph::get_average_degree(*G);
-  double degree_std_dev = graph::get_degree_standard_deviation(*G);
+  using use_type_t = csr_view_t;
 
-  printf("__device__\n");
+  auto source = 2;
+  auto edge = 1;
+
+  auto num_vertices = G.get_number_of_vertices();
+  auto num_edges = G.get_number_of_edges();
+
+  // Both valid.
+  auto num_neighbors = G.template get_number_of_neighbors<use_type_t>(source);
+  auto source_vertex = G.template get_source_vertex<use_type_t>(edge);
+  auto destination_vertex = G.template get_destination_vertex<use_type_t>(edge);
+  auto edge_weight = G.template get_edge_weight<use_type_t>(edge);
+  auto starting_edge = G.template get_starting_edge<use_type_t>(source);
+  double average_degree = graph::get_average_degree(G);
+  double degree_std_dev = graph::get_degree_standard_deviation(G);
+
+  if constexpr (G.memory_space() == memory_space_t::host)
+    printf("__host__\n");
+  else
+    printf("__device__\n");
+
   printf("\tNumber of vertices: %i\n", num_vertices);
   printf("\tNumber of edges: %i\n", num_edges);
   printf("\tNumber of neighbors: %i (source = %i)\n", num_neighbors, source);
   printf("\tSource vertex: %i (edge = %i)\n", source_vertex, edge);
+  printf("\tDestination vertex: %i (edge = %i)\n", destination_vertex, edge);
   printf("\tEdge weight: %f (edge = %i)\n", edge_weight, edge);
+  printf("\tStarting Edge: %i (vertex = %i)\n", starting_edge, source);
   printf("\tAverage degree: %lf\n", average_degree);
   printf("\tDegree std. deviation: %lf\n", degree_std_dev);
+}
+
+template <typename graph_type>
+__global__ void kernel(graph_type G) {
+  use_graph(G);
 }
 
 void test_graph() {
@@ -61,11 +83,13 @@ void test_graph() {
 
   // let's use thrust vector<type_t> for initial arrays
   thrust::host_vector<edge_t> h_Ap(r + 1);
-  thrust::host_vector<vertex_t> h_Aj(nnz);
+  thrust::host_vector<vertex_t> h_J(nnz);
   thrust::host_vector<weight_t> h_Ax(nnz);
+  thrust::host_vector<vertex_t> h_I(nnz);
+  thrust::host_vector<edge_t> h_Aj(c + 1);
 
   auto Ap = h_Ap.data();
-  auto Aj = h_Aj.data();
+  auto J = h_J.data();
   auto Ax = h_Ax.data();
 
   Ap[0] = 0;
@@ -73,65 +97,46 @@ void test_graph() {
   Ap[2] = 2;
   Ap[3] = 3;
   Ap[4] = 4;
-  Aj[0] = 0;
-  Aj[1] = 1;
-  Aj[2] = 2;
-  Aj[3] = 3;
+  J[0] = 0;
+  J[1] = 1;
+  J[2] = 2;
+  J[3] = 3;
   Ax[0] = 5;
   Ax[1] = 8;
   Ax[2] = 3;
   Ax[3] = 6;
 
   // wrap it with shared_ptr<csr_t> (memory_space_t::host)
-  constexpr memory::memory_space_t host_space = memory::memory_space_t::host;
-  auto h_G = graph::build::from_csr_t<host_space>(r, c, nnz, h_Ap, h_Aj, h_Ax);
-  auto G = h_G.data();
+  const graph::view_t graph_views = /* graph::view_t::csr; */
+      graph::set(graph::view_t::csr, graph::view_t::csc);
 
-  vertex_t source = 1;
-  vertex_t edge = 0;
+  auto G = graph::build::from_csr<memory_space_t::host, graph_views>(
+      r, c, nnz, h_Ap.data(), h_J.data(), h_Ax.data(), h_I.data(), h_Aj.data());
 
-  vertex_t num_vertices = G->get_number_of_vertices();
-  edge_t num_edges = G->get_number_of_edges();
-  edge_t num_neighbors = G->get_number_of_neighbors(source);
-  vertex_t source_vertex = G->get_source_vertex(edge);
-  weight_t edge_weight = G->get_edge_weight(edge);
-  double average_degree = graph::get_average_degree(*G);
-  double degree_std_dev = graph::get_degree_standard_deviation(*G);
+  using csr_view_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
 
-  // Host Output
-  std::cout << "__host__" << std::endl;
-  std::cout << "\tNumber of vertices: " << num_vertices << std::endl;
-  std::cout << "\tNumber of edges: " << num_edges << std::endl;
-  std::cout << "\tNumber of neighbors: " << num_neighbors
-            << " (source = " << source << ")" << std::endl;
-  std::cout << "\tSource vertex: " << source_vertex << " (edge = " << edge
-            << ")" << std::endl;
-  std::cout << "\tEdge weight: " << edge_weight << " (edge = " << edge << ")"
-            << std::endl;
-  std::cout << "\tAverage Degree: " << average_degree << std::endl;
-  std::cout << "\tDegree Std. Deviation: " << degree_std_dev << std::endl;
+  use_graph(G);
 
   // Compile-Time Constants (device && host)
-  using type_find_t =
-      graph::graph_csr_t<host_space, vertex_t, edge_t, weight_t>;
-
   std::cout << "\tNumber of Graph Representations = "
-            << G->number_of_graph_representations() << std::endl;
+            << G.number_of_graph_representations() << std::endl;
   std::cout << "\tContains CSR Representation? " << std::boolalpha
-            << G->contains_representation<type_find_t>() << std::endl;
+            << G.template contains_representation<csr_view_t>() << std::endl;
 
   // wrap it with shared_ptr<csr_t> (memory_space_t::device)
-  constexpr memory::memory_space_t space = memory::memory_space_t::device;
-
   thrust::device_vector<edge_t> d_Ap = h_Ap;
-  thrust::device_vector<vertex_t> d_Aj = h_Aj;
+  thrust::device_vector<vertex_t> d_J = h_J;
   thrust::device_vector<weight_t> d_Ax = h_Ax;
+  thrust::device_vector<vertex_t> d_I(nnz);
+  thrust::device_vector<edge_t> d_Aj(c + 1);
 
-  auto O = graph::build::from_csr_t<space>(r, c, nnz, d_Ap, d_Aj, d_Ax);
+  auto O = graph::build::from_csr<memory_space_t::device, graph_views>(
+      r, c, nnz, d_Ap.data().get(), d_J.data().get(), d_Ax.data().get(),
+      d_I.data().get(), d_Aj.data().get());
 
   // Device Output
   cudaDeviceSynchronize();
-  kernel<<<1, 1>>>(O.data().get());
+  kernel<<<1, 1>>>(O);
   cudaDeviceSynchronize();
   error::throw_if_exception(cudaPeekAtLastError());
 }

@@ -14,10 +14,10 @@ namespace operators {
 namespace filter {
 
 template <filter_type_t type = filter_type_t::predicated,
-          typename graph_type,
+          typename graph_t,
           typename enactor_type,
           typename operator_type>
-void execute(graph_type* G,
+void execute(graph_t& G,
              enactor_type* E,
              operator_type op,
              cuda::standard_context_t* context) {

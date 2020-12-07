@@ -6,15 +6,15 @@ namespace gunrock {
 namespace operators {
 namespace filter {
 namespace bypass {
-template <typename graph_type, typename enactor_type, typename operator_type>
-void execute(graph_type* G,
+template <typename graph_t, typename enactor_type, typename operator_type>
+void execute(graph_t& G,
              enactor_type* E,
              operator_type op,
              cuda::standard_context_t& context) {
-  using vertex_t = typename graph_type::vertex_type;
+  using vertex_t = typename graph_t::vertex_type;
   auto active_buffer = E->get_active_frontier_buffer();
 
-  auto bypass = [op] __device__(vertex_t const& v) {
+  auto bypass = [=] __device__(vertex_t const& v) {
     return (op(v) ? v : gunrock::numeric_limits<vertex_t>::invalid());
   };
 

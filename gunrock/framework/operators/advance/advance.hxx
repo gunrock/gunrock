@@ -28,10 +28,10 @@ namespace advance {
 template <advance_type_t type = advance_type_t::vertex_to_vertex,
           advance_direction_t direction = advance_direction_t::forward,
           load_balance_t lb = load_balance_t::merge_path,
-          typename graph_type,
+          typename graph_t,
           typename enactor_type,
           typename operator_type>
-void execute(graph_type* G,
+void execute(graph_t& G,
              enactor_type* E,
              operator_type op,
              cuda::standard_context_t* context) {

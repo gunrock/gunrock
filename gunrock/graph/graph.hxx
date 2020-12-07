@@ -6,12 +6,8 @@
 #include <gunrock/memory.hxx>
 #include <gunrock/util/type_traits.hxx>
 
-#include <gunrock/formats/formats.hxx>
-
 #include <gunrock/graph/properties.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
-
-#include <gunrock/graph/detail/base.hxx>
 
 #include <gunrock/graph/coo.hxx>
 #include <gunrock/graph/csc.hxx>
@@ -22,8 +18,6 @@
 namespace gunrock {
 namespace graph {
 
-using namespace format;
-using namespace detail;
 using namespace memory;
 
 /**
@@ -57,13 +51,14 @@ template <memory_space_t space,
 class graph_t : public graph_view_t... {
   // Default view (graph representation) if no view is specified
   using first_view_t =
-      typename std::tuple_element<0,  // get first type
+      typename std::tuple_element<0,  // default: get first type
                                   std::tuple<graph_view_t...>>::type;
 
  public:
   using vertex_type = vertex_t;
   using edge_type = edge_t;
   using weight_type = weight_t;
+  using vertex_pair_type = vertex_pair_t<vertex_type>;
 
   using vertex_pointer_t = vertex_t*;
   using edge_pointer_t = edge_type*;
@@ -72,18 +67,16 @@ class graph_t : public graph_view_t... {
   using graph_type =
       graph_t<space, vertex_type, edge_type, weight_type, graph_view_t...>;
 
-  // Base graph type, always exists.
-  using graph_base_type = graph_base_t<vertex_type, edge_type, weight_type>;
-
   // Different supported graph representation views.
-  using graph_csr_view =
-      graph_csr_t<space, vertex_type, edge_type, weight_type>;
-  using graph_csc_view =
-      graph_csc_t<space, vertex_type, edge_type, weight_type>;
-  using graph_coo_view =
-      graph_coo_t<space, vertex_type, edge_type, weight_type>;
+  using graph_csr_view_t = graph_csr_t<vertex_type, edge_type, weight_type>;
+  using graph_csc_view_t = graph_csc_t<vertex_type, edge_type, weight_type>;
+  using graph_coo_view_t = graph_coo_t<vertex_type, edge_type, weight_type>;
 
-  __host__ __device__ graph_t() : graph_view_t()... {}
+  __host__ __device__ graph_t()
+      : number_of_vertices(0),
+        number_of_edges(0),
+        properties(),
+        graph_view_t()... {}
 
   // template<typename csr_matrix_t>
   // graph_t(csr_matrix_t& rhs) :
@@ -91,69 +84,105 @@ class graph_t : public graph_view_t... {
   //                   rhs.num_nonzeros),
   //   graph_csr_view(rhs) {}
 
-  template <typename edge_vector_t,
-            typename vertex_vector_t,
-            typename weight_vector_t>
-  void set(typename vertex_vector_t::value_type const& r,
-           typename vertex_vector_t::value_type const& c,
-           typename edge_vector_t::value_type const& nnz,
-           edge_vector_t& Ap,
-           vertex_vector_t& Aj,
-           weight_vector_t& Ax) {
-    graph_csr_view::set(r, c, nnz, Ap, Aj, Ax);
+  // graph_t specific methods (base graph type)
+  __host__ __device__ __forceinline__ const vertex_type
+  get_number_of_vertices() const {
+    return number_of_vertices;
   }
 
-  __host__ __device__ void set(vertex_type const& r,
-                               vertex_type const& c,
-                               edge_type const& nnz,
-                               edge_pointer_t Ap,
-                               vertex_pointer_t Aj,
-                               weight_pointer_t Ax) {
-    graph_csr_view::set(r, c, nnz, Ap, Aj, Ax);
+  __host__ __device__ __forceinline__ const edge_type
+  get_number_of_edges() const {
+    return number_of_edges;
   }
 
-  // XXX: add support for per-view based methods
-  // template<typename view_t = first_view_t>
-  __host__ __device__ __forceinline__ edge_type
-  get_number_of_neighbors(vertex_type const& v) const override {
-    return first_view_t::get_number_of_neighbors(v);
-  }
-
-  __host__ __device__ __forceinline__ vertex_type
-  get_source_vertex(edge_type const& e) const override {
-    return first_view_t::get_source_vertex(e);
-  }
-
-  __host__ __device__ __forceinline__ weight_type
-  get_edge_weight(edge_type const& e) const override {
-    return first_view_t::get_edge_weight(e);
-  }
-
-  __host__ __device__ __forceinline__ vertex_type
-  get_destination_vertex(edge_type const& e) const override {
-    return first_view_t::get_destination_vertex(e);
-  }
-
-  __host__ __device__ __forceinline__ edge_type
-  get_starting_edge(vertex_type const& v) const override {
-    return first_view_t::get_starting_edge(v);
-  }
+  bool is_directed() { return properties.directed; }
 
   __host__ __device__ __forceinline__ std::size_t
   number_of_graph_representations() const {
     return number_of_formats_inherited;
   }
 
-  template <typename view_t>
+  template <typename input_view_t>
   constexpr bool contains_representation() {
-    return std::disjunction_v<std::is_same<view_t, graph_view_t>...>;
+    return std::disjunction_v<std::is_same<input_view_t, graph_view_t>...>;
   }
 
-  constexpr memory_space_t memory_space() const { return space; }
+  __host__ __device__ __forceinline__ constexpr memory_space_t memory_space()
+      const {
+    return space;
+  }
+
+  template <class input_view_t = first_view_t, typename... T>
+  __host__ __device__ void set(vertex_type const& _number_of_vertices,
+                               edge_type const& _number_of_edges,
+                               T... args) {
+    this->number_of_vertices = _number_of_vertices;
+    this->number_of_edges = _number_of_edges;
+    input_view_t::set(_number_of_vertices, _number_of_edges, args...);
+  }
+
+  // Override pure virtual functions Must use [override] keyword to identify
+  // functions that are overriding the derived class
+  template <typename input_view_t = first_view_t>
+  __host__ __device__ __forceinline__ edge_type
+  get_number_of_neighbors(vertex_type const& v) const /* override */ {
+    assert(v < this->get_number_of_vertices());
+    return input_view_t::get_number_of_neighbors(v);
+  }
+
+  template <typename input_view_t = first_view_t>
+  __host__ __device__ __forceinline__ vertex_type
+  get_source_vertex(edge_type const& e) const /* override */ {
+    assert(e < this->get_number_of_edges());
+    return input_view_t::get_source_vertex(e);
+  }
+
+  template <typename input_view_t = first_view_t>
+  __host__ __device__ __forceinline__ vertex_type
+  get_destination_vertex(edge_type const& e) const /* override */ {
+    assert(e < this->get_number_of_edges());
+    return input_view_t::get_destination_vertex(e);
+  }
+
+  template <typename input_view_t = first_view_t>
+  __host__ __device__ __forceinline__ edge_type
+  get_starting_edge(vertex_type const& v) const /* override */ {
+    assert(v < this->get_number_of_vertices());
+    return input_view_t::get_starting_edge(v);
+  }
+
+  template <typename input_view_t = first_view_t>
+  __host__ __device__ __forceinline__ vertex_pair_type
+  get_source_and_destination_vertices(edge_type const& e) const /* override */ {
+    assert(e < this->get_number_of_edges());
+    return input_view_t::get_source_and_destination_vertices(e);
+  }
+
+  template <typename input_view_t = first_view_t>
+  __host__ __device__ __forceinline__ edge_type
+  get_edge(vertex_type const& source, vertex_type const& destination) const
+  /* override */ {
+    assert((source < this->get_number_of_vertices()) &&
+           (destination < this->get_number_of_vertices()));
+    return input_view_t::get_edge(source, destination);
+  }
+
+  template <typename input_view_t = first_view_t>
+  __host__ __device__ __forceinline__ weight_type
+  get_edge_weight(edge_type const& e) const /* override */ {
+    assert(e < this->get_number_of_edges());
+    return input_view_t::get_edge_weight(e);
+  }
 
  private:
+  // TODO: fix this, it is including empty_t structs for now.
+  // We can subtract those structs to get the real value.
   static constexpr std::size_t number_of_formats_inherited =
       sizeof...(graph_view_t);
+
+  vertex_type number_of_vertices;
+  edge_type number_of_edges;
+  graph_properties_t properties;
 
 };  // struct graph_t
 
@@ -187,7 +216,7 @@ __host__ __device__ double get_average_degree(graph_type const& G) {
  * @return double
  */
 template <typename graph_type>
-__host__ __device__ double get_degree_standard_deviation(const graph_type& G) {
+__host__ __device__ double get_degree_standard_deviation(graph_type const& G) {
   auto average_degree = get_average_degree(G);
 
   double accum = 0.0;
@@ -208,7 +237,8 @@ __host__ __device__ double get_degree_standard_deviation(const graph_type& G) {
  */
 // template <typename graph_type, typename histogram_t>
 // histogram_t* build_degree_histogram(graph_type &graph) {
-//   using vertex_t = graph_type::vertex_t;
+//   using vertex_t = typename graph_type::vertex_type;
+
 //   auto length = sizeof(vertex_t) * 8 + 1;
 
 //   thrust::device_vector<vertex_t> histogram(length);

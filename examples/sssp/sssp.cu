@@ -28,25 +28,31 @@ void test_sssp(int num_arguments, char** argument_array) {
   csr.from_coo(mm.load(filename));
 
   // --
-  // Build graph + metadata
+  // Build graph
 
-  auto [G, meta] = graph::build::from_csr_t<memory_space_t::device>(&csr);
+  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
+      csr.number_of_rows,               // rows
+      csr.number_of_columns,            // columns
+      csr.number_of_nonzeros,           // nonzeros
+      csr.row_offsets.data().get(),     // row_offsets
+      csr.column_indices.data().get(),  // column_indices
+      csr.nonzero_values.data().get()   // values
+  );  // supports row_indices and column_offsets (default = nullptr)
 
   // --
   // Params and memory allocation
 
   vertex_t single_source = 0;
 
-  vertex_t n_vertices = meta->get_number_of_vertices();
+  vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
 
   // --
   // Run problem
 
-  float elapsed =
-      gunrock::sssp::run(G, meta, single_source, distances.data().get(),
-                         predecessors.data().get());
+  float elapsed = gunrock::sssp::run(G, single_source, distances.data().get(),
+                                     predecessors.data().get());
 
   // --
   // Log

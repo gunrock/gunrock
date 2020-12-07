@@ -11,5 +11,11 @@ struct vertex_pair_t {
   vertex_t destination;
 };
 
+template <typename edge_t>
+struct edge_pair_t {
+  edge_t x;
+  edge_t y;
+};
+
 }  // namespace graph
 }  // namespace gunrock

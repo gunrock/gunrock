@@ -27,10 +27,10 @@ namespace unbalanced {
 
 template <advance_type_t type,
           advance_direction_t direction,
-          typename graph_type,
+          typename graph_t,
           typename enactor_type,
           typename operator_type>
-void execute(graph_type* G,
+void execute(graph_t& G,
              enactor_type* E,
              operator_type op,
              cuda::standard_context_t& context) {
@@ -49,10 +49,10 @@ void execute(graph_type* G,
   auto scanned_work_domain = E->scanned_work_domain.data().get();
   thrust::device_vector<int> count(1, 0);
 
-  auto segment_sizes = [G, input_data] __device__(int idx) {
+  auto segment_sizes = [=] __device__(int idx) {
     int count = 0;
     int v = input_data[idx];
-    count = G->get_number_of_neighbors(v);
+    count = G.get_number_of_neighbors(v);
     return count;
   };
 
@@ -83,12 +83,12 @@ void execute(graph_type* G,
     if (!gunrock::util::limits::is_valid(v))
       return;
 
-    auto starting_edge = G->get_starting_edge(v);
+    auto starting_edge = G.get_starting_edge(v);
     auto total_edges = scanned_work_domain[idx];
 
     for (auto e = starting_edge; e < total_edges; ++e) {
-      auto n = G->get_destination_vertex(e);
-      auto w = G->get_edge_weight(e);
+      auto n = G.get_destination_vertex(e);
+      auto w = G.get_edge_weight(e);
       bool cond = op(v, n, e, w);
       output_data[e] =
           cond ? n : gunrock::numeric_limits<decltype(v)>::invalid();
