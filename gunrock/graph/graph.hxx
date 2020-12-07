@@ -218,13 +218,13 @@ struct graph_container_t {
  * @param G
  * @return double
  */
-template <typename graph_container_type>
-__host__ __device__ double get_average_degree(graph_container_type const& G) {
+template <typename graph_type>
+__host__ __device__ double get_average_degree(graph_type const& G) {
   auto sum = 0;
-  for (auto v = 0; v < G->get_number_of_vertices(); ++v)
-    sum += G->get_number_of_neighbors(v);
+  for (auto v = 0; v < G.get_number_of_vertices(); ++v)
+    sum += G.get_number_of_neighbors(v);
 
-  return (sum / G->get_number_of_vertices());
+  return (sum / G.get_number_of_vertices());
 }
 
 /**
@@ -242,17 +242,16 @@ __host__ __device__ double get_average_degree(graph_container_type const& G) {
  * @param G
  * @return double
  */
-template <typename graph_container_type>
-__host__ __device__ double get_degree_standard_deviation(
-    graph_container_type const& G) {
+template <typename graph_type>
+__host__ __device__ double get_degree_standard_deviation(graph_type const& G) {
   auto average_degree = get_average_degree(G);
 
   double accum = 0.0;
-  for (auto v = 0; v < G->get_number_of_vertices(); ++v) {
-    double d = G->get_number_of_neighbors(v);
+  for (auto v = 0; v < G.get_number_of_vertices(); ++v) {
+    double d = G.get_number_of_neighbors(v);
     accum += (d - average_degree) * (d - average_degree);
   }
-  return sqrt(accum / G->get_number_of_vertices());
+  return sqrt(accum / G.get_number_of_vertices());
 }
 
 /**

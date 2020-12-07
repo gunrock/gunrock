@@ -19,18 +19,16 @@ __global__ void kernel(graph_ptr_type G) {
   vertex_t source = 1;
   auto edge = 0;
 
-  auto num_vertices = G->get_number_of_vertices();
-  auto num_edges = G->get_number_of_edges();
+  auto num_vertices = G.get_number_of_vertices();
+  auto num_edges = G.get_number_of_edges();
 
   // Both valid.
-  auto num_neighbors = G->template get_number_of_neighbors<csr_view_t>(source);
-  auto coo_source_vertex = G->template get_source_vertex<coo_view_t>(edge);
-  auto csr_source_vertex = G->template get_source_vertex<csr_view_t>(edge);
-  auto coo_destination_vertex =
-      G->template get_destination_vertex<coo_view_t>(edge);
-  auto csr_destination_vertex =
-      G->template get_destination_vertex<csr_view_t>(edge);
-  auto edge_weight = G->get_edge_weight(edge);
+  auto num_neighbors = G.get_number_of_neighbors(source);
+  auto coo_source_vertex = G.get_source_vertex(edge);
+  auto csr_source_vertex = G.get_source_vertex(edge);
+  auto coo_destination_vertex = G.get_destination_vertex(edge);
+  auto csr_destination_vertex = G.get_destination_vertex(edge);
+  auto edge_weight = G.get_edge_weight(edge);
   double average_degree = graph::get_average_degree(G);
   double degree_std_dev = graph::get_degree_standard_deviation(G);
 
@@ -99,11 +97,10 @@ void test_graph() {
   using namespace memory;
 
   // wrap it with shared_ptr<csr_t> (memory_space_t::host)
-  const graph::view_t graph_views =  // graph::view_t::csr;
-      graph::set(graph::view_t::csr, graph::view_t::coo);
+  const graph::view_t graph_views = graph::view_t::csr;
+  // graph::set(graph::view_t::csr, graph::view_t::coo);
 
-  auto G = graph::build::from_csr<memory_space_t::host,
-                                  graph::view_t::csr | graph::view_t::coo>(
+  auto G = graph::build::from_csr<memory_space_t::host, graph_views>(
       r, c, nnz, h_Ap.data(), h_Aj.data(), h_Ax.data());
 
   using csr_view_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
@@ -113,12 +110,11 @@ void test_graph() {
   vertex_t source = 1;
   vertex_t edge = 0;
 
-  vertex_t num_vertices = G->get_number_of_vertices();
-  edge_t num_edges = G->get_number_of_edges();
-  edge_t num_neighbors =
-      G->template get_number_of_neighbors<csr_view_t>(source);
-  vertex_t source_vertex = G->template get_source_vertex<coo_view_t>(edge);
-  weight_t edge_weight = G->template get_edge_weight<csr_view_t>(edge);
+  vertex_t num_vertices = G.get_number_of_vertices();
+  edge_t num_edges = G.get_number_of_edges();
+  edge_t num_neighbors = G.get_number_of_neighbors(source);
+  vertex_t source_vertex = G.get_source_vertex(edge);
+  weight_t edge_weight = G.get_edge_weight(edge);
   double average_degree = graph::get_average_degree(G);
   double degree_std_dev = graph::get_degree_standard_deviation(G);
 
@@ -137,9 +133,9 @@ void test_graph() {
 
   // Compile-Time Constants (device && host)
   std::cout << "\tNumber of Graph Representations = "
-            << G->number_of_graph_representations() << std::endl;
+            << G.number_of_graph_representations() << std::endl;
   std::cout << "\tContains CSR Representation? " << std::boolalpha
-            << G->template contains_representation<csr_view_t>() << std::endl;
+            << G.template contains_representation<csr_view_t>() << std::endl;
 
   // wrap it with shared_ptr<csr_t> (memory_space_t::device)
   thrust::device_vector<edge_t> d_Ap = h_Ap;
