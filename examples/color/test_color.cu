@@ -12,7 +12,7 @@
  * @brief Color driver program for Gunrock.
  */
 
-#include <gunrock/app/color/color_app.cuh>
+#include <gunrock/app/color/color_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
