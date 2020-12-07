@@ -227,15 +227,12 @@ double gunrock_color(gunrock::util::Parameters &parameters, GraphT &graph,
  * @param[out] num_colors Return number of colors generated for each run
  * \return     double     Return accumulated elapsed times for all runs
  */
-template <typename VertexT = int, typename SizeT = int,
-          typename GValueT = unsigned int>
+template <typename VertexT, typename SizeT>
 double color(const SizeT num_nodes, const SizeT num_edges,
              const SizeT *row_offsets, const VertexT *col_indices,
-             const int num_runs, int **colors, int *num_colors,
-             const GValueT edge_values = NULL) {
-  typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-                                           gunrock::graph::HAS_CSR>
-      GraphT;
+             int **colors, int *num_colors, const int num_runs) {
+  typedef typename gunrock::app::TestGraph<VertexT, SizeT, VertexT,
+                                           gunrock::graph::HAS_CSR> GraphT;
   typedef typename GraphT::CsrT CsrT;
 
   // Setup parameters
@@ -255,7 +252,7 @@ double color(const SizeT num_nodes, const SizeT num_edges,
                                      gunrock::util::HOST);
   graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges,
                                         gunrock::util::HOST);
-  // graph.FromCsr(graph.csr(), true, quiet);
+  graph.FromCsr(graph.csr(), gunrock::util::HOST, 0, quiet, true);
   gunrock::graphio::LoadGraph(parameters, graph);
 
   // Run the graph coloring
@@ -279,8 +276,8 @@ double color(const SizeT num_nodes, const SizeT num_edges,
  */
 double color(const int num_nodes, const int num_edges, const int *row_offsets,
              const int *col_indices, int *colors, int num_colors) {
-  return color(num_nodes, num_edges, row_offsets, col_indices, 1 /* num_runs */,
-               &colors, &num_colors);
+  return color(num_nodes, num_edges, row_offsets, col_indices,
+               &colors, &num_colors, 1 /* num_runs */);
 }
 
 // Leave this at the end of the file

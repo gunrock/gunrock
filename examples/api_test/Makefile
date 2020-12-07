@@ -10,16 +10,15 @@
 #-------------------------------------------------------------------------------
 
 include ../BaseMakefile.mk
-ALGO = ssspapi
+ALGO = colorapi
 EXEC = bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+NVCCFLAGS += -lcurand
 
 test: $(EXEC)
 
 $(EXEC) : test_$(ALGO).cu $(DEPS)
 	mkdir -p bin
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -g -G -O0
-#-O3
-#-O0 -g -G
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3
 
 a : test_$(ALGO).cu $(DEPS)
 	mkdir -p bin
