@@ -64,11 +64,11 @@ struct enactor_t {
         inactive_frontier(&frontiers[1]),
         buffer_selector(0),
         iteration(0),
-        scanned_work_domain(problem->get_graph()->get_number_of_vertices()) {
+        scanned_work_domain(problem->get_graph().get_number_of_vertices()) {
     // Set temporary buffer to be at least the number of edges
     auto g = problem->get_graph();
     auto buffer = get_inactive_frontier_buffer();
-    buffer->reserve(g->get_number_of_edges());
+    buffer->reserve(g.get_number_of_edges());
   }
 
   /**

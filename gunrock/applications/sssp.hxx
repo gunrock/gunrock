@@ -31,20 +31,19 @@ struct result_t {
       : distances(_distances), predecessors(_predecessors) {}
 };
 
-template <typename graph_container_t, typename param_type, typename result_type>
-struct problem_t : gunrock::problem_t<graph_container_t> {
+template <typename graph_t, typename param_type, typename result_type>
+struct problem_t : gunrock::problem_t<graph_t> {
   param_type param;
   result_type result;
 
-  problem_t(graph_container_t& G,
+  problem_t(graph_t& G,
             param_type& _param,
             result_type& _result,
             std::shared_ptr<cuda::multi_context_t> _context)
-      : gunrock::problem_t<graph_container_t>(G, _context),
+      : gunrock::problem_t<graph_t>(G, _context),
         param(_param),
         result(_result) {}
 
-  using graph_t = typename graph_container_t::graph_type;
   using vertex_t = typename graph_t::vertex_type;
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
@@ -53,14 +52,14 @@ struct problem_t : gunrock::problem_t<graph_container_t> {
 
   void init() {
     auto g = this->get_graph();
-    auto n_vertices = g->get_number_of_vertices();
+    auto n_vertices = g.get_number_of_vertices();
     visited.resize(n_vertices);
     thrust::fill(thrust::device, visited.begin(), visited.end(), -1);
   }
 
   void reset() {
     auto g = this->get_graph();
-    auto n_vertices = g->get_number_of_vertices();
+    auto n_vertices = g.get_number_of_vertices();
 
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
     thrust::fill(thrust::device, d_distances + 0, d_distances + n_vertices,
@@ -124,7 +123,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         return false;
 
       visited[vertex] = iteration;
-      return G->get_number_of_neighbors(vertex) > 0;
+      return G.get_number_of_neighbors(vertex) > 0;
     };
 
     // Execute advance operator on the provided lambda
@@ -140,9 +139,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
 };  // struct enactor_t
 
-template <typename graph_container_t,
-          typename graph_t = typename graph_container_t::graph_type>
-float run(graph_container_t& G,
+template <typename graph_t>
+float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter
           typename graph_t::weight_type* distances,      // Output
           typename graph_t::vertex_type* predecessors    // Output
@@ -158,8 +156,8 @@ float run(graph_container_t& G,
   auto multi_context =
       std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
 
-  using problem_type = problem_t<graph_container_t, param_t<vertex_t>,
-                                 result_t<vertex_t, weight_t>>;
+  using problem_type =
+      problem_t<graph_t, param_t<vertex_t>, result_t<vertex_t, weight_t>>;
   using enactor_type = enactor_t<problem_type>;
 
   problem_type problem(G, param, result, multi_context);

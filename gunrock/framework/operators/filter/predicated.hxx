@@ -6,10 +6,8 @@ namespace gunrock {
 namespace operators {
 namespace filter {
 namespace predicated {
-template <typename graph_container_type,
-          typename enactor_type,
-          typename operator_type>
-void execute(graph_container_type& G,
+template <typename graph_t, typename enactor_type, typename operator_type>
+void execute(graph_t& G,
              enactor_type* E,
              operator_type op,
              cuda::standard_context_t& context) {
@@ -21,7 +19,7 @@ void execute(graph_container_type& G,
   // Allocate output size.
   inactive_buffer->resize(active_buffer->size());
 
-  auto predicate = [op] __host__ __device__(type_t const& i) -> bool {
+  auto predicate = [=] __host__ __device__(type_t const& i) -> bool {
     return gunrock::util::limits::is_valid(i) ? op(i) : false;
   };
 

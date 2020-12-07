@@ -8,10 +8,8 @@ namespace operators {
 namespace filter {
 namespace uniquify {
 
-template <typename graph_container_type,
-          typename enactor_type,
-          typename operator_type>
-void execute(graph_container_type& G,
+template <typename graph_t, typename enactor_type, typename operator_type>
+void execute(graph_t& G,
              enactor_type* E,
              operator_type op,
              cuda::standard_context_t& __ignore) {

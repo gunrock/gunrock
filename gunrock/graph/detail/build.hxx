@@ -81,14 +81,14 @@ auto from_csr(vertex_t const& r,
               weight_t* X,
               vertex_t* I = nullptr,
               edge_t* Aj = nullptr) {
-  const edge_t size_of_offsets = r + 1;
-
   if constexpr (has(build_views, view_t::csc) ||
                 has(build_views, view_t::coo)) {
+    const edge_t size_of_offsets = r + 1;
     convert::offsets_to_indices<space>(Ap, size_of_offsets, I, nnz);
   }
 
   if constexpr (has(build_views, view_t::csc)) {
+    const edge_t size_of_offsets = r + 1;
     convert::indices_to_offsets<space>(J, nnz, Aj, size_of_offsets);
   }
 

@@ -30,14 +30,17 @@ void test_sssp(int num_arguments, char** argument_array) {
   // --
   // Build graphs container (stores host and device pointers to graph struct)
 
-  auto G = graph::build::from_csr_t<memory_space_t::device>(&csr);
+  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
+      csr.number_of_rows, csr.number_of_columns, csr.number_of_nonzeros,
+      csr.row_offsets.data().get(), csr.column_indices.data().get(),
+      csr.nonzero_values.data().get());
 
   // --
   // Params and memory allocation
 
   vertex_t single_source = 0;
 
-  vertex_t n_vertices = G->get_number_of_vertices();
+  vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
 

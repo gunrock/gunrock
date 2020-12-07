@@ -22,22 +22,20 @@ namespace gunrock {
  *
  * @tparam graph_t
  */
-template <typename graph_container_t>
+template <typename graph_t>
 struct problem_t {
-  using graph_t = typename graph_container_t::graph_type;
   using vertex_t = typename graph_t::vertex_type;
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
 
-  graph_container_t graph_slice;
+  graph_t graph_slice;
   std::shared_ptr<cuda::multi_context_t> context;
 
   auto get_graph() { return graph_slice; }
 
   problem_t() : graph_slice(nullptr) {}
 
-  problem_t(graph_container_t& G,
-            std::shared_ptr<cuda::multi_context_t> _context)
+  problem_t(graph_t& G, std::shared_ptr<cuda::multi_context_t> _context)
       : graph_slice(G), context(_context) {}
 
   // Disable copy ctor and assignment operator.
