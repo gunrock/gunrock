@@ -221,20 +221,14 @@ double gunrock_sssp(gunrock::util::Parameters &parameters, GraphT &graph,
  * @param[in]  exec_policy Location where app will be run
  * \return     double      Return accumulated elapsed times for all runs
  */
-template <typename VertexT, typename SizeT,
-          typename GValueT, typename SSSPValueT>
-double sssp(const SizeT num_nodes, 
-            const SizeT num_edges,
-            const SizeT *row_offsets, 
-            const VertexT *col_indices,
-            const GValueT *edge_values, 
-            VertexT *sources,
-            const bool mark_pred, 
-            SSSPValueT **distances, 
-            VertexT **preds,
-            const int num_runs, 
-            gunrock::util::Location memspace,
-            gunrock::util::Location exec_policy) {
+template <typename VertexT = int, typename SizeT = int,
+          typename GValueT = unsigned int, typename SSSPValueT = GValueT>
+double sssp(const SizeT num_nodes, const SizeT num_edges,
+            const SizeT *row_offsets, const VertexT *col_indices,
+            const GValueT *edge_values, const int num_runs, VertexT *sources,
+            const bool mark_pred, SSSPValueT **distances, VertexT **preds = NULL, 
+            gunrock::util::Location memspace = gunrock::util::HOST,
+            gunrock::util::Location exec_policy = gunrock::util::DEVICE) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
                                            gunrock::graph::HAS_EDGE_VALUES |
                                                gunrock::graph::HAS_CSR>
@@ -300,7 +294,7 @@ double sssp(const int num_nodes, const int num_edges, const int *row_offsets,
             const bool mark_pred, float *distances, int *preds, gunrock::util::Location memspace = gunrock::util::HOST,
             gunrock::util::Location exec_policy = gunrock::util::DEVICE) {
   return sssp(num_nodes, num_edges, row_offsets, col_indices, edge_values,
-              &source, mark_pred, &distances, &preds, 1 /* num_runs */, memspace, exec_policy);
+              1 /* num_runs */, &source, mark_pred, &distances, &preds, memspace, exec_policy);
 }
 
 // Leave this at the end of the file
