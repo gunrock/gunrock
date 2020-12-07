@@ -107,7 +107,10 @@ class graph_t : public graph_view_t... {
     return std::disjunction_v<std::is_same<input_view_t, graph_view_t>...>;
   }
 
-  constexpr memory_space_t memory_space() const { return space; }
+  __host__ __device__ __forceinline__ constexpr memory_space_t memory_space()
+      const {
+    return space;
+  }
 
   template <class input_view_t = first_view_t, typename... T>
   __host__ __device__ void set(vertex_type const& _number_of_vertices,
@@ -172,6 +175,8 @@ class graph_t : public graph_view_t... {
   }
 
  private:
+  // TODO: fix this, it is including empty_t structs for now.
+  // We can subtract those structs to get the real value.
   static constexpr std::size_t number_of_formats_inherited =
       sizeof...(graph_view_t);
 

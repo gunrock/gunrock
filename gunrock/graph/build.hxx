@@ -28,27 +28,10 @@ auto from_csr(vertex_t const& r,
               edge_t* Ap,
               vertex_t* J,
               weight_t* X,
-              vertex_t* I,
-              edge_t* Aj) {
+              vertex_t* I = nullptr,
+              edge_t* Aj = nullptr) {
+  // static_assert(); // TODO: check for flags and nullptrs
   return detail::from_csr<space, build_views>(r, c, nnz, Ap, J, X, I, Aj);
-}
-
-template <memory_space_t space,
-          view_t build_views,
-          typename edge_t,
-          typename vertex_t,
-          typename weight_t>
-auto from_csr(vertex_t const& r,
-              vertex_t const& c,
-              edge_t const& nnz,
-              edge_t* Ap,
-              vertex_t* J,
-              weight_t* X) {
-  auto I_deleter = [&](vertex_t* ptr) { memory::free(ptr, space); };
-  std::shared_ptr<vertex_t> I_ptr(
-      memory::allocate<vertex_t>(nnz * sizeof(vertex_t), space), I_deleter);
-  return from_csr<space, build_views>(r, c, nnz, Ap, J, X, I_ptr.get(),
-                                      (edge_t*)nullptr);
 }
 
 }  // namespace build

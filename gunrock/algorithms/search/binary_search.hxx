@@ -74,6 +74,19 @@ __host__ __device__ iterator_t lower_bound(
   return thrust::lower_bound(thrust::seq, first, last, value, comp);
 }
 
+template <typename key_pointer_t, typename key_t, typename index_t>
+__host__ __device__ key_t lower_bound(const key_pointer_t keys,
+                                      const key_t& key,
+                                      const index_t size) {
+  auto it = algo::search::binary::lower_bound(
+      thrust::counting_iterator<key_t>(0),
+      thrust::counting_iterator<key_t>(size), key,
+      [keys] __host__ __device__(const key_t& pivot, const key_t& key) {
+        return keys[pivot] < key;
+      });
+  return *it;
+}
+
 // Find the rightmost element in an array.
 // Specify bounds using begin and end positions.
 // Default will search the whole array of size counts.
