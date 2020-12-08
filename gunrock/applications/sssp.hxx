@@ -11,7 +11,6 @@
 #pragma once
 
 #include <bits/stdc++.h>
-
 #include <gunrock/applications/application.hxx>
 
 namespace gunrock {
