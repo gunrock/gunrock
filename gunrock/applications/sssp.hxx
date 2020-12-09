@@ -152,6 +152,7 @@ float run(graph_t& G,
   result_t<vertex_t, weight_t> result(distances, predecessors);
   // </user-defined>
 
+  // <boiler-plate>
   auto multi_context =
       std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
 
