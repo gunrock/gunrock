@@ -17,8 +17,7 @@
 #include <gunrock/framework/operators/configs.hxx>
 #include <gunrock/framework/operators/for/for.hxx>
 
-// XXX: Replace these later
-#include <moderngpu/kernel_scan.hxx>
+#include <thrust/transform_scan.h>
 
 namespace gunrock {
 namespace operators {
@@ -34,9 +33,7 @@ void execute(graph_t& G,
              enactor_type* E,
              operator_type op,
              cuda::standard_context_t& context) {
-  // XXX: should use existing context (context)
-  mgpu::standard_context_t _context(false, context.stream());
-
+  using vertex_t = typename graph_t::vertex_type;
   // Used as an input buffer (frontier)
   auto active_buffer = E->get_active_frontier_buffer();
   // Used as an output buffer (frontier)
@@ -47,56 +44,68 @@ void execute(graph_t& G,
 
   // Scan over the work domain to find the output frontier's size.
   auto scanned_work_domain = E->scanned_work_domain.data().get();
-  thrust::device_vector<int> count(1, 0);
 
-  auto segment_sizes = [=] __device__(int idx) {
-    int count = 0;
-    int v = input_data[idx];
-    count = G.get_number_of_neighbors(v);
-    return count;
+  auto segment_sizes = [=] __host__ __device__(vertex_t const& v) {
+    // if item is invalid, segment size is 0.
+    if (!gunrock::util::limits::is_valid(v))
+      return 0;
+    return G.get_number_of_neighbors(v);
   };
 
-  mgpu::transform_scan<int>(segment_sizes, (int)active_buffer->size(),
-                            scanned_work_domain, mgpu::plus_t<int>(),
-                            count.data(), _context);
+  auto new_length = thrust::transform_inclusive_scan(
+      thrust::cuda::par.on(context.stream()),  // execution policy
+      input_data,                              // input iterator: first
+      input_data + active_buffer->size(),      // input iterator: last
+      scanned_work_domain,                     // output iterator
+      segment_sizes,                           // unary operation
+      thrust::plus<vertex_t>()                 // binary operation
+  );
+
+  // Move the last element of the scanned work-domain to host.
+  // Last Element = size of active buffer - 1;
+  // If the active buffer is greater than number of vertices,
+  // we should TODO: resize the scanned work domain, this happens
+  // when we allow duplicates to be in the active buffer.
+  thrust::host_vector<vertex_t> size_of_output(1, 0);
+  cudaMemcpy(size_of_output.data(),
+             scanned_work_domain + active_buffer->size() - 1,
+             sizeof(vertex_t),  // move one integer
+             cudaMemcpyDeviceToHost);
 
   // If output frontier is empty, resize and return.
-  thrust::host_vector<int> front = count;
-  if (!front[0]) {
-    inactive_buffer->resize(front[0]);
+  if (!size_of_output[0]) {
+    inactive_buffer->resize(size_of_output[0]);
+    E->swap_frontier_buffers();
     return;
   }
 
   // Resize the output (inactive) buffer to the new size.
-  inactive_buffer->resize(front[0]);
+  inactive_buffer->resize(size_of_output[0]);
   auto output_data = inactive_buffer->data();
 
-  // Expand incoming neighbors, and using a load-balanced transformation
-  // (merge-path based load-balancing) run the user defined advance operator on
-  // the load-balanced work items.
-  auto neighbors_expand = [G, op, input_data, output_data,
-                           scanned_work_domain] __device__(std::size_t idx) {
-    auto v = input_data[idx];
-    output_data[idx] = v;
-
+  auto neighbors_expand = [=] __device__(vertex_t const& v) {
     // if item is invalid, skip processing.
     if (!gunrock::util::limits::is_valid(v))
-      return;
+      return gunrock::numeric_limits<vertex_t>::invalid();
 
     auto starting_edge = G.get_starting_edge(v);
-    auto total_edges = scanned_work_domain[idx];
-
-    for (auto e = starting_edge; e < total_edges; ++e) {
+    auto total_edges = G.get_number_of_neighbors(v);
+    for (auto e = starting_edge; e < starting_edge + total_edges; ++e) {
       auto n = G.get_destination_vertex(e);
       auto w = G.get_edge_weight(e);
       bool cond = op(v, n, e, w);
-      output_data[e] =
-          cond ? n : gunrock::numeric_limits<decltype(v)>::invalid();
+      output_data[e] = cond ? n : gunrock::numeric_limits<vertex_t>::invalid();
     }
+
+    return gunrock::numeric_limits<vertex_t>::invalid();
   };
 
-  operators::parallel_for::execute(0, active_buffer->size(), neighbors_expand,
-                                   context);
+  thrust::transform(thrust::cuda::par.on(context.stream()),  // execution policy
+                    input_data,  // input iterator: first
+                    input_data + active_buffer->size(),  // input iterator: last
+                    input_data,                          // in-place transform
+                    neighbors_expand                     // unary operation
+  );
 
   // Swap frontier buffers, output buffer now becomes the input buffer and
   // vice-versa.

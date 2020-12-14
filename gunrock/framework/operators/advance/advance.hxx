@@ -40,7 +40,8 @@ void execute(graph_t& G,
   else if (lb == load_balance_t::unbalanced)
     unbalanced::execute<type, direction>(G, E, op, *context);
   else
-    error::throw_if_exception(cudaErrorUnknown);
+    error::throw_if_exception(cudaErrorUnknown,
+                              "Unsupported advance's load-balancing schedule.");
 }
 
 }  // namespace advance
