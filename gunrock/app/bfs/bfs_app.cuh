@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file bfs_app.cu
+ * @file bfs_app.cuh
  *
  * @brief Gunrock breadth-first search (BFS) application
  */
@@ -216,13 +216,12 @@ double gunrock_bfs(gunrock::util::Parameters &parameters, GraphT &graph,
  * @param[out] preds       Return predecessors of each vertex
  * \return     double      Return accumulated elapsed times for all runs
  */
-template <typename VertexT = int, typename SizeT = int,
-          typename LabelT = VertexT>
+template <typename VertexT, typename SizeT, typename LabelT>
 double bfs(const SizeT num_nodes, const SizeT num_edges,
            const SizeT *row_offsets, const VertexT *col_indices,
-           const int num_runs, VertexT *sources, const bool mark_pred,
+           VertexT *sources, const bool mark_pred,
            const bool direction_optimized, const bool idempotence,
-           LabelT **labels, VertexT **preds = NULL) {
+           LabelT **labels, VertexT **preds, const int num_runs) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, VertexT,
                                            gunrock::graph::HAS_CSR |
                                                gunrock::graph::HAS_CSC>
@@ -284,8 +283,8 @@ double bfs(const int num_nodes, const int num_edges, const int *row_offsets,
            const int *col_indices, int source, const bool mark_pred,
            const bool direction_optimized, const bool idempotence,
            int *distances, int *preds) {
-  return bfs(num_nodes, num_edges, row_offsets, col_indices, 1, &source,
-             mark_pred, direction_optimized, idempotence, &distances, &preds);
+  return bfs(num_nodes, num_edges, row_offsets, col_indices, &source,
+             mark_pred, direction_optimized, idempotence, &distances, &preds, 1);
 }
 
 // Leave this at the end of the file
