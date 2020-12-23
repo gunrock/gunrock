@@ -256,8 +256,8 @@ double gunrock_vn(gunrock::util::Parameters &parameters, GraphT &graph,
  * @param[out] preds       Return predecessors of each vertex
  * \return     double      Return accumulated elapsed times for all runs
  */
-template <typename VertexT, typename SizeT,
-          typename GValueT, typename vnValueT>
+template <typename VertexT, typename SizeT, typename GValueT,
+          typename vnValueT>
 double vn(const SizeT num_nodes, const SizeT num_edges,
           const SizeT *row_offsets, const VertexT *col_indices,
           const GValueT *edge_values, VertexT *sources, const bool mark_pred,
