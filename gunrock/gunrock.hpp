@@ -37,13 +37,13 @@ double bfs(const SizeT    num_nodes,
            const SizeT    num_edges,
            const SizeT    *row_offsets,
            const VertexT  *col_indices,
-           const int      num_runs,
            VertexT        *sources,
            const bool     mark_pred,
            const bool     direction_optimized,
            const bool     idempotence,
            LabelT         **labels,
-           VertexT        **preds = NULL);
+           VertexT        **preds = NULL,
+           const int      num_runs,);
 
 // Application Includes
 #include <gunrock/app/bfs/bfs_app.cuh>
