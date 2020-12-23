@@ -76,6 +76,9 @@ class frontier_t {
 
   pointer_type_t data() { return memory::raw_pointer_cast(_storage.data()); }
 
+  auto begin() { return this->data(); }
+  auto end() { return this->data() + this->size(); }
+
   bool empty() const { return (size() == 0); }
 
   void push_back(type_t const& value) {
