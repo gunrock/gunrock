@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file vn_app.cu
+ * @file vn_app.cuh
  *
  * @brief single-source shortest path (vn) application
  */
@@ -242,25 +242,26 @@ double gunrock_vn(gunrock::util::Parameters &parameters, GraphT &graph,
   return total_time;
 }
 
-//  * @brief Simple interface take in graph as CSR format
-//  * @param[in]  num_nodes   Number of veritces in the input graph
-//  * @param[in]  num_edges   Number of edges in the input graph
-//  * @param[in]  row_offsets CSR-formatted graph input row offsets
-//  * @param[in]  col_indices CSR-formatted graph input column indices
-//  * @param[in]  edge_values CSR-formatted graph input edge weights
-//  * @param[in]  num_runs    Number of runs to perform vn
-//  * @param[in]  sources     Sources to begin traverse, one for each run
-//  * @param[in]  mark_preds  Whether to output predecessor info
-//  * @param[out] distances   Return shortest distance to source per vertex
-//  * @param[out] preds       Return predecessors of each vertex
-//  * \return     double      Return accumulated elapsed times for all runs
-
-template <typename VertexT = int, typename SizeT = int,
-          typename GValueT = unsigned int, typename vnValueT = GValueT>
+/**
+ * @brief Simple interface take in graph as CSR format
+ * @param[in]  num_nodes   Number of veritces in the input graph
+ * @param[in]  num_edges   Number of edges in the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  edge_values CSR-formatted graph input edge weights
+ * @param[in]  num_runs    Number of runs to perform vn
+ * @param[in]  sources     Sources to begin traverse, one for each run
+ * @param[in]  mark_preds  Whether to output predecessor info
+ * @param[out] distances   Return shortest distance to source per vertex
+ * @param[out] preds       Return predecessors of each vertex
+ * \return     double      Return accumulated elapsed times for all runs
+ */
+template <typename VertexT, typename SizeT,
+          typename GValueT, typename vnValueT>
 double vn(const SizeT num_nodes, const SizeT num_edges,
           const SizeT *row_offsets, const VertexT *col_indices,
-          const GValueT *edge_values, const int num_runs, VertexT *sources,
-          const bool mark_pred, vnValueT *distances, VertexT *preds = NULL) {
+          const GValueT *edge_values, VertexT *sources, const bool mark_pred,
+          vnValueT *distances, VertexT *preds, const int num_runs) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
                                            gunrock::graph::HAS_EDGE_VALUES |
                                                gunrock::graph::HAS_CSR>

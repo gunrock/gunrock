@@ -45,8 +45,38 @@ double bfs(const SizeT    num_nodes,
            VertexT        **preds = NULL,
            const int      num_runs,);
 
+/**
+ * @brief Simple interface take in graph as CSR format
+ * @param[in]  num_nodes   Number of veritces in the input graph
+ * @param[in]  num_edges   Number of edges in the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  edge_values CSR-formatted graph input edge weights
+ * @param[in]  num_runs    Number of runs to perform vn
+ * @param[in]  sources     Sources to begin traverse, one for each run
+ * @param[in]  mark_preds  Whether to output predecessor info
+ * @param[out] distances   Return shortest distance to source per vertex
+ * @param[out] preds       Return predecessors of each vertex
+ * \return     double      Return accumulated elapsed times for all runs
+ */
+template <typename VertexT = int,
+          typename SizeT = int,
+          typename GValueT = unsigned int,
+          typename vnValueT = GValueT>
+double vn(const SizeT   num_nodes,
+          const SizeT   num_edges,
+          const SizeT   *row_offsets,
+          const VertexT *col_indices,
+          const GValueT *edge_values,
+          const int     num_runs,
+          VertexT       *sources,
+          const bool    mark_pred,
+          vnValueT      *distances,
+          VertexT       *preds = NULL);
+
 // Application Includes
 #include <gunrock/app/bfs/bfs_app.cuh>
+#include <gunrock/app/vn/vn_app.cuh>
 
 // Leave this at the end of the file
 // Local Variables:
