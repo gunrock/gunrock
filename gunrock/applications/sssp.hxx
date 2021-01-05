@@ -32,6 +32,7 @@ struct result_t {
 
 template <typename graph_t, typename param_type, typename result_type>
 struct problem_t : gunrock::problem_t<graph_t> {
+  
   param_type param;
   result_type result;
 
