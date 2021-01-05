@@ -147,18 +147,20 @@ float run(graph_t& G,
 ) {
   
   // <user-defined>
+  using vertex_t    = typename graph_t::vertex_type;
+  
   using param_type  = param_t;
-  using result_type = result_t<typename graph_t::vertex_type>;
+  using result_type = result_t<vertex_t>;
   
   param_type param;
   result_type result(colors);
   // </user-defined>
 
+  // <boiler-plate>
   auto multi_context =
       std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
 
-  using problem_type =
-      problem_t<graph_t, param_type, result_type>;
+  using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
   problem_type problem(G, param, result, multi_context);
