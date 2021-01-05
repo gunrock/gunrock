@@ -36,7 +36,7 @@ enum advance_type_t {
 enum advance_direction_t {
   forward,   // Push-based approach
   backward,  // Pull-based approach
-  both       // Push-pull optimized
+  optimized  // Push-pull optimized
 };
 
 enum filter_type_t {

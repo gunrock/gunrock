@@ -67,7 +67,7 @@ struct enactor_t {
         scanned_work_domain(problem->get_graph().get_number_of_vertices()) {
     // Set temporary buffer to be at least the number of edges
     auto g = problem->get_graph();
-    auto buffer = get_inactive_frontier_buffer();
+    auto buffer = get_output_frontier();
     buffer->reserve(g.get_number_of_edges());
   }
 
@@ -81,13 +81,13 @@ struct enactor_t {
    * @brief Get the frontier pointer object
    * @return frontier_type*
    */
-  frontier_type* get_active_frontier_buffer() { return active_frontier; }
+  frontier_type* get_input_frontier() { return active_frontier; }
 
   /**
    * @brief Get the frontier pointer object
    * @return frontier_type*
    */
-  frontier_type* get_inactive_frontier_buffer() { return inactive_frontier; }
+  frontier_type* get_output_frontier() { return inactive_frontier; }
 
   void swap_frontier_buffers() {
     buffer_selector ^= 1;

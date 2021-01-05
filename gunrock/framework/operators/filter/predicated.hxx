@@ -6,18 +6,20 @@ namespace gunrock {
 namespace operators {
 namespace filter {
 namespace predicated {
-template <typename graph_t, typename enactor_type, typename operator_type>
+template <typename graph_t,
+          typename enactor_type,
+          typename operator_type,
+          typename frontier_type>
 void execute(graph_t& G,
              enactor_type* E,
              operator_type op,
+             frontier_type* input,
+             frontier_type* output,
              cuda::standard_context_t& context) {
-  auto active_buffer = E->get_active_frontier_buffer();
-  auto inactive_buffer = E->get_inactive_frontier_buffer();
-
-  using type_t = std::remove_pointer_t<decltype(active_buffer->data())>;
+  using type_t = std::remove_pointer_t<decltype(input->data())>;
 
   // Allocate output size.
-  inactive_buffer->resize(active_buffer->size());
+  output->resize(input->size());
 
   auto predicate = [=] __host__ __device__(type_t const& i) -> bool {
     return gunrock::util::limits::is_valid(i) ? op(i) : false;
@@ -25,25 +27,24 @@ void execute(graph_t& G,
 
   // Copy w/ predicate!
   auto new_length = thrust::copy_if(
-      thrust::cuda::par.on(context.stream()),         // execution policy
-      active_buffer->data(),                          // input iterator: begin
-      active_buffer->data() + active_buffer->size(),  // input iterator: end
-      inactive_buffer->data(),                        // output iterator
-      predicate                                       // predicate
+      thrust::cuda::par.on(context.stream()),  // execution policy
+      input->begin(),                          // input iterator: begin
+      input->end(),                            // input iterator: end
+      output->begin(),                         // output iterator
+      predicate                                // predicate
   );
 
-  // XXX: yikes, idk if this is a good idea.
-  inactive_buffer->resize((new_length - inactive_buffer->data()));
+  auto new_size = thrust::distance(output->begin(), new_length);
+  output->resize(new_size);
 
-  //   // Uniquify!
-  //   auto new_end = thrust::unique(
-  //       thrust::cuda::par.on(context.stream()),  // execution policy
-  //       inactive_buffer->data(),                 // input iterator: begin
-  //       inactive_buffer->data()
-  //       + inactive_buffer->size()  // input iterator: end
-  //   );
+  // // Uniquify!
+  // auto new_end = thrust::unique(
+  //     thrust::cuda::par.on(context.stream()),  // execution policy
+  //     output->begin(),                         // input iterator: begin
+  //     output->end()                            // input iterator: end
+  // );
 
-  //   inactive_buffer->resize((new_end - inactive_buffer->data()));
+  //   output->resize((new_end - output->data()));
 
   E->swap_frontier_buffers();
 }

@@ -84,7 +84,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
   void prepare_frontier(cuda::standard_context_t* context) override {
     auto P = this->get_problem();
-    auto f = this->get_active_frontier_buffer();
+    auto f = this->get_input_frontier();
     f->push_back(P->param.single_source);
   }
 
