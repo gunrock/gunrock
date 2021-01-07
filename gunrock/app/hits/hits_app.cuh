@@ -220,7 +220,7 @@ template <
     typename VertexT,
     typename SizeT,
     typename GValueT>
-double hits_template(
+double hits(
     const SizeT        num_nodes,
     const SizeT        num_edges,
     const SizeT       *row_offsets,

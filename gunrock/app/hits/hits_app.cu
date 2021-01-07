@@ -58,7 +58,7 @@ double hits(
     float                     *auth_ranks,
     gunrock::util::Location   allocated_on = gunrock::util::HOST)
 {
-      return hits_template(num_nodes, num_edges, row_offsets, col_indices,
+      return hits<int, int, float>(num_nodes, num_edges, row_offsets, col_indices,
          max_iter, tol, hits_norm, hub_ranks, auth_ranks, allocated_on);
 }
 
