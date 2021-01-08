@@ -53,7 +53,8 @@ void execute(graph_t& G,
     // if item is invalid, skip processing.
     if (!gunrock::util::limits::is_valid(v))
       return 0;
-    return G.get_number_of_neighbors(v);
+    auto count = G.get_number_of_neighbors(v);
+    return count;  // G.get_number_of_neighbors(v);
   };
 
   auto new_length = thrust::transform_inclusive_scan(

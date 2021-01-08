@@ -20,37 +20,41 @@
 namespace gunrock {
 namespace color {
 
-template <typename meta_t>
+
 struct param_t {
   // No parameters for this algorithm
 };
 
-template <typename meta_t>
+template <typename vertex_t>
 struct result_t {
-  using vertex_t = typename meta_t::vertex_type;
-
   vertex_t* colors;
   result_t(vertex_t* colors_) : colors(colors_) {}
 };
 
-template <typename graph_t,
-          typename meta_t,
-          typename param_t,
-          typename result_t>
-struct problem_t : gunrock::problem_t<graph_t, meta_t, param_t, result_t> {
-  // Use Base class constructor -- does this work? does it handle copy
-  // constructor?
-  using gunrock::problem_t<graph_t, meta_t, param_t, result_t>::problem_t;
+template <typename graph_t, typename param_type, typename result_type>
+struct problem_t : gunrock::problem_t<graph_t> {
+  
+  param_type param;
+  result_type result;
 
-  using vertex_t = typename meta_t::vertex_type;
-  using edge_t = typename meta_t::edge_type;
-  using weight_t = typename meta_t::weight_type;
+  problem_t(graph_t& G,
+            param_type& _param,
+            result_type& _result,
+            std::shared_ptr<cuda::multi_context_t> _context)
+      : gunrock::problem_t<graph_t>(G, _context),
+        param(_param),
+        result(_result) {}
+  
+  using vertex_t = typename graph_t::vertex_type;
+  using edge_t = typename graph_t::edge_type;
+  using weight_t = typename graph_t::weight_type;
 
   thrust::device_vector<vertex_t> randoms;
 
   void reset() {
-    auto n_vertices = this->get_meta_pointer()->get_number_of_vertices();
-    auto d_colors = thrust::device_pointer_cast(this->result->colors);
+    auto g = this->get_graph();
+    auto n_vertices = g.get_number_of_vertices();
+    auto d_colors = thrust::device_pointer_cast(this->result.colors);
     thrust::fill(thrust::device, d_colors + 0, d_colors + n_vertices,
                  gunrock::numeric_limits<vertex_t>::invalid());
 
@@ -71,30 +75,30 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
   // <user-defined>
   void prepare_frontier(cuda::standard_context_t* context) override {
-    auto E = this->get_enactor();              // Enactor pointer
-    auto P = E->get_problem_pointer();         // Problem pointer
-    auto meta = P->get_meta_pointer();         // metadata pointer
-    auto f = E->get_active_frontier_buffer();  // active frontier
+    auto P = this->get_problem();
+    auto f = this->get_input_frontier();
+    
+    auto n_vertices = P->get_graph().get_number_of_vertices();
 
     // XXX: Find a better way to initialize the frontier to all nodes
-    for (vertex_t v = 0; v < meta->get_number_of_vertices(); ++v)
+    for (vertex_t v = 0; v < n_vertices; ++v)
       f->push_back(v);
   }
 
   void loop(cuda::standard_context_t* context) override {
     // Data slice
     auto E = this->get_enactor();
-    auto P = E->get_problem_pointer();
-    auto G = P->get_graph_pointer();
+    auto P = this->get_problem();
+    auto G = P->get_graph();
 
-    auto colors = P->result->colors;
-    auto randoms = P->randoms.data().get();
+    auto colors    = P->result.colors;
+    auto randoms   = P->randoms.data().get();
     auto iteration = E->iteration;
 
     auto color_me_in = [G, colors, randoms, iteration] __host__ __device__(
                            vertex_t const& vertex) -> bool {
-      edge_t start_edge = G->get_starting_edge(vertex);
-      edge_t num_neighbors = G->get_number_of_neighbors(vertex);
+      edge_t start_edge = G.get_starting_edge(vertex);
+      edge_t num_neighbors = G.get_number_of_neighbors(vertex);
 
       bool colormax = true;
       bool colormin = true;
@@ -105,7 +109,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // Main loop that goes over all the neighbors and finds the maximum or
       // minimum random number vertex.
       for (edge_t e = start_edge; e < start_edge + num_neighbors; ++e) {
-        vertex_t u = G->get_destination_vertex(e);
+        vertex_t u = G.get_destination_vertex(e);
 
         if (gunrock::util::limits::is_valid(colors[u]) &&
                 (colors[u] != color + 1) && (colors[u] != color + 2) ||
@@ -137,29 +141,30 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   // </user-defined>
 };  // struct enactor_t
 
-template <typename graph_t, typename meta_t>
-float run(std::shared_ptr<graph_t>& G,
-          std::shared_ptr<meta_t>& meta,
-          typename meta_t::vertex_type* colors  // Output
+template <typename graph_t>
+float run(graph_t& G,
+          typename graph_t::vertex_type* colors  // Output
 ) {
+  
   // <user-defined>
-  param_t<meta_t> param;
-  result_t<meta_t> result(colors);
+  using vertex_t    = typename graph_t::vertex_type;
+  
+  using param_type  = param_t;
+  using result_type = result_t<vertex_t>;
+  
+  param_type param;
+  result_type result(colors);
   // </user-defined>
 
+  // <boiler-plate>
   auto multi_context =
       std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
 
-  using problem_type =
-      problem_t<graph_t, meta_t, param_t<meta_t>, result_t<meta_t>>;
+  using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
-  problem_type problem(G.get(),       // input graph (GPU)
-                       meta.get(),    // metadata    (CPU)
-                       &param,        // input parameters
-                       &result,       // output results
-                       multi_context  // input context
-  );
+  problem_type problem(G, param, result, multi_context);
+  problem.init();
   problem.reset();
 
   enactor_type enactor(&problem, multi_context);

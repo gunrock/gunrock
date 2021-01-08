@@ -33,6 +33,9 @@ struct problem_t {
 
   auto get_graph() { return graph_slice; }
 
+  virtual void init() {};
+  virtual void reset() {};
+  
   problem_t() : graph_slice(nullptr) {}
 
   problem_t(graph_t& G, std::shared_ptr<cuda::multi_context_t> _context)
