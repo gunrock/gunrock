@@ -74,7 +74,7 @@ target_include_directories(essentials
     INTERFACE externals/
     INTERFACE externals/mtx
     INTERFACE externals/moderngpu/src
-	INTERFACE externals/rapidjson/include
+    INTERFACE externals/rapidjson/include
     INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
 )
 target_sources(essentials
