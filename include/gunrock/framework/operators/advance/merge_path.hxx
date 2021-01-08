@@ -54,11 +54,8 @@ void execute(graph_t& G,
     if (!gunrock::util::limits::is_valid(v))
       return 0;
     auto count = G.get_number_of_neighbors(v);
-    // printf("Vertex %u ;; num_neighbors = %u\n", v, count);
     return count;  // G.get_number_of_neighbors(v);
   };
-
-  printf("Size of input = %u\n", input->size());
 
   auto new_length = thrust::transform_inclusive_scan(
       thrust::cuda::par.on(__ignore.stream()),  // execution policy
