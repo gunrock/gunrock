@@ -57,6 +57,35 @@ cudaError_t cubInclusiveSum(util::Array1D<uint64_t, char> &cub_temp_space,
   return retval;
 }
 
+template <typename InputT, typename OutputT, typename SizeT>
+cudaError_t cubExclusiveSum(util::Array1D<uint64_t, char> &cub_temp_space,
+                            util::Array1D<SizeT, InputT> &d_in,
+                            util::Array1D<SizeT, OutputT> &d_out,
+                            SizeT num_items, cudaStream_t stream = 0,
+                            bool debug_synchronous = false) {
+  cudaError_t retval = cudaSuccess;
+  size_t request_bytes = 0;
+
+  retval = cub::DeviceScan::ExclusiveSum(
+      NULL, request_bytes, d_in.GetPointer(util::DEVICE),
+      d_out.GetPointer(util::DEVICE), num_items, stream, debug_synchronous);
+
+  if (retval) return retval;
+
+  retval = cub_temp_space.EnsureSize_(request_bytes, util::DEVICE);
+  if (retval) return retval;
+
+  retval = cub::DeviceScan::ExclusiveSum(
+      cub_temp_space.GetPointer(util::DEVICE), request_bytes,
+      d_in.GetPointer(util::DEVICE), d_out.GetPointer(util::DEVICE), num_items,
+      stream, debug_synchronous);
+
+  if (retval) return retval;
+
+  return retval;
+}
+
+
 template <typename InputT, typename OutputT, 
           typename ReduceT, typename SizeT>
 cudaError_t Scan(util::Array1D<SizeT, InputT> &d_in, SizeT num_items,

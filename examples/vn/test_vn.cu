@@ -117,7 +117,15 @@ struct main_struct {
     VertexT *all_srcs = &srcs_vector[0];
 
     ValueT **ref_distances = NULL;
+
     bool quick = parameters.Get<bool>("quick");
+    std::string validation = parameters.Get<std::string>("validation");
+    if (quick && (parameters.UseDefault("validation") == false && validation != "none")) {
+      util::PrintMsg("Invalid options --quick and --validation=" + validation +
+                     ", no CPU reference result to validate");
+      return retval;
+    }
+
     if (!quick) {
       SizeT nodes = graph.nodes;
       bool quiet = parameters.Get<bool>("quiet");

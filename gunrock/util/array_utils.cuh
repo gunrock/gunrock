@@ -26,7 +26,7 @@
 namespace gunrock {
 namespace util {
 
-//#define ENABLE_ARRAY_DEBUG
+// #define ENABLE_ARRAY_DEBUG
 
 /**
  * @brief location flags
@@ -252,6 +252,24 @@ struct Array1D {
                      int grid_size = PreDefinedValues<int>::InvalidValue,
                      int block_size = PreDefinedValues<int>::InvalidValue);
 
+  template <typename ApplyLambda>
+  cudaError_t ForAllDebug(ApplyLambda apply,
+                     SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+                     Location target = LOCATION_DEFAULT,
+                     cudaStream_t stream = 0,
+                     int grid_size = PreDefinedValues<int>::InvalidValue,
+                     int block_size = PreDefinedValues<int>::InvalidValue);
+
+
+  template <typename ApplyLambda>
+  cudaError_t SharedForAll(ApplyLambda apply,
+                     SizeT length = PreDefinedValues<SizeT>::InvalidValue,
+                     Location target = LOCATION_DEFAULT,
+                     cudaStream_t stream = 0,
+                     unsigned sh_mem_size = 0,
+                     dim3 grid_size = PreDefinedValues<int>::InvalidValue,
+                     dim3 block_size = PreDefinedValues<int>::InvalidValue);
+
   template <typename ArrayT_in, typename ApplyLambda>
   cudaError_t ForAll(ArrayT_in &array_in, ApplyLambda apply,
                      SizeT length = PreDefinedValues<SizeT>::InvalidValue,
@@ -451,10 +469,18 @@ Location_to_string(HOST) +
       sizeof(ValueT)) + " bytes, pointer =\t " + std::to_string(d_pointer));
       #endif*/
       if (size != 0) {
-        retval = GRError(
+        if ((FLAG & UNIFIED) == UNIFIED) {
+          if(retval = util::GRError(cudaMallocManaged((void **)&(d_pointer), 
+                            sizeof(ValueT) * size),
+                            std::string(name) + " cudaMallocManaged failed", 
+                            __FILE__, __LINE__))
+            return retval;
+        } else {
+          retval = GRError(
             cudaMalloc((void **)&(d_pointer), sizeof(ValueT) * size),
             std::string(name) + " cudaMalloc failed", __FILE__, __LINE__);
-        if (retval) return retval;
+          if (retval) return retval;
+        }
       }
       allocated = allocated | DEVICE;
 #ifdef ENABLE_ARRAY_DEBUG
@@ -821,7 +847,7 @@ DEVICE)); #endif } else {*/
 
     else if (source == DEVICE && target == HOST) {
       if ((FLAG & PINNED) == PINNED && stream != 0) {
-        // printf("%s MemcpyAsync\n");
+
         retval = GRError(cudaMemcpyAsync(h_pointer + offset, d_pointer + offset,
                                          sizeof(ValueT) * size,
                                          cudaMemcpyDeviceToHost, stream),

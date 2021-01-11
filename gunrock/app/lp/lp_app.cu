@@ -6,21 +6,20 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file sssp_app.cu
+ * @file lp_app.cu
  *
- * @brief single-source shortest path (SSSP) application
+ * @brief Gunrock label propagation (LP) application
  */
 
-// <primitive>_app.cuh includes
 #include <gunrock/app/app.cuh>
 
-// single-source shortest path includes
-#include <gunrock/app/sssp/sssp_enactor.cuh>
-#include <gunrock/app/sssp/sssp_test.cuh>
+#include <gunrock/app/lp/lp_problem.cuh>
+#include <gunrock/app/lp/lp_enactor.cuh>
+#include <gunrock/app/lp/lp_test.cuh>
 
 namespace gunrock {
 namespace app {
-namespace sssp {
+namespace lp {
 
 cudaError_t UseParameters(util::Parameters &parameters) {
   cudaError_t retval = cudaSuccess;
@@ -43,22 +42,30 @@ cudaError_t UseParameters(util::Parameters &parameters) {
       util::PreDefinedValues<int>::InvalidValue,
       "seed to generate random sources", __FILE__, __LINE__));
 
+  GUARD_CU(parameters.Use<int>(
+    "test",
+    util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+    -1,
+    "test id for validation", __FILE__, __LINE__));
+  
+  
+
   return retval;
 }
 
 /**
- * @brief Run SSSP tests
+ * @brief Run LP tests
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the distances
  * @param[in]  parameters    Excution parameters
  * @param[in]  graph         Input graph
- * @param[in]  ref_distances Reference distances
- * @param[in]  target        Whether to perform the SSSP
+ * @param[in]  ref_labels    Reference labels
+ * @param[in]  target        Whether to perform the LP
  * \return cudaError_t error message(s), if any
  */
-template <typename GraphT, typename ValueT = typename GraphT::ValueT>
+template <typename GraphT, typename LabelT = typename GraphT::VertexT>
 cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
-                     ValueT **ref_distances = NULL,
+                     LabelT **ref_labels = NULL,
                      util::Location target = util::DEVICE) {
   cudaError_t retval = cudaSuccess;
   typedef typename GraphT::VertexT VertexT;
@@ -71,17 +78,14 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   // parse configurations from parameters
   bool quiet_mode = parameters.Get<bool>("quiet");
-  bool quick_mode = parameters.Get<bool>("quick");
-  bool mark_pred = parameters.Get<bool>("mark-pred");
   int num_runs = parameters.Get<int>("num-runs");
   std::string validation = parameters.Get<std::string>("validation");
   std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
   int num_srcs = srcs.size();
-  util::Info info("SSSP", parameters, graph);  // initialize Info structure
+  util::Info info("LP", parameters, graph);  // initialize Info structure
 
   // Allocate host-side array (for both reference and GPU-computed results)
-  ValueT *h_distances = new ValueT[graph.nodes];
-  VertexT *h_preds = (mark_pred) ? new VertexT[graph.nodes] : NULL;
+  LabelT *h_labels = new LabelT[graph.nodes];
 
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
@@ -91,8 +95,9 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   cpu_timer.Stop();
   parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
-  // perform SSSP
+  // perform LP
   VertexT src;
+
   for (int run_num = 0; run_num < num_runs; ++run_num) {
     src = srcs[run_num % num_srcs];
     GUARD_CU(problem.Reset(src, target));
@@ -110,27 +115,26 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
             " ms, src = " + std::to_string(src) + ", #iterations = " +
             std::to_string(enactor.enactor_slices[0].enactor_stats.iteration),
         !quiet_mode);
-    if (!quick_mode && validation == "each") {
-      GUARD_CU(problem.Extract(h_distances, h_preds));
-      SizeT num_errors = app::sssp::Validate_Results(
-          parameters, graph, src, h_distances, h_preds,
-          ref_distances == NULL ? NULL : ref_distances[run_num % num_srcs],
-          (VertexT*)NULL, false);
+    if (validation == "each") {
+      GUARD_CU(problem.Extract(h_labels));
+      SizeT num_errors = app::lp::Validate_Results(
+          parameters, graph, src, h_labels,
+          ref_labels == NULL ? NULL : ref_labels[run_num % num_srcs],
+          false);
     }
   }
 
   cpu_timer.Start();
   // Copy out results
-  GUARD_CU(problem.Extract(h_distances, h_preds));
-  if (!quick_mode && validation == "last") {
-    SizeT num_errors = app::sssp::Validate_Results(
-        parameters, graph, src, h_distances, h_preds,
-        ref_distances == NULL ? NULL
-                              : ref_distances[(num_runs - 1) % num_srcs]);
+  GUARD_CU(problem.Extract(h_labels));
+  if (validation == "last") {
+    SizeT num_errors = app::lp::Validate_Results(
+        parameters, graph, src, h_labels,
+        ref_labels == NULL ? NULL : ref_labels[(num_runs - 1) % num_srcs]);
   }
 
   // compute running statistics
-  info.ComputeTraversalStats(enactor, h_distances);
+  info.ComputeTraversalStats(enactor, h_labels);
 // Display_Memory_Usage(problem);
 #ifdef ENABLE_PERFORMANCE_PROFILING
   // Display_Performance_Profiling(&enactor);
@@ -139,10 +143,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   // Clean up
   GUARD_CU(enactor.Release(target));
   GUARD_CU(problem.Release(target));
-  delete[] h_distances;
-  h_distances = NULL;
-  delete[] h_preds;
-  h_preds = NULL;
+  delete[] h_labels;
+  h_labels = NULL;
   cpu_timer.Stop();
   total_timer.Stop();
 
@@ -150,32 +152,29 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   return retval;
 }
 
-}  // namespace sssp
+}  // namespace lp
 }  // namespace app
 }  // namespace gunrock
 
 /*
- * @brief Entry of gunrock_sssp function
+ * @brief Entry of gunrock_lp function
  * @tparam     GraphT     Type of the graph
- * @tparam     ValueT     Type of the distances
+ * @tparam     LabelT     Type of the labels
  * @param[in]  parameters Excution parameters
  * @param[in]  graph      Input graph
- * @param[out] distances  Return shortest distance to source per vertex
- * @param[out] preds      Return predecessors of each vertex
+ * @param[out] labels     Return the labels of the vertices
  * \return     double     Return accumulated elapsed times for all runs
  */
-template <typename GraphT, typename ValueT = typename GraphT::ValueT>
-double gunrock_sssp(gunrock::util::Parameters &parameters, GraphT &graph,
-                    ValueT **distances,
-                    typename GraphT::VertexT **preds = NULL) {
+template <typename GraphT, typename LabelT = typename GraphT::VertexT>
+double gunrock_lp(gunrock::util::Parameters &parameters, GraphT &graph,
+                   LabelT **labels) {
   typedef typename GraphT::VertexT VertexT;
-  typedef gunrock::app::sssp::Problem<GraphT> ProblemT;
-  typedef gunrock::app::sssp::Enactor<ProblemT> EnactorT;
+  typedef gunrock::app::lp::Problem<GraphT> ProblemT;
+  typedef gunrock::app::lp::Enactor<ProblemT> EnactorT;
   gunrock::util::CpuTimer cpu_timer;
   gunrock::util::Location target = gunrock::util::DEVICE;
   double total_time = 0;
   if (parameters.UseDefault("quiet")) parameters.Set("quiet", true);
-
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
@@ -196,7 +195,7 @@ double gunrock_sssp(gunrock::util::Parameters &parameters, GraphT &graph,
     cpu_timer.Stop();
 
     total_time += cpu_timer.ElapsedMillis();
-    problem.Extract(distances[src_num], preds == NULL ? NULL : preds[src_num]);
+    problem.Extract(labels[src_num]);
   }
 
   enactor.Release(target);
@@ -212,35 +211,29 @@ double gunrock_sssp(gunrock::util::Parameters &parameters, GraphT &graph,
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
  * @param[in]  edge_values CSR-formatted graph input edge weights
- * @param[in]  num_runs    Number of runs to perform SSSP
- * @param[in]  sources     Sources to begin traverse, one for each run
- * @param[in]  mark_preds  Whether to output predecessor info
- * @param[out] distances   Return shortest distance to source per vertex
- * @param[out] preds       Return predecessors of each vertex
+ * @param[out] labels      Return shortest hop distances to source per vertex
  * \return     double      Return accumulated elapsed times for all runs
  */
 template <typename VertexT = int, typename SizeT = int,
-          typename GValueT = unsigned int, typename SSSPValueT = GValueT>
-double sssp(const SizeT num_nodes, const SizeT num_edges,
-            const SizeT *row_offsets, const VertexT *col_indices,
-            const GValueT *edge_values, const int num_runs, VertexT *sources,
-            const bool mark_pred, SSSPValueT **distances,
-            VertexT **preds = NULL) {
-  typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-                                           gunrock::graph::HAS_EDGE_VALUES |
-                                               gunrock::graph::HAS_CSR>
+          typename LabelT = VertexT>
+double lp(const SizeT num_nodes, const SizeT num_edges,
+           const SizeT *row_offsets, const VertexT *col_indices,
+           const int num_runs, VertexT *sources, LabelT **labels) {
+  typedef typename gunrock::app::TestGraph<VertexT, SizeT, VertexT,
+                                           gunrock::graph::HAS_CSR |
+                                               gunrock::graph::HAS_CSC>
       GraphT;
   typedef typename GraphT::CsrT CsrT;
 
   // Setup parameters
-  gunrock::util::Parameters parameters("sssp");
+  gunrock::util::Parameters parameters("lp");
   gunrock::graphio::UseParameters(parameters);
-  gunrock::app::sssp::UseParameters(parameters);
+  gunrock::app::lp::UseParameters(parameters);
   gunrock::app::UseParameters_test(parameters);
   parameters.Parse_CommandLine(0, NULL);
   parameters.Set("graph-type", "by-pass");
-  parameters.Set("mark-pred", mark_pred);
   parameters.Set("num-runs", num_runs);
+  parameters.Set("test", -1);
   std::vector<VertexT> srcs;
   for (int i = 0; i < num_runs; i++) srcs.push_back(sources[i]);
   parameters.Set("srcs", srcs);
@@ -253,12 +246,11 @@ double sssp(const SizeT num_nodes, const SizeT num_edges,
                                      gunrock::util::HOST);
   graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges,
                                         gunrock::util::HOST);
-  graph.CsrT::edge_values.SetPointer((GValueT *)edge_values, num_edges,
-                                     gunrock::util::HOST);
+  graph.FromCsr(graph.csr(), gunrock::util::HOST, 0, quiet, true);
   gunrock::graphio::LoadGraph(parameters, graph);
 
-  // Run the SSSP
-  double elapsed_time = gunrock_sssp(parameters, graph, distances, preds);
+  // Run the LP
+  double elapsed_time = gunrock_lp(parameters, graph, labels);
 
   // Cleanup
   graph.Release();
@@ -273,18 +265,13 @@ double sssp(const SizeT num_nodes, const SizeT num_edges,
  * @param[in]  num_edges   Number of edges in the input graph
  * @param[in]  row_offsets CSR-formatted graph input row offsets
  * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  edge_values CSR-formatted graph input edge weights
- * @param[in]  source      Source to begin traverse
- * @param[in]  mark_preds  Whether to output predecessor info
- * @param[out] distances   Return shortest distance to source per vertex
- * @param[out] preds       Return predecessors of each vertex
+ * @param[out] labels      Return shortest hop distances to source per vertex
  * \return     double      Return accumulated elapsed times for all runs
  */
-double sssp(const int num_nodes, const int num_edges, const int *row_offsets,
-            const int *col_indices, const float *edge_values, int source,
-            const bool mark_pred, float *distances, int *preds) {
-  return sssp(num_nodes, num_edges, row_offsets, col_indices, edge_values,
-              1 /* num_runs */, &source, mark_pred, &distances, &preds);
+double lp(const int num_nodes, const int num_edges, const int *row_offsets,
+           const int *col_indices, int source,
+           int *distances) {
+  return lp(num_nodes, num_edges, row_offsets, col_indices, 1, &source, &distances);
 }
 
 // Leave this at the end of the file

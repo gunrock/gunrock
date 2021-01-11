@@ -6,23 +6,24 @@
 # ----------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
-# (make test) Test driver for KNN
+# (make test) Test driver for ALGO
 #-------------------------------------------------------------------------------
 
 include ../BaseMakefile.mk
-ALGO = knn
-EXEC = bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+ALGO = lp
+EXEC = bin/$(ALGO)_main_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+SRC = test_$(ALGO).cu
 
 test: $(EXEC)
 
-$(EXEC) : test_$(ALGO).cu $(DEPS)
+$(EXEC) : $(SRC) $(DEPS)
 	mkdir -p bin
-	$(NVCC) -w $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) $(SRC) $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -g -lineinfo
 
-a : test_$(ALGO).cu $(DEPS)
+a : $(SRC) $(DEPS)
 	mkdir -p bin
 	rm -f $(EXEC)
-	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) test_$(ALGO).cu $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -O3 > a.txt 2>&1 || true
+	$(NVCC) $(DEFINES) $(SM_TARGETS) -o $(EXEC) $(SRC) $(EXTRA_SOURCE) $(NVCCFLAGS) $(ARCH) $(INC) -g -G > a.txt 2>&1 || true
 	grep rror: a.txt; grep arn a.txt
 
 .DEFAULT_GOAL := test
