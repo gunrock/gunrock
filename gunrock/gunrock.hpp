@@ -68,11 +68,11 @@ double vn(const SizeT   num_nodes,
           const SizeT   *row_offsets,
           const VertexT *col_indices,
           const GValueT *edge_values,
-          const int     num_runs,
           VertexT       *sources,
           const bool    mark_pred,
           vnValueT      *distances,
-          VertexT       *preds = NULL);
+          VertexT       *preds = NULL,
+          const int     num_runs);
 
 // Application Includes
 #include <gunrock/app/bfs/bfs_app.cuh>
