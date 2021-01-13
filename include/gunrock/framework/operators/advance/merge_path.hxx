@@ -21,8 +21,6 @@
 #include <moderngpu/kernel_scan.hxx>
 #include <moderngpu/kernel_load_balance.hxx>
 
-#include <thrust/transform_scan.h>
-
 namespace gunrock {
 namespace operators {
 namespace advance {
@@ -33,65 +31,30 @@ template <advance_type_t type,
           typename frontier_t,
           typename work_tiles_t>
 void execute(graph_t& G,
-             operator_type op,
-             frontier_type* input,
-             frontier_type* output,
+             operator_t op,
+             frontier_t* input,
+             frontier_t* output,
              work_tiles_t& segments,
-             cuda::standard_context_t& __ignore) {
+             cuda::standard_context_t& context) {
   using vertex_t = typename graph_t::vertex_type;
 
-  // XXX: should use existing context (__ignore)
-  mgpu::standard_context_t context(false, __ignore.stream());
+  // XXX: should use existing context (context)
+  mgpu::standard_context_t _context(false, context.stream());
 
-  // Get input data of the active buffer.
-  auto input_data = input->data();
-
-  auto segment_sizes = [=] __host__ __device__(vertex_t const& v) {
-    // if item is invalid, skip processing.
-    if (!gunrock::util::limits::is_valid(v))
-      return 0;
-    auto count = G.get_number_of_neighbors(v);
-    return count;  // G.get_number_of_neighbors(v);
-  };
-
-  auto new_length = thrust::transform_inclusive_scan(
-      thrust::cuda::par.on(__ignore.stream()),  // execution policy
-      input->begin(),                           // input iterator: first
-      input->end(),                             // input iterator: last
-      segments.begin(),                         // output iterator
-      segment_sizes,                            // unary operation
-      thrust::plus<vertex_t>()                  // binary operation
-  );
-
-  // The last item contains the total scanned items, so in a simple
-  // example, where the input = {1, 0, 2, 2, 1, 3} resulted in the
-  // inclusive scan output = {1, 1, 3, 5, 6, 9}, then output.size() - 1
-  // will contain the element 9, which is the number of total items to process.
-  // We can use this to allocate the size of the output frontier.
-  auto location_of_total_scanned_items =
-      thrust::distance(segments.begin(), new_length) - 1;
-
-  // Move the last element of the scanned work-domain to host.
-  // Last Element = size of active buffer - 1;
-  // If the active buffer is greater than number of vertices,
-  // we should TODO: resize the scanned work domain, this happens
-  // when we allow duplicates to be in the active buffer.
-  thrust::host_vector<vertex_t> size_of_output(1, 0);
-  cudaMemcpy(size_of_output.data(),
-             thrust::raw_pointer_cast(segments.data()) +
-                 location_of_total_scanned_items,
-             sizeof(vertex_t),  // move one integer
-             cudaMemcpyDeviceToHost);
+  auto size_of_output = compute_output_length(G, input, segments, context);
 
   // If output frontier is empty, resize and return.
-  if (!size_of_output[0]) {
-    output->resize(size_of_output[0]);
+  if (size_of_output <= 0) {
+    output->resize(0);
     return;
   }
 
   // Resize the output (inactive) buffer to the new size.
-  output->resize(size_of_output[0]);
+  output->resize(size_of_output);
   auto output_data = output->data();
+
+  // Get input data of the active buffer.
+  auto input_data = input->data();
 
   // Expand incoming neighbors, and using a load-balanced transformation
   // (merge-path based load-balancing) run the user defined advance operator on
@@ -109,30 +72,29 @@ void execute(graph_t& G,
     auto n = G.get_destination_vertex(e);
     auto w = G.get_edge_weight(e);
     bool cond = op(v, n, e, w);
-    output_data[idx] =
-        cond ? n : gunrock::numeric_limits<decltype(v)>::invalid();
+    output_data[idx] = cond ? n : gunrock::numeric_limits<vertex_t>::invalid();
   };
 
-  mgpu::transform_lbs(neighbors_expand, size_of_output[0],
+  mgpu::transform_lbs(neighbors_expand, size_of_output,
                       thrust::raw_pointer_cast(segments.data()),
-                      (int)input->size(), context);
+                      (int)input->size(), _context);
 }
 
 template <advance_type_t type,
           advance_direction_t direction,
           typename graph_t,
-          typename enactor_type,
-          typename operator_type,
-          typename frontier_type>
+          typename operator_t,
+          typename frontier_t,
+          typename work_tiles_t>
 void execute(graph_t& G,
-             enactor_type* E,
-             operator_type op,
-             frontier_type* input,
-             frontier_type* output,
-             cuda::standard_context_t& __ignore) {
+             operator_t op,
+             frontier_t* input,
+             frontier_t* output,
+             work_tiles_t& segments,
+             cuda::standard_context_t& context) {
   if ((direction == advance_direction_t::forward) ||
       direction == advance_direction_t::backward) {
-    execute<type>(G, E, op, input, output, __ignore);
+    execute<type>(G, op, input, output, segments, context);
   } else {  // both (forward + backward)
 
     // Direction-Optimized advance is supported using CSR and CSC graph
