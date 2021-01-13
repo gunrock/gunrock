@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <gunrock/util/type_limits.hxx>
 #include <gunrock/graph/graph.hxx>
 
 namespace gunrock {
@@ -95,8 +96,10 @@ class frontier_t {
    *
    * @param s
    */
-  void resize(std::size_t const& s) {
-    _storage.resize(s);
+  void resize(
+      std::size_t const& s,
+      type_t const default_value = gunrock::numeric_limits<type_t>::invalid()) {
+    _storage.resize(s, default_value);
     set_size(s);
     _data = memory::raw_pointer_cast(_storage.data());
   }

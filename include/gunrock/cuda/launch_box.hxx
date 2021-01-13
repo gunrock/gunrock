@@ -16,7 +16,7 @@
 #include <type_traits>
 
 #ifndef SM_TARGET
-  #define SM_TARGET 0
+#define SM_TARGET 0
 #endif
 
 namespace gunrock {
@@ -31,7 +31,7 @@ namespace launch_box {
  * @tparam y_ Dimension in the Y direction
  * @tparam z_ Dimension in the Z direction
  */
-template<unsigned int x_, unsigned int y_ = 1, unsigned int z_ = 1>
+template <unsigned int x_, unsigned int y_ = 1, unsigned int z_ = 1>
 struct dim3_t {
   enum : unsigned int { x = x_, y = y_, z = z_, size = x_ * y_ * z_ };
   static constexpr dim3 get_dim3() { return dim3(x, y, z); }
@@ -59,7 +59,7 @@ enum sm_flag_t : unsigned {
 #define SM_TARGET_FLAG _SM_FLAG_WRAPPER(SM_TARGET)
 // "ver" will be expanded before the call to _SM_FLAG
 #define _SM_FLAG_WRAPPER(ver) _SM_FLAG(ver)
-#define _SM_FLAG(ver) sm_ ## ver
+#define _SM_FLAG(ver) sm_##ver
 
 /**
  * @brief Overloaded bitwise OR operator
@@ -68,9 +68,8 @@ enum sm_flag_t : unsigned {
  * \return sm_flag_t
  */
 constexpr sm_flag_t operator|(sm_flag_t lhs, sm_flag_t rhs) {
-  return static_cast<sm_flag_t>(
-    static_cast<unsigned>(lhs) | static_cast<unsigned>(rhs)
-  );
+  return static_cast<sm_flag_t>(static_cast<unsigned>(lhs) |
+                                static_cast<unsigned>(rhs));
 }
 
 /**
@@ -80,9 +79,8 @@ constexpr sm_flag_t operator|(sm_flag_t lhs, sm_flag_t rhs) {
  * \return sm_flag_t
  */
 constexpr sm_flag_t operator&(sm_flag_t lhs, sm_flag_t rhs) {
-  return static_cast<sm_flag_t>(
-    static_cast<unsigned>(lhs) & static_cast<unsigned>(rhs)
-  );
+  return static_cast<sm_flag_t>(static_cast<unsigned>(lhs) &
+                                static_cast<unsigned>(rhs));
 }
 
 /**
@@ -92,10 +90,10 @@ constexpr sm_flag_t operator&(sm_flag_t lhs, sm_flag_t rhs) {
  * @tparam grid_dimensions_ Grid dimensions to launch with
  * @tparam shared_memory_bytes_ Amount of shared memory to allocate
  */
-template<sm_flag_t sm_flags_,
-         typename block_dimensions_,
-         typename grid_dimensions_,
-         size_t shared_memory_bytes_ = 0>
+template <sm_flag_t sm_flags_,
+          typename block_dimensions_,
+          typename grid_dimensions_,
+          size_t shared_memory_bytes_ = 0>
 struct launch_params_t {
   typedef block_dimensions_ block_dimensions;
   typedef grid_dimensions_ grid_dimensions;
@@ -103,7 +101,7 @@ struct launch_params_t {
   enum : unsigned { sm_flags = sm_flags_ };
 };
 
-template<typename... lp_v>
+template <typename... lp_v>
 struct device_launch_params_t;
 
 /**
@@ -111,19 +109,23 @@ struct device_launch_params_t;
  * @tparam lp_t Launch parameters to check for match with current device
  * @tparam lp_v Pack of launch parameters to pass down recursively
  */
-template<typename lp_t, typename... lp_v>
-struct device_launch_params_t<lp_t, lp_v...> :
-std::conditional_t<lp_t::sm_flags == fallback,
-                   device_launch_params_t<lp_v..., lp_t>,  // Move fallback_t to end
-                   std::conditional_t<(bool)(lp_t::sm_flags & SM_TARGET_FLAG),  // Otherwise check lp_t for device's SM version
-                                      lp_t,
-                                      device_launch_params_t<lp_v...>>> {};
+template <typename lp_t, typename... lp_v>
+struct device_launch_params_t<lp_t, lp_v...>
+    : std::conditional_t<
+          lp_t::sm_flags == fallback,
+          device_launch_params_t<lp_v..., lp_t>,  // Move fallback_t to end
+          std::conditional_t<
+              (bool)(lp_t::sm_flags& SM_TARGET_FLAG),  // Otherwise check lp_t
+                                                       // for device's SM
+                                                       // version
+              lp_t,
+              device_launch_params_t<lp_v...>>> {};
 
 /**
  * @brief False value dependent on template param so compiler can't optimize
  * @tparam T Arbitrary type
  */
-template<typename T>
+template <typename T>
 struct always_false {
   enum { value = false };
 };
@@ -132,7 +134,7 @@ struct always_false {
  * @brief Raises static assert when template is instantiated
  * @tparam T Arbitrary type
  */
-template<typename T>
+template <typename T>
 struct raise_not_found_error_t {
   static_assert(always_false<T>::value,
                 "Launch box could not find valid launch parameters");
@@ -143,19 +145,19 @@ struct raise_not_found_error_t {
  * @tparam lp_t Launch parameters to check for match with current device or
  * fallback
  */
-template<typename lp_t>
-struct device_launch_params_t<lp_t> :
-std::conditional_t<
-  (bool)(lp_t::sm_flags & SM_TARGET_FLAG) || lp_t::sm_flags == fallback,
-  lp_t,
-  raise_not_found_error_t<void>  // Raises a compiler error
-> {};
+template <typename lp_t>
+struct device_launch_params_t<lp_t>
+    : std::conditional_t<
+          (bool)(lp_t::sm_flags& SM_TARGET_FLAG) || lp_t::sm_flags == fallback,
+          lp_t,
+          raise_not_found_error_t<void>  // Raises a compiler error
+          > {};
 
 /**
  * @brief Collection of kernel launch parameters for multiple architectures
  * @tparam lp_v... Pack of launch_params_t types for each desired arch
  */
-template<typename... lp_v>
+template <typename... lp_v>
 struct launch_box_t : device_launch_params_t<lp_v...> {};
 
 /**
@@ -164,7 +166,7 @@ struct launch_box_t : device_launch_params_t<lp_v...> {};
  * @param kernel CUDA kernel for which to calculate the occupancy
  * \return float
  */
-template<typename launch_box_t, typename func_t>
+template <typename launch_box_t, typename func_t>
 inline float occupancy(func_t kernel) {
   int max_active_blocks;
   int block_size = launch_box_t::block_dimensions::size;
@@ -174,19 +176,14 @@ inline float occupancy(func_t kernel) {
   cudaGetDevice(&device);
   cudaGetDeviceProperties(&props, device);
   error::error_t status = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-    &max_active_blocks,
-    kernel,
-    block_size,
-    (size_t)0
-  );
+      &max_active_blocks, kernel, block_size, (size_t)0);
   error::throw_if_exception(status);
   float occupancy = (max_active_blocks * block_size / props.warpSize) /
-                    (float)(props.maxThreadsPerMultiProcessor /
-                            props.warpSize);
+                    (float)(props.maxThreadsPerMultiProcessor / props.warpSize);
   return occupancy;
 }
 
 }  // namespace launch_box
 
-}  // namespace gunrock
 }  // namespace cuda
+}  // namespace gunrock

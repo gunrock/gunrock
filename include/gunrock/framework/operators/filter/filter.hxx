@@ -15,21 +15,19 @@ namespace filter {
 
 template <filter_type_t type,
           typename graph_t,
-          typename enactor_type,
           typename operator_type,
           typename frontier_type>
 void execute(graph_t& G,
-             enactor_type* E,
              operator_type op,
              frontier_type* input,
              frontier_type* output,
              cuda::standard_context_t* context) {
   if (type == filter_type_t::uniquify)
-    uniquify::execute(G, E, op, input, output, *context);
+    uniquify::execute(G, op, input, output, *context);
   else if (type == filter_type_t::predicated)
-    predicated::execute(G, E, op, input, output, *context);
+    predicated::execute(G, op, input, output, *context);
   else if (type == filter_type_t::bypass)
-    bypass::execute(G, E, op, input, output, *context);
+    bypass::execute(G, op, input, output, *context);
   else
     error::throw_if_exception(cudaErrorUnknown, "Filter type not supported.");
 }
@@ -42,8 +40,14 @@ void execute(graph_t& G,
              enactor_type* E,
              operator_type op,
              cuda::standard_context_t* context) {
-  execute<type>(G, E, op, E->get_input_frontier(), E->get_output_frontier(),
-                context);
+  execute<type>(G,                         // graph
+                op,                        // operator_type
+                E->get_input_frontier(),   // input frontier
+                E->get_output_frontier(),  // output frontier
+                context                    // context
+  );
+
+  E->swap_frontier_buffers();
 }
 
 }  // namespace filter

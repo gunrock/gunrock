@@ -6,20 +6,18 @@ namespace gunrock {
 namespace operators {
 namespace filter {
 namespace predicated {
-template <typename graph_t,
-          typename enactor_type,
-          typename operator_type,
-          typename frontier_type>
+template <typename graph_t, typename operator_t, typename frontier_t>
 void execute(graph_t& G,
-             enactor_type* E,
-             operator_type op,
-             frontier_type* input,
-             frontier_type* output,
+             operator_t op,
+             frontier_t* input,
+             frontier_t* output,
              cuda::standard_context_t& context) {
   using type_t = std::remove_pointer_t<decltype(input->data())>;
 
-  // Allocate output size.
-  output->resize(input->size());
+  // Allocate output size if necessary.
+  if (output->size() != input->size()) {
+    output->resize(input->size());
+  }
 
   auto predicate = [=] __host__ __device__(type_t const& i) -> bool {
     return gunrock::util::limits::is_valid(i) ? op(i) : false;
@@ -37,16 +35,15 @@ void execute(graph_t& G,
   auto new_size = thrust::distance(output->begin(), new_length);
   output->resize(new_size);
 
-  // // Uniquify!
+  // Uniquify!
   // auto new_end = thrust::unique(
   //     thrust::cuda::par.on(context.stream()),  // execution policy
   //     output->begin(),                         // input iterator: begin
   //     output->end()                            // input iterator: end
   // );
 
-  //   output->resize((new_end - output->data()));
-
-  E->swap_frontier_buffers();
+  // new_size = thrust::distance(output->begin(), new_end);
+  // output->resize(new_size);
 }
 }  // namespace predicated
 }  // namespace filter
