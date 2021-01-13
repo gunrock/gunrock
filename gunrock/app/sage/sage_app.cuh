@@ -342,8 +342,8 @@ double gunrock_sage(gunrock::util::Parameters &parameters, GraphT &graph
  * @param[out] preds       Return predecessors of each vertex
  * \return     double      Return accumulated elapsed times for all runs
  */
-template <typename VertexT, typename SizeT,
-          typename GValueT, typename SAGEValueT>
+template <typename VertexT, typename SizeT, typename GValueT,
+          typename SAGEValueT>
 double sage(const SizeT num_nodes, const SizeT num_edges,
             const SizeT *row_offsets, const VertexT *col_indices,
             const GValueT *edge_values, const int num_runs
@@ -375,14 +375,12 @@ double sage(const SizeT num_nodes, const SizeT num_edges,
   bool quiet = parameters.Get<bool>("quiet");
   GraphT graph;
   // Assign pointers into gunrock graph format
-  graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-  graph.CsrT::row_offsets.SetPointer(row_offsets, num_nodes + 1,
-                                     gunrock::util::HOST);
-  graph.CsrT::column_indices.SetPointer(col_indices, num_edges,
-                                        gunrock::util::HOST);
-  graph.CsrT::edge_values.SetPointer(edge_values, num_edges,
-                                     gunrock::util::HOST);
-  // graph.FromCsr(graph.csr(), true, quiet);
+  gunrock::util::Location target = gunrock::util::HOST;
+  graph.CsrT::Allocate(num_nodes, num_edges, target);
+  graph.CsrT::row_offsets.SetPointer(row_offsets, num_nodes + 1, target);
+  graph.CsrT::column_indices.SetPointer(col_indices, num_edges, target);
+  graph.CsrT::edge_values.SetPointer(edge_values, num_edges, target);
+  graph.FromCsr(graph.csr(), target, 0, quiet, true);
   gunrock::graphio::LoadGraph(parameters, graph);
 
   // Run the SSSP

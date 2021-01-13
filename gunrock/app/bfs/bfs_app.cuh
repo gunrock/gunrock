@@ -248,12 +248,13 @@ double bfs(const SizeT num_nodes, const SizeT num_edges,
   bool quiet = parameters.Get<bool>("quiet");
   GraphT graph;
   // Assign pointers into gunrock graph format
-  graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
+  gunrock::util::Location target = gunrock::util::HOST;
+  graph.CsrT::Allocate(num_nodes, num_edges, target);
   graph.CsrT::row_offsets.SetPointer((SizeT *)row_offsets, num_nodes + 1,
-                                     gunrock::util::HOST);
+                                     target);
   graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges,
-                                        gunrock::util::HOST);
-  graph.FromCsr(graph.csr(), gunrock::util::HOST, 0, quiet, true);
+                                        target);
+  graph.FromCsr(graph.csr(), target, 0, quiet, true);
   gunrock::graphio::LoadGraph(parameters, graph);
 
   // Run the BFS
