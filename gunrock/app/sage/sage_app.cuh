@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 
 /**
- * @file sage_app.cu
+ * @file sage_app.cuh
  *
  * @brief graphSage application
  */
@@ -342,8 +342,8 @@ double gunrock_sage(gunrock::util::Parameters &parameters, GraphT &graph
  * @param[out] preds       Return predecessors of each vertex
  * \return     double      Return accumulated elapsed times for all runs
  */
-template <typename VertexT = int, typename SizeT = int,
-          typename GValueT = unsigned int, typename SAGEValueT = GValueT>
+template <typename VertexT, typename SizeT,
+          typename GValueT, typename SAGEValueT>
 double sage(const SizeT num_nodes, const SizeT num_edges,
             const SizeT *row_offsets, const VertexT *col_indices,
             const GValueT *edge_values, const int num_runs
