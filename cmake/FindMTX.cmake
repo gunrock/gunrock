@@ -2,12 +2,12 @@
 #  Find external mtx directories
 # ------------------------------------------------------------------------
 SET(MTX_INCLUDEDIR
-  ${CMAKE_SOURCE_DIR}/externals/mtx
+  ${PROJECT_SOURCE_DIR}/externals/mtx
   CACHE PATH
   "Directory to the MTX include files")
 
 SET(MTX_SOURCE_DIR
-  ${CMAKE_SOURCE_DIR}/externals/mtx
+  ${PROJECT_SOURCE_DIR}/externals/mtx
   CACHE PATH
   "Directory to the MTX source files")
 
