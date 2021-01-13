@@ -41,7 +41,7 @@
 # -----------------------------------------------------------------------------------
 
 SET(RAPIDJSON_INCLUDEDIR
-  ${CMAKE_SOURCE_DIR}/externals/rapidjson/include
+  ${PROJECT_SOURCE_DIR}/externals/rapidjson/include
   CACHE PATH
   "Directory to the RapidJson include files")
 

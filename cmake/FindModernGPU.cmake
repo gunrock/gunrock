@@ -2,12 +2,12 @@
 #  Find external moderngpu directories
 # ------------------------------------------------------------------------
 SET(MODERNGPU_INCLUDEDIR
-  ${CMAKE_SOURCE_DIR}/externals/moderngpu/src
+  ${PROJECT_SOURCE_DIR}/externals/moderngpu/src
   CACHE PATH
   "Directory to the Modern GPU include files")
 
 SET(MODERNGPU_SOURCE_DIR
-  ${CMAKE_SOURCE_DIR}/externals/moderngpu/src/moderngpu
+  ${PROJECT_SOURCE_DIR}/externals/moderngpu/src/moderngpu
   CACHE PATH
   "Directory to the Modern GPU source files")
 

@@ -20,10 +20,10 @@ set(PROJECT_DEPS_DIR externals)
 # end /* Dependencies directory */
 
 # begin /* Include cmake modules */
-include(${CMAKE_SOURCE_DIR}/cmake/FindRapidJSON.cmake)
-include(${CMAKE_SOURCE_DIR}/cmake/FindModernGPU.cmake)
-include(${CMAKE_SOURCE_DIR}/cmake/FindMTX.cmake)
-include(${CMAKE_SOURCE_DIR}/cmake/CUDAArchitectures.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FindRapidJSON.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FindModernGPU.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FindMTX.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/CUDAArchitectures.cmake)
 # end /* Include cmake modules */
 
 
@@ -43,7 +43,9 @@ set(LIBRARY_OUTPUT_PATH
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-############ SET LANGUAGE STANDARDS ############
+####################################################
+############## SET LANGUAGE STANDARDS ##############
+####################################################
 # set(CMAKE_CXX_STANDARD 17)
 # set(CMAKE_CUDA_STANDARD 17)
 # set(CMAKE_CUDA_STANDARD_REQUIRED TRUE)
@@ -137,11 +139,11 @@ target_compile_options(essentials INTERFACE
 ####################################################
 ############ BUILD EXAMPLE APPLICATIONS ############
 ####################################################
-option(ESSENTIALS_BUILD_EXAMPLES
-  "If on, builds the example graph applications."
-  ON)
+# option(ESSENTIALS_BUILD_EXAMPLES
+#   "If on, builds the example graph applications."
+#   OFF)
 
-# Subdirectories for examples, testing and documentation
-if(ESSENTIALS_BUILD_EXAMPLES)
-  add_subdirectory(examples)
-endif(ESSENTIALS_BUILD_EXAMPLES)
+# # Subdirectories for examples, testing and documentation
+# if(ESSENTIALS_BUILD_EXAMPLES)
+#   add_subdirectory(examples)
+# endif(ESSENTIALS_BUILD_EXAMPLES)
