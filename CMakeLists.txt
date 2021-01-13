@@ -139,11 +139,11 @@ target_compile_options(essentials INTERFACE
 ####################################################
 ############ BUILD EXAMPLE APPLICATIONS ############
 ####################################################
-# option(ESSENTIALS_BUILD_EXAMPLES
-#   "If on, builds the example graph applications."
-#   OFF)
+option(ESSENTIALS_BUILD_EXAMPLES
+  "If on, builds the example graph applications."
+  ON)
 
-# # Subdirectories for examples, testing and documentation
-# if(ESSENTIALS_BUILD_EXAMPLES)
-#   add_subdirectory(examples)
-# endif(ESSENTIALS_BUILD_EXAMPLES)
+# Subdirectories for examples, testing and documentation
+if(ESSENTIALS_BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif(ESSENTIALS_BUILD_EXAMPLES)
