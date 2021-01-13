@@ -8,22 +8,18 @@ namespace operators {
 namespace filter {
 namespace uniquify {
 
-template <typename graph_t,
-          typename enactor_type,
-          typename operator_type,
-          typename frontier_type>
+template <typename graph_t, typename operator_t, typename frontier_t>
 void execute(graph_t& G,
-             enactor_type* E,
-             operator_type op,
-             frontier_type* input,
-             frontier_type* output,
-             cuda::standard_context_t& __ignore) {
-  // XXX: should use existing context (__ignore)
-  mgpu::standard_context_t context(false);
+             operator_t op,
+             frontier_t* input,
+             frontier_t* output,
+             cuda::standard_context_t& context) {
+  // XXX: should use existing context (context)
+  mgpu::standard_context_t __context(false, context.stream());
 
   using size_type = decltype(input->size());
 
-  auto compact = mgpu::transform_compact(input->size(), context);
+  auto compact = mgpu::transform_compact(input->size(), __context);
   auto input_data = input->data();
   int stream_count = compact.upsweep([=] __device__(size_type idx) {
     auto item = input_data[idx];
@@ -34,7 +30,6 @@ void execute(graph_t& G,
   compact.downsweep([=] __device__(size_type dest_idx, size_type source_idx) {
     output_data[dest_idx] = input_data[source_idx];
   });
-  E->swap_frontier_buffers();
 }
 }  // namespace uniquify
 }  // namespace filter

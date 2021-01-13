@@ -48,7 +48,7 @@ CUSPARSE    = -lcusparse
 
 GUNROCK_DEF = -Xcompiler -DGUNROCKVERSION=2.0.0
 LINK        = $(BOOST_LINK) $(OMP_LINK) $(METIS_LINK) $(GUNROCK_DEF)
-INC         = -I.. -I../.. $(CUDA_CPP) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(JSON_INC) $(CUDA_INC) $(MTX_INC) $(LINK)
+INC         = -I.. -I../.. -I../../include $(CUDA_CPP) $(OMP_INC) $(MGPU_INC) $(CUB_INC) $(JSON_INC) $(CUDA_INC) $(MTX_INC) $(LINK)
 
 #-------------------------------------------------------------------------------
 # Defines
@@ -96,29 +96,12 @@ endif
 #-------------------------------------------------------------------------------
 # Dependency Lists
 #-------------------------------------------------------------------------------
-SOURCE = ../../gunrock/util/gitsha1make.c
+SOURCE = ../../include/gunrock/util/gitsha1make.c
 SOURCE += ../../externals/mtx/mmio.cpp
-
-# ifeq (DARWIN, $(findstring DARWIN, $(OSUPPER)))
-#     EXTRA_SOURCE = $(EXTRA_SOURCE_) \
-# 	    ../../gunrock/util/misc_utils.cu
-# else
-#     EXTRA_SOURCE = $(EXTRA_SOURCE_)
-# endif
 
 DEPS = ./Makefile \
     ../Makefile.inc \
-    $(SOURCE) \
-	$(wildcard ../../gunrock/cuda/*.hxx) \
-    $(wildcard ../../gunrock/algorithms/*.hxx) \
-    $(wildcard ../../gunrock/algorithms/**/*.hxx)  \
-    $(wildcard ../../gunrock/util/*.hxx) \
-	$(wildcard ../../gunrock/util/*.cuh)  \
-	$(wildcard ../../gunrock/io/*.hxx) \
-	$(wildcard ../../gunrock/formats/*.hxx) \
-    $(wildcard ../../gunrock/container/*.hxx) \
-	$(wildcard ../../gunrock/framework/*.hxx) \
-	$(wildcard ../../gunrock/framework/**/*.hxx)
+    $(SOURCE)
 
 #-------------------------------------------------------------------------------
 # Clean

@@ -23,7 +23,8 @@ enum load_balance_t {
   merge_path,     // Merrill & Garland (SpMV)
   bucketing,      // Davidson et al. (SSSP)
   work_stealing,  // <cite>
-  unbalanced      // No load-balancing applied
+  unbalanced,     // No load-balancing applied
+  all_edges       // Output-Oriented
 };
 
 enum advance_type_t {
