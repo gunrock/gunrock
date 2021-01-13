@@ -43,7 +43,7 @@ double bfs(const SizeT    num_nodes,
            const bool     idempotence,
            LabelT         **labels,
            VertexT        **preds = NULL,
-           const int      num_runs,);
+           const int      num_runs);
 
 /**
  * @brief Simple interface take in graph as CSR format
