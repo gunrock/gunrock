@@ -6,7 +6,7 @@
 namespace gunrock {
 namespace operators {
 namespace filter {
-namespace uniquify {
+namespace compact {
 
 template <typename graph_t, typename operator_t, typename frontier_t>
 void execute(graph_t& G,
@@ -31,7 +31,7 @@ void execute(graph_t& G,
     output_data[dest_idx] = input_data[source_idx];
   });
 }
-}  // namespace uniquify
+}  // namespace compact
 }  // namespace filter
 }  // namespace operators
 }  // namespace gunrock

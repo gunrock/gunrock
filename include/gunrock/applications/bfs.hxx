@@ -114,7 +114,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         G, E, search, context);
 
     // Execute filter operator on the provided lambda
-    operators::filter::execute<operators::filter_type_t::uniquify>(
+    operators::filter::execute<operators::filter_algorithm_t::compact>(
         G, E, remove_visited, context);
   }
 
@@ -126,10 +126,9 @@ float run(graph_t& G,
           typename graph_t::vertex_type* distances,      // Output
           typename graph_t::vertex_type* predecessors    // Output
 ) {
-  
   // <user-defined>
-  using vertex_t    = typename graph_t::vertex_type;
-  using param_type  = param_t<vertex_t>;
+  using vertex_t = typename graph_t::vertex_type;
+  using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t>;
 
   param_type param(single_source);

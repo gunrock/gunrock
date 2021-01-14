@@ -20,11 +20,11 @@ namespace operators {
  *
  */
 enum load_balance_t {
-  merge_path,     // Merrill & Garland (SpMV)
-  bucketing,      // Davidson et al. (SSSP)
-  work_stealing,  // <cite>
-  unbalanced,     // No load-balancing applied
-  all_edges       // Output-Oriented
+  merge_path,      // Merrill & Garland (SpMV)
+  bucketing,       // Davidson et al. (SSSP)
+  work_stealing,   // <cite>
+  input_oriented,  // Input-Oriented
+  all_edges        // Output-Oriented (advance entire graph)
 };
 
 enum advance_type_t {
@@ -40,9 +40,9 @@ enum advance_direction_t {
   optimized  // Push-pull optimized
 };
 
-enum filter_type_t {
+enum filter_algorithm_t {
   predicated,  // Copy if predicate = true
-  uniquify,    // Exact deduplication (100%)
+  compact,     // 2-Pass Transform compact
   bypass       // Marks as invalid, instead of culling
 };
 

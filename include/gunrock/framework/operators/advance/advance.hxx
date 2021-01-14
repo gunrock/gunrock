@@ -20,7 +20,7 @@
 
 #include <gunrock/framework/operators/advance/helpers.hxx>
 #include <gunrock/framework/operators/advance/merge_path.hxx>
-#include <gunrock/framework/operators/advance/unbalanced.hxx>
+#include <gunrock/framework/operators/advance/input_oriented.hxx>
 #include <gunrock/framework/operators/advance/all_edges.hxx>
 
 namespace gunrock {
@@ -60,9 +60,9 @@ void execute(graph_t& G,
   if (lb == load_balance_t::merge_path)
     merge_path::execute<type, direction>(G, op, input, output, segments,
                                          *context);
-  else if (lb == load_balance_t::unbalanced)
-    unbalanced::execute<type, direction>(G, op, input, output, segments,
-                                         *context);
+  else if (lb == load_balance_t::input_oriented)
+    input_oriented::execute<type, direction>(G, op, input, output, segments,
+                                             *context);
   else if (lb == load_balance_t::all_edges)
     all_edges::execute<type, direction>(G, op, input, output, segments,
                                         *context);

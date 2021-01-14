@@ -20,7 +20,6 @@
 namespace gunrock {
 namespace color {
 
-
 struct param_t {
   // No parameters for this algorithm
 };
@@ -33,7 +32,6 @@ struct result_t {
 
 template <typename graph_t, typename param_type, typename result_type>
 struct problem_t : gunrock::problem_t<graph_t> {
-  
   param_type param;
   result_type result;
 
@@ -44,7 +42,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
       : gunrock::problem_t<graph_t>(G, _context),
         param(_param),
         result(_result) {}
-  
+
   using vertex_t = typename graph_t::vertex_type;
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
@@ -77,7 +75,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   void prepare_frontier(cuda::standard_context_t* context) override {
     auto P = this->get_problem();
     auto f = this->get_input_frontier();
-    
+
     auto n_vertices = P->get_graph().get_number_of_vertices();
 
     // XXX: Find a better way to initialize the frontier to all nodes
@@ -91,8 +89,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto P = this->get_problem();
     auto G = P->get_graph();
 
-    auto colors    = P->result.colors;
-    auto randoms   = P->randoms.data().get();
+    auto colors = P->result.colors;
+    auto randoms = P->randoms.data().get();
     auto iteration = E->iteration;
 
     auto color_me_in = [G, colors, randoms, iteration] __host__ __device__(
@@ -135,7 +133,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute filter operator on the provided lambda.
-    operators::filter::execute<operators::filter_type_t::uniquify>(
+    operators::filter::execute<operators::filter_algorithm_t::compact>(
         G, E, color_me_in, context);
   }
   // </user-defined>
@@ -145,13 +143,12 @@ template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type* colors  // Output
 ) {
-  
   // <user-defined>
-  using vertex_t    = typename graph_t::vertex_type;
-  
-  using param_type  = param_t;
+  using vertex_t = typename graph_t::vertex_type;
+
+  using param_type = param_t;
   using result_type = result_t<vertex_t>;
-  
+
   param_type param;
   result_type result(colors);
   // </user-defined>
