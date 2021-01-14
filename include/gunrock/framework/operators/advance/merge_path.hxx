@@ -41,7 +41,9 @@ void execute(graph_t& G,
   // XXX: should use existing context (context)
   mgpu::standard_context_t _context(false, context.stream());
 
-  auto size_of_output = compute_output_length(G, input, segments, context);
+  auto size_of_output_ignore =
+      compute_output_length(G, input, segments, context);
+  auto size_of_output = compute_output_length(G, input, segments, _context);
 
   // If output frontier is empty, resize and return.
   if (size_of_output <= 0) {
