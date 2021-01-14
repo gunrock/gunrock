@@ -279,10 +279,10 @@ struct Queues {
         __syncwarp(mask);
     }
 
-    template<typename Functor, typename... Args>
-    __host__ void launch_thread(int numBlock, int numThread, Functor f, Args... arg) {
+    template<typename Functor>
+    __host__ void launch_thread(int numBlock, int numThread, Functor f) {
         for(int i = 0; i < num_queues; i++)
-            worklist[i].launch_thread(numBlock / num_queues, numThread, streams[i], f, arg...);
+            worklist[i].launch_thread(numBlock / num_queues, numThread, streams[i], f, *this);
     }
 
     __host__ void reset() {
