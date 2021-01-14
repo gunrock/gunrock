@@ -112,11 +112,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * @param[in] gpu_idx     GPU device index
      * @param[in] target      Targeting device location
      * @param[in] flag        Problem flag containling options
+     * @param[in] parameters  Parameters struct initialized in sssp_app
      * \return    cudaError_t Error message(s), if any
      */
     cudaError_t Init(GraphT &sub_graph, int num_gpus = 1, int gpu_idx = 0,
                      util::Location target = util::DEVICE,
-                     ProblemFlag flag = Problem_None) {
+                     ProblemFlag flag = Problem_None, util::Parameters& parameters = NULL) {
       cudaError_t retval = cudaSuccess;
 
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
@@ -131,8 +132,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       {
           GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this -> stream));
       }*/
-      GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
-      return retval;
+
+      //Don't need to move sub_graph from host to device if data already stored in host.
+      if (parameters.Get<util::Location>("mem-space")==util::HOST){
+       GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
+      }
+       return retval;
     }  // Init
 
     /**
@@ -233,6 +238,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @param[in]  target where the results are stored
    * \return     cudaError_t Error message(s), if any
    */
+  // auto getParam(){
+  //   return parameters;
+  // }
+
   cudaError_t Extract(ValueT *h_distances, VertexT *h_preds = NULL,
                       util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
@@ -318,18 +327,18 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
     if (this->parameters.template Get<bool>("mark-pred"))
       this->flag = this->flag | Mark_Predecessors;
+    
+      for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+        data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
+        if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
 
-    for (int gpu = 0; gpu < this->num_gpus; gpu++) {
-      data_slices[gpu].SetName("data_slices[" + std::to_string(gpu) + "]");
-      if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+        GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
 
-      GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
+        auto &data_slice = data_slices[gpu][0];
 
-      auto &data_slice = data_slices[gpu][0];
-      GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
-                               this->gpu_idx[gpu], target, this->flag));
-    }  // end for (gpu)
-
+        GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
+                                this->gpu_idx[gpu], target, this->flag, this->parameters));
+      }  // end for (gpu)
     return retval;
   }
 

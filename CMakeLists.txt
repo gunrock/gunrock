@@ -72,6 +72,23 @@ set(gunrock_INCLUDE_DIRS
 include_directories(${gunrock_INCLUDE_DIRS})
 # end /* Include gunrock directories ./ */
 
+include(cmake/CPM.cmake)
+CPMAddPackage(
+  NAME RapidJSON
+  GITHUB_REPOSITORY Tencent/rapidjson
+  GIT_TAG v1.1.0-489-g4b3d7c2f
+  SOURCE_DIR ${CMAKE_SOURCE_DIR}/externals/rapidjson)
+CPMAddPackage(
+  NAME ModernGPU
+  GITHUB_REPOSITORY NVlabs/moderngpu
+  GIT_TAG v2.12_june_8_2016-16-g2b39855
+  SOURCE_DIR ${CMAKE_SOURCE_DIR}/externals/moderngpu)
+CPMAddPackage(
+  NAME CUB
+  GITHUB_REPOSITORY NVlabs/cub
+  GIT_TAG 1.8.0
+  SOURCE_DIR ${CMAKE_SOURCE_DIR}/externals/cub)
+
 # begin /* Include moderngpu & cub */
 include(${CMAKE_SOURCE_DIR}/cmake/FindRapidJson.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindModernGPU.cmake)
@@ -140,6 +157,8 @@ set(GENCODE_SM72
   -gencode=arch=compute_72,code=sm_72 -gencode=arch=compute_72,code=compute_72)
 set(GENCODE_SM75
   -gencode=arch=compute_75,code=sm_75 -gencode=arch=compute_75,code=compute_75)
+set(GENCODE_SM80
+  -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_80,code=compute_80)
 
 #set(GENCODE -gencode=arch=compute_10,code=compute_10) # at least generate PTX
 # end /* SET GENCODE_SM */
@@ -280,6 +299,13 @@ if (CUDA_VERSION VERSION_EQUAL "10.0" OR CUDA_VERSION VERSION_GREATER "10.0")
     OFF)
 endif ()
 
+#Ampere Architecture: CUDA 11
+if (CUDA_VERSION VERSION_EQUAL "11.0" OR CUDA_VERSION VERSION_GREATER "11.0")
+  option(GUNROCK_GENCODE_SM80
+    "ON to generate code for Compute Capability 8.0 devices"
+    OFF)
+endif ()
+
 option (CUDA_AUTODETECT_GENCODE
   "On to enable autodetection of appropriate gencode=X options for each detected device"
   OFF)
@@ -344,6 +370,10 @@ endif(GUNROCK_GENCODE_SM72)
 if (GUNROCK_GENCODE_SM75)
   set(GENCODE ${GENCODE} ${GENCODE_SM75})
 endif(GUNROCK_GENCODE_SM75)
+
+if (GUNROCK_GENCODE_SM80)
+  set(GENCODE ${GENCODE} ${GENCODE_SM80})
+endif(GUNROCK_GENCODE_SM80)
 
 message(STATUS "Listing chosen GENCODE commands")
 foreach(code IN LISTS GENCODE)

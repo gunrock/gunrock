@@ -4,7 +4,7 @@
  */
 
 #include <stdio.h>
-#include <gunrock/gunrock.h>
+#include <gunrock/gunrock.hpp>
 
 #include <thrust/device_vector.h>
 #include <thrust/for_each.h>
@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
   //  Host call
   //
   printf("host memory call\n");
-  hits(num_verts, num_edges, graph_offsets.data(), graph_indices.data(), max_iter, tol, hits_norm, hub_ranks.data(), auth_ranks.data(), HOST);
+  hits<int, int, float>(num_verts, num_edges, graph_offsets.data(), graph_indices.data(), max_iter, tol, hits_norm, hub_ranks.data(), auth_ranks.data(), HOST);
 
   for (int i = 0 ; i < num_verts ; ++i) {
     printf("Node_ID: [%d], Hub Score: [%f], Auth Score: [%f]\n", i, hub_ranks[i], auth_ranks[i]);

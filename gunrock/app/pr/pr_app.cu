@@ -101,6 +101,9 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   cpu_timer.Stop();
   parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
 
+  // Collect elapsed iterations
+  std::vector<int> elapsed_iterations;
+
   // perform PageRank
   VertexT src;
   for (int run_num = 0; run_num < num_runs; ++run_num) {
@@ -135,7 +138,10 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
           ref_node_ids == NULL ? NULL : ref_node_ids[run_num % num_srcs],
           ref_ranks == NULL ? NULL : ref_ranks[run_num % num_srcs], false);
     }
+    elapsed_iterations.push_back(enactor.enactor_slices[0].enactor_stats.iteration);
   }
+
+  info.SetVal("elapsed-iterations", elapsed_iterations);
 
   cpu_timer.Start();
   if (!quick_mode && validation == "last") {
