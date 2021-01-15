@@ -148,11 +148,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * @brief initializing hits-specific data on each gpu
      * @param     sub_graph   Sub graph on the GPU.
      * @param[in] gpu_idx     GPU device index
+     * @param[in] memspace    Location where data has been allocated
      * @param[in] target      Targeting device location
      * @param[in] flag        Problem flag containling options
      * \return    cudaError_t Error message(s), if any
      */
-    cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,  util::Location allocated_on, util::Location target, ProblemFlag flag) {
+    cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,  util::Location memspace, util::Location target, ProblemFlag flag) {
       cudaError_t retval = cudaSuccess;
 
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
@@ -170,8 +171,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(cur_error.Allocate(1, target | util::HOST));
 
-      // TODO: only call this if the csr matrix is already on the host. Not needed if allocated_on == GPU
-      if (allocated_on == util::HOST && (target & util::DEVICE)) {
+      // TODO: only call this if the csr matrix is already on the host. Not needed if memspace == GPU
+      if (memspace == util::HOST && (target & util::DEVICE)) {
         GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
       }
       return retval;
@@ -330,10 +331,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   /**
    * @brief initialization function.
    * @param     graph       The graph that SSSP processes on
-   * @param[in] Location    Memory location to work on
+   * @param[in] memspace    Location where data was allocated
+   * @param[in] target      Memory location to work on
    * \return    cudaError_t Error message(s), if any
    */
-  cudaError_t Init(GraphT &graph, util::Location allocated_on = util::HOST, util::Location target = util::DEVICE) {
+  cudaError_t Init(GraphT &graph, util::Location memspace = util::HOST, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
@@ -353,7 +355,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           this->parameters.template Get<SizeT>("hits-normalize-n");
 
       GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
-                               this->gpu_idx[gpu], allocated_on, target, this->flag));
+                               this->gpu_idx[gpu], memspace, target, this->flag));
     }
 
     return retval;

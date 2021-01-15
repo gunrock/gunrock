@@ -98,11 +98,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * @brief initializing sssp-specific data on each gpu
      * @param     sub_graph   Sub graph on the GPU.
      * @param[in] gpu_idx     GPU device index
+     * @param[in] memspace    Location where data is allocated
      * @param[in] target      Targeting device location
      * @param[in] flag        Problem flag containling options
      * \return    cudaError_t Error message(s), if any
      */
     cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,
+                     util::Location memspace,
                      util::Location target, ProblemFlag flag,
                      int seed) {
       cudaError_t retval = cudaSuccess;
@@ -115,7 +117,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(colors.Allocate(sub_graph.nodes, target));
       GUARD_CU(rand.Allocate(sub_graph.nodes, target));
 
-      if (target & util::DEVICE) {
+      if (memspace == util::HOST && (target & util::DEVICE)) {
         GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
       }
       return retval;
@@ -195,27 +197,39 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 ...
    * \return     cudaError_t Error message(s), if any
    */
-  cudaError_t Extract(VertexT *h_colors, util::Location target = util::DEVICE) {
+  cudaError_t Extract(VertexT *h_colors,
+                      util::Location target = util::DEVICE,
+                      util::Location device = util::HOST) {
     cudaError_t retval = cudaSuccess;
     SizeT nodes = this->org_graph->nodes;
 
     if (this->num_gpus == 1) {
       auto &data_slice = data_slices[0][0];
 
-      // Set device
-      if (target == util::DEVICE) {
-        GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+      if (device == util::HOST) { // Store on the CPU
+        // Set device
+        if (target == util::DEVICE) {
+          GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-        GUARD_CU(data_slice.colors.SetPointer(h_colors, nodes, util::HOST));
-        GUARD_CU(data_slice.colors.Move(util::DEVICE, util::HOST));
-      } else if (target == util::HOST) {
-        GUARD_CU(data_slice.colors.ForEach(
-            h_colors,
-            [] __host__ __device__(const VertexT &device_val,
-                                   VertexT &host_val) {
-              host_val = device_val;
-            },
-            nodes, util::HOST));
+          GUARD_CU(data_slice.colors.SetPointer(h_colors, nodes, util::HOST));
+          GUARD_CU(data_slice.colors.Move(util::DEVICE, util::HOST));
+        } else if (target == util::HOST) {
+          GUARD_CU(data_slice.colors.ForEach(
+              h_colors,
+              [] __host__ __device__(const VertexT &device_val,
+                                     VertexT &host_val) {
+                host_val = device_val;
+              },
+              nodes, util::HOST));
+        }
+      } else if (device == util::DEVICE) { // Store on the GPU
+        if (target == util:: HOST) {
+          // Not implemented
+        } else if (target == util::DEVICE) { // Compute on the GPU
+          GUARD_CU(cudaMemcpy(h_colors, data_slice.colors.GetPointer(util::DEVICE), nodes * sizeof(ValueT), cudaMemcpyDeviceToDevice));
+        } else { // Unsupported option
+          assert(false); 
+        }
       }
     } else {  // num_gpus != 1
 
@@ -256,10 +270,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   /**
    * @brief initialization function.
    * @param     graph       The graph that SSSP processes on
+   * @param[in] memspace    Location where data was allocated
    * @param[in] Location    Memory location to work on
    * \return    cudaError_t Error message(s), if any
    */
-  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE) {
+  cudaError_t Init(GraphT &graph, util::Location memspace = util::HOST, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
@@ -275,7 +290,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       auto &data_slice = data_slices[gpu][0];
       GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
-                               this->gpu_idx[gpu], target, this->flag,
+                               this->gpu_idx[gpu], memspace, target, this->flag,
                                this->seed));
     }
 

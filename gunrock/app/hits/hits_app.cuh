@@ -161,7 +161,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
  * @param[in]  graph      Input graph
  * @param[out] hub_ranks   Vertex hub scores
  * @param[out] auth ranks  Vertex authority scores
- * @param[in]  allocated_on    Target device where inputs and outputs are stored
+ * @param[in]  memspace    Target device where inputs and outputs are stored
  * \return     double     Return accumulated elapsed times for all iterations
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
@@ -170,7 +170,7 @@ double gunrock_hits(
     GraphT &data_graph,
     ValueT *hub_ranks,
     ValueT *auth_ranks,
-    gunrock::util::Location allocated_on = gunrock::util::HOST)
+    gunrock::util::Location memspace = gunrock::util::HOST)
 {
     typedef typename GraphT::VertexT VertexT;
     typedef gunrock::app::hits::Problem<GraphT  > ProblemT;
@@ -184,8 +184,8 @@ double gunrock_hits(
     // Allocate problem and enactor on GPU, and initialize them
     ProblemT problem(parameters);
     EnactorT enactor;
-    problem.Init(data_graph, allocated_on, target);
-    enactor.Init(problem   , target);
+    problem.Init(data_graph, memspace, target);
+    enactor.Init(problem, target);
 
     problem.Reset(target);
     enactor.Reset(data_graph.nodes, target);
@@ -195,7 +195,7 @@ double gunrock_hits(
     cpu_timer.Stop();
 
     total_time += cpu_timer.ElapsedMillis();
-    problem.Extract(hub_ranks, auth_ranks, target, allocated_on);    
+    problem.Extract(hub_ranks, auth_ranks, target, memspace);    
 
     enactor.Release(target);
     problem.Release(target);
@@ -230,7 +230,7 @@ double hits(
     const int          hits_norm,
     GValueT           *hub_ranks,
     GValueT           *auth_ranks,
-    gunrock::util::Location allocated_on = gunrock::util::HOST)
+    gunrock::util::Location memspace = gunrock::util::HOST)
 {
 
     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
@@ -254,7 +254,7 @@ double hits(
     // Assign pointers into gunrock graph format
     gunrock::util::Location target = gunrock::util::HOST;
 
-    if (allocated_on == gunrock::util::DEVICE) {
+    if (memspace == gunrock::util::DEVICE) {
       target = gunrock::util::DEVICE;
     }
 
@@ -265,7 +265,7 @@ double hits(
     data_graph.FromCsr(data_graph.csr(), target, 0, quiet, true);
 
     // Run HITS
-    double elapsed_time = gunrock_hits(parameters, data_graph, hub_ranks, auth_ranks, allocated_on);
+    double elapsed_time = gunrock_hits(parameters, data_graph, hub_ranks, auth_ranks, memspace);
 
     // Cleanup
     data_graph.Release();

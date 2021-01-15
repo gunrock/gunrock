@@ -27,6 +27,8 @@
 
 // Others
 #include <cstdio>
+#include <thrust/device_vector.h>
+#include <thrust/unique.h>
 
 namespace gunrock {
 namespace app {
@@ -84,12 +86,15 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   total_timer.Start();
 
   VertexT *h_colors = new VertexT[graph.nodes];
+  util::Location memspace = util::HOST;
 
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
-  GUARD_CU(problem.Init(graph, target));
+  GUARD_CU(problem.Init(graph, memspace, target));
   GUARD_CU(enactor.Init(problem, target));
+
+  graph.Display();
 
   cpu_timer.Stop();
   parameters.Set("preprocess-time", cpu_timer.ElapsedMillis());
@@ -112,7 +117,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
             std::to_string(enactor.enactor_slices[0].enactor_stats.iteration),
         !quiet_mode);
     if (validation == "each") {
-      GUARD_CU(problem.Extract(h_colors));
+      GUARD_CU(problem.Extract(h_colors, target, memspace));
       SizeT num_errors = Validate_Results(parameters, graph, h_colors,
                                           ref_colors, false);
     }
@@ -120,7 +125,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   cpu_timer.Start();
 
-  GUARD_CU(problem.Extract(h_colors));
+  GUARD_CU(problem.Extract(h_colors, target, memspace));
   if (validation == "last") {
     SizeT num_errors = Validate_Results(parameters, graph, h_colors, ref_colors,
                                         false);
@@ -168,14 +173,15 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
  * @tparam     VertexT    Type of the colors
  * @param[in]  parameters Excution parameters
  * @param[in]  graph      Input graph
- * @param[out] colors     Return generated colors for each run
- * @param[out] num_colors Return number of colors generated for each run
+ * @param[out] colors     Return generated colors
  * \return     double     Return accumulated elapsed times for all runs
  */
 template <typename GraphT, typename VertexT = typename GraphT::VertexT,
           typename SizeT = typename GraphT::SizeT>
-double gunrock_color(gunrock::util::Parameters &parameters, GraphT &graph,
-                     VertexT **colors, SizeT *num_colors) {
+double gunrock_color(gunrock::util::Parameters &parameters,
+                     GraphT &graph,
+                     VertexT *colors,
+                     gunrock::util::Location memspace = gunrock::util::HOST) {
   typedef gunrock::app::color::Problem<GraphT> ProblemT;
   typedef gunrock::app::color::Enactor<ProblemT> EnactorT;
   gunrock::util::CpuTimer cpu_timer;
@@ -186,31 +192,18 @@ double gunrock_color(gunrock::util::Parameters &parameters, GraphT &graph,
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
-  problem.Init(graph, target);
+  problem.Init(graph, memspace, target);
   enactor.Init(problem, target);
 
-  int num_runs = parameters.Get<int>("num-runs");
-  for (int run_num = 0; run_num < num_runs; ++run_num) {
-    problem.Reset(target);
-    enactor.Reset(target);
+  problem.Reset(target);
+  enactor.Reset(target);
 
-    cpu_timer.Start();
-    enactor.Enact();
-    cpu_timer.Stop();
+  cpu_timer.Start();
+  enactor.Enact();
+  cpu_timer.Stop();
 
-    total_time += cpu_timer.ElapsedMillis();
-    problem.Extract(colors[run_num]);
-
-    // count number of colors
-    std::unordered_set<int> set;
-    for (SizeT v = 0; v < graph.nodes; v++) {
-      int c = colors[run_num][v];
-      if (set.find(c) == set.end()) {
-        set.insert(c);
-        num_colors[run_num] += 1;
-      }
-    }
-  }
+  total_time += cpu_timer.ElapsedMillis();
+  problem.Extract(colors, target, memspace);
 
   enactor.Release(target);
   problem.Release(target);
@@ -220,18 +213,18 @@ double gunrock_color(gunrock::util::Parameters &parameters, GraphT &graph,
 /*
  * @brief Entry of gunrock_color function
  * @tparam     VertexT    Type of the colors
- * @tparam     SizeT      Type of the num_colors
+ * @tparam     SizeT      Type of the row_offsets
  * @param[in]  parameters Excution parameters
  * @param[in]  graph      Input graph
  * @param[out] colors     Return generated colors for each run
- * @param[out] num_colors Return number of colors generated for each run
  * \return     double     Return accumulated elapsed times for all runs
  */
-template <typename VertexT = int, typename SizeT = int,
-          typename GValueT = unsigned int>
+template <typename VertexT, typename SizeT,
+          typename GValueT>
 double color(const SizeT num_nodes, const SizeT num_edges,
              const SizeT *row_offsets, const VertexT *col_indices,
-             const int num_runs, int **colors, int *num_colors,
+             VertexT *colors,
+             gunrock::util::Location memspace = gunrock::util::HOST,
              const GValueT edge_values = NULL) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
                                            gunrock::graph::HAS_CSR>
@@ -245,21 +238,19 @@ double color(const SizeT num_nodes, const SizeT num_edges,
   gunrock::app::UseParameters_test(parameters);
   parameters.Parse_CommandLine(0, NULL);
   parameters.Set("graph-type", "by-pass");
-  parameters.Set("num-runs", num_runs);
 
   bool quiet = parameters.Get<bool>("quiet");
   GraphT graph;
   // Assign pointers into gunrock graph format
-  graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
+  graph.CsrT::Allocate(num_nodes, num_edges, memspace);
   graph.CsrT::row_offsets.SetPointer((SizeT *)row_offsets, num_nodes + 1,
-                                     gunrock::util::HOST);
+                                     memspace);
   graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges,
-                                        gunrock::util::HOST);
-  // graph.FromCsr(graph.csr(), true, quiet);
-  gunrock::graphio::LoadGraph(parameters, graph);
+                                        memspace);
+  graph.FromCsr(graph.csr(), memspace, 0, quiet, true);
 
   // Run the graph coloring
-  double elapsed_time = gunrock_color(parameters, graph, colors, num_colors);
+  double elapsed_time = gunrock_color(parameters, graph, colors, memspace);
 
   // Cleanup
   graph.Release();
@@ -267,20 +258,9 @@ double color(const SizeT num_nodes, const SizeT num_edges,
   return elapsed_time;
 }
 
-/*
- * @brief Entry of gunrock_color function
- * @tparam     VertexT    Type of the colors
- * @tparam     SizeT      Type of the num_colors
- * @param[in]  parameters Excution parameters
- * @param[in]  graph      Input graph
- * @param[out] colors     Return generated colors for each run
- * @param[out] num_colors Return number of colors generated for each run
- * \return     double     Return accumulated elapsed times for all runs
- */
 double color(const int num_nodes, const int num_edges, const int *row_offsets,
-             const int *col_indices, int *colors, int num_colors) {
-  return color(num_nodes, num_edges, row_offsets, col_indices, 1 /* num_runs */,
-               &colors, &num_colors);
+             const int *col_indices, int *colors) {
+  return color<int, int, int>(num_nodes, num_edges, row_offsets, col_indices, colors);
 }
 
 // Leave this at the end of the file

@@ -90,6 +90,18 @@ double hits(
     GValueT           *auth_ranks,
     gunrock::util::Location memspace = gunrock::util::HOST);
 
+template <
+    typename VertexT,
+    typename SizeT,
+    typename GValueT>
+double color(const SizeT num_nodes, 
+             const SizeT num_edges,
+             const SizeT *row_offsets,
+             const VertexT *col_indices,
+             VertexT *colors,
+             gunrock::util::Location memspace = gunrock::util::HOST,
+             const GValueT edge_values = NULL);
+
 // Local Variables:
 // mode:c++
 // c-file-style: "NVIDIA"
