@@ -17,8 +17,6 @@
 #include <gunrock/graph/csc.hxx>
 #include <gunrock/graph/csr.hxx>
 
-// #include <gunrock/algorithms/search/binary_search.cuh>
-
 namespace gunrock {
 namespace graph {
 
