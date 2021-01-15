@@ -207,13 +207,11 @@ __host__ __device__ double get_average_degree(graph_type const& G) {
 }
 
 /**
- * @brief Get the degree standard deviation of a graph.
- * This method uses population standard deviation,
- * therefore measuring the standard deviation over
- * the entire population (all nodes). This can be
- * sped up by only taking a small sample and using
- * sqrt(accum / graph.get_number_of_vertices() - 1)
- * as the result.
+ * @brief Get the degree standard deviation of a graph. This method uses
+ * population standard deviation, therefore measuring the standard deviation
+ * over the entire population (all nodes). This can be sped up by only taking a
+ * small sample and using sqrt(accum / graph.get_number_of_vertices() - 1) as
+ * the result.
  *
  * @tparam graph_type
  * @param G
@@ -233,6 +231,10 @@ __host__ __device__ double get_degree_standard_deviation(graph_type const& G) {
 
 /**
  * @brief build a log-scale degree histogram of a graph.
+ * @todo maybe a faster implementation will maybe be creating a segment array
+ * (which is just number of neighbors per vertex), and then sort and find the
+ * end of each bin of values using an upper_bound search. Once that is achieved,
+ * compute the adjacent_difference of the cumulative histogram.
  *
  * @tparam graph_type
  * @tparam histogram_t
@@ -278,6 +280,13 @@ void build_degree_histogram(graph_type const& G,
   );
 }
 
+/**
+ * @brief Utility to remove self-loops, so, if we have an edge between vertex_0
+ * and vertex_0, that edge will be removed as it is a self-loop.
+ *
+ * @tparam graph_type
+ * @param G
+ */
 template <typename graph_type>
 void remove_self_loops(graph_type& G) {}
 
