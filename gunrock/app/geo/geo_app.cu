@@ -88,6 +88,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
                      ArrayT &ref_predicted_lat, ArrayT &ref_predicted_lon,
                      util::Location target) {
   cudaError_t retval = cudaSuccess;
+  util::Location memspace = util::HOST;
 
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::ValueT ValueT;
@@ -123,7 +124,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   util::PrintMsg("Initializing problem ... ", !quiet_mode);
 
-  GUARD_CU(problem.Init(graph, target));
+  GUARD_CU(problem.Init(graph, memspace, target));
 
   util::PrintMsg("Initializing enactor ... ", !quiet_mode);
 
@@ -135,7 +136,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   for (int run_num = 0; run_num < num_runs; ++run_num) {
     GUARD_CU(problem.Reset(h_latitude.GetPointer(util::HOST),
                            h_longitude.GetPointer(util::HOST), geo_iter,
-                           spatial_iter, target));
+                           spatial_iter, target, memspace));
     GUARD_CU(enactor.Reset(target));
 
     util::PrintMsg("__________________________", !quiet_mode);
@@ -153,7 +154,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
         !quiet_mode);
 
     if (validation == "each") {
-      GUARD_CU(problem.Extract(h_predicted_lat, h_predicted_lon));
+      GUARD_CU(problem.Extract(h_predicted_lat, h_predicted_lon, target, memspace));
 
       SizeT num_errors =
           Validate_Results(parameters, graph, h_predicted_lat, h_predicted_lon,
@@ -164,7 +165,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   cpu_timer.Start();
 
   // Extract problem data
-  GUARD_CU(problem.Extract(h_predicted_lat, h_predicted_lon));
+  GUARD_CU(problem.Extract(h_predicted_lat, h_predicted_lon, target, memspace));
 
   if (validation == "last") {
     SizeT num_errors =
@@ -194,145 +195,109 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 }  // namespace app
 }  // namespace gunrock
 
-// ===========================================================================================
-// ========================= CODE BELOW THIS LINE NOT NEEDED FOR TESTS
-// =======================
-// ===========================================================================================
+/*
+ * @brief Entry of gunrock_geo function
+ * @tparam     GraphT     Type of the graph
+ * @tparam     VertexT    Type of the vertices
+ * @param[in]  parameters Excution parameters
+ * @param[in]  graph      Input graph
+ * @param[out] longitudes Return predicted longitudes
+ * @param[out] latitudes  Return predicted latitudes
+ * @param[in]  memspace   Location of allocated arrays (default = HOST)
+ * \return     double     Return accumulated elapsed times for all runs
+ */
+template <typename GraphT, typename ValueT = typename GraphT::ValueT>
+double gunrock_geo(gunrock::util::Parameters &parameters,
+                     GraphT &graph,
+                     ValueT *latitudes,
+                     ValueT *longitudes,
+                     ValueT *predicted_lat,
+                     ValueT *predicted_long,
+                     gunrock::util::Location memspace = gunrock::util::HOST) {
+  typedef gunrock::app::geo::Problem<GraphT> ProblemT;
+  typedef gunrock::app::geo::Enactor<ProblemT> EnactorT;
+  gunrock::util::CpuTimer cpu_timer;
+  gunrock::util::Location target = gunrock::util::DEVICE;
+  double total_time = 0;
+  if (parameters.UseDefault("quiet")) parameters.Set("quiet", true);
 
-// /*
-// * @brief Entry of gunrock_template function
-// * @tparam     GraphT     Type of the graph
-// * @tparam     ValueT     Type of the distances
-// * @param[in]  parameters Excution parameters
-// * @param[in]  graph      Input graph
-// * @param[out] distances  Return shortest distance to source per vertex
-// * @param[out] preds      Return predecessors of each vertex
-// * \return     double     Return accumulated elapsed times for all runs
-// */
-// template <typename GraphT, typename ValueT = typename GraphT::ValueT>
-// double gunrock_Template(
-//     gunrock::util::Parameters &parameters,
-//     GraphT &graph
-//     // TODO: add problem specific outputs, e.g.:
-//     //ValueT **distances
-//     )
-// {
-//     typedef typename GraphT::VertexT VertexT;
-//     typedef gunrock::app::Template::Problem<GraphT  > ProblemT;
-//     typedef gunrock::app::Template::Enactor<ProblemT> EnactorT;
-//     gunrock::util::CpuTimer cpu_timer;
-//     gunrock::util::Location target = gunrock::util::DEVICE;
-//     double total_time = 0;
-//     if (parameters.UseDefault("quiet"))
-//         parameters.Set("quiet", true);
+  int geo_iter = parameters.Get<int>("geo-iter");
+  int spatial_iter = parameters.Get<int>("spatial-iter");
 
-//     // Allocate problem and enactor on GPU, and initialize them
-//     ProblemT problem(parameters);
-//     EnactorT enactor;
-//     problem.Init(graph  , target);
-//     enactor.Init(problem, target);
+  // Allocate problem and enactor on GPU, and initialize them
+  ProblemT problem(parameters);
+  EnactorT enactor;
 
-//     int num_runs = parameters.Get<int>("num-runs");
-//     // TODO: get problem specific inputs, e.g.:
-//     // std::vector<VertexT> srcs =
-//     parameters.Get<std::vector<VertexT>>("srcs");
-//     // int num_srcs = srcs.size();
-//     for (int run_num = 0; run_num < num_runs; ++run_num)
-//     {
-//         // TODO: problem specific inputs, e.g.:
-//         // int src_num = run_num % num_srcs;
-//         // VertexT src = srcs[src_num];
-//         problem.Reset(/*src,*/ target);
-//         enactor.Reset(/*src,*/ target);
+  problem.Init(graph, memspace, target);
+  enactor.Init(problem, target);
 
-//         cpu_timer.Start();
-//         enactor.Enact(/*src*/);
-//         cpu_timer.Stop();
+  problem.Reset(latitudes, longitudes, geo_iter, spatial_iter, target, memspace);
+  enactor.Reset(target);
 
-//         total_time += cpu_timer.ElapsedMillis();
-//         // TODO: extract problem specific data, e.g.:
-//         problem.Extract(/*distances[src_num]*/);
-//     }
+  cpu_timer.Start();
+  enactor.Enact();
+  cpu_timer.Stop();
 
-//     enactor.Release(target);
-//     problem.Release(target);
-//     // TODO: problem specific clean ups, e.g.:
-//     // srcs.clear();
-//     return total_time;
-// }
+  total_time += cpu_timer.ElapsedMillis();
 
-//  * @brief Simple interface take in graph as CSR format
-//  * @param[in]  num_nodes   Number of veritces in the input graph
-//  * @param[in]  num_edges   Number of edges in the input graph
-//  * @param[in]  row_offsets CSR-formatted graph input row offsets
-//  * @param[in]  col_indices CSR-formatted graph input column indices
-//  * @param[in]  edge_values CSR-formatted graph input edge weights
-//  * @param[in]  num_runs    Number of runs to perform SSSP
-//  * @param[in]  sources     Sources to begin traverse, one for each run
-//  * @param[in]  mark_preds  Whether to output predecessor info
-//  * @param[out] distances   Return shortest distance to source per vertex
-//  * @param[out] preds       Return predecessors of each vertex
-//  * \return     double      Return accumulated elapsed times for all runs
+  // Extract problem data
+  problem.Extract(predicted_lat, predicted_long, target, memspace);
 
-// template <
-//     typename VertexT = int,
-//     typename SizeT   = int,
-//     typename GValueT = unsigned int,
-//     typename TValueT = GValueT>
-// float Geolocation(
-//     const SizeT        num_nodes,
-//     const SizeT        num_edges,
-//     const SizeT       *row_offsets,
-//     const VertexT     *col_indices,
-//     const GValueT     *edge_values,
-//     const int          num_runs
-//     // TODO: add problem specific inputs and outputs, e.g.:
-//     //      VertexT     *sources,
-//     //      SSSPValueT **distances
-//     )
-// {
-//     // TODO: change to other graph representation, if not using CSR
-//     typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
-//         gunrock::graph::HAS_EDGE_VALUES | gunrock::graph::HAS_CSR>
-//         GraphT;
-//     typedef typename GraphT::CsrT CsrT;
+  // Clean up
+  enactor.Release(target);
+  problem.Release(target);
 
-//     // Setup parameters
-//     gunrock::util::Parameters parameters("Template");
-//     gunrock::graphio::UseParameters(parameters);
-//     gunrock::app::Template::UseParameters(parameters);
-//     gunrock::app::UseParameters_test(parameters);
-//     parameters.Parse_CommandLine(0, NULL);
-//     parameters.Set("graph-type", "by-pass");
-//     parameters.Set("num-runs", num_runs);
-//     // TODO: problem specific inputs, e.g.:
-//     // std::vector<VertexT> srcs;
-//     // for (int i = 0; i < num_runs; i ++)
-//     //     srcs.push_back(sources[i]);
-//     // parameters.Set("srcs", srcs);
+  return total_time;
+}
 
-//     bool quiet = parameters.Get<bool>("quiet");
-//     GraphT graph;
-//     // Assign pointers into gunrock graph format
-//     // TODO: change to other graph representation, if not using CSR
-//     graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
-//     graph.CsrT::row_offsets   .SetPointer(row_offsets, num_nodes + 1,
-//     gunrock::util::HOST); graph.CsrT::column_indices.SetPointer(col_indices,
-//     num_edges, gunrock::util::HOST); graph.FromCsr(graph.csr(), true, quiet);
-//     gunrock::graphio::LoadGraph(parameters, graph);
+/*
+ * @brief Entry of gunrock_geo function
+ * \return     double     Return accumulated elapsed times for all runs
+ */
+template <typename VertexT, typename SizeT,
+          typename GValueT>
+double geo(const SizeT num_nodes, const SizeT num_edges,
+           const SizeT *row_offsets, const VertexT *col_indices,
+           GValueT *latitudes, GValueT *longitudes,
+           GValueT *predicted_lat, GValueT* predicted_long,
+           gunrock::util::Location memspace = gunrock::util::HOST) {
+  typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
+                                           gunrock::graph::HAS_CSR>
+      GraphT;
+  typedef typename GraphT::CsrT CsrT;
 
-//     // Run the Template
-//     // TODO: add problem specific outputs, e.g.
-//     double elapsed_time = gunrock_Template(parameters, graph /*,
-//     distances*/);
+  // Setup parameters
+  gunrock::util::Parameters parameters("geo");
+  gunrock::graphio::UseParameters(parameters);
+  gunrock::app::geo::UseParameters(parameters);
+  gunrock::app::UseParameters_test(parameters);
+  parameters.Parse_CommandLine(0, NULL);
+  parameters.Set("graph-type", "by-pass");
 
-//     // Cleanup
-//     graph.Release();
-//     // TODO: problem specific cleanup
-//     // srcs.clear();
+  bool quiet = parameters.Get<bool>("quiet");
+  GraphT graph;
+  // Assign pointers into gunrock graph format
+  graph.CsrT::Allocate(num_nodes, num_edges, memspace);
+  graph.CsrT::row_offsets.SetPointer((SizeT *)row_offsets, num_nodes + 1,
+                                     memspace);
+  graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges,
+                                        memspace);
+  graph.FromCsr(graph.csr(), memspace, 0, quiet, true);
 
-//     return elapsed_time;
-// }
+  // Run the geolocation
+  double elapsed_time = gunrock_geo(parameters, graph, latitudes, longitudes, predicted_lat, predicted_long, memspace);
+
+  // Cleanup
+  graph.Release();
+
+  return elapsed_time;
+}
+
+double geo(const int num_nodes, const int num_edges, const int *row_offsets,
+             const int *col_indices, float *latitudes, float* longitudes, float* predicted_lat, float* predicted_long) {
+  return geo<int, int, float>(num_nodes, num_edges, row_offsets, col_indices, latitudes, longitudes, predicted_lat, predicted_long);
+}
+
 
 // Leave this at the end of the file
 // Local Variables:

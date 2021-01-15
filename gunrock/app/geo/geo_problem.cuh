@@ -123,6 +123,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      */
     cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,
                      ProblemFlag flag, bool geo_complete_,
+                     util::Location memspace = util::HOST,
                      util::Location target = util::DEVICE) {
       cudaError_t retval = cudaSuccess;
 
@@ -139,7 +140,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(active.Allocate(1, util::HOST | target));
       GUARD_CU(Dinv.Allocate(edges, target));
 
-      if (target & util::DEVICE) {
+      if (memspace == util::HOST && (target & util::DEVICE)) {
         GUARD_CU(sub_graph.CsrT::Move(util::HOST, target, this->stream));
       }
       return retval;
@@ -151,7 +152,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * \return    cudaError_t Error message(s), if any
      */
     cudaError_t Reset(ValueT *h_latitude, ValueT *h_longitude, int _geo_iter,
-                      int _spatial_iter, util::Location target = util::DEVICE) {
+                      int _spatial_iter, util::Location target = util::DEVICE,
+                      util::Location memspace = util::HOST) {
       cudaError_t retval = cudaSuccess;
       SizeT nodes = this->sub_graph->nodes;
       SizeT edges = this->sub_graph->edges + 1;
@@ -177,11 +179,17 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       // Assumes that all vertices have invalid positions, in reality
       // a preprocessing step is needed to assign nodes that do have
       // positions to have proper positions already.
-      GUARD_CU(latitude.SetPointer(h_latitude, nodes, util::HOST));
-      GUARD_CU(latitude.Move(util::HOST, util::DEVICE));
+      if (memspace == util::HOST) {
+        GUARD_CU(latitude.SetPointer(h_latitude, nodes, util::HOST));
+        GUARD_CU(latitude.Move(util::HOST, util::DEVICE));
 
-      GUARD_CU(longitude.SetPointer(h_longitude, nodes, util::HOST));
-      GUARD_CU(longitude.Move(util::HOST, util::DEVICE));
+        GUARD_CU(longitude.SetPointer(h_longitude, nodes, util::HOST));
+        GUARD_CU(longitude.Move(util::HOST, util::DEVICE));
+      } else if (memspace == util::DEVICE) {
+        GUARD_CU(latitude.SetPointer(h_latitude, nodes, util::DEVICE)); 
+
+        GUARD_CU(longitude.SetPointer(h_longitude, nodes, util::DEVICE)); 
+      }
 
       return retval;
     }
@@ -233,39 +241,49 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * \return     cudaError_t Error message(s), if any
    */
   cudaError_t Extract(ValueT *h_predicted_lat, ValueT *h_predicted_lon,
-                      util::Location target = util::DEVICE) {
+                      util::Location target = util::DEVICE,
+                      util::Location memspace = util::HOST) {
     cudaError_t retval = cudaSuccess;
     SizeT nodes = this->org_graph->nodes;
 
     if (this->num_gpus == 1) {
       auto &data_slice = data_slices[0][0];
 
-      // Set device
-      if (target == util::DEVICE) {
-        GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+      if (memspace == util::HOST) {
+        // Set device
+        if (target == util::DEVICE) {
+          GUARD_CU(util::SetDevice(this->gpu_idx[0]));
 
-        GUARD_CU(
-            data_slice.latitude.SetPointer(h_predicted_lat, nodes, util::HOST));
-        GUARD_CU(data_slice.latitude.Move(util::DEVICE, util::HOST));
+          GUARD_CU(
+              data_slice.latitude.SetPointer(h_predicted_lat, nodes, util::HOST));
+          GUARD_CU(data_slice.latitude.Move(util::DEVICE, util::HOST));
 
-        GUARD_CU(data_slice.longitude.SetPointer(h_predicted_lon, nodes,
-                                                 util::HOST));
-        GUARD_CU(data_slice.longitude.Move(util::DEVICE, util::HOST));
+          GUARD_CU(data_slice.longitude.SetPointer(h_predicted_lon, nodes,
+                                                   util::HOST));
+          GUARD_CU(data_slice.longitude.Move(util::DEVICE, util::HOST));
 
-      } else if (target == util::HOST) {
-        GUARD_CU(data_slice.latitude.ForEach(
-            h_predicted_lat,
-            [] __host__ __device__(const ValueT &device_val, ValueT &host_val) {
-              host_val = device_val;
-            },
-            nodes, util::HOST));
+        } else if (target == util::HOST) {
+          GUARD_CU(data_slice.latitude.ForEach(
+              h_predicted_lat,
+              [] __host__ __device__(const ValueT &device_val, ValueT &host_val) {
+                host_val = device_val;
+              },
+              nodes, util::HOST));
 
-        GUARD_CU(data_slice.longitude.ForEach(
-            h_predicted_lon,
-            [] __host__ __device__(const ValueT &device_val, ValueT &host_val) {
-              host_val = device_val;
-            },
-            nodes, util::HOST));
+          GUARD_CU(data_slice.longitude.ForEach(
+              h_predicted_lon,
+              [] __host__ __device__(const ValueT &device_val, ValueT &host_val) {
+                host_val = device_val;
+              },
+              nodes, util::HOST));
+        }
+      } else if (memspace == util::DEVICE) {
+        if (target == util::HOST) {
+          // Not implemented
+        } else if (target == util::DEVICE) {
+          GUARD_CU(cudaMemcpy(h_predicted_lat, data_slice.latitude.GetPointer(util::DEVICE), nodes * sizeof(ValueT), cudaMemcpyDeviceToDevice));
+          GUARD_CU(cudaMemcpy(h_predicted_lon, data_slice.longitude.GetPointer(util::DEVICE), nodes * sizeof(ValueT), cudaMemcpyDeviceToDevice));
+        }
       }
     } else {  // num_gpus != 1
 
@@ -310,7 +328,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @param[in] Location    Memory location to work on
    * \return    cudaError_t Error message(s), if any
    */
-  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE) {
+  cudaError_t Init(GraphT &graph, util::Location memspace = util::HOST, util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
@@ -324,7 +342,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       auto &data_slice = data_slices[gpu][0];
       GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
                                this->gpu_idx[gpu], this->flag,
-                               this->geo_complete, target));
+                               this->geo_complete, memspace, target));
     }
 
     return retval;
@@ -337,15 +355,16 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * \return cudaError_t Error message(s), if any
    */
   cudaError_t Reset(ValueT *h_latitude, ValueT *h_longitude, int _geo_iter,
-                    int _spatial_iter, util::Location target = util::DEVICE) {
+                    int _spatial_iter, util::Location target = util::DEVICE,
+                    util::Location memspace = util::HOST) {
     cudaError_t retval = cudaSuccess;
 
     // Reset data slices
     for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
       GUARD_CU(data_slices[gpu]->Reset(h_latitude, h_longitude, _geo_iter,
-                                       _spatial_iter, target));
-      GUARD_CU(data_slices[gpu].Move(util::HOST, target));
+                                       _spatial_iter, target, memspace));
+      GUARD_CU(data_slices[gpu].Move(memspace, target));
     }
 
     GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
