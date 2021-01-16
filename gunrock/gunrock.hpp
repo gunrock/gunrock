@@ -101,7 +101,6 @@ double vn(const SizeT   num_nodes,
           VertexT       *preds = NULL,
           const int     num_runs);
 
-
 /*
  * @brief Subgraph Matching CXX interface
  *
