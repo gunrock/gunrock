@@ -29,35 +29,7 @@ namespace gunrock {
 namespace app {
 namespace vn {
 
-cudaError_t UseParameters(util::Parameters &parameters) {
-  cudaError_t retval = cudaSuccess;
-  GUARD_CU(UseParameters_app(parameters));
-  GUARD_CU(UseParameters_problem(parameters));
-  GUARD_CU(UseParameters_enactor(parameters));
-
-  GUARD_CU(parameters.Use<std::string>(
-      "src",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      "0",
-      "<Vertex-IDs|random|largestdegree> The source vertices\n"
-      "\tIf random, randomly select non-zero degree vertices;\n"
-      "\tIf largestdegree, select vertices with largest degrees",
-      __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<int>(
-      "src-seed",
-      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-      util::PreDefinedValues<int>::InvalidValue,
-      "seed to generate random sources", __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<int>(
-      "srcs-per-run",
-      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-      util::PreDefinedValues<int>::InvalidValue,
-      "number of source nodes per run", __FILE__, __LINE__));
-
-  return retval;
-}
+cudaError_t UseParameters(util::Parameters &parameters);
 
 /**
  * @brief Run vn tests
@@ -242,7 +214,7 @@ double gunrock_vn(gunrock::util::Parameters &parameters, GraphT &graph,
   return total_time;
 }
 
-/**
+/*
  * @brief Simple interface take in graph as CSR format
  * @param[in]  num_nodes   Number of veritces in the input graph
  * @param[in]  num_edges   Number of edges in the input graph
@@ -261,7 +233,8 @@ template <typename VertexT, typename SizeT, typename GValueT,
 double vn(const SizeT num_nodes, const SizeT num_edges,
           const SizeT *row_offsets, const VertexT *col_indices,
           const GValueT *edge_values, VertexT *sources, const bool mark_pred,
-          vnValueT *distances, VertexT *preds, const int num_runs) {
+          vnValueT *distances, VertexT *preds, const int num_runs,
+          gunrock::util::Location allocated_on) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
                                            gunrock::graph::HAS_EDGE_VALUES |
                                                gunrock::graph::HAS_CSR>
@@ -274,7 +247,7 @@ double vn(const SizeT num_nodes, const SizeT num_edges,
   gunrock::app::vn::UseParameters(parameters);
   gunrock::app::UseParameters_test(parameters);
   parameters.Parse_CommandLine(0, NULL);
-  parameters.Set("graph-type", "by-pass");
+  parameters.Set("graph-type", "by-pass");~
   parameters.Set("mark-pred", mark_pred);
   parameters.Set("num-runs", num_runs);
   std::vector<VertexT> srcs;
@@ -284,12 +257,18 @@ double vn(const SizeT num_nodes, const SizeT num_edges,
 
   bool quiet = parameters.Get<bool>("quiet");
   GraphT graph;
+
   // Assign pointers into gunrock graph format
   gunrock::util::Location target = gunrock::util::HOST;
+
+  if (allocated_on == gunrock::util::DEVICE) {
+    target = gunrock::util::DEVICE;
+  }
+
   graph.CsrT::Allocate(num_nodes, num_edges, target);
-  graph.CsrT::row_offsets.SetPointer(row_offsets, num_nodes + 1, target);
-  graph.CsrT::column_indices.SetPointer(col_indices, num_edges, target);
-  // graph.CsrT::edge_values   .SetPointer(edge_values, target);
+  graph.CsrT::row_offsets.SetPointer((SizeT *)row_offsets, num_nodes + 1, target);
+  graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges, target);
+  // graph.CsrT::edge_values   .SetPointer((GValueT *)edge_values, target);
   graph.FromCsr(graph.csr(), target, 0, quiet, true);
   gunrock::graphio::LoadGraph(parameters, graph);
 

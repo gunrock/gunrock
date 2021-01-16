@@ -30,6 +30,7 @@
  * @param[in]  mark_preds  Whether to output predecessor info
  * @param[out] distances   Return shortest distance to source per vertex
  * @param[out] preds       Return predecessors of each vertex
+ * @param[in]  memspace    Input and output target device, by default CPU
  * \return     double      Return accumulated elapsed times for all runs
  */
 template <typename VertexT = int,
@@ -45,9 +46,10 @@ double bfs(const SizeT    num_nodes,
            const bool     idempotence,
            LabelT         **labels,
            VertexT        **preds = NULL,
-           const int      num_runs);
+           const int      num_runs,
+           gunrock::util::Location memspace = gunrock::util::HOST);
 
-/**
+/*
  * @brief Simple interface take in graph as CSR format
  * @param[in]  num_nodes   Number of veritces in the input graph
  * @param[in]  num_edges   Number of edges in the input graph
@@ -72,7 +74,7 @@ double sage(const SizeT   num_nodes,
             const GValueT *edge_values,
             const int     num_runs);
 
-/**
+/*
  * @brief Simple interface take in graph as CSR format
  * @param[in]  num_nodes   Number of veritces in the input graph
  * @param[in]  num_edges   Number of edges in the input graph
@@ -80,6 +82,7 @@ double sage(const SizeT   num_nodes,
  * @param[in]  col_indices CSR-formatted graph input column indices
  * @param[in]  edge_values CSR-formatted graph input edge weights
  * @param[in]  num_runs    Number of runs to perform vn
+ * @param[in]  memspace    Input and output target device, by default CPU
  * @param[in]  sources     Sources to begin traverse, one for each run
  * @param[in]  mark_preds  Whether to output predecessor info
  * @param[out] distances   Return shortest distance to source per vertex
@@ -99,7 +102,8 @@ double vn(const SizeT   num_nodes,
           const bool    mark_pred,
           vnValueT      *distances,
           VertexT       *preds = NULL,
-          const int     num_runs);
+          const int     num_runs,
+          gunrock::util::Location memspace = gunrock::util::HOST);
 
 /*
  * @brief Subgraph Matching CXX interface

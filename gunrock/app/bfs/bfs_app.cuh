@@ -22,29 +22,7 @@ namespace gunrock {
 namespace app {
 namespace bfs {
 
-cudaError_t UseParameters(util::Parameters &parameters) {
-  cudaError_t retval = cudaSuccess;
-  GUARD_CU(UseParameters_app(parameters));
-  GUARD_CU(UseParameters_problem(parameters));
-  GUARD_CU(UseParameters_enactor(parameters));
-
-  GUARD_CU(parameters.Use<std::string>(
-      "src",
-      util::REQUIRED_ARGUMENT | util::MULTI_VALUE | util::OPTIONAL_PARAMETER,
-      "0",
-      "<Vertex-ID|random|largestdegree> The source vertices\n"
-      "\tIf random, randomly select non-zero degree vertices;\n"
-      "\tIf largestdegree, select vertices with largest degrees",
-      __FILE__, __LINE__));
-
-  GUARD_CU(parameters.Use<int>(
-      "src-seed",
-      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
-      util::PreDefinedValues<int>::InvalidValue,
-      "seed to generate random sources", __FILE__, __LINE__));
-
-  return retval;
-}
+cudaError_t UseParameters(util::Parameters &parameters);
 
 /**
  * @brief Run BFS tests
@@ -222,7 +200,8 @@ double bfs(const SizeT num_nodes, const SizeT num_edges,
            const SizeT *row_offsets, const VertexT *col_indices,
            VertexT *sources, const bool mark_pred,
            const bool direction_optimized, const bool idempotence,
-           LabelT **labels, VertexT **preds, const int num_runs) {
+           LabelT **labels, VertexT **preds, const int num_runs,
+           gunrock::util::Location allocated_on) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, VertexT,
                                            gunrock::graph::HAS_CSR |
                                                gunrock::graph::HAS_CSC>
@@ -247,8 +226,14 @@ double bfs(const SizeT num_nodes, const SizeT num_edges,
 
   bool quiet = parameters.Get<bool>("quiet");
   GraphT graph;
+
   // Assign pointers into gunrock graph format
   gunrock::util::Location target = gunrock::util::HOST;
+
+  if (allocated_on == gunrock::util::DEVICE) {
+    target = gunrock::util::DEVICE;
+  }
+
   graph.CsrT::Allocate(num_nodes, num_edges, target);
   graph.CsrT::row_offsets.SetPointer((SizeT *)row_offsets, num_nodes + 1,
                                      target);
@@ -265,28 +250,6 @@ double bfs(const SizeT num_nodes, const SizeT num_edges,
   srcs.clear();
 
   return elapsed_time;
-}
-
-/*
- * @brief Simple C-interface take in graph as CSR format
- * @param[in]  num_nodes   Number of veritces in the input graph
- * @param[in]  num_edges   Number of edges in the input graph
- * @param[in]  row_offsets CSR-formatted graph input row offsets
- * @param[in]  col_indices CSR-formatted graph input column indices
- * @param[in]  source      Source to begin traverse
- * @param[in]  mark_preds  Whether to output predecessor info
- * @param[in]  direction_optimized Whether to use directional optimizing BFS
- * @param[in]  idempotence Whether to use idempotence
- * @param[out] labels      Return shortest hop distances to source per vertex
- * @param[out] preds       Return predecessors of each vertex
- * \return     double      Return accumulated elapsed times for all runs
- */
-double bfs(const int num_nodes, const int num_edges, const int *row_offsets,
-           const int *col_indices, int source, const bool mark_pred,
-           const bool direction_optimized, const bool idempotence,
-           int *distances, int *preds) {
-  return bfs(num_nodes, num_edges, row_offsets, col_indices, &source,
-             mark_pred, direction_optimized, idempotence, &distances, &preds, 1);
 }
 
 // Leave this at the end of the file

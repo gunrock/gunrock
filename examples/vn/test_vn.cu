@@ -12,7 +12,7 @@
  * @brief Simple test driver program for single source shortest path.
  */
 
-#include <gunrock/app/vn/vn_app.cuh>
+#include <gunrock/app/vn/vn_app.cu>
 #include <gunrock/app/test_base.cuh>
 #include <assert.h>
 

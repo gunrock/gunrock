@@ -13,7 +13,7 @@
  */
 
 #include <vector>
-#include <gunrock/app/bfs/bfs_app.cuh>
+#include <gunrock/app/bfs/bfs_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
