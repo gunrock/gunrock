@@ -19,6 +19,7 @@
 #include <gunrock/graph/coo.cuh>
 #include <gunrock/graph/csc.cuh>
 #include <gunrock/graph/gp.cuh>
+#include <gunrock/graphio/csv.cuh>
 #include <gunrock/graphio/market.cuh>
 #include <gunrock/graphio/rmat.cuh>
 #include <gunrock/graphio/rgg.cuh>
@@ -36,7 +37,7 @@ cudaError_t UseParameters(ParametersT &parameters,
       graph_prefix + "graph-type",
       util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::REQUIRED_PARAMETER,
       "",
-      graph_prefix + " graph type, be one of market, rgg,"
+      graph_prefix + " graph type, be one of market, csv, rgg,"
                      " rmat, grmat or smallworld",
       __FILE__, __LINE__));
 
@@ -202,6 +203,12 @@ cudaError_t LoadGraph(util::Parameters &parameters, GraphT &graph,
     GUARD_CU(market::Load(parameters, graph, graph_prefix));
   }
 
+  else if (graph_type == "csv") // comma-separated values graph
+  {
+      parameters.Set("vertex-start-from-zero", false);
+      GUARD_CU(csv::Load(parameters, graph, graph_prefix));
+  }
+
   else if (graph_type == "rmat") {
     GUARD_CU(rmat::Load(parameters, graph, graph_prefix));
   }
@@ -228,7 +235,8 @@ cudaError_t LoadGraph(util::Parameters &parameters, GraphT &graph,
     graph.csr().Sort();
   }
 
-  if (!parameters.Get<bool>("quiet")) {
+  //Histogram functions assume the input data is stored on host
+  if (!parameters.Get<bool>("quiet") && parameters.Get<gunrock::util::Location>("mem-space")==gunrock::util::HOST) {
     typedef typename GraphT::SizeT SizeT;
     util::Array1D<SizeT, SizeT> histogram;
     GUARD_CU(graph::GetHistogram(graph, histogram));

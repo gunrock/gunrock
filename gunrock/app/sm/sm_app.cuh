@@ -197,7 +197,7 @@ double gunrock_sm(gunrock::util::Parameters &parameters, GraphT &data_graph,
  * \return     double            Return accumulated elapsed times for all runs
  */
 template <typename VertexT, typename SizeT>
-double sm_template(const SizeT num_nodes, const SizeT num_edges,
+double sm(const SizeT num_nodes, const SizeT num_edges,
                    const SizeT *row_offsets, const VertexT *col_indices,
                    const SizeT num_query_nodes, const SizeT num_query_edges,
                    const SizeT *query_row_offsets,
