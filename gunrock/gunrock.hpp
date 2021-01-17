@@ -125,6 +125,15 @@ double sssp(const SizeT num_nodes, const SizeT num_edges,
             const bool mark_pred, SSSPValueT *distances, VertexT *preds = NULL, 
             gunrock::util::Location memspace = gunrock::util::HOST);
 
+template <typename VertexT, typename SizeT,
+          typename ValueT>
+float gtf(const SizeT num_nodes, const SizeT num_edges,
+          const SizeT *row_offsets, const VertexT *col_indices,
+          const ValueT capacity, const int num_runs, VertexT source,
+          VertexT sink,
+          ValueT *flow, ValueT *residuals,
+          gunrock::util::Location memspace = gunrock::util::HOST);
+
 // Local Variables:
 // mode:c++
 // c-file-style: "NVIDIA"

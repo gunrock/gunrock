@@ -184,6 +184,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      */
     cudaError_t Init(GraphT &sub_graph, int num_gpus = 1, int gpu_idx = 0,
                      util::Location target = util::DEVICE,
+                     util::Location memspace = util::HOST,
                      ProblemFlag flag = Problem_None) {
       debug_aml("DataSlice Init");
       cudaError_t retval = cudaSuccess;
@@ -210,8 +211,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       GUARD_CU(Y.Allocate(nodes_size, target));
 
-      GUARD_CU(util::SetDevice(gpu_idx));
-      GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
+      GUARD_CU(util::SetDevice(gpu_idx)); 
+      if (memspace == util::HOST && (target & util::DEVICE)) { 
+          GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
+       } 
       return retval;
     }  // Init Data Slice
 
@@ -405,7 +408,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * \return     cudaError_t Error message(s), if any
    */
   cudaError_t Extract(ValueT *h_Y, ValueT *edge_values,
-                      util::Location target = util::DEVICE) {
+                      util::Location target = util::DEVICE,
+                      util::Location memspace = util::HOST) {
     cudaError_t retval = cudaSuccess;
 
     auto &data_slice = data_slices[0][0];
@@ -413,23 +417,33 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     SizeT vE = this->org_graph->edges;
 
     // Set device
-    if (target == util::DEVICE) {
-      printf("transfering to host!!!: %d \n", vN);
-      GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-      GUARD_CU(data_slice.Y.SetPointer(h_Y, vN, util::HOST));
-      GUARD_CU(data_slice.Y.Move(util::DEVICE, util::HOST));
+    if (memspace == util::HOST) {
+        if (target == util::DEVICE) {
+          printf("transfering to host!!!: %d \n", vN);
+          GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+          GUARD_CU(data_slice.Y.SetPointer(h_Y, vN, util::HOST));
+          GUARD_CU(data_slice.Y.Move(util::DEVICE, util::HOST));
 
-      GUARD_CU(util::SetDevice(this->gpu_idx[0]));
-      GUARD_CU(
-          data_slice.edge_residuals.SetPointer(edge_values, vE, util::HOST));
-      GUARD_CU(data_slice.edge_residuals.Move(util::DEVICE, util::HOST));
-    } else if (target == util::HOST) {
-      GUARD_CU(data_slice.Y.ForEach(
-          h_Y,
-          [] __host__ __device__(const ValueT &f, ValueT &h_f) {
-            { h_f = f; }
-          },
-          vN, util::HOST));
+          GUARD_CU(util::SetDevice(this->gpu_idx[0]));
+          GUARD_CU(
+              data_slice.edge_residuals.SetPointer(edge_values, vE, util::HOST));
+          GUARD_CU(data_slice.edge_residuals.Move(util::DEVICE, util::HOST));
+        } else if (target == util::HOST) {
+          GUARD_CU(data_slice.Y.ForEach(
+              h_Y,
+              [] __host__ __device__(const ValueT &f, ValueT &h_f) {
+                { h_f = f; }
+              },
+              vN, util::HOST));
+        }
+    } else if (memspace == util::DEVICE) {
+        if (target == util::DEVICE) {
+            GUARD_CU(cudaMemcpy(h_Y, data_slice.Y.GetPointer(util::DEVICE), nodes * sizeof(ValueT), cudaMemcpyDeviceToDevice));
+            GUARD_CU(cudaMemcpy(edge_values, data_slice.edge_residuals.GetPointer(util::DEVICE), nodes * sizeof(ValueT), cudaMemcpyDeviceToDevice)); 
+        } else if (target == util::HOST) {
+            // Not implemented
+            assert(false);
+        } 
     }
     return retval;
   }
@@ -440,7 +454,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @param[in] Location    Memory location to work on
    * \return    cudaError_t Error message(s), if any
    */
-  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE) {
+  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE, util::Location memspace = util::HOST) {
     debug_aml("Problem Init");
     cudaError_t retval = cudaSuccess;
 
@@ -457,7 +471,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(data_slices[gpu].Allocate(1, target | util::HOST));
       auto &data_slice = data_slices[gpu][0];
       GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
-                               this->gpu_idx[gpu], target, this->flag));
+                               this->gpu_idx[gpu], target, memspace, this->flag));
 
       GUARD_CU2(cudaStreamSynchronize(data_slices[gpu]->stream),
                 "sync failed.");
