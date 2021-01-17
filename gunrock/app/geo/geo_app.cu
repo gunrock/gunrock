@@ -167,6 +167,12 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   // Extract problem data
   GUARD_CU(problem.Extract(h_predicted_lat, h_predicted_lon, target, memspace));
 
+  for (int p = 0; p < graph.nodes; p++) {
+        util::PrintMsg("    locations[ " + std::to_string(p) + " ] = < " +
+                           std::to_string(h_predicted_lat[p]) + " , " +
+                           std::to_string(h_predicted_lon[p]) + " > ");
+   }
+
   if (validation == "last") {
     SizeT num_errors =
         Validate_Results(parameters, graph, h_predicted_lat, h_predicted_lon,
@@ -211,8 +217,6 @@ double gunrock_geo(gunrock::util::Parameters &parameters,
                      GraphT &graph,
                      ValueT *latitudes,
                      ValueT *longitudes,
-                     ValueT *predicted_lat,
-                     ValueT *predicted_long,
                      gunrock::util::Location memspace = gunrock::util::HOST) {
   typedef gunrock::app::geo::Problem<GraphT> ProblemT;
   typedef gunrock::app::geo::Enactor<ProblemT> EnactorT;
@@ -241,7 +245,7 @@ double gunrock_geo(gunrock::util::Parameters &parameters,
   total_time += cpu_timer.ElapsedMillis();
 
   // Extract problem data
-  problem.Extract(predicted_lat, predicted_long, target, memspace);
+  problem.Extract(latitudes, longitudes, target, memspace);
 
   // Clean up
   enactor.Release(target);
@@ -258,8 +262,8 @@ template <typename VertexT, typename SizeT,
           typename GValueT>
 double geo(const SizeT num_nodes, const SizeT num_edges,
            const SizeT *row_offsets, const VertexT *col_indices,
+           const unsigned int spatial_iter, const unsigned int geo_iter,
            GValueT *latitudes, GValueT *longitudes,
-           GValueT *predicted_lat, GValueT* predicted_long,
            gunrock::util::Location memspace = gunrock::util::HOST) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
                                            gunrock::graph::HAS_CSR>
@@ -285,7 +289,7 @@ double geo(const SizeT num_nodes, const SizeT num_edges,
   graph.FromCsr(graph.csr(), memspace, 0, quiet, true);
 
   // Run the geolocation
-  double elapsed_time = gunrock_geo(parameters, graph, latitudes, longitudes, predicted_lat, predicted_long, memspace);
+  double elapsed_time = gunrock_geo(parameters, graph, latitudes, longitudes, memspace);
 
   // Cleanup
   graph.Release();
@@ -294,8 +298,9 @@ double geo(const SizeT num_nodes, const SizeT num_edges,
 }
 
 double geo(const int num_nodes, const int num_edges, const int *row_offsets,
-             const int *col_indices, float *latitudes, float* longitudes, float* predicted_lat, float* predicted_long) {
-  return geo<int, int, float>(num_nodes, num_edges, row_offsets, col_indices, latitudes, longitudes, predicted_lat, predicted_long);
+             const int *col_indices, float *latitudes, float* longitudes,
+             const unsigned int spatial_iter, const unsigned int geo_iter) {
+  return geo<int, int, float>(num_nodes, num_edges, row_offsets, col_indices,  spatial_iter, geo_iter, latitudes, longitudes);
 }
 
 

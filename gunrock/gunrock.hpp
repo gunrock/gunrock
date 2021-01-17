@@ -102,6 +102,20 @@ double color(const SizeT num_nodes,
              gunrock::util::Location memspace = gunrock::util::HOST,
              const GValueT edge_values = NULL);
 
+
+template <typename VertexT,
+          typename SizeT,
+          typename GValueT>
+double geo(const SizeT num_nodes,
+           const SizeT num_edges,
+           const SizeT *row_offsets,
+           const VertexT *col_indices,
+           const unsigned int geo_iter,
+           const unsigned int spatial_iter,
+           GValueT *latitudes,
+           GValueT *longitudes,
+           gunrock::util::Location memspace = gunrock::util::HOST);
+
 // Local Variables:
 // mode:c++
 // c-file-style: "NVIDIA"
