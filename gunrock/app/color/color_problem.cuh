@@ -103,9 +103,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * @param[in] flag        Problem flag containling options
      * \return    cudaError_t Error message(s), if any
      */
-    cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,
-                     util::Location memspace,
-                     util::Location target, ProblemFlag flag,
+    cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx, 
+                     util::Location target, util::Location memspace, ProblemFlag flag,
                      int seed) {
       cudaError_t retval = cudaSuccess;
 
@@ -274,7 +273,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @param[in] Location    Memory location to work on
    * \return    cudaError_t Error message(s), if any
    */
-  cudaError_t Init(GraphT &graph, util::Location memspace = util::HOST, util::Location target = util::DEVICE) {
+  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE, util::Location memspace = util::HOST) {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
@@ -290,7 +289,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       auto &data_slice = data_slices[gpu][0];
       GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
-                               this->gpu_idx[gpu], memspace, target, this->flag,
+                               this->gpu_idx[gpu], target, memspace, this->flag,
                                this->seed));
     }
 

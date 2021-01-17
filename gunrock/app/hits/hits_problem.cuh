@@ -153,7 +153,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * @param[in] flag        Problem flag containling options
      * \return    cudaError_t Error message(s), if any
      */
-    cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,  util::Location memspace, util::Location target, ProblemFlag flag) {
+    cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,  util::Location target, util::Location memspace, ProblemFlag flag) {
       cudaError_t retval = cudaSuccess;
 
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
@@ -335,7 +335,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @param[in] target      Memory location to work on
    * \return    cudaError_t Error message(s), if any
    */
-  cudaError_t Init(GraphT &graph, util::Location memspace = util::HOST, util::Location target = util::DEVICE) {
+  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE, util::Location memspace = util::HOST) {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
@@ -355,7 +355,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           this->parameters.template Get<SizeT>("hits-normalize-n");
 
       GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
-                               this->gpu_idx[gpu], memspace, target, this->flag));
+                               this->gpu_idx[gpu], target, memspace, this->flag));
     }
 
     return retval;

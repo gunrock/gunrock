@@ -11,7 +11,7 @@
  * @brief Geolocation Application
  */
 
-#include <gunrock/gunrock.h>
+
 #include <gunrock/util/test_utils.cuh>
 
 #include <gunrock/graphio/graphio.cuh>
@@ -124,7 +124,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   util::PrintMsg("Initializing problem ... ", !quiet_mode);
 
-  GUARD_CU(problem.Init(graph, memspace, target));
+  GUARD_CU(problem.Init(graph, target, memspace));
 
   util::PrintMsg("Initializing enactor ... ", !quiet_mode);
 
@@ -232,7 +232,7 @@ double gunrock_geo(gunrock::util::Parameters &parameters,
   ProblemT problem(parameters);
   EnactorT enactor;
 
-  problem.Init(graph, memspace, target);
+  problem.Init(graph, target, memspace);
   enactor.Init(problem, target);
 
   problem.Reset(latitudes, longitudes, geo_iter, spatial_iter, target, memspace);
@@ -302,7 +302,6 @@ double geo(const int num_nodes, const int num_edges, const int *row_offsets,
              const unsigned int spatial_iter, const unsigned int geo_iter) {
   return geo<int, int, float>(num_nodes, num_edges, row_offsets, col_indices,  spatial_iter, geo_iter, latitudes, longitudes);
 }
-
 
 // Leave this at the end of the file
 // Local Variables:

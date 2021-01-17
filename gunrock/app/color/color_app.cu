@@ -91,7 +91,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
-  GUARD_CU(problem.Init(graph, memspace, target));
+  GUARD_CU(problem.Init(graph, target, memspace));
   GUARD_CU(enactor.Init(problem, target));
 
   graph.Display();
@@ -192,7 +192,7 @@ double gunrock_color(gunrock::util::Parameters &parameters,
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
-  problem.Init(graph, memspace, target);
+  problem.Init(graph, target, memspace);
   enactor.Init(problem, target);
 
   problem.Reset(target);

@@ -123,8 +123,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      */
     cudaError_t Init(GraphT &sub_graph, int num_gpus, int gpu_idx,
                      ProblemFlag flag, bool geo_complete_,
-                     util::Location memspace = util::HOST,
-                     util::Location target = util::DEVICE) {
+                     util::Location target = util::DEVICE,
+                     util::Location memspace = util::HOST) {
       cudaError_t retval = cudaSuccess;
 
       GUARD_CU(BaseDataSlice::Init(sub_graph, num_gpus, gpu_idx, target, flag));
@@ -328,7 +328,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @param[in] Location    Memory location to work on
    * \return    cudaError_t Error message(s), if any
    */
-  cudaError_t Init(GraphT &graph, util::Location memspace = util::HOST, util::Location target = util::DEVICE) {
+  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE, util::Location memspace = util::HOST) {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
@@ -342,7 +342,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       auto &data_slice = data_slices[gpu][0];
       GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
                                this->gpu_idx[gpu], this->flag,
-                               this->geo_complete, memspace, target));
+                               this->geo_complete, target, memspace));
     }
 
     return retval;

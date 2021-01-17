@@ -116,6 +116,15 @@ double geo(const SizeT num_nodes,
            GValueT *longitudes,
            gunrock::util::Location memspace = gunrock::util::HOST);
 
+
+template <typename VertexT, typename SizeT,
+          typename GValueT, typename SSSPValueT = GValueT>
+double sssp(const SizeT num_nodes, const SizeT num_edges,
+            const SizeT *row_offsets, const VertexT *col_indices,
+            const GValueT *edge_values, VertexT source,
+            const bool mark_pred, SSSPValueT *distances, VertexT *preds = NULL, 
+            gunrock::util::Location memspace = gunrock::util::HOST);
+
 // Local Variables:
 // mode:c++
 // c-file-style: "NVIDIA"
