@@ -28,6 +28,8 @@ OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
 # Gen targets
 #-------------------------------------------------------------------------------
 
+GEN_SM86 = -gencode=arch=compute_86,code=\"sm_86,compute_86\" # Ampere RTX30XX
+GEN_SM80 = -gencode=arch=compute_80,code=\"sm_80,compute_80\" # Ampere A100
 GEN_SM75 = -gencode=arch=compute_75,code=\"sm_75,compute_75\" # Turing RTX20XX
 GEN_SM70 = -gencode=arch=compute_70,code=\"sm_70,compute_70\" # Volta V100
 GEN_SM61 = -gencode=arch=compute_61,code=\"sm_61,compute_61\" # Pascal GTX10XX
