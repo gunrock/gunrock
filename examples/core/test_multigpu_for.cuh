@@ -1,11 +1,6 @@
-/*
- * @brief Test multi-gpu ForAll operator
- * @file test_multi-gpu_forall.h
- */
-
+#include <iostream>
 #include <gunrock/util/test_utils.h>
-
-#include <gunrock/oprtr/1D_oprtr/for_all.cuh>
+#include <gunrock/oprtr/1D_oprtr/for.cuh>
 
 void just_a_func(int *d_ptr, int num_elements) {
 
@@ -38,8 +33,12 @@ void just_a_func(int *d_ptr, int num_elements) {
                             num_elements);
 }
 
-TEST(utils, MultGPU_ForAll) 
-{
+
+cudaError_t MultiGPUForAllTest() {
+    cudaError_t retval = cudaSuccess;
+
+    std::cout << "hello serban\n";
+
 
     //cudaError_t retval = cudaSuccess;
     gunrock::util::Array1D<int, int, gunrock::util::UNIFIED> my_data; 
@@ -48,7 +47,7 @@ TEST(utils, MultGPU_ForAll)
     int num_elements = 1<<10;
     my_data.Allocate(num_elements, gunrock::util::DEVICE);
     auto d_ptr = my_data.GetPointer(gunrock::util::DEVICE);
-    EXPECT_TRUE(d_ptr != nullptr);
+    assert(d_ptr != nullptr);
 
 
     // need to call through function because "googletest!"
@@ -56,4 +55,5 @@ TEST(utils, MultGPU_ForAll)
 
     my_data.Release();
 
+    return retval;
 }

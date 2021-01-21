@@ -15,6 +15,7 @@
 #include <examples/core/test_for.cuh>
 #include <examples/core/test_segreduce.cuh>
 #include <examples/core/test_binarysearch.cuh>
+#include <examples/core/test_multigpu_for.cuh>
 
 int main() {
   std::cout << "--- Testing RepeatFor ---" << std::endl;
@@ -25,6 +26,8 @@ int main() {
 
   std::cout << "--- Testing BinarySearch ---" << std::endl;
   BinarySearchTest();
+  std::cout << "--- Testing MultiGPUForAllTest ---\n";
+  MultiGPUForAllTest();
 
   return 0;
 }
