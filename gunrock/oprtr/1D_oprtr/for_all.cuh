@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include <sys/types.h>
 #include <gunrock/util/array_utils.cuh>
 #include <vector>
 #include "gunrock/util/error_utils.cuh"
@@ -236,10 +235,6 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
     cudaStream_t stream;
     T *data; // pointer to our elements
     int data_length; // number of elements
-
-    // not sure if I really need these
-    int index_start;
-    int index_end;
   };
 
   std::vector<GPU_info> gpu_infos;
@@ -262,6 +257,8 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
   // give the last gpu any left over elements
   gpu_infos.back().data_length += length % num_gpus;
 
+
+  // launch kernel for each gpu
   for(u_int i = 0; i < gpu_infos.size(); i++) {
     // assume T *elements is allocated as Unified Memory / Managed Memory
     // so no need to copy data to the GPU
@@ -281,15 +278,6 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
 
     GUARD_CU(cudaStreamDestroy(gpu_infos[i].stream));
   }
-
-  // for each GPU
-  //  set start and end index for current GPU
-  //  call ForAll_Kernel<<<>>> on current GPU with elements(start, end)
-
-  //if ((target & util::DEVICE) == util::DEVICE) {
-  //  ForAll_Kernel<<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, stream>>>(
-  //      elements, apply, length);
-  //}
 
   return retval;
 }
