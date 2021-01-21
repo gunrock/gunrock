@@ -47,6 +47,8 @@
 
 #include "test_pointer_location.h"
 
+#include "test_multi-gpu_forall.h"
+
 using namespace gunrock;
 
 cudaError_t UseParameters(util::Parameters &parameters) {
