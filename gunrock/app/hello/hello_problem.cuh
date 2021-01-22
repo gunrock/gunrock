@@ -23,7 +23,7 @@ namespace hello {
 // </TODO>
 
 /**
- * @brief Speciflying parameters for hello Problem
+ * @brief Specifying parameters for hello Problem
  * @param  parameters  The util::Parameter<...> structure holding all parameter
  * info \return cudaError_t error message(s), if any
  */

@@ -71,7 +71,7 @@ struct main_struct {
     // </TODO>
 
     if (!quick) {
-      // <TODO> init datastructures for reference result on GPU
+      // <TODO> init data structures for reference result on GPU
       ref_degrees = new ValueT[graph.nodes];
       // </TODO>
 
