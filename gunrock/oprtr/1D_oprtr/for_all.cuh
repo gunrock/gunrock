@@ -278,7 +278,7 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
 
   // synchronize with stream 0 (null_stream)
   for(int i = 0; i < gpu_infos.size(); i++) {
-    cudaStreamWaitEvent(0, gpu_infos[i].event);
+    cudaStreamWaitEvent(stream, gpu_infos[i].event, 0);
   }
 
   // clean up after ourselves

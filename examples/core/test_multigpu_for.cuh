@@ -1,5 +1,5 @@
 #include <gunrock/util/test_utils.h>
-#include <gunrock/oprtr/1D_oprtr/for.cuh>
+#include <gunrock/oprtr/1D_oprtr/for_all.cuh>
 
 
 cudaError_t MultiGPUForAllTest() {
