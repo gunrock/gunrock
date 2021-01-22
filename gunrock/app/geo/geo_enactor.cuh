@@ -77,7 +77,6 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     auto &latitude = data_slice.latitude;
     auto &longitude = data_slice.longitude;
-    auto &active = data_slice.active;
     auto &spatial_iter = data_slice.spatial_iter;
     auto &geo_complete = data_slice.geo_complete;
     auto &Dinv = data_slice.Dinv;
@@ -107,8 +106,8 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             SizeT num_neighbors = graph.CsrT::GetNeighborListLength(v);
 
             SizeT i = 0;
-            ValueT neighbor_lat[2],
-                neighbor_lon[2];  // for length <=2 use registers
+            ValueT neighbor_lat[2];
+            ValueT neighbor_lon[2];  // for length <=2 use registers
 
             for (SizeT e = start_edge; e < start_edge + num_neighbors; e++) {
               VertexT u = graph.CsrT::GetEdgeDest(e);
@@ -154,84 +153,56 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           }  // -- median calculation.
         };
 
-    auto status_op = [latitude, longitude, active] __host__ __device__(
-                         VertexT * v_q, const SizeT &pos) {
-      VertexT v = v_q[pos];
-      if (util::isValid(latitude[v]) && util::isValid(longitude[v])) {
-        atomicAdd(&active[0], 1);
-      }
-    };
-
     // Run --
-
-    GUARD_CU(frontier.V_Q()->ForAll(spatial_center_op, frontier.queue_length,
-                                    util::DEVICE, oprtr_parameters.stream));
+    GUARD_CU(frontier.V_Q()->ForAll(spatial_center_op, 
+      frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
 
     if (geo_complete) {
-      GUARD_CU(frontier.V_Q()->ForAll(status_op, frontier.queue_length,
-                                      util::DEVICE, oprtr_parameters.stream));
+      // The filter operation
+      auto filter_op = [=] 
+      __host__ __device__(
+        const VertexT &src, VertexT &dest,
+        const SizeT &edge_id, const VertexT &input_item,
+        const SizeT &input_pos, SizeT &output_pos) -> bool {
+        
+        if (!util::isValid(dest)) return false;
+        VertexT v = dest;
 
-      GUARD_CU(data_slice.active.SetPointer(&data_slice.active_, sizeof(SizeT),
-                                            util::HOST));
-      GUARD_CU(data_slice.active.Move(util::DEVICE, util::HOST));
+        if (!util::isValid(latitude[v]) || !util::isValid(longitude[v]))
+          return true;
+        else
+          return false;
+      };
+
+      frontier.queue_reset = true;
+      GUARD_CU(oprtr::Filter<oprtr::OprtrType_V2V>(
+        graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
+        filter_op));
+
+      // Get back the resulted frontier length
+      GUARD_CU(frontier.work_progress.GetQueueLength(
+        frontier.queue_index, frontier.queue_length, false,
+        oprtr_parameters.stream, true));
     }
 
     return retval;
   }
 
-  /**
-   * @brief Routine to combine received data and local data
-   * @tparam NUM_VERTEX_ASSOCIATES Number of data associated with each
-   * transmition item, typed VertexT
-   * @tparam NUM_VALUE__ASSOCIATES Number of data associated with each
-   * transmition item, typed ValueT
-   * @param  received_length The numver of transmition items received
-   * @param[in] peer_ which peer GPU the data came from
-   * \return cudaError_t error message(s), if any
-   */
-  template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
+    template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
   cudaError_t ExpandIncoming(SizeT &received_length, int peer_) {
-    // ================ INCOMPLETE TEMPLATE - MULTIGPU ====================
-
-    auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
-    auto &enactor_slice =
-        this->enactor
-            ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
-
-    auto expand_op = [
-                         // TODO: pass data used by the lambda, e.g.:
-                         // distances
-    ] __host__ __device__(VertexT & key, const SizeT &in_pos,
-                          VertexT *vertex_associate_ins,
-                          ValueT *value__associate_ins) -> bool {
-      // TODO: fill in the lambda to combine received and local data, e.g.:
-      // ValueT in_val  = value__associate_ins[in_pos];
-      // ValueT old_val = atomicMin(distances + key, in_val);
-      // if (old_val <= in_val)
-      //     return false;
-      return true;
-    };
-
-    cudaError_t retval =
-        BaseIterationLoop::template ExpandIncomingBase<NUM_VERTEX_ASSOCIATES,
-                                                       NUM_VALUE__ASSOCIATES>(
-            received_length, peer_, expand_op);
-    return retval;
+    return cudaSuccess;
   }
 
   bool Stop_Condition(int gpu_num = 0) {
     auto &enactor_slice = this->enactor->enactor_slices[0];
     auto &enactor_stats = enactor_slice.enactor_stats;
+    auto &frontier = enactor_slice.frontier;
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
     auto &graph = data_slice.sub_graph[0];
-
     auto iter = enactor_stats.iteration;
 
-    // Anymore work to do?
-    // printf("Predictions active in Stop: %u vs. needed %u.\n",
-    // data_slice.active_, graph.nodes);
     if (data_slice.geo_complete) {
-      if (data_slice.active_ >= graph.nodes) return true;
+      if (!frontier.queue_length) return true;
     } else {
       if (iter >= data_slice.geo_iter) return true;
     }
@@ -359,19 +330,10 @@ class Enactor
               this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
           frontier.queue_length = (peer_ == 0) ? nodes : 0;
           if (peer_ == 0) {
-            util::Array1D<SizeT, VertexT> tmp;
-            tmp.Allocate(nodes, target | util::HOST);
-            for (SizeT i = 0; i < nodes; ++i) {
-              tmp[i] = (VertexT)i % nodes;
-            }
-            GUARD_CU(tmp.Move(util::HOST, target));
-
-            GUARD_CU(frontier.V_Q()->ForEach(
-                tmp,
-                [] __host__ __device__(VertexT & v, VertexT & i) { v = i; },
-                nodes, target, 0));
-
-            tmp.Release();
+            GUARD_CU(frontier.V_Q()->ForAll(
+              [] __host__ __device__ (VertexT * v, const SizeT &i) {
+                v[i] = i;
+              }, nodes, target, 0));
           }
         }
       } else {
