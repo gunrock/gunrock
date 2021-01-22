@@ -233,22 +233,28 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
 
   struct GPU_info {
     cudaStream_t stream;
+    cudaEvent_t event;
     T *data; // pointer to our elements
     int data_length; // number of elements
   };
 
   std::vector<GPU_info> gpu_infos;
 
-  int num_gpus;
+  int num_gpus = 1;
   GUARD_CU(cudaGetDeviceCount(&num_gpus));
+
 
   u_int num_elements_per_gpu = length / num_gpus;
 
-  // prepare a cuda stream for each gpu
+  // prepare a cuda stream (non-blocking) and 
+  // events for each gpu
   for(u_int i = 0; i < num_gpus; i++) {
     GPU_info info;
+    
     GUARD_CU(cudaSetDevice(i));
-    GUARD_CU(cudaStreamCreate(&info.stream));
+    GUARD_CU(cudaStreamCreateWithFlags(&info.stream, cudaStreamNonBlocking));
+    GUARD_CU(cudaEventCreate(&info.event));
+
     info.data = elements + i * num_elements_per_gpu;
     info.data_length = num_elements_per_gpu;
     gpu_infos.push_back(info);
@@ -267,17 +273,23 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
     GUARD_CU(cudaSetDevice(i));
     ForAll_Kernel<<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, gpu_infos[i].stream>>>(
       gpu_infos[i].data, apply, gpu_infos[i].data_length);
+    GUARD_CU(cudaEventRecord(gpu_infos[i].event, gpu_infos[i].stream));
+  }
+
+  // synchronize with stream 0 (null_stream)
+  for(int i = 0; i < gpu_infos.size(); i++) {
+    cudaStreamWaitEvent(0, gpu_infos[i].event);
   }
 
   // clean up after ourselves
   for(u_int i = 0; i < num_gpus; i++) {
-    
     GUARD_CU(cudaSetDevice(i));
-
-    GUARD_CU(cudaStreamSynchronize(gpu_infos[i].stream));
-
     GUARD_CU(cudaStreamDestroy(gpu_infos[i].stream));
+    GUARD_CU(cudaEventDestroy(gpu_infos[i].event));
   }
+
+  // set the device back to 0 (might have some other one that should be set?)
+  GUARD_CU(cudaSetDevice(0));
 
   return retval;
 }

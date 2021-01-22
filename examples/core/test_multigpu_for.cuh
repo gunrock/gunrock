@@ -18,11 +18,12 @@ cudaError_t MultiGPUForAllTest() {
     cudaSetDevice(0);
     gunrock::oprtr::ForAll(d_ptr, 
                            [] __device__ (int* array, int idx) {
-                               array[idx] = 2;
+                               array[idx] = -1;
                             },
                            num_elements);
 
     printf("ForAll done, starting multigpu ForAll\n");
+    // make sure we wait for the data to be initialized
     cudaDeviceSynchronize();
 
     // multigpu ForAll store the device id in the array
@@ -33,18 +34,9 @@ cudaError_t MultiGPUForAllTest() {
                                array[idx] = id;
                             },
                             num_elements);
-
-    // do this a nicer way, but for now synchronize and wait for all devices
-    int num_gpus;
-    GUARD_CU(cudaGetDeviceCount(&num_gpus));
-    for(int i = 0; i < num_gpus; i++) {
-        cudaSetDevice(i);
-        cudaDeviceSynchronize();
-    }
-
-    cudaSetDevice(0);
+ 
     gunrock::oprtr::ForAll(d_ptr,
-                           [] __device__ (int* array, int idx) {   
+                           [num_elements] __device__ (int* array, int idx) {   
                                 //printf("idx % 100 == %d\n", idx % 100);
                                 if(idx % 100 == 0) {
                                     printf("array[%d] = %d\n", idx, array[idx]);
