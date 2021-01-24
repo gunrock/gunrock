@@ -392,7 +392,7 @@ void Iteration_Loop(ThreadSlice &thread_data, IterationT &iteration) {
                 (/*(enactor.flag & Debug) !=0 ||*/ num_gpus > 1)) {
               bool over_sized = false;
               if (IterationT::FLAG & Use_SubQ) {
-                if (retval = CheckSize<SizeT, VertexT>(
+                if (retval = CheckSize(
                         false, "queue3", frontier.output_length[0] + 2,
                         frontier.Next_V_Q(), over_sized, gpu_num, iteration_num,
                         peer_, false))
@@ -400,7 +400,7 @@ void Iteration_Loop(ThreadSlice &thread_data, IterationT &iteration) {
               }
               if (frontier.queue_length == 0) break;
 
-              if (retval = CheckSize<SizeT, VertexT>(
+              if (retval = CheckSize(
                       false, "total_queue",
                       total_length + frontier.queue_length,
                       enactor_slices[num_gpus].frontier.V_Q(), over_sized,
@@ -526,13 +526,13 @@ void Iteration_Loop(ThreadSlice &thread_data, IterationT &iteration) {
       if ((enactor.flag & Size_Check) &&
           (IterationT::FLAG & Unified_Receive) == 0) {
         bool over_sized = false;
-        if (enactor_stats0.retval = CheckSize<SizeT, VertexT>(
+        if (enactor_stats0.retval = CheckSize(
                 true, "total_queue", total_length, frontier0.V_Q(), over_sized,
                 gpu_num, enactor_stats0.iteration, num_gpus, true))
           break;
         // if (problem -> use_double_buffer)
         //    if (enactor_stats[0].retval =
-        //        CheckSize</*true,*/ SizeT, Value> (
+        //        CheckSize (
         //            true, "total_queue", Total_Length,
         //            &data_slice->frontier_queues[0].values[frontier_attribute[0].selector],
         //            over_sized, thread_num, enactor_stats0.iteration,
@@ -676,7 +676,7 @@ void Iteration_Loop(ThreadSlice &thread_data, IterationT &iteration) {
 #endif
           if ((enactor.flag & Size_Check) == 0) {
             bool over_sized = false;
-            if (retval = CheckSize<SizeT, VertexT>(
+            if (retval = CheckSize(
                     false, "queue3", frontier.output_length[0] + 2,
                     frontier.Next_V_Q(), over_sized, gpu_num, iteration_num,
                     peer_, false))

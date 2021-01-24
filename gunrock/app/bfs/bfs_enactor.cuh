@@ -170,7 +170,7 @@ struct BFSIterationLoop
 
     else {
       // printf("Size check runs\n");
-      retval = CheckSize<SizeT, SizeT>(
+      retval = CheckSize(
           this->enactor->flag & Size_Check, "scanned_edges",
           frontier.queue_length + 2, &frontier.output_offsets, over_sized, -1,
           -1, -1, false);
@@ -210,11 +210,11 @@ struct BFSIterationLoop
             // (!gunrock::oprtr::advance::isFused<AdvanceKernelPolicy::ADVANCE_MODE>())
     //(AdvanceKernelPolicy::ADVANCE_MODE != gunrock::oprtr::advance::LB_CULL)
     {
-      retval = CheckSize<SizeT, VertexT>(
+      retval = CheckSize(
           true, "queue3", request_length, frontier.Next_V_Q(), over_sized,
           this->gpu_num, iteration, peer_, false);
       if (retval) return retval;
-      retval = CheckSize<SizeT, VertexT>(true, "queue3", graph.nodes + 2,
+      retval = CheckSize(true, "queue3", graph.nodes + 2,
                                          frontier.V_Q(), over_sized,
                                          this->gpu_num, iteration, peer_, true);
       if (retval) return retval;

@@ -151,11 +151,11 @@ struct IterationLoopBase {
       fflush(stdout);
     }
 
-    retval = CheckSize<SizeT, VertexT>(true, "queue3", request_length,
+    retval = CheckSize(true, "queue3", request_length,
                                        frontier.Next_V_Q(), over_sized, gpu_num,
                                        iteration, peer_, false);
     if (retval) return retval;
-    retval = CheckSize<SizeT, VertexT>(true, "queue3", request_length,
+    retval = CheckSize(true, "queue3", request_length,
                                        frontier.V_Q(), over_sized, gpu_num,
                                        iteration, peer_, true);
     if (retval) return retval;
@@ -212,12 +212,27 @@ struct IterationLoopBase {
     if (FLAG & Pull) size_multi += 1;
 
     for (int peer_ = 0; peer_ < num_gpus; peer_++) {
-      if (retval = CheckSize<SizeT, VertexT>(
+      // if (retval = CheckSize(
+      //         enactor->flag & Size_Check, "keys_out", num_elements * size_multi,
+      //         (peer_ == 0) ? enactor_slice.frontier.Next_V_Q()
+      //                      : &(mgpu_slice.keys_out[peer_]),
+      //         keys_over_sized, gpu_num, enactor_stats.iteration, peer_, false))
+      //   break;
+
+      if(peer_ == 0) {
+        if(retval = CheckSize(
               enactor->flag & Size_Check, "keys_out", num_elements * size_multi,
-              (peer_ == 0) ? enactor_slice.frontier.Next_V_Q()
-                           : &(mgpu_slice.keys_out[peer_]),
+              enactor_slice.frontier.Next_V_Q(),
               keys_over_sized, gpu_num, enactor_stats.iteration, peer_, false))
-        break;
+          break;
+      } else {
+        if(retval = CheckSize(
+              enactor->flag & Size_Check, "keys_out", num_elements * size_multi,
+              &(mgpu_slice.keys_out[peer_]),
+              keys_over_sized, gpu_num, enactor_stats.iteration, peer_, false))
+          break;
+      }
+
       // if (keys_over_sized)
       mgpu_slice.keys_outs[peer_] =
           (peer_ == 0)
@@ -228,7 +243,7 @@ struct IterationLoopBase {
       over_sized = false;
       // for (i = 0; i< NUM_VERTEX_ASSOCIATES; i++)
       //{
-      if (retval = CheckSize<SizeT, VertexT>(
+      if (retval = CheckSize(
               enactor->flag & Size_Check, "vertex_associate_outs",
               num_elements * NUM_VERTEX_ASSOCIATES * size_multi,
               &mgpu_slice.vertex_associate_out[peer_], over_sized, gpu_num,
@@ -246,7 +261,7 @@ struct IterationLoopBase {
       over_sized = false;
       // for (i=0;i<NUM_VALUE__ASSOCIATES;i++)
       //{
-      if (retval = CheckSize<SizeT, ValueT>(
+      if (retval = CheckSize(
               enactor->flag & Size_Check, "value__associate_outs",
               num_elements * NUM_VALUE__ASSOCIATES * size_multi,
               &mgpu_slice.value__associate_out[peer_], over_sized, gpu_num,
@@ -461,14 +476,14 @@ struct IterationLoopBase {
     auto &stream = enactor_slice.stream;
 
     if (FLAG & Unified_Receive) {
-      retval = CheckSize<SizeT, VertexT>(
+      retval = CheckSize(
           enactor->flag & Size_Check, "incoming_queue",
           num_elements + received_length, frontier.V_Q(), over_sized, gpu_num,
           iteration, peer_, true);
       if (retval) return retval;
       received_length += num_elements;
     } else {
-      retval = CheckSize<SizeT, VertexT>(
+      retval = CheckSize(
           enactor->flag & Size_Check, "incomping_queue", num_elements,
           frontier.V_Q(), over_sized, gpu_num, iteration, peer_, false);
       if (retval) return retval;
@@ -508,7 +523,7 @@ struct IterationLoopBase {
       return retval;
     }
 
-    retval = CheckSize<SizeT, SizeT>(
+    retval = CheckSize(
         enactor->flag & Size_Check, "scanned_edges", frontier.queue_length + 2,
         &frontier.output_offsets, over_sized, -1, -1, -1, false);
     if (retval) return retval;
