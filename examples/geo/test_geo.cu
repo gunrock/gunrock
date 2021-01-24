@@ -56,7 +56,7 @@ struct main_struct {
     }
 
     typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-                                    graph::HAS_EDGE_VALUES | graph::HAS_CSR>
+                                    graph::HAS_EDGE_VALUES | graph::HAS_CSR | graph::GRAPH_UNIFIED>
         GraphT;
  
     util::CpuTimer cpu_timer;

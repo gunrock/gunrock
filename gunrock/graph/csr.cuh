@@ -47,9 +47,16 @@ struct Csr :
     typedef _SizeT   SizeT;
     typedef _ValueT  ValueT;
     static const GraphFlag FLAG = _FLAG | HAS_CSR;
-    static const util::ArrayFlag ARRAY_FLAG =
+    static const util::ArrayFlag _ARRAY_FLAG =
         util::If_Val<(FLAG & GRAPH_PINNED) != 0, (FLAG & ARRAY_RESERVE) | util::PINNED,
             FLAG & ARRAY_RESERVE>::Value;
+    
+    // Enable Unified Memory support for CSR data.
+    static const util::ArrayFlag ARRAY_FLAG = 
+        util::If_Val<(FLAG & GRAPH_UNIFIED) !=0, 
+        (_ARRAY_FLAG | util::UNIFIED), 
+        _ARRAY_FLAG>::Value;
+
     typedef GraphBase<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag> BaseGraph;
     typedef Csr<VertexT, SizeT, ValueT, _FLAG, cudaHostRegisterFlag> CsrT;
 
