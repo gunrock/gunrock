@@ -26,18 +26,6 @@ namespace gunrock {
 namespace app {
 namespace mf {
 
-/**
- * @brief Speciflying parameters for MF Problem
- * @param  parameters  The util::Parameter<...> structure holding all
- *			parameter info
- * \return cudaError_t error message(s), if any
- */
-cudaError_t UseParameters_problem(util::Parameters &parameters) {
-  cudaError_t retval = cudaSuccess;
-  GUARD_CU(gunrock::app::UseParameters_problem(parameters));
-
-  return retval;
-}
 
 /**
  * @brief Max Flow Problem structure stores device-side arrays

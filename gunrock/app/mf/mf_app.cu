@@ -23,6 +23,7 @@
 #include <gunrock/graphio/graphio.cuh>
 
 // MF includes
+#include <gunrock/app/mf/mf_problem.cuh>
 #include <gunrock/app/mf/mf_enactor.cuh>
 #include <gunrock/app/mf/mf_test.cuh>
 
@@ -33,6 +34,32 @@
 namespace gunrock {
 namespace app {
 namespace mf {
+
+/**
+ * @brief Speciflying parameters for MF Problem
+ * @param  parameters  The util::Parameter<...> structure holding all
+ *          parameter info
+ * \return cudaError_t error message(s), if any
+ */
+cudaError_t UseParameters_problem(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
+  GUARD_CU(gunrock::app::UseParameters_problem(parameters));
+
+  return retval;
+}
+
+
+/**
+ * @brief Speciflying parameters for MF Enactor
+ * @param parameters The util::Parameter<...> structure holding all parameter
+ *            info
+ * \return cudaError_t error message(s), if any
+ */
+cudaError_t UseParameters_enactor(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
+  GUARD_CU(app::UseParameters_enactor(parameters));
+  return retval;
+}
 
 cudaError_t UseParameters(util::Parameters &parameters) {
   cudaError_t retval = cudaSuccess;

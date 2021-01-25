@@ -18,6 +18,7 @@
 #include <gunrock/oprtr/1D_oprtr/for_all.cuh>
 
 // MF includes
+#include <gunrock/app/mf/mf_problem.cuh>
 #include <gunrock/app/mf/mf_enactor.cuh>
 #include <gunrock/app/mf/mf_test.cuh>
 
@@ -438,8 +439,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         }
     } else if (memspace == util::DEVICE) {
         if (target == util::DEVICE) {
-            GUARD_CU(cudaMemcpy(h_Y, data_slice.Y.GetPointer(util::DEVICE), nodes * sizeof(ValueT), cudaMemcpyDeviceToDevice));
-            GUARD_CU(cudaMemcpy(edge_values, data_slice.edge_residuals.GetPointer(util::DEVICE), nodes * sizeof(ValueT), cudaMemcpyDeviceToDevice)); 
+            GUARD_CU(cudaMemcpy(h_Y, data_slice.Y.GetPointer(util::DEVICE), vN * sizeof(ValueT), cudaMemcpyDeviceToDevice));
+            GUARD_CU(cudaMemcpy(edge_values, data_slice.edge_residuals.GetPointer(util::DEVICE), vN * sizeof(ValueT), cudaMemcpyDeviceToDevice)); 
         } else if (target == util::HOST) {
             // Not implemented
             assert(false);
