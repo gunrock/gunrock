@@ -1,5 +1,5 @@
 /**
- * @file unbalanced.hxx
+ * @file input_oriented.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
  * @version 0.1
@@ -22,15 +22,15 @@
 namespace gunrock {
 namespace operators {
 namespace advance {
-namespace unbalanced {
+namespace input_oriented {
 
 template <typename graph_t, typename operator_t, typename type_t>
-__global__ void unbalanced_kernel(const graph_t G,
-                                  operator_t op,
-                                  type_t* input,
-                                  const std::size_t input_size,
-                                  type_t* output,
-                                  const std::size_t output_size) {
+__global__ void input_oriented_kernel(const graph_t G,
+                                      operator_t op,
+                                      type_t* input,
+                                      const std::size_t input_size,
+                                      type_t* output,
+                                      const std::size_t output_size) {
   for (int idx = threadIdx.x + (blockIdx.x * blockDim.x);  // Index into Input
        idx < input_size;                                   // Bound checking
        idx += blockDim.x * gridDim.x                       // Stride
@@ -51,7 +51,7 @@ __global__ void unbalanced_kernel(const graph_t G,
                       : gunrock::numeric_limits<decltype(v)>::invalid();
     }
   }
-}  // namespace unbalanced
+}  // namespace input_oriented
 
 template <advance_type_t type,
           advance_direction_t direction,
@@ -113,10 +113,10 @@ void execute(graph_t& G,
   constexpr int BLOCK_SIZE = 256;
   int GRIDE_SIZE = (input->size() + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
-  unbalanced_kernel<<<GRIDE_SIZE, BLOCK_SIZE, 0, context.stream()>>>(
+  input_oriented_kernel<<<GRIDE_SIZE, BLOCK_SIZE, 0, context.stream()>>>(
       G, op, input->data(), input->size(), output->data(), size_of_output);
 }
-}  // namespace unbalanced
+}  // namespace input_oriented
 }  // namespace advance
 }  // namespace operators
 }  // namespace gunrock

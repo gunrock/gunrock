@@ -5,6 +5,10 @@
 
 #include <gunrock/memory.hxx>
 #include <gunrock/util/type_traits.hxx>
+#include <gunrock/util/math.hxx>
+
+#include <thrust/iterator/discard_iterator.h>
+#include <thrust/iterator/counting_iterator.h>
 
 #include <gunrock/graph/properties.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
@@ -12,8 +16,6 @@
 #include <gunrock/graph/coo.hxx>
 #include <gunrock/graph/csc.hxx>
 #include <gunrock/graph/csr.hxx>
-
-// #include <gunrock/algorithms/search/binary_search.cuh>
 
 namespace gunrock {
 namespace graph {
@@ -203,13 +205,11 @@ __host__ __device__ double get_average_degree(graph_type const& G) {
 }
 
 /**
- * @brief Get the degree standard deviation of a graph.
- * This method uses population standard deviation,
- * therefore measuring the standard deviation over
- * the entire population (all nodes). This can be
- * sped up by only taking a small sample and using
- * sqrt(accum / graph.get_number_of_vertices() - 1)
- * as the result.
+ * @brief Get the degree standard deviation of a graph. This method uses
+ * population standard deviation, therefore measuring the standard deviation
+ * over the entire population (all nodes). This can be sped up by only taking a
+ * small sample and using sqrt(accum / graph.get_number_of_vertices() - 1) as
+ * the result.
  *
  * @tparam graph_type
  * @param G
@@ -229,35 +229,64 @@ __host__ __device__ double get_degree_standard_deviation(graph_type const& G) {
 
 /**
  * @brief build a log-scale degree histogram of a graph.
+ * @todo maybe a faster implementation will maybe be creating a segment array
+ * (which is just number of neighbors per vertex), and then sort and find the
+ * end of each bin of values using an upper_bound search. Once that is achieved,
+ * compute the adjacent_difference of the cumulative histogram.
  *
  * @tparam graph_type
  * @tparam histogram_t
  * @param G
- * @return histogram_t*
+ * @param histogram
+ * @param context
  */
-// template <typename graph_type, typename histogram_t>
-// histogram_t* build_degree_histogram(graph_type &graph) {
-//   using vertex_t = typename graph_type::vertex_type;
+template <typename graph_type, typename histogram_t>
+void build_degree_histogram(graph_type const& G,
+                            histogram_t* histogram,
+                            cuda::stream_t stream = 0) {
+  using vertex_t = typename graph_type::vertex_type;
+  auto length = sizeof(vertex_t) * 8 + 1;
 
-//   auto length = sizeof(vertex_t) * 8 + 1;
+  // Initialize histogram array to 0s.
+  thrust::fill(thrust::cuda::par.on(stream),
+               histogram + 0,       // iterator begin()
+               histogram + length,  // iterator end()
+               0                    // fill value
+  );
 
-//   thrust::device_vector<vertex_t> histogram(length);
+  // Build the histogram count.
+  auto build_histogram = [=] __device__(vertex_t const& v) {
+    auto degree = G.get_number_of_neighbors(v);
+    vertex_t log_length = 0;
+    while (degree >= (1 << log_length))
+      ++log_length;
 
-//   auto build_histogram = [graph] __device__ (vertex_t* counts, vertex_t i) {
-//       auto degree = graph.get_neighbor_list_length(i);
-//       while (num_neighbors >= (1 << log_length))
-//         ++log_length;
+    math::atomic::add(histogram + log_length, (histogram_t)1);
+    return v;  // output is discarded, but we still need the return.
+  };
 
-//       operation::atomic::add(&counts[log_length], (vertex_t)1);
-//   };
+  // Transform (count from 0...#_of_Vertices), and perform
+  // the operation called build_histogram. Ignore output, as
+  // we are interested in what goes in the pointer histogram.
+  thrust::transform(
+      thrust::cuda::par.on(stream),
+      thrust::make_counting_iterator((vertex_t)0),  // Begin: 0
+      thrust::make_counting_iterator(
+          (vertex_t)G.get_number_of_vertices()),  // End: # of Vertices
+      thrust::make_discard_iterator(0),           // Discard Output Iterator
+      build_histogram                             // Unary operation
+  );
+}
 
-//   auto begin = 0;
-//   auto end = graph.get_number_of_vertices();
-//   operators::for_all(thrust::device, histogram.data(), begin, end,
-//   build_histogram);
-
-//   return histogram.data.get();
-// }
+/**
+ * @brief Utility to remove self-loops, so, if we have an edge between vertex_0
+ * and vertex_0, that edge will be removed as it is a self-loop.
+ *
+ * @tparam graph_type
+ * @param G
+ */
+template <typename graph_type>
+void remove_self_loops(graph_type& G) {}
 
 }  // namespace graph
 }  // namespace gunrock

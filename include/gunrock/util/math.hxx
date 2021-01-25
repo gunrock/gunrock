@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <functional>
 
 #include <gunrock/cuda/atomic_functions.hxx>
 
@@ -72,7 +73,10 @@ __host__ __device__ __forceinline__ type_t add(type_t* address, type_t value) {
 #ifdef __CUDA_ARCH__
   return atomicAdd(address, value);
 #else
-  return std::plus<type_t>(*address, value);  // use std::atomic::fetch_add();
+  // use std::atomic::fetch_add();
+  auto old_value = *address;
+  *address += value;
+  return old_value;
 #endif
 }
 
@@ -81,7 +85,7 @@ __host__ __device__ __forceinline__ type_t min(type_t* address, type_t value) {
 #ifdef __CUDA_ARCH__
   return cuda::atomicMin(address, value);
 #else
-  return std::min<type_t>(*address, value);   // use std::atomic;
+  return std::min<type_t>(*address, value);  // use std::atomic;
 #endif
 }
 

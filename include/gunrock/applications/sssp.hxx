@@ -132,7 +132,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         G, E, shortest_path, context);
 
     // Execute filter operator on the provided lambda
-    operators::filter::execute<operators::filter_type_t::uniquify>(
+    operators::filter::execute<operators::filter_algorithm_t::compact>(
         G, E, remove_completed_paths, context);
   }
 
