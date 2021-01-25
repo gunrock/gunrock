@@ -221,7 +221,6 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
  * @param[out] min_cut	  Return partition into two sets of nodes
  * \return     double     Return accumulated elapsed times for all runs
  */
-#if 0
 template <typename GraphT, typename VertexT = typename GraphT::VertexT,
     typename ValueT = typename GraphT::ValueT>
 
@@ -273,7 +272,6 @@ double gunrock_mf(
     problem.Release(target);
     return total_time;
 }
-#endif
 
 /*
  * @brief Simple interface  take in graph as CSR format
@@ -288,11 +286,10 @@ double gunrock_mf(
  * @param[out] maxflow	    Return maxflow value
  * \return     double       Return accumulated elapsed times for all runs
  */
-/*
 template <
-    typename VertexT  = uint32_t,
-    typename SizeT    = uint32_t,
-    typename ValueT   = double>
+    typename VertexT = int,
+    typename SizeT = int,
+    typename ValueT = float>
 double mf(
         const int     num_runs,
         ValueT	      *flow,
@@ -404,7 +401,7 @@ double mf(
     d_graph.Release();
 
     return elapsed_time;
-}*/
+}
 
 // Leave this at the end of the file
 // Local Variables:

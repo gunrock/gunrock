@@ -1,7 +1,6 @@
 # ------------------------------------------------------------------------
 #  Gunrock: Shared Library CMAKE files
 # ------------------------------------------------------------------------
-
 if(RAPIDJSON_FOUND)
   include_directories(${RAPIDJSON_INCLUDEDIR})
 else()
@@ -31,12 +30,15 @@ set(CUFILES
   ##app/bfs/bfs_app.cu
   #app/bc/bc_app.cu
   ##app/cc/cc_app.cu
+ # app/app.cu
   app/color/color_app.cu
   app/geo/geo_app.cu
+  app/gtf/gtf_app.cu
   app/hits/hits_app.cu
   app/pr/pr_app.cu
   app/sm/sm_app.cu
   app/sssp/sssp_app.cu
+  app/mf/mf_app.cu
   #app/louvain/louvain_app.cu
   #app/color/color_app.cu
   util/test_utils.cu

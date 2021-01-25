@@ -134,6 +134,18 @@ float gtf(const SizeT num_nodes, const SizeT num_edges,
           ValueT *flow, ValueT *residuals,
           gunrock::util::Location memspace = gunrock::util::HOST);
 
+
+template <
+    typename VertexT,
+    typename SizeT,
+    typename ValueT>
+double mf(
+        const int     num_runs,
+        ValueT        *flow,
+        ValueT        &maxflow,
+        int       *min_cut,
+        int       undirected = 0);
+
 // Local Variables:
 // mode:c++
 // c-file-style: "NVIDIA"

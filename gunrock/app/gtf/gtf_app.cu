@@ -387,7 +387,7 @@ template <typename VertexT, typename SizeT,
           typename ValueT>
 float gtf(const SizeT num_nodes, const SizeT num_edges,
           const SizeT *row_offsets, const VertexT *col_indices,
-          const ValueT capacity, const int num_runs, VertexT source,
+          const ValueT *capacity, const int num_runs, VertexT source,
           VertexT sink,
           ValueT *flow, ValueT *residuals,
           gunrock::util::Location memspace = gunrock::util::HOST) {
@@ -415,7 +415,7 @@ float gtf(const SizeT num_nodes, const SizeT num_edges,
   // Assign pointers into gunrock graph format
   csr.Allocate(num_nodes, num_edges, memspace);
   csr.row_offsets.SetPointer(row_offsets, memspace);
-  csr.column_indices.SetPointer(col_indices, mempspace);
+  csr.column_indices.SetPointer(col_indices, memspace);
   csr.capacity.SetPointer(capacity, memspace);
  
   GraphT graph;
