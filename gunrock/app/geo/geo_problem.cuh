@@ -52,6 +52,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   typedef ProblemBase<GraphT, FLAG> BaseProblem;
   typedef DataSliceBase<GraphT, FLAG> BaseDataSlice;
 
+  static const util::ArrayFlag ARRAY_FLAG = util::UNIFIED;
+
   // ----------------------------------------------------------------
   // Dataslice structure
 
@@ -60,11 +62,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   struct DataSlice : BaseDataSlice {
     // Device arrays to store latitudes and longitudes
-    util::Array1D<SizeT, ValueT, util::UNIFIED> latitude;
-    util::Array1D<SizeT, ValueT, util::UNIFIED> longitude;
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> latitude;
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> longitude;
 
     // Store inverse of Haversine Distances
-    util::Array1D<SizeT, ValueT, util::UNIFIED> Dinv;
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> Dinv;
 
     // Run as many iterations as possible to do a
     // complete geolocation -> uses atomics()

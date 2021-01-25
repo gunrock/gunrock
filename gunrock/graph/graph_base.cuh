@@ -39,6 +39,7 @@ enum : GraphFlag {
   HAS_GP = 0x0800,
 
   GRAPH_PINNED = 0x1000,
+  GRAPH_UNIFIED = 0x2000,
 };
 
 template <GraphFlag FLAG>

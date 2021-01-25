@@ -85,14 +85,12 @@ cudaError_t cubExclusiveSum(util::Array1D<uint64_t, char> &cub_temp_space,
   return retval;
 }
 
-
 template <typename InputT, typename OutputT, 
           typename ReduceT, typename SizeT>
-cudaError_t Scan(util::Array1D<SizeT, InputT> &d_in, SizeT num_items,
-                 util::Array1D<SizeT, OutputT> &d_out,
+cudaError_t Scan(InputT *d_in, SizeT num_items,
+                 OutputT *d_out,
                  ReduceT *r, mgpu::context_t *context,
                  bool debug_synchronous = false) {
-
   if (context == nullptr) {
       return cudaErrorInvalidValue;
   }
@@ -109,14 +107,22 @@ cudaError_t Scan(util::Array1D<SizeT, InputT> &d_in, SizeT num_items,
       mgpu::arch_70_cta<256, 7>,
       mgpu::arch_75_cta<256, 7>
       > launch_t;
-  mgpu::scan<mgpu::scan_type_inc, launch_t>(d_in.GetPointer(util::DEVICE), num_items,
-                                  d_out.GetPointer(util::DEVICE),
-                                  mgpu::plus_t<InputT>(), r,
-                                  *context);
+  mgpu::scan<mgpu::scan_type_inc, launch_t>(d_in, num_items, d_out, 
+        mgpu::plus_t<InputT>(), r, *context);
 
   if (debug_synchronous) GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
 
   return retval;
+}
+
+template <typename InputT, typename OutputT, 
+          typename ReduceT, typename SizeT>
+cudaError_t Scan(util::Array1D<SizeT, InputT> &d_in, SizeT num_items,
+                 util::Array1D<SizeT, OutputT> &d_out,
+                 ReduceT *r, mgpu::context_t *context,
+                 bool debug_synchronous = false) {
+
+  return Scan(d_in.GetPointer(util::DEVICE), d_out.GetPointer(util::DEVICE), r, context, debug_synchronous);
 }
 
 /** @} */

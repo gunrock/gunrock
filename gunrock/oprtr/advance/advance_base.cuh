@@ -179,9 +179,9 @@ cudaError_t ComputeOutputLength(const GraphT graph,
   // util::DisplayDeviceResults(partitioned_scanned_edges,
   // frontier_attribute->queue_length);
 
-  util::Scan(parameters.frontier->output_offsets,  // Input
+  util::Scan(parameters.frontier->output_offsets.GetPointer(util::DEVICE),  // Input
     parameters.frontier->queue_length,    // Num_Items
-    parameters.frontier->output_offsets,  // Output
+    parameters.frontier->output_offsets.GetPointer(util::DEVICE),  // Output
     parameters.frontier->output_length.GetPointer(util::DEVICE), //); // Reduction It.
     parameters.context);
 

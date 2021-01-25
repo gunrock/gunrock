@@ -147,7 +147,7 @@ struct BCForwardIterationLoop
 
     SizeT cur_offset = data_slice.forward_queue_offsets[peer_].back();
     bool over_sized = false;
-    retval = CheckSize<SizeT, VertexT>(
+    retval = CheckSize(
         (this->enactor->flag & Size_Check) != 0, "forward_output",
         cur_offset + frontier.queue_length, &data_slice.forward_output[peer_],
         over_sized, this->gpu_num, enactor_stats.iteration, peer_);
@@ -409,7 +409,7 @@ struct BCBackwardIterationLoop
       //     &frontier_queue -> keys[frontier_queue -> selector],
       //     over_sized, thread_num, enactor_stats->iteration, peer_, false))
       //     return;
-      retval = CheckSize<SizeT, VertexT>(
+      retval = CheckSize(
           (this->enactor->flag & Size_Check) != 0, "queue1",
           frontier.queue_length, frontier.V_Q(), over_sized, this->gpu_num,
           enactor_stats.iteration, peer_);

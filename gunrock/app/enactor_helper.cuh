@@ -95,11 +95,9 @@ bool All_Done(EnactorT &enactor, int gpu_num = 0) {
  *
  * \return cudaError_t object Indicates the success of all CUDA calls.
  */
-template <
-    // bool     SIZE_CHECK,
-    typename SizeT, typename Type>
+template <typename ArrayT, typename SizeT = typename ArrayT::SizeT>
 cudaError_t CheckSize(bool size_check, const char *name, SizeT target_length,
-                      util::Array1D<SizeT, Type> *array, bool &oversized,
+                      ArrayT *array, bool &oversized,
                       int thread_num = -1, int iteration = -1, int peer_ = -1,
                       bool keep_content = false) {
   cudaError_t retval = cudaSuccess;
@@ -203,14 +201,14 @@ void PushNeighbor_Old(Enactor *enactor, int gpu, int peer,
 
   if (to_reallocate) {
     if (enactor->size_check) util::SetDevice(data_slice_p->gpu_idx);
-    if (enactor_stats->retval = CheckSize<SizeT, VertexId>(
+    if (enactor_stats->retval = CheckSize(
             enactor->size_check, "keys_in", queue_length,
             &data_slice_p->keys_in[t][gpu_], over_sized, gpu,
             enactor_stats->iteration, peer))
       return;
 
     for (i = 0; i < NUM_VERTEX_ASSOCIATES; i++) {
-      if (enactor_stats->retval = CheckSize<SizeT, VertexId>(
+      if (enactor_stats->retval = CheckSize(
               enactor->size_check, "vertex_associate_in", queue_length,
               &data_slice_p->vertex_associate_in[t][gpu_][i], over_sized, gpu,
               enactor_stats->iteration, peer))
@@ -220,7 +218,7 @@ void PushNeighbor_Old(Enactor *enactor, int gpu, int peer,
               util::DEVICE);
     }
     for (i = 0; i < NUM_VALUE__ASSOCIATES; i++) {
-      if (enactor_stats->retval = CheckSize<SizeT, Value>(
+      if (enactor_stats->retval = CheckSize(
               enactor->size_check, "value__associate_in", queue_length,
               &data_slice_p->value__associate_in[t][gpu_][i], over_sized, gpu,
               enactor_stats->iteration, peer))
@@ -313,19 +311,19 @@ cudaError_t PushNeighbor(Enactor &enactor, int gpu, int peer) {
       GUARD_CU(util::SetDevice(mgpu_slice_p.gpu_idx));
     }
     if (mgpu_slice_l.keys_out[peer_].GetPointer(util::DEVICE) != NULL) {
-      retval = CheckSize<SizeT, VertexT>(
+      retval = CheckSize(
           enactor.flag & Size_Check, "keys_in", queue_length,
           &mgpu_slice_p.keys_in[t][gpu_], over_sized, gpu,
           enactor_stats.iteration, peer);
       if (retval) return retval;
     }
-    retval = CheckSize<SizeT, VertexT>(
+    retval = CheckSize(
         enactor.flag & Size_Check, "vertex_associate_in",
         queue_length * NUM_VERTEX_ASSOCIATES,
         &mgpu_slice_p.vertex_associate_in[t][gpu_], over_sized, gpu,
         enactor_stats.iteration, peer);
     if (retval) return retval;
-    retval = CheckSize<SizeT, ValueT>(
+    retval = CheckSize(
         enactor.flag & Size_Check, "value__associate_in",
         queue_length * NUM_VALUE__ASSOCIATES,
         &mgpu_slice_p.value__associate_in[t][gpu_], over_sized, gpu,

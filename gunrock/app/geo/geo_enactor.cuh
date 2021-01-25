@@ -154,8 +154,9 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         };
 
     // Run --
-    GUARD_CU(frontier.V_Q()->ForAll(spatial_center_op, 
-      frontier.queue_length, util::DEVICE, oprtr_parameters.stream));
+    GUARD_CU(oprtr::mgpu_ForAll(frontier.V_Q()->GetPointer(target),
+      spatial_center_op, frontier.queue_length, 
+      target, oprtr_parameters.stream));
 
     if (geo_complete) {
       // The filter operation
