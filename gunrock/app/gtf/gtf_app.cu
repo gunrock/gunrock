@@ -356,7 +356,7 @@ double gunrock_gtf(gunrock::util::Parameters &parameters, GraphT &graph,
   int sink = parameters.Get<VertexT>("sink");
 
   for (int run_num = 0; run_num < num_runs; ++run_num) {
-    problem.Reset(target);
+    problem.Reset(flow, residuals, target);
     enactor.Reset(target);
 
     cpu_timer.Start();
@@ -391,13 +391,9 @@ float gtf(const SizeT num_nodes, const SizeT num_edges,
           VertexT sink,
           ValueT *flow, ValueT *residuals,
           gunrock::util::Location memspace = gunrock::util::HOST) {
-  // TODO: change to other graph representation, if not using CSR
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, ValueT,
-                                           gunrock::graph::HAS_EDGE_VALUES |
-                                               gunrock::graph::HAS_COO>
+      gunrock::graph::HAS_CSR>
       GraphT;
-  typedef typename GraphT::CooT CooT;
-  typedef typename GraphT::CsrT CsrT;
 
   // Setup parameters
   gunrock::util::Parameters parameters("gtf");
@@ -411,15 +407,13 @@ float gtf(const SizeT num_nodes, const SizeT num_edges,
   parameters.Set("sink", sink);
 
   bool quiet = parameters.Get<bool>("quiet");
-  CsrT csr;
-  // Assign pointers into gunrock graph format
-  csr.Allocate(num_nodes, num_edges, memspace);
-  csr.row_offsets.SetPointer(row_offsets, memspace);
-  csr.column_indices.SetPointer(col_indices, memspace);
-  csr.capacity.SetPointer(capacity, memspace);
  
   GraphT graph;
-  graph.FromCsr(csr, memspace, 0, quiet, true);
+  graph.CsrT::Allocate(num_nodes, num_edges, memspace);
+  graph.CsrT::row_offsets.SetPointer((SizeT *)row_offsets, num_nodes + 1, memspace);
+  graph.CsrT::column_indices.SetPointer((VertexT*)col_indices, num_edges, memspace);
+
+  graph.FromCsr(graph.csr(), memspace, 0, quiet, true);
 
   // Run the gtf
   double elapsed_time = gunrock_gtf(parameters, graph, flow, residuals, memspace);
@@ -429,6 +423,8 @@ float gtf(const SizeT num_nodes, const SizeT num_edges,
 
   return elapsed_time;
 }
+
+template float gtf(const int, const int, const int*, const int*, const float*, const int, int, int, float*, float*, gunrock::util::Location);
 
 // Leave this at the end of the file
 // Local Variables:

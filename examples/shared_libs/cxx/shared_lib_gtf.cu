@@ -26,15 +26,15 @@ int main(int argc, char** argv) {
 
   unsigned int memspace = gunrock::util::HOST;
   float *flow = (float *)malloc(num_nodes * sizeof(float));
-  int *residuals = (int *)NULL;
+  float *residuals = (float *)NULL;
 
   double elapsed =
       gtf<int, int, float>(num_nodes, num_edges, row_offsets, col_indices, edge_values,
            1 /* num runs */, source, sink, flow, residuals, memspace);
 
-  printf("Distances: ");
+  printf("residuals: ");
   for (int i = 0; i < num_nodes; i++) {
-    printf("%f ", distances[i]);
+    printf("%f ", residuals[i]);
   }
   printf("\n\n");
 
@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
   thrust::device_vector<float> device_edge_values(edge_values,
                                                   edge_values + 15);
   thrust::device_vector<float> device_flow(num_nodes);
-  thrust::device_vector<int> device_residuals(1);
+  thrust::device_vector<float> device_residuals(1);
 
   elapsed =
       gtf<int, int, float>(num_nodes, num_edges, device_row_offsets.data().get(),
@@ -53,9 +53,9 @@ int main(int argc, char** argv) {
            1, /* num runs */ source, sink, device_flow.data().get(),
            device_residuals.data().get(), memspace);
 
-  printf("Distances: ");
-  thrust::copy(device_distances.begin(), device_distances.end(),
-               std::ostream_iterator<int>(std::cout, " "));
+  printf("residuals: ");
+  thrust::copy(device_residuals.begin(), device_residuals.end(),
+               std::ostream_iterator<float>(std::cout, " "));
 
   printf("\n");
   return 0;
