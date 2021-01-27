@@ -88,6 +88,8 @@ struct RWIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &neighbors_seen = data_slice.neighbors_seen;
     auto &steps_taken = data_slice.steps_taken;
 
+    util::Location target = util::DEVICE;
+
     if (walk_mode == 0) {  // uniform random walk
 
       auto uniform_rw_op =
@@ -128,8 +130,14 @@ struct RWIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
       curandSetStream(gen, oprtr_parameters.stream);
       curandGenerateUniform(gen, rand.GetPointer(util::DEVICE),
                             graph.nodes * walks_per_node);
-      GUARD_CU(frontier.V_Q()->ForAll(uniform_rw_op, frontier.queue_length,
-                                      util::DEVICE, oprtr_parameters.stream));
+
+      GUARD_CU(
+        oprtr::mgpu_ForAll(frontier.V_Q()->GetPointer(target),
+                           uniform_rw_op,
+                           frontier.queue_length,
+                           target,
+                           oprtr_parameters.stream)
+      );
 
     } else if (walk_mode ==
                1) {  // greedy: walk to neighbor w/ maximum node value
