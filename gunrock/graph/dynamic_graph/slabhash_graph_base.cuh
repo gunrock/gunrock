@@ -63,13 +63,11 @@ struct SlabHashGraphBase {
    * @brief Allocate maximum capacity memory for SlabHash graph .
    *
    * @param[in] max_nodes Maximum number of nodes that the graph can store
-   * @param[in] max_buckets Maximum number of buckets that the graph will use
    */
-  void Allocate(SizeT max_nodes = 1 << 20, SizeT max_buckets = 1 << 20) {
+  void Allocate(SizeT max_nodes = 1 << 20) {
     memory_allocator = new DynamicAllocatorT;
 
     nodes_capacity = max_nodes;
-    buckets_capacity = max_buckets;
     buckets_per_table = new SizeT[nodes_capacity];
 
     std::memset(buckets_per_table, 0, sizeof(SizeT) * nodes_capacity);
@@ -80,25 +78,8 @@ struct SlabHashGraphBase {
                            sizeof(HashContextT) * nodes_capacity));
     CHECK_ERROR(
         cudaMalloc((void**)&d_edges_per_node, sizeof(SizeT) * nodes_capacity));
-    CHECK_ERROR(cudaMalloc((void**)&d_edges_per_bucket,
-                           sizeof(SizeT) * buckets_capacity));
-    CHECK_ERROR(cudaMalloc((void**)&d_buckets_offset,
-                           sizeof(SizeT) * buckets_capacity));
-
     CHECK_ERROR(
-        cudaMemset(d_edges_per_node, 0, sizeof(SizeT) * nodes_capacity));
-    CHECK_ERROR(
-        cudaMemset(d_edges_per_bucket, 0, sizeof(SizeT) * buckets_capacity));
-    CHECK_ERROR(
-        cudaMemset(d_buckets_offset, 0, sizeof(SizeT) * buckets_capacity));
-
-    size_t slab_unit_size =
-        GpuSlabHashContext<VertexT, ValueT,
-                           SlabHashTypeT::ConcurrentMap>::getSlabUnitSize();
-    CHECK_ERROR(
-        cudaMalloc((void**)&d_base_slabs, slab_unit_size * buckets_capacity));
-    CHECK_ERROR(
-        cudaMemset(d_base_slabs, 0xFF, slab_unit_size * buckets_capacity));
+      cudaMemset(d_edges_per_node, 0, sizeof(SizeT) * nodes_capacity));
   }
 
   ~SlabHashGraphBase() {}
@@ -120,6 +101,40 @@ struct SlabHashGraphBase {
     SizeT total_num_buckets = 0;
     num_nodes = num_init_nodes;
 
+    // Compute the required number of base slabs
+    for (SizeT i = 0; i < num_nodes; i++) {
+      SizeT node_edges;
+      if (h_row_offsets_hint) {
+        node_edges = h_row_offsets_hint[i + 1] - h_row_offsets_hint[i];
+      } else {
+        node_edges = 0;
+      }
+      buckets_per_table[i] =
+          ceil(node_edges / (load_factor * float(kEdgesPerSlab)));
+      buckets_per_table[i] = std::max(buckets_per_table[i], SizeT(1));
+      total_num_buckets += buckets_per_table[i];
+    }
+    buckets_capacity = total_num_buckets;
+
+    // Allocate memory for base slabs
+    CHECK_ERROR(cudaMalloc((void**)&d_edges_per_bucket,
+    sizeof(SizeT) * buckets_capacity));
+    CHECK_ERROR(cudaMalloc((void**)&d_buckets_offset,
+        sizeof(SizeT) * buckets_capacity));
+
+    CHECK_ERROR(
+    cudaMemset(d_edges_per_bucket, 0, sizeof(SizeT) * buckets_capacity));
+    CHECK_ERROR(
+    cudaMemset(d_buckets_offset, 0, sizeof(SizeT) * buckets_capacity));
+
+    size_t slab_unit_size =
+    GpuSlabHashContext<VertexT, ValueT,
+        SlabHashTypeT::ConcurrentMap>::getSlabUnitSize();
+    CHECK_ERROR(
+    cudaMalloc((void**)&d_base_slabs, slab_unit_size * buckets_capacity));
+    CHECK_ERROR(
+    cudaMemset(d_base_slabs, 0xFF, slab_unit_size * buckets_capacity));
+
     std::vector<SizeT> h_buckets_offset(buckets_capacity);
 
     uint32_t hash_func_x, hash_func_y;
@@ -131,26 +146,15 @@ struct SlabHashGraphBase {
     using SlabT = typename ConcurrentMapT<VertexT, ValueT>::SlabTypeT;
     SlabT* d_base_slabs32 = reinterpret_cast<SlabT*>(d_base_slabs);
 
+    // initialize slab hash contexts
+    SizeT current_base_buckets_offset = 0;
     for (SizeT i = 0; i < num_nodes; i++) {
-      SizeT node_edges;
-      if (h_row_offsets_hint) {
-        node_edges = h_row_offsets_hint[i + 1] - h_row_offsets_hint[i];
-      } else {
-        node_edges = 0;
-      }
-      buckets_per_table[i] =
-          ceil(node_edges / (load_factor * float(kEdgesPerSlab)));
-      buckets_per_table[i] = std::max(buckets_per_table[i], SizeT(1));
-
-      assert(total_num_buckets < buckets_capacity &&
-             "Capcity lower than required number of base slabs");
-
       h_hash_context[i].initParameters(
           buckets_per_table[i], hash_func_x, hash_func_y,
-          reinterpret_cast<int8_t*>(&d_base_slabs32[total_num_buckets]),
+          reinterpret_cast<int8_t*>(&d_base_slabs32[current_base_buckets_offset]),
           memory_allocator->getContextPtr());
-      h_buckets_offset[i] = total_num_buckets;
-      total_num_buckets += buckets_per_table[i];
+      h_buckets_offset[i] = current_base_buckets_offset;
+      current_base_buckets_offset += buckets_per_table[i];
     }
 
     CHECK_ERROR(cudaMemcpy(d_hash_context, h_hash_context,
