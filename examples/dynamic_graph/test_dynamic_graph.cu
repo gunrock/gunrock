@@ -117,8 +117,8 @@ struct main_struct {
               " elapsed: " + std::to_string(gpu_timer.ElapsedMillis()) + " ms.",
           !quiet);
 
-      if (validation == "each" ||
-          validation == "last" && run_num == num_runs - 1) {
+      if (!quick && (validation == "each" ||
+          validation == "last" && run_num == num_runs - 1)) {
         bool failed =
             CompareWeightedDynCSR(input_graph_csr, result_dyn_graph, quiet);
         if (failed) {
