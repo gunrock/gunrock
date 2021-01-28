@@ -122,8 +122,10 @@ TEST(dynamicGraph, insertUndirectedWeighted) {
   edges_batch_values.Move(util::HOST, util::DEVICE);
 
   // insert the edges batch
+  bool directed_batch = true;
   result_dynamic_graph.InsertEdgesBatch(edges_batch, edges_batch_values,
-                                        batch_size, util::DEVICE);
+                                        batch_size, directed_batch,
+                                        util::DEVICE);
 
   // Apply batch to host graph & generate values as well
   SizeT new_edges_count = edges;
@@ -199,8 +201,10 @@ TEST(dynamicGraph, insertDirectedWeighted) {
   edges_batch_values.Move(util::HOST, util::DEVICE);
 
   // insert the edges batch
+  bool directed_batch = true;
   result_dynamic_graph.InsertEdgesBatch(edges_batch, edges_batch_values,
-                                        batch_size, util::DEVICE);
+                                        batch_size, directed_batch,
+                                        util::DEVICE);
 
   // Apply batch to host graph & generate values as well
   SizeT new_edges_count = edges;

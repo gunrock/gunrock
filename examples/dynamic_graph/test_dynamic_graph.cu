@@ -97,17 +97,18 @@ struct main_struct {
       result_dyn_graph.dynamicGraph.InitHashTables(
           nodes, load_factor,
           input_graph_csr.row_offsets.GetPointer(util::HOST));
-      result_dyn_graph.is_directed = false;
+      result_dyn_graph.is_directed = true;
       result_dyn_graph.nodes = nodes;
       result_dyn_graph.edges = edges;
-
+      bool directed_edges = false;  // Input is from Market loader which will
+                                    // always double the edges
       util::PrintMsg("__________________________", !quiet);
 
       gunrock::util::GpuTimer gpu_timer;
       gpu_timer.Start();
       result_dyn_graph.InsertEdgesBatch(input_graph_coo.edge_pairs,
                                         input_graph_coo.edge_values, edges,
-                                        util::DEVICE);
+                                        directed_edges, util::DEVICE);
       gpu_timer.Stop();
       info.CollectSingleRun(gpu_timer.ElapsedMillis());
 

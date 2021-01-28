@@ -38,11 +38,13 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, false>
    *
    * @param[in] edges Pointer to pairs of edges
    * @param[in] batch_size Size of the inserted batch
+   * @param[in] batch_directed Batch contains directed edges (i.e, false means
+   * double the batch edges)
    * @param[in] target Location of the edges data
    */
   template <typename PairT>
   cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> edges,
-                               SizeT batchSize,
+                               SizeT batchSize, bool batch_directed = true,
                                util::Location target = util::DEVICE) {
     return cudaSuccess;
   }
@@ -119,7 +121,7 @@ template <typename VertexT, typename SizeT, typename ValueT, GraphFlag FLAG,
 struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, false, false> {
   template <typename PairT>
   cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> edges,
-                               SizeT batchSize,
+                               SizeT batchSize, bool batch_directed = true,
                                util::Location target = util::DEVICE) {
     return cudaSuccess;
   }

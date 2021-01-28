@@ -35,16 +35,16 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, true, true>
   template <typename PairT>
   cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> &edges,
                                util::Array1D<SizeT, ValueT> &vals,
-                               SizeT batchSize,
+                               SizeT batchSize, bool batch_directed = true,
                                util::Location target = util::DEVICE) {
     if (target != util::DEVICE) {
       edges.Move(util::HOST, util::DEVICE);
       vals.Move(util::HOST, util::DEVICE);
     }
 
-    this->dynamicGraph.InsertEdgesBatch(edges.GetPointer(util::DEVICE),
-                                        vals.GetPointer(util::DEVICE),
-                                        batchSize, !this->is_directed);
+    this->dynamicGraph.InsertEdgesBatch(
+        edges.GetPointer(util::DEVICE), vals.GetPointer(util::DEVICE),
+        batchSize, (!this->is_directed) && batch_directed);
 
     if (target != util::DEVICE) {
       edges.Release(util::DEVICE);
@@ -105,7 +105,7 @@ struct Dyn<VertexT, SizeT, ValueT, FLAG, cudaHostRegisterFlag, false, true> {
   template <typename PairT>
   cudaError_t InsertEdgesBatch(util::Array1D<SizeT, PairT> src,
                                util::Array1D<SizeT, ValueT> vals,
-                               SizeT batchSize,
+                               SizeT batchSize, bool batch_directed = true,
                                util::Location target = util::DEVICE) {
     return cudaSuccess;
   }

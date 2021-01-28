@@ -107,8 +107,9 @@ TEST(dynamicGraphIterator, SingleBucketMultipleChains) {
   edges_batch_values.Move(util::HOST, util::DEVICE);
 
   // insert the edges batch
+  bool directed_batch = true;
   ref_dynamic_graph.InsertEdgesBatch(edges_batch, edges_batch_values,
-                                     batch_size, util::DEVICE);
+                                     batch_size, directed_batch, util::DEVICE);
 
   // call advance
   std::vector<VertexT> result_frontier;
@@ -191,8 +192,9 @@ TEST(dynamicGraphIterator, MultipleBucketMultipleChains) {
   edges_batch_values.Move(util::HOST, util::DEVICE);
 
   // insert the edges batch
+  bool directed_batch = true;
   ref_dynamic_graph.InsertEdgesBatch(edges_batch, edges_batch_values,
-                                     batch_size, util::DEVICE);
+                                     batch_size, directed_batch, util::DEVICE);
 
   // call advance
   std::vector<VertexT> result_frontier;
