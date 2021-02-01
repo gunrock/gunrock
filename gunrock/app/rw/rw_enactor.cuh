@@ -241,9 +241,13 @@ struct RWIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             }
           };
 
-      GUARD_CU(frontier.V_Q()->ForAll(stochastic_greedy_rw_op,
-                                      frontier.queue_length, util::DEVICE,
-                                      oprtr_parameters.stream));
+      GUARD_CU(
+        oprtr::mgpu_ForAll(frontier.V_Q()->GetPointer(target),
+                           stochastic_greedy_rw_op,
+                           frontier.queue_length,
+                           target,
+                           oprtr_parameters.stream)
+      );
 
     } else {
       printf("ERROR: unknown walk_mode=%d\n", walk_mode);
