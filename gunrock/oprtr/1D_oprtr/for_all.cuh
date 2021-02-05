@@ -53,6 +53,18 @@ __global__ void ForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length) {
 }
 
 template <typename ArrayT, typename SizeT, typename ApplyLambda>
+__global__ void mgpu_ForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length, SizeT offset) {
+  // typedef typename ArrayT::SizeT SizeT;
+  const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
+  SizeT i = (SizeT)blockDim.x * blockIdx.x + threadIdx.x;
+  while (i < length) {
+    apply(array + 0, offset + i);
+    i += STRIDE;
+  }
+}
+
+
+template <typename ArrayT, typename SizeT, typename ApplyLambda>
 __global__ void SharedForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length){
   extern __shared__ char shared_array[];
   const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
@@ -234,7 +246,7 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
   struct GPU_info {
     cudaStream_t stream;
     cudaEvent_t event;
-    T *data; // pointer to our elements
+    int offset; // pointer to our elements
     int data_length; // number of elements
   };
 
@@ -245,8 +257,8 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
 
   // Use cieling to make sure we don't miss any values when
   // finding the number of elements to assign each GPU.
-  u_int num_elements_per_gpu = (length + num_gpus - 1) / num_gpus;
-
+  int num_elements_per_gpu = (length + num_gpus - 1) / num_gpus;
+  
   // prepare a cuda stream (non-blocking) and 
   // events for each gpu
   for(u_int i = 0; i < num_gpus; i++) {
@@ -256,21 +268,24 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
     GUARD_CU(cudaStreamCreateWithFlags(&info.stream, cudaStreamNonBlocking));
     GUARD_CU(cudaEventCreate(&info.event));
 
-    info.data = elements + i * num_elements_per_gpu;
+    info.offset      = i * num_elements_per_gpu;
     info.data_length = num_elements_per_gpu;
     gpu_infos.push_back(info);
   }
 
   // launch kernel for each gpu
+  int offset = 0;
   for(u_int i = 0; i < gpu_infos.size(); i++) {
     // assume T *elements is allocated as Unified Memory / Managed Memory
     // so no need to copy data to the GPU
 
     // call our kernel 
     GUARD_CU(cudaSetDevice(i));
-    ForAll_Kernel<<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, gpu_infos[i].stream>>>(
-      gpu_infos[i].data, apply, gpu_infos[i].data_length);
+    mgpu_ForAll_Kernel<<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, gpu_infos[i].stream>>>(
+      elements, apply, gpu_infos[i].data_length, gpu_infos[i].offset);
     GUARD_CU(cudaEventRecord(gpu_infos[i].event, gpu_infos[i].stream));
+    
+    offset += gpu_infos[i].data_length;
   }
 
   // synchronize with stream 0 (null_stream)

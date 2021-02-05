@@ -267,23 +267,21 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       if (target == util::DEVICE) {
         GUARD_CU(util::SetDevice(this->gpu_idx[0]));
         if (this->store_walks) {
-          GUARD_CU(data_slice.walks.SetPointer(
-              h_walks, nodes * walk_length * walks_per_node, util::HOST));
+          GUARD_CU(data_slice.walks.SetPointer(h_walks, nodes * walk_length * walks_per_node, util::HOST));
           GUARD_CU(data_slice.walks.Move(util::DEVICE, util::HOST));
         }
-        GUARD_CU(data_slice.neighbors_seen.SetPointer(
-            h_neighbors_seen, nodes * walks_per_node, util::HOST));
+        
+        GUARD_CU(data_slice.neighbors_seen.SetPointer(h_neighbors_seen, nodes * walks_per_node, util::HOST));
         GUARD_CU(data_slice.neighbors_seen.Move(util::DEVICE, util::HOST));
-        GUARD_CU(data_slice.steps_taken.SetPointer(
-            h_steps_taken, nodes * walks_per_node, util::HOST));
+        
+        GUARD_CU(data_slice.steps_taken.SetPointer(h_steps_taken, nodes * walks_per_node, util::HOST));
         GUARD_CU(data_slice.steps_taken.Move(util::DEVICE, util::HOST));
 
       } else if (target == util::HOST) {
         if (this->store_walks) {
           GUARD_CU(data_slice.walks.ForEach(
               h_walks,
-              [] __host__ __device__(const VertexT &device_val,
-                                     VertexT &host_val) {
+              [] __host__ __device__(const VertexT &device_val, VertexT &host_val) {
                 host_val = device_val;
               },
               nodes * walk_length * walks_per_node, util::HOST));

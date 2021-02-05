@@ -234,7 +234,7 @@ option(GUNROCK_APP_COLOR
 
 option(GUNROCK_BUILD_TESTS
   "If on, tests graph primitives with ctest"
-  ON)
+  OFF)
 
 option(GUNROCK_MGPU_TESTS
   "If on, tests multi GPU primitives with ctest"
