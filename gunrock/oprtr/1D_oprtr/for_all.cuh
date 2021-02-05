@@ -63,7 +63,6 @@ __global__ void mgpu_ForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length
   }
 }
 
-
 template <typename ArrayT, typename SizeT, typename ApplyLambda>
 __global__ void SharedForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length){
   extern __shared__ char shared_array[];
@@ -246,7 +245,7 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
   struct GPU_info {
     cudaStream_t stream;
     cudaEvent_t event;
-    int offset; // pointer to our elements
+    int offset;
     int data_length; // number of elements
   };
 
@@ -268,7 +267,7 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
     GUARD_CU(cudaStreamCreateWithFlags(&info.stream, cudaStreamNonBlocking));
     GUARD_CU(cudaEventCreate(&info.event));
 
-    info.offset      = i * num_elements_per_gpu;
+    info.offset = i * num_elements_per_gpu;
     info.data_length = num_elements_per_gpu;
     gpu_infos.push_back(info);
   }
