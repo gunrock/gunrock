@@ -184,8 +184,16 @@ struct RWIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             }
           };
 
-      GUARD_CU(frontier.V_Q()->ForAll(greedy_rw_op, frontier.queue_length,
-                                      util::DEVICE, oprtr_parameters.stream));
+      //GUARD_CU(frontier.V_Q()->ForAll(greedy_rw_op, frontier.queue_length,
+      //                                util::DEVICE, oprtr_parameters.stream));
+      GUARD_CU(
+        oprtr::mgpu_ForAll(frontier.V_Q()->GetPointer(target),
+                           greedy_rw_op,
+                           frontier.queue_length,
+                           target,
+                           oprtr_parameters.stream)
+      );
+
 
     } else if (walk_mode == 2) {
       curandGenerateUniform(gen, rand.GetPointer(util::DEVICE),
