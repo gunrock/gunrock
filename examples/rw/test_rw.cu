@@ -59,7 +59,7 @@ struct main_struct {
     }
 
     typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-                                    graph::HAS_NODE_VALUES | graph::HAS_CSR>
+                                    graph::HAS_NODE_VALUES | graph::HAS_CSR | graph::GRAPH_UNIFIED>
         GraphT;
     typedef typename GraphT::CsrT CsrT;
 

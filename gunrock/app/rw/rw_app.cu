@@ -81,7 +81,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   typedef typename GraphT::ValueT ValueT;
   typedef typename GraphT::SizeT SizeT;
   typedef Problem<GraphT> ProblemT;
-  typedef Enactor<ProblemT> EnactorT;
+  typedef Enactor<ProblemT, util::UNIFIED> EnactorT;
 
   // CLI parameters
   bool quiet_mode = parameters.Get<bool>("quiet");

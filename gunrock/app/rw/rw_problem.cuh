@@ -51,6 +51,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   typedef ProblemBase<GraphT, FLAG> BaseProblem;
   typedef DataSliceBase<GraphT, FLAG> BaseDataSlice;
 
+  // Use CUDA manage memory
+  static const util::ArrayFlag ARRAY_FLAG = util::UNIFIED;
+
   // ----------------------------------------------------------------
   // Dataslice structure
 
@@ -59,10 +62,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   struct DataSlice : BaseDataSlice {
     // problem specific storage arrays:
-    util::Array1D<SizeT, VertexT> walks;
-    util::Array1D<SizeT, float> rand;
-    util::Array1D<SizeT, uint64_t> neighbors_seen;
-    util::Array1D<SizeT, uint64_t> steps_taken;
+    util::Array1D<SizeT, VertexT,   ARRAY_FLAG> walks;
+    util::Array1D<SizeT, float,     ARRAY_FLAG> rand;
+    util::Array1D<SizeT, uint64_t,  ARRAY_FLAG> neighbors_seen;
+    util::Array1D<SizeT, uint64_t,  ARRAY_FLAG> steps_taken;
     int walk_length;
     int walks_per_node;
     int walk_mode;

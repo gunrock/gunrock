@@ -243,8 +243,9 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
   int num_gpus = 1;
   GUARD_CU(cudaGetDeviceCount(&num_gpus));
 
-
-  u_int num_elements_per_gpu = length / num_gpus;
+  // Use cieling to make sure we don't miss any values when
+  // finding the number of elements to assign each GPU.
+  u_int num_elements_per_gpu = (length + num_gpus - 1) / num_gpus;
 
   // prepare a cuda stream (non-blocking) and 
   // events for each gpu
@@ -259,10 +260,6 @@ cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
     info.data_length = num_elements_per_gpu;
     gpu_infos.push_back(info);
   }
-
-  // give the last gpu any left over elements
-  gpu_infos.back().data_length += length % num_gpus;
-
 
   // launch kernel for each gpu
   for(u_int i = 0; i < gpu_infos.size(); i++) {
