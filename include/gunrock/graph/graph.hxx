@@ -6,6 +6,7 @@
 #include <gunrock/memory.hxx>
 #include <gunrock/util/type_traits.hxx>
 #include <gunrock/util/math.hxx>
+#include <gunrock/cuda/cuda.hxx>
 
 #include <thrust/iterator/discard_iterator.h>
 #include <thrust/iterator/counting_iterator.h>
@@ -268,13 +269,12 @@ void build_degree_histogram(graph_type const& G,
   // Transform (count from 0...#_of_Vertices), and perform
   // the operation called build_histogram. Ignore output, as
   // we are interested in what goes in the pointer histogram.
-  thrust::transform(
-      thrust::cuda::par.on(stream),
-      thrust::make_counting_iterator((vertex_t)0),  // Begin: 0
-      thrust::make_counting_iterator(
-          (vertex_t)G.get_number_of_vertices()),  // End: # of Vertices
-      thrust::make_discard_iterator(0),           // Discard Output Iterator
-      build_histogram                             // Unary operation
+  thrust::transform(thrust::cuda::par.on(stream),
+                    thrust::make_counting_iterator<vertex_t>(0),  // Begin: 0
+                    thrust::make_counting_iterator<vertex_t>(
+                        G.get_number_of_vertices()),  // End: # of Vertices
+                    thrust::make_discard_iterator(),  // Discard Output Iterator
+                    build_histogram                   // Unary operation
   );
 }
 
