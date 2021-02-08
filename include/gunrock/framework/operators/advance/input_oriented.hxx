@@ -18,6 +18,7 @@
 #include <gunrock/framework/operators/for/for.hxx>
 
 #include <thrust/transform_scan.h>
+#include <thrust/iterator/discard_iterator.h>
 
 namespace gunrock {
 namespace operators {
@@ -51,7 +52,7 @@ __global__ void input_oriented_kernel(const graph_t G,
                       : gunrock::numeric_limits<decltype(v)>::invalid();
     }
   }
-}  // namespace input_oriented
+}
 
 template <advance_type_t type,
           advance_direction_t direction,
@@ -77,44 +78,42 @@ void execute(graph_t& G,
 
   // Resize the output (inactive) buffer to the new size.
   output->resize(size_of_output);
+  auto output_data = output->data();
+  auto input_data = input->data();
 
-  // auto output_data = output->data();
-  // auto segments_data = thrust::raw_pointer_cast(segments.data());
+  auto pre_condition = [=] __device__(vertex_t const& i) {
+    vertex_t v = input_data[i];
+    return gunrock::util::limits::is_valid(v);
+  };
 
-  // auto pre_condition = [=] __device__(vertex_t const& v) {
-  //   return gunrock::util::limits::is_valid(v) ? true : false;
-  // };
+  auto neighbors_expand = [=] __device__(vertex_t const& i) {
+    vertex_t v = input_data[i];
 
-  // auto neighbors_expand = [=] __device__(vertex_t const& v) {
-  //   auto starting_edge = G.get_starting_edge(v);
-  //   auto total_edges = G.get_number_of_neighbors(v);
-  //   for (auto e = starting_edge; e < starting_edge + total_edges; ++e) {
-  //     auto n = G.get_destination_vertex(e);
-  //     auto w = G.get_edge_weight(e);
-  //     bool cond = op(v, n, e, w);
-  //     printf("Inserting in e = %i\n", e);
-  //     output_data[e] = cond ? n :
-  //     gunrock::numeric_limits<vertex_t>::invalid();
-  //   }
+    auto starting_edge = G.get_starting_edge(v);
+    auto total_edges = G.get_number_of_neighbors(v);
 
-  //   // Do we keep the input vertex in the frontier?
-  //   return gunrock::numeric_limits<vertex_t>::invalid();
-  // };
+    for (auto e = starting_edge; e < starting_edge + total_edges; ++e) {
+      auto n = G.get_destination_vertex(e);
+      auto w = G.get_edge_weight(e);
+      bool cond = op(v, n, e, w);
+      output_data[e] =
+          (cond && n != v) ? n : gunrock::numeric_limits<vertex_t>::invalid();
+    }
 
-  // thrust::transform_if(
-  //     thrust::cuda::par.on(context.stream()),  // execution policy
-  //     input->begin(),                          // input iterator: first
-  //     input->end(),                            // input iterator: last
-  //     output->begin(),                         // output iterator: first
-  //     neighbors_expand,                        // unary operation
-  //     pre_condition                            // predicate operation
-  // );
+    return v;  // output is discarded.
+  };
 
-  constexpr int BLOCK_SIZE = 256;
-  int GRIDE_SIZE = (input->size() + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  output->fill(gunrock::numeric_limits<vertex_t>::invalid());
 
-  input_oriented_kernel<<<GRIDE_SIZE, BLOCK_SIZE, 0, context.stream()>>>(
-      G, op, input->data(), input->size(), output->data(), size_of_output);
+  thrust::transform_if(
+      thrust::cuda::par.on(context.stream()),       // execution policy
+      thrust::make_counting_iterator<vertex_t>(0),  // input iterator: first
+      thrust::make_counting_iterator<vertex_t>(
+          input->size()),               // input iterator: last
+      thrust::make_discard_iterator(),  // output iterator: ignore
+      neighbors_expand,                 // unary operation
+      pre_condition                     // predicate operation
+  );
 }
 }  // namespace input_oriented
 }  // namespace advance

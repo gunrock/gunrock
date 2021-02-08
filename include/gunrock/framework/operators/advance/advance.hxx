@@ -57,6 +57,9 @@ void execute(graph_t& G,
              frontier_t* output,
              work_tiles_t& segments,
              cuda::standard_context_t* context) {
+  // std::cout << "Input advance frontier: ";
+  // input->print();
+
   if (lb == load_balance_t::merge_path)
     merge_path::execute<type, direction>(G, op, input, output, segments,
                                          *context);
@@ -69,6 +72,9 @@ void execute(graph_t& G,
   else
     error::throw_if_exception(cudaErrorUnknown,
                               "Unsupported advance's load-balancing schedule.");
+
+  // std::cout << "Output advance frontier: ";
+  // output->print();
 }
 
 /**

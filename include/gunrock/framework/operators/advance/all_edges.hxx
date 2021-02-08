@@ -23,22 +23,6 @@ namespace operators {
 namespace advance {
 namespace all_edges {
 
-template <typename graph_t, typename operator_t, typename type_t>
-__global__ void all_edges_kernel(const graph_t G,
-                                 operator_t op,
-                                 type_t* output) {
-  auto e = blockIdx.x * blockDim.x + threadIdx.x;
-  while (e - threadIdx.x < G.get_number_of_edges()) {
-    if (e < G.get_number_of_edges()) {
-      auto pair = G.get_source_and_destination_vertices(e);
-      auto w = G.get_edge_weight(e);
-      bool cond = op(pair.source, pair.destination, e, w);
-      output[e] =
-          cond ? pair.destination : gunrock::numeric_limits<type_t>::invalid();
-    }
-  }
-}
-
 template <advance_type_t type,
           advance_direction_t direction,
           typename graph_t,
@@ -51,6 +35,8 @@ void execute(graph_t& G,
              frontier_t* output,
              work_tiles_t& segments,
              cuda::standard_context_t& context) {
+  using edge_t = typename graph_t::edge_type;
+
   // Prepare output for all edges advance.
   if (G.get_number_of_edges() <= 0) {
     output->resize(0);
@@ -61,14 +47,27 @@ void execute(graph_t& G,
     output->resize(G.get_number_of_edges());
   }
 
-  // Get the data buffer from the output frontier.
-  auto output_data = output->data();
+  auto input_begin = input->begin();
+  auto input_end = input->end();
 
-  // TODO: use launch box instead.
-  constexpr int BLOCK_SIZE = 256;
-  int GRIDE_SIZE = (G.get_number_of_edges() + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  all_edges_kernel<<<GRIDE_SIZE, BLOCK_SIZE, 0, context.stream()>>>(
-      G, op, output_data);
+  auto all_edges_kernel = [=] __device__(edge_t const& e) {
+    auto pair = G.get_source_and_destination_vertices(e);
+    auto w = G.get_edge_weight(e);
+    bool exists =
+        thrust::binary_search(thrust::seq, input_begin, input_end, pair.source);
+    bool cond = op(pair.source, pair.destination, e, w);
+    return (cond && exists)
+               ? pair.destination
+               : gunrock::numeric_limits<decltype(pair.source)>::invalid();
+  };
+
+  thrust::transform(thrust::cuda::par.on(context.stream()),
+                    thrust::make_counting_iterator<edge_t>(0),  // Begin: 0
+                    thrust::make_counting_iterator<edge_t>(
+                        G.get_number_of_edges()),  // End: # of Edges
+                    output->begin(),               // Output frontier
+                    all_edges_kernel               // Unary Operator
+  );
 }
 }  // namespace all_edges
 }  // namespace advance

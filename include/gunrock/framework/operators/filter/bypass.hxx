@@ -21,6 +21,8 @@ void execute(graph_t& G,
 
   // Mark items as invalid instead of removing them (therefore, a "bypass").
   auto bypass = [=] __device__(vertex_t const& v) {
+    if (!gunrock::util::limits::is_valid(v))
+      return gunrock::numeric_limits<vertex_t>::invalid();  // exit early
     return (op(v) ? v : gunrock::numeric_limits<vertex_t>::invalid());
   };
 
