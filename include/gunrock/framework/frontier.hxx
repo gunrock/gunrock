@@ -19,6 +19,7 @@
 
 #include <gunrock/util/type_limits.hxx>
 #include <gunrock/graph/graph.hxx>
+#include <gunrock/cuda/context.hxx>
 
 namespace gunrock {
 
@@ -88,6 +89,11 @@ class frontier_t {
   }
 
   void set_size(std::size_t const& s) { _size = s; }
+
+  void fill(type_t const value, cuda::stream_t stream = 0) {
+    thrust::fill(thrust::cuda::par.on(stream), _storage.begin(), _storage.end(),
+                 value);
+  }
 
   /**
    * @brief Resize the underlying frontier storage to be exactly the size
