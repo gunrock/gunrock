@@ -41,6 +41,7 @@ enum advance_direction_t {
 };
 
 enum filter_algorithm_t {
+  remove,      // Remove if predicate = true
   predicated,  // Copy if predicate = true
   compact,     // 2-Pass Transform compact
   bypass       // Marks as invalid, instead of culling

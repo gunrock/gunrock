@@ -38,12 +38,8 @@ void execute(graph_t& G,
              cuda::standard_context_t& context) {
   using vertex_t = typename graph_t::vertex_type;
 
-  // XXX: should use existing context (context)
-  mgpu::standard_context_t _context(false, context.stream());
-
-  auto size_of_output_ignore =
-      compute_output_length(G, input, segments, context);
-  auto size_of_output = compute_output_length(G, input, segments, _context);
+  auto size_of_output =
+      compute_output_length(G, input, segments, *(context.mgpu()));
 
   // If output frontier is empty, resize and return.
   if (size_of_output <= 0) {
@@ -79,7 +75,7 @@ void execute(graph_t& G,
 
   mgpu::transform_lbs(neighbors_expand, size_of_output,
                       thrust::raw_pointer_cast(segments.data()),
-                      (int)input->size(), _context);
+                      (int)input->size(), *(context.mgpu()));
 }
 
 template <advance_type_t type,

@@ -5,7 +5,7 @@
 namespace gunrock {
 namespace operators {
 namespace filter {
-namespace predicated {
+namespace remove {
 template <typename graph_t, typename operator_t, typename frontier_t>
 void execute(graph_t& G,
              operator_t op,
@@ -20,22 +20,22 @@ void execute(graph_t& G,
   }
 
   auto predicate = [=] __host__ __device__(type_t const& i) -> bool {
-    return gunrock::util::limits::is_valid(i) ? op(i) : false;
+    return gunrock::util::limits::is_valid(i) ? !op(i) : true;
   };
 
   // Copy w/ predicate!
-  auto new_length = thrust::copy_if(
+  auto new_length = thrust::remove_copy_if(
       thrust::cuda::par.on(context.stream()),  // execution policy
       input->begin(),                          // input iterator: begin
       input->end(),                            // input iterator: end
-      output->begin(),                         // output iterator
+      output->begin(),                         // output iterator: begin
       predicate                                // predicate
   );
 
   auto new_size = thrust::distance(output->begin(), new_length);
   output->resize(new_size);
 }
-}  // namespace predicated
+}  // namespace remove
 }  // namespace filter
 }  // namespace operators
 }  // namespace gunrock

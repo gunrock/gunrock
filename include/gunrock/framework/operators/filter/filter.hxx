@@ -8,6 +8,9 @@
 #include <gunrock/framework/operators/filter/compact.hxx>
 #include <gunrock/framework/operators/filter/predicated.hxx>
 #include <gunrock/framework/operators/filter/bypass.hxx>
+#include <gunrock/framework/operators/filter/remove.hxx>
+
+#include <gunrock/framework/operators/filter/uniquify.hxx>
 
 namespace gunrock {
 namespace operators {
@@ -22,14 +25,28 @@ void execute(graph_t& G,
              frontier_t* input,
              frontier_t* output,
              cuda::standard_context_t* context) {
+  // std::cout << "Input filter frontier:: ";
+  // input->print();
+
   if (type == filter_algorithm_t::compact)
     compact::execute(G, op, input, output, *context);
   else if (type == filter_algorithm_t::predicated)
     predicated::execute(G, op, input, output, *context);
   else if (type == filter_algorithm_t::bypass)
     bypass::execute(G, op, input, output, *context);
+  else if (type == filter_algorithm_t::remove)
+    remove::execute(G, op, input, output, *context);
   else
     error::throw_if_exception(cudaErrorUnknown, "Filter type not supported.");
+
+  // std::cout << "Output filter frontier:: ";
+  // output->print();
+
+  // XXX: should we let user control when to uniquify?
+  uniquify::execute<type>(output, (float)100, *context);
+
+  // std::cout << "Output unique frontier:: ";
+  // output->print();
 }
 
 template <filter_algorithm_t type,
