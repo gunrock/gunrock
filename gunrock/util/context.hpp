@@ -16,9 +16,17 @@ struct SingleGpuContext {
     // sdp: cudaFlags -- not sure I want to go this route, but it's a start
     SingleGpuContext(int deviceId, unsigned int cudaFlags = cudaEventDisableTiming) : 
         device_id(deviceId) {
+        
+        // save the current device
+        int current_device;
+        cudaGetDevice(&current_device);
+
         cudaSetDevice(device_id);
         cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
         cudaEventCreate(&event, cudaFlags);
+
+        // restore the current device
+        cudaSetDevice(current_device);
     }
 
     // sdp: not ideal, I'd rather have a destructor (and RAII), but
@@ -26,9 +34,18 @@ struct SingleGpuContext {
     // Get rid of this "cudaError_t" asap
     cudaError_t Release() {
         cudaError_t retval = cudaSuccess;
+
+        // save the current device
+        int current_device;
+        GUARD_CU(cudaGetDevice(&current_device));
+
         GUARD_CU(cudaSetDevice(device_id));
         GUARD_CU(cudaStreamDestroy(stream));
         GUARD_CU(cudaEventDestroy(event));
+
+        // restore the current device
+        GUARD_CU(cudaSetDevice(current_device));
+
         return retval;
     }
 
