@@ -72,7 +72,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using weight_t = typename problem_t::weight_t;
 
   // <user-defined>
-  void prepare_frontier(cuda::standard_context_t* context) override {
+  void prepare_frontier(cuda::multi_context_t& context) override {
     auto P = this->get_problem();
     auto f = this->get_input_frontier();
 
@@ -83,7 +83,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       f->push_back(v);
   }
 
-  void loop(cuda::standard_context_t* context) override {
+  void loop(cuda::multi_context_t& context) override {
     // Data slice
     auto E = this->get_enactor();
     auto P = this->get_problem();

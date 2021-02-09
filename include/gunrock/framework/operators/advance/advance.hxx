@@ -56,19 +56,26 @@ void execute(graph_t& G,
              frontier_t* input,
              frontier_t* output,
              work_tiles_t& segments,
-             cuda::standard_context_t* context) {
-  if (lb == load_balance_t::merge_path)
-    merge_path::execute<type, direction>(G, op, input, output, segments,
-                                         *context);
-  else if (lb == load_balance_t::input_oriented)
-    input_oriented::execute<type, direction>(G, op, input, output, segments,
-                                             *context);
-  else if (lb == load_balance_t::all_edges)
-    all_edges::execute<type, direction>(G, op, input, output, segments,
-                                        *context);
-  else
-    error::throw_if_exception(cudaErrorUnknown,
-                              "Unsupported advance's load-balancing schedule.");
+             cuda::multi_context_t& context) {
+
+  if(context.size() == 1) {
+    auto context0 = context.get_context(0);
+
+    if (lb == load_balance_t::merge_path) {
+      merge_path::execute<type, direction>(G, op, input, output, segments,
+                                          *context0);
+    } else if (lb == load_balance_t::input_oriented) {
+      input_oriented::execute<type, direction>(G, op, input, output, segments,
+                                              *context0);
+    } else if (lb == load_balance_t::all_edges) {
+      all_edges::execute<type, direction>(G, op, input, output, segments,
+                                          *context0);
+    } else {
+      error::throw_if_exception(cudaErrorUnknown, "Advance type not supported.");
+    }
+  } else {
+    error::throw_if_exception(cudaErrorUnknown, "`context.size() != 1` not supported");
+  }
 }
 
 /**
@@ -94,7 +101,7 @@ template <advance_type_t type = advance_type_t::vertex_to_vertex,
 void execute(graph_t& G,
              enactor_type* E,
              operator_type op,
-             cuda::standard_context_t* context) {
+             cuda::multi_context_t& context) {
   execute<type, direction, lb>(G,                         // graph
                                op,                        // advance operator
                                E->get_input_frontier(),   // input frontier

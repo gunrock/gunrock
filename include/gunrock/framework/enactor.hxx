@@ -103,13 +103,12 @@ struct enactor_t {
    * @return float time took for enactor to complete.
    */
   float enact() {
-    auto single_context = context->get_context(0);
-    single_context->print_properties();
-    prepare_frontier(single_context);
-    auto timer = single_context->timer();
+    auto context0 = context->get_context(0);
+    prepare_frontier(*context);
+    auto timer = context0->timer();
     timer.begin();
-    while (!is_converged(single_context)) {
-      loop(single_context);
+    while (!is_converged(*context)) {
+      loop(*context);
       ++iteration;
     }
     return timer.end();
@@ -125,14 +124,14 @@ struct enactor_t {
    *
    * @param context
    */
-  virtual void loop(cuda::standard_context_t* context) = 0;
+  virtual void loop(cuda::multi_context_t& context) = 0;
 
   /**
    * @brief Prepare the initial frontier.
    *
    * @param context
    */
-  virtual void prepare_frontier(cuda::standard_context_t* context) = 0;
+  virtual void prepare_frontier(cuda::multi_context_t& context) = 0;
 
   /**
    * @brief Algorithm is converged if true is returned, keep on iterating if
@@ -142,7 +141,7 @@ struct enactor_t {
    * @return true
    * @return false
    */
-  virtual bool is_converged(cuda::standard_context_t* context) {
+  virtual bool is_converged(cuda::multi_context_t& context) {
     return active_frontier->empty();
   }
 
