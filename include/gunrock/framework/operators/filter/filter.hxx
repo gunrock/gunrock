@@ -8,6 +8,9 @@
 #include <gunrock/framework/operators/filter/compact.hxx>
 #include <gunrock/framework/operators/filter/predicated.hxx>
 #include <gunrock/framework/operators/filter/bypass.hxx>
+#include <gunrock/framework/operators/filter/remove.hxx>
+
+#include <gunrock/framework/operators/filter/uniquify.hxx>
 
 namespace gunrock {
 namespace operators {
@@ -38,6 +41,15 @@ void execute(graph_t& G,
   } else {
     error::throw_if_exception(cudaErrorUnknown, "`context.size() != 1` not supported");
   }
+  
+  // std::cout << "Output filter frontier:: ";
+  // output->print();
+
+  // XXX: should we let user control when to uniquify?
+  uniquify::execute<type>(output, (float)100, *context);
+
+  // std::cout << "Output unique frontier:: ";
+  // output->print();
 }
 
 template <filter_algorithm_t type,
