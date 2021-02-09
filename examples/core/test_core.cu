@@ -29,5 +29,8 @@ int main() {
   std::cout << "--- Testing MultiGPUForAllTest ---\n";
   MultiGPUForAllTest();
 
+  std::cout << "--- Testing MultiGPUTestContexts ---\n";
+  MultiGPUTestContexts();
+
   return 0;
 }
