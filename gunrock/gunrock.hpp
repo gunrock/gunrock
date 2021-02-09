@@ -159,7 +159,15 @@ enum HITS_NORMALIZATION_METHOD { // Integer
  * @param[out] auth ranks  Vertex authority scores
  * @param[in]  device      Target device to store inputs and outputs
  * \return     double      Elapsed run time in milliseconds
+ */
+template <
+    typename VertexT,
+    typename SizeT,
+    typename GValueT>
+double hits(
+    const SizeT        num_nodes,
     const SizeT        num_edges,
+    const SizeT       *row_offsets,
     const VertexT     *col_indices,
     const int          max_iter,
     const float        tol,
