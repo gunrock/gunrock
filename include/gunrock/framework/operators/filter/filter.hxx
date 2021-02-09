@@ -24,21 +24,24 @@ void execute(graph_t& G,
              operator_t op,
              frontier_t* input,
              frontier_t* output,
-             cuda::standard_context_t* context) {
-  // std::cout << "Input filter frontier:: ";
-  // input->print();
-
-  if (type == filter_algorithm_t::compact)
-    compact::execute(G, op, input, output, *context);
-  else if (type == filter_algorithm_t::predicated)
-    predicated::execute(G, op, input, output, *context);
-  else if (type == filter_algorithm_t::bypass)
-    bypass::execute(G, op, input, output, *context);
-  else if (type == filter_algorithm_t::remove)
-    remove::execute(G, op, input, output, *context);
-  else
-    error::throw_if_exception(cudaErrorUnknown, "Filter type not supported.");
-
+             cuda::multi_context_t& context) {
+  
+  if(context.size() == 1) {
+    auto context0 = context.get_context(0);
+    
+    if (type == filter_algorithm_t::compact) {
+      compact::execute(G, op, input, output, *context0);
+    } else if (type == filter_algorithm_t::predicated) {
+      predicated::execute(G, op, input, output, *context0);
+    } else if (type == filter_algorithm_t::bypass) {
+      bypass::execute(G, op, input, output, *context0);
+    } else {
+      error::throw_if_exception(cudaErrorUnknown, "Filter type not supported.");
+    }
+  } else {
+    error::throw_if_exception(cudaErrorUnknown, "`context.size() != 1` not supported");
+  }
+  
   // std::cout << "Output filter frontier:: ";
   // output->print();
 
@@ -56,7 +59,7 @@ template <filter_algorithm_t type,
 void execute(graph_t& G,
              enactor_type* E,
              operator_t op,
-             cuda::standard_context_t* context) {
+             cuda::multi_context_t& context) {
   execute<type>(G,                         // graph
                 op,                        // operator_t
                 E->get_input_frontier(),   // input frontier

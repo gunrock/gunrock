@@ -23,12 +23,17 @@ template <typename operator_type>
 void execute(const std::size_t begin,
              const std::size_t end,
              operator_type op,
-             cuda::standard_context_t& context) {
+             cuda::multi_context_t& context) {
   // XXX: context should use occupancy calculator to figure this out:
   constexpr int grid_size = 256;
   constexpr int block_size = 256;
-  detail::compute<<<grid_size, block_size, 0, context.stream()>>>(begin, end,
-                                                                  op);
+  
+  if(context.size() == 1) {
+    auto context0 = context.get_context(0);
+    detail::compute<<<grid_size, block_size, 0, context0.stream()>>>(begin, end, op);
+  } else {
+    error::throw_if_exception(cudaErrorUnknown, "`context.size() != 1` not supported");
+  }
 }
 
 }  // namespace parallel_for
