@@ -246,46 +246,23 @@ cudaError_t mgpu_ForAll(const util::MultiGpuContext& mgpuContext,
   // no mgpu for HOST
   assert( (target & util::DEVICE) == util::DEVICE );
 
-  struct GPU_info {
-    cudaStream_t stream;
-    cudaEvent_t event;
-    int offset;
-    int data_length; // number of elements
-  };
-
-  std::vector<GPU_info> gpu_infos;
-  auto num_gpus = mgpuContext.getGpuCount();
-
   // Use cieling to make sure we don't miss any values when
   // finding the number of elements to assign each GPU.
-  auto num_elements_per_gpu = gunrock::util::ceil_divide(length, num_gpus);
+  auto num_elements_per_gpu = gunrock::util::ceil_divide(length, mgpuContext.getGpuCount());
 
-  // prepare data for each gpu / context
+  // launch ForAll kernel for each gpu
   for (auto const &context : mgpuContext.contexts) {
-    GPU_info info;
-
-    info.stream = context.stream;
-    info.event = context.event;
-    info.offset = context.device_id * num_elements_per_gpu;
-    info.data_length = num_elements_per_gpu;
-    gpu_infos.push_back(info);
-  }
-
-  // launch kernel for each gpu
-  for(u_int i = 0; i < gpu_infos.size(); i++) {
-    // assume T *elements is allocated as Unified Memory / Managed Memory
-    // so no need to copy data to the GPU
-
-    // call our kernel 
-    GUARD_CU(cudaSetDevice(i));
-    mgpu_ForAll_Kernel<<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, gpu_infos[i].stream>>>(
-      elements, apply, gpu_infos[i].data_length, gpu_infos[i].offset);
-    GUARD_CU(cudaEventRecord(gpu_infos[i].event, gpu_infos[i].stream));
+    auto data_length = num_elements_per_gpu;
+    auto offset = context.device_id * num_elements_per_gpu;
+    GUARD_CU( cudaSetDevice(context.device_id) );
+    mgpu_ForAll_Kernel<<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, context.stream>>>(
+      elements, apply, data_length, offset);
+    GUARD_CU(cudaEventRecord(context.event, context.stream));
   }
 
   // synchronize with stream 0 (null_stream)
-  for(int i = 0; i < gpu_infos.size(); i++) {
-    cudaStreamWaitEvent(stream, gpu_infos[i].event, 0);
+  for (auto const &context : mgpuContext.contexts) {
+    cudaStreamWaitEvent(context.stream, context.event, 0);
   }
 
   // set the device back to 0 (might have some other one that should be set?)
