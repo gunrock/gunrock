@@ -262,7 +262,7 @@ cudaError_t mgpu_ForAll(const util::MultiGpuContext& mgpuContext,
 
   // synchronize with stream 0 (null_stream)
   for (auto const &context : mgpuContext.contexts) {
-    cudaStreamWaitEvent(context.stream, context.event, 0);
+    cudaStreamWaitEvent(stream, context.event, 0);
   }
 
   // set the device back to 0 (might have some other one that should be set?)

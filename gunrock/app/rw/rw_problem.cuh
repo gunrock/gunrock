@@ -15,6 +15,7 @@
 #pragma once
 
 #include <gunrock/app/problem_base.cuh>
+#include <gunrock/util/context.hpp>
 
 namespace gunrock {
 namespace app {
@@ -206,6 +207,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   bool store_walks;
   int seed;
 
+  gunrock::util::MultiGpuContext mgpu_context;
+
   // ----------------------------------------------------------------
   // Problem Methods
 
@@ -242,6 +245,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       delete[] data_slices;
       data_slices = NULL;
     }
+
+    GUARD_CU(mgpu_context.Release());
+
     GUARD_CU(BaseProblem::Release(target));
     return retval;
   }
