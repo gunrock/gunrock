@@ -7,26 +7,52 @@
 namespace gunrock {
 namespace util {
 
+
+/*
+ * Use to Save the device state at the start of a function.
+ * Restore() before returning.
+ * Ideally, this would work with just the constructor and
+ * the destructor would restore state automatically -- just
+ * worried that an unused variable would get optimized away (need
+ * to verify the behavior).
+ */
+struct SaveToRestore {
+    int current_device;
+
+    void Save() {
+        // save the current device
+        cudaGetDevice(&current_device);
+    }
+
+    void Restore() {
+        // restore the current device
+        cudaSetDevice(current_device);    
+    }
+
+    SaveToRestore() = default;
+    ~SaveToRestore() = default;
+    SaveToRestore(const SaveToRestore& rhs) = default;
+    SaveToRestore& operator=(const SaveToRestore& rhs) = default;
+};
+
 struct SingleGpuContext {
 
     int device_id;
     cudaStream_t stream;
     cudaEvent_t event;
+    SaveToRestore state;
 
     // sdp: cudaFlags -- not sure I want to go this route, but it's a start
     SingleGpuContext(int deviceId, unsigned int cudaFlags = cudaEventDisableTiming) : 
         device_id(deviceId) {
         
-        // save the current device
-        int current_device;
-        cudaGetDevice(&current_device);
+        state.Save();
 
         cudaSetDevice(device_id);
         cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
         cudaEventCreate(&event, cudaFlags);
 
-        // restore the current device
-        cudaSetDevice(current_device);
+        state.Restore();
     }
 
     // sdp: not ideal, I'd rather have a destructor (and RAII), but
@@ -35,16 +61,13 @@ struct SingleGpuContext {
     cudaError_t Release() {
         cudaError_t retval = cudaSuccess;
 
-        // save the current device
-        int current_device;
-        GUARD_CU(cudaGetDevice(&current_device));
+        state.Save();
 
         GUARD_CU(cudaSetDevice(device_id));
         GUARD_CU(cudaStreamDestroy(stream));
         GUARD_CU(cudaEventDestroy(event));
 
-        // restore the current device
-        GUARD_CU(cudaSetDevice(current_device));
+        state.Restore();
 
         return retval;
     }
