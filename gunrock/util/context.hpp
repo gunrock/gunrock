@@ -91,6 +91,8 @@ struct MultiGpuContext {
             retval = context.Release(); 
         }
 
+        contexts.clear();
+
         return retval;
     }
 

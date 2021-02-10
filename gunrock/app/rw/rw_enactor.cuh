@@ -64,6 +64,8 @@ struct RWIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // --
     // Alias variables
 
+    auto &mgpu_context = this->enactor->problem->mgpu_context;
+
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
 
     auto &enactor_slice =
@@ -132,7 +134,7 @@ struct RWIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                             graph.nodes * walks_per_node);
 
       GUARD_CU(
-        oprtr::mgpu_ForAll(frontier.V_Q()->GetPointer(target),
+        oprtr::mgpu_ForAll(mgpu_context, frontier.V_Q()->GetPointer(target),
                            uniform_rw_op,
                            frontier.queue_length,
                            target,
@@ -187,7 +189,7 @@ struct RWIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
       //GUARD_CU(frontier.V_Q()->ForAll(greedy_rw_op, frontier.queue_length,
       //                                util::DEVICE, oprtr_parameters.stream));
       GUARD_CU(
-        oprtr::mgpu_ForAll(frontier.V_Q()->GetPointer(target),
+        oprtr::mgpu_ForAll(mgpu_context, frontier.V_Q()->GetPointer(target),
                            greedy_rw_op,
                            frontier.queue_length,
                            target,
@@ -250,7 +252,7 @@ struct RWIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
           };
 
       GUARD_CU(
-        oprtr::mgpu_ForAll(frontier.V_Q()->GetPointer(target),
+        oprtr::mgpu_ForAll(mgpu_context, frontier.V_Q()->GetPointer(target),
                            stochastic_greedy_rw_op,
                            frontier.queue_length,
                            target,
