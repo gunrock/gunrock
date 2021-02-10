@@ -87,3 +87,15 @@ cudaError_t MultiGPUTestContexts() {
 
     return retval;
 }
+
+cudaError_t MultiGPUTestPeerAccess() {
+    cudaError_t retval = cudaSuccess;
+
+    // Creat our multi-gpu context
+    gunrock::util::MultiGpuContext mgpu_context;
+
+    GUARD_CU( mgpu_context.enablePeerAccess() );
+    GUARD_CU( mgpu_context.disablePeerAccess() );
+
+    return retval;
+}

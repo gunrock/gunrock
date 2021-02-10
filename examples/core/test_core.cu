@@ -32,5 +32,7 @@ int main() {
   std::cout << "--- Testing MultiGPUTestContexts ---\n";
   MultiGPUTestContexts();
 
+  std::cout << "--- Testing MultiGPUTestPeerAccess ---\n";
+  MultiGPUTestPeerAccess();
   return 0;
 }
