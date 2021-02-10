@@ -16,7 +16,7 @@
 
 #include <gunrock/util/array_utils.cuh>
 #include <vector>
-#include "gunrock/util/error_utils.cuh"
+#include <thread>
 #include <gunrock/util/context.hpp>
 
 namespace gunrock {
@@ -241,6 +241,9 @@ cudaError_t mgpu_ForAll(const util::MultiGpuContext& mgpuContext,
                         SizeT length,
                         util::Location target = util::DEVICE,
                         cudaStream_t stream = 0) {
+  
+  util::SaveToRestore state; state.Save();
+
   cudaError_t retval = cudaSuccess;
 
   // no mgpu for HOST
@@ -250,23 +253,31 @@ cudaError_t mgpu_ForAll(const util::MultiGpuContext& mgpuContext,
   // finding the number of elements to assign each GPU.
   auto num_elements_per_gpu = gunrock::util::ceil_divide(length, mgpuContext.getGpuCount());
 
-  // launch ForAll kernel for each gpu
+  // launch ForAll kernel for each gpu (on its own thread)
+  std::vector<std::thread> threads;
+  threads.reserve(mgpuContext.getGpuCount());
   for (auto const &context : mgpuContext.contexts) {
-    auto data_length = num_elements_per_gpu;
-    auto offset = context.device_id * num_elements_per_gpu;
-    GUARD_CU( cudaSetDevice(context.device_id) );
-    mgpu_ForAll_Kernel<<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, context.stream>>>(
-      elements, apply, data_length, offset);
-    GUARD_CU(cudaEventRecord(context.event, context.stream));
+    threads.push_back(std::thread( [&, context]() {
+      auto data_length = num_elements_per_gpu;
+      auto offset = context.device_id * num_elements_per_gpu;
+      GUARD_CU( cudaSetDevice(context.device_id) );
+      mgpu_ForAll_Kernel<<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, context.stream>>>(
+        elements, apply, data_length, offset);
+      GUARD_CU(cudaEventRecord(context.event, context.stream));
+    }));
   }
 
-  // synchronize with stream 0 (null_stream)
+  for (auto &thread: threads) {
+    thread.join();
+  }
+
+  // user's stream waits on events recorded above
   for (auto const &context : mgpuContext.contexts) {
     cudaStreamWaitEvent(stream, context.event, 0);
   }
 
-  // set the device back to 0 (might have some other one that should be set?)
-  GUARD_CU(cudaSetDevice(0));
+  // restore to previous cuda device
+  state.Restore();
 
   return retval;
 }
