@@ -55,16 +55,16 @@ struct SingleGpuContext {
     ~SingleGpuContext() = default;
 
     // Output
-    friend std::ostream& operator<<(std::ostream& os, const SingleGpuContext& context);
+    friend std::ostream& operator<<(std::ostream& os, const SingleGpuContext& context) {
+        os << "device_id: " << context.device_id << "\n"
+            << "stream: " << context.stream << "\n"
+            << "event: " << context.event;
+        
+        return os;
+    }
 };
 
-std::ostream& operator<<(std::ostream& os, const SingleGpuContext& context) {
-    os << "device_id: " << context.device_id << "\n"
-        << "stream: " << context.stream << "\n"
-        << "event: " << context.event;
-    
-    return os;
-}
+
 
 struct MultiGpuContext {
     std::vector<SingleGpuContext> contexts;
@@ -100,18 +100,15 @@ struct MultiGpuContext {
     ~MultiGpuContext() = default;
 
     // Output
-    friend std::ostream& operator<<(std::ostream& os, const MultiGpuContext& mgpu_context);
+    friend std::ostream& operator<<(std::ostream& os, const MultiGpuContext& mgpu_context) {
+        for (auto& context : mgpu_context.contexts) {
+            os << "{\n" << context << "\n}\n";
+        }
+        return os;
+    }
 
     int getGpuCount() const { return contexts.size(); }
 };
-
-std::ostream& operator<<(std::ostream& os, const MultiGpuContext& mgpu_context) {
-
-    for (auto& context : mgpu_context.contexts) {
-        os << "{\n" << context << "\n}\n";
-    }
-    return os;
-}
 
 // Data necessary to perform a multi-gpu forall
 struct MultiGpuInfo {
