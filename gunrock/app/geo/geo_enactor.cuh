@@ -63,6 +63,8 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // --
     // Alias variables
 
+    auto &mgpu_context = this->enactor->problem->mgpu_context;
+
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
 
     auto &enactor_slice =
@@ -154,7 +156,7 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         };
 
     // Run --
-    GUARD_CU(oprtr::mgpu_ForAll(frontier.V_Q()->GetPointer(target),
+    GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, frontier.V_Q()->GetPointer(target),
       spatial_center_op, frontier.queue_length, 
       target, oprtr_parameters.stream));
 
