@@ -16,7 +16,8 @@
 
 #include <gunrock/util/array_utils.cuh>
 #include <vector>
-#include "gunrock/util/error_utils.cuh"
+#include <thread>
+#include <gunrock/util/context.hpp>
 
 namespace gunrock {
 namespace oprtr {
@@ -234,70 +235,49 @@ cudaError_t ForAll(T *elements, ApplyLambda apply, SizeT length,
 }
 
 template <typename T, typename SizeT, typename ApplyLambda>
-cudaError_t mgpu_ForAll(T *elements, ApplyLambda apply, SizeT length,
-                   util::Location target = util::DEVICE,
-                   cudaStream_t stream = 0) {
+cudaError_t mgpu_ForAll(const util::MultiGpuContext& mgpuContext, 
+                        T *elements, 
+                        ApplyLambda apply, 
+                        SizeT length,
+                        util::Location target = util::DEVICE,
+                        cudaStream_t stream = 0) {
+  
+  util::SaveToRestore state; state.Save();
+
   cudaError_t retval = cudaSuccess;
 
   // no mgpu for HOST
   assert( (target & util::DEVICE) == util::DEVICE );
 
-  struct GPU_info {
-    cudaStream_t stream;
-    cudaEvent_t event;
-    int offset;
-    int data_length; // number of elements
-  };
-
-  std::vector<GPU_info> gpu_infos;
-
-  int num_gpus = 1;
-  GUARD_CU(cudaGetDeviceCount(&num_gpus));
-
   // Use cieling to make sure we don't miss any values when
   // finding the number of elements to assign each GPU.
-  u_int num_elements_per_gpu = (length + num_gpus - 1) / num_gpus;
+  auto num_elements_per_gpu = gunrock::util::ceil_divide(length, mgpuContext.getGpuCount());
 
-  // prepare a cuda stream (non-blocking) and 
-  // events for each gpu
-  for(u_int i = 0; i < num_gpus; i++) {
-    GPU_info info;
-    
-    GUARD_CU(cudaSetDevice(i));
-    GUARD_CU(cudaStreamCreateWithFlags(&info.stream, cudaStreamNonBlocking));
-    GUARD_CU(cudaEventCreate(&info.event));
-
-    info.offset = i * num_elements_per_gpu;
-    info.data_length = num_elements_per_gpu;
-    gpu_infos.push_back(info);
+  // launch ForAll kernel for each gpu (on its own thread)
+  std::vector<std::thread> threads;
+  threads.reserve(mgpuContext.getGpuCount());
+  for (auto const &context : mgpuContext.contexts) {
+    threads.push_back(std::thread( [&, context]() {
+      auto data_length = num_elements_per_gpu;
+      auto offset = context.device_id * num_elements_per_gpu;
+      GUARD_CU( cudaSetDevice(context.device_id) );
+      mgpu_ForAll_Kernel<<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, context.stream>>>(
+        elements, apply, data_length, offset);
+      GUARD_CU(cudaEventRecord(context.event, context.stream));
+    }));
   }
 
-  // launch kernel for each gpu
-  for(u_int i = 0; i < gpu_infos.size(); i++) {
-    // assume T *elements is allocated as Unified Memory / Managed Memory
-    // so no need to copy data to the GPU
-
-    // call our kernel 
-    GUARD_CU(cudaSetDevice(i));
-    mgpu_ForAll_Kernel<<<FORALL_GRIDSIZE, FORALL_BLOCKSIZE, 0, gpu_infos[i].stream>>>(
-      elements, apply, gpu_infos[i].data_length, gpu_infos[i].offset);
-    GUARD_CU(cudaEventRecord(gpu_infos[i].event, gpu_infos[i].stream));
+  for (auto &thread: threads) {
+    thread.join();
   }
 
-  // synchronize with stream 0 (null_stream)
-  for(int i = 0; i < gpu_infos.size(); i++) {
-    cudaStreamWaitEvent(stream, gpu_infos[i].event, 0);
+  // user's stream waits on events recorded above
+  for (auto const &context : mgpuContext.contexts) {
+    cudaStreamWaitEvent(stream, context.event, 0);
   }
 
-  // clean up after ourselves
-  for(u_int i = 0; i < num_gpus; i++) {
-    GUARD_CU(cudaSetDevice(i));
-    GUARD_CU(cudaStreamDestroy(gpu_infos[i].stream));
-    GUARD_CU(cudaEventDestroy(gpu_infos[i].event));
-  }
-
-  // set the device back to 0 (might have some other one that should be set?)
-  GUARD_CU(cudaSetDevice(0));
+  // restore to previous cuda device
+  state.Restore();
 
   return retval;
 }

@@ -1,6 +1,7 @@
 #include <gunrock/util/test_utils.h>
 #include <gunrock/oprtr/1D_oprtr/for_all.cuh>
-
+#include <gunrock/util/context.hpp>
+#include <vector>
 
 cudaError_t MultiGPUForAllTest() {
     cudaError_t retval = cudaSuccess;
@@ -26,8 +27,10 @@ cudaError_t MultiGPUForAllTest() {
     // make sure we wait for the data to be initialized
     cudaDeviceSynchronize();
 
+    gunrock::util::MultiGpuContext mgpu_context;
+
     // multigpu ForAll store the device id in the array
-    gunrock::oprtr::mgpu_ForAll(d_ptr,
+    gunrock::oprtr::mgpu_ForAll(mgpu_context, d_ptr,
                             [] __device__ (int* array, int idx) {
                                int id;
                                cudaGetDevice(&id);
@@ -46,6 +49,53 @@ cudaError_t MultiGPUForAllTest() {
 
 
     my_data.Release();
+
+    return retval;
+}
+
+cudaError_t MultiGPUTestContexts() {
+
+    cudaError_t retval = cudaSuccess;
+
+    int device_count = 1;
+    GUARD_CU(cudaGetDeviceCount(&device_count));
+  
+    using SingleGpuContext = gunrock::util::SingleGpuContext;
+    std::vector<SingleGpuContext> gpu_contexts;
+    gpu_contexts.reserve(device_count);
+
+    // create per device contexts
+    for (int i = 0; i < device_count; i++) {
+        gpu_contexts.push_back( SingleGpuContext(i) );
+    }
+
+    // print the context and cleanup
+    for (auto& context : gpu_contexts) {
+        std::cout << context << "\n";
+        context.Release();
+    }
+
+    // Let the constructor do all the setup,
+    // as a user I want to do as little as possible.
+    gunrock::util::MultiGpuContext mgpu_contexts;
+
+    // Show me what you've created
+    std::cout << mgpu_contexts << "\n";
+
+    // Clean up after yourself
+    mgpu_contexts.Release();
+
+    return retval;
+}
+
+cudaError_t MultiGPUTestPeerAccess() {
+    cudaError_t retval = cudaSuccess;
+
+    // Creat our multi-gpu context
+    gunrock::util::MultiGpuContext mgpu_context;
+
+    GUARD_CU( mgpu_context.enablePeerAccess() );
+    GUARD_CU( mgpu_context.disablePeerAccess() );
 
     return retval;
 }
