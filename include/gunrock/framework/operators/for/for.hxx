@@ -27,12 +27,14 @@ void execute(const std::size_t begin,
   // XXX: context should use occupancy calculator to figure this out:
   constexpr int grid_size = 256;
   constexpr int block_size = 256;
-  
-  if(context.size() == 1) {
+
+  if (context.size() == 1) {
     auto context0 = context.get_context(0);
-    detail::compute<<<grid_size, block_size, 0, context0.stream()>>>(begin, end, op);
+    detail::compute<<<grid_size, block_size, 0, context0->stream()>>>(begin,
+                                                                      end, op);
   } else {
-    error::throw_if_exception(cudaErrorUnknown, "`context.size() != 1` not supported");
+    error::throw_if_exception(cudaErrorUnknown,
+                              "`context.size() != 1` not supported");
   }
 }
 

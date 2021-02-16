@@ -25,10 +25,9 @@ void execute(graph_t& G,
              frontier_t* input,
              frontier_t* output,
              cuda::multi_context_t& context) {
-  
-  if(context.size() == 1) {
+  if (context.size() == 1) {
     auto context0 = context.get_context(0);
-    
+
     if (type == filter_algorithm_t::compact) {
       compact::execute(G, op, input, output, *context0);
     } else if (type == filter_algorithm_t::predicated) {
@@ -38,15 +37,16 @@ void execute(graph_t& G,
     } else {
       error::throw_if_exception(cudaErrorUnknown, "Filter type not supported.");
     }
-  } else {
-    error::throw_if_exception(cudaErrorUnknown, "`context.size() != 1` not supported");
-  }
-  
-  // std::cout << "Output filter frontier:: ";
-  // output->print();
 
-  // XXX: should we let user control when to uniquify?
-  uniquify::execute<type>(output, (float)100, *context);
+    // std::cout << "Output filter frontier:: ";
+    // output->print();
+
+    // XXX: should we let user control when to uniquify?
+    uniquify::execute<type>(output, (float)100, *context0);
+  } else {
+    error::throw_if_exception(cudaErrorUnknown,
+                              "`context.size() != 1` not supported");
+  }
 
   // std::cout << "Output unique frontier:: ";
   // output->print();
