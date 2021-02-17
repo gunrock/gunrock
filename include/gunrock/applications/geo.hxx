@@ -356,20 +356,17 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
           // If one location found, point at that location
           if (valid_neighbors == 1) {
-            // coordinates_t only_neighbor;
-            // if (gunrock::util::limits::is_valid(neighbors[0].latitude) &&
-            //     gunrock::util::limits::is_valid(neighbors[0].longitude)) {
-            //   only_neighbor.latitude = neighbors[0].latitude;
-            //   only_neighbor.longitude = neighbors[0].longitude;
-            // } else {
-            //   only_neighbor.latitude = neighbors[1].latitude;
-            //   only_neighbor.longitude = neighbors[1].longitude;
-            // }
-            // coordinates[v].latitude = only_neighbor.latitude;
-            // coordinates[v].longitude = only_neighbor.longitude;
-
-            coordinates[v].latitude = neighbors[0].latitude;
-            coordinates[v].longitude = neighbors[0].longitude;
+            coordinates_t only_neighbor;
+            if (gunrock::util::limits::is_valid(neighbors[0].latitude) &&
+                gunrock::util::limits::is_valid(neighbors[0].longitude)) {
+              only_neighbor.latitude = neighbors[0].latitude;
+              only_neighbor.longitude = neighbors[0].longitude;
+            } else {
+              only_neighbor.latitude = neighbors[1].latitude;
+              only_neighbor.longitude = neighbors[1].longitude;
+            }
+            coordinates[v].latitude = only_neighbor.latitude;
+            coordinates[v].longitude = only_neighbor.longitude;
             return;
           }
 
@@ -409,7 +406,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto total_iterations = P->param.total_iterations;
 
     if (iteration == total_iterations) {
-      std::cout << "Total Iterations: " << iteration << std::endl;
       return true;
     } else
       return false;
