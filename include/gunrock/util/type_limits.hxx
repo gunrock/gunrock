@@ -63,9 +63,10 @@ __host__ __device__ __forceinline__ bool is_valid(type_t value) {
                 "type_t must be an arithmetic type.");
   if constexpr (std::is_integral<type_t>::value)
     return (value != gunrock::numeric_limits<type_t>::invalid());
-  else
-    // XXX: test this on device
-    return (bool)!isnan(value);
+
+  // else if constexpr (std::is_floating_point<type_t>::value)
+  // just putting else doesn't work (gives a warning), even though it should...
+  return isnan(value) ? false : true;  // XXX: test this on device
 }
 
 }  // namespace limits

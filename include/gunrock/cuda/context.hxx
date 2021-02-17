@@ -71,8 +71,8 @@ class standard_context_t : public context_t {
     _ptx_version = cuda::make_compute_capability(attr.ptxVersion);
 
     cudaSetDevice(_ordinal);
-    cudaStreamCreate(&_stream);
-    cudaEventCreate(&_event);
+    cudaStreamCreateWithFlags(&_stream, cudaStreamNonBlocking);
+    cudaEventCreateWithFlags(&_event, cudaEventDisableTiming);
     cudaGetDeviceProperties(&_props, _ordinal);
 
     _mgpu_context = new mgpu::standard_context_t(false, _stream);
@@ -111,9 +111,9 @@ class standard_context_t : public context_t {
   virtual cuda::event_t event() override { return _event; }
 
   virtual util::timer_t& timer() override { return _timer; }
-  
-  virtual cuda::device_id_t ordinal() {return _ordinal; }
-  
+
+  virtual cuda::device_id_t ordinal() { return _ordinal; }
+
 };  // class standard_context_t
 
 class multi_context_t {
@@ -145,19 +145,18 @@ class multi_context_t {
     auto contexts_ptr = contexts.data();
     return contexts_ptr[device];
   }
-  
-  auto size() {
-    return contexts.size();
-  }
-  
+
+  auto size() { return contexts.size(); }
+
   void enable_peer_access() {
     int num_gpus = size();
-    for(int i = 0; i < num_gpus; i++) {
+    for (int i = 0; i < num_gpus; i++) {
       auto ctx = get_context(i);
       cudaSetDevice(ctx->ordinal());
 
-      for(int j = 0; j < num_gpus; j++) {
-        if(i == j) continue;
+      for (int j = 0; j < num_gpus; j++) {
+        if (i == j)
+          continue;
 
         auto ctx_peer = get_context(j);
         cudaDeviceEnablePeerAccess(ctx_peer->ordinal(), 0);
