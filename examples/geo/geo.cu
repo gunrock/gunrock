@@ -7,40 +7,33 @@
 using namespace gunrock;
 using namespace memory;
 
-class coordinate_adaptor {
- public:
-  const geo::coordinates_t& m;
-  coordinate_adaptor(const geo::coordinates_t& a) : m(a) {}
-
-  friend std::ostream& operator<<(std::ostream& out,
-                                  const coordinate_adaptor& d) {
-    const geo::coordinates_t& m = d.m;
-    return out << m.latitude << ", " << m.longitude;
-  }
-};
-
 /**
  * @brief Reads a coordinates file from an input-stream a dense array.
  *
- * Here is an example of the labels format
+ * Here is an example of the labels file
  * +----------------------------------------------+
- * |%%Labels Formatted File 			  | <--- header line
+ * |%%Labels Formatted File 			                | <--- header line
  * |%                                             | <--+
- * |% comments                                    |    |-- 0 or more comment
- * lines
+ * |% comments                                    |    |-- 0 or more comment lines
  * |%                                             | <--+
- * |  N L L                                       | <--- nodes, labels, labels
- * |  I1 L1A L1B                                  | <--+
- * |  I2 L2A L2B                                  |    |
+ * |  N L L                                       | <--- # of nodes, # of labels, # of labels
+ * |  I0 L1A L1B                                  | <--+ node id, latitude, longutude
+ * |  I4                                          |    | coordinates missing, populated as invalids
+ * |  I5 L5A L5B                                  |    |
  * |     . . .                                    |    |
  * |  IN LNA LNB                                  | <--+
  * +----------------------------------------------+
+ * 
+ * @note Node ID (first column) must be 0-based.
+ * @note If a Node ID is present but coordinates are missing, 
+ *       the coordinates are filled as invalids.
+ * @note If Node ID and coordinates are missing, the coordinates 
+ *       for those Node IDs are filled as invalids.
  */
 void read_coordinates_file(std::string filename,
                            geo::coordinates_t* coordinates) {
   FILE* f_in = fopen(filename.c_str(), "r");
   int labels_read = gunrock::numeric_limits<int>::invalid();
-  long long nodes = 0;
   char line[1024];
 
   while (true) {
@@ -60,13 +53,6 @@ void read_coordinates_file(std::string filename,
       long long ll_nodes, ll_label_x, ll_label_y;
       int items_scanned =
           sscanf(line, "%lld %lld %lld", &ll_nodes, &ll_label_x, &ll_label_y);
-      nodes = ll_nodes;
-
-      for (int k = 0; k < nodes; k++) {
-        coordinates[k].latitude = gunrock::numeric_limits<float>::invalid();
-        coordinates[k].longitude = gunrock::numeric_limits<float>::invalid();
-      }
-
       labels_read = 0;
     }  // -> else if
 
@@ -104,8 +90,10 @@ void read_coordinates_file(std::string filename,
         exit(1);
       }
 
-      coordinates[ll_node - 1].latitude = ll_label_a;
-      coordinates[ll_node - 1].longitude = ll_label_b;
+      // XXX: Make sure these are 0-based;
+      coordinates[ll_node].latitude = ll_label_a;
+      coordinates[ll_node].longitude = ll_label_b;
+
     }  // -> else
   }    // -> while
 
@@ -165,10 +153,11 @@ void test_geo(int num_arguments, char** argument_array) {
 
   // Coordinates: Latitude/Longitude
   std::string coordinates_filename = argument_array[2];
-  geo::coordinates_t default_invalid{gunrock::numeric_limits<float>::invalid(),
-                                     gunrock::numeric_limits<float>::invalid()};
-  thrust::host_vector<geo::coordinates_t> load_coordinates(n_vertices,
-                                                           default_invalid);
+  geo::coordinates_t default_invalid;
+  default_invalid.latitude = gunrock::numeric_limits<float>::invalid();
+  default_invalid.longitude = gunrock::numeric_limits<float>::invalid();
+
+  thrust::host_vector<geo::coordinates_t> load_coordinates(n_vertices, default_invalid);
   read_coordinates_file(coordinates_filename, load_coordinates.data());
   thrust::device_vector<geo::coordinates_t> coordinates(load_coordinates);
 

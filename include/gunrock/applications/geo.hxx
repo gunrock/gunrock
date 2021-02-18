@@ -68,11 +68,7 @@ __device__ __host__ coordinates_t mean(graph_t const& G,
   b /= length;
 
   // mean latitude and longitude
-  coordinates_t _mean;
-  _mean.latitude = a;
-  _mean.longitude = b;
-
-  return _mean;
+  return {a, b};
 }
 
 /**
@@ -252,7 +248,7 @@ struct param_t {
 
 struct result_t {
   coordinates_t* coordinates;
-  result_t(coordinates_t* coordinates_) : coordinates(coordinates) {}
+  result_t(coordinates_t* _coordinates) : coordinates(_coordinates) {}
 };
 
 template <typename graph_t, typename param_type, typename result_type>
@@ -309,8 +305,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto P = this->get_problem();
     auto G = P->get_graph();
     auto f = this->get_input_frontier();
-    auto data = f->data();
-
+    auto f_data = f->data();
+    
     auto coordinates = P->result.coordinates;
     auto spatial_iterations = P->param.spatial_iterations;
     auto inv_haversine_distance = P->inv_haversine_distance.data().get();
@@ -325,9 +321,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
      */
     auto spatial_center_op =
         [G, coordinates, inv_haversine_distance, spatial_iterations,
-         data] __host__
+         f_data] __host__
         __device__(std::size_t const& tid) {
-          vertex_t v = data[tid];
+          vertex_t v = f_data[tid];
 
           if (gunrock::util::limits::is_valid(coordinates[v].latitude) &&
               gunrock::util::limits::is_valid(coordinates[v].longitude))
