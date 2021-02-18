@@ -36,13 +36,8 @@ class coordinate_adaptor {
  * |  IN LNA LNB                                  | <--+
  * +----------------------------------------------+
  */
-void read_coordinates_file(
-    std::string filename,
-    thrust::device_vector<geo::coordinates_t>& _coordinates) {
-  geo::coordinates_t default_invalid{gunrock::numeric_limits<float>::invalid(),
-                                     gunrock::numeric_limits<float>::invalid()};
-  thrust::host_vector<geo::coordinates_t> coordinates(_coordinates.size(),
-                                                      default_invalid);
+void read_coordinates_file(std::string filename,
+                           geo::coordinates_t* coordinates) {
   FILE* f_in = fopen(filename.c_str(), "r");
   int labels_read = gunrock::numeric_limits<int>::invalid();
   long long nodes = 0;
@@ -120,9 +115,6 @@ void read_coordinates_file(
     std::cerr << "Error: No coordinates read." << std::endl;
     exit(1);
   }
-
-  // Move to device.
-  _coordinates = coordinates;
 }
 
 void test_geo(int num_arguments, char** argument_array) {
@@ -170,11 +162,15 @@ void test_geo(int num_arguments, char** argument_array) {
   unsigned int total_iterations = 10;
 
   vertex_t n_vertices = G.get_number_of_vertices();
-  thrust::device_vector<geo::coordinates_t> coordinates(n_vertices);
 
   // Coordinates: Latitude/Longitude
   std::string coordinates_filename = argument_array[2];
-  read_coordinates_file(coordinates_filename, coordinates);
+  geo::coordinates_t default_invalid{gunrock::numeric_limits<float>::invalid(),
+                                     gunrock::numeric_limits<float>::invalid()};
+  thrust::host_vector<geo::coordinates_t> load_coordinates(n_vertices,
+                                                           default_invalid);
+  read_coordinates_file(coordinates_filename, load_coordinates.data());
+  thrust::device_vector<geo::coordinates_t> coordinates(load_coordinates);
 
   // --
   // GPU Run
@@ -188,9 +184,10 @@ void test_geo(int num_arguments, char** argument_array) {
   std::cout << "Coordinates (output) = " << std::endl;
 
   thrust::host_vector<geo::coordinates_t> h_coordinates = coordinates;
-  for (int i = 0; i < h_coordinates.size(); i++)
-    std::cout << "Node (" << i << ") = " << h_coordinates[i].latitude << ", "
-              << h_coordinates[i].longitude << std::endl;
+  auto h_coordinates_data = h_coordinates.data();
+  for (int i = 0; i < h_coordinates.size() && i < 40; i++)
+    std::cout << "Node (" << i << ") = " << h_coordinates_data[i].latitude
+              << ", " << h_coordinates_data[i].longitude << std::endl;
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 }
