@@ -63,6 +63,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   typedef ProblemBase<GraphT, FLAG> BaseProblem;
   typedef DataSliceBase<GraphT, FLAG> BaseDataSlice;
 
+  typedef util::Array1D<SizeT, ValueT, util::UNIFIED> ArraySage;
+
   // Helper structures
 
   /**
@@ -70,31 +72,31 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   struct DataSlice : BaseDataSlice {
     // sage-specific storage arrays
-    util::Array1D<SizeT, ValueT>
+    ArraySage
         W_f_1_1D;  // w_f_1 1D array. weight matrix for W^1 feature part
-    util::Array1D<SizeT, ValueT>
+    ArraySage
         W_a_1_1D;  // w_a_1 1D array. weight matrix for W^1 agg part
-    util::Array1D<SizeT, ValueT>
+    ArraySage
         W_f_2_1D;  // w_f_2 1D array. weight matrix for W^2 feature part
-    util::Array1D<SizeT, ValueT>
+    ArraySage
         W_a_2_1D;  // w_a_2 1D array. weight matrix for W^2 agg part
     util::Array1D<uint64_t, ValueT> features_1D;  // fature matrix 1D
-    util::Array1D<SizeT, ValueT> children_temp;   // 256 agg(h_B1^1)
-    util::Array1D<SizeT, ValueT> source_temp;     // 256 h_B2^1
-    util::Array1D<SizeT, ValueT> source_result;   // 256 h_B2^2
-    util::Array1D<SizeT, ValueT>
+    ArraySage children_temp;   // 256 agg(h_B1^1)
+    ArraySage source_temp;     // 256 h_B2^1
+    ArraySage source_result;   // 256 h_B2^2
+    ArraySage
         child_temp;  // 256 h_B1^1, I feel like this one could be local
-    util::Array1D<SizeT, ValueT>
+    ArraySage
         sums_child_feat;  // 64 sum of children's features, I feel like this one
                           // could be local as well
-    util::Array1D<SizeT, ValueT> sums;  // 64 per child
+    ArraySage sums;  // 64 per child
     util::Array1D<uint64_t, ValueT, util::PINNED>
         host_source_result;  // results on HOST
 
-    util::Array1D<SizeT, curandState>
+    util::Array1D<SizeT, curandState, util::UNIFIED>
         rand_states;  // random states, one per child
 
-    util::Array1D<SizeT, VertexT> children;  // children vertices
+    util::Array1D<SizeT, VertexT, util::UNIFIED> children;  // children vertices
 
     VertexT batch_size;
     int feature_column;
