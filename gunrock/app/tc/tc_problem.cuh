@@ -64,7 +64,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   struct DataSlice : BaseDataSlice {
     // tc-specific storage arrays
-    util::Array1D<SizeT, VertexT> tc_counts;  // triangle counting values
+    util::Array1D<SizeT, VertexT, util::UNIFIED> tc_counts;  // triangle counting values
     /*
      * @brief Default constructor
      */
@@ -136,6 +136,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   // Members
   // Set of data slices (one for each GPU)
   util::Array1D<SizeT, DataSlice> *data_slices;
+
+  gunrock::util::MultiGpuContext mgpu_context;
 
   // Methods
 

@@ -115,11 +115,12 @@ cudaError_t NeighborReduce(const GraphT &graph, FrontierInT *frontier_in,
 
 template <OprtrFlag FLAG, typename GraphT, typename FrontierInT,
           typename FrontierOutT, typename ParametersT, typename OpT>
-cudaError_t Intersect(const GraphT graph, FrontierInT *frontier_in,
+cudaError_t Intersect(gunrock::util::MultiGpuContext mgpu_context,
+                      const GraphT graph, FrontierInT *frontier_in,
                       FrontierOutT *frontier_out, ParametersT &parameters,
                       OpT op) {
   cudaError_t retval = cudaSuccess;
-  GUARD_CU(oprtr::intersection::Launch<FLAG>(graph, frontier_in, frontier_out,
+  GUARD_CU(oprtr::intersection::Launch<FLAG>(mgpu_context, graph, frontier_in, frontier_out,
                                              parameters, op));
 
   return retval;

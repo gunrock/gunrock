@@ -67,7 +67,7 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true> {
       const InKeyT *&d_src_node_ids, const VertexT *&d_dst_node_ids,
       //       ValueT        *&d_output_counts,
       OutKeyT *&d_output_total, SizeT &input_length, SizeT &stride,
-      SizeT &num_vertex, SizeT &num_edge, InterOpT &inter_op) {
+      InterOpT &inter_op) {
     VertexT start = threadIdx.x + blockIdx.x * blockDim.x;
     for (VertexT idx = start; idx < input_length;
          idx += KernelPolicyT::BLOCKS * KernelPolicyT::THREADS) {
@@ -137,8 +137,6 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true> {
  * (d_src_node_ids and d_dst_node_ids should have the same length)
  * @param[in] num_vertex        Maximum number of elements we can place into the
  * incoming frontier
- * @param[in] num_edge          Maximum number of elements we can place into the
- * outgoing frontier
  *
  */
 template <OprtrFlag FLAG, typename InKeyT, typename OutKeyT, typename SizeT,
@@ -154,19 +152,20 @@ __launch_bounds__(Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT,
                              const VertexT *d_dst_node_ids,
                              //      	  ValueT       *d_output_counts,
                              OutKeyT *d_output_total, SizeT input_length,
-                             SizeT stride, SizeT num_vertex, SizeT num_edge,
+                             SizeT stride,
                              InterOpT inter_op) {
   Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT,
            InterOpT>::IntersectTwoSmallNL(d_row_offsets, d_column_indices,
                                           d_src_node_ids, d_dst_node_ids,
                                           //      d_output_counts,
                                           d_output_total, input_length, stride,
-                                          num_vertex, num_edge, inter_op);
+                                          inter_op);
 }
 
 template <OprtrFlag FLAG, typename GraphT, typename FrontierInT,
           typename FrontierOutT, typename ParametersT, typename InterOpT>
-cudaError_t Launch(const GraphT &graph, const FrontierInT *frontier_in,
+cudaError_t Launch(gunrock::util::MultiGpuContext mgpu_context,
+    const GraphT &graph, const FrontierInT *frontier_in,
                    FrontierOutT *frontier_out, ParametersT &parameters,
                    InterOpT inter_op) {
   typedef typename GraphT ::CsrT CsrT;
@@ -179,21 +178,65 @@ cudaError_t Launch(const GraphT &graph, const FrontierInT *frontier_in,
   typedef typename Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT,
                             InterOpT, true>::KernelPolicyT KernelPolicyT;
 
+  util::SaveToRestore state;
+  state.Save();
+
   size_t input_length = graph.edges;
   size_t stride =
       (input_length + KernelPolicyT::BLOCKS * KernelPolicyT::THREADS - 1) >>
       (KernelPolicyT::LOG_THREADS + KernelPolicyT::LOG_BLOCKS);
-  SizeT num_vertex = graph.nodes;
-  SizeT num_edges = graph.edges;
 
-  IntersectTwoSmallNL<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
-      <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS, 0, parameters.stream>>>(
-          graph.CsrT::row_offsets.GetPointer(util::DEVICE),
-          graph.CsrT::column_indices.GetPointer(util::DEVICE),
-          frontier_in->GetPointer(util::DEVICE),
-          graph.CsrT::column_indices.GetPointer(util::DEVICE),
-          frontier_out->GetPointer(util::DEVICE), input_length, stride,
-          num_vertex, num_edges, inter_op);
+  SizeT num_vertices = graph.nodes;
+
+  SizeT edges_per_gpu = gunrock::util::ceil_divide(input_length, mgpu_context.getGpuCount());
+
+  printf("Num verts %d\n", num_vertices);
+  printf("edges_per_gpu %d\n", edges_per_gpu);
+
+  std::vector<std::thread> threads;
+  threads.reserve(mgpu_context.getGpuCount());
+
+  for (int i = 0; i < mgpu_context.getGpuCount(); ++i) {
+    auto context = mgpu_context.contexts[i];
+    auto rows_offset = edges_per_gpu * i + graph.CsrT::row_offsets.GetPointer(util::DEVICE);
+    auto cols_offset = edges_per_gpu * i + graph.CsrT::column_indices.GetPointer(util::DEVICE);
+
+    printf("Rows offset %p\n", rows_offset);
+    printf("Cols offset %p\n", cols_offset);
+
+    threads.push_back(std::thread( [&, context]() {
+        
+        IntersectTwoSmallNL<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
+        <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS, 0, parameters.stream>>>(
+            rows_offset,
+            cols_offset,
+            frontier_in->GetPointer(util::DEVICE),
+            cols_offset,
+            frontier_out->GetPointer(util::DEVICE),
+            edges_per_gpu,
+            stride,
+            inter_op);
+    }));
+  }
+
+  for (auto &thread : threads) {
+    thread.join();
+  }
+
+  for (auto & context : mgpu_context.contexts) {
+    cudaStreamWaitEvent(parameters.stream, context.event, 0);
+  }
+
+  state.Restore();
+
+  // IntersectTwoSmallNL<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
+  //     <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS, 0, parameters.stream>>>(
+  //         graph.CsrT::row_offsets.GetPointer(util::DEVICE),
+  //         graph.CsrT::column_indices.GetPointer(util::DEVICE),
+  //         frontier_in->GetPointer(util::DEVICE),
+  //         graph.CsrT::column_indices.GetPointer(util::DEVICE),
+  //         frontier_out->GetPointer(util::DEVICE), input_length, stride,
+  //         num_vertices, inter_op);
 
   return cudaSuccess;
 }
