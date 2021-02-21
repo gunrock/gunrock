@@ -82,6 +82,8 @@ struct TCIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
         intersect_op));
 
+    GUARD_CU(cudaStreamSynchronize(oprtr_parameters.stream));
+
     return retval;
   }
 
