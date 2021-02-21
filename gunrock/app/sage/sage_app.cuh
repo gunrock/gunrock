@@ -286,7 +286,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
  * \return     double     Return accumulated elapsed times for all runs
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
-double gunrock_sage(gunrock::util::Parameters &parameters, GraphT &graph
+double gunrock_sage(gunrock::util::Parameters &parameters, GraphT &graph,
+                    const ValueT *source_result
                     // ValueT **distances,
                     // typename GraphT::VertexT **preds = NULL
 ) {
@@ -318,7 +319,7 @@ double gunrock_sage(gunrock::util::Parameters &parameters, GraphT &graph
     cpu_timer.Stop();
 
     total_time += cpu_timer.ElapsedMillis();
-    problem.Extract( /*distances[src_num],
+    problem.Extract(source_result /*distances[src_num],
             preds == NULL ? NULL : preds[src_num]*/);
   }
 
@@ -346,7 +347,8 @@ template <typename VertexT, typename SizeT, typename GValueT,
           typename SAGEValueT>
 double sage(const SizeT num_nodes, const SizeT num_edges,
             const SizeT *row_offsets, const VertexT *col_indices,
-            const GValueT *edge_values, const int num_runs
+            const GValueT *edge_values, const GValueT *source_result,
+            const int num_runs
             //      VertexT     *sources,
             // const bool         mark_pred,
             //      SSSPValueT **distances,
@@ -384,7 +386,7 @@ double sage(const SizeT num_nodes, const SizeT num_edges,
   gunrock::graphio::LoadGraph(parameters, graph);
 
   // Run the SSSP
-  double elapsed_time = gunrock_sage(parameters, graph /*, distances, preds*/);
+  double elapsed_time = gunrock_sage(parameters, graph, source_result/*, distances, preds*/);
 
   // Cleanup
   graph.Release();

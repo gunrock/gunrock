@@ -72,6 +72,7 @@ double sage(const SizeT   num_nodes,
             const SizeT   *row_offsets,
             const VertexT *col_indices,
             const GValueT *edge_values,
+            const GValueT *source_result,
             const int     num_runs);
 
 /*
