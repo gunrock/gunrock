@@ -75,10 +75,10 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true> {
       VertexT sid = _ldg(d_src_node_ids + idx);
       VertexT did = _ldg(d_dst_node_ids + idx + offset);
       if (sid >= did) continue;
-      SizeT src_it = _ldg(d_row_offsets + sid + offset);
-      SizeT src_end = _ldg(d_row_offsets + sid + 1 + offset);
-      SizeT dst_it = _ldg(d_row_offsets + did + offset);
-      SizeT dst_end = _ldg(d_row_offsets + did + 1 + offset);
+      SizeT src_it = _ldg(d_row_offsets + sid);
+      SizeT src_end = _ldg(d_row_offsets + sid + 1);
+      SizeT dst_it = _ldg(d_row_offsets + did);
+      SizeT dst_end = _ldg(d_row_offsets + did + 1);
       if (src_it >= src_end || dst_it >= dst_end) continue;
       SizeT src_nl_size = src_end - src_it;
       SizeT dst_nl_size = dst_end - dst_it;
@@ -97,17 +97,17 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true> {
           }
         }
       } else {
-        VertexT src_edge = _ldg(d_column_indices + src_it + offset);
-        VertexT dst_edge = _ldg(d_column_indices + dst_it + offset);
+        VertexT src_edge = _ldg(d_column_indices + src_it);
+        VertexT dst_edge = _ldg(d_column_indices + dst_it);
         while (src_it < src_end && dst_it < dst_end) {
           int diff = src_edge - dst_edge;
           if (diff == 0) {
             inter_op(src_edge, idx);
           }
           src_edge =
-              (diff <= 0) ? _ldg(d_column_indices + (++src_it) + offset) : src_edge;
+              (diff <= 0) ? _ldg(d_column_indices + (++src_it)) : src_edge;
           dst_edge =
-              (diff >= 0) ? _ldg(d_column_indices + (++dst_it) + offset) : dst_edge;
+              (diff >= 0) ? _ldg(d_column_indices + (++dst_it)) : dst_edge;
         }
       }
     }
