@@ -64,21 +64,21 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true> {
 
   static __device__ void IntersectTwoSmallNL(
       const SizeT *&d_row_offsets, VertexT *&d_column_indices,
+      const SizeT offset,
       const InKeyT *&d_src_node_ids, const VertexT *&d_dst_node_ids,
-      //       ValueT        *&d_output_counts,
-      OutKeyT *&d_output_total, SizeT &input_length, SizeT &stride,
+      SizeT &input_length,
       InterOpT &inter_op) {
     VertexT start = threadIdx.x + blockIdx.x * blockDim.x;
     for (VertexT idx = start; idx < input_length;
          idx += KernelPolicyT::BLOCKS * KernelPolicyT::THREADS) {
       // get nls start and end index for two ids
       VertexT sid = _ldg(d_src_node_ids + idx);
-      VertexT did = _ldg(d_dst_node_ids + idx);
+      VertexT did = _ldg(d_dst_node_ids + idx + offset);
       if (sid >= did) continue;
-      SizeT src_it = _ldg(d_row_offsets + sid);
-      SizeT src_end = _ldg(d_row_offsets + sid + 1);
-      SizeT dst_it = _ldg(d_row_offsets + did);
-      SizeT dst_end = _ldg(d_row_offsets + did + 1);
+      SizeT src_it = _ldg(d_row_offsets + sid + offset);
+      SizeT src_end = _ldg(d_row_offsets + sid + 1 + offset);
+      SizeT dst_it = _ldg(d_row_offsets + did + offset);
+      SizeT dst_end = _ldg(d_row_offsets + did + 1 + offset);
       if (src_it >= src_end || dst_it >= dst_end) continue;
       SizeT src_nl_size = src_end - src_it;
       SizeT dst_nl_size = dst_end - dst_it;
@@ -89,25 +89,25 @@ struct Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT, true> {
         SizeT min_it = (src_nl_size < dst_nl_size) ? src_it : dst_it;
         SizeT min_end = min_it + min_nl;
         SizeT max_it = (src_nl_size < dst_nl_size) ? dst_it : src_it;
-        VertexT *keys = &d_column_indices[max_it];
+        VertexT *keys = &d_column_indices[max_it + offset];
         while (min_it < min_end) {
-          VertexT small_edge = d_column_indices[min_it++];
+          VertexT small_edge = d_column_indices[(min_it++) + offset];
           if (BinarySearch(keys, max_nl, small_edge) == 1) {
             inter_op(small_edge, idx);
           }
         }
       } else {
-        VertexT src_edge = _ldg(d_column_indices + src_it);
-        VertexT dst_edge = _ldg(d_column_indices + dst_it);
+        VertexT src_edge = _ldg(d_column_indices + src_it + offset);
+        VertexT dst_edge = _ldg(d_column_indices + dst_it + offset);
         while (src_it < src_end && dst_it < dst_end) {
           int diff = src_edge - dst_edge;
           if (diff == 0) {
             inter_op(src_edge, idx);
           }
           src_edge =
-              (diff <= 0) ? _ldg(d_column_indices + (++src_it)) : src_edge;
+              (diff <= 0) ? _ldg(d_column_indices + (++src_it) + offset) : src_edge;
           dst_edge =
-              (diff >= 0) ? _ldg(d_column_indices + (++dst_it)) : dst_edge;
+              (diff >= 0) ? _ldg(d_column_indices + (++dst_it) + offset) : dst_edge;
         }
       }
     }
@@ -148,17 +148,17 @@ __launch_bounds__(Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT,
     __global__
     void IntersectTwoSmallNL(const SizeT *d_row_offsets,
                              VertexT *d_column_indices,
+                             const SizeT offset, 
                              const InKeyT *d_src_node_ids,
                              const VertexT *d_dst_node_ids,
                              //      	  ValueT       *d_output_counts,
-                             OutKeyT *d_output_total, SizeT input_length,
-                             SizeT stride,
+                             SizeT input_length,
                              InterOpT inter_op) {
   Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT,
            InterOpT>::IntersectTwoSmallNL(d_row_offsets, d_column_indices,
-                                          d_src_node_ids, d_dst_node_ids,
-                                          //      d_output_counts,
-                                          d_output_total, input_length, stride,
+                                          offset,
+                                          d_src_node_ids, d_dst_node_ids, 
+                                          input_length,
                                           inter_op);
 }
 
@@ -182,16 +182,9 @@ cudaError_t Launch(gunrock::util::MultiGpuContext mgpu_context,
   state.Save();
 
   size_t input_length = graph.edges;
-  size_t stride =
-      (input_length + KernelPolicyT::BLOCKS * KernelPolicyT::THREADS - 1) >>
-      (KernelPolicyT::LOG_THREADS + KernelPolicyT::LOG_BLOCKS);
-
   SizeT num_vertices = graph.nodes;
 
-  SizeT edges_per_gpu = gunrock::util::ceil_divide(input_length, mgpu_context.getGpuCount());
-
   printf("Num verts %d\n", num_vertices);
-  printf("edges_per_gpu %d\n", edges_per_gpu);
 
   std::vector<std::thread> threads;
   threads.reserve(mgpu_context.getGpuCount());
@@ -199,29 +192,28 @@ cudaError_t Launch(gunrock::util::MultiGpuContext mgpu_context,
   for (auto& context : mgpu_context.contexts) {
 
     threads.push_back(std::thread( [&, context]() {
-        auto rows_offset = edges_per_gpu * context.device_id + graph.CsrT::row_offsets.GetPointer(util::DEVICE);  
-        auto cols_offset = edges_per_gpu * context.device_id + graph.CsrT::column_indices.GetPointer(util::DEVICE);
+        SizeT edges_per_gpu = gunrock::util::ceil_divide(input_length, mgpu_context.getGpuCount());
 
-        printf("Rows offset %p\n", rows_offset);
-        printf("Cols offset %p\n", cols_offset);
+        auto offset = edges_per_gpu * context.device_id;
 
-        if (rows_offset == nullptr) {
-          printf("rows_offset == nullptr");
-        }
-        if (cols_offset == nullptr) {
-          printf("cols_offset == nullptr");
-        }
+        auto rows_offset = graph.CsrT::row_offsets.GetPointer(util::DEVICE);
+        auto column_indices = graph.CsrT::column_indices.GetPointer(util::DEVICE);
 
+        printf("offset %p\n", offset);
+        printf("row offsets %p\n", rows_offset);
+        printf("col indicies %p\n", column_indices);
+
+        cudaSetDevice(context.device_id);
         IntersectTwoSmallNL<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
-        <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS, 0, parameters.stream>>>(
+        <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS, 0, context.stream>>>(
             rows_offset,
-            cols_offset,
+            column_indices,
+            offset,
             frontier_in->GetPointer(util::DEVICE),
-            cols_offset,
-            frontier_out->GetPointer(util::DEVICE),
+            column_indices,
             edges_per_gpu,
-            stride,
             inter_op);
+        cudaEventRecord(context.event, context.stream);
     }));
   }
 
