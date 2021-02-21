@@ -390,6 +390,10 @@ endif (CUDA_VERBOSE_PTXAS)
 set(CUDA_NVCC_FLAGS --expt-extended-lambda -rdc=true -lcudadevrt)
 set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_curand_LIBRARY})
 
+#FIXME
+#debug build explodes without this.
+set(CUDA_NVCC_FLAGS_DEBUG --maxrregcount 32 -G)
+
 # begin /* Suppress all warnings from nvcc */
 if (NOT ENABLE_WARNINGS)
   set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -w")
