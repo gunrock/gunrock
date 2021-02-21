@@ -196,16 +196,22 @@ cudaError_t Launch(gunrock::util::MultiGpuContext mgpu_context,
   std::vector<std::thread> threads;
   threads.reserve(mgpu_context.getGpuCount());
 
-  for (int i = 0; i < mgpu_context.getGpuCount(); ++i) {
-    auto context = mgpu_context.contexts[i];
-    auto rows_offset = edges_per_gpu * i + graph.CsrT::row_offsets.GetPointer(util::DEVICE);
-    auto cols_offset = edges_per_gpu * i + graph.CsrT::column_indices.GetPointer(util::DEVICE);
-
-    printf("Rows offset %p\n", rows_offset);
-    printf("Cols offset %p\n", cols_offset);
+  for (auto& context : mgpu_context.contexts) {
 
     threads.push_back(std::thread( [&, context]() {
-        
+        auto rows_offset = edges_per_gpu * context.device_id + graph.CsrT::row_offsets.GetPointer(util::DEVICE);  
+        auto cols_offset = edges_per_gpu * context.device_id + graph.CsrT::column_indices.GetPointer(util::DEVICE);
+
+        printf("Rows offset %p\n", rows_offset);
+        printf("Cols offset %p\n", cols_offset);
+
+        if (rows_offset == nullptr) {
+          printf("rows_offset == nullptr");
+        }
+        if (cols_offset == nullptr) {
+          printf("cols_offset == nullptr");
+        }
+
         IntersectTwoSmallNL<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT, InterOpT>
         <<<KernelPolicyT::BLOCKS, KernelPolicyT::THREADS, 0, parameters.stream>>>(
             rows_offset,
