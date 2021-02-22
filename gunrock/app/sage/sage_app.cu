@@ -185,5 +185,5 @@ double sage(const int               num_nodes,
             gunrock::util::Location allocated_on = gunrock::util::HOST
 ) {
   return sage<int, int, int, int>(num_nodes, num_edges, row_offsets,
-    col_indices, edge_values, source_result, num_runs);
+    col_indices, edge_values, source_result, num_runs, allocated_on);
 }

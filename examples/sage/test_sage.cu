@@ -12,7 +12,7 @@
  * @brief Simple test driver program for single source shortest path.
  */
 
-#include <gunrock/app/sage/sage_app.cuh>
+#include <gunrock/app/sage/sage_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;

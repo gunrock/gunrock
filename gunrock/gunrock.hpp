@@ -73,7 +73,8 @@ double sage(const SizeT   num_nodes,
             const VertexT *col_indices,
             const GValueT *edge_values,
             const GValueT *source_result,
-            const int     num_runs);
+            const int     num_runs,
+            gunrock::util::Location allocated_on = gunrock::util::HOST);
 
 /*
  * @brief Simple interface take in graph as CSR format

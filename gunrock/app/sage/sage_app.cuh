@@ -22,8 +22,9 @@
 #include <gunrock/app/test_base.cuh>
 
 // single-source shortest path includes
-#include <gunrock/app/sage/sage_test.cuh>
+#include <gunrock/app/sage/sage_problem.cuh>
 #include <gunrock/app/sage/sage_enactor.cuh>
+#include <gunrock/app/sage/sage_test.cuh>
 
 namespace gunrock {
 namespace app {
@@ -149,7 +150,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_sage(gunrock::util::Parameters &parameters, GraphT &graph,
-                    const ValueT *source_result
+                    const ValueT *source_result,
+                    gunrock::util::Location target = gunrock::util::DEVICE
                     // ValueT **distances,
                     // typename GraphT::VertexT **preds = NULL
 ) {
@@ -157,7 +159,6 @@ double gunrock_sage(gunrock::util::Parameters &parameters, GraphT &graph,
   typedef gunrock::app::sage::Problem<GraphT> ProblemT;
   typedef gunrock::app::sage::Enactor<ProblemT> EnactorT;
   gunrock::util::CpuTimer cpu_timer;
-  gunrock::util::Location target = gunrock::util::DEVICE;
   double total_time = 0;
   if (parameters.UseDefault("quiet")) parameters.Set("quiet", true);
 
@@ -210,7 +211,8 @@ template <typename VertexT, typename SizeT, typename GValueT,
 double sage(const SizeT num_nodes, const SizeT num_edges,
             const SizeT *row_offsets, const VertexT *col_indices,
             const GValueT *edge_values, const GValueT *source_result,
-            const int num_runs
+            const int num_runs,
+            gunrock::util::Location allocated_on = gunrock::util::HOST
             //      VertexT     *sources,
             // const bool         mark_pred,
             //      SSSPValueT **distances,
@@ -240,6 +242,11 @@ double sage(const SizeT num_nodes, const SizeT num_edges,
   GraphT graph;
   // Assign pointers into gunrock graph format
   gunrock::util::Location target = gunrock::util::HOST;
+
+  if (allocated_on == gunrock::util::DEVICE) {
+    target = gunrock::util::DEVICE;
+  }
+
   graph.CsrT::Allocate(num_nodes, num_edges, target);
   graph.CsrT::row_offsets.SetPointer(row_offsets, num_nodes + 1, target);
   graph.CsrT::column_indices.SetPointer(col_indices, num_edges, target);
@@ -248,7 +255,7 @@ double sage(const SizeT num_nodes, const SizeT num_edges,
   gunrock::graphio::LoadGraph(parameters, graph);
 
   // Run the SSSP
-  double elapsed_time = gunrock_sage(parameters, graph, source_result/*, distances, preds*/);
+  double elapsed_time = gunrock_sage(parameters, graph, source_result, target/*, distances, preds*/);
 
   // Cleanup
   graph.Release();
