@@ -55,9 +55,9 @@ struct main_struct {
       return retval;
     }
 
-    typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_CSR>
+    typedef typename app::TestGraph<VertexT, SizeT, ValueT, graph::HAS_CSR | graph::GRAPH_UNIFIED>
         GraphT;
-    
+
     util::CpuTimer cpu_timer;
     GraphT graph;
 

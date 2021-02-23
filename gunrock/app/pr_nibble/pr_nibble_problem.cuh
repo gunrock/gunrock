@@ -17,6 +17,7 @@
 #include <iostream>
 #include <math.h>
 #include <gunrock/app/problem_base.cuh>
+#include <gunrock/util/context.hpp>
 
 namespace gunrock {
 namespace app {
@@ -58,13 +59,13 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @brief Data structure containing problem specific data on indivual GPU.
    */
   struct DataSlice : BaseDataSlice {
-    util::Array1D<SizeT, ValueT> values;  // Output values
+    util::Array1D<SizeT, ValueT, util::UNIFIED> values;  // Output values
 
-    util::Array1D<SizeT, ValueT> grad;  // Gradient values
-    util::Array1D<SizeT, ValueT> y;     // Intermediate quantity
-    util::Array1D<SizeT, ValueT> z;     // Intermediate quantity
-    util::Array1D<SizeT, ValueT> q;     // Truncated z-values
-    util::Array1D<SizeT, int> touched;  // Keep track of
+    util::Array1D<SizeT, ValueT, util::UNIFIED> grad;  // Gradient values
+    util::Array1D<SizeT, ValueT, util::UNIFIED> y;     // Intermediate quantity
+    util::Array1D<SizeT, ValueT, util::UNIFIED> z;     // Intermediate quantity
+    util::Array1D<SizeT, ValueT, util::UNIFIED> q;     // Truncated z-values
+    util::Array1D<SizeT, int, util::UNIFIED> touched;  // Keep track of
 
     VertexT src;        // Node to start local PR from
     VertexT src_neib;   // Neighbor of reference node
@@ -221,6 +222,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
   ValueT alpha;
   ValueT rho;
+
+  gunrock::util::MultiGpuContext mgpu_context;
 
   // ----------------------------------------------------------------
   // Problem Methods

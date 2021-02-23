@@ -63,6 +63,8 @@ struct PRNibbleIterationLoop
     // --
     // Alias variables
 
+    auto &mgpu_context = this->enactor->problem->mgpu_context;
+
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
 
     auto &enactor_slice =
@@ -144,8 +146,13 @@ struct PRNibbleIterationLoop
                         grad[idx] = y[idx] * (1.0 + alpha) / 2;
                       };
 
-    GUARD_CU(frontier.V_Q()->ForAll(compute_op, frontier.queue_length,
-                                    util::DEVICE, oprtr_parameters.stream));
+    util::Location target = util::DEVICE;
+
+    GUARD_CU(
+      oprtr::mgpu_ForAll(mgpu_context, frontier.V_Q()->GetPointer(target),
+                         compute_op, frontier.queue_length, target,
+                         oprtr_parameters.stream)
+    );
 
     // advance operation
     auto advance_op =
