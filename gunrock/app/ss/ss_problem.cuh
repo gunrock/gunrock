@@ -55,7 +55,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   typedef _ValueT ValueT;
 
   typedef ProblemBase<GraphT, FLAG> BaseProblem;
-  typedef DataSliceBase<GraphT, FLAG> BaseDataSlice;
+  typedef DataSliceBase<GraphT, FLAG> BaseDataSlice; 
+
+  static const util::ArrayFlag ARRAY_FLAG = util::UNIFIED;
+  util::MultiGpuContext mgpu_context;
 
   // Helper structures
 
@@ -64,7 +67,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   struct DataSlice : BaseDataSlice {
     // ss-specific storage arrays
-    util::Array1D<SizeT, VertexT> scan_stats;  // scan statistis values
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> scan_stats;  // scan statistis values
     /*
      * @brief Default constructor
      */

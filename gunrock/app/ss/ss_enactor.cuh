@@ -71,8 +71,10 @@ struct SSIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &stream = oprtr_parameters.stream;
     auto target = util::DEVICE;
 
+    auto mgpu_context = this->enactor->problem->mgpu_context;
+
     // First add degrees to scan statistics
-    GUARD_CU(scan_stats.ForAll(
+    GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, scan_stats.GetPointer(util::DEVICE),
         [scan_stats, row_offsets] __host__ __device__(VertexT * scan_stats_,
                                                       const SizeT &v) {
           scan_stats_[v] = row_offsets[v + 1] - row_offsets[v];
@@ -89,6 +91,8 @@ struct SSIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     };
     frontier.queue_length = graph.edges;
     frontier.queue_reset = true;
+
+    // Intersect needs fixing for multigpu
     GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
         graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
         intersect_op));
