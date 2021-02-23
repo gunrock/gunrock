@@ -69,6 +69,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   typedef ProblemBase<GraphT, FLAG> BaseProblem;
   typedef DataSliceBase<GraphT, FLAG> BaseDataSlice;
 
+  static const util::ArrayFlag ARRAY_FLAG = util::UNIFIED;
+  util::MultiGpuContext mgpu_context;
+
+
   // Helper structures
 
   /**
@@ -81,32 +85,32 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     int num_edges;
     double error_threshold;  // = parameters.Get<double>("error_threshold");
 
-    util::Array1D<SizeT, VertexT>
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG>
         next_communities;  //= new VertexT[num_nodes]; // nextlabel
-    util::Array1D<SizeT, VertexT>
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG>
         curr_communities;  //= new VertexT[num_nodes]; // label
-    util::Array1D<SizeT, VertexT>
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG>
         community_sizes;  //= new VertexT[num_nodes]; // nums
-    util::Array1D<SizeT, ValueT>
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG>
         community_weights;  //= new ValueT [num_nodes]; // averages
-    util::Array1D<SizeT, bool>
+    util::Array1D<SizeT, bool, ARRAY_FLAG>
         community_active;  //= new bool   [num_nodes]; // !inactivelable
-    util::Array1D<SizeT, ValueT>
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG>
         community_accus;  //  = new ValueT [num_nodes]; // values
-    util::Array1D<SizeT, bool>
+    util::Array1D<SizeT, bool, ARRAY_FLAG>
         vertex_active;  //    = new bool   [num_nodes]; // alive
-    util::Array1D<SizeT, bool> vertex_reachabilities;  // = new bool[num_nodes];
-    util::Array1D<SizeT, ValueT>
+    util::Array1D<SizeT, bool, ARRAY_FLAG> vertex_reachabilities;  // = new bool[num_nodes];
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG>
         edge_residuals;  //   = new ValueT [num_edges]; // graph
-    util::Array1D<SizeT, ValueT>
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG>
         edge_flows;  //       = new ValueT [num_edges]; // edge flows
-    util::Array1D<SizeT, SizeT> active;  // flag active vertices
-    util::Array1D<SizeT, VertexT> num_comms;
-    util::Array1D<SizeT, VertexT> previous_num_comms;  // flag active vertices
+    util::Array1D<SizeT, SizeT, ARRAY_FLAG> active;  // flag active vertices
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> num_comms;
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> previous_num_comms;  // flag active vertices
     // util::Array1D<SizeT, VertexT> num_comms;	      // flag active vertices
-    util::Array1D<SizeT, SizeT> reverse;  // for storing mf h_reverse
+    util::Array1D<SizeT, SizeT, ARRAY_FLAG> reverse;  // for storing mf h_reverse
 
-    util::Array1D<SizeT, ValueT> Y;  // for storing mf h_reverse
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> Y;  // for storing mf h_reverse
     SizeT num_updated_vertices;
 
     VertexT source;  // source vertex
