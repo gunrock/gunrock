@@ -151,7 +151,7 @@ __launch_bounds__(Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT,
                              const SizeT offset, 
                              const InKeyT *d_src_node_ids,
                              const VertexT *d_dst_node_ids,
-                             //      	  ValueT       *d_output_counts,
+ 
                              SizeT input_length,
                              InterOpT inter_op) {
   Dispatch<FLAG, InKeyT, OutKeyT, SizeT, ValueT, VertexT,

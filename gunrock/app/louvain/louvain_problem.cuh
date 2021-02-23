@@ -74,6 +74,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     return pair & VERTEXT_MASK;
   }
 
+  static const util::ArrayFlag ARRAY_FLAG = util::UNIFIED;
+  util::MultiGpuContext mgpu_context;
+
   // Helper structures
 
   /**
@@ -81,59 +84,59 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   struct DataSlice : BaseDataSlice {
     // communities the vertices are current in
-    util::Array1D<SizeT, VertexT> current_communities;
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> current_communities;
 
     // communities to move in
-    util::Array1D<SizeT, VertexT> next_communities;
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> next_communities;
 
     // size of communities
-    util::Array1D<SizeT, VertexT> community_sizes;
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> community_sizes;
 
     // sum of edge weights from vertices
-    util::Array1D<SizeT, ValueT> w_v2;
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> w_v2;
 
     // sum of edge weights from vertices to self
-    util::Array1D<SizeT, ValueT> w_v2self;
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> w_v2self;
 
     // sum of edge weights from communities
-    util::Array1D<SizeT, ValueT> w_c2;
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> w_c2;
 
     // communities each edge belongs to
     // util::Array1D<SizeT, VertexT>   edge_comms0;
     // util::Array1D<SizeT, VertexT>   edge_comms1;
 
     // weights of edges
-    util::Array1D<SizeT, ValueT> edge_weights0;
-    util::Array1D<SizeT, ValueT> edge_weights1;
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> edge_weights0;
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> edge_weights1;
 
     // segment offsets
-    util::Array1D<SizeT, SizeT> seg_offsets0;
-    util::Array1D<SizeT, SizeT> seg_offsets1;
+    util::Array1D<SizeT, SizeT, ARRAY_FLAG> seg_offsets0;
+    util::Array1D<SizeT, SizeT, ARRAY_FLAG> seg_offsets1;
 
     // edge pairs for sorting
-    util::Array1D<SizeT, EdgePairT> edge_pairs0;
-    util::Array1D<SizeT, EdgePairT> edge_pairs1;
+    util::Array1D<SizeT, EdgePairT, ARRAY_FLAG> edge_pairs0;
+    util::Array1D<SizeT, EdgePairT, ARRAY_FLAG> edge_pairs1;
 
     // temp space for cub
-    util::Array1D<uint64_t, char> cub_temp_space;
+    util::Array1D<uint64_t, char, ARRAY_FLAG> cub_temp_space;
 
     // number of neighbor communities
-    util::Array1D<SizeT, SizeT> num_neighbor_comms;
+    util::Array1D<SizeT, SizeT, ARRAY_FLAG> num_neighbor_comms;
 
     // Number of new communities
-    util::Array1D<SizeT, SizeT> num_new_comms;
+    util::Array1D<SizeT, SizeT, ARRAY_FLAG> num_new_comms;
 
     // Number of new edges
-    util::Array1D<SizeT, SizeT> num_new_edges;
+    util::Array1D<SizeT, SizeT, ARRAY_FLAG> num_new_edges;
 
     // base of modularity grain
-    util::Array1D<SizeT, ValueT> gain_bases;
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> gain_bases;
 
     // gain of each moves
-    util::Array1D<SizeT, ValueT> max_gains;
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> max_gains;
 
     // gain from current iteration
-    util::Array1D<SizeT, ValueT> iter_gain;
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> iter_gain;
 
     // gain from current pass
     ValueT pass_gain;
@@ -148,7 +151,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     GraphT new_graphs[2];
 
     // std::vector<util::Array1D<SizeT, VertexT>*> pass_communities;
-    util::Array1D<SizeT, VertexT> *pass_communities;
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> *pass_communities;
     int num_pass, max_iters;
 
     // Whether to use cubRedixSort instead of cubSegmentRadixSort
@@ -288,7 +291,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       if (target & util::DEVICE) {
         GUARD_CU(sub_graph.Move(util::HOST, target, this->stream));
       }
-      pass_communities = new util::Array1D<SizeT, VertexT>[max_iters + 1];
+      pass_communities = new util::Array1D<SizeT, VertexT, ARRAY_FLAG>[max_iters + 1];
       return retval;
     }  // Init
 

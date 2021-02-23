@@ -171,11 +171,13 @@ struct LouvainIterationLoop
     auto &graph = graph_ptr[0];
     auto &weights = graph.CsrT::edge_values;
 
+    auto mgpu_context = this->enactor->problem->mgpu_context;
+
     if (enactor.pass_stats) pass_timer.Start();
     if (enactor.iter_stats) iter_timer.Start();
 
     // Pass initialization
-    GUARD_CU(w_v2.ForAll(
+    GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, w_v2.GetPointer(util::DEVICE),
         [w_v2self, current_communities, community_sizes] __host__ __device__(
             ValueT * w_v2_, const SizeT &v) {
           w_v2_[v] = 0;
@@ -202,7 +204,7 @@ struct LouvainIterationLoop
     GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
         graph.csr(), null_frontier, null_frontier, oprtr_parameters, accu_op));
 
-    GUARD_CU(w_c2.ForAll(
+    GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, w_c2.GetPointer(util::DEVICE),
         [w_v2] __host__ __device__(ValueT * w_c, const VertexT &v) {
           w_c[v] = w_v2[v];
           // w_c = w_v;
@@ -228,7 +230,7 @@ struct LouvainIterationLoop
       if (enactor.iter_stats) iter_timer.Start();
 
       if (unify_segments) {
-        GUARD_CU(edge_pairs0.ForAll(
+        GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, edge_pairs0.GetPointer(util::DEVICE),
             [edge_weights0, weights, current_communities,
              graph] __host__ __device__(EdgePairT * e_pairs, const SizeT &e) {
               VertexT src, dest;
@@ -238,13 +240,15 @@ struct LouvainIterationLoop
             },
             graph.edges, target, stream));
 
+        /* SKIP NEEDS REWRITTEN FIXME PLS PLS PLS FIXME DONT IGNORE
         GUARD_CU(util::cubSortPairs(cub_temp_space, edge_pairs0, edge_pairs1,
                                     weights, edge_weights1, graph.edges, 0,
                                     sizeof(EdgePairT) * 8, stream));
+        */
 
         GUARD_CU(seg_offsets0.Set(0, graph.edges + 1, target, stream));
 
-        GUARD_CU(seg_offsets0.ForAll(
+        GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, seg_offsets0.GetPointer(util::DEVICE),
             [edge_pairs1, graph] __host__ __device__(SizeT * offsets,
                                                      const SizeT &e) {
               bool to_keep = false;
@@ -266,7 +270,7 @@ struct LouvainIterationLoop
             graph.edges + 1, target, stream));
 
       } else {
-        GUARD_CU(edge_comms0.ForAll(
+        GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, edge_comms0.GetPointer(util::DEVICE),
             [edge_weights0, weights, current_communities,
              graph] __host__ __device__(EdgePairT * e_comms, const SizeT &e) {
               e_comms[e] = current_communities[graph.GetEdgeDest(e)];
@@ -274,21 +278,23 @@ struct LouvainIterationLoop
             },
             graph.edges, target, stream));
 
+        /* FIXME PLS PLS
         GUARD_CU(util::cubSegmentedSortPairs(
             cub_temp_space, edge_comms0, edge_comms1, edge_weights0,
             edge_weights1, graph.edges, graph.nodes, graph.CsrT::row_offsets, 0,
             std::ceil(std::log2(graph.nodes)), stream));
+        */
 
         GUARD_CU(seg_offsets0.Set(0, graph.edges + 1, target, stream));
 
-        GUARD_CU(graph.CsrT::row_offsets.ForAll(
+        GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, graph.CsrT::row_offsets.GetPointer(util::DEVICE),
             [seg_offsets0] __host__ __device__(SizeT * offsets,
                                                const SizeT &v) {
               seg_offsets0[offsets[v]] = 1;
             },
             graph.nodes + 1, target, stream));
 
-        GUARD_CU(seg_offsets0.ForAll(
+        GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, seg_offsets0.GetPointer(util::DEVICE), 
             [edge_comms1] __host__ __device__(SizeT * offsets, const SizeT &e) {
               bool to_keep = false;
               if (offsets[e] == 1)
@@ -305,11 +311,13 @@ struct LouvainIterationLoop
       }
 
       // Filter in order
+      /* FIXME PLS
       GUARD_CU(util::cubSelectIf(
           cub_temp_space, seg_offsets0, seg_offsets1, num_neighbor_comms,
           graph.edges + 1,
           [] __host__ __device__(const SizeT &e) { return util::isValid(e); },
           stream));
+      */
 
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed.");
 
@@ -325,6 +333,7 @@ struct LouvainIterationLoop
       //    graph.edges - num_neighbor_comms[0] - 1,
       //    target, stream));
 
+      /* FIXMEPLS
       GUARD_CU(util::SegmentedReduce(
           cub_temp_space, edge_weights1, edge_weights0, n_neighbor_comms,
           seg_offsets1,
@@ -332,8 +341,9 @@ struct LouvainIterationLoop
             return a + b;
           },
           (ValueT)0, stream));
+      */
 
-      GUARD_CU(seg_offsets0.ForAll(
+      GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, seg_offsets0.GetPointer(util::DEVICE),
           [seg_offsets1, n_neighbor_comms, graph] __host__ __device__(
               SizeT * offsets, const VertexT &v) {
             if (v == graph.nodes)
@@ -353,7 +363,7 @@ struct LouvainIterationLoop
           graph.nodes + 1, target, stream));
 
       auto m2 = data_slice.m2;
-      GUARD_CU(gain_bases.ForAll(
+      GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, gain_bases.GetPointer(util::DEVICE),
           [seg_offsets0, edge_weights0, edge_comms1, seg_offsets1, w_v2,
            current_communities, w_v2self, m2, w_c2, unify_segments,
            edge_pairs1] __host__ __device__(ValueT * bases, const VertexT &v) {
@@ -386,7 +396,7 @@ struct LouvainIterationLoop
           },
           graph.nodes, target, stream));
 
-      GUARD_CU(max_gains.ForAll(
+      GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, max_gains.GetPointer(util::DEVICE),
           [next_communities, current_communities] __host__ __device__(
               ValueT * gains, const VertexT &v) {
             gains[v] = 0;
@@ -394,7 +404,7 @@ struct LouvainIterationLoop
           },
           graph.nodes, target, stream));
 
-      GUARD_CU(edge_weights0.ForAll(
+      GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, edge_weights0.GetPointer(util::DEVICE),
           [seg_offsets0, seg_offsets1, n_neighbor_comms, gain_bases, w_c2, w_v2,
            m2, current_communities, max_gains, next_communities, edge_comms1,
            graph, unify_segments,
@@ -431,7 +441,7 @@ struct LouvainIterationLoop
           },
           n_neighbor_comms, target, stream));
 
-      GUARD_CU(edge_weights0.ForAll(
+      GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, edge_weights0.GetPointer(util::DEVICE),
           [max_gains, next_communities, seg_offsets0, graph, seg_offsets1,
            edge_comms1, unify_segments,
            edge_pairs1] __host__ __device__(ValueT * gains, const SizeT &pos) {
@@ -460,7 +470,7 @@ struct LouvainIterationLoop
           },
           n_neighbor_comms, target, stream));
 
-      GUARD_CU(current_communities.ForAll(
+      GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, current_communities.GetPointer(util::DEVICE),
           [next_communities, community_sizes, max_gains, w_v2,
            w_c2] __host__ __device__(VertexT * communities, const VertexT &v) {
             VertexT c_comm = communities[v];
@@ -488,12 +498,14 @@ struct LouvainIterationLoop
           },
           graph.nodes, target, stream));
 
+      /* FIXME PLS
       GUARD_CU(util::cubReduce(
           cub_temp_space, max_gains, iter_gain, graph.nodes,
           [] __host__ __device__(const ValueT &a, const ValueT &b) {
             return a + b;
           },
           (ValueT)0, stream));
+      */
 
       // GUARD_CU(iter_gain.ForEach(
       //    [] __host__ __device__ (const ValueT &gain)
@@ -548,7 +560,7 @@ struct LouvainIterationLoop
         },
         graph.nodes, target, stream));
 
-    GUARD_CU(edge_comms0.ForAll(
+    GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, edge_comms0.GetPointer(util::DEVICE),
         [current_communities] __host__ __device__(EdgePairT * comms0,
                                                   const SizeT &v) {
           VertexT comm = current_communities[v];
@@ -558,6 +570,7 @@ struct LouvainIterationLoop
         },
         graph.nodes, target, stream));
 
+    /* FIXME PLS
     GUARD_CU(util::cubSelectIf(cub_temp_space, edge_comms0, edge_comms1,
                                num_new_comms, graph.nodes,
                                [] __host__ __device__(EdgePairT & comm) {
@@ -568,6 +581,7 @@ struct LouvainIterationLoop
                                  return (util::isValid(comm));
                                },
                                stream));
+    */
 
     GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
 
@@ -577,7 +591,7 @@ struct LouvainIterationLoop
     auto n_new_comms = num_new_comms[0];
     // util::PrintMsg("#new_comms = " + std::to_string(n_new_comms));
 
-    GUARD_CU(edge_comms0.ForAll(
+    GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, edge_comms0.GetPointer(util::DEVICE),
         [edge_comms1, n_new_comms] __host__ __device__(EdgePairT * comms0,
                                                        const SizeT &new_comm) {
           comms0[edge_comms1[new_comm]] = new_comm;
@@ -594,7 +608,7 @@ struct LouvainIterationLoop
     //            comms0[8278]);
     //    }, 1, target, stream));
 
-    GUARD_CU(current_communities.ForAll(
+    GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, current_communities.GetPointer(util::DEVICE),
         [edge_comms0, n_new_comms] __host__ __device__(VertexT * comms,
                                                        const VertexT &v) {
           VertexT comm = comms[v];
@@ -626,9 +640,11 @@ struct LouvainIterationLoop
           return false;
         }));
 
+    /* FIXME PLS
     GUARD_CU(util::cubSortPairs(cub_temp_space, edge_pairs0, edge_pairs1,
                                 graph.CsrT::edge_values, edge_weights1,
                                 graph.edges, 0, sizeof(EdgePairT) * 8, stream));
+    */
 
     GUARD_CU(seg_offsets0.ForEach(
         [] __host__ __device__(SizeT & offset) {
@@ -636,7 +652,7 @@ struct LouvainIterationLoop
         },
         graph.edges + 1, target, stream));
 
-    GUARD_CU(seg_offsets0.ForAll(
+    GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, seg_offsets0.GetPointer(util::DEVICE),
         [graph, edge_pairs1] __host__ __device__(SizeT * offsets0,
                                                  const SizeT &e) {
           if (e != 0 && e != graph.edges) {
@@ -648,12 +664,14 @@ struct LouvainIterationLoop
         },
         graph.edges + 1, target, stream));
 
+    /* FIXME PLS
     GUARD_CU(util::cubSelectIf(cub_temp_space, seg_offsets0, seg_offsets1,
                                num_new_edges, graph.edges + 1,
                                [] __host__ __device__(SizeT & offset) {
                                  return (util::isValid(offset));
                                },
                                stream));
+    */
 
     GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
 
@@ -675,6 +693,7 @@ struct LouvainIterationLoop
     new_graph.CsrT::edges = n_new_edges;
     //}
 
+    /* FIXXME PLS
     GUARD_CU(util::SegmentedReduce(
         cub_temp_space, edge_weights1, new_graph.CsrT::edge_values, n_new_edges,
         seg_offsets1,
@@ -682,8 +701,9 @@ struct LouvainIterationLoop
           return a + b;
         },
         (ValueT)0, stream));
+    */
 
-    GUARD_CU(new_graph.CsrT::column_indices.ForAll(
+    GUARD_CU( oprtr::mgpu_ForAll(mgpu_context, new_graph.CsrT::column_indices.GetPointer(util::DEVICE),
         [edge_pairs1, seg_offsets1, n_new_comms] __host__ __device__(
             VertexT * indices, const SizeT &e) {
           indices[e] = edge_pairs1[seg_offsets1[e]] &
@@ -695,7 +715,7 @@ struct LouvainIterationLoop
         n_new_edges, target, stream));
 
     auto &new_row_offsets = new_graph.CsrT::row_offsets;
-    GUARD_CU(seg_offsets1.ForAll(
+    GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, seg_offsets1.GetPointer(util::DEVICE),
         [new_row_offsets, edge_pairs1, n_new_comms,
          n_new_edges] __host__ __device__(SizeT * offsets, const SizeT &new_e) {
           VertexT src = 0, pervious_src = 0;
@@ -714,7 +734,7 @@ struct LouvainIterationLoop
             new_row_offsets[new_v] = new_e;
         },
         n_new_edges + 1, target, stream));
-    GUARD_CU(new_row_offsets.ForAll(
+    GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, new_row_offsets.GetPointer(util::DEVICE),
         [] __host__ __device__(SizeT * offsets, const VertexT &v) {
           offsets[0] = 0;
         },
