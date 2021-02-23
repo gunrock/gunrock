@@ -93,7 +93,7 @@ struct SSIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     frontier.queue_reset = true;
 
     // Intersect needs fixing for multigpu
-    GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
+    GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(mgpu_context,
         graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
         intersect_op));
 
