@@ -22,8 +22,8 @@
 namespace gunrock {
 namespace oprtr {
 
-#define FORALL_BLOCKSIZE 256
-#define FORALL_GRIDSIZE 256
+#define FORALL_BLOCKSIZE 1024
+#define FORALL_GRIDSIZE 160
 /*template <
     typename T,
     typename SizeT,
@@ -56,11 +56,16 @@ __global__ void ForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length) {
 template <typename ArrayT, typename SizeT, typename ApplyLambda>
 __global__ void mgpu_ForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length, SizeT offset) {
   // typedef typename ArrayT::SizeT SizeT;
-  const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
-  SizeT i = (SizeT)blockDim.x * blockIdx.x + threadIdx.x;
-  while (i < length) {
+  // const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
+  // SizeT i = (SizeT)blockDim.x * blockIdx.x + threadIdx.x;
+  // while (i < length) {
+  //   apply(array + 0, offset + i);
+  //   i += STRIDE;
+  // }
+
+  for(SizeT i = (SizeT)blockDim.x * blockIdx.x + threadIdx.x;
+      i < length; i=i+(SizeT)(blockDim.x * gridDim.x)) {
     apply(array + 0, offset + i);
-    i += STRIDE;
   }
 }
 
@@ -255,7 +260,7 @@ cudaError_t mgpu_ForAll(const util::MultiGpuContext& mgpuContext,
 
   // launch ForAll kernel for each gpu (on its own thread)
   std::vector<std::thread> threads;
-  threads.reserve(mgpuContext.getGpuCount());
+  // threads.reserve(mgpuContext.getGpuCount());
   for (auto const &context : mgpuContext.contexts) {
     threads.push_back(std::thread( [&, context]() {
       auto data_length = num_elements_per_gpu;

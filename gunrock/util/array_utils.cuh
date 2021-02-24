@@ -828,6 +828,9 @@ DEVICE)); #endif } else {*/
              ", h_pointer = " + to_string(h_pointer));
 #endif
 
+    int num_gpus = -1;
+    cudaGetDeviceCount(&num_gpus);
+
     if (source == HOST && target == DEVICE) {
       if ((FLAG & PINNED) == PINNED && stream != 0) {
         retval = GRError(cudaMemcpyAsync(d_pointer + offset, h_pointer + offset,
@@ -835,6 +838,27 @@ DEVICE)); #endif } else {*/
                                          cudaMemcpyHostToDevice, stream),
                          std::string(name) + " cudaMemcpyAsync H2D failed",
                          __FILE__, __LINE__);
+
+        // This is a hack.
+        // We check the names of the arrays we would want to set as
+        // read-only, and in this case, it is all the graph arrays.
+        if(!strcmp(this->name, "row_offsets") || 
+           !strcmp(this->name, "column_indices") || 
+           !strcmp(this->name, "edge_values") || 
+           !strcmp(this->name, "node_values") || 
+           !strcmp(this->name, "edge_pairs") ||
+           !strcmp(this->name, "column_offsets") || 
+           !strcmp(this->name, "row_indices")) {
+          cudaMemAdvise(d_pointer + offset, size * sizeof(ValueT), cudaMemAdviseSetReadMostly, 0);
+        }
+
+
+        #pragma omp parallel for num_threads(num_gpus)
+        for(int i = 0; i < num_gpus; i++) {
+          cudaMemAdvise(d_pointer + offset, size * sizeof(ValueT), cudaMemAdviseSetAccessedBy, i);
+          cudaMemPrefetchAsync(d_pointer + offset, size * sizeof(ValueT), i, stream);
+        }
+
         if (retval) return retval;
       } else {
         retval = GRError(
@@ -842,6 +866,25 @@ DEVICE)); #endif } else {*/
                        sizeof(ValueT) * size, cudaMemcpyHostToDevice),
             std::string(name) + " cudaMemcpy H2D failed", __FILE__, __LINE__);
         if (retval) return retval;
+
+        // This is a hack.
+        // We check the names of the arrays we would want to set as
+        // read-only, and in this case, it is all the graph arrays.
+        if(!strcmp(this->name, "row_offsets") || 
+           !strcmp(this->name, "column_indices") || 
+           !strcmp(this->name, "edge_values") || 
+           !strcmp(this->name, "node_values") || 
+           !strcmp(this->name, "edge_pairs") ||
+           !strcmp(this->name, "column_offsets") || 
+           !strcmp(this->name, "row_indices")) {
+          cudaMemAdvise(d_pointer + offset, size * sizeof(ValueT), cudaMemAdviseSetReadMostly, 0);
+        }
+
+        #pragma omp parallel for num_threads(num_gpus)
+        for(int i = 0; i < num_gpus; i++) {
+          cudaMemAdvise(d_pointer + offset, size * sizeof(ValueT), cudaMemAdviseSetAccessedBy, i);
+          cudaMemPrefetchAsync(d_pointer + offset, size * sizeof(ValueT), i, stream);
+        }
       }
     }
 
