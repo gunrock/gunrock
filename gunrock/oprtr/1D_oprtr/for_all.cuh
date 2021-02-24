@@ -63,6 +63,7 @@ __global__ void mgpu_ForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length
   //   i += STRIDE;
   // }
 
+  #pragma unroll
   for(SizeT i = (SizeT)blockDim.x * blockIdx.x + threadIdx.x;
       i < length; i=i+(SizeT)(blockDim.x * gridDim.x)) {
     apply(array + 0, offset + i);
@@ -260,7 +261,7 @@ cudaError_t mgpu_ForAll(const util::MultiGpuContext& mgpuContext,
 
   // launch ForAll kernel for each gpu (on its own thread)
   std::vector<std::thread> threads;
-  // threads.reserve(mgpuContext.getGpuCount());
+  threads.reserve(mgpuContext.getGpuCount());
   for (auto const &context : mgpuContext.contexts) {
     threads.push_back(std::thread( [&, context]() {
       auto data_length = num_elements_per_gpu;
