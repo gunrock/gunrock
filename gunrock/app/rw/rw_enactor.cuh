@@ -443,19 +443,10 @@ class Enactor
               this->enactor_slices[gpu * this->num_gpus + peer_].frontier;
           frontier.queue_length = (peer_ == 0) ? num_nodes * walks_per_node : 0;
           if (peer_ == 0) {
-            util::Array1D<SizeT, VertexT> tmp;
-            tmp.Allocate(num_nodes * walks_per_node, target | util::HOST);
-            for (SizeT i = 0; i < num_nodes * walks_per_node; ++i) {
-              tmp[i] = (VertexT)i % num_nodes;
-            }
-            GUARD_CU(tmp.Move(util::HOST, target));
-
-            GUARD_CU(frontier.V_Q()->ForEach(
-                tmp,
-                [] __host__ __device__(VertexT & v, VertexT & i) { v = i; },
-                num_nodes * walks_per_node, target, 0));
-
-            tmp.Release();
+            GUARD_CU(frontier.V_Q()->ForAll(
+              [] __host__ __device__ (VertexT * v, const SizeT &i) {
+                v[i] = i;
+              }, num_nodes * walks_per_node, target, 0));
           }
         }
       } else {
