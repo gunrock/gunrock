@@ -110,10 +110,11 @@ cudaError_t cubSegmentedReduce(util::Array1D<uint64_t, char> &cub_temp_space,
 }
 
 template <typename InputT, typename OutputT, typename SizeT,
-          typename ReductionOp>
-cudaError_t cubReduce(util::Array1D<uint64_t, char> &cub_temp_space,
-                      util::Array1D<SizeT, InputT> &keys_in,
-                      util::Array1D<SizeT, OutputT> &keys_out, SizeT num_keys,
+          typename ReductionOp, ArrayFlag FLAG>
+cudaError_t cubReduce(util::Array1D<uint64_t, char, FLAG> &cub_temp_space,
+                      util::Array1D<SizeT, InputT, FLAG> &keys_in,
+                      util::Array1D<SizeT, OutputT, FLAG> &keys_out,
+                      SizeT num_keys,
                       ReductionOp reduction_op, InputT initial_value,
                       cudaStream_t stream = 0, bool debug_synchronous = false) {
   cudaError_t retval = cudaSuccess;
@@ -140,12 +141,12 @@ cudaError_t cubReduce(util::Array1D<uint64_t, char> &cub_temp_space,
 }
 
 template <typename InputT, typename OutputT, typename SizeT,
-          typename ReductionOp>
-cudaError_t SegmentedReduce(util::Array1D<uint64_t, char> &temp_space,
-                            util::Array1D<SizeT, InputT> &keys_in,
-                            util::Array1D<SizeT, OutputT> &keys_out,
+          typename ReductionOp, ArrayFlag FLAG>
+cudaError_t SegmentedReduce(util::Array1D<uint64_t, char, FLAG> &temp_space,
+                            util::Array1D<SizeT, InputT, FLAG> &keys_in,
+                            util::Array1D<SizeT, OutputT, FLAG> &keys_out,
                             SizeT num_segments,
-                            util::Array1D<SizeT, SizeT> &segment_offsets,
+                            util::Array1D<SizeT, SizeT, FLAG> &segment_offsets,
                             ReductionOp reduction_op, OutputT initial_value,
                             cudaStream_t stream = 0,
                             bool debug_synchronous = false,

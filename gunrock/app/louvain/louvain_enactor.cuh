@@ -240,11 +240,9 @@ struct LouvainIterationLoop
             },
             graph.edges, target, stream));
 
-        /* SKIP NEEDS REWRITTEN FIXME PLS PLS PLS FIXME DONT IGNORE
         GUARD_CU(util::cubSortPairs(cub_temp_space, edge_pairs0, edge_pairs1,
                                     weights, edge_weights1, graph.edges, 0,
                                     sizeof(EdgePairT) * 8, stream));
-        */
 
         GUARD_CU(seg_offsets0.Set(0, graph.edges + 1, target, stream));
 
@@ -278,12 +276,10 @@ struct LouvainIterationLoop
             },
             graph.edges, target, stream));
 
-        /* FIXME PLS PLS
         GUARD_CU(util::cubSegmentedSortPairs(
             cub_temp_space, edge_comms0, edge_comms1, edge_weights0,
             edge_weights1, graph.edges, graph.nodes, graph.CsrT::row_offsets, 0,
             std::ceil(std::log2(graph.nodes)), stream));
-        */
 
         GUARD_CU(seg_offsets0.Set(0, graph.edges + 1, target, stream));
 
@@ -294,7 +290,7 @@ struct LouvainIterationLoop
             },
             graph.nodes + 1, target, stream));
 
-        GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, seg_offsets0.GetPointer(util::DEVICE), 
+        GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, seg_offsets0.GetPointer(util::DEVICE),
             [edge_comms1] __host__ __device__(SizeT * offsets, const SizeT &e) {
               bool to_keep = false;
               if (offsets[e] == 1)
@@ -311,13 +307,11 @@ struct LouvainIterationLoop
       }
 
       // Filter in order
-      /* FIXME PLS
       GUARD_CU(util::cubSelectIf(
           cub_temp_space, seg_offsets0, seg_offsets1, num_neighbor_comms,
           graph.edges + 1,
           [] __host__ __device__(const SizeT &e) { return util::isValid(e); },
           stream));
-      */
 
       GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed.");
 
@@ -333,7 +327,6 @@ struct LouvainIterationLoop
       //    graph.edges - num_neighbor_comms[0] - 1,
       //    target, stream));
 
-      /* FIXMEPLS
       GUARD_CU(util::SegmentedReduce(
           cub_temp_space, edge_weights1, edge_weights0, n_neighbor_comms,
           seg_offsets1,
@@ -341,7 +334,6 @@ struct LouvainIterationLoop
             return a + b;
           },
           (ValueT)0, stream));
-      */
 
       GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, seg_offsets0.GetPointer(util::DEVICE),
           [seg_offsets1, n_neighbor_comms, graph] __host__ __device__(
@@ -498,14 +490,12 @@ struct LouvainIterationLoop
           },
           graph.nodes, target, stream));
 
-      /* FIXME PLS
       GUARD_CU(util::cubReduce(
           cub_temp_space, max_gains, iter_gain, graph.nodes,
           [] __host__ __device__(const ValueT &a, const ValueT &b) {
             return a + b;
           },
           (ValueT)0, stream));
-      */
 
       // GUARD_CU(iter_gain.ForEach(
       //    [] __host__ __device__ (const ValueT &gain)
@@ -570,7 +560,6 @@ struct LouvainIterationLoop
         },
         graph.nodes, target, stream));
 
-    /* FIXME PLS
     GUARD_CU(util::cubSelectIf(cub_temp_space, edge_comms0, edge_comms1,
                                num_new_comms, graph.nodes,
                                [] __host__ __device__(EdgePairT & comm) {
@@ -581,7 +570,6 @@ struct LouvainIterationLoop
                                  return (util::isValid(comm));
                                },
                                stream));
-    */
 
     GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
 
@@ -640,11 +628,9 @@ struct LouvainIterationLoop
           return false;
         }));
 
-    /* FIXME PLS
     GUARD_CU(util::cubSortPairs(cub_temp_space, edge_pairs0, edge_pairs1,
                                 graph.CsrT::edge_values, edge_weights1,
                                 graph.edges, 0, sizeof(EdgePairT) * 8, stream));
-    */
 
     GUARD_CU(seg_offsets0.ForEach(
         [] __host__ __device__(SizeT & offset) {
@@ -664,14 +650,12 @@ struct LouvainIterationLoop
         },
         graph.edges + 1, target, stream));
 
-    /* FIXME PLS
     GUARD_CU(util::cubSelectIf(cub_temp_space, seg_offsets0, seg_offsets1,
                                num_new_edges, graph.edges + 1,
                                [] __host__ __device__(SizeT & offset) {
                                  return (util::isValid(offset));
                                },
                                stream));
-    */
 
     GUARD_CU2(cudaStreamSynchronize(stream), "cudaStreamSynchronize failed");
 
@@ -693,7 +677,6 @@ struct LouvainIterationLoop
     new_graph.CsrT::edges = n_new_edges;
     //}
 
-    /* FIXXME PLS
     GUARD_CU(util::SegmentedReduce(
         cub_temp_space, edge_weights1, new_graph.CsrT::edge_values, n_new_edges,
         seg_offsets1,
@@ -701,7 +684,6 @@ struct LouvainIterationLoop
           return a + b;
         },
         (ValueT)0, stream));
-    */
 
     GUARD_CU( oprtr::mgpu_ForAll(mgpu_context, new_graph.CsrT::column_indices.GetPointer(util::DEVICE),
         [edge_pairs1, seg_offsets1, n_new_comms] __host__ __device__(

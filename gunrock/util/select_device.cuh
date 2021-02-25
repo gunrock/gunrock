@@ -183,11 +183,12 @@ cudaError_t CUBSelect(T *d_input, SizeT num_elements, T *d_output,
   return retval;
 }
 
-template <typename InputT, typename OutputT, typename SizeT, typename SelectOp>
-cudaError_t cubSelectIf(util::Array1D<uint64_t, char> &cub_temp_space,
-                        util::Array1D<SizeT, InputT> &keys_in,
-                        util::Array1D<SizeT, OutputT> &keys_out,
-                        util::Array1D<SizeT, SizeT> &num_selected,
+template <typename InputT, typename OutputT, typename SizeT, typename SelectOp,
+          ArrayFlag FLAG>
+cudaError_t cubSelectIf(util::Array1D<uint64_t, char, FLAG> &cub_temp_space,
+                        util::Array1D<SizeT, InputT, FLAG> &keys_in,
+                        util::Array1D<SizeT, OutputT, FLAG> &keys_out,
+                        util::Array1D<SizeT, SizeT, FLAG> &num_selected,
                         SizeT num_keys, SelectOp select_op,
                         cudaStream_t stream = 0,
                         bool debug_synchronous = false) {
