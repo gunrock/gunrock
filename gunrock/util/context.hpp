@@ -27,7 +27,7 @@ struct SaveToRestore {
 
     void Restore() {
         // restore the current device
-        cudaSetDevice(current_device);    
+        cudaSetDevice(current_device);
     }
 
     SaveToRestore() = default;
@@ -45,9 +45,9 @@ struct SingleGpuContext {
     SaveToRestore state;
 
     // sdp: cudaFlags -- not sure I want to go this route, but it's a start
-    SingleGpuContext(int deviceId, unsigned int cudaFlags = cudaEventDisableTiming) : 
+    SingleGpuContext(int deviceId, unsigned int cudaFlags = cudaEventDisableTiming) :
         device_id(deviceId) {
-        
+
         state.Save();
 
         cudaSetDevice(device_id);
@@ -85,7 +85,7 @@ struct SingleGpuContext {
         os << "device_id: " << context.device_id << "\n"
             << "stream: " << context.stream << "\n"
             << "event: " << context.event;
-        
+
         return os;
     }
 };
@@ -96,10 +96,10 @@ struct MultiGpuContext {
     std::vector<SingleGpuContext> contexts;
     SaveToRestore state;
 
-    // Map device to peers access enabled 
+    // Map device to peers access enabled
     // (e.g., current_device -> p1,p2 --- p2 -> current_device, p1)
     // Makes disabling peer access easier because cuda doesn't report back if
-    // devices are peers, but wll throw an error if they're not and you try to 
+    // devices are peers, but wll throw an error if they're not and you try to
     // cudaDeviceDisablePeerAccess.
     using PeerAccessMap = std::unordered_map<int, int>;
     PeerAccessMap device_peers;
@@ -127,7 +127,7 @@ struct MultiGpuContext {
 
         for (auto& context : contexts ) {
             // could miss an error as written, but fine for now
-            retval = context.Release(); 
+            retval = context.Release();
         }
 
         contexts.clear();
@@ -162,8 +162,8 @@ struct MultiGpuContext {
                 }
 
                 int can_access_peer;
-                GUARD_CU(cudaDeviceCanAccessPeer(&can_access_peer, 
-                                                 context.device_id, 
+                GUARD_CU(cudaDeviceCanAccessPeer(&can_access_peer,
+                                                 context.device_id,
                                                  peer_context.device_id));
                 if (can_access_peer) {
                     GUARD_CU(cudaSetDevice(context.device_id));
@@ -172,7 +172,7 @@ struct MultiGpuContext {
                 }
                 else {
                     std::cout << "WARNING! No peer access from "
-                              << context.prop.name 
+                              << context.prop.name
                               << " (GPU" << context.device_id << ") -> "
                               << peer_context.prop.name
                               << " (GPU" << peer_context.device_id << ")\n";
@@ -188,7 +188,7 @@ struct MultiGpuContext {
     // Disable (assumed) all-to-all peer access
     cudaError_t disablePeerAccess() {
         state.Save();
-        cudaError_t retval = cudaSuccess;   
+        cudaError_t retval = cudaSuccess;
 
         for (const auto& kv: device_peers) {
             GUARD_CU(cudaSetDevice(kv.first));
@@ -213,9 +213,9 @@ struct MultiGpuInfo {
     cudaEvent_t event;
 
     // At the moment (Feb 2021), arrays split across GPUs are
-    // 0-indexed on each GPU, but lambda functions need access to 
-    // a global index that considers the array in aggregate. This 
-    // offset provides that mapping / transformation 
+    // 0-indexed on each GPU, but lambda functions need access to
+    // a global index that considers the array in aggregate. This
+    // offset provides that mapping / transformation
     // (e.g., global_index = zero_based_index + offset).
     int offset;
 
@@ -226,8 +226,11 @@ struct MultiGpuInfo {
 /*
  * Standard integer division results in the floor of the operation.
  * This function gives us the cieling version of integer division.
+ *
+ * Indicate function as inline to tell compiler/linker it can be included in
+ * multiple files.
  */
-int ceil_divide(int numerator, int divisor) {
+inline int ceil_divide(int numerator, int divisor) {
     return (numerator + divisor - 1) / divisor;
 }
 

@@ -238,7 +238,7 @@ cudaError_t SegmentedSort(util::Array1D<SizeT, KeyT> &in,
     size_t request_bytes = 0;
 
     retval = cub::DeviceSegmentedRadixSort::SortKeys(NULL, request_bytes,
-            keys, num_items, num_segments, 
+            keys, num_items, num_segments,
             offsets.GetPointer(util::DEVICE),
             offsets.GetPointer(util::DEVICE) + 1,
             begin_bit, end_bit, stream, debug_synchronous);
@@ -246,11 +246,11 @@ cudaError_t SegmentedSort(util::Array1D<SizeT, KeyT> &in,
 
     retval = temp_space.EnsureSize_(request_bytes, util::DEVICE);
     if(retval) return retval;
-    
+
     retval = cub::DeviceSegmentedRadixSort::SortKeys(
-            temp_space.GetPointer(util::DEVICE), 
+            temp_space.GetPointer(util::DEVICE),
             request_bytes,
-            keys, num_items, num_segments, 
+            keys, num_items, num_segments,
             offsets.GetPointer(util::DEVICE),
             offsets.GetPointer(util::DEVICE) + 1,
             begin_bit, end_bit, stream, debug_synchronous);
@@ -376,13 +376,14 @@ cudaError_t cubSortPairsDescending(util::Array1D<uint64_t, char> &temp_space,
   return retval;
 }
 
-template <typename KeyT, typename ValueT, typename SizeT>
+template <typename KeyT, typename ValueT, typename SizeT, ArrayFlag FLAG>
 cudaError_t cubSegmentedSortPairs(
-    util::Array1D<uint64_t, char> &temp_space,
-    util::Array1D<SizeT, KeyT> &keys_in, util::Array1D<SizeT, KeyT> &keys_out,
-    util::Array1D<SizeT, ValueT> &values_in,
-    util::Array1D<SizeT, ValueT> &values_out, SizeT num_items,
-    SizeT num_segments, util::Array1D<SizeT, SizeT> &seg_offsets,
+    util::Array1D<uint64_t, char, FLAG> &temp_space,
+    util::Array1D<SizeT, KeyT, FLAG> &keys_in,
+    util::Array1D<SizeT, KeyT, FLAG> &keys_out,
+    util::Array1D<SizeT, ValueT, FLAG> &values_in,
+    util::Array1D<SizeT, ValueT, FLAG> &values_out, SizeT num_items,
+    SizeT num_segments, util::Array1D<SizeT, SizeT, FLAG> &seg_offsets,
     int begin_bit = 0, int end_bit = sizeof(KeyT) * 8, cudaStream_t stream = 0,
     bool debug_synchronous = false) {
   cudaError_t retval = cudaSuccess;
