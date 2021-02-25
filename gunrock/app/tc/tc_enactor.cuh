@@ -78,7 +78,7 @@ struct TCIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     };
     frontier.queue_length = graph.edges;
     frontier.queue_reset = true;
-    GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(mgpu_context,
+    GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
         graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
         intersect_op));
 
