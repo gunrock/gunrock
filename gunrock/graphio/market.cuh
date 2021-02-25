@@ -480,7 +480,7 @@ cudaError_t Read(util::Parameters &parameters, GraphT &graph,
   // GUARD_CU(graph.Display());
 
   if (parameters.Get<bool>(graph_prefix + "vertex-start-from-zero")) {
-    util::PrintMsg("  Substracting 1 from node Ids...", !quiet);
+    util::PrintMsg("  Subtracting 1 from node Ids...", !quiet);
     GUARD_CU(graph.edge_pairs.ForEach(
         [] __host__ __device__(typename GraphT::EdgePairT & edge_pair) {
           edge_pair.x -= 1;

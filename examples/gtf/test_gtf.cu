@@ -45,7 +45,7 @@ struct main_struct {
   cudaError_t
   operator()(util::Parameters &parameters, VertexT v, SizeT s, ValueT val) {
     typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-                                    graph::HAS_EDGE_VALUES | graph::HAS_CSR>
+                                    graph::HAS_EDGE_VALUES | graph::HAS_CSR | graph::GRAPH_UNIFIED>
         GraphT;
     typedef typename GraphT::CsrT CsrT;
     cudaError_t retval = cudaSuccess;

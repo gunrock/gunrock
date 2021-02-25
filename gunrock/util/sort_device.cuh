@@ -269,12 +269,12 @@ cudaError_t SegmentedSort(util::Array1D<SizeT, KeyT> &in,
     return retval;
 }
 
-template <typename KeyT, typename ValueT, typename SizeT>
-cudaError_t cubSortPairs(util::Array1D<uint64_t, char> &temp_space,
-                         util::Array1D<SizeT, KeyT> &keys_in,
-                         util::Array1D<SizeT, KeyT> &keys_out,
-                         util::Array1D<SizeT, ValueT> &values_in,
-                         util::Array1D<SizeT, ValueT> &values_out,
+template <typename KeyT, typename ValueT, typename SizeT, ArrayFlag FLAG>
+cudaError_t cubSortPairs(util::Array1D<uint64_t, char, FLAG> &temp_space,
+                         util::Array1D<SizeT, KeyT, FLAG> &keys_in,
+                         util::Array1D<SizeT, KeyT, FLAG> &keys_out,
+                         util::Array1D<SizeT, ValueT, FLAG> &values_in,
+                         util::Array1D<SizeT, ValueT, FLAG> &values_out,
                          SizeT num_items, int begin_bit = 0,
                          int end_bit = sizeof(KeyT) * 8,
                          cudaStream_t stream = 0,

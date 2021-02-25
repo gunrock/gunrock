@@ -68,6 +68,8 @@ struct TCIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &oprtr_parameters = enactor_slice.oprtr_parameters;
     auto &retval = enactor_stats.retval;
 
+    auto &mgpu_context = this->enactor->problem->mgpu_context;
+
     auto intersect_op = [tc_counts] __host__ __device__(
                             VertexT & comm_node, VertexT & edge) -> bool {
       atomicAdd(tc_counts + comm_node, 1);
@@ -79,6 +81,8 @@ struct TCIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     GUARD_CU(oprtr::Intersect<oprtr::OprtrType_V2V>(
         graph.csr(), frontier.V_Q(), frontier.Next_V_Q(), oprtr_parameters,
         intersect_op));
+
+    GUARD_CU(cudaStreamSynchronize(oprtr_parameters.stream));
 
     return retval;
   }

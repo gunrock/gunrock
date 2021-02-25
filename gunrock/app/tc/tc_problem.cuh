@@ -64,7 +64,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   struct DataSlice : BaseDataSlice {
     // tc-specific storage arrays
-    util::Array1D<SizeT, VertexT> tc_counts;  // triangle counting values
+    util::Array1D<SizeT, VertexT, util::UNIFIED> tc_counts;  // triangle counting values
     /*
      * @brief Default constructor
      */
@@ -116,7 +116,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * @param[in] target      Targeting device location
      * \return    cudaError_t Error metcage(s), if any
      */
-    cudaError_t Reset(util::Location target = util::DEVICE) {
+    cudaError_t Reset(util::Location target, util::MultiGpuContext mgpu_context) {
       cudaError_t retval = cudaSuccess;
       SizeT num_nodes = this->sub_graph->nodes;
 
@@ -125,9 +125,12 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       //            GUARD_CU(nodes     .EnsureSize_(num_nodes, target));
 
       // Reset data
-      GUARD_CU(tc_counts.ForEach(
-          [] __host__ __device__(VertexT & x) { x = (VertexT)0; }, num_nodes,
-          target, this->stream));
+      auto tc_clear_op = 
+          [] __host__ __device__(VertexT* x, const SizeT &i) { x[i] = (VertexT)0; }; 
+
+
+      GUARD_CU(oprtr::mgpu_ForAll(mgpu_context, tc_counts.GetPointer(util::DEVICE), tc_clear_op, num_nodes,
+                                  target, this->stream));
 
       return retval;
     }
@@ -136,6 +139,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   // Members
   // Set of data slices (one for each GPU)
   util::Array1D<SizeT, DataSlice> *data_slices;
+
+  gunrock::util::MultiGpuContext mgpu_context;
 
   // Methods
 
@@ -285,7 +290,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
       // Set device
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-      GUARD_CU(data_slices[gpu]->Reset(target));
+      GUARD_CU(data_slices[gpu]->Reset(target, mgpu_context));
       GUARD_CU(data_slices[gpu].Move(util::HOST, target));
     }
 

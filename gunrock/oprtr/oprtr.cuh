@@ -115,7 +115,8 @@ cudaError_t NeighborReduce(const GraphT &graph, FrontierInT *frontier_in,
 
 template <OprtrFlag FLAG, typename GraphT, typename FrontierInT,
           typename FrontierOutT, typename ParametersT, typename OpT>
-cudaError_t Intersect(const GraphT graph, FrontierInT *frontier_in,
+cudaError_t Intersect(
+                      const GraphT graph, FrontierInT *frontier_in,
                       FrontierOutT *frontier_out, ParametersT &parameters,
                       OpT op) {
   cudaError_t retval = cudaSuccess;

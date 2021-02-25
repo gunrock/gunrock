@@ -248,6 +248,8 @@ struct SAGEIterationLoop
 
   SAGEIterationLoop() : BaseIterationLoop() {}
 
+  gunrock::util::MultiGpuContext mgpu_context;
+
   /**
    * @brief Core computation of sage, one iteration
    * @param[in] peer_ Which GPU peers to work on, 0 means local
@@ -314,7 +316,8 @@ struct SAGEIterationLoop
     } else {
       int grid_size = 80;
       int block_size = 256;
-      GUARD_CU(children.ForAll(
+ 
+        auto children_op = 
           [source_start, num_children_per_source, graph, feature_column,
            features, num_leafs_per_child, sums, rand_states, sums_child_feat,
            grid_size,
@@ -369,11 +372,13 @@ struct SAGEIterationLoop
                             num_children_per_source);
               // merge 220 and 226
             }
-          },
-          num_children, util::DEVICE, stream, 80, 256));
+          };
+
+          oprtr::mgpu_ForAll(mgpu_context, children.GetPointer(util::DEVICE), 
+                             children_op, num_children, util::DEVICE, stream);
     }
-    // GUARD_CU2(cudaDeviceSynchronize(),
-    //    "cudaDeviceSynchronize failed.");
+    GUARD_CU2(cudaDeviceSynchronize(),
+        "cudaDeviceSynchronize failed.");
 
     if (data_slice.custom_kernels && Wa2_dim0 <= 1024) {
       if (Wa2_dim0 <= 128)
@@ -417,7 +422,7 @@ struct SAGEIterationLoop
             sums.GetPointer(util::DEVICE), num_children);
 
     } else {
-      GUARD_CU(data_slice.child_temp.ForAll(
+      auto child_temp_op = 
           [num_children_per_source, feature_column, features, W_f_1, Wf1_dim1,
            children, W_a_1, Wa1_dim1, Wa2_dim0, Wf2_dim0, children_temp,
            sums_child_feat,
@@ -475,8 +480,8 @@ struct SAGEIterationLoop
             }  // finished agg (h_B1^1)
 
             // end of for each child
-          },
-          num_children, util::DEVICE, stream, 80));
+          };
+          oprtr::mgpu_ForAll(mgpu_context, data_slice.child_temp.GetPointer(util::DEVICE), child_temp_op, num_children, util::DEVICE, stream);
     }
     // GUARD_CU2(cudaDeviceSynchronize(),
     //    "cudaDeviceSynchronize failed.");
@@ -542,7 +547,7 @@ struct SAGEIterationLoop
             data_slice.source_temp.GetPointer(util::DEVICE), num_sources,
             use_shared_source_temp);
     } else {
-      GUARD_CU(data_slice.source_temp.ForAll(
+      auto source_temp_op = 
           [feature_column, features, source_start, W_f_1, Wf1_dim1,
            children_temp, sums_child_feat, W_a_1, Wa1_dim1, W_f_2, Wf2_dim1,
            Wf2_dim0, W_a_2, Wa2_dim1, Wa2_dim0, source_result,
@@ -637,8 +642,8 @@ struct SAGEIterationLoop
               // printf ("source_r:%f", source_result[idx_0] );
               // printf ("ch_t:%f", children_temp[idx_0]);
             }  // finished L-2 norm for source result
-          },
-          num_sources, util::DEVICE, stream, 640));
+          };
+          oprtr::mgpu_ForAll(mgpu_context, data_slice.source_temp.GetPointer(util::DEVICE), source_temp_op, num_sources, util::DEVICE, stream);
     }
 
     // GUARD_CU2(cudaDeviceSynchronize(),

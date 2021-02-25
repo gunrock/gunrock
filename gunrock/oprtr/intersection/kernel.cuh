@@ -25,6 +25,8 @@
 #include <gunrock/oprtr/intersection/cta.cuh>
 
 #include <gunrock/oprtr/intersection/kernel_policy.cuh>
+#include <cub/cub.cuh>
+
 #include <gunrock/util/test_utils.cuh>
 
 namespace gunrock {
