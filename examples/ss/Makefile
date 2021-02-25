@@ -11,8 +11,8 @@
 
 include ../BaseMakefile.mk
 ALGO = ss
-EXEC = bin/$(ALGO)_main_$(NVCC_VERSION)_$(ARCH_SUFFIX)
-SRC = $(ALGO)_main.cu
+EXEC = bin/test_$(ALGO)_$(NVCC_VERSION)_$(ARCH_SUFFIX)
+SRC = test_$(ALGO).cu
 
 test: $(EXEC)
 
