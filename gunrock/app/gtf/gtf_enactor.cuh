@@ -138,6 +138,10 @@ struct GTFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
     mf_problem.parameters.Set("source", source);
     mf_problem.parameters.Set("sink", sink);
+    mf_problem.parameters.Set("num-repeats", 
+                              max(10, static_cast<int>(pow(10, floor(log10(graph.nodes))))) 
+                              );
+
     cpu_timer.Start();
     GUARD_CU(mf_problem.Reset(graph, h_reverse + 0, mf_target));
     GUARD_CU(cudaDeviceSynchronize());
@@ -425,6 +429,13 @@ struct GTFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     return retval;
   }
 
+  cudaError_t Compute_OutputLength(int peer_) {
+    return cudaSuccess;  // No need to load balance or get output size
+  }
+  cudaError_t Check_Queue_Size(int peer_) {
+    return cudaSuccess;  // no need to check queue size for RW
+  }
+  
   /* cudaError_t Compute_OutputLength(int peer_)
   {
       // No need to load balance or get output size
@@ -529,7 +540,7 @@ class Enactor
   Problem *problem;
   IterationT *iterations;
   // typedef mf::Problem<GraphT> MfProblemT;
-  typedef mf::Enactor<MfProblemT> MfEnactorT;
+  typedef mf::Enactor<MfProblemT, util::UNIFIED> MfEnactorT;
   MfEnactorT mf_enactor;
 
   /**
