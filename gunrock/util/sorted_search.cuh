@@ -30,11 +30,13 @@ namespace util {
 //---------------------------------------------------------------------
 
 template <typename A, typename B, typename C, typename SizeT>
-cudaError_t SortedSearch(util::Array1D<SizeT, A> &needles, SizeT num_needles,
-                        util::Array1D<SizeT, B> &haystack, SizeT num_haystack,
-                        util::Array1D<SizeT, C> &indices,
+cudaError_t SortedSearch(A &needles, SizeT num_needles,
+                        B &haystack, SizeT num_haystack,
+                        C &indices,
                         mgpu::context_t *context,
                         bool debug_synchronous = false) {
+                            
+  using type_t = typename A::ValueT;
 
   if (context == nullptr) {
       return cudaErrorInvalidValue;
@@ -55,7 +57,7 @@ cudaError_t SortedSearch(util::Array1D<SizeT, A> &needles, SizeT num_needles,
 
   mgpu::sorted_search<mgpu::bounds_lower, launch_t>(needles.GetPointer(util::DEVICE), num_needles,
                                                     haystack.GetPointer(util::DEVICE), num_haystack,
-                                                    indices.GetPointer(util::DEVICE), mgpu::less_t<A>(),
+                                                    indices.GetPointer(util::DEVICE), mgpu::less_t<type_t>(),
                                                     *context);
 
   if (debug_synchronous) GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
