@@ -165,7 +165,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   debug_aml("RunTests starts");
   cudaError_t retval = cudaSuccess;
   typedef Problem<GraphT> ProblemT;
-  typedef Enactor<ProblemT> EnactorT;
+  typedef Enactor<ProblemT, util::UNIFIED> EnactorT;
 
   util::CpuTimer total_timer;
   total_timer.Start();
@@ -218,7 +218,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   // Allocate host-side array (for both reference and GPU-computed results)
   // ... for function Extract
-  util::Array1D<SizeT, ValueT> community_accus;
+  util::Array1D<SizeT, ValueT, util::UNIFIED> community_accus;
   community_accus.SetName("community_accus");
   GUARD_CU(community_accus.Allocate(graph.nodes, util::HOST | util::DEVICE));
 
