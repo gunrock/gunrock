@@ -364,7 +364,7 @@ struct GTFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         graph.edges, util::DEVICE, oprtr_parameters.stream));
 
     GUARD_CU(community_accus.ForAll(
-        [active, community_accus, curr_communities] __host__ __device__(
+        [active, curr_communities] __host__ __device__(
             ValueT * community_accus, SizeT & v) {
           {
             if (active[0] == 0) {
@@ -377,7 +377,7 @@ struct GTFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         num_org_nodes, util::DEVICE, oprtr_parameters.stream));
 
     GUARD_CU(community_accus.ForAll(
-        [active, community_accus, curr_communities, Y] __host__ __device__(
+        [active, curr_communities, Y] __host__ __device__(
             ValueT * community_accus, SizeT & v) {
           {
             if (active[0] == 0) {
