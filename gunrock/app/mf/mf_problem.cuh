@@ -58,6 +58,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   typedef ProblemBase<GraphT, FLAG> BaseProblem;
   typedef DataSliceBase<GraphT, FLAG> BaseDataSlice;
 
+  // Use CUDA manage memory
+  static const util::ArrayFlag ARRAY_FLAG = util::UNIFIED;
+
   // Helper structures
 
   /**
@@ -65,31 +68,31 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    */
   struct DataSlice : BaseDataSlice {
     // MF-specific storage arrays:
-    util::Array1D<SizeT, ValueT> flow;                 // edge flow
-    util::Array1D<SizeT, ValueT> residuals;            // edge residuals
-    util::Array1D<SizeT, ValueT> excess;               // vertex excess
-    util::Array1D<SizeT, VertexT> height;              // vertex height
-    util::Array1D<SizeT, VertexT> reverse;             // id reverse edge
-    util::Array1D<SizeT, SizeT> lowest_neighbor;       // id lowest neighbor
-    util::Array1D<SizeT, VertexT> local_vertices;      // set of vertices
-    util::Array1D<SizeT, SizeT, util::PINNED> active;  // flag active vertices
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> flow;                 // edge flow
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> residuals;            // edge residuals
+    util::Array1D<SizeT, ValueT, ARRAY_FLAG> excess;               // vertex excess
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> height;              // vertex height
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> reverse;             // id reverse edge
+    util::Array1D<SizeT, SizeT, ARRAY_FLAG> lowest_neighbor;       // id lowest neighbor
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> local_vertices;      // set of vertices
+    util::Array1D<SizeT, SizeT, ARRAY_FLAG | util::PINNED> active;  // flag active vertices
 
-    util::Array1D<SizeT, VertexT> head;
-    util::Array1D<SizeT, VertexT> tail;
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> head;
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> tail;
     VertexT head_;
     VertexT tail_;
 
-    util::Array1D<SizeT, bool> reachabilities;
-    util::Array1D<SizeT, VertexT> queue0;
-    util::Array1D<SizeT, VertexT> queue1;
-    util::Array1D<SizeT, bool> mark;
+    util::Array1D<SizeT, bool, ARRAY_FLAG> reachabilities;
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> queue0;
+    util::Array1D<SizeT, VertexT, ARRAY_FLAG> queue1;
+    util::Array1D<SizeT, bool, ARRAY_FLAG> mark;
 
     VertexT source;  // source vertex
     VertexT sink;    // sink vertex
     int num_repeats;
     SizeT num_updated_vertices;
     bool was_changed;  // flag relabeling
-    util::Array1D<SizeT, SizeT, util::PINNED> changed;
+    util::Array1D<SizeT, SizeT, ARRAY_FLAG | util::PINNED> changed;
 
     /*
      * @brief Default constructor
@@ -326,7 +329,16 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @brief MFProblem default constructor
    */
   Problem(util::Parameters &_parameters, ProblemFlag _flag = Problem_None)
-      : BaseProblem(_parameters, _flag), data_slices(NULL) {}
+      : BaseProblem(_parameters, _flag), data_slices(NULL) {
+        _parameters.Use<int>(
+      "num-repeats",
+      util::REQUIRED_ARGUMENT | util::SINGLE_VALUE | util::OPTIONAL_PARAMETER,
+      util::PreDefinedValues<int>::InvalidValue,
+      "Number of repeats for ReapetFor operator\n"
+      "\tDefault num-repeats is linear from number of vertices",
+      __FILE__, __LINE__);
+
+      }
 
   /**
    * @brief MFProblem default destructor
@@ -432,7 +444,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
     auto source_vertex = this->parameters.template Get<VertexT>("source");
     auto sink_vertex = this->parameters.template Get<VertexT>("sink");
-    auto num_repeats = this->parameters.template Get<int>("num-repeats");
+    auto num_repeats = this->parameters.template Get<int>("num-repeats");//sdp
 
     for (int gpu = 0; gpu < this->num_gpus; ++gpu) {
       auto &data_slice = data_slices[gpu][0];
@@ -449,20 +461,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
     // Filling the initial input_queue for MF problem
 
-    int gpu;
-    VertexT src_;
-    if (this->num_gpus <= 1) {
-      gpu = 0;
-      src_ = source_vertex;
-    } else {
-      gpu = this->org_graph->partition_table[source_vertex];
-      if (this->flag & partitioner::Keep_Node_Num)
-        src_ = source_vertex;
-      else
-        src_ = this->org_graph->GpT::convertion_table[source_vertex];
-    }
-    GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
+    // int gpu;
+    // VertexT src_;
+    // if (this->num_gpus <= 1) {
+    //   gpu = 0;
+    //   src_ = source_vertex;
+    // } else {
+    //   gpu = this->org_graph->partition_table[source_vertex];
+    //   if (this->flag & partitioner::Keep_Node_Num)
+    //     src_ = source_vertex;
+    //   else
+    //     src_ = this->org_graph->GpT::convertion_table[source_vertex];
+    // }
+    // GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+    // GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
 
     return retval;
   }
