@@ -94,12 +94,12 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &residuals = data_slice.residuals;
     auto &excess = data_slice.excess;
     auto &height = data_slice.height;
-    auto &lowest_neighbor = data_slice.lowest_neighbor;
+    // auto &lowest_neighbor = data_slice.lowest_neighbor;
     auto &local_vertices = data_slice.local_vertices;
     auto &active = data_slice.active;
     auto null_ptr = &local_vertices;
     null_ptr = NULL;
-    auto &mark = data_slice.mark;
+    // auto &mark = data_slice.mark;
     auto &queue = data_slice.queue0;
     auto &queue0 = data_slice.queue0;
     auto &queue1 = data_slice.queue1;
@@ -281,7 +281,7 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     // GUARD_CU(frontier.V_Q()->ForAll(compute_lockfree_op,
     //            graph.nodes, util::DEVICE, oprtr_parameters.stream));
 
-    SizeT loop_size = graph.nodes;
+    // SizeT loop_size = graph.nodes;
     gunrock::oprtr::RepeatFor(
         compute_lockfree_op,                       /* lambda */
         num_repeats,                               /* num_repeats (int) */
@@ -333,7 +333,7 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto gpu_offset = gpu_num * enactor->num_gpus;
     auto &data_slice = problem->data_slices[gpu_num][0];
     auto &enactor_slice = enactor->enactor_slices[gpu_offset + peer_];
-    auto iteration = enactor_slice.enactor_stats.iteration;
+    // auto iteration = enactor_slice.enactor_stats.iteration;
 
     auto &capacity = data_slice.sub_graph[0].edge_values;
     auto &flow = data_slice.flow;
@@ -372,7 +372,7 @@ struct MFIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto &data_slice = enactor->problem->data_slices[gpu_num][0];
     auto &enactor_slice = enactor->enactor_slices[0];
     auto &retval = enactor_slice.enactor_stats.retval;
-    auto &oprtr_parameters = enactor_slice.oprtr_parameters;
+    // auto &oprtr_parameters = enactor_slice.oprtr_parameters;
 
     if (retval != cudaSuccess) {
       printf("(CUDA error %d @ GPU %d: %s\n", retval, 0 % num_gpus,

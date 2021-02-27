@@ -461,20 +461,20 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
     // Filling the initial input_queue for MF problem
 
-    int gpu;
-    VertexT src_;
-    if (this->num_gpus <= 1) {
-      gpu = 0;
-      src_ = source_vertex;
-    } else {
-      gpu = this->org_graph->partition_table[source_vertex];
-      if (this->flag & partitioner::Keep_Node_Num)
-        src_ = source_vertex;
-      else
-        src_ = this->org_graph->GpT::convertion_table[source_vertex];
-    }
-    GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
+    // int gpu;
+    // VertexT src_;
+    // if (this->num_gpus <= 1) {
+    //   gpu = 0;
+    //   src_ = source_vertex;
+    // } else {
+    //   gpu = this->org_graph->partition_table[source_vertex];
+    //   if (this->flag & partitioner::Keep_Node_Num)
+    //     src_ = source_vertex;
+    //   else
+    //     src_ = this->org_graph->GpT::convertion_table[source_vertex];
+    // }
+    // GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+    // GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
 
     return retval;
   }

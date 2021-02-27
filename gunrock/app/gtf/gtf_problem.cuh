@@ -108,7 +108,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     util::Array1D<SizeT, VertexT, ARRAY_FLAG> num_comms;
     util::Array1D<SizeT, VertexT, ARRAY_FLAG> previous_num_comms;  // flag active vertices
     // util::Array1D<SizeT, VertexT> num_comms;	      // flag active vertices
-    util::Array1D<SizeT, SizeT, ARRAY_FLAG> reverse;  // for storing mf h_reverse
+    util::Array1D<SizeT, SizeT> reverse;  // for storing mf h_reverse
 
     util::Array1D<SizeT, ValueT, ARRAY_FLAG> Y;  // for storing mf h_reverse
     SizeT num_updated_vertices;
@@ -173,7 +173,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(active.Release(target));
       GUARD_CU(num_comms.Release(target));
       GUARD_CU(previous_num_comms.Release(target));
-      GUARD_CU(reverse.Release(target));
+      GUARD_CU(reverse.Release(util::HOST));
       GUARD_CU(Y.Release(target));
       return retval;
     }
@@ -224,7 +224,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      * @param[in] target      Targeting device location
      * \return    cudaError_t Error message(s), if any
      */
-    cudaError_t Reset(const GraphT &graph, ValueT *h_community_accus,
+    cudaError_t Reset(const GraphT &graph, ValueT avg_weights_source_sink,
                       util::Location target = util::DEVICE) {
       cudaError_t retval = cudaSuccess;
 
@@ -255,21 +255,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       ///////////////////////////////
       num_org_nodes = graph.nodes - 2;
-      SizeT offset = graph.edges - num_org_nodes * 2;
-      printf("offset is %d num edges %d \n", offset, edges_size);
-
-      // bool* h_vertex_active = (bool*)malloc(sizeof(bool)*graph.edges);
-      // bool* h_community_active = (bool*)malloc(sizeof(bool)*graph.nodes);
-      // VertexT* h_curr_communities =
-      // (VertexT*)malloc(sizeof(VertexT)*graph.nodes); VertexT*
-      // h_next_communities = (VertexT*)malloc(sizeof(VertexT)*graph.nodes); for
-      // (VertexT v = 0; v < num_org_nodes; v++)
-      // {
-      //     h_vertex_active   [v] = true;
-      //     h_community_active[v] = true;
-      //     h_curr_communities[v] = 0;
-      //     h_next_communities[v] = 0; //extra
-      // }
+      // SizeT offset = graph.edges - num_org_nodes * 2;
 
       GUARD_CU(vertex_active.ForAll(
           [] __host__ __device__(bool *v_active, const SizeT &pos) {
@@ -302,32 +288,11 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           },
           graph.nodes, target, this->stream));
 
-      // GUARD_CU(community_accus.ForAll([h_community_accus]
-      //    __host__ __device__(ValueT *community_accus, const SizeT &pos)
-      // {
-      //   community_accus[0] = h_community_accus[0];
-      // }, 1, target, this -> stream));
-
-      // GUARD_CU(vertex_active.SetPointer(h_vertex_active, num_org_nodes,
-      // util::HOST)); GUARD_CU(vertex_active.Move(util::HOST, target,
-      // num_org_nodes, 0, this->stream));
-      // GUARD_CU(community_active.SetPointer(h_community_active, num_org_nodes,
-      // util::HOST)); GUARD_CU(community_active.Move(util::HOST, target,
-      // num_org_nodes, 0, this->stream));
-      // GUARD_CU(curr_communities.SetPointer(h_curr_communities, num_org_nodes,
-      // util::HOST)); GUARD_CU(curr_communities.Move(util::HOST, target,
-      // num_org_nodes, 0, this->stream));
-      // GUARD_CU(next_communities.SetPointer(h_next_communities, num_org_nodes,
-      // util::HOST)); GUARD_CU(next_communities.Move(util::HOST, target,
-      // num_org_nodes, 0, this->stream));
-      //
-      printf("h_community_accus is %f \n", h_community_accus[0]);
-      GUARD_CU(community_accus.SetPointer(h_community_accus, graph.nodes,
-                                          util::HOST));
-      GUARD_CU(community_accus.Move(util::HOST, target, graph.nodes, 0,
-                                    this->stream));
-
-      this->num_updated_vertices = 1;
+      GUARD_CU(community_accus.ForAll([avg_weights_source_sink]
+         __host__ __device__(ValueT *community_accus, const SizeT &pos)
+      {
+        community_accus[0] = avg_weights_source_sink;
+      }, 1, target, this->stream));
 
       GUARD_CU(active.ForAll(
           [] __host__ __device__(SizeT * active_, const VertexT &pos) {
@@ -418,7 +383,6 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
     // Set device
     if (target == util::DEVICE) {
-      printf("transfering to host!!!: %d \n", vN);
       GUARD_CU(util::SetDevice(this->gpu_idx[0]));
       GUARD_CU(data_slice.Y.SetPointer(h_Y, vN, util::HOST));
       GUARD_CU(data_slice.Y.Move(util::DEVICE, util::HOST));
@@ -475,7 +439,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @param[in] location Memory location to work on
    * \return cudaError_t Error message(s), if any
    */
-  cudaError_t Reset(GraphT &graph, ValueT *h_community_accus, SizeT *h_reverse,
+  cudaError_t Reset(GraphT &graph, ValueT avg_weights_source_sink, SizeT *h_reverse,
                     util::Location target = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
 
@@ -495,27 +459,9 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
 
       // Set device
       if (target & util::DEVICE) GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-      GUARD_CU(data_slices[gpu]->Reset(graph, h_community_accus, target));
+      GUARD_CU(data_slices[gpu]->Reset(graph, avg_weights_source_sink, target));
       GUARD_CU(data_slices[gpu].Move(util::HOST, target));
     }
-
-    // Filling the initial input_queue for GTF problem
-
-    int gpu;
-    VertexT src_;
-    if (this->num_gpus <= 1) {
-      gpu = 0;
-      src_ = source_vertex;
-    } else {
-      gpu = this->org_graph->partition_table[source_vertex];
-      if (this->flag & partitioner::Keep_Node_Num)
-        src_ = source_vertex;
-      else
-        src_ = this->org_graph->GpT::convertion_table[source_vertex];
-    }
-    GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
-    GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed");
-
     return retval;
   }
 
