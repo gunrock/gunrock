@@ -165,7 +165,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   debug_aml("RunTests starts");
   cudaError_t retval = cudaSuccess;
   typedef Problem<GraphT> ProblemT;
-  typedef Enactor<ProblemT> EnactorT;
+  typedef Enactor<ProblemT, util::UNIFIED> EnactorT;
 
   util::CpuTimer total_timer;
   total_timer.Start();
@@ -218,11 +218,11 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   // Allocate host-side array (for both reference and GPU-computed results)
   // ... for function Extract
-  util::Array1D<SizeT, ValueT> community_accus;
-  community_accus.SetName("community_accus");
-  GUARD_CU(community_accus.Allocate(graph.nodes, util::HOST | util::DEVICE));
+  // util::Array1D<SizeT, ValueT, util::UNIFIED> community_accus;
+  // community_accus.SetName("community_accus");
+  // GUARD_CU(community_accus.Allocate(graph.nodes, util::HOST | util::DEVICE));
 
-  community_accus[0] = avg_weights_source_sink;
+  // community_accus[0] = avg_weights_source_sink;
 
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
@@ -235,7 +235,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   // perform the gtf algorithm
   for (int run_num = 0; run_num < num_runs; ++run_num) {
-    GUARD_CU(problem.Reset(graph, community_accus + 0, h_reverse, target));
+    GUARD_CU(problem.Reset(graph, avg_weights_source_sink, h_reverse, target));
     GUARD_CU(enactor.Reset(source, target));
 
     util::PrintMsg("______GPU SFL algorithm____", !quiet_mode);
@@ -299,7 +299,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   }
 
 // Compute running statistics
-// info.ComputeTraversalStats(enactor, h_flow);//!!!
+info.ComputeTraversalStats(enactor, (VertexT *)NULL);
 // Display_Memory_Usage(problem);
 #ifdef ENABLE_PERFORMANCE_PROFILING
   // Display_Performance_Profiling(&enactor);
