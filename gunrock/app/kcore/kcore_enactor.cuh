@@ -47,26 +47,14 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
  */
 template <typename EnactorT>
 struct kcoreIterationLoop
-    : public IterationLoopBase<EnactorT, Use_FullQ | Push
-                               // <TODO>if needed, stack more option, e.g.:
-                               // | (((EnactorT::Problem::FLAG &
-                               // Mark_Predecessors) != 0) ? Update_Predecessors
-                               // : 0x0)
-                               // </TODO>
-                               > {
+    : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
   typedef typename EnactorT::VertexT VertexT;
   typedef typename EnactorT::SizeT SizeT;
   typedef typename EnactorT::ValueT ValueT;
   typedef typename EnactorT::Problem::GraphT::CsrT CsrT;
   typedef typename EnactorT::Problem::GraphT::GpT GpT;
 
-  typedef IterationLoopBase<EnactorT, Use_FullQ | Push
-                            // <TODO> add the same options as in template
-                            // parameters here, e.g.: |
-                            // (((EnactorT::Problem::FLAG & Mark_Predecessors)
-                            // != 0) ? Update_Predecessors : 0x0)
-                            // </TODO>
-                            >
+  typedef IterationLoopBase<EnactorT, Use_FullQ | Push>
       BaseIterationLoop;
 
   kcoreIterationLoop() : BaseIterationLoop() {}
@@ -294,10 +282,6 @@ struct kcoreIterationLoop
 
     util::Parameters &parameters = this->enactor->problem->parameters;
     bool quiet = parameters.Get<bool>("quiet");
-    if (!quiet) {
-      printf("check stop condition...\n");
-      printf("frontier_length = %u\n", frontier.queue_length);
-    }
 
     GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream), "cudaStreamSynchronize failed");
     GUARD_CU(empty.Move(util::DEVICE, util::HOST));
@@ -358,20 +342,11 @@ struct kcoreIterationLoop
         this->enactor
             ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
     // auto iteration = enactor_slice.enactor_stats.iteration;
-    // TODO: add problem specific data alias here, e.g.:
-    // auto         &distances          =   data_slice.distances;
 
     auto expand_op = [
-                         // TODO: pass data used by the lambda, e.g.:
-                         // distances
     ] __host__ __device__(VertexT & key, const SizeT &in_pos,
                           VertexT *vertex_associate_ins,
                           ValueT *value__associate_ins) -> bool {
-      // TODO: fill in the lambda to combine received and local data, e.g.:
-      // ValueT in_val  = value__associate_ins[in_pos];
-      // ValueT old_val = atomicMin(distances + key, in_val);
-      // if (old_val <= in_val)
-      //     return false;
       return true;
     };
 
@@ -414,10 +389,8 @@ class Enactor
    * @brief k-core constructor
    */
   Enactor() : BaseEnactor("k-core"), problem(NULL) {
-    // <TODO> change according to algorithmic needs
     this->max_num_vertex_associates = 0;
     this->max_num_value__associates = 1;
-    // </TODO>
   }
 
   /**
@@ -453,9 +426,7 @@ class Enactor
     // Lazy initialization
     GUARD_CU(BaseEnactor::Init(
         problem, Enactor_None,
-        // <TODO> change to how many frontier queues, and their types
         2, NULL,
-        // </TODO>
         target, false));
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
       GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
@@ -482,10 +453,7 @@ class Enactor
    */
   cudaError_t Run(ThreadSlice &thread_data) {
     gunrock::app::Iteration_Loop<
-        // <TODO> change to how many {VertexT, ValueT} data need to communicate
-        //       per element in the inter-GPU sub-frontiers
         0, 1,
-        // </TODO>
         IterationT>(thread_data, iterations[thread_data.thread_num]);
     return cudaSuccess;
   }
@@ -496,15 +464,12 @@ class Enactor
    * @param[in] target Target location of data
    * \return cudaError_t error message(s), if any
    */
-  cudaError_t Reset(
-      // <TODO> problem specific data if necessary, eg
-      // </TODO>
-      util::Location target = util::DEVICE) {
+  cudaError_t Reset(util::Location target = util::DEVICE) {
     typedef typename GraphT::GpT GpT;
     cudaError_t retval = cudaSuccess;
     GUARD_CU(BaseEnactor::Reset(target));
 
-    // <TODO> Initialize frontiers according to the algorithm:
+    //Initialize frontier:
     auto &data_slice = this->problem->data_slices[0][0];
     auto &initial_frontier = data_slice.initial_frontier;
     auto &bitmap = data_slice.delete_bitmap;
@@ -528,7 +493,6 @@ class Enactor
         printf("No multi-GPU implementation.\n");
       }
     }
-    // </TODO>
 
     //Initialize deleted flags
     unsigned int overflowBitmask = UINT_MAX >> (num_nodes % 32);
@@ -556,10 +520,7 @@ class Enactor
 ...
    * \return cudaError_t error message(s), if any
    */
-  cudaError_t Enact(
-      // <TODO> problem specific data if necessary, eg
-      // </TODO>
-  ) {
+  cudaError_t Enact() {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(this->Run_Threads(this));
     util::PrintMsg("GPU Template Done.", this->flag & Debug);

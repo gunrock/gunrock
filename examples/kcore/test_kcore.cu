@@ -47,7 +47,7 @@ struct main_struct {
     parameters.Set("undirected", true);
 
     typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-                                    graph::HAS_EDGE_VALUES | graph::HAS_COO |
+                                        graph::HAS_COO |
                                         graph::HAS_CSR | graph::HAS_CSC>
         GraphT;
 
@@ -60,21 +60,12 @@ struct main_struct {
     cpu_timer.Stop();
     parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-    // <TODO> get srcs if needed, e.g.:
-    // GUARD_CU(app::Set_Srcs (parameters, graph));
-    // std::vector<VertexT> srcs
-    //    = parameters.Get<std::vector<VertexT> >("srcs");
-    // int num_srcs = srcs.size();
-    // </TODO>
-
-    // <TODO> declare data structures for reference result on CPU
+    //Declare data structures for reference result on CPU
     SizeT *ref_k_cores = NULL;
-    // </TODO>
 
     if (!quick) {
-      // <TODO> init data structures for reference result on CPU
+      //Init data structures for reference result on CPU
       ref_k_cores = new SizeT[graph.nodes];
-      // </TODO>
 
       // If not in `quick` mode, compute CPU reference implementation
       util::PrintMsg("__________________________", !quiet);
@@ -87,29 +78,22 @@ struct main_struct {
           !quiet);
     }
 
-    // <TODO> add other switching parameters, if needed
+    //Add other switching parameters, if needed
     std::vector<std::string> switches{"advance-mode"};
-    // </TODO>
 
     GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
                                     [
-                                        // </TODO> pass necessary data to lambda
                                         ref_k_cores
-                                        // </TODO>
     ](util::Parameters &parameters, GraphT &graph) {
-                                      // <TODO> pass necessary data to
-                                      // app::Template::RunTests
                                       return app::kcore::RunTests(
                                           parameters, graph, ref_k_cores,
                                           util::DEVICE);
-                                      // </TODO>
                                     }));
 
     if (!quick) {
-      // <TODO> deallocate host references
+      //Deallocate host references
       delete[] ref_k_cores;
       ref_k_cores = NULL;
-      // </TODO>
     }
     return retval;
   }
@@ -128,9 +112,9 @@ int main(int argc, char **argv) {
   }
   GUARD_CU(parameters.Check_Required());
 
-  // TODO: change available graph types, according to requirements
+  //Available graph types
   return app::Switch_Types<app::VERTEXT_U32B | app::VERTEXT_U64B |
-                           app::SIZET_U32B | //app::SIZET_S64B |
+                           app::SIZET_U32B |
                            app::VALUET_F32B | app::UNDIRECTED>(
                            parameters, main_struct());
 }

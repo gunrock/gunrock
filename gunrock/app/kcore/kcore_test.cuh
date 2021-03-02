@@ -33,9 +33,7 @@ namespace kcore {
  */
 template <typename GraphT>
 double CPU_Reference(const GraphT &graph,
-                     // <TODO> add problem specific inputs and outputs
                      typename GraphT::SizeT *k_cores,
-                     // </TODO>
                      bool quiet) {
   typedef typename GraphT::SizeT SizeT;
   typedef typename GraphT::CsrT CsrT;
@@ -43,8 +41,7 @@ double CPU_Reference(const GraphT &graph,
   util::CpuTimer cpu_timer;
   cpu_timer.Start();
 
-  // <TODO>
-  // implement CPU reference implementation
+  //CPU reference implementation
   int *degrees = (int *)malloc(sizeof(int) * graph.nodes);
   bool *remove = (bool *)malloc(sizeof(bool) * graph.nodes);
   bool *deleted = (bool *)malloc(sizeof(bool) * graph.nodes);
@@ -99,8 +96,6 @@ double CPU_Reference(const GraphT &graph,
     if (numRemaining == 0) break;
   }
     
-    // </TODO>
-
   cpu_timer.Stop();
   float elapsed = cpu_timer.ElapsedMillis();
   return elapsed;
@@ -120,10 +115,8 @@ double CPU_Reference(const GraphT &graph,
 template <typename GraphT>
 typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
                                         GraphT &graph,
-                                        // <TODO>
                                         typename GraphT::SizeT *h_k_cores,
                                         typename GraphT::SizeT *ref_k_cores,
-                                        // </TODO>
                                         bool verbose = true) {
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::SizeT SizeT;
@@ -132,7 +125,7 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
   bool quiet = parameters.Get<bool>("quiet");
   bool quick = parameters.Get<bool>("quick");
 
-  // <TODO> result validation and display
+  //Result validation and display
   if(!quick){
     for (SizeT v = 0; v < graph.nodes; ++v) {
       util::PrintMsg(std::to_string(v) + "\t" + 
@@ -146,7 +139,6 @@ typename GraphT::SizeT Validate_Results(util::Parameters &parameters,
           util::PrintMsg("^^Error here GPU result, CPU result^^", true);
       }
     }
-    // </TODO>
 
     util::PrintMsg(std::to_string(num_errors) + " errors occurred.", true);
   }
