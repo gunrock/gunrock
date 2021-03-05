@@ -104,7 +104,7 @@ struct enactor_t {
    */
   float enact() {
     auto context0 = context->get_context(0);
-    prepare_frontier(*context);
+    prepare_frontier(get_input_frontier(), *context);
     auto timer = context0->timer();
     timer.begin();
     while (!is_converged(*context)) {
@@ -131,7 +131,8 @@ struct enactor_t {
    *
    * @param context
    */
-  virtual void prepare_frontier(cuda::multi_context_t& context) = 0;
+  virtual void prepare_frontier(frontier_type* f,
+                                cuda::multi_context_t& context) = 0;
 
   /**
    * @brief Algorithm is converged if true is returned, keep on iterating if

@@ -11,7 +11,6 @@
 
 #pragma once
 
-#include <bits/stdc++.h>
 #include <gunrock/cuda/context.hxx>
 #include <gunrock/error.hxx>
 #include <gunrock/util/type_limits.hxx>
@@ -57,24 +56,25 @@ void execute(graph_t& G,
              frontier_t* output,
              work_tiles_t& segments,
              cuda::multi_context_t& context) {
-
-  if(context.size() == 1) {
+  if (context.size() == 1) {
     auto context0 = context.get_context(0);
 
     if (lb == load_balance_t::merge_path) {
       merge_path::execute<type, direction>(G, op, input, output, segments,
-                                          *context0);
+                                           *context0);
     } else if (lb == load_balance_t::input_oriented) {
       input_oriented::execute<type, direction>(G, op, input, output, segments,
-                                              *context0);
+                                               *context0);
     } else if (lb == load_balance_t::all_edges) {
       all_edges::execute<type, direction>(G, op, input, output, segments,
                                           *context0);
     } else {
-      error::throw_if_exception(cudaErrorUnknown, "Advance type not supported.");
+      error::throw_if_exception(cudaErrorUnknown,
+                                "Advance type not supported.");
     }
   } else {
-    error::throw_if_exception(cudaErrorUnknown, "`context.size() != 1` not supported");
+    error::throw_if_exception(cudaErrorUnknown,
+                              "`context.size() != 1` not supported");
   }
 }
 

@@ -11,9 +11,6 @@
 
 #pragma once
 
-#include <bits/stdc++.h>
-#include <cstdlib>
-
 #include <gunrock/applications/application.hxx>
 
 namespace gunrock {
@@ -288,10 +285,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using weight_t = typename problem_t::weight_t;
 
   // <user-defined>
-  void prepare_frontier(cuda::multi_context_t& context) override {
+  void prepare_frontier(frontier_t<vertex_t>* f,
+                        cuda::multi_context_t& context) override {
     auto P = this->get_problem();
-    auto f = this->get_input_frontier();
-
     auto n_vertices = P->get_graph().get_number_of_vertices();
 
     // XXX: Find a better way to initialize the frontier to all nodes
@@ -306,7 +302,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto G = P->get_graph();
     auto f = this->get_input_frontier();
     auto f_data = f->data();
-    
+
     auto coordinates = P->result.coordinates;
     auto spatial_iterations = P->param.spatial_iterations;
     auto inv_haversine_distance = P->inv_haversine_distance.data().get();
@@ -395,7 +391,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     operators::parallel_for::execute(0, f->size(), spatial_center_op, context);
   }
 
-  bool is_converged(cuda::multi_context_t& context) {
+  bool is_converged(cuda::multi_context_t& context) override {
     auto E = this->get_enactor();
     auto P = this->get_problem();
     auto iteration = E->iteration;
