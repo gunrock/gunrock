@@ -1,5 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
-
 #include <gunrock/error.hxx>            // error checking
 #include <gunrock/graph/graph.hxx>      // graph class
 #include <gunrock/formats/formats.hxx>  // csr support
@@ -152,5 +150,4 @@ void test_graph() {
 
 int main(int argc, char** argv) {
   test_graph();
-  return EXIT_SUCCESS;
 }

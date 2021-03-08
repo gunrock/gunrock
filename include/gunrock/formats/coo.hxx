@@ -24,9 +24,9 @@ struct coo_t {
   index_t number_of_columns;
   nz_size_t number_of_nonzeros;
 
-  typename vector<index_t, space>::type row_indices;     // I
-  typename vector<index_t, space>::type column_indices;  // J
-  typename vector<value_t, space>::type nonzero_values;  // V
+  vector_t<index_t, space> row_indices;     // I
+  vector_t<index_t, space> column_indices;  // J
+  vector_t<value_t, space> nonzero_values;  // V
 
   coo_t()
       : number_of_rows(0),

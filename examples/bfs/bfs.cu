@@ -1,5 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
-
 #include <gunrock/applications/bfs.hxx>
 
 using namespace gunrock;
@@ -24,7 +22,7 @@ void test_bfs(int num_arguments, char** argument_array) {
   std::string filename = argument_array[1];
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  format::csr_t<memory::memory_space_t::device, vertex_t, edge_t, weight_t> csr;
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
   csr.from_coo(mm.load(filename));
   thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
   thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
@@ -71,5 +69,4 @@ void test_bfs(int num_arguments, char** argument_array) {
 
 int main(int argc, char** argv) {
   test_bfs(argc, argv);
-  return EXIT_SUCCESS;
 }

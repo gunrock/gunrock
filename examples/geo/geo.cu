@@ -1,4 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
 #include <iostream>
 #include <sstream>
 
@@ -11,23 +10,23 @@ using namespace memory;
  * @brief Reads a coordinates file from an input-stream a dense array.
  *
  * Here is an example of the labels file
- * +----------------------------------------------+
- * |%%Labels Formatted File 			                | <--- header line
- * |%                                             | <--+
- * |% comments                                    |    |-- 0 or more comment lines
- * |%                                             | <--+
- * |  N L L                                       | <--- # of nodes, # of labels, # of labels
- * |  I0 L1A L1B                                  | <--+ node id, latitude, longutude
- * |  I4                                          |    | coordinates missing, populated as invalids
- * |  I5 L5A L5B                                  |    |
- * |     . . .                                    |    |
- * |  IN LNA LNB                                  | <--+
- * +----------------------------------------------+
- * 
+ * +-------------------------+
+ * |%%Labels Formatted File  | <-- header
+ * |%                        | <-+
+ * |% comments               |   |-- comments
+ * |%                        | <-+
+ * |  N L L                  | <-- num_nodes, num_labels, num_labels
+ * |  I0 L1A L1B             | <-- node id, latitude, longutude
+ * |  I4                     | <-- coordinates missing, populated as invalids
+ * |  I5 L5A L5B             |
+ * |  . . .                  |
+ * |  IN LNA LNB             |
+ * +-------------------------+
+ *
  * @note Node ID (first column) must be 0-based.
- * @note If a Node ID is present but coordinates are missing, 
+ * @note If a Node ID is present but coordinates are missing,
  *       the coordinates are filled as invalids.
- * @note If Node ID and coordinates are missing, the coordinates 
+ * @note If Node ID and coordinates are missing, the coordinates
  *       for those Node IDs are filled as invalids.
  */
 void read_coordinates_file(std::string filename,
@@ -127,7 +126,7 @@ void test_geo(int num_arguments, char** argument_array) {
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
 
   using csr_t =
-      format::csr_t<memory::memory_space_t::device, vertex_t, edge_t, weight_t>;
+      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
   csr_t csr;
   csr.from_coo(mm.load(filename));
 
@@ -157,7 +156,8 @@ void test_geo(int num_arguments, char** argument_array) {
   default_invalid.latitude = gunrock::numeric_limits<float>::invalid();
   default_invalid.longitude = gunrock::numeric_limits<float>::invalid();
 
-  thrust::host_vector<geo::coordinates_t> load_coordinates(n_vertices, default_invalid);
+  thrust::host_vector<geo::coordinates_t> load_coordinates(n_vertices,
+                                                           default_invalid);
   read_coordinates_file(coordinates_filename, load_coordinates.data());
   thrust::device_vector<geo::coordinates_t> coordinates(load_coordinates);
 
@@ -183,5 +183,4 @@ void test_geo(int num_arguments, char** argument_array) {
 
 int main(int argc, char** argv) {
   test_geo(argc, argv);
-  return EXIT_SUCCESS;
 }

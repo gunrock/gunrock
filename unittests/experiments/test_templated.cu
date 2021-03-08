@@ -1,4 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
 #include <stdio.h>
 
 struct der1 {
@@ -53,5 +52,4 @@ void test_templated() {
 
 int main(int argc, char** argv) {
   test_templated();
-  return EXIT_SUCCESS;
 }

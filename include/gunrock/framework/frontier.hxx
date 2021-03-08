@@ -18,10 +18,14 @@
 #pragma once
 
 #include <gunrock/util/type_limits.hxx>
+#include <gunrock/container/vector.hxx>
+
 #include <gunrock/graph/graph.hxx>
 #include <gunrock/cuda/context.hxx>
 
 namespace gunrock {
+
+using namespace memory;
 
 // Maybe we use for frontier related function
 namespace frontier {}  // namespace frontier
@@ -56,13 +60,6 @@ class frontier_t {
   //   // return *this;
   // }
 
-  // XXX: Useful writing some loaders Maybe this can be a single loader with
-  // templated over over copy memory::copy::device(_data, v.data(), v.size());
-  // void load(thrust::device_vector<type_t>& v) {
-  //   _storage = v;
-  //   _data = memory::raw_pointer_cast(_storage.data());
-  // }
-
   /**
    * @brief Frontier type, either an edge based frontier or a vertex based
    * frontier.
@@ -76,7 +73,7 @@ class frontier_t {
 
   std::size_t capacity() const { return _storage.capacity(); }
 
-  pointer_type_t data() { return memory::raw_pointer_cast(_storage.data()); }
+  pointer_type_t data() { return raw_pointer_cast(_storage.data()); }
 
   auto begin() { return this->data(); }
   auto end() { return this->data() + this->size(); }
@@ -107,7 +104,7 @@ class frontier_t {
       type_t const default_value = gunrock::numeric_limits<type_t>::invalid()) {
     _storage.resize(s, default_value);
     set_size(s);
-    _data = memory::raw_pointer_cast(_storage.data());
+    _data = raw_pointer_cast(_storage.data());
   }
 
   /**
@@ -119,7 +116,7 @@ class frontier_t {
    */
   void reserve(std::size_t const& s) {
     _storage.reserve(s);
-    _data = memory::raw_pointer_cast(_storage.data());
+    _data = raw_pointer_cast(_storage.data());
   }
 
   /**
@@ -140,7 +137,7 @@ class frontier_t {
  private:
   std::size_t _size;
   frontier_type_t _type;
-  thrust::device_vector<type_t> _storage;
+  vector_t<type_t, memory_space_t::device> _storage;
   pointer_type_t _data;
 };  // struct frontier_t
 

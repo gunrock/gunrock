@@ -1,4 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
 #include <gunrock/applications/sssp.hxx>
 #include "sssp_cpu.hxx"  // Reference implementation
 
@@ -26,7 +25,7 @@ void test_sssp(int num_arguments, char** argument_array) {
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
 
   using csr_t =
-      format::csr_t<memory::memory_space_t::device, vertex_t, edge_t, weight_t>;
+      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
   csr_t csr;
   csr.from_coo(mm.load(filename));
 
@@ -88,5 +87,4 @@ void test_sssp(int num_arguments, char** argument_array) {
 
 int main(int argc, char** argv) {
   test_sssp(argc, argv);
-  return EXIT_SUCCESS;
 }

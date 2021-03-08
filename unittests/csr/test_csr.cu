@@ -1,5 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
-
 #include <gunrock/error.hxx>  // error checking
 #include <gunrock/memory.hxx>
 #include <gunrock/formats/csr.hxx>
@@ -25,5 +23,4 @@ void test_csr() {
 
 int main(int argc, char** argv) {
   test_csr();
-  return EXIT_SUCCESS;
 }

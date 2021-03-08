@@ -1,4 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
 #include <set>
 
 #include <gunrock/applications/color.hxx>
@@ -25,7 +24,7 @@ void test_color(int num_arguments, char** argument_array) {
   std::string filename = argument_array[1];
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  format::csr_t<memory::memory_space_t::device, vertex_t, edge_t, weight_t> csr;
+  format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t> csr;
   csr.from_coo(mm.load(filename));
 
   // --
@@ -39,7 +38,6 @@ void test_color(int num_arguments, char** argument_array) {
       csr.column_indices.data().get(),  // column_indices
       csr.nonzero_values.data().get()   // values
   );  // supports row_indices and column_offsets (default = nullptr)
-
 
   // --
   // Params and memory allocation
@@ -64,5 +62,4 @@ void test_color(int num_arguments, char** argument_array) {
 
 int main(int argc, char** argv) {
   test_color(argc, argv);
-  return EXIT_SUCCESS;
 }

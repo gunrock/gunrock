@@ -100,9 +100,9 @@ class graph_csc_t {
     this->number_of_vertices = _number_of_vertices;
     this->number_of_edges = _number_of_edges;
     // Set raw pointers
-    offsets = memory::raw_pointer_cast<edge_type>(Aj);
-    indices = memory::raw_pointer_cast<vertex_type>(Ap);
-    values = memory::raw_pointer_cast<weight_type>(Ax);
+    offsets = raw_pointer_cast<edge_type>(Aj);
+    indices = raw_pointer_cast<vertex_type>(Ap);
+    values = raw_pointer_cast<weight_type>(Ax);
   }
 
  private:

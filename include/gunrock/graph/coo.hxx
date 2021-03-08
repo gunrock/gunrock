@@ -90,9 +90,9 @@ class graph_coo_t {
     this->number_of_vertices = _number_of_vertices;
     this->number_of_edges = _number_of_edges;
     // Set raw pointers
-    row_indices = memory::raw_pointer_cast<edge_type>(I);
-    column_indices = memory::raw_pointer_cast<vertex_type>(J);
-    values = memory::raw_pointer_cast<weight_type>(X);
+    row_indices = raw_pointer_cast<edge_type>(I);
+    column_indices = raw_pointer_cast<vertex_type>(J);
+    values = raw_pointer_cast<weight_type>(X);
   }
 
  private:
