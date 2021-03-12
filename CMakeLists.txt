@@ -228,6 +228,10 @@ option(GUNROCK_APP_COLOR
   "If on, builds only COLOR application."
   OFF)
 
+option(GUNROCK_APP_KCORE
+  "If on, builds only KCORE application."
+  OFF)
+
 #option(GUNROCK_APP_SAMPLE
 #  "If on, builds only SAMPLE application."
 #  OFF)

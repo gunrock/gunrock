@@ -30,8 +30,8 @@ namespace hello {
 // </TODO>
 
 /**
- * @brief Speciflying parameters for hello Enactor
- * @param parameters The util::Parameter<...> structure holding all parameter
+ * @brief Specifying parameters for hello Enactor
+ * @param parameters The util::Parameter<...> structure holding all parameters
  * info \return cudaError_t error message(s), if any
  */
 cudaError_t UseParameters_enactor(util::Parameters &parameters) {
@@ -45,13 +45,13 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
 }
 
 /**
- * @brief defination of hello iteration loop
+ * @brief definition of hello iteration loop
  * @tparam EnactorT Type of enactor
  */
 template <typename EnactorT>
 struct helloIterationLoop
     : public IterationLoopBase<EnactorT, Use_FullQ | Push
-                               // <TODO>if needed, stack more option, e.g.:
+                               // <TODO>if needed, stack more options, e.g.:
                                // | (((EnactorT::Problem::FLAG &
                                // Mark_Predecessors) != 0) ? Update_Predecessors
                                // : 0x0)

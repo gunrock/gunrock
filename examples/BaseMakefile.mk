@@ -42,7 +42,7 @@ GEN_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\" # Kepler K10
 # RepeatFor (Cooperative Groups), e.g: SM35
 
 # Add your own SM target (default: V100, P100):
-SM_TARGETS = $(GEN_SM70)
+SM_TARGETS = $(GEN_SM35)
 
 #-------------------------------------------------------------------------------
 # Libs

@@ -7,14 +7,14 @@
 
 /**
  * @file
- * test_sssp.cu
+ * app_base.cuh
  *
- * @brief Simple test driver program for single source shortest path.
+ * @brief //TODO
  */
 
 #pragma once
 
-// Graph definations
+// Graph definitions
 #include <gunrock/graphio/graphio.cuh>
 #include <gunrock/util/info_rapidjson.cuh>
 

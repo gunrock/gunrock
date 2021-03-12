@@ -61,10 +61,10 @@ double CPU_Reference(const GraphT &graph,
  * @brief Validation of hello results
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the values
- * @param[in]  parameters    Excution parameters
+ * @param[in]  parameters    Execution parameters
  * @param[in]  graph         Input graph
 ...
- * @param[in]  verbose       Whether to output detail comparsions
+ * @param[in]  verbose       Whether to output detailed comparsions
  * \return     GraphT::SizeT Number of errors
  */
 template <typename GraphT>

@@ -19,7 +19,7 @@
 #include <gunrock/util/test_utils.cuh>
 #include <gunrock/util/shared_utils.cuh>
 
-// Graph definations
+// Graph definitions
 #include <gunrock/graphio/graphio.cuh>
 #include <gunrock/app/app_base.cuh>
 #include <gunrock/app/test_base.cuh>
