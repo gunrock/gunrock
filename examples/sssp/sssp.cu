@@ -71,12 +71,17 @@ void test_sssp(int num_arguments, char** argument_array) {
   // Log + Validate
 
   std::cout << "GPU Distances (output) = ";
-  thrust::copy(distances.begin(), distances.end(),
+  thrust::copy(distances.begin(),
+               (distances.size() < 40) ? distances.begin() + distances.size()
+                                       : distances.begin() + 40,
                std::ostream_iterator<weight_t>(std::cout, " "));
   std::cout << std::endl;
 
   std::cout << "CPU Distances (output) = ";
-  thrust::copy(h_distances.begin(), h_distances.end(),
+  thrust::copy(h_distances.begin(),
+               (h_distances.size() < 40)
+                   ? h_distances.begin() + h_distances.size()
+                   : h_distances.begin() + 40,
                std::ostream_iterator<weight_t>(std::cout, " "));
   std::cout << std::endl;
 

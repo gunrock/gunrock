@@ -388,7 +388,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // parallel for to keep the implementation the same as gunrock.
     // operators::parallel_for::execute(f->begin(), f->end(), spatial_center_op,
     //                                  context);
-    operators::parallel_for::execute(0, f->size(), spatial_center_op, context);
+    operators::parallel_for::execute(0, G.get_number_of_vertices(),
+                                     spatial_center_op, context);
   }
 
   bool is_converged(cuda::multi_context_t& context) override {
@@ -397,9 +398,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto iteration = E->iteration;
     auto total_iterations = P->param.total_iterations;
 
-    if (iteration == total_iterations) {
+    if (iteration == total_iterations)
       return true;
-    } else
+    else
       return false;
   }
   // </user-defined>
