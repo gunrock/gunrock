@@ -15,10 +15,10 @@ void execute(graph_t& G,
              frontier_t* output,
              cuda::standard_context_t& context) {
   using vertex_t = typename graph_t::vertex_type;
+  using size_type = decltype(input->get_number_of_elements());
 
-  using size_type = decltype(input->size());
-
-  auto compact = mgpu::transform_compact(input->size(), *(context.mgpu()));
+  auto compact = mgpu::transform_compact(input->get_number_of_elements(),
+                                         *(context.mgpu()));
   auto input_data = input->data();
   int stream_count = compact.upsweep([=] __device__(size_type idx) {
     auto item = input_data[idx];
@@ -26,7 +26,9 @@ void execute(graph_t& G,
     return gunrock::util::limits::is_valid(item) ? op(item) : false;
   });
 
+  // if (output->get_capacity() < stream_count)
   output->resize(stream_count);
+  output->set_number_of_elements(stream_count);
 
   auto output_data = output->data();
   compact.downsweep([=] __device__(size_type dest_idx, size_type source_idx) {

@@ -43,16 +43,20 @@ void execute(graph_t& G,
 
   // If output frontier is empty, resize and return.
   if (size_of_output <= 0) {
-    output->resize(0);
+    output->set_number_of_elements(0);
     return;
   }
 
-  // Resize the output (inactive) buffer to the new size.
+  // <todo> Resize the output (inactive) buffer to the new size.
+  // Can be hidden within the frontier struct.
+  // if (output->get_capacity() < size_of_output)
   output->resize(size_of_output);
-  auto output_data = output->data();
+  output->set_number_of_elements(size_of_output);
+  // </todo>
 
-  // Get input data of the active buffer.
+  // Get input/output data of the active buffer.
   auto input_data = input->data();
+  auto output_data = output->data();
 
   // Expand incoming neighbors, and using a load-balanced transformation
   // (merge-path based load-balancing) run the user defined advance operator on
@@ -75,7 +79,7 @@ void execute(graph_t& G,
 
   mgpu::transform_lbs(neighbors_expand, size_of_output,
                       thrust::raw_pointer_cast(segments.data()),
-                      (int)input->size(), *(context.mgpu()));
+                      (int)input->get_number_of_elements(), *(context.mgpu()));
 }
 
 template <advance_type_t type,

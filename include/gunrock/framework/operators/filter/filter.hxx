@@ -34,6 +34,8 @@ void execute(graph_t& G,
       predicated::execute(G, op, input, output, *context0);
     } else if (type == filter_algorithm_t::bypass) {
       bypass::execute(G, op, input, output, *context0);
+    } else if (type == filter_algorithm_t::remove) {
+      remove::execute(G, op, input, output, *context0);
     } else {
       error::throw_if_exception(cudaErrorUnknown, "Filter type not supported.");
     }

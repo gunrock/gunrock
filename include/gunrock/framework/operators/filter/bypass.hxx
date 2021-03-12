@@ -12,18 +12,21 @@ void execute(graph_t& G,
              frontier_t* input,
              frontier_t* output,
              cuda::standard_context_t& context) {
-  using vertex_t = typename graph_t::vertex_type;
+  using type_t = typename frontier_t::type_t;
 
   // ... resize as needed.
-  if ((output->data() != input->data()) || (output->size() != input->size())) {
-    output->resize(input->size());
+  if ((output->data() != input->data()) ||
+      (output->get_capacity() < input->get_number_of_elements())) {
+    output->resize(input->get_number_of_elements());
   }
 
+  output->set_number_of_elements(input->get_number_of_elements());
+
   // Mark items as invalid instead of removing them (therefore, a "bypass").
-  auto bypass = [=] __device__(vertex_t const& v) {
-    if (!gunrock::util::limits::is_valid(v))
-      return gunrock::numeric_limits<vertex_t>::invalid();  // exit early
-    return (op(v) ? v : gunrock::numeric_limits<vertex_t>::invalid());
+  auto bypass = [=] __device__(type_t const& i) {
+    if (!gunrock::util::limits::is_valid(i))
+      return gunrock::numeric_limits<type_t>::invalid();  // exit early
+    return (op(i) ? i : gunrock::numeric_limits<type_t>::invalid());
   };
 
   // Filter with bypass

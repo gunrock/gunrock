@@ -99,9 +99,9 @@ std::size_t compute_output_length(graph_t& G,
     return count;
   };
 
-  mgpu::transform_scan<vertex_t>(segment_sizes, (vertex_t)input->size(),
-                                 segments_data, mgpu::plus_t<vertex_t>(),
-                                 _size_of_output.data(), context);
+  mgpu::transform_scan<vertex_t>(
+      segment_sizes, (vertex_t)input->get_number_of_elements(), segments_data,
+      mgpu::plus_t<vertex_t>(), _size_of_output.data(), context);
 
   // Move the size of output to host.
   thrust::host_vector<vertex_t> size_of_output = _size_of_output;

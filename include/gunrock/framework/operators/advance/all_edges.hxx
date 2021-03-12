@@ -38,25 +38,25 @@ void execute(graph_t& G,
   using edge_t = typename graph_t::edge_type;
 
   // Prepare output for all edges advance.
+
+  // If no edges found in the graph,
+  // output an empty frontier.
   if (G.get_number_of_edges() <= 0) {
-    output->resize(0);
+    output->set_number_of_elements(0);
     return;
   }
 
-  if (output->size() != G.get_number_of_edges()) {
-    output->resize(G.get_number_of_edges());
-  }
-
-  auto input_begin = input->begin();
-  auto input_end = input->end();
+  // <todo> Resize the output (inactive) buffer to the new size.
+  // Can be hidden within the frontier struct.
+  // if (output->get_capacity() < G.get_number_of_edges())
+  output->resize(G.get_number_of_edges());
+  output->set_number_of_elements(G.get_number_of_edges());
+  // </todo>
 
   auto all_edges_kernel = [=] __device__(edge_t const& e) {
     auto pair = G.get_source_and_destination_vertices(e);
     auto w = G.get_edge_weight(e);
-    bool exists =
-        thrust::binary_search(thrust::seq, input_begin, input_end, pair.source);
-    bool cond = op(pair.source, pair.destination, e, w);
-    return (cond && exists)
+    return op(pair.source, pair.destination, e, w)
                ? pair.destination
                : gunrock::numeric_limits<decltype(pair.source)>::invalid();
   };

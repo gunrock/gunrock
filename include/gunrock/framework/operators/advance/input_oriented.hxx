@@ -72,23 +72,25 @@ void execute(graph_t& G,
 
   // If output frontier is empty, resize and return.
   if (size_of_output <= 0) {
-    output->resize(0);
+    output->set_number_of_elements(0);
     return;
   }
 
-  // Resize the output (inactive) buffer to the new size.
+  // <todo> Resize the output (inactive) buffer to the new size.
+  // Can be hidden within the frontier struct.
+  // if (output->get_capacity() < size_of_output)
   output->resize(size_of_output);
-  auto output_data = output->data();
-  auto input_data = input->data();
+  output->set_number_of_elements(size_of_output);
+  // </todo>
 
-  auto pre_condition = [=] __device__(vertex_t const& i) {
-    vertex_t v = input_data[i];
+  // Get output data of the active buffer.
+  auto output_data = output->data();
+
+  auto pre_condition = [=] __device__(vertex_t const& v) {
     return gunrock::util::limits::is_valid(v);
   };
 
-  auto neighbors_expand = [=] __device__(vertex_t const& i) {
-    vertex_t v = input_data[i];
-
+  auto neighbors_expand = [=] __device__(vertex_t const& v) {
     auto starting_edge = G.get_starting_edge(v);
     auto total_edges = G.get_number_of_neighbors(v);
 
@@ -106,13 +108,12 @@ void execute(graph_t& G,
   output->fill(gunrock::numeric_limits<vertex_t>::invalid());
 
   thrust::transform_if(
-      thrust::cuda::par.on(context.stream()),       // execution policy
-      thrust::make_counting_iterator<vertex_t>(0),  // input iterator: first
-      thrust::make_counting_iterator<vertex_t>(
-          input->size()),               // input iterator: last
-      thrust::make_discard_iterator(),  // output iterator: ignore
-      neighbors_expand,                 // unary operation
-      pre_condition                     // predicate operation
+      thrust::cuda::par.on(context.stream()),  // execution policy
+      input->begin(),                          // input iterator: first
+      input->end(),                            // input iterator: last
+      thrust::make_discard_iterator(),         // output iterator: ignore
+      neighbors_expand,                        // unary operation
+      pre_condition                            // predicate operation
   );
 }
 }  // namespace input_oriented

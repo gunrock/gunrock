@@ -31,7 +31,7 @@ void execute(frontier_t* input,
     );
 
     auto new_size = thrust::distance(input->begin(), new_end);
-    input->resize(new_size);
+    input->set_number_of_elements(new_size);
   }
 
   else

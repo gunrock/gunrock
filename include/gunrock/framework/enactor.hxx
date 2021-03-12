@@ -13,12 +13,22 @@
 
 #include <gunrock/cuda/cuda.hxx>
 
-#include <gunrock/framework/frontier.hxx>
+#include <gunrock/framework/frontier/frontier.hxx>
 #include <gunrock/framework/problem.hxx>
 
 #pragma once
 
 namespace gunrock {
+
+/**
+ * @brief
+ *
+ */
+struct enactor_properties_t {
+  float frontier_sizing_factor{1.0};
+  std::size_t number_of_frontier_buffers{2};
+  enactor_properties_t() = default;
+};
 
 /**
  * @brief Building block of the algorithm within gunrock. An enactor structure
@@ -35,12 +45,18 @@ namespace gunrock {
  *
  * @tparam algorithm_problem_t algorithm specific problem type
  */
-template <typename algorithm_problem_t>
+template <typename algorithm_problem_t,
+          frontier_kind_t frontier_kind = frontier_kind_t::vertex_frontier>
 struct enactor_t {
   using vertex_t = typename algorithm_problem_t::vertex_t;
-  using frontier_type = frontier_t<vertex_t>;
+  using edge_t = typename algorithm_problem_t::edge_t;
 
-  static constexpr std::size_t number_of_buffers = 2;
+  using frontier_type = frontier_t<
+      std::conditional_t<frontier_kind == frontier_kind_t::vertex_frontier,
+                         vertex_t,
+                         edge_t>>;
+
+  enactor_properties_t properties;
   std::shared_ptr<cuda::multi_context_t> context;
   algorithm_problem_t* problem;
   thrust::host_vector<frontier_type> frontiers;
@@ -56,10 +72,12 @@ struct enactor_t {
   enactor_t& operator=(const enactor_t& rhs) = delete;
 
   enactor_t(algorithm_problem_t* _problem,
-            std::shared_ptr<cuda::multi_context_t> _context)
+            std::shared_ptr<cuda::multi_context_t> _context,
+            enactor_properties_t _properties = enactor_properties_t())
       : problem(_problem),
+        properties(_properties),
         context(_context),
-        frontiers(number_of_buffers),
+        frontiers(properties.number_of_frontier_buffers),
         active_frontier(&frontiers[0]),
         inactive_frontier(&frontiers[1]),
         buffer_selector(0),
@@ -67,8 +85,15 @@ struct enactor_t {
         scanned_work_domain(problem->get_graph().get_number_of_vertices()) {
     // Set temporary buffer to be at least the number of edges
     auto g = problem->get_graph();
-    auto buffer = get_output_frontier();
-    buffer->reserve(g.get_number_of_edges());
+    std::size_t initial_size =
+        (g.get_number_of_edges() > g.get_number_of_vertices())
+            ? g.get_number_of_edges()
+            : g.get_number_of_vertices();
+
+    for (auto& buffers : frontiers) {
+      buffers.reserve(
+          (std::size_t)(properties.frontier_sizing_factor * initial_size));
+    }
   }
 
   /**
@@ -143,7 +168,7 @@ struct enactor_t {
    * @return false
    */
   virtual bool is_converged(cuda::multi_context_t& context) {
-    return active_frontier->empty();
+    return active_frontier->is_empty();
   }
 
 };  // struct enactor_t
