@@ -28,10 +28,10 @@ enum load_balance_t {
 };
 
 enum advance_type_t {
-  vertex_to_vertex,
-  vertex_to_edge,
-  edge_to_edge,
-  edge_to_vertex
+  vertex_to_vertex,  // Vertex input to vertex output frontier
+  vertex_to_edge,    // Vertex input to edge output frontier
+  edge_to_edge,      // Edge input to edge output frontier
+  edge_to_vertex     // Edge input to vertex output frontier
 };
 
 enum advance_direction_t {

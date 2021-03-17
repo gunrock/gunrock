@@ -66,7 +66,7 @@ void execute(graph_t& G,
              frontier_t* output,
              work_tiles_t& segments,
              cuda::standard_context_t& context) {
-  using vertex_t = typename graph_t::vertex_type;
+  using type_t = typename frontier_t::type_t;
 
   auto size_of_output = compute_output_length(G, input, segments, context);
 
@@ -78,42 +78,49 @@ void execute(graph_t& G,
 
   // <todo> Resize the output (inactive) buffer to the new size.
   // Can be hidden within the frontier struct.
-  // if (output->get_capacity() < size_of_output)
-  output->resize(size_of_output);
+  if (output->get_capacity() < size_of_output)
+    output->reserve(size_of_output);
   output->set_number_of_elements(size_of_output);
+  // output->fill(gunrock::numeric_limits<type_t>::invalid());
   // </todo>
 
   // Get output data of the active buffer.
+  auto segments_data = segments.data().get();
+  auto input_data = input->data();
   auto output_data = output->data();
 
-  auto pre_condition = [=] __device__(vertex_t const& v) {
+  auto pre_condition = [=] __device__(std::size_t idx) {
+    auto v = input_data[idx];
     return gunrock::util::limits::is_valid(v);
   };
 
-  auto neighbors_expand = [=] __device__(vertex_t const& v) {
+  auto neighbors_expand = [=] __device__(std::size_t idx) {
+    auto v = input_data[idx];
     auto starting_edge = G.get_starting_edge(v);
     auto total_edges = G.get_number_of_neighbors(v);
 
-    for (auto e = starting_edge; e < starting_edge + total_edges; ++e) {
-      auto n = G.get_destination_vertex(e);
-      auto w = G.get_edge_weight(e);
+    auto offset = segments_data[idx];
+
+    for (auto i = 0; i < total_edges; ++i) {
+      auto e = i + starting_edge;            // edge id
+      auto n = G.get_destination_vertex(e);  // neighbor id
+      auto w = G.get_edge_weight(e);         // weight
       bool cond = op(v, n, e, w);
-      output_data[e] =
-          (cond && n != v) ? n : gunrock::numeric_limits<vertex_t>::invalid();
+      output_data[offset + i] =
+          (cond && n != v) ? n : gunrock::numeric_limits<type_t>::invalid();
     }
 
-    return v;  // output is discarded.
+    return gunrock::numeric_limits<type_t>::invalid();
   };
 
-  output->fill(gunrock::numeric_limits<vertex_t>::invalid());
-
   thrust::transform_if(
-      thrust::cuda::par.on(context.stream()),  // execution policy
-      input->begin(),                          // input iterator: first
-      input->end(),                            // input iterator: last
-      thrust::make_discard_iterator(),         // output iterator: ignore
-      neighbors_expand,                        // unary operation
-      pre_condition                            // predicate operation
+      thrust::cuda::par.on(context.stream()),          // execution policy
+      thrust::make_counting_iterator<std::size_t>(0),  // input iterator: first
+      thrust::make_counting_iterator<std::size_t>(
+          input->get_number_of_elements()),  // input iterator: last
+      thrust::make_discard_iterator(),       // output iterator: ignore
+      neighbors_expand,                      // unary operation
+      pre_condition                          // predicate operation
   );
 }
 }  // namespace input_oriented

@@ -26,8 +26,8 @@ void execute(graph_t& G,
     return gunrock::util::limits::is_valid(item) ? op(item) : false;
   });
 
-  // if (output->get_capacity() < stream_count)
-  output->resize(stream_count);
+  if (output->get_capacity() < stream_count)
+    output->reserve(stream_count);
   output->set_number_of_elements(stream_count);
 
   auto output_data = output->data();

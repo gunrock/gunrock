@@ -48,8 +48,8 @@ void execute(graph_t& G,
 
   // <todo> Resize the output (inactive) buffer to the new size.
   // Can be hidden within the frontier struct.
-  // if (output->get_capacity() < G.get_number_of_edges())
-  output->resize(G.get_number_of_edges());
+  if (output->get_capacity() < G.get_number_of_edges())
+    output->reserve(G.get_number_of_edges());
   output->set_number_of_elements(G.get_number_of_edges());
   // </todo>
 

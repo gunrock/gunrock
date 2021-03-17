@@ -15,8 +15,8 @@ void execute(graph_t& G,
   using type_t = typename frontier_t::type_t;
 
   // Allocate output size if necessary.
-  // if (output->get_capacity() < input->get_number_of_elements())
-  output->resize(input->get_number_of_elements());
+  if (output->get_capacity() < input->get_number_of_elements())
+    output->reserve(input->get_number_of_elements());
   output->set_number_of_elements(input->get_number_of_elements());
 
   auto predicate = [=] __host__ __device__(type_t const& i) -> bool {

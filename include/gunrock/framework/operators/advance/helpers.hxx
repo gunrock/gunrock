@@ -13,7 +13,6 @@
 
 #include <gunrock/cuda/context.hxx>
 #include <thrust/transform_scan.h>
-#include <moderngpu/kernel_scan.hxx>
 
 namespace gunrock {
 namespace operators {
@@ -26,22 +25,30 @@ std::size_t compute_output_length(graph_t& G,
                                   cuda::standard_context_t& context) {
   using vertex_t = typename graph_t::vertex_type;
 
-  auto segment_sizes = [=] __host__ __device__(vertex_t const& v) {
+  auto input_data = input->data();
+  auto total_elems = input->get_number_of_elements();
+
+  auto segment_sizes = [=] __host__ __device__(std::size_t const& i) {
+    if (i == total_elems)  // XXX: this is a weird exc. scan.
+      return 0;
+
+    auto v = input_data[i];
     // if item is invalid, segment size is 0.
     if (!gunrock::util::limits::is_valid(v))
       return 0;
-    return G.get_number_of_neighbors(v);
+    else
+      return G.get_number_of_neighbors(v);
   };
 
-  // auto new_length = thrust::transform_exclusive_scan(
-  auto new_length = thrust::transform_inclusive_scan(
-      thrust::cuda::par.on(context.stream()),  // execution policy
-      input->begin(),                          // input iterator: first
-      input->end(),                            // input iterator: last
-      segments.begin(),                        // output iterator
-      segment_sizes,                           // unary operation
-      // (vertex_t)0,                             // initial value
-      thrust::plus<vertex_t>()  // binary operation
+  auto new_length = thrust::transform_exclusive_scan(
+      thrust::cuda::par.on(context.stream()),          // execution policy
+      thrust::make_counting_iterator<std::size_t>(0),  // input iterator: first
+      thrust::make_counting_iterator<std::size_t>(total_elems +
+                                                  1),  // input iterator: last
+      segments.begin(),                                // output iterator
+      segment_sizes,                                   // unary operation
+      (vertex_t)0,                                     // initial value
+      thrust::plus<vertex_t>()                         // binary operation
   );
 
   // The last item contains the total scanned items, so in a simple
@@ -57,12 +64,9 @@ std::size_t compute_output_length(graph_t& G,
   // If the active buffer is greater than number of vertices,
   // we should TODO: resize the scanned work domain, this happens
   // when we allow duplicates to be in the active buffer.
-  thrust::host_vector<vertex_t> size_of_output(1, 0);
-  cudaMemcpy(size_of_output.data(),
-             thrust::raw_pointer_cast(segments.data()) +
-                 location_of_total_scanned_items,
-             sizeof(vertex_t),  // move one integer
-             cudaMemcpyDeviceToHost);
+  thrust::host_vector<vertex_t> size_of_output(
+      segments.data() + location_of_total_scanned_items,
+      segments.data() + location_of_total_scanned_items + 1);
 
   // DEBUG::
   // std::cout << "Scanned Segments (THRUST) = ";
@@ -71,47 +75,6 @@ std::size_t compute_output_length(graph_t& G,
   // std::cout << std::endl;
   // std::cout << "Size of Output (THRUST) = " << size_of_output[0] <<
   // std::endl;
-
-  return size_of_output[0];
-}
-
-template <typename graph_t, typename frontier_t, typename work_tiles_t>
-std::size_t compute_output_length(graph_t& G,
-                                  frontier_t* input,
-                                  work_tiles_t& segments,
-                                  mgpu::standard_context_t& context) {
-  using vertex_t = typename graph_t::vertex_type;
-
-  // Scan over the work domain to find the output frontier's size.
-  auto segments_data = segments.data().get();
-  auto input_data = input->data();
-  thrust::device_vector<vertex_t> _size_of_output(1, 0);
-
-  auto segment_sizes = [=] __device__(std::size_t idx) {
-    auto count = 0;
-    auto v = input_data[idx];
-
-    // if item is invalid, skip processing.
-    if (!gunrock::util::limits::is_valid(v))
-      return 0;
-
-    count = G.get_number_of_neighbors(v);
-    return count;
-  };
-
-  mgpu::transform_scan<vertex_t>(
-      segment_sizes, (vertex_t)input->get_number_of_elements(), segments_data,
-      mgpu::plus_t<vertex_t>(), _size_of_output.data(), context);
-
-  // Move the size of output to host.
-  thrust::host_vector<vertex_t> size_of_output = _size_of_output;
-
-  // DEBUG::
-  // std::cout << "Scanned Segments (MGPU) = ";
-  // thrust::copy(segments.begin(), segments.end(),
-  //              std::ostream_iterator<vertex_t>(std::cout, " "));
-  // std::cout << std::endl;
-  // std::cout << "Size of Output (MGPU) = " << size_of_output[0] << std::endl;
 
   return size_of_output[0];
 }

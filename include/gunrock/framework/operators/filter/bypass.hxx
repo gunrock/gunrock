@@ -17,7 +17,7 @@ void execute(graph_t& G,
   // ... resize as needed.
   if ((output->data() != input->data()) ||
       (output->get_capacity() < input->get_number_of_elements())) {
-    output->resize(input->get_number_of_elements());
+    output->reserve(input->get_number_of_elements());
   }
 
   output->set_number_of_elements(input->get_number_of_elements());

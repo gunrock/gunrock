@@ -38,8 +38,7 @@ void execute(graph_t& G,
              cuda::standard_context_t& context) {
   using vertex_t = typename graph_t::vertex_type;
 
-  auto size_of_output =
-      compute_output_length(G, input, segments, *(context.mgpu()));
+  auto size_of_output = compute_output_length(G, input, segments, context);
 
   // If output frontier is empty, resize and return.
   if (size_of_output <= 0) {
@@ -49,8 +48,8 @@ void execute(graph_t& G,
 
   // <todo> Resize the output (inactive) buffer to the new size.
   // Can be hidden within the frontier struct.
-  // if (output->get_capacity() < size_of_output)
-  output->resize(size_of_output);
+  if (output->get_capacity() < size_of_output)
+    output->reserve(size_of_output);
   output->set_number_of_elements(size_of_output);
   // </todo>
 
