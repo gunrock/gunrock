@@ -28,6 +28,9 @@ void execute(graph_t& G,
   if (context.size() == 1) {
     auto context0 = context.get_context(0);
 
+    // std::cout << "[FILTER] Input:: ";
+    // input->print();
+
     if (type == filter_algorithm_t::compact) {
       compact::execute(G, op, input, output, *context0);
     } else if (type == filter_algorithm_t::predicated) {
@@ -40,7 +43,7 @@ void execute(graph_t& G,
       error::throw_if_exception(cudaErrorUnknown, "Filter type not supported.");
     }
 
-    // std::cout << "Output filter frontier:: ";
+    // std::cout << "[FILTER] Output:: ";
     // output->print();
 
     // XXX: should we let user control when to uniquify?
@@ -49,9 +52,6 @@ void execute(graph_t& G,
     error::throw_if_exception(cudaErrorUnknown,
                               "`context.size() != 1` not supported");
   }
-
-  // std::cout << "Output unique frontier:: ";
-  // output->print();
 }
 
 template <filter_algorithm_t type,
