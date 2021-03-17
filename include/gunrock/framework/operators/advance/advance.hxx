@@ -59,6 +59,9 @@ void execute(graph_t& G,
   if (context.size() == 1) {
     auto context0 = context.get_context(0);
 
+    // std::cout << "[ADV] Input:: ";
+    // input->print();
+
     if (lb == load_balance_t::merge_path) {
       merge_path::execute<type, direction>(G, op, input, output, segments,
                                            *context0);
@@ -72,6 +75,10 @@ void execute(graph_t& G,
       error::throw_if_exception(cudaErrorUnknown,
                                 "Advance type not supported.");
     }
+
+    // std::cout << "[ADV] Output:: ";
+    // output->print();
+
   } else {
     error::throw_if_exception(cudaErrorUnknown,
                               "`context.size() != 1` not supported");
