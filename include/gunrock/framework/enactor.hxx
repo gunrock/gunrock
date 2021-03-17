@@ -25,7 +25,7 @@ namespace gunrock {
  *
  */
 struct enactor_properties_t {
-  float frontier_sizing_factor{1.0};
+  float frontier_sizing_factor{1.5};
   std::size_t number_of_frontier_buffers{2};
   enactor_properties_t() = default;
 };
@@ -90,9 +90,9 @@ struct enactor_t {
             ? g.get_number_of_edges()
             : g.get_number_of_vertices();
 
-    for (auto& buffers : frontiers) {
-      buffers.reserve(
-          (std::size_t)(properties.frontier_sizing_factor * initial_size));
+    for (auto& buffer : frontiers) {
+      buffer.set_resizing_factor(properties.frontier_sizing_factor);
+      buffer.reserve((std::size_t)(initial_size));
     }
   }
 

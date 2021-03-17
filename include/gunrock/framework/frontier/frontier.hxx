@@ -57,9 +57,14 @@ class frontier_t : public frontier::vector_frontier_t<t> {
 
   // <todo> revisit frontier constructors/destructor
   frontier_t()
-      : underlying_frontier_t(), kind(frontier_kind_t::vertex_frontier) {}
-  frontier_t(std::size_t size)
-      : underlying_frontier_t(size), kind(frontier_kind_t::vertex_frontier) {}
+      : underlying_frontier_t(),
+        kind(frontier_kind_t::vertex_frontier),
+        resizing_factor(1) {}
+  frontier_t(std::size_t size, float frontier_resizing_factor = 1.0)
+      : underlying_frontier_t(size),
+        kind(frontier_kind_t::vertex_frontier),
+        resizing_factor(frontier_resizing_factor) {}
+
   ~frontier_t() {}
   // </todo>
 
@@ -83,6 +88,13 @@ class frontier_t : public frontier::vector_frontier_t<t> {
   }
 
   /**
+   * @brief Get the resizing factor used to scale the frontier size.
+   *
+   * @return float
+   */
+  float get_resizing_factor() const { return resizing_factor; }
+
+  /**
    * @brief Get the capacity (number of elements possible).
    * @return std::size_t
    */
@@ -96,6 +108,15 @@ class frontier_t : public frontier::vector_frontier_t<t> {
    * @param _kind
    */
   void set_frontier_kind(frontier_kind_t _kind) { kind = _kind; }
+
+  /**
+   * @brief Set the resizing factor for the frontier. This float is used to
+   * multiply the `reserve` size to scale it a bit higher every time to avoid
+   * reallocations.
+   *
+   * @param factor
+   */
+  void set_resizing_factor(float factor) { resizing_factor = factor; }
 
   /**
    * @brief Set how many number of elements the frontier contains. Note, this is
@@ -142,11 +163,13 @@ class frontier_t : public frontier::vector_frontier_t<t> {
    * bytes).
    * @param default_value
    */
-  void resize(
-      std::size_t const& size,
-      type_t const default_value = gunrock::numeric_limits<type_t>::invalid()) {
-    underlying_frontier_t::resize(size, default_value);
-  }
+  // void resize(
+  //     std::size_t const& size,
+  //     type_t const default_value =
+  //     gunrock::numeric_limits<type_t>::invalid()) {
+  //   underlying_frontier_t::resize(size, default_value);
+  //   this->set_number_of_elements(size);
+  // }
 
   /**
    * @brief "Hints" the alocator that we need to reserve the suggested size. The
@@ -156,7 +179,7 @@ class frontier_t : public frontier::vector_frontier_t<t> {
    * @param size size to reserve (size is in count not bytes).
    */
   void reserve(std::size_t const& size) {
-    underlying_frontier_t::reserve(size);
+    underlying_frontier_t::reserve(size * resizing_factor);
   }
 
   /**
@@ -173,15 +196,11 @@ class frontier_t : public frontier::vector_frontier_t<t> {
   /**
    * @brief Print the frontier.
    */
-  void print() {
-    std::cout << "Frontier = ";
-    thrust::copy(this->begin(), this->end(),
-                 std::ostream_iterator<type_t>(std::cout, " "));
-    std::cout << std::endl;
-  }
+  void print() { underlying_frontier_t::print(); }
 
  private:
-  frontier_kind_t kind;  // vertex or edge frontier.
-};                       // struct frontier_t
+  frontier_kind_t kind;   // vertex or edge frontier.
+  float resizing_factor;  // reserve size * factor.
+};                        // struct frontier_t
 
 }  // namespace gunrock

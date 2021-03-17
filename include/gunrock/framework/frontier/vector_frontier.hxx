@@ -51,7 +51,7 @@ class vector_frontier_t {
     num_elements = elements;
   }
 
-  pointer_t data() { return storage.data().get(); }
+  pointer_t data() { return raw_pointer_cast(storage.data()) /* .get() */; }
   pointer_t begin() { return this->data(); }
   pointer_t end() { return this->begin() + this->get_number_of_elements(); }
   bool is_empty() const { return (this->get_number_of_elements() == 0); }
@@ -109,7 +109,16 @@ class vector_frontier_t {
    */
   void sort(sort::order_t order = sort::order_t::ascending,
             cuda::stream_t stream = 0) {
-    sort::radix::sort_keys(storage.data(), this->number_of_elements(), stream);
+    sort::radix::sort_keys(storage.data(), this->get_number_of_elements(),
+                           stream);
+  }
+
+  void print() {
+    std::cout << "Frontier = ";
+    thrust::copy(storage.begin(),
+                 storage.begin() + this->get_number_of_elements(),
+                 std::ostream_iterator<type_t>(std::cout, " "));
+    std::cout << std::endl;
   }
 
  private:
