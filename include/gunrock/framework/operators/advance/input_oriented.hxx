@@ -89,12 +89,12 @@ void execute(graph_t& G,
   auto input_data = input->data();
   auto output_data = output->data();
 
-  auto pre_condition = [=] __device__(std::size_t idx) {
+  auto pre_condition = [=] __device__(std::size_t const& idx) {
     auto v = input_data[idx];
     return gunrock::util::limits::is_valid(v);
   };
 
-  auto neighbors_expand = [=] __device__(std::size_t idx) {
+  auto neighbors_expand = [=] __device__(std::size_t const& idx) {
     auto v = input_data[idx];
     auto starting_edge = G.get_starting_edge(v);
     auto total_edges = G.get_number_of_neighbors(v);

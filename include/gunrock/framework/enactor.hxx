@@ -25,7 +25,7 @@ namespace gunrock {
  *
  */
 struct enactor_properties_t {
-  float frontier_sizing_factor{1.5};
+  float frontier_sizing_factor{2};
   std::size_t number_of_frontier_buffers{2};
   enactor_properties_t() = default;
 };
