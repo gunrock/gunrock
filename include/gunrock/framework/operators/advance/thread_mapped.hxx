@@ -1,5 +1,5 @@
 /**
- * @file input_oriented.hxx
+ * @file thread_mapped.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
  * @version 0.1
@@ -23,36 +23,7 @@
 namespace gunrock {
 namespace operators {
 namespace advance {
-namespace input_oriented {
-
-template <typename graph_t, typename operator_t, typename type_t>
-__global__ void input_oriented_kernel(const graph_t G,
-                                      operator_t op,
-                                      type_t* input,
-                                      const std::size_t input_size,
-                                      type_t* output,
-                                      const std::size_t output_size) {
-  for (int idx = threadIdx.x + (blockIdx.x * blockDim.x);  // Index into Input
-       idx < input_size;                                   // Bound checking
-       idx += blockDim.x * gridDim.x                       // Stride
-  ) {
-    auto v = input[idx];
-    if (!gunrock::util::limits::is_valid(v))
-      continue;
-
-    auto starting_edge = G.get_starting_edge(v);
-    auto total_edges = G.get_number_of_neighbors(v);
-
-    for (auto e = starting_edge; e < starting_edge + total_edges; ++e) {
-      auto n = G.get_destination_vertex(e);
-      auto w = G.get_edge_weight(e);
-      bool cond = op(v, n, e, w);
-      output[e] = (cond && n != v)
-                      ? n
-                      : gunrock::numeric_limits<decltype(v)>::invalid();
-    }
-  }
-}
+namespace thread_mapped {
 
 template <advance_type_t type,
           advance_direction_t direction,
@@ -123,7 +94,7 @@ void execute(graph_t& G,
       pre_condition                          // predicate operation
   );
 }
-}  // namespace input_oriented
+}  // namespace thread_mapped
 }  // namespace advance
 }  // namespace operators
 }  // namespace gunrock

@@ -20,11 +20,13 @@ namespace operators {
  *
  */
 enum load_balance_t {
-  merge_path,      // Merrill & Garland (SpMV)
-  bucketing,       // Davidson et al. (SSSP)
-  work_stealing,   // <cite>
-  input_oriented,  // Input-Oriented
-  all_edges        // Output-Oriented (advance entire graph)
+  merge_path,     // Merrill & Garland (SpMV)
+  bucketing,      // Davidson et al. (SSSP)
+  work_stealing,  // <cite>
+  thread_mapped,  // 1 element / thread
+  warp_mapped,    // Equal # of elements / warp
+  block_mapped,   // Equal # of elements / block
+  all_edges       // 1 edge / thread (advance an entire graph)
 };
 
 enum advance_type_t {
