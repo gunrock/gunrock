@@ -20,7 +20,7 @@
 #include <gunrock/framework/operators/advance/helpers.hxx>
 #include <gunrock/framework/operators/advance/merge_path.hxx>
 #include <gunrock/framework/operators/advance/thread_mapped.hxx>
-#include <gunrock/framework/operators/advance/block_mapped.hxx>
+// #include <gunrock/framework/operators/advance/block_mapped.hxx>
 #include <gunrock/framework/operators/advance/all_edges.hxx>
 
 namespace gunrock {
@@ -69,9 +69,10 @@ void execute(graph_t& G,
     } else if (lb == load_balance_t::thread_mapped) {
       thread_mapped::execute<type, direction>(G, op, input, output, segments,
                                               *context0);
-    } else if (lb == load_balance_t::block_mapped) {
-      block_mapped::execute<type, direction>(G, op, input, output, segments,
-                                             *context0);
+      // } else if (lb == load_balance_t::block_mapped) {
+      //   block_mapped::execute<type, direction>(G, op, input, output,
+      //   segments,
+      //                                          *context0);
     } else if (lb == load_balance_t::all_edges) {
       all_edges::execute<type, direction>(G, op, input, output, segments,
                                           *context0);
