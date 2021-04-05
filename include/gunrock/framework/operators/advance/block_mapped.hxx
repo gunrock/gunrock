@@ -156,7 +156,6 @@ void execute(graph_t& G,
   context.synchronize();
 
   thrust::host_vector<std::size_t> h_output_size = output_size;
-  std::cout << "Output Size = " << h_output_size[0] << std::endl;
   output->set_number_of_elements(h_output_size[0]);
 }
 
