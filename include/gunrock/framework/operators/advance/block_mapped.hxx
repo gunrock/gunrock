@@ -23,27 +23,10 @@
 #include <cub/block/block_load.cuh>
 #include <cub/block/block_scan.cuh>
 
-#include <moderngpu/operators.hxx>
-
 namespace gunrock {
 namespace operators {
 namespace advance {
 namespace block_mapped {
-
-int32_t __device__ upperbound(int32_t* array, int32_t key, int32_t len) {
-  int32_t s = 0;
-  while (len > 0) {
-    int32_t half = len >> 1;
-    int32_t mid = s + half;
-    if (array[mid] > key) {
-      len = half;
-    } else {
-      s = mid + 1;
-      len = len - half - 1;
-    }
-  }
-  return s;
-}
 
 template <int THREADS_PER_BLOCK,
           int ITEMS_PER_THREAD,
@@ -61,99 +44,89 @@ void __global__ block_mapped_kernel(graph_t const G,
 
   // Specialize Block Scan for 1D block of THREADS_PER_BLOCK.
   using block_scan_t = cub::BlockScan<edge_t, THREADS_PER_BLOCK>;
-  using block_load_t =
-      cub::BlockLoad<edge_t, THREADS_PER_BLOCK, ITEMS_PER_THREAD>;
+  // using block_load_t =
+  //     cub::BlockLoad<edge_t, THREADS_PER_BLOCK, ITEMS_PER_THREAD>;
 
   __shared__ union TempStorage {
-    typename block_scan_t::TempStorage load;
-    typename block_load_t::TempStorage scan;
+    typename block_scan_t::TempStorage scan;
+    // typename block_load_t::TempStorage load;
   } storage;
 
   __shared__ vertex_t shared_vertices[THREADS_PER_BLOCK];
   __shared__ edge_t shared_degrees[THREADS_PER_BLOCK];
   __shared__ edge_t shared_starting_edges[THREADS_PER_BLOCK];
 
-  auto idx = threadIdx.x + blockDim.x * blockIdx.x;
+  auto idx = threadIdx.x + (blockDim.x * blockIdx.x);
 
-  auto load_degree = [=] __device__(int index) {
-    if (index < input_size) {
-      vertex_t v = input[index];
-      shared_vertices[index] = v;
-      if (gunrock::util::limits::is_valid(v)) {
-        shared_starting_edges[threadIdx.x] = G.get_starting_edge(v);
-        return G.get_number_of_neighbors(v);
-      } else
-        return 0;
+  if (idx < input_size) {
+    vertex_t v = input[idx];
+    shared_vertices[threadIdx.x] = v;
+    if (gunrock::util::limits::is_valid(v)) {
+      shared_starting_edges[threadIdx.x] = G.get_starting_edge(v);
+      shared_degrees[threadIdx.x] = G.get_number_of_neighbors(v);
     } else {
-      shared_vertices[index] = gunrock::numeric_limits<vertex_t>::invalid();
-      return 0;
+      shared_degrees[threadIdx.x] = 0;
     }
-  };
+  } else {
+    shared_vertices[threadIdx.x] = gunrock::numeric_limits<vertex_t>::invalid();
+    shared_degrees[threadIdx.x] = 0;
+  }
 
-  edge_t degrees[ITEMS_PER_THREAD];
-
-  block_load_t(storage.load)
-      .Load(mgpu::make_load_iterator<edge_t>(load_degree), degrees);
-
+  // Per-thread tile data
   __syncthreads();
+  edge_t deg[ITEMS_PER_THREAD];
+  deg[0] = shared_degrees[threadIdx.x];
 
-  // if (idx < input_size) {
-  //   v = input[idx];
-  //   shared_vertices[threadIdx.x] = v;
-  //   printf("v = %i\n", v);
-
-  //   if (gunrock::util::limits::is_valid(v)) {
-  //     shared_degrees[threadIdx.x] = G.get_number_of_neighbors(v);
-  //     shared_starting_edges[threadIdx.x] = G.get_starting_edge(v);
-  //   } else {
-  //     shared_degrees[threadIdx.x] = 0;
-  //     shared_starting_edges[threadIdx.x] =
-  //         gunrock::numeric_limits<vertex_t>::invalid();
-  //   }
-  // } else {
-  //   shared_vertices[threadIdx.x] =
-  //   gunrock::numeric_limits<vertex_t>::invalid(); shared_degrees[threadIdx.x]
-  //   = 0;
-  // }
-
-  printf("shared degree = %i\n", degrees[0]);
+  // if (idx < input_size)
+  // printf("\t# input: shared_degrees = %i\n", shared_degrees[threadIdx.x]);
 
   __syncthreads();
   vertex_t aggregate_degree_per_block;
-  block_scan_t(storage.scan)
-      .ExclusiveSum(degrees, degrees, aggregate_degree_per_block);
+  block_scan_t(storage.scan).ExclusiveSum(deg, deg, aggregate_degree_per_block);
   __syncthreads();
 
-  printf("#### shared degree = %i\n", degrees[0]);
+  // Store back to shared memory
+  shared_degrees[threadIdx.x] = deg[0];
+  __syncthreads();
 
-  // auto width = idx - threadIdx.x + blockDim.x;
-  // if (aggregate_degree_per_block < width)
-  //   width = aggregate_degree_per_block;
+  // if (idx < input_size)
+  //   printf("\t# output: shared_degrees = %i\n", shared_degrees[threadIdx.x]);
 
-  // width -= idx - threadIdx.x;
-  // for (int i = threadIdx.x; i < aggregate_degree_per_block; i += blockDim.x)
-  // {
-  //   int id = /* algo::search::binary::rightmost */ upperbound(shared_degrees,
-  //   i,
-  //                                                             width) -
-  //            1;
-  //   if (id >= width)
-  //     continue;
+  if (threadIdx.x == 0)
+    math::atomic::add((vertex_t*)output_size, aggregate_degree_per_block);
 
-  //   vertex_t v = shared_vertices[id];
-  //   if (!gunrock::util::limits::is_valid(v))
-  //     continue;
+  auto length = idx - threadIdx.x + blockDim.x;
 
-  //   auto e = shared_starting_edges[id] + i - shared_degrees[id];
-  //   auto n = G.get_destination_vertex(e);
-  //   auto w = G.get_edge_weight(e);
+  // Bound check.
+  if (input_size < length)
+    length = input_size;
+  length -= idx - threadIdx.x;
 
-  //   // printf("(v, n, e) = (%i, %i, %i), %i\n", v, n, e,
-  //   //        aggregate_degree_per_block);
-  //   bool cond = op(v, e, n, w);
-  //   output[shared_degrees[id]] =
-  //       cond ? n : gunrock::numeric_limits<vertex_t>::invalid();
-  // }
+  for (int i = threadIdx.x; i < aggregate_degree_per_block; i += blockDim.x) {
+    // printf("global_edge_processing = %i\n", i);
+    int id = algo::search::binary::rightmost(shared_degrees, i, length);
+
+    // printf("id, length = %i, %i\n", id, length);
+    if (id >= length)
+      continue;
+
+    vertex_t v = shared_vertices[id];
+
+    // printf("vertex = %i\n", v);
+    if (!gunrock::util::limits::is_valid(v))
+      continue;
+
+    auto e = shared_starting_edges[id] + i - shared_degrees[id];
+    auto n = G.get_destination_vertex(e);
+    auto w = G.get_edge_weight(e);
+    bool cond = op(v, n, e, w);
+
+    /* printf("output[%i] = v, n, e, w, cond = %i, %i, %i, %f, %s\n", i, v, n,
+       e, w, cond ? "true" : "false"); */
+
+    output[i] =
+        (cond && n != v) ? n : gunrock::numeric_limits<vertex_t>::invalid();
+  }
 }
 
 template <advance_type_t type,
@@ -180,8 +153,10 @@ void execute(graph_t& G,
       <<<grid_size, block_size, 0, context.stream()>>>(
           G, op, input->data(), output->data(), input->get_number_of_elements(),
           output_size.data().get());
+  context.synchronize();
 
   thrust::host_vector<std::size_t> h_output_size = output_size;
+  std::cout << "Output Size = " << h_output_size[0] << std::endl;
   output->set_number_of_elements(h_output_size[0]);
 }
 
