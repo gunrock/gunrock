@@ -4,3 +4,11 @@
 [submodule "externals/rapidjson"]
 	path = externals/rapidjson
 	url = https://github.com/Tencent/rapidjson.git
+[submodule "externals/cub"]
+	path = externals/cub
+	url = https://github.com/NVIDIA/cub
+	branch = 1.12.0
+[submodule "externals/thrust"]
+	path = externals/thrust
+	url = https://github.com/NVIDIA/thrust
+	branch = 1.12.0
