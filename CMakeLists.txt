@@ -23,6 +23,8 @@ set(PROJECT_DEPS_DIR externals)
 include(${PROJECT_SOURCE_DIR}/cmake/FindRapidJSON.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FindModernGPU.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FindMTX.cmake)
+add_subdirectory(${PROJECT_SOURCE_DIR}/externals/cub)
+add_subdirectory(${PROJECT_SOURCE_DIR}/externals/thrust)
 # end /* Include cmake modules */
 
 ## Set the directory where the binaries will be stored
@@ -89,6 +91,8 @@ target_include_directories(essentials
     INTERFACE include
     INTERFACE externals/
     INTERFACE externals/mtx
+    INTERFACE externals/cub
+    INTERFACE externals/thrust
     INTERFACE externals/moderngpu/src
 	  INTERFACE externals/rapidjson/include
     INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
