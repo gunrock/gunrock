@@ -52,7 +52,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
     visited.resize(n_vertices);
-    thrust::fill(thrust::device, visited.begin(), visited.end(), -1);
+    thrust::fill(thrust::cuda::par.on(context->get_context(0)->stream()), visited.begin(), visited.end(), -1);
   }
 
   void reset() {
@@ -60,13 +60,13 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto n_vertices = g.get_number_of_vertices();
 
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
-    thrust::fill(thrust::device, d_distances + 0, d_distances + n_vertices,
+    thrust::fill(thrust::cuda::par.on(this->context->get_context(0)->stream()), d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<weight_t>::max());
 
-    thrust::fill(thrust::device, d_distances + this->param.single_source,
+    thrust::fill(thrust::cuda::par.on(this->context->get_context(0)->stream()), d_distances + this->param.single_source,
                  d_distances + this->param.single_source + 1, 0);
 
-    thrust::fill(thrust::device, visited.begin(), visited.end(),
+    thrust::fill(thrust::cuda::par.on(this->context->get_context(0)->stream()), visited.begin(), visited.end(),
                  -1);  // This does need to be reset in between runs though
   }
 };

@@ -36,10 +36,14 @@ void execute(graph_t& G,
              frontier_t* output,
              work_tiles_t& segments,
              cuda::standard_context_t& context) {
+  
+  printf("execute:\n");
+  
   using vertex_t = typename graph_t::vertex_type;
 
   auto size_of_output = compute_output_length(G, input, segments, context);
-
+  printf("size_of_output %lu\n", size_of_output);
+  
   // If output frontier is empty, resize and return.
   if (size_of_output <= 0) {
     output->set_number_of_elements(0);

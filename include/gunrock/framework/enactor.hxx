@@ -133,7 +133,21 @@ struct enactor_t {
     auto timer = context0->timer();
     timer.begin();
     while (!is_converged(*context)) {
+      // >>
+      printf("iteration start %d\n", iteration);
+      printf("before\n");
+      active_frontier->print();
+      inactive_frontier->print();
+      // <<
+      
+      printf("call loop\n");
       loop(*context);
+      printf("done loop\n");
+      
+      printf("after\n");
+      active_frontier->print();
+      inactive_frontier->print();
+      
       ++iteration;
     }
     return timer.end();
