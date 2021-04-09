@@ -135,20 +135,22 @@ struct enactor_t {
     while (!is_converged(*context)) {
       // >>
       printf("iteration start %d\n", iteration);
-      printf("before\n");
-      active_frontier->print();
-      inactive_frontier->print();
+      // printf("before\n");
+      // active_frontier->print();
+      // inactive_frontier->print();
       // <<
       
-      printf("call loop\n");
+      // printf("call loop\n");
       loop(*context);
-      printf("done loop\n");
+      // printf("done loop\n");
       
-      printf("after\n");
-      active_frontier->print();
-      inactive_frontier->print();
+      // printf("after\n");
+      // active_frontier->print();
+      // inactive_frontier->print();
       
       ++iteration;
+      
+      if(iteration > 100) break;
     }
     return timer.end();
   }

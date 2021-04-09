@@ -28,6 +28,9 @@ std::size_t compute_output_length(graph_t& G,
   auto input_data = input->data();
   auto total_elems = input->get_number_of_elements();
 
+  if (segments.size() < total_elems + 1)
+    segments.resize(total_elems + 1);
+  
   auto segment_sizes = [=] __host__ __device__(std::size_t const& i) {
     if (i == total_elems)  // XXX: this is a weird exc. scan.
       return 0;

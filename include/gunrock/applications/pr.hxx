@@ -43,20 +43,20 @@ struct problem_t : gunrock::problem_t<graph_t> {
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
 
-  thrust::device_vector<weight_t> pnext;
+  thrust::device_vector<weight_t> plast;
 
   void init() {
     auto g = this->get_graph();
-    // auto n_vertices = g.get_number_of_vertices();
-    // pnext.resize(n_vertices);
+    auto n_vertices = g.get_number_of_vertices();
+    plast.resize(n_vertices);
   }
 
   void reset() {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
 
-    // thrust::fill_n(thrust::device, this->result.p, n_vertices, 1.0 / n_vertices);
-    // thrust::fill_n(thrust::device, pnext.begin(), n_vertices, 0);    
+    thrust::fill_n(thrust::device, this->result.p, n_vertices, 1.0 / n_vertices);
+    thrust::fill_n(thrust::device, plast.begin(), n_vertices, 0);
   }
 };
 
@@ -74,11 +74,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto P = this->get_problem();
     auto G = P->get_graph();
     auto n_vertices = G.get_number_of_vertices();
-
-    // XXX: Find a better way to initialize the frontier to all nodes
-    // for (vertex_t v = 0; v < n_vertices; ++v) {
-      f->push_back(0);
-    // }
+    
+    for (vertex_t v = 0; v < n_vertices; ++v)
+      f->push_back(v);
   }
 
   void loop(cuda::multi_context_t& context) override {
@@ -88,102 +86,45 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto G = P->get_graph();
 
     auto n_vertices = G.get_number_of_vertices();
-    // auto p          = P->result.p;
-    // auto pnext      = P->pnext.data().get();
-
-    auto iteration = this->iteration;
-    printf("ok\n");
+    auto p          = P->result.p;
+    auto plast      = P->plast.data().get();
     
-    if(iteration != 0) {
-      auto filter_op = [] __host__ __device__ (
-        vertex_t const& src,
-        vertex_t const& dst,
-        edge_t const& edge,
-        weight_t const& weight
-      ) -> bool {
-        
-        // weight_t delta     = 0.85;
-        // weight_t threshold = 0.01;
-        
-        // weight_t old_val = p[dst];
-        // weight_t new_val = (1 - delta) + delta * pnext[dst];
-        
-        // if(G.get_number_of_neighbors(dst) > 0) {
-        //   new_val /= G.get_number_of_neighbors(dst);
-        // }
-        
-        // if(new_val > 999) {
-        //   new_val = 0;
-        // }
-        
-        // p[dst] = new_val;
-        
-        // return fabs(new_val - old_val) > (threshold * old_val);
-        return false;
-      };
-      
-      operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
-                                  operators::advance_direction_t::forward,
-                                  operators::load_balance_t::thread_mapped>(
-          G, E, filter_op, context);
-      
-      // thrust::fill_n(thrust::device, pnext, n_vertices, 0);
-    }
+    weight_t alpha = 0.85;
     
-    auto advance_op = [] __host__ __device__ (
+    thrust::copy_n(thrust::device, p, n_vertices, plast);
+    thrust::fill_n(thrust::device, p, n_vertices, (1 - alpha) / n_vertices);
+    
+    auto spread_op = [G, p, plast, alpha] __host__ __device__(
       vertex_t const& src,
       vertex_t const& dst,
       edge_t const& edge,
       weight_t const& weight
     ) -> bool {
-      // weight_t val = p[src];
-      // if(val < 9999) {
-      //   math::atomic::add(pnext + dst, val);
-      // }
-      
-      return true;
+      float update = alpha * plast[src] / G.get_number_of_neighbors(src);
+      // printf("src=%d | dst=%d | update=%f \n", src, dst, update);
+      math::atomic::add(p + dst, update);
+      return false;
     };
-
+    
     operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
                                 operators::advance_direction_t::forward,
                                 operators::load_balance_t::thread_mapped>(
-        G, E, advance_op, context);
-
-    // auto shortest_path = [distances, single_source] __host__ __device__(
-    //                          vertex_t const& source,    // ... source
-    //                          vertex_t const& neighbor,  // neighbor
-    //                          edge_t const& edge,        // edge
-    //                          weight_t const& weight     // weight (tuple).
-    //                          ) -> bool {
-    //   weight_t source_distance = distances[source];  // use cached::load
-    //   weight_t distance_to_neighbor = source_distance + weight;
-
-    //   // Check if the destination node has been claimed as someone's child
-    //   weight_t recover_distance =
-    //       math::atomic::min(&(distances[neighbor]), distance_to_neighbor);
-
-    //   return (distance_to_neighbor < recover_distance);
-    // };
-
-    // auto remove_completed_paths = [G, visited, iteration] __host__ __device__(
-    //                                   vertex_t const& vertex) -> bool {
-    //   if (visited[vertex] == iteration)
-    //     return false;
-
-    //   visited[vertex] = iteration;
-    //   return G.get_number_of_neighbors(vertex) > 0;
-    // };
-
-    // // Execute advance operator on the provided lambda
-    // operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
-    //                             operators::advance_direction_t::forward,
-    //                             operators::load_balance_t::thread_mapped>(
-    //     G, E, shortest_path, context);
-
-    // // Execute filter operator on the provided lambda
-    // operators::filter::execute<operators::filter_algorithm_t::predicated>(
-    //     G, E, remove_completed_paths, context);
+        G, E, spread_op, context);
+    
+    E->swap_frontier_buffers(); // swap back
   }
+  
+  virtual bool is_converged(cuda::multi_context_t& context) {
+    auto P = this->get_problem();
+    auto G = P->get_graph();
+    
+    auto n_vertices = G.get_number_of_vertices();
+    auto p          = P->result.p;
+    auto plast      = P->plast.data().get();
+
+    // need to compute (p - plast).abs().sum() ....
+  }
+
 
 };  // struct enactor_t
 
