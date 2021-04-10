@@ -87,8 +87,6 @@ target_compile_features(essentials INTERFACE cxx_std_17)
 ####################################################
 target_include_directories(essentials
     INTERFACE include
-    INTERFACE externals/
-    INTERFACE externals/mtx
     INTERFACE ${THRUST_INCLUDE_DIR}
     INTERFACE ${CUB_INCLUDE_DIR}
     INTERFACE ${MODERNGPU_INCLUDE_DIR}
