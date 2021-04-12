@@ -33,13 +33,14 @@ template <int THREADS_PER_BLOCK,
           int ITEMS_PER_THREAD,
           typename graph_t,
           typename frontier_t,
+          typename work_tiles_t,
           typename operator_t>
 void __global__ block_mapped_kernel(graph_t const G,
                                     operator_t op,
                                     frontier_t* input,
                                     frontier_t* output,
                                     std::size_t input_size,
-                                    std::size_t* output_size) {
+                                    work_tiles_t* offsets) {
   using vertex_t = typename graph_t::vertex_type;
   using edge_t = typename graph_t::edge_type;
 
@@ -60,6 +61,7 @@ void __global__ block_mapped_kernel(graph_t const G,
   } storage;
 
   // Prepare data to process (to shmem/registers).
+  __shared__ vertex_t offset[1];
   __shared__ vertex_t vertices[THREADS_PER_BLOCK];
   __shared__ edge_t degrees[THREADS_PER_BLOCK];
   __shared__ edge_t sedges[THREADS_PER_BLOCK];
@@ -88,6 +90,12 @@ void __global__ block_mapped_kernel(graph_t const G,
 
   // Store back to shared memory.
   degrees[local_idx] = th_deg[0];
+
+  // Accumulate the output size to global memory, only done once per block.
+  if (local_idx == 0)
+    if ((cuda::block::id::x() * cuda::block::size::x()) < input_size)
+      offset[0] = offsets[cuda::block::id::x() * cuda::block::size::x()];
+
   __syncthreads();
 
   // To search for which vertex id we are computing on.
@@ -125,14 +133,8 @@ void __global__ block_mapped_kernel(graph_t const G,
     bool cond = op(v, n, e, w);
 
     // Store [neighbor] into the output frontier.
-    output[cuda::block::id::x() + i] =
+    output[offset[0] + i] =
         (cond && n != v) ? n : gunrock::numeric_limits<vertex_t>::invalid();
-  }
-
-  // Accumulate the output size to global memory, only done once per block.
-  if (local_idx == 0) {
-    math::atomic::add((vertex_t*)output_size, aggregate_degree_per_block);
-    // printf("aggregate_degree_per_block = %d\n", aggregate_degree_per_block);
   }
 }
 
@@ -148,23 +150,32 @@ void execute(graph_t& G,
              frontier_t* output,
              work_tiles_t& segments,
              cuda::standard_context_t& context) {
+  // This shouldn't be required for block-mapped.
+  auto size_of_output = compute_output_length(G, input, segments, context);
+
+  // If output frontier is empty, resize and return.
+  if (size_of_output <= 0) {
+    output->set_number_of_elements(0);
+    return;
+  }
+
+  // <todo> Resize the output (inactive) buffer to the new size.
+  // Can be hidden within the frontier struct.
+  if (output->get_capacity() < size_of_output)
+    output->reserve(size_of_output);
+  output->set_number_of_elements(size_of_output);
+
   // TODO: Use launch_box_t instead.
   constexpr int block_size = 128;
   int grid_size =
       (input->get_number_of_elements() + block_size - 1) / block_size;
 
-  thrust::device_vector<std::size_t> output_size(1, 0);
-
   // Launch blocked-mapped advance kernel.
   block_mapped_kernel<block_size, 1>
       <<<grid_size, block_size, 0, context.stream()>>>(
           G, op, input->data(), output->data(), input->get_number_of_elements(),
-          output_size.data().get());
+          segments.data().get());
   context.synchronize();
-
-  thrust::host_vector<std::size_t> h_output_size = output_size;
-  // std::cout << "Output Size = " << h_output_size[0] << std::endl;
-  output->set_number_of_elements(h_output_size[0]);
 }
 
 }  // namespace block_mapped

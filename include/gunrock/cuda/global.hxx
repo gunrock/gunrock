@@ -83,5 +83,25 @@ __device__ __forceinline__ int total() {
 }  // namespace size
 }  // namespace block
 
+namespace grid {
+namespace size {
+__device__ __forceinline__ int x() {
+  return gridDim.x;
+}
+
+__device__ __forceinline__ int y() {
+  return gridDim.y;
+}
+
+__device__ __forceinline__ int z() {
+  return gridDim.z;
+}
+
+__device__ __forceinline__ int total() {
+  return x() * y() * z();
+}
+}  // namespace size
+}  // namespace grid
+
 }  // namespace cuda
 }  // namespace gunrock
