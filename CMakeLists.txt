@@ -20,9 +20,9 @@ set(PROJECT_DEPS_DIR externals)
 # end /* Dependencies directory */
 
 # begin /* Include cmake modules */
-include(${PROJECT_SOURCE_DIR}/cmake/FindRapidJSON.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/FindModernGPU.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/FindMTX.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchRapidJSON.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 # end /* Include cmake modules */
 
 ## Set the directory where the binaries will be stored
@@ -87,10 +87,10 @@ target_compile_features(essentials INTERFACE cxx_std_17)
 ####################################################
 target_include_directories(essentials
     INTERFACE include
-    INTERFACE externals/
-    INTERFACE externals/mtx
-    INTERFACE externals/moderngpu/src
-	  INTERFACE externals/rapidjson/include
+    INTERFACE ${THRUST_INCLUDE_DIR}
+    INTERFACE ${CUB_INCLUDE_DIR}
+    INTERFACE ${MODERNGPU_INCLUDE_DIR}
+	  INTERFACE ${RAPIDJSON_INCLUDE_DIR}
     INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
 )
 
@@ -106,7 +106,7 @@ target_link_libraries(essentials
 ####################################################
 target_sources(essentials
     INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include/gunrock/util/gitsha1make.c"
-    INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/externals/mtx/mmio.cpp"
+    INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include/gunrock/io/detail/mmio.cpp"
 )
 
 ####################################################

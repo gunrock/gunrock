@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 
-#include "mmio.hxx"
+#include <gunrock/io/detail/mmio.hxx>
 
 int mm_read_unsymmetric_sparse(const char* fname,
                                int* M_,
