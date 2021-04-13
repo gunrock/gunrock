@@ -45,29 +45,19 @@ void test_sssp(int num_arguments, char** argument_array) {
   
   srand(time(NULL));
   
+  weight_t alpha = 0.85;
+  weight_t tol   = 1e-6;
+  
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> p(n_vertices);
 
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::pr::run(G, p.data().get());
+  float gpu_elapsed = gunrock::pr::run(G, alpha, tol, p.data().get());
 
   // --
   // Log + Validate
-
-  thrust::host_vector<weight_t> p_h(p);
-
-  std::cout << p_h[0] << std::endl; // PageRank: 0.003473
-  std::cout << p_h[159452] << std::endl; // PageRank: 0.001432
-  std::cout << p_h[78517] << std::endl; // PageRank: 0.001427
-  std::cout << p_h[133417] << std::endl; // PageRank: 0.001421
-  std::cout << p_h[144324] << std::endl; // PageRank: 0.001417
-  std::cout << p_h[158200] << std::endl; // PageRank: 0.001416
-  std::cout << p_h[2098] << std::endl; // PageRank: 0.001414
-  std::cout << p_h[20982] << std::endl; // PageRank: 0.001413
-  std::cout << p_h[115678] << std::endl; // PageRank: 0.001412
-  std::cout << p_h[143635] << std::endl; // PageRank: 0.001398
 
   std::cout << "GPU p (output) = ";
   thrust::copy(p.begin(),
