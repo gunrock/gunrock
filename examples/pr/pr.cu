@@ -46,15 +46,17 @@ void test_sssp(int num_arguments, char** argument_array) {
   srand(time(NULL));
   
   weight_t alpha = 0.85;
-  weight_t tol   = 1e-10;
+  weight_t tol   = 1e-6;
   
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> p(n_vertices);
 
   // --
   // GPU Run
-
+  
+  std::cout << "gunrock::pr::run -- starting" << std::endl;
   float gpu_elapsed = gunrock::pr::run(G, alpha, tol, p.data().get());
+  std::cout << "gunrock::pr::run -- complete" << std::endl;
 
   // --
   // Log + Validate

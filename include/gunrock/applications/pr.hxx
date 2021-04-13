@@ -82,7 +82,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
         val += g.get_edge_weight(offset);
       }
       
-      return alpha / val;
+      return val != 0 ? alpha / val : 0;
     };
 
     thrust::transform(
@@ -102,7 +102,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using gunrock::enactor_t<problem_t>::enactor_t;
 
   using vertex_t = typename problem_t::vertex_t;
-  using edge_t = typename problem_t::edge_t;
+  using edge_t   = typename problem_t::edge_t;
   using weight_t = typename problem_t::weight_t;
 
   void prepare_frontier(frontier_t<vertex_t>* f, cuda::multi_context_t& context) override {
@@ -126,9 +126,32 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto iweights   = P->iweights.data().get();
     auto alpha      = P->param.alpha;
     
-    thrust::copy_n(thrust::device, p, n_vertices, plast);
-    thrust::fill_n(thrust::device, p, n_vertices, (1 - alpha) / n_vertices);
+    thrust::copy_n(thrust::cuda::par.on(context.get_context(0)->stream()),
+      p, n_vertices, plast);
     
+    // >> handle "dangling nodes" (nodes w/ zero outdegree)
+    // could skip this if no nodes have sero outdegree
+    auto compute_dangling = [=] __device__ (const int& i) -> weight_t {
+      return iweights[i] == 0 ? alpha * p[i] : 0;
+    };
+
+    float dsum = thrust::transform_reduce(
+      thrust::cuda::par.on(context.get_context(0)->stream()),
+      thrust::counting_iterator<vertex_t>(0), 
+      thrust::counting_iterator<vertex_t>(n_vertices),
+      compute_dangling,
+      (weight_t)0.0,
+      thrust::plus<weight_t>()
+    );
+    
+    thrust::fill_n(thrust::cuda::par.on(context.get_context(0)->stream()),
+      p, n_vertices, (1 - alpha + dsum) / n_vertices);
+    // -- OR --
+    // skip dangling nodes
+    // thrust::fill_n(thrust::cuda::par.on(context.get_context(0)->stream()),
+    //   p, n_vertices, (1 - alpha) / n_vertices);
+    // <<
+        
     auto spread_op = [p, plast, iweights] __host__ __device__(
       vertex_t const& src,
       vertex_t const& dst,
