@@ -152,22 +152,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return p[i];
     };
 
-    // auto abs_diff = [=] __host__ __device__ (const weight_t &a, const weight_t &b) -> weight_t {
-    //   printf("%f\n", a);
-    //   return a;
-    //   // return 1;
-    // };
-    
-    // weight_t err = thrust::inner_product(
-    //   thrust::device, 
-    //   p,
-    //   p + n_vertices,
-    //   plast,
-    //   0, 
-    //   thrust::plus<weight_t>(), 
-    //   abs_diff
-    // );
-    
     weight_t err = thrust::transform_reduce(
       thrust::device,
       thrust::counting_iterator<vertex_t>(0), 
