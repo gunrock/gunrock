@@ -49,34 +49,48 @@ struct problem_t : gunrock::problem_t<graph_t> {
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
 
-  thrust::device_vector<weight_t> plast;
-  thrust::device_vector<weight_t> idegrees;
+  thrust::device_vector<weight_t> plast;    // pagerank values from previous iteration
+  thrust::device_vector<weight_t> iweights; // alpha * 1 / (sum of outgoing weights) -- used to determine out of mass spread from src to dst
 
   void init() {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
     plast.resize(n_vertices);
-    idegrees.resize(n_vertices);
+    iweights.resize(n_vertices);
   }
 
   void reset() {
+    auto context0 = this->context->get_context(0)->stream();
+    
     auto g = this->get_graph();
+    
     auto n_vertices = g.get_number_of_vertices();
-
-    thrust::fill_n(thrust::device, this->result.p, n_vertices, 1.0 / n_vertices);
-    thrust::fill_n(thrust::device, plast.begin(), n_vertices, 0);
-        
-    weight_t alpha = 0.85;
-    auto get_degree = [=] __device__ (const int& i) -> weight_t {
-      return alpha / g.get_number_of_neighbors(i);
+    auto alpha      = this->param.alpha;
+    
+    thrust::fill_n(thrust::cuda::par.on(context0),
+      this->result.p, n_vertices, 1.0 / n_vertices);
+    
+    thrust::fill_n(thrust::cuda::par.on(context0),
+      plast.begin(), n_vertices, 0);
+    
+    auto get_weight = [=] __device__ (const int& i) -> weight_t {
+      weight_t val = 0;
+      
+      edge_t start = g.get_starting_edge(i);
+      edge_t end   = start + g.get_number_of_neighbors(i);
+      for(edge_t offset = start; offset < end; offset++) {
+        val += g.get_edge_weight(offset);
+      }
+      
+      return alpha / val;
     };
 
     thrust::transform(
-      thrust::device,
+      thrust::cuda::par.on(context0),
       thrust::counting_iterator<vertex_t>(0), 
       thrust::counting_iterator<vertex_t>(n_vertices),
-      idegrees.begin(),
-      get_degree
+      iweights.begin(),
+      get_weight
     );
   }
 };
@@ -109,19 +123,19 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto n_vertices = G.get_number_of_vertices();
     auto p          = P->result.p;
     auto plast      = P->plast.data().get();
-    auto idegrees   = P->idegrees.data().get();
+    auto iweights   = P->iweights.data().get();
     auto alpha      = P->param.alpha;
     
     thrust::copy_n(thrust::device, p, n_vertices, plast);
     thrust::fill_n(thrust::device, p, n_vertices, (1 - alpha) / n_vertices);
     
-    auto spread_op = [p, plast, idegrees] __host__ __device__(
+    auto spread_op = [p, plast, iweights] __host__ __device__(
       vertex_t const& src,
       vertex_t const& dst,
       edge_t const& edge,
       weight_t const& weight
     ) -> bool {
-      weight_t update = plast[src] * idegrees[src];
+      weight_t update = plast[src] * iweights[src] * weight;
       math::atomic::add(p + dst, update);
       return false;
     };
@@ -150,6 +164,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     float err = thrust::transform_reduce(
+      thrust::cuda::par.on(context.get_context(0).stream()),
       thrust::counting_iterator<vertex_t>(0), 
       thrust::counting_iterator<vertex_t>(n_vertices),
       abs_diff,
