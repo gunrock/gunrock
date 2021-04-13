@@ -117,52 +117,46 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
   
   virtual bool is_converged(cuda::multi_context_t& context) {
-    if(this->iteration == 0) {
-      printf("pass\n");
-      return false;
-    }
+    return false;
+    // if(this->iteration == 0) return false;
     
-    auto P = this->get_problem();
-    auto G = P->get_graph();
+    // auto P = this->get_problem();
+    // auto G = P->get_graph();
     
-    auto n_vertices = G.get_number_of_vertices();
-    auto p          = P->result.p;
-    auto plast      = P->plast.data().get();
+    // auto n_vertices = G.get_number_of_vertices();
+    // auto p          = P->result.p;
+    // auto plast      = P->plast.data().get();
 
-    // >>
-    // Logging for debugging
-    thrust::device_vector<weight_t> p_d(p, p + n_vertices);
-    thrust::host_vector<weight_t> p_(p_d);
+    // // // >>
+    // // // Logging for debugging
+    // // thrust::device_vector<weight_t> p_d(p, p + n_vertices);
+    // // thrust::host_vector<weight_t> p_(p_d);
     
-    thrust::device_vector<weight_t> plast_d(plast, plast + n_vertices);
-    thrust::host_vector<weight_t> plast_(plast_d);
+    // // thrust::device_vector<weight_t> plast_d(plast, plast + n_vertices);
+    // // thrust::host_vector<weight_t> plast_(plast_d);
     
-    std::cout << "p    : " << std::endl;
-    thrust::copy(p_.begin(), p_.end(), std::ostream_iterator<weight_t>(std::cout, " "));
-    std::cout << std::endl;
+    // // std::cout << "p    : " << std::endl;
+    // // thrust::copy(p_.begin(), p_.end(), std::ostream_iterator<weight_t>(std::cout, " "));
+    // // std::cout << std::endl;
   
-    std::cout << "plast: " << std::endl;
-    thrust::copy(plast_.begin(), plast_.end(), std::ostream_iterator<weight_t>(std::cout, " "));
-    std::cout << std::endl;
-    // <<
+    // // std::cout << "plast: " << std::endl;
+    // // thrust::copy(plast_.begin(), plast_.end(), std::ostream_iterator<weight_t>(std::cout, " "));
+    // // std::cout << std::endl;
+    // // // <<
   
-    auto abs_diff = [=] __device__ (const vertex_t& i) -> weight_t {
-      printf("%f %f\n", p[i], plast[i]);
-      return abs(p[i] - plast[i]);
-    };
+    // auto abs_diff = [=] __device__ (const int& i) -> weight_t {
+    //   return abs(p[i] - plast[i]);
+    // };
 
-    weight_t err = thrust::transform_reduce(
-      thrust::device,
-      thrust::counting_iterator<vertex_t>(0), 
-      thrust::counting_iterator<vertex_t>(n_vertices),
-      abs_diff,
-      0,
-      thrust::plus<weight_t>()
-    );
+    // float err = thrust::transform_reduce(
+    //   thrust::counting_iterator<vertex_t>(0), 
+    //   thrust::counting_iterator<vertex_t>(n_vertices),
+    //   abs_diff,
+    //   (weight_t)0.0,
+    //   thrust::maximum<weight_t>()
+    // );
     
-    printf("err %f\n", err);
-    
-    return true;
+    // return err < 1e-6;
   }
 
 

@@ -56,6 +56,19 @@ void test_sssp(int num_arguments, char** argument_array) {
   // --
   // Log + Validate
 
+  thrust::host_vector<weight_t> p_h(p);
+
+  std::cout << p_h[0] << std::endl; // PageRank: 0.003473
+  std::cout << p_h[159452] << std::endl; // PageRank: 0.001432
+  std::cout << p_h[78517] << std::endl; // PageRank: 0.001427
+  std::cout << p_h[133417] << std::endl; // PageRank: 0.001421
+  std::cout << p_h[144324] << std::endl; // PageRank: 0.001417
+  std::cout << p_h[158200] << std::endl; // PageRank: 0.001416
+  std::cout << p_h[2098] << std::endl; // PageRank: 0.001414
+  std::cout << p_h[20982] << std::endl; // PageRank: 0.001413
+  std::cout << p_h[115678] << std::endl; // PageRank: 0.001412
+  std::cout << p_h[143635] << std::endl; // PageRank: 0.001398
+
   std::cout << "GPU p (output) = ";
   thrust::copy(p.begin(),
                (p.size() < 40) ? p.begin() + p.size()

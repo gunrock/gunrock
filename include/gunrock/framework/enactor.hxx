@@ -149,8 +149,7 @@ struct enactor_t {
       // inactive_frontier->print();
       
       ++iteration;
-      
-      // if(iteration > 100) break;
+      if(iteration == 27) break;
     }
     return timer.end();
   }
