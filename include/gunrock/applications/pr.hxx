@@ -157,7 +157,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       thrust::counting_iterator<vertex_t>(n_vertices),
       abs_diff,
       0,
-      thrust::maximum<weight_t>()
+      thrust::plus<weight_t>()
     );
     
     printf("err %f\n", err);
