@@ -54,9 +54,11 @@ class standard_context_t : public context_t {
   cuda::stream_t _stream;
   cuda::event_t _event;
 
-  // TODO: Find out how to use a shared_ptr<> without printing the GPU debug
-  // information. Currently, we are not releasing this pointer, which causes a
-  // memory leak. Fix this later.
+  /**
+   * @todo Find out how to use a shared_ptr<> without printing the GPU debug
+   * information. Currently, we are not releasing this pointer, which causes a
+   * memory leak. Fix this later.
+   */
   mgpu::standard_context_t* _mgpu_context;
 
   util::timer_t _timer;
@@ -113,6 +115,8 @@ class standard_context_t : public context_t {
   virtual util::timer_t& timer() override { return _timer; }
 
   virtual cuda::device_id_t ordinal() { return _ordinal; }
+
+  auto execution_policy() { return thrust::cuda::par.on(this->stream()); }
 
 };  // class standard_context_t
 
