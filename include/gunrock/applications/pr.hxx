@@ -164,7 +164,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     float err = thrust::transform_reduce(
-      thrust::cuda::par.on(context.get_context(0).stream()),
+      thrust::cuda::par.on(context.get_context(0)->stream()),
       thrust::counting_iterator<vertex_t>(0), 
       thrust::counting_iterator<vertex_t>(n_vertices),
       abs_diff,
