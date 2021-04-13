@@ -146,6 +146,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     std::cout << std::endl;
     // <<
   
+    auto abs_diff = [=] __device__ (const vertex_t& i) {
+      return abs(p[i] - plast[i]);
+    };
+
     // auto abs_diff = [=] __host__ __device__ (const weight_t &a, const weight_t &b) -> weight_t {
     //   printf("%f\n", a);
     //   return a;
