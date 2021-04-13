@@ -148,8 +148,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   
     auto abs_diff = [=] __device__ (const vertex_t& i) -> weight_t {
       printf("%f %f\n", p[i], plast[i]);
-      // return abs(p[i] - plast[i]);
-      return p[i];
+      return abs(p[i] - plast[i]);
     };
 
     weight_t err = thrust::transform_reduce(
