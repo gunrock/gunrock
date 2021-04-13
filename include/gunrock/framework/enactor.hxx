@@ -150,7 +150,7 @@ struct enactor_t {
       
       ++iteration;
       
-      if(iteration > 100) break;
+      // if(iteration > 100) break;
     }
     return timer.end();
   }

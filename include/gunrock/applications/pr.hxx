@@ -11,6 +11,8 @@
 #pragma once
 
 #include <gunrock/applications/application.hxx>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/inner_product.h>
 
 namespace gunrock {
 namespace pr {
@@ -115,6 +117,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
   
   virtual bool is_converged(cuda::multi_context_t& context) {
+    if(this->iteration == 0) {
+      printf("pass\n");
+      return false;
+    }
+    
     auto P = this->get_problem();
     auto G = P->get_graph();
     
@@ -122,7 +129,50 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto p          = P->result.p;
     auto plast      = P->plast.data().get();
 
-    // need to compute (p - plast).abs().sum() ....
+    // >>
+    // Logging for debugging
+    thrust::device_vector<weight_t> p_d(p, p + n_vertices);
+    thrust::host_vector<weight_t> p_(p_d);
+    
+    thrust::device_vector<weight_t> plast_d(plast, plast + n_vertices);
+    thrust::host_vector<weight_t> plast_(plast_d);
+    
+    std::cout << "p    : " << std::endl;
+    thrust::copy(p_.begin(), p_.end(), std::ostream_iterator<weight_t>(std::cout, " "));
+    std::cout << std::endl;
+  
+    std::cout << "plast: " << std::endl;
+    thrust::copy(plast_.begin(), plast_.end(), std::ostream_iterator<weight_t>(std::cout, " "));
+    std::cout << std::endl;
+    // <<
+  
+    // auto abs_diff = [=] __host__ __device__ (const weight_t &a, const weight_t &b) -> weight_t {
+    //   printf("%f\n", a);
+    //   return a;
+    //   // return 1;
+    // };
+    
+    // weight_t err = thrust::inner_product(
+    //   thrust::device, 
+    //   p,
+    //   p + n_vertices,
+    //   plast,
+    //   0, 
+    //   thrust::plus<weight_t>(), 
+    //   abs_diff
+    // );
+    
+    weight_t err = thrust::transform_reduce(
+      thrust::counting_iterator<vertex_t>(0), 
+      thrust::counting_iterator<vertex_t>(n_vertices),
+      abs_diff,
+      -1,
+      thrust::plus<weight_t>()
+    );
+    
+    printf("err %f\n", err);
+    
+    return true;
   }
 
 
