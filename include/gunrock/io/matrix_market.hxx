@@ -13,7 +13,7 @@
 
 #include <string>
 
-#include <mtx/mmio.hxx>
+#include <gunrock/io/detail/mmio.hxx>
 
 #include <gunrock/util/filepath.hxx>
 #include <gunrock/formats/formats.hxx>

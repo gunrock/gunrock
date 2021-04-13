@@ -93,6 +93,9 @@ void execute(graph_t& G,
       neighbors_expand,                      // unary operation
       pre_condition                          // predicate operation
   );
+
+  // std::cout << "[thread-mapped] Output Size = " << size_of_output <<
+  // std::endl;
 }
 }  // namespace thread_mapped
 }  // namespace advance
