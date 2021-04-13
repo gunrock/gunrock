@@ -115,7 +115,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     thrust::copy_n(thrust::device, p, n_vertices, plast);
     thrust::fill_n(thrust::device, p, n_vertices, (1 - alpha) / n_vertices);
     
-    auto spread_op = [p, plast, alpha, idegrees] __host__ __device__(
+    auto spread_op = [p, plast, idegrees] __host__ __device__(
       vertex_t const& src,
       vertex_t const& dst,
       edge_t const& edge,
