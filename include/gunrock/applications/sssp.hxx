@@ -48,7 +48,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   thrust::device_vector<vertex_t> visited;
 
-  void init() {
+  void init() override {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
     visited.resize(n_vertices);
@@ -58,7 +58,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
     thrust::fill(policy, visited.begin(), visited.end(), -1);
   }
 
-  void reset() {
+  void reset() override {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
 

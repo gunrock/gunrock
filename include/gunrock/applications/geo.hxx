@@ -267,13 +267,15 @@ struct problem_t : gunrock::problem_t<graph_t> {
         param(_param),
         result(_result) {}
 
-  void init() {
+  void init() override {
     auto g = this->get_graph();
     auto n_edges = g.get_number_of_edges();
     inv_haversine_distance.resize(n_edges);
   }
 
-  void reset() {}
+  void reset() override {
+    /// @todo reset the coordinates and inv_haversine_distance arrays.
+  }
 };
 
 template <typename problem_t>
