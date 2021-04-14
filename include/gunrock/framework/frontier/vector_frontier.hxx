@@ -14,6 +14,7 @@
 #include <gunrock/util/type_limits.hxx>
 #include <gunrock/container/vector.hxx>
 #include <gunrock/algorithms/sort/radix_sort.hxx>
+#include <thrust/sequence.h>
 
 namespace gunrock {
 namespace frontier {
@@ -75,6 +76,23 @@ class vector_frontier_t {
   void fill(type_t const value, cuda::stream_t stream = 0) {
     thrust::fill(thrust::cuda::par.on(stream), this->begin(), this->end(),
                  value);
+  }
+
+  /**
+   * @brief `sequence` fills the entire frontier with a sequence of numbers.
+   *
+   * @param initial_value The first value of the sequence.
+   * @param size Number of elements to fill the sequence up to. Also corresponds
+   * to the new size of the frontier.
+   * @param stream @see `cuda::stream_t`.
+   *
+   * @todo Maybe we should accept `standard_context_t` instead of `stream_t`.
+   */
+  void sequence(type_t const initial_value,
+                std::size_t const& size,
+                cuda::stream_t stream = 0) {
+    thrust::sequence(thrust::cuda::par.on(stream), this->begin(), this->end(),
+                     initial_value);
   }
 
   /**
