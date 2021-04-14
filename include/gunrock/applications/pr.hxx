@@ -54,14 +54,14 @@ struct problem_t : gunrock::problem_t<graph_t> {
       iweights;  // alpha * 1 / (sum of outgoing weights) -- used to determine
                  // out of mass spread from src to dst
 
-  void init() {
+  void init() override {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
     plast.resize(n_vertices);
     iweights.resize(n_vertices);
   }
 
-  void reset() {
+  void reset() override {
     // Execution policy for a given context (using single-gpu).
     auto policy = this->context->get_context(0)->execution_policy();
 
@@ -108,8 +108,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto G = P->get_graph();
     auto n_vertices = G.get_number_of_vertices();
 
-    for (vertex_t v = 0; v < n_vertices; ++v)
-      f->push_back(v);
+    // Fill the frontier with a sequence of vertices from 0 -> n_vertices.
+    f->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
   }
 
   void loop(cuda::multi_context_t& context) override {

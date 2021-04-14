@@ -155,6 +155,31 @@ class frontier_t : public frontier::vector_frontier_t<t> {
   }
 
   /**
+   * @brief `sequence` resizes the frontier to *at least* `size` and fills the
+   * entire frontier with a sequence of numbers.
+   *
+   * @param initial_value The first value of the sequence.
+   * @param size Number of elements to fill the sequence up to. Also corresponds
+   * to the new size of the frontier.
+   * @param stream @see `cuda::stream_t`.
+   *
+   * @todo Maybe we should accept `standard_context_t` instead of `stream_t`.
+   */
+  void sequence(type_t const initial_value,
+                std::size_t const& size,
+                cuda::stream_t stream = 0) {
+    // Resize if needed.
+    if (this->get_capacity() < size)
+      this->reserve(size);
+
+    // Set the new number of elements.
+    this->set_number_of_elements(size);
+
+    // Fill in the sequence.
+    underlying_frontier_t::sequence(initial_value, size, stream);
+  }
+
+  /**
    * @brief Resize the underlying frontier storage to be exactly the size
    * specified. Note that this actually resizes, and will now change the
    * capacity as well as the size.

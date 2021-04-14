@@ -46,8 +46,8 @@ struct problem_t {
     return context->get_context(device);
   }
 
-  // virtual void init() = 0;
-  // virtual void reset() = 0;
+  virtual void init() = 0;
+  virtual void reset() = 0;
 
   /*! Disable copy ctor and assignment operator. We do not want to let user copy
    * only a slice. Explanation:
