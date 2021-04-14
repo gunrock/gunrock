@@ -62,7 +62,8 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
 
-    auto policy = this->context->get_context(0)->execution_policy();
+    auto context = this->get_single_context();
+    auto policy = context->execution_policy();
 
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
     thrust::fill(policy, d_distances + 0, d_distances + n_vertices,

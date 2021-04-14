@@ -16,13 +16,18 @@ void execute(frontier_t* input,
         cudaErrorUnknown,
         "Uniquification percentage must be a +ve float between 0 and 100.");
 
-  // Filter algorithm already produces a unique output, or no uniquification
-  // needed. TODO: confirm if compact actually generates a unique output.
+  /*!
+   * Filter algorithm already produces a unique output, or no uniquification
+   * needed.
+   * @todo confirm if compact actually generates a unique output.
+   */
   if ((type == filter_algorithm_t::compact) || (uniquification_percent == 0))
     return;
 
-  // 100% uniquification; there could be multiple algorithms to perform this, we
-  // will stick with thrust for now.
+  /*!
+   * 100% uniquification; there could be multiple algorithms to perform this, we
+   * will stick with thrust for now.
+   */
   else if (uniquification_percent == 100) {
     auto new_end = thrust::unique(
         thrust::cuda::par.on(context.stream()),  // execution policy
