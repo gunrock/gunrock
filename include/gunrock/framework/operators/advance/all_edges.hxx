@@ -46,12 +46,13 @@ void execute(graph_t& G,
     return;
   }
 
-  // <todo> Resize the output (inactive) buffer to the new size.
-  // Can be hidden within the frontier struct.
+  /*!
+   * @todo Resize the output (inactive) buffer to the new size. Can be hidden
+   * within the frontier struct.
+   */
   if (output->get_capacity() < G.get_number_of_edges())
     output->reserve(G.get_number_of_edges());
   output->set_number_of_elements(G.get_number_of_edges());
-  // </todo>
 
   auto all_edges_kernel = [=] __device__(edge_t const& e) {
     auto pair = G.get_source_and_destination_vertices(e);
