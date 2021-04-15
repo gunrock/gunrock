@@ -1,5 +1,5 @@
 /**
- * @file sssp_implementation.hxx
+ * @file sssp.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Single-Source Shortest Path algorithm.
  * @version 0.1

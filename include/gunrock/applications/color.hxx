@@ -81,9 +81,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto P = this->get_problem();
     auto n_vertices = P->get_graph().get_number_of_vertices();
 
-    // XXX: Find a better way to initialize the frontier to all nodes
-    for (vertex_t v = 0; v < n_vertices; ++v)
-      f->push_back(v);
+    // Fill the frontier with a sequence of vertices from 0 -> n_vertices.
+    f->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
   }
 
   void loop(cuda::multi_context_t& context) override {
