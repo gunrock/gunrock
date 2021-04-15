@@ -127,8 +127,8 @@ class vector_frontier_t {
    */
   void sort(sort::order_t order = sort::order_t::ascending,
             cuda::stream_t stream = 0) {
-    sort::radix::sort_keys(storage.data(), this->get_number_of_elements(),
-                           stream);
+    sort::radix::sort_keys(storage.data().get(), this->get_number_of_elements(),
+                           order, stream);
   }
 
   void print() {

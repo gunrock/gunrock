@@ -37,11 +37,17 @@ namespace radix {
 // DoubleBuffer: Sorts keys pairs into ascending order. (~N auxiliary storage
 // required)
 
-template <order_t order, typename type_t>
-void sort_keys(type_t* keys, std::size_t num_items, cuda::stream_t stream = 0) {
-  thrust::sort(thrust::cuda::par.on(stream), keys, keys + num_items,
-               (order == order_t::ascending) ? thrust::less<type_t>()
-                                             : thrust::greater<type_t>());
+template <typename type_t>
+void sort_keys(type_t* keys,
+               std::size_t num_items,
+               order_t order = order_t::ascending,
+               cuda::stream_t stream = 0) {
+  if (order == order_t::ascending)
+    thrust::sort(thrust::cuda::par.on(stream), keys, keys + num_items,
+                 thrust::less<type_t>());
+  else
+    thrust::sort(thrust::cuda::par.on(stream), keys, keys + num_items,
+                 thrust::greater<type_t>());
 }
 
 }  // namespace radix

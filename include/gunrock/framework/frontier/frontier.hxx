@@ -215,7 +215,7 @@ class frontier_t : public frontier::vector_frontier_t<t> {
    */
   void sort(sort::order_t order = sort::order_t::ascending,
             cuda::stream_t stream = 0) {
-    sort::radix::sort_keys(this->data(), this->number_of_elements(), stream);
+    underlying_frontier_t::sort(order, stream);
   }
 
   /**
