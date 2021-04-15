@@ -29,13 +29,12 @@ namespace operators {
  * @todo somehow make that gist part of the in-code comments.
  */
 enum load_balance_t {
-  thread_mapped,  /// 1 element / thread
-  warp_mapped,    /// Equal # of elements / warp
-  block_mapped,   /// Equal # of elements / block
+  thread_mapped,  /// 1 element per thread
+  warp_mapped,    /// Equal # of elements per warp
+  block_mapped,   /// Equal # of elements per block
   bucketing,      /// Davidson et al. (SSSP)
   merge_path,     /// Merrill & Garland (SpMV)
   work_stealing,  /// <cite>
-  all_edges       /// 1 edge / thread (advance an entire graph)
 };
 
 /**
@@ -82,6 +81,19 @@ enum filter_algorithm_t {
   predicated,  /// Copy if predicate = true
   compact,     /// 2-Pass Transform compact
   bypass       /// Marks as invalid, instead of culling
+};
+
+enum uniquify_algorithm_t {
+  unique,  /// Keep only the unique item for each consecutive group. Sort for
+           /// 100% uniqueness.
+  unique_copy  /// Copy the unique items for each consecutive group. Sort for
+               /// 100% uniqueness.
+};
+
+enum parallel_for_each_t {
+  vertex,  /// for each vertex in the graph
+  edge,    /// for each edge in the graph
+  weight   /// for each weight in the graph (todo)
 };
 
 }  // namespace operators

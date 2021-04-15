@@ -21,7 +21,6 @@
 #include <gunrock/framework/operators/advance/merge_path.hxx>
 #include <gunrock/framework/operators/advance/thread_mapped.hxx>
 #include <gunrock/framework/operators/advance/block_mapped.hxx>
-#include <gunrock/framework/operators/advance/all_edges.hxx>
 
 namespace gunrock {
 namespace operators {
@@ -31,11 +30,11 @@ namespace advance {
  * @brief An advance operator generates a new frontier from an input frontier
  * by visiting the neighbors of the input frontier.
  *
- * @par A frontier can consist of either vertices or edges, and an advance step
- * can input and output either kind of frontier. The output frontier only
- * contains the neighbors and not the source vertex/edges of the input frontier.
- *
- * @par Advance is an irregularly-parallel operation for two reasons:
+ * @par Overview
+ * A frontier can consist of either vertices or edges, and an advance step can
+ * input and output either kind of frontier. The output frontier only contains
+ * the neighbors and not the source vertex/edges of the input frontier. Advance
+ * is an irregularly-parallel operation for two reasons:
  *  1. different vertices in a graph have different numbers of neighbors and
  *  2. vertices share neighbors.
  * Thus a vertex in an input frontier map to multiple output items. An efficient
@@ -63,16 +62,16 @@ namespace advance {
  *    G, sample, input_frontier, output_frontier, storage, context);
  *  \endcode
  *
- * @tparam type @see `gunrock::operators::advance_type_t` enum for available
+ * @tparam type `gunrock::operators::advance_type_t` enum for available
  * advance types. Default is `advance_type_t::vertex_to_vertex`.
- * @tparam direction @see `gunrock::operators::advance_direction_t` enum.
+ * @tparam direction `gunrock::operators::advance_direction_t` enum.
  * Determines the direction when advancing the input frontier (foward, backward,
  * both).
- * @tparam lb @see `gunrock::operators::load_balance_t` enum, determines which
+ * @tparam lb `gunrock::operators::load_balance_t` enum, determines which
  * load-balancing algorithm to use when running advance.
- * @tparam graph_t @see `gunrock::graph_t` struct.
+ * @tparam graph_t `gunrock::graph_t` struct.
  * @tparam operator_t is the type of the lambda function being passed in.
- * @tparam frontier_t @see `gunrock::frontier_t`.
+ * @tparam frontier_t `gunrock::frontier_t`.
  * @tparam work_tiles_t type of the storaged space for scanned items.
  *
  * @param G input graph used to determine the neighboring vertex/edges of the
@@ -113,9 +112,6 @@ void execute(graph_t& G,
     } else if (lb == load_balance_t::block_mapped) {
       block_mapped::execute<type, direction>(G, op, input, output, segments,
                                              *context0);
-    } else if (lb == load_balance_t::all_edges) {
-      all_edges::execute<type, direction>(G, op, input, output, segments,
-                                          *context0);
     } else {
       error::throw_if_exception(cudaErrorUnknown,
                                 "Advance type not supported.");
@@ -134,15 +130,15 @@ void execute(graph_t& G,
  * @brief An advance operator generates a new frontier from an input frontier
  * by visiting the neighbors of the input frontier.
  *
- * @par A frontier can consist of either vertices or edges, and an advance step
- * can input and output either kind of frontier. The output frontier only
- * contains the neighbors and not the source vertex/edges of the input frontier.
- *
- * @par Advance is an irregularly-parallel operation for two reasons: 1)
- * different vertices in a graph have different numbers of neighbors and 2)
- * vertices share neighbors. Thus a vertex in an input frontier map to multiple
- * output items. An efficient advance is the most significant challenge of a GPU
- * implementation.
+ * @par Overview
+ * A frontier can consist of either vertices or edges, and an advance step can
+ * input and output either kind of frontier. The output frontier only contains
+ * the neighbors and not the source vertex/edges of the input frontier. Advance
+ * is an irregularly-parallel operation for two reasons:
+ *  1. different vertices in a graph have different numbers of neighbors and
+ *  2. vertices share neighbors.
+ * Thus a vertex in an input frontier map to multiple output items. An efficient
+ * advance is the most significant challenge of a GPU implementation.
  *
  * @par Example
  *  The following code is a simple snippet on how to use advance within the
@@ -166,14 +162,14 @@ void execute(graph_t& G,
  *    G, E, sample, context);
  *  \endcode
  *
- * @tparam type @see `gunrock::operators::advance_type_t` enum for available
+ * @tparam type `gunrock::operators::advance_type_t` enum for available
  * advance types. Default is `advance_type_t::vertex_to_vertex`.
- * @tparam direction @see `gunrock::operators::advance_direction_t` enum.
+ * @tparam direction `gunrock::operators::advance_direction_t` enum.
  * Determines the direction when advancing the input frontier (foward, backward,
  * both).
- * @tparam lb @see `gunrock::operators::load_balance_t` enum, determines which
+ * @tparam lb `gunrock::operators::load_balance_t` enum, determines which
  * load-balancing algorithm to use when running advance.
- * @tparam graph_t @see `gunrock::graph_t` struct.
+ * @tparam graph_t `gunrock::graph_t` struct.
  * @tparam enactor_type is the type of the enactor being passed in.
  * @tparam operator_type is the type of the lambda function being passed in.
  *
@@ -208,11 +204,11 @@ void execute(graph_t& G,
                                context                    // gpu context
   );
 
-  /**
+  /*!
    * @note if the Enactor interface is used, we, the library writers assume
    * control of the frontiers and swap the input/output buffers as needed,
    * meaning; Swap frontier buffers, output buffer now becomes the input buffer
-   * and vice-versa.
+   * and vice-versa. This can be overridden by `swap_buffers`.
    */
   if (swap_buffers)
     E->swap_frontier_buffers();
