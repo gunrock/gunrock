@@ -53,7 +53,7 @@ struct enactor_properties_t {
  * loop) to extend the enactor to implement a graph algorithm.
  *
  * @par Overview
- * Note that the enactor's @see `enact()` member can be extended to support
+ * Note that the enactor's `enact()` member can be extended to support
  * multi-gpu contexts (using execution policies like model). Enactor also has
  * pure virtual functions, which **must** be implemented within the graph
  * algorithm by the developers. These functions prepare the initial frontier of
@@ -65,7 +65,7 @@ struct enactor_properties_t {
  * @see is_converged()
  *
  * @tparam algorithm_problem_t algorithm specific problem type.
- * @tparam frontier_kind @see `gunrock::frontier_kind_t` enum (vertex or
+ * @tparam frontier_kind `gunrock::frontier_kind_t` enum (vertex or
  * edge-based frontier). Currently, only vertex frontier is supported.
  *
  */
@@ -86,7 +86,8 @@ struct enactor_t {
   enactor_properties_t properties;
 
   /*!
-   * A shared_ptr to a multi-gpu context @see `gunrock::cuda::multi_context_t`.
+   * A shared_ptr to a multi-gpu context.
+   * @see `gunrock::cuda::multi_context_t`
    */
   std::shared_ptr<cuda::multi_context_t> context;
 
@@ -147,7 +148,7 @@ struct enactor_t {
    * @param _context shared pointer to the cuda::multi_context_t context that
    * stores information about multiple GPUs (such as streams, device ids,
    * events, etc.)
-   * @param _properties @see `gunrock::enactor_properties_t`, includes
+   * @param _properties `gunrock::enactor_properties_t`, includes
    * properties such as frontier resizing factor (default = 2) and number of
    * frontier buffers to create for the enactor.
    */
@@ -232,7 +233,7 @@ struct enactor_t {
    * @brief This is the core of the implementation for any algorithm. Graph
    * algorithm developers should override this virtual function to implement
    * their own `loop` function, which loops till a convergence condition is
-   * met @see `is_converged()`.
+   * met `is_converged()`.
    *
    * @par Overview
    * This function is on the host and is timed, so make sure you are writing the
@@ -240,7 +241,7 @@ struct enactor_t {
    * function if they are not part of the algorithm's core, or running API calls
    * that are incredibly slow (such as `printfs` or debug statements).
    *
-   * @param context @see `gunrock::cuda::multi_context_t`.
+   * @param context `gunrock::cuda::multi_context_t`.
    */
   virtual void loop(cuda::multi_context_t& context) = 0;
 

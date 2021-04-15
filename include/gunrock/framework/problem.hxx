@@ -24,7 +24,7 @@ namespace gunrock {
  * replicated or partitioned to multiple instances (for example, in a multi-gpu
  * context).
  *
- * @tparam graph_t @see `gunrock::graph_t` struct.
+ * @tparam graph_t `gunrock::graph_t` struct.
  */
 template <typename graph_t>
 struct problem_t {
