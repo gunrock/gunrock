@@ -1,5 +1,5 @@
 /**
- * @file sssp_implementation.hxx
+ * @file sssp.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Single-Source Shortest Path algorithm.
  * @version 0.1
@@ -48,25 +48,31 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   thrust::device_vector<vertex_t> visited;
 
-  void init() {
+  void init() override {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
     visited.resize(n_vertices);
-    thrust::fill(thrust::device, visited.begin(), visited.end(), -1);
+
+    // Execution policy for a given context (using single-gpu).
+    auto policy = this->context->get_context(0)->execution_policy();
+    thrust::fill(policy, visited.begin(), visited.end(), -1);
   }
 
-  void reset() {
+  void reset() override {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
 
+    auto context = this->get_single_context();
+    auto policy = context->execution_policy();
+
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
-    thrust::fill(thrust::device, d_distances + 0, d_distances + n_vertices,
+    thrust::fill(policy, d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<weight_t>::max());
 
-    thrust::fill(thrust::device, d_distances + this->param.single_source,
+    thrust::fill(policy, d_distances + this->param.single_source,
                  d_distances + this->param.single_source + 1, 0);
 
-    thrust::fill(thrust::device, visited.begin(), visited.end(),
+    thrust::fill(policy, visited.begin(), visited.end(),
                  -1);  // This does need to be reset in between runs though
   }
 };

@@ -267,13 +267,15 @@ struct problem_t : gunrock::problem_t<graph_t> {
         param(_param),
         result(_result) {}
 
-  void init() {
+  void init() override {
     auto g = this->get_graph();
     auto n_edges = g.get_number_of_edges();
     inv_haversine_distance.resize(n_edges);
   }
 
-  void reset() {}
+  void reset() override {
+    /// @todo reset the coordinates and inv_haversine_distance arrays.
+  }
 };
 
 template <typename problem_t>
@@ -287,12 +289,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   // <user-defined>
   void prepare_frontier(frontier_t<vertex_t>* f,
                         cuda::multi_context_t& context) override {
-    auto P = this->get_problem();
-    auto n_vertices = P->get_graph().get_number_of_vertices();
-
-    // XXX: Find a better way to initialize the frontier to all nodes
-    for (vertex_t v = 0; v < n_vertices; ++v)
-      f->push_back(v);
+    // Geolocation does not need a frontier as its frontier is the entire graph.
   }
 
   void loop(cuda::multi_context_t& context) override {
@@ -315,81 +312,78 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
      *        if points == 2; center = midpoint;
      *        if points > 2; center = spatial median;
      */
-    auto spatial_center_op =
-        [G, coordinates, inv_haversine_distance, spatial_iterations,
-         f_data] __host__
-        __device__(std::size_t const& tid) {
-          vertex_t v = f_data[tid];
+    auto spatial_center_op = [=] __device__(vertex_t const& v) -> void {
+      if (gunrock::util::limits::is_valid(coordinates[v].latitude) &&
+          gunrock::util::limits::is_valid(coordinates[v].longitude))
+        return;
 
-          if (gunrock::util::limits::is_valid(coordinates[v].latitude) &&
-              gunrock::util::limits::is_valid(coordinates[v].longitude))
-            return;
+      // if no predicted location, and neighbor locations exists
+      // Custom spatial center median calculation for geolocation
+      // start median calculation -->
+      auto start_edge = G.get_starting_edge(v);
+      auto num_neighbors = G.get_number_of_neighbors(v);
 
-          // if no predicted location, and neighbor locations exists
-          // Custom spatial center median calculation for geolocation
-          // start median calculation -->
-          auto start_edge = G.get_starting_edge(v);
-          auto num_neighbors = G.get_number_of_neighbors(v);
+      auto valid_neighbors = 0;
+      coordinates_t neighbors[2];  // for length <=2 use registers
 
-          auto valid_neighbors = 0;
-          coordinates_t neighbors[2];  // for length <=2 use registers
+      for (auto e = start_edge; e < start_edge + num_neighbors; e++) {
+        auto u = G.get_destination_vertex(e);
+        if (gunrock::util::limits::is_valid(coordinates[u].latitude) &&
+            gunrock::util::limits::is_valid(coordinates[u].longitude)) {
+          neighbors[valid_neighbors % 2].latitude =
+              coordinates[u].latitude;  // last valid latitude
+          neighbors[valid_neighbors % 2].longitude =
+              coordinates[u].longitude;  // last valid longitude
+          valid_neighbors++;
+        }
+      }
 
-          for (auto e = start_edge; e < start_edge + num_neighbors; e++) {
-            auto u = G.get_destination_vertex(e);
-            if (gunrock::util::limits::is_valid(coordinates[u].latitude) &&
-                gunrock::util::limits::is_valid(coordinates[u].longitude)) {
-              neighbors[valid_neighbors % 2].latitude =
-                  coordinates[u].latitude;  // last valid latitude
-              neighbors[valid_neighbors % 2].longitude =
-                  coordinates[u].longitude;  // last valid longitude
-              valid_neighbors++;
-            }
-          }
+      // If one location found, point at that location
+      if (valid_neighbors == 1) {
+        coordinates_t only_neighbor;
+        if (gunrock::util::limits::is_valid(neighbors[0].latitude) &&
+            gunrock::util::limits::is_valid(neighbors[0].longitude)) {
+          only_neighbor.latitude = neighbors[0].latitude;
+          only_neighbor.longitude = neighbors[0].longitude;
+        } else {
+          only_neighbor.latitude = neighbors[1].latitude;
+          only_neighbor.longitude = neighbors[1].longitude;
+        }
+        coordinates[v].latitude = only_neighbor.latitude;
+        coordinates[v].longitude = only_neighbor.longitude;
+        return;
+      }
 
-          // If one location found, point at that location
-          if (valid_neighbors == 1) {
-            coordinates_t only_neighbor;
-            if (gunrock::util::limits::is_valid(neighbors[0].latitude) &&
-                gunrock::util::limits::is_valid(neighbors[0].longitude)) {
-              only_neighbor.latitude = neighbors[0].latitude;
-              only_neighbor.longitude = neighbors[0].longitude;
-            } else {
-              only_neighbor.latitude = neighbors[1].latitude;
-              only_neighbor.longitude = neighbors[1].longitude;
-            }
-            coordinates[v].latitude = only_neighbor.latitude;
-            coordinates[v].longitude = only_neighbor.longitude;
-            return;
-          }
+      // If two locations found, compute a midpoint
+      else if (valid_neighbors == 2) {
+        coordinates[v] = midpoint(neighbors[0], neighbors[1], v);
+        return;
+      }
 
-          // If two locations found, compute a midpoint
-          else if (valid_neighbors == 2) {
-            coordinates[v] = midpoint(neighbors[0], neighbors[1], v);
-            return;
-          }
+      // if locations more than 2, compute spatial median.
+      else if (valid_neighbors > 2) {
+        spatial_median(G, valid_neighbors, coordinates, v,
+                       inv_haversine_distance, spatial_iterations);
+      }
 
-          // if locations more than 2, compute spatial median.
-          else if (valid_neighbors > 2) {
-            spatial_median(G, valid_neighbors, coordinates, v,
-                           inv_haversine_distance, spatial_iterations);
-          }
+      // if no valid locations are found
+      else {
+        coordinates[v].latitude = gunrock::numeric_limits<float>::invalid();
+        coordinates[v].longitude = gunrock::numeric_limits<float>::invalid();
+      }
 
-          // if no valid locations are found
-          else {
-            coordinates[v].latitude = gunrock::numeric_limits<float>::invalid();
-            coordinates[v].longitude =
-                gunrock::numeric_limits<float>::invalid();
-          }
+      // <-- end median calculation.
+    };
 
-          // <-- end median calculation.
-        };
-
-    // We can implement this better with filter, but for now, lets use a
-    // parallel for to keep the implementation the same as gunrock.
-    // operators::parallel_for::execute(f->begin(), f->end(), spatial_center_op,
-    //                                  context);
-    operators::parallel_for::execute(0, G.get_number_of_vertices(),
-                                     spatial_center_op, context);
+    /*!
+     * For each vertex, run the spatial center operation.
+     * @todo We can possibly do better with a filter operator instead.
+     */
+    operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
+        G,                  // graph
+        spatial_center_op,  // lambda function
+        context             // context
+    );
   }
 
   bool is_converged(cuda::multi_context_t& context) override {

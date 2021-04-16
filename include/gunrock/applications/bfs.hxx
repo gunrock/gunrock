@@ -46,11 +46,11 @@ struct problem_t : gunrock::problem_t<graph_t> {
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
 
-  thrust::device_vector<vertex_t> visited;
+  thrust::device_vector<vertex_t> visited;  /// @todo not used.
 
-  void init() {}
+  void init() override {}
 
-  void reset() {
+  void reset() override {
     auto n_vertices = this->get_graph().get_number_of_vertices();
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
     thrust::fill(thrust::device, d_distances + 0, d_distances + n_vertices, -1);

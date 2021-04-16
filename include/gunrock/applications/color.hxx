@@ -46,7 +46,15 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   thrust::device_vector<vertex_t> randoms;
 
-  void reset() {
+  void init() override {
+    auto g = this->get_graph();
+    auto n_vertices = g.get_number_of_vertices();
+
+    // Allocate space for randoms array.
+    randoms.resize(n_vertices);
+  }
+
+  void reset() override {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
     auto d_colors = thrust::device_pointer_cast(this->result.colors);
@@ -54,7 +62,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
                  gunrock::numeric_limits<vertex_t>::invalid());
 
     // Generate random numbers.
-    randoms.resize(n_vertices);
     algo::generate::random::uniform_distribution(0, n_vertices,
                                                  randoms.begin());
   }
@@ -74,9 +81,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto P = this->get_problem();
     auto n_vertices = P->get_graph().get_number_of_vertices();
 
-    // XXX: Find a better way to initialize the frontier to all nodes
-    for (vertex_t v = 0; v < n_vertices; ++v)
-      f->push_back(v);
+    // Fill the frontier with a sequence of vertices from 0 -> n_vertices.
+    f->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
   }
 
   void loop(cuda::multi_context_t& context) override {
