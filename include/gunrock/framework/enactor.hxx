@@ -218,14 +218,15 @@ struct enactor_t {
    * **the** time for performance measurements).
    */
   float enact() {
-    auto context0 = context->get_context(0);
+    auto single_context = context->get_context(0);
     prepare_frontier(get_input_frontier(), *context);
-    auto timer = context0->timer();
+    auto timer = single_context->timer();
     timer.begin();
     while (!is_converged(*context)) {
       loop(*context);
       ++iteration;
     }
+    finalize(*context);
     return timer.end();
   }
 
@@ -248,7 +249,7 @@ struct enactor_t {
   /**
    * @brief Prepare the initial frontier.
    *
-   * @param context
+   * @param context `gunrock::cuda::multi_context_t`.
    */
   virtual void prepare_frontier(frontier_type* f,
                                 cuda::multi_context_t& context) = 0;
@@ -270,6 +271,18 @@ struct enactor_t {
   virtual bool is_converged(cuda::multi_context_t& context) {
     return active_frontier->is_empty();
   }
+
+  /**
+   * @brief `finalize()` runs only once, and after the `while()` has ended.
+   *
+   * @par Finalize runs after the convergence condition is met in
+   * `is_converged()`. Users can extend the following virtual function to do a
+   * one final wrap-up of the application. Users are not required to implement
+   * this function.
+   *
+   * @param context `gunrock::cuda::multi_context_t`.
+   */
+  virtual void finalize(cuda::multi_context_t& context) {}
 
 };  // struct enactor_t
 
