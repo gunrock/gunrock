@@ -214,7 +214,7 @@ typename GraphT::SizeT Validate_Results(
 
   if (!quiet && verbose) {
     // Display Solution
-    DisplaySolution(h_bc_values, h_sigmas, num_vertices, quiet);
+    DisplaySolution(h_sigmas, h_bc_values, num_vertices, quiet);
   }
 
   return num_errors;
