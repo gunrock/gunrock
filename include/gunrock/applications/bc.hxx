@@ -114,6 +114,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto labels        = P->labels.data().get();
     auto bc_values     = P->result.bc_values;
     auto deltas        = P->deltas.data().get();
+    auto depth_        = depth;
 
     if(forward) {
       auto forward_op = [sigmas, labels] __host__ __device__(
@@ -134,12 +135,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                   operators::load_balance_t::merge_path>(
           G, E, forward_op, context);
       
-      depth++;
+      this->depth++;
       
     } else {
-      auto backward_op = [sigmas, labels, bc_values, deltas, single_source] __host__ __device__(
+      auto backward_op = [sigmas, labels, bc_values, deltas, single_source, depth_] __host__ __device__(
         vertex_t const& src, vertex_t const& dst,
         edge_t const& edge, weight_t const& weight) -> bool {
+        
+        if(labels[src] != depth_) return false;
         
         auto s_label = labels[src];
         auto d_label = labels[dst];
@@ -158,7 +161,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                   operators::load_balance_t::merge_path>(
           G, E, backward_op, context);
       
-      depth--;
+      this->depth--;
+      E->swap_frontier_buffers();  // swap back
     }
   }
 
@@ -178,12 +182,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         auto labels     = P->labels.data().get();
         
         this->active_frontier->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
-        auto filter_labels = [labels, iteration] __host__ __device__(vertex_t const& vertex) -> bool {
-          return labels[vertex] == iteration - 3; // might be wrong
-        };
+        // auto filter_labels = [labels, iteration] __host__ __device__(vertex_t const& vertex) -> bool {
+        //   return labels[vertex] == iteration - 3; // might be wrong
+        // };
         
-        operators::filter::execute<operators::filter_algorithm_t::predicated>(
-          G, E, filter_labels, context);
+        // operators::filter::execute<operators::filter_algorithm_t::predicated>(
+        //   G, E, filter_labels, context);
 
         forward  = false;
         depth    = iteration - 1; // might be wrong
