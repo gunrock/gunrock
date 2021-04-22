@@ -142,27 +142,27 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         vertex_t const& src, vertex_t const& dst,
         edge_t const& edge, weight_t const& weight) -> bool {
         
-        if(labels[src] != depth_) return false;
+        if(src == single_source)   return false;
         
         auto s_label = labels[src];
+        if(labels[src] != depth_)  return false;
+        
         auto d_label = labels[dst];
         if(d_label != s_label + 1) return false;
-        if(src == single_source)   return true;
         
         auto update = sigmas[src] / sigmas[dst] * (1 + deltas[dst]);
         math::atomic::add(deltas + src, update);
         math::atomic::add(bc_values + src, update);
         
-        return true;
+        return false;
       };
             
       operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
                                   operators::advance_direction_t::forward,
                                   operators::load_balance_t::merge_path>(
-          G, E, backward_op, context);
+          G, E, backward_op, context, false);
       
       this->depth--;
-      E->swap_frontier_buffers();  // swap back
     }
   }
 
@@ -182,15 +182,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         auto labels     = P->labels.data().get();
         
         this->active_frontier->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
-        // auto filter_labels = [labels, iteration] __host__ __device__(vertex_t const& vertex) -> bool {
-        //   return labels[vertex] == iteration - 3; // might be wrong
-        // };
-        
-        // operators::filter::execute<operators::filter_algorithm_t::predicated>(
-        //   G, E, filter_labels, context);
-
         forward  = false;
-        depth    = iteration - 1; // might be wrong
+        depth    = iteration - 1;
       }
       
       return false;
