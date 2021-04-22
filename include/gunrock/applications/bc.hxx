@@ -11,8 +11,6 @@
 #pragma once
 
 #include <gunrock/applications/application.hxx>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/inner_product.h>
 
 namespace gunrock {
 namespace bc {
@@ -207,29 +205,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         return false;
       }
     }
-    
-    // if (this->iteration == 0)
-    //   return false;
-
-    // auto P = this->get_problem();
-    // auto G = P->get_graph();
-    // auto tol = P->param.tol;
-
-    // auto n_vertices = G.get_number_of_vertices();
-    // auto p = P->result.p;
-    // auto plast = P->plast.data().get();
-
-    // auto abs_diff = [=] __device__(const int& i) -> weight_t {
-    //   return abs(p[i] - plast[i]);
-    // };
-
-    // auto policy = this->context->get_context(0)->execution_policy();
-    // float err = thrust::transform_reduce(
-    //     policy, thrust::counting_iterator<vertex_t>(0),
-    //     thrust::counting_iterator<vertex_t>(n_vertices), abs_diff,
-    //     (weight_t)0.0, thrust::maximum<weight_t>());
-
-    // return err < tol;
   }
 
 };  // struct enactor_t
