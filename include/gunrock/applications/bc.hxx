@@ -117,6 +117,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto depth_        = depth;
 
     if(forward) {
+      // This should be ~ identical to original gunrock
       auto forward_op = [sigmas, labels] __host__ __device__(
         vertex_t const& src, vertex_t const& dst,
         edge_t const& edge, weight_t const& weight) -> bool {
@@ -138,17 +139,23 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       this->depth++;
       
     } else {
+      // XXX: This isn't the same as the original Gunrock implementation
+      //      I think you should be able to traverse the frontiers in reverse, but I couldn't 
+      //      figure out how to do that w/o calling `uniquify` after every iteration, which seems bad
+      //      
+      //      Also -- if we're sticking w/ this algorithm -- `parallel_for` is probably a better method
+      //      but it doesn't seem to be working -- need to test.
       auto backward_op = [sigmas, labels, bc_values, deltas, single_source, depth_] __host__ __device__(
         vertex_t const& src, vertex_t const& dst,
         edge_t const& edge, weight_t const& weight) -> bool {
         
-        if(src == single_source)   return false;
+        if(src == single_source) return false;
         
         auto s_label = labels[src];
-        if(labels[src] != depth_)  return false;
+        if(s_label != depth_)  return false;
         
         auto d_label = labels[dst];
-        if(d_label != s_label + 1) return false;
+        if(s_label + 1 != d_label) return false;
         
         auto update = sigmas[src] / sigmas[dst] * (1 + deltas[dst]);
         math::atomic::add(deltas + src, update);
@@ -174,24 +181,19 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     
     auto n_vertices = G.get_number_of_vertices();
     
+    // XXX: `bc` is a two-phase algorithm -- is there a better way to support this in the API?
     if(forward) {
       bool forward_converged = this->active_frontier->is_empty();
       if(forward_converged) {
-        
-        auto iteration = this->iteration;
-        auto labels     = P->labels.data().get();
-        
+        forward = false;
         this->active_frontier->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
-        forward  = false;
-        depth    = iteration - 1;
       }
       
       return false;
       
     } else {
-      printf("backward depth %d\n", depth);
-            
-      if(depth == 0) {
+      if(depth == 0 || this->active_frontier->is_empty()) {
+        // XXX: "final operation" -- is there a better way to support these kinds of things in the API?
         auto policy     = this->context->get_context(0)->execution_policy();
         auto bc_values  = P->result.bc_values;
         
