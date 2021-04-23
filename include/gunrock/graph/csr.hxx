@@ -55,9 +55,19 @@ class graph_csr_t {
 
   __host__ __device__ __forceinline__ vertex_type
   get_source_vertex(edge_type const& e) const {
-    // XXX: I am dumb, idk if this is upper or lower bound?
-    return (vertex_type)algo::search::binary::upper_bound(
-        get_row_offsets(), e, this->number_of_vertices);
+    auto keys = get_row_offsets();
+    auto key = e;
+
+    // returns `it` such that everything to the left is <= e.
+    // This will be one element to the right of the node id.
+    auto it = thrust::lower_bound(
+        thrust::seq, thrust::counting_iterator<edge_t>(0),
+        thrust::counting_iterator<edge_t>(this->number_of_vertices), key,
+        [keys] __host__ __device__(const edge_t& pivot, const edge_t& key) {
+          return keys[pivot] <= key;
+        });
+
+    return (*it) - 1;
   }
 
   __host__ __device__ __forceinline__ vertex_type
