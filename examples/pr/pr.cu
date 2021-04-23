@@ -60,19 +60,13 @@ void test_sssp(int num_arguments, char** argument_array) {
   // --
   // GPU Run
   
-  std::cout << "gunrock::pr::run -- starting" << std::endl;
   float gpu_elapsed = gunrock::pr::run(G, alpha, tol, p.data().get());
-  std::cout << "gunrock::pr::run -- complete" << std::endl;
 
   // --
   // Log + Validate
 
-  std::cout << "GPU p (output) = ";
-  thrust::copy(p.begin(),
-               (p.size() < 40) ? p.begin() + p.size()
-                                       : p.begin() + 40,
-               std::ostream_iterator<weight_t>(std::cout, " "));
-  std::cout << std::endl;
+  std::cout << "GPU p[:40] = ";
+  gunrock::print::head<weight_t>(p, 40);
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 }
 
