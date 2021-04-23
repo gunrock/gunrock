@@ -19,6 +19,7 @@
 
 // Utility includes
 #include <gunrock/util/math.hxx>
+#include <gunrock/util/print.hxx>
 
 // Format includes
 #include <gunrock/formats/formats.hxx>

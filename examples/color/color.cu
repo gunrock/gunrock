@@ -48,16 +48,15 @@ void test_color(int num_arguments, char** argument_array) {
   // --
   // Run problem
 
-  float elapsed = gunrock::color::run(G, colors.data().get());
+  float gpu_elapsed = gunrock::color::run(G, colors.data().get());
 
   // --
   // Log
 
-  std::cout << "Colors (output) = ";
-  thrust::copy(colors.begin(), colors.end(),
-               std::ostream_iterator<weight_t>(std::cout, " "));
+  std::cout << "colors[:40] = ";
+  gunrock::print::head<weight_t>(colors, 40);
   std::cout << std::endl;
-  std::cout << "color Elapsed Time: " << elapsed << " (ms)" << std::endl;
+  std::cout << "GPU Elapsed Time: " << gpu_elapsed << " (ms)" << std::endl;
 }
 
 int main(int argc, char** argv) {

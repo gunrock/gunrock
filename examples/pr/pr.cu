@@ -16,18 +16,24 @@ void test_sssp(int num_arguments, char** argument_array) {
   using edge_t = int;
   using weight_t = float;
 
+  using csr_t = format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  csr_t csr;
+  
   // --
   // IO
 
   std::string filename = argument_array[1];
-
-  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-
-  using csr_t =
-      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
-  csr_t csr;
-  csr.from_coo(mm.load(filename));
-
+   
+  if(util::is_market(filename)) {
+    io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+    csr.from_coo(mm.load(filename));
+  } else if(util::is_binary_csr(filename)) {
+    csr.read_binary(filename);
+  } else {
+    std::cerr << "Unknown file format: " << filename << std::endl;
+    exit(1);
+  }
+  
   // --
   // Build graph
 
@@ -54,19 +60,13 @@ void test_sssp(int num_arguments, char** argument_array) {
   // --
   // GPU Run
   
-  std::cout << "gunrock::pr::run -- starting" << std::endl;
   float gpu_elapsed = gunrock::pr::run(G, alpha, tol, p.data().get());
-  std::cout << "gunrock::pr::run -- complete" << std::endl;
 
   // --
   // Log + Validate
 
-  std::cout << "GPU p (output) = ";
-  thrust::copy(p.begin(),
-               (p.size() < 40) ? p.begin() + p.size()
-                                       : p.begin() + 40,
-               std::ostream_iterator<weight_t>(std::cout, " "));
-  std::cout << std::endl;
+  std::cout << "GPU p[:40] = ";
+  gunrock::print::head<weight_t>(p, 40);
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 }
 
