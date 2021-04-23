@@ -146,3 +146,15 @@ option(ESSENTIALS_BUILD_EXAMPLES
 if(ESSENTIALS_BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif(ESSENTIALS_BUILD_EXAMPLES)
+
+####################################################
+################ BUILD UNIT TESTS  #################
+####################################################
+option(ESSENTIALS_BUILD_TESTS
+  "If on, builds the unit tests."
+  OFF)
+
+# Subdirectories for examples, testing and documentation
+if(ESSENTIALS_BUILD_TESTS)
+  add_subdirectory(unittests)
+endif(ESSENTIALS_BUILD_TESTS)
