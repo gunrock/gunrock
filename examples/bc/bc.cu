@@ -62,7 +62,7 @@ void test_sssp(int num_arguments, char** argument_array) {
   // --
   // Log + Validate
 
-  std::cout << "GPU sigmas (output) = ";
+  std::cout << "GPU sigmas (output)    = ";
   thrust::copy(sigmas.begin(),
                (sigmas.size() < 40) ? sigmas.begin() + sigmas.size()
                                        : sigmas.begin() + 40,
