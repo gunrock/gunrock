@@ -48,12 +48,16 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   thrust::device_vector<vertex_t> labels;
   thrust::device_vector<weight_t> deltas;
+  
+  thrust::device_vector<vertex_t> my_frontiers;
+  thrust::host_vector<vertex_t> offsets;
 
   void init() override {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
     labels.resize(n_vertices);
     deltas.resize(n_vertices);
+    my_frontiers.resize(n_vertices);
   }
 
   void reset() override {
@@ -63,22 +67,24 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto g = this->get_graph();
 
     auto n_vertices = g.get_number_of_vertices();
-
+    
     auto d_sigmas    = thrust::device_pointer_cast(this->result.sigmas);
     auto d_bc_values = thrust::device_pointer_cast(this->result.bc_values);
     auto d_labels    = thrust::device_pointer_cast(labels.data());
     auto d_deltas    = thrust::device_pointer_cast(deltas.data());
-
+    auto d_my_frontiers = thrust::device_pointer_cast(my_frontiers.data());
+    
     thrust::fill_n(policy, d_sigmas,    n_vertices, 0);
     thrust::fill_n(policy, d_bc_values, n_vertices, 0);
     thrust::fill_n(policy, d_labels,    n_vertices, -1);
     thrust::fill_n(policy, d_deltas,    n_vertices, 0);
 
-    thrust::fill(policy, d_sigmas + this->param.single_source,
-                 d_sigmas + this->param.single_source + 1, 1);
-                 
-    thrust::fill(policy, d_labels + this->param.single_source,
-                 d_labels + this->param.single_source + 1, 0);
+    thrust::fill(policy, d_sigmas + this->param.single_source, d_sigmas + this->param.single_source + 1, 1);
+    thrust::fill(policy, d_labels + this->param.single_source, d_labels + this->param.single_source + 1, 0);
+
+    offsets.clear();
+    offsets.push_back(0);
+    thrust::fill_n(policy, d_my_frontiers, n_vertices, -1);
   }
 };
 
@@ -112,7 +118,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto labels        = P->labels.data().get();
     auto bc_values     = P->result.bc_values;
     auto deltas        = P->deltas.data().get();
+    auto offsets       = P->offsets;
+    auto my_frontiers  = P->my_frontiers.data().get();
     auto depth_        = depth;
+
+    auto policy = context.get_context(0)->execution_policy();
 
     if(forward) {
       // This should be ~ identical to original gunrock
@@ -136,13 +146,62 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       
       this->depth++;
       
+      // >>
+      // std::cout << "forward" << std::endl;
+      
+      
+
+      auto predicate = [=] __host__ __device__(vertex_t const& i) -> bool {
+        return i != -1;
+      };
+
+      auto output = P->my_frontiers.begin() + offsets.back();
+      auto ptr = thrust::copy_if(
+        policy,
+        this->active_frontier->begin(),
+        this->active_frontier->end(),
+        output,
+        predicate
+      );
+
+      auto new_offset = thrust::distance(P->my_frontiers.begin(), ptr);
+      P->offsets.push_back(new_offset);
+      
+      // // >>
+      // // Logging
+      // std::cout << "my_frontiers:" << std::endl;
+      // thrust::host_vector<vertex_t> tmp;
+      // tmp = P->my_frontiers;
+      // thrust::copy(tmp.begin(), tmp.end(), std::ostream_iterator<vertex_t>(std::cout, " "));
+      // std::cout << std::endl;
+      
+      // std::cout << "offsets:" << std::endl;
+      // thrust::copy(P->offsets.begin(), P->offsets.end(), std::ostream_iterator<vertex_t>(std::cout, " "));
+      // std::cout << std::endl;
+      // // <<
+      
     } else {
-      // XXX: This isn't the same as the original Gunrock implementation
-      //      I think you should be able to traverse the frontiers in reverse, but I couldn't 
-      //      figure out how to do that w/o calling `uniquify` after every iteration, which seems bad
-      //      
-      //      Also -- if we're sticking w/ this algorithm -- `parallel_for` is probably a better method
-      //      but it doesn't seem to be working -- need to test.
+      
+      // std::cout << "backward" << std::endl;
+
+      // std::cout << "offsets:" << std::endl;
+      // thrust::copy(P->offsets.begin(), P->offsets.end(), std::ostream_iterator<vertex_t>(std::cout, " "));
+      // std::cout << std::endl;
+      
+      auto offset1 = P->offsets.back();
+      P->offsets.pop_back();
+      auto offset0 = P->offsets.back();
+      this->active_frontier->set_number_of_elements(offset1 - offset0);
+      
+      thrust::copy(
+        policy,
+        P->my_frontiers.begin() + offset0,
+        P->my_frontiers.begin() + offset1,
+        this->active_frontier->begin()
+      );
+      
+      // this->active_frontier->print();
+      
       auto backward_op = [sigmas, labels, bc_values, deltas, single_source, depth_] __host__ __device__(
         vertex_t const& src, vertex_t const& dst,
         edge_t const& edge, weight_t const& weight) -> bool {
@@ -184,13 +243,13 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       bool forward_converged = this->active_frontier->is_empty();
       if(forward_converged) {
         forward = false;
-        this->active_frontier->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
+        // this->active_frontier->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
       }
       
       return false;
       
     } else {
-      if(depth == 0 || this->active_frontier->is_empty()) {
+      if(depth == 0) { // || this->active_frontier->is_empty()) {
         // XXX: "final operation" -- is there a better way to support these kinds of things in the API?
         auto policy     = this->context->get_context(0)->execution_policy();
         auto bc_values  = P->result.bc_values;
