@@ -49,15 +49,19 @@ struct problem_t : gunrock::problem_t<graph_t> {
   thrust::device_vector<vertex_t> labels;
   thrust::device_vector<weight_t> deltas;
   
-  thrust::device_vector<vertex_t> frontier_hist;
-  thrust::device_vector<vertex_t> offsets;
+  thrust::host_vector<frontier_t<vertex_t>> my_frontiers;
 
   void init() override {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
     labels.resize(n_vertices);
     deltas.resize(n_vertices);
-    frontier_hist.resize(n_vertices);
+    
+    // !! HACK: Because I get segfaults if I allocate frontiers in loop
+    for(int i = 0 ; i < 1000; i++) {
+      frontier_t<vertex_t> f;
+      my_frontiers.push_back(f);
+    }
   }
 
   void reset() override {
@@ -72,7 +76,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto d_bc_values     = thrust::device_pointer_cast(this->result.bc_values);
     auto d_labels        = thrust::device_pointer_cast(labels.data());
     auto d_deltas        = thrust::device_pointer_cast(deltas.data());
-    auto d_frontier_hist = thrust::device_pointer_cast(frontier_hist.data());
     
     thrust::fill_n(policy, d_sigmas,    n_vertices, 0);
     thrust::fill_n(policy, d_bc_values, n_vertices, 0);
@@ -81,10 +84,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
     thrust::fill(policy, d_sigmas + this->param.single_source, d_sigmas + this->param.single_source + 1, 1);
     thrust::fill(policy, d_labels + this->param.single_source, d_labels + this->param.single_source + 1, 0);
-
-    offsets.clear();
-    offsets.push_back(0);
-    thrust::fill_n(policy, d_frontier_hist, n_vertices, -1);
   }
 };
 
@@ -102,8 +101,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   edge_t depth = 0;
 
   void prepare_frontier(frontier_t<vertex_t>* f, cuda::multi_context_t& context) override {
-    auto P = this->get_problem();
-    f->push_back(P->param.single_source);
+    auto P  = this->get_problem();
+    P->my_frontiers[0].push_back(P->param.single_source);
   }
 
   void loop(cuda::multi_context_t& context) override {
@@ -119,8 +118,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto bc_values     = P->result.bc_values;
     auto deltas        = P->deltas.data().get();
     
-    auto offsets       = &P->offsets;
-    auto frontier_hist = P->frontier_hist.data().get();
+    // auto my_frontiers  = &(P->my_frontiers);
 
     auto policy = context.get_context(0)->execution_policy();
 
@@ -140,43 +138,17 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         return old_label == -1;
       };
 
+      auto in_frontier  = &(P->my_frontiers[this->depth]);
+      auto out_frontier = &(P->my_frontiers[this->depth + 1]);
+      
       operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
                                   operators::advance_direction_t::forward,
                                   operators::load_balance_t::merge_path>(
-          G, E, forward_op, context);
+          G, forward_op, in_frontier, out_frontier, E->scanned_work_domain, context);
       
       this->depth++;
-            
-      // Record frontier
-      auto predicate = [=] __host__ __device__(vertex_t const& i) -> bool {
-        return i != -1;
-      };
-
-      auto ptr = thrust::copy_if(
-        policy,
-        this->active_frontier->begin(),
-        this->active_frontier->end(),
-        frontier_hist + offsets->back(),
-        predicate
-      );
-
-      auto new_offset = thrust::distance(frontier_hist, ptr);
-      offsets->push_back(new_offset);
       
     } else {
-      
-      // Restore frontier
-      auto offset1 = offsets->back();
-      offsets->pop_back();
-      auto offset0 = offsets->back();
-      this->active_frontier->set_number_of_elements(offset1 - offset0);
-      
-      thrust::copy(
-        policy,
-        frontier_hist + offset0,
-        frontier_hist + offset1,
-        this->active_frontier->begin()
-      );
       
       // Run advance
       auto backward_op = [sigmas, labels, bc_values, deltas, single_source] __host__ __device__(
@@ -195,18 +167,20 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         
         return false;
       };
-            
+
+      auto in_frontier  = &(P->my_frontiers[this->depth]);
+      auto out_frontier = &(P->my_frontiers[this->depth + 1]);
+      
       operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
                                   operators::advance_direction_t::forward,
                                   operators::load_balance_t::merge_path>(
-          G, E, backward_op, context, false);
+          G, backward_op, in_frontier, out_frontier, E->scanned_work_domain, context);
       
       this->depth--;
     }
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
-
     auto E = this->get_enactor();
     auto P = this->get_problem();
     auto G = P->get_graph();
@@ -215,10 +189,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     
     // XXX: `bc` is a two-phase algorithm -- is there a better way to support this in the API?
     if(forward) {
-      bool forward_converged = this->active_frontier->is_empty();
-      if(forward_converged) {
+      auto out_frontier      = &(P->my_frontiers[this->depth]);
+      bool forward_converged = out_frontier->is_empty();
+      if(forward_converged)
         forward = false;
-      }
       return false;
       
     } else {
@@ -271,8 +245,6 @@ float run(graph_t& G,
   enactor_type enactor(&problem, multi_context);
   return enactor.enact();
   // </boiler-plate>
-  
-  return -1;
 }
 
 }  // namespace pr
