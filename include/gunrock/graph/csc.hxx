@@ -94,8 +94,8 @@ class graph_csc_t {
   //  protected:
   __host__ __device__ void set(vertex_type const& _number_of_vertices,
                                edge_type const& _number_of_edges,
-                               edge_type* Ap,
                                vertex_type* Aj,
+                               edge_type* Ap,
                                weight_type* Ax) {
     this->number_of_vertices = _number_of_vertices;
     this->number_of_edges = _number_of_edges;
