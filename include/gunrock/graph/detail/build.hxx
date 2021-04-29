@@ -48,8 +48,10 @@ auto builder(vertex_t const& r,
                          graph::graph_coo_t<vertex_t, edge_t, weight_t>,
                          empty_coo_t>;
 
-  using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t,
-                                    csc_v_t, coo_v_t>;
+  // using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t,
+  //                                   csc_v_t, coo_v_t>;
+
+  using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, coo_v_t>;
 
   graph_type G;
 
