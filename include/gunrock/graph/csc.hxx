@@ -110,14 +110,14 @@ class graph_csc_t {
   //  protected:
   __host__ __device__ void set(vertex_type const& _number_of_vertices,
                                edge_type const& _number_of_edges,
-                               edge_type* _offsets,
-                               vertex_type* _indices,
+                               edge_type* _column_offsets,
+                               vertex_type* _row_indices,
                                weight_type* _values) {
     this->number_of_vertices = _number_of_vertices;
     this->number_of_edges = _number_of_edges;
     // Set raw pointers
-    offsets = raw_pointer_cast<edge_type>(_offsets);
-    indices = raw_pointer_cast<vertex_type>(_indices);
+    offsets = raw_pointer_cast<edge_type>(_column_offsets);
+    indices = raw_pointer_cast<vertex_type>(_row_indices);
     values  = raw_pointer_cast<weight_type>(_values);
   }
 
