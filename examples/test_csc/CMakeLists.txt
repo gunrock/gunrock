@@ -1,5 +1,5 @@
 # begin /* Set the application name. */
-set(APPLICATION_NAME test_coo)
+set(APPLICATION_NAME test_csc)
 # end /* Set the application name. */
 
 # begin /* Add CUDA executables */

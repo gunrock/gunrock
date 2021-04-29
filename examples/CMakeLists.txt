@@ -4,5 +4,5 @@ add_subdirectory(bfs)
 add_subdirectory(color)
 add_subdirectory(geo)
 add_subdirectory(pr)
-add_subdirectory(test_coo)
+add_subdirectory(test_csc)
 # end /* Add examples' subdirectories */

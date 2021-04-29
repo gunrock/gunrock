@@ -10,6 +10,7 @@
  */
 
 #include <gunrock/graph/conversions/convert.hxx>
+#include <gunrock/applications/application.hxx>
 
 namespace gunrock {
 namespace graph {
@@ -51,7 +52,7 @@ auto builder(vertex_t const& r,
   // using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t,
   //                                   csc_v_t, coo_v_t>;
 
-  using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, coo_v_t>;
+  using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csc_v_t>; // HACK -- need to fix inheritence
 
   graph_type G;
 
@@ -83,6 +84,11 @@ auto from_csr(vertex_t const& r,
               weight_t* X,
               vertex_t* I = nullptr,
               edge_t* Aj = nullptr) {
+
+  if constexpr (has(build_views, view_t::csc) && has(build_views, view_t::csr)) {
+    printf("!!!!!!!!!!!!!!! Cannot have both CSC and CSR view !!!!!!!!!!!!!!!!!!!");
+  }
+
   if constexpr (has(build_views, view_t::csc) ||
                 has(build_views, view_t::coo)) {
     const edge_t size_of_offsets = r + 1;
@@ -90,6 +96,13 @@ auto from_csr(vertex_t const& r,
   }
 
   if constexpr (has(build_views, view_t::csc)) {
+    thrust::sort_by_key(
+      thrust::seq,
+      J,
+      J + nnz,
+      thrust::make_zip_iterator(thrust::make_tuple(I, X)) // values
+    );
+
     const edge_t size_of_offsets = r + 1;
     convert::indices_to_offsets<space>(J, nnz, Aj, size_of_offsets);
   }
