@@ -1,13 +1,14 @@
 /**
- * @file pr.hxx
- * @author Ben Johnson (bkj.322@gmail.com)
- * @brief PageRank
+ * @file lgc.hxx
+ * @author Muhammad Osama (mosama@ucdavis.edu)
+ * @brief
  * @version 0.1
- * @date 2021-04-01
+ * @date 2021-04-20
  *
  * @copyright Copyright (c) 2021
  *
  */
+
 #pragma once
 
 #include <gunrock/applications/application.hxx>
@@ -15,7 +16,7 @@
 #include <thrust/inner_product.h>
 
 namespace gunrock {
-namespace pr {
+namespace lgc {
 
 template <typename weight_t>
 struct param_t {
@@ -48,6 +49,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
 
+  thrust::device_vector<bool> visited;
   thrust::device_vector<weight_t>
       plast;  // pagerank values from previous iteration
   thrust::device_vector<weight_t>
@@ -103,7 +105,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using weight_t = typename problem_t::weight_t;
 
   void prepare_frontier(frontier_t<vertex_t>* f,
-                        cuda::multi_context_t& context) override {}
+                        cuda::multi_context_t& context) override {
+    auto P = this->get_problem();
+    auto G = P->get_graph();
+    auto n_vertices = G.get_number_of_vertices();
+
+    // Fill the frontier with a sequence of vertices from 0 -> n_vertices.
+    f->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
+  }
 
   void loop(cuda::multi_context_t& context) override {
     // Data slice
@@ -147,11 +156,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return false;
     };
 
-    operators::advance::execute<operators::load_balance_t::block_mapped,
+    operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
                                 operators::advance_direction_t::forward,
-                                operators::advance_io_type_t::graph,
-                                operators::advance_io_type_t::none>(
+                                operators::load_balance_t::merge_path>(
         G, E, spread_op, context);
+
+    E->swap_frontier_buffers();  // swap back
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
@@ -214,5 +224,5 @@ float run(graph_t& G,
   // </boiler-plate>
 }
 
-}  // namespace pr
+}  // namespace lgc
 }  // namespace gunrock
