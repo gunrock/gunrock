@@ -30,30 +30,23 @@ namespace operators {
  */
 enum load_balance_t {
   thread_mapped,  /// 1 element per thread
-  warp_mapped,    /// Equal # of elements per warp
+  warp_mapped,    /// (wip) Equal # of elements per warp
   block_mapped,   /// Equal # of elements per block
-  bucketing,      /// Davidson et al. (SSSP)
+  bucketing,      /// (wip) Davidson et al. (SSSP)
   merge_path,     /// Merrill & Garland (SpMV)
-  work_stealing,  /// <cite>
+  work_stealing,  /// (wip) <cite>
 };
 
 /**
- * @brief Type of advance to perform. E.g. vertex to vertex means we take in an
- * input frontier of vertices and output the neighboring vertices.
- *
- * @par Overview
- * As of right now, only the first (1) type is supported, we are working on
- * adding the others.
- *  1. Vertex input frontier to vertex output frontier.
- *  2. Vertex input frontier to Edge output frontier.
- *  3. Edge input frontier to Edge output frontier.
- *  4. Edge input frontier to vertex output frontier.
+ * @brief Type of the input and output for advance. E.g. none imples that there
+ * will be no output for the advance.
+ * @see advance_output_t
  */
-enum advance_type_t {
-  vertex_to_vertex,  /// Vertex input to vertex output frontier
-  vertex_to_edge,    /// Vertex input to edge output frontier
-  edge_to_edge,      /// Edge input to edge output frontier
-  edge_to_vertex     /// Edge input to vertex output frontier
+enum advance_io_type_t {
+  graph,     /// Entire graph as an input frontier
+  vertices,  /// Vertex input or output frontier
+  edges,     /// Edge input or output frontier
+  none       /// No output frontier
 };
 
 /**
