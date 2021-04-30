@@ -56,19 +56,18 @@ namespace advance {
  *  };
  *
  *  // Execute advance operator on the provided lambda.
- *  operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
+ *  operators::advance::execute<operators::load_balance_t::block_mapped,
  *                              operators::advance_direction_t::forward,
- *                              operators::load_balance_t::block_mapped>(
+ *                              operators::advance_io_type_t::vertex,
+ *                              operators::advance_io_type_t::vertex>(
  *    G, sample, input_frontier, output_frontier, storage, context);
  *  \endcode
  *
- * @tparam type `gunrock::operators::advance_type_t` enum for available
- * advance types. Default is `advance_type_t::vertex_to_vertex`.
+ * @tparam lb `gunrock::operators::load_balance_t` enum, determines which
+ * load-balancing algorithm to use when running advance.
  * @tparam direction `gunrock::operators::advance_direction_t` enum.
  * Determines the direction when advancing the input frontier (foward, backward,
  * both).
- * @tparam lb `gunrock::operators::load_balance_t` enum, determines which
- * load-balancing algorithm to use when running advance.
  * @tparam graph_t `gunrock::graph_t` struct.
  * @tparam operator_t is the type of the lambda function being passed in.
  * @tparam frontier_t `gunrock::frontier_t`.
@@ -84,9 +83,10 @@ namespace advance {
  * @param context a `cuda::multi_context_t` that contains GPU contexts for the
  * available CUDA devices. Used to launch the advance kernels.
  */
-template <advance_type_t type,
+template <load_balance_t lb,
           advance_direction_t direction,
-          load_balance_t lb,
+          advance_io_type_t input_type,
+          advance_io_type_t output_type,
           typename graph_t,
           typename operator_t,
           typename frontier_t,
@@ -104,14 +104,14 @@ void execute(graph_t& G,
     // input->print();
 
     if (lb == load_balance_t::merge_path) {
-      merge_path::execute<type, direction>(G, op, input, output, segments,
-                                           *context0);
+      merge_path::execute<direction, input_type, output_type>(
+          G, op, input, output, segments, *context0);
     } else if (lb == load_balance_t::thread_mapped) {
-      thread_mapped::execute<type, direction>(G, op, input, output, segments,
-                                              *context0);
+      thread_mapped::execute<direction, input_type, output_type>(
+          G, op, input, output, segments, *context0);
     } else if (lb == load_balance_t::block_mapped) {
-      block_mapped::execute<type, direction>(G, op, input, output, segments,
-                                             *context0);
+      block_mapped::execute<direction, input_type, output_type>(
+          G, op, input, output, segments, *context0);
     } else {
       error::throw_if_exception(cudaErrorUnknown,
                                 "Advance type not supported.");
@@ -156,19 +156,18 @@ void execute(graph_t& G,
  *  };
  *
  *  // Execute advance operator on the provided lambda.
- *  operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
+ *  operators::advance::execute<operators::load_balance_t::block_mapped,
  *                              operators::advance_direction_t::forward,
- *                              operators::load_balance_t::block_mapped>(
+ *                              operators::advance_io_type_t::vertex,
+ *                              operators::advance_io_type_t::vertex>(
  *    G, E, sample, context);
  *  \endcode
  *
- * @tparam type `gunrock::operators::advance_type_t` enum for available
- * advance types. Default is `advance_type_t::vertex_to_vertex`.
+ * @tparam lb `gunrock::operators::load_balance_t` enum, determines which
+ * load-balancing algorithm to use when running advance.
  * @tparam direction `gunrock::operators::advance_direction_t` enum.
  * Determines the direction when advancing the input frontier (foward, backward,
  * both).
- * @tparam lb `gunrock::operators::load_balance_t` enum, determines which
- * load-balancing algorithm to use when running advance.
  * @tparam graph_t `gunrock::graph_t` struct.
  * @tparam enactor_type is the type of the enactor being passed in.
  * @tparam operator_type is the type of the lambda function being passed in.
@@ -185,9 +184,10 @@ void execute(graph_t& G,
  * enactor, such that the input buffer gets reused as the output buffer in the
  * next iteration. Use `false` to disable the swap behavior.
  */
-template <advance_type_t type = advance_type_t::vertex_to_vertex,
+template <load_balance_t lb = load_balance_t::merge_path,
           advance_direction_t direction = advance_direction_t::forward,
-          load_balance_t lb = load_balance_t::merge_path,
+          advance_io_type_t input_type = advance_io_type_t::vertices,
+          advance_io_type_t output_type = advance_io_type_t::vertices,
           typename graph_t,
           typename enactor_type,
           typename operator_type>
@@ -196,12 +196,13 @@ void execute(graph_t& G,
              operator_type op,
              cuda::multi_context_t& context,
              bool swap_buffers = true) {
-  execute<type, direction, lb>(G,                         // graph
-                               op,                        // advance operator
-                               E->get_input_frontier(),   // input frontier
-                               E->get_output_frontier(),  // output frontier
-                               E->scanned_work_domain,    // work segments
-                               context                    // gpu context
+  execute<lb, direction, input_type, output_type>(
+      G,                         // graph
+      op,                        // advance operator
+      E->get_input_frontier(),   // input frontier
+      E->get_output_frontier(),  // output frontier
+      E->scanned_work_domain,    // work segments
+      context                    // gpu context
   );
 
   /*!
@@ -210,7 +211,7 @@ void execute(graph_t& G,
    * meaning; Swap frontier buffers, output buffer now becomes the input buffer
    * and vice-versa. This can be overridden by `swap_buffers`.
    */
-  if (swap_buffers)
+  if (swap_buffers && (output_type != advance_io_type_t::none))
     E->swap_frontier_buffers();
 }
 

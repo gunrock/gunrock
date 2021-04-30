@@ -25,7 +25,8 @@ namespace gunrock {
 namespace operators {
 namespace advance {
 namespace merge_path {
-template <advance_type_t type,
+template <advance_io_type_t input_type,
+          advance_io_type_t output_type,
           typename graph_t,
           typename operator_t,
           typename frontier_t,
@@ -36,22 +37,26 @@ void execute(graph_t& G,
              frontier_t* output,
              work_tiles_t& segments,
              cuda::standard_context_t& context) {
-  using vertex_t = typename graph_t::vertex_type;
+  using type_t = typename frontier_t::type_t;
 
-  auto size_of_output = compute_output_length(G, input, segments, context);
+  auto size_of_output = compute_output_length(
+      G, input, segments, context,
+      (input_type == advance_io_type_t::graph) ? true : false);
 
-  // If output frontier is empty, resize and return.
-  if (size_of_output <= 0) {
-    output->set_number_of_elements(0);
-    return;
+  if constexpr (output_type != advance_io_type_t::none) {
+    // If output frontier is empty, resize and return.
+    if (size_of_output <= 0) {
+      output->set_number_of_elements(0);
+      return;
+    }
+
+    // <todo> Resize the output (inactive) buffer to the new size.
+    // Can be hidden within the frontier struct.
+    if (output->get_capacity() < size_of_output)
+      output->reserve(size_of_output);
+    output->set_number_of_elements(size_of_output);
+    // </todo>
   }
-
-  // <todo> Resize the output (inactive) buffer to the new size.
-  // Can be hidden within the frontier struct.
-  if (output->get_capacity() < size_of_output)
-    output->reserve(size_of_output);
-  output->set_number_of_elements(size_of_output);
-  // </todo>
 
   // Get input/output data of the active buffer.
   auto input_data = input->data();
@@ -62,7 +67,8 @@ void execute(graph_t& G,
   // the load-balanced work items.
   auto neighbors_expand = [=] __device__(std::size_t idx, std::size_t seg,
                                          std::size_t rank) {
-    auto v = input_data[seg];
+    auto v = (input_type == advance_io_type_t::graph) ? type_t(seg)
+                                                      : input_data[seg];
 
     // if item is invalid, skip processing.
     if (!gunrock::util::limits::is_valid(v))
@@ -73,16 +79,22 @@ void execute(graph_t& G,
     auto n = G.get_destination_vertex(e);
     auto w = G.get_edge_weight(e);
     bool cond = op(v, n, e, w);
-    output_data[idx] = cond ? n : gunrock::numeric_limits<vertex_t>::invalid();
+
+    if (output_type != advance_io_type_t::none)
+      output_data[idx] = cond ? n : gunrock::numeric_limits<type_t>::invalid();
   };
 
+  int end = (input_type == advance_io_type_t::graph)
+                ? G.get_number_of_vertices()
+                : input->get_number_of_elements();
   mgpu::transform_lbs(neighbors_expand, size_of_output,
-                      thrust::raw_pointer_cast(segments.data()),
-                      (int)input->get_number_of_elements(), *(context.mgpu()));
+                      thrust::raw_pointer_cast(segments.data()), end,
+                      *(context.mgpu()));
 }
 
-template <advance_type_t type,
-          advance_direction_t direction,
+template <advance_direction_t direction,
+          advance_io_type_t input_type,
+          advance_io_type_t output_type,
           typename graph_t,
           typename operator_t,
           typename frontier_t,
@@ -95,7 +107,7 @@ void execute(graph_t& G,
              cuda::standard_context_t& context) {
   if ((direction == advance_direction_t::forward) ||
       direction == advance_direction_t::backward) {
-    execute<type>(G, op, input, output, segments, context);
+    execute<input_type, output_type>(G, op, input, output, segments, context);
   } else {  // both (forward + backward)
 
     // Direction-Optimized advance is supported using CSR and CSC graph

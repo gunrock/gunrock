@@ -22,11 +22,13 @@ template <typename graph_t, typename frontier_t, typename work_tiles_t>
 std::size_t compute_output_length(graph_t& G,
                                   frontier_t* input,
                                   work_tiles_t& segments,
-                                  cuda::standard_context_t& context) {
+                                  cuda::standard_context_t& context,
+                                  bool graph_as_frontier = false) {
   using vertex_t = typename graph_t::vertex_type;
 
   auto input_data = input->data();
-  auto total_elems = input->get_number_of_elements();
+  auto total_elems = graph_as_frontier ? G.get_number_of_vertices()
+                                       : input->get_number_of_elements();
 
   // XXX: todo, maybe use capacity instead?
   if (segments.size() < total_elems + 1)
@@ -36,7 +38,7 @@ std::size_t compute_output_length(graph_t& G,
     if (i == total_elems)  // XXX: this is a weird exc. scan.
       return 0;
 
-    auto v = input_data[i];
+    auto v = graph_as_frontier ? vertex_t(i) : input_data[i];
     // if item is invalid, segment size is 0.
     if (!gunrock::util::limits::is_valid(v))
       return 0;
