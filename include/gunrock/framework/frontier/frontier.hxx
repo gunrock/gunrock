@@ -40,9 +40,10 @@ enum frontier_storage_t {
 };  // enum: frontier_storage_t
 
 enum frontier_kind_t {
-  edge_frontier,
-  vertex_frontier
-};  // enum: frontier_kind_t
+  edge_frontier,        /// edge frontier storage only
+  vertex_frontier,      /// vertex frontier storage only
+  vertex_edge_frontier  /// (wip)
+};                      // enum: frontier_kind_t
 
 template <typename t,
           frontier_storage_t underlying_st = frontier_storage_t::vector>
