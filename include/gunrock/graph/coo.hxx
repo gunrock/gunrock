@@ -101,15 +101,15 @@ class graph_coo_t {
   //  protected:
   __host__ __device__ void set(vertex_type const& _number_of_vertices,
                                edge_type const& _number_of_edges,
-                               vertex_type* I,
-                               vertex_type* J,
-                               weight_type* X) {
+                               vertex_type* _row_indices,
+                               vertex_type* _column_indices,
+                               weight_type* _values) {
     this->number_of_vertices = _number_of_vertices;
     this->number_of_edges = _number_of_edges;
     // Set raw pointers
-    row_indices = raw_pointer_cast<edge_type>(I);
-    column_indices = raw_pointer_cast<vertex_type>(J);
-    values = raw_pointer_cast<weight_type>(X);
+    row_indices = raw_pointer_cast<edge_type>(_row_indices);
+    column_indices = raw_pointer_cast<vertex_type>(_column_indices);
+    values = raw_pointer_cast<weight_type>(_values);
   }
 
  private:
