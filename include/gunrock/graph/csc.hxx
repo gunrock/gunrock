@@ -83,9 +83,10 @@ class graph_csc_t {
 
   __host__ __device__ __forceinline__ edge_type
   get_edge(const vertex_type& source, const vertex_type& destination) const {
-    return (edge_type)algo::search::binary::execute(
-        get_row_indices(), source, offsets[destination],
-        offsets[destination + 1]) - 1;
+    return (edge_type)algo::search::binary::execute(get_row_indices(), source,
+                                                    offsets[destination],
+                                                    offsets[destination + 1]) -
+           1;
   }
 
   __host__ __device__ __forceinline__ weight_type
@@ -107,7 +108,7 @@ class graph_csc_t {
     return values;
   }
 
-  //  protected:
+ protected:
   __host__ __device__ void set(vertex_type const& _number_of_vertices,
                                edge_type const& _number_of_edges,
                                edge_type* _column_offsets,
@@ -118,7 +119,7 @@ class graph_csc_t {
     // Set raw pointers
     offsets = raw_pointer_cast<edge_type>(_column_offsets);
     indices = raw_pointer_cast<vertex_type>(_row_indices);
-    values  = raw_pointer_cast<weight_type>(_values);
+    values = raw_pointer_cast<weight_type>(_values);
   }
 
  private:
