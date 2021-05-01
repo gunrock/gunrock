@@ -28,24 +28,26 @@ void test_bfs(int num_arguments, char** argument_array) {
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
   csr_t csr;
   csr.from_coo(mm.load(filename));
-  
+
   thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
+  thrust::device_vector<vertex_t> column_indices(csr.number_of_nonzeros);
   thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
 
   // --
   // Build graph + metadata
 
-  auto G = graph::build::from_csr<memory_space_t::device,
-                                  graph::view_t::csr | graph::view_t::csc>(
-      csr.number_of_rows,               // rows
-      csr.number_of_columns,            // columns
-      csr.number_of_nonzeros,           // nonzeros
-      csr.row_offsets.data().get(),     // row_offsets
-      csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get(),  // values
-      row_indices.data().get(),         // row_indices
-      column_offsets.data().get()       // column_offsets
-  );
+  auto G =
+      graph::build::from_csr<memory_space_t::device,
+                             graph::view_t::csr /* | graph::view_t::csc */>(
+          csr.number_of_rows,               // rows
+          csr.number_of_columns,            // columns
+          csr.number_of_nonzeros,           // nonzeros
+          csr.row_offsets.data().get(),     // row_offsets
+          csr.column_indices.data().get(),  // column_indices
+          csr.nonzero_values.data().get(),  // values
+          row_indices.data().get(),         // row_indices
+          column_offsets.data().get()       // column_offsets
+      );
 
   // --
   // Params and memory allocation
@@ -59,8 +61,8 @@ void test_bfs(int num_arguments, char** argument_array) {
   // --
   // Run problem
 
-  float gpu_elapsed = gunrock::bfs::run(G, single_source, distances.data().get(),
-                                    predecessors.data().get());
+  float gpu_elapsed = gunrock::bfs::run(
+      G, single_source, distances.data().get(), predecessors.data().get());
 
   // --
   // CPU Run
@@ -94,7 +96,6 @@ void test_bfs(int num_arguments, char** argument_array) {
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
   std::cout << "Number of errors : " << n_errors << std::endl;
-  
 }
 
 int main(int argc, char** argv) {

@@ -90,9 +90,8 @@ auto from_csr(vertex_t const& r,
               edge_t* column_offsets = nullptr) {
   if constexpr (has(build_views, view_t::csc) &&
                 has(build_views, view_t::csr)) {
-    printf(
-        "!!!!!!!!!!!!!!! Cannot have both CSC and CSR view "
-        "!!!!!!!!!!!!!!!!!!!");
+    error::throw_if_exception(cudaErrorUnknown,
+                              "CSC & CSR view not yet supported together.");
   }
 
   if constexpr (has(build_views, view_t::csc) ||
