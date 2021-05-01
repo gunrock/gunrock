@@ -102,7 +102,11 @@ auto from_csr(vertex_t const& r,
   }
 
   if constexpr (has(build_views, view_t::csc)) {
-    thrust::sort_by_key(thrust::seq, column_indices, column_indices + nnz,
+    using execution_policy_t =
+        std::conditional_t<space == memory_space_t::device,
+                           decltype(thrust::device), decltype(thrust::host)>;
+    execution_policy_t exec;
+    thrust::sort_by_key(exec, column_indices, column_indices + nnz,
                         thrust::make_zip_iterator(
                             thrust::make_tuple(row_indices, values))  // values
     );
