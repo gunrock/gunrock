@@ -54,6 +54,9 @@ auto builder(vertex_t const& r,
 
   using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t, csc_v_t>; // HACK -- need to fix inheritence
 
+  // using graph_type = graph::graph_t<space, vertex_t, edge_t, weight_t,
+  // coo_v_t>;
+
   graph_type G;
 
   if constexpr (has(build_views, view_t::csr)) {

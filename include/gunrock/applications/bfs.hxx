@@ -107,9 +107,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator on the provided lambda
-    operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
-                                operators::advance_direction_t::forward,
-                                operators::load_balance_t::merge_path>(
+    operators::advance::execute<operators::load_balance_t::merge_path>(
         G, E, search, context);
 
     // Execute filter operator on the provided lambda

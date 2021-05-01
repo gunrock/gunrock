@@ -41,7 +41,7 @@ void execute(frontier_t* input,
   }
 }
 
-template <uniquify_algorithm_t type, typename enactor_type, typename operator_t>
+template <uniquify_algorithm_t type, typename enactor_type>
 void execute(enactor_type* E,
              cuda::multi_context_t& context,
              const float& uniquification_percent = 100,
