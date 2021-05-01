@@ -34,7 +34,7 @@ class graph_coo_t {
   // overriding the derived class
   __host__ __device__ __forceinline__ edge_type
   get_number_of_neighbors(vertex_type const& v) const {
-    // XXX: ...
+    return get_starting_edge(v + 1) - get_starting_edge(v);
   }
 
   __host__ __device__ __forceinline__ vertex_type
@@ -49,7 +49,22 @@ class graph_coo_t {
 
   __host__ __device__ __forceinline__ edge_type
   get_starting_edge(vertex_type const& v) const {
-    // XXX: ...
+    
+    auto row_indices = get_row_indices();
+    
+    // Returns `it` such that everything to the left is < `v`
+    // This will be the offset of `v`
+    auto it = thrust::lower_bound(
+      thrust::seq,                                             // ??? Is this right policy?
+      thrust::counting_iterator<edge_t>(0),
+      thrust::counting_iterator<edge_t>(this->number_of_edges),
+      v,
+      [row_indices] __host__ __device__(const vertex_type& pivot, const vertex_type& key) {
+        return row_indices[pivot] < key;
+      }
+    );
+
+    return (*it);
   }
 
   __host__ __device__ __forceinline__ vertex_pair_type
@@ -59,7 +74,9 @@ class graph_coo_t {
 
   __host__ __device__ __forceinline__ edge_type
   get_edge(const vertex_type& source, const vertex_type& destination) const {
-    // XXX: ...
+    return (edge_type)algo::search::binary::execute(
+        get_column_indices(), destination, get_starting_edge(source),
+        get_starting_edge(source + 1)) - 1;
   }
 
   __host__ __device__ __forceinline__ weight_type
