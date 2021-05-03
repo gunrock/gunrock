@@ -89,12 +89,6 @@ class graph_t : public graph_view_t... {
         properties(),
         graph_view_t()... {}
 
-  // template<typename csr_matrix_t>
-  // graph_t(csr_matrix_t& rhs) :
-  //   graph_base_type(rhs.num_rows,
-  //                   rhs.num_nonzeros),
-  //   graph_csr_view(rhs) {}
-
   // graph_t specific methods (base graph type)
   __host__ __device__ __forceinline__ const vertex_type
   get_number_of_vertices() const {

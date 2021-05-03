@@ -25,7 +25,8 @@ namespace gunrock {
 namespace operators {
 namespace advance {
 namespace merge_path {
-template <advance_io_type_t input_type,
+template <advance_direction_t direction,
+          advance_io_type_t input_type,
           advance_io_type_t output_type,
           typename graph_t,
           typename operator_t,
@@ -37,7 +38,27 @@ void execute(graph_t& G,
              frontier_t* output,
              work_tiles_t& segments,
              cuda::standard_context_t& context) {
+  if constexpr (direction == advance_direction_t::optimized) {
+    error::throw_if_exception(cudaErrorUnknown,
+                              "Direction-optimized not yet implemented.");
+
+    // Direction-Optimized advance is supported using CSR and CSC graph
+    // views/representations. If they are not both present within the
+    // \type(graph_t), throw an exception.
+    using find_csr_t = typename graph_t::graph_csr_view_t;
+    using find_csc_t = typename graph_t::graph_csc_view_t;
+    if (!(G.template contains_representation<find_csr_t>() &&
+          G.template contains_representation<find_csc_t>())) {
+      error::throw_if_exception(cudaErrorUnknown,
+                                "CSR and CSC sparse-matrix representations "
+                                "required for direction-optimized advance.");
+    }
+  }
+
   using type_t = typename frontier_t::type_t;
+  using view_t = std::conditional_t<direction == advance_direction_t::forward,
+                                    typename graph_t::graph_csr_view_t,
+                                    typename graph_t::graph_csc_view_t>;
 
   auto size_of_output = compute_output_length(
       G, input, segments, context,
@@ -63,8 +84,8 @@ void execute(graph_t& G,
   auto output_data = output->data();
 
   // Expand incoming neighbors, and using a load-balanced transformation
-  // (merge-path based load-balancing) run the user defined advance operator on
-  // the load-balanced work items.
+  // (merge-path based load-balancing) run the user defined advance operator
+  // on the load-balanced work items.
   auto neighbors_expand = [=] __device__(std::size_t idx, std::size_t seg,
                                          std::size_t rank) {
     auto v = (input_type == advance_io_type_t::graph) ? type_t(seg)
@@ -74,10 +95,10 @@ void execute(graph_t& G,
     if (!gunrock::util::limits::is_valid(v))
       return;
 
-    auto start_edge = G.get_starting_edge(v);
+    auto start_edge = G.template get_starting_edge<view_t>(v);
     auto e = start_edge + rank;
-    auto n = G.get_destination_vertex(e);
-    auto w = G.get_edge_weight(e);
+    auto n = G.template get_destination_vertex<view_t>(e);
+    auto w = G.template get_edge_weight<view_t>(e);
     bool cond = op(v, n, e, w);
 
     if (output_type != advance_io_type_t::none)
@@ -90,38 +111,6 @@ void execute(graph_t& G,
   mgpu::transform_lbs(neighbors_expand, size_of_output,
                       thrust::raw_pointer_cast(segments.data()), end,
                       *(context.mgpu()));
-}
-
-template <advance_direction_t direction,
-          advance_io_type_t input_type,
-          advance_io_type_t output_type,
-          typename graph_t,
-          typename operator_t,
-          typename frontier_t,
-          typename work_tiles_t>
-void execute(graph_t& G,
-             operator_t op,
-             frontier_t* input,
-             frontier_t* output,
-             work_tiles_t& segments,
-             cuda::standard_context_t& context) {
-  if ((direction == advance_direction_t::forward) ||
-      direction == advance_direction_t::backward) {
-    execute<input_type, output_type>(G, op, input, output, segments, context);
-  } else {  // both (forward + backward)
-
-    // Direction-Optimized advance is supported using CSR and CSC graph
-    // views/representations. If they are not both present within the
-    // \type(graph_t), throw an exception.
-    using find_csr_t = typename graph_t::graph_csr_view_t;
-    using find_csc_t = typename graph_t::graph_csc_view_t;
-    if (!(G.template contains_representation<find_csr_t>() &&
-          G.template contains_representation<find_csc_t>())) {
-      error::throw_if_exception(cudaErrorUnknown,
-                                "CSR and CSC sparse-matrix representations "
-                                "required for direction-optimized advance.");
-    }
-  }
 }
 }  // namespace merge_path
 }  // namespace advance
