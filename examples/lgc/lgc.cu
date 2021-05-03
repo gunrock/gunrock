@@ -1,9 +1,9 @@
-#include <gunrock/applications/pr.hxx>
+#include <gunrock/applications/lgc.hxx>
 
 using namespace gunrock;
 using namespace memory;
 
-void test_pr(int num_arguments, char** argument_array) {
+void test_lgc(int num_arguments, char** argument_array) {
   if (num_arguments != 2) {
     std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
     exit(1);
@@ -72,5 +72,5 @@ void test_pr(int num_arguments, char** argument_array) {
 }
 
 int main(int argc, char** argv) {
-  test_pr(argc, argv);
+  test_lgc(argc, argv);
 }

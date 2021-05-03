@@ -3,7 +3,7 @@
 using namespace gunrock;
 using namespace memory;
 
-void test_sssp(int num_arguments, char** argument_array) {
+void test_bc(int num_arguments, char** argument_array) {
   if (num_arguments != 2) {
     std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
     exit(1);
@@ -42,22 +42,18 @@ void test_sssp(int num_arguments, char** argument_array) {
 
   // --
   // Params and memory allocation
-  
+
   vertex_t single_source = 0;
-  
+
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> sigmas(n_vertices);
   thrust::device_vector<weight_t> bc_values(n_vertices);
 
   // --
   // GPU Run
-  
-  float gpu_elapsed = gunrock::bc::run(
-    G, 
-    single_source, 
-    sigmas.data().get(), 
-    bc_values.data().get()
-  );
+
+  float gpu_elapsed = gunrock::bc::run(G, single_source, sigmas.data().get(),
+                                       bc_values.data().get());
 
   // --
   // Log + Validate
@@ -65,7 +61,7 @@ void test_sssp(int num_arguments, char** argument_array) {
   std::cout << "GPU sigmas (output)    = ";
   thrust::copy(sigmas.begin(),
                (sigmas.size() < 40) ? sigmas.begin() + sigmas.size()
-                                       : sigmas.begin() + 40,
+                                    : sigmas.begin() + 40,
                std::ostream_iterator<weight_t>(std::cout, " "));
   std::cout << std::endl;
 
@@ -80,5 +76,5 @@ void test_sssp(int num_arguments, char** argument_array) {
 }
 
 int main(int argc, char** argv) {
-  test_sssp(argc, argv);
+  test_bc(argc, argv);
 }
