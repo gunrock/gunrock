@@ -50,19 +50,11 @@ struct problem_t : gunrock::problem_t<graph_t> {
   thrust::device_vector<vertex_t> labels;
   thrust::device_vector<weight_t> deltas;
 
-  thrust::host_vector<frontier_t<vertex_t>> my_frontiers;
-
   void init() override {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
     labels.resize(n_vertices);
     deltas.resize(n_vertices);
-
-    // !! HACK: Because I get segfaults if I allocate frontiers in loop
-    for (int i = 0; i < 1000; i++) {
-      frontier_t<vertex_t> f;
-      my_frontiers.push_back(f);
-    }
   }
 
   void reset() override {
@@ -92,8 +84,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
-  // Use Base class constructor -- does this work? does it handle copy
-  // constructor?
   using gunrock::enactor_t<problem_t>::enactor_t;
 
   using vertex_t = typename problem_t::vertex_t;
@@ -101,12 +91,13 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using weight_t = typename problem_t::weight_t;
 
   bool forward = true;
-  edge_t depth = 0;
+  bool backward = true;
+  std::size_t depth = 0;
 
   void prepare_frontier(frontier_t<vertex_t>* f,
                         cuda::multi_context_t& context) override {
     auto P = this->get_problem();
-    P->my_frontiers[0].push_back(P->param.single_source);
+    this->frontiers[0].push_back(P->param.single_source);
   }
 
   void loop(cuda::multi_context_t& context) override {
@@ -121,8 +112,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto labels = P->labels.data().get();
     auto bc_values = P->result.bc_values;
     auto deltas = P->deltas.data().get();
-
-    // auto my_frontiers  = &(P->my_frontiers);
 
     auto policy = context.get_context(0)->execution_policy();
 
@@ -142,17 +131,21 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         return old_label == -1;
       };
 
-      auto in_frontier = &(P->my_frontiers[this->depth]);
-      auto out_frontier = &(P->my_frontiers[this->depth + 1]);
+      while (true) {
+        auto in_frontier = &(this->frontiers[this->depth]);
+        auto out_frontier = &(this->frontiers[this->depth + 1]);
 
-      operators::advance::execute<operators::load_balance_t::merge_path,
-                                  operators::advance_direction_t::forward,
-                                  operators::advance_io_type_t::vertices,
-                                  operators::advance_io_type_t::vertices>(
-          G, forward_op, in_frontier, out_frontier, E->scanned_work_domain,
-          context);
+        operators::advance::execute<operators::load_balance_t::merge_path,
+                                    operators::advance_direction_t::forward,
+                                    operators::advance_io_type_t::vertices,
+                                    operators::advance_io_type_t::vertices>(
+            G, forward_op, in_frontier, out_frontier, E->scanned_work_domain,
+            context);
 
-      this->depth++;
+        this->depth++;
+        if (is_forward_converged(context))
+          break;
+      }
 
     } else {
       // Run advance
@@ -175,54 +168,58 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         return false;
       };
 
-      auto in_frontier = &(P->my_frontiers[this->depth]);
-      auto out_frontier = &(P->my_frontiers[this->depth + 1]);
+      while (true) {
+        auto in_frontier = &(this->frontiers[this->depth]);
+        auto out_frontier = &(this->frontiers[this->depth + 1]);
 
-      operators::advance::execute<operators::load_balance_t::merge_path,
-                                  operators::advance_direction_t::forward,
-                                  operators::advance_io_type_t::vertices,
-                                  operators::advance_io_type_t::vertices>(
-          G, backward_op, in_frontier, out_frontier, E->scanned_work_domain,
-          context);
+        operators::advance::execute<operators::load_balance_t::merge_path,
+                                    operators::advance_direction_t::forward,
+                                    operators::advance_io_type_t::vertices,
+                                    operators::advance_io_type_t::none>(
+            G, backward_op, in_frontier, out_frontier, E->scanned_work_domain,
+            context);
 
-      this->depth--;
-    }
-  }
-
-  virtual bool is_converged(cuda::multi_context_t& context) {
-    auto E = this->get_enactor();
-    auto P = this->get_problem();
-    auto G = P->get_graph();
-
-    auto n_vertices = G.get_number_of_vertices();
-
-    // XXX: `bc` is a two-phase algorithm -- is there a better way to support
-    // this in the API?
-    if (forward) {
-      auto out_frontier = &(P->my_frontiers[this->depth]);
-      bool forward_converged = out_frontier->is_empty();
-      if (forward_converged)
-        forward = false;
-      return false;
-
-    } else {
-      if (depth == 0) {
-        auto policy = this->context->get_context(0)->execution_policy();
-        auto bc_values = P->result.bc_values;
-
-        auto scale = [] __host__ __device__(weight_t & val) -> weight_t {
-          return 0.5 * val;
-        };
-        thrust::transform(policy, bc_values, bc_values + n_vertices, bc_values,
-                          scale);
-
-        return true;
-      } else {
-        return false;
+        this->depth--;
+        if (is_backward_converged(context))
+          break;
       }
     }
   }
 
+  bool is_forward_converged(cuda::multi_context_t& context) {
+    auto P = this->get_problem();
+    auto out_frontier = &(this->frontiers[this->depth]);
+    bool forward_converged = out_frontier->is_empty();
+    if (forward_converged) {
+      forward = false;
+      return true;
+    }
+    return false;
+  }
+
+  bool is_backward_converged(cuda::multi_context_t& context) {
+    auto P = this->get_problem();
+    auto G = P->get_graph();
+    auto n_vertices = G.get_number_of_vertices();
+    if (depth == 0) {
+      auto policy = this->context->get_context(0)->execution_policy();
+      auto bc_values = P->result.bc_values;
+
+      auto scale = [] __host__ __device__(weight_t & val) -> weight_t {
+        return 0.5 * val;
+      };
+      thrust::transform(policy, bc_values, bc_values + n_vertices, bc_values,
+                        scale);
+      backward = false;
+      return true;
+    }
+
+    return false;
+  }
+
+  virtual bool is_converged(cuda::multi_context_t& context) {
+    return (!forward && !backward) ? true : false;
+  }
 };  // struct enactor_t
 
 template <typename graph_t>
@@ -252,7 +249,12 @@ float run(graph_t& G,
   problem.init();
   problem.reset();
 
-  enactor_type enactor(&problem, multi_context);
+  // Disable internal-frontiers management:
+  enactor_properties_t props;
+  props.number_of_frontier_buffers = 1000;  // XXX: hack!
+  props.self_manage_frontiers = true;
+
+  enactor_type enactor(&problem, multi_context, props);
   return enactor.enact();
   // </boiler-plate>
 }
