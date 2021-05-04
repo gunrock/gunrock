@@ -24,14 +24,14 @@ namespace batch {
 
 template <typename function_t, typename... args_t>
 void execute(function_t f,
-             std::size_t batch_size,
+             std::size_t number_of_jobs,
              float* total_elapsed,
              args_t&... args) {
-  thrust::host_vector<float> elapsed(batch_size);
+  thrust::host_vector<float> elapsed(number_of_jobs);
   std::vector<std::thread> threads;
 
-  for (std::size_t idx = 0; idx < batch_size; idx++) {
-    threads.push_back(std::thread([&, idx]() { elapsed[idx] = f(idx); }));
+  for (std::size_t j = 0; j < number_of_jobs; j++) {
+    threads.push_back(std::thread([&, j]() { elapsed[j] = f(j); }));
   }
 
   for (auto& thread : threads)
