@@ -259,5 +259,22 @@ float run(graph_t& G,
   // </boiler-plate>
 }
 
+template <typename graph_t>
+float run(graph_t& G,
+          typename graph_t::weight_type* sigmas,
+          typename graph_t::weight_type* bc_values) {
+  using vertex_t = typename graph_t::vertex_type;
+  using weight_t = typename graph_t::weight_type;
+
+  auto f = [&](std::size_t idx) -> float {
+    return bc::run(G, (vertex_t)idx, sigmas, bc_values);
+  };
+
+  std::size_t batch_size = G.get_number_of_vertices();
+  thrust::host_vector<float> total_elapsed(1);
+  operators::batch::execute(f, batch_size, total_elapsed.data());
+  return total_elapsed[0];
+}
+
 }  // namespace bc
 }  // namespace gunrock

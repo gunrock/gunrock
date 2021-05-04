@@ -43,7 +43,7 @@ void test_bc(int num_arguments, char** argument_array) {
   // --
   // Params and memory allocation
 
-  vertex_t single_source = 0;
+  // vertex_t single_source = 0;
 
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> sigmas(n_vertices);
@@ -52,8 +52,8 @@ void test_bc(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::bc::run(G, single_source, sigmas.data().get(),
-                                       bc_values.data().get());
+  float gpu_elapsed = gunrock::bc::run(
+      G, /* single_source, */ sigmas.data().get(), bc_values.data().get());
 
   // --
   // Log + Validate
