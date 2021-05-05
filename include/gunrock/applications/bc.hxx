@@ -18,16 +18,13 @@ namespace bc {
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
-
   param_t(vertex_t _single_source) : single_source(_single_source) {}
 };
 
 template <typename weight_t>
 struct result_t {
-  weight_t* sigmas;
   weight_t* bc_values;
-  result_t(weight_t* _sigmas, weight_t* _bc_values)
-      : sigmas(_sigmas), bc_values(_bc_values) {}
+  result_t(weight_t* _bc_values) : bc_values(_bc_values) {}
 };
 
 template <typename graph_t, typename param_type, typename result_type>
@@ -49,12 +46,14 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   thrust::device_vector<vertex_t> labels;
   thrust::device_vector<weight_t> deltas;
+  thrust::device_vector<weight_t> sigmas;
 
   void init() override {
     auto g = this->get_graph();
     auto n_vertices = g.get_number_of_vertices();
     labels.resize(n_vertices);
     deltas.resize(n_vertices);
+    sigmas.resize(n_vertices);
   }
 
   void reset() override {
@@ -65,13 +64,11 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
     auto n_vertices = g.get_number_of_vertices();
 
-    auto d_sigmas = thrust::device_pointer_cast(this->result.sigmas);
-    auto d_bc_values = thrust::device_pointer_cast(this->result.bc_values);
+    auto d_sigmas = thrust::device_pointer_cast(sigmas.data());
     auto d_labels = thrust::device_pointer_cast(labels.data());
     auto d_deltas = thrust::device_pointer_cast(deltas.data());
 
     thrust::fill_n(policy, d_sigmas, n_vertices, 0);
-    thrust::fill_n(policy, d_bc_values, n_vertices, 0);
     thrust::fill_n(policy, d_labels, n_vertices, -1);
     thrust::fill_n(policy, d_deltas, n_vertices, 0);
 
@@ -108,10 +105,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto n_vertices = G.get_number_of_vertices();
 
     auto single_source = P->param.single_source;
-    auto sigmas = P->result.sigmas;
+    auto sigmas = P->sigmas.data().get();
     auto labels = P->labels.data().get();
-    auto bc_values = P->result.bc_values;
     auto deltas = P->deltas.data().get();
+
+    auto bc_values = P->result.bc_values;
 
     auto policy = context.get_context(0)->execution_policy();
 
@@ -163,7 +161,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
         auto update = sigmas[src] / sigmas[dst] * (1 + deltas[dst]);
         math::atomic::add(deltas + src, update);
-        math::atomic::add(bc_values + src, update);
+        math::atomic::add(bc_values + src, 0.5f * update);  // scaled output
 
         return false;
       };
@@ -198,18 +196,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 
   bool is_backward_converged(cuda::multi_context_t& context) {
-    auto P = this->get_problem();
-    auto G = P->get_graph();
-    auto n_vertices = G.get_number_of_vertices();
     if (depth == 0) {
-      auto policy = this->context->get_context(0)->execution_policy();
-      auto bc_values = P->result.bc_values;
-
-      auto scale = [] __host__ __device__(weight_t & val) -> weight_t {
-        return 0.5 * val;
-      };
-      thrust::transform(policy, bc_values, bc_values + n_vertices, bc_values,
-                        scale);
       backward = false;
       return true;
     }
@@ -225,7 +212,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type single_source,
-          typename graph_t::weight_type* sigmas,
           typename graph_t::weight_type* bc_values) {
   // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
@@ -235,7 +221,7 @@ float run(graph_t& G,
   using result_type = result_t<weight_t>;
 
   param_type param(single_source);
-  result_type result(sigmas, bc_values);
+  result_type result(bc_values);
   // </user-defined>
 
   // <boiler-plate>
@@ -257,6 +243,26 @@ float run(graph_t& G,
   enactor_type enactor(&problem, multi_context, props);
   return enactor.enact();
   // </boiler-plate>
+}
+
+template <typename graph_t>
+float run(graph_t& G, typename graph_t::weight_type* bc_values) {
+  using vertex_t = typename graph_t::vertex_type;
+  using weight_t = typename graph_t::weight_type;
+
+  vertex_t n_vertices = G.get_number_of_vertices();
+  auto d_bc_values = thrust::device_pointer_cast(bc_values);
+  thrust::fill_n(thrust::device, d_bc_values, n_vertices, (weight_t)0);
+
+  auto f = [&](std::size_t job_idx) -> float {
+    return bc::run(G, (vertex_t)job_idx, bc_values);
+  };
+
+  std::size_t n_jobs = n_vertices;
+  thrust::host_vector<float> total_elapsed(1);
+  operators::batch::execute(f, n_jobs, total_elapsed.data());
+
+  return total_elapsed[0];
 }
 
 }  // namespace bc
