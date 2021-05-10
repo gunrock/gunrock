@@ -158,3 +158,4 @@ option(ESSENTIALS_BUILD_TESTS
 if(ESSENTIALS_BUILD_TESTS)
   add_subdirectory(unittests)
 endif(ESSENTIALS_BUILD_TESTS)
+
