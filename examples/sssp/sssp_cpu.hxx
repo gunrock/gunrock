@@ -28,7 +28,7 @@ float run(csr_t& csr,
   thrust::host_vector<weight_t> _nonzero_values(csr.nonzero_values);
   
   edge_t* row_offsets = _row_offsets.data();
-  edge_t* column_indices = _column_indices.data();
+  vertex_t* column_indices = _column_indices.data();
   weight_t* nonzero_values = _nonzero_values.data();
 
   for (vertex_t i = 0; i < csr.number_of_rows; i++)
