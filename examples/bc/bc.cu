@@ -1,9 +1,9 @@
-#include <gunrock/applications/pr.hxx>
+#include <gunrock/applications/bc.hxx>
 
 using namespace gunrock;
 using namespace memory;
 
-void test_pr(int num_arguments, char** argument_array) {
+void test_bc(int num_arguments, char** argument_array) {
   if (num_arguments != 2) {
     std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
     exit(1);
@@ -16,24 +16,17 @@ void test_pr(int num_arguments, char** argument_array) {
   using edge_t = int;
   using weight_t = float;
 
-  using csr_t =
-      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
-  csr_t csr;
-
   // --
   // IO
 
   std::string filename = argument_array[1];
 
-  if (util::is_market(filename)) {
-    io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-    csr.from_coo(mm.load(filename));
-  } else if (util::is_binary_csr(filename)) {
-    csr.read_binary(filename);
-  } else {
-    std::cerr << "Unknown file format: " << filename << std::endl;
-    exit(1);
-  }
+  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+
+  using csr_t =
+      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  csr_t csr;
+  csr.from_coo(mm.load(filename));
 
   // --
   // Build graph
@@ -50,27 +43,29 @@ void test_pr(int num_arguments, char** argument_array) {
   // --
   // Params and memory allocation
 
-  srand(time(NULL));
-
-  weight_t alpha = 0.85;
-  weight_t tol = 1e-6;
-
+  // vertex_t single_source = 0;
   vertex_t n_vertices = G.get_number_of_vertices();
-  thrust::device_vector<weight_t> p(n_vertices);
+  thrust::device_vector<weight_t> bc_values(n_vertices);
 
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::pr::run(G, alpha, tol, p.data().get());
+  float gpu_elapsed =
+      gunrock::bc::run(G, /* single_source, */ bc_values.data().get());
 
   // --
   // Log + Validate
 
-  std::cout << "GPU p[:40] = ";
-  gunrock::print::head<weight_t>(p, 40);
+  std::cout << "GPU bc_values (output) = ";
+  thrust::copy(bc_values.begin(),
+               (bc_values.size() < 40) ? bc_values.begin() + bc_values.size()
+                                       : bc_values.begin() + 40,
+               std::ostream_iterator<weight_t>(std::cout, " "));
+  std::cout << std::endl;
+
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 }
 
 int main(int argc, char** argv) {
-  test_pr(argc, argv);
+  test_bc(argc, argv);
 }

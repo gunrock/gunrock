@@ -10,6 +10,7 @@
  */
 
 #include <gunrock/graph/conversions/convert.hxx>
+#include <gunrock/applications/application.hxx>
 
 namespace gunrock {
 namespace graph {
@@ -24,11 +25,11 @@ template <memory_space_t space,
 auto builder(vertex_t const& r,
              vertex_t const& c,
              edge_t const& nnz,
-             vertex_t* I,
-             vertex_t* J,
-             edge_t* Ap,
-             edge_t* Aj,
-             weight_t* X) {
+             vertex_t* row_indices,
+             vertex_t* column_indices,
+             edge_t* row_offsets,
+             edge_t* column_offsets,
+             weight_t* values) {
   // Enable the types based on the different views required.
   // Enable CSR.
   using csr_v_t =
@@ -54,15 +55,15 @@ auto builder(vertex_t const& r,
   graph_type G;
 
   if constexpr (has(build_views, view_t::csr)) {
-    G.template set<csr_v_t>(r, nnz, Ap, J, X);
+    G.template set<csr_v_t>(r, nnz, row_offsets, column_indices, values);
   }
 
   if constexpr (has(build_views, view_t::csc)) {
-    G.template set<csc_v_t>(r, nnz, Aj, I, X);
+    G.template set<csc_v_t>(r, nnz, column_offsets, row_indices, values);
   }
 
   if constexpr (has(build_views, view_t::coo)) {
-    G.template set<coo_v_t>(r, nnz, I, J, X);
+    G.template set<coo_v_t>(r, nnz, row_indices, column_indices, values);
   }
 
   return G;
@@ -76,25 +77,43 @@ template <memory_space_t space,
 auto from_csr(vertex_t const& r,
               vertex_t const& c,
               edge_t const& nnz,
-              edge_t* Ap,
-              vertex_t* J,
-              weight_t* X,
-              vertex_t* I = nullptr,
-              edge_t* Aj = nullptr) {
+              edge_t* row_offsets,
+              vertex_t* column_indices,
+              weight_t* values,
+              vertex_t* row_indices = nullptr,
+              edge_t* column_offsets = nullptr) {
+  if constexpr (has(build_views, view_t::csc) &&
+                has(build_views, view_t::csr)) {
+    error::throw_if_exception(cudaErrorUnknown,
+                              "CSC & CSR view not yet supported together.");
+  }
+
   if constexpr (has(build_views, view_t::csc) ||
                 has(build_views, view_t::coo)) {
     const edge_t size_of_offsets = r + 1;
-    convert::offsets_to_indices<space>(Ap, size_of_offsets, I, nnz);
+    convert::offsets_to_indices<space>(row_offsets, size_of_offsets,
+                                       row_indices, nnz);
   }
 
   if constexpr (has(build_views, view_t::csc)) {
+    using execution_policy_t =
+        std::conditional_t<space == memory_space_t::device,
+                           decltype(thrust::device), decltype(thrust::host)>;
+    execution_policy_t exec;
+    thrust::sort_by_key(exec, column_indices, column_indices + nnz,
+                        thrust::make_zip_iterator(
+                            thrust::make_tuple(row_indices, values))  // values
+    );
+
     const edge_t size_of_offsets = r + 1;
-    convert::indices_to_offsets<space>(J, nnz, Aj, size_of_offsets);
+    convert::indices_to_offsets<space>(column_indices, nnz, column_offsets,
+                                       size_of_offsets);
   }
 
   return builder<space,       // build for host
                  build_views  // supported views
-                 >(r, c, nnz, I, J, Ap, Aj, X);
+                 >(r, c, nnz, row_indices, column_indices, row_offsets,
+                   column_offsets, values);
 }
 }  // namespace detail
 }  // namespace build
