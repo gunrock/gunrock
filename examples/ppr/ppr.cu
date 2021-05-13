@@ -23,9 +23,9 @@ void test_ppr(int num_arguments, char** argument_array) {
   // --
   // IO
 
-  vertex_t n_seeds = 50;
   weight_t alpha   = 0.15;
   weight_t epsilon = 1e-6;
+  vertex_t n_seeds = 50;
 
   std::string filename = argument_array[1];
    
@@ -64,15 +64,15 @@ void test_ppr(int num_arguments, char** argument_array) {
   float gpu_elapsed = gunrock::ppr::run_batch(
       G, n_seeds, p.data().get(), alpha, epsilon);
 
-  // // --
-  // // CPU Run
+  // --
+  // CPU Run
 
-  // thrust::host_vector<weight_t> h_p(n_vertices);
+  thrust::host_vector<weight_t> h_p(n_seeds * n_vertices);
 
-  // float cpu_elapsed = ppr_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
-  //     csr, seed, h_p.data(), alpha, epsilon);
+  float cpu_elapsed = ppr_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
+      csr, n_seeds, h_p.data(), alpha, epsilon);
 
-  // int n_errors = ppr_cpu::compute_error(p, h_p);
+  int n_errors = ppr_cpu::compute_error(p, h_p);
 
   // --
   // Log + Validate
@@ -80,12 +80,12 @@ void test_ppr(int num_arguments, char** argument_array) {
   std::cout << "GPU distances[:40] = ";
   gunrock::print::head<weight_t>(p, 40);
 
-  // std::cout << "CPU Distances (output) = ";
-  // gunrock::print::head<weight_t>(h_p, 40);
+  std::cout << "CPU Distances (output) = ";
+  gunrock::print::head<weight_t>(h_p, 40);
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
-  // std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
-  // std::cout << "Number of errors : " << n_errors << std::endl;
+  std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
+  std::cout << "Number of errors : " << n_errors               << std::endl;
 }
 
 int main(int argc, char** argv) {

@@ -139,9 +139,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator on the provided lambda
-    operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
-                                operators::advance_direction_t::forward,
-                                operators::load_balance_t::merge_path>(
+    operators::advance::execute<operators::load_balance_t::block_mapped>(
         G, E, advance_op, context);
     
     auto policy = this->context->get_context(0)->execution_policy();
@@ -152,9 +150,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
 template <typename graph_t>
 float run(graph_t& G,
-          typename graph_t::vertex_type& seed,  // Parameter
-          typename graph_t::weight_type* p,     // Output
-          typename graph_t::weight_type& alpha, // Output
+          typename graph_t::vertex_type& seed,
+          typename graph_t::weight_type* p,
+          typename graph_t::weight_type& alpha,
           typename graph_t::weight_type& epsilon
 ) {
   // <user-defined>
@@ -186,28 +184,32 @@ float run(graph_t& G,
 
 template <typename graph_t>
 float run_batch(graph_t& G,
-          typename graph_t::vertex_type& n_seeds, // Parameter
-          typename graph_t::weight_type* p,       // Output
-          typename graph_t::weight_type& alpha,   // Output
+          typename graph_t::vertex_type& n_seeds,
+          typename graph_t::weight_type* p,
+          typename graph_t::weight_type& alpha,
           typename graph_t::weight_type& epsilon
 ) {
   // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
 
-  using param_type = param_t<vertex_t, weight_t>;
-  using result_type = result_t<weight_t>;
-
   auto n_vertices = G.get_number_of_vertices();
 
-  auto f = [&](std::size_t seed) -> float {
-    // return ppr::run(G, (vertex_t)seed, p + (n_vertices * seed), alpha, epsilon);
-    return -1;
+  // ???: Is this a good way to time wall-clock time?
+  auto multi_context = std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
+  auto context       = multi_context->get_context(0);
+  auto timer         = context->timer();
+  timer.begin();
+
+  auto f = [&](vertex_t seed) -> float {
+    return ppr::run(G, seed, p + (n_vertices * seed), alpha, epsilon);
   };
 
   thrust::host_vector<float> total_elapsed(1);
   operators::batch::execute(f, n_seeds, total_elapsed.data());
-  return total_elapsed[0];
+  
+  // return total_elapsed[0]; // This returns the total execution time, not the wall-clock time.  Weird.
+  return timer.end();         // Is this a better way to time?
 }
 
 }  // namespace sssp

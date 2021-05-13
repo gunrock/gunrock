@@ -41,12 +41,6 @@ struct enactor_properties_t {
    */
   std::size_t number_of_frontier_buffers{2};
 
-  /*!
-   * When enabled, enactor's internal frontiers are not allocated ahead of time.
-   * Instead, the user is encouraged to manage the frontiers.
-   */
-  bool self_manage_frontiers{false};
-
   /**
    * @brief Construct a new enactor properties t object with default values.
    */
@@ -170,25 +164,16 @@ struct enactor_t {
         buffer_selector(0),
         iteration(0),
         scanned_work_domain(problem->get_graph().get_number_of_vertices()) {
-    /*!
-     * If the self manage frontiers property is false, the enactor interface
-     * will resize the frontier buffers ahead of time to avoid the first
-     * allocation during the algorithm execution face.
-     * @note We also use a resizing factor to allocate more than what we
-     * actually may need.
-     *
-     */
-    if (!(properties.self_manage_frontiers)) {
-      auto g = problem->get_graph();
-      std::size_t initial_size =
-          (g.get_number_of_edges() > g.get_number_of_vertices())
-              ? g.get_number_of_edges()
-              : g.get_number_of_vertices();
+    // Set temporary buffer to be at least the number of edges
+    auto g = problem->get_graph();
+    std::size_t initial_size =
+        (g.get_number_of_edges() > g.get_number_of_vertices())
+            ? g.get_number_of_edges()
+            : g.get_number_of_vertices();
 
-      for (auto& buffer : frontiers) {
-        buffer.set_resizing_factor(properties.frontier_sizing_factor);
-        buffer.reserve((std::size_t)(initial_size));
-      }
+    for (auto& buffer : frontiers) {
+      buffer.set_resizing_factor(properties.frontier_sizing_factor);
+      buffer.reserve((std::size_t)(initial_size));
     }
   }
 
