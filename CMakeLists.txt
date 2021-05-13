@@ -57,7 +57,7 @@ set_target_properties(essentials
         CUDA_EXTENSIONS OFF
         CUDA_RESOLVE_DEVICE_SYMBOLS ON
         CUDA_SEPARABLE_COMPILATION ON
-        CUDA_ARCHITECTURES 61 # Set required architecture.
+        CUDA_ARCHITECTURES 70 # Set required architecture.
         # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
 )
 
