@@ -1,4 +1,11 @@
 include(FetchContent)
+
+
+set(FETCHCONTENT_QUIET off)
+get_filename_component(fc_base "../_cmake_fetch"
+                REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
+set(FETCHCONTENT_BASE_DIR ${fc_base})
+
 FetchContent_Declare(
     thrust
     GIT_REPOSITORY https://github.com/thrust/thrust.git
