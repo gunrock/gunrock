@@ -114,15 +114,15 @@ class graph_csr_t {
  protected:
   __host__ __device__ void set(vertex_type const& _number_of_vertices,
                                edge_type const& _number_of_edges,
-                               edge_type* Aj,
-                               vertex_type* Ap,
-                               weight_type* Ax) {
+                               edge_type* _row_offsets,
+                               vertex_type* _column_indices,
+                               weight_type* _values) {
     this->number_of_vertices = _number_of_vertices;
     this->number_of_edges = _number_of_edges;
     // Set raw pointers
-    offsets = raw_pointer_cast<edge_type>(Aj);
-    indices = raw_pointer_cast<vertex_type>(Ap);
-    values = raw_pointer_cast<weight_type>(Ax);
+    offsets = raw_pointer_cast<edge_type>(_row_offsets);
+    indices = raw_pointer_cast<vertex_type>(_column_indices);
+    values = raw_pointer_cast<weight_type>(_values);
   }
 
  private:

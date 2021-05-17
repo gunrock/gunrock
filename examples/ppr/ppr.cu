@@ -1,9 +1,10 @@
-#include <gunrock/applications/pr.hxx>
+#include <gunrock/applications/ppr.hxx>
+#include "ppr_cpu.hxx"
 
 using namespace gunrock;
 using namespace memory;
 
-void test_pr(int num_arguments, char** argument_array) {
+void test_ppr(int num_arguments, char** argument_array) {
   if (num_arguments != 2) {
     std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
     exit(1);
@@ -16,19 +17,22 @@ void test_pr(int num_arguments, char** argument_array) {
   using edge_t = int;
   using weight_t = float;
 
-  using csr_t =
-      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  using csr_t = format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
   csr_t csr;
-
+  
   // --
   // IO
 
-  std::string filename = argument_array[1];
+  weight_t alpha   = 0.15;
+  weight_t epsilon = 1e-6;
+  vertex_t n_seeds = 50;
 
-  if (util::is_market(filename)) {
+  std::string filename = argument_array[1];
+   
+  if(util::is_market(filename)) {
     io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
     csr.from_coo(mm.load(filename));
-  } else if (util::is_binary_csr(filename)) {
+  } else if(util::is_binary_csr(filename)) {
     csr.read_binary(filename);
   } else {
     std::cerr << "Unknown file format: " << filename << std::endl;
@@ -49,28 +53,41 @@ void test_pr(int num_arguments, char** argument_array) {
 
   // --
   // Params and memory allocation
-
-  srand(time(NULL));
-
-  weight_t alpha = 0.85;
-  weight_t tol = 1e-6;
-
+  
   vertex_t n_vertices = G.get_number_of_vertices();
-  thrust::device_vector<weight_t> p(n_vertices);
+
+  thrust::device_vector<weight_t> p(n_seeds * n_vertices);
 
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::pr::run(G, alpha, tol, p.data().get());
+  float gpu_elapsed = gunrock::ppr::run_batch(
+      G, n_seeds, p.data().get(), alpha, epsilon);
+
+  // --
+  // CPU Run
+
+  thrust::host_vector<weight_t> h_p(n_seeds * n_vertices);
+
+  float cpu_elapsed = ppr_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
+      csr, n_seeds, h_p.data(), alpha, epsilon);
+
+  int n_errors = ppr_cpu::compute_error(p, h_p);
 
   // --
   // Log + Validate
 
-  std::cout << "GPU p[:40] = ";
+  std::cout << "GPU distances[:40] = ";
   gunrock::print::head<weight_t>(p, 40);
+
+  std::cout << "CPU Distances (output) = ";
+  gunrock::print::head<weight_t>(h_p, 40);
+
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
+  std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
+  std::cout << "Number of errors : " << n_errors               << std::endl;
 }
 
 int main(int argc, char** argv) {
-  test_pr(argc, argv);
+  test_ppr(argc, argv);
 }

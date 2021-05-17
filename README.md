@@ -14,6 +14,8 @@ make sssp # or for all applications, use: make -j$(nproc)
 bin/sssp ../datasets/chesapeake.mtx
 ```
 
+##### Preferred **CUDA v11.2.1** due to support for stream ordered memory allocators (e.g. `cudaFreeAsync()`).
+
 ## Getting Started with Gunrock
 
 - **Tutorial:** [Gunrock's programming model]()

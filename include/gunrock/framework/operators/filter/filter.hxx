@@ -16,7 +16,7 @@ namespace gunrock {
 namespace operators {
 namespace filter {
 
-template <filter_algorithm_t type,
+template <filter_algorithm_t alg_type,
           typename graph_t,
           typename operator_t,
           typename frontier_t>
@@ -29,13 +29,13 @@ void execute(graph_t& G,
   if (context.size() == 1) {
     auto single_context = context.get_context(0);
 
-    if (type == filter_algorithm_t::compact) {
+    if constexpr (alg_type == filter_algorithm_t::compact) {
       compact::execute(G, op, input, output, *single_context);
-    } else if (type == filter_algorithm_t::predicated) {
+    } else if (alg_type == filter_algorithm_t::predicated) {
       predicated::execute(G, op, input, output, *single_context);
-    } else if (type == filter_algorithm_t::bypass) {
+    } else if (alg_type == filter_algorithm_t::bypass) {
       bypass::execute(G, op, input, output, *single_context);
-    } else if (type == filter_algorithm_t::remove) {
+    } else if (alg_type == filter_algorithm_t::remove) {
       remove::execute(G, op, input, output, *single_context);
     } else {
       error::throw_if_exception(cudaErrorUnknown, "Filter type not supported.");
@@ -61,7 +61,7 @@ void execute(graph_t& G,
   }
 }
 
-template <filter_algorithm_t type,
+template <filter_algorithm_t alg_type,
           typename graph_t,
           typename enactor_type,
           typename operator_t>
@@ -71,12 +71,12 @@ void execute(graph_t& G,
              cuda::multi_context_t& context,
              bool filter_and_uniquify = true,
              bool swap_buffers = true) {
-  execute<type>(G,                         // graph
-                op,                        // operator_t
-                E->get_input_frontier(),   // input frontier
-                E->get_output_frontier(),  // output frontier
-                context,                   // context
-                filter_and_uniquify        // flag to deduplicate
+  execute<alg_type>(G,                         // graph
+                    op,                        // operator_t
+                    E->get_input_frontier(),   // input frontier
+                    E->get_output_frontier(),  // output frontier
+                    context,                   // context
+                    filter_and_uniquify        // flag to deduplicate
   );
 
   /*!
