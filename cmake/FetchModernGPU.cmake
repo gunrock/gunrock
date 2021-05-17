@@ -1,12 +1,11 @@
 include(FetchContent)
+set(FETCHCONTENT_QUIET ON)
 
-
-set(FETCHCONTENT_QUIET off)
-get_filename_component(fc_base "../_cmake_fetch"
+message("-- Cloning External Project: ModernGPU")
+get_filename_component(FC_BASE "../externals"
                 REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
-set(FETCHCONTENT_BASE_DIR ${fc_base})
+set(FETCHCONTENT_BASE_DIR ${FC_BASE})
 
-set(FETCHCONTENT_QUIET off)
 FetchContent_Declare(
     moderngpu
     GIT_REPOSITORY https://github.com/moderngpu/moderngpu.git
