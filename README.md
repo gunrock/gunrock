@@ -10,7 +10,7 @@ git clone https://github.com/gunrock/essentials.git
 cd essentials
 mkdir build && cd build
 cmake .. 
-make sssp # or for all applications, use: make -j$(nproc)
+make sssp # or for all algorithms, use: make -j$(nproc)
 bin/sssp ../datasets/chesapeake.mtx
 ```
 
@@ -18,9 +18,7 @@ bin/sssp ../datasets/chesapeake.mtx
 
 ## Getting Started with Gunrock
 
-- **Tutorial:** [Gunrock's programming model]()
-- **Tutorial:** [Write a graph primitive within Gunrock]()
-- **Tutorial:** [Building Gunrock]()
+- [Gunrock's programming model]()
 - [API reference documentation]()
 - [Performance analysis]()
 - [Publications](https://gunrock.github.io/docs/#/gunrock/publications_and_presentations) and [presentations](https://gunrock.github.io/docs/#/gunrock/publications_and_presentations?id=presentations)
