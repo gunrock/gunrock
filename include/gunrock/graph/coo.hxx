@@ -7,7 +7,6 @@
 #include <gunrock/memory.hxx>
 #include <gunrock/util/type_traits.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
-
 #include <gunrock/algorithms/search/binary_search.hxx>
 
 namespace gunrock {
@@ -72,9 +71,9 @@ class graph_coo_t {
 
   __host__ __device__ __forceinline__ edge_type
   get_edge(const vertex_type& source, const vertex_type& destination) const {
-    return (edge_type)algo::search::binary::execute(
-               get_column_indices(), destination, get_starting_edge(source),
-               get_starting_edge(source + 1)) -
+    return (edge_type)search::binary::execute(get_column_indices(), destination,
+                                              get_starting_edge(source),
+                                              get_starting_edge(source + 1)) -
            1;
   }
 

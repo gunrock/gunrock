@@ -1,4 +1,4 @@
-#include <gunrock/applications/pr.hxx>
+#include <gunrock/algorithms/pr.hxx>
 
 using namespace gunrock;
 using namespace memory;

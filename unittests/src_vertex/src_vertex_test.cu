@@ -1,4 +1,4 @@
-#include <gunrock/applications/application.hxx>
+#include <gunrock/algorithms/algorithms.hxx>
 
 using namespace gunrock;
 using namespace memory;
@@ -26,7 +26,7 @@ void test_get_source_vertex(int num_arguments, char** argument_array) {
   using csr_t =
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
   csr_t csr;
-  
+
   csr.from_coo(mm.load(filename));
 
   // --
@@ -41,8 +41,8 @@ void test_get_source_vertex(int num_arguments, char** argument_array) {
       csr.nonzero_values.data().get()   // values
   );  // supports row_indices and column_offsets (default = nullptr)
 
-
-  auto multi_context = std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
+  auto multi_context =
+      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
 
   auto log_edge = [G] __device__(edge_t const& e) -> void {
     auto src = G.get_source_vertex(e);

@@ -1,7 +1,7 @@
 #include <iostream>
 #include <sstream>
 
-#include <gunrock/applications/geo.hxx>
+#include <gunrock/algorithms/geo.hxx>
 
 using namespace gunrock;
 using namespace memory;

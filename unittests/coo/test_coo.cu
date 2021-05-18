@@ -1,4 +1,4 @@
-#include <gunrock/applications/application.hxx>
+#include <gunrock/algorithms/algorithms.hxx>
 
 using namespace gunrock;
 using namespace memory;

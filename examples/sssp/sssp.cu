@@ -1,4 +1,4 @@
-#include <gunrock/applications/sssp.hxx>
+#include <gunrock/algorithms/sssp.hxx>
 #include "sssp_cpu.hxx"  // Reference implementation
 
 using namespace gunrock;

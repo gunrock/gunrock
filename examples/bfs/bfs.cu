@@ -1,4 +1,4 @@
-#include <gunrock/applications/bfs.hxx>
+#include <gunrock/algorithms/bfs.hxx>
 #include "bfs_cpu.hxx"  // Reference implementation
 
 using namespace gunrock;

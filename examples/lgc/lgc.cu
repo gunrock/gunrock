@@ -1,4 +1,4 @@
-#include <gunrock/applications/lgc.hxx>
+#include <gunrock/algorithms/lgc.hxx>
 
 using namespace gunrock;
 using namespace memory;

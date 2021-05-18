@@ -10,7 +10,7 @@
  */
 
 #include <gunrock/graph/conversions/convert.hxx>
-#include <gunrock/applications/application.hxx>
+#include <gunrock/algorithms/algorithms.hxx>
 
 namespace gunrock {
 namespace graph {

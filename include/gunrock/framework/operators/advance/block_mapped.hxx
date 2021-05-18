@@ -120,7 +120,7 @@ void __global__ block_mapped_kernel(graph_t const G,
        i += cuda::block::size::x()      // increment by blockDim.x
   ) {
     // Binary search to find which vertex id to work on.
-    int id = algo::search::binary::rightmost(degrees, i, length);
+    int id = search::binary::rightmost(degrees, i, length);
 
     // If the id is greater than the width of the block or the input size, we
     // exit.

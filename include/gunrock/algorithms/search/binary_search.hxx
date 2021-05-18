@@ -17,7 +17,6 @@
 #include <thrust/binary_search.h>
 
 namespace gunrock {
-namespace algo {
 
 /**
  * @namespace search
@@ -78,7 +77,7 @@ template <typename key_pointer_t, typename key_t, typename index_t>
 __host__ __device__ key_t lower_bound(const key_pointer_t keys,
                                       const key_t& key,
                                       const index_t size) {
-  auto it = algo::search::binary::lower_bound(
+  auto it = search::binary::lower_bound(
       thrust::counting_iterator<key_t>(0),
       thrust::counting_iterator<key_t>(size), key,
       [keys] __host__ __device__(const key_t& pivot, const key_t& key) {
@@ -107,7 +106,7 @@ template <typename key_pointer_t, typename key_t, typename index_t>
 __host__ __device__ key_t upper_bound(const key_pointer_t keys,
                                       const key_t& key,
                                       const index_t size) {
-  auto it = algo::search::binary::upper_bound(
+  auto it = search::binary::upper_bound(
       thrust::counting_iterator<key_t>(0),
       thrust::counting_iterator<key_t>(size), key,
       [keys] __host__ __device__(const key_t& pivot, const key_t& key) {
@@ -137,5 +136,4 @@ __host__ __device__ index_t rightmost(const key_t* keys,
 
 }  // namespace binary
 }  // namespace search
-}  // namespace algo
 }  // namespace gunrock
