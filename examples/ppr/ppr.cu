@@ -1,4 +1,4 @@
-#include <gunrock/applications/ppr.hxx>
+#include <gunrock/algorithms/ppr.hxx>
 #include "ppr_cpu.hxx"
 
 using namespace gunrock;
@@ -17,22 +17,23 @@ void test_ppr(int num_arguments, char** argument_array) {
   using edge_t = int;
   using weight_t = float;
 
-  using csr_t = format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  using csr_t =
+      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
   csr_t csr;
-  
+
   // --
   // IO
 
-  weight_t alpha   = 0.15;
+  weight_t alpha = 0.15;
   weight_t epsilon = 1e-6;
   vertex_t n_seeds = 50;
 
   std::string filename = argument_array[1];
-   
-  if(util::is_market(filename)) {
+
+  if (util::is_market(filename)) {
     io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
     csr.from_coo(mm.load(filename));
-  } else if(util::is_binary_csr(filename)) {
+  } else if (util::is_binary_csr(filename)) {
     csr.read_binary(filename);
   } else {
     std::cerr << "Unknown file format: " << filename << std::endl;
@@ -53,7 +54,7 @@ void test_ppr(int num_arguments, char** argument_array) {
 
   // --
   // Params and memory allocation
-  
+
   vertex_t n_vertices = G.get_number_of_vertices();
 
   thrust::device_vector<weight_t> p(n_seeds * n_vertices);
@@ -61,8 +62,8 @@ void test_ppr(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::ppr::run_batch(
-      G, n_seeds, p.data().get(), alpha, epsilon);
+  float gpu_elapsed =
+      gunrock::ppr::run_batch(G, n_seeds, p.data().get(), alpha, epsilon);
 
   // --
   // CPU Run
@@ -85,7 +86,7 @@ void test_ppr(int num_arguments, char** argument_array) {
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
-  std::cout << "Number of errors : " << n_errors               << std::endl;
+  std::cout << "Number of errors : " << n_errors << std::endl;
 }
 
 int main(int argc, char** argv) {

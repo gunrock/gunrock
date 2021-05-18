@@ -10,7 +10,7 @@
  */
 #pragma once
 
-#include <gunrock/applications/application.hxx>
+#include <gunrock/algorithms/algorithms.hxx>
 
 namespace gunrock {
 namespace bc {

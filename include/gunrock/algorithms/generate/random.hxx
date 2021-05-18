@@ -4,8 +4,6 @@
 #include <thrust/random.h>
 
 namespace gunrock {
-namespace algo {
-
 namespace generate {
 namespace random {
 
@@ -26,6 +24,4 @@ void uniform_distribution(index_t begin, index_t end, iterator_t input) {
 }
 }  // namespace random
 }  // namespace generate
-
-}  // namespace algo
 }  // namespace gunrock

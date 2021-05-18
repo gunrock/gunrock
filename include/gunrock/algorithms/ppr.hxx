@@ -10,7 +10,7 @@
  */
 #pragma once
 
-#include <gunrock/applications/application.hxx>
+#include <gunrock/algorithms/algorithms.hxx>
 
 namespace gunrock {
 namespace ppr {
@@ -20,15 +20,14 @@ struct param_t {
   vertex_t seed;
   weight_t alpha;
   weight_t epsilon;
-  param_t(vertex_t _seed, weight_t _alpha, weight_t _epsilon) : 
-    seed(_seed), alpha(_alpha), epsilon(_epsilon) {}
+  param_t(vertex_t _seed, weight_t _alpha, weight_t _epsilon)
+      : seed(_seed), alpha(_alpha), epsilon(_epsilon) {}
 };
 
 template <typename weight_t>
 struct result_t {
   weight_t* p;
-  result_t(weight_t* _p)
-      : p(_p) {}
+  result_t(weight_t* _p) : p(_p) {}
 };
 
 template <typename graph_t, typename param_type, typename result_type>
@@ -50,7 +49,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   thrust::device_vector<weight_t> r;
   thrust::device_vector<weight_t> r_prime;
-  
+
   weight_t _2a1a;
   weight_t _1a1a;
 
@@ -59,7 +58,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto n_vertices = g.get_number_of_vertices();
     r.resize(n_vertices);
     r_prime.resize(n_vertices);
-    
+
     auto alpha = this->param.alpha;
     _2a1a = (2 * alpha) / (1 + alpha);
     _1a1a = ((1 - alpha) / (1 + alpha));
@@ -70,18 +69,18 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto n_vertices = g.get_number_of_vertices();
 
     auto context = this->get_single_context();
-    auto policy  = context->execution_policy();
+    auto policy = context->execution_policy();
 
-    auto seed      = this->param.seed;
-    auto d_p       = thrust::device_pointer_cast(this->result.p);
-    auto d_r       = thrust::device_pointer_cast(r.data());
+    auto seed = this->param.seed;
+    auto d_p = thrust::device_pointer_cast(this->result.p);
+    auto d_r = thrust::device_pointer_cast(r.data());
     auto d_r_prime = thrust::device_pointer_cast(r_prime.data());
-    
-    thrust::fill(policy, d_p       + 0, d_p       + n_vertices, 0);
-    thrust::fill(policy, d_r       + 0, d_r       + n_vertices, 0);
+
+    thrust::fill(policy, d_p + 0, d_p + n_vertices, 0);
+    thrust::fill(policy, d_r + 0, d_r + n_vertices, 0);
     thrust::fill(policy, d_r_prime + 0, d_r_prime + n_vertices, 0);
-    
-    thrust::fill(policy, d_r       + seed, d_r       + seed + 1, 1);
+
+    thrust::fill(policy, d_r + seed, d_r + seed + 1, 1);
     thrust::fill(policy, d_r_prime + seed, d_r_prime + seed + 1, 1);
   }
 };
@@ -96,7 +95,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using edge_t = typename problem_t::edge_t;
   using weight_t = typename problem_t::weight_t;
 
-  void prepare_frontier(frontier_t<vertex_t>* f, cuda::multi_context_t& context) override {
+  void prepare_frontier(frontier_t<vertex_t>* f,
+                        cuda::multi_context_t& context) override {
     auto P = this->get_problem();
     f->push_back(P->param.seed);
   }
@@ -107,30 +107,28 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto P = this->get_problem();
     auto G = P->get_graph();
 
-    weight_t* p       = P->result.p;
-    weight_t* r       = P->r.data().get();
+    weight_t* p = P->result.p;
+    weight_t* r = P->r.data().get();
     weight_t* r_prime = P->r_prime.data().get();
-    
-    auto n_vertices  = G.get_number_of_vertices();
-    weight_t epsilon = P->param.epsilon;
-    weight_t _2a1a   = P->_2a1a;
-    weight_t _1a1a   = P->_1a1a;
 
-    auto filter_op = [p, r, r_prime, _2a1a]__host__ __device__(vertex_t const& vertex) -> bool {
+    auto n_vertices = G.get_number_of_vertices();
+    weight_t epsilon = P->param.epsilon;
+    weight_t _2a1a = P->_2a1a;
+    weight_t _1a1a = P->_1a1a;
+
+    auto filter_op = [p, r, r_prime, _2a1a] __host__ __device__(
+                         vertex_t const& vertex) -> bool {
       p[vertex] += _2a1a * r[vertex];
       r_prime[vertex] = 0;
-      return true; 
+      return true;
     };
 
     operators::filter::execute<operators::filter_algorithm_t::predicated>(
         G, E, filter_op, context);
 
     auto advance_op = [G, r, r_prime, _1a1a, epsilon] __host__ __device__(
-      vertex_t const& src,
-      vertex_t const& dst,
-      edge_t const& edge,
-      weight_t const& weight
-    ) -> bool {
+                          vertex_t const& src, vertex_t const& dst,
+                          edge_t const& edge, weight_t const& weight) -> bool {
       auto update = _1a1a * r[src] / (weight_t)G.get_number_of_neighbors(src);
       auto oldval = math::atomic::add(r_prime + dst, update);
       auto newval = oldval + update;
@@ -141,7 +139,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // Execute advance operator on the provided lambda
     operators::advance::execute<operators::load_balance_t::block_mapped>(
         G, E, advance_op, context);
-    
+
     auto policy = this->context->get_context(0)->execution_policy();
     thrust::copy_n(policy, r_prime, n_vertices, r);
   }
@@ -153,8 +151,7 @@ float run(graph_t& G,
           typename graph_t::vertex_type& seed,
           typename graph_t::weight_type* p,
           typename graph_t::weight_type& alpha,
-          typename graph_t::weight_type& epsilon
-) {
+          typename graph_t::weight_type& epsilon) {
   // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
@@ -184,11 +181,10 @@ float run(graph_t& G,
 
 template <typename graph_t>
 float run_batch(graph_t& G,
-          typename graph_t::vertex_type& n_seeds,
-          typename graph_t::weight_type* p,
-          typename graph_t::weight_type& alpha,
-          typename graph_t::weight_type& epsilon
-) {
+                typename graph_t::vertex_type& n_seeds,
+                typename graph_t::weight_type* p,
+                typename graph_t::weight_type& alpha,
+                typename graph_t::weight_type& epsilon) {
   // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
@@ -196,9 +192,10 @@ float run_batch(graph_t& G,
   auto n_vertices = G.get_number_of_vertices();
 
   // ???: Is this a good way to time wall-clock time?
-  auto multi_context = std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
-  auto context       = multi_context->get_context(0);
-  auto timer         = context->timer();
+  auto multi_context =
+      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
+  auto context = multi_context->get_context(0);
+  auto timer = context->timer();
   timer.begin();
 
   auto f = [&](vertex_t seed) -> float {
@@ -207,10 +204,11 @@ float run_batch(graph_t& G,
 
   thrust::host_vector<float> total_elapsed(1);
   operators::batch::execute(f, n_seeds, total_elapsed.data());
-  
-  // return total_elapsed[0]; // This returns the total execution time, not the wall-clock time.  Weird.
-  return timer.end();         // Is this a better way to time?
+
+  // return total_elapsed[0]; // This returns the total execution time, not the
+  // wall-clock time.  Weird.
+  return timer.end();  // Is this a better way to time?
 }
 
-}  // namespace sssp
+}  // namespace ppr
 }  // namespace gunrock
