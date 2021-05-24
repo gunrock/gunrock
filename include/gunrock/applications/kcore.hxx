@@ -28,19 +28,15 @@ struct result_t {
   result_t(int* _k_cores) : k_cores(_k_cores) {}
 };
 
-//template <typename graph_t, typename param_type, typename result_type>
 template <typename graph_t, typename result_type>
 struct problem_t : gunrock::problem_t<graph_t> {
-  //param_type param;
   result_type result;
 
   problem_t(
     graph_t& G,
-    //param_type& _param,
     result_type& _result,
     std::shared_ptr<cuda::multi_context_t> _context
   ) : gunrock::problem_t<graph_t>(G, _context), result(_result) {}
-  //) : gunrock::problem_t<graph_t>(G, _context), param(_param), result(_result) {}
 
   using vertex_t = typename graph_t::vertex_type;
   using edge_t = typename graph_t::edge_type;
@@ -85,13 +81,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
     thrust::fill(
       thrust::device, 
-      deleted.begin(), 
-      deleted.end(),
-      0
-    );
-
-    thrust::fill(
-      thrust::device, 
       to_be_deleted.begin(), 
       to_be_deleted.end(),
       0
@@ -106,6 +95,22 @@ struct problem_t : gunrock::problem_t<graph_t> {
     thrust::transform(thrust::counting_iterator<vertex_t>(0),
                       thrust::counting_iterator<vertex_t>(n_vertices),
                       degrees.begin(), get_degree);
+
+    //mark zero degree vertices as deleted
+    auto degrees_data = degrees.data().get();
+    auto mark_zero_degrees = [=] __device__(const int& i) -> bool {
+      if ((degrees_data[i]) == 0) {
+        return true;
+      }
+      else {
+        return false;
+      }
+    };
+
+    thrust::transform(thrust::device, thrust::counting_iterator<vertex_t>(0),
+                      thrust::counting_iterator<vertex_t>(n_vertices),
+                      deleted.begin(), mark_zero_degrees);
+
   }
 };
 
@@ -136,16 +141,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto G = P->get_graph();
 
     // Get parameters and data structures
-    // Note that `P->visited` is a thrust vector, so we need to unwrap again
-    //auto single_source = P->param.single_source;
-    //auto distances     = P->result.distances;
-    //auto visited       = P->visited.data().get();
-
     auto k_cores = P->result.k_cores;
     auto degrees = P->degrees.data().get();
     auto deleted = P->deleted.data().get();
     auto to_be_deleted = P->to_be_deleted.data().get();
-
     auto n_vertices = G.get_number_of_vertices();
     auto f = this->get_input_frontier();
 
@@ -203,15 +202,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     while(!f->is_empty()) {
 
-      printf("frontier size before advance, iteration %u: %u\n", k, f->get_number_of_elements());
-
       // Execute advance operator
       operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
                                 operators::advance_direction_t::forward,
                                 operators::load_balance_t::merge_path>(
         G, E, advance_op, context);
-
-      printf("frontier size after advance, iteration %u: %u\n", k, f->get_number_of_elements());
 
       //Mark to-be-deleted vertices as deleted
       auto mark_deleted = [=] __device__(const int& i) -> bool {
@@ -226,8 +221,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       operators::filter::execute<operators::filter_algorithm_t::predicated>(
           G, E, filter_op, context);
 
-      printf("frontier size after filter, iteration %u: %u\n", k, f->get_number_of_elements());
-
     }
 
   }
@@ -240,14 +233,15 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     //  Check if all vertices have been removed from graph
     bool graph_empty = thrust::all_of(thrust::device, P->deleted.begin(), P->deleted.end(), thrust::identity<bool>());
-    printf("no vertices remaining? %u\n", graph_empty);
+
+    if (graph_empty) {
+      printf("degeneracy = %u\n", this->iteration);
+    }
 
     // Fill the frontier with a sequence of vertices from 0 -> n_vertices.
     f->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
 
-    bool timeout = (this->iteration >= 10); //TODO: remove
-
-    return graph_empty || timeout;
+    return graph_empty;
   }
 };
 
@@ -258,28 +252,21 @@ float run(graph_t& G,
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
 
-  // instantiate `param` and `result` templates
-  //using param_type = param_t<vertex_t>;
+  // instantiate `result` template
   using result_type = result_t<int>;
 
-  // initialize `param` and `result` w/ the appropriate parameters / data structures
-  //param_type param();
+  // initialize `result` w/ the appropriate parameters / data structures
   result_type result(k_cores);
 
-  // <boilerplate> This code probably should be the same across all applications, 
-  // unless maybe you're doing something like multi-gpu / concurrent function calls
-  
   // Context for application (eg, GPU + CUDA stream it will be executed on)
   auto multi_context =
       std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
 
   // instantiate `problem` and `enactor` templates.
-  //using problem_type = problem_t<graph_t, param_type, result_type>;
   using problem_type = problem_t<graph_t, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
   // initialize problem; call `init` and `reset` to prepare data structures
-  //problem_type problem(G, param, result, multi_context);
   problem_type problem(G, result, multi_context);
   problem.init();
   problem.reset();
@@ -287,7 +274,6 @@ float run(graph_t& G,
   // initialize enactor; call enactor, returning GPU elapsed time
   enactor_type enactor(&problem, multi_context);
   return enactor.enact();
-  // </boilerplate>
 }
 
 }  // namespace kcore

@@ -1,5 +1,6 @@
 #include <gunrock/applications/application.hxx>
 #include <gunrock/applications/kcore.hxx>
+#include "kcore_cpu.hxx"
 
 using namespace gunrock;
 using namespace memory;
@@ -53,6 +54,7 @@ void test_kcore(int num_arguments, char** argument_array) {
 
   std::cout << "G.get_number_of_vertices() : " << G.get_number_of_vertices() << std::endl;
   std::cout << "G.get_number_of_edges()    : " << G.get_number_of_edges()    << std::endl;
+  std::cout << "G.is_directed()    : " << G.is_directed()    << std::endl;
 
   // --
   // Params and memory allocation
@@ -69,20 +71,28 @@ void test_kcore(int num_arguments, char** argument_array) {
   // --
   // CPU Run
 
+  thrust::host_vector<int> h_k_cores(n_vertices);
+ 
+  float cpu_elapsed = kcore_cpu::run<csr_t, vertex_t, edge_t, weight_t>(csr, h_k_cores.data());
+
+  int n_errors = kcore_cpu::compute_error(k_cores, h_k_cores);
 
   // --
   // Log + Validate
 
-  // Use a fancy thrust function to print the results to the command line
-  // Note, if your graph is big you might not want to print this whole thing
-  std::cout << "GPU k-Core Values (output) = ";
-  thrust::copy(k_cores.begin(), k_cores.end(), std::ostream_iterator<int>(std::cout, " "));
-  std::cout << std::endl;
+  std::cout << "GPU k-core values[:40] = ";
+  gunrock::print::head<int>(k_cores, 40);
 
-  // Print runtime returned by `gunrock::my_sssp::run`
+  std::cout << "CPU k-core values[:40] = ";
+  gunrock::print::head<int>(h_k_cores, 40);
+
+
+  // Print runtime returned by `gunrock::kcore::run`
   // This will just be the GPU runtime of the "region of interest", and will ignore any 
   // setup/teardown code.
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
+  std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
+  std::cout << "Number of errors : " << n_errors << std::endl;
 
 }
 
