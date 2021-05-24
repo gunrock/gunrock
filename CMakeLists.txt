@@ -20,7 +20,7 @@ set(PROJECT_DEPS_DIR externals)
 # end /* Dependencies directory */
 
 # begin /* Include cmake modules */
-include(${PROJECT_SOURCE_DIR}/cmake/FetchRapidJSON.cmake)
+# include(${PROJECT_SOURCE_DIR}/cmake/FetchRapidJSON.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 # end /* Include cmake modules */
@@ -158,4 +158,3 @@ option(ESSENTIALS_BUILD_TESTS
 if(ESSENTIALS_BUILD_TESTS)
   add_subdirectory(unittests)
 endif(ESSENTIALS_BUILD_TESTS)
-

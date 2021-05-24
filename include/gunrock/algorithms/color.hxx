@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include <gunrock/applications/application.hxx>
+#include <gunrock/algorithms/algorithms.hxx>
 #include <gunrock/algorithms/generate/random.hxx>
 
 namespace gunrock {
@@ -62,8 +62,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
                  gunrock::numeric_limits<vertex_t>::invalid());
 
     // Generate random numbers.
-    algo::generate::random::uniform_distribution(0, n_vertices,
-                                                 randoms.begin());
+    generate::random::uniform_distribution(0, n_vertices, randoms.begin());
   }
 };
 

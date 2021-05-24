@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include <gunrock/applications/application.hxx>
+#include <gunrock/algorithms/algorithms.hxx>
 
 namespace gunrock {
 namespace geo {
@@ -434,7 +434,11 @@ float run(graph_t& G,
   problem.init();
   problem.reset();
 
-  enactor_type enactor(&problem, multi_context);
+  // Disable internal-frontiers:
+  enactor_properties_t props;
+  props.self_manage_frontiers = true;
+
+  enactor_type enactor(&problem, multi_context, props);
   return enactor.enact();
   // </boiler-plate>
 }

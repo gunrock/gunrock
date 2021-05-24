@@ -10,7 +10,7 @@
  */
 #pragma once
 
-#include <gunrock/applications/application.hxx>
+#include <gunrock/algorithms/algorithms.hxx>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/inner_product.h>
 
@@ -103,14 +103,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using weight_t = typename problem_t::weight_t;
 
   void prepare_frontier(frontier_t<vertex_t>* f,
-                        cuda::multi_context_t& context) override {
-    auto P = this->get_problem();
-    auto G = P->get_graph();
-    auto n_vertices = G.get_number_of_vertices();
-
-    // Fill the frontier with a sequence of vertices from 0 -> n_vertices.
-    f->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
-  }
+                        cuda::multi_context_t& context) override {}
 
   void loop(cuda::multi_context_t& context) override {
     // Data slice
@@ -154,12 +147,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return false;
     };
 
-    operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
+    operators::advance::execute<operators::load_balance_t::block_mapped,
                                 operators::advance_direction_t::forward,
-                                operators::load_balance_t::merge_path>(
+                                operators::advance_io_type_t::graph,
+                                operators::advance_io_type_t::none>(
         G, E, spread_op, context);
-
-    E->swap_frontier_buffers();  // swap back
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
@@ -217,7 +209,11 @@ float run(graph_t& G,
   problem.init();
   problem.reset();
 
-  enactor_type enactor(&problem, multi_context);
+  // Disable internal-frontiers:
+  enactor_properties_t props;
+  props.self_manage_frontiers = true;
+
+  enactor_type enactor(&problem, multi_context, props);
   return enactor.enact();
   // </boiler-plate>
 }

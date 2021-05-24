@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include <gunrock/applications/application.hxx>
+#include <gunrock/algorithms/algorithms.hxx>
 #include <thrust/logical.h>
 
 namespace gunrock {
@@ -203,10 +203,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     while(!f->is_empty()) {
 
       // Execute advance operator
-      operators::advance::execute<operators::advance_type_t::vertex_to_vertex,
-                                operators::advance_direction_t::forward,
-                                operators::load_balance_t::merge_path>(
-        G, E, advance_op, context);
+      //
+        operators::advance::execute<operators::load_balance_t::merge_path,
+                                    operators::advance_direction_t::forward,
+                                    operators::advance_io_type_t::vertices,
+                                    operators::advance_io_type_t::vertices>(
+		G, E, advance_op, context);
 
       //Mark to-be-deleted vertices as deleted
       auto mark_deleted = [=] __device__(const int& i) -> bool {

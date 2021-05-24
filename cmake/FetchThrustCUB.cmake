@@ -1,4 +1,11 @@
 include(FetchContent)
+set(FETCHCONTENT_QUIET ON)
+
+message("-- Cloning External Project: Thrust")
+get_filename_component(FC_BASE "../externals"
+                REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
+set(FETCHCONTENT_BASE_DIR ${FC_BASE})
+
 FetchContent_Declare(
     thrust
     GIT_REPOSITORY https://github.com/thrust/thrust.git

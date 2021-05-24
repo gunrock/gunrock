@@ -1,9 +1,9 @@
-#include <gunrock/applications/pr.hxx>
+#include <gunrock/algorithms/pr.hxx>
 
 using namespace gunrock;
 using namespace memory;
 
-void test_sssp(int num_arguments, char** argument_array) {
+void test_pr(int num_arguments, char** argument_array) {
   if (num_arguments != 2) {
     std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
     exit(1);
@@ -16,24 +16,25 @@ void test_sssp(int num_arguments, char** argument_array) {
   using edge_t = int;
   using weight_t = float;
 
-  using csr_t = format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  using csr_t =
+      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
   csr_t csr;
-  
+
   // --
   // IO
 
   std::string filename = argument_array[1];
-   
-  if(util::is_market(filename)) {
+
+  if (util::is_market(filename)) {
     io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
     csr.from_coo(mm.load(filename));
-  } else if(util::is_binary_csr(filename)) {
+  } else if (util::is_binary_csr(filename)) {
     csr.read_binary(filename);
   } else {
     std::cerr << "Unknown file format: " << filename << std::endl;
     exit(1);
   }
-  
+
   // --
   // Build graph
 
@@ -48,18 +49,18 @@ void test_sssp(int num_arguments, char** argument_array) {
 
   // --
   // Params and memory allocation
-  
+
   srand(time(NULL));
-  
+
   weight_t alpha = 0.85;
-  weight_t tol   = 1e-6;
-  
+  weight_t tol = 1e-6;
+
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> p(n_vertices);
 
   // --
   // GPU Run
-  
+
   float gpu_elapsed = gunrock::pr::run(G, alpha, tol, p.data().get());
 
   // --
@@ -71,5 +72,5 @@ void test_sssp(int num_arguments, char** argument_array) {
 }
 
 int main(int argc, char** argv) {
-  test_sssp(argc, argv);
+  test_pr(argc, argv);
 }

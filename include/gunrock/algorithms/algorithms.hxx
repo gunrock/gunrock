@@ -11,25 +11,28 @@
 
 #pragma once
 
-namespace gunrock {
-namespace algo {
+namespace gunrock {}  // namespace gunrock
 
-// Forward declaration...
+// Core includes
+#include <gunrock/memory.hxx>
+#include <gunrock/error.hxx>
 
-}  // namespace algo
-}  // namespace gunrock
+// Framework includes
+#include <gunrock/framework/framework.hxx>
 
-// Raking Algorithms
-#include <gunrock/algorithms/rake/rake.hxx>
+// Utility includes
+#include <gunrock/util/math.hxx>
+#include <gunrock/util/print.hxx>
 
-// Scan & Reduce Algorithms
-#include <gunrock/algorithms/reduce/reduce.hxx>
-#include <gunrock/algorithms/scan/scan.hxx>
+// Format includes
+#include <gunrock/formats/formats.hxx>
 
-// Search Algorithms
-#include <gunrock/algorithms/search/binary_search.hxx>
-#include <gunrock/algorithms/search/sorted_search.hxx>
+// I/O includes
+#include <gunrock/io/matrix_market.hxx>
 
-// Sort Algorithms
-#include <gunrock/algorithms/sort/radix_sort.hxx>
-#include <gunrock/algorithms/sort/stable_sort.hxx>
+// Graph includes
+#include <gunrock/graph/graph.hxx>
+
+// Container includes
+#include <gunrock/container/array.hxx>
+#include <gunrock/container/vector.hxx>

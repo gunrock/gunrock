@@ -1,5 +1,5 @@
-#include <gunrock/applications/application.hxx>
-#include <gunrock/applications/kcore.hxx>
+#include <gunrock/algorithms/algorithms.hxx>
+#include <gunrock/algorithms/kcore.hxx>
 #include "kcore_cpu.hxx"
 
 using namespace gunrock;

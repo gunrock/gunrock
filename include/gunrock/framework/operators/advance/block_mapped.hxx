@@ -31,6 +31,8 @@ namespace block_mapped {
 
 template <int THREADS_PER_BLOCK,
           int ITEMS_PER_THREAD,
+          advance_io_type_t input_type,
+          advance_io_type_t output_type,
           typename graph_t,
           typename frontier_t,
           typename work_tiles_t,
@@ -55,6 +57,8 @@ void __global__ block_mapped_kernel(graph_t const G,
   auto global_idx = cuda::thread::global::id::x();
   auto local_idx = cuda::thread::local::id::x();
 
+  thrust::counting_iterator<type_t> all_vertices(0);
+
   __shared__ union TempStorage {
     typename block_scan_t::TempStorage scan;
     // typename block_load_t::TempStorage load;
@@ -68,7 +72,9 @@ void __global__ block_mapped_kernel(graph_t const G,
   edge_t th_deg[ITEMS_PER_THREAD];
 
   if (global_idx < input_size) {
-    vertex_t v = input[global_idx];
+    vertex_t v = (input_type == advance_io_type_t::graph)
+                     ? all_vertices[global_idx]
+                     : input[global_idx];
     vertices[local_idx] = v;
     if (gunrock::util::limits::is_valid(v)) {
       sedges[local_idx] = G.get_starting_edge(v);
@@ -91,10 +97,12 @@ void __global__ block_mapped_kernel(graph_t const G,
   // Store back to shared memory.
   degrees[local_idx] = th_deg[0];
 
-  // Accumulate the output size to global memory, only done once per block.
-  if (local_idx == 0)
-    if ((cuda::block::id::x() * cuda::block::size::x()) < input_size)
-      offset[0] = offsets[cuda::block::id::x() * cuda::block::size::x()];
+  if (output_type != advance_io_type_t::none) {
+    // Accumulate the output size to global memory, only done once per block.
+    if (local_idx == 0)
+      if ((cuda::block::id::x() * cuda::block::size::x()) < input_size)
+        offset[0] = offsets[cuda::block::id::x() * cuda::block::size::x()];
+  }
 
   __syncthreads();
 
@@ -112,7 +120,7 @@ void __global__ block_mapped_kernel(graph_t const G,
        i += cuda::block::size::x()      // increment by blockDim.x
   ) {
     // Binary search to find which vertex id to work on.
-    int id = algo::search::binary::rightmost(degrees, i, length);
+    int id = search::binary::rightmost(degrees, i, length);
 
     // If the id is greater than the width of the block or the input size, we
     // exit.
@@ -133,13 +141,15 @@ void __global__ block_mapped_kernel(graph_t const G,
     bool cond = op(v, n, e, w);
 
     // Store [neighbor] into the output frontier.
-    output[offset[0] + i] =
-        (cond && n != v) ? n : gunrock::numeric_limits<vertex_t>::invalid();
+    if (output_type != advance_io_type_t::none)
+      output[offset[0] + i] =
+          (cond && n != v) ? n : gunrock::numeric_limits<vertex_t>::invalid();
   }
-}
+}  // namespace block_mapped
 
-template <advance_type_t type,
-          advance_direction_t direction,
+template <advance_direction_t direction,
+          advance_io_type_t input_type,
+          advance_io_type_t output_type,
           typename graph_t,
           typename operator_t,
           typename frontier_t,
@@ -150,30 +160,35 @@ void execute(graph_t& G,
              frontier_t* output,
              work_tiles_t& segments,
              cuda::standard_context_t& context) {
-  // This shouldn't be required for block-mapped.
-  auto size_of_output = compute_output_length(G, input, segments, context);
+  if constexpr (output_type != advance_io_type_t::none) {
+    // This shouldn't be required for block-mapped.
+    auto size_of_output = compute_output_length(G, input, segments, context);
 
-  // If output frontier is empty, resize and return.
-  if (size_of_output <= 0) {
-    output->set_number_of_elements(0);
-    return;
+    // If output frontier is empty, resize and return.
+    if (size_of_output <= 0) {
+      output->set_number_of_elements(0);
+      return;
+    }
+
+    // <todo> Resize the output (inactive) buffer to the new size.
+    // Can be hidden within the frontier struct.
+    if (output->get_capacity() < size_of_output)
+      output->reserve(size_of_output);
+    output->set_number_of_elements(size_of_output);
   }
 
-  // <todo> Resize the output (inactive) buffer to the new size.
-  // Can be hidden within the frontier struct.
-  if (output->get_capacity() < size_of_output)
-    output->reserve(size_of_output);
-  output->set_number_of_elements(size_of_output);
+  std::size_t work_size = (input_type == advance_io_type_t::graph)
+                              ? G.get_number_of_vertices()
+                              : input->get_number_of_elements();
 
   // TODO: Use launch_box_t instead.
   constexpr int block_size = 128;
-  int grid_size =
-      (input->get_number_of_elements() + block_size - 1) / block_size;
+  int grid_size = (work_size + block_size - 1) / block_size;
 
   // Launch blocked-mapped advance kernel.
-  block_mapped_kernel<block_size, 1>
+  block_mapped_kernel<block_size, 1, input_type, output_type>
       <<<grid_size, block_size, 0, context.stream()>>>(
-          G, op, input->data(), output->data(), input->get_number_of_elements(),
+          G, op, input->data(), output->data(), work_size,
           segments.data().get());
   context.synchronize();
 }

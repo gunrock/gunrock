@@ -43,7 +43,7 @@ void offsets_to_indices(const index_t* offsets,
           }),
       indices + 0);
 
-  thrust::inclusive_scan(exec, indices + 0, indices + size_of_offsets,
+  thrust::inclusive_scan(exec, indices + 0, indices + size_of_indices,
                          indices + 0, thrust::maximum<offset_t>());
 }
 
