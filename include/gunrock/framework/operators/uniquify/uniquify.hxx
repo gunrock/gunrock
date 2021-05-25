@@ -16,8 +16,8 @@ template <uniquify_algorithm_t type, typename frontier_t>
 void execute(frontier_t* input,
              frontier_t* output,
              cuda::multi_context_t& context,
-             const float& uniquification_percent = 100,
-             bool best_effort_uniquification = false) {
+             bool best_effort_uniquification = false,
+             const float uniquification_percent = 100) {
   if (context.size() == 1) {
     auto single_context = context.get_context(0);
 
@@ -41,11 +41,12 @@ void execute(frontier_t* input,
   }
 }
 
-template <uniquify_algorithm_t type, typename enactor_type>
+template <uniquify_algorithm_t type = uniquify_algorithm_t::unique,
+          typename enactor_type>
 void execute(enactor_type* E,
              cuda::multi_context_t& context,
-             const float& uniquification_percent = 100,
              bool best_effort_uniquification = false,
+             const float uniquification_percent = 100,
              bool swap_buffers = true) {
   if (!best_effort_uniquification)
     if (uniquification_percent < 0 || uniquification_percent > 100)
@@ -53,11 +54,11 @@ void execute(enactor_type* E,
           cudaErrorUnknown,
           "Uniquification percentage must be a +ve float between 0 and 100.");
 
-  execute<type>(E->get_input_frontier(),    // input frontier
-                E->get_output_frontier(),   // output frontier
-                context,                    // context
-                uniquification_percent,     // percentage in float
-                best_effort_uniquification  // best effort attempt
+  execute<type>(E->get_input_frontier(),     // input frontier
+                E->get_output_frontier(),    // output frontier
+                context,                     // context
+                best_effort_uniquification,  // best effort attempt
+                uniquification_percent       // percentage in float
   );
 
   /*!
