@@ -5,7 +5,7 @@ NUM_GPUS=2
 
 APP_SCRIPT="./hive-ss-test.sh"
 
-OUTPUT_DIR="eval_mgpu/$PARTITION_NAME"
+OUTPUT_DIR="ss_eval_mgpu/$PARTITION_NAME"
 mkdir -p $OUTPUT_DIR
 
 for (( i=1; i<=$NUM_GPUS; i++))
