@@ -1,16 +1,17 @@
 #!/bin/bash
 
 PARTITION_NAME="dgx2"
-NUM_GPUS=2
+NUM_GPUS=16
 
 #APP_SCRIPT="./hive-rw-test.sh"
 APP_SCRIPT[0]="./hive-rw-undirected-uniform.sh"
 APP_SCRIPT[1]="./hive-rw-directed-uniform.sh"
+APP_SCRIPT[2]="./hive-rw-directed-greedy.sh"
 
 OUTPUT_DIR="rw_eval_mgpu/$PARTITION_NAME"
 mkdir -p $OUTPUT_DIR
 
-for app in {0..1}
+for app in {0..2}
 do
    for (( i=1; i<=$NUM_GPUS; i++))
    do
