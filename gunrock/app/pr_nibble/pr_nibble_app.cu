@@ -149,7 +149,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
 
   // compute running statistics
   // <TODO> change NULL to problem specific per-vertex visited marker, e.g.
-  // h_distances info.ComputeTraversalStats(enactor, (VertexT*)NULL);
+  info.ComputeTraversalStats(enactor, (VertexT*)NULL);
   // Display_Memory_Usage(problem);
   // #ifdef ENABLE_PERFORMANCE_PROFILING
   // Display_Performance_Profiling(&enactor);
