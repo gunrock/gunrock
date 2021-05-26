@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PARTITION_NAME="dgx2"
-NUM_GPUS=2
+NUM_GPUS=16
 
 APP_SCRIPT="./hive-ss-test.sh"
 

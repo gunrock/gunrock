@@ -12,8 +12,7 @@ OUTPUT_DIR=${1:-"eval_mgpu"}
 NUM_GPUS=${2:-"1"}
 JSON_FILE=""
 
-TIMESTAMP=`date '+%Y-%m-%d_%H:%M:%S'`
-TAG=$TIMESTAMP
+TAG="num-gpus:$NUM_GPUS"
 
 NAME[0]="pokec"
 
