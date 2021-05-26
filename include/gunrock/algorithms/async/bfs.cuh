@@ -7,24 +7,21 @@ namespace gunrock {
 namespace async {
 namespace bfs {
 
-// <user-defined>
+// !! Identical to synchronous `essentials`
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
   param_t(vertex_t _single_source) : single_source(_single_source) {}
 };
-// </user-defined>
 
-// <user-defined>
+// !! Identical to synchronous `essentials`
 template <typename edge_t>
 struct result_t {
   edge_t* depth;
   result_t(edge_t* _depth) : depth(_depth) {}
 };
-// </user-defined>
 
-// This is very close to compatible w/ standard Gunrock problem_t
-// However, it doesn't use the `context` argument, so not joining yet
+// !! Identical to synchronous `essentials`
 template <typename graph_t, typename param_type, typename result_type>
 struct problem_t : gunrock::problem_t<graph_t> {
 
@@ -56,8 +53,10 @@ struct problem_t : gunrock::problem_t<graph_t> {
     
     auto single_source = param.single_source;
     auto d_depth       = thrust::device_pointer_cast(this->result.depth);
-    thrust::fill(policy, d_depth + 0, d_depth + n_vertices, n_vertices + 1);
-    thrust::fill(policy, d_depth + single_source, d_depth + single_source + 1, 0);
+    thrust::fill_n(
+      policy, d_depth, n_vertices, std::numeric_limits<vertex_t>::max());
+    thrust::fill_n(
+      policy, d_depth + single_source, 1, 0);
   }
 };
 
@@ -81,6 +80,7 @@ struct enactor_t : async_enactor_t<problem_t> {
   using weight_t = typename problem_t::weight_t;
   using queue_t  = typename async_enactor_t<problem_t>::queue_t;
 
+  // !! Breaks w/ standard essentials (mildly...)
   void prepare_frontier(queue_t& q, cuda::multi_context_t& context) {
     auto P = this->get_problem();
     
@@ -89,6 +89,7 @@ struct enactor_t : async_enactor_t<problem_t> {
     _push_one<<<1, 1>>>(q, P->param.single_source);
   }
   
+  // !! Breaks w/ standard essentials (mildly...)
   void loop(cuda::multi_context_t& context) {
     auto P = this->get_problem();
     auto G = P->get_graph();
@@ -114,6 +115,7 @@ struct enactor_t : async_enactor_t<problem_t> {
 };
 
 
+// !! Identical to synchronous `essentials`
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter

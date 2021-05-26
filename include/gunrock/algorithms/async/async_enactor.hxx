@@ -22,6 +22,9 @@ struct async_enactor_t {
   async_enactor_t(const async_enactor_t& rhs) = delete;
   async_enactor_t& operator=(const async_enactor_t& rhs) = delete;
 
+  // !! These parameters may be application specific, so really we want a way to 
+  // pass them in as "execution policy parameters"
+  // For instance ... I don't think these parameters would work w/ async pagerank
   int num_queue       = 4;
   int min_iter        = 800;
   int num_block       = 56 * 5;
