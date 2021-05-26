@@ -13,7 +13,7 @@ OUTPUT_DIR=${1:-"rw_eval_mgpu"}
 NUM_GPUS=${2:-"1"}
 JSON_FILE=""
 TIMESTAMP=`date '+%Y-%m-%d_%H:%M:%S'`
-TAG=$TIMESTAMP
+#TAG=$TIMESTAMP
 
 NAME1[0]="dir_gs_twitter"
 NAME2[0]="gs_twitter.values"
@@ -21,6 +21,8 @@ GRAPH[0]="market $DATA_PREFIX/${NAME1[0]}.mtx --node-value-path=$DATA_PREFIX/${N
 
 SUB_DIR="directed-greedy"
 mkdir -p "$OUTPUT_DIR/$SUB_DIR"
+
+TAG="walkmode:$SUB_DIR,num-gpus:$NUM_GPUS"
 
 for i in {0..0}
 do
@@ -31,7 +33,7 @@ do
    $BIN_PREFIX$APP_NAME \
    ${GRAPH[$i]} \
    $APP_OPTIONS \
-   --tag=$TAG \
+   --tag=${TAG} \
    --jsonfile="$OUTPUT_DIR/$SUB_DIR/$JSON_FILE.json" \
    > "$OUTPUT_DIR/$SUB_DIR/$JSON_FILE.output.txt"
 done
