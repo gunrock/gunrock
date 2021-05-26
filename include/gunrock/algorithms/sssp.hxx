@@ -65,12 +65,13 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto context = this->get_single_context();
     auto policy = context->execution_policy();
 
-    auto d_distances = thrust::device_pointer_cast(this->result.distances);
+    auto single_source = this->param.single_source;
+    auto d_distances   = thrust::device_pointer_cast(this->result.distances);
     thrust::fill(policy, d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<weight_t>::max());
 
-    thrust::fill(policy, d_distances + this->param.single_source,
-                 d_distances + this->param.single_source + 1, 0);
+    thrust::fill(policy, d_distances + single_source,
+                 d_distances + single_source + 1, 0);
 
     thrust::fill(policy, visited.begin(), visited.end(),
                  -1);  // This does need to be reset in between runs though

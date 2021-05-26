@@ -20,15 +20,14 @@ class prioritize {
 template <typename csr_t, typename vertex_t, typename edge_t>
 float run(csr_t& csr,
           vertex_t& single_source,
-          vertex_t* distances,
-          vertex_t* predecessors) {
+          vertex_t* distances) {
 
   thrust::host_vector<edge_t> _row_offsets(csr.row_offsets);  // Copy data to CPU
   thrust::host_vector<vertex_t> _column_indices(csr.column_indices);
   
   edge_t* row_offsets = _row_offsets.data();
   vertex_t* column_indices = _column_indices.data();
-
+  
   for (vertex_t i = 0; i < csr.number_of_rows; i++)
     distances[i] = std::numeric_limits<vertex_t>::max();
 
