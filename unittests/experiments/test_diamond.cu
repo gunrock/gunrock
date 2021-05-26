@@ -1,4 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
 #include <stdio.h>
 
 #include <thrust/device_vector.h>
@@ -115,5 +114,4 @@ void test_diamond() {
 
 int main(int argc, char** argv) {
   test_diamond();
-  return EXIT_SUCCESS;
 }

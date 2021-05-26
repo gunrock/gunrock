@@ -1,7 +1,7 @@
-#include <cstdlib>  // EXIT_SUCCESS
 #include <set>
 
-#include <gunrock/applications/color.hxx>
+#include <gunrock/algorithms/color.hxx>
+#include "color_cpu.hxx"  // Reference implementation
 
 using namespace gunrock;
 using namespace memory;
@@ -25,7 +25,10 @@ void test_color(int num_arguments, char** argument_array) {
   std::string filename = argument_array[1];
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  format::csr_t<memory::memory_space_t::device, vertex_t, edge_t, weight_t> csr;
+
+  using csr_t =
+      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  csr_t csr;
   csr.from_coo(mm.load(filename));
 
   // --
@@ -40,7 +43,6 @@ void test_color(int num_arguments, char** argument_array) {
       csr.nonzero_values.data().get()   // values
   );  // supports row_indices and column_offsets (default = nullptr)
 
-
   // --
   // Params and memory allocation
 
@@ -48,21 +50,36 @@ void test_color(int num_arguments, char** argument_array) {
   thrust::device_vector<vertex_t> colors(n_vertices);
 
   // --
-  // Run problem
+  // GPU Run
 
-  float elapsed = gunrock::color::run(G, colors.data().get());
+  float gpu_elapsed = gunrock::color::run(G, colors.data().get());
+  std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
+
+  // --
+  // CPU Run
+
+  thrust::host_vector<vertex_t> h_colors(n_vertices);
+
+  float cpu_elapsed =
+      color_cpu::run<csr_t, vertex_t, edge_t, weight_t>(csr, h_colors.data());
+
+  int n_errors = color_cpu::compute_error<csr_t, vertex_t, edge_t, weight_t>(
+      csr, colors, h_colors);
 
   // --
   // Log
 
-  std::cout << "Colors (output) = ";
-  thrust::copy(colors.begin(), colors.end(),
-               std::ostream_iterator<weight_t>(std::cout, " "));
-  std::cout << std::endl;
-  std::cout << "color Elapsed Time: " << elapsed << " (ms)" << std::endl;
+  std::cout << "GPU colors[:40] = ";
+  gunrock::print::head<weight_t>(colors, 40);
+
+  std::cout << "CPU colors[:40] = ";
+  gunrock::print::head<weight_t>(h_colors, 40);
+
+  std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
+  std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
+  std::cout << "Number of errors : " << n_errors << std::endl;
 }
 
 int main(int argc, char** argv) {
   test_color(argc, argv);
-  return EXIT_SUCCESS;
 }

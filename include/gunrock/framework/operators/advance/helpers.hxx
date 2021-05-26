@@ -22,23 +22,39 @@ template <typename graph_t, typename frontier_t, typename work_tiles_t>
 std::size_t compute_output_length(graph_t& G,
                                   frontier_t* input,
                                   work_tiles_t& segments,
-                                  cuda::standard_context_t& context) {
+                                  cuda::standard_context_t& context,
+                                  bool graph_as_frontier = false) {
   using vertex_t = typename graph_t::vertex_type;
 
-  auto segment_sizes = [=] __host__ __device__(vertex_t const& v) {
+  auto input_data = input->data();
+  auto total_elems = graph_as_frontier ? G.get_number_of_vertices()
+                                       : input->get_number_of_elements();
+
+  // XXX: todo, maybe use capacity instead?
+  if (segments.size() < total_elems + 1)
+    segments.resize(total_elems + 1);
+
+  auto segment_sizes = [=] __host__ __device__(std::size_t const& i) {
+    if (i == total_elems)  // XXX: this is a weird exc. scan.
+      return 0;
+
+    auto v = graph_as_frontier ? vertex_t(i) : input_data[i];
     // if item is invalid, segment size is 0.
     if (!gunrock::util::limits::is_valid(v))
       return 0;
-    return G.get_number_of_neighbors(v);
+    else
+      return G.get_number_of_neighbors(v);
   };
 
-  auto new_length = thrust::transform_inclusive_scan(
-      thrust::cuda::par.on(context.stream()),  // execution policy
-      input->begin(),                          // input iterator: first
-      input->end(),                            // input iterator: last
-      segments.begin(),                        // output iterator
-      segment_sizes,                           // unary operation
-      thrust::plus<vertex_t>()                 // binary operation
+  auto new_length = thrust::transform_exclusive_scan(
+      thrust::cuda::par.on(context.stream()),          // execution policy
+      thrust::make_counting_iterator<std::size_t>(0),  // input iterator: first
+      thrust::make_counting_iterator<std::size_t>(total_elems +
+                                                  1),  // input iterator: last
+      segments.begin(),                                // output iterator
+      segment_sizes,                                   // unary operation
+      (vertex_t)0,                                     // initial value
+      thrust::plus<vertex_t>()                         // binary operation
   );
 
   // The last item contains the total scanned items, so in a simple
@@ -54,12 +70,17 @@ std::size_t compute_output_length(graph_t& G,
   // If the active buffer is greater than number of vertices,
   // we should TODO: resize the scanned work domain, this happens
   // when we allow duplicates to be in the active buffer.
-  thrust::host_vector<vertex_t> size_of_output(1, 0);
-  cudaMemcpy(size_of_output.data(),
-             thrust::raw_pointer_cast(segments.data()) +
-                 location_of_total_scanned_items,
-             sizeof(vertex_t),  // move one integer
-             cudaMemcpyDeviceToHost);
+  thrust::host_vector<vertex_t> size_of_output(
+      segments.data() + location_of_total_scanned_items,
+      segments.data() + location_of_total_scanned_items + 1);
+
+  // DEBUG::
+  // std::cout << "Scanned Segments (THRUST) = ";
+  // thrust::copy(segments.begin(), segments.end(),
+  //              std::ostream_iterator<vertex_t>(std::cout, " "));
+  // std::cout << std::endl;
+  // std::cout << "Size of Output (THRUST) = " << size_of_output[0] <<
+  // std::endl;
 
   return size_of_output[0];
 }

@@ -17,6 +17,8 @@
 #include <gunrock/container/array.hxx>
 #include <gunrock/container/vector.hxx>
 
+#include <moderngpu/context.hxx>
+
 namespace gunrock {
 namespace cuda {
 
@@ -35,6 +37,7 @@ struct context_t {
   virtual void print_properties() = 0;
   virtual cuda::compute_capability_t ptx_version() const = 0;
   virtual cuda::stream_t stream() = 0;
+  virtual mgpu::standard_context_t* mgpu() = 0;
 
   // cudaStreamSynchronize or cudaDeviceSynchronize for stream 0.
   virtual void synchronize() = 0;
@@ -51,6 +54,13 @@ class standard_context_t : public context_t {
   cuda::stream_t _stream;
   cuda::event_t _event;
 
+  /**
+   * @todo Find out how to use a shared_ptr<> without printing the GPU debug
+   * information. Currently, we are not releasing this pointer, which causes a
+   * memory leak. Fix this later.
+   */
+  mgpu::standard_context_t* _mgpu_context;
+
   util::timer_t _timer;
 
   // Making this a template argument means we won't generate an instance
@@ -63,14 +73,16 @@ class standard_context_t : public context_t {
     _ptx_version = cuda::make_compute_capability(attr.ptxVersion);
 
     cudaSetDevice(_ordinal);
-    cudaStreamCreate(&_stream);
+    cudaStreamCreateWithFlags(&_stream, cudaStreamNonBlocking);
+    cudaEventCreateWithFlags(&_event, cudaEventDisableTiming);
     cudaGetDeviceProperties(&_props, _ordinal);
-    cudaEventCreate(&_event);
+
+    _mgpu_context = new mgpu::standard_context_t(false, _stream);
   }
 
  public:
   standard_context_t(cuda::device_id_t device = 0)
-      : context_t(), _ordinal(device) {
+      : context_t(), _ordinal(device), _mgpu_context(nullptr) {
     init();
   }
 
@@ -88,7 +100,9 @@ class standard_context_t : public context_t {
   virtual cuda::compute_capability_t ptx_version() const override {
     return _ptx_version;
   }
+
   virtual cuda::stream_t stream() override { return _stream; }
+  virtual mgpu::standard_context_t* mgpu() override { return _mgpu_context; }
 
   virtual void synchronize() override {
     error::error_t status =
@@ -99,6 +113,11 @@ class standard_context_t : public context_t {
   virtual cuda::event_t event() override { return _event; }
 
   virtual util::timer_t& timer() override { return _timer; }
+
+  virtual cuda::device_id_t ordinal() { return _ordinal; }
+
+  auto execution_policy() { return thrust::cuda::par.on(this->stream()); }
+
 };  // class standard_context_t
 
 class multi_context_t {
@@ -129,6 +148,27 @@ class multi_context_t {
   auto get_context(cuda::device_id_t device) {
     auto contexts_ptr = contexts.data();
     return contexts_ptr[device];
+  }
+
+  auto size() { return contexts.size(); }
+
+  void enable_peer_access() {
+    int num_gpus = size();
+    for (int i = 0; i < num_gpus; i++) {
+      auto ctx = get_context(i);
+      cudaSetDevice(ctx->ordinal());
+
+      for (int j = 0; j < num_gpus; j++) {
+        if (i == j)
+          continue;
+
+        auto ctx_peer = get_context(j);
+        cudaDeviceEnablePeerAccess(ctx_peer->ordinal(), 0);
+      }
+    }
+
+    auto ctx0 = get_context(0);
+    cudaSetDevice(ctx0->ordinal());
   }
 };  // class multi_context_t
 

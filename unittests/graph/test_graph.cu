@@ -1,5 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
-
 #include <gunrock/error.hxx>            // error checking
 #include <gunrock/graph/graph.hxx>      // graph class
 #include <gunrock/formats/formats.hxx>  // csr support
@@ -139,9 +137,17 @@ void test_graph() {
   kernel<<<1, 1>>>(O);
   cudaDeviceSynchronize();
   error::throw_if_exception(cudaPeekAtLastError());
+
+  // TODO: Revisit this test.
+  thrust::device_vector<vertex_t> histogram(sizeof(vertex_t) * 8 + 1);
+  gunrock::graph::build_degree_histogram(O, histogram.data().get());
+
+  std::cout << "Degree Histogram = ";
+  thrust::copy(histogram.begin(), histogram.end(),
+               std::ostream_iterator<vertex_t>(std::cout, " "));
+  std::cout << std::endl;
 }
 
 int main(int argc, char** argv) {
   test_graph();
-  return EXIT_SUCCESS;
 }

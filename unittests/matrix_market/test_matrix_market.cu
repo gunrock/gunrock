@@ -1,5 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
-
 #include <gunrock/error.hxx>             // error checking
 #include <gunrock/io/matrix_market.hxx>  // matrix_market support
 
@@ -28,5 +26,4 @@ void test_matrix_market(int num_arguments, char** argument_array) {
 
 int main(int argc, char** argv) {
   test_matrix_market(argc, argv);
-  return EXIT_SUCCESS;
 }

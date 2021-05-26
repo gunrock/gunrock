@@ -13,7 +13,7 @@
 
 #include <string>
 
-#include <mtx/mmio.hxx>
+#include <gunrock/io/detail/mmio.hxx>
 
 #include <gunrock/util/filepath.hxx>
 #include <gunrock/formats/formats.hxx>
@@ -171,9 +171,9 @@ struct matrix_market_t {
       vertex_t _nonzeros =
           2 * off_diagonals + (coo.number_of_nonzeros - off_diagonals);
 
-      thrust::host_vector<vertex_t> new_I(_nonzeros);
-      thrust::host_vector<vertex_t> new_J(_nonzeros);
-      thrust::host_vector<weight_t> new_V(_nonzeros);
+      vector_t<vertex_t, memory_space_t::host> new_I(_nonzeros);
+      vector_t<vertex_t, memory_space_t::host> new_J(_nonzeros);
+      vector_t<weight_t, memory_space_t::host> new_V(_nonzeros);
 
       vertex_t* _I = new_I.data();
       vertex_t* _J = new_J.data();

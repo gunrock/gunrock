@@ -1,4 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
 #include <cassert>
 #include <iostream>
 
@@ -66,5 +65,4 @@ int main(int argc, char** argv) {
   test_occupancy_calc();
   test_define();
   test_fallback();
-  return EXIT_SUCCESS;
 }

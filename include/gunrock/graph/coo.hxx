@@ -7,7 +7,6 @@
 #include <gunrock/memory.hxx>
 #include <gunrock/util/type_traits.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
-
 #include <gunrock/algorithms/search/binary_search.hxx>
 
 namespace gunrock {
@@ -34,7 +33,7 @@ class graph_coo_t {
   // overriding the derived class
   __host__ __device__ __forceinline__ edge_type
   get_number_of_neighbors(vertex_type const& v) const {
-    // XXX: ...
+    return get_starting_edge(v + 1) - get_starting_edge(v);
   }
 
   __host__ __device__ __forceinline__ vertex_type
@@ -49,7 +48,20 @@ class graph_coo_t {
 
   __host__ __device__ __forceinline__ edge_type
   get_starting_edge(vertex_type const& v) const {
-    // XXX: ...
+    auto row_indices = get_row_indices();
+
+    // Returns `it` such that everything to the left is < `v`
+    // This will be the offset of `v`
+    auto it = thrust::lower_bound(
+        thrust::seq,  // ??? Is this right policy?
+        thrust::counting_iterator<edge_t>(0),
+        thrust::counting_iterator<edge_t>(this->number_of_edges), v,
+        [row_indices] __host__ __device__(const vertex_type& pivot,
+                                          const vertex_type& key) {
+          return row_indices[pivot] < key;
+        });
+
+    return (*it);
   }
 
   __host__ __device__ __forceinline__ vertex_pair_type
@@ -59,7 +71,10 @@ class graph_coo_t {
 
   __host__ __device__ __forceinline__ edge_type
   get_edge(const vertex_type& source, const vertex_type& destination) const {
-    // XXX: ...
+    return (edge_type)search::binary::execute(get_column_indices(), destination,
+                                              get_starting_edge(source),
+                                              get_starting_edge(source + 1)) -
+           1;
   }
 
   __host__ __device__ __forceinline__ weight_type
@@ -81,18 +96,18 @@ class graph_coo_t {
     return values;
   }
 
-  //  protected:
+ protected:
   __host__ __device__ void set(vertex_type const& _number_of_vertices,
                                edge_type const& _number_of_edges,
-                               vertex_type* I,
-                               vertex_type* J,
-                               weight_type* X) {
+                               vertex_type* _row_indices,
+                               vertex_type* _column_indices,
+                               weight_type* _values) {
     this->number_of_vertices = _number_of_vertices;
     this->number_of_edges = _number_of_edges;
     // Set raw pointers
-    row_indices = memory::raw_pointer_cast<edge_type>(I);
-    column_indices = memory::raw_pointer_cast<vertex_type>(J);
-    values = memory::raw_pointer_cast<weight_type>(X);
+    row_indices = raw_pointer_cast<edge_type>(_row_indices);
+    column_indices = raw_pointer_cast<vertex_type>(_column_indices);
+    values = raw_pointer_cast<weight_type>(_values);
   }
 
  private:

@@ -12,12 +12,12 @@ void execute(graph_t& G,
              frontier_t* input,
              frontier_t* output,
              cuda::standard_context_t& context) {
-  using type_t = std::remove_pointer_t<decltype(input->data())>;
+  using type_t = typename frontier_t::type_t;
 
   // Allocate output size if necessary.
-  if (output->size() != input->size()) {
-    output->resize(input->size());
-  }
+  if (output->get_capacity() < input->get_number_of_elements())
+    output->reserve(input->get_number_of_elements());
+  output->set_number_of_elements(input->get_number_of_elements());
 
   auto predicate = [=] __host__ __device__(type_t const& i) -> bool {
     return gunrock::util::limits::is_valid(i) ? op(i) : false;
@@ -33,17 +33,7 @@ void execute(graph_t& G,
   );
 
   auto new_size = thrust::distance(output->begin(), new_length);
-  output->resize(new_size);
-
-  // Uniquify!
-  // auto new_end = thrust::unique(
-  //     thrust::cuda::par.on(context.stream()),  // execution policy
-  //     output->begin(),                         // input iterator: begin
-  //     output->end()                            // input iterator: end
-  // );
-
-  // new_size = thrust::distance(output->begin(), new_end);
-  // output->resize(new_size);
+  output->set_number_of_elements(new_size);
 }
 }  // namespace predicated
 }  // namespace filter

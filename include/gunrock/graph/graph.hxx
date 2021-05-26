@@ -5,6 +5,11 @@
 
 #include <gunrock/memory.hxx>
 #include <gunrock/util/type_traits.hxx>
+#include <gunrock/util/math.hxx>
+#include <gunrock/cuda/cuda.hxx>
+
+#include <thrust/iterator/discard_iterator.h>
+#include <thrust/iterator/counting_iterator.h>
 
 #include <gunrock/graph/properties.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
@@ -13,12 +18,12 @@
 #include <gunrock/graph/csc.hxx>
 #include <gunrock/graph/csr.hxx>
 
-// #include <gunrock/algorithms/search/binary_search.cuh>
-
 namespace gunrock {
 namespace graph {
 
 using namespace memory;
+
+struct empty_graph_t {};
 
 /**
  * @brief Variadic inheritence based graph class, inherit only what you need
@@ -49,10 +54,16 @@ template <memory_space_t space,
           typename weight_t,
           class... graph_view_t>
 class graph_t : public graph_view_t... {
+  // see: <gunrock/util/type_traits.hxx>
+  using true_view_t =
+      filter_tuple_t<std::tuple<empty_graph_t,
+                                empty_csr_t,
+                                empty_csc_t,
+                                empty_coo_t>,  // filter these types.
+                     std::tuple<graph_view_t...>>;
+
   // Default view (graph representation) if no view is specified
-  using first_view_t =
-      typename std::tuple_element<0,  // default: get first type
-                                  std::tuple<graph_view_t...>>::type;
+  using default_view_t = std::tuple_element_t<0, true_view_t>;
 
  public:
   using vertex_type = vertex_t;
@@ -77,12 +88,6 @@ class graph_t : public graph_view_t... {
         number_of_edges(0),
         properties(),
         graph_view_t()... {}
-
-  // template<typename csr_matrix_t>
-  // graph_t(csr_matrix_t& rhs) :
-  //   graph_base_type(rhs.num_rows,
-  //                   rhs.num_nonzeros),
-  //   graph_csr_view(rhs) {}
 
   // graph_t specific methods (base graph type)
   __host__ __device__ __forceinline__ const vertex_type
@@ -112,7 +117,7 @@ class graph_t : public graph_view_t... {
     return space;
   }
 
-  template <class input_view_t = first_view_t, typename... T>
+  template <class input_view_t = default_view_t, typename... T>
   __host__ __device__ void set(vertex_type const& _number_of_vertices,
                                edge_type const& _number_of_edges,
                                T... args) {
@@ -123,42 +128,42 @@ class graph_t : public graph_view_t... {
 
   // Override pure virtual functions Must use [override] keyword to identify
   // functions that are overriding the derived class
-  template <typename input_view_t = first_view_t>
+  template <typename input_view_t = default_view_t>
   __host__ __device__ __forceinline__ edge_type
   get_number_of_neighbors(vertex_type const& v) const /* override */ {
     assert(v < this->get_number_of_vertices());
     return input_view_t::get_number_of_neighbors(v);
   }
 
-  template <typename input_view_t = first_view_t>
+  template <typename input_view_t = default_view_t>
   __host__ __device__ __forceinline__ vertex_type
   get_source_vertex(edge_type const& e) const /* override */ {
     assert(e < this->get_number_of_edges());
     return input_view_t::get_source_vertex(e);
   }
 
-  template <typename input_view_t = first_view_t>
+  template <typename input_view_t = default_view_t>
   __host__ __device__ __forceinline__ vertex_type
   get_destination_vertex(edge_type const& e) const /* override */ {
     assert(e < this->get_number_of_edges());
     return input_view_t::get_destination_vertex(e);
   }
 
-  template <typename input_view_t = first_view_t>
+  template <typename input_view_t = default_view_t>
   __host__ __device__ __forceinline__ edge_type
   get_starting_edge(vertex_type const& v) const /* override */ {
     assert(v < this->get_number_of_vertices());
     return input_view_t::get_starting_edge(v);
   }
 
-  template <typename input_view_t = first_view_t>
+  template <typename input_view_t = default_view_t>
   __host__ __device__ __forceinline__ vertex_pair_type
   get_source_and_destination_vertices(edge_type const& e) const /* override */ {
     assert(e < this->get_number_of_edges());
     return input_view_t::get_source_and_destination_vertices(e);
   }
 
-  template <typename input_view_t = first_view_t>
+  template <typename input_view_t = default_view_t>
   __host__ __device__ __forceinline__ edge_type
   get_edge(vertex_type const& source, vertex_type const& destination) const
   /* override */ {
@@ -167,7 +172,7 @@ class graph_t : public graph_view_t... {
     return input_view_t::get_edge(source, destination);
   }
 
-  template <typename input_view_t = first_view_t>
+  template <typename input_view_t = default_view_t>
   __host__ __device__ __forceinline__ weight_type
   get_edge_weight(edge_type const& e) const /* override */ {
     assert(e < this->get_number_of_edges());
@@ -175,16 +180,16 @@ class graph_t : public graph_view_t... {
   }
 
  private:
-  // TODO: fix this, it is including empty_t structs for now.
-  // We can subtract those structs to get the real value.
+  /// @note using `graph_view_t` here instead will cause problems as that pack
+  /// includes empty structs.
   static constexpr std::size_t number_of_formats_inherited =
-      sizeof...(graph_view_t);
+      std::tuple_size_v<true_view_t>;
 
   vertex_type number_of_vertices;
   edge_type number_of_edges;
   graph_properties_t properties;
 
-};  // struct graph_t
+};  // namespace graph
 
 /**
  * @brief Get the average degree of a graph.
@@ -203,13 +208,11 @@ __host__ __device__ double get_average_degree(graph_type const& G) {
 }
 
 /**
- * @brief Get the degree standard deviation of a graph.
- * This method uses population standard deviation,
- * therefore measuring the standard deviation over
- * the entire population (all nodes). This can be
- * sped up by only taking a small sample and using
- * sqrt(accum / graph.get_number_of_vertices() - 1)
- * as the result.
+ * @brief Get the degree standard deviation of a graph. This method uses
+ * population standard deviation, therefore measuring the standard deviation
+ * over the entire population (all nodes). This can be sped up by only taking a
+ * small sample and using sqrt(accum / graph.get_number_of_vertices() - 1) as
+ * the result.
  *
  * @tparam graph_type
  * @param G
@@ -229,35 +232,63 @@ __host__ __device__ double get_degree_standard_deviation(graph_type const& G) {
 
 /**
  * @brief build a log-scale degree histogram of a graph.
+ * @todo maybe a faster implementation will maybe be creating a segment array
+ * (which is just number of neighbors per vertex), and then sort and find the
+ * end of each bin of values using an upper_bound search. Once that is achieved,
+ * compute the adjacent_difference of the cumulative histogram.
  *
  * @tparam graph_type
  * @tparam histogram_t
  * @param G
- * @return histogram_t*
+ * @param histogram
+ * @param context
  */
-// template <typename graph_type, typename histogram_t>
-// histogram_t* build_degree_histogram(graph_type &graph) {
-//   using vertex_t = typename graph_type::vertex_type;
+template <typename graph_type, typename histogram_t>
+void build_degree_histogram(graph_type const& G,
+                            histogram_t* histogram,
+                            cuda::stream_t stream = 0) {
+  using vertex_t = typename graph_type::vertex_type;
+  auto length = sizeof(vertex_t) * 8 + 1;
 
-//   auto length = sizeof(vertex_t) * 8 + 1;
+  // Initialize histogram array to 0s.
+  thrust::fill(thrust::cuda::par.on(stream),
+               histogram + 0,       // iterator begin()
+               histogram + length,  // iterator end()
+               0                    // fill value
+  );
 
-//   thrust::device_vector<vertex_t> histogram(length);
+  // Build the histogram count.
+  auto build_histogram = [=] __device__(vertex_t const& v) {
+    auto degree = G.get_number_of_neighbors(v);
+    vertex_t log_length = 0;
+    while (degree >= (1 << log_length))
+      ++log_length;
 
-//   auto build_histogram = [graph] __device__ (vertex_t* counts, vertex_t i) {
-//       auto degree = graph.get_neighbor_list_length(i);
-//       while (num_neighbors >= (1 << log_length))
-//         ++log_length;
+    math::atomic::add(histogram + log_length, (histogram_t)1);
+    return v;  // output is discarded, but we still need the return.
+  };
 
-//       operation::atomic::add(&counts[log_length], (vertex_t)1);
-//   };
+  // Transform (count from 0...#_of_Vertices), and perform
+  // the operation called build_histogram. Ignore output, as
+  // we are interested in what goes in the pointer histogram.
+  thrust::transform(thrust::cuda::par.on(stream),
+                    thrust::make_counting_iterator<vertex_t>(0),  // Begin: 0
+                    thrust::make_counting_iterator<vertex_t>(
+                        G.get_number_of_vertices()),  // End: # of Vertices
+                    thrust::make_discard_iterator(),  // Discard Output Iterator
+                    build_histogram                   // Unary operation
+  );
+}
 
-//   auto begin = 0;
-//   auto end = graph.get_number_of_vertices();
-//   operators::for_all(thrust::device, histogram.data(), begin, end,
-//   build_histogram);
-
-//   return histogram.data.get();
-// }
+/**
+ * @brief Utility to remove self-loops, so, if we have an edge between vertex_0
+ * and vertex_0, that edge will be removed as it is a self-loop.
+ *
+ * @tparam graph_type
+ * @param G
+ */
+template <typename graph_type>
+void remove_self_loops(graph_type& G) {}
 
 }  // namespace graph
 }  // namespace gunrock

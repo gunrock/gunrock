@@ -27,9 +27,9 @@ struct csr_t {
   index_t number_of_columns;
   offset_t number_of_nonzeros;
 
-  typename vector<offset_t, space>::type row_offsets;    // Ap
-  typename vector<index_t, space>::type column_indices;  // Aj
-  typename vector<value_t, space>::type nonzero_values;  // Ax
+  vector_t<offset_t, space> row_offsets;    // Ap
+  vector_t<index_t, space> column_indices;  // Aj
+  vector_t<value_t, space> nonzero_values;  // Ax
 
   csr_t()
       : number_of_rows(0),
@@ -59,16 +59,16 @@ struct csr_t {
    * @param coo
    * @return csr_t<space, index_t, offset_t, value_t>&
    */
-  csr_t<space, index_t, offset_t, value_t>from_coo(
+  csr_t<space, index_t, offset_t, value_t> from_coo(
       const coo_t<memory_space_t::host, index_t, offset_t, value_t>& coo) {
     number_of_rows = coo.number_of_rows;
     number_of_columns = coo.number_of_columns;
     number_of_nonzeros = coo.number_of_nonzeros;
 
     // Allocate space for vectors
-    typename vector<offset_t, memory_space_t::host>::type _Ap;
-    typename vector<index_t, memory_space_t::host>::type _Aj;
-    typename vector<value_t, memory_space_t::host>::type _Ax;
+    vector_t<offset_t, memory_space_t::host> _Ap;
+    vector_t<index_t, memory_space_t::host> _Aj;
+    vector_t<value_t, memory_space_t::host> _Ax;
 
     offset_t* Ap;
     index_t* Aj;
@@ -93,9 +93,9 @@ struct csr_t {
       column_indices.resize(number_of_nonzeros);
       nonzero_values.resize(number_of_nonzeros);
 
-      Ap = memory::raw_pointer_cast(row_offsets.data());
-      Aj = memory::raw_pointer_cast(column_indices.data());
-      Ax = memory::raw_pointer_cast(nonzero_values.data());
+      Ap = raw_pointer_cast(row_offsets.data());
+      Aj = raw_pointer_cast(column_indices.data());
+      Ax = raw_pointer_cast(nonzero_values.data());
     }
 
     // compute number of non-zero entries per row of A.
@@ -144,6 +144,73 @@ struct csr_t {
     return *this;  // CSR representation (with possible duplicates)
   }
 
+  void read_binary(std::string filename) {
+    FILE* file = fopen(filename.c_str(), "rb");
+
+    // Read metadata
+    fread(&number_of_rows,     sizeof(index_t),  1, file);
+    fread(&number_of_columns,  sizeof(index_t),  1, file);
+    fread(&number_of_nonzeros, sizeof(offset_t), 1, file);
+
+    row_offsets.resize(number_of_rows + 1);
+    column_indices.resize(number_of_nonzeros);
+    nonzero_values.resize(number_of_nonzeros);
+
+    if(space == memory_space_t::device) {
+      assert(space == memory_space_t::device);
+
+      thrust::host_vector<offset_t> h_row_offsets(number_of_rows + 1);
+      thrust::host_vector<index_t> h_column_indices(number_of_nonzeros);
+      thrust::host_vector<value_t> h_nonzero_values(number_of_nonzeros);
+
+      fread(memory::raw_pointer_cast(h_row_offsets.data()),     sizeof(offset_t), number_of_rows + 1, file);
+      fread(memory::raw_pointer_cast(h_column_indices.data()),  sizeof(index_t),  number_of_nonzeros, file);
+      fread(memory::raw_pointer_cast(h_nonzero_values.data()),  sizeof(value_t),  number_of_nonzeros, file);
+
+      // Copy data from host to device
+      row_offsets    = h_row_offsets;
+      column_indices = h_column_indices;
+      nonzero_values = h_nonzero_values;
+
+    } else {
+      assert(space == memory_space_t::host);
+
+      fread(memory::raw_pointer_cast(row_offsets.data()),     sizeof(offset_t), number_of_rows + 1, file);
+      fread(memory::raw_pointer_cast(column_indices.data()),  sizeof(index_t),  number_of_nonzeros, file);
+      fread(memory::raw_pointer_cast(nonzero_values.data()),  sizeof(value_t),  number_of_nonzeros, file);      
+    }
+  }
+  
+  void write_binary(std::string filename) {
+    FILE* file = fopen(filename.c_str(), "wb");
+
+    // Write metadata
+    fwrite(&number_of_rows,      sizeof(index_t),  1, file);
+    fwrite(&number_of_columns,   sizeof(index_t),  1, file);
+    fwrite(&number_of_nonzeros,  sizeof(offset_t), 1, file);
+
+    // Write data
+    if(space == memory_space_t::device) {
+      assert(space == memory_space_t::device);
+
+      thrust::host_vector<offset_t> h_row_offsets(row_offsets);
+      thrust::host_vector<index_t> h_column_indices(column_indices);
+      thrust::host_vector<value_t> h_nonzero_values(nonzero_values);
+
+      fwrite(memory::raw_pointer_cast(h_row_offsets.data()),    sizeof(offset_t), number_of_rows + 1, file);
+      fwrite(memory::raw_pointer_cast(h_column_indices.data()), sizeof(index_t),  number_of_nonzeros, file);
+      fwrite(memory::raw_pointer_cast(h_nonzero_values.data()), sizeof(value_t),  number_of_nonzeros, file);
+    } else {
+      assert(space == memory_space_t::host);
+
+      fwrite(memory::raw_pointer_cast(row_offsets.data()),    sizeof(offset_t), number_of_rows + 1, file);
+      fwrite(memory::raw_pointer_cast(column_indices.data()), sizeof(index_t),  number_of_nonzeros, file);
+      fwrite(memory::raw_pointer_cast(nonzero_values.data()), sizeof(value_t),  number_of_nonzeros, file);
+    }
+
+    fclose(file);
+  }
+  
 };  // struct csr_t
 
 }  // namespace format

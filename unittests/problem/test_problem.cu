@@ -1,5 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
-
 #include <gunrock/error.hxx>  // error checking
 #include <gunrock/framework/problem.hxx>
 
@@ -12,5 +10,4 @@ void test_problem() {
 
 int main(int argc, char** argv) {
   test_problem();
-  return EXIT_SUCCESS;
 }

@@ -1,5 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
-
 #include <iostream>
 
 #include <gunrock/container/array.hxx>
@@ -55,5 +53,4 @@ void test_array() {
 
 int main(int argc, char** argv) {
   test_array();
-  return EXIT_SUCCESS;
 }

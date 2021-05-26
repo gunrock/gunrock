@@ -24,9 +24,9 @@ struct csc_t {
   index_t number_of_columns;
   index_t number_of_nonzeros;
 
-  typename vector<offset_t, space>::type column_offsets;  // Aj
-  typename vector<index_t, space>::type row_indices;      // Ap
-  typename vector<value_t, space>::type nonzero_values;   // Ax
+  vector_t<offset_t, space> column_offsets;  // Aj
+  vector_t<index_t, space> row_indices;      // Ap
+  vector_t<value_t, space> nonzero_values;   // Ax
 
   csc_t()
       : number_of_rows(0),

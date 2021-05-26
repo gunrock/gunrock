@@ -11,7 +11,7 @@
 
 #include <gunrock/cuda/cuda.hxx>
 
-#include <gunrock/framework/frontier.hxx>
+#include <gunrock/framework/frontier/frontier.hxx>
 #include <gunrock/framework/problem.hxx>
 #include <gunrock/framework/enactor.hxx>
 

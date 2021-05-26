@@ -1,5 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
-
 #include <gunrock/error.hxx>             // error checking
 #include <gunrock/formats/formats.hxx>   // formats (csr, coo)
 #include <gunrock/memory.hxx>            // memory space
@@ -49,5 +47,4 @@ void test_coo_to_csr(int num_arguments, char** argument_array) {
 
 int main(int argc, char** argv) {
   test_coo_to_csr(argc, argv);
-  return EXIT_SUCCESS;
 }

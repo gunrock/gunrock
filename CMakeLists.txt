@@ -20,12 +20,10 @@ set(PROJECT_DEPS_DIR externals)
 # end /* Dependencies directory */
 
 # begin /* Include cmake modules */
-include(${PROJECT_SOURCE_DIR}/cmake/FindRapidJSON.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/FindModernGPU.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/FindMTX.cmake)
-include(${PROJECT_SOURCE_DIR}/cmake/CUDAArchitectures.cmake)
+# include(${PROJECT_SOURCE_DIR}/cmake/FetchRapidJSON.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 # end /* Include cmake modules */
-
 
 ## Set the directory where the binaries will be stored
 set(EXECUTABLE_OUTPUT_PATH
@@ -43,14 +41,6 @@ set(LIBRARY_OUTPUT_PATH
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-####################################################
-############## SET LANGUAGE STANDARDS ##############
-####################################################
-# set(CMAKE_CXX_STANDARD 17)
-# set(CMAKE_CUDA_STANDARD 17)
-# set(CMAKE_CUDA_STANDARD_REQUIRED TRUE)
-# set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
-
 ############ ADD LIBRARY: ESSENTIALS (HEADER-ONLY) ############
 add_library(essentials INTERFACE)
 
@@ -59,19 +49,30 @@ add_library(essentials INTERFACE)
 ####################################################
 set_target_properties(essentials 
     PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
         CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_EXTENSIONS OFF
         CUDA_RESOLVE_DEVICE_SYMBOLS ON
         CUDA_SEPARABLE_COMPILATION ON
-        CUDA_ARCHITECTURES OFF
-        # CUDA_PTX_COMPILATION ON # This doesn't work, idk why.
-) 
+        CUDA_ARCHITECTURES 70 # Set required architecture.
+        # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
+)
+
+# Use for later.
+get_target_property(ESSENTIALS_ARCHITECTURES 
+    essentials 
+        CUDA_ARCHITECTURES
+)
 
 ####################################################
 ############ TARGET COMPILER DEFINITIONS ###########
 ####################################################
-set(SM_TARGET 61) # ?? SM_TARGET hard-coded for now.
 target_compile_definitions(essentials
-  INTERFACE SM_TARGET=${SM_TARGET}
+  INTERFACE 
+    SM_TARGET=${ESSENTIALS_ARCHITECTURES}
 )
 
 ####################################################
@@ -79,17 +80,17 @@ target_compile_definitions(essentials
 ####################################################
 # Turn C++ Standard 17 ON.
 target_compile_features(essentials INTERFACE cxx_std_17)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# set(CMAKE_CXX_EXTENSIONS OFF)
 
 ####################################################
 ############ TARGET INCLUDE DIRECTORIES ############
 ####################################################
 target_include_directories(essentials
     INTERFACE include
-    INTERFACE externals/
-    INTERFACE externals/mtx
-    INTERFACE externals/moderngpu/src
-	  INTERFACE externals/rapidjson/include
+    INTERFACE ${THRUST_INCLUDE_DIR}
+    INTERFACE ${CUB_INCLUDE_DIR}
+    INTERFACE ${MODERNGPU_INCLUDE_DIR}
+	  INTERFACE ${RAPIDJSON_INCLUDE_DIR}
     INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
 )
 
@@ -105,14 +106,13 @@ target_link_libraries(essentials
 ####################################################
 target_sources(essentials
     INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include/gunrock/util/gitsha1make.c"
-    INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/externals/mtx/mmio.cpp"
+    INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include/gunrock/io/detail/mmio.cpp"
 )
 
 ####################################################
 ############## SET CXX & CUDA FLAGS ################
 ####################################################
 set(CXX_FLAGS 
-  -std=c++17 
   -Wall 
   -Wno-unused-local-typedefs 
   -Wno-strict-aliasing 
@@ -120,11 +120,10 @@ set(CXX_FLAGS
   -Wno-format-security
 )
 
-set(NVCC_FLAGS 
-  ${GENCODE} 
+set(CUDA_FLAGS
   --expt-extended-lambda 
   --expt-relaxed-constexpr 
-  --use_fast_math 
+  --use_fast_math
   --ptxas-options -v
 )
 
@@ -133,7 +132,7 @@ set(NVCC_FLAGS
 ####################################################
 target_compile_options(essentials INTERFACE 
     $<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS}>
-    $<$<COMPILE_LANGUAGE:CUDA>:${NVCC_FLAGS}>
+    $<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS}>
 )
 
 ####################################################
@@ -141,9 +140,21 @@ target_compile_options(essentials INTERFACE
 ####################################################
 option(ESSENTIALS_BUILD_EXAMPLES
   "If on, builds the example graph applications."
-  OFF)
+  ON)
 
 # Subdirectories for examples, testing and documentation
 if(ESSENTIALS_BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif(ESSENTIALS_BUILD_EXAMPLES)
+
+####################################################
+################ BUILD UNIT TESTS  #################
+####################################################
+option(ESSENTIALS_BUILD_TESTS
+  "If on, builds the unit tests."
+  OFF)
+
+# Subdirectories for examples, testing and documentation
+if(ESSENTIALS_BUILD_TESTS)
+  add_subdirectory(unittests)
+endif(ESSENTIALS_BUILD_TESTS)

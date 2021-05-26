@@ -1,5 +1,3 @@
-#include <cstdlib>  // EXIT_SUCCESS
-
 #include <gunrock/cuda/context.hxx>
 #include <gunrock/error.hxx>  // error checking
 
@@ -24,5 +22,4 @@ void test_context() {
 
 int main(int argc, char** argv) {
   test_context();
-  return EXIT_SUCCESS;
 }
