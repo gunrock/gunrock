@@ -181,15 +181,25 @@ struct Queues {
     volatile CounterT *counters;
     volatile CounterT *start, *end, *start_alloc, *end_alloc, *end_max, *end_count, *stop;
     int num_counters = 7;
+    int num_block;
+    int num_thread;
 
     uint32_t min_iter;
     MaxCountQueue::Queue<T, CounterT> *worklist;
     cudaStream_t *streams;
 
-    __host__ void init(CounterT _capacity, uint32_t _num_q=8, uint32_t _min_iter=800) {
+    __host__ void init(
+        CounterT _capacity, 
+        uint32_t _num_q=8, 
+        int _num_block=280,
+        int _num_thread=256,
+        uint32_t _min_iter=800
+    ) {
         capacity   = _capacity;
         num_queues = _num_q;
         min_iter   = _min_iter;
+        num_block  = _num_block;
+        num_thread = _num_thread;
 
         // Allocate queue memory
         auto queue_size   = sizeof(T) * capacity * num_queues;
@@ -280,9 +290,9 @@ struct Queues {
     }
 
     template<typename Functor>
-    __host__ void launch_thread(int numBlock, int numThread, Functor f) {
+    __host__ void launch_thread(Functor f) {
         for(int i = 0; i < num_queues; i++)
-            worklist[i].launch_thread(numBlock / num_queues, numThread, streams[i], f, *this);
+            worklist[i].launch_thread(num_block / num_queues, num_thread, streams[i], f, *this);
     }
 
     __host__ void reset() {
@@ -298,42 +308,6 @@ struct Queues {
     }
 
 }; //Queues
-
-// template<typename T>
-// __global__ void check_end(MaxCountQueue::Queues<T> q) {
-//     if(TID < q.num_queues) {
-//         // printf("check_end | TID | %d\n", TID);
-//         auto c_offset = TID * PADDING_SIZE;
-        
-//         // // >>
-//         // auto q_end       = *(q.end + c_offset);
-//         // auto q_end_alloc = *(q.end_alloc + c_offset);
-//         // auto q_end_max   = *(q.end_max + c_offset);
-//         // auto q_end_count = *(q.end_count + c_offset);
-//         // printf("check_end | q | %d %d %d %d\n", q_end, q_end_alloc, q_end_max, q_end_count);
-//         // // <<
-        
-//         if(*(q.end + c_offset) != *(q.end_alloc + c_offset)) {
-//             if(
-//                 *(q.end_max + c_offset) == *(q.end_count + c_offset) &&
-//                 *(q.end_count + c_offset) == *(q.end_alloc + c_offset)
-//             ) {
-//                 *(q.end + c_offset) = *(q.end_alloc + c_offset);
-//             } else  {
-//                 printf("queue end update error: end[%d] %d, end_alloc[%d] %d, end_count[%d] %d, end_max[%d] %d\n", TID, *(q.end+c_offset), TID, *(q.end_alloc+TID*PADDING_SIZE), TID, *(q.end_count+TID*PADDING_SIZE), TID, *(q.end_max+TID*PADDING_SIZE));
-//             }
-//         }
-
-//         // // >>
-//         // q_end       = *(q.end + c_offset);
-//         // q_end_alloc = *(q.end_alloc + c_offset);
-//         // q_end_max   = *(q.end_max + c_offset);
-//         // q_end_count = *(q.end_count + c_offset);
-//         // printf("check_end | q | %d %d %d %d\n", q_end, q_end_alloc, q_end_max, q_end_count);
-//         // // <<
-
-//     }
-// }
 
 } //MaxCountQueue
 #endif

@@ -1,16 +1,13 @@
 #pragma once
 
-#include <bits/stdc++.h>
-
 #include <gunrock/algorithms/algorithms.hxx>
-#include "gunrock/algorithms/async/queue.cuh"
+#include <gunrock/algorithms/async/async_enactor.hxx>
 
 namespace gunrock {
 namespace async {
 namespace bfs {
 
 // <user-defined>
-// OK
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
@@ -19,7 +16,6 @@ struct param_t {
 // </user-defined>
 
 // <user-defined>
-// OK
 template <typename edge_t>
 struct result_t {
   edge_t* depth;
@@ -31,6 +27,11 @@ struct result_t {
 // However, it doesn't use the `context` argument, so not joining yet
 template <typename graph_t, typename param_type, typename result_type>
 struct problem_t : gunrock::problem_t<graph_t> {
+
+  using vertex_t = typename graph_t::vertex_type;
+  using edge_t   = typename graph_t::edge_type;
+  using weight_t = typename graph_t::weight_type;
+  
   param_type param;
   result_type result;
 
@@ -41,12 +42,10 @@ struct problem_t : gunrock::problem_t<graph_t> {
       : gunrock::problem_t<graph_t>(G, _context),
         param(_param),
         result(_result) {}
-
-  using vertex_t = typename graph_t::vertex_type;
-  using edge_t = typename graph_t::edge_type;
-  using weight_t = typename graph_t::weight_type;
   
-  void init() override {}
+  void init() override {
+    // noop
+  }
   
   void reset() override {
     auto g = this->get_graph();
@@ -73,63 +72,31 @@ __global__ void _push_one(queue_t q, val_t val) {
 }
 
 template <typename problem_t>
-struct enactor_t : gunrock::enactor_t<problem_t> {
-  using gunrock::enactor_t<problem_t>::enactor_t;
+struct enactor_t : async_enactor_t<problem_t> {
+  
+  using async_enactor_t<problem_t>::async_enactor_t;
 
   using vertex_t = typename problem_t::vertex_t;
   using edge_t   = typename problem_t::edge_t;
   using weight_t = typename problem_t::weight_t;
-  
-  using single_queue_t = uint32_t;
-  using queue_t        = MaxCountQueue::Queues<vertex_t, single_queue_t>;
-  queue_t q;
-  
-  int num_queue  = 4;
-  int min_iter   = 800;
-  int num_block  = 56 * 5;
-  int num_thread = 256;
-  
-  // !! Have to implement stubs for these
-  void prepare_frontier(frontier_t<vertex_t>* f, cuda::multi_context_t& context) override {}
-  void loop(cuda::multi_context_t& context) override {}
-  
+  using queue_t  = typename async_enactor_t<problem_t>::queue_t;
+
   void prepare_frontier(queue_t& q, cuda::multi_context_t& context) {
     auto P = this->get_problem();
-    auto n_vertices = P->get_graph().get_number_of_vertices();
-   
-    // Initialize queues
-    // !! Maybe this should go somewhere else?
-    auto capacity = min(
-      single_queue_t(1 << 30), 
-      max(single_queue_t(1024), single_queue_t(n_vertices * 1.5))
-    );
-    
-    q.init(capacity, num_queue, min_iter);
-    q.reset();
     
     // !! MaxCountQueue::Queues creates it's own streams.  But I think we should at least
     //    synchronizing the to the `context` stream?
     _push_one<<<1, 1>>>(q, P->param.single_source);
   }
   
-  float enact() {
-    auto context = this->context;
-    auto single_context = context->get_context(0);
-    prepare_frontier(q, *context);
-    auto timer = single_context->timer();
-    timer.begin();
-    async_loop(*context);
-    // finalize(*context);
-    return timer.end();
-  }
-  
-  void async_loop(cuda::multi_context_t& context) {
+  void loop(cuda::multi_context_t& context) {
     auto P = this->get_problem();
     auto G = P->get_graph();
+    auto q = this->q;
     
     edge_t* depth = P->result.depth;
     
-    auto async_bfs_op = [G, depth] __device__ (vertex_t node, queue_t q) -> void {
+    q.launch_thread([G, depth] __device__ (vertex_t node, queue_t q) -> void {
         
         vertex_t d = ((volatile vertex_t * )depth)[node];
         
@@ -142,11 +109,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
             if(old_d > d + 1)
                 q.push(neib);
         }
-    };
-    
-    q.launch_thread(num_block, num_thread, async_bfs_op);
-    q.sync();
-    // !! Best way to synchronize w/ the `context` stream?  Do we need to?
+    });
   }
 };
 
