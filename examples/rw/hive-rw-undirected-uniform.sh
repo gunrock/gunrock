@@ -23,7 +23,7 @@ GRAPH[0]="market $DATA_PREFIX/${NAME1[0]}.mtx"
 SUB_DIR="undirected-uniform"
 mkdir -p "$OUTPUT_DIR/$SUB_DIR"
 
-TAG="walkmode:$SUB_DIR,num-gpus:$NUM_GPUS"
+TAG="variant:$SUB_DIR,num-gpus:$NUM_GPUS"
 
 for i in {0..0}
 do
