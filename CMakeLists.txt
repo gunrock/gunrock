@@ -57,7 +57,7 @@ set_target_properties(essentials
         CUDA_EXTENSIONS OFF
         CUDA_RESOLVE_DEVICE_SYMBOLS ON
         CUDA_SEPARABLE_COMPILATION ON
-        CUDA_ARCHITECTURES 70 # Set required architecture.
+        CUDA_ARCHITECTURES 61 # Set required architecture.
         # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
 )
 
@@ -121,15 +121,19 @@ set(CXX_FLAGS
   -Wno-strict-aliasing
   -Wno-unused-function
   -Wno-format-security
+  -vvv
 )
 
 set(CUDA_FLAGS
   --expt-extended-lambda 
-  --expt-relaxed-constexpr 
+  --expt-relaxed-constexpr
   --use_fast_math
   --ptxas-options -v
-  -O3 # optimize-level
-  # -g -G -O0 # debug
+  --verbose
+  --optimize 0 # Host optimize-level
+  --debug # Host debug
+  --device-debug # Device debug
+  # --generate-line-info
 )
 
 ####################################################
