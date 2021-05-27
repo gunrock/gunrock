@@ -6,4 +6,5 @@ add_subdirectory(geo)
 add_subdirectory(pr)
 add_subdirectory(ppr)
 add_subdirectory(bc)
+add_subdirectory(kcore)
 # end /* Add examples' subdirectories */
