@@ -13,7 +13,7 @@ do
     # prepare and run SLURM command
     #SLURM_CMD="srun --cpus-per-gpu 1 -G $i -p $PARTITION_NAME -w $NODE_NAME"
 
-    SLURM_CMD="srun --cpus-per-gpu 1 -G $i -p $PARTITION_NAME "
+    SLURM_CMD="srun --cpus-per-gpu 1 -G $i -p $PARTITION_NAME -N 1"
     $SLURM_CMD $APP_SCRIPT $OUTPUT_DIR $i &
 
     #echo "$SLURM_CMD $APP_SCRIPT $OUTPUT_DIR $i"
