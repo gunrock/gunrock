@@ -144,6 +144,7 @@ struct GEOIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
                   graph, valid_neighbors, latitude.GetPointer(target),
                   longitude.GetPointer(target), v, Dinv.GetPointer(target),
                   false, target, spatial_iter);
+              return;
             }
 
             // if no valid locations are found

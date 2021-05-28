@@ -19,11 +19,15 @@
 #include <thread>
 #include <gunrock/util/context.hpp>
 
+#include <cub/block/block_load.cuh>
+#include <cub/block/block_store.cuh>
+
 namespace gunrock {
 namespace oprtr {
 
-#define FORALL_BLOCKSIZE 1024
-#define FORALL_GRIDSIZE 160
+#define FORALL_BLOCKSIZE 256
+#define FORALL_GRIDSIZE 256
+#define FORALL_THREADSIZE 1
 /*template <
     typename T,
     typename SizeT,
@@ -56,6 +60,9 @@ __global__ void ForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length) {
 template <typename ArrayT, typename SizeT, typename ApplyLambda>
 __global__ void mgpu_ForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length, SizeT offset) {
   // typedef typename ArrayT::SizeT SizeT;
+  // typedef typename ArrayT::ValueT ValueT;
+  using ValueT = typename std::remove_pointer<ArrayT>::type;
+  
   // const SizeT STRIDE = (SizeT)blockDim.x * gridDim.x;
   // SizeT i = (SizeT)blockDim.x * blockIdx.x + threadIdx.x;
   // while (i < length) {
@@ -63,10 +70,31 @@ __global__ void mgpu_ForAll_Kernel(ArrayT array, ApplyLambda apply, SizeT length
   //   i += STRIDE;
   // }
 
-  #pragma unroll
+  // Specialize BlockLoad/BlockStore for a 1D block of 256 threads owning 1 ValueT items each
+  typedef cub::BlockLoad<ValueT, FORALL_BLOCKSIZE, FORALL_THREADSIZE, cub::BLOCK_LOAD_VECTORIZE> BlockLoad;
+  // typedef cub::BlockStore<ValueT, FORALL_BLOCKSIZE, FORALL_THREADSIZE, cub::BLOCK_STORE_VECTORIZE> BlockStore;
+
+
+  // Allocate shared memory for BlockLoad & BlockStore
+  __shared__ union TempStorage {
+        typename BlockLoad::TempStorage    load;
+        // typename BlockStore::TempStorage   store;
+  } temp_storage;
+
+  const SizeT STRIDE = (SizeT)(blockDim.x * gridDim.x) * FORALL_THREADSIZE;
+
   for(SizeT i = (SizeT)blockDim.x * blockIdx.x + threadIdx.x;
-      i < length; i=i+(SizeT)(blockDim.x * gridDim.x)) {
-    apply(array + 0, offset + i);
+      i < length; 
+      i=i+STRIDE) {
+
+    ValueT thread_data[FORALL_THREADSIZE];
+    BlockLoad(temp_storage.load).Load(array + STRIDE, thread_data);
+
+    #pragma unroll
+    for(SizeT k = 0; k < FORALL_THREADSIZE; k++)
+      apply(&thread_data[k], offset + i);
+
+    // BlockStore(temp_storage.store).Store(array + STRIDE, thread_data);
   }
 }
 
