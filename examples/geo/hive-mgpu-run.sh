@@ -1,9 +1,9 @@
 #!/bin/bash
 
-PARTITION_NAME="dgx2"
-#PARTITION_NAME="batch"
-NODE_NAME="dgx2-000"
 NUM_GPUS=${1:-"16"}
+PARTITION_NAME=${2:-"dgx2"}
+
+NODE_NAME="dgx2-000"
 
 APP_SCRIPT="./hive-geo-test.sh"
 GEO_ITER[0]=10
