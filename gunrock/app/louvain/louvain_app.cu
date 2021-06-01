@@ -56,7 +56,7 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
   typedef typename GraphT::VertexT VertexT;
   typedef typename GraphT::SizeT SizeT;
   typedef Problem<GraphT> ProblemT;
-  typedef Enactor<ProblemT> EnactorT;
+  typedef Enactor<ProblemT, util::UNIFIED> EnactorT;
   util::CpuTimer cpu_timer, total_timer;
   cpu_timer.Start();
   total_timer.Start();
