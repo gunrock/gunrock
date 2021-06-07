@@ -5,8 +5,11 @@ set(APPLICATION_NAME hits)
 # begin /* Add CUDA executables */
 add_executable(${APPLICATION_NAME})
 
-set(SOURCE_LIST 
+set(SOURCE_LIST
     ${APPLICATION_NAME}.cu
+    hits_problem.cu
+    hits_result.cu
+    hits_test.cu
 )
 
 target_sources(${APPLICATION_NAME} PRIVATE ${SOURCE_LIST})
