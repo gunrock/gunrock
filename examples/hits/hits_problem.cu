@@ -1,6 +1,8 @@
-#include <thrust/device_vector.h>
 #include <gunrock/util/math.hxx>
-#include "hits_problem.hxx"
+#include <gunrock/applications/hits.hxx>
+
+#include <thrust/device_vector.h>
+#include <thrust/device_ptr.h>
 
 // using namespace gunrock;
 // using namespace hits;
@@ -85,15 +87,15 @@ void problem_t<graph_t>::swap_buffer(){
 template <typename graph_t>
 __device__
 void problem_t<graph_t>::update_auth(int dest_pos, int source_pos){
-  gunrock::math::atomic::add(this->auth_next[dest_pos],
-                             this->hub_curr[source_pos]);
+  gunrock::math::atomic::add((&this->auth_next[dest_pos]).get(),
+                             (float)this->hub_curr[source_pos]);
 }
 
 template <typename graph_t>
 __device__
 void problem_t<graph_t>::update_hub(int dest_pos, int source_pos){
-  gunrock::math::atomic::add(this->hub_next[dest_pos],
-                             this->auth_curr[source_pos]);
+  gunrock::math::atomic::add((&this->hub_next[dest_pos]).get(),
+                             (float)this->auth_curr[source_pos]);
 }
 
 template <typename graph_t>

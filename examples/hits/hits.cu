@@ -1,5 +1,4 @@
 #include <gunrock/applications/hits.hxx>
-#include "hits_problem.hxx"
 #include <gunrock/cuda/cuda.hxx>
 
 #include <memory>
@@ -20,7 +19,7 @@ result_c<graph_t>& run(graph_t &G, int iter_times){
   // qqq copy constructor
   result_c<graph_t>& result = new result_c<graph_t>;
 
-  problem_type problem(G, multi_context);
+  problem_type problem(G, multi_context, iter_times);
 
   enactor_type enactor(problem, multi_context);
   enactor.enact();

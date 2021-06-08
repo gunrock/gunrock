@@ -1,4 +1,3 @@
-#include <gunrock/applications/hits.hxx>
 #include <gunrock/applications/application.hxx>
 
 #pragma once
@@ -25,7 +24,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto P = this->get_problem();
     auto G = P->get_graph();
 
-    auto update = [] __host__ __device__(
+    auto update = [P] __host__ __device__(
                             vertex_t& source,
                             vertex_t& neighbor,
                             edge_t const& edge,

@@ -9,8 +9,12 @@
  *
  */
 #include <../../examples/hits/hits_problem.hxx>
+#include <../../examples/hits/hits_enactor.hxx>
+#include <gunrock/applications/application.hxx>
 #include <thrust/device_vector.h>
 #include <fstream>
+
+#pragma once
 
 namespace gunrock {
 namespace hits {
@@ -33,7 +37,6 @@ private:
 public:
 
   result_c();
-  ~result_c();
   void rank_authority();
   void rank_hub();
   void print_result(std::ostream& os = std::cout);

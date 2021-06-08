@@ -1,5 +1,4 @@
 #include <gunrock/applications/hits.hxx>
-#include "hits_problem.hxx"
 
 #include <thrust/device_vector.h>
 #include <thrust/sequence.h>

@@ -1,5 +1,4 @@
 #include <gunrock/framework/problem.hxx>
-#include <gunrock/applications/hits.hxx>
 
 #pragma once
 
@@ -41,7 +40,7 @@ private:
 public:
   problem_t(graph_t& G,
             std::shared_ptr<cuda::multi_context_t> _context,
-            int max_iterations = default_max_iterations);
+            int max_iterations);
 
   void init() override;
   void reset() override;

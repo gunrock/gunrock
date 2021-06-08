@@ -1,6 +1,4 @@
 #include <gunrock/applications/hits.hxx>
-#include <string>
-#include <stdio>
 
 using namespace gunrock;
 using namespace memory;
