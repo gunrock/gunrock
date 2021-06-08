@@ -22,9 +22,14 @@ float run(csr_t& csr,
           vertex_t& single_source,
           weight_t* distances,
           vertex_t* predecessors) {
-  thrust::host_vector<edge_t> row_offsets(csr.row_offsets);  // Copy data to CPU
-  thrust::host_vector<vertex_t> column_indices(csr.column_indices);
-  thrust::host_vector<weight_t> nonzero_values(csr.nonzero_values);
+   
+  thrust::host_vector<edge_t> _row_offsets(csr.row_offsets);  // Copy data to CPU
+  thrust::host_vector<vertex_t> _column_indices(csr.column_indices);
+  thrust::host_vector<weight_t> _nonzero_values(csr.nonzero_values);
+  
+  edge_t* row_offsets = _row_offsets.data();
+  vertex_t* column_indices = _column_indices.data();
+  weight_t* nonzero_values = _nonzero_values.data();
 
   for (vertex_t i = 0; i < csr.number_of_rows; i++)
     distances[i] = std::numeric_limits<weight_t>::max();

@@ -90,6 +90,15 @@ __host__ __device__ __forceinline__ type_t min(type_t* address, type_t value) {
 }
 
 template <typename type_t>
+__host__ __device__ __forceinline__ type_t max(type_t* address, type_t value) {
+#ifdef __CUDA_ARCH__
+  return cuda::atomicMax(address, value);
+#else
+  return std::max<type_t>(*address, value);  // use std::atomic;
+#endif
+}
+
+template <typename type_t>
 __host__ __device__ __forceinline__ type_t cas(type_t* address,
                                                type_t compare,
                                                type_t value) {

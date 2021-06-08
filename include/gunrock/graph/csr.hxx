@@ -5,9 +5,9 @@
 #include <iterator>
 
 #include <gunrock/memory.hxx>
+#include <gunrock/util/load_store.hxx>
 #include <gunrock/util/type_traits.hxx>
 #include <gunrock/graph/vertex_pair.hxx>
-
 #include <gunrock/algorithms/search/binary_search.hxx>
 
 namespace gunrock {
@@ -50,7 +50,7 @@ class graph_csr_t {
   // overriding the derived class
   __host__ __device__ __forceinline__ edge_type
   get_number_of_neighbors(vertex_type const& v) const {
-    return (offsets[v + 1] - offsets[v]);
+    return (get_starting_edge(v + 1) - get_starting_edge(v));
   }
 
   __host__ __device__ __forceinline__ vertex_type
@@ -72,12 +72,12 @@ class graph_csr_t {
 
   __host__ __device__ __forceinline__ vertex_type
   get_destination_vertex(edge_type const& e) const {
-    return indices[e];
+    return thread::load(&indices[e]);
   }
 
   __host__ __device__ __forceinline__ edge_type
   get_starting_edge(vertex_type const& v) const {
-    return offsets[v];
+    return thread::load(&offsets[v]);
   }
 
   __host__ __device__ __forceinline__ vertex_pair_type
@@ -87,14 +87,14 @@ class graph_csr_t {
 
   __host__ __device__ __forceinline__ edge_type
   get_edge(const vertex_type& source, const vertex_type& destination) const {
-    return (edge_type)algo::search::binary::execute(
-        get_column_indices(), destination, offsets[source],
-        offsets[source + 1] - 1);
+    return (edge_type)search::binary::execute(get_column_indices(), destination,
+                                              offsets[source],
+                                              offsets[source + 1] - 1);
   }
 
   __host__ __device__ __forceinline__ weight_type
   get_edge_weight(edge_type const& e) const {
-    return values[e];
+    return thread::load(&values[e]);
   }
 
   // Representation specific functions

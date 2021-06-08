@@ -1,5 +1,5 @@
 # begin /* Set the application name. */
-set(APPLICATION_NAME lgc)
+set(APPLICATION_NAME ppr)
 # end /* Set the application name. */
 
 # begin /* Add CUDA executables */

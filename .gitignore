@@ -36,3 +36,6 @@ eval/
 
 # Ignore build directory
 build
+
+# Ignore external fetched content
+externals/*

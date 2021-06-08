@@ -1,9 +1,10 @@
-#include <gunrock/applications/lgc.hxx>
+#include <gunrock/algorithms/ppr.hxx>
+#include "ppr_cpu.hxx"
 
 using namespace gunrock;
 using namespace memory;
 
-void test_lgc(int num_arguments, char** argument_array) {
+void test_ppr(int num_arguments, char** argument_array) {
   if (num_arguments != 2) {
     std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
     exit(1);
@@ -22,6 +23,10 @@ void test_lgc(int num_arguments, char** argument_array) {
 
   // --
   // IO
+
+  weight_t alpha = 0.15;
+  weight_t epsilon = 1e-6;
+  vertex_t n_seeds = 50;
 
   std::string filename = argument_array[1];
 
@@ -50,27 +55,40 @@ void test_lgc(int num_arguments, char** argument_array) {
   // --
   // Params and memory allocation
 
-  srand(time(NULL));
-
-  weight_t alpha = 0.85;
-  weight_t tol = 1e-6;
-
   vertex_t n_vertices = G.get_number_of_vertices();
-  thrust::device_vector<weight_t> p(n_vertices);
+
+  thrust::device_vector<weight_t> p(n_seeds * n_vertices);
 
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::pr::run(G, alpha, tol, p.data().get());
+  float gpu_elapsed =
+      gunrock::ppr::run_batch(G, n_seeds, p.data().get(), alpha, epsilon);
+
+  // --
+  // CPU Run
+
+  thrust::host_vector<weight_t> h_p(n_seeds * n_vertices);
+
+  float cpu_elapsed = ppr_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
+      csr, n_seeds, h_p.data(), alpha, epsilon);
+
+  int n_errors = ppr_cpu::compute_error(p, h_p);
 
   // --
   // Log + Validate
 
-  std::cout << "GPU p[:40] = ";
+  std::cout << "GPU distances[:40] = ";
   gunrock::print::head<weight_t>(p, 40);
+
+  std::cout << "CPU Distances (output) = ";
+  gunrock::print::head<weight_t>(h_p, 40);
+
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
+  std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
+  std::cout << "Number of errors : " << n_errors << std::endl;
 }
 
 int main(int argc, char** argv) {
-  test_lgc(argc, argv);
+  test_ppr(argc, argv);
 }

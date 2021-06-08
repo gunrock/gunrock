@@ -793,7 +793,7 @@ WARN_LOGFILE           =
 
 INPUT                  = ../README.md \
                          ../include/gunrock/framework \
-                         ../include/gunrock/applications \
+                         ../include/gunrock/algorithms \
                          ../include/gunrock/graph
 
 # This tag can be used to specify the character encoding of the source files
