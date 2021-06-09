@@ -24,8 +24,7 @@ void execute(graph_t& G,
              operator_t op,
              frontier_t* input,
              frontier_t* output,
-             cuda::multi_context_t& context,
-             bool filter_and_uniquify = true) {
+             cuda::multi_context_t& context) {
   if (context.size() == 1) {
     auto single_context = context.get_context(0);
 
@@ -39,21 +38,6 @@ void execute(graph_t& G,
       remove::execute(G, op, input, output, *single_context);
     } else {
       error::throw_if_exception(cudaErrorUnknown, "Filter type not supported.");
-    }
-
-    /*!
-     * @todo Should filter really do uniquify? This is a tedious interface
-     * change.
-     */
-    if (filter_and_uniquify) {
-      operators::uniquify::execute<uniquify_algorithm_t::unique>(output, input,
-                                                                 context);
-      // Simple pointer swap since output is input and vice-versa after the
-      // uniquify.
-      frontier_t* temp = input;
-      input = output;
-      output = temp;
-      temp = nullptr;
     }
   } else {
     error::throw_if_exception(cudaErrorUnknown,
@@ -69,14 +53,12 @@ void execute(graph_t& G,
              enactor_type* E,
              operator_t op,
              cuda::multi_context_t& context,
-             bool filter_and_uniquify = true,
              bool swap_buffers = true) {
   execute<alg_type>(G,                         // graph
                     op,                        // operator_t
                     E->get_input_frontier(),   // input frontier
                     E->get_output_frontier(),  // output frontier
-                    context,                   // context
-                    filter_and_uniquify        // flag to deduplicate
+                    context                    // context
   );
 
   /*!

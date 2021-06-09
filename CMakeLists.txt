@@ -114,9 +114,12 @@ target_sources(essentials
 ####################################################
 set(CXX_FLAGS 
   -Wall 
-  -Wno-unused-local-typedefs 
-  -Wno-strict-aliasing 
-  -Wno-unused-function 
+  # -Wextra
+  # -Werror
+  -Wno-unused-result
+  -Wno-unused-local-typedefs
+  -Wno-strict-aliasing
+  -Wno-unused-function
   -Wno-format-security
 )
 
@@ -125,6 +128,8 @@ set(CUDA_FLAGS
   --expt-relaxed-constexpr 
   --use_fast_math
   --ptxas-options -v
+  -O3 # optimize-level
+  # -g -G -O0 # debug
 )
 
 ####################################################
