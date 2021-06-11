@@ -78,11 +78,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
     // mark zero degree vertices as deleted
     auto degrees_data = degrees.data().get();
     auto mark_zero_degrees = [=] __device__(const int& i) -> bool {
-      if ((degrees_data[i]) == 0) {
-        return true;
-      } else {
-        return false;
-      }
+      return (degrees_data[i] == 0) ? true : false;
     };
 
     thrust::transform(policy, thrust::counting_iterator<vertex_t>(0),
@@ -127,7 +123,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto k = this->iteration + 1;
 
     // Mark vertices with degree <= k for deletion and output their neighbors
-    auto advance_op = [=] __device__(
+    auto advance_op = [=] __host__ __device__(
                           vertex_t const& source,    // source of edge
                           vertex_t const& neighbor,  // destination of edge
                           edge_t const& edge,        // id of edge
@@ -147,7 +143,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     // Reduce degrees of deleted vertices' neighbors
     // Check updated degree against k
-    auto filter_op = [=] __device__(vertex_t const& vertex) -> bool {
+    auto filter_op = [=] __host__ __device__(vertex_t const& vertex) -> bool {
       if (deleted[vertex] == true) {
         return false;
       }

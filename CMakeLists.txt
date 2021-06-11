@@ -121,7 +121,7 @@ set(CXX_FLAGS
   -Wno-strict-aliasing
   -Wno-unused-function
   -Wno-format-security
-  -vvv
+  # -vvv
 )
 
 set(CUDA_FLAGS
@@ -129,11 +129,11 @@ set(CUDA_FLAGS
   --expt-relaxed-constexpr
   --use_fast_math
   --ptxas-options -v
-  --verbose
-  --optimize 0 # Host optimize-level
-  --debug # Host debug
-  --device-debug # Device debug
-  # --generate-line-info
+  # --verbose
+  --optimize 3 # Host optimize-level
+  # --debug # Host debug
+  # --device-debug # Device debug
+  --generate-line-info
 )
 
 ####################################################

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <gunrock/util/type_limits.hxx>
 #include <gunrock/framework/operators/configs.hxx>
 
 namespace gunrock {
@@ -20,7 +21,7 @@ void execute(graph_t& G,
   output->set_number_of_elements(input->get_number_of_elements());
 
   auto predicate = [=] __host__ __device__(type_t const& i) -> bool {
-    return gunrock::util::limits::is_valid(i) ? op(i) : false;
+    return util::limits::is_valid(i) ? op(i) : false;
   };
 
   // Copy w/ predicate!
