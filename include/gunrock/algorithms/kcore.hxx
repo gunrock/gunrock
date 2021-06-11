@@ -183,7 +183,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto G = P->get_graph();
     auto n_vertices = G.get_number_of_vertices();
     auto f = this->get_input_frontier();
-    auto policy = context->get_context(0)->execution_policy();
+    auto policy = context.get_context(0)->execution_policy();
 
     //  Check if all vertices have been removed from graph
     bool graph_empty = thrust::all_of(
