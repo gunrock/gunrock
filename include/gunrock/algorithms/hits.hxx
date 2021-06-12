@@ -8,9 +8,7 @@
  * @copyright Copyright (c) 2020
  *
  */
-#include <../../examples/hits/hits_problem.hxx>
-#include <../../examples/hits/hits_enactor.hxx>
-#include <gunrock/applications/application.hxx>
+#include <gunrock/algorithms/algorithms.hxx>
 #include <thrust/device_vector.h>
 #include <fstream>
 
@@ -28,6 +26,7 @@ class result_c{
 private:
 
   int max_pages;
+  graph_t& G;
 
   thrust::device_vector<float> auth;
   thrust::device_vector<float> hub;
@@ -36,7 +35,8 @@ private:
 
 public:
 
-  result_c();
+  result_c(graph_t& G);
+
   void rank_authority();
   void rank_hub();
   void print_result(std::ostream& os = std::cout);
@@ -52,13 +52,10 @@ public:
   get_hub(){
   return this->hub;
   }
-};
+};// end result_c
 
 template<typename graph_t>
-result_c<graph_t> run(graph_t& G);
-
-template<typename graph_t>
-result_c<graph_t> run(graph_t& G, int iter_times = default_max_iterations);
+result_c<graph_t>& run(graph_t& G, int iter_times = default_max_iterations);
 
 
 }// namespace hits

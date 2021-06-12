@@ -1,4 +1,4 @@
-#include <gunrock/applications/hits.hxx>
+#include <gunrock/algorithms/hits.hxx>
 
 using namespace gunrock;
 using namespace memory;
@@ -40,9 +40,9 @@ void test_hits(int argc, char** argv){
       csr.nonzero_values.data().get()   // values
   );  // supports row_indices and column_offsets (default = nullptr)
 
-  auto result = gunrock::hits::run(G, 20);
+  int iter_times = 20;
+  auto result = gunrock::hits::run(G, iter_times);
   result.print_result(20);
-
 }
 
 int main(int argc, char **argv){

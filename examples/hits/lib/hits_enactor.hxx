@@ -1,4 +1,5 @@
-#include <gunrock/applications/application.hxx>
+#include <gunrock/algorithms/algorithms.hxx>
+#include <gunrock/framework/enactor.hxx>
 
 #pragma once
 

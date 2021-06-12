@@ -1,5 +1,6 @@
-#include <gunrock/util/math.hxx>
-#include <gunrock/applications/hits.hxx>
+#include <gunrock/algorithms/hits.hxx>
+#include "hits_problem.hxx"
+#include "hits_enactor.hxx"
 
 #include <thrust/device_vector.h>
 #include <thrust/device_ptr.h>
@@ -35,20 +36,7 @@ void problem_t<graph_t>::init(){
 }
 
 template <typename graph_t>
-void problem_t<graph_t>::reset(){
-  auto g = this->get_graph();
-  auto n_vertices = g.get_number_of_vertices();
-
-  auto context = this->get_single_context();
-  auto policy = context->execution_policy();
-
-  auto d_distances = thrust::device_pointer_cast(this->result.distances);
-  thrust::fill(policy, d_distances + 0, d_distances + n_vertices,
-               std::numeric_limits<weight_t>::max());
-
-  thrust::fill(policy, d_distances + this->param.single_source,
-               d_distances + this->param.single_source + 1, 0);
-}
+void problem_t<graph_t>::reset(){}
 
 template <typename graph_t>
 bool problem_t<graph_t>::is_converged(){

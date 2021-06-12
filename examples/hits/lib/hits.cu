@@ -1,7 +1,7 @@
-#include <gunrock/applications/hits.hxx>
-#include <gunrock/cuda/cuda.hxx>
+#include <gunrock/algorithms/hits.hxx>
+#include "hits_enactor.hxx"
+#include "hits_problem.hxx"
 
-#include <memory>
 namespace gunrock{
 namespace hits{
 
@@ -16,23 +16,23 @@ result_c<graph_t>& run(graph_t &G, int iter_times){
   using problem_type = problem_t<graph_t>;
   using enactor_type = enactor_t<problem_type>;
 
-  // qqq copy constructor
-  result_c<graph_t>& result = new result_c<graph_t>;
-
   problem_type problem(G, multi_context, iter_times);
 
   enactor_type enactor(problem, multi_context);
   enactor.enact();
 
-  dump_result(result.get_auth(),
-              result.get_hub(),
-              problem.get_auth(),
-              problem.get_hub());
+// qqq copy constructor
+  result_c<graph_t>* result = new result_c(G);
 
-  result.rank_auth();
-  result.rank_hub();
+  dump_result(result->get_auth(),
+              result->get_hub(),
+              problem->get_auth(),
+              problem->get_hub());
 
-  return result;
+  result->rank_auth();
+  result->rank_hub();
+
+  return *result;
 }
 
 template<typename ForwardIterator>

@@ -1,4 +1,4 @@
-#include <gunrock/applications/hits.hxx>
+#include <gunrock/algorithms/hits.hxx>
 
 #include <thrust/device_vector.h>
 #include <thrust/sequence.h>
@@ -12,9 +12,7 @@ namespace gunrock{
 namespace hits{
 
 template<typename graph_t>
-result_c<graph_t>::result_c(){
-
-}
+result_c<graph_t>::result_c(graph_t& G):G(G){}
 
 template<typename graph_t>
 void result_c<graph_t>::rank_authority(){
