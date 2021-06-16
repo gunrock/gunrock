@@ -2,7 +2,6 @@
 set(APPLICATION_NAME hits)
 # end /* Set the application name. */
 
-add_subdirectory(./lib)
 # begin /* Add CUDA executables */
 add_executable(${APPLICATION_NAME})
 
@@ -10,7 +9,6 @@ aux_source_directory(. SOURCE_LIST)
 
 target_sources(${APPLICATION_NAME} PRIVATE ${SOURCE_LIST})
 
-target_link_libraries(${APPLICATION_NAME} PRIVATE HIST_LIB)
 target_link_libraries(${APPLICATION_NAME} PRIVATE essentials)
 get_target_property(ESSENTIALS_ARCHITECTURES essentials CUDA_ARCHITECTURES)
 set_target_properties(${APPLICATION_NAME} 

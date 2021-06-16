@@ -41,7 +41,11 @@ void test_hits(int argc, char** argv){
   );  // supports row_indices and column_offsets (default = nullptr)
 
   int iter_times = 20;
-  auto result = gunrock::hits::run(G, iter_times);
+  // qqq interface
+  hits::param_c param{20};
+  hits::result_c result{G};
+
+  auto time = gunrock::hits::run(G, param, result);
   result.print_result(20);
 }
 
