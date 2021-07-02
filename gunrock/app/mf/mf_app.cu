@@ -23,6 +23,7 @@
 #include <gunrock/graphio/graphio.cuh>
 
 // MF includes
+#include <gunrock/app/mf/mf_problem.cuh>
 #include <gunrock/app/mf/mf_enactor.cuh>
 #include <gunrock/app/mf/mf_test.cuh>
 
@@ -33,6 +34,32 @@
 namespace gunrock {
 namespace app {
 namespace mf {
+
+/**
+ * @brief Speciflying parameters for MF Problem
+ * @param  parameters  The util::Parameter<...> structure holding all
+ *          parameter info
+ * \return cudaError_t error message(s), if any
+ */
+cudaError_t UseParameters_problem(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
+  GUARD_CU(gunrock::app::UseParameters_problem(parameters));
+
+  return retval;
+}
+
+
+/**
+ * @brief Speciflying parameters for MF Enactor
+ * @param parameters The util::Parameter<...> structure holding all parameter
+ *            info
+ * \return cudaError_t error message(s), if any
+ */
+cudaError_t UseParameters_enactor(util::Parameters &parameters) {
+  cudaError_t retval = cudaSuccess;
+  GUARD_CU(app::UseParameters_enactor(parameters));
+  return retval;
+}
 
 cudaError_t UseParameters(util::Parameters &parameters) {
   cudaError_t retval = cudaSuccess;
@@ -221,7 +248,6 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
  * @param[out] min_cut	  Return partition into two sets of nodes
  * \return     double     Return accumulated elapsed times for all runs
  */
-#if 0
 template <typename GraphT, typename VertexT = typename GraphT::VertexT,
     typename ValueT = typename GraphT::ValueT>
 
@@ -273,7 +299,6 @@ double gunrock_mf(
     problem.Release(target);
     return total_time;
 }
-#endif
 
 /*
  * @brief Simple interface  take in graph as CSR format
@@ -288,11 +313,10 @@ double gunrock_mf(
  * @param[out] maxflow	    Return maxflow value
  * \return     double       Return accumulated elapsed times for all runs
  */
-/*
 template <
-    typename VertexT  = uint32_t,
-    typename SizeT    = uint32_t,
-    typename ValueT   = double>
+    typename VertexT = int,
+    typename SizeT = int,
+    typename ValueT = float>
 double mf(
         const int     num_runs,
         ValueT	      *flow,
@@ -404,7 +428,7 @@ double mf(
     d_graph.Release();
 
     return elapsed_time;
-}*/
+}
 
 // Leave this at the end of the file
 // Local Variables:

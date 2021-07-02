@@ -415,7 +415,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   cudaError_t Extract(unsigned long *count_subgraphs,
                       unsigned long **list_subgraphs,
                       util::Location target = util::DEVICE,
-                      util::Location device = util::HOST) {
+                      util::Location memspace = util::HOST) {
     cudaError_t retval = cudaSuccess;
     unsigned long nodes = this->org_graph->nodes;
     unsigned long edges = this->org_graph->edges;
@@ -426,7 +426,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       unsigned long mem_limit = nodes * nodes;
 
       // returning results will be stored on the CPU
-      if (device == util::HOST) {
+      if (memspace == util::HOST) {
         // Set device
         if (target == util::DEVICE) {
           GUARD_CU(util::SetDevice(this->gpu_idx[0]));

@@ -117,6 +117,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
      */
     cudaError_t Init(GraphT &sub_graph, int num_gpus = 1, int gpu_idx = 0,
                      util::Location target = util::DEVICE,
+                     util::Location memspace = util::HOST,
                      ProblemFlag flag = Problem_None, util::Parameters& parameters = NULL) {
       cudaError_t retval = cudaSuccess;
 
@@ -243,7 +244,8 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
   // }
 
   cudaError_t Extract(ValueT *h_distances, VertexT *h_preds = NULL,
-                      util::Location target = util::DEVICE) {
+                      util::Location target = util::DEVICE,
+                      util::Location memspace = util::HOST) {
     cudaError_t retval = cudaSuccess;
     SizeT nodes = this->org_graph->nodes;
 
@@ -320,7 +322,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
    * @param[in] Location    Memory location to work on
    * \return    cudaError_t Error message(s), if any
    */
-  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE) {
+  cudaError_t Init(GraphT &graph, util::Location target = util::DEVICE, util::Location memspace = util::DEVICE) {
     cudaError_t retval = cudaSuccess;
     GUARD_CU(BaseProblem::Init(graph, target));
     data_slices = new util::Array1D<SizeT, DataSlice>[this->num_gpus];
@@ -337,7 +339,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
         auto &data_slice = data_slices[gpu][0];
 
         GUARD_CU(data_slice.Init(this->sub_graphs[gpu], this->num_gpus,
-                                this->gpu_idx[gpu], target, this->flag, this->parameters));
+                                this->gpu_idx[gpu], target, memspace, this->flag, this->parameters));
       }  // end for (gpu)
     return retval;
   }

@@ -335,7 +335,8 @@ cudaError_t RunTests(util::Parameters &parameters, GraphT &graph,
  */
 template <typename GraphT, typename ValueT = typename GraphT::ValueT>
 double gunrock_gtf(gunrock::util::Parameters &parameters, GraphT &graph,
-                   ValueT *flow, ValueT &maxflow) {
+                   ValueT *flow, ValueT *residuals,
+                   gunrock::util::Location memspace = gunrock::util::HOST) {
   typedef typename GraphT::VertexT VertexT;
   typedef gunrock::app::gtf::Problem<GraphT> ProblemT;
   typedef gunrock::app::gtf::Enactor<ProblemT> EnactorT;
@@ -347,7 +348,7 @@ double gunrock_gtf(gunrock::util::Parameters &parameters, GraphT &graph,
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
-  problem.Init(graph, target);
+  problem.Init(graph, target, memspace);
   enactor.Init(problem, target);
 
   int num_runs = parameters.Get<int>("num-runs");
@@ -355,7 +356,7 @@ double gunrock_gtf(gunrock::util::Parameters &parameters, GraphT &graph,
   int sink = parameters.Get<VertexT>("sink");
 
   for (int run_num = 0; run_num < num_runs; ++run_num) {
-    problem.Reset(target);
+    problem.Reset(flow, residuals, target);
     enactor.Reset(target);
 
     cpu_timer.Start();
@@ -363,7 +364,7 @@ double gunrock_gtf(gunrock::util::Parameters &parameters, GraphT &graph,
     cpu_timer.Stop();
 
     total_time += cpu_timer.ElapsedMillis();
-    problem.Extract(flow);
+    problem.Extract(flow, residuals, target, memspace);
   }
 
   enactor.Release(target);
@@ -380,23 +381,19 @@ double gunrock_gtf(gunrock::util::Parameters &parameters, GraphT &graph,
  * @param[in]  capacity	    CSR-formatted graph input edge weights
  * @param[in]  num_runs     Number of runs to perform gtf
  * @param[in]  source	    Source to push flow towards the sink
- * @param[out] flow	    Return flow calculated on edges
- * @param[out] maxflow	    Return maxflow value
  * \return     double       Return accumulated elapsed times for all runs
  */
-template <typename VertexT = uint32_t, typename SizeT = uint32_t,
-          typename ValueT = double>
+template <typename VertexT, typename SizeT,
+          typename ValueT>
 float gtf(const SizeT num_nodes, const SizeT num_edges,
           const SizeT *row_offsets, const VertexT *col_indices,
-          const ValueT capacity, const int num_runs, VertexT source,
-          VertexT sink, ValueT *flow, ValueT &maxflow) {
-  // TODO: change to other graph representation, if not using CSR
+          const ValueT *capacity, const int num_runs, VertexT source,
+          VertexT sink,
+          ValueT *flow, ValueT *residuals,
+          gunrock::util::Location memspace = gunrock::util::HOST) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, ValueT,
-                                           gunrock::graph::HAS_EDGE_VALUES |
-                                               gunrock::graph::HAS_COO>
+      gunrock::graph::HAS_CSR>
       GraphT;
-  typedef typename GraphT::CooT CooT;
-  typedef typename GraphT::CsrT CsrT;
 
   // Setup parameters
   gunrock::util::Parameters parameters("gtf");
@@ -410,27 +407,24 @@ float gtf(const SizeT num_nodes, const SizeT num_edges,
   parameters.Set("sink", sink);
 
   bool quiet = parameters.Get<bool>("quiet");
-  CsrT csr;
-  // Assign pointers into gunrock graph format
-  csr.Allocate(num_nodes, num_edges, gunrock::util::HOST);
-  csr.row_offsets.SetPointer(row_offsets, gunrock::util::HOST);
-  csr.column_indices.SetPointer(col_indices, gunrock::util::HOST);
-  csr.capacity.SetPointer(capacity, gunrock::util::HOST);
+ 
+  GraphT graph;
+  graph.CsrT::Allocate(num_nodes, num_edges, memspace);
+  graph.CsrT::row_offsets.SetPointer((SizeT *)row_offsets, num_nodes + 1, memspace);
+  graph.CsrT::column_indices.SetPointer((VertexT*)col_indices, num_edges, memspace);
 
-  gunrock::util::Location target = gunrock::util::HOST;
-  CooT graph;
-  graph.FromCsr(csr, target, 0, quiet, true);
-  csr.Release();
-  gunrock::graphio::LoadGraph(parameters, graph);
+  graph.FromCsr(graph.csr(), memspace, 0, quiet, true);
 
   // Run the gtf
-  double elapsed_time = gunrock_gtf(parameters, graph, flow, maxflow);
+  double elapsed_time = gunrock_gtf(parameters, graph, flow, residuals, memspace);
 
   // Cleanup
   graph.Release();
 
   return elapsed_time;
 }
+
+template float gtf(const int, const int, const int*, const int*, const float*, const int, int, int, float*, float*, gunrock::util::Location);
 
 // Leave this at the end of the file
 // Local Variables:

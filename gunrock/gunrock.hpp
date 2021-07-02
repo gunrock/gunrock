@@ -90,6 +90,62 @@ double hits(
     GValueT           *auth_ranks,
     gunrock::util::Location memspace = gunrock::util::HOST);
 
+template <
+    typename VertexT,
+    typename SizeT,
+    typename GValueT>
+double color(const SizeT num_nodes, 
+             const SizeT num_edges,
+             const SizeT *row_offsets,
+             const VertexT *col_indices,
+             VertexT *colors,
+             gunrock::util::Location memspace = gunrock::util::HOST,
+             const GValueT edge_values = NULL);
+
+
+template <typename VertexT,
+          typename SizeT,
+          typename GValueT>
+double geo(const SizeT num_nodes,
+           const SizeT num_edges,
+           const SizeT *row_offsets,
+           const VertexT *col_indices,
+           const unsigned int geo_iter,
+           const unsigned int spatial_iter,
+           GValueT *latitudes,
+           GValueT *longitudes,
+           gunrock::util::Location memspace = gunrock::util::HOST);
+
+
+template <typename VertexT, typename SizeT,
+          typename GValueT, typename SSSPValueT = GValueT>
+double sssp(const SizeT num_nodes, const SizeT num_edges,
+            const SizeT *row_offsets, const VertexT *col_indices,
+            const GValueT *edge_values, VertexT source,
+            const bool mark_pred, SSSPValueT *distances, VertexT *preds = NULL, 
+            gunrock::util::Location memspace = gunrock::util::HOST);
+
+template <typename VertexT, typename SizeT,
+          typename ValueT>
+float gtf(const SizeT num_nodes, const SizeT num_edges,
+          const SizeT *row_offsets, const VertexT *col_indices,
+          const ValueT *capacity, const int num_runs, VertexT source,
+          VertexT sink,
+          ValueT *flow, ValueT *residuals,
+          gunrock::util::Location memspace = gunrock::util::HOST);
+
+
+template <
+    typename VertexT,
+    typename SizeT,
+    typename ValueT>
+double mf(
+        const int     num_runs,
+        ValueT        *flow,
+        ValueT        &maxflow,
+        int       *min_cut,
+        int       undirected = 0);
+
 // Local Variables:
 // mode:c++
 // c-file-style: "NVIDIA"

@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
   //  Device call
   //
   printf("device memory call\n");
-  hits(num_verts, num_edges, graph_offsets_d.data().get(), graph_indices_d.data().get(), max_iter, tol, hits_norm, d_hub_ranks, d_auth_ranks, DEVICE);
+  hits<int, int, float>(num_verts, num_edges, graph_offsets_d.data().get(), graph_indices_d.data().get(), max_iter, tol, hits_norm, d_hub_ranks, d_auth_ranks, DEVICE);
 
   thrust::for_each(thrust::device,
                    thrust::make_counting_iterator<int>(0),
