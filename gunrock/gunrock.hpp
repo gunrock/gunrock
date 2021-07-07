@@ -1,4 +1,3 @@
-
 // ----------------------------------------------------------------------------
 // Gunrock -- Fast and Efficient GPU Graph Library
 // ----------------------------------------------------------------------------
@@ -18,6 +17,95 @@
 #pragma once
 
 #include <gunrock/util/array_utils.cuh>
+
+/**
+ * @brief Simple interface take in graph as CSR format
+ * @param[in]  num_nodes   Number of veritces in the input graph
+ * @param[in]  num_edges   Number of edges in the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  edge_values CSR-formatted graph input edge weights
+ * @param[in]  num_runs    Number of runs to perform SSSP
+ * @param[in]  sources     Sources to begin traverse, one for each run
+ * @param[in]  mark_preds  Whether to output predecessor info
+ * @param[out] distances   Return shortest distance to source per vertex
+ * @param[out] preds       Return predecessors of each vertex
+ * @param[in]  memspace    Input and output target device, by default CPU
+ * \return     double      Return accumulated elapsed times for all runs
+ */
+template <typename VertexT = int,
+          typename SizeT = int,
+          typename LabelT = VertexT>
+double bfs(const SizeT    num_nodes,
+           const SizeT    num_edges,
+           const SizeT    *row_offsets,
+           const VertexT  *col_indices,
+           VertexT        *sources,
+           const bool     mark_pred,
+           const bool     direction_optimized,
+           const bool     idempotence,
+           LabelT         **labels,
+           VertexT        **preds = NULL,
+           const int      num_runs,
+           gunrock::util::Location memspace = gunrock::util::HOST);
+
+/*
+ * @brief Simple interface take in graph as CSR format
+ * @param[in]  num_nodes   Number of veritces in the input graph
+ * @param[in]  num_edges   Number of edges in the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  edge_values CSR-formatted graph input edge weights
+ * @param[in]  num_runs    Number of runs to perform SSSP
+ * @param[in]  sources     Sources to begin traverse, one for each run
+ * @param[in]  mark_preds  Whether to output predecessor info
+ * @param[out] distances   Return shortest distance to source per vertex
+ * @param[out] preds       Return predecessors of each vertex
+ * \return     double      Return accumulated elapsed times for all runs
+ */
+template <typename VertexT = int,
+          typename SizeT = int,
+          typename GValueT = unsigned int,
+          typename SAGEValueT = GValueT>
+double sage(const SizeT   num_nodes,
+            const SizeT   num_edges,
+            const SizeT   *row_offsets,
+            const VertexT *col_indices,
+            const GValueT *edge_values,
+            const GValueT *source_result,
+            const int     num_runs,
+            gunrock::util::Location allocated_on = gunrock::util::HOST);
+
+/*
+ * @brief Simple interface take in graph as CSR format
+ * @param[in]  num_nodes   Number of veritces in the input graph
+ * @param[in]  num_edges   Number of edges in the input graph
+ * @param[in]  row_offsets CSR-formatted graph input row offsets
+ * @param[in]  col_indices CSR-formatted graph input column indices
+ * @param[in]  edge_values CSR-formatted graph input edge weights
+ * @param[in]  num_runs    Number of runs to perform vn
+ * @param[in]  memspace    Input and output target device, by default CPU
+ * @param[in]  sources     Sources to begin traverse, one for each run
+ * @param[in]  mark_preds  Whether to output predecessor info
+ * @param[out] distances   Return shortest distance to source per vertex
+ * @param[out] preds       Return predecessors of each vertex
+ * \return     double      Return accumulated elapsed times for all runs
+ */
+template <typename VertexT = int,
+          typename SizeT = int,
+          typename GValueT = unsigned int,
+          typename vnValueT = GValueT>
+double vn(const SizeT   num_nodes,
+          const SizeT   num_edges,
+          const SizeT   *row_offsets,
+          const VertexT *col_indices,
+          const GValueT *edge_values,
+          VertexT       *sources,
+          const bool    mark_pred,
+          vnValueT      *distances,
+          VertexT       *preds = NULL,
+          const int     num_runs,
+          gunrock::util::Location memspace = gunrock::util::HOST);
 
 /*
  * @brief Subgraph Matching CXX interface
@@ -73,7 +161,7 @@ enum HITS_NORMALIZATION_METHOD { // Integer
  * @param[out] auth ranks  Vertex authority scores
  * @param[in]  device      Target device to store inputs and outputs
  * \return     double      Elapsed run time in milliseconds
- */  
+ */
 template <
     typename VertexT,
     typename SizeT,
