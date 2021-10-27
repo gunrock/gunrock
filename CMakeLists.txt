@@ -99,6 +99,7 @@ target_include_directories(essentials
 ####################################################
 target_link_libraries(essentials
     INTERFACE curand
+    INTERFACE cuda
 )
 
 ####################################################

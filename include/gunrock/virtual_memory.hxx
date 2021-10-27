@@ -12,7 +12,7 @@
 
 #include <iostream>
 #include <memory>
-
+#include <cuda.h>
 #include <gunrock/error.hxx>
 
 namespace gunrock {
@@ -182,13 +182,13 @@ class striped_memory_mapper_t {
 
         // Set the access_descriptors flag.
         if (access == access_flags_t::none)
-          access_descriptors[idx].flags = CU_MEM_ACCESS_FLAGS_PROT_NONE;
+          access_descriptors[remote].flags = CU_MEM_ACCESS_FLAGS_PROT_NONE;
         else if (access == access_flags_t::read_only)
-          access_descriptors[idx].flags = CU_MEM_ACCESS_FLAGS_PROT_READ;
+          access_descriptors[remote].flags = CU_MEM_ACCESS_FLAGS_PROT_READ;
         else if (access == access_flags_t::read_write)
-          access_descriptors[idx].flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+          access_descriptors[remote].flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
         else
-          access_descriptors[idx].flags = CU_MEM_ACCESS_FLAGS_PROT_MAX;
+          access_descriptors[remote].flags = CU_MEM_ACCESS_FLAGS_PROT_MAX;
       }
 
       cuMemSetAccess((CUdeviceptr)virt.ptr + (stripe_size * local), stripe_size,

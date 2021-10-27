@@ -4,4 +4,5 @@ add_subdirectory(mtx2bin)
 add_subdirectory(src_vertex)
 add_subdirectory(coo)
 add_subdirectory(csc)
+add_subdirectory(memory)
 # end /* Add unit tests' subdirectories */
