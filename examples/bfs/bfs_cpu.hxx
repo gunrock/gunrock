@@ -75,6 +75,7 @@ int compute_error(thrust::device_vector<val_t> _gpu_result,
   int n_errors = 0;
   for (int i = 0; i < cpu_result.size(); i++) {
     if (gpu_result[i] != cpu_result[i]) {
+      std::cout << "gpu, cpu : " << gpu_result[i] << ", " << cpu_result[i] << std::endl;
       n_errors++;
     }
   }
