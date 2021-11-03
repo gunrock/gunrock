@@ -8,7 +8,8 @@ add_subdirectory(ppr)
 add_subdirectory(bc)
 add_subdirectory(hits)
 add_subdirectory(kcore)
+add_subdirectory(spmv)
 # end /* Add examples' subdirectories */
 
-# begin /* Add experimenatl examples' subdirectories */
+# begin /* Add experimental examples' subdirectories */
 add_subdirectory(experimental/async)
