@@ -37,7 +37,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   thrust::device_vector<weight_t> dummy;
 
-  void init() override { this->dummy.resize(2); }
+  void init() override {}
 
   void reset() override {
     auto policy = this->context->get_context(0)->execution_policy();
@@ -48,7 +48,12 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
-  using gunrock::enactor_t<problem_t>::enactor_t;
+  // using gunrock::enactor_t<problem_t>::enactor_t;
+
+  enactor_t(problem_t* _problem,
+            std::shared_ptr<cuda::multi_context_t> _context,
+            enactor_properties_t _properties = enactor_properties_t())
+      : gunrock::enactor_t<problem_t>(_problem, _context, _properties) {}
 
   using vertex_t = typename problem_t::vertex_t;
   using edge_t = typename problem_t::edge_t;
@@ -61,14 +66,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto E = this->get_enactor();
     auto P = this->get_problem();
     auto G = P->get_graph();
-    auto dummy = P->dummy.data().get();
 
-    // TODO: This causes segfault.
-    // auto re = P->result;
-    // auto y = P->result.y;
-    // auto x = P->param.x;
+    auto y = P->result.y;
+    auto x = P->param.x;
 
-    /* auto spmv = [=] __host__ __device__(
+    auto spmv = [=] __host__ __device__(
                     vertex_t const& source,    // ... source (row index)
                     vertex_t const& neighbor,  // neighbor (column index)
                     edge_t const& edge,        // edge (row ↦ column)
@@ -86,7 +88,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                                   // transpose)
         operators::advance_io_type_t::graph,      // entire graph as input
         operators::advance_io_type_t::none>(      // no output frontier needed
-        G, E, spmv, context); */
+        G, E, spmv, context);
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
