@@ -63,6 +63,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                         cuda::multi_context_t& context) override {}
 
   void loop(cuda::multi_context_t& context) override {
+    // TODO: Use a parameter (enum) to select between the two:
+    // Maybe use the existing advance_direction_t enum.
+    push(context);
+  }
+
+  void push(cuda::multi_context_t& context) {
     auto E = this->get_enactor();
     auto P = this->get_problem();
     auto G = P->get_graph();
@@ -89,6 +95,24 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         operators::advance_io_type_t::graph,      // entire graph as input
         operators::advance_io_type_t::none>(      // no output frontier needed
         G, E, spmv, context);
+  }
+
+  void pull(cuda::multi_context_t& context) {
+    auto E = this->get_enactor();
+    auto P = this->get_problem();
+    auto G = P->get_graph();
+
+    auto y = P->result.y;
+    auto x = P->param.x;
+
+    auto spmv = [=] __host__ __device__(edge_t edge) {
+      weight_t weight = G.get_edge_weight(edge);
+      vertex_t neighbor = G.get_destination_vertex(edge);
+      return weight * x[neighbor];
+    };
+
+    // Perform neighbor-reduce
+    operators::neighborreduce::execute(G, E, y, spmv, context);
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
