@@ -23,9 +23,8 @@ float run(csr_t& csr, vertex_t* colors) {
   for (vertex_t i = 0; i < n_vertices; i++)
     colors[i] = -1;
 
-  thrust::host_vector<vertex_t> randoms(n_vertices);
-  gunrock::generate::random::uniform_distribution(0, n_vertices,
-                                                  randoms.begin());
+  thrust::host_vector<weight_t> randoms(n_vertices);
+  gunrock::generate::random::uniform_distribution(randoms);
 
   int color = 0;
   int n_left = n_vertices;

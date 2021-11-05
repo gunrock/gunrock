@@ -44,7 +44,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
 
-  thrust::device_vector<vertex_t> randoms;
+  thrust::device_vector<weight_t> randoms;
 
   void init() override {
     auto g = this->get_graph();
@@ -62,7 +62,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
                  gunrock::numeric_limits<vertex_t>::invalid());
 
     // Generate random numbers.
-    generate::random::uniform_distribution(0, n_vertices, randoms.begin());
+    generate::random::uniform_distribution(randoms);
   }
 };
 

@@ -59,7 +59,7 @@ void test_spmv(int num_arguments, char** argument_array) {
   thrust::device_vector<weight_t> x(n_vertices);
   thrust::device_vector<weight_t> y(n_vertices);
 
-  gunrock::generate::random::uniform_distribution(0, n_vertices, x.begin());
+  gunrock::generate::random::uniform_distribution(x);
 
   // --
   // GPU Run

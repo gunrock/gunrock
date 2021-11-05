@@ -1,3 +1,15 @@
+/**
+ * @file spmv.hxx
+ * @author Daniel Loran (dcloran@ucdavis.edu)
+ * @author Muhammad Osama (mosama@ucdavis.edu)
+ * @brief Sparse-Matrix Vector Multiplication.
+ * @version 0.1
+ * @date 2021-11-05
+ *
+ * @copyright Copyright (c) 2021
+ *
+ */
+
 #pragma once
 
 #include <gunrock/algorithms/algorithms.hxx>
@@ -65,7 +77,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   void loop(cuda::multi_context_t& context) override {
     // TODO: Use a parameter (enum) to select between the two:
     // Maybe use the existing advance_direction_t enum.
-    push(context);
+    pull(context);
   }
 
   void push(cuda::multi_context_t& context) {
@@ -108,7 +120,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto spmv = [=] __host__ __device__(edge_t edge) {
       weight_t weight = G.get_edge_weight(edge);
       vertex_t neighbor = G.get_destination_vertex(edge);
-      return weight * x[neighbor];
+      return weight * thread::load(&x[neighbor]);
     };
 
     // Perform neighbor-reduce
