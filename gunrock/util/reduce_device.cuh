@@ -81,29 +81,24 @@ cudaError_t cubSegmentedReduce(util::Array1D<uint64_t, char> &cub_temp_space,
   cudaError_t retval = cudaSuccess;
   size_t request_bytes = 0;
 
-  retval = cub::DispatchSegmentedReduce<
-      InputT *, OutputT *, SizeT *, SizeT,
-      ReductionOp>::Dispatch(NULL, request_bytes,
-                             keys_in.GetPointer(util::DEVICE),
-                             keys_out.GetPointer(util::DEVICE), num_segments,
-                             segment_offsets.GetPointer(util::DEVICE),
-                             segment_offsets.GetPointer(util::DEVICE) + 1,
-                             reduction_op, initial_value, stream,
-                             debug_synchronous);
+  retval = cub::DeviceSegmentedReduce::
+      Reduce(NULL, request_bytes, keys_in.GetPointer(util::DEVICE),
+             keys_out.GetPointer(util::DEVICE), num_segments,
+             segment_offsets.GetPointer(util::DEVICE),
+             segment_offsets.GetPointer(util::DEVICE) + 1, reduction_op,
+             initial_value, stream, debug_synchronous);
   if (retval) return retval;
 
   retval = cub_temp_space.EnsureSize_(request_bytes, util::DEVICE);
   if (retval) return retval;
 
-  retval = cub::DispatchSegmentedReduce<
-      InputT *, OutputT *, SizeT *, SizeT,
-      ReductionOp>::Dispatch(cub_temp_space.GetPointer(util::DEVICE),
-                             request_bytes, keys_in.GetPointer(util::DEVICE),
-                             keys_out.GetPointer(util::DEVICE), num_segments,
-                             segment_offsets.GetPointer(util::DEVICE),
-                             segment_offsets.GetPointer(util::DEVICE) + 1,
-                             reduction_op, initial_value, stream,
-                             debug_synchronous);
+  retval = cub::DeviceSegmentedReduce::
+      Reduce(cub_temp_space.GetPointer(util::DEVICE), request_bytes,
+             keys_in.GetPointer(util::DEVICE),
+             keys_out.GetPointer(util::DEVICE), num_segments,
+             segment_offsets.GetPointer(util::DEVICE),
+             segment_offsets.GetPointer(util::DEVICE) + 1,
+             reduction_op, initial_value, stream, debug_synchronous);
   if (retval) return retval;
 
   return retval;
@@ -120,20 +115,21 @@ cudaError_t cubReduce(util::Array1D<uint64_t, char> &cub_temp_space,
   size_t request_bytes = 0;
 
   retval =
-      cub::DispatchReduce<InputT *, OutputT *, SizeT, ReductionOp>::Dispatch(
-          NULL, request_bytes, keys_in.GetPointer(util::DEVICE),
-          keys_out.GetPointer(util::DEVICE), num_keys, reduction_op,
-          initial_value, stream, debug_synchronous);
+      cub::DeviceReduce::
+          Reduce(NULL, request_bytes, keys_in.GetPointer(util::DEVICE),
+                 keys_out.GetPointer(util::DEVICE), num_keys, reduction_op,
+                 initial_value, stream, debug_synchronous);
   if (retval) return retval;
 
   retval = cub_temp_space.EnsureSize_(request_bytes, util::DEVICE);
   if (retval) return retval;
 
   retval =
-      cub::DispatchReduce<InputT *, OutputT *, SizeT, ReductionOp>::Dispatch(
-          cub_temp_space.GetPointer(util::DEVICE), request_bytes,
-          keys_in.GetPointer(util::DEVICE), keys_out.GetPointer(util::DEVICE),
-          num_keys, reduction_op, initial_value, stream, debug_synchronous);
+      cub::DeviceReduce::
+          Reduce(cub_temp_space.GetPointer(util::DEVICE), request_bytes,
+                 keys_in.GetPointer(util::DEVICE),
+                 keys_out.GetPointer(util::DEVICE), num_keys, reduction_op,
+                 initial_value, stream, debug_synchronous);
   if (retval) return retval;
 
   return retval;
