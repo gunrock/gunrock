@@ -193,22 +193,28 @@ cudaError_t cubSelectIf(util::Array1D<uint64_t, char> &cub_temp_space,
                         bool debug_synchronous = false) {
   cudaError_t retval = cudaSuccess;
 
+  typedef cub::NullType *FlagIterator;
+  typedef cub::NullType EqualityOp;
+
   size_t request_bytes = 0;
-  retval = cub::DeviceSelect::
-      If(NULL, request_bytes, keys_in.GetPointer(util::DEVICE),
-         keys_out.GetPointer(util::DEVICE),
-         num_selected.GetPointer(util::DEVICE), num_keys, select_op, stream,
-         debug_synchronous);
+  retval = cub::DispatchSelectIf<
+      InputT *, FlagIterator, OutputT *, SizeT *, SelectOp, EqualityOp, SizeT,
+      false>::Dispatch(NULL, request_bytes, keys_in.GetPointer(util::DEVICE),
+                       NULL, keys_out.GetPointer(util::DEVICE),
+                       num_selected.GetPointer(util::DEVICE), select_op,
+                       EqualityOp(), num_keys, stream, debug_synchronous);
   if (retval) return retval;
 
   retval = cub_temp_space.EnsureSize_(request_bytes, util::DEVICE);
   if (retval) return retval;
 
-  retval = cub::DeviceSelect::
-      If(cub_temp_space.GetPointer(util::DEVICE), request_bytes,
-         keys_in.GetPointer(util::DEVICE), keys_out.GetPointer(util::DEVICE),
-         num_selected.GetPointer(util::DEVICE), num_keys, select_op, stream,
-         debug_synchronous);
+  retval = cub::DispatchSelectIf<
+      InputT *, FlagIterator, OutputT *, SizeT *, SelectOp, EqualityOp, SizeT,
+      false>::Dispatch(cub_temp_space.GetPointer(util::DEVICE), request_bytes,
+                       keys_in.GetPointer(util::DEVICE), NULL,
+                       keys_out.GetPointer(util::DEVICE),
+                       num_selected.GetPointer(util::DEVICE), select_op,
+                       EqualityOp(), num_keys, stream, debug_synchronous);
   if (retval) return retval;
 
   return retval;
