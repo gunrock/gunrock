@@ -31,6 +31,8 @@ if(GUNROCK_BUILD_APPLICATIONS)
   #add_subdirectory(topk)
   add_subdirectory(vn)
   add_subdirectory(lp)
+  add_subdirectory(lcc)
+
   #add_subdirectory(wtf)
 
   # TUTORIAL SUBDIRECTORIES
@@ -154,6 +156,9 @@ endif(GUNROCK_APP_KCORE)
     add_subdirectory(wtf)
   endif(GUNROCK_APP_WTF)
 
+  if(GUNROCK_APP_LCC)
+    add_subdirectory(lcc)
+  endif(GUNROCK_APP_LCC)
   # if(GUNROCK_APP_HELLO)
   #   add_subdirectory(hello)
   # endif(GUNROCK_APP_HELLO)
