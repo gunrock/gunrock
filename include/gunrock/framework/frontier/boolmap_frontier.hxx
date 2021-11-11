@@ -1,7 +1,7 @@
 /**
- * @file vector_frontier.hxx
+ * @file boolmap_frontier.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
- * @brief Vector-based frontier implementation.
+ * @brief Boolmap-based frontier implementation.
  * @version 0.1
  * @date 2021-03-12
  *
@@ -21,18 +21,22 @@ namespace frontier {
 using namespace memory;
 
 template <typename type_t>
-class vector_frontier_t {
+class boolmap_frontier_t {
  public:
   using pointer_t = type_t*;
 
-  vector_frontier_t() : storage(), num_elements(0) {}
-  vector_frontier_t(std::size_t size) : storage(size), num_elements(size) {}
+  boolmap_frontier_t() : storage(), num_elements(0) {}
+  boolmap_frontier_t(std::size_t size) : storage(size), num_elements(size) {}
 
   /**
-   * @brief Get the number of elements within the frontier.
+   * @brief Get the number of elements within the frontier. This is a costly
+   * feature of a boolmap and should be avoided when possible.
    * @return std::size_t
    */
-  std::size_t get_number_of_elements(cuda::stream_t stream = 0) const {
+  std::size_t get_number_of_elements(cuda::stream_t stream = 0) {
+    // Compute number of elements using a reduction.
+    num_elements = thrust::reduce(thrust::cuda::par.on(stream), this->begin(),
+                                  this->end(), 0);
     return num_elements;
   }
 
@@ -57,17 +61,17 @@ class vector_frontier_t {
   pointer_t data() { return raw_pointer_cast(storage.data()) /* .get() */; }
   pointer_t begin() { return this->data(); }
   pointer_t end() { return this->begin() + this->get_number_of_elements(); }
-  bool is_empty() const { return (this->get_number_of_elements() == 0); }
 
   /**
-   * @brief (vertex-like) push back a value to the frontier.
+   * @brief Is the frontier empty or not?
+   * @todo right now, this relies on an expensive get_number_of_elements() call,
+   * we can replace this with a simple transform that checks each position and
+   * if any one of the position is active, the frontier is not empty.
    *
-   * @param value
+   * @return true
+   * @return false
    */
-  void push_back(type_t const& value) {
-    storage.push_back(value);
-    num_elements++;
-  }
+  bool is_empty() { return (this->get_number_of_elements() == 0); }
 
   /**
    * @brief Fill the entire frontier with a user-specified value.
@@ -76,32 +80,12 @@ class vector_frontier_t {
    * @param stream
    */
   void fill(type_t const value, cuda::stream_t stream = 0) {
+    if (value != 0 || value != 1)
+      error::throw_if_exception(cudaErrorUnknown,
+                                "Boolmap only supports 1 or 0 as fill value.");
+
     thrust::fill(thrust::cuda::par.on(stream), this->begin(), this->end(),
                  value);
-  }
-
-  /**
-   * @brief `sequence` fills the entire frontier with a sequence of numbers.
-   *
-   * @param initial_value The first value of the sequence.
-   * @param size Number of elements to fill the sequence up to. Also corresponds
-   * to the new size of the frontier.
-   * @param stream @see `cuda::stream_t`.
-   *
-   * @todo Maybe we should accept `standard_context_t` instead of `stream_t`.
-   */
-  void sequence(type_t const initial_value,
-                std::size_t const& size,
-                cuda::stream_t stream = 0) {
-    // Resize if needed.
-    if (this->get_capacity() < size)
-      this->reserve(size);
-
-    // Set the new number of elements.
-    this->set_number_of_elements(size);
-
-    thrust::sequence(thrust::cuda::par.on(stream), this->begin(), this->end(),
-                     initial_value);
   }
 
   /**
@@ -111,18 +95,18 @@ class vector_frontier_t {
    *
    * @param size number of elements used to resize the frontier (count not
    * bytes).
-   * @param default_value
+   * @param default_value is 0 (meaning vertex is not active).
    */
-  void resize(
-      std::size_t const& size,
-      type_t const default_value = gunrock::numeric_limits<type_t>::invalid()) {
+  void resize(std::size_t const& size, type_t const default_value = 0) {
     storage.resize(size, default_value);
   }
 
   /**
    * @brief "Hints" the alocator that we need to reserve the suggested size. The
    * capacity() will increase and report reserved() size, but size() will still
-   * report the actual size, not reserved size. See std::vector for more detail.
+   * report the actual size, not reserved size.
+   * @note This isn't as relevant for a boolmap because the size of the frontier
+   * remains the same.
    *
    * @param size size to reserve (size is in count not bytes).
    */
@@ -136,8 +120,7 @@ class vector_frontier_t {
    */
   void sort(sort::order_t order = sort::order_t::ascending,
             cuda::stream_t stream = 0) {
-    sort::radix::sort_keys(storage.data().get(), this->get_number_of_elements(),
-                           order, stream);
+    // Bool-map frontier is always sorted.
   }
 
   void print() {
@@ -149,7 +132,7 @@ class vector_frontier_t {
   }
 
  private:
-  vector_t<type_t, memory_space_t::device> storage;
+  vector_t<int, memory_space_t::device> storage;
   std::size_t num_elements;  // number of elements in the frontier.
 };
 

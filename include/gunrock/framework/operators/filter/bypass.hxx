@@ -13,6 +13,7 @@ void execute(graph_t& G,
              frontier_t* output,
              cuda::standard_context_t& context) {
   using type_t = typename frontier_t::type_t;
+  frontier_storage_t underlying_t = input->get_frontier_storage_t();
 
   // ... resize as needed.
   if ((output->data() != input->data()) ||
@@ -20,22 +21,41 @@ void execute(graph_t& G,
     output->reserve(input->get_number_of_elements());
   }
 
-  output->set_number_of_elements(input->get_number_of_elements());
+  if (underlying_t != frontier_storage_t::boolmap)
+    output->set_number_of_elements(input->get_number_of_elements());
+
+  auto input_ptr = input->data();
 
   // Mark items as invalid instead of removing them (therefore, a "bypass").
-  auto bypass = [=] __device__(type_t const& i) {
-    if (!gunrock::util::limits::is_valid(i))
-      return gunrock::numeric_limits<type_t>::invalid();  // exit early
-    return (op(i) ? i : gunrock::numeric_limits<type_t>::invalid());
+  auto bypass = [=] __device__(std::size_t const& idx) {
+    auto v = frontier::get_element_at(idx, input_ptr);
+    if (underlying_t == frontier_storage_t::boolmap) {
+      if (v == 0)
+        return 0;
+      return (op(i) ? 1 : 0);
+    } else {
+      if (!gunrock::util::limits::is_valid(v))
+        return gunrock::numeric_limits<type_t>::invalid();  // exit early
+      return (op(i) ? i : gunrock::numeric_limits<type_t>::invalid());
+    }
   };
 
+  std::size_t end = (underlying_t == frontier_storage_t::boolmap)
+                        ? G.get_number_of_vertices()
+                        : input->get_number_of_elements();
+
   // Filter with bypass
-  thrust::transform(thrust::cuda::par.on(context.stream()),  // execution policy
-                    input->begin(),   // input iterator: begin
-                    input->end(),     // input iterator: end
-                    output->begin(),  // output iterator
-                    bypass            // predicate
+  thrust::transform(
+      thrust::cuda::par.on(context.stream()),          // execution policy
+      thrust::make_counting_iterator<std::size_t>(0),  // input iterator: first
+      thrust::make_counting_iterator<std::size_t>(end),  // input iterator: last
+      output->begin(),                                   // output iterator
+      bypass                                             // predicate
   );
+
+  // reset the input frontier.
+  if (underlying_t == frontier_storage_t::boolmap)
+    input->fill(0, context.stream());
 }
 
 template <typename graph_t, typename operator_t, typename frontier_t>

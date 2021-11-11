@@ -18,6 +18,8 @@
 #pragma once
 
 #include <gunrock/framework/frontier/vector_frontier.hxx>
+#include <gunrock/framework/frontier/boolmap_frontier.hxx>
+
 #include <gunrock/util/type_limits.hxx>
 
 #include <gunrock/graph/graph.hxx>
@@ -26,9 +28,6 @@
 namespace gunrock {
 
 using namespace memory;
-
-// Maybe we use for frontier related function
-namespace frontier {}  // namespace frontier
 
 /**
  * @brief Underlying frontier data structure.
@@ -46,15 +45,21 @@ enum frontier_kind_t {
 };                      // enum: frontier_kind_t
 
 template <typename t,
-          frontier_storage_t underlying_st = frontier_storage_t::vector>
-class frontier_t : public frontier::vector_frontier_t<t> {
+          frontier_storage_t underlying_st = frontier_storage_t::boolmap>
+class frontier_t
+    : public std::conditional_t<underlying_st == frontier_storage_t::vector,
+                                frontier::vector_frontier_t<t>,
+                                frontier::boolmap_frontier_t<t>> {
  public:
   using type_t = t;
   using pointer_t = type_t*;
   using frontier_type_t = frontier_t<type_t>;
 
   // We can use std::conditional to figure out what type to use.
-  using underlying_frontier_t = frontier::vector_frontier_t<type_t>;
+  using underlying_frontier_t =
+      std::conditional_t<underlying_st == frontier_storage_t::vector,
+                         frontier::vector_frontier_t<type_t>,
+                         frontier::boolmap_frontier_t<type_t>>;
 
   // <todo> revisit frontier constructors/destructor
   frontier_t()
@@ -76,7 +81,11 @@ class frontier_t : public frontier::vector_frontier_t<t> {
    */
   frontier_kind_t get_frontier_kind() const { return kind; }
 
-  std::size_t get_size_in_bytes() const {
+  constexpr frontier_storage_t get_frontier_storage_t() {
+    return underlying_st;
+  }
+
+  std::size_t get_size_in_bytes() {
     return this->get_number_of_elements() * sizeof(type_t);
   }
 
@@ -84,8 +93,8 @@ class frontier_t : public frontier::vector_frontier_t<t> {
    * @brief Get the number of elements within the frontier.
    * @return std::size_t
    */
-  std::size_t get_number_of_elements() const {
-    return underlying_frontier_t::get_number_of_elements();
+  std::size_t get_number_of_elements(cuda::stream_t stream = 0) {
+    return underlying_frontier_t::get_number_of_elements(stream);
   }
 
   /**
@@ -137,47 +146,14 @@ class frontier_t : public frontier::vector_frontier_t<t> {
   bool is_empty() const { return underlying_frontier_t::is_empty(); }
 
   /**
-   * @brief (vertex-like) push back a value to the frontier.
-   *
-   * @param value
-   */
-  void push_back(type_t const& value) {
-    underlying_frontier_t::push_back(value);
-  }
-
-  /**
-   * @brief Fill the entire frontier with a user-specified value.
+   * @brief Fill the entire frontier with a user-specified value. For boolmap
+   * frontier, only valid values are 1s or 0s.
    *
    * @param value
    * @param stream
    */
   void fill(type_t const value, cuda::stream_t stream = 0) {
     underlying_frontier_t::fill(value, stream);
-  }
-
-  /**
-   * @brief `sequence` resizes the frontier to *at least* `size` and fills the
-   * entire frontier with a sequence of numbers.
-   *
-   * @param initial_value The first value of the sequence.
-   * @param size Number of elements to fill the sequence up to. Also corresponds
-   * to the new size of the frontier.
-   * @param stream @see `cuda::stream_t`.
-   *
-   * @todo Maybe we should accept `standard_context_t` instead of `stream_t`.
-   */
-  void sequence(type_t const initial_value,
-                std::size_t const& size,
-                cuda::stream_t stream = 0) {
-    // Resize if needed.
-    if (this->get_capacity() < size)
-      this->reserve(size);
-
-    // Set the new number of elements.
-    this->set_number_of_elements(size);
-
-    // Fill in the sequence.
-    underlying_frontier_t::sequence(initial_value, size, stream);
   }
 
   /**
@@ -229,4 +205,49 @@ class frontier_t : public frontier::vector_frontier_t<t> {
   float resizing_factor;  // reserve size * factor.
 };                        // struct frontier_t
 
+// Maybe we use for frontier related function
+namespace frontier {
+
+/**
+ * @brief Get the element at the specified index.
+ *
+ * @tparam type_t
+ * @param idx
+ * @param ptr
+ * @return type_t
+ */
+template <frontier_storage_t underlying_st = frontier_storage_t::vector,
+          typename type_t>
+__device__ __forceinline__ type_t get_element_at(std::size_t const& idx,
+                                                 type_t* ptr) {
+  auto element = thread::load(ptr + idx);
+  if (underlying_st == frontier_storage_t::boolmap) {
+    if (element == 1)
+      return idx;
+    else
+      return gunrock::numeric_limits<type_t>::invalid();
+  } else
+    return element;
+}
+
+/**
+ * @brief Set the element at the specified index.
+ *
+ * @tparam type_t
+ * @param idx
+ * @param element
+ * @param ptr
+ * @return void
+ */
+template <frontier_storage_t underlying_st = frontier_storage_t::vector,
+          typename type_t>
+__device__ __forceinline__ void set_element_at(std::size_t const& idx,
+                                               type_t const& element,
+                                               type_t* ptr) {
+  if (underlying_st == frontier_storage_t::boolmap) {
+    thread::store(ptr + idx, 1);
+  } else
+    thread::store(ptr + idx, element);
+}
+}  // namespace frontier
 }  // namespace gunrock
