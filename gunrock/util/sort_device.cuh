@@ -419,8 +419,10 @@ cudaError_t cubSegmentedSortPairs(
 
   retval = cub::DeviceSegmentedRadixSort::
       SortPairs(temp_space.GetPointer(util::DEVICE), request_bytes,
-                keys_in, keys_out, values_in, values_out, num_items,
-                num_segments, num_items, num_segments,
+                keys_in.GetPointer(util::DEVICE), 
+                keys_out.GetPointer(util::DEVICE), 
+                values_in.GetPointer(util::DEVICE), 
+                values_out.GetPointer(util::DEVICE), num_items, num_segments,
                 seg_offsets.GetPointer(util::DEVICE),
                 seg_offsets.GetPointer(util::DEVICE) + 1, begin_bit,
                 end_bit, stream, debug_synchronous);
