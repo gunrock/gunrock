@@ -52,7 +52,7 @@ cudaError_t UseParameters(util::Parameters &parameters) {
  * @brief Run hello tests
  * @tparam     GraphT        Type of the graph
  * @tparam     ValueT        Type of the distances
- * @param[in]  parameters    Excution parameters
+ * @param[in]  parameters    Execution parameters
  * @param[in]  graph         Input graph
 ...
  * @param[in]  target        where to perform the app
