@@ -25,8 +25,14 @@ class boolmap_frontier_t {
  public:
   using pointer_t = type_t*;
 
+  // Constructors
   boolmap_frontier_t() : storage(), num_elements(0) {}
   boolmap_frontier_t(std::size_t size) : storage(size), num_elements(size) {}
+
+  // Copy Constructor
+  template <typename frontier_t_t>
+  boolmap_frontier_t(const frontier_t_t& other)
+      : storage(other.storage), num_elements(other.num_elements) {}
 
   /**
    * @brief Get the number of elements within the frontier. This is a costly

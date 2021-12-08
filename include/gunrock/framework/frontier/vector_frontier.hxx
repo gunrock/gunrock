@@ -14,6 +14,8 @@
 #include <gunrock/util/type_limits.hxx>
 #include <gunrock/container/vector.hxx>
 #include <gunrock/algorithms/sort/radix_sort.hxx>
+#include <gunrock/util/load_store.hxx>
+
 #include <thrust/sequence.h>
 
 namespace gunrock {
@@ -25,8 +27,32 @@ class vector_frontier_t {
  public:
   using pointer_t = type_t*;
 
-  vector_frontier_t() : storage(), num_elements(0) {}
-  vector_frontier_t(std::size_t size) : storage(size), num_elements(size) {}
+  // Constructors
+  vector_frontier_t() : storage(), ptr(storage.data().get()), num_elements(0) {
+    std::cout << "Empty C -- Pointer: " << ptr << std::endl;
+  }
+  vector_frontier_t(std::size_t size)
+      : storage(size),
+        // ptr(storage.data().get()),
+        num_elements(size) {
+    // std::cout << "Pointer: " << ptr << std::endl;
+  }
+
+  // Empty Destructor, this is important on kernel-exit.
+  ~vector_frontier_t() {}
+
+  // Copy Constructor
+  vector_frontier_t(const vector_frontier_t& other)
+      : storage(other.storage),
+        ptr(other.ptr),
+        num_elements(other.num_elements) {
+    printf("Copy constructor called at vector_frontier_t\n");
+  }
+
+  // Disable move and assignment.
+  vector_frontier_t& operator=(const vector_frontier_t& rhs) = delete;
+  vector_frontier_t& operator=(vector_frontier_t&&) = delete;
+  vector_frontier_t(vector_frontier_t&&) = delete;
 
   /**
    * @brief Get the number of elements within the frontier.
@@ -43,6 +69,30 @@ class vector_frontier_t {
   std::size_t get_capacity() const { return storage.capacity(); }
 
   /**
+   * @brief Get the element at the specified index.
+   *
+   * @param idx
+   * @return type_t
+   */
+  __device__ __forceinline__ type_t
+  get_element_at(std::size_t const& idx) const {
+    auto element = thread::load(ptr + idx);
+    return element;
+  }
+
+  /**
+   * @brief Set the element at the specified index.
+   *
+   * @param idx
+   * @param element
+   * @return void
+   */
+  __device__ __forceinline__ void set_element_at(std::size_t const& idx,
+                                                 type_t const& element) {
+    thread::store(ptr + idx, element);
+  }
+
+  /**
    * @brief Set how many number of elements the frontier contains. Note, this is
    * manually managed right now, we can look for better and cleaner options
    * later on as well. We require users (gunrock devs), to set the number of
@@ -55,6 +105,7 @@ class vector_frontier_t {
   }
 
   pointer_t data() { return raw_pointer_cast(storage.data()) /* .get() */; }
+  __host__ __device__ __forceinline__ pointer_t get() const { return ptr; }
   pointer_t begin() { return this->data(); }
   pointer_t end() { return this->begin() + this->get_number_of_elements(); }
   bool is_empty() const { return (this->get_number_of_elements() == 0); }
@@ -117,6 +168,9 @@ class vector_frontier_t {
       std::size_t const& size,
       type_t const default_value = gunrock::numeric_limits<type_t>::invalid()) {
     storage.resize(size, default_value);
+    if (ptr != nullptr)
+      ptr = raw_pointer_cast(storage.data());
+    std::cout << "resize Pointer: " << ptr << std::endl;
   }
 
   /**
@@ -126,7 +180,11 @@ class vector_frontier_t {
    *
    * @param size size to reserve (size is in count not bytes).
    */
-  void reserve(std::size_t const& size) { storage.reserve(size); }
+  void reserve(std::size_t const& size) {
+    storage.reserve(size);
+    ptr = raw_pointer_cast(storage.data());
+    std::cout << "reserve Pointer: " << ptr << std::endl;
+  }
 
   /**
    * @brief Parallel sort the frontier.
@@ -150,6 +208,7 @@ class vector_frontier_t {
 
  private:
   vector_t<type_t, memory_space_t::device> storage;
+  pointer_t ptr;
   std::size_t num_elements;  // number of elements in the frontier.
 };
 

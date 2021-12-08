@@ -45,7 +45,7 @@ enum frontier_kind_t {
 };                      // enum: frontier_kind_t
 
 template <typename t,
-          frontier_storage_t underlying_st = frontier_storage_t::boolmap>
+          frontier_storage_t underlying_st = frontier_storage_t::vector>
 class frontier_t
     : public std::conditional_t<underlying_st == frontier_storage_t::vector,
                                 frontier::vector_frontier_t<t>,
@@ -61,7 +61,7 @@ class frontier_t
                          frontier::vector_frontier_t<type_t>,
                          frontier::boolmap_frontier_t<type_t>>;
 
-  // <todo> revisit frontier constructors/destructor
+  // Constructors
   frontier_t()
       : underlying_frontier_t(),
         kind(frontier_kind_t::vertex_frontier),
@@ -71,8 +71,21 @@ class frontier_t
         kind(frontier_kind_t::vertex_frontier),
         resizing_factor(frontier_resizing_factor) {}
 
+  // Empty Destructor, this is important on kernel-exit.
   ~frontier_t() {}
-  // </todo>
+
+  // Copy Constructor
+  frontier_t(const frontier_t& other)
+      : underlying_frontier_t(other),
+        kind(other.kind),
+        resizing_factor(other.resizing_factor) {
+    printf("Copy constructor called at frontier_t\n");
+  }
+
+  // Disable move and assignment.
+  frontier_t& operator=(const frontier_t& rhs) = delete;
+  frontier_t& operator=(frontier_t&&) = delete;
+  frontier_t(frontier_t&&) = delete;
 
   /**
    * @brief Frontier type, either an edge based frontier or a vertex based
@@ -143,7 +156,7 @@ class frontier_t
   pointer_t data() { return underlying_frontier_t::data(); }
   pointer_t begin() { return underlying_frontier_t::begin(); }
   pointer_t end() { return underlying_frontier_t::end(); }
-  bool is_empty() const { return underlying_frontier_t::is_empty(); }
+  // bool is_empty() const { return underlying_frontier_t::is_empty(); }
 
   /**
    * @brief Fill the entire frontier with a user-specified value. For boolmap

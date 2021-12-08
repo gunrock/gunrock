@@ -131,8 +131,8 @@ set(CUDA_FLAGS
   --ptxas-options -v
   # --verbose
   --optimize 3 # Host optimize-level
-  # --debug # Host debug
-  # --device-debug # Device debug
+  --debug # Host debug
+  --device-debug # Device debug
   --generate-line-info
 )
 

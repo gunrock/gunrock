@@ -32,11 +32,11 @@ void execute(graph_t& G,
     if (underlying_t == frontier_storage_t::boolmap) {
       if (v == 0)
         return 0;
-      return (op(i) ? 1 : 0);
+      return (op(v) ? 1 : 0);
     } else {
       if (!gunrock::util::limits::is_valid(v))
         return gunrock::numeric_limits<type_t>::invalid();  // exit early
-      return (op(i) ? i : gunrock::numeric_limits<type_t>::invalid());
+      return (op(v) ? v : gunrock::numeric_limits<type_t>::invalid());
     }
   };
 

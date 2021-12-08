@@ -34,16 +34,16 @@ template <advance_direction_t direction,
           typename work_tiles_t>
 void execute(graph_t& G,
              operator_t op,
-             frontier_t* input,
+             frontier_t& input,
              frontier_t* output,
              work_tiles_t& segments,
              cuda::standard_context_t& context) {
   using type_t = typename frontier_t::type_t;
-  frontier_storage_t underlying_t = input->get_frontier_storage_t();
+  frontier_storage_t underlying_t = input.get_frontier_storage_t();
 
   if (output_type != advance_io_type_t::none ||
       underlying_t == frontier_storage_t::boolmap) {
-    auto size_of_output = compute_output_length(G, input, segments, context);
+    auto size_of_output = compute_output_length(G, &input, segments, context);
 
     // If output frontier is empty, resize and return.
     if (size_of_output <= 0) {
@@ -60,7 +60,7 @@ void execute(graph_t& G,
 
   // Get output data of the active buffer.
   auto segments_ptr = segments.data().get();
-  auto input_ptr = input->data();
+  auto input_ptr = input.data();
   auto output_ptr = output->data();
 
   /// @note Pre-Condition is causing two reads,
@@ -78,6 +78,8 @@ void execute(graph_t& G,
     auto v = (input_type == advance_io_type_t::graph)
                  ? type_t(idx)
                  : frontier::get_element_at(idx, input_ptr);
+
+    printf("%p\n", (void*)input.get());
 
     if (!gunrock::util::limits::is_valid(v))
       return gunrock::numeric_limits<type_t>::invalid();
@@ -111,7 +113,7 @@ void execute(graph_t& G,
   std::size_t end = (input_type == advance_io_type_t::graph ||
                      underlying_t == frontier_storage_t::boolmap)
                         ? G.get_number_of_vertices()
-                        : input->get_number_of_elements();
+                        : input.get_number_of_elements();
   thrust::transform(
       thrust::cuda::par.on(context.stream()),          // execution policy
       thrust::make_counting_iterator<std::size_t>(0),  // input iterator: first
@@ -123,7 +125,7 @@ void execute(graph_t& G,
 
   // reset the input frontier.
   if (underlying_t == frontier_storage_t::boolmap)
-    input->fill(0, context.stream());
+    input.fill(0, context.stream());
 }
 }  // namespace thread_mapped
 }  // namespace advance
