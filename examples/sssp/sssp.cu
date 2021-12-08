@@ -17,17 +17,24 @@ void test_sssp(int num_arguments, char** argument_array) {
   using edge_t = int;
   using weight_t = float;
 
+  using csr_t =
+      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+
   // --
   // IO
 
+  csr_t csr;
   std::string filename = argument_array[1];
 
-  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-
-  using csr_t =
-      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
-  csr_t csr;
-  csr.from_coo(mm.load(filename));
+  if (util::is_market(filename)) {
+    io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+    csr.from_coo(mm.load(filename));
+  } else if (util::is_binary_csr(filename)) {
+    csr.read_binary(filename);
+  } else {
+    std::cerr << "Unknown file format: " << filename << std::endl;
+    exit(1);
+  }
 
   // --
   // Build graph
@@ -44,15 +51,16 @@ void test_sssp(int num_arguments, char** argument_array) {
   // --
   // Params and memory allocation
   srand(time(NULL));
-  vertex_t n_vertices = G.get_number_of_vertices();
+  
+  vertex_t n_vertices    = G.get_number_of_vertices();
   vertex_t single_source = 0;  // rand() % n_vertices;
   std::cout << "Single Source = " << single_source << std::endl;
 
-  thrust::device_vector<weight_t> distances(n_vertices);
-  thrust::device_vector<vertex_t> predecessors(n_vertices);
-
   // --
   // GPU Run
+
+  thrust::device_vector<weight_t> distances(n_vertices);
+  thrust::device_vector<vertex_t> predecessors(n_vertices);
 
   float gpu_elapsed = gunrock::sssp::run(
       G, single_source, distances.data().get(), predecessors.data().get());
@@ -74,7 +82,7 @@ void test_sssp(int num_arguments, char** argument_array) {
   std::cout << "GPU distances[:40] = ";
   gunrock::print::head<weight_t>(distances, 40);
 
-  std::cout << "CPU Distances (output) = ";
+  std::cout << "CPU Distances[:40] = ";
   gunrock::print::head<weight_t>(h_distances, 40);
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;

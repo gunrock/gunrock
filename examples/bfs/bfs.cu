@@ -17,17 +17,24 @@ void test_bfs(int num_arguments, char** argument_array) {
   using edge_t = int;
   using weight_t = float;
 
+  using csr_t =
+      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+
   // --
   // IO
 
+  csr_t csr;
   std::string filename = argument_array[1];
 
-  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-
-  using csr_t =
-      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
-  csr_t csr;
-  csr.from_coo(mm.load(filename));
+  if (util::is_market(filename)) {
+    io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+    csr.from_coo(mm.load(filename));
+  } else if (util::is_binary_csr(filename)) {
+    csr.read_binary(filename);
+  } else {
+    std::cerr << "Unknown file format: " << filename << std::endl;
+    exit(1);
+  }
 
   thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
   thrust::device_vector<vertex_t> column_indices(csr.number_of_nonzeros);
@@ -78,20 +85,11 @@ void test_bfs(int num_arguments, char** argument_array) {
   // --
   // Log
 
-  std::cout << "GPU Distances (output) = ";
-  thrust::copy(distances.begin(),
-               (distances.size() < 40) ? distances.begin() + distances.size()
-                                       : distances.begin() + 40,
-               std::ostream_iterator<vertex_t>(std::cout, " "));
-  std::cout << std::endl;
+  std::cout << "GPU distances[:40] = ";
+  gunrock::print::head<weight_t>(distances, 40);
 
-  std::cout << "CPU Distances (output) = ";
-  thrust::copy(h_distances.begin(),
-               (h_distances.size() < 40)
-                   ? h_distances.begin() + h_distances.size()
-                   : h_distances.begin() + 40,
-               std::ostream_iterator<vertex_t>(std::cout, " "));
-  std::cout << std::endl;
+  std::cout << "CPU Distances[:40] = ";
+  gunrock::print::head<weight_t>(h_distances, 40);
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;

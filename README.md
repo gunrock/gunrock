@@ -3,7 +3,7 @@
 
 ## Quick Start Guide
 
-Before building Gunrock make sure you have **CUDA Toolkit 11 or higher** installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
+Before building Gunrock make sure you have **CUDA Toolkit 11 or higher**[^1] installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
 
 ```shell
 git clone https://github.com/gunrock/essentials.git
@@ -11,17 +11,19 @@ cd essentials
 mkdir build && cd build
 cmake .. 
 make sssp # or for all algorithms, use: make -j$(nproc)
-bin/sssp ../datasets/chesapeake.mtx
+bin/sssp ../datasets/chesapeake/chesapeake.mtx
 ```
-
-##### Preferred **CUDA v11.2.1** due to support for stream ordered memory allocators (e.g. `cudaFreeAsync()`).
+[^1]: Preferred **CUDA v11.2.1 or higher** due to support for stream ordered memory allocators (e.g. `cudaFreeAsync()`).
 
 ## Getting Started with Gunrock
 
-- [Gunrock's programming model]()
-- [API reference documentation]()
-- [Performance analysis]()
-- [Publications](https://gunrock.github.io/docs/#/gunrock/publications_and_presentations) and [presentations](https://gunrock.github.io/docs/#/gunrock/publications_and_presentations?id=presentations)
+- [Gunrock's Overview](https://github.com/gunrock/essentials/wiki/Overview)
+- [Gunrock's programming model](https://github.com/gunrock/essentials/wiki/Programming-Model)
+- [Gunrock's documentation](https://github.com/gunrock/essentials/wiki)
+- [Publications](https://github.com/gunrock/essentials/wiki/Publications) and [presentations](https://github.com/gunrock/essentials/wiki/Presentations)
+
+## Essentials vs. Gunrock
+Essentials is the future of Gunrock. The idea being to take the lessons learned from Gunrock to a new design, which simplfies the effort it takes to **(1)** implement graph algorithms, **(2)** add internal optimizations, **(3)** conduct future research. One example, in Gunrock SSSP is implemented in 4-5 files with 1000s of lines of code, whereas in essentials it is a single file with ~170 lines of code. Our end goal with essentials is releasing it as a `v2.0` for Gunrock.
 
 ## How to Cite Gunrock
 Thank you for citing our work.

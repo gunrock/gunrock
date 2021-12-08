@@ -53,7 +53,8 @@ struct problem_t : gunrock::problem_t<graph_t> {
   void reset() override {
     auto n_vertices = this->get_graph().get_number_of_vertices();
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
-    thrust::fill(thrust::device, d_distances + 0, d_distances + n_vertices, -1);
+    thrust::fill(thrust::device, d_distances + 0, d_distances + n_vertices,
+                 std::numeric_limits<vertex_t>::max());
     thrust::fill(thrust::device, d_distances + this->param.single_source,
                  d_distances + this->param.single_source + 1, 0);
   }
@@ -93,11 +94,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                       edge_t const& edge,        // edge
                       weight_t const& weight     // weight (tuple).
                       ) -> bool {
-      if (distances[neighbor] != -1)
+      if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
         return false;
       else
-        return (math::atomic::cas(&distances[neighbor], -1, iteration + 1) ==
-                -1);
+        return (math::atomic::cas(
+                    &distances[neighbor], std::numeric_limits<vertex_t>::max(),
+                    iteration + 1) == std::numeric_limits<vertex_t>::max());
     };
 
     auto remove_visited =

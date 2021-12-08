@@ -65,12 +65,13 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto context = this->get_single_context();
     auto policy = context->execution_policy();
 
-    auto d_distances = thrust::device_pointer_cast(this->result.distances);
+    auto single_source = this->param.single_source;
+    auto d_distances   = thrust::device_pointer_cast(this->result.distances);
     thrust::fill(policy, d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<weight_t>::max());
 
-    thrust::fill(policy, d_distances + this->param.single_source,
-                 d_distances + this->param.single_source + 1, 0);
+    thrust::fill(policy, d_distances + single_source,
+                 d_distances + single_source + 1, 0);
 
     thrust::fill(policy, visited.begin(), visited.end(),
                  -1);  // This does need to be reset in between runs though
@@ -111,7 +112,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                              edge_t const& edge,        // edge
                              weight_t const& weight     // weight (tuple).
                              ) -> bool {
-      weight_t source_distance = distances[source];  // use cached::load
+      weight_t source_distance = thread::load(&distances[source]);
       weight_t distance_to_neighbor = source_distance + weight;
 
       // Check if the destination node has been claimed as someone's child
@@ -127,7 +128,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         return false;
 
       visited[vertex] = iteration;
-      return G.get_number_of_neighbors(vertex) > 0;
+      /// @todo Confirm we do not need the following for bug
+      /// https://github.com/gunrock/essentials/issues/9 anymore.
+      // return G.get_number_of_neighbors(vertex) > 0;
+      return true;
     };
 
     // Execute advance operator on the provided lambda
@@ -137,6 +141,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // Execute filter operator on the provided lambda
     operators::filter::execute<operators::filter_algorithm_t::predicated>(
         G, E, remove_completed_paths, context);
+
+    // Execute uniquify operator to deduplicate the frontier
+    bool best_effort_uniquification = true;
+    operators::uniquify::execute<operators::uniquify_algorithm_t::unique>(
+        E, context, best_effort_uniquification);
   }
 
 };  // struct enactor_t
