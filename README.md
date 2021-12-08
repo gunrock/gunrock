@@ -18,7 +18,7 @@ bin/sssp ../datasets/chesapeake/chesapeake.mtx
 ## Getting Started with Gunrock
 
 - [Gunrock's Overview](https://github.com/gunrock/essentials/wiki/Overview)
-- [Gunrock's programming model]()
+- [Gunrock's programming model](https://github.com/gunrock/essentials/wiki/Programming-Model)
 - [Gunrock's documentation](https://github.com/gunrock/essentials/wiki)
 - [Publications](https://github.com/gunrock/essentials/wiki/Publications) and [presentations](https://github.com/gunrock/essentials/wiki/Presentations)
 
