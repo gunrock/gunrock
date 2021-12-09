@@ -5,4 +5,5 @@ add_subdirectory(src_vertex)
 add_subdirectory(coo)
 add_subdirectory(csc)
 add_subdirectory(memory)
+add_subdirectory(copy_ctor)
 # end /* Add unit tests' subdirectories */
