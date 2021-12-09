@@ -79,7 +79,8 @@ void execute(graph_t& G,
                  ? type_t(idx)
                  : frontier::get_element_at(idx, input_ptr);
 
-    printf("%p\n", (void*)input.get());
+    // This causes the illegal memory access:
+    input.blah();
 
     if (!gunrock::util::limits::is_valid(v))
       return gunrock::numeric_limits<type_t>::invalid();

@@ -18,6 +18,14 @@
 
 #include <thrust/sequence.h>
 
+__host__ __device__ void is_device() {
+#ifdef __CUDA_ARCH__
+  printf("Device Code\n");
+#else
+  printf("Host Code\n");
+#endif
+}
+
 namespace gunrock {
 namespace frontier {
 using namespace memory;
@@ -28,25 +36,27 @@ class vector_frontier_t {
   using pointer_t = type_t*;
 
   // Constructors
-  vector_frontier_t() : storage(), ptr(storage.data().get()), num_elements(0) {
-    std::cout << "Empty C -- Pointer: " << ptr << std::endl;
+  vector_frontier_t() : num_elements(0) {
+    p_storage = std::make_shared<vector_t<type_t, memory_space_t::device>>(
+        vector_t<type_t, memory_space_t::device>(1));
   }
-  vector_frontier_t(std::size_t size)
-      : storage(size),
-        // ptr(storage.data().get()),
-        num_elements(size) {
-    // std::cout << "Pointer: " << ptr << std::endl;
+  vector_frontier_t(std::size_t size) : num_elements(size) {
+    p_storage = std::make_shared<vector_t<type_t, memory_space_t::device>>(
+        vector_t<type_t, memory_space_t::device>(size));
+    raw_ptr = nullptr;
   }
 
   // Empty Destructor, this is important on kernel-exit.
   ~vector_frontier_t() {}
 
   // Copy Constructor
-  vector_frontier_t(const vector_frontier_t& other)
-      : storage(other.storage),
-        ptr(other.ptr),
-        num_elements(other.num_elements) {
+  vector_frontier_t(const vector_frontier_t& rhs) {
+    p_storage = rhs.p_storage;
+    raw_ptr = rhs.p_storage.get()->data().get();
+    num_elements = rhs.num_elements;
+
     printf("Copy constructor called at vector_frontier_t\n");
+    printf("%p\n", (void*)raw_ptr);
   }
 
   // Disable move and assignment.
@@ -66,7 +76,7 @@ class vector_frontier_t {
    * @brief Get the capacity (number of elements possible).
    * @return std::size_t
    */
-  std::size_t get_capacity() const { return storage.capacity(); }
+  std::size_t get_capacity() const { return p_storage.get()->capacity(); }
 
   /**
    * @brief Get the element at the specified index.
@@ -76,9 +86,11 @@ class vector_frontier_t {
    */
   __device__ __forceinline__ type_t
   get_element_at(std::size_t const& idx) const {
-    auto element = thread::load(ptr + idx);
+    auto element = thread::load(this->get() + idx);
     return element;
   }
+
+  __device__ __forceinline__ void blah() const { printf("blah"); }
 
   /**
    * @brief Set the element at the specified index.
@@ -89,7 +101,7 @@ class vector_frontier_t {
    */
   __device__ __forceinline__ void set_element_at(std::size_t const& idx,
                                                  type_t const& element) {
-    thread::store(ptr + idx, element);
+    thread::store(this->get() + idx, element);
   }
 
   /**
@@ -104,8 +116,9 @@ class vector_frontier_t {
     num_elements = elements;
   }
 
-  pointer_t data() { return raw_pointer_cast(storage.data()) /* .get() */; }
-  __host__ __device__ __forceinline__ pointer_t get() const { return ptr; }
+  __host__ __device__ __forceinline__ pointer_t get() const { return raw_ptr; }
+
+  pointer_t data() { return raw_pointer_cast(p_storage.get()->data()); }
   pointer_t begin() { return this->data(); }
   pointer_t end() { return this->begin() + this->get_number_of_elements(); }
   bool is_empty() const { return (this->get_number_of_elements() == 0); }
@@ -116,7 +129,7 @@ class vector_frontier_t {
    * @param value
    */
   void push_back(type_t const& value) {
-    storage.push_back(value);
+    p_storage.get()->push_back(value);
     num_elements++;
   }
 
@@ -167,10 +180,7 @@ class vector_frontier_t {
   void resize(
       std::size_t const& size,
       type_t const default_value = gunrock::numeric_limits<type_t>::invalid()) {
-    storage.resize(size, default_value);
-    if (ptr != nullptr)
-      ptr = raw_pointer_cast(storage.data());
-    std::cout << "resize Pointer: " << ptr << std::endl;
+    p_storage.get()->resize(size, default_value);
   }
 
   /**
@@ -180,11 +190,7 @@ class vector_frontier_t {
    *
    * @param size size to reserve (size is in count not bytes).
    */
-  void reserve(std::size_t const& size) {
-    storage.reserve(size);
-    ptr = raw_pointer_cast(storage.data());
-    std::cout << "reserve Pointer: " << ptr << std::endl;
-  }
+  void reserve(std::size_t const& size) { p_storage.get()->reserve(size); }
 
   /**
    * @brief Parallel sort the frontier.
@@ -194,21 +200,21 @@ class vector_frontier_t {
    */
   void sort(sort::order_t order = sort::order_t::ascending,
             cuda::stream_t stream = 0) {
-    sort::radix::sort_keys(storage.data().get(), this->get_number_of_elements(),
-                           order, stream);
+    sort::radix::sort_keys(p_storage.get()->data().get(),
+                           this->get_number_of_elements(), order, stream);
   }
 
   void print() {
     std::cout << "Frontier = ";
-    thrust::copy(storage.begin(),
-                 storage.begin() + this->get_number_of_elements(),
+    thrust::copy(p_storage.get()->begin(),
+                 p_storage.get()->begin() + this->get_number_of_elements(),
                  std::ostream_iterator<type_t>(std::cout, " "));
     std::cout << std::endl;
   }
 
  private:
-  vector_t<type_t, memory_space_t::device> storage;
-  pointer_t ptr;
+  std::shared_ptr<vector_t<type_t, memory_space_t::device>> p_storage;
+  pointer_t raw_ptr;
   std::size_t num_elements;  // number of elements in the frontier.
 };
 

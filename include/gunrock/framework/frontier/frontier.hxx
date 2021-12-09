@@ -75,10 +75,10 @@ class frontier_t
   ~frontier_t() {}
 
   // Copy Constructor
-  frontier_t(const frontier_t& other)
-      : underlying_frontier_t(other),
-        kind(other.kind),
-        resizing_factor(other.resizing_factor) {
+  frontier_t(const frontier_t& rhs)
+      : underlying_frontier_t(rhs),
+        kind(rhs.kind),
+        resizing_factor(rhs.resizing_factor) {
     printf("Copy constructor called at frontier_t\n");
   }
 
