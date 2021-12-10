@@ -78,9 +78,7 @@ class frontier_t
   frontier_t(const frontier_t& rhs)
       : underlying_frontier_t(rhs),
         kind(rhs.kind),
-        resizing_factor(rhs.resizing_factor) {
-    printf("Copy constructor called at frontier_t\n");
-  }
+        resizing_factor(rhs.resizing_factor) {}
 
   // Disable move and assignment.
   frontier_t& operator=(const frontier_t& rhs) = delete;
@@ -94,7 +92,7 @@ class frontier_t
    */
   frontier_kind_t get_frontier_kind() const { return kind; }
 
-  constexpr frontier_storage_t get_frontier_storage_t() {
+  constexpr frontier_storage_t get_frontier_storage_t() const {
     return underlying_st;
   }
 

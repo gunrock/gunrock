@@ -165,8 +165,8 @@ struct enactor_t {
         properties(_properties),
         context(_context),
         frontiers(properties.number_of_frontier_buffers),
-        active_frontier(&frontiers[0]),
-        inactive_frontier(&frontiers[1]),
+        active_frontier(reinterpret_cast<frontier_type*>(&frontiers[0])),
+        inactive_frontier(reinterpret_cast<frontier_type*>(&frontiers[1])),
         buffer_selector(0),
         iteration(0),
         scanned_work_domain(problem->get_graph().get_number_of_vertices()) {
@@ -196,28 +196,24 @@ struct enactor_t {
    * @brief Get the problem pointer object
    * @return algorithm_problem_t*
    */
-  algorithm_problem_t* get_problem() { return problem; }
+  algorithm_problem_t* get_problem() {
+    return reinterpret_cast<algorithm_problem_t*>(problem);
+  }
 
   /**
    * @brief Get the frontier pointer object
    * @return frontier_type*
    */
-  frontier_type* get_input_frontier() { return active_frontier; }
+  frontier_type* get_input_frontier() {
+    return reinterpret_cast<frontier_type*>(active_frontier);
+  }
 
   /**
    * @brief Get the frontier pointer object
    * @return frontier_type*
    */
-  frontier_type* get_output_frontier() { return inactive_frontier; }
-
-  /**
-   * @brief Swap the inactive and active frontier buffers such that the inactive
-   * buffer becomes the input buffer to the next operator and vice-versa.
-   */
-  void swap_frontier_buffers() {
-    buffer_selector ^= 1;
-    active_frontier = &frontiers[buffer_selector];
-    inactive_frontier = &frontiers[buffer_selector ^ 1];
+  frontier_type* get_output_frontier() {
+    return reinterpret_cast<frontier_type*>(inactive_frontier);
   }
 
   /**
@@ -225,6 +221,18 @@ struct enactor_t {
    * @return enactor_t*
    */
   enactor_t* get_enactor() { return this; }
+
+  /**
+   * @brief Swap the inactive and active frontier buffers such that the inactive
+   * buffer becomes the input buffer to the next operator and vice-versa.
+   */
+  void swap_frontier_buffers() {
+    buffer_selector ^= 1;
+    active_frontier =
+        reinterpret_cast<frontier_type*>(&frontiers[buffer_selector]);
+    inactive_frontier =
+        reinterpret_cast<frontier_type*>(&frontiers[buffer_selector ^ 1]);
+  }
 
   /**
    * @brief Run the enactor with the given problem and the loop.

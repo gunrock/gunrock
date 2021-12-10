@@ -13,17 +13,24 @@
 
 #include <gunrock/util/math.hxx>
 #include <gunrock/cuda/context.hxx>
+#include <gunrock/cuda/launch_box.hxx>
+#include <gunrock/cuda/global.hxx>
 
 #include <gunrock/framework/operators/configs.hxx>
 #include <gunrock/framework/operators/for/for.hxx>
-
-#include <thrust/transform_scan.h>
-#include <thrust/iterator/discard_iterator.h>
 
 namespace gunrock {
 namespace operators {
 namespace advance {
 namespace thread_mapped {
+
+template <typename lambda_t>
+void __global__ thread_mapped_kernel(lambda_t neighbors_expand,
+                                     std::size_t num_elements) {
+  auto idx = cuda::thread::global::id::x();
+  if (idx < num_elements)
+    neighbors_expand(idx);
+}
 
 template <advance_direction_t direction,
           advance_io_type_t input_type,
@@ -35,7 +42,7 @@ template <advance_direction_t direction,
 void execute(graph_t& G,
              operator_t op,
              frontier_t& input,
-             frontier_t* output,
+             frontier_t& output,
              work_tiles_t& segments,
              cuda::standard_context_t& context) {
   using type_t = typename frontier_t::type_t;
@@ -47,43 +54,27 @@ void execute(graph_t& G,
 
     // If output frontier is empty, resize and return.
     if (size_of_output <= 0) {
-      output->set_number_of_elements(0);
+      output.set_number_of_elements(0);
       return;
     }
 
     /// Resize the output (inactive) buffer to the new size.
     /// @todo Can be hidden within the frontier struct.
-    if (output->get_capacity() < size_of_output)
-      output->reserve(size_of_output);
-    output->set_number_of_elements(size_of_output);
+    if (output.get_capacity() < size_of_output)
+      output.reserve(size_of_output);
+    output.set_number_of_elements(size_of_output);
   }
 
   // Get output data of the active buffer.
   auto segments_ptr = segments.data().get();
-  auto input_ptr = input.data();
-  auto output_ptr = output->data();
-
-  /// @note Pre-Condition is causing two reads,
-  /// when only one is required.
-
-  // auto pre_condition = [=] __device__(std::size_t const& idx) {
-  //   auto v = (input_type == advance_io_type_t::graph)
-  //                ? type_t(idx)
-  //                : frontier::get_element_at(idx, input_ptr);
-
-  //   return gunrock::util::limits::is_valid(v);
-  // };
 
   auto neighbors_expand = [=] __device__(std::size_t const& idx) {
     auto v = (input_type == advance_io_type_t::graph)
                  ? type_t(idx)
-                 : frontier::get_element_at(idx, input_ptr);
-
-    // This causes the illegal memory access:
-    input.blah();
+                 : input.get_element_at(idx);
 
     if (!gunrock::util::limits::is_valid(v))
-      return gunrock::numeric_limits<type_t>::invalid();
+      return;
 
     auto starting_edge = G.get_starting_edge(v);
     auto total_edges = G.get_number_of_neighbors(v);
@@ -97,32 +88,34 @@ void execute(graph_t& G,
 
       if constexpr (output_type != advance_io_type_t::none) {
         std::size_t out_idx = segments_ptr[idx] + i;
-        cond = (cond && n != v);
-        type_t element = cond ? n : gunrock::numeric_limits<type_t>::invalid();
-        if (underlying_t == frontier_storage_t::boolmap) {
-          if (cond)
-            frontier::set_element_at<frontier_storage_t::boolmap>(
-                (std::size_t)n, element, output_ptr);
-        } else
-          frontier::set_element_at(out_idx, element, output_ptr);
+        type_t element =
+            (cond && n != v) ? n : gunrock::numeric_limits<type_t>::invalid();
+        output.set_element_at(out_idx, element);
       }
     }
-
-    return gunrock::numeric_limits<type_t>::invalid();
   };
 
-  std::size_t end = (input_type == advance_io_type_t::graph ||
-                     underlying_t == frontier_storage_t::boolmap)
-                        ? G.get_number_of_vertices()
-                        : input.get_number_of_elements();
-  thrust::transform(
-      thrust::cuda::par.on(context.stream()),          // execution policy
-      thrust::make_counting_iterator<std::size_t>(0),  // input iterator: first
-      thrust::make_counting_iterator<std::size_t>(end),  // input iterator: last
-      thrust::make_discard_iterator(),  // output iterator: ignore
-      neighbors_expand                  // unary operation
-      // pre_condition                     // predicate operation
-  );
+  std::size_t num_elements = (input_type == advance_io_type_t::graph ||
+                              underlying_t == frontier_storage_t::boolmap)
+                                 ? G.get_number_of_vertices()
+                                 : input.get_number_of_elements();
+
+  using namespace gunrock::cuda::launch_box;
+  using launch_t = launch_box_t<launch_params_t<fallback, dim3_t<128>>>;
+
+  dim3 grid_dimensions =
+      dim3((num_elements + launch_t::block_dimensions::x - 1) /
+               launch_t::block_dimensions::x,
+           1, 1);
+
+  // Launch blocked-mapped advance kernel.
+  thread_mapped_kernel<<<grid_dimensions,  // grid dimensions
+                         launch_t::block_dimensions::get_dim3(),  // block
+                                                                  // dimensions
+                         launch_t::shared_memory_bytes,  // shared memory
+                         context.stream()                // context
+                         >>>(neighbors_expand, num_elements);
+  context.synchronize();
 
   // reset the input frontier.
   if (underlying_t == frontier_storage_t::boolmap)

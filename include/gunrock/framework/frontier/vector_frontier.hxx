@@ -18,14 +18,6 @@
 
 #include <thrust/sequence.h>
 
-__host__ __device__ void is_device() {
-#ifdef __CUDA_ARCH__
-  printf("Device Code\n");
-#else
-  printf("Host Code\n");
-#endif
-}
-
 namespace gunrock {
 namespace frontier {
 using namespace memory;
@@ -54,9 +46,6 @@ class vector_frontier_t {
     p_storage = rhs.p_storage;
     raw_ptr = rhs.p_storage.get()->data().get();
     num_elements = rhs.num_elements;
-
-    printf("Copy constructor called at vector_frontier_t\n");
-    printf("%p\n", (void*)raw_ptr);
   }
 
   // Disable move and assignment.
@@ -84,13 +73,15 @@ class vector_frontier_t {
    * @param idx
    * @return type_t
    */
-  __device__ __forceinline__ type_t
-  get_element_at(std::size_t const& idx) const {
-    auto element = thread::load(this->get() + idx);
-    return element;
+  __device__ __forceinline__ constexpr const type_t get_element_at(
+      std::size_t const& idx) const noexcept {
+    return thread::load(this->get() + idx);
   }
 
-  __device__ __forceinline__ void blah() const { printf("blah"); }
+  __device__ __forceinline__ constexpr type_t get_element_at(
+      std::size_t const& idx) noexcept {
+    return thread::load(this->get() + idx);
+  }
 
   /**
    * @brief Set the element at the specified index.
@@ -99,8 +90,9 @@ class vector_frontier_t {
    * @param element
    * @return void
    */
-  __device__ __forceinline__ void set_element_at(std::size_t const& idx,
-                                                 type_t const& element) {
+  __device__ __forceinline__ constexpr void set_element_at(
+      std::size_t const& idx,
+      type_t const& element) const noexcept {  // XXX: This should not be const
     thread::store(this->get() + idx, element);
   }
 
@@ -116,7 +108,12 @@ class vector_frontier_t {
     num_elements = elements;
   }
 
-  __host__ __device__ __forceinline__ pointer_t get() const { return raw_ptr; }
+  /**
+   * @brief Access to internal raw pointer, works on host and device.
+   */
+  __host__ __device__ __forceinline__ constexpr pointer_t get() const {
+    return raw_ptr;
+  }
 
   pointer_t data() { return raw_pointer_cast(p_storage.get()->data()); }
   pointer_t begin() { return this->data(); }

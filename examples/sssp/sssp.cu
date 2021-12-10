@@ -63,7 +63,7 @@ void test_sssp(int num_arguments, char** argument_array) {
   thrust::device_vector<vertex_t> predecessors(n_vertices);
 
   float gpu_elapsed = 0.0f;
-  int num_runs = 1;
+  int num_runs = 5;
 
   for (auto i = 0; i < num_runs; i++)
     gpu_elapsed += gunrock::sssp::run(G, single_source, distances.data().get(),

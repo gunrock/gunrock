@@ -108,7 +108,7 @@ void execute(graph_t& G,
           G, op, input, output, segments, *context0);
     } else if (lb == load_balance_t::thread_mapped) {
       thread_mapped::execute<direction, input_type, output_type>(
-          G, op, *input, output, segments, *context0);
+          G, op, *input, *output, segments, *context0);
     } else if (lb == load_balance_t::block_mapped) {
       block_mapped::execute<direction, input_type, output_type>(
           G, op, input, output, segments, *context0);

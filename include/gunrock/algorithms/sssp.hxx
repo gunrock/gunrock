@@ -142,8 +142,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     operators::filter::execute<operators::filter_algorithm_t::bypass>(
         G, E, remove_completed_paths, context);
 
-    // /// @brief Execute uniquify operator to deduplicate the frontier
-    // /// @note Not required.
+    /// @brief Execute uniquify operator to deduplicate the frontier
+    /// @note Not required.
     // // bool best_effort_uniquification = true;
     // // operators::uniquify::execute<operators::uniquify_algorithm_t::unique>(
     // // E, context, best_effort_uniquification);

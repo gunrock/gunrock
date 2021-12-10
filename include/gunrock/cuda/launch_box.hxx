@@ -92,7 +92,7 @@ constexpr sm_flag_t operator&(sm_flag_t lhs, sm_flag_t rhs) {
  */
 template <sm_flag_t sm_flags_,
           typename block_dimensions_,
-          typename grid_dimensions_,
+          typename grid_dimensions_ = dim3_t<0, 0, 0>,
           size_t shared_memory_bytes_ = 0>
 struct launch_params_t {
   typedef block_dimensions_ block_dimensions;
