@@ -1,10 +1,9 @@
-# This is a basic workflow to help you get started with Actions
-
+# Gunrock/Essentials Ubuntu Workflow
 name: Ubuntu
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the master branch
+  # Triggers the workflow on push or pull request events but only for the master and dev branch
   push:
     branches: [ master, dev ]
   pull_request:
@@ -22,8 +21,9 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: Jimver/cuda-toolkit@v0.2.5
+      # Fetch CUDA toolkit using Jimver/cuda-toolkit@v0.2.5
+      - name: Fetch CUDA toolkit
+        uses: Jimver/cuda-toolkit@v0.2.5
         id: cuda-toolkit
         with:
           cuda: '11.5.1'
@@ -41,13 +41,10 @@ jobs:
         # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
         run: cmake -B ${{github.workspace}}/build -D ESSENTIALS_BUILD_TESTS=ON #-DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} 
         
-      - name: Build
+      - name: Build all applications
         # Build your program with the given configuration
         run: cmake  --build ${{github.workspace}}/build
-        # TODO: Use the following once we have BUILD_TYPE set-up.
-        # run: cmake -DESSENTIALS_BUILD_TESTS=ON --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
         
-      - name: Run make
-        working-directory: ${{github.workspace}}/build
-        run: make sssp # Test with only sssp
+        # TODO: Use the following once we have BUILD_TYPE and envrionment variables set-up:
+        # run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
       
