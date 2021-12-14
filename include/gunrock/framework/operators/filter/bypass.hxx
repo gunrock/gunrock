@@ -28,16 +28,10 @@ void execute(graph_t& G,
 
   // Mark items as invalid instead of removing them (therefore, a "bypass").
   auto bypass = [=] __device__(std::size_t const& idx) {
-    auto v = frontier::get_element_at(idx, input_ptr);
-    if (underlying_t == frontier_storage_t::boolmap) {
-      if (v == 0)
-        return 0;
-      return (op(v) ? 1 : 0);
-    } else {
-      if (!gunrock::util::limits::is_valid(v))
-        return gunrock::numeric_limits<type_t>::invalid();  // exit early
-      return (op(v) ? v : gunrock::numeric_limits<type_t>::invalid());
-    }
+    auto v = input_ptr[idx];
+    if (!gunrock::util::limits::is_valid(v))
+      return gunrock::numeric_limits<type_t>::invalid();  // exit early
+    return (op(v) ? v : gunrock::numeric_limits<type_t>::invalid());
   };
 
   std::size_t end = (underlying_t == frontier_storage_t::boolmap)

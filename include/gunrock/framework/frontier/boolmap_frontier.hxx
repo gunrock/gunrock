@@ -26,13 +26,25 @@ class boolmap_frontier_t {
   using pointer_t = type_t*;
 
   // Constructors
-  boolmap_frontier_t() : storage(), num_elements(0) {}
-  boolmap_frontier_t(std::size_t size) : storage(size), num_elements(size) {}
+  boolmap_frontier_t() : num_elements(0) {
+    p_storage = std::make_shared<vector_t<type_t, memory_space_t::device>>(
+        vector_t<type_t, memory_space_t::device>(1));
+  }
+  boolmap_frontier_t(std::size_t size) : num_elements(size) {
+    p_storage = std::make_shared<vector_t<type_t, memory_space_t::device>>(
+        vector_t<type_t, memory_space_t::device>(size));
+    raw_ptr = nullptr;
+  }
+
+  // Empty Destructor, this is important on kernel-exit.
+  ~boolmap_frontier_t() {}
 
   // Copy Constructor
-  template <typename frontier_t_t>
-  boolmap_frontier_t(const frontier_t_t& other)
-      : storage(other.storage), num_elements(other.num_elements) {}
+  boolmap_frontier_t(const boolmap_frontier_t& rhs) {
+    p_storage = rhs.p_storage;
+    raw_ptr = rhs.p_storage.get()->data().get();
+    num_elements = rhs.num_elements;
+  }
 
   /**
    * @brief Get the number of elements within the frontier. This is a costly
@@ -50,7 +62,39 @@ class boolmap_frontier_t {
    * @brief Get the capacity (number of elements possible).
    * @return std::size_t
    */
-  std::size_t get_capacity() const { return storage.capacity(); }
+  std::size_t get_capacity() const { return p_storage.get()->capacity(); }
+
+  /**
+   * @brief Get the element at the specified index.
+   *
+   * @param idx
+   * @return type_t
+   */
+  __device__ __forceinline__ constexpr const type_t get_element_at(
+      std::size_t const& idx) const noexcept {
+    return this->get()[idx] == 1 ? idx
+                                 : gunrock::numeric_limits<type_t>::invalid();
+  }
+
+  __device__ __forceinline__ constexpr type_t get_element_at(
+      std::size_t const& idx) noexcept {
+    return this->get()[idx] == 1 ? idx
+                                 : gunrock::numeric_limits<type_t>::invalid();
+  }
+
+  /**
+   * @brief Set the element at the specified index.
+   *
+   * @param idx
+   * @param element
+   * @return void
+   */
+  __device__ __forceinline__ constexpr void set_element_at(
+      type_t const& element,
+      std::size_t const& idx = 0  // Ignore idx for boolmap.
+  ) const noexcept {              // XXX: This should not be const
+    thread::store(this->get() + element, 1);
+  }
 
   /**
    * @brief Set how many number of elements the frontier contains. Note, this is
@@ -64,7 +108,14 @@ class boolmap_frontier_t {
     num_elements = elements;
   }
 
-  pointer_t data() { return raw_pointer_cast(storage.data()) /* .get() */; }
+  /**
+   * @brief Access to internal raw pointer, works on host and device.
+   */
+  __host__ __device__ __forceinline__ constexpr pointer_t get() const {
+    return raw_ptr;
+  }
+
+  pointer_t data() { return raw_pointer_cast(p_storage.get()->data()); }
   pointer_t begin() { return this->data(); }
   pointer_t end() { return this->begin() + this->get_number_of_elements(); }
 
@@ -104,7 +155,7 @@ class boolmap_frontier_t {
    * @param default_value is 0 (meaning vertex is not active).
    */
   void resize(std::size_t const& size, type_t const default_value = 0) {
-    storage.resize(size, default_value);
+    p_storage.get()->resize(size, default_value);
   }
 
   /**
@@ -116,7 +167,7 @@ class boolmap_frontier_t {
    *
    * @param size size to reserve (size is in count not bytes).
    */
-  void reserve(std::size_t const& size) { storage.reserve(size); }
+  void reserve(std::size_t const& size) { p_storage.get()->reserve(size); }
 
   /**
    * @brief Parallel sort the frontier.
@@ -131,14 +182,15 @@ class boolmap_frontier_t {
 
   void print() {
     std::cout << "Frontier = ";
-    thrust::copy(storage.begin(),
-                 storage.begin() + this->get_number_of_elements(),
+    thrust::copy(p_storage.get()->begin(),
+                 p_storage.get()->begin() + this->get_number_of_elements(),
                  std::ostream_iterator<type_t>(std::cout, " "));
     std::cout << std::endl;
   }
 
  private:
-  vector_t<int, memory_space_t::device> storage;
+  std::shared_ptr<vector_t<type_t, memory_space_t::device>> p_storage;
+  pointer_t raw_ptr;
   std::size_t num_elements;  // number of elements in the frontier.
 };
 

@@ -217,48 +217,6 @@ class frontier_t
 };                        // struct frontier_t
 
 // Maybe we use for frontier related function
-namespace frontier {
+namespace frontier {}  // namespace frontier
 
-/**
- * @brief Get the element at the specified index.
- *
- * @tparam type_t
- * @param idx
- * @param ptr
- * @return type_t
- */
-template <frontier_storage_t underlying_st = frontier_storage_t::vector,
-          typename type_t>
-__device__ __forceinline__ type_t get_element_at(std::size_t const& idx,
-                                                 type_t* ptr) {
-  auto element = thread::load(ptr + idx);
-  if (underlying_st == frontier_storage_t::boolmap) {
-    if (element == 1)
-      return idx;
-    else
-      return gunrock::numeric_limits<type_t>::invalid();
-  } else
-    return element;
-}
-
-/**
- * @brief Set the element at the specified index.
- *
- * @tparam type_t
- * @param idx
- * @param element
- * @param ptr
- * @return void
- */
-template <frontier_storage_t underlying_st = frontier_storage_t::vector,
-          typename type_t>
-__device__ __forceinline__ void set_element_at(std::size_t const& idx,
-                                               type_t const& element,
-                                               type_t* ptr) {
-  if (underlying_st == frontier_storage_t::boolmap) {
-    thread::store(ptr + idx, 1);
-  } else
-    thread::store(ptr + idx, element);
-}
-}  // namespace frontier
 }  // namespace gunrock

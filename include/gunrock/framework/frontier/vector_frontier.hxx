@@ -91,8 +91,8 @@ class vector_frontier_t {
    * @return void
    */
   __device__ __forceinline__ constexpr void set_element_at(
-      std::size_t const& idx,
-      type_t const& element) const noexcept {  // XXX: This should not be const
+      type_t const& element,
+      std::size_t const& idx) const noexcept {  // XXX: This should not be const
     thread::store(this->get() + idx, element);
   }
 

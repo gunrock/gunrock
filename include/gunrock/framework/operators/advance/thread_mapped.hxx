@@ -90,7 +90,7 @@ void execute(graph_t& G,
         std::size_t out_idx = segments_ptr[idx] + i;
         type_t element =
             (cond && n != v) ? n : gunrock::numeric_limits<type_t>::invalid();
-        output.set_element_at(out_idx, element);
+        output.set_element_at(element, out_idx);
       }
     }
   };
