@@ -72,6 +72,8 @@ get_target_property(ESSENTIALS_ARCHITECTURES
 target_compile_definitions(essentials
   INTERFACE 
     SM_TARGET=${ESSENTIALS_ARCHITECTURES}
+    # For some reason, Thrust/CUB version mismatch on windows.
+    $<$<PLATFORM_ID:Windows>:THRUST_IGNORE_CUB_VERSION_CHECK=1>
 )
 
 ####################################################
