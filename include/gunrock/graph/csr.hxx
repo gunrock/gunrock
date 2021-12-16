@@ -41,9 +41,11 @@ class graph_csr_t {
   // We do not want to let user copy only a slice.
   // Explanation:
   // https://www.geeksforgeeks.org/preventing-object-copy-in-cpp-3-different-ways/
-  // graph_csr_t(const graph_csr_t& rhs) = delete;               // Copy
-  // constructor graph_csr_t& operator=(const graph_csr_t& rhs) = delete;    //
+
+  // Copy constructor
+  // graph_csr_t(const graph_csr_t& rhs) = delete;
   // Copy assignment
+  // graph_csr_t& operator=(const graph_csr_t& rhs) = delete;
 
   // Override pure virtual functions
   // Must use [override] keyword to identify functions that are

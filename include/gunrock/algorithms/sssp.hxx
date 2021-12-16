@@ -66,7 +66,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto policy = context->execution_policy();
 
     auto single_source = this->param.single_source;
-    auto d_distances   = thrust::device_pointer_cast(this->result.distances);
+    auto d_distances = thrust::device_pointer_cast(this->result.distances);
     thrust::fill(policy, d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<weight_t>::max());
 
@@ -80,9 +80,9 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
-  // Use Base class constructor -- does this work? does it handle copy
-  // constructor?
-  using gunrock::enactor_t<problem_t>::enactor_t;
+  enactor_t(problem_t* _problem,
+            std::shared_ptr<cuda::multi_context_t> _context)
+      : gunrock::enactor_t<problem_t>(_problem, _context) {}
 
   using vertex_t = typename problem_t::vertex_t;
   using edge_t = typename problem_t::edge_t;
@@ -135,17 +135,18 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator on the provided lambda
-    operators::advance::execute<operators::load_balance_t::block_mapped>(
+    operators::advance::execute<operators::load_balance_t::thread_mapped>(
         G, E, shortest_path, context);
 
     // Execute filter operator on the provided lambda
-    operators::filter::execute<operators::filter_algorithm_t::predicated>(
+    operators::filter::execute<operators::filter_algorithm_t::bypass>(
         G, E, remove_completed_paths, context);
 
-    // Execute uniquify operator to deduplicate the frontier
-    bool best_effort_uniquification = true;
-    operators::uniquify::execute<operators::uniquify_algorithm_t::unique>(
-        E, context, best_effort_uniquification);
+    /// @brief Execute uniquify operator to deduplicate the frontier
+    /// @note Not required.
+    // // bool best_effort_uniquification = true;
+    // // operators::uniquify::execute<operators::uniquify_algorithm_t::unique>(
+    // // E, context, best_effort_uniquification);
   }
 
 };  // struct enactor_t

@@ -18,6 +18,8 @@
 #pragma once
 
 #include <gunrock/framework/frontier/vector_frontier.hxx>
+#include <gunrock/framework/frontier/boolmap_frontier.hxx>
+
 #include <gunrock/util/type_limits.hxx>
 
 #include <gunrock/graph/graph.hxx>
@@ -26,9 +28,6 @@
 namespace gunrock {
 
 using namespace memory;
-
-// Maybe we use for frontier related function
-namespace frontier {}  // namespace frontier
 
 /**
  * @brief Underlying frontier data structure.
@@ -47,16 +46,22 @@ enum frontier_kind_t {
 
 template <typename t,
           frontier_storage_t underlying_st = frontier_storage_t::vector>
-class frontier_t : public frontier::vector_frontier_t<t> {
+class frontier_t
+    : public std::conditional_t<underlying_st == frontier_storage_t::vector,
+                                frontier::vector_frontier_t<t>,
+                                frontier::boolmap_frontier_t<t>> {
  public:
   using type_t = t;
   using pointer_t = type_t*;
   using frontier_type_t = frontier_t<type_t>;
 
   // We can use std::conditional to figure out what type to use.
-  using underlying_frontier_t = frontier::vector_frontier_t<type_t>;
+  using underlying_frontier_t =
+      std::conditional_t<underlying_st == frontier_storage_t::vector,
+                         frontier::vector_frontier_t<type_t>,
+                         frontier::boolmap_frontier_t<type_t>>;
 
-  // <todo> revisit frontier constructors/destructor
+  // Constructors
   frontier_t()
       : underlying_frontier_t(),
         kind(frontier_kind_t::vertex_frontier),
@@ -66,8 +71,19 @@ class frontier_t : public frontier::vector_frontier_t<t> {
         kind(frontier_kind_t::vertex_frontier),
         resizing_factor(frontier_resizing_factor) {}
 
+  // Empty Destructor, this is important on kernel-exit.
   ~frontier_t() {}
-  // </todo>
+
+  // Copy Constructor
+  frontier_t(const frontier_t& rhs)
+      : underlying_frontier_t(rhs),
+        kind(rhs.kind),
+        resizing_factor(rhs.resizing_factor) {}
+
+  // Disable move and assignment.
+  frontier_t& operator=(const frontier_t& rhs) = delete;
+  frontier_t& operator=(frontier_t&&) = delete;
+  frontier_t(frontier_t&&) = delete;
 
   /**
    * @brief Frontier type, either an edge based frontier or a vertex based
@@ -76,7 +92,11 @@ class frontier_t : public frontier::vector_frontier_t<t> {
    */
   frontier_kind_t get_frontier_kind() const { return kind; }
 
-  std::size_t get_size_in_bytes() const {
+  constexpr frontier_storage_t get_frontier_storage_t() const {
+    return underlying_st;
+  }
+
+  std::size_t get_size_in_bytes() {
     return this->get_number_of_elements() * sizeof(type_t);
   }
 
@@ -84,8 +104,8 @@ class frontier_t : public frontier::vector_frontier_t<t> {
    * @brief Get the number of elements within the frontier.
    * @return std::size_t
    */
-  std::size_t get_number_of_elements() const {
-    return underlying_frontier_t::get_number_of_elements();
+  std::size_t get_number_of_elements(cuda::stream_t stream = 0) {
+    return underlying_frontier_t::get_number_of_elements(stream);
   }
 
   /**
@@ -134,50 +154,17 @@ class frontier_t : public frontier::vector_frontier_t<t> {
   pointer_t data() { return underlying_frontier_t::data(); }
   pointer_t begin() { return underlying_frontier_t::begin(); }
   pointer_t end() { return underlying_frontier_t::end(); }
-  bool is_empty() const { return underlying_frontier_t::is_empty(); }
+  // bool is_empty() const { return underlying_frontier_t::is_empty(); }
 
   /**
-   * @brief (vertex-like) push back a value to the frontier.
-   *
-   * @param value
-   */
-  void push_back(type_t const& value) {
-    underlying_frontier_t::push_back(value);
-  }
-
-  /**
-   * @brief Fill the entire frontier with a user-specified value.
+   * @brief Fill the entire frontier with a user-specified value. For boolmap
+   * frontier, only valid values are 1s or 0s.
    *
    * @param value
    * @param stream
    */
   void fill(type_t const value, cuda::stream_t stream = 0) {
     underlying_frontier_t::fill(value, stream);
-  }
-
-  /**
-   * @brief `sequence` resizes the frontier to *at least* `size` and fills the
-   * entire frontier with a sequence of numbers.
-   *
-   * @param initial_value The first value of the sequence.
-   * @param size Number of elements to fill the sequence up to. Also corresponds
-   * to the new size of the frontier.
-   * @param stream @see `cuda::stream_t`.
-   *
-   * @todo Maybe we should accept `standard_context_t` instead of `stream_t`.
-   */
-  void sequence(type_t const initial_value,
-                std::size_t const& size,
-                cuda::stream_t stream = 0) {
-    // Resize if needed.
-    if (this->get_capacity() < size)
-      this->reserve(size);
-
-    // Set the new number of elements.
-    this->set_number_of_elements(size);
-
-    // Fill in the sequence.
-    underlying_frontier_t::sequence(initial_value, size, stream);
   }
 
   /**
@@ -228,5 +215,8 @@ class frontier_t : public frontier::vector_frontier_t<t> {
   frontier_kind_t kind;   // vertex or edge frontier.
   float resizing_factor;  // reserve size * factor.
 };                        // struct frontier_t
+
+// Maybe we use for frontier related function
+namespace frontier {}  // namespace frontier
 
 }  // namespace gunrock

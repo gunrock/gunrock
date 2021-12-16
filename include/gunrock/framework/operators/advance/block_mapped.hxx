@@ -181,15 +181,21 @@ void execute(graph_t& G,
                               ? G.get_number_of_vertices()
                               : input->get_number_of_elements();
 
-  // TODO: Use launch_box_t instead.
-  constexpr int block_size = 128;
-  int grid_size = (work_size + block_size - 1) / block_size;
+  using namespace gunrock::cuda::launch_box;
+  using launch_t = launch_box_t<launch_params_t<fallback, dim3_t<128>>>;
+
+  dim3 grid_dimensions = dim3((work_size + launch_t::block_dimensions::x - 1) /
+                                  launch_t::block_dimensions::x,
+                              1, 1);
 
   // Launch blocked-mapped advance kernel.
-  block_mapped_kernel<block_size, 1, input_type, output_type>
-      <<<grid_size, block_size, 0, context.stream()>>>(
-          G, op, input->data(), output->data(), work_size,
-          segments.data().get());
+  block_mapped_kernel<launch_t::block_dimensions::x, 1, input_type, output_type>
+      <<<grid_dimensions,                         // grid dimensions
+         launch_t::block_dimensions::get_dim3(),  // block dimensions
+         launch_t::shared_memory_bytes,           // shared memory
+         context.stream()                         // context
+         >>>(G, op, input->data(), output->data(), work_size,
+             segments.data().get());
   context.synchronize();
 }
 

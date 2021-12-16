@@ -51,8 +51,8 @@ void test_sssp(int num_arguments, char** argument_array) {
   // --
   // Params and memory allocation
   srand(time(NULL));
-  
-  vertex_t n_vertices    = G.get_number_of_vertices();
+
+  vertex_t n_vertices = G.get_number_of_vertices();
   vertex_t single_source = 0;  // rand() % n_vertices;
   std::cout << "Single Source = " << single_source << std::endl;
 
@@ -62,8 +62,14 @@ void test_sssp(int num_arguments, char** argument_array) {
   thrust::device_vector<weight_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
 
-  float gpu_elapsed = gunrock::sssp::run(
-      G, single_source, distances.data().get(), predecessors.data().get());
+  float gpu_elapsed = 0.0f;
+  int num_runs = 5;
+
+  for (auto i = 0; i < num_runs; i++)
+    gpu_elapsed += gunrock::sssp::run(G, single_source, distances.data().get(),
+                                      predecessors.data().get());
+
+  gpu_elapsed /= num_runs;
 
   // --
   // CPU Run
