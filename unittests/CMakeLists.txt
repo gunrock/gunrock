@@ -7,4 +7,5 @@ add_subdirectory(csc)
 add_subdirectory(memory)
 add_subdirectory(copy_ctor)
 add_subdirectory(launch_box)
+add_subdirectory(for)
 # end /* Add unit tests' subdirectories */
