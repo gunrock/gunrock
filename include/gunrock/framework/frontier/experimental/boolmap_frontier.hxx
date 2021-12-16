@@ -17,6 +17,7 @@
 #include <thrust/sequence.h>
 
 namespace gunrock {
+namespace experimental {
 namespace frontier {
 using namespace memory;
 
@@ -195,4 +196,5 @@ class boolmap_frontier_t {
 };
 
 }  // namespace frontier
+}  // namespace experimental
 }  // namespace gunrock

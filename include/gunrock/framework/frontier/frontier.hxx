@@ -18,7 +18,7 @@
 #pragma once
 
 #include <gunrock/framework/frontier/vector_frontier.hxx>
-#include <gunrock/framework/frontier/boolmap_frontier.hxx>
+#include <gunrock/framework/frontier/experimental/boolmap_frontier.hxx>
 
 #include <gunrock/util/type_limits.hxx>
 
@@ -49,7 +49,7 @@ template <typename t,
 class frontier_t
     : public std::conditional_t<underlying_st == frontier_storage_t::vector,
                                 frontier::vector_frontier_t<t>,
-                                frontier::boolmap_frontier_t<t>> {
+                                experimental::frontier::boolmap_frontier_t<t>> {
  public:
   using type_t = t;
   using pointer_t = type_t*;
@@ -59,7 +59,7 @@ class frontier_t
   using underlying_frontier_t =
       std::conditional_t<underlying_st == frontier_storage_t::vector,
                          frontier::vector_frontier_t<type_t>,
-                         frontier::boolmap_frontier_t<type_t>>;
+                         experimental::frontier::boolmap_frontier_t<type_t>>;
 
   // Constructors
   frontier_t()
