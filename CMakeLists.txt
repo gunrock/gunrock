@@ -50,7 +50,7 @@ set_target_properties(essentials
     PROPERTIES
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
-        CXX_EXTENSIONS OFF
+        CXX_EXTENSIONS OFF # Should this be turned on for MSVC?
         CUDA_STANDARD 17
         CUDA_STANDARD_REQUIRED ON
         CUDA_EXTENSIONS OFF
@@ -113,14 +113,15 @@ target_sources(essentials
 ############## SET CXX & CUDA FLAGS ################
 ####################################################
 set(CXX_FLAGS 
-  -Wall 
-  # -Wextra
-  # -Werror
+  $<$<CXX_COMPILER_ID:MSVC>:-D_SCL_SECURE_NO_WARNINGS>
+  $<$<CXX_COMPILER_ID:GNU>:-Wall 
   -Wno-unused-result
   -Wno-unused-local-typedefs
   -Wno-strict-aliasing
   -Wno-unused-function
-  -Wno-format-security
+  -Wno-format-security>
+  # -Wextra
+  # -Werror
   # -vvv
 )
 
@@ -129,11 +130,11 @@ set(CUDA_FLAGS
   --expt-relaxed-constexpr
   --use_fast_math
   --ptxas-options -v
+  --generate-line-info
+  $<$<CXX_COMPILER_ID:GNU>:-O3> # Host optimize-level
   # --verbose
-  --optimize 3 # Host optimize-level
   # --debug # Host debug
   # --device-debug # Device debug
-  --generate-line-info
 )
 
 ####################################################
