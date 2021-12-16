@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include <gunrock/cuda/context.hxx>
+#include <gunrock/cuda/cuda.hxx>
 #include <gunrock/error.hxx>
 #include <gunrock/util/type_limits.hxx>
 
@@ -21,6 +21,7 @@
 #include <gunrock/framework/operators/advance/merge_path.hxx>
 #include <gunrock/framework/operators/advance/thread_mapped.hxx>
 #include <gunrock/framework/operators/advance/block_mapped.hxx>
+#include <gunrock/framework/operators/advance/bucketing.hxx>
 
 namespace gunrock {
 namespace operators {

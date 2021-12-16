@@ -21,8 +21,7 @@ void execute(graph_t& G,
     output->reserve(input->get_number_of_elements());
   }
 
-  if (underlying_t != frontier_storage_t::boolmap)
-    output->set_number_of_elements(input->get_number_of_elements());
+  output->set_number_of_elements(input->get_number_of_elements());
 
   auto input_ptr = input->data();
 
@@ -34,9 +33,7 @@ void execute(graph_t& G,
     return (op(v) ? v : gunrock::numeric_limits<type_t>::invalid());
   };
 
-  std::size_t end = (underlying_t == frontier_storage_t::boolmap)
-                        ? G.get_number_of_vertices()
-                        : input->get_number_of_elements();
+  std::size_t end = input->get_number_of_elements();
 
   // Filter with bypass
   thrust::transform(
@@ -46,10 +43,6 @@ void execute(graph_t& G,
       output->begin(),                                   // output iterator
       bypass                                             // predicate
   );
-
-  // reset the input frontier.
-  if (underlying_t == frontier_storage_t::boolmap)
-    input->fill(0, context.stream());
 }
 
 template <typename graph_t, typename operator_t, typename frontier_t>
