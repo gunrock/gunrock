@@ -46,7 +46,6 @@ void execute(graph_t& G,
              work_tiles_t& segments,
              cuda::standard_context_t& context) {
   using type_t = typename frontier_t::type_t;
-  frontier_storage_t underlying_t = input.get_frontier_storage_t();
 
   if (output_type != advance_io_type_t::none) {
     auto size_of_output = compute_output_length(G, &input, segments, context);

@@ -13,7 +13,6 @@ void execute(graph_t& G,
              frontier_t* output,
              cuda::standard_context_t& context) {
   using type_t = typename frontier_t::type_t;
-  frontier_storage_t underlying_t = input->get_frontier_storage_t();
 
   // ... resize as needed.
   if ((output->data() != input->data()) ||

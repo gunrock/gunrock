@@ -73,9 +73,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using vertex_t = typename problem_t::vertex_t;
   using edge_t = typename problem_t::edge_t;
   using weight_t = typename problem_t::weight_t;
+  using frontier_t = typename enactor_t<problem_t>::frontier_t;
 
-  // <user-defined>
-  void prepare_frontier(frontier_t<vertex_t>* f,
+  void prepare_frontier(frontier_t* f,
                         cuda::multi_context_t& context) override {
     auto P = this->get_problem();
     auto n_vertices = P->get_graph().get_number_of_vertices();
@@ -137,14 +137,13 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     operators::filter::execute<operators::filter_algorithm_t::compact>(
         G, E, color_me_in, context);
   }
-  // </user-defined>
+
 };  // struct enactor_t
 
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type* colors  // Output
 ) {
-  // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
 
   using param_type = param_t;
@@ -152,9 +151,7 @@ float run(graph_t& G,
 
   param_type param;
   result_type result(colors);
-  // </user-defined>
 
-  // <boiler-plate>
   auto multi_context =
       std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
 
@@ -167,7 +164,6 @@ float run(graph_t& G,
 
   enactor_type enactor(&problem, multi_context);
   return enactor.enact();
-  // </boiler-plate>
 }
 
 }  // namespace color

@@ -11,10 +11,13 @@
 
 #pragma once
 
+#include <gunrock/framework/frontier/configs.hxx>
+
 #include <gunrock/util/type_limits.hxx>
+#include <gunrock/util/load_store.hxx>
+
 #include <gunrock/container/vector.hxx>
 #include <gunrock/algorithms/sort/radix_sort.hxx>
-#include <gunrock/util/load_store.hxx>
 
 #include <thrust/sequence.h>
 
@@ -22,36 +25,52 @@ namespace gunrock {
 namespace frontier {
 using namespace memory;
 
-template <typename type_t>
+template <typename vertex_t, typename edge_t, frontier_kind_t _kind>
 class vector_frontier_t {
  public:
-  using pointer_t = type_t*;
+  using vector_frontier_type = vector_frontier_t<vertex_t, edge_t, _kind>;
+  using type_t = std::conditional_t<_kind == frontier_kind_t::vertex_frontier,
+                                    vertex_t,
+                                    edge_t>;
 
-  // Constructors
-  vector_frontier_t() : num_elements(0) {
+  /**
+   * @brief Default constructor.
+   */
+  vector_frontier_t() : num_elements(0), raw_ptr(nullptr), resizing_factor(1) {
+    /// TODO: we are using a vector of size 1 to avoid the overhead of setting
+    /// it up later. Check if this is valid to do.
     p_storage = std::make_shared<vector_t<type_t, memory_space_t::device>>(
         vector_t<type_t, memory_space_t::device>(1));
   }
-  vector_frontier_t(std::size_t size) : num_elements(size) {
+
+  /**
+   * @brief Construct a new vector frontier object with a given size and
+   * frontier resizing factor.
+   *
+   * @param size
+   * @param frontier_resizing_factor
+   */
+  vector_frontier_t(std::size_t size, float frontier_resizing_factor = 1.0)
+      : num_elements(size), resizing_factor(frontier_resizing_factor) {
     p_storage = std::make_shared<vector_t<type_t, memory_space_t::device>>(
         vector_t<type_t, memory_space_t::device>(size));
-    raw_ptr = nullptr;
+    raw_ptr = p_storage.get()->data().get();
   }
 
   // Empty Destructor, this is important on kernel-exit.
   ~vector_frontier_t() {}
 
   // Copy Constructor
-  vector_frontier_t(const vector_frontier_t& rhs) {
+  __device__ __host__ vector_frontier_t(const vector_frontier_t& rhs) {
+#ifdef __CUDA_ARCH__
+    raw_ptr = rhs.raw_ptr;
+#else
     p_storage = rhs.p_storage;
     raw_ptr = rhs.p_storage.get()->data().get();
+#endif
     num_elements = rhs.num_elements;
+    resizing_factor = rhs.resizing_factor;
   }
-
-  // Disable move and assignment.
-  vector_frontier_t& operator=(const vector_frontier_t& rhs) = delete;
-  vector_frontier_t& operator=(vector_frontier_t&&) = delete;
-  vector_frontier_t(vector_frontier_t&&) = delete;
 
   /**
    * @brief Get the number of elements within the frontier.
@@ -66,6 +85,13 @@ class vector_frontier_t {
    * @return std::size_t
    */
   std::size_t get_capacity() const { return p_storage.get()->capacity(); }
+
+  /**
+   * @brief Get the resizing factor used to scale the frontier size.
+   *
+   * @return float
+   */
+  float get_resizing_factor() const { return resizing_factor; }
 
   /**
    * @brief Get the element at the specified index.
@@ -88,13 +114,22 @@ class vector_frontier_t {
    *
    * @param idx
    * @param element
-   * @return void
    */
   __device__ __forceinline__ constexpr void set_element_at(
       type_t const& element,
-      std::size_t const& idx) const noexcept {  // XXX: This should not be const
+      std::size_t const& idx) const
+      noexcept {  /// XXX: This should not be const
     thread::store(this->get() + idx, element);
   }
+
+  /**
+   * @brief Set the resizing factor for the frontier. This float is used to
+   * multiply the `reserve` size to scale it a bit higher every time to avoid
+   * reallocations.
+   *
+   * @param factor
+   */
+  void set_resizing_factor(float factor) { resizing_factor = factor; }
 
   /**
    * @brief Set how many number of elements the frontier contains. Note, this is
@@ -111,13 +146,13 @@ class vector_frontier_t {
   /**
    * @brief Access to internal raw pointer, works on host and device.
    */
-  __host__ __device__ __forceinline__ constexpr pointer_t get() const {
+  __host__ __device__ __forceinline__ constexpr auto get() const {
     return raw_ptr;
   }
 
-  pointer_t data() { return raw_pointer_cast(p_storage.get()->data()); }
-  pointer_t begin() { return this->data(); }
-  pointer_t end() { return this->begin() + this->get_number_of_elements(); }
+  auto data() { return raw_pointer_cast(p_storage.get()->data()); }
+  auto begin() { return this->data(); }
+  auto end() { return this->begin() + this->get_number_of_elements(); }
   bool is_empty() const { return (this->get_number_of_elements() == 0); }
 
   /**
@@ -211,8 +246,9 @@ class vector_frontier_t {
 
  private:
   std::shared_ptr<vector_t<type_t, memory_space_t::device>> p_storage;
-  pointer_t raw_ptr;
+  type_t* raw_ptr;
   std::size_t num_elements;  // number of elements in the frontier.
+  float resizing_factor;     // reserve size * factor.
 };
 
 }  // namespace frontier
