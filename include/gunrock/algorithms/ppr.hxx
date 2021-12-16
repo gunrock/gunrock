@@ -1,7 +1,7 @@
 /**
- * @file sssp.hxx
+ * @file ppr.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
- * @brief Single-Source Shortest Path algorithm.
+ * @brief Personalized Page-Rank.
  * @version 0.1
  * @date 2020-10-05
  *
