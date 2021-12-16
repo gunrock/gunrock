@@ -42,7 +42,7 @@ jobs:
         run: cmake -B ${{github.workspace}}/build -D ESSENTIALS_BUILD_TESTS=OFF #-DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} 
         
       - name: Build all applications
-        Build your program with the given configuration
+        # Build your program with the given configuration
         run: cmake --build ${{github.workspace}}/build --target sssp
         
         # TODO: Use the following once we have BUILD_TYPE and envrionment variables set-up:
