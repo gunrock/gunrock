@@ -1,7 +1,7 @@
 /**
- * @file vector_frontier.hxx
+ * @file boolmap_frontier.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
- * @brief Vector-based frontier implementation.
+ * @brief Boolmap-based frontier implementation.
  * @version 0.1
  * @date 2021-03-12
  *
@@ -14,8 +14,6 @@
 #include <gunrock/util/type_limits.hxx>
 #include <gunrock/container/vector.hxx>
 #include <gunrock/algorithms/sort/radix_sort.hxx>
-#include <gunrock/util/load_store.hxx>
-
 #include <thrust/sequence.h>
 
 namespace gunrock {
@@ -23,41 +21,40 @@ namespace frontier {
 using namespace memory;
 
 template <typename type_t>
-class vector_frontier_t {
+class boolmap_frontier_t {
  public:
   using pointer_t = type_t*;
 
   // Constructors
-  vector_frontier_t() : num_elements(0) {
+  boolmap_frontier_t() : num_elements(0) {
     p_storage = std::make_shared<vector_t<type_t, memory_space_t::device>>(
         vector_t<type_t, memory_space_t::device>(1));
   }
-  vector_frontier_t(std::size_t size) : num_elements(size) {
+  boolmap_frontier_t(std::size_t size) : num_elements(size) {
     p_storage = std::make_shared<vector_t<type_t, memory_space_t::device>>(
         vector_t<type_t, memory_space_t::device>(size));
     raw_ptr = nullptr;
   }
 
   // Empty Destructor, this is important on kernel-exit.
-  ~vector_frontier_t() {}
+  ~boolmap_frontier_t() {}
 
   // Copy Constructor
-  vector_frontier_t(const vector_frontier_t& rhs) {
+  boolmap_frontier_t(const boolmap_frontier_t& rhs) {
     p_storage = rhs.p_storage;
     raw_ptr = rhs.p_storage.get()->data().get();
     num_elements = rhs.num_elements;
   }
 
-  // Disable move and assignment.
-  vector_frontier_t& operator=(const vector_frontier_t& rhs) = delete;
-  vector_frontier_t& operator=(vector_frontier_t&&) = delete;
-  vector_frontier_t(vector_frontier_t&&) = delete;
-
   /**
-   * @brief Get the number of elements within the frontier.
+   * @brief Get the number of elements within the frontier. This is a costly
+   * feature of a boolmap and should be avoided when possible.
    * @return std::size_t
    */
-  std::size_t get_number_of_elements(cuda::stream_t stream = 0) const {
+  std::size_t get_number_of_elements(cuda::stream_t stream = 0) {
+    // Compute number of elements using a reduction.
+    num_elements = thrust::reduce(thrust::cuda::par.on(stream), this->begin(),
+                                  this->end(), 0);
     return num_elements;
   }
 
@@ -75,12 +72,14 @@ class vector_frontier_t {
    */
   __device__ __forceinline__ constexpr const type_t get_element_at(
       std::size_t const& idx) const noexcept {
-    return thread::load(this->get() + idx);
+    return this->get()[idx] == 1 ? idx
+                                 : gunrock::numeric_limits<type_t>::invalid();
   }
 
   __device__ __forceinline__ constexpr type_t get_element_at(
       std::size_t const& idx) noexcept {
-    return thread::load(this->get() + idx);
+    return this->get()[idx] == 1 ? idx
+                                 : gunrock::numeric_limits<type_t>::invalid();
   }
 
   /**
@@ -92,8 +91,9 @@ class vector_frontier_t {
    */
   __device__ __forceinline__ constexpr void set_element_at(
       type_t const& element,
-      std::size_t const& idx) const noexcept {  // XXX: This should not be const
-    thread::store(this->get() + idx, element);
+      std::size_t const& idx = 0  // Ignore idx for boolmap.
+  ) const noexcept {              // XXX: This should not be const
+    thread::store(this->get() + element, 1);
   }
 
   /**
@@ -118,17 +118,17 @@ class vector_frontier_t {
   pointer_t data() { return raw_pointer_cast(p_storage.get()->data()); }
   pointer_t begin() { return this->data(); }
   pointer_t end() { return this->begin() + this->get_number_of_elements(); }
-  bool is_empty() const { return (this->get_number_of_elements() == 0); }
 
   /**
-   * @brief (vertex-like) push back a value to the frontier.
+   * @brief Is the frontier empty or not?
+   * @todo right now, this relies on an expensive get_number_of_elements() call,
+   * we can replace this with a simple transform that checks each position and
+   * if any one of the position is active, the frontier is not empty.
    *
-   * @param value
+   * @return true
+   * @return false
    */
-  void push_back(type_t const& value) {
-    p_storage.get()->push_back(value);
-    num_elements++;
-  }
+  bool is_empty() { return (this->get_number_of_elements() == 0); }
 
   /**
    * @brief Fill the entire frontier with a user-specified value.
@@ -137,32 +137,12 @@ class vector_frontier_t {
    * @param stream
    */
   void fill(type_t const value, cuda::stream_t stream = 0) {
+    if (value != 0 || value != 1)
+      error::throw_if_exception(cudaErrorUnknown,
+                                "Boolmap only supports 1 or 0 as fill value.");
+
     thrust::fill(thrust::cuda::par.on(stream), this->begin(), this->end(),
                  value);
-  }
-
-  /**
-   * @brief `sequence` fills the entire frontier with a sequence of numbers.
-   *
-   * @param initial_value The first value of the sequence.
-   * @param size Number of elements to fill the sequence up to. Also corresponds
-   * to the new size of the frontier.
-   * @param stream @see `cuda::stream_t`.
-   *
-   * @todo Maybe we should accept `standard_context_t` instead of `stream_t`.
-   */
-  void sequence(type_t const initial_value,
-                std::size_t const& size,
-                cuda::stream_t stream = 0) {
-    // Resize if needed.
-    if (this->get_capacity() < size)
-      this->reserve(size);
-
-    // Set the new number of elements.
-    this->set_number_of_elements(size);
-
-    thrust::sequence(thrust::cuda::par.on(stream), this->begin(), this->end(),
-                     initial_value);
   }
 
   /**
@@ -172,18 +152,18 @@ class vector_frontier_t {
    *
    * @param size number of elements used to resize the frontier (count not
    * bytes).
-   * @param default_value
+   * @param default_value is 0 (meaning vertex is not active).
    */
-  void resize(
-      std::size_t const& size,
-      type_t const default_value = gunrock::numeric_limits<type_t>::invalid()) {
+  void resize(std::size_t const& size, type_t const default_value = 0) {
     p_storage.get()->resize(size, default_value);
   }
 
   /**
    * @brief "Hints" the alocator that we need to reserve the suggested size. The
    * capacity() will increase and report reserved() size, but size() will still
-   * report the actual size, not reserved size. See std::vector for more detail.
+   * report the actual size, not reserved size.
+   * @note This isn't as relevant for a boolmap because the size of the frontier
+   * remains the same.
    *
    * @param size size to reserve (size is in count not bytes).
    */
@@ -197,8 +177,7 @@ class vector_frontier_t {
    */
   void sort(sort::order_t order = sort::order_t::ascending,
             cuda::stream_t stream = 0) {
-    sort::radix::sort_keys(p_storage.get()->data().get(),
-                           this->get_number_of_elements(), order, stream);
+    // Bool-map frontier is always sorted.
   }
 
   void print() {

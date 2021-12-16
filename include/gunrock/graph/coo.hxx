@@ -28,6 +28,15 @@ class graph_coo_t {
   __host__ __device__ graph_coo_t()
       : row_indices(nullptr), column_indices(nullptr), values(nullptr) {}
 
+  // Disable copy ctor and assignment operator.
+  // We do not want to let user copy only a slice.
+  // Explanation:
+  // https://www.geeksforgeeks.org/preventing-object-copy-in-cpp-3-different-ways/
+  // Copy constructor
+  // graph_coo_t(const graph_coo_t& rhs) = delete;
+  // Copy assignment
+  // graph_coo_t& operator=(const graph_coo_t& rhs) = delete;
+
   // Override pure virtual functions
   // Must use [override] keyword to identify functions that are
   // overriding the derived class
