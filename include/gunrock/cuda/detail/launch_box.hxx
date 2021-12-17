@@ -16,7 +16,8 @@ namespace cuda {
 namespace launch_box {
 
 /**
- * @brief Bit flag enum representing different SM architectures.
+ * @brief Bit flag enum representing different SM architectures. `fallback` is a
+ * bit vector of all 1's so it can be used to represent all SM architectures.
  *
  */
 enum sm_flag_t : unsigned {
@@ -49,7 +50,7 @@ struct launch_params_abc_t {
   enum : unsigned { sm_flags = sm_flags_ };
 
  protected:
-  launch_params_abc_t();
+  launch_params_abc_t() {}
 };
 
 /**
