@@ -86,8 +86,8 @@ constexpr sm_flag_t operator&(sm_flag_t lhs, sm_flag_t rhs) {
  * case that there isn't a fallback and the compiler can't find launch
  * parameters for the architecture being compiled for, a static assert will be
  * raised. All launch parameters *should* use the same struct template so there
- * isn't any ambiguity as to what the launch box's constructor is (though this
- * isn't enforced).
+ * isn't any ambiguity as to what the launch box's constructor is, though this
+ * isn't enforced.
  *
  * @par Example
  * The following code is an example of how to instantiate a launch box.

@@ -82,7 +82,17 @@ struct raise_not_found_error_t {
 /**
  * @brief Subsets a pack of launch parameters (children of
  * `launch_params_abc_t`), selecting the ones that match the architecture being
- * compiled for.
+ * compiled for, stored in a tuple type.
+ *
+ * @par Overview
+ * This template alias is a tuple type of all the launch parameter types that
+ * have `sm_flags` matching the current SM architecture being compiled for. It
+ * uses the `tuple_cat()` funtion to concatenate tuples that are empty or
+ * contain the launch parameter type if the SM version matches. The `lp_v` pack
+ * is placed inside a `conditional_t`, which checks for a match and is then
+ * expanded into the arguments of `tuple_cat()` using the `...` operator. This
+ * was inspired by this Stack Overflow solution:
+ * https://stackoverflow.com/a/67155114/13232647.
  *
  * @tparam lp_v Pack of `launch_params_t` types for each desired arch.
  */
