@@ -8,7 +8,7 @@ using namespace gunrock::cuda::launch_box;
 typedef launch_box_t<
     launch_params_t<sm_86 | sm_80, dim3_t<16, 2, 2>, dim3_t<64, 1, 4>, 2>,
     launch_params_t<sm_75 | sm_70, dim3_t<32, 2, 4>, dim3_t<64, 8, 8>>,
-    launch_params_t<sm_61 | sm_60, dim3_t<64, 1, 1>>,
+    launch_params_t<sm_61 | sm_60, dim3_t<8, 4, 4>, dim3_t<32, 1, 4>, 2>,
     launch_params_t<sm_35, dim3_t<64>, dim3_t<64>, 16>,
     launch_params_t<fallback, dim3_t<16>, dim3_t<2>, 4>>
     launch_t;
@@ -44,14 +44,14 @@ void test_fallback() {
                       EXPECTED_SMEM>>
       launch_t;
 
-  assert(launch_t::block_dimensions::x == EXPECTED_BLOCK &&
-         launch_t::grid_dimensions::x == EXPECTED_GRID &&
+  assert(launch_t::block_dimensions_t::x == EXPECTED_BLOCK &&
+         launch_t::grid_dimensions_t::x == EXPECTED_GRID &&
          launch_t::shared_memory_bytes == EXPECTED_SMEM);
 }
 
 void test_define() {
-  dim3 block_dimensions = launch_t::block_dimensions::get_dim3();
-  dim3 grid_dimensions = launch_t::grid_dimensions::get_dim3();
+  dim3 block_dimensions = launch_t::block_dimensions_t::get_dim3();
+  dim3 grid_dimensions = launch_t::grid_dimensions_t::get_dim3();
   size_t smem = launch_t::shared_memory_bytes;
 
   std::cout << "block_dimensions:    " << block_dimensions.x << ", "

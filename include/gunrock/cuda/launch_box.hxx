@@ -11,8 +11,10 @@
 #pragma once
 
 #include <gunrock/cuda/device_properties.hxx>
+#include <gunrock/cuda/context.hxx>
 #include <gunrock/error.hxx>
 
+#include <tuple>
 #include <type_traits>
 
 #ifndef SM_TARGET
@@ -38,7 +40,7 @@ struct dim3_t {
 };
 
 enum sm_flag_t : unsigned {
-  fallback = 0,
+  fallback = ~0u,
   sm_30 = 1 << 0,
   sm_35 = 1 << 1,
   sm_37 = 1 << 2,
@@ -84,42 +86,61 @@ constexpr sm_flag_t operator&(sm_flag_t lhs, sm_flag_t rhs) {
 }
 
 /**
- * @brief Kernel launch parameters for a specific SM version
+ * @brief Abstract base class for launch parameters
  * @tparam sm_flags_ Bitwise flags indicating SM versions (sm_flag_t enum)
- * @tparam block_dimensions_ Block dimensions to launch with
- * @tparam grid_dimensions_ Grid dimensions to launch with
- * @tparam shared_memory_bytes_ Amount of shared memory to allocate
  */
-template <sm_flag_t sm_flags_,
-          typename block_dimensions_,
-          typename grid_dimensions_ = dim3_t<0, 0, 0>,
-          size_t shared_memory_bytes_ = 0>
-struct launch_params_t {
-  typedef block_dimensions_ block_dimensions;
-  typedef grid_dimensions_ grid_dimensions;
-  enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
+template <sm_flag_t sm_flags_>
+struct launch_params_abc_t {
   enum : unsigned { sm_flags = sm_flags_ };
+
+  protected:
+  launch_params_abc_t();
 };
 
-template <typename... lp_v>
-struct device_launch_params_t;
 
-/**
- * @brief Struct that inherits the launch parameters of the current device
- * @tparam lp_t Launch parameters to check for match with current device
- * @tparam lp_v Pack of launch parameters to pass down recursively
- */
-template <typename lp_t, typename... lp_v>
-struct device_launch_params_t<lp_t, lp_v...>
-    : std::conditional_t<
-          lp_t::sm_flags == fallback,
-          device_launch_params_t<lp_v..., lp_t>,  // Move fallback_t to end
-          std::conditional_t<
-              (bool)(lp_t::sm_flags& SM_TARGET_FLAG),  // Otherwise check lp_t
-                                                       // for device's SM
-                                                       // version
-              lp_t,
-              device_launch_params_t<lp_v...>>> {};
+template <sm_flag_t sm_flags_,
+          typename block_dimensions_,
+          typename grid_dimensions_,
+          size_t shared_memory_bytes_ = 0>
+struct launch_params_t : launch_params_abc_t<sm_flags_> {
+  typedef block_dimensions_ block_dimensions_t;
+  typedef grid_dimensions_ grid_dimensions_t;
+  enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
+
+  static constexpr dim3 block_dimensions = block_dimensions_t::get_dim3();
+  static constexpr dim3 grid_dimensions = grid_dimensions_t::get_dim3();
+  standard_context_t& context;
+
+  launch_params_t(standard_context_t& context_) : context(context_) {}
+};
+
+template <sm_flag_t sm_flags_,
+          typename grid_dimensions_,
+          size_t shared_memory_bytes_ = 0>
+struct launch_params_dynamic_block_t : launch_params_abc_t<sm_flags_> {
+  typedef grid_dimensions_ grid_dimensions_t;
+  enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
+
+  dim3 block_dimensions;
+  static constexpr dim3 grid_dimensions = grid_dimensions_t::get_dim3();
+  standard_context_t& context;
+
+  launch_params_dynamic_block_t(dim3 block_dimensions_, standard_context_t& context_) : block_dimensions(block_dimensions_), context(context_) {}  // FIXME: How to format this under 80 chars?
+};
+
+template <sm_flag_t sm_flags_,
+          typename block_dimensions_,
+          size_t shared_memory_bytes_ = 0>
+struct launch_params_dynamic_grid_t : launch_params_abc_t<sm_flags_> {
+  typedef block_dimensions_ block_dimensions_t;
+  enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
+
+  static constexpr dim3 block_dimensions = block_dimensions_t::get_dim3();
+  dim3 grid_dimensions;
+  standard_context_t& context;
+
+  launch_params_dynamic_grid_t(dim3 grid_dimensions_, standard_context_t& context_) : grid_dimensions(grid_dimensions_), context(context_) {}  // FIXME: How to format this under 80 chars?
+};
 
 /**
  * @brief False value dependent on template param so compiler can't optimize
@@ -140,25 +161,29 @@ struct raise_not_found_error_t {
                 "Launch box could not find valid launch parameters");
 };
 
-/**
- * @brief Struct that inherits the launch parameters of the current device
- * @tparam lp_t Launch parameters to check for match with current device or
- * fallback
- */
-template <typename lp_t>
-struct device_launch_params_t<lp_t>
-    : std::conditional_t<
-          (bool)(lp_t::sm_flags& SM_TARGET_FLAG) || lp_t::sm_flags == fallback,
-          lp_t,
-          raise_not_found_error_t<void>  // Raises a compiler error
-          > {};
+template <typename... lp_v>
+using match_launch_params_t = decltype(
+  std::tuple_cat(
+    std::declval<
+      std::conditional_t<
+        (bool)(lp_v::sm_flags & SM_TARGET_FLAG),
+        std::tuple<lp_v>,
+        std::tuple<>
+      >
+    >()...
+  )
+);
 
 /**
  * @brief Collection of kernel launch parameters for multiple architectures
  * @tparam lp_v... Pack of launch_params_t types for each desired arch
  */
 template <typename... lp_v>
-struct launch_box_t : device_launch_params_t<lp_v...> {};
+using launch_box_t = std::conditional_t<
+  (std::tuple_size<match_launch_params_t<lp_v...>>::value == 0),
+  raise_not_found_error_t<void>,
+  std::tuple_element_t<0, match_launch_params_t<lp_v...>>
+>;
 
 /**
  * @brief Calculator for ratio of active to maximum warps per multiprocessor
@@ -169,7 +194,7 @@ struct launch_box_t : device_launch_params_t<lp_v...> {};
 template <typename launch_box_t, typename func_t>
 inline float occupancy(func_t kernel) {
   int max_active_blocks;
-  int block_size = launch_box_t::block_dimensions::size;
+  int block_size = launch_box_t::block_dimensions_t::size;
   int device;
   cudaDeviceProp props;
 

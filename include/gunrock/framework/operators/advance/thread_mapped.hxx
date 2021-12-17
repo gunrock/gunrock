@@ -101,19 +101,15 @@ void execute(graph_t& G,
                                  : input.get_number_of_elements();
 
   using namespace gunrock::cuda::launch_box;
-  using launch_t = launch_box_t<launch_params_t<fallback, dim3_t<128>>>;
+  using launch_t = launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
 
-  dim3 grid_dimensions =
-      dim3((num_elements + launch_t::block_dimensions::x - 1) /
-               launch_t::block_dimensions::x,
-           1, 1);
+  launch_t launch_box(dim3((num_elements + launch_t::block_dimensions_t::x - 1) / launch_t::block_dimensions_t::x, 1, 1), context);
 
   // Launch blocked-mapped advance kernel.
-  thread_mapped_kernel<<<grid_dimensions,  // grid dimensions
-                         launch_t::block_dimensions::get_dim3(),  // block
-                                                                  // dimensions
-                         launch_t::shared_memory_bytes,  // shared memory
-                         context.stream()                // context
+  thread_mapped_kernel<<<launch_box.grid_dimensions,     // grid dimensions
+                         launch_box.block_dimensions,    // block dimensions
+                         launch_box.shared_memory_bytes, // shared memory
+                         launch_box.context.stream()     // context
                          >>>(neighbors_expand, num_elements);
   context.synchronize();
 
