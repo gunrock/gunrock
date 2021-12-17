@@ -58,7 +58,8 @@ class frontier_t : public frontier::vector_frontier_t<vertex_t, edge_t, _kind> {
   /**
    * @brief Construct a new frontier_t object, this constructor is only
    * available with frontier_view_t == vector.
-   *
+   * @ref
+   * https://stackoverflow.com/questions/17842478/select-class-constructor-using-enable-if
    * @tparam U
    * @param size
    * @param frontier_resizing_factor
