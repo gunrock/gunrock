@@ -13,7 +13,6 @@ void execute(graph_t& G,
              frontier_t* output,
              cuda::standard_context_t& context) {
   using type_t = typename frontier_t::type_t;
-  frontier_storage_t underlying_t = input->get_frontier_storage_t();
 
   // ... resize as needed.
   if ((output->data() != input->data()) ||
@@ -21,28 +20,19 @@ void execute(graph_t& G,
     output->reserve(input->get_number_of_elements());
   }
 
-  if (underlying_t != frontier_storage_t::boolmap)
-    output->set_number_of_elements(input->get_number_of_elements());
+  output->set_number_of_elements(input->get_number_of_elements());
 
   auto input_ptr = input->data();
 
   // Mark items as invalid instead of removing them (therefore, a "bypass").
   auto bypass = [=] __device__(std::size_t const& idx) {
-    auto v = frontier::get_element_at(idx, input_ptr);
-    if (underlying_t == frontier_storage_t::boolmap) {
-      if (v == 0)
-        return 0;
-      return (op(v) ? 1 : 0);
-    } else {
-      if (!gunrock::util::limits::is_valid(v))
-        return gunrock::numeric_limits<type_t>::invalid();  // exit early
-      return (op(v) ? v : gunrock::numeric_limits<type_t>::invalid());
-    }
+    auto v = input_ptr[idx];
+    if (!gunrock::util::limits::is_valid(v))
+      return gunrock::numeric_limits<type_t>::invalid();  // exit early
+    return (op(v) ? v : gunrock::numeric_limits<type_t>::invalid());
   };
 
-  std::size_t end = (underlying_t == frontier_storage_t::boolmap)
-                        ? G.get_number_of_vertices()
-                        : input->get_number_of_elements();
+  std::size_t end = input->get_number_of_elements();
 
   // Filter with bypass
   thrust::transform(
@@ -52,10 +42,6 @@ void execute(graph_t& G,
       output->begin(),                                   // output iterator
       bypass                                             // predicate
   );
-
-  // reset the input frontier.
-  if (underlying_t == frontier_storage_t::boolmap)
-    input->fill(0, context.stream());
 }
 
 template <typename graph_t, typename operator_t, typename frontier_t>

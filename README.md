@@ -3,7 +3,7 @@
 
 ## Quick Start Guide
 
-Before building Gunrock make sure you have **CUDA Toolkit 11 or higher** installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
+Before building Gunrock make sure you have **CUDA Toolkit 11 or higher**[^1] installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
 
 ```shell
 git clone https://github.com/gunrock/essentials.git
@@ -13,13 +13,12 @@ cmake ..
 make sssp # or for all algorithms, use: make -j$(nproc)
 bin/sssp ../datasets/chesapeake/chesapeake.mtx
 ```
-
-##### Preferred **CUDA v11.2.1 or higher** due to support for stream ordered memory allocators (e.g. `cudaFreeAsync()`).
+[^1]: Preferred **CUDA v11.2.1 or higher** due to support for stream ordered memory allocators (e.g. `cudaFreeAsync()`).
 
 ## Getting Started with Gunrock
 
 - [Gunrock's Overview](https://github.com/gunrock/essentials/wiki/Overview)
-- [Gunrock's programming model]()
+- [Gunrock's programming model](https://github.com/gunrock/essentials/wiki/Programming-Model)
 - [Gunrock's documentation](https://github.com/gunrock/essentials/wiki)
 - [Publications](https://github.com/gunrock/essentials/wiki/Publications) and [presentations](https://github.com/gunrock/essentials/wiki/Presentations)
 

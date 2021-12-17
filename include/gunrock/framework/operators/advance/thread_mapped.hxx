@@ -46,10 +46,8 @@ void execute(graph_t& G,
              work_tiles_t& segments,
              cuda::standard_context_t& context) {
   using type_t = typename frontier_t::type_t;
-  frontier_storage_t underlying_t = input.get_frontier_storage_t();
 
-  if (output_type != advance_io_type_t::none ||
-      underlying_t == frontier_storage_t::boolmap) {
+  if (output_type != advance_io_type_t::none) {
     auto size_of_output = compute_output_length(G, &input, segments, context);
 
     // If output frontier is empty, resize and return.
@@ -86,17 +84,16 @@ void execute(graph_t& G,
       auto w = G.get_edge_weight(e);         // weight
       bool cond = op(v, n, e, w);
 
-      if constexpr (output_type != advance_io_type_t::none) {
+      if (output_type != advance_io_type_t::none) {
         std::size_t out_idx = segments_ptr[idx] + i;
         type_t element =
             (cond && n != v) ? n : gunrock::numeric_limits<type_t>::invalid();
-        output.set_element_at(out_idx, element);
+        output.set_element_at(element, out_idx);
       }
     }
   };
 
-  std::size_t num_elements = (input_type == advance_io_type_t::graph ||
-                              underlying_t == frontier_storage_t::boolmap)
+  std::size_t num_elements = (input_type == advance_io_type_t::graph)
                                  ? G.get_number_of_vertices()
                                  : input.get_number_of_elements();
 
@@ -112,10 +109,6 @@ void execute(graph_t& G,
                          launch_box.context.stream()     // context
                          >>>(neighbors_expand, num_elements);
   context.synchronize();
-
-  // reset the input frontier.
-  if (underlying_t == frontier_storage_t::boolmap)
-    input.fill(0, context.stream());
 }
 }  // namespace thread_mapped
 }  // namespace advance
