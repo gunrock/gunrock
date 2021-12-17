@@ -20,7 +20,8 @@ set(PROJECT_DEPS_DIR externals)
 # end /* Dependencies directory */
 
 # begin /* Include cmake modules */
-include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchCUB.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchThrust.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 # end /* Include cmake modules */
 

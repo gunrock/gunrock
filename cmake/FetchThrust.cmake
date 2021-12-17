@@ -19,5 +19,3 @@ if(NOT thrust_POPULATED)
   )
 endif()
 set(THRUST_INCLUDE_DIR "${thrust_SOURCE_DIR}")
-# Windows doesn't support symblink, so make sure we link to the real library.
-set(CUB_INCLUDE_DIR "${thrust_SOURCE_DIR}/dependencies/cub")
