@@ -29,11 +29,11 @@ namespace launch_box {
 
 /**
  * @brief CUDA dim3 template representation, since dim3 cannot be used as a
- * template argument
+ * template argument.
  *
- * @tparam x_ Dimension in the X direction
- * @tparam y_ Dimension in the Y direction
- * @tparam z_ Dimension in the Z direction
+ * @tparam x_ Dimension in the X direction.
+ * @tparam y_ (default = `1`) Dimension in the Y direction.
+ * @tparam z_ (default = `1`) Dimension in the Z direction.
  */
 template <unsigned int x_, unsigned int y_ = 1, unsigned int z_ = 1>
 struct dim3_t {
@@ -42,16 +42,16 @@ struct dim3_t {
 };
 
 /**
- * @brief Bit flag enum representing different SM architectures
+ * @brief Bit flag enum representing different SM architectures.
  *
  */
 enum sm_flag_t : unsigned;
 
 /**
- * @brief Overloaded bitwise OR operator
+ * @brief Overloaded bitwise OR operator.
  *
- * @param lhs Left-hand side
- * @param rhs Right-hand side
+ * @param lhs Left-hand side.
+ * @param rhs Right-hand side.
  * \return sm_flag_t
  */
 constexpr sm_flag_t operator|(sm_flag_t lhs, sm_flag_t rhs) {
@@ -60,10 +60,10 @@ constexpr sm_flag_t operator|(sm_flag_t lhs, sm_flag_t rhs) {
 }
 
 /**
- * @brief Overloaded bitwise AND operator
+ * @brief Overloaded bitwise AND operator.
  *
- * @param lhs Left-hand side
- * @param rhs Right-hand side
+ * @param lhs Left-hand side.
+ * @param rhs Right-hand side.
  * \return sm_flag_t
  */
 constexpr sm_flag_t operator&(sm_flag_t lhs, sm_flag_t rhs) {
@@ -72,9 +72,40 @@ constexpr sm_flag_t operator&(sm_flag_t lhs, sm_flag_t rhs) {
 }
 
 /**
- * @brief Collection of kernel launch parameters for multiple architectures
+ * @brief Collection of kernel launch parameters for different architectures.
  *
- * @tparam lp_v Pack of launch_params_t types for each desired arch
+ * @par Overview
+ * A launch box is a collection of sets of CUDA kernel launch parameters each
+ * corresponding to one or more SM architectures. At compile time, the launch
+ * box's type resolves to the **first** launch parameters type (derived from
+ * `launch_param_abc_t`) that match the SM architecture that Gunrock is being
+ * compiled for. If there isn't an explicit match, launch parameters for any SM
+ * version can be specified at the end of the parameter pack using the
+ * `fallback` enum for the `sm_flag_t` template parameter (note that this will
+ * invalidate any launch parameter types later in the parameter pack). In the
+ * case that there isn't a fallback and the compiler can't find launch
+ * parameters for the architecture being compiled for, a static assert will be
+ * raised. All launch parameters *should* use the same struct template so there
+ * isn't any ambiguity as to what the launch box's constructor is (though this
+ * isn't enforced).
+ *
+ * @par Example
+ * The following code is an example of how to instantiate a launch box.
+ *
+ * \code
+ * typedef launch_box_t<
+ *     launch_params_t<sm_86 | sm_80, dim3_t<16, 2, 2>, dim3_t<64, 1, 4>, 2>,
+ *     launch_params_t<sm_75 | sm_70, dim3_t<32, 2, 4>, dim3_t<64, 8, 8>>,
+ *     launch_params_t<sm_61 | sm_60, dim3_t<8, 4, 4>, dim3_t<32, 1, 4>, 2>,
+ *     launch_params_t<sm_35, dim3_t<64>, dim3_t<64>, 16>,
+ *     launch_params_t<fallback, dim3_t<16>, dim3_t<2>, 4>>
+ *     launch_t;
+ *
+ * launch_t my_launch_box(context);
+ * \endcode
+ *
+ * @tparam lp_v Pack of `launch_params_t` types for each corresponding
+ * architecture(s).
  */
 template <typename... lp_v>
 using launch_box_t = std::conditional_t<
@@ -83,13 +114,13 @@ using launch_box_t = std::conditional_t<
     std::tuple_element_t<0, detail::match_launch_params_t<lp_v...>>>;
 
 /**
- * @brief Set of launch parameters for a CUDA kernel
+ * @brief Set of launch parameters for a CUDA kernel.
  *
  * @tparam sm_flags_ Bit flags for the SM architectures the launch parameters
- * correspond to
- * @tparam block_dimensions_ A dim3_t type representing the block dimensions
- * @tparam grid_dimensions_ A dim3_t type representing the grid dimensions
- * @tparam shared_memory_bytes_ Number of bytes of shared memory to allocate
+ * correspond to.
+ * @tparam block_dimensions_ A `dim3_t` type representing the block dimensions.
+ * @tparam grid_dimensions_ A `dim3_t` type representing the grid dimensions.
+ * @tparam shared_memory_bytes_ Number of bytes of shared memory to allocate.
  */
 template <sm_flag_t sm_flags_,
           typename block_dimensions_,
@@ -109,12 +140,12 @@ struct launch_params_t : detail::launch_params_abc_t<sm_flags_> {
 
 /**
  * @brief Set of launch parameters for a CUDA kernel (with non-static block
- * dimensions)
+ * dimensions).
  *
  * @tparam sm_flags_ Bit flags for the SM architectures the launch parameters
- * correspond to
- * @tparam grid_dimensions_ A dim3_t type representing the grid dimensions
- * @tparam shared_memory_bytes_ Number of bytes of shared memory to allocate
+ * correspond to.
+ * @tparam grid_dimensions_ A `dim3_t` type representing the grid dimensions.
+ * @tparam shared_memory_bytes_ Number of bytes of shared memory to allocate.
  */
 template <sm_flag_t sm_flags_,
           typename grid_dimensions_,
@@ -134,12 +165,12 @@ struct launch_params_dynamic_block_t : detail::launch_params_abc_t<sm_flags_> {
 
 /**
  * @brief Set of launch parameters for a CUDA kernel (with non-static grid
- * dimensions)
+ * dimensions).
  *
  * @tparam sm_flags_ Bit flags for the SM architectures the launch parameters
- * correspond to
- * @tparam block_dimensions_ A dim3_t type representing the block dimensions
- * @tparam shared_memory_bytes_ Number of bytes of shared memory to allocate
+ * correspond to.
+ * @tparam block_dimensions_ A `dim3_t` type representing the block dimensions.
+ * @tparam shared_memory_bytes_ Number of bytes of shared memory to allocate.
  */
 template <sm_flag_t sm_flags_,
           typename block_dimensions_,
@@ -158,10 +189,10 @@ struct launch_params_dynamic_grid_t : detail::launch_params_abc_t<sm_flags_> {
 };
 
 /**
- * @brief Calculator for ratio of active to maximum warps per multiprocessor
+ * @brief Calculator for ratio of active to maximum warps per multiprocessor.
  *
- * @tparam launch_box_t Launch box for the corresponding kernel
- * @param kernel CUDA kernel for which to calculate the occupancy
+ * @tparam launch_box_t Launch box for the corresponding kernel.
+ * @param kernel CUDA kernel for which to calculate the occupancy.
  * \return float
  */
 template <typename launch_box_t, typename func_t>

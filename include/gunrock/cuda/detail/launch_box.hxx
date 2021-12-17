@@ -16,7 +16,7 @@ namespace cuda {
 namespace launch_box {
 
 /**
- * @brief Bit flag enum representing different SM architectures
+ * @brief Bit flag enum representing different SM architectures.
  *
  */
 enum sm_flag_t : unsigned {
@@ -40,9 +40,9 @@ enum sm_flag_t : unsigned {
 namespace detail {
 
 /**
- * @brief Abstract base class for launch parameters
+ * @brief Abstract base class for launch parameters.
  *
- * @tparam sm_flags_ Bitwise flags indicating SM versions (sm_flag_t enum)
+ * @tparam sm_flags_ Bitwise flags indicating SM versions (`sm_flag_t` enum).
  */
 template <sm_flag_t sm_flags_>
 struct launch_params_abc_t {
@@ -53,9 +53,9 @@ struct launch_params_abc_t {
 };
 
 /**
- * @brief False value dependent on template param so compiler can't optimize
+ * @brief False value dependent on template param so compiler can't optimize.
  *
- * @tparam T Arbitrary type
+ * @tparam T Arbitrary type.
  */
 template <typename T>
 struct always_false {
@@ -63,9 +63,9 @@ struct always_false {
 };
 
 /**
- * @brief Raises static assert when template is instantiated
+ * @brief Raises static assert when template is instantiated.
  *
- * @tparam T Arbitrary type
+ * @tparam T Arbitrary type.
  */
 template <typename T>
 struct raise_not_found_error_t {
@@ -80,10 +80,11 @@ struct raise_not_found_error_t {
 #define _SM_FLAG(ver) sm_##ver
 
 /**
- * @brief Subsets a pack of launch parameters (children of launch_params_abc_t),
- * selecting the ones that match the architecture being compiled for
+ * @brief Subsets a pack of launch parameters (children of
+ * `launch_params_abc_t`), selecting the ones that match the architecture being
+ * compiled for.
  *
- * @tparam lp_v Pack of launch_params_t types for each desired arch
+ * @tparam lp_v Pack of `launch_params_t` types for each desired arch.
  */
 template <typename... lp_v>
 using match_launch_params_t = decltype(std::tuple_cat(
