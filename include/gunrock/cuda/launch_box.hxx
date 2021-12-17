@@ -1,5 +1,5 @@
 /**
- * @file device_properties.hxx
+ * @file launch_box.hxx
  * @author Cameron Shinn (ctshinn@ucdavis.edu)
  * @brief
  * @version 0.1
