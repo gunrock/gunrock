@@ -8,9 +8,9 @@ set(FETCHCONTENT_BASE_DIR ${FC_BASE})
 
 FetchContent_Declare(
     moderngpu
-    GIT_REPOSITORY https://github.com/moderngpu/moderngpu.git
-    # tag at master branch:
-    GIT_TAG        2b3985541c8e88a133769598c406c33ddde9d0a5
+    GIT_REPOSITORY https://github.com/neoblizz/moderngpu.git
+    # tag at master branch of neoblizz/moderngpu.
+    GIT_TAG        005129d1cd70906f2b8bc17d95ee35560bc0e151
 )
 
 FetchContent_GetProperties(moderngpu)
