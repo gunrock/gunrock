@@ -10,7 +10,7 @@ FetchContent_Declare(
     moderngpu
     GIT_REPOSITORY https://github.com/neoblizz/moderngpu.git
     # tag at master branch of neoblizz/moderngpu.
-    GIT_TAG        005129d1cd70906f2b8bc17d95ee35560bc0e151
+    GIT_TAG        origin/master
 )
 
 FetchContent_GetProperties(moderngpu)
