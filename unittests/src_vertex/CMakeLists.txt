@@ -17,5 +17,5 @@ set_target_properties(${APPLICATION_NAME}
         CUDA_ARCHITECTURES ${ESSENTIALS_ARCHITECTURES}
 ) # XXX: Find a better way to inherit essentials properties.
 
-message("-- Example Added: ${APPLICATION_NAME}")
+message(STATUS "Example Added: ${APPLICATION_NAME}")
 # end /* Add CUDA executables */
