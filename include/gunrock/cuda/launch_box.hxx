@@ -11,6 +11,7 @@
 #pragma once
 
 #include <gunrock/cuda/detail/launch_box.hxx>
+#include <gunrock/cuda/sm.hxx>
 #include <gunrock/cuda/device_properties.hxx>
 #include <gunrock/cuda/context.hxx>
 #include <gunrock/error.hxx>
@@ -40,36 +41,6 @@ struct dim3_t {
   enum : unsigned int { x = x_, y = y_, z = z_, size = x_ * y_ * z_ };
   static constexpr dim3 get_dim3() { return dim3(x, y, z); }
 };
-
-/**
- * @brief Bit flag enum representing different SM architectures.
- *
- */
-enum sm_flag_t : unsigned;
-
-/**
- * @brief Overloaded bitwise OR operator.
- *
- * @param lhs Left-hand side.
- * @param rhs Right-hand side.
- * \return sm_flag_t
- */
-constexpr sm_flag_t operator|(sm_flag_t lhs, sm_flag_t rhs) {
-  return static_cast<sm_flag_t>(static_cast<unsigned>(lhs) |
-                                static_cast<unsigned>(rhs));
-}
-
-/**
- * @brief Overloaded bitwise AND operator.
- *
- * @param lhs Left-hand side.
- * @param rhs Right-hand side.
- * \return sm_flag_t
- */
-constexpr sm_flag_t operator&(sm_flag_t lhs, sm_flag_t rhs) {
-  return static_cast<sm_flag_t>(static_cast<unsigned>(lhs) &
-                                static_cast<unsigned>(rhs));
-}
 
 /**
  * @brief Collection of kernel launch parameters for different architectures.
