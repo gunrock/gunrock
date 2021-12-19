@@ -44,14 +44,14 @@ void test_fallback() {
                       EXPECTED_SMEM>>
       launch_t;
 
-  assert(launch_t::block_dimensions::x == EXPECTED_BLOCK &&
-         launch_t::grid_dimensions::x == EXPECTED_GRID &&
+  assert(launch_t::block_dimensions_t::x == EXPECTED_BLOCK &&
+         launch_t::grid_dimensions_t::x == EXPECTED_GRID &&
          launch_t::shared_memory_bytes == EXPECTED_SMEM);
 }
 
 void test_define() {
-  dim3 block_dimensions = launch_t::block_dimensions::get_dim3();
-  dim3 grid_dimensions = launch_t::grid_dimensions::get_dim3();
+  dim3 block_dimensions = launch_t::block_dimensions_t::get_dim3();
+  dim3 grid_dimensions = launch_t::grid_dimensions_t::get_dim3();
   size_t smem = launch_t::shared_memory_bytes;
 
   std::cout << "block_dimensions:    " << block_dimensions.x << ", "

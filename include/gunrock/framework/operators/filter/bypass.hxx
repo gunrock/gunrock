@@ -22,19 +22,25 @@ void execute(graph_t& G,
 
   output->set_number_of_elements(input->get_number_of_elements());
 
+  auto input_ptr = input->data();
+
   // Mark items as invalid instead of removing them (therefore, a "bypass").
-  auto bypass = [=] __device__(type_t const& i) {
-    if (!gunrock::util::limits::is_valid(i))
+  auto bypass = [=] __device__(std::size_t const& idx) {
+    auto v = input_ptr[idx];
+    if (!gunrock::util::limits::is_valid(v))
       return gunrock::numeric_limits<type_t>::invalid();  // exit early
-    return (op(i) ? i : gunrock::numeric_limits<type_t>::invalid());
+    return (op(v) ? v : gunrock::numeric_limits<type_t>::invalid());
   };
 
+  std::size_t end = input->get_number_of_elements();
+
   // Filter with bypass
-  thrust::transform(thrust::cuda::par.on(context.stream()),  // execution policy
-                    input->begin(),   // input iterator: begin
-                    input->end(),     // input iterator: end
-                    output->begin(),  // output iterator
-                    bypass            // predicate
+  thrust::transform(
+      thrust::cuda::par.on(context.stream()),          // execution policy
+      thrust::make_counting_iterator<std::size_t>(0),  // input iterator: first
+      thrust::make_counting_iterator<std::size_t>(end),  // input iterator: last
+      output->begin(),                                   // output iterator
+      bypass                                             // predicate
   );
 }
 

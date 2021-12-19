@@ -76,15 +76,15 @@ struct enactor_properties_t {
  *
  */
 template <typename algorithm_problem_t,
-          frontier_kind_t frontier_kind = frontier_kind_t::vertex_frontier>
+          frontier::frontier_kind_t frontier_kind =
+              frontier::frontier_kind_t::vertex_frontier,
+          frontier::frontier_view_t frontier_view =
+              frontier::frontier_view_t::vector>
 struct enactor_t {
   using vertex_t = typename algorithm_problem_t::vertex_t;
   using edge_t = typename algorithm_problem_t::edge_t;
 
-  using frontier_type = frontier_t<
-      std::conditional_t<frontier_kind == frontier_kind_t::vertex_frontier,
-                         vertex_t,
-                         edge_t>>;
+  using frontier_t = frontier::frontier_t<vertex_t, edge_t, frontier_kind>;
 
   /*!
    * Enactor properties (frontier resizing factor, buffers, etc.)
@@ -105,7 +105,7 @@ struct enactor_t {
   /*!
    * Vector of frontier buffers (default number of buffers = 2).
    */
-  thrust::host_vector<frontier_type> frontiers;
+  thrust::host_vector<frontier_t> frontiers;
 
   /*!
    * Extra space to store scan of the work domain (for advance).
@@ -120,14 +120,14 @@ struct enactor_t {
    * Active frontier buffer, this pointer can be obtained by
    * `get_input_frontier()` method. This buffer is used as an input frontier.
    */
-  frontier_type* active_frontier;
+  frontier_t* active_frontier;
 
   /*!
    * Inactive frontier buffer, this pointer can be obtained by
    * `get_output_frontier()` method. This buffer is often but not always used as
    * an output frontier.
    */
-  frontier_type* inactive_frontier;
+  frontier_t* inactive_frontier;
 
   /*!
    * An internal selector used to swap frontier buffers.
@@ -165,8 +165,8 @@ struct enactor_t {
         properties(_properties),
         context(_context),
         frontiers(properties.number_of_frontier_buffers),
-        active_frontier(&frontiers[0]),
-        inactive_frontier(&frontiers[1]),
+        active_frontier(reinterpret_cast<frontier_t*>(&frontiers[0])),
+        inactive_frontier(reinterpret_cast<frontier_t*>(&frontiers[1])),
         buffer_selector(0),
         iteration(0),
         scanned_work_domain(problem->get_graph().get_number_of_vertices()) {
@@ -196,28 +196,24 @@ struct enactor_t {
    * @brief Get the problem pointer object
    * @return algorithm_problem_t*
    */
-  algorithm_problem_t* get_problem() { return problem; }
+  algorithm_problem_t* get_problem() {
+    return reinterpret_cast<algorithm_problem_t*>(problem);
+  }
 
   /**
    * @brief Get the frontier pointer object
-   * @return frontier_type*
+   * @return frontier_t*
    */
-  frontier_type* get_input_frontier() { return active_frontier; }
+  frontier_t* get_input_frontier() {
+    return reinterpret_cast<frontier_t*>(active_frontier);
+  }
 
   /**
    * @brief Get the frontier pointer object
-   * @return frontier_type*
+   * @return frontier_t*
    */
-  frontier_type* get_output_frontier() { return inactive_frontier; }
-
-  /**
-   * @brief Swap the inactive and active frontier buffers such that the inactive
-   * buffer becomes the input buffer to the next operator and vice-versa.
-   */
-  void swap_frontier_buffers() {
-    buffer_selector ^= 1;
-    active_frontier = &frontiers[buffer_selector];
-    inactive_frontier = &frontiers[buffer_selector ^ 1];
+  frontier_t* get_output_frontier() {
+    return reinterpret_cast<frontier_t*>(inactive_frontier);
   }
 
   /**
@@ -225,6 +221,18 @@ struct enactor_t {
    * @return enactor_t*
    */
   enactor_t* get_enactor() { return this; }
+
+  /**
+   * @brief Swap the inactive and active frontier buffers such that the inactive
+   * buffer becomes the input buffer to the next operator and vice-versa.
+   */
+  void swap_frontier_buffers() {
+    buffer_selector ^= 1;
+    active_frontier =
+        reinterpret_cast<frontier_t*>(&frontiers[buffer_selector]);
+    inactive_frontier =
+        reinterpret_cast<frontier_t*>(&frontiers[buffer_selector ^ 1]);
+  }
 
   /**
    * @brief Run the enactor with the given problem and the loop.
@@ -266,8 +274,8 @@ struct enactor_t {
    *
    * @param context `gunrock::cuda::multi_context_t`.
    */
-  virtual void prepare_frontier(frontier_type* f,
-                                cuda::multi_context_t& context) = 0;
+  virtual void prepare_frontier(frontier_t* f,
+                                cuda::multi_context_t& context){};
 
   /**
    * @brief Algorithm is converged if true is returned, keep on iterating if

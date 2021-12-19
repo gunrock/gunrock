@@ -1,7 +1,7 @@
 /**
- * @file sssp.hxx
+ * @file ppr.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
- * @brief Single-Source Shortest Path algorithm.
+ * @brief Personalized Page-Rank.
  * @version 0.1
  * @date 2020-10-05
  *
@@ -94,8 +94,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using vertex_t = typename problem_t::vertex_t;
   using edge_t = typename problem_t::edge_t;
   using weight_t = typename problem_t::weight_t;
+  using frontier_t = typename enactor_t<problem_t>::frontier_t;
 
-  void prepare_frontier(frontier_t<vertex_t>* f,
+  void prepare_frontier(frontier_t* f,
                         cuda::multi_context_t& context) override {
     auto P = this->get_problem();
     f->push_back(P->param.seed);
