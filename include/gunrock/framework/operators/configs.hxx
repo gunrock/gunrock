@@ -86,7 +86,7 @@ enum uniquify_algorithm_t {
 enum parallel_for_each_t {
   vertex,  /// for each vertex in the graph
   edge,    /// for each edge in the graph
-  weight   /// for each weight in the graph (todo)
+  weight   /// for each weight in the graph
 };
 
 }  // namespace operators

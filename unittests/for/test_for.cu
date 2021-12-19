@@ -1,67 +1,83 @@
-#include <cstdlib>            // EXIT_SUCCESS
-#include <gunrock/error.hxx>  // error checking
+#include <cstdlib>  // EXIT_SUCCESS
 
-#include <gunrock/container/array.hxx>  // array support for the loop
-#include <gunrock/cuda/context.hxx>     // context to run on
+#include <gunrock/error.hxx>                        // error checking
+#include <gunrock/graph/graph.hxx>                  // graph class
+#include <gunrock/formats/formats.hxx>              // csr support
+#include <gunrock/cuda/cuda.hxx>                    // context to run on
+#include <gunrock/framework/operators/for/for.hxx>  // for operator
 
-#include <gunrock/framework/operators/for/for.hxx>       // for operator
-#include <gunrock/framework/operators/for/for_each.hxx>  // for_each operator
-
-void test_for() {
+void test_for(int num_arguments, char** argument_array) {
   using namespace gunrock;
 
-  constexpr std::size_t N = 10;
+  using vertex_t = int;
+  using edge_t = int;
+  using weight_t = float;
 
-  gunrock::array<float, N> host;
+  using csr_t =
+      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
 
-  float* pointer = host.data();
-  const float* const_pointer = host.data();
+  // --
+  // IO
 
-  std::size_t size = host.size();
-  std::size_t max_size = host.max_size();
-  bool is_empty = host.empty();
+  csr_t csr;
+  std::string filename = argument_array[1];
 
-  std::cout << "Array.size() = " << size << std::endl;
-  std::cout << "Array.max_size() = " << max_size << std::endl;
-  std::cout << "Is Array Empty? " << std::boolalpha << is_empty << std::endl;
-
-  for (std::size_t i = 0; i < N; ++i) {
-    host[i] = i;
-    std::cout << "host[" << i << "] = " << host[i] << std::endl;
+  if (util::is_market(filename)) {
+    io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+    csr.from_coo(mm.load(filename));
+  } else if (util::is_binary_csr(filename)) {
+    csr.read_binary(filename);
+  } else {
+    std::cerr << "Unknown file format: " << filename << std::endl;
+    exit(1);
   }
+
+  // --
+  // Build graph
+
+  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
+      csr.number_of_rows,               // rows
+      csr.number_of_columns,            // columns
+      csr.number_of_nonzeros,           // nonzeros
+      csr.row_offsets.data().get(),     // row_offsets
+      csr.column_indices.data().get(),  // column_indices
+      csr.nonzero_values.data().get()   // values
+  );  // supports row_indices and column_offsets (default = nullptr)
 
   // Initialize the context.
   cuda::device_id_t device = 0;
-  cuda::standard_context_t context(device);
+  cuda::multi_context_t context(device);
 
-  // Run parallel_for, create an array inside for and set/print the values.
-  operators::parallel_for::execute(0, N,
-                                   [N] __host__ __device__(std::size_t & i) {
-                                     gunrock::array<float, N> device;
-                                     device[i] = i;
-                                     printf("a[%i] = %f\n", (int)i, device[i]);
-                                   },
-                                   context);
+  auto vertex_op = [=] __device__(vertex_t const& v) -> void {
+    printf("%i\n", v);
+  };
 
-  // Without synchronize, it won't print.
-  context.synchronize();
+  auto edge_op = [=] __device__(edge_t const& e) -> void { printf("%i\n", e); };
 
-  thrust::device_vector<float> v(N);
-  auto data = v.data().get();
+  auto weight_op = [=] __device__(weight_t const& w) -> void {
+    printf("%f\n", w);
+  };
 
-  // Run parallel_for_each, create an array inside for and set/print the values.
-  operators::parallel_for_each::execute(
-      data, 0, N,
-      [] __host__ __device__(float* reference) {
-        *reference = 1;
-        printf("%f\n", *reference);
-      },
-      context);
+  operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
+      G,          // graph
+      vertex_op,  // lambda function
+      context     // context
+  );
 
-  context.synchronize();
+  operators::parallel_for::execute<operators::parallel_for_each_t::edge>(
+      G,        // graph
+      edge_op,  // lambda function
+      context   // context
+  );
+
+  operators::parallel_for::execute<operators::parallel_for_each_t::weight>(
+      G,          // graph
+      weight_op,  // lambda function
+      context     // context
+  );
 }
 
 int main(int argc, char** argv) {
-  test_for();
+  test_for(argc, argv);
   return EXIT_SUCCESS;
 }

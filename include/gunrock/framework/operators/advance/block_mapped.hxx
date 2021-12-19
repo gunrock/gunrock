@@ -1,5 +1,5 @@
 /**
- * @file thread_mapped.hxx
+ * @file block_mapped.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief
  * @version 0.1
@@ -12,9 +12,7 @@
 #pragma once
 
 #include <gunrock/util/math.hxx>
-#include <gunrock/cuda/context.hxx>
-#include <gunrock/cuda/launch_box.hxx>
-#include <gunrock/cuda/global.hxx>
+#include <gunrock/cuda/cuda.hxx>
 
 #include <gunrock/framework/operators/configs.hxx>
 
@@ -181,15 +179,19 @@ void execute(graph_t& G,
                               ? G.get_number_of_vertices()
                               : input->get_number_of_elements();
 
-  // TODO: Use launch_box_t instead.
-  constexpr int block_size = 128;
-  int grid_size = (work_size + block_size - 1) / block_size;
+  using namespace gunrock::cuda::launch_box;
+  using launch_t = launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
+
+  launch_t launch_box(dim3((work_size + launch_t::block_dimensions_t::x - 1) / launch_t::block_dimensions_t::x), context);
 
   // Launch blocked-mapped advance kernel.
-  block_mapped_kernel<block_size, 1, input_type, output_type>
-      <<<grid_size, block_size, 0, context.stream()>>>(
-          G, op, input->data(), output->data(), work_size,
-          segments.data().get());
+  block_mapped_kernel<launch_t::block_dimensions_t::x, 1, input_type, output_type>
+      <<<launch_box.grid_dimensions,     // grid dimensions
+         launch_box.block_dimensions,    // block dimensions
+         launch_box.shared_memory_bytes, // shared memory
+         launch_box.context.stream()     // context
+         >>>(G, op, input->data(), output->data(), work_size,
+             segments.data().get());
   context.synchronize();
 }
 
