@@ -48,7 +48,7 @@ jobs:
         
       - name: Build all applications
         # Build your program with the given configuration
-        run: cmake --build ${{github.workspace}}/build # --target sssp
+        run: cmake --build ${{github.workspace}}/build --verbose # --target sssp
         
         # TODO: Use the following once we have BUILD_TYPE and envrionment variables set-up:
         # run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}

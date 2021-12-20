@@ -15,7 +15,7 @@ project(essentials
 )
 
 # Increase verbosity.
-set(CMAKE_VERBOSE_MAKEFILE ON)
+# set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # begin /* Dependencies directory */
 set(PROJECT_DEPS_DIR externals)
@@ -121,7 +121,7 @@ set(CXX_FLAGS
   >
   $<$<CXX_COMPILER_ID:GNU>:
     -Wall 
-    -Wextra
+    # -Wextra
     -Wno-unused-result
     -Wno-unused-local-typedefs
     -Wno-strict-aliasing
