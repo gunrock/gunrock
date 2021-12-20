@@ -21,8 +21,7 @@ jobs:
     steps:
       # Runs a single command using the runners shell
       - name: Check nvcc/nvidia-smi version
-        run: nvcc -V
-        run: nvidia-smi
+        run: nvcc -V && nvidia-smi
         
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
