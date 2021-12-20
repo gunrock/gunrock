@@ -64,7 +64,7 @@ constexpr __host__ __device__ __forceinline__ bool is_valid(type_t value) {
   if (std::is_integral<type_t>::value)
     return (value != gunrock::numeric_limits<type_t>::invalid());
   else
-    return isnan(value) ? false : true;
+    return isnan(static_cast<double>(value)) ? false : true;
 }
 
 }  // namespace limits

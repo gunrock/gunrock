@@ -4,10 +4,29 @@
 #include <gunrock/util/type_limits.hxx>
 
 void test_type_limits() {
-  using type_t = unsigned int;
-  type_t i = gunrock::numeric_limits<type_t>::invalid();
-  std::cout << "i = " << i << " (is valid? " << std::boolalpha
-            << gunrock::util::limits::is_valid(i) << ")" << std::endl;
+  std::cout << "invalid = " << gunrock::numeric_limits<int>::invalid()
+            << " (is valid? " << std::boolalpha
+            << gunrock::util::limits::is_valid(
+                   gunrock::numeric_limits<int>::invalid())
+            << ")" << std::endl;
+
+  std::cout << "invalid = " << gunrock::numeric_limits<float>::invalid()
+            << " (is valid? " << std::boolalpha
+            << gunrock::util::limits::is_valid(
+                   gunrock::numeric_limits<float>::invalid())
+            << ")" << std::endl;
+
+  std::cout << "invalid = " << gunrock::numeric_limits<double>::invalid()
+            << " (is valid? " << std::boolalpha
+            << gunrock::util::limits::is_valid(
+                   gunrock::numeric_limits<double>::invalid())
+            << ")" << std::endl;
+
+  std::cout << "invalid = " << gunrock::numeric_limits<unsigned int>::invalid()
+            << " (is valid? " << std::boolalpha
+            << gunrock::util::limits::is_valid(
+                   gunrock::numeric_limits<unsigned int>::invalid())
+            << ")" << std::endl;
 }
 
 int main(int argc, char** argv) {
