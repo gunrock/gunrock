@@ -164,8 +164,8 @@ void test_geo(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::geo::run(G, coordinates.data().get(),
-                                        total_iterations, spatial_iterations);
+  // float gpu_elapsed = gunrock::geo::run(G, coordinates.data().get(),
+  // total_iterations, spatial_iterations);
 
   // --
   // Log + Validate
