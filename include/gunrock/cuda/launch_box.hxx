@@ -36,9 +36,14 @@ struct dimensions_t {
       : x(_x), y(_y), z(_z) {}
 
   __host__ __device__ constexpr unsigned int size() const { return x * y * z; }
+
+#ifdef _MSC_VER
+  __host__ __device__ operator dim3(void) const { return uint3{x, y, z}; }
+#else
   __host__ __device__ constexpr operator dim3(void) const {
     return uint3{x, y, z};
   }
+#endif
 };
 
 /**
