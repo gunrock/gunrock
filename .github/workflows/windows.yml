@@ -1,0 +1,54 @@
+# Gunrock/Essentials Windows Workflow
+name: Windows
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the master and dev branch
+  push:
+    branches: [ master, dev ]
+  pull_request:
+    branches: [ master, dev ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: windows-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Fetch CUDA toolkit using Jimver/cuda-toolkit@v0.2.5
+      - name: Fetch CUDA toolkit
+        uses: Jimver/cuda-toolkit@v0.2.5
+        id: cuda-toolkit
+        with:
+          cuda: '11.4.0' # Build fails @ 11.5.1, 11.3.1
+          linux-local-args: '["--toolkit"]'
+
+      # Runs a single command using the runners shell
+      - name: Check nvcc version
+        run: nvcc -V
+        
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+      
+      - name: Configure cmake
+        # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
+        # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
+        run: cmake -B ${{github.workspace}}/build -D ESSENTIALS_BUILD_TESTS=ON #-DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} 
+      
+      # See issue: https://github.com/NVIDIA/thrust/issues/1328
+      # And... https://github.com/gunrock/essentials/issues/92
+      - name: Remove CUB symbolic link
+        run: rm ${{github.workspace}}/externals/thrust-src/cub
+        
+      - name: Build all applications
+        # Build your program with the given configuration
+        run: cmake --build ${{github.workspace}}/build # --target sssp
+        
+        # TODO: Use the following once we have BUILD_TYPE and envrionment variables set-up:
+        # run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
