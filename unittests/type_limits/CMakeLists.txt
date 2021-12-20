@@ -1,5 +1,5 @@
 # begin /* Set the application name. */
-set(APPLICATION_NAME launch_box)
+set(APPLICATION_NAME type_limits)
 # end /* Set the application name. */
 
 # begin /* Add CUDA executables */

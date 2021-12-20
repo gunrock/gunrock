@@ -57,16 +57,17 @@ namespace util {
 namespace limits {
 
 template <typename type_t>
-__host__ __device__ __forceinline__ bool is_valid(type_t value) {
+constexpr __host__ __device__ __forceinline__ bool is_valid(type_t value) {
   static_assert((std::is_integral<type_t>::value ||
                  std::is_floating_point<type_t>::value),
                 "type_t must be an arithmetic type.");
-  if constexpr (std::is_integral<type_t>::value)
-    return (value != gunrock::numeric_limits<type_t>::invalid());
 
-  // else if constexpr (std::is_floating_point<type_t>::value)
-  // just putting else doesn't work (gives a warning), even though it should...
-  return isnan(value) ? false : true;  // XXX: test this on device
+  // Trying:
+  // https://stackoverflow.com/questions/61646166/how-to-resolve-fpclassify-ambiguous-call-to-overloaded-function
+  if (std::is_integral<type_t>::value)
+    return (value != gunrock::numeric_limits<type_t>::invalid());
+  else
+    return isnan(static_cast<double>(value)) ? false : true;
 }
 
 }  // namespace limits

@@ -50,8 +50,9 @@ void test_fallback() {
 }
 
 void test_define() {
-  dim3 block_dimensions = launch_t::block_dimensions_t::get_dim3();
-  dim3 grid_dimensions = launch_t::grid_dimensions_t::get_dim3();
+  dimensions_t block_dimensions = launch_t::block_dimensions_t::dimensions();
+  dimensions_t grid_dimensions = launch_t::grid_dimensions_t::dimensions();
+  dim3 conversion_test = block_dimensions;
   size_t smem = launch_t::shared_memory_bytes;
 
   std::cout << "block_dimensions:    " << block_dimensions.x << ", "

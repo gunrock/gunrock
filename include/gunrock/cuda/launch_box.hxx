@@ -25,8 +25,26 @@
 
 namespace gunrock {
 namespace cuda {
-
 namespace launch_box {
+
+struct dimensions_t {
+  unsigned int x, y, z;
+
+  __host__ __device__ constexpr dimensions_t(const unsigned int _x = 1,
+                                             const unsigned int _y = 1,
+                                             const unsigned int _z = 1)
+      : x(_x), y(_y), z(_z) {}
+
+  __host__ __device__ constexpr unsigned int size() const { return x * y * z; }
+
+#ifdef _MSC_VER
+  __host__ __device__ operator dim3(void) const { return uint3{x, y, z}; }
+#else
+  __host__ __device__ constexpr operator dim3(void) const {
+    return uint3{x, y, z};
+  }
+#endif
+};
 
 /**
  * @brief CUDA dim3 template representation, since dim3 cannot be used as a
@@ -36,10 +54,14 @@ namespace launch_box {
  * @tparam y_ (default = `1`) Dimension in the Y direction.
  * @tparam z_ (default = `1`) Dimension in the Z direction.
  */
-template <unsigned int x_, unsigned int y_ = 1, unsigned int z_ = 1>
+template <unsigned int x_ = 1, unsigned int y_ = 1, unsigned int z_ = 1>
 struct dim3_t {
-  enum : unsigned int { x = x_, y = y_, z = z_, size = x_ * y_ * z_ };
-  static constexpr dim3 get_dim3() { return dim3(x, y, z); }
+  enum : unsigned int { x = x_, y = y_, z = z_ };
+  static constexpr unsigned int size() { return x * y * z; }
+  static constexpr dimensions_t dimensions() { return {x, y, z}; }
+
+  // Convertors must be non-static members.
+  constexpr operator dimensions_t(void) { return {x, y, z}; }
 };
 
 /**
@@ -97,13 +119,15 @@ template <sm_flag_t sm_flags_,
           typename block_dimensions_,
           typename grid_dimensions_,
           size_t shared_memory_bytes_ = 0>
-struct launch_params_t : detail::launch_params_abc_t<sm_flags_> {
+struct launch_params_t : detail::launch_params_base_t<sm_flags_> {
   typedef block_dimensions_ block_dimensions_t;
   typedef grid_dimensions_ grid_dimensions_t;
   enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
 
-  static constexpr dim3 block_dimensions = block_dimensions_t::get_dim3();
-  static constexpr dim3 grid_dimensions = grid_dimensions_t::get_dim3();
+  static constexpr dimensions_t block_dimensions =
+      block_dimensions_t::dimensions();
+  static constexpr dimensions_t grid_dimensions =
+      grid_dimensions_t::dimensions();
   standard_context_t& context;
 
   launch_params_t(standard_context_t& context_) : context(context_) {}
@@ -121,15 +145,17 @@ struct launch_params_t : detail::launch_params_abc_t<sm_flags_> {
 template <sm_flag_t sm_flags_,
           typename grid_dimensions_,
           size_t shared_memory_bytes_ = 0>
-struct launch_params_dynamic_block_t : detail::launch_params_abc_t<sm_flags_> {
+struct launch_params_dynamic_block_t : detail::launch_params_base_t<sm_flags_> {
   typedef grid_dimensions_ grid_dimensions_t;
   enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
 
-  dim3 block_dimensions;
-  static constexpr dim3 grid_dimensions = grid_dimensions_t::get_dim3();
+  dimensions_t block_dimensions;
+  static constexpr dimensions_t grid_dimensions =
+      grid_dimensions_t::dimensions();
+
   standard_context_t& context;
 
-  launch_params_dynamic_block_t(dim3 block_dimensions_,
+  launch_params_dynamic_block_t(dimensions_t block_dimensions_,
                                 standard_context_t& context_)
       : block_dimensions(block_dimensions_), context(context_) {}
 };
@@ -146,17 +172,33 @@ struct launch_params_dynamic_block_t : detail::launch_params_abc_t<sm_flags_> {
 template <sm_flag_t sm_flags_,
           typename block_dimensions_,
           size_t shared_memory_bytes_ = 0>
-struct launch_params_dynamic_grid_t : detail::launch_params_abc_t<sm_flags_> {
+struct launch_params_dynamic_grid_t : detail::launch_params_base_t<sm_flags_> {
   typedef block_dimensions_ block_dimensions_t;
   enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
 
-  static constexpr dim3 block_dimensions = block_dimensions_t::get_dim3();
-  dim3 grid_dimensions;
+  static constexpr dimensions_t block_dimensions =
+      block_dimensions_t::dimensions();
+
+  dimensions_t grid_dimensions;
   standard_context_t& context;
 
-  launch_params_dynamic_grid_t(dim3 grid_dimensions_,
-                               standard_context_t& context_)
-      : grid_dimensions(grid_dimensions_), context(context_) {}
+  launch_params_dynamic_grid_t(standard_context_t& context_)
+      : context(context_) {}
+
+  void calculate_grid_dimensions(std::size_t num_elements) {
+    grid_dimensions = dimensions_t(
+        (num_elements + block_dimensions.x - 1) / block_dimensions.x, 1, 1);
+  }
+
+  /**
+   * @brief Launch a kernel within the given launch box.
+   */
+  template <typename func_t, typename... args_t>
+  void launch(func_t __, args_t&&... args) {
+    __<<<  // kernel function.
+        grid_dimensions, block_dimensions, shared_memory_bytes,
+        context.stream()>>>(std::forward<args_t>(args)...);
+  }
 };
 
 /**
@@ -169,7 +211,7 @@ struct launch_params_dynamic_grid_t : detail::launch_params_abc_t<sm_flags_> {
 template <typename launch_box_t, typename func_t>
 inline float occupancy(func_t kernel) {
   int max_active_blocks;
-  int block_size = launch_box_t::block_dimensions_t::size;
+  int block_size = launch_box_t::block_dimensions_t::size();
   int device;
   cudaDeviceProp props;
 

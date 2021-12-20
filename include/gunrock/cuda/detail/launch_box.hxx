@@ -24,11 +24,11 @@ namespace detail {
  * @tparam sm_flags_ Bitwise flags indicating SM versions (`sm_flag_t` enum).
  */
 template <sm_flag_t sm_flags_>
-struct launch_params_abc_t {
+struct launch_params_base_t {
   enum : unsigned { sm_flags = sm_flags_ };
 
  protected:
-  launch_params_abc_t() {}
+  launch_params_base_t() {}
 };
 
 /**
@@ -60,7 +60,7 @@ struct raise_not_found_error_t {
 
 /**
  * @brief Subsets a pack of launch parameters (children of
- * `launch_params_abc_t`), selecting the ones that match the architecture being
+ * `launch_params_base_t`), selecting the ones that match the architecture being
  * compiled for, stored in a tuple type.
  *
  * @par Overview

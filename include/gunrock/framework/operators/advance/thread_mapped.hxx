@@ -97,17 +97,15 @@ void execute(graph_t& G,
                                  ? G.get_number_of_vertices()
                                  : input.get_number_of_elements();
 
-  using namespace gunrock::cuda::launch_box;
-  using launch_t = launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
+  // Set-up and launch thread-mapped advance.
+  using namespace cuda::launch_box;
+  using launch_t =
+      launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
 
-  launch_t launch_box(dim3((num_elements + launch_t::block_dimensions_t::x - 1) / launch_t::block_dimensions_t::x, 1, 1), context);
-
-  // Launch blocked-mapped advance kernel.
-  thread_mapped_kernel<<<launch_box.grid_dimensions,     // grid dimensions
-                         launch_box.block_dimensions,    // block dimensions
-                         launch_box.shared_memory_bytes, // shared memory
-                         launch_box.context.stream()     // context
-                         >>>(neighbors_expand, num_elements);
+  launch_t launch_box(context);
+  launch_box.calculate_grid_dimensions(num_elements);
+  auto __tm = thread_mapped_kernel<decltype(neighbors_expand)>;
+  launch_box.launch(__tm, neighbors_expand, num_elements);
   context.synchronize();
 }
 }  // namespace thread_mapped
