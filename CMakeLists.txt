@@ -8,7 +8,6 @@ set(ESSENTIALS_VERSION_PATCH 0)
 # end /* Update Essentials version */
 
 set(ESSENTIALS_VERSION "${ESSENTIALS_VERSION_MAJOR}.${ESSENTIALS_VERSION_MINOR}.${ESSENTIALS_VERSION_PATCH}")
-add_definitions("-DESSENTIALSVERSION=${ESSENTIALS_VERSION}")
 
 project(essentials
   VERSION ${ESSENTIALS_VERSION}
@@ -72,8 +71,7 @@ get_target_property(ESSENTIALS_ARCHITECTURES
 target_compile_definitions(essentials
   INTERFACE 
     SM_TARGET=${ESSENTIALS_ARCHITECTURES}
-    # For some reason, Thrust/CUB version mismatch on windows.
-    # $<$<PLATFORM_ID:Windows>:THRUST_IGNORE_CUB_VERSION_CHECK=1>
+    ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
 )
 
 ####################################################
