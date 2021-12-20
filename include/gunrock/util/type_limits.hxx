@@ -61,6 +61,9 @@ constexpr __host__ __device__ __forceinline__ bool is_valid(type_t value) {
   static_assert((std::is_integral<type_t>::value ||
                  std::is_floating_point<type_t>::value),
                 "type_t must be an arithmetic type.");
+
+  // Trying:
+  // https://stackoverflow.com/questions/61646166/how-to-resolve-fpclassify-ambiguous-call-to-overloaded-function
   if (std::is_integral<type_t>::value)
     return (value != gunrock::numeric_limits<type_t>::invalid());
   else
