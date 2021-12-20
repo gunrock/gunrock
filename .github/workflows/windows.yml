@@ -26,7 +26,7 @@ jobs:
         uses: Jimver/cuda-toolkit@v0.2.5
         id: cuda-toolkit
         with:
-          cuda: '11.4.0' # Build fails @ 11.5.1, 11.3.1
+          cuda: '11.5.1' # Build fails @ 11.5.1, 11.3.1 (11.4.0 passes except geo.cu)
           linux-local-args: '["--toolkit"]'
 
       # Runs a single command using the runners shell

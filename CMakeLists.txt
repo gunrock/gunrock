@@ -14,6 +14,9 @@ project(essentials
   LANGUAGES CXX CUDA
 )
 
+# Increase verbosity.
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
 # begin /* Dependencies directory */
 set(PROJECT_DEPS_DIR externals)
 # end /* Dependencies directory */
@@ -114,16 +117,16 @@ target_sources(essentials
 ####################################################
 set(CXX_FLAGS 
   $<$<CXX_COMPILER_ID:MSVC>:
-    -D_SCL_SECURE_NO_WARNINGS
+    /W4
   >
   $<$<CXX_COMPILER_ID:GNU>:
     -Wall 
+    -Wextra
     -Wno-unused-result
     -Wno-unused-local-typedefs
     -Wno-strict-aliasing
     -Wno-unused-function
     -Wno-format-security
-    # -Wextra
     # -Werror
     # -vvv
   >
