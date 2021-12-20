@@ -210,7 +210,11 @@ __device__ __host__ void spatial_median(graph_t& G,
       R.latitude = (T.latitude - y.latitude) * Dinvs;
       R.longitude = (T.longitude - y.longitude) * Dinvs;
       r = sqrt(R.latitude * R.latitude + R.longitude * R.longitude);
-      rinv = r == 0 ?: num_zeros / r;
+
+      // Was rinv = (r == 0) ?: (num_zeros / r);
+      // https://gcc.gnu.org/onlinedocs/gcc/Conditionals.html
+      // ... I hate myself too.
+      rinv = (r == 0) ? 0 : (num_zeros / r);
 
       y1.latitude = max(0.0f, 1 - rinv) * T.latitude +
                     min(1.0f, rinv) * y.latitude;  // latitude
@@ -394,9 +398,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
 template <typename graph_t>
 float run(graph_t& G,
-          coordinates_t* coordinates,              // Input/Output
-          unsigned int& total_iterations,          // Parameter
-          unsigned int& spatial_iterations = 1000  // Parameter
+          coordinates_t* coordinates,                   // Input/Output
+          const unsigned int total_iterations,          // Parameter
+          const unsigned int spatial_iterations = 1000  // Parameter
 ) {
   // <user-defined>
   using param_type = param_t;
