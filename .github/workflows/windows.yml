@@ -5,7 +5,7 @@ name: Windows
 on:
   # Triggers the workflow on push or pull request events but only for the master and dev branch
   push:
-    branches: [ master, dev, windows ]
+    branches: [ master, dev ]
   pull_request:
     branches: [ master, dev ]
 
@@ -26,7 +26,7 @@ jobs:
         uses: Jimver/cuda-toolkit@v0.2.5
         id: cuda-toolkit
         with:
-          cuda: '11.5.1' # Build fails @ 11.5.1, 11.3.1 (11.4.0 passes except geo.cu)
+          cuda: '11.5.1'
           linux-local-args: '["--toolkit"]'
 
       # Runs a single command using the runners shell
@@ -48,7 +48,7 @@ jobs:
         
       - name: Build all applications
         # Build your program with the given configuration
-        run: cmake --build ${{github.workspace}}/build --verbose # --target sssp
+        run: cmake --build ${{github.workspace}}/build # --verbose # --target sssp
         
         # TODO: Use the following once we have BUILD_TYPE and envrionment variables set-up:
         # run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
