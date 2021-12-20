@@ -37,7 +37,7 @@ jobs:
         
       - name: Build all applications
         # Build your program with the given configuration
-        run: cmake  --build ${{github.workspace}}/build -- target sssp # --config ${{env.BUILD_TYPE}}
+        run: cmake  --build ${{github.workspace}}/build --target sssp # --config ${{env.BUILD_TYPE}}
 
       - name: Run the applications
         run: ${{github.workspace}}/build/bin/sssp ${{github.workspace}}/datasets/chesapeake/chesapeake.mtx
