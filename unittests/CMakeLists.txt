@@ -9,4 +9,5 @@ add_subdirectory(copy_ctor)
 add_subdirectory(launch_box)
 add_subdirectory(device_properties)
 add_subdirectory(for)
+add_subdirectory(type_limits)
 # end /* Add unit tests' subdirectories */
