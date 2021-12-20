@@ -27,8 +27,8 @@ namespace operators {
 namespace advance {
 namespace block_mapped {
 
-template <int THREADS_PER_BLOCK,
-          int ITEMS_PER_THREAD,
+template <unsigned int THREADS_PER_BLOCK,
+          unsigned int ITEMS_PER_THREAD,
           advance_io_type_t input_type,
           advance_io_type_t output_type,
           typename graph_t,
@@ -175,23 +175,29 @@ void execute(graph_t& G,
     output->set_number_of_elements(size_of_output);
   }
 
-  std::size_t work_size = (input_type == advance_io_type_t::graph)
-                              ? G.get_number_of_vertices()
-                              : input->get_number_of_elements();
+  std::size_t num_elements = (input_type == advance_io_type_t::graph)
+                                 ? G.get_number_of_vertices()
+                                 : input->get_number_of_elements();
 
-  using namespace gunrock::cuda::launch_box;
-  using launch_t = launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
+  // Set-up and launch block-mapped advance.
+  using namespace cuda::launch_box;
+  using launch_t =
+      launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
 
-  launch_t launch_box(dim3((work_size + launch_t::block_dimensions_t::x - 1) / launch_t::block_dimensions_t::x), context);
+  launch_t launch_box(context);
 
-  // Launch blocked-mapped advance kernel.
-  block_mapped_kernel<launch_t::block_dimensions_t::x, 1, input_type, output_type>
-      <<<launch_box.grid_dimensions,     // grid dimensions
-         launch_box.block_dimensions,    // block dimensions
-         launch_box.shared_memory_bytes, // shared memory
-         launch_box.context.stream()     // context
-         >>>(G, op, input->data(), output->data(), work_size,
-             segments.data().get());
+  launch_box.calculate_grid_dimensions(num_elements);
+  auto __bm = block_mapped_kernel<        // kernel
+      launch_box.block_dimensions.x,      // threas per block
+      1,                                  // items per thread
+      input_type, output_type,            // i/o parameters
+      graph_t,                            // graph type
+      typename frontier_t::type_t,        // frontier value type
+      typename work_tiles_t::value_type,  // segments value type
+      operator_t                          // lambda type
+      >;
+  launch_box.launch(__bm, G, op, input->data(), output->data(), num_elements,
+                    segments.data().get());
   context.synchronize();
 }
 

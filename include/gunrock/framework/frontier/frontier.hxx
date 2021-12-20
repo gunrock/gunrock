@@ -38,6 +38,9 @@ class frontier_t : public frontier::vector_frontier_t<vertex_t, edge_t, _kind> {
  public:
   using vertex_type = vertex_t;
   using edge_type = edge_t;
+  using type_t = std::conditional_t<_kind == frontier_kind_t::vertex_frontier,
+                                    vertex_t,
+                                    edge_t>;
   using frontier_type = frontier_t<vertex_t, edge_t, _kind, _view>;
 
   /// TODO: This is a more permenant solution.
