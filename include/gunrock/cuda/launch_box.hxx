@@ -71,7 +71,7 @@ struct dim3_t {
  * A launch box is a collection of sets of CUDA kernel launch parameters each
  * corresponding to one or more SM architectures. At compile time, the launch
  * box's type resolves to the **first** launch parameters type (derived from
- * `launch_param_abc_t`) that match the SM architecture that Gunrock is being
+ * `launch_param_base_t`) that match the SM architecture that Gunrock is being
  * compiled for. If there isn't an explicit match, launch parameters for any SM
  * version can be specified at the end of the parameter pack using the
  * `fallback` enum for the `sm_flag_t` template parameter (note that this will
@@ -119,49 +119,55 @@ template <sm_flag_t sm_flags_,
           typename block_dimensions_,
           typename grid_dimensions_,
           size_t shared_memory_bytes_ = 0>
-struct launch_params_t : detail::launch_params_base_t<sm_flags_> {
+struct launch_params_t
+    : detail::launch_params_base_t<sm_flags_, shared_memory_bytes_> {
+  typedef detail::launch_params_base_t<sm_flags_, shared_memory_bytes_> base_t;
   typedef block_dimensions_ block_dimensions_t;
   typedef grid_dimensions_ grid_dimensions_t;
-  enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
 
   static constexpr dimensions_t block_dimensions =
       block_dimensions_t::dimensions();
   static constexpr dimensions_t grid_dimensions =
       grid_dimensions_t::dimensions();
-  standard_context_t& context;
 
-  launch_params_t(standard_context_t& context_) : context(context_) {}
+  /**
+   * @brief Launch a kernel within the given launch box.
+   *
+   * @par Overview
+   * This function is a reimplementation of `std::apply`, that allows for
+   * launching cuda kernels with launch param members of the class and a context
+   * argument. It follows the "possible implementation" of `std::apply` in the
+   * C++ reference: https://en.cppreference.com/w/cpp/utility/apply.
+   *
+   * @tparam func_t The type of the kernel function being passed in.
+   * @tparam args_tuple_t The type of the tuple of arguments being passed in.
+   * @param __ Kernel function to call.
+   * @param args Tuple of arguments to be expanded as the arguments of the
+   * kernel function.
+   * @param context Reference to the context used to launch the kernel (used for
+   * the context's stream).
+   */
+  template <typename func_t, typename args_tuple_t>
+  void launch(func_t&& __, args_tuple_t&& args, standard_context_t& context) {
+    expand_launch(
+        std::forward<func_t>(__), std::forward<args_tuple_t>(args), context,
+        std::make_index_sequence<
+            std::tuple_size_v<std::remove_reference_t<args_tuple_t>>>{});
+  }
+
+ private:
+  template <typename func_t, typename args_tuple_t, std::size_t... I>
+  void expand_launch(func_t&& __,
+                     args_tuple_t&& args,
+                     standard_context_t& context,
+                     std::index_sequence<I...>) {
+    __<<<grid_dimensions, block_dimensions, base_t::shared_memory_bytes,
+         context.stream()>>>(std::get<I>(std::forward<args_tuple_t>(args))...);
+  }
 };
 
 /**
- * @brief Set of launch parameters for a CUDA kernel (with non-static block
- * dimensions).
- *
- * @tparam sm_flags_ Bit flags for the SM architectures the launch parameters
- * correspond to.
- * @tparam grid_dimensions_ A `dim3_t` type representing the grid dimensions.
- * @tparam shared_memory_bytes_ Number of bytes of shared memory to allocate.
- */
-template <sm_flag_t sm_flags_,
-          typename grid_dimensions_,
-          size_t shared_memory_bytes_ = 0>
-struct launch_params_dynamic_block_t : detail::launch_params_base_t<sm_flags_> {
-  typedef grid_dimensions_ grid_dimensions_t;
-  enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
-
-  dimensions_t block_dimensions;
-  static constexpr dimensions_t grid_dimensions =
-      grid_dimensions_t::dimensions();
-
-  standard_context_t& context;
-
-  launch_params_dynamic_block_t(dimensions_t block_dimensions_,
-                                standard_context_t& context_)
-      : block_dimensions(block_dimensions_), context(context_) {}
-};
-
-/**
- * @brief Set of launch parameters for a CUDA kernel (with non-static grid
+ * @brief Set of launch parameters for a CUDA kernel (with dynamic grid
  * dimensions).
  *
  * @tparam sm_flags_ Bit flags for the SM architectures the launch parameters
@@ -172,18 +178,15 @@ struct launch_params_dynamic_block_t : detail::launch_params_base_t<sm_flags_> {
 template <sm_flag_t sm_flags_,
           typename block_dimensions_,
           size_t shared_memory_bytes_ = 0>
-struct launch_params_dynamic_grid_t : detail::launch_params_base_t<sm_flags_> {
+struct launch_params_dynamic_grid_t
+    : detail::launch_params_base_t<sm_flags_, shared_memory_bytes_> {
+  typedef detail::launch_params_base_t<sm_flags_, shared_memory_bytes_> base_t;
   typedef block_dimensions_ block_dimensions_t;
-  enum : size_t { shared_memory_bytes = shared_memory_bytes_ };
 
   static constexpr dimensions_t block_dimensions =
       block_dimensions_t::dimensions();
 
   dimensions_t grid_dimensions;
-  standard_context_t& context;
-
-  launch_params_dynamic_grid_t(standard_context_t& context_)
-      : context(context_) {}
 
   void calculate_grid_dimensions(std::size_t num_elements) {
     grid_dimensions = dimensions_t(
@@ -192,12 +195,37 @@ struct launch_params_dynamic_grid_t : detail::launch_params_base_t<sm_flags_> {
 
   /**
    * @brief Launch a kernel within the given launch box.
+   *
+   * @par Overview
+   * This function is a reimplementation of `std::apply`, that allows for
+   * launching cuda kernels with launch param members of the class and a context
+   * argument. It follows the "possible implementation" of `std::apply` in the
+   * C++ reference: https://en.cppreference.com/w/cpp/utility/apply.
+   *
+   * @tparam func_t The type of the kernel function being passed in.
+   * @tparam args_tuple_t The type of the tuple of arguments being passed in.
+   * @param __ Kernel function to call.
+   * @param args Tuple of arguments to be expanded as the arguments of the
+   * kernel function.
+   * @param context Reference to the context used to launch the kernel (used for
+   * the context's stream).
    */
-  template <typename func_t, typename... args_t>
-  void launch(func_t __, args_t&&... args) {
-    __<<<  // kernel function.
-        grid_dimensions, block_dimensions, shared_memory_bytes,
-        context.stream()>>>(std::forward<args_t>(args)...);
+  template <typename func_t, typename args_tuple_t>
+  void launch(func_t&& __, args_tuple_t&& args, standard_context_t& context) {
+    expand_launch(
+        std::forward<func_t>(__), std::forward<args_tuple_t>(args), context,
+        std::make_index_sequence<
+            std::tuple_size_v<std::remove_reference_t<args_tuple_t>>>{});
+  }
+
+ private:
+  template <typename func_t, typename args_tuple_t, std::size_t... I>
+  void expand_launch(func_t&& __,
+                     args_tuple_t&& args,
+                     standard_context_t& context,
+                     std::index_sequence<I...>) {
+    __<<<grid_dimensions, block_dimensions, base_t::shared_memory_bytes,
+         context.stream()>>>(std::get<I>(std::forward<args_tuple_t>(args))...);
   }
 };
 
