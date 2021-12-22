@@ -175,3 +175,19 @@ option(ESSENTIALS_BUILD_TESTS
 if(ESSENTIALS_BUILD_TESTS)
   add_subdirectory(unittests)
 endif(ESSENTIALS_BUILD_TESTS)
+
+####################################################
+################ BUILD BENCHMARKS  #################
+####################################################
+option(ESSENTIALS_BUILD_BENCHMARKS
+  "If on, builds essentials with benchmarking support."
+  OFF)
+
+# Subdirectories for examples, testing and documentation
+if(ESSENTIALS_BUILD_BENCHMARKS)
+  include(${PROJECT_SOURCE_DIR}/cmake/FetchNVBench.cmake)
+  target_include_directories(essentials
+    INTERFACE ${NVBENCH_INCLUDE_DIR}
+  )
+  add_subdirectory(benchmarks)
+endif(ESSENTIALS_BUILD_BENCHMARKS)
