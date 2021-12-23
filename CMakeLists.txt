@@ -77,6 +77,8 @@ target_compile_definitions(essentials
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
 )
 
+message(STATUS "Essentials CUDA Architecture: ${ESSENTIALS_ARCHITECTURES}")
+
 ####################################################
 ############ TARGET COMPILE FEATURES ###############
 ####################################################
@@ -187,6 +189,8 @@ option(ESSENTIALS_BUILD_BENCHMARKS
 
 # Subdirectories for examples, testing and documentation
 if(ESSENTIALS_BUILD_BENCHMARKS)
+  # ... see https://github.com/NVIDIA/nvbench/issues/66
+  set(NVBench_ENABLE_NVML OFF)
   # ... set cuda architecture for nvbench.
   set(CMAKE_CUDA_ARCHITECTURES ${ESSENTIALS_ARCHITECTURES})
   include(${PROJECT_SOURCE_DIR}/cmake/FetchNVBench.cmake)

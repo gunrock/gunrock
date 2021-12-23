@@ -28,9 +28,12 @@ void parallel_for(nvbench::state& state) {
   cuda::device_id_t device = 0;
   cuda::multi_context_t context(device);
 
-  auto f = [=] __device__(int const& v) -> void { printf("%i\n", v); };
+  vector_t<int> vertices(G.get_number_of_vertices());
+  auto d_vertices = vertices.data().get();
 
-  state.exec([&](nvbench::launch& launch) {
+  auto f = [=] __device__(int const& v) -> void { d_vertices[v] = v; };
+
+  state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
     operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
         G,       // graph
         f,       // lambda function
