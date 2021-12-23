@@ -27,9 +27,12 @@ namespace thread_mapped {
 template <typename lambda_t>
 void __global__ thread_mapped_kernel(lambda_t neighbors_expand,
                                      std::size_t num_elements) {
-  auto idx = cuda::thread::global::id::x();
-  if (idx < num_elements)
+  const int stride = cuda::block::size::x() * cuda::grid::size::x();
+
+  for (auto idx = cuda::thread::global::id::x(); idx < num_elements;
+       idx += stride) {
     neighbors_expand(idx);
+  }
 }
 
 template <advance_direction_t direction,
