@@ -72,7 +72,8 @@ struct raise_not_found_error_t {
  * was inspired by this Stack Overflow solution:
  * https://stackoverflow.com/a/67155114/13232647.
  *
- * @tparam lp_v Pack of `launch_params_t` types for each desired arch.
+ * @tparam lp_v Pack of `launch_params_t` types for each corresponding
+ * architecture(s).
  */
 template <typename... lp_v>
 using match_launch_params_t = decltype(std::tuple_cat(
