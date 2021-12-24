@@ -12,9 +12,7 @@
 #pragma once
 
 #include <gunrock/util/math.hxx>
-#include <gunrock/cuda/context.hxx>
-#include <gunrock/cuda/launch_box.hxx>
-#include <gunrock/cuda/global.hxx>
+#include <gunrock/cuda/cuda.hxx>
 
 #include <gunrock/framework/operators/configs.hxx>
 #include <gunrock/framework/operators/for/for.hxx>
@@ -23,14 +21,6 @@ namespace gunrock {
 namespace operators {
 namespace advance {
 namespace thread_mapped {
-
-template <typename lambda_t>
-void __global__ thread_mapped_kernel(lambda_t neighbors_expand,
-                                     std::size_t num_elements) {
-  auto idx = cuda::thread::global::id::x();
-  if (idx < num_elements)
-    neighbors_expand(idx);
-}
 
 template <advance_direction_t direction,
           advance_io_type_t input_type,
@@ -66,10 +56,10 @@ void execute(graph_t& G,
   // Get output data of the active buffer.
   auto segments_ptr = segments.data().get();
 
-  auto neighbors_expand = [=] __device__(std::size_t const& idx) {
+  auto thread_mapped = [=] __device__(int const& tid, int const& bid) {
     auto v = (input_type == advance_io_type_t::graph)
-                 ? type_t(idx)
-                 : input.get_element_at(idx);
+                 ? type_t(tid)
+                 : input.get_element_at(tid);
 
     if (!gunrock::util::limits::is_valid(v))
       return;
@@ -77,7 +67,6 @@ void execute(graph_t& G,
     auto starting_edge = G.get_starting_edge(v);
     auto total_edges = G.get_number_of_neighbors(v);
 
-    // #pragma unroll
     for (auto i = 0; i < total_edges; ++i) {
       auto e = i + starting_edge;            // edge id
       auto n = G.get_destination_vertex(e);  // neighbor id
@@ -85,7 +74,7 @@ void execute(graph_t& G,
       bool cond = op(v, n, e, w);
 
       if (output_type != advance_io_type_t::none) {
-        std::size_t out_idx = segments_ptr[idx] + i;
+        std::size_t out_idx = segments_ptr[tid] + i;
         type_t element =
             (cond && n != v) ? n : gunrock::numeric_limits<type_t>::invalid();
         output.set_element_at(element, out_idx);
@@ -100,13 +89,10 @@ void execute(graph_t& G,
   // Set-up and launch thread-mapped advance.
   using namespace cuda::launch_box;
   using launch_t =
-      launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
+      launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<256>, 3>>;
 
-  launch_t launch_box;
-  launch_box.calculate_grid_dimensions(num_elements);
-  auto __tm = thread_mapped_kernel<decltype(neighbors_expand)>;
-  launch_box.launch(__tm, std::make_tuple(neighbors_expand, num_elements),
-                    context);
+  launch_t l;
+  l.launch_blocked(context, thread_mapped, num_elements);
   context.synchronize();
 }
 }  // namespace thread_mapped

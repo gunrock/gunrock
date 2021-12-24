@@ -10,8 +10,13 @@
  */
 #pragma once
 
+#include <gunrock/cuda/device.hxx>
+#include <gunrock/cuda/device_properties.hxx>
+#include <gunrock/cuda/event_management.hxx>
+#include <gunrock/cuda/stream_management.hxx>
+#include <gunrock/cuda/function.hxx>
+
 #include <gunrock/error.hxx>
-#include <gunrock/cuda/cuda.hxx>
 #include <gunrock/util/timer.hxx>
 
 #include <gunrock/container/array.hxx>

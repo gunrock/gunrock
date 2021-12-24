@@ -3,14 +3,14 @@
 #include <gunrock/formats/formats.hxx>
 #include <gunrock/cuda/cuda.hxx>
 #include <gunrock/framework/operators/for/for.hxx>
-#include <gunrock/util/sample.hxx>
+#include <gunrock/io/sample.hxx>
 
 #include <nvbench/nvbench.cuh>
 
 namespace gunrock {
 namespace benchmark {
 void parallel_for(nvbench::state& state) {
-  auto csr = sample::csr();
+  auto csr = io::sample::csr();
 
   // --
   // Build graph

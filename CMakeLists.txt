@@ -11,7 +11,7 @@ set(ESSENTIALS_VERSION "${ESSENTIALS_VERSION_MAJOR}.${ESSENTIALS_VERSION_MINOR}.
 
 project(essentials
   VERSION ${ESSENTIALS_VERSION}
-  LANGUAGES CXX CUDA
+  LANGUAGES CXX C CUDA
 )
 
 # Increase verbosity.
@@ -175,6 +175,7 @@ option(ESSENTIALS_BUILD_TESTS
 
 # Subdirectories for examples, testing and documentation
 if(ESSENTIALS_BUILD_TESTS)
+  include(${PROJECT_SOURCE_DIR}/cmake/FetchGoogleTest.cmake)
   add_subdirectory(unittests)
 endif(ESSENTIALS_BUILD_TESTS)
 

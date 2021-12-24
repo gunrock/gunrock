@@ -14,7 +14,6 @@
 
 namespace gunrock {
 namespace cuda {
-
 namespace launch_box {
 namespace detail {
 
@@ -22,12 +21,16 @@ namespace detail {
  * @brief Abstract base class for launch parameters.
  *
  * @tparam sm_flags_ Bitwise flags indicating SM versions (`sm_flag_t` enum).
+ * @tparam items_per_thread_ (default = `1`) Number of items per thread.
  * @tparam shared_memory_bytes_ Number of bytes of shared memory to allocate.
  */
-template <sm_flag_t sm_flags_, size_t shared_memory_bytes_>
+template <sm_flag_t sm_flags_,
+          std::size_t items_per_thread_,
+          std::size_t shared_memory_bytes_>
 struct launch_params_base_t {
   static constexpr sm_flag_t sm_flags = sm_flags_;
-  static constexpr size_t shared_memory_bytes = shared_memory_bytes_;
+  static constexpr std::size_t shared_memory_bytes = shared_memory_bytes_;
+  static constexpr std::size_t items_per_thread = items_per_thread_;
 };
 
 /**
@@ -83,6 +86,5 @@ using match_launch_params_t = decltype(std::tuple_cat(
 
 }  // namespace detail
 }  // namespace launch_box
-
 }  // namespace cuda
 }  // namespace gunrock
