@@ -60,8 +60,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
-  // using gunrock::enactor_t<problem_t>::enactor_t;
-
   enactor_t(problem_t* _problem,
             std::shared_ptr<cuda::multi_context_t> _context,
             enactor_properties_t _properties = enactor_properties_t())

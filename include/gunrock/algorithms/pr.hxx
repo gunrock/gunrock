@@ -94,17 +94,14 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
-  // Use Base class constructor -- does this work? does it handle copy
-  // constructor?
-  using gunrock::enactor_t<problem_t>::enactor_t;
+  enactor_t(problem_t* _problem,
+            std::shared_ptr<cuda::multi_context_t> _context,
+            enactor_properties_t _properties)
+      : gunrock::enactor_t<problem_t>(_problem, _context, _properties) {}
 
   using vertex_t = typename problem_t::vertex_t;
   using edge_t = typename problem_t::edge_t;
   using weight_t = typename problem_t::weight_t;
-  using frontier_t = typename enactor_t<problem_t>::frontier_t;
-
-  void prepare_frontier(frontier_t* f,
-                        cuda::multi_context_t& context) override {}
 
   void loop(cuda::multi_context_t& context) override {
     // Data slice
