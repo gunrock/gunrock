@@ -23,18 +23,17 @@ template <unsigned int threads_per_block,
           typename... args_t>
 __global__ __launch_bounds__(threads_per_block,
                              items_per_thread)  // strict launch bounds
-    void blocked_strided_kernel(func_t f,
-                                const std::size_t bound,
-                                args_t... args) {
+    void blocked_kernel(func_t f, const std::size_t bound, args_t... args) {
   const int stride = cuda::block::size::x() * cuda::grid::size::x();
   for (int i = cuda::thread::global::id::x();  // global id
        i < bound;                              // bound check
        i += (stride * items_per_thread)        // offset
   ) {
-#pragma unroll
+#pragma unroll items_per_thread
     for (int j = 0; j < items_per_thread; ++j) {
       // Simple blocking per thread (unrolled items_per_thread_t)
-      f(i + (stride * j), cuda::block::id::x(), args...);
+      if ((i + (stride * j)) < bound)
+        f(i + (stride * j), cuda::block::id::x(), args...);
     }
   }
 }

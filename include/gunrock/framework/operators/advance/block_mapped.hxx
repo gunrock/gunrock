@@ -186,7 +186,7 @@ void execute(graph_t& G,
 
   launch_t launch_box;
 
-  launch_box.calculate_grid_dimensions(num_elements);
+  launch_box.calculate_grid_dimensions_strided(num_elements);
   auto __bm = block_mapped_kernel<        // kernel
       launch_box.block_dimensions.x,      // threas per block
       1,                                  // items per thread

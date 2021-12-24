@@ -67,7 +67,6 @@ void execute(graph_t& G,
     auto starting_edge = G.get_starting_edge(v);
     auto total_edges = G.get_number_of_neighbors(v);
 
-    // #pragma unroll
     for (auto i = 0; i < total_edges; ++i) {
       auto e = i + starting_edge;            // edge id
       auto n = G.get_destination_vertex(e);  // neighbor id
@@ -90,11 +89,10 @@ void execute(graph_t& G,
   // Set-up and launch thread-mapped advance.
   using namespace cuda::launch_box;
   using launch_t =
-      launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
+      launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<256>, 3>>;
 
   launch_t l;
-  l.calculate_grid_dimensions(num_elements);
-  l.launch_blocked_strided(context, thread_mapped, num_elements);
+  l.launch_blocked(context, thread_mapped, num_elements);
   context.synchronize();
 }
 }  // namespace thread_mapped

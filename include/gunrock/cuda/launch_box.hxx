@@ -126,9 +126,16 @@ struct launch_params_dynamic_grid_t
 
   dimensions_t grid_dimensions;
 
-  void calculate_grid_dimensions(std::size_t num_elements) {
+  void calculate_grid_dimensions_strided(std::size_t num_elements) {
     grid_dimensions = dimensions_t(
         (num_elements + block_dimensions.x - 1) / block_dimensions.x, 1, 1);
+  }
+
+  void calculate_grid_dimensions_blocked(std::size_t num_elements) {
+    grid_dimensions = dimensions_t(
+        (num_elements + (block_dimensions.x * base_t::items_per_thread) - 1) /
+            (block_dimensions.x * base_t::items_per_thread),
+        1, 1);
   }
 };
 
@@ -214,19 +221,20 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * @tparam args_t Pack of arguments to pass to the kernel.
    * @param context The device context to use.
    * @param f lambda, function or functor to be launched.
-   * @param bound if thread id > bound, return.
+   * @param num_elements if thread id > num_elements, return.
    * @param args arguments to be passed to the function.
    */
   template <typename func_t, typename... args_t>
   void launch_strided(standard_context_t& context,
                       func_t& f,
-                      const std::size_t bound,
+                      const std::size_t num_elements,
                       args_t&&... args) {
+    params_t::calculate_grid_dimensions_strided(num_elements);
     using namespace kernels::detail;
     strided_kernel<params_t::block_dimensions_t::size()>
         <<<params_t::grid_dimensions, params_t::block_dimensions,
            params_t::shared_memory_bytes, context.stream()>>>(
-            f, bound, std::forward<args_t>(args)...);
+            f, num_elements, std::forward<args_t>(args)...);
   }
 
   /**
@@ -257,20 +265,21 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * @tparam args_t Pack of arguments to pass to the kernel.
    * @param context The device context to use.
    * @param f lambda, function or functor to be launched.
-   * @param bound if thread id > bound, return.
+   * @param num_elements if thread id > num_elements, return.
    * @param args arguments to be passed to the function.
    */
   template <typename func_t, typename... args_t>
-  void launch_blocked_strided(standard_context_t& context,
-                              func_t& f,
-                              const std::size_t bound,
-                              args_t&&... args) {
+  void launch_blocked(standard_context_t& context,
+                      func_t& f,
+                      const std::size_t num_elements,
+                      args_t&&... args) {
+    params_t::calculate_grid_dimensions_blocked(num_elements);
     using namespace kernels::detail;
-    blocked_strided_kernel<params_t::block_dimensions_t::size(),
-                           params_t::items_per_thread>
+    blocked_kernel<params_t::block_dimensions_t::size(),
+                   params_t::items_per_thread>
         <<<params_t::grid_dimensions, params_t::block_dimensions,
            params_t::shared_memory_bytes, context.stream()>>>(
-            f, bound, std::forward<args_t>(args)...);
+            f, num_elements, std::forward<args_t>(args)...);
   }
 
   /**
