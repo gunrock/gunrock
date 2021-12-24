@@ -12,9 +12,7 @@
 #pragma once
 
 #include <gunrock/util/math.hxx>
-#include <gunrock/cuda/context.hxx>
-#include <gunrock/cuda/launch_box.hxx>
-#include <gunrock/cuda/global.hxx>
+#include <gunrock/cuda/cuda.hxx>
 
 #include <gunrock/framework/operators/configs.hxx>
 #include <gunrock/framework/operators/for/for.hxx>

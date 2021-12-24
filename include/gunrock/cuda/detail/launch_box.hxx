@@ -10,11 +10,10 @@
  */
 #pragma once
 
-#include <gunrock/cuda/cuda.hxx>
+#include <gunrock/cuda/sm.hxx>
 
 namespace gunrock {
 namespace cuda {
-
 namespace launch_box {
 namespace detail {
 
@@ -85,42 +84,7 @@ using match_launch_params_t = decltype(std::tuple_cat(
                                     std::tuple<lp_v>,
                                     std::tuple<>>>()...));
 
-template <unsigned int threads_per_block,
-          unsigned int items_per_thread,
-          typename func_t,
-          typename... args_t>
-__global__ __launch_bounds__(threads_per_block,
-                             items_per_thread)  // strict launch bounds
-    void blocked_strided_kernel(func_t f,
-                                const std::size_t bound,
-                                args_t... args) {
-  const int stride = cuda::block::size::x() * cuda::grid::size::x();
-  for (int i = cuda::thread::global::id::x();  // global id
-       i < bound;                              // bound check
-       i += (stride * items_per_thread)        // offset
-  ) {
-#pragma unroll
-    for (int j = 0; j < items_per_thread; ++j) {
-      // Simple blocking per thread (unrolled items_per_thread_t)
-      f(i + (stride * j), cuda::block::id::x(), args...);
-    }
-  }
-}
-
-template <unsigned int threads_per_block, typename func_t, typename... args_t>
-__global__ __launch_bounds__(threads_per_block, 1)  // strict launch bounds
-    void strided_kernel(func_t f, const std::size_t bound, args_t... args) {
-  const int stride = cuda::block::size::x() * cuda::grid::size::x();
-  for (int i = cuda::thread::global::id::x();  // global id
-       i < bound;                              // bound check
-       i += stride                             // offset
-  ) {
-    f(i, cuda::block::id::x(), args...);
-  }
-}
-
 }  // namespace detail
 }  // namespace launch_box
-
 }  // namespace cuda
 }  // namespace gunrock

@@ -23,3 +23,4 @@ namespace cuda {}  // namespace cuda
 #include <gunrock/cuda/device_properties.hxx>
 #include <gunrock/cuda/context.hxx>
 #include <gunrock/cuda/sm.hxx>
+#include <gunrock/cuda/launch_box.hxx>

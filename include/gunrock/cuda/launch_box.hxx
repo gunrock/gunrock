@@ -11,6 +11,8 @@
 #pragma once
 
 #include <gunrock/cuda/detail/launch_box.hxx>
+#include <gunrock/cuda/detail/launch_kernels.hxx>
+
 #include <gunrock/cuda/sm.hxx>
 #include <gunrock/cuda/device_properties.hxx>
 #include <gunrock/cuda/context.hxx>
@@ -220,7 +222,8 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
                       func_t& f,
                       const std::size_t bound,
                       args_t&&... args) {
-    detail::strided_kernel<params_t::block_dimensions_t::size()>
+    using namespace kernels::detail;
+    strided_kernel<params_t::block_dimensions_t::size()>
         <<<params_t::grid_dimensions, params_t::block_dimensions,
            params_t::shared_memory_bytes, context.stream()>>>(
             f, bound, std::forward<args_t>(args)...);
@@ -262,8 +265,9 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
                               func_t& f,
                               const std::size_t bound,
                               args_t&&... args) {
-    detail::blocked_strided_kernel<params_t::block_dimensions_t::size(),
-                                   params_t::items_per_thread>
+    using namespace kernels::detail;
+    blocked_strided_kernel<params_t::block_dimensions_t::size(),
+                           params_t::items_per_thread>
         <<<params_t::grid_dimensions, params_t::block_dimensions,
            params_t::shared_memory_bytes, context.stream()>>>(
             f, bound, std::forward<args_t>(args)...);
