@@ -105,10 +105,11 @@ void execute(graph_t& G,
   using launch_t =
       launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
 
-  launch_t launch_box(context);
+  launch_t launch_box;
   launch_box.calculate_grid_dimensions(num_elements);
   auto __tm = thread_mapped_kernel<decltype(neighbors_expand)>;
-  launch_box.launch(__tm, neighbors_expand, num_elements);
+  launch_box.launch(__tm, std::make_tuple(neighbors_expand, num_elements),
+                    context);
   context.synchronize();
 }
 }  // namespace thread_mapped

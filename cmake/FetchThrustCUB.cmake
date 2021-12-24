@@ -1,7 +1,7 @@
 include(FetchContent)
 set(FETCHCONTENT_QUIET ON)
 
-message("-- Cloning External Project: Thrust")
+message(STATUS "Cloning External Project: Thrust")
 get_filename_component(FC_BASE "../externals"
                 REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
 set(FETCHCONTENT_BASE_DIR ${FC_BASE})

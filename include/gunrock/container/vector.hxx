@@ -24,7 +24,7 @@ namespace gunrock {
 
 using namespace memory;
 
-template <typename type_t, memory_space_t space>
+template <typename type_t, memory_space_t space = memory_space_t::device>
 using vector_t =
     std::conditional_t<space == memory_space_t::host,  // condition
                        thrust::host_vector<type_t>,    // host_type

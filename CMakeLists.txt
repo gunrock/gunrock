@@ -1,5 +1,5 @@
 # We can lower this if needed.
-cmake_minimum_required(VERSION 3.19 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.20.1 FATAL_ERROR)
 
 # begin /* Update Essentials version */
 set(ESSENTIALS_VERSION_MAJOR 2)
@@ -76,6 +76,8 @@ target_compile_definitions(essentials
     SM_TARGET=${ESSENTIALS_ARCHITECTURES}
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
 )
+
+message(STATUS "Essentials CUDA Architecture: ${ESSENTIALS_ARCHITECTURES}")
 
 ####################################################
 ############ TARGET COMPILE FEATURES ###############
@@ -175,3 +177,25 @@ option(ESSENTIALS_BUILD_TESTS
 if(ESSENTIALS_BUILD_TESTS)
   add_subdirectory(unittests)
 endif(ESSENTIALS_BUILD_TESTS)
+
+####################################################
+################ BUILD BENCHMARKS  #################
+####################################################
+option(ESSENTIALS_BUILD_BENCHMARKS
+  "If on, builds essentials with benchmarking support."
+  OFF)
+
+
+
+# Subdirectories for examples, testing and documentation
+if(ESSENTIALS_BUILD_BENCHMARKS)
+  # ... see https://github.com/NVIDIA/nvbench/issues/66
+  set(NVBench_ENABLE_NVML OFF)
+  # ... set cuda architecture for nvbench.
+  set(CMAKE_CUDA_ARCHITECTURES ${ESSENTIALS_ARCHITECTURES})
+  include(${PROJECT_SOURCE_DIR}/cmake/FetchNVBench.cmake)
+  target_link_libraries(essentials 
+    INTERFACE nvbench::main
+  )
+  add_subdirectory(benchmarks)
+endif(ESSENTIALS_BUILD_BENCHMARKS)
