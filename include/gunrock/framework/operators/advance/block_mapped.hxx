@@ -184,7 +184,7 @@ void execute(graph_t& G,
   using launch_t =
       launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
 
-  launch_t launch_box(context);
+  launch_t launch_box;
 
   launch_box.calculate_grid_dimensions(num_elements);
   auto __bm = block_mapped_kernel<        // kernel
@@ -196,8 +196,9 @@ void execute(graph_t& G,
       typename work_tiles_t::value_type,  // segments value type
       operator_t                          // lambda type
       >;
-  launch_box.launch(__bm, G, op, input->data(), output->data(), num_elements,
-                    segments.data().get());
+  auto __args = std::make_tuple(G, op, input->data(), output->data(),
+                                num_elements, segments.data().get());
+  launch_box.launch(__bm, __args, context);
   context.synchronize();
 }
 
