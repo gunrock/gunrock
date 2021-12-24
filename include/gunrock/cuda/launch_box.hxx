@@ -10,13 +10,14 @@
  */
 #pragma once
 
-#include <gunrock/cuda/detail/launch_box.hxx>
-#include <gunrock/cuda/detail/launch_kernels.hxx>
+#include <gunrock/error.hxx>
 
 #include <gunrock/cuda/sm.hxx>
 #include <gunrock/cuda/device_properties.hxx>
 #include <gunrock/cuda/context.hxx>
-#include <gunrock/error.hxx>
+
+#include <gunrock/cuda/detail/launch_box.hxx>
+#include <gunrock/cuda/detail/launch_kernels.hxx>
 
 #include <tuple>
 #include <type_traits>
@@ -225,7 +226,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * @param args arguments to be passed to the function.
    */
   template <typename func_t, typename... args_t>
-  void launch_strided(standard_context_t& context,
+  void launch_strided(cuda::standard_context_t& context,
                       func_t& f,
                       const std::size_t num_elements,
                       args_t&&... args) {
@@ -269,7 +270,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * @param args arguments to be passed to the function.
    */
   template <typename func_t, typename... args_t>
-  void launch_blocked(standard_context_t& context,
+  void launch_blocked(cuda::standard_context_t& context,
                       func_t& f,
                       const std::size_t num_elements,
                       args_t&&... args) {
@@ -303,7 +304,9 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * \return void
    */
   template <typename func_t, typename args_tuple_t>
-  void launch(func_t&& f, args_tuple_t&& args, standard_context_t& context) {
+  void launch(func_t&& f,
+              args_tuple_t&& args,
+              cuda::standard_context_t& context) {
     launch_impl(
         std::forward<func_t>(f), std::forward<args_tuple_t>(args), context,
         std::make_index_sequence<
@@ -314,7 +317,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
   template <typename func_t, typename args_tuple_t, std::size_t... I>
   void launch_impl(func_t&& f,
                    args_tuple_t&& args,
-                   standard_context_t& context,
+                   cuda::standard_context_t& context,
                    std::index_sequence<I...>) {
     f<<<params_t::grid_dimensions, params_t::block_dimensions,
         params_t::shared_memory_bytes, context.stream()>>>(

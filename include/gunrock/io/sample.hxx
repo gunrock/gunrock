@@ -13,6 +13,7 @@
 #include <gunrock/formats/formats.hxx>
 
 namespace gunrock {
+namespace io {
 namespace sample {
 
 using namespace memory;
@@ -73,4 +74,5 @@ format::csr_t<space, vertex_t, edge_t, weight_t> csr() {
 }
 
 }  // namespace sample
+}  // namespace io
 }  // namespace gunrock
