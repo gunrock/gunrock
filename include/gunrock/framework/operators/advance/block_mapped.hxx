@@ -87,7 +87,7 @@ void __global__ block_mapped_kernel(graph_t const G,
   __syncthreads();
 
   // Exclusive sum of degrees.
-  vertex_t aggregate_degree_per_block;
+  edge_t aggregate_degree_per_block;
   block_scan_t(storage.scan)
       .ExclusiveSum(th_deg, th_deg, aggregate_degree_per_block);
   __syncthreads();
@@ -113,7 +113,7 @@ void __global__ block_mapped_kernel(graph_t const G,
 
   length -= global_idx - local_idx;
 
-  for (int i = local_idx;               // threadIdx.x
+  for (edge_t i = local_idx;            // threadIdx.x
        i < aggregate_degree_per_block;  // total degree to process
        i += cuda::block::size::x()      // increment by blockDim.x
   ) {

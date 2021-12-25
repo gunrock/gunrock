@@ -114,7 +114,7 @@ struct enactor_t {
    * actually needs it is being run. Otherwise, it maybe a waste of memory space
    * to allocate this.
    */
-  thrust::device_vector<vertex_t> scanned_work_domain;
+  thrust::device_vector<edge_t> scanned_work_domain;
 
   /*!
    * Active frontier buffer, this pointer can be obtained by
