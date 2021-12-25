@@ -217,6 +217,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * launch_box.calculate_grid_dimensions(num_elements);
    * launch_box.launch_strided(context, f, num_elements);
    * context.synchronize();
+   * \endcode
    *
    * @tparam func_t Function type to launch.
    * @tparam args_t Pack of arguments to pass to the kernel.
@@ -261,6 +262,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * launch_box.calculate_grid_dimensions(num_elements);
    * launch_box.launch_blocked_strided(context, f, num_elements);
    * context.synchronize();
+   * \endcode
    *
    * @tparam func_t Function type to launch.
    * @tparam args_t Pack of arguments to pass to the kernel.
