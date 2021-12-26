@@ -48,10 +48,8 @@ jobs:
         # TODO: Use the following once we have BUILD_TYPE and envrionment variables set-up:
         # run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
       
-
-  # This workflow contains a single job called "test"
   test:
-    # The type of runner that the job will run on
+    if: "contains(github.event.commits[0].message, '[test]')"
     runs-on: gpu
 
     # Steps represent a sequence of tasks that will be executed as part of the job
