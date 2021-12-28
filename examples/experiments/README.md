@@ -1,0 +1,2 @@
+# Experiments
+The examples within this folder are not necessarily related to `essentials` or `gunrock` directly. They're intended to be experimentation done to enable or understand technology implemented within essentials. This folder can be safely ignored, and only looked at if you're interested in some C++/CUDA magic or limitations, etc.

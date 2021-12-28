@@ -1,13 +1,11 @@
-#include <cstdlib>  // EXIT_SUCCESS
-
 #include <gunrock/algorithms/algorithms.hxx>
 
 using namespace gunrock;
 using namespace memory;
 
-void test_mtx2bin(int num_arguments, char** argument_array) {
+void mtx2bin(int num_arguments, char** argument_array) {
   if (num_arguments != 2) {
-    std::cerr << "usage: ./bin/mtx2bin <inpath>" << std::endl;
+    std::cerr << "usage: " << argument_array[0] << " <inpath>" << std::endl;
     exit(1);
   }
 
@@ -42,6 +40,5 @@ void test_mtx2bin(int num_arguments, char** argument_array) {
 }
 
 int main(int argc, char** argv) {
-  test_mtx2bin(argc, argv);
-  return EXIT_SUCCESS;
+  mtx2bin(argc, argv);
 }
