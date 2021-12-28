@@ -24,6 +24,7 @@ set(PROJECT_DEPS_DIR externals)
 # begin /* Include cmake modules */
 include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
 # end /* Include cmake modules */
 
 ## Set the directory where the binaries will be stored
@@ -86,11 +87,14 @@ message(STATUS "Essentials CUDA Architecture: ${ESSENTIALS_ARCHITECTURES}")
 target_compile_features(essentials INTERFACE cxx_std_17)
 # set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(ESSENTIALS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 ####################################################
 ############ TARGET INCLUDE DIRECTORIES ############
 ####################################################
 target_include_directories(essentials
-  INTERFACE include
+  INTERFACE ${ESSENTIALS_INCLUDE_DIR}
+  INTERFACE ${CXXOPTS_INCLUDE_DIR}
   INTERFACE ${THRUST_INCLUDE_DIR}
   INTERFACE ${CUB_INCLUDE_DIR}
   INTERFACE ${MODERNGPU_INCLUDE_DIR}
