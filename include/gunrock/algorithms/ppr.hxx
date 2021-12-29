@@ -148,11 +148,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 };  // struct enactor_t
 
 template <typename graph_t>
-float run(graph_t& G,
-          typename graph_t::vertex_type& seed,
-          typename graph_t::weight_type* p,
-          typename graph_t::weight_type& alpha,
-          typename graph_t::weight_type& epsilon) {
+float run(
+    graph_t& G,
+    typename graph_t::vertex_type& seed,
+    typename graph_t::weight_type* p,
+    typename graph_t::weight_type& alpha,
+    typename graph_t::weight_type& epsilon,
+    std::shared_ptr<cuda::multi_context_t> context =
+        std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0))) {
   // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
@@ -164,18 +167,14 @@ float run(graph_t& G,
   result_type result(p);
   // </user-defined>
 
-  // <boiler-plate>
-  auto multi_context =
-      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
-
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
-  problem_type problem(G, param, result, multi_context);
+  problem_type problem(G, param, result, context);
   problem.init();
   problem.reset();
 
-  enactor_type enactor(&problem, multi_context);
+  enactor_type enactor(&problem, context);
   return enactor.enact();
   // </boiler-plate>
 }
@@ -191,14 +190,6 @@ float run_batch(graph_t& G,
   using weight_t = typename graph_t::weight_type;
 
   auto n_vertices = G.get_number_of_vertices();
-
-  // ???: Is this a good way to time wall-clock time?
-  auto multi_context =
-      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
-  auto context = multi_context->get_context(0);
-  auto timer = context->timer();
-  timer.begin();
-
   auto f = [&](vertex_t seed) -> float {
     return ppr::run(G, seed, p + (n_vertices * seed), alpha, epsilon);
   };
@@ -206,9 +197,8 @@ float run_batch(graph_t& G,
   thrust::host_vector<float> total_elapsed(1);
   operators::batch::execute(f, n_seeds, total_elapsed.data());
 
-  // return total_elapsed[0]; // This returns the total execution time, not the
-  // wall-clock time.  Weird.
-  return timer.end();  // Is this a better way to time?
+  return total_elapsed[0];  // This returns the total execution time, not the
+                            // wall-clock time.
 }
 
 }  // namespace ppr
