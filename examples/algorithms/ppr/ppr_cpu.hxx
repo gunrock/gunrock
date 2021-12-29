@@ -27,13 +27,11 @@ float run(csr_t& csr,
 
   auto t_start = high_resolution_clock::now();
 
-  weight_t* r = (weight_t*)malloc(n_nodes * sizeof(weight_t));
-  weight_t* r_prime = (weight_t*)malloc(n_nodes * sizeof(weight_t));
-
-  vertex_t* f = (vertex_t*)malloc(n_nodes * sizeof(vertex_t));
-  vertex_t* f_prime = (vertex_t*)malloc(n_nodes * sizeof(vertex_t));
-
-  vertex_t* degrees = (vertex_t*)malloc(n_nodes * sizeof(vertex_t));
+  std::vector<weight_t> r(n_nodes);
+  std::vector<weight_t> r_prime(n_nodes);
+  std::vector<vertex_t> f(n_nodes);
+  std::vector<vertex_t> f_prime(n_nodes);
+  std::vector<vertex_t> degrees(n_nodes);
 
   for (vertex_t seed = 0; seed < n_seeds; seed++) {
     weight_t* p = all_p + (seed * n_nodes);
@@ -83,12 +81,9 @@ float run(csr_t& csr,
         }
       }
 
-      memcpy(r, r_prime, n_nodes * sizeof(weight_t));
-
-      vertex_t* tmp_ptr = f;
-      f = f_prime;
+      r_prime = r;
+      f.swap(f_prime);
       f_size = f_prime_size;
-      f_prime = tmp_ptr;
       f_prime_size = 0;
     }
   }

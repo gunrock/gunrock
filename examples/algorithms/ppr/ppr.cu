@@ -26,7 +26,7 @@ void test_ppr(int num_arguments, char** argument_array) {
 
   weight_t alpha = 0.15;
   weight_t epsilon = 1e-6;
-  vertex_t n_seeds = 50;
+  vertex_t n_seeds = 10;
 
   std::string filename = argument_array[1];
 
