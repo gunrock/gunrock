@@ -183,7 +183,10 @@ template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::weight_type alpha,
           typename graph_t::weight_type tol,
-          typename graph_t::weight_type* p  // Output
+          typename graph_t::weight_type* p,  // Output
+          std::shared_ptr<cuda::multi_context_t> context =
+              std::shared_ptr<cuda::multi_context_t>(
+                  new cuda::multi_context_t(0))  // Context
 ) {
   // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
@@ -196,14 +199,10 @@ float run(graph_t& G,
   result_type result(p);
   // </user-defined>
 
-  // <boiler-plate>
-  auto multi_context =
-      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
-
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
-  problem_type problem(G, param, result, multi_context);
+  problem_type problem(G, param, result, context);
   problem.init();
   problem.reset();
 
@@ -211,7 +210,7 @@ float run(graph_t& G,
   enactor_properties_t props;
   props.self_manage_frontiers = true;
 
-  enactor_type enactor(&problem, multi_context, props);
+  enactor_type enactor(&problem, context, props);
   return enactor.enact();
   // </boiler-plate>
 }
