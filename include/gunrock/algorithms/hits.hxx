@@ -293,19 +293,22 @@ void dump_result(ForwardIterator auth_dest,
 
 // qqq get rid of template for better control
 template <typename graph_t, typename param_t, typename result_t>
-float run(graph_t& G, param_t& param, result_t& result) {
+float run(graph_t& G,
+          param_t& param,
+          result_t& result,
+          std::shared_ptr<cuda::multi_context_t> context =
+              std::shared_ptr<cuda::multi_context_t>(
+                  new cuda::multi_context_t(0))  // Context
+) {
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
-
-  auto multi_context =
-      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
 
   using problem_type = problem_t<graph_t>;
   using enactor_type = enactor_t<problem_type>;
 
-  problem_type problem(G, multi_context, param.get_max_iterations());
+  problem_type problem(G, context, param.get_max_iterations());
 
-  enactor_type enactor(&problem, multi_context);
+  enactor_type enactor(&problem, context);
   auto time = enactor.enact();
 
   dump_result(result.get_auth(), result.get_hub(), problem.get_auth(),

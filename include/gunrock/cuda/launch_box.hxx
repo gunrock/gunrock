@@ -195,6 +195,9 @@ template <typename... lp_v>
 struct launch_box_t : public select_launch_params_t<lp_v...> {
   typedef select_launch_params_t<lp_v...> params_t;
 
+  // Empty constructor to avoid compiler warnings.
+  launch_box_t(){};
+
   /**
    * @brief Launch a function with the given parameters on a simple strided
    * kernel.
@@ -325,7 +328,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
         params_t::shared_memory_bytes, context.stream()>>>(
         std::get<I>(std::forward<args_tuple_t>(args))...);
   }
-};
+};  // struct launch_box_t
 
 /**
  * @brief Calculator for ratio of active to maximum warps per multiprocessor.

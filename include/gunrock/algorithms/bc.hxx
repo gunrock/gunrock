@@ -216,7 +216,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type single_source,
-          typename graph_t::weight_type* bc_values) {
+          typename graph_t::weight_type* bc_values,
+          std::shared_ptr<cuda::multi_context_t> context =
+              std::shared_ptr<cuda::multi_context_t>(
+                  new cuda::multi_context_t(0))  // Context
+) {
   // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
@@ -229,13 +233,10 @@ float run(graph_t& G,
   // </user-defined>
 
   // <boiler-plate>
-  auto multi_context =
-      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
-
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
-  problem_type problem(G, param, result, multi_context);
+  problem_type problem(G, param, result, context);
   problem.init();
   problem.reset();
 
@@ -244,7 +245,7 @@ float run(graph_t& G,
   props.number_of_frontier_buffers = 1000;  // XXX: hack!
   props.self_manage_frontiers = true;
 
-  enactor_type enactor(&problem, multi_context, props);
+  enactor_type enactor(&problem, context, props);
   return enactor.enact();
   // </boiler-plate>
 }
