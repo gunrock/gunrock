@@ -69,7 +69,8 @@ void test_copy_ctor(thrust_container& t) {
   ERROR_CHECK(cudaPeekAtLastError());
   cudaDeviceSynchronize();
 
-  // fails.
+  // fails when using thrust transform.
+  // fix: use copy constructor with __device__ __host__ attributes.
   thrust::transform(
       thrust::device,                          // execution policy
       thrust::make_counting_iterator<int>(0),  // input iterator: first

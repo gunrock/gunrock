@@ -1,7 +1,3 @@
-#include <gunrock/algorithms/algorithms.hxx>
-
-// Include the application code -- we'll comment this out now so we can compile
-// a test quickly.
 #include <gunrock/algorithms/spmv.hxx>
 #include <gunrock/algorithms/generate/random.hxx>
 
@@ -64,9 +60,7 @@ void test_spmv(int num_arguments, char** argument_array) {
   // --
   // GPU Run
   float gpu_elapsed = gunrock::spmv::run(G, x.data().get(), y.data().get());
-
-  std::cout << "GPU y[:40] = ";
-  gunrock::print::head<weight_t>(y, 40);
+  gunrock::print::head(y, 40, "GPU y-vector");
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 }
 

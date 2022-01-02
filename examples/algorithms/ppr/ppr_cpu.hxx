@@ -93,18 +93,4 @@ float run(csr_t& csr,
   return (float)elapsed / 1000;
 }
 
-template <typename val_t>
-int compute_error(thrust::device_vector<val_t> _gpu_result,
-                  thrust::host_vector<val_t> cpu_result) {
-  thrust::host_vector<val_t> gpu_result(_gpu_result);
-
-  int n_errors = 0;
-  for (int i = 0; i < cpu_result.size(); i++) {
-    if (abs(gpu_result[i] - cpu_result[i]) > 1e-6) {
-      n_errors++;
-    }
-  }
-  return n_errors;
-}
-
 }  // namespace ppr_cpu

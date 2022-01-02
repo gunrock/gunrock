@@ -56,13 +56,7 @@ void test_bc(int num_arguments, char** argument_array) {
   // --
   // Log + Validate
 
-  std::cout << "GPU bc_values (output) = ";
-  thrust::copy(bc_values.begin(),
-               (bc_values.size() < 40) ? bc_values.begin() + bc_values.size()
-                                       : bc_values.begin() + 40,
-               std::ostream_iterator<weight_t>(std::cout, " "));
-  std::cout << std::endl;
-
+  print::head(bc_values, 40, "GPU bc values");
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 }
 

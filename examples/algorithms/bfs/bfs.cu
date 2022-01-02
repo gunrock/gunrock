@@ -80,16 +80,14 @@ void test_bfs(int num_arguments, char** argument_array) {
   float cpu_elapsed = bfs_cpu::run<csr_t, vertex_t, edge_t>(
       csr, single_source, h_distances.data(), h_predecessors.data());
 
-  int n_errors = bfs_cpu::compute_error(distances, h_distances);
+  int n_errors =
+      util::compare(distances.data().get(), h_distances.data(), n_vertices);
 
   // --
   // Log
 
-  std::cout << "GPU distances[:40] = ";
-  gunrock::print::head<weight_t>(distances, 40);
-
-  std::cout << "CPU Distances[:40] = ";
-  gunrock::print::head<weight_t>(h_distances, 40);
+  print::head(distances, 40, "GPU distances");
+  print::head(h_distances, 40, "CPU Distances");
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;

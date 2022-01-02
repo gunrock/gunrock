@@ -146,8 +146,9 @@ struct matrix_market_t {
         data = matrix_market_data_t::integer;
 
       for (vertex_t i = 0; i < coo.number_of_nonzeros; ++i) {
-        vertex_t I, J;
-        double V;  // always read in a double and convert later if necessary
+        vertex_t I = 0;
+        vertex_t J = 0;
+        double V = 0.0f;
 
         assert(fscanf(file, " %d %d %lf \n", &I, &J, &V) == 3);
 

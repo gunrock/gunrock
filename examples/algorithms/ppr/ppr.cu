@@ -73,16 +73,15 @@ void test_ppr(int num_arguments, char** argument_array) {
   float cpu_elapsed = ppr_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
       csr, n_seeds, h_p.data(), alpha, epsilon);
 
-  int n_errors = ppr_cpu::compute_error(p, h_p);
+  int n_errors = util::compare(
+      p.data().get(), h_p.data(), n_seeds * n_vertices,
+      [](weight_t a, weight_t b) { return std::abs(a - b) > 1e-6; });
 
   // --
   // Log + Validate
 
-  std::cout << "GPU distances[:40] = ";
-  gunrock::print::head<weight_t>(p, 40);
-
-  std::cout << "CPU Distances (output) = ";
-  gunrock::print::head<weight_t>(h_p, 40);
+  print::head(p, 40, "GPU rank");
+  print::head(h_p, 40, "CPU rank");
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;

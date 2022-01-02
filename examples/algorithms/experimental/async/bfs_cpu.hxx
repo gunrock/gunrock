@@ -18,16 +18,14 @@ class prioritize {
 };
 
 template <typename csr_t, typename vertex_t, typename edge_t>
-float run(csr_t& csr,
-          vertex_t& single_source,
-          vertex_t* distances) {
-
-  thrust::host_vector<edge_t> _row_offsets(csr.row_offsets);  // Copy data to CPU
+float run(csr_t& csr, vertex_t& single_source, vertex_t* distances) {
+  thrust::host_vector<edge_t> _row_offsets(
+      csr.row_offsets);  // Copy data to CPU
   thrust::host_vector<vertex_t> _column_indices(csr.column_indices);
-  
+
   edge_t* row_offsets = _row_offsets.data();
   vertex_t* column_indices = _column_indices.data();
-  
+
   for (vertex_t i = 0; i < csr.number_of_rows; i++)
     distances[i] = std::numeric_limits<vertex_t>::max();
 
@@ -36,9 +34,9 @@ float run(csr_t& csr,
   distances[single_source] = 0;
 
   priority_queue<pair<vertex_t, vertex_t>,
-                 std::vector<pair<vertex_t, vertex_t>>,
-                 prioritize<vertex_t>> pq;
-  
+                 std::vector<pair<vertex_t, vertex_t>>, prioritize<vertex_t>>
+      pq;
+
   pq.push(make_pair(single_source, 0.0));
 
   while (!pq.empty()) {
@@ -64,21 +62,6 @@ float run(csr_t& csr,
   auto t_stop = high_resolution_clock::now();
   auto elapsed = duration_cast<microseconds>(t_stop - t_start).count();
   return (float)elapsed / 1000;
-}
-
-template <typename val_t>
-int compute_error(thrust::device_vector<val_t> _gpu_result,
-                  thrust::host_vector<val_t> cpu_result) {
-  thrust::host_vector<val_t> gpu_result(_gpu_result);
-
-  int n_errors = 0;
-  for (int i = 0; i < cpu_result.size(); i++) {
-    if (gpu_result[i] != cpu_result[i]) {
-      n_errors++;
-      std::cerr << gpu_result[i] << " " << cpu_result[i] << std::endl;
-    }
-  }
-  return n_errors;
 }
 
 }  // namespace bfs_cpu
