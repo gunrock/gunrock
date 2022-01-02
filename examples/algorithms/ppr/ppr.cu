@@ -75,7 +75,8 @@ void test_ppr(int num_arguments, char** argument_array) {
 
   int n_errors = util::compare(
       p.data().get(), h_p.data(), n_seeds * n_vertices,
-      [](weight_t a, weight_t b) { return std::abs(a - b) > 1e-6; });
+      [](const weight_t a, const weight_t b) { return std::abs(a - b) > 1e-6; },
+      true);
 
   // --
   // Log + Validate
