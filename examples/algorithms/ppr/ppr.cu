@@ -73,10 +73,10 @@ void test_ppr(int num_arguments, char** argument_array) {
   float cpu_elapsed = ppr_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
       csr, n_seeds, h_p.data(), alpha, epsilon);
 
-  int n_errors = util::compare(
-      p.data().get(), h_p.data(), n_seeds * n_vertices,
-      [](const weight_t a, const weight_t b) { return std::abs(a - b) > 1e-6; },
-      true);
+  int n_errors = util::compare(p.data().get(), h_p.data(), n_seeds * n_vertices,
+                               [epsilon](const weight_t a, const weight_t b) {
+                                 return std::abs(a - b) > epsilon;
+                               });
 
   // --
   // Log + Validate
