@@ -65,9 +65,8 @@ void test_pr(int num_arguments, char** argument_array) {
 
   // --
   // Log + Validate
+  print::head(p, 40, "GPU rank");
 
-  std::cout << "GPU p[:40] = ";
-  gunrock::print::head<weight_t>(p, 40);
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 }
 

@@ -73,15 +73,15 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
     auto seed = this->param.seed;
     auto d_p = thrust::device_pointer_cast(this->result.p);
-    auto d_r = thrust::device_pointer_cast(r.data());
-    auto d_r_prime = thrust::device_pointer_cast(r_prime.data());
 
-    thrust::fill(policy, d_p + 0, d_p + n_vertices, 0);
-    thrust::fill(policy, d_r + 0, d_r + n_vertices, 0);
-    thrust::fill(policy, d_r_prime + 0, d_r_prime + n_vertices, 0);
+    // Reset everything to 0.
+    thrust::fill(policy, d_p, d_p + n_vertices, 0);
+    thrust::fill(policy, r.begin(), r.end(), 0);
+    thrust::fill(policy, r_prime.begin(), r_prime.end(), 0);
 
-    thrust::fill(policy, d_r + seed, d_r + seed + 1, 1);
-    thrust::fill(policy, d_r_prime + seed, d_r_prime + seed + 1, 1);
+    // Set the seed active.
+    thrust::fill(policy, r.begin() + seed, r.begin() + seed + 1, 1);
+    thrust::fill(policy, r_prime.begin() + seed, r_prime.begin() + seed + 1, 1);
   }
 };
 
@@ -190,15 +190,16 @@ float run_batch(graph_t& G,
   using weight_t = typename graph_t::weight_type;
 
   auto n_vertices = G.get_number_of_vertices();
-  auto f = [&](vertex_t seed) -> float {
-    return ppr::run(G, seed, p + (n_vertices * seed), alpha, epsilon);
+  auto f = [&](std::size_t job) -> float {
+    vertex_t active_seed = job;
+    weight_t* _p = p + (n_vertices * active_seed);
+    return ppr::run(G, active_seed, _p, alpha, epsilon);
   };
 
   thrust::host_vector<float> total_elapsed(1);
   operators::batch::execute(f, n_seeds, total_elapsed.data());
 
-  return total_elapsed[0];  // This returns the total execution time, not the
-                            // wall-clock time.
+  return total_elapsed[0];
 }
 
 }  // namespace ppr

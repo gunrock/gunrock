@@ -50,12 +50,12 @@ void test_csc(int num_arguments, char** argument_array) {
   std::cout << "G.get_number_of_edges()    : " << G.get_number_of_edges()
             << std::endl;
 
-  // gunrock::print::head<vertex_t>(G.get_column_offsets(),
-  // G.get_number_of_vertices());
-  // gunrock::print::head<vertex_t>(G.get_row_indices(),
-  // G.get_number_of_edges());
-  // gunrock::print::head<weight_t>(G.get_nonzero_values(),
-  // G.get_number_of_edges());
+  // gunrock::print::head(G.get_column_offsets(),
+  // G.get_number_of_vertices(), G.get_number_of_vertices());
+  // gunrock::print::head(G.get_row_indices(),
+  // G.get_number_of_edges(), G.get_number_of_edges());
+  // gunrock::print::head(G.get_nonzero_values(),
+  // G.get_number_of_edges(), G.get_number_of_edges());
 
   // for(vertex_t i = 0; i < G.get_number_of_edges(); i++)
   //   std::cout << i << " " << G.get_source_vertex(i) << " " <<

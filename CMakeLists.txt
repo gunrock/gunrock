@@ -199,8 +199,5 @@ if(ESSENTIALS_BUILD_BENCHMARKS)
   # ... set cuda architecture for nvbench.
   set(CMAKE_CUDA_ARCHITECTURES ${ESSENTIALS_ARCHITECTURES})
   include(${PROJECT_SOURCE_DIR}/cmake/FetchNVBench.cmake)
-  target_link_libraries(essentials 
-    INTERFACE nvbench::main
-  )
   add_subdirectory(benchmarks)
 endif(ESSENTIALS_BUILD_BENCHMARKS)

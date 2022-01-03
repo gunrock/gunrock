@@ -65,16 +65,12 @@ void test_async_bfs(int num_arguments, char** argument_array) {
   float cpu_elapsed =
       bfs_cpu::run<csr_t, vertex_t, edge_t>(csr, single_source, h_depth.data());
 
-  int n_errors = bfs_cpu::compute_error(depth, h_depth);
+  int n_errors = util::compare(depth.data().get(), h_depth.data(), n_vertices);
 
   // --
   // Log + Validate
-
-  std::cout << "GPU depth[:40] = ";
-  gunrock::print::head<vertex_t>(depth, 40);
-
-  std::cout << "CPU depth[:40] = ";
-  gunrock::print::head<vertex_t>(h_depth, 40);
+  print::head(depth, 40, "GPU depth");
+  print::head(h_depth, 40, "CPU depth");
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;

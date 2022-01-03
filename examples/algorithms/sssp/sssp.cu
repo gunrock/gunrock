@@ -59,6 +59,16 @@ void test_sssp(int num_arguments, char** argument_array) {
   // --
   // GPU Run
 
+  /// An example of how one can use std::shared_ptr to allocate memory on the
+  /// GPU, using a custom deleter that automatically handles deletion of the
+  /// memory.
+  // std::shared_ptr<weight_t> distances(
+  //     allocate<weight_t>(n_vertices * sizeof(weight_t)),
+  //     deleter_t<weight_t>());
+  // std::shared_ptr<vertex_t> predecessors(
+  //     allocate<vertex_t>(n_vertices * sizeof(vertex_t)),
+  //     deleter_t<vertex_t>());
+
   thrust::device_vector<weight_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
 
@@ -80,16 +90,14 @@ void test_sssp(int num_arguments, char** argument_array) {
   float cpu_elapsed = sssp_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
       csr, single_source, h_distances.data(), h_predecessors.data());
 
-  int n_errors = sssp_cpu::compute_error(distances, h_distances);
+  int n_errors =
+      util::compare(distances.data().get(), h_distances.data(), n_vertices);
 
   // --
   // Log + Validate
 
-  std::cout << "GPU distances[:40] = ";
-  gunrock::print::head<weight_t>(distances, 40);
-
-  std::cout << "CPU Distances[:40] = ";
-  gunrock::print::head<weight_t>(h_distances, 40);
+  print::head(distances, 40, "GPU distances");
+  print::head(h_distances, 40, "CPU Distances");
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;

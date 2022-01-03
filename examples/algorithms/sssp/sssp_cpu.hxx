@@ -4,6 +4,8 @@
 #include <vector>
 #include <queue>
 
+#include <thrust/host_vector.h>
+
 namespace sssp_cpu {
 
 using namespace std;
@@ -22,11 +24,11 @@ float run(csr_t& csr,
           vertex_t& single_source,
           weight_t* distances,
           vertex_t* predecessors) {
-   
-  thrust::host_vector<edge_t> _row_offsets(csr.row_offsets);  // Copy data to CPU
+  thrust::host_vector<edge_t> _row_offsets(
+      csr.row_offsets);  // Copy data to CPU
   thrust::host_vector<vertex_t> _column_indices(csr.column_indices);
   thrust::host_vector<weight_t> _nonzero_values(csr.nonzero_values);
-  
+
   edge_t* row_offsets = _row_offsets.data();
   vertex_t* column_indices = _column_indices.data();
   weight_t* nonzero_values = _nonzero_values.data();
@@ -67,20 +69,6 @@ float run(csr_t& csr,
   auto t_stop = high_resolution_clock::now();
   auto elapsed = duration_cast<microseconds>(t_stop - t_start).count();
   return (float)elapsed / 1000;
-}
-
-template <typename val_t>
-int compute_error(thrust::device_vector<val_t> _gpu_result,
-                  thrust::host_vector<val_t> cpu_result) {
-  thrust::host_vector<val_t> gpu_result(_gpu_result);
-
-  int n_errors = 0;
-  for (int i = 0; i < cpu_result.size(); i++) {
-    if (gpu_result[i] != cpu_result[i]) {
-      n_errors++;
-    }
-  }
-  return n_errors;
 }
 
 }  // namespace sssp_cpu

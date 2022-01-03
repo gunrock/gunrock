@@ -79,25 +79,25 @@ struct csr_t {
     number_of_nonzeros = coo.number_of_nonzeros;
 
     // Allocate space for vectors
-    vector_t<offset_t, memory_space_t::host> _Ap;
-    vector_t<index_t, memory_space_t::host> _Aj;
-    vector_t<value_t, memory_space_t::host> _Ax;
+    vector_t<offset_t, memory_space_t::host> Ap;
+    vector_t<index_t, memory_space_t::host> Aj;
+    vector_t<value_t, memory_space_t::host> Ax;
 
-    offset_t* Ap;
-    index_t* Aj;
-    value_t* Ax;
+    // offset_t* Ap;
+    // index_t* Aj;
+    // value_t* Ax;
 
     if (space == memory_space_t::device) {
       assert(space == memory_space_t::device);
       // If returning csr_t on device, allocate temporary host vectors, build on
       // host and move to device.
-      _Ap.resize(number_of_rows + 1);
-      _Aj.resize(number_of_nonzeros);
-      _Ax.resize(number_of_nonzeros);
+      Ap.resize(number_of_rows + 1);
+      Aj.resize(number_of_nonzeros);
+      Ax.resize(number_of_nonzeros);
 
-      Ap = _Ap.data();
-      Aj = _Aj.data();
-      Ax = _Ax.data();
+      // Ap = _Ap.data();
+      // Aj = _Aj.data();
+      // Ax = _Ax.data();
 
     } else {
       assert(space == memory_space_t::host);
@@ -106,9 +106,9 @@ struct csr_t {
       column_indices.resize(number_of_nonzeros);
       nonzero_values.resize(number_of_nonzeros);
 
-      Ap = raw_pointer_cast(row_offsets.data());
-      Aj = raw_pointer_cast(column_indices.data());
-      Ax = raw_pointer_cast(nonzero_values.data());
+      // Ap = raw_pointer_cast(row_offsets.data());
+      // Aj = raw_pointer_cast(column_indices.data());
+      // Ax = raw_pointer_cast(nonzero_values.data());
     }
 
     // compute number of non-zero entries per row of A.
@@ -144,15 +144,10 @@ struct csr_t {
 
     // If returning a device csr_t, move coverted data to device.
     if (space == memory_space_t::device) {
-      row_offsets = _Ap;
-      column_indices = _Aj;
-      nonzero_values = _Ax;
+      row_offsets = Ap;
+      column_indices = Aj;
+      nonzero_values = Ax;
     }
-
-    // XXX: Clean-up?
-    Ap = nullptr;
-    Ax = nullptr;
-    Aj = nullptr;
 
     return *this;  // CSR representation (with possible duplicates)
   }

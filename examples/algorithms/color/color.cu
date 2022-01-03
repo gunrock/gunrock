@@ -53,7 +53,6 @@ void test_color(int num_arguments, char** argument_array) {
   // GPU Run
 
   float gpu_elapsed = gunrock::color::run(G, colors.data().get());
-  std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 
   // --
   // CPU Run
@@ -68,12 +67,8 @@ void test_color(int num_arguments, char** argument_array) {
 
   // --
   // Log
-
-  std::cout << "GPU colors[:40] = ";
-  gunrock::print::head<weight_t>(colors, 40);
-
-  std::cout << "CPU colors[:40] = ";
-  gunrock::print::head<weight_t>(h_colors, 40);
+  print::head(colors, 40, "GPU colors");
+  print::head(h_colors, 40, "CPU colors");
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;

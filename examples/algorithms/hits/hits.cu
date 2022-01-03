@@ -3,9 +3,9 @@
 using namespace gunrock;
 using namespace memory;
 
-void test_hits(int argc, char** argv){
-  if(2 != argc){
-    std::cerr << "usage:: ./bin/<program-name> filemane.mtx \n";
+void test_hits(int argc, char** argv) {
+  if (2 != argc) {
+    std::cerr << "usage:: ./bin/<program-name> filename.mtx \n";
     exit(1);
   }
 
@@ -18,18 +18,15 @@ void test_hits(int argc, char** argv){
   csr_t csr;
 
   std::string filename = argv[1];
-  if(util::is_market(filename)){
+  if (util::is_market(filename)) {
     io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
     csr.from_coo(mm.load(filename));
-  } else if(util::is_binary_csr(filename)){
+  } else if (util::is_binary_csr(filename)) {
     csr.read_binary(filename);
-  } else{
-    std::cerr<<"Unknown file format: " << filename << std::endl;
+  } else {
+    std::cerr << "Unknown file format: " << filename << std::endl;
     exit(1);
   }
-
-  // qqq for what?
-
 
   auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
       csr.number_of_rows,               // rows
@@ -38,10 +35,8 @@ void test_hits(int argc, char** argv){
       csr.row_offsets.data().get(),     // row_offsets
       csr.column_indices.data().get(),  // column_indices
       csr.nonzero_values.data().get()   // values
-  );  // supports row_indices and column_offsets (default = nullptr)
+  );
 
-  int iter_times = 20;
-  // qqq interface
   hits::param_c param{20};
   hits::result_c result{G};
 
@@ -49,7 +44,7 @@ void test_hits(int argc, char** argv){
   result.print_result(20);
 }
 
-int main(int argc, char **argv){
+int main(int argc, char** argv) {
   test_hits(argc, argv);
   return 0;
 }

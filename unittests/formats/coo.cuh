@@ -50,11 +50,12 @@ void test_coo(int num_arguments, char** argument_array) {
   std::cout << "G.number_of_graph_representations()\t: "
             << G.number_of_graph_representations() << std::endl;
 
-  gunrock::print::head<vertex_t>(G.get_row_indices(), G.get_number_of_edges());
-  gunrock::print::head<vertex_t>(G.get_column_indices(),
-                                 G.get_number_of_edges());
-  gunrock::print::head<weight_t>(G.get_nonzero_values(),
-                                 G.get_number_of_edges());
+  gunrock::print::head(G.get_row_indices(), G.get_number_of_edges(),
+                       G.get_number_of_edges());
+  gunrock::print::head(G.get_column_indices(), G.get_number_of_edges(),
+                       G.get_number_of_edges());
+  gunrock::print::head(G.get_nonzero_values(), G.get_number_of_edges(),
+                       G.get_number_of_edges());
 
   for (vertex_t i = 0; i < G.get_number_of_vertices(); i++)
     std::cout << i << " " << G.get_starting_edge(i) << std::endl;
