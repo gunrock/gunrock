@@ -9,6 +9,7 @@ add_subdirectory(bc)
 add_subdirectory(hits)
 add_subdirectory(kcore)
 add_subdirectory(spmv)
+add_subdirectory(spgemm)
 # end /* Add algorithms' subdirectories */
 
 # begin /* Add experimental algorithms' subdirectories */

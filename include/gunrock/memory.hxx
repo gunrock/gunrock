@@ -34,6 +34,25 @@ namespace memory {
 enum memory_space_t { device, host };
 
 /**
+ * @brief allocate memory on defined memory space on a specific pointer.
+ *
+ * @tparam type_t type of the pointer
+ * @param pointer pointer to the memory
+ * @param size size of the memory in bytes
+ * @param space memory space (device or host)
+ */
+template <typename type_t>
+void allocate(type_t* pointer,
+              std::size_t size,
+              memory_space_t space = memory_space_t::device) {
+  if (size) {
+    error::throw_if_exception((device == space)
+                                  ? cudaMalloc(&pointer, size)
+                                  : cudaMallocHost(&pointer, size));
+  }
+}
+
+/**
  * @brief allocate a pointer with size on a specfied memory space.
  *
  * @tparam T return type of the pointer being allocated.
