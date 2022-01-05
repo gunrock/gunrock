@@ -4,8 +4,8 @@ using namespace gunrock;
 using namespace memory;
 
 void test_spmv(int num_arguments, char** argument_array) {
-  if (num_arguments != 2) {
-    std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
+  if (num_arguments != 3) {
+    std::cerr << "usage: ./bin/<program-name> a.mtx b.mtx" << std::endl;
     exit(1);
   }
 
@@ -21,38 +21,38 @@ void test_spmv(int num_arguments, char** argument_array) {
   using weight_t = float;
 
   // Filename to be read
-  std::string filename = argument_array[1];
+  std::string filename_a = argument_array[1];
   constexpr memory_space_t space = memory_space_t::device;
 
   /// Load the matrix-market dataset into csr format.
   /// See `format` to see other supported formats.
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
   using csr_t = format::csr_t<space, vertex_t, edge_t, weight_t>;
-  csr_t csr;
-  csr.from_coo(mm.load(filename));
+  csr_t a_csr;
+  a_csr.from_coo(mm.load(filename_a));
 
   auto A = graph::build::from_csr<space, graph::view_t::csr>(
-      csr.number_of_rows, csr.number_of_columns, csr.number_of_nonzeros,
-      csr.row_offsets.data().get(), csr.column_indices.data().get(),
-      csr.nonzero_values.data().get());
+      a_csr.number_of_rows, a_csr.number_of_columns, a_csr.number_of_nonzeros,
+      a_csr.row_offsets.data().get(), a_csr.column_indices.data().get(),
+      a_csr.nonzero_values.data().get());
 
-  thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
-  thrust::device_vector<vertex_t> column_offsets(csr.number_of_columns + 1);
+  std::string filename_b = argument_array[2];
+  csr_t b_csr;
+  b_csr.from_coo(mm.load(filename_b));
 
   /// For now, we are using the transpose of CSR-matrix A as the second operand
   /// for our spgemm.
-  auto B = graph::build::from_csr<space, graph::view_t::csc>(
-      csr.number_of_rows, csr.number_of_columns, csr.number_of_nonzeros,
-      csr.row_offsets.data().get(), csr.column_indices.data().get(),
-      csr.nonzero_values.data().get(), row_indices.data().get(),
-      column_offsets.data().get());
+  auto B = graph::build::from_csr<space, graph::view_t::csr>(
+      b_csr.number_of_rows, b_csr.number_of_columns, b_csr.number_of_nonzeros,
+      b_csr.row_offsets.data().get(), b_csr.column_indices.data().get(),
+      b_csr.nonzero_values.data().get());
 
   /// We will use the following graph in csr view to store the sparse-matrix C's
   /// result. Initially, we only know the m x n matrix size of C, which is the
   /// number of rows of A (m) and the number of columns of B (n). The number of
   /// nonzeros of C is unknown (and is therefore set to 0). C must be in the CSR
   /// format for essentials.
-  csr_t cc(csr.number_of_rows, csr.number_of_columns, 0);
+  csr_t cc(a_csr.number_of_rows, b_csr.number_of_columns, 1);
   using csr_v_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
   graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t> C;
   C.template set<csr_v_t>(
@@ -62,6 +62,9 @@ void test_spmv(int num_arguments, char** argument_array) {
   // --
   // GPU Run
   float gpu_elapsed = gunrock::spgemm::run(A, B, C);
+
+  // print::head(cc.nonzero_values.data().get(), 10, 10, "Non-zero (C)");
+
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 }
 
