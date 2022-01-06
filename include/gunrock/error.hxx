@@ -23,6 +23,8 @@ struct exception_t : std::exception {
   exception_t(error_t _status, std::string _message = "") {
     report = cudaGetErrorString(_status) + std::string("\t: ") + _message;
   }
+
+  exception_t(std::string _message = "") { report = _message; }
   virtual const char* what() const noexcept { return report.c_str(); }
 };
 
@@ -35,6 +37,11 @@ struct exception_t : std::exception {
 void throw_if_exception(error_t status, std::string message = "") {
   if (status != cudaSuccess)
     throw exception_t(status, message);
+}
+
+void throw_if_exception(bool is_exception, std::string message = "") {
+  if (is_exception)
+    throw exception_t(message);
 }
 
 }  // namespace error

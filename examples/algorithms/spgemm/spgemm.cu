@@ -64,7 +64,6 @@ void test_spmv(int num_arguments, char** argument_array) {
   float gpu_elapsed = gunrock::spgemm::run(A, B, C);
 
   // print::head(cc.nonzero_values.data().get(), 10, 10, "Non-zero (C)");
-
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 }
 

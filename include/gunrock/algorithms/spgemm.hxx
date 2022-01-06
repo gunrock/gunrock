@@ -49,16 +49,18 @@ struct problem_t : gunrock::problem_t<graph_t> {
         result(_result) {}
 
   thrust::device_vector<edge_t> estimated_nz_per_row;
+  thrust::host_vector<edge_t> nnz;
 
   void init() override {
     auto A = this->get_graph();
 
     // Allocate memory for row-offsets of C = m + 1.
-    auto C_row_offsets = result.C.get_row_offsets();
-    memory::allocate(C_row_offsets,
+    auto row_offsets = result.C.get_row_offsets();
+    memory::allocate(row_offsets,
                      (A.get_number_of_vertices() + 1) * sizeof(edge_t));
 
     estimated_nz_per_row.resize(A.get_number_of_vertices() + 1);
+    nnz.resize(1);
   }
 
   void reset() override {
@@ -90,9 +92,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto& B = P->param.B;
     auto& C = P->result.C;
 
-    auto C_row_offsets = C.get_row_offsets();
-    auto C_col_indices = C.get_column_indices();
-    auto C_values = C.get_nonzero_values();
+    auto row_offsets = C.get_row_offsets();
+    auto column_indices = C.get_column_indices();
+    auto nonzero_values = C.get_nonzero_values();
 
     auto& estimated_nz_per_row = P->estimated_nz_per_row;
     auto estimated_nz_ptr = estimated_nz_per_row.data().get();
@@ -115,42 +117,31 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                 operators::advance_io_type_t::none>(
         A, E, upperbound_nonzeros, context);
 
-    std::cout << "Upperbound Nonzeros/Row = ";
-    thrust::copy(estimated_nz_per_row.begin(), estimated_nz_per_row.end(),
-                 std::ostream_iterator<edge_t>(std::cout, " "));
-    std::cout << std::endl;
-
     /// Step X. Calculate upperbound of C's row-offsets.
     thrust::exclusive_scan(policy, P->estimated_nz_per_row.begin(),
                            P->estimated_nz_per_row.end(),
-                           thrust::device_pointer_cast(C_row_offsets),
-                           edge_t(0), thrust::plus<edge_t>());
+                           thrust::device_pointer_cast(row_offsets), edge_t(0),
+                           thrust::plus<edge_t>());
 
     /// Step X. Calculate the upperbound of total number of nonzeros in the
     /// sparse-matrix C.
-    auto m = A.get_number_of_vertices();
-    thrust::host_vector<edge_t> h_nnz(
-        thrust::device_pointer_cast(C_row_offsets) + m,
-        thrust::device_pointer_cast(C_row_offsets) + m + 1);
+    thrust::copy(
+        thrust::device_pointer_cast(row_offsets) + A.get_number_of_vertices(),
+        thrust::device_pointer_cast(row_offsets) + A.get_number_of_vertices() +
+            1,
+        P->nnz.begin());
 
-    std::cout << "Upperbound Row-Offsets = ";
-    thrust::copy(thrust::device_pointer_cast(C_row_offsets),
-                 thrust::device_pointer_cast(C_row_offsets) + m + 1,
-                 std::ostream_iterator<edge_t>(std::cout, " "));
-    std::cout << std::endl;
-
-    edge_t estimated_nzs = h_nnz[0];
-
-    // estimated_nzs = thrust::reduce(policy, estimated_nz_per_row.begin(),
-    // estimated_nz_per_row.end(), (edge_t)0, thrust::plus<edge_t>());
-
-    std::cout << "Upperbound Total Nonzeros = " << estimated_nzs << std::endl;
+    edge_t estimated_nzs = P->nnz[0];
 
     /// Step . Allocate upperbound memory for C's values and column indices.
-    memory::allocate(C_col_indices, estimated_nzs * sizeof(vertex_t));
-    memory::allocate(C_values, estimated_nzs * sizeof(weight_t));
+    memory::allocate(column_indices, estimated_nzs * sizeof(vertex_t));
+    memory::allocate(nonzero_values, estimated_nzs * sizeof(weight_t));
 
-    /// Step 5. Calculate C's column indices and values.
+    thrust::fill(policy, column_indices, column_indices + estimated_nzs, -1);
+    thrust::fill(policy, nonzero_values, nonzero_values + estimated_nzs,
+                 weight_t(0));
+
+    /// Step X. Calculate C's column indices and values.
     auto gustavsons =
         [=] __device__(
             vertex_t const& m,  // ... source (A: row index)
@@ -162,7 +153,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       auto offset = B.get_starting_edge(k);
       auto nnz = B.get_number_of_neighbors(k);
 
-      auto c_offset = C_row_offsets[m];  // m == 0 ? 0 : C_row_offsets[m - 1];
+      auto c_offset = row_offsets[m];
 
       // Loop over all the nonzeros in row k of sparse-matrix B.
       for (edge_t b_nz_idx = offset; b_nz_idx < (offset + nnz); ++b_nz_idx) {
@@ -170,15 +161,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         auto b_nz = B.get_edge_weight(b_nz_idx);
         auto c_nz_idx = c_offset + n;
 
-        C_col_indices[c_nz_idx] = n;
-        math::atomic::add(&C_values[c_nz_idx], a_nz * b_nz);
-        __syncthreads();
-
-        printf("A (m, k) = nz : (%d, %d) = %f\n", m, k, a_nz);
-        printf("B (k, n) = nz : (%d, %d) = %f\n", k, n, b_nz);
-        printf("C (nz_idx, m, n) = nz : (%d, %d, %d) = %f\n", c_nz_idx, m, n,
-               C_values[c_nz_idx]);
-        __syncthreads();
+        column_indices[c_nz_idx] = n;
+        math::atomic::add(&nonzero_values[c_nz_idx], a_nz * b_nz);
       }
       return false;  // ignored.
     };
@@ -189,9 +173,44 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                 operators::advance_io_type_t::none>(
         A, E, gustavsons, context);
 
-    // /// Step 6. Finally set the sparse-matrix C's data, again.
-    // C.set(A.get_number_of_vertices(), C_nnz, C_row_offsets, C_col_indices,
-    //       C_values);
+    /// Step X. Fix-up, i.e., remove overestimated nonzeros and rellocate the
+    /// storage as necessary.
+    auto real_nonzeros = [=] __device__(vertex_t const& row) -> void {
+      auto overestimated_nzs = 0;
+      for (edge_t k = row_offsets[row]; k < row_offsets[row + 1]; ++k) {
+        if (column_indices[k] == -1 && nonzero_values[k] == 0)
+          overestimated_nzs++;
+      }
+
+      estimated_nz_ptr[row] -= overestimated_nzs;
+    };
+
+    operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
+        A, real_nonzeros, context);
+
+    thrust::exclusive_scan(policy, P->estimated_nz_per_row.begin(),
+                           P->estimated_nz_per_row.end(),
+                           thrust::device_pointer_cast(row_offsets), edge_t(0),
+                           thrust::plus<edge_t>());
+
+    auto it = thrust::copy_if(
+        policy, column_indices, column_indices + estimated_nzs, column_indices,
+        [] __device__(const vertex_t& x) -> bool { return x != -1; });
+
+    auto C_nnz = thrust::distance(column_indices, it);
+
+    auto itv = thrust::copy_if(policy, nonzero_values,
+                               nonzero_values + estimated_nzs, nonzero_values,
+                               [] __device__(const weight_t& nz) -> bool {
+                                 return nz != weight_t(0);
+                               });
+
+    error::throw_if_exception(C_nnz != thrust::distance(nonzero_values, itv),
+                              "NNZ check failed.");
+
+    /// Step X. Finally set the sparse-matrix C's data, again.
+    C.set(A.get_number_of_vertices(), C_nnz, row_offsets, column_indices,
+          nonzero_values);
   }
 
   /**
@@ -205,18 +224,16 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 };  // struct enactor_t
 
-template <typename a_graph_t, typename b_graph_t, typename c_graph_t>
-float run(a_graph_t& A,
+template <typename graph_t, typename b_graph_t, typename c_graph_t>
+float run(graph_t& A,
           b_graph_t& B,
           c_graph_t& C,
           std::shared_ptr<cuda::multi_context_t> context =
               std::shared_ptr<cuda::multi_context_t>(
                   new cuda::multi_context_t(0))  // Context
 ) {
-  using param_type = param_t<a_graph_t, b_graph_t>;
+  using param_type = param_t<graph_t, b_graph_t>;
   using result_type = result_t<c_graph_t>;
-
-  using graph_t = a_graph_t;
 
   param_type param(A, B);
   result_type result(C);
