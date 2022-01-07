@@ -47,23 +47,21 @@ void test_spmv(int num_arguments, char** argument_array) {
       b_csr.row_offsets.data().get(), b_csr.column_indices.data().get(),
       b_csr.nonzero_values.data().get());
 
-  /// We will use the following graph in csr view to store the sparse-matrix C's
-  /// result. Initially, we only know the m x n matrix size of C, which is the
-  /// number of rows of A (m) and the number of columns of B (n). The number of
-  /// nonzeros of C is unknown (and is therefore set to 0). C must be in the CSR
-  /// format for essentials.
-  csr_t cc(a_csr.number_of_rows, b_csr.number_of_columns, 1);
-  using csr_v_t = graph::graph_csr_t<vertex_t, edge_t, weight_t>;
-  graph::graph_t<space, vertex_t, edge_t, weight_t, csr_v_t> C;
-  C.template set<csr_v_t>(
-      cc.number_of_rows, cc.number_of_nonzeros, cc.row_offsets.data().get(),
-      cc.column_indices.data().get(), cc.nonzero_values.data().get());
+  /// Let's use CSR representation
+  csr_t C;
 
   // --
   // GPU Run
   float gpu_elapsed = gunrock::spgemm::run(A, B, C);
 
-  // print::head(cc.nonzero_values.data().get(), 10, 10, "Non-zero (C)");
+  std::cout << "Number of rows: " << C.number_of_rows << std::endl;
+  std::cout << "Number of columns: " << C.number_of_columns << std::endl;
+  std::cout << "Number of nonzeros: " << C.number_of_nonzeros << std::endl;
+
+  print::head(C.row_offsets, 10, "row_offsets");
+  print::head(C.column_indices, 10, "column_indices");
+  print::head(C.nonzero_values, 10, "nonzero_values");
+
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 }
 
