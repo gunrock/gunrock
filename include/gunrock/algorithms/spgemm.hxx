@@ -39,8 +39,8 @@ struct problem_t : gunrock::problem_t<graph_t> {
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
 
-  param_type param;
-  result_type result;
+  param_type& param;
+  result_type& result;
 
   problem_t(graph_t& A,
             param_type& _param,
@@ -55,9 +55,8 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   void init() override {
     auto& A = this->param.A;
-    auto& C = this->result.C;
+    // auto& C = this->result.C;
 
-    C.row_offsets.resize(A.get_number_of_vertices() + 1);
     estimated_nz_per_row.resize(A.get_number_of_vertices());
     nnz.resize(1);
   }
@@ -66,7 +65,15 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto policy = this->context->get_context(0)->execution_policy();
     thrust::fill(policy, estimated_nz_per_row.begin(),
                  estimated_nz_per_row.end(), 0);
+
+    // Reset NNZ.
     nnz[0] = 0;
+
+    // Reset sparse-matrix C.
+    auto& C = this->result.C;
+    C.row_offsets.clear();
+    C.column_indices.clear();
+    C.nonzero_values.clear();
   }
 };
 
@@ -97,6 +104,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto& estimated_nz_per_row = P->estimated_nz_per_row;
     auto estimated_nz_ptr = estimated_nz_per_row.data().get();
+
+    // Resize row-offsets.
+    row_offsets.resize(A.get_number_of_vertices() + 1);
 
     thrust::fill(policy, estimated_nz_per_row.begin(),
                  estimated_nz_per_row.end(), 0);
@@ -146,7 +156,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     /// Step X. Calculate C's column indices and values.
     auto gustavsons =
-        [=] __device__(
+        [=] __host__ __device__(
             vertex_t const& m,  // ... source (A: row index)
             vertex_t const& k,  // neighbor (A: column index or B: row index)
             edge_t const& a_nz_idx,  // edge (A: row ↦ column)
@@ -155,18 +165,23 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // Get the number of nonzeros in row k of sparse-matrix B.
       auto offset = B.get_starting_edge(k);
       auto nnz = B.get_number_of_neighbors(k);
-      auto c_offset = row_off[m];
+      auto c_offset = thread::load(&row_off[m]);
 
       // Loop over all the nonzeros in row k of sparse-matrix B.
       for (edge_t b_nz_idx = offset; b_nz_idx < (offset + nnz); ++b_nz_idx) {
         auto n = B.get_destination_vertex(b_nz_idx);
         auto b_nz = B.get_edge_weight(b_nz_idx);
+
+        // Calculate c's nonzero index.
         std::size_t c_nz_idx = c_offset + n;
-        col_ind[c_nz_idx] = n;
+
+        // Assign column index.
+        thread::store(&col_ind[c_nz_idx], n);
+
+        // Accumulate the nonzero value.
         math::atomic::add(nz_vals + c_nz_idx, a_nz * b_nz);
-        if (c_nz_idx < 13)
-          printf("%f, ", nz_vals[c_nz_idx]);
       }
+      return false;
     };
 
     operators::advance::execute<operators::load_balance_t::block_mapped,
@@ -177,7 +192,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     /// Step X. Fix-up, i.e., remove overestimated nonzeros and rellocate the
     /// storage as necessary.
-    auto real_nonzeros = [=] __device__(vertex_t const& row) -> void {
+    auto real_nonzeros = [=] __host__ __device__(vertex_t const& row) -> void {
       edge_t overestimated_nzs = 0;
       // For all nonzeros within the row of C.
       for (auto nz = row_off[row]; nz < row_off[row + 1]; ++nz) {
@@ -221,7 +236,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto idx_nnz = thrust::distance(column_indices.begin(), itc);
     auto nz_nnz = thrust::distance(nonzero_values.begin(), itv);
 
-    std::cout << std::endl;
     std::cout << "idx_nnz ? nz_nnz : " << idx_nnz << " ? " << nz_nnz
               << std::endl;
 
