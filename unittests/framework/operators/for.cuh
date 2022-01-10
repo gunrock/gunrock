@@ -25,18 +25,8 @@ struct f {
 };
 
 TEST(operators, prallel_for) {
-  // Fetch a sample csr for testing.
-  auto csr = io::sample::csr();
-
-  // Build a graph using the sample csr.
-  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      csr.number_of_rows,               // rows
-      csr.number_of_columns,            // columns
-      csr.number_of_nonzeros,           // nonzeros
-      csr.row_offsets.data().get(),     // row_offsets
-      csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get()   // values
-  );
+  // Build a sample graph using the sample csr.
+  auto [csr, G] = io::sample::graph();
 
   // Initialize the devicecontext.
   cuda::device_id_t device = 0;
