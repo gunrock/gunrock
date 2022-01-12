@@ -1,4 +1,19 @@
-# We can lower this if needed.
+####################################################
+############ INSTALLING CORRECT CMAKE ##############
+####################################################
+# Installing correct cmake version is easy!
+# 1) Find the respective version here;
+# https://github.com/Kitware/CMake/releases,
+# and 2) replace the [x.xx.x] in the following
+# commands with the version number (remove the
+# brackets). For example, if you are installing
+# CMake 3.22.1, replace [x.xx.x] with 3.22.1:
+
+# wget https://github.com/Kitware/CMake/releases/download/v[x.xx.x]/cmake-[x.xx.x]-linux-x86_64.sh
+# chmod +x ./cmake-[x.xx.x]-linux-x86_64.sh
+# ./cmake-[x.xx.x]-linux-x86_64.sh
+# sudo mv cmake-[x.xx.x]-linux-x86_64 /opt/cmake
+# sudo ln -s /opt/cmake/bin/* /usr/local/bin/
 cmake_minimum_required(VERSION 3.20.1 FATAL_ERROR)
 
 # begin /* Update Essentials version */
@@ -13,9 +28,6 @@ project(essentials
   VERSION ${ESSENTIALS_VERSION}
   LANGUAGES CXX C CUDA
 )
-
-# Increase verbosity.
-# set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # begin /* Dependencies directory */
 set(PROJECT_DEPS_DIR externals)
@@ -41,7 +53,7 @@ set(LIBRARY_OUTPUT_PATH
 
 ## Export compile commands
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_VERBOSE_MAKEFILE OFF)
 
 ############ ADD LIBRARY: ESSENTIALS (HEADER-ONLY) ############
 add_library(essentials INTERFACE)
@@ -189,8 +201,6 @@ endif(ESSENTIALS_BUILD_TESTS)
 option(ESSENTIALS_BUILD_BENCHMARKS
   "If on, builds essentials with benchmarking support."
   OFF)
-
-
 
 # Subdirectories for examples, testing and documentation
 if(ESSENTIALS_BUILD_BENCHMARKS)
