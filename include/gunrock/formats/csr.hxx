@@ -50,6 +50,19 @@ struct csr_t {
   ~csr_t() {}
 
   /**
+   * @brief Copy constructor.
+   * @param rhs
+   */
+  template <typename _csr_t>
+  csr_t(const _csr_t& rhs)
+      : number_of_rows(rhs.number_of_rows),
+        number_of_columns(rhs.number_of_columns),
+        number_of_nonzeros(rhs.number_of_nonzeros),
+        row_offsets(rhs.row_offsets),
+        column_indices(rhs.column_indices),
+        nonzero_values(rhs.nonzero_values) {}
+
+  /**
    * @brief Convert a Coordinate Sparse Format into Compressed Sparse Row
    * Format.
    *
@@ -66,25 +79,25 @@ struct csr_t {
     number_of_nonzeros = coo.number_of_nonzeros;
 
     // Allocate space for vectors
-    vector_t<offset_t, memory_space_t::host> _Ap;
-    vector_t<index_t, memory_space_t::host> _Aj;
-    vector_t<value_t, memory_space_t::host> _Ax;
+    vector_t<offset_t, memory_space_t::host> Ap;
+    vector_t<index_t, memory_space_t::host> Aj;
+    vector_t<value_t, memory_space_t::host> Ax;
 
-    offset_t* Ap;
-    index_t* Aj;
-    value_t* Ax;
+    // offset_t* Ap;
+    // index_t* Aj;
+    // value_t* Ax;
 
     if (space == memory_space_t::device) {
       assert(space == memory_space_t::device);
       // If returning csr_t on device, allocate temporary host vectors, build on
       // host and move to device.
-      _Ap.resize(number_of_rows + 1);
-      _Aj.resize(number_of_nonzeros);
-      _Ax.resize(number_of_nonzeros);
+      Ap.resize(number_of_rows + 1);
+      Aj.resize(number_of_nonzeros);
+      Ax.resize(number_of_nonzeros);
 
-      Ap = _Ap.data();
-      Aj = _Aj.data();
-      Ax = _Ax.data();
+      // Ap = _Ap.data();
+      // Aj = _Aj.data();
+      // Ax = _Ax.data();
 
     } else {
       assert(space == memory_space_t::host);
@@ -93,9 +106,9 @@ struct csr_t {
       column_indices.resize(number_of_nonzeros);
       nonzero_values.resize(number_of_nonzeros);
 
-      Ap = raw_pointer_cast(row_offsets.data());
-      Aj = raw_pointer_cast(column_indices.data());
-      Ax = raw_pointer_cast(nonzero_values.data());
+      // Ap = raw_pointer_cast(row_offsets.data());
+      // Aj = raw_pointer_cast(column_indices.data());
+      // Ax = raw_pointer_cast(nonzero_values.data());
     }
 
     // compute number of non-zero entries per row of A.
@@ -131,15 +144,10 @@ struct csr_t {
 
     // If returning a device csr_t, move coverted data to device.
     if (space == memory_space_t::device) {
-      row_offsets = _Ap;
-      column_indices = _Aj;
-      nonzero_values = _Ax;
+      row_offsets = Ap;
+      column_indices = Aj;
+      nonzero_values = Ax;
     }
-
-    // XXX: Clean-up?
-    Ap = nullptr;
-    Ax = nullptr;
-    Aj = nullptr;
 
     return *this;  // CSR representation (with possible duplicates)
   }
@@ -163,12 +171,12 @@ struct csr_t {
       thrust::host_vector<index_t> h_column_indices(number_of_nonzeros);
       thrust::host_vector<value_t> h_nonzero_values(number_of_nonzeros);
 
-      assert(fread(memory::raw_pointer_cast(h_row_offsets.data()), sizeof(offset_t),
-            number_of_rows + 1, file) != 0);
-      assert(fread(memory::raw_pointer_cast(h_column_indices.data()), sizeof(index_t),
-            number_of_nonzeros, file) != 0);
-      assert(fread(memory::raw_pointer_cast(h_nonzero_values.data()), sizeof(value_t),
-            number_of_nonzeros, file) != 0);
+      assert(fread(memory::raw_pointer_cast(h_row_offsets.data()),
+                   sizeof(offset_t), number_of_rows + 1, file) != 0);
+      assert(fread(memory::raw_pointer_cast(h_column_indices.data()),
+                   sizeof(index_t), number_of_nonzeros, file) != 0);
+      assert(fread(memory::raw_pointer_cast(h_nonzero_values.data()),
+                   sizeof(value_t), number_of_nonzeros, file) != 0);
 
       // Copy data from host to device
       row_offsets = h_row_offsets;
@@ -178,12 +186,12 @@ struct csr_t {
     } else {
       assert(space == memory_space_t::host);
 
-      assert(fread(memory::raw_pointer_cast(row_offsets.data()), sizeof(offset_t),
-            number_of_rows + 1, file) != 0);
-      assert(fread(memory::raw_pointer_cast(column_indices.data()), sizeof(index_t),
-            number_of_nonzeros, file) != 0);
-      assert(fread(memory::raw_pointer_cast(nonzero_values.data()), sizeof(value_t),
-            number_of_nonzeros, file) != 0);
+      assert(fread(memory::raw_pointer_cast(row_offsets.data()),
+                   sizeof(offset_t), number_of_rows + 1, file) != 0);
+      assert(fread(memory::raw_pointer_cast(column_indices.data()),
+                   sizeof(index_t), number_of_nonzeros, file) != 0);
+      assert(fread(memory::raw_pointer_cast(nonzero_values.data()),
+                   sizeof(value_t), number_of_nonzeros, file) != 0);
     }
   }
 

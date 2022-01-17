@@ -23,6 +23,7 @@ namespace gunrock {}  // namespace gunrock
 // Utility includes
 #include <gunrock/util/math.hxx>
 #include <gunrock/util/print.hxx>
+#include <gunrock/util/compare.hxx>
 
 // Format includes
 #include <gunrock/formats/formats.hxx>

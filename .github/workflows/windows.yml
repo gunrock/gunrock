@@ -16,7 +16,8 @@ on:
 jobs:
   # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
+    # https://github.blog/changelog/2021-02-08-github-actions-skip-pull-request-and-push-workflows-with-skip-ci/
+    if: "!contains(github.event.commits[0].message, '[skip windows]')"
     runs-on: windows-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
@@ -48,7 +49,7 @@ jobs:
         
       - name: Build all applications
         # Build your program with the given configuration
-        run: cmake --build ${{github.workspace}}/build # --verbose # --target sssp
+        run: cmake --build ${{github.workspace}}/build --verbose # --target sssp
         
         # TODO: Use the following once we have BUILD_TYPE and envrionment variables set-up:
         # run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}

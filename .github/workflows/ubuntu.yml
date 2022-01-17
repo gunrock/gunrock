@@ -16,7 +16,8 @@ on:
 jobs:
   # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
+    # https://github.blog/changelog/2021-02-08-github-actions-skip-pull-request-and-push-workflows-with-skip-ci/
+    if: "!contains(github.event.commits[0].message, '[skip ubuntu]')"
     runs-on: ubuntu-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
@@ -48,3 +49,31 @@ jobs:
         # TODO: Use the following once we have BUILD_TYPE and envrionment variables set-up:
         # run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
       
+  test:
+    if: "contains(github.event.commits[0].message, '[test]')"
+    runs-on: gpu
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Runs a single command using the runners shell
+      - name: Check nvcc/nvidia-smi version
+        run: nvcc -V && nvidia-smi
+        
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      # Fix the SM-version for K80
+      - name: CUDA Architecture 35
+        run: sed -i 's/CUDA_ARCHITECTURES\ 61/CUDA_ARCHITECTURES\ 35/' ${{github.workspace}}/CMakeLists.txt
+      
+      - name: Configure cmake
+        # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
+        # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
+        run: cmake -B ${{github.workspace}}/build -D ESSENTIALS_BUILD_TESTS=ON #-DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} 
+        
+      - name: Build all applications
+        # Build your program with the given configuration
+        run: cmake  --build ${{github.workspace}}/build --target sssp # --config ${{env.BUILD_TYPE}}
+
+      - name: Run the applications
+        run: ${{github.workspace}}/build/bin/sssp ${{github.workspace}}/datasets/chesapeake/chesapeake.mtx

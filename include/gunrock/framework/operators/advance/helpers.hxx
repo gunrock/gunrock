@@ -25,6 +25,7 @@ std::size_t compute_output_length(graph_t& G,
                                   cuda::standard_context_t& context,
                                   bool graph_as_frontier = false) {
   using vertex_t = typename graph_t::vertex_type;
+  using edge_t = typename graph_t::edge_type;
 
   auto input_data = input->data();
   auto total_elems = graph_as_frontier ? G.get_number_of_vertices()
@@ -36,12 +37,12 @@ std::size_t compute_output_length(graph_t& G,
 
   auto segment_sizes = [=] __host__ __device__(std::size_t const& i) {
     if (i == total_elems)  // XXX: this is a weird exc. scan.
-      return 0;
+      return edge_t(0);
 
     auto v = graph_as_frontier ? vertex_t(i) : input_data[i];
     // if item is invalid, segment size is 0.
     if (!gunrock::util::limits::is_valid(v))
-      return 0;
+      return edge_t(0);
     else
       return G.get_number_of_neighbors(v);
   };
@@ -53,8 +54,8 @@ std::size_t compute_output_length(graph_t& G,
                                                   1),  // input iterator: last
       segments.begin(),                                // output iterator
       segment_sizes,                                   // unary operation
-      (vertex_t)0,                                     // initial value
-      thrust::plus<vertex_t>()                         // binary operation
+      edge_t(0),                                       // initial value
+      thrust::plus<edge_t>()                           // binary operation
   );
 
   // The last item contains the total scanned items, so in a simple
@@ -70,14 +71,14 @@ std::size_t compute_output_length(graph_t& G,
   // If the active buffer is greater than number of vertices,
   // we should TODO: resize the scanned work domain, this happens
   // when we allow duplicates to be in the active buffer.
-  thrust::host_vector<vertex_t> size_of_output(
+  thrust::host_vector<edge_t> size_of_output(
       segments.data() + location_of_total_scanned_items,
       segments.data() + location_of_total_scanned_items + 1);
 
   // DEBUG::
   // std::cout << "Scanned Segments (THRUST) = ";
   // thrust::copy(segments.begin(), segments.end(),
-  //              std::ostream_iterator<vertex_t>(std::cout, " "));
+  //              std::ostream_iterator<edge_t>(std::cout, " "));
   // std::cout << std::endl;
   // std::cout << "Size of Output (THRUST) = " << size_of_output[0] <<
   // std::endl;

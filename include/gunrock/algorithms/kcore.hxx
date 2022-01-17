@@ -89,7 +89,9 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
-  using gunrock::enactor_t<problem_t>::enactor_t;
+  enactor_t(problem_t* _problem,
+            std::shared_ptr<cuda::multi_context_t> _context)
+      : gunrock::enactor_t<problem_t>(_problem, _context) {}
 
   using vertex_t = typename problem_t::vertex_t;
   using edge_t = typename problem_t::edge_t;
@@ -199,7 +201,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
 template <typename graph_t>
 float run(graph_t& G,
-          int* k_cores  // Output
+          int* k_cores,  // Output
+          std::shared_ptr<cuda::multi_context_t> context =
+              std::shared_ptr<cuda::multi_context_t>(
+                  new cuda::multi_context_t(0))  // Context
 ) {
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
@@ -210,21 +215,17 @@ float run(graph_t& G,
   // initialize `result` w/ the appropriate parameters / data structures
   result_type result(k_cores);
 
-  // Context for application (eg, GPU + CUDA stream it will be executed on)
-  auto multi_context =
-      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
-
   // instantiate `problem` and `enactor` templates.
   using problem_type = problem_t<graph_t, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
   // initialize problem; call `init` and `reset` to prepare data structures
-  problem_type problem(G, result, multi_context);
+  problem_type problem(G, result, context);
   problem.init();
   problem.reset();
 
   // initialize enactor; call enactor, returning GPU elapsed time
-  enactor_type enactor(&problem, multi_context);
+  enactor_type enactor(&problem, context);
   return enactor.enact();
 }
 

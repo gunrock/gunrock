@@ -34,6 +34,25 @@ namespace memory {
 enum memory_space_t { device, host };
 
 /**
+ * @brief allocate memory on defined memory space on a specific pointer.
+ *
+ * @tparam type_t type of the pointer
+ * @param pointer pointer to the memory
+ * @param size size of the memory in bytes
+ * @param space memory space (device or host)
+ */
+template <typename type_t>
+void allocate(type_t* pointer,
+              std::size_t size,
+              memory_space_t space = memory_space_t::device) {
+  if (size) {
+    error::throw_if_exception((device == space)
+                                  ? cudaMalloc(&pointer, size)
+                                  : cudaMallocHost(&pointer, size));
+  }
+}
+
+/**
  * @brief allocate a pointer with size on a specfied memory space.
  *
  * @tparam T return type of the pointer being allocated.
@@ -42,14 +61,14 @@ enum memory_space_t { device, host };
  * @return T* return allocated T* pointer.
  */
 template <typename type_t>
-inline type_t* allocate(std::size_t size, memory_space_t space) {
+inline type_t* allocate(std::size_t size,
+                        memory_space_t space = memory_space_t::device) {
   void* pointer = nullptr;
   if (size) {
-    error::error_t status = (device == space) ? cudaMalloc(&pointer, size)
-                                              : cudaMallocHost(&pointer, size);
-    error::throw_if_exception(status);
+    error::throw_if_exception((device == space)
+                                  ? cudaMalloc(&pointer, size)
+                                  : cudaMallocHost(&pointer, size));
   }
-
   return reinterpret_cast<type_t*>(pointer);
 }
 
@@ -61,11 +80,11 @@ inline type_t* allocate(std::size_t size, memory_space_t space) {
  * @param space memory space domain where the pointer was allocated.
  */
 template <typename type_t>
-inline void free(type_t* pointer, memory_space_t space) {
+inline void free(type_t* pointer,
+                 memory_space_t space = memory_space_t::device) {
   if (pointer) {
-    error::error_t status = (device == space) ? cudaFree((void*)pointer)
-                                              : cudaFreeHost((void*)pointer);
-    error::throw_if_exception(status);
+    error::throw_if_exception((device == space) ? cudaFree((void*)pointer)
+                                                : cudaFreeHost((void*)pointer));
   }
 }
 
@@ -102,6 +121,37 @@ template <typename type_t>
 __host__ __device__ inline type_t* raw_pointer_cast(type_t* pointer) {
   return thrust::raw_pointer_cast(pointer);
 }
+
+/**
+ * @brief Custom deleter supports deletion of memory on device.
+ *
+ * @tparam type_t type of the pointer's memory to be deleted.
+ */
+template <typename type_t>
+struct deleter_t {
+  /**
+   * @brief Free memory on device.
+   *
+   * @param pointer
+   */
+  void operator()(type_t* pointer) const { free(pointer); }
+};
+
+/**
+ * @brief Custom allocator supports allocation of memory on device.
+ *
+ * @tparam type_t type of the pointer's memory to be allocated.
+ */
+template <typename type_t>
+struct allocator_t {
+  /**
+   * @brief Allocate memory on device.
+   *
+   * @param size size in bytes.
+   * @return type_t* returns the allocated pointer.
+   */
+  type_t* operator()(size_t bytes) const { allocate<type_t>(bytes); }
+};
 
 }  // namespace memory
 }  // namespace gunrock

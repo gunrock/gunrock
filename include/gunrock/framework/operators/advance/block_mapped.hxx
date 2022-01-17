@@ -87,7 +87,7 @@ void __global__ block_mapped_kernel(graph_t const G,
   __syncthreads();
 
   // Exclusive sum of degrees.
-  vertex_t aggregate_degree_per_block;
+  edge_t aggregate_degree_per_block;
   block_scan_t(storage.scan)
       .ExclusiveSum(th_deg, th_deg, aggregate_degree_per_block);
   __syncthreads();
@@ -113,7 +113,7 @@ void __global__ block_mapped_kernel(graph_t const G,
 
   length -= global_idx - local_idx;
 
-  for (int i = local_idx;               // threadIdx.x
+  for (edge_t i = local_idx;            // threadIdx.x
        i < aggregate_degree_per_block;  // total degree to process
        i += cuda::block::size::x()      // increment by blockDim.x
   ) {
@@ -184,9 +184,9 @@ void execute(graph_t& G,
   using launch_t =
       launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
 
-  launch_t launch_box(context);
+  launch_t launch_box;
 
-  launch_box.calculate_grid_dimensions(num_elements);
+  launch_box.calculate_grid_dimensions_strided(num_elements);
   auto __bm = block_mapped_kernel<        // kernel
       launch_box.block_dimensions.x,      // threas per block
       1,                                  // items per thread
@@ -196,8 +196,9 @@ void execute(graph_t& G,
       typename work_tiles_t::value_type,  // segments value type
       operator_t                          // lambda type
       >;
-  launch_box.launch(__bm, G, op, input->data(), output->data(), num_elements,
-                    segments.data().get());
+  auto __args = std::make_tuple(G, op, input->data(), output->data(),
+                                num_elements, segments.data().get());
+  launch_box.launch(__bm, __args, context);
   context.synchronize();
 }
 

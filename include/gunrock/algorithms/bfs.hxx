@@ -62,9 +62,9 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
-  // Use Base class constructor -- does this work? does it handle copy
-  // constructor?
-  using gunrock::enactor_t<problem_t>::enactor_t;
+  enactor_t(problem_t* _problem,
+            std::shared_ptr<cuda::multi_context_t> _context)
+      : gunrock::enactor_t<problem_t>(_problem, _context) {}
 
   using vertex_t = typename problem_t::vertex_t;
   using edge_t = typename problem_t::edge_t;
@@ -124,7 +124,10 @@ template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter
           typename graph_t::vertex_type* distances,      // Output
-          typename graph_t::vertex_type* predecessors    // Output
+          typename graph_t::vertex_type* predecessors,   // Output
+          std::shared_ptr<cuda::multi_context_t> context =
+              std::shared_ptr<cuda::multi_context_t>(
+                  new cuda::multi_context_t(0))  // Context
 ) {
   // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
@@ -136,17 +139,14 @@ float run(graph_t& G,
   // </user-defined>
 
   // <boiler-plate>
-  auto multi_context =
-      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
-
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
-  problem_type problem(G, param, result, multi_context);
+  problem_type problem(G, param, result, context);
   problem.init();
   problem.reset();
 
-  enactor_type enactor(&problem, multi_context);
+  enactor_type enactor(&problem, context);
   return enactor.enact();
   // </boiler-plate>
 }

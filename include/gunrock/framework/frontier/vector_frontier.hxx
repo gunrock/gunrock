@@ -40,7 +40,7 @@ class vector_frontier_t {
     /// TODO: we are using a vector of size 1 to avoid the overhead of setting
     /// it up later. Check if this is valid to do.
     p_storage = std::make_shared<vector_t<type_t, memory_space_t::device>>(
-        vector_t<type_t, memory_space_t::device>(1));
+        vector_t<type_t, memory_space_t::device>());
   }
 
   /**

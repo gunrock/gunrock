@@ -1,5 +1,20 @@
-# We can lower this if needed.
-cmake_minimum_required(VERSION 3.19 FATAL_ERROR)
+####################################################
+############ INSTALLING CORRECT CMAKE ##############
+####################################################
+# Installing correct cmake version is easy!
+# 1) Find the respective version here;
+# https://github.com/Kitware/CMake/releases,
+# and 2) replace the [x.xx.x] in the following
+# commands with the version number (remove the
+# brackets). For example, if you are installing
+# CMake 3.22.1, replace [x.xx.x] with 3.22.1:
+
+# wget https://github.com/Kitware/CMake/releases/download/v[x.xx.x]/cmake-[x.xx.x]-linux-x86_64.sh
+# chmod +x ./cmake-[x.xx.x]-linux-x86_64.sh
+# ./cmake-[x.xx.x]-linux-x86_64.sh
+# sudo mv cmake-[x.xx.x]-linux-x86_64 /opt/cmake
+# sudo ln -s /opt/cmake/bin/* /usr/local/bin/
+cmake_minimum_required(VERSION 3.20.1 FATAL_ERROR)
 
 # begin /* Update Essentials version */
 set(ESSENTIALS_VERSION_MAJOR 2)
@@ -11,11 +26,8 @@ set(ESSENTIALS_VERSION "${ESSENTIALS_VERSION_MAJOR}.${ESSENTIALS_VERSION_MINOR}.
 
 project(essentials
   VERSION ${ESSENTIALS_VERSION}
-  LANGUAGES CXX CUDA
+  LANGUAGES CXX C CUDA
 )
-
-# Increase verbosity.
-# set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # begin /* Dependencies directory */
 set(PROJECT_DEPS_DIR externals)
@@ -24,6 +36,7 @@ set(PROJECT_DEPS_DIR externals)
 # begin /* Include cmake modules */
 include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
 # end /* Include cmake modules */
 
 ## Set the directory where the binaries will be stored
@@ -40,7 +53,7 @@ set(LIBRARY_OUTPUT_PATH
 
 ## Export compile commands
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_VERBOSE_MAKEFILE OFF)
 
 ############ ADD LIBRARY: ESSENTIALS (HEADER-ONLY) ############
 add_library(essentials INTERFACE)
@@ -77,6 +90,8 @@ target_compile_definitions(essentials
     ESSENTIALS_VERSION=${ESSENTIALS_VERSION}
 )
 
+message(STATUS "Essentials CUDA Architecture: ${ESSENTIALS_ARCHITECTURES}")
+
 ####################################################
 ############ TARGET COMPILE FEATURES ###############
 ####################################################
@@ -84,11 +99,14 @@ target_compile_definitions(essentials
 target_compile_features(essentials INTERFACE cxx_std_17)
 # set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(ESSENTIALS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 ####################################################
 ############ TARGET INCLUDE DIRECTORIES ############
 ####################################################
 target_include_directories(essentials
-  INTERFACE include
+  INTERFACE ${ESSENTIALS_INCLUDE_DIR}
+  INTERFACE ${CXXOPTS_INCLUDE_DIR}
   INTERFACE ${THRUST_INCLUDE_DIR}
   INTERFACE ${CUB_INCLUDE_DIR}
   INTERFACE ${MODERNGPU_INCLUDE_DIR}
@@ -173,5 +191,23 @@ option(ESSENTIALS_BUILD_TESTS
 
 # Subdirectories for examples, testing and documentation
 if(ESSENTIALS_BUILD_TESTS)
+  include(${PROJECT_SOURCE_DIR}/cmake/FetchGoogleTest.cmake)
   add_subdirectory(unittests)
 endif(ESSENTIALS_BUILD_TESTS)
+
+####################################################
+################ BUILD BENCHMARKS  #################
+####################################################
+option(ESSENTIALS_BUILD_BENCHMARKS
+  "If on, builds essentials with benchmarking support."
+  OFF)
+
+# Subdirectories for examples, testing and documentation
+if(ESSENTIALS_BUILD_BENCHMARKS)
+  # ... see https://github.com/NVIDIA/nvbench/issues/66
+  set(NVBench_ENABLE_NVML OFF)
+  # ... set cuda architecture for nvbench.
+  set(CMAKE_CUDA_ARCHITECTURES ${ESSENTIALS_ARCHITECTURES})
+  include(${PROJECT_SOURCE_DIR}/cmake/FetchNVBench.cmake)
+  add_subdirectory(benchmarks)
+endif(ESSENTIALS_BUILD_BENCHMARKS)

@@ -94,17 +94,14 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
-  // Use Base class constructor -- does this work? does it handle copy
-  // constructor?
-  using gunrock::enactor_t<problem_t>::enactor_t;
+  enactor_t(problem_t* _problem,
+            std::shared_ptr<cuda::multi_context_t> _context,
+            enactor_properties_t _properties)
+      : gunrock::enactor_t<problem_t>(_problem, _context, _properties) {}
 
   using vertex_t = typename problem_t::vertex_t;
   using edge_t = typename problem_t::edge_t;
   using weight_t = typename problem_t::weight_t;
-  using frontier_t = typename enactor_t<problem_t>::frontier_t;
-
-  void prepare_frontier(frontier_t* f,
-                        cuda::multi_context_t& context) override {}
 
   void loop(cuda::multi_context_t& context) override {
     // Data slice
@@ -186,7 +183,10 @@ template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::weight_type alpha,
           typename graph_t::weight_type tol,
-          typename graph_t::weight_type* p  // Output
+          typename graph_t::weight_type* p,  // Output
+          std::shared_ptr<cuda::multi_context_t> context =
+              std::shared_ptr<cuda::multi_context_t>(
+                  new cuda::multi_context_t(0))  // Context
 ) {
   // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
@@ -199,14 +199,10 @@ float run(graph_t& G,
   result_type result(p);
   // </user-defined>
 
-  // <boiler-plate>
-  auto multi_context =
-      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
-
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
-  problem_type problem(G, param, result, multi_context);
+  problem_type problem(G, param, result, context);
   problem.init();
   problem.reset();
 
@@ -214,7 +210,7 @@ float run(graph_t& G,
   enactor_properties_t props;
   props.self_manage_frontiers = true;
 
-  enactor_type enactor(&problem, multi_context, props);
+  enactor_type enactor(&problem, context, props);
   return enactor.enact();
   // </boiler-plate>
 }

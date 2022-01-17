@@ -73,23 +73,23 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
     auto seed = this->param.seed;
     auto d_p = thrust::device_pointer_cast(this->result.p);
-    auto d_r = thrust::device_pointer_cast(r.data());
-    auto d_r_prime = thrust::device_pointer_cast(r_prime.data());
 
-    thrust::fill(policy, d_p + 0, d_p + n_vertices, 0);
-    thrust::fill(policy, d_r + 0, d_r + n_vertices, 0);
-    thrust::fill(policy, d_r_prime + 0, d_r_prime + n_vertices, 0);
+    // Reset everything to 0.
+    thrust::fill(policy, d_p, d_p + n_vertices, 0);
+    thrust::fill(policy, r.begin(), r.end(), 0);
+    thrust::fill(policy, r_prime.begin(), r_prime.end(), 0);
 
-    thrust::fill(policy, d_r + seed, d_r + seed + 1, 1);
-    thrust::fill(policy, d_r_prime + seed, d_r_prime + seed + 1, 1);
+    // Set the seed active.
+    thrust::fill(policy, r.begin() + seed, r.begin() + seed + 1, 1);
+    thrust::fill(policy, r_prime.begin() + seed, r_prime.begin() + seed + 1, 1);
   }
 };
 
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
-  // Use Base class constructor -- does this work? does it handle copy
-  // constructor?
-  using gunrock::enactor_t<problem_t>::enactor_t;
+  enactor_t(problem_t* _problem,
+            std::shared_ptr<cuda::multi_context_t> _context)
+      : gunrock::enactor_t<problem_t>(_problem, _context) {}
 
   using vertex_t = typename problem_t::vertex_t;
   using edge_t = typename problem_t::edge_t;
@@ -148,11 +148,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 };  // struct enactor_t
 
 template <typename graph_t>
-float run(graph_t& G,
-          typename graph_t::vertex_type& seed,
-          typename graph_t::weight_type* p,
-          typename graph_t::weight_type& alpha,
-          typename graph_t::weight_type& epsilon) {
+float run(
+    graph_t& G,
+    typename graph_t::vertex_type& seed,
+    typename graph_t::weight_type* p,
+    typename graph_t::weight_type& alpha,
+    typename graph_t::weight_type& epsilon,
+    std::shared_ptr<cuda::multi_context_t> context =
+        std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0))) {
   // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
@@ -164,18 +167,14 @@ float run(graph_t& G,
   result_type result(p);
   // </user-defined>
 
-  // <boiler-plate>
-  auto multi_context =
-      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
-
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
-  problem_type problem(G, param, result, multi_context);
+  problem_type problem(G, param, result, context);
   problem.init();
   problem.reset();
 
-  enactor_type enactor(&problem, multi_context);
+  enactor_type enactor(&problem, context);
   return enactor.enact();
   // </boiler-plate>
 }
@@ -191,24 +190,16 @@ float run_batch(graph_t& G,
   using weight_t = typename graph_t::weight_type;
 
   auto n_vertices = G.get_number_of_vertices();
-
-  // ???: Is this a good way to time wall-clock time?
-  auto multi_context =
-      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
-  auto context = multi_context->get_context(0);
-  auto timer = context->timer();
-  timer.begin();
-
-  auto f = [&](vertex_t seed) -> float {
-    return ppr::run(G, seed, p + (n_vertices * seed), alpha, epsilon);
+  auto f = [&](std::size_t job) -> float {
+    vertex_t active_seed = job;
+    weight_t* _p = p + (n_vertices * active_seed);
+    return ppr::run(G, active_seed, _p, alpha, epsilon);
   };
 
   thrust::host_vector<float> total_elapsed(1);
   operators::batch::execute(f, n_seeds, total_elapsed.data());
 
-  // return total_elapsed[0]; // This returns the total execution time, not the
-  // wall-clock time.  Weird.
-  return timer.end();  // Is this a better way to time?
+  return total_elapsed[0];
 }
 
 }  // namespace ppr
