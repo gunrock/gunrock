@@ -76,7 +76,8 @@ class vector_frontier_t {
    * @brief Get the number of elements within the frontier.
    * @return std::size_t
    */
-  std::size_t get_number_of_elements(cuda::stream_t stream = 0) const {
+  __host__ __device__ __forceinline__ std::size_t get_number_of_elements(
+      cuda::stream_t stream = 0) const {
     return num_elements;
   }
 
@@ -117,8 +118,8 @@ class vector_frontier_t {
    */
   __device__ __forceinline__ constexpr void set_element_at(
       type_t const& element,
-      std::size_t const& idx) const
-      noexcept {  /// XXX: This should not be const
+      std::size_t const& idx)
+      const noexcept {  /// XXX: This should not be const
     thread::store(this->get() + idx, element);
   }
 

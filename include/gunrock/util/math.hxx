@@ -21,6 +21,12 @@ namespace gunrock {
  */
 namespace math {
 
+template <typename type_t>
+constexpr __host__ __device__ __forceinline__ type_t
+divide_round_up(type_t const& a, type_t const& b) {
+  return (a + b - 1) / b;
+}
+
 /**
  * @brief Statically determine log2(N).
  *
