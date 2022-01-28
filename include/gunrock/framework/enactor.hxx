@@ -33,7 +33,7 @@ struct enactor_properties_t {
    * Resizes the frontier by this factor * the size required.
    * @code frontier.resize(frontier_sizing_factor * new_size);
    */
-  float frontier_sizing_factor{2};
+  float frontier_sizing_factor{1.5f};
 
   /*!
    * Number of frontier buffers to manage.
