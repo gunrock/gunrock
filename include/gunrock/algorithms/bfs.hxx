@@ -113,6 +113,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     operators::advance::execute<operators::load_balance_t::merge_path>(
         G, E, search, context);
 
+    // TODO: This can be replaced with a uniquify call instead.
     // Execute filter operator on the provided lambda
     operators::filter::execute<operators::filter_algorithm_t::compact>(
         G, E, remove_visited, context);
