@@ -13,17 +13,18 @@
 
 #include <gunrock/cuda/context.hxx>
 #include <thrust/transform_scan.h>
+#include <thrust/transform_reduce.h>
 
 namespace gunrock {
 namespace operators {
 namespace advance {
 
 template <typename graph_t, typename frontier_t, typename work_tiles_t>
-std::size_t compute_output_length(graph_t& G,
-                                  frontier_t* input,
-                                  work_tiles_t& segments,
-                                  cuda::standard_context_t& context,
-                                  bool graph_as_frontier = false) {
+std::size_t compute_output_offsets(graph_t& G,
+                                   frontier_t* input,
+                                   work_tiles_t& segments,
+                                   cuda::standard_context_t& context,
+                                   bool graph_as_frontier = false) {
   using vertex_t = typename graph_t::vertex_type;
   using edge_t = typename graph_t::edge_type;
 
@@ -84,6 +85,42 @@ std::size_t compute_output_length(graph_t& G,
   // std::endl;
 
   return size_of_output[0];
+}
+
+template <typename graph_t, typename frontier_t>
+std::size_t compute_output_length(graph_t& G,
+                                  frontier_t& input,
+                                  cuda::standard_context_t& context,
+                                  bool graph_as_frontier = false) {
+  using vertex_t = typename graph_t::vertex_type;
+  using edge_t = typename graph_t::edge_type;
+
+  if (graph_as_frontier)
+    return G.get_number_of_edges();
+
+  auto input_data = input.data();
+  auto total_elems = input.get_number_of_elements();
+
+  auto segment_sizes = [=] __host__ __device__(std::size_t const& i) {
+    auto v = input_data[i];
+    // if item is invalid, segment size is 0.
+    if (!gunrock::util::limits::is_valid(v))
+      return edge_t(0);
+    else
+      return G.get_number_of_neighbors(v);
+  };
+
+  auto new_length = thrust::transform_reduce(
+      thrust::cuda::par.on(context.stream()),          // execution policy
+      thrust::make_counting_iterator<std::size_t>(0),  // input iterator: first
+      thrust::make_counting_iterator<std::size_t>(
+          total_elems),       // input iterator: last
+      segment_sizes,          // unary operation
+      edge_t(0),              // initial value
+      thrust::plus<edge_t>()  // binary operation
+  );
+
+  return new_length;
 }
 
 }  // namespace advance
