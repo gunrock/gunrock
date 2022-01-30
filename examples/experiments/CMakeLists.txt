@@ -7,6 +7,7 @@ set(EXPERIMENTS_SOURCES
   shared_ptr.cu
   templated.cu
   spmm.cu
+  enable_if.cu
 )
 
 get_target_property(ESSENTIALS_ARCHITECTURES essentials CUDA_ARCHITECTURES)
