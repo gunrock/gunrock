@@ -19,6 +19,21 @@ namespace gunrock {
 namespace operators {
 namespace advance {
 
+/**
+ * @brief Given a frontier and a graph, find the offsets segments for the output
+ * frontier of an advance operation (@see advance.hxx).
+ *
+ * @tparam graph_t Graph type
+ * @tparam frontier_t Frontier type
+ * @tparam work_tiles_t Segments type
+ * @param G Graph
+ * @param input Input frontier
+ * @param segments Segments array
+ * @param context CUDA context
+ * @param graph_as_frontier if true, entire graph is used instead of the
+ * frontier.
+ * @return std::size_t number of total elements in the output frontier.
+ */
 template <typename graph_t, typename frontier_t, typename work_tiles_t>
 std::size_t compute_output_offsets(graph_t& G,
                                    frontier_t* input,
@@ -76,17 +91,23 @@ std::size_t compute_output_offsets(graph_t& G,
       segments.data() + location_of_total_scanned_items,
       segments.data() + location_of_total_scanned_items + 1);
 
-  // DEBUG::
-  // std::cout << "Scanned Segments (THRUST) = ";
-  // thrust::copy(segments.begin(), segments.end(),
-  //              std::ostream_iterator<edge_t>(std::cout, " "));
-  // std::cout << std::endl;
-  // std::cout << "Size of Output (THRUST) = " << size_of_output[0] <<
-  // std::endl;
-
   return size_of_output[0];
 }
 
+/**
+ * @brief Cheaper than compute_output_offsets, only calculates the number of
+ * total elements in the output frontier. Maybe used to allocate the output
+ * frontier.
+ *
+ * @tparam graph_t Graph type
+ * @tparam frontier_t Frontier type
+ * @param G Graph object
+ * @param input Input frontier
+ * @param context CUDA context
+ * @param graph_as_frontier if true, entire graph is used instead of the
+ * frontier.
+ * @return std::size_t number of total elements in the output frontier
+ */
 template <typename graph_t, typename frontier_t>
 std::size_t compute_output_length(graph_t& G,
                                   frontier_t& input,
