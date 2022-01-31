@@ -90,7 +90,7 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
   degrees[local_idx] = th_deg[0];
 
   /// 3. Compute block offsets if there's an output frontier.
-  if (output_type != advance_io_type_t::none) {
+  if constexpr (output_type != advance_io_type_t::none) {
     // Accumulate the output size to global memory, only done once per block by
     // threadIdx.x == 0, and retrieve the previously stored value from the
     // global memory. The previous value is now current block's starting offset.
@@ -139,7 +139,7 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
     bool cond = op(v, n, e, w);
 
     // Store [neighbor] into the output frontier.
-    if (output_type != advance_io_type_t::none) {
+    if constexpr (output_type != advance_io_type_t::none) {
       output[offset[0] + i] =
           (cond && n != v) ? n : gunrock::numeric_limits<vertex_t>::invalid();
     }
