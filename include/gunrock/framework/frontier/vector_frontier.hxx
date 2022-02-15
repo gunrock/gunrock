@@ -36,8 +36,7 @@ class vector_frontier_t {
   /**
    * @brief Default constructor.
    */
-  vector_frontier_t()
-      : num_elements(0), raw_ptr(nullptr), resizing_factor(1.0f) {
+  vector_frontier_t() : num_elements(0), raw_ptr(nullptr), resizing_factor(1) {
     /// TODO: we are using a vector of size 1 to avoid the overhead of setting
     /// it up later. Check if this is valid to do.
     p_storage = std::make_shared<vector_t<type_t, memory_space_t::device>>(
@@ -51,7 +50,7 @@ class vector_frontier_t {
    * @param size
    * @param frontier_resizing_factor
    */
-  vector_frontier_t(std::size_t size, float frontier_resizing_factor = 1.0f)
+  vector_frontier_t(std::size_t size, float frontier_resizing_factor = 1.0)
       : num_elements(size), resizing_factor(frontier_resizing_factor) {
     p_storage = std::make_shared<vector_t<type_t, memory_space_t::device>>(
         vector_t<type_t, memory_space_t::device>(size));
@@ -77,8 +76,7 @@ class vector_frontier_t {
    * @brief Get the number of elements within the frontier.
    * @return std::size_t
    */
-  __host__ __device__ __forceinline__ std::size_t get_number_of_elements(
-      cuda::stream_t stream = 0) const {
+  std::size_t get_number_of_elements(cuda::stream_t stream = 0) const {
     return num_elements;
   }
 
@@ -119,8 +117,8 @@ class vector_frontier_t {
    */
   __device__ __forceinline__ constexpr void set_element_at(
       type_t const& element,
-      std::size_t const& idx)
-      const noexcept {  /// XXX: This should not be const
+      std::size_t const& idx) const
+      noexcept {  /// XXX: This should not be const
     thread::store(this->get() + idx, element);
   }
 
@@ -224,9 +222,7 @@ class vector_frontier_t {
    *
    * @param size size to reserve (size is in count not bytes).
    */
-  void reserve(std::size_t const& size) {
-    p_storage.get()->reserve(size * resizing_factor);
-  }
+  void reserve(std::size_t const& size) { p_storage.get()->reserve(size); }
 
   /**
    * @brief Parallel sort the frontier.

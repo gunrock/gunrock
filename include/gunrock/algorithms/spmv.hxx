@@ -118,12 +118,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return weight * thread::load(&x[neighbor]);
     };
 
-    // Perform neighbor-reduce with plus arithmetic operator.
-    auto plus_t = [] __host__ __device__(weight_t a, weight_t b) {
-      return a + b;
-    };
-    operators::neighborreduce::execute(G, E, y, spmv, plus_t, weight_t(0),
-                                       context);
+    // Perform neighbor-reduce
+    operators::neighborreduce::execute(G, E, y, spmv, context);
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
