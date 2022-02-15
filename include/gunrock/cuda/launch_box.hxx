@@ -288,6 +288,22 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
             f, num_elements, std::forward<args_t>(args)...);
   }
 
+  template <typename func_t, typename... args_t>
+  void launch_cooperative(cuda::standard_context_t& context,
+                          const func_t& f,
+                          const std::size_t num_elements,
+                          args_t&&... args) {
+    params_t::calculate_grid_dimensions_strided(num_elements);
+    constexpr const auto non_zero_num_params =
+        sizeof...(args_t) == 0 ? 1 : sizeof...(args_t);
+    void* argument_ptrs[non_zero_num_params];
+    detail::for_each_argument_address(argument_ptrs,
+                                      ::std::forward<args_t>(args)...);
+    cudaLaunchCooperativeKernel<func_t>(
+        &f, params_t::grid_dimensions, params_t::block_dimensions,
+        argument_ptrs, params_t::shared_memory_bytes, context.stream());
+  }
+
   /**
    * @brief Launch a kernel within the given launch box.
    *
@@ -308,25 +324,13 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * (used for the context's stream).
    * \return void
    */
-  template <typename func_t, typename args_tuple_t>
-  void launch(func_t&& f,
-              args_tuple_t&& args,
-              cuda::standard_context_t& context) {
-    launch_impl(
-        std::forward<func_t>(f), std::forward<args_tuple_t>(args), context,
-        std::make_index_sequence<
-            std::tuple_size_v<std::remove_reference_t<args_tuple_t>>>{});
-  }
-
- private:
-  template <typename func_t, typename args_tuple_t, std::size_t... I>
-  void launch_impl(func_t&& f,
-                   args_tuple_t&& args,
-                   cuda::standard_context_t& context,
-                   std::index_sequence<I...>) {
+  template <typename func_t, typename... args_t>
+  void launch(cuda::standard_context_t& context,
+              const func_t& f,
+              args_t&&... args) {
     f<<<params_t::grid_dimensions, params_t::block_dimensions,
         params_t::shared_memory_bytes, context.stream()>>>(
-        std::get<I>(std::forward<args_tuple_t>(args))...);
+        std::forward<args_t>(args)...);
   }
 };  // struct launch_box_t
 

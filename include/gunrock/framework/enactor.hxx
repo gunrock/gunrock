@@ -33,7 +33,7 @@ struct enactor_properties_t {
    * Resizes the frontier by this factor * the size required.
    * @code frontier.resize(frontier_sizing_factor * new_size);
    */
-  float frontier_sizing_factor{2};
+  float frontier_sizing_factor{1.5f};
 
   /*!
    * Number of frontier buffers to manage.
@@ -169,7 +169,7 @@ struct enactor_t {
         inactive_frontier(reinterpret_cast<frontier_t*>(&frontiers[1])),
         buffer_selector(0),
         iteration(0),
-        scanned_work_domain(problem->get_graph().get_number_of_vertices()) {
+        scanned_work_domain(problem->get_graph().get_number_of_vertices() + 1) {
     /*!
      * If the self manage frontiers property is false, the enactor interface
      * will resize the frontier buffers ahead of time to avoid the first

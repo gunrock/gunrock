@@ -95,6 +95,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                       edge_t const& edge,        // edge
                       weight_t const& weight     // weight (tuple).
                       ) -> bool {
+      // If the neighbor is not visited, update the distance. Returning false
+      // here means that the neighbor is not added to the output frontier, and
+      // instead an invalid vertex is added in its place. These invalides (-1 in
+      // most cases) can be removed using a filter operator or uniquify.
       if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
         return false;
       else
@@ -103,23 +107,41 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                     iteration + 1) == std::numeric_limits<vertex_t>::max());
     };
 
-    auto remove_visited =
+    auto remove_invalids =
         [] __host__ __device__(vertex_t const& vertex) -> bool {
-      // default: always filters out the invalids, keep the rest.
+      // Returning true here means that we keep all the valid vertices.
+      // Internally, filter will automatically remove invalids and will never
+      // pass them to this lambda function.
       return true;
     };
 
     // Execute advance operator on the provided lambda
-    operators::advance::execute<operators::load_balance_t::merge_path>(
+    operators::advance::execute<operators::load_balance_t::block_mapped>(
         G, E, search, context);
 
-    // Execute filter operator on the provided lambda
-    operators::filter::execute<operators::filter_algorithm_t::compact>(
-        G, E, remove_visited, context);
+    // Execute filter operator to remove the invalids.
+    // @todo: Add CLI option to enable or disable this.
+    // operators::filter::execute<operators::filter_algorithm_t::compact>(
+    // G, E, remove_invalids, context);
   }
 
 };  // struct enactor_t
 
+/**
+ * @brief Run Breadth-First Search algorithm on a given graph, G, starting from
+ * the source node, single_source. The resulting distances are stored in the
+ * distances pointer. All data must be allocated by the user, on the device
+ * (GPU) and passed in to this function.
+ *
+ * @tparam graph_t Graph type.
+ * @param G Graph object.
+ * @param single_source A vertex in the graph (integral type).
+ * @param distances Pointer to the distances array of size number of vertices.
+ * @param predecessors Pointer to the predecessors array of size number of
+ * vertices. (optional, wip)
+ * @param context Device context.
+ * @return float Time taken to run the algorithm.
+ */
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter
@@ -129,16 +151,13 @@ float run(graph_t& G,
               std::shared_ptr<cuda::multi_context_t>(
                   new cuda::multi_context_t(0))  // Context
 ) {
-  // <user-defined>
   using vertex_t = typename graph_t::vertex_type;
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t>;
 
   param_type param(single_source);
   result_type result(distances, predecessors);
-  // </user-defined>
 
-  // <boiler-plate>
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
@@ -148,7 +167,6 @@ float run(graph_t& G,
 
   enactor_type enactor(&problem, context);
   return enactor.enact();
-  // </boiler-plate>
 }
 
 }  // namespace bfs

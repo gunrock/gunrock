@@ -52,10 +52,16 @@ class boolmap_frontier_t {
    * feature of a boolmap and should be avoided when possible.
    * @return std::size_t
    */
-  std::size_t get_number_of_elements(cuda::stream_t stream = 0) {
+  __host__ __device__ __forceinline__ std::size_t get_number_of_elements(
+      cuda::stream_t stream = 0) {
     // Compute number of elements using a reduction.
+#ifdef __CUDA_ARCH__
+    num_elements = thrust::reduce(thrust::seq, this->begin(), this->end(), 0);
+#else
     num_elements = thrust::reduce(thrust::cuda::par.on(stream), this->begin(),
                                   this->end(), 0);
+#endif
+
     return num_elements;
   }
 
@@ -93,7 +99,7 @@ class boolmap_frontier_t {
   __device__ __forceinline__ constexpr void set_element_at(
       type_t const& element,
       std::size_t const& idx = 0  // Ignore idx for boolmap.
-  ) const noexcept {              // XXX: This should not be const
+      ) const noexcept {          // XXX: This should not be const
     thread::store(this->get() + element, 1);
   }
 

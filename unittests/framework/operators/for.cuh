@@ -26,7 +26,9 @@ struct f {
 
 TEST(operators, prallel_for) {
   // Build a sample graph using the sample csr.
-  auto [csr, G] = io::sample::graph();
+  auto csr = io::sample::csr();
+  auto G =
+      graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(csr);
 
   // Initialize the devicecontext.
   cuda::device_id_t device = 0;

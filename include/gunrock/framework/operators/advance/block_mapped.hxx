@@ -33,14 +33,15 @@ template <unsigned int THREADS_PER_BLOCK,
           advance_io_type_t output_type,
           typename graph_t,
           typename frontier_t,
-          typename work_tiles_t,
+          typename offset_counter_t,
           typename operator_t>
-void __global__ block_mapped_kernel(graph_t const G,
-                                    operator_t op,
-                                    frontier_t* input,
-                                    frontier_t* output,
-                                    std::size_t input_size,
-                                    work_tiles_t* offsets) {
+__global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
+    block_mapped_kernel(graph_t const G,
+                        operator_t op,
+                        frontier_t* input,
+                        frontier_t* output,
+                        std::size_t input_size,
+                        offset_counter_t* block_offsets) {
   using vertex_t = typename graph_t::vertex_type;
   using edge_t = typename graph_t::edge_type;
 
@@ -49,21 +50,15 @@ void __global__ block_mapped_kernel(graph_t const G,
 
   // Specialize Block Scan for 1D block of THREADS_PER_BLOCK.
   using block_scan_t = cub::BlockScan<edge_t, THREADS_PER_BLOCK>;
-  // using block_load_t =
-  //     cub::BlockLoad<edge_t, THREADS_PER_BLOCK, ITEMS_PER_THREAD>;
 
   auto global_idx = cuda::thread::global::id::x();
   auto local_idx = cuda::thread::local::id::x();
 
   thrust::counting_iterator<type_t> all_vertices(0);
+  __shared__ typename block_scan_t::TempStorage scan;
+  __shared__ uint64_t offset[1];
 
-  __shared__ union TempStorage {
-    typename block_scan_t::TempStorage scan;
-    // typename block_load_t::TempStorage load;
-  } storage;
-
-  // Prepare data to process (to shmem/registers).
-  __shared__ vertex_t offset[1];
+  /// 1. Load input data to shared/register memory.
   __shared__ vertex_t vertices[THREADS_PER_BLOCK];
   __shared__ edge_t degrees[THREADS_PER_BLOCK];
   __shared__ edge_t sedges[THREADS_PER_BLOCK];
@@ -86,33 +81,38 @@ void __global__ block_mapped_kernel(graph_t const G,
   }
   __syncthreads();
 
-  // Exclusive sum of degrees.
+  /// 2. Exclusive sum of degrees to find total work items per block.
   edge_t aggregate_degree_per_block;
-  block_scan_t(storage.scan)
-      .ExclusiveSum(th_deg, th_deg, aggregate_degree_per_block);
+  block_scan_t(scan).ExclusiveSum(th_deg, th_deg, aggregate_degree_per_block);
   __syncthreads();
 
-  // Store back to shared memory.
+  // Store back to shared memory (to later use in the binary search).
   degrees[local_idx] = th_deg[0];
 
-  if (output_type != advance_io_type_t::none) {
-    // Accumulate the output size to global memory, only done once per block.
+  /// 3. Compute block offsets if there's an output frontier.
+  if constexpr (output_type != advance_io_type_t::none) {
+    // Accumulate the output size to global memory, only done once per block by
+    // threadIdx.x == 0, and retrieve the previously stored value from the
+    // global memory. The previous value is now current block's starting offset.
+    // All writes from this block will be after this offset. Note: this does not
+    // guarantee that the data written will be in any specific order.
     if (local_idx == 0)
-      if ((cuda::block::id::x() * cuda::block::size::x()) < input_size)
-        offset[0] = offsets[cuda::block::id::x() * cuda::block::size::x()];
+      offset[0] = math::atomic::add(
+          &block_offsets[0], (offset_counter_t)aggregate_degree_per_block);
+    __syncthreads();
   }
 
-  __syncthreads();
-
-  // To search for which vertex id we are computing on.
   auto length = global_idx - local_idx + cuda::block::size::x();
 
-  // Bound check.
   if (input_size < length)
     length = input_size;
 
   length -= global_idx - local_idx;
 
+  /// 4. Compute. Using binary search, find the source vertex each thread is
+  /// processing, and the corresponding edge, neighbor and weight tuple. Passed
+  /// to the user-defined lambda operator to process. If there's an output, the
+  /// resultant neighbor or invalid vertex is written to the output frontier.
   for (edge_t i = local_idx;            // threadIdx.x
        i < aggregate_degree_per_block;  // total degree to process
        i += cuda::block::size::x()      // increment by blockDim.x
@@ -139,66 +139,68 @@ void __global__ block_mapped_kernel(graph_t const G,
     bool cond = op(v, n, e, w);
 
     // Store [neighbor] into the output frontier.
-    if (output_type != advance_io_type_t::none)
+    if constexpr (output_type != advance_io_type_t::none) {
       output[offset[0] + i] =
           (cond && n != v) ? n : gunrock::numeric_limits<vertex_t>::invalid();
+    }
   }
-}  // namespace block_mapped
+}
 
 template <advance_direction_t direction,
           advance_io_type_t input_type,
           advance_io_type_t output_type,
           typename graph_t,
           typename operator_t,
-          typename frontier_t,
-          typename work_tiles_t>
+          typename frontier_t>
 void execute(graph_t& G,
              operator_t op,
-             frontier_t* input,
-             frontier_t* output,
-             work_tiles_t& segments,
+             frontier_t& input,
+             frontier_t& output,
              cuda::standard_context_t& context) {
   if constexpr (output_type != advance_io_type_t::none) {
-    // This shouldn't be required for block-mapped.
-    auto size_of_output = compute_output_length(G, input, segments, context);
+    auto size_of_output = compute_output_length(G, input, context);
 
     // If output frontier is empty, resize and return.
     if (size_of_output <= 0) {
-      output->set_number_of_elements(0);
+      output.set_number_of_elements(0);
       return;
     }
 
-    // <todo> Resize the output (inactive) buffer to the new size.
-    // Can be hidden within the frontier struct.
-    if (output->get_capacity() < size_of_output)
-      output->reserve(size_of_output);
-    output->set_number_of_elements(size_of_output);
+    /// @todo Resize the output (inactive) buffer to the new size.
+    /// Can be hidden within the frontier struct.
+    if (output.get_capacity() < size_of_output)
+      output.reserve(size_of_output);
+    output.set_number_of_elements(size_of_output);
   }
 
   std::size_t num_elements = (input_type == advance_io_type_t::graph)
                                  ? G.get_number_of_vertices()
-                                 : input->get_number_of_elements();
+                                 : input.get_number_of_elements();
 
   // Set-up and launch block-mapped advance.
   using namespace cuda::launch_box;
   using launch_t =
-      launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
+      launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<256>>>;
 
   launch_t launch_box;
 
   launch_box.calculate_grid_dimensions_strided(num_elements);
-  auto __bm = block_mapped_kernel<        // kernel
-      launch_box.block_dimensions.x,      // threas per block
-      1,                                  // items per thread
-      input_type, output_type,            // i/o parameters
-      graph_t,                            // graph type
-      typename frontier_t::type_t,        // frontier value type
-      typename work_tiles_t::value_type,  // segments value type
-      operator_t                          // lambda type
+  auto kernel = block_mapped_kernel<  // kernel
+      launch_box.block_dimensions.x,  // threas per block
+      1,                              // items per thread
+      input_type, output_type,        // i/o parameters
+      graph_t,                        // graph type
+      typename frontier_t::type_t,    // frontier value type
+      typename frontier_t::offset_t,  // segments value type
+      operator_t                      // lambda type
       >;
-  auto __args = std::make_tuple(G, op, input->data(), output->data(),
-                                num_elements, segments.data().get());
-  launch_box.launch(__bm, __args, context);
+
+  /// @todo Is there a better place to create block_offsets? This is always a
+  /// one element array.
+  thrust::device_vector<typename frontier_t::offset_t> block_offsets(1);
+  launch_box.calculate_grid_dimensions_strided(num_elements);
+  launch_box.launch(context, kernel, G, op, input.data(), output.data(),
+                    num_elements, block_offsets.data().get());
   context.synchronize();
 }
 

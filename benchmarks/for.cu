@@ -12,14 +12,8 @@ namespace benchmark {
 void parallel_for(nvbench::state& state) {
   // Build a graph using a sample csr.
   auto csr = io::sample::csr();
-  auto G = graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(
-      csr.number_of_rows,               // rows
-      csr.number_of_columns,            // columns
-      csr.number_of_nonzeros,           // nonzeros
-      csr.row_offsets.data().get(),     // row_offsets
-      csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get()   // values
-  );
+  auto G =
+      graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(csr);
 
   // Initialize the context.
   cuda::device_id_t device = 0;
