@@ -23,6 +23,7 @@
 #include <gunrock/container/vector.hxx>
 
 #include <moderngpu/context.hxx>
+#include <thrust/execution_policy.h>
 
 namespace gunrock {
 namespace cuda {
@@ -121,7 +122,9 @@ class standard_context_t : public context_t {
 
   virtual cuda::device_id_t ordinal() { return _ordinal; }
 
-  auto execution_policy() { return thrust::cuda::par.on(this->stream()); }
+  auto execution_policy() {
+    return thrust::cuda::par_nosync.on(this->stream());
+  }
 
 };  // class standard_context_t
 
