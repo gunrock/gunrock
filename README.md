@@ -23,7 +23,7 @@ bin/sssp ../datasets/chesapeake/chesapeake.mtx
 - [Gunrock's overview](https://github.com/gunrock/essentials/wiki/Overview)
 - [Gunrock's programming model](https://github.com/gunrock/essentials/wiki/Programming-Model)
 - [Publications](https://github.com/gunrock/essentials/wiki/Publications) and [presentations](https://github.com/gunrock/essentials/wiki/Presentations)
-- Essentials versus Gunrock[^2]
+- [Essentials](https://github.com/gunrock/essentials) versus [Gunrock](https://github.com/gunrock/gunrock)[^2]
 
 [^2]: Essentials is the future of Gunrock. The idea is to take the lessons learned from Gunrock to a new design, which simplifies the effort it takes to **(1)** implement graph algorithms, **(2)** add internal optimizations, **(3)** conduct future research. One example is Gunrock's SSSP, implemented in 4-5 files with 1000s of lines of code versus in essentials, it is a single file with less than 200 lines of code. Our end goal with essentials is possibly releasing it as a `v2.0.0` for Gunrock.
 
@@ -54,4 +54,4 @@ Thank you for citing our work.
 
 ## Copyright and License
 
-Gunrock is copyright The Regents of the University of California, 2021. The library, examples, and all source code are released under [Apache 2.0](https://github.com/gunrock/essentials/blob/master/LICENSE).
+Gunrock is copyright The Regents of the University of California. The library, examples, and all source code are released under [Apache 2.0](https://github.com/gunrock/essentials/blob/master/LICENSE).

@@ -35,4 +35,12 @@ TEST(operators, prallel_for) {
   // Launch for using a separate function.
   operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
       G, f(), context);
+
+  // Build a sample frontier.
+  frontier::frontier_t<int, int> X;
+  X.push_back(1);
+
+  // Launch for on a frontier.
+  operators::parallel_for::execute<operators::parallel_for_each_t::element>(
+      X, f(), context);
 }
