@@ -30,6 +30,7 @@ namespace gunrock {}  // namespace gunrock
 
 // I/O includes
 #include <gunrock/io/matrix_market.hxx>
+#include <gunrock/io/sample.hxx>
 
 // Graph includes
 #include <gunrock/graph/graph.hxx>
