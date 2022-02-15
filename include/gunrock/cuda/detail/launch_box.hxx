@@ -84,6 +84,17 @@ using match_launch_params_t = decltype(std::tuple_cat(
                                     std::tuple<lp_v>,
                                     std::tuple<>>>()...));
 
+inline void for_each_argument_address(void**) {}
+
+template <typename arg_t, typename... args_t>
+inline void for_each_argument_address(void** collected_addresses,
+                                      arg_t&& arg,
+                                      args_t&&... args) {
+  collected_addresses[0] = const_cast<void*>(static_cast<const void*>(&arg));
+  for_each_argument_address(collected_addresses + 1,
+                            ::std::forward<args_t>(args)...);
+}
+
 }  // namespace detail
 }  // namespace launch_box
 }  // namespace cuda

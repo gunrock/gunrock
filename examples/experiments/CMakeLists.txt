@@ -6,6 +6,7 @@ set(EXPERIMENTS_SOURCES
   diamond.cu
   shared_ptr.cu
   templated.cu
+  spmm.cu
 )
 
 get_target_property(ESSENTIALS_ARCHITECTURES essentials CUDA_ARCHITECTURES)

@@ -1,7 +1,7 @@
 /**
  * @file thread_mapped.hxx
  * @author Muhammad Osama (mosama@ucdavis.edu)
- * @brief
+ * @brief Advance operator where a vertex/edge is mapped to a thread.
  * @version 0.1
  * @date 2020-10-20
  *
@@ -38,7 +38,7 @@ void execute(graph_t& G,
   using type_t = typename frontier_t::type_t;
 
   if (output_type != advance_io_type_t::none) {
-    auto size_of_output = compute_output_length(G, &input, segments, context);
+    auto size_of_output = compute_output_offsets(G, &input, segments, context);
 
     // If output frontier is empty, resize and return.
     if (size_of_output <= 0) {

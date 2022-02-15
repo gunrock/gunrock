@@ -33,7 +33,8 @@ enum load_balance_t {
   warp_mapped,    /// (wip) Equal # of elements per warp
   block_mapped,   /// Equal # of elements per block
   bucketing,      /// (wip) Davidson et al. (SSSP)
-  merge_path,     /// Merrill & Garland (SpMV)
+  merge_path,     /// Merrill & Garland (SpMV):: ModernGPU
+  merge_path_v2,  /// Merrill & Garland (SpMV):: CUSTOM
   work_stealing,  /// (wip) <cite>
 };
 
