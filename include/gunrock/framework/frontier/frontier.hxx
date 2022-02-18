@@ -41,6 +41,9 @@ class frontier_t : public frontier::vector_frontier_t<vertex_t, edge_t, _kind> {
   using type_t = std::conditional_t<_kind == frontier_kind_t::vertex_frontier,
                                     vertex_t,
                                     edge_t>;
+  using offset_t = std::conditional_t<_kind == frontier_kind_t::vertex_frontier,
+                                      edge_t,
+                                      vertex_t>;
   using frontier_type = frontier_t<vertex_t, edge_t, _kind, _view>;
 
   /// TODO: This is a more permenant solution.
@@ -114,7 +117,8 @@ class frontier_t : public frontier::vector_frontier_t<vertex_t, edge_t, _kind> {
    * @brief Get the number of elements within the frontier.
    * @return std::size_t
    */
-  std::size_t get_number_of_elements(cuda::stream_t stream = 0) {
+  __host__ __device__ __forceinline__ std::size_t get_number_of_elements(
+      cuda::stream_t stream = 0) {
     return underlying_view_t::get_number_of_elements(stream);
   }
 

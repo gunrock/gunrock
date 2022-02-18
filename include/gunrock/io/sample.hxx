@@ -92,34 +92,6 @@ format::csr_t<space, vertex_t, edge_t, weight_t> csr() {
   }
 }
 
-/**
- * @brief Returns a small sample graph using a csr of 4x4x4.
- * @see sample::csr for more details.
- *
- * @tparam space Memory space of the graph.
- * @tparam vertex_t Type of vertex.
- * @tparam edge_t Type of edge.
- * @tparam weight_t Type of weight.
- * @return auto csr and the graph.
- */
-template <memory_space_t space = memory_space_t::device,
-          typename vertex_t = int,
-          typename edge_t = int,
-          typename weight_t = float>
-auto graph() {
-  auto csr = sample::csr<space, vertex_t, edge_t, weight_t>();
-  auto G = graph::build::from_csr<space, graph::view_t::csr>(
-      csr.number_of_rows,               // rows
-      csr.number_of_columns,            // columns
-      csr.number_of_nonzeros,           // nonzeros
-      csr.row_offsets.data().get(),     // row_offsets
-      csr.column_indices.data().get(),  // column_indices
-      csr.nonzero_values.data().get()   // values
-  );
-
-  return std::tuple<decltype(csr), decltype(G)>{csr, G};
-}
-
 }  // namespace sample
 }  // namespace io
 }  // namespace gunrock

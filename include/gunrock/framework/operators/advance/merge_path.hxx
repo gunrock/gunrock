@@ -60,7 +60,7 @@ void execute(graph_t& G,
                                     typename graph_t::graph_csr_view_t,
                                     typename graph_t::graph_csc_view_t>;
 
-  auto size_of_output = compute_output_length(
+  auto size_of_output = compute_output_offsets(
       G, input, segments, context,
       (input_type == advance_io_type_t::graph) ? true : false);
 

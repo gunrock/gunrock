@@ -26,7 +26,9 @@ struct f {
 
 TEST(operators, prallel_for) {
   // Build a sample graph using the sample csr.
-  auto [csr, G] = io::sample::graph();
+  auto csr = io::sample::csr();
+  auto G =
+      graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(csr);
 
   // Initialize the devicecontext.
   cuda::device_id_t device = 0;
@@ -35,4 +37,12 @@ TEST(operators, prallel_for) {
   // Launch for using a separate function.
   operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
       G, f(), context);
+
+  // Build a sample frontier.
+  frontier::frontier_t<int, int> X;
+  X.push_back(1);
+
+  // Launch for on a frontier.
+  operators::parallel_for::execute<operators::parallel_for_each_t::element>(
+      X, f(), context);
 }

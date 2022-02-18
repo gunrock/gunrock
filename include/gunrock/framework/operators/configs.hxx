@@ -33,7 +33,8 @@ enum load_balance_t {
   warp_mapped,    /// (wip) Equal # of elements per warp
   block_mapped,   /// Equal # of elements per block
   bucketing,      /// (wip) Davidson et al. (SSSP)
-  merge_path,     /// Merrill & Garland (SpMV)
+  merge_path,     /// Merrill & Garland (SpMV):: ModernGPU
+  merge_path_v2,  /// Merrill & Garland (SpMV):: CUSTOM
   work_stealing,  /// (wip) <cite>
 };
 
@@ -86,7 +87,8 @@ enum uniquify_algorithm_t {
 enum parallel_for_each_t {
   vertex,  /// for each vertex in the graph
   edge,    /// for each edge in the graph
-  weight   /// for each weight in the graph
+  weight,  /// for each weight in the graph
+  element  /// for each element in the frontier
 };
 
 }  // namespace operators
