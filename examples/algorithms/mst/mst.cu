@@ -1,6 +1,5 @@
 #include <gunrock/algorithms/algorithms.hxx>
-
-//#include <gunrock/algorithms/mst.hxx>
+#include <gunrock/algorithms/mst.hxx>
 #include "mst_cpu.hxx"  // Reference implementation
 
 using namespace gunrock;
@@ -53,12 +52,14 @@ void test_mst(int num_arguments, char** argument_array) {
   // Params and memory allocation
   
   vertex_t n_vertices = G.get_number_of_vertices();
-  thrust::device_vector<weight_t> distances(n_vertices);
+  weight_t weight = 0;
+  weight_t* mst_weight = &weight;
+
 
   // --
   // GPU Run
 
-  //float gpu_elapsed = gunrock::mst::run(G, single_source, distances.data().get());
+  float gpu_elapsed = gunrock::mst::run(G, mst_weight);
 
   // --
   // CPU Run

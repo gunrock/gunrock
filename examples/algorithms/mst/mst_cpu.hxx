@@ -105,6 +105,8 @@ float run(csr_t& csr) {
     for (vertex_t v = 0; v < n_vertices; v++) {
         jump_pointers(supers,v);
     }
+
+    //need to free
   }
 
   printf("mst weight %f\n", mst_weight);
