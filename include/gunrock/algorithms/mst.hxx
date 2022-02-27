@@ -17,12 +17,12 @@ struct super {
 
 // there might be a race here but it would just change the # of jumps
 // Does this need context?
-void jump_pointers __host__ __device__(super* supers, vertex_t v) {
-  super* u = supers[v].root;
-  while (u->root != u) {
-    u = u->root;
+void jump_pointers __host__ __device__(vertex_t* roots, vertex_t v) {
+  vertex_t u = roots[v];
+  while (roots[u] != u) {
+    u = roots[u];
   }
-  supers[v].root = u;
+  roots[v] = u;
   return;
 }
 
@@ -55,23 +55,44 @@ struct problem_t : gunrock::problem_t<graph_t> {
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
   // </boilerplate>
-  graph_t g = this->get_graph();
-  int n_vertices = g.get_number_of_vertices();
-
-  int* mst_edges;
-  int* super_vertices;
-  struct super* supers = new super[n_vertices];
-
+  thrust::device_vector<vertex_t> roots;
+  thrust::device_vector<weight_t> min_weights;
+  thrust::device_vector<int> mst_edges;
+  thrust::device_vector<int> super_vertices;
+  
   void init() {
-    *(result.mst_weight) = 0;
-    *mst_edges = 0;
-    *super_vertices = n_vertices;
+    graph_t g = this->get_graph();
+    int n_vertices = g.get_number_of_vertices();
+
+    roots.resize(n_vertices);
+    min_weights.resize(n_vertices);
+    mst_edges.resize(1);
+    super_vertices.resize(1);
+
+    auto policy = this->context->get_context(0)->execution_policy();
+
+    *(this->result.mst_weight) = 0;
+
+    thrust::sequence(policy, roots.begin(), roots.end(), 0);
+    thrust::fill(policy, min_weights.begin(), min_weights.end(),
+                 std::numeric_limits<weight_t>::max());
+    thrust::fill(policy, mst_edges.begin(), mst_edges.end(), 0);
+    thrust::fill(policy, super_vertices.begin(), super_vertices.end(), n_vertices);
   }
 
   void reset() {
-    *(result.mst_weight) = 0;
-    *mst_edges = 0;
-    *super_vertices = n_vertices;
+    graph_t g = this->get_graph();
+    int n_vertices = g.get_number_of_vertices();
+    
+    auto policy = this->context->get_context(0)->execution_policy();
+
+    *(this->result.mst_weight) = 0;
+
+    thrust::sequence(policy, roots.begin(), roots.end(), 0);
+    thrust::fill(policy, min_weights.begin(), min_weights.end(),
+                 std::numeric_limits<weight_t>::max());
+    thrust::fill(policy, mst_edges.begin(), mst_edges.end(), 0);
+    thrust::fill(policy, super_vertices.begin(), super_vertices.end(), n_vertices);
   }
 };
 
@@ -93,9 +114,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                         cuda::multi_context_t& context) override {
     // get pointer to the problem
     auto P = this->get_problem();
+    auto n_vertices = P->get_graph().get_number_of_vertices();
 
     // Fill the frontier with a sequence of vertices from 0 -> n_vertices.
-    f->sequence((vertex_t)0, P->n_vertices, context.get_context(0)->stream());
+    f->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
   }
 
   // One iteration of the application
@@ -103,57 +125,36 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto E = this->get_enactor();
     auto P = this->get_problem();
     auto G = P->get_graph();
-    auto supers = P->supers;
+    auto roots = P->roots.data().get();
+    auto min_weights = P->min_weights.data().get();
     auto mst_weight = P->result.mst_weight;
-    auto mst_edges = P->mst_edges;
-    auto super_vertices = P->super_vertices;
+    auto mst_edges = P->mst_edges.data().get();
+    auto n_vertices = G.get_number_of_vertices();
+    auto super_vertices = P->super_vertices.data().get();
 
     // Get parameters and datastructures
-    int old_super_vertices = *super_vertices;
+    int old_super_vertices = super_vertices[0];
 
-    // TODO: switch DSs to thrust vectors, move initialization to init/reset and
-    // use thrust::fill and thrust::for_each
-    if (this->iteration == 0) {
-      // Parallel for to set root and min_weight (in supers) for each vertex
-      auto set_supers =
-          [supers] __host__ __device__(vertex_t const& v) -> void {
-        supers[v].root = supers + v;
-        supers[v].min_weight = std::numeric_limits<weight_t>::max();
-      };
-      operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
-          G,           // graph
-          set_supers,  // lambda function
-          context      // context
-      );
+    auto policy = this->context->get_context(0)->execution_policy();
 
-    } else {
-      // Parallel for to set min_weight (in supers) for each vertex
-      auto set_supers =
-          [supers] __host__ __device__(vertex_t const& v) -> void {
-        supers[v].min_weight = std::numeric_limits<weight_t>::max();
-      };
-      operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
-          G,           // graph
-          set_supers,  // lambda function
-          context      // context
-      );
-    }
+    // TODO: reset weights
+    //thrust::fill_n(policy, min_weights.begin(), n_vertices,
+    //               std::numeric_limits<weight_t>::max());
 
-    // Find minimum weight for each vertex 
+    // Find minimum weight for each vertex
     // TODO: Update for multi-directional edges?
-    auto min_weights = [supers] __host__ __device__(
-                           vertex_t const& source,    // source of edge
-                           vertex_t const& neighbor,  // destination of edge
-                           edge_t const& edge,        // id of edge
-                           weight_t const& weight     // weight of edge
-                           ) -> bool {
+    auto get_min_weights = [roots,min_weights] __host__ __device__(
+                               vertex_t const& source,    // source of edge
+                               vertex_t const& neighbor,  // destination of edge
+                               edge_t const& edge,        // id of edge
+                               weight_t const& weight     // weight of edge
+                               ) -> bool {
       // If they are already part of same super vertex, do not check
-      if (supers[source].root == supers[neighbor].root) {
+      if (roots[source] == roots[neighbor]) {
         return false;
       }
       // Store minimum weight
-      weight_t old_dist =
-          math::atomic::min(&(supers[source].min_weight), weight);
+      weight_t old_dist = math::atomic::min(&(min_weights[source]), weight);
 
       // If the new distance is better than the previously known
       // best_distance, add `neighbor` to the frontier
@@ -164,29 +165,24 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // Add weights to MST
     // Update roots
     auto add_to_mst =
-        [G, context, supers, mst_weight, mst_edges, super_vertices] __host__
+        [G, roots, mst_weight, mst_edges, super_vertices] __host__
         __device__(edge_t const& e) -> void {
       auto v = G.get_source_vertex(e);
       auto u = G.get_destination_vertex(e);
       auto weight = G.get_edge_weight(e);
 
       // Jump pointers for source and destination to get accurate roots
-      jump_pointers(supers, v);
-      jump_pointers(supers, u);
+      jump_pointers(roots, v);
+      jump_pointers(roots, u);
 
       // Do I want to use all math::atomic::add to fit into math or should I use
       // inc/dec atomic cuda functions or should I add those to math.hxx? Not
       // sure cycle comparison for inc/dec vs add
       math::atomic::add(mst_weight, weight);
-      math::atomic::add(mst_edges, 1);
-      math::atomic::add(super_vertices, -1);
+      math::atomic::add(&mst_edges[0], 1);
+      math::atomic::add(&super_vertices[0], -1);
 
-      supers[v].root->root = supers[u].root;
-      // Is atomic exch needed to resolve race between updates to v root and u?
-      // I don't think so; if it gets wrong root, will be resolved during
-      // pointer jumping
-      // cuda::atomicExch(&(supers[v].root->root),supers[u].root);
-      return;
+      roots[roots[v]] = roots[u];
     };
 
     // Jump pointers in parallel for
@@ -194,12 +190,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // think about more there might be a race here but it would just change the
     // # of jumps
     auto jump_pointers_parallel =
-        [supers] __host__ __device__(vertex_t const& v) -> void {
-      super* u = supers[v].root;
-      while (u->root != u) {
-        u = u->root;
+        [roots] __host__ __device__(vertex_t const& v) -> void {
+      vertex_t u = roots[v];
+      while (roots[u] != u) {
+        u = roots[u];
       }
-      supers[v].root = u;
+      roots[v] = u;
       return;
     };
 
@@ -208,7 +204,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                 operators::advance_direction_t::forward,
                                 operators::advance_io_type_t::edges,
                                 operators::advance_io_type_t::edges>(
-        G, E, min_weights, context);
+        G, E, get_min_weights, context);
 
     // Execute parallel for to add weights to MST
     operators::parallel_for::execute<operators::parallel_for_each_t::edge>(
@@ -219,7 +215,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     // TODO: remove duplicates (increment super vertices when removing)
 
-    // Execute parallel for to jump pointers 
+    // Execute parallel for to jump pointers
     operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
         G,                       // graph
         jump_pointers_parallel,  // lambda function
@@ -227,14 +223,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     );
 
     // Exit on error if super_vertices not decremented
-    if (*super_vertices == old_super_vertices) {
+     if (super_vertices[0] == old_super_vertices) {
       std::cout << "error\n";
     }
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
     auto P = this->get_problem();
-    return *(P->super_vertices) == 1;
+    return P->super_vertices[0] == 1;
   }
 };
 
@@ -269,7 +265,7 @@ float run(
   // initialize problem; call `init` and `reset` to prepare data structures
   problem_type problem(G, param, result, context);
   problem.init();
-  problem.reset();
+  //problem.reset();
 
   // initialize enactor; call enactor, returning GPU elapsed time
   enactor_type enactor(&problem, context);
