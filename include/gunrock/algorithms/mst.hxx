@@ -118,6 +118,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     // Find minimum weight for each vertex
     // TODO: update for multi-directional edges?
+    // TODO: fix issue! will return all previous min edges
     auto get_min_weights = [min_weights, roots] __host__ __device__(
                                vertex_t const& source,    // source of edge
                                vertex_t const& neighbor,  // destination of edge
@@ -151,6 +152,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // TODO: need total ordering but this is restricting some edges that
       // should be added; need to check for dup and not exclude if there is no
       // dup; checking for dup edge in frontier should work
+      printf("v %i\n", v);
+      printf("u %i\n", u);
       if (v < u) {
         // printf("add mst v %i\n", v);
         // printf("add mst u %i\n", u);
@@ -173,7 +176,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     // Jump pointers in parallel for
     // I do not think parallel updates to roots will cause issues but need to
-    // think about more there might be a race here but it would just change the
+    // think about more; there might be a race here but it would just change the
     // # of jumps
     auto jump_pointers_parallel =
         [roots] __host__ __device__(vertex_t const& v) -> void {
@@ -186,18 +189,21 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator to get min weights
+    auto in_frontier = &(this->frontiers[0]);
+    auto out_frontier = &(this->frontiers[1]);
     operators::advance::execute<operators::load_balance_t::block_mapped,
                                 operators::advance_direction_t::forward,
                                 operators::advance_io_type_t::edges,
                                 operators::advance_io_type_t::edges>(
-        G, E, get_min_weights, context);
+        G, get_min_weights, in_frontier, out_frontier, E->scanned_work_domain,
+        context);
 
     // Execute parallel for to add weights to MST
     // TODO: ensure this executes on new frontier outputted from advance above
-    operators::parallel_for::execute<operators::parallel_for_each_t::edge>(
-        G,           // graph
-        add_to_mst,  // lambda function
-        context      // context
+    operators::parallel_for::execute<operators::parallel_for_each_t::element>(
+        *out_frontier,  // graph
+        add_to_mst,     // lambda function
+        context         // context
     );
 
     // TODO: remove duplicates (increment super vertices when removing)
@@ -214,7 +220,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
   virtual bool is_converged(cuda::multi_context_t& context) {
     // TODO: update condition
-    if (this->iteration > 1) {
+    if (this->iteration > 0) {
       return true;
     }
     return false;
