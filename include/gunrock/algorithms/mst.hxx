@@ -67,12 +67,16 @@ struct problem_t : gunrock::problem_t<graph_t> {
     super_vertices.resize(1);
 
     auto d_mst_weight = thrust::device_pointer_cast(this->result.mst_weight);
-    thrust::fill(policy, min_weights.begin(), min_weights.end(), n_vertices);
+    thrust::fill(policy, min_weights.begin(), min_weights.end(),
+                 std::numeric_limits<weight_t>::max());
     thrust::fill(policy, d_mst_weight, d_mst_weight + 1, 0);
     thrust::sequence(policy, roots.begin(), roots.end(), 0);
   }
 
-  void reset() { return; }
+  void reset() {
+    // TODO: reset
+    return;
+  }
 };
 
 // <boilerplate>
@@ -167,6 +171,20 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       }
     };
 
+    // Jump pointers in parallel for
+    // I do not think parallel updates to roots will cause issues but need to
+    // think about more there might be a race here but it would just change the
+    // # of jumps
+    auto jump_pointers_parallel =
+        [roots] __host__ __device__(vertex_t const& v) -> void {
+      vertex_t u = roots[v];
+      while (roots[u] != u) {
+        u = roots[u];
+      }
+      roots[v] = u;
+      return;
+    };
+
     // Execute advance operator to get min weights
     operators::advance::execute<operators::load_balance_t::block_mapped,
                                 operators::advance_direction_t::forward,
@@ -182,9 +200,16 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         context      // context
     );
 
-    // TODO: parallel for to jump pointers
+    // TODO: remove duplicates (increment super vertices when removing)
 
     // TODO: exit on error if super_vertices not decremented
+
+    // Execute parallel for to jump pointers
+    operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
+        G,                       // graph
+        jump_pointers_parallel,  // lambda function
+        context                  // context
+    );
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
