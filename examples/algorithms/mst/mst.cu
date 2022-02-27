@@ -52,14 +52,13 @@ void test_mst(int num_arguments, char** argument_array) {
   // Params and memory allocation
   
   vertex_t n_vertices = G.get_number_of_vertices();
-  weight_t weight = 0;
-  weight_t* mst_weight = &weight;
+  thrust::device_vector<weight_t> mst_weight(1);
 
 
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::mst::run(G, mst_weight);
+  float gpu_elapsed = gunrock::mst::run(G, mst_weight.data().get());
 
   // --
   // CPU Run
