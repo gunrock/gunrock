@@ -9,17 +9,6 @@ using weight_t = float;
 namespace gunrock {
 namespace mst {
 
-// there might be a race here but it would just change the # of jumps
-// Does this need context?
-void jump_pointers __host__ __device__(vertex_t* roots, vertex_t v) {
-  vertex_t u = roots[v];
-  while (roots[u] != u) {
-    u = roots[u];
-  }
-  roots[v] = u;
-  return;
-}
-
 template <typename vertex_t>
 struct param_t {
   // No parameters for this algorithm
@@ -74,6 +63,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
     thrust::fill(policy, d_mst_weight, d_mst_weight + 1, 0);
     thrust::fill(policy, min_neighbors.begin(), min_neighbors.end(), -1);
     thrust::sequence(policy, roots.begin(), roots.end(), 0);
+    thrust::sequence(policy, super_vertices.begin(), super_vertices.end(), n_vertices);
   }
 
   void reset() {
@@ -118,97 +108,88 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto roots = P->roots.data().get();
     auto min_weights = P->min_weights.data().get();
 
-    // Get parameters and datastructures
+    auto policy = this->context->get_context(0)->execution_policy();
+    thrust::fill_n(policy, min_weights, P->n_vertices,
+                   std::numeric_limits<weight_t>::max());
+    thrust::fill_n(policy, min_neighbors, P->n_vertices, -1);
 
     // Find minimum weight for each vertex
     // TODO: update for multi-directional edges?
-    // TODO: fix issue! will return all previous min edges
-    auto get_min_weights = [min_weights, roots] __host__ __device__(
-                               vertex_t const& source,    // source of edge
-                               vertex_t const& neighbor,  // destination of edge
-                               edge_t const& edge,        // id of edge
-                               weight_t const& weight     // weight of edge
-                               ) -> bool {
-      // If they are already part of same super vertex, do not check
-      if (roots[source] == roots[neighbor]) {
-        return false;
-      }
-
-      // Store minimum weight
-      auto old_weight = math::atomic::min(&(min_weights[source]), weight);
-      printf("1: source %i weight %f min weight %f weight < old weight %i\n", source, weight, min_weights[source], weight < old_weight);
-
-      // If the new weight is better than the previously known
-      // best weight, add `neighbor` to the frontier
-      return weight < old_weight;
-    };
-    
-    // TODO: need tiebreaker
-    auto get_min_neighbors = [G,min_weights] __host__ __device__(
-                               edge_t const& e        // id of edge
-                               ) -> bool {
-      
+    auto get_min_weights = [min_weights, roots, G] __host__ __device__(
+                               edge_t const& e  // id of edge
+                               ) -> void {
       auto source = G.get_source_vertex(e);
+      auto neighbor = G.get_destination_vertex(e);
       auto weight = G.get_edge_weight(e);
-      printf("2: source %i weight %f min weight %f\n", source, weight, min_weights[source]);
-      
-      // Keep neighbor if it is the min
-      return weight == min_weights[source];
+
+      // If they are already part of same super vertex, do not check
+      if (roots[source] != roots[neighbor]) {
+        // Store minimum weight
+        auto old_weight =
+            math::atomic::min(&(min_weights[roots[source]]), weight);
+        printf(
+            "1: source %i roots[source] %i weight %f min weight %f weight < "
+            "old weight %i\n",
+            source, roots[source], weight, min_weights[roots[source]],
+            weight < old_weight);
+      }
     };
-    
-    //auto break_ties = [G,min_neighbors] __host__ __device__(
-    //                           edge_t const& e        // id of edge
-    //                           ) -> bool {
-    //  
-    //  auto source = G.get_source_vertex(e);
-    //  auto neighbor = G.get_destination_vertex(e);
-    //  
-    //  int old = atomicCAS(&min_neighbors[source], -1, neighbor);
-    //  
-    //  // Return true when above gets set
-    //  return old == -1;
-    //};
 
-    // Iterate over edges in new frontier
-    // Add weights to MST
-    // Update roots
-    auto add_to_mst =
-        [G, roots, mst_weight, mst_edges, super_vertices, min_neighbors] __host__ __device__(
-            edge_t const& e) -> void {
-      auto v = G.get_source_vertex(e);
-      auto u = G.get_destination_vertex(e);
+    // TODO: technically this is non-deterministic between edges that are tied
+    auto get_min_neighbors =
+        [G, min_weights, min_neighbors, roots] __host__ __device__(
+            edge_t const& e  // id of edge
+            ) -> void {
+      auto source = G.get_source_vertex(e);
+      auto neighbor = G.get_destination_vertex(e);
       auto weight = G.get_edge_weight(e);
 
-      // TODO: need total ordering but this is restricting some edges that
-      // should be added; need to check for dup and not exclude if there is no
-      // dup; checking for dup edge in frontier should work
-      printf("v %i\n", v);
-      printf("u %i\n", u);
-      if (v < u) {
-      //if (v < u || min_neighbors[u] != v) {
-        // printf("add mst v %i\n", v);
-        // printf("add mst u %i\n", u);
-        // printf("add mst v root %i\n", roots[v]);
-        // printf("add mst u root %i\n", roots[u]);
+      // Keep neighbor if it is the min
+      if (weight == min_weights[roots[source]]) {
+        atomicCAS(&min_neighbors[roots[source]], -1, e);
+        printf("source %i root %i min_neighbor %i\n", source, roots[source],
+               min_neighbors[roots[source]]);
+      }
+    };
 
-        jump_pointers(roots, v);
-        jump_pointers(roots, u);
+    // Add weights to MST
+    auto add_to_mst = [G, roots, mst_weight, mst_edges, super_vertices,
+                       min_neighbors, min_weights] __host__
+                      __device__(vertex_t const& v) -> void {
+      if (min_weights[v] != std::numeric_limits<weight_t>::max()) {
+        auto source = G.get_source_vertex(min_neighbors[v]);
+        auto dest = G.get_destination_vertex(min_neighbors[v]);
+        auto weight = min_weights[v];
 
-        // Not sure cycle comparison for inc/dec vs add; using atomic::add for
-        // now because it is in our math.hxx
-        math::atomic::add(&mst_weight[0], weight);
-        printf("weight %f\n", mst_weight[0]);
-        math::atomic::add(&mst_edges[0], 1);
-        math::atomic::add(&super_vertices[0], -1);
-        atomicExch((&roots[roots[v]]), roots[u]);
-        return;
+        // TODO: technically there is a race between reads/writes to
+        // roots[dest]; not allowing duplicate edges would remove this check
+        // requirement
+        if (source < dest ||
+            G.get_destination_vertex(min_neighbors[roots[dest]]) != source) {
+          printf("v %i\n", source);
+          printf("u %i\n", dest);
+          // printf("add mst v %i\n", v);
+          // printf("add mst u %i\n", u);
+          // printf("add mst v root %i\n", roots[v]);
+          // printf("add mst u root %i\n", roots[u]);
+
+          // Not sure cycle comparison for inc/dec vs add; using atomic::add for
+          // now because it is in our math.hxx
+          math::atomic::add(&mst_weight[0], weight);
+          printf("weight %f\n", mst_weight[0]);
+          printf("adding source %i weight %f\n", source, weight);
+          math::atomic::add(&mst_edges[0], 1);
+          math::atomic::add(&super_vertices[0], -1);
+          printf("super vertices %i\n", super_vertices[0]);
+          atomicExch((&roots[v]), roots[dest]);
+          return;
+        }
       }
     };
 
     // Jump pointers in parallel for
-    // I do not think parallel updates to roots will cause issues but need to
-    // think about more; there might be a race here but it would just change the
-    // # of jumps
+    // TODO: technically there will be races between reads/writes to roots
+    // entries, but this will just impact the number of hops
     auto jump_pointers_parallel =
         [roots] __host__ __device__(vertex_t const& v) -> void {
       vertex_t u = roots[v];
@@ -220,49 +201,43 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator to get min weights
-    operators::advance::execute<operators::load_balance_t::block_mapped,
-                                operators::advance_direction_t::forward,
-                                operators::advance_io_type_t::edges,
-                                operators::advance_io_type_t::edges>(
-        G, E,  get_min_weights,
-        context);
-    
+    auto in_frontier = &(this->frontiers[0]);
+    auto out_frontier = &(this->frontiers[1]);
+    operators::parallel_for::execute<operators::parallel_for_each_t::edge>(
+        G, get_min_weights, context);
+
+    frontier_t it = *out_frontier;
     // Execute filter operator to get min neighbors
-    operators::filter::execute<operators::filter_algorithm_t::bypass>(
-        G, E, get_min_neighbors, context);
-    
-    // Execute filter operator to break ties
-    //operators::filter::execute<operators::filter_algorithm_t::bypass>(
-    //    G, E, break_ties,
-    //    context);
+    operators::parallel_for::execute<operators::parallel_for_each_t::edge>(
+        G, get_min_neighbors, context);
 
     // Execute parallel for to add weights to MST
-    //operators::parallel_for::execute<operators::parallel_for_each_t::element>(
-    //    *out_frontier,  // graph
-    //    add_to_mst,     // lambda function
-    //    context         // context
-    //);
+    operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
+        G,           // graph
+        add_to_mst,  // lambda function
+        context      // context
+    );
 
-    // TODO: remove duplicates (increment super vertices when removing)
+    // TODO: remove cycles (because we can't check that roots aren't equal when
+    // adding due to races)
 
     // TODO: exit on error if super_vertices not decremented
 
     // Execute parallel for to jump pointers
-    //operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
-    //    G,                       // graph
-    //    jump_pointers_parallel,  // lambda function
-    //    context                  // context
-    //);
+    operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
+        G,                       // graph
+        jump_pointers_parallel,  // lambda function
+        context                  // context
+    );
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
-    // TODO: update condition
-    if (this->iteration > 0) {
-      return true;
-    }
-    return false;
-    // auto P = this->get_problem();
-    // return *(P->super_vertices) == 1;
+    //if (this->iteration > 1) {
+    //  return true;
+    //}
+    //return false;
+     auto P = this->get_problem();
+     return (P->super_vertices[0] == 1);
   }
 };
 
