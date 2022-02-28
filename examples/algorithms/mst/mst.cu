@@ -70,7 +70,7 @@ void test_mst(int num_arguments, char** argument_array) {
   // Log + Validate
 
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
-  //std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
+  std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 }
 
 int main(int argc, char** argv) {

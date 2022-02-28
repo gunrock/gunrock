@@ -95,9 +95,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // get pointer to the problem
     auto P = this->get_problem();
     auto n_vertices = P->get_graph().get_number_of_vertices();
+    auto n_edges = P->get_graph().get_number_of_edges();
 
     // Fill the frontier with a sequence of vertices from 0 -> n_vertices.
-    f->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
+    f->sequence((edge_t)0, n_edges, context.get_context(0)->stream());
   }
 
   // One iteration of the application
@@ -121,40 +122,44 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // Find minimum weight for each vertex
     // TODO: update for multi-directional edges?
     auto get_min_weights = [min_weights, roots, G] __host__ __device__(
-                               edge_t const& e  // id of edge
-                               ) -> void {
+                               edge_t const& e        // id of edge
+                               ) -> bool {
+
       auto source = G.get_source_vertex(e);
       auto neighbor = G.get_destination_vertex(e);
       auto weight = G.get_edge_weight(e);
-
       // If they are already part of same super vertex, do not check
       if (roots[source] != roots[neighbor]) {
         // Store minimum weight
         auto old_weight =
             math::atomic::min(&(min_weights[roots[source]]), weight);
-        printf(
-            "1: source %i roots[source] %i weight %f min weight %f weight < "
-            "old weight %i\n",
-            source, roots[source], weight, min_weights[roots[source]],
-            weight < old_weight);
+        // printf(
+        //    "1: source %i roots[source] %i weight %f min weight %f weight < "
+        //    "old weight %i\n",
+        //    source, roots[source], weight, min_weights[roots[source]],
+        //    weight < old_weight);
+      return weight < old_weight;
       }
+      return false;
     };
 
     // TODO: technically this is non-deterministic between edges that are tied
     auto get_min_neighbors =
         [G, min_weights, min_neighbors, roots] __host__ __device__(
             edge_t const& e  // id of edge
-            ) -> void {
+            ) -> bool {
       auto source = G.get_source_vertex(e);
       auto neighbor = G.get_destination_vertex(e);
       auto weight = G.get_edge_weight(e);
 
+        // printf("source %i root %i min_neighbor %i\n", source, roots[source],
+               // min_neighbors[roots[source]]);
       // Keep neighbor if it is the min
       if (weight == min_weights[roots[source]]) {
         atomicCAS(&min_neighbors[roots[source]], -1, e);
-        printf("source %i root %i min_neighbor %i\n", source, roots[source],
-               min_neighbors[roots[source]]);
+        return true;
       }
+      return false;
     };
 
     // Add weights to MST
@@ -167,12 +172,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         auto weight = min_weights[v];
 
         // TODO: technically there is a race between reads/writes to
-        // roots[dest];
+        // new_roots[dest];
         if (source < dest ||
             G.get_destination_vertex(min_neighbors[roots[dest]]) != source ||
             G.get_source_vertex(min_neighbors[roots[dest]]) != dest) {
-          printf("v %i\n", source);
-          printf("u %i\n", dest);
+          // printf("v %i\n", source);
+          // printf("u %i\n", dest);
           // printf("add mst v %i\n", v);
           // printf("add mst u %i\n", u);
           // printf("add mst v root %i\n", roots[v]);
@@ -181,11 +186,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
           // Not sure cycle comparison for inc/dec vs add; using atomic::add for
           // now because it is in our math.hxx
           math::atomic::add(&mst_weight[0], weight);
-          printf("adding source %i dest %i weight %f\n", source, dest, weight);
-          printf("mst weight %f\n", mst_weight[0]);
+          // printf("adding source %i dest %i weight %f\n", source, dest, weight);
+          // printf("GPU mst weight %f\n", mst_weight[0]);
           math::atomic::add(&mst_edges[0], 1);
           math::atomic::add(&super_vertices[0], -1);
-          printf("super vertices %i\n", super_vertices[0]);
+          // printf("super vertices %i\n", super_vertices[0]);
           atomicExch((&new_roots[v]), new_roots[dest]);
           return;
         }
@@ -193,9 +198,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Jump pointers in parallel for
-    // TODO: technically there will be races between reads/writes to roots
-    // entries, but this will just impact the number of hops
-    // read and write from different copies to resolve
+    // read and write from different copies of roots to resolve races
     auto jump_pointers_parallel =
         [roots, new_roots] __host__ __device__(vertex_t const& v) -> void {
       vertex_t u = roots[v];
@@ -209,13 +212,13 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // Execute advance operator to get min weights
     auto in_frontier = &(this->frontiers[0]);
     auto out_frontier = &(this->frontiers[1]);
-    operators::parallel_for::execute<operators::parallel_for_each_t::edge>(
-        G, get_min_weights, context);
+    operators::filter::execute<operators::filter_algorithm_t::bypass>(
+    G, get_min_weights, in_frontier, out_frontier,
+    context);
 
-    frontier_t it = *out_frontier;
     // Execute filter operator to get min neighbors
-    operators::parallel_for::execute<operators::parallel_for_each_t::edge>(
-        G, get_min_neighbors, context);
+    operators::filter::execute<operators::filter_algorithm_t::bypass>(
+        G, get_min_neighbors, out_frontier, out_frontier, context);
 
     // Execute parallel for to add weights to MST
     operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
@@ -240,12 +243,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
-    if (this->iteration > 1) {
-      return true;
-    }
-    return false;
-    // auto P = this->get_problem();
-    // return (P->super_vertices[0] == 1);
+    // if (this->iteration > 0) {
+    //   return true;
+    // }
+    // return false;
+    auto P = this->get_problem();
+    return (P->super_vertices[0] == 1);
   }
 };
 
