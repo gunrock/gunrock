@@ -56,12 +56,14 @@ struct problem_t : gunrock::problem_t<graph_t> {
   thrust::device_vector<weight_t> min_weights;
   thrust::device_vector<int> mst_edges;
   thrust::device_vector<int> super_vertices;
+  thrust::device_vector<int> min_neighbors;
 
   void init() {
     auto policy = this->context->get_context(0)->execution_policy();
 
     roots.resize(n_vertices);
     min_weights.resize(n_vertices);
+    min_neighbors.resize(n_vertices);
 
     mst_edges.resize(1);
     super_vertices.resize(1);
@@ -70,6 +72,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
     thrust::fill(policy, min_weights.begin(), min_weights.end(),
                  std::numeric_limits<weight_t>::max());
     thrust::fill(policy, d_mst_weight, d_mst_weight + 1, 0);
+    thrust::fill(policy, min_neighbors.begin(), min_neighbors.end(), -1);
     thrust::sequence(policy, roots.begin(), roots.end(), 0);
   }
 
@@ -111,6 +114,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto mst_weight = P->result.mst_weight;
     auto mst_edges = P->mst_edges.data().get();
     auto super_vertices = P->super_vertices.data().get();
+    auto min_neighbors = P->min_neighbors.data().get();
     auto roots = P->roots.data().get();
     auto min_weights = P->min_weights.data().get();
 
@@ -130,20 +134,46 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         return false;
       }
 
-      // If they are already part of same super vertex, do not check
       // Store minimum weight
-      auto old_dist = math::atomic::min(&(min_weights[source]), weight);
+      auto old_weight = math::atomic::min(&(min_weights[source]), weight);
+      printf("1: source %i weight %f min weight %f weight < old weight %i\n", source, weight, min_weights[source], weight < old_weight);
 
-      // If the new distance is better than the previously known
-      // best_distance, add `neighbor` to the frontier
-      return weight < old_dist;
+      // If the new weight is better than the previously known
+      // best weight, add `neighbor` to the frontier
+      return weight < old_weight;
     };
+    
+    // TODO: need tiebreaker
+    auto get_min_neighbors = [G,min_weights] __host__ __device__(
+                               edge_t const& e        // id of edge
+                               ) -> bool {
+      
+      auto source = G.get_source_vertex(e);
+      auto weight = G.get_edge_weight(e);
+      printf("2: source %i weight %f min weight %f\n", source, weight, min_weights[source]);
+      
+      // Keep neighbor if it is the min
+      return weight == min_weights[source];
+    };
+    
+    //auto break_ties = [G,min_neighbors] __host__ __device__(
+    //                           edge_t const& e        // id of edge
+    //                           ) -> bool {
+    //  
+    //  auto source = G.get_source_vertex(e);
+    //  auto neighbor = G.get_destination_vertex(e);
+    //  
+    //  int old = atomicCAS(&min_neighbors[source], -1, neighbor);
+    //  
+    //  // Return true when above gets set
+    //  return old == -1;
+    //};
 
     // Iterate over edges in new frontier
     // Add weights to MST
     // Update roots
     auto add_to_mst =
-        [G, roots, mst_weight, mst_edges, super_vertices] __host__ __device__(
+        [G, roots, mst_weight, mst_edges, super_vertices, min_neighbors] __host__ __device__(
             edge_t const& e) -> void {
       auto v = G.get_source_vertex(e);
       auto u = G.get_destination_vertex(e);
@@ -155,6 +185,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       printf("v %i\n", v);
       printf("u %i\n", u);
       if (v < u) {
+      //if (v < u || min_neighbors[u] != v) {
         // printf("add mst v %i\n", v);
         // printf("add mst u %i\n", u);
         // printf("add mst v root %i\n", roots[v]);
@@ -189,33 +220,39 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator to get min weights
-    auto in_frontier = &(this->frontiers[0]);
-    auto out_frontier = &(this->frontiers[1]);
     operators::advance::execute<operators::load_balance_t::block_mapped,
                                 operators::advance_direction_t::forward,
                                 operators::advance_io_type_t::edges,
                                 operators::advance_io_type_t::edges>(
-        G, get_min_weights, in_frontier, out_frontier, E->scanned_work_domain,
+        G, E,  get_min_weights,
         context);
+    
+    // Execute filter operator to get min neighbors
+    operators::filter::execute<operators::filter_algorithm_t::bypass>(
+        G, E, get_min_neighbors, context);
+    
+    // Execute filter operator to break ties
+    //operators::filter::execute<operators::filter_algorithm_t::bypass>(
+    //    G, E, break_ties,
+    //    context);
 
     // Execute parallel for to add weights to MST
-    // TODO: ensure this executes on new frontier outputted from advance above
-    operators::parallel_for::execute<operators::parallel_for_each_t::element>(
-        *out_frontier,  // graph
-        add_to_mst,     // lambda function
-        context         // context
-    );
+    //operators::parallel_for::execute<operators::parallel_for_each_t::element>(
+    //    *out_frontier,  // graph
+    //    add_to_mst,     // lambda function
+    //    context         // context
+    //);
 
     // TODO: remove duplicates (increment super vertices when removing)
 
     // TODO: exit on error if super_vertices not decremented
 
     // Execute parallel for to jump pointers
-    operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
-        G,                       // graph
-        jump_pointers_parallel,  // lambda function
-        context                  // context
-    );
+    //operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
+    //    G,                       // graph
+    //    jump_pointers_parallel,  // lambda function
+    //    context                  // context
+    //);
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
