@@ -42,6 +42,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   int n_vertices = g.get_number_of_vertices();
 
   thrust::device_vector<vertex_t> roots;
+  thrust::device_vector<vertex_t> new_roots;
   thrust::device_vector<weight_t> min_weights;
   thrust::device_vector<int> mst_edges;
   thrust::device_vector<int> super_vertices;
@@ -51,6 +52,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto policy = this->context->get_context(0)->execution_policy();
 
     roots.resize(n_vertices);
+    new_roots.resize(n_vertices);
     min_weights.resize(n_vertices);
     min_neighbors.resize(n_vertices);
 
@@ -63,7 +65,9 @@ struct problem_t : gunrock::problem_t<graph_t> {
     thrust::fill(policy, d_mst_weight, d_mst_weight + 1, 0);
     thrust::fill(policy, min_neighbors.begin(), min_neighbors.end(), -1);
     thrust::sequence(policy, roots.begin(), roots.end(), 0);
-    thrust::sequence(policy, super_vertices.begin(), super_vertices.end(), n_vertices);
+    thrust::sequence(policy, new_roots.begin(), new_roots.end(), 0);
+    thrust::sequence(policy, super_vertices.begin(), super_vertices.end(),
+                     n_vertices);
   }
 
   void reset() {
@@ -106,6 +110,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto super_vertices = P->super_vertices.data().get();
     auto min_neighbors = P->min_neighbors.data().get();
     auto roots = P->roots.data().get();
+    auto new_roots = P->new_roots.data().get();
     auto min_weights = P->min_weights.data().get();
 
     auto policy = this->context->get_context(0)->execution_policy();
@@ -154,7 +159,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     // Add weights to MST
     auto add_to_mst = [G, roots, mst_weight, mst_edges, super_vertices,
-                       min_neighbors, min_weights] __host__
+                       min_neighbors, min_weights, new_roots] __host__
                       __device__(vertex_t const& v) -> void {
       if (min_weights[v] != std::numeric_limits<weight_t>::max()) {
         auto source = G.get_source_vertex(min_neighbors[v]);
@@ -162,10 +167,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         auto weight = min_weights[v];
 
         // TODO: technically there is a race between reads/writes to
-        // roots[dest]; not allowing duplicate edges would remove this check
-        // requirement
+        // roots[dest];
         if (source < dest ||
-            G.get_destination_vertex(min_neighbors[roots[dest]]) != source) {
+            G.get_destination_vertex(min_neighbors[roots[dest]]) != source ||
+            G.get_source_vertex(min_neighbors[roots[dest]]) != dest) {
           printf("v %i\n", source);
           printf("u %i\n", dest);
           // printf("add mst v %i\n", v);
@@ -176,12 +181,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
           // Not sure cycle comparison for inc/dec vs add; using atomic::add for
           // now because it is in our math.hxx
           math::atomic::add(&mst_weight[0], weight);
-          printf("weight %f\n", mst_weight[0]);
-          printf("adding source %i weight %f\n", source, weight);
+          printf("adding source %i dest %i weight %f\n", source, dest, weight);
+          printf("mst weight %f\n", mst_weight[0]);
           math::atomic::add(&mst_edges[0], 1);
           math::atomic::add(&super_vertices[0], -1);
           printf("super vertices %i\n", super_vertices[0]);
-          atomicExch((&roots[v]), roots[dest]);
+          atomicExch((&new_roots[v]), new_roots[dest]);
           return;
         }
       }
@@ -190,13 +195,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // Jump pointers in parallel for
     // TODO: technically there will be races between reads/writes to roots
     // entries, but this will just impact the number of hops
+    // read and write from different copies to resolve
     auto jump_pointers_parallel =
-        [roots] __host__ __device__(vertex_t const& v) -> void {
+        [roots, new_roots] __host__ __device__(vertex_t const& v) -> void {
       vertex_t u = roots[v];
       while (roots[u] != u) {
         u = roots[u];
       }
-      roots[v] = u;
+      new_roots[v] = u;
       return;
     };
 
@@ -224,20 +230,22 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // TODO: exit on error if super_vertices not decremented
 
     // Execute parallel for to jump pointers
+    thrust::copy_n(policy, new_roots, P->n_vertices, roots);
     operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
         G,                       // graph
         jump_pointers_parallel,  // lambda function
         context                  // context
     );
+    thrust::copy_n(policy, new_roots, P->n_vertices, roots);
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
-    //if (this->iteration > 1) {
-    //  return true;
-    //}
-    //return false;
-     auto P = this->get_problem();
-     return (P->super_vertices[0] == 1);
+    if (this->iteration > 1) {
+      return true;
+    }
+    return false;
+    // auto P = this->get_problem();
+    // return (P->super_vertices[0] == 1);
   }
 };
 
