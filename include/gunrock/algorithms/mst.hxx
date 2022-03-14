@@ -49,6 +49,8 @@ struct problem_t : gunrock::problem_t<graph_t> {
   thrust::device_vector<int> min_neighbors;
 
   void init() {
+    cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1073741824);
+    
     auto policy = this->context->get_context(0)->execution_policy();
 
     roots.resize(n_vertices);
@@ -157,7 +159,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       }
       return false;
     };
-    
+
     // just used for graph
     auto remove_ties =
         [G, min_weights, min_neighbors, roots] __host__ __device__(
@@ -166,27 +168,40 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       auto source = G.get_source_vertex(e);
       auto dest = G.get_destination_vertex(e);
       auto weight = G.get_edge_weight(e);
-      //printf("source %i dest %i weight %f\n", source, dest, weight);
+      // printf("source %i dest %i weight %f\n", source, dest, weight);
       if (e == min_neighbors[roots[source]]) {
-          return true;
+        return true;
       }
       return false;
     };
-    
+
     // just used for graph
     auto remove_dups =
         [G, min_weights, min_neighbors, roots] __host__ __device__(
             edge_t const& e  // id of edge
             ) -> bool {
-        auto source = G.get_source_vertex(e);
-        auto dest = G.get_destination_vertex(e);
+      auto source = G.get_source_vertex(e);
+      auto dest = G.get_destination_vertex(e);
+      auto weight = G.get_edge_weight(e);
 
-        if (source < dest ||
-            G.get_destination_vertex(min_neighbors[roots[dest]]) != source ||
-            G.get_source_vertex(min_neighbors[roots[dest]]) != dest) {
-          return true;
-        }
-        return false;
+      if (source < dest ||
+          G.get_destination_vertex(min_neighbors[roots[dest]]) != source ||
+          G.get_source_vertex(min_neighbors[roots[dest]]) != dest) {
+        return true;
+      }
+      return false;
+    };
+
+    auto print_weights =
+        [G, min_weights, min_neighbors, roots] __host__ __device__(
+            edge_t const& e  // id of edge
+            ) -> bool {
+      auto source = G.get_source_vertex(e);
+      auto dest = G.get_destination_vertex(e);
+      auto weight = G.get_edge_weight(e);
+
+      printf("%i,%i,%f\n", int(source), int(dest), float(weight));
+      return true;
     };
 
     // Add weights to MST
@@ -213,12 +228,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
           // Not sure cycle comparison for inc/dec vs add; using atomic::add for
           // now because it is in our math.hxx
           math::atomic::add(&mst_weight[0], weight);
-          
-          
-          //printf("%i,%i,%f\n", source, dest, weight);
-          //printf("GPU mst weight %f\n", mst_weight[0]);
+
+          // printf("%i,%i,%f\n", source, dest, weight);
+          // printf("GPU mst weight %f\n", mst_weight[0]);
           math::atomic::add(&mst_edges[0], 1);
-          //printf("GPU mst edges %i\n", mst_edges[0]);
+          // printf("GPU mst edges %i\n", mst_edges[0]);
           math::atomic::add(&super_vertices[0], -1);
           // printf("super vertices %i\n", super_vertices[0]);
           atomicExch((&new_roots[v]), new_roots[dest]);
@@ -238,11 +252,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       new_roots[v] = u;
       return;
     };
-    
+
     // Execute advance operator to get min weights
     auto in_frontier = &(this->frontiers[0]);
     auto out_frontier = &(this->frontiers[1]);
-    
+
     operators::filter::execute<operators::filter_algorithm_t::remove>(
         G, get_min_weights, in_frontier, out_frontier, context);
 
@@ -250,13 +264,17 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     operators::filter::execute<operators::filter_algorithm_t::remove>(
         G, get_min_neighbors, out_frontier, out_frontier, context);
 
-    // Execute filter operator to remove ties from frontier 
+    // Execute filter operator to remove ties from frontier
     operators::filter::execute<operators::filter_algorithm_t::remove>(
         G, remove_ties, out_frontier, out_frontier, context);
 
-    // Execute filter operator to remove ties from frontier 
+    // Execute filter operator to remove duplicates from frontier
     operators::filter::execute<operators::filter_algorithm_t::remove>(
         G, remove_dups, out_frontier, out_frontier, context);
+
+    // Execute parallel for operator to print weights 
+    operators::parallel_for::execute<operators::parallel_for_each_t::element>(
+        *out_frontier, print_weights, context);
 
     // Execute parallel for to add weights to MST
     operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
@@ -265,10 +283,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         context      // context
     );
 
-    (&(this->frontiers[1]))->print();
-
-    // TODO: remove cycles (because we can't check that roots aren't equal when
-    // adding due to races)
+    // Print frontier
+    //(&(this->frontiers[1]))->print();
 
     // TODO: exit on error if super_vertices not decremented
 
@@ -283,10 +299,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
-    //if (this->iteration > 0) {
+    // if (this->iteration > 0) {
     //  return true;
     //}
-    //return false;
+    // return false;
     auto P = this->get_problem();
     return (P->super_vertices[0] == 1);
   }
@@ -324,7 +340,7 @@ float run(
   problem_type problem(G, param, result, context);
   problem.init();
   // problem.reset();
-  
+
   // initialize enactor; call enactor, returning GPU elapsed time
   enactor_type enactor(&problem, context);
   return enactor.enact();
