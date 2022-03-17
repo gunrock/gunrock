@@ -48,6 +48,11 @@ void test_mst(int num_arguments, char** argument_array) {
       csr.nonzero_values.data().get() 
   );
 
+  if (G.is_directed()) {
+      std::cout << "MST is only defined on undirected graphs.\n";
+      exit(1);
+  }
+
   // --
   // Params and memory allocation
   

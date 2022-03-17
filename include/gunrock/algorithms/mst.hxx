@@ -1,3 +1,14 @@
+/**
+ * @file mst.hxx
+ * @author Annie Robison (amrobison@ucdavis.edu)
+ * @author Muhammad Osama (mosama@ucdavis.edu)
+ * @brief Minimum Spanning Tree algorithm.
+ * @version 0.1
+ * @date 2022-03-17
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
 #pragma once
 
 #include <gunrock/algorithms/algorithms.hxx>
@@ -10,9 +21,7 @@ namespace gunrock {
 namespace mst {
 
 template <typename vertex_t>
-struct param_t {
-  // No parameters for this algorithm
-};
+struct param_t {};
 
 template <typename vertex_t, typename weight_t>
 struct result_t {
@@ -20,7 +29,6 @@ struct result_t {
   result_t(weight_t* _mst_weight) : mst_weight(_mst_weight) {}
 };
 
-// <boilerplate>
 template <typename graph_t, typename param_type, typename result_type>
 struct problem_t : gunrock::problem_t<graph_t> {
   param_type param;
@@ -37,7 +45,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   using vertex_t = typename graph_t::vertex_type;
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
-  // </boilerplate>
+
   graph_t g = this->get_graph();
   int n_vertices = g.get_number_of_vertices();
 
@@ -47,21 +55,24 @@ struct problem_t : gunrock::problem_t<graph_t> {
   thrust::device_vector<int> mst_edges;
   thrust::device_vector<int> super_vertices;
   thrust::device_vector<int> min_neighbors;
+  thrust::device_vector<bool> not_decremented;
 
   void init() {
     cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1073741824);
-    
-    auto policy = this->context->get_context(0)->execution_policy();
 
     roots.resize(n_vertices);
     new_roots.resize(n_vertices);
     min_weights.resize(n_vertices);
     min_neighbors.resize(n_vertices);
-
     mst_edges.resize(1);
     super_vertices.resize(1);
+    not_decremented.resize(1);
+  }
 
+  void reset() {
+    auto policy = this->context->get_context(0)->execution_policy();
     auto d_mst_weight = thrust::device_pointer_cast(this->result.mst_weight);
+
     thrust::fill(policy, min_weights.begin(), min_weights.end(),
                  std::numeric_limits<weight_t>::max());
     thrust::fill(policy, d_mst_weight, d_mst_weight + 1, 0);
@@ -70,15 +81,11 @@ struct problem_t : gunrock::problem_t<graph_t> {
     thrust::sequence(policy, new_roots.begin(), new_roots.end(), 0);
     thrust::sequence(policy, super_vertices.begin(), super_vertices.end(),
                      n_vertices);
-  }
-
-  void reset() {
-    // TODO: reset
-    return;
+    thrust::sequence(policy, not_decremented.begin(), not_decremented.end(),
+                     false);
   }
 };
 
-// <boilerplate>
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
   enactor_t(problem_t* _problem,
@@ -89,21 +96,17 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using edge_t = typename problem_t::edge_t;
   using weight_t = typename problem_t::weight_t;
   using frontier_t = typename enactor_t<problem_t>::frontier_t;
-  // </boilerplate>
 
-  // How to initialize the frontier at the beginning of the application.
   void prepare_frontier(frontier_t* f,
                         cuda::multi_context_t& context) override {
-    // get pointer to the problem
     auto P = this->get_problem();
     auto n_vertices = P->get_graph().get_number_of_vertices();
     auto n_edges = P->get_graph().get_number_of_edges();
 
-    // Fill the frontier with a sequence of vertices from 0 -> n_vertices.
+    // Fill the frontier with a sequence of edges from 0 -> n_edges
     f->sequence((edge_t)0, n_edges, context.get_context(0)->stream());
   }
 
-  // One iteration of the application
   void loop(cuda::multi_context_t& context) override {
     auto E = this->get_enactor();
     auto P = this->get_problem();
@@ -115,30 +118,30 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto roots = P->roots.data().get();
     auto new_roots = P->new_roots.data().get();
     auto min_weights = P->min_weights.data().get();
-
     auto policy = this->context->get_context(0)->execution_policy();
+    auto not_decremented = P->not_decremented.data().get();
+
+    // Reset on each iteration
+    thrust::fill_n(policy, not_decremented, 1, true);
     thrust::fill_n(policy, min_weights, P->n_vertices,
                    std::numeric_limits<weight_t>::max());
     thrust::fill_n(policy, min_neighbors, P->n_vertices, -1);
 
-    // Find minimum weight for each vertex
-    // TODO: update for multi-directional edges?
     auto get_min_weights = [min_weights, roots, G] __host__ __device__(
                                edge_t const& e  // id of edge
                                ) -> bool {
+      // Find the minimum weight for each vertex. If the function returns true,
+      // the weight is the current minimum and the edge will be added to the
+      // output frontier.
       auto source = G.get_source_vertex(e);
       auto neighbor = G.get_destination_vertex(e);
       auto weight = G.get_edge_weight(e);
-      // If they are already part of same super vertex, do not check
+
+      // If the source and destination are already part of same super vertex, do
+      // not check
       if (roots[source] != roots[neighbor]) {
-        // Store minimum weight
         auto old_weight =
             math::atomic::min(&(min_weights[roots[source]]), weight);
-        // printf(
-        //    "1: source %i roots[source] %i weight %f min weight %f weight < "
-        //    "old weight %i\n",
-        //    source, roots[source], weight, min_weights[roots[source]],
-        //    weight < old_weight);
         return weight < old_weight;
       }
       return false;
@@ -147,104 +150,65 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto get_min_neighbors =
         [G, min_weights, min_neighbors, roots] __host__ __device__(
             edge_t const& e  // id of edge
-            ) -> bool {
+            ) -> void {
+      // Find the minimum neighbor for each vertex. Use atomic max to break ties
+      // between neighbors that have the same weight.
+      // Consistent ordering (using max here) will prevent loops.
+      // Must check that the weight equals the min weight for that vertex,
+      // because some edges can be added to the frontier that are later beaten
+      // by lower weights.
       auto source = G.get_source_vertex(e);
       auto weight = G.get_edge_weight(e);
       if (weight == min_weights[roots[source]]) {
         auto old_val = math::atomic::max(&min_neighbors[roots[source]], e);
-
-        if (old_val < e) {
-          return true;
-        }
       }
-      return false;
     };
 
-    // just used for graph
-    auto remove_ties =
-        [G, min_weights, min_neighbors, roots] __host__ __device__(
-            edge_t const& e  // id of edge
-            ) -> bool {
-      auto source = G.get_source_vertex(e);
-      auto dest = G.get_destination_vertex(e);
-      auto weight = G.get_edge_weight(e);
-      // printf("source %i dest %i weight %f\n", source, dest, weight);
-      if (e == min_neighbors[roots[source]]) {
-        return true;
-      }
-      return false;
-    };
-
-    // just used for graph
-    auto remove_dups =
-        [G, min_weights, min_neighbors, roots] __host__ __device__(
-            edge_t const& e  // id of edge
-            ) -> bool {
-      auto source = G.get_source_vertex(e);
-      auto dest = G.get_destination_vertex(e);
-      auto weight = G.get_edge_weight(e);
-
-      if (source < dest ||
-          G.get_destination_vertex(min_neighbors[roots[dest]]) != source ||
-          G.get_source_vertex(min_neighbors[roots[dest]]) != dest) {
-        return true;
-      }
-      return false;
-    };
-
-    auto print_weights =
-        [G, min_weights, min_neighbors, roots] __host__ __device__(
-            edge_t const& e  // id of edge
-            ) -> bool {
-      auto source = G.get_source_vertex(e);
-      auto dest = G.get_destination_vertex(e);
-      auto weight = G.get_edge_weight(e);
-
-      printf("%i,%i,%f\n", int(source), int(dest), float(weight));
-      return true;
-    };
-
-    // Add weights to MST
     auto add_to_mst = [G, roots, mst_weight, mst_edges, super_vertices,
-                       min_neighbors, min_weights, new_roots] __host__
+                       min_neighbors, min_weights, new_roots,
+                       not_decremented] __host__
                       __device__(vertex_t const& v) -> void {
+      // Add weights to MST. To prevent duplicate edges, check that either
+      // the source vertex index is
+      // less than the destination vertex index or that the edge with the source
+      // and destination flipped is not included.
+      // Combine super vertices by setting the root of the source to the root
+      // of the destination.
+      // Use `roots` to check pre-existing roots and update roots in
+      // `new_roots`.
       if (min_weights[v] != std::numeric_limits<weight_t>::max()) {
         auto source = G.get_source_vertex(min_neighbors[v]);
         auto dest = G.get_destination_vertex(min_neighbors[v]);
         auto weight = min_weights[v];
 
-        // TODO: technically there is a race between reads/writes to
-        // new_roots[dest];
         if (source < dest ||
             G.get_destination_vertex(min_neighbors[roots[dest]]) != source ||
             G.get_source_vertex(min_neighbors[roots[dest]]) != dest) {
-          // printf("v %i\n", source);
-          // printf("u %i\n", dest);
-          // printf("add mst v %i\n", v);
-          // printf("add mst u %i\n", u);
-          // printf("add mst v root %i\n", roots[v]);
-          // printf("add mst u root %i\n", roots[u]);
+          // For large graphs with float weights, there may be slight variance
+          // in the final MST weight due to the amount of precision loss
+          // depending on the order of adds.
 
-          // Not sure cycle comparison for inc/dec vs add; using atomic::add for
-          // now because it is in our math.hxx
+          not_decremented[0] = false;
           math::atomic::add(&mst_weight[0], weight);
-
-          // printf("%i,%i,%f\n", source, dest, weight);
-          // printf("GPU mst weight %f\n", mst_weight[0]);
           math::atomic::add(&mst_edges[0], 1);
-          // printf("GPU mst edges %i\n", mst_edges[0]);
           math::atomic::add(&super_vertices[0], -1);
-          // printf("super vertices %i\n", super_vertices[0]);
+
+          printf("%f\n", weight);
+
+          // TODO: add to math.hxx
           atomicExch((&new_roots[v]), new_roots[dest]);
           return;
         }
       }
     };
 
-    // Jump pointers in parallel for
-    // read and write from different copies of roots to resolve races
     auto jump_pointers_parallel =
         [roots, new_roots] __host__ __device__(vertex_t const& v) -> void {
+      // Update the root of each vertex. When adding an edge to the MST, we
+      // update the source's root's root to the destination's root.
+      // However, any vertex that had the source's root as its root would not
+      // be updated. We must jump from root to root until the current vertex
+      // and root are equal to find the new roots.
       vertex_t u = roots[v];
       while (roots[u] != u) {
         u = roots[u];
@@ -253,28 +217,16 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return;
     };
 
-    // Execute advance operator to get min weights
     auto in_frontier = &(this->frontiers[0]);
     auto out_frontier = &(this->frontiers[1]);
 
+    // Execute filter operator to get min weights
     operators::filter::execute<operators::filter_algorithm_t::remove>(
         G, get_min_weights, in_frontier, out_frontier, context);
 
     // Execute filter operator to get min neighbors
-    operators::filter::execute<operators::filter_algorithm_t::remove>(
-        G, get_min_neighbors, out_frontier, out_frontier, context);
-
-    // Execute filter operator to remove ties from frontier
-    operators::filter::execute<operators::filter_algorithm_t::remove>(
-        G, remove_ties, out_frontier, out_frontier, context);
-
-    // Execute filter operator to remove duplicates from frontier
-    operators::filter::execute<operators::filter_algorithm_t::remove>(
-        G, remove_dups, out_frontier, out_frontier, context);
-
-    // Execute parallel for operator to print weights 
     operators::parallel_for::execute<operators::parallel_for_each_t::element>(
-        *out_frontier, print_weights, context);
+        *out_frontier, get_min_neighbors, context);
 
     // Execute parallel for to add weights to MST
     operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
@@ -283,68 +235,56 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         context      // context
     );
 
-    // Print frontier
-    //(&(this->frontiers[1]))->print();
-
-    // TODO: exit on error if super_vertices not decremented
+    thrust::host_vector<bool> h_not_dec = P->not_decremented;
+    if (h_not_dec[0]) {
+        return;
+    }
+    
+    // Copy `new_roots` to `roots`
+    thrust::copy_n(policy, new_roots, P->n_vertices, roots);
 
     // Execute parallel for to jump pointers
-    thrust::copy_n(policy, new_roots, P->n_vertices, roots);
     operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
         G,                       // graph
         jump_pointers_parallel,  // lambda function
         context                  // context
     );
+
+    // Copy `new_roots` to `roots`
     thrust::copy_n(policy, new_roots, P->n_vertices, roots);
   }
 
   virtual bool is_converged(cuda::multi_context_t& context) {
-    // if (this->iteration > 0) {
-    //  return true;
-    //}
-    // return false;
     auto P = this->get_problem();
-    return (P->super_vertices[0] == 1);
+    return ((P->super_vertices[0] == 1) || (P->not_decremented[0]));
   }
 };
 
 template <typename graph_t>
-float run(
-    graph_t& G,
-    typename graph_t::weight_type* mst_weight,  // Output
-    // Context for application (eg, GPU + CUDA stream it will be
-    // executed on)
-    std::shared_ptr<cuda::multi_context_t> context =
-        std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0))) {
+float run(graph_t& G,
+          typename graph_t::weight_type* mst_weight,  // Output
+          std::shared_ptr<cuda::multi_context_t> context =
+              std::shared_ptr<cuda::multi_context_t>(
+                  new cuda::multi_context_t(0))  // Context
+) {
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;
 
-  // instantiate `param` and `result` templates
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t, weight_t>;
 
-  // initialize `param` and `result` w/ the appropriate parameters / data
-  // structures
   param_type param;
   result_type result(mst_weight);
 
-  // <boilerplate> This code probably should be the same across all
-  // applications, unless maybe you're doing something like multi-gpu /
-  // concurrent function calls
-
-  // instantiate `problem` and `enactor` templates.
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;
 
-  // initialize problem; call `init` and `reset` to prepare data structures
   problem_type problem(G, param, result, context);
   problem.init();
-  // problem.reset();
+  problem.reset();
 
-  // initialize enactor; call enactor, returning GPU elapsed time
   enactor_type enactor(&problem, context);
   return enactor.enact();
-  // </boilerplate>
 }
 
 }  // namespace mst
