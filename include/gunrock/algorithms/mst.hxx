@@ -110,10 +110,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 
   void loop(cuda::multi_context_t& context) override {
-    
     auto E = this->get_enactor();
     auto P = this->get_problem();
-    printf("it %i\n", this->iteration);
     auto G = P->get_graph();
     auto mst_weight = P->result.mst_weight;
     auto n_edges = P->n_edges;
@@ -133,17 +131,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                    std::numeric_limits<weight_t>::max());
     thrust::fill_n(policy, min_neighbors, P->n_vertices, -1);
 
-    
-    auto print_weights =
-        [G, min_weights, min_neighbors, roots, new_roots] __host__ __device__(
-            vertex_t const& v  // id of edge
-            ) -> bool {
-      //printf("v %i roots[v] %i\n", v, new_roots[v]);
-      return true;
-    };
-    
-    
-    
     auto get_min_weights = [min_weights, roots, G] __host__ __device__(
                                edge_t const& e  // id of edge
                                ) -> bool {
@@ -171,27 +158,30 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // Find the minimum neighbor for each vertex. Use atomic max to break ties
       // between neighbors that have the same weight.
       // Consistent ordering (using max here) will prevent loops.
-      // Must check that the weight equals the min weight for that vertex,
-      // because some edges can be added to the frontier that are later beaten
-      // by lower weights.
+      // Edges with dest < source are flipped so that reverse edges are treated
+      // at equivalent. Must check that the weight equals the min weight for
+      // that vertex, because some edges can be added to the frontier that are
+      // later beaten by lower weights.
       auto source = G.get_source_vertex(e);
       auto dest = G.get_destination_vertex(e);
       auto weight = G.get_edge_weight(e);
       edge_t new_e = e;
-      
+
       edge_t reverse_edge = G.get_edge(dest, source) - 1;
       if (reverse_edge < e) {
-          new_e = reverse_edge;
+        new_e = reverse_edge;
       }
-      //printf("source %i dest %i new_e source %i new_e dest %i\n",source, dest, G.get_source_vertex(new_e),G.get_destination_vertex(new_e));
-      if (roots[source] != roots[dest] && weight == min_weights[roots[source]]) {
+      // printf("source %i dest %i new_e source %i new_e dest %i\n",source,
+      // dest, G.get_source_vertex(new_e),G.get_destination_vertex(new_e));
+      if (roots[source] != roots[dest] &&
+          weight == min_weights[roots[source]]) {
         math::atomic::max(&(min_neighbors[roots[source]]), new_e);
       }
     };
 
     auto add_to_mst = [G, roots, mst_weight, mst_edges, super_vertices,
-                       min_neighbors, min_weights, new_roots,
-                       not_decremented, mst] __host__
+                       min_neighbors, min_weights, new_roots, not_decremented,
+                       mst] __host__
                       __device__(vertex_t const& v) -> void {
       // Add weights to MST. To prevent duplicate edges, check that either
       // the source vertex index is
@@ -202,35 +192,29 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // Use `roots` to check pre-existing roots and update roots in
       // `new_roots`.
       if (min_weights[v] != std::numeric_limits<weight_t>::max()) {
-          auto e = min_neighbors[v];
-          auto source = G.get_source_vertex(e);
-          auto dest = G.get_destination_vertex(e);
-          auto weight = G.get_edge_weight(e);
+        auto e = min_neighbors[v];
+        auto source = G.get_source_vertex(e);
+        auto dest = G.get_destination_vertex(e);
+        auto weight = G.get_edge_weight(e);
 
-          auto old_dest = dest;
-          //printf("v %i source %i dest %i\n", v, source, dest); 
-          
-          if (roots[source] != v) {
-              auto temp = source;
-              source = dest;
-              dest = temp;
-          }
+        auto old_dest = dest;
 
+        if (roots[source] != v) {
+          auto temp = source;
+          source = dest;
+          dest = temp;
+        }
 
-          //printf("v %i source %i dest %i\n", v, source, dest); 
-          if (source < dest ||
-             min_neighbors[roots[old_dest]] != e) {
-            // For large graphs with float weights, there may be slight variance
-            // in the final MST weight due to the amount of precision loss
-            // depending on the order of adds.
-            not_decremented[0] = false;
-            math::atomic::add(&mst_weight[0], weight);
-            math::atomic::add(&mst_edges[0], 1);
-            math::atomic::add(&super_vertices[0], -1);
-            printf("mst weight %f\n", mst_weight[0]);
-            atomicExch(&new_roots[v],new_roots[dest]);
-            //printf("%i %i %i %i %i %i %i %i %i\n", v, source, dest, roots[v], new_roots[v], roots[source], new_roots[source], roots[dest], new_roots[dest]);
-          }
+        if (source < dest || min_neighbors[roots[old_dest]] != e) {
+          // For large graphs with float weights, there may be slight variance
+          // in the final MST weight due to the amount of precision loss
+          // depending on the order of adds.
+          not_decremented[0] = false;
+          math::atomic::add(&mst_weight[0], weight);
+          math::atomic::add(&mst_edges[0], 1);
+          math::atomic::add(&super_vertices[0], -1);
+          atomicExch(&new_roots[v], new_roots[dest]);
+        }
       }
     };
 
@@ -251,7 +235,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto in_frontier = &(this->frontiers[0]);
     auto out_frontier = &(this->frontiers[1]);
-    
+
     // Execute filter operator to get min weights
     operators::filter::execute<operators::filter_algorithm_t::remove>(
         G, get_min_weights, in_frontier, out_frontier, context);
@@ -266,21 +250,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         add_to_mst,  // lambda function
         context      // context
     );
-    
-    operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
-        G,           // graph
-        print_weights,  // lambda function
-        context      // context
-    );
 
-
-    //thrust::host_vector<bool> h_not_dec = P->not_decremented;
-    //thrust::host_vector<bool> h_super_vert = P->super_vertices;
-    ////if (h_not_dec[0] || h_super_vert[0] == 1) {
-    //if (h_not_dec[0]) {
-    //  printf("error");
-    //  return;
-    //}
+    thrust::host_vector<bool> h_not_dec = P->not_decremented;
+    if (h_not_dec[0]) {
+      printf("Error: invalid graph (super vertices not decremented)\n");
+      exit(1);
+    }
 
     // Copy `new_roots` to `roots`
     thrust::copy_n(policy, new_roots, P->n_vertices, roots);
@@ -298,7 +273,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
   virtual bool is_converged(cuda::multi_context_t& context) {
     auto P = this->get_problem();
-    return ((P->super_vertices[0] == 1));
+    return (P->super_vertices[0] == 1);
   }
 };
 

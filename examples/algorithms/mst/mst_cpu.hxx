@@ -34,7 +34,7 @@ void jump_pointers(super* supers, vertex_t v) {
 }
 
 template <typename csr_t, typename vertex_t, typename edge_t, typename weight_t>
-float run(csr_t& csr) {
+float run(csr_t& csr, weight_t* mst_weight) {
   // Copy data to CPU
   thrust::host_vector<edge_t> row_offsets(csr.row_offsets);
   thrust::host_vector<vertex_t> column_indices(csr.column_indices);
@@ -49,7 +49,7 @@ float run(csr_t& csr) {
 
   edge_t* mst = new edge_t[nonzero_values.size()];
 
-  float mst_weight = 0;
+  *mst_weight = 0;
 
   for (vertex_t i = 0; i < n_vertices; i++) {
     supers[i].root = &supers[i];
@@ -92,7 +92,7 @@ float run(csr_t& csr) {
         if (supers[supers[v].min_neighbor].root != supers[v].root) {
           if (supers[supers[v].min_neighbor].min_neighbor != v ||
               v < supers[v].min_neighbor) {
-            mst_weight += supers[v].min_weight;
+            *mst_weight += supers[v].min_weight;
             mst_edges++;
             supers[v].root->root = supers[supers[v].min_neighbor].root;
             super_vertices--;
@@ -109,7 +109,6 @@ float run(csr_t& csr) {
     //need to free
   }
 
-  printf("CPU mst weight : %f\n", mst_weight);
   //std::cout << "mst edges " << mst_edges << "\n";
 
   auto t_stop = high_resolution_clock::now();

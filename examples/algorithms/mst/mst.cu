@@ -49,7 +49,7 @@ void test_mst(int num_arguments, char** argument_array) {
   );
 
   if (G.is_directed()) {
-      std::cout << "MST is only defined on undirected graphs.\n";
+      printf("Error: invalid graph (MST is only defined on undirected graphs)\n");
       exit(1);
   }
 
@@ -64,18 +64,22 @@ void test_mst(int num_arguments, char** argument_array) {
   // GPU Run
 
   float gpu_elapsed = gunrock::mst::run(G, mst_weight.data().get());
+  thrust::host_vector<weight_t> h_mst_weight = mst_weight;
+  printf("GPU MST Weight: %f\n", h_mst_weight[0]);
 
   // --
   // CPU Run
 
+  weight_t cpu_mst_weight;
   float cpu_elapsed = mst_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
-      csr);
+      csr, &cpu_mst_weight);
+  printf("CPU MST Weight: %f\n", cpu_mst_weight);
 
   // --
-  // Log + Validate
+  // Log
 
-  std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
+  std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
 }
 
 int main(int argc, char** argv) {
