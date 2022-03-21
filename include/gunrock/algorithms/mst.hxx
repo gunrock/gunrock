@@ -159,7 +159,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // between neighbors that have the same weight.
       // Consistent ordering (using max here) will prevent loops.
       // Edges with dest < source are flipped so that reverse edges are treated
-      // at equivalent. Must check that the weight equals the min weight for
+      // as equivalent. Must check that the weight equals the min weight for
       // that vertex, because some edges can be added to the frontier that are
       // later beaten by lower weights.
       auto source = G.get_source_vertex(e);
@@ -171,8 +171,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       if (reverse_edge < e) {
         new_e = reverse_edge;
       }
-      // printf("source %i dest %i new_e source %i new_e dest %i\n",source,
-      // dest, G.get_source_vertex(new_e),G.get_destination_vertex(new_e));
       if (roots[source] != roots[dest] &&
           weight == min_weights[roots[source]]) {
         math::atomic::max(&(min_neighbors[roots[source]]), new_e);
@@ -187,10 +185,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // the source vertex index is
       // less than the destination vertex index or that the edge with the source
       // and destination flipped is not included.
-      // Combine super vertices by setting the root of the source to the root
-      // of the destination.
-      // Use `roots` to check pre-existing roots and update roots in
-      // `new_roots`.
+      // Combine super vertices by setting the root of the super vertex to the
+      // root of the destination. Use `roots` to check old roots and update
+      // roots in `new_roots`.
       if (min_weights[v] != std::numeric_limits<weight_t>::max()) {
         auto e = min_neighbors[v];
         auto source = G.get_source_vertex(e);
