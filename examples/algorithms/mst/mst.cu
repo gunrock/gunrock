@@ -1,6 +1,7 @@
 #include <gunrock/algorithms/algorithms.hxx>
 #include <gunrock/algorithms/mst.hxx>
 #include "mst_cpu.hxx"  // Reference implementation
+#include <fstream>
 
 using namespace gunrock;
 using namespace memory;
@@ -25,6 +26,14 @@ void test_mst(int num_arguments, char** argument_array) {
   
   csr_t csr;
   std::string filename = argument_array[1];
+
+  std::ifstream infile (filename);
+  std::string line;
+  getline(infile, line);
+  if (line.find("symmetric") == std::string::npos) {
+      printf("Error: input matrix must be symmetric\n");
+      exit(1);
+  }
 
   if (util::is_market(filename)) {
     io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
