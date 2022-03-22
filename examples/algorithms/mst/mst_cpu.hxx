@@ -47,30 +47,37 @@ float run(csr_t& csr, weight_t* mst_weight) {
   struct super* supers = new super[n_vertices];
   int super_vertices = n_vertices;
 
-  edge_t* mst = new edge_t[nonzero_values.size()];
-
   *mst_weight = 0;
 
+  // Initialize: set the root for each vertex to itself
   for (vertex_t i = 0; i < n_vertices; i++) {
     supers[i].root = &supers[i];
     supers[i].min_neighbor = i;
   }
   int mst_edges = 0;
   int it = 0;
+
   while (super_vertices > 1) {
+    int start_super_vertices = super_vertices;
     it++;
+
+    // Reset minimum weights and neighbors on each iteration
     for (vertex_t i = 0; i < n_vertices; i++) {
       supers[i].min_weight = std::numeric_limits<weight_t>::max();
       supers[i].min_neighbor = i;
     }
 
+    // Iterate over each edge and compare to find the minimum weight and
+    // neighbor for each super vertex
     for (vertex_t v = 0; v < n_vertices; v++) {
       edge_t start_edge = row_offsets[v];
       edge_t num_neighbors = row_offsets[v + 1] - row_offsets[v];
 
       for (edge_t e = start_edge; e < start_edge + num_neighbors; ++e) {
         vertex_t u = column_indices[e];
-        if (supers[v].root == supers[u].root) {
+        // Do not check if they are already part of the same super vertex or if
+        // v is less than u (we don't need to check duplicate / reverse edges)
+        if (supers[v].root == supers[u].root || v < u) {
           continue;
         }
         weight_t new_dist = nonzero_values[e];
@@ -85,10 +92,17 @@ float run(csr_t& csr, weight_t* mst_weight) {
       }
     }
 
+    // Add the minimum weight edges to the MST
     for (vertex_t v = 0; v < n_vertices; v++) {
       if (supers[v].min_weight != std::numeric_limits<weight_t>::max()) {
+        // Jump pointers for the relevant vertices because their roots may have
+        // been updated to be the same
         jump_pointers(supers, v);
         jump_pointers(supers, supers[v].min_neighbor);
+        // To prevent duplicate edges, check that either
+        // the source vertex index is
+        // less than the destination vertex index or that the edge with the
+        // source and destination flipped is not included.
         if (supers[supers[v].min_neighbor].root != supers[v].root) {
           if (supers[supers[v].min_neighbor].min_neighbor != v ||
               v < supers[v].min_neighbor) {
@@ -100,16 +114,23 @@ float run(csr_t& csr, weight_t* mst_weight) {
         }
       }
     }
-    // add stop condition when super vertices not decremented
 
+    if (start_super_vertices == super_vertices) {
+      printf("Error: invalid graph (super vertices not decremented)\n");
+      exit(1);
+    }
+
+    // Update the root of each vertex. When adding an edge to the MST, we
+    // update the source's root's root to the destination's root.
+    // However, a vertex that had the source's root as its root may not
+    // be updated. We must jump from root to root until the current vertex
+    // and root are equal to find the new roots.
     for (vertex_t v = 0; v < n_vertices; v++) {
       jump_pointers(supers, v);
     }
-
-    // need to free
   }
 
-  // std::cout << "mst edges " << mst_edges << "\n";
+  delete (supers);
 
   auto t_stop = high_resolution_clock::now();
   auto elapsed = duration_cast<microseconds>(t_stop - t_start).count();

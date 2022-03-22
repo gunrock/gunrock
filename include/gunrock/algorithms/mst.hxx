@@ -60,8 +60,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
   thrust::device_vector<bool> not_decremented;
 
   void init() {
-    cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1073741824);
-
     roots.resize(n_vertices);
     new_roots.resize(n_vertices);
     min_weights.resize(n_vertices);
