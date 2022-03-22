@@ -60,20 +60,13 @@ void test_mst(int num_arguments, char** argument_array) {
   csr_t csr;
   parameters_t params(num_arguments, argument_array);
 
-  if (util::is_market(params.filename)) {
-    io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-    auto mmatrix = mm.load(params.filename);
-    if (!mm_is_symmetric(mm.code)) {
-      printf("Error: input matrix must be symmetric\n");
-      exit(1);
-    }
-    csr.from_coo(mmatrix);
-  } else if (util::is_binary_csr(params.filename)) {
-    csr.read_binary(params.filename);
-  } else {
-    std::cerr << "Unknown file format: " << params.filename << std::endl;
+  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+  auto mmatrix = mm.load(params.filename);
+  if (!mm_is_symmetric(mm.code)) {
+    printf("Error: input matrix must be symmetric\n");
     exit(1);
   }
+  csr.from_coo(mmatrix);
 
   // --
   // Build graph
