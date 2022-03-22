@@ -19,9 +19,8 @@ struct parameters_t {
   parameters_t(int argc, char** argv)
       : options(argv[0], "Sparse Matrix-Vector Multiplication example") {
     // Add command line options
-    options.add_options()("help",
-                          "Print help")  // help
-        ("m,market", "Matrix file", cxxopts::value<std::string>());      // mtx
+    options.add_options()("help", "Print help")                      // help
+        ("m,market", "Matrix file", cxxopts::value<std::string>());  // mtx
 
     // Parse command line arguments
     auto result = options.parse(argc, argv);
