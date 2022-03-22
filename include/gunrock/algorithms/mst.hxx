@@ -204,13 +204,13 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
         if (source < dest || min_neighbors[roots[dest]] != e) {
           // For large graphs with float weights, there may be slight variance
-          // in the final MST weight due to the amount of precision loss
-          // depending on the order of adds.
+          // in the final MST weight due to atomic adds and the amount of
+          // precision loss depending on the order of adds.
           not_decremented[0] = false;
           math::atomic::add(&mst_weight[0], weight);
           math::atomic::add(&mst_edges[0], 1);
           math::atomic::add(&super_vertices[0], -1);
-          atomicExch(&new_roots[v], new_roots[dest]);
+          math::atomic::exch(&new_roots[v], new_roots[dest]);
         }
       }
     };
