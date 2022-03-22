@@ -12,9 +12,9 @@ namespace mst_cpu {
 
 using namespace std;
 using namespace std::chrono;
-  
+
 using vertex_t = int;
-using edge_t   = int;
+using edge_t = int;
 using weight_t = float;
 
 struct super {
@@ -25,12 +25,12 @@ struct super {
 
 // pointer jumping to form super vertices
 void jump_pointers(super* supers, vertex_t v) {
-    super* u = supers[v].root;
-    while (u->root != u) {
-      u = u->root;
-    }
-    supers[v].root = u;
-    return;
+  super* u = supers[v].root;
+  while (u->root != u) {
+    u = u->root;
+  }
+  supers[v].root = u;
+  return;
 }
 
 template <typename csr_t, typename vertex_t, typename edge_t, typename weight_t>
@@ -56,7 +56,7 @@ float run(csr_t& csr, weight_t* mst_weight) {
     supers[i].min_neighbor = i;
   }
   int mst_edges = 0;
-  int it=0;
+  int it = 0;
   while (super_vertices > 1) {
     it++;
     for (vertex_t i = 0; i < n_vertices; i++) {
@@ -87,8 +87,8 @@ float run(csr_t& csr, weight_t* mst_weight) {
 
     for (vertex_t v = 0; v < n_vertices; v++) {
       if (supers[v].min_weight != std::numeric_limits<weight_t>::max()) {
-        jump_pointers(supers,v);
-        jump_pointers(supers,supers[v].min_neighbor);
+        jump_pointers(supers, v);
+        jump_pointers(supers, supers[v].min_neighbor);
         if (supers[supers[v].min_neighbor].root != supers[v].root) {
           if (supers[supers[v].min_neighbor].min_neighbor != v ||
               v < supers[v].min_neighbor) {
@@ -101,15 +101,15 @@ float run(csr_t& csr, weight_t* mst_weight) {
       }
     }
     // add stop condition when super vertices not decremented
-    
+
     for (vertex_t v = 0; v < n_vertices; v++) {
-        jump_pointers(supers,v);
+      jump_pointers(supers, v);
     }
 
-    //need to free
+    // need to free
   }
 
-  //std::cout << "mst edges " << mst_edges << "\n";
+  // std::cout << "mst edges " << mst_edges << "\n";
 
   auto t_stop = high_resolution_clock::now();
   auto elapsed = duration_cast<microseconds>(t_stop - t_start).count();

@@ -78,7 +78,8 @@ struct problem_t : gunrock::problem_t<graph_t> {
     thrust::fill(policy, min_weights.begin(), min_weights.end(),
                  std::numeric_limits<weight_t>::max());
     thrust::fill(policy, d_mst_weight, d_mst_weight + 1, 0);
-    thrust::fill(policy, min_neighbors.begin(), min_neighbors.end(), -1);
+    thrust::fill(policy, min_neighbors.begin(), min_neighbors.end(),
+                 std::numeric_limits<edge_t>::max());
     thrust::sequence(policy, roots.begin(), roots.end(), 0);
     thrust::sequence(policy, new_roots.begin(), new_roots.end(), 0);
     thrust::sequence(policy, super_vertices.begin(), super_vertices.end(),
@@ -124,12 +125,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto mst = P->mst.data().get();
     auto policy = this->context->get_context(0)->execution_policy();
     auto not_decremented = P->not_decremented.data().get();
-
     // Reset on each iteration
     thrust::fill_n(policy, not_decremented, 1, true);
     thrust::fill_n(policy, min_weights, P->n_vertices,
                    std::numeric_limits<weight_t>::max());
-    thrust::fill_n(policy, min_neighbors, P->n_vertices, -1);
+    thrust::fill_n(policy, min_neighbors, P->n_vertices,
+                   std::numeric_limits<weight_t>::max());
 
     auto get_min_weights = [min_weights, roots, G] __host__ __device__(
                                edge_t const& e  // id of edge
@@ -138,15 +139,19 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // the weight is the current minimum and the edge will be added to the
       // output frontier.
       auto source = G.get_source_vertex(e);
-      auto neighbor = G.get_destination_vertex(e);
+      auto dest = G.get_destination_vertex(e);
       auto weight = G.get_edge_weight(e);
 
       // If the source and destination are already part of same super vertex, do
       // not check
-      if (roots[source] != roots[neighbor]) {
-        auto old_weight =
+      if (source < dest && roots[source] != roots[dest]) {
+        auto old_weight1 =
             math::atomic::min(&(min_weights[roots[source]]), weight);
-        return weight <= old_weight;
+        auto old_weight2 =
+            math::atomic::min(&(min_weights[roots[dest]]), weight);
+        if (weight <= old_weight1 || weight <= old_weight2) {
+          return true;
+        }
       }
       return false;
     };
@@ -155,7 +160,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         [G, min_weights, min_neighbors, roots, n_edges] __host__ __device__(
             edge_t const& e  // id of edge
             ) -> void {
-      // Find the minimum neighbor for each vertex. Use atomic max to break ties
+      // Find the minimum neighbor for each vertex. Use atomic min to break ties
       // between neighbors that have the same weight.
       // Consistent ordering (using max here) will prevent loops.
       // Edges with dest < source are flipped so that reverse edges are treated
@@ -165,15 +170,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       auto source = G.get_source_vertex(e);
       auto dest = G.get_destination_vertex(e);
       auto weight = G.get_edge_weight(e);
-      edge_t new_e = e;
 
-      edge_t reverse_edge = G.get_edge(dest, source) - 1;
-      if (reverse_edge < e) {
-        new_e = reverse_edge;
-      }
-      if (roots[source] != roots[dest] &&
-          weight == min_weights[roots[source]]) {
-        math::atomic::max(&(min_neighbors[roots[source]]), new_e);
+      if (source < dest && roots[source] != roots[dest]) {
+        if (weight == min_weights[roots[source]]) {
+          math::atomic::min(&(min_neighbors[roots[source]]), e);
+        }
+        if (weight == min_weights[roots[dest]]) {
+          math::atomic::min(&(min_neighbors[roots[dest]]), e);
+        }
       }
     };
 
@@ -194,15 +198,13 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         auto dest = G.get_destination_vertex(e);
         auto weight = G.get_edge_weight(e);
 
-        auto old_dest = dest;
-
         if (roots[source] != v) {
           auto temp = source;
           source = dest;
           dest = temp;
         }
 
-        if (source < dest || min_neighbors[roots[old_dest]] != e) {
+        if (source < dest || min_neighbors[roots[dest]] != e) {
           // For large graphs with float weights, there may be slight variance
           // in the final MST weight due to the amount of precision loss
           // depending on the order of adds.
@@ -216,15 +218,15 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     auto jump_pointers_parallel =
-        [roots, new_roots] __host__ __device__(vertex_t const& v) -> void {
+        [new_roots] __host__ __device__(vertex_t const& v) -> void {
       // Update the root of each vertex. When adding an edge to the MST, we
       // update the source's root's root to the destination's root.
       // However, any vertex that had the source's root as its root would not
       // be updated. We must jump from root to root until the current vertex
       // and root are equal to find the new roots.
-      vertex_t u = roots[v];
-      while (roots[u] != u) {
-        u = roots[u];
+      vertex_t u = new_roots[v];
+      while (new_roots[u] != u) {
+        u = new_roots[u];
       }
       new_roots[v] = u;
       return;
@@ -237,11 +239,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     operators::filter::execute<operators::filter_algorithm_t::remove>(
         G, get_min_weights, in_frontier, out_frontier, context);
 
-    // Execute filter operator to get min neighbors
+    // Execute parallel for operator to get min neighbors
     operators::parallel_for::execute<operators::parallel_for_each_t::element>(
         *out_frontier, get_min_neighbors, context);
 
-    // Execute parallel for to add weights to MST
+    // Execute parallel for operator to add weights to MST
     operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
         G,           // graph
         add_to_mst,  // lambda function
@@ -253,9 +255,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       printf("Error: invalid graph (super vertices not decremented)\n");
       exit(1);
     }
-
-    // Copy `new_roots` to `roots`
-    thrust::copy_n(policy, new_roots, P->n_vertices, roots);
 
     // Execute parallel for to jump pointers
     operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(

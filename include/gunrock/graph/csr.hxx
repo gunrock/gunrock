@@ -91,7 +91,7 @@ class graph_csr_t {
   get_edge(const vertex_type& source, const vertex_type& destination) const {
     return (edge_type)search::binary::execute(get_column_indices(), destination,
                                               offsets[source],
-                                              offsets[source] + int(get_number_of_neighbors(source)));
+                                              offsets[source + 1] - 1));
   }
 
   __host__ __device__ __forceinline__ weight_type
