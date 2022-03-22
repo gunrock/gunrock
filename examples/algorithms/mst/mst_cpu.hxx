@@ -23,7 +23,7 @@ struct super {
   vertex_t min_neighbor;
 };
 
-// pointer jumping to form super vertices
+// Pointer jumping to form super vertices
 void jump_pointers(super* supers, vertex_t v) {
   super* u = supers[v].root;
   while (u->root != u) {
