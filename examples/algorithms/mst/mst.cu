@@ -2,6 +2,7 @@
 #include <gunrock/algorithms/mst.hxx>
 #include "mst_cpu.hxx"  // Reference implementation
 #include <cxxopts.hpp>
+#include <iomanip>
 
 using namespace gunrock;
 using namespace memory;
@@ -9,6 +10,7 @@ using namespace memory;
 struct parameters_t {
   std::string filename;
   cxxopts::Options options;
+  bool validate;
 
   /**
    * @brief Construct a new parameters object and parse command line arguments.
@@ -20,6 +22,7 @@ struct parameters_t {
       : options(argv[0], "Sparse Matrix-Vector Multiplication example") {
     // Add command line options
     options.add_options()("help", "Print help")                      // help
+        ("validate", "CPU validation")                               // validate
         ("m,market", "Matrix file", cxxopts::value<std::string>());  // mtx
 
     // Parse command line arguments
@@ -40,6 +43,12 @@ struct parameters_t {
     } else {
       std::cout << options.help({""}) << std::endl;
       std::exit(0);
+    }
+
+    if (result.count("validate") == 1) {
+      validate = true;
+    } else {
+      validate = false;
     }
   }
 };
@@ -87,21 +96,21 @@ void test_mst(int num_arguments, char** argument_array) {
 
   float gpu_elapsed = gunrock::mst::run(G, mst_weight.data().get());
   thrust::host_vector<weight_t> h_mst_weight = mst_weight;
-  printf("GPU MST Weight: %f\n", h_mst_weight[0]);
+  std::cout << "GPU MST Weight: " << std::fixed << std::setprecision(4)
+            << h_mst_weight[0] << std::endl;
+  std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
 
   // --
   // CPU Run
 
-  weight_t cpu_mst_weight;
-  float cpu_elapsed =
-      mst_cpu::run<csr_t, vertex_t, edge_t, weight_t>(csr, &cpu_mst_weight);
-  printf("CPU MST Weight: %f\n", cpu_mst_weight);
-
-  // --
-  // Log
-
-  std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
-  std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
+  if (params.validate) {
+    weight_t cpu_mst_weight;
+    float cpu_elapsed =
+        mst_cpu::run<csr_t, vertex_t, edge_t, weight_t>(csr, &cpu_mst_weight);
+    std::cout << "CPU MST Weight: " << std::fixed << std::setprecision(4)
+              << cpu_mst_weight << std::endl;
+    std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
+  }
 }
 
 int main(int argc, char** argv) {

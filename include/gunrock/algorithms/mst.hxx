@@ -1,7 +1,6 @@
 /**
  * @file mst.hxx
  * @author Annie Robison (amrobison@ucdavis.edu)
- * @author Muhammad Osama (mosama@ucdavis.edu)
  * @brief Minimum Spanning Tree algorithm.
  * @version 0.1
  * @date 2022-03-17
@@ -48,15 +47,12 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   graph_t g = this->get_graph();
   int n_vertices = g.get_number_of_vertices();
-  int n_edges = g.get_number_of_edges();
 
   thrust::device_vector<vertex_t> roots;
   thrust::device_vector<vertex_t> new_roots;
   thrust::device_vector<weight_t> min_weights;
-  thrust::device_vector<int> mst_edges;
+  thrust::device_vector<edge_t> min_neighbors;
   thrust::device_vector<int> super_vertices;
-  thrust::device_vector<int> min_neighbors;
-  thrust::device_vector<int> mst;
   thrust::device_vector<bool> not_decremented;
 
   void init() {
@@ -64,7 +60,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
     new_roots.resize(n_vertices);
     min_weights.resize(n_vertices);
     min_neighbors.resize(n_vertices);
-    mst_edges.resize(1);
     super_vertices.resize(1);
     not_decremented.resize(1);
   }
@@ -78,12 +73,11 @@ struct problem_t : gunrock::problem_t<graph_t> {
     thrust::fill(policy, d_mst_weight, d_mst_weight + 1, 0);
     thrust::fill(policy, min_neighbors.begin(), min_neighbors.end(),
                  std::numeric_limits<edge_t>::max());
+    thrust::fill(policy, super_vertices.begin(), super_vertices.end(),
+                 n_vertices);
+    thrust::fill(policy, not_decremented.begin(), not_decremented.end(), false);
     thrust::sequence(policy, roots.begin(), roots.end(), 0);
     thrust::sequence(policy, new_roots.begin(), new_roots.end(), 0);
-    thrust::sequence(policy, super_vertices.begin(), super_vertices.end(),
-                     n_vertices);
-    thrust::sequence(policy, not_decremented.begin(), not_decremented.end(),
-                     false);
   }
 };
 
@@ -113,14 +107,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto P = this->get_problem();
     auto G = P->get_graph();
     auto mst_weight = P->result.mst_weight;
-    auto n_edges = P->n_edges;
-    auto mst_edges = P->mst_edges.data().get();
     auto super_vertices = P->super_vertices.data().get();
     auto min_neighbors = P->min_neighbors.data().get();
     auto roots = P->roots.data().get();
     auto new_roots = P->new_roots.data().get();
     auto min_weights = P->min_weights.data().get();
-    auto mst = P->mst.data().get();
     auto policy = this->context->get_context(0)->execution_policy();
     auto not_decremented = P->not_decremented.data().get();
     // Reset on each iteration
@@ -155,7 +146,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     auto get_min_neighbors =
-        [G, min_weights, min_neighbors, roots, n_edges] __host__ __device__(
+        [G, min_weights, min_neighbors, roots] __host__ __device__(
             edge_t const& e  // id of edge
             ) -> void {
       // Find the minimum neighbor for each vertex. Use atomic min to break ties
@@ -179,9 +170,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       }
     };
 
-    auto add_to_mst = [G, roots, mst_weight, mst_edges, super_vertices,
-                       min_neighbors, min_weights, new_roots, not_decremented,
-                       mst] __host__
+    auto add_to_mst = [G, roots, mst_weight, super_vertices, min_neighbors,
+                       min_weights, new_roots, not_decremented] __host__
                       __device__(vertex_t const& v) -> void {
       // Add weights to MST. To prevent duplicate edges, check that either
       // the source vertex index is
@@ -208,7 +198,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
           // precision loss depending on the order of adds.
           not_decremented[0] = false;
           math::atomic::add(&mst_weight[0], weight);
-          math::atomic::add(&mst_edges[0], 1);
           math::atomic::add(&super_vertices[0], -1);
           math::atomic::exch(&new_roots[v], new_roots[dest]);
         }
@@ -248,11 +237,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         context      // context
     );
 
+    // Throw an exception if the number of super vertices has not been
+    // decremented
     thrust::host_vector<bool> h_not_dec = P->not_decremented;
-    if (h_not_dec[0]) {
-      printf("Error: invalid graph (super vertices not decremented)\n");
-      exit(1);
-    }
+    error::throw_if_exception(
+        h_not_dec[0],
+        "Error: invalid graph (super vertices not decremented)\n");
 
     // Execute parallel for to jump pointers
     operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
