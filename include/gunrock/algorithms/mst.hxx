@@ -151,7 +151,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
             ) -> void {
       // Find the minimum neighbor for each vertex. Use atomic min to break ties
       // between neighbors that have the same weight.
-      // Consistent ordering (using max here) will prevent loops.
+      // Consistent ordering (using min here) will prevent loops.
       // Edges with dest < source are flipped so that reverse edges are treated
       // as equivalent. Must check that the weight equals the min weight for
       // that vertex, because some edges can be added to the frontier that are
