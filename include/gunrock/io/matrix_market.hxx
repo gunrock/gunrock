@@ -12,6 +12,7 @@
 #pragma once
 
 #include <string>
+#include <limits>
 
 #include <gunrock/io/detail/mmio.hxx>
 
@@ -19,7 +20,6 @@
 #include <gunrock/formats/formats.hxx>
 #include <gunrock/memory.hxx>
 #include <gunrock/error.hxx>
-#include <limits>
 
 namespace gunrock {
 namespace io {
