@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <cstddef>
 
 #include <gunrock/io/detail/mmio.hxx>
 #include <gunrock/error.hxx>
