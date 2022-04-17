@@ -18,6 +18,7 @@
 #include <gunrock/util/filepath.hxx>
 #include <gunrock/formats/formats.hxx>
 #include <gunrock/memory.hxx>
+#include <gunrock/error.hxx>
 
 namespace gunrock {
 namespace io {
@@ -132,8 +133,10 @@ struct matrix_market_t {
 
       // pattern matrix defines sparsity pattern, but not values
       for (vertex_t i = 0; i < num_nonzeros; ++i) {
-        assert(fscanf(file, " %d %d \n", &(coo.row_indices[i]),
-                      &(coo.column_indices[i])) == 2);
+        auto num_assigned = fscanf(file, " %d %d \n", &(coo.row_indices[i]),
+                                   &(coo.column_indices[i]));
+        error::throw_if_exception(num_assigned != 2,
+                                  "Could not read edge from market file");
         coo.row_indices[i]--;  // adjust from 1-based to 0-based indexing
         coo.column_indices[i]--;
         coo.nonzero_values[i] =
@@ -150,7 +153,9 @@ struct matrix_market_t {
         vertex_t J = 0;
         double V = 0.0f;
 
-        assert(fscanf(file, " %d %d %lf \n", &I, &J, &V) == 3);
+        auto num_assigned = fscanf(file, " %d %d %lf \n", &I, &J, &V);
+        error::throw_if_exception(
+            num_assigned != 3, "Could not read weighted edge from market file");
 
         coo.row_indices[i] = (vertex_t)I - 1;
         coo.column_indices[i] = (vertex_t)J - 1;
