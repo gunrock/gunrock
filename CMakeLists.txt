@@ -37,6 +37,8 @@ set(PROJECT_DEPS_DIR externals)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchThrustCUB.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchRapidJSON.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchNlohmannJson.cmake)
 # end /* Include cmake modules */
 
 ## Set the directory where the binaries will be stored
@@ -71,7 +73,7 @@ set_target_properties(essentials
     CUDA_EXTENSIONS OFF
     CUDA_RESOLVE_DEVICE_SYMBOLS ON
     CUDA_SEPARABLE_COMPILATION ON
-    CUDA_ARCHITECTURES 61 # Set required architecture.
+    CUDA_ARCHITECTURES 86 # Set required architecture.
     # CUDA_PTX_COMPILATION ON # Can only be applied to OBJ.
 )
 
@@ -111,6 +113,7 @@ target_include_directories(essentials
   INTERFACE ${CUB_INCLUDE_DIR}
   INTERFACE ${MODERNGPU_INCLUDE_DIR}
   INTERFACE ${RAPIDJSON_INCLUDE_DIR}
+  INTERFACE ${NHLOMANN_JSON_INCLUDE_DIR}
   INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
 )
 
@@ -120,6 +123,7 @@ target_include_directories(essentials
 target_link_libraries(essentials
   INTERFACE curand
   INTERFACE cuda
+  INTERFACE cusparse
 )
 
 ####################################################
@@ -162,6 +166,9 @@ set(CUDA_FLAGS
   # --device-debug # Device debug
 )
 
+set(CMAKE_CUDA_FLAGS_DEBUG "--optimize 0 --debug --device-debug -g -G")
+set(CMAKE_CUDA_FLAGS_RELEASE "--optimize 3")
+
 ####################################################
 ############ TARGET COMPILE OPTIONS ################
 ####################################################
@@ -187,11 +194,12 @@ endif(ESSENTIALS_BUILD_EXAMPLES)
 ####################################################
 option(ESSENTIALS_BUILD_TESTS
   "If on, builds the unit tests."
-  OFF)
+  ON)
 
 # Subdirectories for examples, testing and documentation
 if(ESSENTIALS_BUILD_TESTS)
   include(${PROJECT_SOURCE_DIR}/cmake/FetchGoogleTest.cmake)
+  enable_testing()
   add_subdirectory(unittests)
 endif(ESSENTIALS_BUILD_TESTS)
 

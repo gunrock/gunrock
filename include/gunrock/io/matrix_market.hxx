@@ -113,7 +113,14 @@ struct matrix_market_t {
       exit(1);
     }
 
+    // Make sure we're actually reading a matrix, and not an array
+    if (mm_is_array(code)) {
+      std::cerr << "File is not a sparse matrix" << std::endl;
+      exit(1);
+    }
+
     std::size_t num_rows, num_columns, num_nonzeros;
+
     if ((mm_read_mtx_crd_size(file, &num_rows, &num_columns, &num_nonzeros)) !=
         0) {
       std::cerr << "Could not read file info (M, N, NNZ)" << std::endl;
