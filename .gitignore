@@ -36,6 +36,11 @@ eval/
 
 # Ignore build directory
 build
+build_release
+build_debug
 
 # Ignore external fetched content
 externals/*
+
+# Ignore slurm files
+slurm-*.out

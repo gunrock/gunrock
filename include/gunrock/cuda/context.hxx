@@ -92,6 +92,11 @@ class standard_context_t : public context_t {
     init();
   }
 
+  standard_context_t(cudaStream_t stream, cuda::device_id_t device = 0)
+      : context_t(), _ordinal(device), _mgpu_context(nullptr), _stream(stream) {
+    init();
+  }
+
   ~standard_context_t() { cudaEventDestroy(_event); }
 
   virtual const cuda::device_properties_t& props() const override {
@@ -143,6 +148,17 @@ class multi_context_t {
     }
   }
 
+  // Multiple devices with a user-provided stream
+  multi_context_t(thrust::host_vector<cuda::device_id_t> _devices,
+                  cudaStream_t _stream)
+      : devices(_devices) {
+    for (auto& device : devices) {
+      standard_context_t* device_context =
+          new standard_context_t(_stream, device);
+      contexts.push_back(device_context);
+    }
+  }
+
   // Single device.
   multi_context_t(cuda::device_id_t _device) : devices(1, _device) {
     for (auto& device : devices) {
@@ -151,6 +167,15 @@ class multi_context_t {
     }
   }
 
+  // Single device with a user-provided stream
+  multi_context_t(cuda::device_id_t _device, cudaStream_t _stream)
+      : devices(1, _device) {
+    for (auto& device : devices) {
+      standard_context_t* device_context =
+          new standard_context_t(_stream, device);
+      contexts.push_back(device_context);
+    }
+  }
   ~multi_context_t() {}
 
   auto get_context(cuda::device_id_t device) {

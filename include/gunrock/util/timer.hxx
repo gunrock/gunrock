@@ -32,6 +32,7 @@ struct timer_t {
   void begin() { cudaEventRecord(start_); }
   void start() { this->begin(); }
 
+  // Alias of each other, stop the timer.
   float end() {
     cudaEventRecord(stop_);
     cudaEventSynchronize(stop_);
@@ -39,6 +40,7 @@ struct timer_t {
 
     return milliseconds();
   }
+  float stop() { return this->end(); }
 
   float seconds() { return time * 1e-3; }
   float milliseconds() { return time; }
