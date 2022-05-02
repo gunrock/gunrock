@@ -1,0 +1,27 @@
+<map id="/home/neoblizz/essentials/include/gunrock/algorithms/kcore.hxx" name="/home/neoblizz/essentials/include/gunrock/algorithms/kcore.hxx">
+<area shape="rect" id="node2" href="$algorithms_8hxx.html" title="gunrock/algorithms\l/algorithms.hxx" alt="" coords="2246,109,2378,151"/>
+<area shape="rect" id="node5" href="$framework_8hxx.html" title="gunrock/framework/framework.hxx" alt="" coords="1515,199,1738,225"/>
+<area shape="rect" id="node15" href="$graph_8hxx_source.html" title="gunrock/graph/graph.hxx" alt="" coords="1089,459,1255,486"/>
+<area shape="rect" id="node7" href="$frontier_8hxx.html" title="Frontier structure for graph algorithms. Frontiers are one of the fundamental structure used to imple..." alt="" coords="1863,363,2041,404"/>
+<area shape="rect" id="node33" href="$problem_8hxx.html" title="gunrock/framework/problem.hxx" alt="" coords="1452,370,1660,397"/>
+<area shape="rect" id="node34" href="$enactor_8hxx_source.html" title="gunrock/framework/enactor.hxx" alt="" coords="1384,281,1589,307"/>
+<area shape="rect" id="node36" href="$operators_8hxx.html" title="gunrock/framework/operators\l/operators.hxx" alt="" coords="2894,273,3085,315"/>
+<area shape="rect" id="node8" href="$frontier_2configs_8hxx_source.html" title="gunrock/framework/frontier\l/configs.hxx" alt="" coords="1722,541,1899,583"/>
+<area shape="rect" id="node9" href="$vector__frontier_8hxx.html" title="Vector&#45;based frontier implementation. " alt="" coords="2021,452,2198,493"/>
+<area shape="rect" id="node13" href="$radix__sort_8hxx.html" title="gunrock/algorithms\l/sort/radix_sort.hxx" alt="" coords="2074,541,2209,583"/>
+<area shape="rect" id="node22" href="$properties_8hxx_source.html" title="gunrock/graph/properties.hxx" alt="" coords="879,549,1070,575"/>
+<area shape="rect" id="node23" href="$vertex__pair_8hxx_source.html" title="gunrock/graph/vertex\l_pair.hxx" alt="" coords="788,631,932,672"/>
+<area shape="rect" id="node24" href="$coo_8hxx_source.html" title="gunrock/graph/coo.hxx" alt="" coords="700,549,855,575"/>
+<area shape="rect" id="node27" href="$csc_8hxx_source.html" title="gunrock/graph/csc.hxx" alt="" coords="1095,549,1249,575"/>
+<area shape="rect" id="node28" href="$csr_8hxx_source.html" title="gunrock/graph/csr.hxx" alt="" coords="1274,549,1425,575"/>
+<area shape="rect" id="node29" href="$build_8hxx.html" title="gunrock/graph/build.hxx" alt="" coords="263,549,423,575"/>
+<area shape="rect" id="node26" href="$binary__search_8hxx_source.html" title="gunrock/algorithms\l/search/binary_search.hxx" alt="" coords="1118,631,1293,672"/>
+<area shape="rect" id="node37" href="$operators_2configs_8hxx_source.html" title="gunrock/framework/operators\l/configs.hxx" alt="" coords="3303,541,3494,583"/>
+<area shape="rect" id="node38" href="$advance_8hxx.html" title="gunrock/framework/operators\l/advance/advance.hxx" alt="" coords="2818,363,3009,404"/>
+<area shape="rect" id="node40" href="$filter_8hxx_source.html" title="gunrock/framework/operators\l/filter/filter.hxx" alt="" coords="2603,363,2794,404"/>
+<area shape="rect" id="node41" href="$uniquify_8hxx_source.html" title="gunrock/framework/operators\l/uniquify/uniquify.hxx" alt="" coords="2578,452,2769,493"/>
+<area shape="rect" id="node42" href="$for_8hxx_source.html" title="gunrock/framework/operators\l/for/for.hxx" alt="" coords="3626,452,3817,493"/>
+<area shape="rect" id="node43" href="$batch_8hxx.html" title="A batch operator is an operator that can be used to execute a function/application in bactches with d..." alt="" coords="3359,452,3550,493"/>
+<area shape="rect" id="node44" href="$neighborreduce_8hxx.html" title="gunrock/framework/operators\l/neighborreduce/neighborreduce.hxx" alt="" coords="3033,363,3263,404"/>
+<area shape="rect" id="node39" href="$helpers_8hxx.html" title="Helper functions for Advance operators. " alt="" coords="2845,452,3035,493"/>
+</map>

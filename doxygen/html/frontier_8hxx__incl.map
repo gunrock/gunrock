@@ -1,0 +1,13 @@
+<map id="/home/neoblizz/essentials/include/gunrock/framework/frontier/frontier.hxx" name="/home/neoblizz/essentials/include/gunrock/framework/frontier/frontier.hxx">
+<area shape="rect" id="node2" href="$frontier_2configs_8hxx_source.html" title="gunrock/framework/frontier\l/configs.hxx" alt="" coords="5,199,183,240"/>
+<area shape="rect" id="node3" href="$vector__frontier_8hxx.html" title="Vector&#45;based frontier implementation. " alt="" coords="485,109,663,151"/>
+<area shape="rect" id="node11" href="$graph_8hxx_source.html" title="gunrock/graph/graph.hxx" alt="" coords="1579,117,1745,143"/>
+<area shape="rect" id="node7" href="$radix__sort_8hxx.html" title="gunrock/algorithms\l/sort/radix_sort.hxx" alt="" coords="413,199,548,240"/>
+<area shape="rect" id="node20" href="$properties_8hxx_source.html" title="gunrock/graph/properties.hxx" alt="" coords="2272,206,2463,233"/>
+<area shape="rect" id="node21" href="$vertex__pair_8hxx_source.html" title="gunrock/graph/vertex\l_pair.hxx" alt="" coords="1094,288,1238,329"/>
+<area shape="rect" id="node22" href="$coo_8hxx_source.html" title="gunrock/graph/coo.hxx" alt="" coords="1266,206,1421,233"/>
+<area shape="rect" id="node26" href="$csc_8hxx_source.html" title="gunrock/graph/csc.hxx" alt="" coords="1445,206,1599,233"/>
+<area shape="rect" id="node27" href="$csr_8hxx_source.html" title="gunrock/graph/csr.hxx" alt="" coords="1091,206,1241,233"/>
+<area shape="rect" id="node28" href="$build_8hxx.html" title="gunrock/graph/build.hxx" alt="" coords="2487,206,2647,233"/>
+<area shape="rect" id="node24" href="$binary__search_8hxx_source.html" title="gunrock/algorithms\l/search/binary_search.hxx" alt="" coords="1349,288,1524,329"/>
+</map>

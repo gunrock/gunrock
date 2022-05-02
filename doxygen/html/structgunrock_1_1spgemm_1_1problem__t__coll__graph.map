@@ -1,0 +1,3 @@
+<map id="gunrock::spgemm::problem_t&lt; graph_t, param_type, result_type &gt;" name="gunrock::spgemm::problem_t&lt; graph_t, param_type, result_type &gt;">
+<area shape="rect" id="node2" href="$structgunrock_1_1problem__t.html" title="Problem contains the data structure of the graph algorithms implemented in gunrock. Inherit problem struct for your custom applications&#39; implementation. " alt="" coords="29,5,162,47"/>
+</map>

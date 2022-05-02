@@ -1,0 +1,10 @@
+<map id="/home/neoblizz/essentials/include/gunrock/framework/operators/advance/advance.hxx" name="/home/neoblizz/essentials/include/gunrock/framework/operators/advance/advance.hxx">
+<area shape="rect" id="node5" href="$operators_2configs_8hxx_source.html" title="gunrock/framework/operators\l/configs.hxx" alt="" coords="1582,288,1773,329"/>
+<area shape="rect" id="node6" href="$helpers_8hxx.html" title="Helper functions for Advance operators. " alt="" coords="343,109,534,151"/>
+<area shape="rect" id="node10" href="$merge__path_8hxx.html" title="gunrock/framework/operators\l/advance/merge_path.hxx" alt="" coords="1127,109,1318,151"/>
+<area shape="rect" id="node15" href="$merge__path__v2_8hxx.html" title="gunrock/framework/operators\l/advance/merge_path_v2.hxx" alt="" coords="1342,109,1535,151"/>
+<area shape="rect" id="node18" href="$thread__mapped_8hxx.html" title="Advance operator where a vertex/edge is mapped to a thread. " alt="" coords="1559,109,1753,151"/>
+<area shape="rect" id="node22" href="$block__mapped_8hxx.html" title="gunrock/framework/operators\l/advance/block_mapped.hxx" alt="" coords="2043,109,2234,151"/>
+<area shape="rect" id="node26" href="$bucketing_8hxx.html" title="gunrock/framework/operators\l/advance/bucketing.hxx" alt="" coords="1777,109,1967,151"/>
+<area shape="rect" id="node19" href="$for_8hxx_source.html" title="gunrock/framework/operators\l/for/for.hxx" alt="" coords="1347,199,1538,240"/>
+</map>
