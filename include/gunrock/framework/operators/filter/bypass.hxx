@@ -1,6 +1,7 @@
 #pragma once
 
 #include <gunrock/framework/operators/configs.hxx>
+#include <thrust/transform.h>
 
 namespace gunrock {
 namespace operators {

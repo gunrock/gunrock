@@ -117,6 +117,18 @@ __host__ __device__ __forceinline__ type_t cas(type_t* address,
 #endif
 }
 
+template <typename type_t>
+__host__ __device__ __forceinline__ type_t exch(type_t* address,
+                                               type_t value) {
+#ifdef __CUDA_ARCH__
+  return atomicExch(address, value);
+#else
+  type_t old = *address;
+  *address = value;  // use std::atomic;
+  return old;
+#endif
+}
+
 }  // namespace atomic
 }  // namespace math
 }  // namespace gunrock

@@ -1,0 +1,19 @@
+<map id="/home/neoblizz/essentials/include/gunrock/framework/operators/advance/thread_mapped.hxx" name="/home/neoblizz/essentials/include/gunrock/framework/operators/advance/thread_mapped.hxx">
+<area shape="rect" id="node2" href="$advance_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/advance/advance.hxx" alt="" coords="1271,124,1481,180"/>
+<area shape="rect" id="node3" href="$operators_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/operators.hxx" alt="" coords="1285,228,1467,284"/>
+<area shape="rect" id="node4" href="$framework_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/framework.hxx" alt="" coords="1285,332,1467,388"/>
+<area shape="rect" id="node5" href="$algorithms_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/algorithms\l/algorithms.hxx" alt="" coords="1285,436,1467,492"/>
+<area shape="rect" id="node6" href="$bc_8hxx.html" title="Betweeness Centrality. " alt="" coords="5,547,229,589"/>
+<area shape="rect" id="node7" href="$bfs_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/algorithms\l/bfs.hxx" alt="" coords="253,540,435,596"/>
+<area shape="rect" id="node8" href="$color_8hxx.html" title="Graph Coloring algorithm. " alt="" coords="459,540,640,596"/>
+<area shape="rect" id="node9" href="$experimental_2async_2bfs_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/algorithms\l/experimental/async/bfs.hxx" alt="" coords="664,540,851,596"/>
+<area shape="rect" id="node10" href="$geo_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/algorithms\l/geo.hxx" alt="" coords="875,540,1056,596"/>
+<area shape="rect" id="node11" href="$hits_8hxx.html" title="Hyperlink&#45;Induced Topic Search. " alt="" coords="1080,540,1261,596"/>
+<area shape="rect" id="node12" href="$kcore_8hxx.html" title="Vertex k&#45;core decomposition algorithm. " alt="" coords="1285,540,1467,596"/>
+<area shape="rect" id="node13" href="$mst_8hxx.html" title="Minimum Spanning Tree algorithm. " alt="" coords="1491,540,1672,596"/>
+<area shape="rect" id="node14" href="$ppr_8hxx.html" title="Personalized Page&#45;Rank. " alt="" coords="1696,540,1877,596"/>
+<area shape="rect" id="node15" href="$pr_8hxx.html" title="PageRank. " alt="" coords="1901,547,2123,589"/>
+<area shape="rect" id="node16" href="$spgemm_8hxx.html" title="Sparse&#45;Matrix&#45;Matrix multiplication. " alt="" coords="2147,540,2328,596"/>
+<area shape="rect" id="node17" href="$spmv_8hxx.html" title="Sparse&#45;Matrix Vector Multiplication. " alt="" coords="2352,540,2533,596"/>
+<area shape="rect" id="node18" href="$sssp_8hxx.html" title="Single&#45;Source Shortest Path algorithm. " alt="" coords="2557,540,2739,596"/>
+</map>

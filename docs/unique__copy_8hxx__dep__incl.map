@@ -1,0 +1,20 @@
+<map id="/home/neoblizz/essentials/include/gunrock/framework/operators/uniquify/unique_copy.hxx" name="/home/neoblizz/essentials/include/gunrock/framework/operators/uniquify/unique_copy.hxx">
+<area shape="rect" id="node2" href="$uniquify_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/uniquify/uniquify.hxx" alt="" coords="1275,124,1477,180"/>
+<area shape="rect" id="node3" href="$filter_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/filter/filter.hxx" alt="" coords="1221,228,1403,284"/>
+<area shape="rect" id="node4" href="$operators_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/operators.hxx" alt="" coords="1285,332,1467,388"/>
+<area shape="rect" id="node5" href="$framework_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/framework.hxx" alt="" coords="1285,436,1467,492"/>
+<area shape="rect" id="node6" href="$algorithms_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/algorithms\l/algorithms.hxx" alt="" coords="1285,540,1467,596"/>
+<area shape="rect" id="node7" href="$bc_8hxx.html" title="Betweeness Centrality. " alt="" coords="5,651,229,693"/>
+<area shape="rect" id="node8" href="$bfs_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/algorithms\l/bfs.hxx" alt="" coords="253,644,435,700"/>
+<area shape="rect" id="node9" href="$color_8hxx.html" title="Graph Coloring algorithm. " alt="" coords="459,644,640,700"/>
+<area shape="rect" id="node10" href="$experimental_2async_2bfs_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/algorithms\l/experimental/async/bfs.hxx" alt="" coords="664,644,851,700"/>
+<area shape="rect" id="node11" href="$geo_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/algorithms\l/geo.hxx" alt="" coords="875,644,1056,700"/>
+<area shape="rect" id="node12" href="$hits_8hxx.html" title="Hyperlink&#45;Induced Topic Search. " alt="" coords="1080,644,1261,700"/>
+<area shape="rect" id="node13" href="$kcore_8hxx.html" title="Vertex k&#45;core decomposition algorithm. " alt="" coords="1285,644,1467,700"/>
+<area shape="rect" id="node14" href="$mst_8hxx.html" title="Minimum Spanning Tree algorithm. " alt="" coords="1491,644,1672,700"/>
+<area shape="rect" id="node15" href="$ppr_8hxx.html" title="Personalized Page&#45;Rank. " alt="" coords="1696,644,1877,700"/>
+<area shape="rect" id="node16" href="$pr_8hxx.html" title="PageRank. " alt="" coords="1901,651,2123,693"/>
+<area shape="rect" id="node17" href="$spgemm_8hxx.html" title="Sparse&#45;Matrix&#45;Matrix multiplication. " alt="" coords="2147,644,2328,700"/>
+<area shape="rect" id="node18" href="$spmv_8hxx.html" title="Sparse&#45;Matrix Vector Multiplication. " alt="" coords="2352,644,2533,700"/>
+<area shape="rect" id="node19" href="$sssp_8hxx.html" title="Single&#45;Source Shortest Path algorithm. " alt="" coords="2557,644,2739,700"/>
+</map>
