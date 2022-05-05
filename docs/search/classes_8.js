@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['vector_5ffrontier_5ft',['vector_frontier_t',['../classgunrock_1_1frontier_1_1vector__frontier__t.html',1,'gunrock::frontier']]],
-  ['vertex_5fpair_5ft',['vertex_pair_t',['../structgunrock_1_1graph_1_1vertex__pair__t.html',1,'gunrock::graph']]]
+  ['matrix_5fmarket_5ft',['matrix_market_t',['../structgunrock_1_1io_1_1matrix__market__t.html',1,'gunrock::io']]],
+  ['multi_5fcontext_5ft',['multi_context_t',['../classgunrock_1_1cuda_1_1multi__context__t.html',1,'gunrock::cuda']]]
 ];

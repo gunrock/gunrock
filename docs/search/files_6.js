@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['kcore_2ehxx',['kcore.hxx',['../kcore_8hxx.html',1,'']]]
+  ['geo_2ehxx',['geo.hxx',['../geo_8hxx.html',1,'']]],
+  ['global_2ehxx',['global.hxx',['../global_8hxx.html',1,'']]]
 ];

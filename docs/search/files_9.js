@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['operators_2ehxx',['operators.hxx',['../operators_8hxx.html',1,'']]]
+  ['kcore_2ehxx',['kcore.hxx',['../kcore_8hxx.html',1,'']]]
 ];

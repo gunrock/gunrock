@@ -95,6 +95,10 @@ $(document).ready(function(){initNavTree('structgunrock_1_1experimental_1_1async
 Collaboration diagram for gunrock::experimental::async::enactor_t&lt; algorithm_problem_t &gt;:</div>
 <div class="dyncontent">
 <div class="center"><img src="structgunrock_1_1experimental_1_1async_1_1enactor__t__coll__graph.png" border="0" usemap="#gunrock_1_1experimental_1_1async_1_1enactor__t_3_01algorithm__problem__t_01_4_coll__map" alt="Collaboration graph"/></div>
+<map name="gunrock_1_1experimental_1_1async_1_1enactor__t_3_01algorithm__problem__t_01_4_coll__map" id="gunrock_1_1experimental_1_1async_1_1enactor__t_3_01algorithm__problem__t_01_4_coll__map">
+<area shape="rect" id="node3" href="structgunrock_1_1experimental_1_1async_1_1Queues.html" title="gunrock::experimental\l::async::Queues\&lt; vertex\l_t, single_queue_t \&gt;" alt="" coords="261,56,428,112"/>
+<area shape="rect" id="node4" href="structgunrock_1_1experimental_1_1async_1_1Queue.html" title="gunrock::experimental\l::async::Queue\&lt; vertex\l_t, single_queue_t \&gt;" alt="" coords="5,56,164,112"/>
+</map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-types"></a>
@@ -112,7 +116,7 @@ using&#160;</td><td class="memItemRight" valign="bottom"><b>weight_t</b> = typen
 using&#160;</td><td class="memItemRight" valign="bottom"><b>single_queue_t</b> = uint32_t</td></tr>
 <tr class="separator:adb52c27a3b52a6577904460a8d187833"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab72f49963cc6e67add7ebfc24b89ea8e"><td class="memItemLeft" align="right" valign="top"><a id="ab72f49963cc6e67add7ebfc24b89ea8e"></a>
-using&#160;</td><td class="memItemRight" valign="bottom"><b>queue_t</b> = Queues&lt; vertex_t, single_queue_t &gt;</td></tr>
+using&#160;</td><td class="memItemRight" valign="bottom"><b>queue_t</b> = <a class="el" href="structgunrock_1_1experimental_1_1async_1_1Queues.html">Queues</a>&lt; vertex_t, single_queue_t &gt;</td></tr>
 <tr class="separator:ab72f49963cc6e67add7ebfc24b89ea8e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
@@ -124,7 +128,7 @@ Public Member Functions</h2></td></tr>
 <a class="el" href="structgunrock_1_1experimental_1_1async_1_1enactor__t.html">enactor_t</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>operator=</b> (const <a class="el" href="structgunrock_1_1experimental_1_1async_1_1enactor__t.html">enactor_t</a> &amp;rhs)=delete</td></tr>
 <tr class="separator:a056f790b5c5a2ea192475468e0e8ff18"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:afd7a1a6fd54b22b299e04e5e7f257dfc"><td class="memItemLeft" align="right" valign="top"><a id="afd7a1a6fd54b22b299e04e5e7f257dfc"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>enactor_t</b> (algorithm_problem_t *_problem, std::shared_ptr&lt; cuda::multi_context_t &gt; _context, enactor_properties_t _properties=enactor_properties_t())</td></tr>
+&#160;</td><td class="memItemRight" valign="bottom"><b>enactor_t</b> (algorithm_problem_t *_problem, std::shared_ptr&lt; <a class="el" href="classgunrock_1_1cuda_1_1multi__context__t.html">cuda::multi_context_t</a> &gt; _context, enactor_properties_t _properties=enactor_properties_t())</td></tr>
 <tr class="separator:afd7a1a6fd54b22b299e04e5e7f257dfc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af2b08a37165a10205615d0b6f5aeba17"><td class="memItemLeft" align="right" valign="top"><a id="af2b08a37165a10205615d0b6f5aeba17"></a>
 <a class="el" href="structgunrock_1_1experimental_1_1async_1_1enactor__t.html">enactor_t</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>get_enactor</b> ()</td></tr>
@@ -133,10 +137,10 @@ Public Member Functions</h2></td></tr>
 algorithm_problem_t *&#160;</td><td class="memItemRight" valign="bottom"><b>get_problem</b> ()</td></tr>
 <tr class="separator:a99f84f34eedbf658fed63e33fc05e527"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a89226d575e3a411220345ac6b4cbabca"><td class="memItemLeft" align="right" valign="top"><a id="a89226d575e3a411220345ac6b4cbabca"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>loop</b> (cuda::multi_context_t &amp;context)=0</td></tr>
+virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>loop</b> (<a class="el" href="classgunrock_1_1cuda_1_1multi__context__t.html">cuda::multi_context_t</a> &amp;context)=0</td></tr>
 <tr class="separator:a89226d575e3a411220345ac6b4cbabca"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac122909dd6fe65fb12ffa6d60ecc4932"><td class="memItemLeft" align="right" valign="top"><a id="ac122909dd6fe65fb12ffa6d60ecc4932"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>prepare_frontier</b> (queue_t &amp;q, cuda::multi_context_t &amp;context)=0</td></tr>
+virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>prepare_frontier</b> (<a class="el" href="structgunrock_1_1experimental_1_1async_1_1Queues.html">queue_t</a> &amp;q, <a class="el" href="classgunrock_1_1cuda_1_1multi__context__t.html">cuda::multi_context_t</a> &amp;context)=0</td></tr>
 <tr class="separator:ac122909dd6fe65fb12ffa6d60ecc4932"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad35c033b8bd302108994995493e2a451"><td class="memItemLeft" align="right" valign="top"><a id="ad35c033b8bd302108994995493e2a451"></a>
 float&#160;</td><td class="memItemRight" valign="bottom"><b>enact</b> ()</td></tr>
@@ -145,13 +149,13 @@ float&#160;</td><td class="memItemRight" valign="bottom"><b>enact</b> ()</td></t
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
 <tr class="memitem:a1af5c55d86476ab99123cfccfc9f2504"><td class="memItemLeft" align="right" valign="top"><a id="a1af5c55d86476ab99123cfccfc9f2504"></a>
-queue_t&#160;</td><td class="memItemRight" valign="bottom"><b>q</b></td></tr>
+<a class="el" href="structgunrock_1_1experimental_1_1async_1_1Queues.html">queue_t</a>&#160;</td><td class="memItemRight" valign="bottom"><b>q</b></td></tr>
 <tr class="separator:a1af5c55d86476ab99123cfccfc9f2504"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a193a4f505a0c1764f0c7beb086cc36fa"><td class="memItemLeft" align="right" valign="top"><a id="a193a4f505a0c1764f0c7beb086cc36fa"></a>
 algorithm_problem_t *&#160;</td><td class="memItemRight" valign="bottom"><b>problem</b></td></tr>
 <tr class="separator:a193a4f505a0c1764f0c7beb086cc36fa"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a763ac8570794ed06ba5cb4dd24f8f838"><td class="memItemLeft" align="right" valign="top"><a id="a763ac8570794ed06ba5cb4dd24f8f838"></a>
-std::shared_ptr&lt; cuda::multi_context_t &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>context</b></td></tr>
+std::shared_ptr&lt; <a class="el" href="classgunrock_1_1cuda_1_1multi__context__t.html">cuda::multi_context_t</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>context</b></td></tr>
 <tr class="separator:a763ac8570794ed06ba5cb4dd24f8f838"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa06cbe5a8479675e74f9bc66b7cef656"><td class="memItemLeft" align="right" valign="top"><a id="aa06cbe5a8479675e74f9bc66b7cef656"></a>
 int&#160;</td><td class="memItemRight" valign="bottom"><b>num_queue</b> = 4</td></tr>

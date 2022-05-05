@@ -1,4 +1,10 @@
 var searchData=
 [
-  ['number_5fof_5fgraph_5frepresentations',['number_of_graph_representations',['../classgunrock_1_1graph_1_1graph__t.html#afda37174d680f72250645f8549ace7ad',1,'gunrock::graph::graph_t']]]
+  ['launch',['launch',['../structgunrock_1_1cuda_1_1launch__box_1_1launch__box__t.html#ad3801b8e207beb8fdf1fb38d4e16cd53',1,'gunrock::cuda::launch_box::launch_box_t']]],
+  ['launch_5fblocked',['launch_blocked',['../structgunrock_1_1cuda_1_1launch__box_1_1launch__box__t.html#a38664e291ea726844c8ee560e7c14fca',1,'gunrock::cuda::launch_box::launch_box_t']]],
+  ['launch_5fstrided',['launch_strided',['../structgunrock_1_1cuda_1_1launch__box_1_1launch__box__t.html#a4e1e253415c9f214cac78014d265d33d',1,'gunrock::cuda::launch_box::launch_box_t']]],
+  ['load',['load',['../structgunrock_1_1io_1_1matrix__market__t.html#a4e4c668364ad3330b17a3c3656d2fd79',1,'gunrock::io::matrix_market_t::load()'],['../load__store_8hxx.html#a2535db1769249a11d4fee60860bf68c0',1,'gunrock::thread::load()']]],
+  ['log',['log',['../classgunrock_1_1util_1_1stats_1_1log.html#a835672081dcebcbf56eb6015a51d1a6c',1,'gunrock::util::stats::log']]],
+  ['log2',['log2',['../math_8hxx.html#a15b531aa0c975c4880ead041fb8523af',1,'gunrock::math']]],
+  ['loop',['loop',['../structgunrock_1_1geo_1_1enactor__t.html#aceb1754d50f6b95a1afa90f31ec2b4b7',1,'gunrock::geo::enactor_t::loop()'],['../structgunrock_1_1spgemm_1_1enactor__t.html#a7b84b5cedd82a1ca326a8413c341086a',1,'gunrock::spgemm::enactor_t::loop()'],['../structgunrock_1_1sssp_1_1enactor__t.html#a3a587b8ebefb83a0a6480311f94a517f',1,'gunrock::sssp::enactor_t::loop()']]]
 ];

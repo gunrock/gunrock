@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['coordinate_5ft',['coordinate_t',['../structgunrock_1_1operators_1_1advance_1_1merge__path__v2_1_1coordinate__t.html',1,'gunrock::operators::advance::merge_path_v2']]],
-  ['coordinates_5ft',['coordinates_t',['../structgunrock_1_1geo_1_1coordinates__t.html',1,'gunrock::geo']]]
+  ['boolmap_5ffrontier_5ft',['boolmap_frontier_t',['../classgunrock_1_1experimental_1_1frontier_1_1boolmap__frontier__t.html',1,'gunrock::experimental::frontier']]]
 ];

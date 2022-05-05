@@ -95,11 +95,15 @@ $(document).ready(function(){initNavTree('structgunrock_1_1bc_1_1enactor__t.html
 Inheritance diagram for gunrock::bc::enactor_t&lt; problem_t &gt;:</div>
 <div class="dyncontent">
 <div class="center"><img src="structgunrock_1_1bc_1_1enactor__t__inherit__graph.png" border="0" usemap="#gunrock_1_1bc_1_1enactor__t_3_01problem__t_01_4_inherit__map" alt="Inheritance graph"/></div>
+<map name="gunrock_1_1bc_1_1enactor__t_3_01problem__t_01_4_inherit__map" id="gunrock_1_1bc_1_1enactor__t_3_01problem__t_01_4_inherit__map">
+</map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <div class="dynheader">
 Collaboration diagram for gunrock::bc::enactor_t&lt; problem_t &gt;:</div>
 <div class="dyncontent">
 <div class="center"><img src="structgunrock_1_1bc_1_1enactor__t__coll__graph.png" border="0" usemap="#gunrock_1_1bc_1_1enactor__t_3_01problem__t_01_4_coll__map" alt="Collaboration graph"/></div>
+<map name="gunrock_1_1bc_1_1enactor__t_3_01problem__t_01_4_coll__map" id="gunrock_1_1bc_1_1enactor__t_3_01problem__t_01_4_coll__map">
+</map>
 <center><span class="legend">[<a target="top" href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-types"></a>
@@ -120,22 +124,22 @@ using&#160;</td><td class="memItemRight" valign="bottom"><b>frontier_t</b> = typ
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a183659bc76e8404439497be71fe9407c"><td class="memItemLeft" align="right" valign="top"><a id="a183659bc76e8404439497be71fe9407c"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>enactor_t</b> (<a class="el" href="structgunrock_1_1bc_1_1problem__t.html">problem_t</a> *_problem, std::shared_ptr&lt; cuda::multi_context_t &gt; _context, enactor_properties_t _properties)</td></tr>
+&#160;</td><td class="memItemRight" valign="bottom"><b>enactor_t</b> (<a class="el" href="structgunrock_1_1bc_1_1problem__t.html">problem_t</a> *_problem, std::shared_ptr&lt; <a class="el" href="classgunrock_1_1cuda_1_1multi__context__t.html">cuda::multi_context_t</a> &gt; _context, enactor_properties_t _properties)</td></tr>
 <tr class="separator:a183659bc76e8404439497be71fe9407c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abb2c5783f553ba83f39f1b4b871d6398"><td class="memItemLeft" align="right" valign="top"><a id="abb2c5783f553ba83f39f1b4b871d6398"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>prepare_frontier</b> (frontier_t *f, cuda::multi_context_t &amp;context) override</td></tr>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>prepare_frontier</b> (frontier_t *f, <a class="el" href="classgunrock_1_1cuda_1_1multi__context__t.html">cuda::multi_context_t</a> &amp;context) override</td></tr>
 <tr class="separator:abb2c5783f553ba83f39f1b4b871d6398"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4b9120feaada5bc5280b3de1aea9baae"><td class="memItemLeft" align="right" valign="top"><a id="a4b9120feaada5bc5280b3de1aea9baae"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>loop</b> (cuda::multi_context_t &amp;context) override</td></tr>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>loop</b> (<a class="el" href="classgunrock_1_1cuda_1_1multi__context__t.html">cuda::multi_context_t</a> &amp;context) override</td></tr>
 <tr class="separator:a4b9120feaada5bc5280b3de1aea9baae"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7c1b5e9e3c36b41900a56a4e48d3b711"><td class="memItemLeft" align="right" valign="top"><a id="a7c1b5e9e3c36b41900a56a4e48d3b711"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>is_forward_converged</b> (cuda::multi_context_t &amp;context)</td></tr>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>is_forward_converged</b> (<a class="el" href="classgunrock_1_1cuda_1_1multi__context__t.html">cuda::multi_context_t</a> &amp;context)</td></tr>
 <tr class="separator:a7c1b5e9e3c36b41900a56a4e48d3b711"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af6d64c59c68e46d892c523d2ebc4f655"><td class="memItemLeft" align="right" valign="top"><a id="af6d64c59c68e46d892c523d2ebc4f655"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>is_backward_converged</b> (cuda::multi_context_t &amp;context)</td></tr>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>is_backward_converged</b> (<a class="el" href="classgunrock_1_1cuda_1_1multi__context__t.html">cuda::multi_context_t</a> &amp;context)</td></tr>
 <tr class="separator:af6d64c59c68e46d892c523d2ebc4f655"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0f29c2083795ec019779adcf1197aece"><td class="memItemLeft" align="right" valign="top"><a id="a0f29c2083795ec019779adcf1197aece"></a>
-virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>is_converged</b> (cuda::multi_context_t &amp;context)</td></tr>
+virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>is_converged</b> (<a class="el" href="classgunrock_1_1cuda_1_1multi__context__t.html">cuda::multi_context_t</a> &amp;context)</td></tr>
 <tr class="separator:a0f29c2083795ec019779adcf1197aece"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>

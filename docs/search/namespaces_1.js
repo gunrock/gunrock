@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['radix',['radix',['../namespaceradix.html',1,'']]]
+  ['atomic',['atomic',['../namespacegunrock_1_1math_1_1atomic.html',1,'gunrock::math']]]
 ];

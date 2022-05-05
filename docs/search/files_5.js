@@ -1,5 +1,7 @@
 var searchData=
 [
-  ['helpers_2ehxx',['helpers.hxx',['../helpers_8hxx.html',1,'']]],
-  ['hits_2ehxx',['hits.hxx',['../hits_8hxx.html',1,'']]]
+  ['formats_2ehxx',['formats.hxx',['../formats_8hxx.html',1,'']]],
+  ['framework_2ehxx',['framework.hxx',['../framework_8hxx.html',1,'']]],
+  ['frontier_2ehxx',['frontier.hxx',['../frontier_8hxx.html',1,'']]],
+  ['function_2ehxx',['function.hxx',['../function_8hxx.html',1,'']]]
 ];

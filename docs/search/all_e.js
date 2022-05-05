@@ -1,11 +1,9 @@
 var searchData=
 [
-  ['radians',['radians',['../geo_8hxx.html#ab32e5eb6a0a317135f6da75fedcd26d6',1,'gunrock::geo']]],
-  ['radix',['radix',['../namespaceradix.html',1,'']]],
-  ['radix_5fsort_2ehxx',['radix_sort.hxx',['../radix__sort_8hxx.html',1,'']]],
-  ['reserve',['reserve',['../classgunrock_1_1experimental_1_1frontier_1_1boolmap__frontier__t.html#a099c44a5b97be93f7ea8914e51373463',1,'gunrock::experimental::frontier::boolmap_frontier_t::reserve()'],['../classgunrock_1_1frontier_1_1vector__frontier__t.html#a7db6c893c67e2ce7e9e8cd3239d87ad7',1,'gunrock::frontier::vector_frontier_t::reserve()']]],
-  ['reset',['reset',['../structgunrock_1_1geo_1_1problem__t.html#a9d321da9dcb440587af962010a889897',1,'gunrock::geo::problem_t']]],
-  ['resize',['resize',['../classgunrock_1_1experimental_1_1frontier_1_1boolmap__frontier__t.html#a1248d50b573234048fca9a35600d51e9',1,'gunrock::experimental::frontier::boolmap_frontier_t::resize()'],['../classgunrock_1_1frontier_1_1vector__frontier__t.html#abd137580d3fb447f812d11b0279113ce',1,'gunrock::frontier::vector_frontier_t::resize()']]],
-  ['result_5fc',['result_c',['../classgunrock_1_1hits_1_1result__c.html',1,'gunrock::hits']]],
-  ['result_5ft',['result_t',['../structgunrock_1_1spgemm_1_1result__t.html',1,'gunrock::spgemm::result_t&lt; csr_t &gt;'],['../structgunrock_1_1experimental_1_1async_1_1bfs_1_1result__t.html',1,'gunrock::experimental::async::bfs::result_t&lt; edge_t &gt;'],['../structgunrock_1_1bc_1_1result__t.html',1,'gunrock::bc::result_t&lt; weight_t &gt;'],['../structgunrock_1_1ppr_1_1result__t.html',1,'gunrock::ppr::result_t&lt; weight_t &gt;'],['../structgunrock_1_1color_1_1result__t.html',1,'gunrock::color::result_t&lt; vertex_t &gt;'],['../structgunrock_1_1pr_1_1result__t.html',1,'gunrock::pr::result_t&lt; weight_t &gt;'],['../structgunrock_1_1spmv_1_1result__t.html',1,'gunrock::spmv::result_t&lt; weight_t &gt;'],['../structgunrock_1_1bfs_1_1result__t.html',1,'gunrock::bfs::result_t&lt; vertex_t &gt;'],['../structgunrock_1_1mst_1_1result__t.html',1,'gunrock::mst::result_t&lt; vertex_t, weight_t &gt;'],['../structgunrock_1_1sssp_1_1result__t.html',1,'gunrock::sssp::result_t&lt; vertex_t, weight_t &gt;'],['../structgunrock_1_1geo_1_1result__t.html',1,'gunrock::geo::result_t'],['../structgunrock_1_1kcore_1_1result__t.html',1,'gunrock::kcore::result_t&lt; vertex_t &gt;']]]
+  ['occupancy',['occupancy',['../launch__box_8hxx.html#a08feabe65b0b6edcfacab8a7f2444cb6',1,'gunrock::cuda::launch_box']]],
+  ['op',['op',['../structgunrock_1_1hits_1_1problem__t_1_1op.html',1,'gunrock::hits::problem_t']]],
+  ['operator_20_26',['operator &amp;',['../sm_8hxx.html#a69dce655955d0dcb0dd857fe8ac4d565',1,'gunrock::cuda::launch_box']]],
+  ['operator_5b_5d',['operator[]',['../structgunrock_1_1array.html#a0748e3dfad3e2153f6b068d70f0f2709',1,'gunrock::array']]],
+  ['operators_2ehxx',['operators.hxx',['../operators_8hxx.html',1,'']]],
+  ['operator_7c',['operator|',['../sm_8hxx.html#a2245b98d8e9a3456e8d9c0a5f0b0d442',1,'gunrock::cuda::launch_box']]]
 ];
