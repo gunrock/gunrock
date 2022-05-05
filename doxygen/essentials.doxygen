@@ -792,16 +792,18 @@ WARN_LOGFILE           =
 # Note: If this tag is empty the current directory is searched.
 
 INPUT                  = essentials.wiki/Home.md \
-                         essentials.wiki/Overview.md \
-                         essentials.wiki/Publications.md \
-                         essentials.wiki/Presentations.md \
-                         essentials.wiki/Programming-Model.md \
-                         essentials.wiki/Gunrock-Operators.md \
-                         essentials.wiki/Graph-Algorithms.md \
                          essentials.wiki/API.md \
-                         ../include/gunrock/framework \
+			 ../include/gunrock/framework \
                          ../include/gunrock/algorithms \
-                         ../include/gunrock/graph
+                         ../include/gunrock/graph \
+			 ../include/gunrock/container \
+			 ../include/gunrock/formats \
+			 ../include/gunrock/cuda \
+			 ../include/gunrock/util \
+			 ../include/gunrock/io
+			 ../include/gunrock/error.hxx \
+			 ../include/gunrock/memory.hxx \
+			 ../include/gunrock/virtual_memory.hxx
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses

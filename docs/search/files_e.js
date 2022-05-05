@@ -1,5 +1,7 @@
 var searchData=
 [
-  ['unique_2ehxx',['unique.hxx',['../unique_8hxx.html',1,'']]],
-  ['unique_5fcopy_2ehxx',['unique_copy.hxx',['../unique__copy_8hxx.html',1,'']]]
+  ['ppr_2ehxx',['ppr.hxx',['../ppr_8hxx.html',1,'']]],
+  ['pr_2ehxx',['pr.hxx',['../pr_8hxx.html',1,'']]],
+  ['print_2ehxx',['print.hxx',['../print_8hxx.html',1,'']]],
+  ['problem_2ehxx',['problem.hxx',['../problem_8hxx.html',1,'']]]
 ];

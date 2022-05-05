@@ -1,10 +1,7 @@
 var searchData=
 [
-  ['sequence',['sequence',['../classgunrock_1_1frontier_1_1vector__frontier__t.html#a4d10de07349429693724480f997ecbab',1,'gunrock::frontier::vector_frontier_t']]],
-  ['set',['set',['../classgunrock_1_1graph_1_1graph__t.html#a139e61c3dae66c3fd07348b3900ae9c3',1,'gunrock::graph::graph_t']]],
-  ['set_5felement_5fat',['set_element_at',['../classgunrock_1_1experimental_1_1frontier_1_1boolmap__frontier__t.html#aff9ffc50f990bb79cc7667ce34e4339f',1,'gunrock::experimental::frontier::boolmap_frontier_t::set_element_at()'],['../classgunrock_1_1frontier_1_1vector__frontier__t.html#a7035f1195858041dc1579e4202cb86b3',1,'gunrock::frontier::vector_frontier_t::set_element_at()']]],
-  ['set_5fnumber_5fof_5felements',['set_number_of_elements',['../classgunrock_1_1experimental_1_1frontier_1_1boolmap__frontier__t.html#aba8b7855190acdc41d350ce8476da5da',1,'gunrock::experimental::frontier::boolmap_frontier_t::set_number_of_elements()'],['../classgunrock_1_1frontier_1_1vector__frontier__t.html#a216e76dc16ea20447c56779b372a2e4b',1,'gunrock::frontier::vector_frontier_t::set_number_of_elements()']]],
-  ['set_5fresizing_5ffactor',['set_resizing_factor',['../classgunrock_1_1frontier_1_1vector__frontier__t.html#a005ecc9b270528363406af772ffd3823',1,'gunrock::frontier::vector_frontier_t']]],
-  ['sort',['sort',['../classgunrock_1_1experimental_1_1frontier_1_1boolmap__frontier__t.html#a9ec26e228d46c5a2fcfa976004777e26',1,'gunrock::experimental::frontier::boolmap_frontier_t::sort()'],['../classgunrock_1_1frontier_1_1vector__frontier__t.html#a5ac6dec53af010c479331d4b419f2f9a',1,'gunrock::frontier::vector_frontier_t::sort()']]],
-  ['spatial_5fmedian',['spatial_median',['../geo_8hxx.html#a80c6f39c7f800df129a21dcd43b005aa',1,'gunrock::geo']]]
+  ['occupancy',['occupancy',['../launch__box_8hxx.html#a08feabe65b0b6edcfacab8a7f2444cb6',1,'gunrock::cuda::launch_box']]],
+  ['operator_20_26',['operator &amp;',['../sm_8hxx.html#a69dce655955d0dcb0dd857fe8ac4d565',1,'gunrock::cuda::launch_box']]],
+  ['operator_5b_5d',['operator[]',['../structgunrock_1_1array.html#a0748e3dfad3e2153f6b068d70f0f2709',1,'gunrock::array']]],
+  ['operator_7c',['operator|',['../sm_8hxx.html#a2245b98d8e9a3456e8d9c0a5f0b0d442',1,'gunrock::cuda::launch_box']]]
 ];

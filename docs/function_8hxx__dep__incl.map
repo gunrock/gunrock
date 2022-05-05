@@ -1,0 +1,39 @@
+<map id="/home/neoblizz/essentials/include/gunrock/cuda/function.hxx" name="/home/neoblizz/essentials/include/gunrock/cuda/function.hxx">
+<area shape="rect" id="node2" href="$context_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/cuda/context.hxx" alt="" coords="949,95,1170,136"/>
+<area shape="rect" id="node31" href="$cuda_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/cuda/cuda.hxx" alt="" coords="1479,295,1685,337"/>
+<area shape="rect" id="node3" href="$frontier_8hxx.html" title="Frontier structure for graph algorithms. Frontiers are one of the fundamental structure used to imple..." alt="" coords="1959,518,2141,574"/>
+<area shape="rect" id="node20" href="$helpers_8hxx.html" title="Helper functions for Advance operators. " alt="" coords="677,288,881,344"/>
+<area shape="rect" id="node23" href="$merge__path_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/advance/merge_path.hxx" alt="" coords="811,184,1041,240"/>
+<area shape="rect" id="node24" href="$merge__path__v2_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/advance/merge_path_v2.hxx" alt="" coords="1066,184,1317,240"/>
+<area shape="rect" id="node25" href="$batch_8hxx.html" title="A batch operator is an operator that can be used to execute a function/application in bactches with d..." alt="" coords="5,288,188,344"/>
+<area shape="rect" id="node26" href="$filter_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/filter/filter.hxx" alt="" coords="212,288,395,344"/>
+<area shape="rect" id="node27" href="$for_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/for/for.hxx" alt="" coords="471,288,653,344"/>
+<area shape="rect" id="node29" href="$neighborreduce_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/neighborreduce\l/neighborreduce.hxx" alt="" coords="1140,511,1323,581"/>
+<area shape="rect" id="node30" href="$uniquify_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/uniquify/uniquify.hxx" alt="" coords="341,184,543,240"/>
+<area shape="rect" id="node38" href="$launch__box_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/cuda/launch\l_box.hxx" alt="" coords="1460,184,1651,240"/>
+<area shape="rect" id="node4" href="$enactor_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/enactor.hxx" alt="" coords="2001,629,2184,685"/>
+<area shape="rect" id="node5" href="$framework_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/framework.hxx" alt="" coords="1989,733,2172,789"/>
+<area shape="rect" id="node6" href="$algorithms_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/algorithms\l/algorithms.hxx" alt="" coords="2207,837,2389,893"/>
+<area shape="rect" id="node7" href="$bc_8hxx.html" title="Betweeness Centrality. " alt="" coords="927,949,1151,990"/>
+<area shape="rect" id="node8" href="$bfs_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/algorithms\l/bfs.hxx" alt="" coords="1175,941,1357,997"/>
+<area shape="rect" id="node9" href="$color_8hxx.html" title="Graph Coloring algorithm. " alt="" coords="1381,941,1562,997"/>
+<area shape="rect" id="node10" href="$experimental_2async_2bfs_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/algorithms\l/experimental/async/bfs.hxx" alt="" coords="1586,941,1773,997"/>
+<area shape="rect" id="node11" href="$geo_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/algorithms\l/geo.hxx" alt="" coords="1797,941,1978,997"/>
+<area shape="rect" id="node12" href="$hits_8hxx.html" title="Hyperlink&#45;Induced Topic Search. " alt="" coords="2002,941,2183,997"/>
+<area shape="rect" id="node13" href="$kcore_8hxx.html" title="Vertex k&#45;core decomposition algorithm. " alt="" coords="2207,941,2389,997"/>
+<area shape="rect" id="node14" href="$mst_8hxx.html" title="Minimum Spanning Tree algorithm. " alt="" coords="2413,941,2594,997"/>
+<area shape="rect" id="node15" href="$ppr_8hxx.html" title="Personalized Page&#45;Rank. " alt="" coords="2618,941,2799,997"/>
+<area shape="rect" id="node16" href="$pr_8hxx.html" title="PageRank. " alt="" coords="2823,949,3045,990"/>
+<area shape="rect" id="node17" href="$spgemm_8hxx.html" title="Sparse&#45;Matrix&#45;Matrix multiplication. " alt="" coords="3069,941,3250,997"/>
+<area shape="rect" id="node18" href="$spmv_8hxx.html" title="Sparse&#45;Matrix Vector Multiplication. " alt="" coords="3274,941,3455,997"/>
+<area shape="rect" id="node19" href="$sssp_8hxx.html" title="Single&#45;Source Shortest Path algorithm. " alt="" coords="3479,941,3661,997"/>
+<area shape="rect" id="node21" href="$advance_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/advance/advance.hxx" alt="" coords="830,518,1041,574"/>
+<area shape="rect" id="node22" href="$operators_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/operators.hxx" alt="" coords="471,629,653,685"/>
+<area shape="rect" id="node28" href="$thread__mapped_8hxx.html" title="Advance operator where a vertex/edge is mapped to a thread. " alt="" coords="908,392,1091,463"/>
+<area shape="rect" id="node32" href="$block__mapped_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/advance/block_mapped.hxx" alt="" coords="1459,399,1705,455"/>
+<area shape="rect" id="node33" href="$bucketing_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/operators/advance/bucketing.hxx" alt="" coords="1115,399,1334,455"/>
+<area shape="rect" id="node34" href="$convert_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/graph\l/conversions/convert.hxx" alt="" coords="1730,399,1903,455"/>
+<area shape="rect" id="node35" href="$graph_8hxx_source.html" title="/home/neoblizz/essentials\l/include/gunrock/graph\l/graph.hxx" alt="" coords="2170,399,2343,455"/>
+<area shape="rect" id="node36" href="$problem_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/framework\l/problem.hxx" alt="" coords="2165,518,2348,574"/>
+<area shape="rect" id="node37" href="$sample_8hxx.html" title="/home/neoblizz/essentials\l/include/gunrock/io/sample.hxx" alt="" coords="2197,741,2399,782"/>
+</map>

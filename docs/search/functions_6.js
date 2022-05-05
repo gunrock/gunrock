@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['loop',['loop',['../structgunrock_1_1geo_1_1enactor__t.html#aceb1754d50f6b95a1afa90f31ec2b4b7',1,'gunrock::geo::enactor_t::loop()'],['../structgunrock_1_1spgemm_1_1enactor__t.html#a7b84b5cedd82a1ca326a8413c341086a',1,'gunrock::spgemm::enactor_t::loop()'],['../structgunrock_1_1sssp_1_1enactor__t.html#a3a587b8ebefb83a0a6480311f94a517f',1,'gunrock::sssp::enactor_t::loop()']]]
+  ['haversine',['haversine',['../geo_8hxx.html#a0410f92c0fa81050b0f47c81e9b25132',1,'gunrock::geo']]],
+  ['head',['head',['../print_8hxx.html#a6550e6dd55c639028ba3ec72e372394f',1,'gunrock::print::head(vector_t &amp;x, int k, std::string name=&quot;&quot;)'],['../print_8hxx.html#a7989913221d9bdc1a1ce6cd71ee86d30',1,'gunrock::print::head(type_t *x, int k, int n, std::string name=&quot;&quot;)']]]
 ];

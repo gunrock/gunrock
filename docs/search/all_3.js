@@ -1,12 +1,23 @@
 var searchData=
 [
-  ['edge_5fpair_5ft',['edge_pair_t',['../structgunrock_1_1graph_1_1edge__pair__t.html',1,'gunrock::graph']]],
-  ['empty_5fcoo_5ft',['empty_coo_t',['../structgunrock_1_1graph_1_1empty__coo__t.html',1,'gunrock::graph']]],
-  ['empty_5fcsc_5ft',['empty_csc_t',['../structgunrock_1_1graph_1_1empty__csc__t.html',1,'gunrock::graph']]],
-  ['empty_5fcsr_5ft',['empty_csr_t',['../structgunrock_1_1graph_1_1empty__csr__t.html',1,'gunrock::graph']]],
-  ['empty_5fgraph_5ft',['empty_graph_t',['../structgunrock_1_1graph_1_1empty__graph__t.html',1,'gunrock::graph']]],
-  ['enactor_5ft',['enactor_t',['../structgunrock_1_1color_1_1enactor__t.html',1,'gunrock::color::enactor_t&lt; problem_t &gt;'],['../structgunrock_1_1hits_1_1enactor__t.html',1,'gunrock::hits::enactor_t&lt; problem_t &gt;'],['../structgunrock_1_1kcore_1_1enactor__t.html',1,'gunrock::kcore::enactor_t&lt; problem_t &gt;'],['../structgunrock_1_1mst_1_1enactor__t.html',1,'gunrock::mst::enactor_t&lt; problem_t &gt;'],['../structgunrock_1_1bc_1_1enactor__t.html',1,'gunrock::bc::enactor_t&lt; problem_t &gt;'],['../structgunrock_1_1ppr_1_1enactor__t.html',1,'gunrock::ppr::enactor_t&lt; problem_t &gt;'],['../structgunrock_1_1experimental_1_1async_1_1enactor__t.html',1,'gunrock::experimental::async::enactor_t&lt; algorithm_problem_t &gt;'],['../structgunrock_1_1experimental_1_1async_1_1bfs_1_1enactor__t.html',1,'gunrock::experimental::async::bfs::enactor_t&lt; problem_t &gt;'],['../structgunrock_1_1pr_1_1enactor__t.html',1,'gunrock::pr::enactor_t&lt; problem_t &gt;'],['../structgunrock_1_1geo_1_1enactor__t.html',1,'gunrock::geo::enactor_t&lt; problem_t &gt;'],['../structgunrock_1_1spgemm_1_1enactor__t.html',1,'gunrock::spgemm::enactor_t&lt; problem_t &gt;'],['../structgunrock_1_1spmv_1_1enactor__t.html',1,'gunrock::spmv::enactor_t&lt; problem_t &gt;'],['../structgunrock_1_1bfs_1_1enactor__t.html',1,'gunrock::bfs::enactor_t&lt; problem_t &gt;'],['../structgunrock_1_1sssp_1_1enactor__t.html',1,'gunrock::sssp::enactor_t&lt; problem_t &gt;']]],
-  ['enactor_5ft_3c_20problem_5ft_20_3e',['enactor_t&lt; problem_t &gt;',['../structgunrock_1_1experimental_1_1async_1_1enactor__t.html',1,'gunrock::experimental::async']]],
-  ['execute',['execute',['../advance_8hxx.html#a375f2d93a2fed300665eb525b7f84cc6',1,'gunrock::operators::advance::execute(graph_t &amp;G, operator_t op, frontier_t *input, frontier_t *output, work_tiles_t &amp;segments, cuda::multi_context_t &amp;context)'],['../advance_8hxx.html#a16dc398057f73c2220e3bceddd2137b0',1,'gunrock::operators::advance::execute(graph_t &amp;G, enactor_type *E, operator_type op, cuda::multi_context_t &amp;context, bool swap_buffers=true)'],['../block__mapped_8hxx.html#ab5dc1a3807d970dbf11b80a5d5812631',1,'gunrock::operators::advance::block_mapped::execute()'],['../thread__mapped_8hxx.html#a1d600601e484ff4f7cf6c36f4f5ddfb1',1,'gunrock::operators::advance::thread_mapped::execute()'],['../batch_8hxx.html#aaa16c4fe0d80c18f0483fc608abdaae9',1,'gunrock::operators::batch::execute()'],['../neighborreduce_8hxx.html#afdf5d7b81e02e19304330ab49ae3a862',1,'gunrock::operators::neighborreduce::execute()']]],
-  ['essentials_3a_20high_2dperformance_20c_2b_2b_20gpu_20graph_20analytics',['Essentials: High-Performance C++ GPU Graph Analytics',['../index.html',1,'']]]
+  ['collect_5fsingle_5frun',['collect_single_run',['../classgunrock_1_1util_1_1stats_1_1log.html#ad47756926145d7e0b4824f432a9fb74e',1,'gunrock::util::stats::log']]],
+  ['color_2ehxx',['color.hxx',['../color_8hxx.html',1,'']]],
+  ['compare',['compare',['../compare_8hxx.html#af63777569b62f4bd118b5d8b3d612289',1,'gunrock::util']]],
+  ['compare_2ehxx',['compare.hxx',['../compare_8hxx.html',1,'']]],
+  ['compute_5fcapability_5ft',['compute_capability_t',['../structgunrock_1_1cuda_1_1compute__capability__t.html',1,'gunrock::cuda']]],
+  ['compute_5foutput_5flength',['compute_output_length',['../helpers_8hxx.html#ac05ed727551716720a329f6897c30e57',1,'gunrock::operators::advance']]],
+  ['compute_5foutput_5foffsets',['compute_output_offsets',['../helpers_8hxx.html#ad67aefe9298ffb62bf38cbbea604b510',1,'gunrock::operators::advance']]],
+  ['constexpr',['constexpr',['../block__mapped_8hxx.html#ac0cc67429437278ddc9f9dd2912a16ca',1,'gunrock::operators::advance::block_mapped']]],
+  ['contains_5frepresentation',['contains_representation',['../classgunrock_1_1graph_1_1graph__t.html#ae6b13292da8d83e7dc3283d0ecf92bf5',1,'gunrock::graph::graph_t']]],
+  ['context_2ehxx',['context.hxx',['../context_8hxx.html',1,'']]],
+  ['context_5ft',['context_t',['../structgunrock_1_1cuda_1_1context__t.html',1,'gunrock::cuda']]],
+  ['convert_2ehxx',['convert.hxx',['../convert_8hxx.html',1,'']]],
+  ['coo_5ft',['coo_t',['../structgunrock_1_1format_1_1coo__t.html',1,'gunrock::format']]],
+  ['coordinate_5ft',['coordinate_t',['../structgunrock_1_1operators_1_1advance_1_1merge__path__v2_1_1coordinate__t.html',1,'gunrock::operators::advance::merge_path_v2']]],
+  ['coordinates_5ft',['coordinates_t',['../structgunrock_1_1geo_1_1coordinates__t.html',1,'gunrock::geo']]],
+  ['csc_5ft',['csc_t',['../structgunrock_1_1format_1_1csc__t.html',1,'gunrock::format']]],
+  ['csr',['csr',['../sample_8hxx.html#afa67a2ea264de2ef4b7e3f8d3f8633b4',1,'gunrock::io::sample']]],
+  ['csr_5ft',['csr_t',['../structgunrock_1_1format_1_1csr__t.html',1,'gunrock::format::csr_t&lt; space, index_t, offset_t, value_t &gt;'],['../structgunrock_1_1format_1_1csr__t.html#a30c4b2f433b6cf1ea2765a839e46729b',1,'gunrock::format::csr_t::csr_t()']]],
+  ['cta_5fmax_5fthreads',['cta_max_threads',['../device__properties_8hxx.html#a5c24c3cf20bdd746889cf09e53d8cad6',1,'gunrock::cuda::properties']]],
+  ['cuda_2ehxx',['cuda.hxx',['../cuda_8hxx.html',1,'']]]
 ];
