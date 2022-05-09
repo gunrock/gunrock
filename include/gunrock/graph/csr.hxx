@@ -113,6 +113,21 @@ class graph_csr_t {
     return values;
   }
 
+  // Graph type (inherited from this class) has equivalents of this in graph 
+  // terminology (vertices and edges). Also include these for linear algebra
+  // terminology
+  __host__ __device__ __forceinline__ auto get_number_of_rows() const {
+    return number_of_vertices;
+  }
+
+  __host__ __device__ __forceinline__ auto get_number_of_columns() const {
+    return number_of_vertices;
+  }
+
+  __host__ __device__ __forceinline__ auto get_number_of_nonzeros() const {
+    return number_of_edges;
+  }
+
  protected:
   __host__ __device__ void set(vertex_type const& _number_of_vertices,
                                edge_type const& _number_of_edges,

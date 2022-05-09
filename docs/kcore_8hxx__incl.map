@@ -1,0 +1,30 @@
+<map id="/home/neoblizz/essentials/include/gunrock/algorithms/kcore.hxx" name="/home/neoblizz/essentials/include/gunrock/algorithms/kcore.hxx">
+<area shape="rect" id="node2" href="$algorithms_8hxx.html" title="gunrock/algorithms\l/algorithms.hxx" alt="" coords="2237,109,2369,151"/>
+<area shape="rect" id="node5" href="$framework_8hxx.html" title="gunrock/framework/framework.hxx" alt="" coords="670,199,893,225"/>
+<area shape="rect" id="node8" href="$graph_8hxx_source.html" title="gunrock/graph/graph.hxx" alt="" coords="904,452,1069,479"/>
+<area shape="rect" id="node12" href="$math_8hxx.html" title="gunrock/util/math.hxx" alt="" coords="1509,534,1656,561"/>
+<area shape="rect" id="node26" href="$formats_8hxx.html" title="gunrock/formats/formats.hxx" alt="" coords="2032,623,2221,650"/>
+<area shape="rect" id="node28" href="$vector_8hxx.html" title="support for stl based vectors on gpu. Relies on thrust::host and device vectors. " alt="" coords="1866,780,2057,807"/>
+<area shape="rect" id="node36" href="$print_8hxx.html" title="gunrock/util/print.hxx" alt="" coords="3059,623,3202,650"/>
+<area shape="rect" id="node40" href="$compare_8hxx.html" title="gunrock/util/compare.hxx" alt="" coords="1888,534,2056,561"/>
+<area shape="rect" id="node43" href="$matrix__market_8hxx.html" title="gunrock/io/matrix_market.hxx" alt="" coords="2441,534,2636,561"/>
+<area shape="rect" id="node47" href="$sample_8hxx.html" title="gunrock/io/sample.hxx" alt="" coords="2035,370,2189,397"/>
+<area shape="rect" id="node48" href="$array_8hxx.html" title="Dense data structure supported within gunrock. Note that the array structure is modeled exactly after..." alt="" coords="1681,534,1863,561"/>
+<area shape="rect" id="node6" href="$cuda_8hxx.html" title="gunrock/cuda/cuda.hxx" alt="" coords="5,534,163,561"/>
+<area shape="rect" id="node7" href="$frontier_8hxx.html" title="Frontier structure for graph algorithms. Frontiers are one of the fundamental structure used to imple..." alt="" coords="898,363,1075,404"/>
+<area shape="rect" id="node33" href="$problem_8hxx.html" title="gunrock/framework/problem.hxx" alt="" coords="609,370,817,397"/>
+<area shape="rect" id="node34" href="$enactor_8hxx_source.html" title="gunrock/framework/enactor.hxx" alt="" coords="748,281,953,307"/>
+<area shape="rect" id="node35" href="$operators_8hxx.html" title="gunrock/framework/operators\l/operators.hxx" alt="" coords="343,273,534,315"/>
+<area shape="rect" id="node11" href="$type__traits_8hxx_source.html" title="gunrock/util/type_traits.hxx" alt="" coords="631,855,809,881"/>
+<area shape="rect" id="node20" href="$properties_8hxx_source.html" title="gunrock/graph/properties.hxx" alt="" coords="187,534,378,561"/>
+<area shape="rect" id="node21" href="$vertex__pair_8hxx_source.html" title="gunrock/graph/vertex\l_pair.hxx" alt="" coords="589,616,733,657"/>
+<area shape="rect" id="node22" href="$graph_2coo_8hxx_source.html" title="gunrock/graph/coo.hxx" alt="" coords="680,534,835,561"/>
+<area shape="rect" id="node23" href="$graph_2csc_8hxx_source.html" title="gunrock/graph/csc.hxx" alt="" coords="909,534,1064,561"/>
+<area shape="rect" id="node24" href="$graph_2csr_8hxx_source.html" title="gunrock/graph/csr.hxx" alt="" coords="505,534,655,561"/>
+<area shape="rect" id="node25" href="$build_8hxx.html" title="gunrock/graph/build.hxx" alt="" coords="2080,534,2240,561"/>
+<area shape="rect" id="node17" href="$atomic__functions_8hxx.html" title="gunrock/cuda/atomic\l_functions.hxx" alt="" coords="1421,616,1563,657"/>
+<area shape="rect" id="node27" href="$formats_2coo_8hxx_source.html" title="gunrock/formats/coo.hxx" alt="" coords="1863,705,2030,732"/>
+<area shape="rect" id="node31" href="$formats_2csc_8hxx_source.html" title="gunrock/formats/csc.hxx" alt="" coords="2054,705,2221,732"/>
+<area shape="rect" id="node32" href="$formats_2csr_8hxx_source.html" title="gunrock/formats/csr.hxx" alt="" coords="1676,705,1839,732"/>
+<area shape="rect" id="node46" href="$filepath_8hxx_source.html" title="gunrock/util/filepath.hxx" alt="" coords="2600,623,2760,650"/>
+</map>

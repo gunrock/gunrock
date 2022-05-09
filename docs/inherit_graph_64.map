@@ -1,0 +1,16 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$structgunrock_1_1problem__t.html" title="Problem contains the data structure of the graph algorithms implemented in gunrock. Inherit problem struct for your custom applications&#39; implementation. " alt="" coords="5,487,139,529"/>
+<area shape="rect" id="node2" href="$structgunrock_1_1bc_1_1problem__t.html" title="gunrock::bc::problem\l_t\&lt; graph_t, param_type,\l result_type \&gt;" alt="" coords="193,5,361,61"/>
+<area shape="rect" id="node3" href="$structgunrock_1_1bfs_1_1problem__t.html" title="gunrock::bfs::problem\l_t\&lt; graph_t, param_type,\l result_type \&gt;" alt="" coords="193,85,361,141"/>
+<area shape="rect" id="node4" href="$structgunrock_1_1color_1_1problem__t.html" title="gunrock::color::problem\l_t\&lt; graph_t, param_type,\l result_type \&gt;" alt="" coords="193,165,361,221"/>
+<area shape="rect" id="node5" href="$structgunrock_1_1experimental_1_1async_1_1bfs_1_1problem__t.html" title="gunrock::experimental\l::async::bfs::problem\l_t\&lt; graph_t, param_type,\l result_type \&gt;" alt="" coords="193,246,361,317"/>
+<area shape="rect" id="node6" href="$structgunrock_1_1geo_1_1problem__t.html" title="gunrock::geo::problem\l_t\&lt; graph_t, param_type,\l result_type \&gt;" alt="" coords="193,341,361,397"/>
+<area shape="rect" id="node7" href="$structgunrock_1_1hits_1_1problem__t.html" title="gunrock::hits::problem\l_t\&lt; graph_t \&gt;" alt="" coords="201,422,352,463"/>
+<area shape="rect" id="node8" href="$structgunrock_1_1kcore_1_1problem__t.html" title="gunrock::kcore::problem\l_t\&lt; graph_t, result_type \&gt;" alt="" coords="191,487,363,529"/>
+<area shape="rect" id="node9" href="$structgunrock_1_1mst_1_1problem__t.html" title="gunrock::mst::problem\l_t\&lt; graph_t, param_type,\l result_type \&gt;" alt="" coords="193,553,361,609"/>
+<area shape="rect" id="node10" href="$structgunrock_1_1ppr_1_1problem__t.html" title="gunrock::ppr::problem\l_t\&lt; graph_t, param_type,\l result_type \&gt;" alt="" coords="193,633,361,689"/>
+<area shape="rect" id="node11" href="$structgunrock_1_1pr_1_1problem__t.html" title="gunrock::pr::problem\l_t\&lt; graph_t, param_type,\l result_type \&gt;" alt="" coords="193,713,361,769"/>
+<area shape="rect" id="node12" href="$structgunrock_1_1spgemm_1_1problem__t.html" title="gunrock::spgemm::problem\l_t\&lt; graph_t, param_type,\l result_type \&gt;" alt="" coords="187,793,367,849"/>
+<area shape="rect" id="node13" href="$structgunrock_1_1spmv_1_1problem__t.html" title="gunrock::spmv::problem\l_t\&lt; graph_t, param_type,\l result_type \&gt;" alt="" coords="193,873,361,929"/>
+<area shape="rect" id="node14" href="$structgunrock_1_1sssp_1_1problem__t.html" title="gunrock::sssp::problem\l_t\&lt; graph_t, param_type,\l result_type \&gt;" alt="" coords="193,953,361,1009"/>
+</map>

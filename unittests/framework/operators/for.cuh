@@ -15,8 +15,6 @@
 
 #include <gtest/gtest.h>
 
-using namespace gunrock;
-
 /// It is not valid in CUDA/NVCC to use a lambda within TEST().
 /// error: The enclosing parent function ("TestBody") for an extended
 /// __device__ lambda cannot have private or protected access within its class
@@ -26,23 +24,23 @@ struct f {
 
 TEST(operators, prallel_for) {
   // Build a sample graph using the sample csr.
-  auto csr = io::sample::csr();
-  auto G =
-      graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(csr);
+  auto csr = gunrock::io::sample::csr();
+  auto G = gunrock::graph::build::from_csr<gunrock::memory_space_t::device,
+                                           gunrock::graph::view_t::csr>(csr);
 
   // Initialize the devicecontext.
-  cuda::device_id_t device = 0;
-  cuda::multi_context_t context(device);
+  gunrock::cuda::device_id_t device = 0;
+  gunrock::cuda::multi_context_t context(device);
 
   // Launch for using a separate function.
-  operators::parallel_for::execute<operators::parallel_for_each_t::vertex>(
-      G, f(), context);
+  gunrock::operators::parallel_for::execute<
+      gunrock::operators::parallel_for_each_t::vertex>(G, f(), context);
 
   // Build a sample frontier.
-  frontier::frontier_t<int, int> X;
+  gunrock::frontier::frontier_t<int, int> X;
   X.push_back(1);
 
   // Launch for on a frontier.
-  operators::parallel_for::execute<operators::parallel_for_each_t::element>(
-      X, f(), context);
+  gunrock::operators::parallel_for::execute<
+      gunrock::operators::parallel_for_each_t::element>(X, f(), context);
 }

@@ -1,0 +1,4 @@
+var searchData=
+[
+  ['execute',['execute',['../advance_8hxx.html#a375f2d93a2fed300665eb525b7f84cc6',1,'gunrock::operators::advance::execute(graph_t &amp;G, operator_t op, frontier_t *input, frontier_t *output, work_tiles_t &amp;segments, cuda::multi_context_t &amp;context)'],['../advance_8hxx.html#a16dc398057f73c2220e3bceddd2137b0',1,'gunrock::operators::advance::execute(graph_t &amp;G, enactor_type *E, operator_type op, cuda::multi_context_t &amp;context, bool swap_buffers=true)'],['../block__mapped_8hxx.html#ab5dc1a3807d970dbf11b80a5d5812631',1,'gunrock::operators::advance::block_mapped::execute()'],['../thread__mapped_8hxx.html#a1d600601e484ff4f7cf6c36f4f5ddfb1',1,'gunrock::operators::advance::thread_mapped::execute()'],['../batch_8hxx.html#aaa16c4fe0d80c18f0483fc608abdaae9',1,'gunrock::operators::batch::execute()'],['../neighborreduce_8hxx.html#afdf5d7b81e02e19304330ab49ae3a862',1,'gunrock::operators::neighborreduce::execute()']]]
+];

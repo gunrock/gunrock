@@ -1,0 +1,12 @@
+<map id="/home/neoblizz/essentials/include/gunrock/framework/operators/advance/helpers.hxx" name="/home/neoblizz/essentials/include/gunrock/framework/operators/advance/helpers.hxx">
+<area shape="rect" id="node2" href="$context_8hxx.html" title="gunrock/cuda/context.hxx" alt="" coords="709,109,881,136"/>
+<area shape="rect" id="node3" href="$device_8hxx.html" title="gunrock/cuda/device.hxx" alt="" coords="5,273,172,300"/>
+<area shape="rect" id="node4" href="$device__properties_8hxx.html" title="gunrock/cuda/device\l_properties.hxx" alt="" coords="161,184,304,225"/>
+<area shape="rect" id="node7" href="$event__management_8hxx.html" title="gunrock/cuda/event\l_management.hxx" alt="" coords="379,184,515,225"/>
+<area shape="rect" id="node8" href="$stream__management_8hxx.html" title="gunrock/cuda/stream\l_management.hxx" alt="" coords="539,184,683,225"/>
+<area shape="rect" id="node9" href="$function_8hxx.html" title="gunrock/cuda/function.hxx" alt="" coords="708,191,883,218"/>
+<area shape="rect" id="node10" href="$timer_8hxx.html" title="Simple timer utility for device side code. " alt="" coords="907,191,1054,218"/>
+<area shape="rect" id="node11" href="$array_8hxx.html" title="Dense data structure supported within gunrock. Note that the array structure is modeled exactly after..." alt="" coords="1079,191,1261,218"/>
+<area shape="rect" id="node20" href="$vector_8hxx.html" title="support for stl based vectors on gpu. Relies on thrust::host and device vectors. " alt="" coords="1347,191,1537,218"/>
+<area shape="rect" id="node22" href="$type__traits_8hxx_source.html" title="gunrock/util/type_traits.hxx" alt="" coords="1538,273,1717,300"/>
+</map>

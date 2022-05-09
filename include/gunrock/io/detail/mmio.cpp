@@ -10,22 +10,24 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <cstddef>
 
 #include <gunrock/io/detail/mmio.hxx>
+#include <gunrock/error.hxx>
 
 int mm_read_unsymmetric_sparse(const char* fname,
-                               int* M_,
-                               int* N_,
-                               int* nz_,
+                               std::size_t* M_,
+                               std::size_t* N_,
+                               std::size_t* nz_,
                                double** val_,
-                               int** I_,
-                               int** J_) {
+                               std::size_t** I_,
+                               std::size_t** J_) {
   FILE* f;
   MM_typecode matcode;
-  int M, N, nz;
-  int i;
+  std::size_t M, N, nz;
+  std::size_t i;
   double* val;
-  int *I, *J;
+  std::size_t *I, *J;
 
   if ((f = fopen(fname, "r")) == NULL)
     return -1;
@@ -57,8 +59,8 @@ int mm_read_unsymmetric_sparse(const char* fname,
 
   /* reseve memory for matrices */
 
-  I = (int*)malloc(nz * sizeof(int));
-  J = (int*)malloc(nz * sizeof(int));
+  I = (std::size_t*)malloc(nz * sizeof(std::size_t));
+  J = (std::size_t*)malloc(nz * sizeof(std::size_t));
   val = (double*)malloc(nz * sizeof(double));
 
   *val_ = val;
@@ -70,8 +72,13 @@ int mm_read_unsymmetric_sparse(const char* fname,
   /*  (ANSI C X3.159-1989, Sec. 4.9.6.2, p. 136 lines 13-15)            */
 
   for (i = 0; i < nz; ++i) {
-    if (fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]))
+    if (fscanf(f, "%zu %zu %lg\n", &I[i], &J[i], &val[i]))
       ;
+
+    gunrock::error::throw_if_exception(I[i] == 0,
+                                       "Market file is zero-indexed");
+    gunrock::error::throw_if_exception(J[i] == 0,
+                                       "Market file is zero-indexed");
     I[i]--; /* adjust from 1-based to 0-based */
     J[i]--;
   }
@@ -175,7 +182,10 @@ int mm_write_mtx_crd_size(FILE* f, int M, int N, int nz) {
     return 0;
 }
 
-int mm_read_mtx_crd_size(FILE* f, int* M, int* N, int* nz) {
+int mm_read_mtx_crd_size(FILE* f,
+                         std::size_t* M,
+                         std::size_t* N,
+                         std::size_t* nz) {
   char line[MM_MAX_LINE_LENGTH];
   int num_items_read;
 
@@ -189,12 +199,12 @@ int mm_read_mtx_crd_size(FILE* f, int* M, int* N, int* nz) {
   } while (line[0] == '%');
 
   /* line[] is either blank or has M,N, nz */
-  if (sscanf(line, "%d %d %d", M, N, nz) == 3)
+  if (sscanf(line, "%zu %zu %zu", M, N, nz) == 3)
     return 0;
 
   else
     do {
-      num_items_read = fscanf(f, "%d %d %d", M, N, nz);
+      num_items_read = fscanf(f, "%zu %zu %zu", M, N, nz);
       if (num_items_read == EOF)
         return MM_PREMATURE_EOF;
     } while (num_items_read != 3);
@@ -242,29 +252,29 @@ int mm_write_mtx_array_size(FILE* f, int M, int N) {
 /******************************************************************/
 
 int mm_read_mtx_crd_data(FILE* f,
-                         int M,
-                         int N,
-                         int nz,
-                         int I[],
-                         int J[],
+                         std::size_t M,
+                         std::size_t N,
+                         std::size_t nz,
+                         std::size_t I[],
+                         std::size_t J[],
                          double val[],
                          MM_typecode matcode) {
-  int i;
+  std::size_t i;
   if (mm_is_complex(matcode)) {
     for (i = 0; i < nz; i++)
-      if (fscanf(f, "%d %d %lg %lg", &I[i], &J[i], &val[2 * i],
+      if (fscanf(f, "%zu %zu %lg %lg", &I[i], &J[i], &val[2 * i],
                  &val[2 * i + 1]) != 4)
         return MM_PREMATURE_EOF;
   } else if (mm_is_real(matcode)) {
     for (i = 0; i < nz; i++) {
-      if (fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]) != 3)
+      if (fscanf(f, "%zu %zu %lg\n", &I[i], &J[i], &val[i]) != 3)
         return MM_PREMATURE_EOF;
     }
   }
 
   else if (mm_is_pattern(matcode)) {
     for (i = 0; i < nz; i++)
-      if (fscanf(f, "%d %d", &I[i], &J[i]) != 2)
+      if (fscanf(f, "%zu %zu", &I[i], &J[i]) != 2)
         return MM_PREMATURE_EOF;
   } else
     return MM_UNSUPPORTED_TYPE;
@@ -273,22 +283,22 @@ int mm_read_mtx_crd_data(FILE* f,
 }
 
 int mm_read_mtx_crd_entry(FILE* f,
-                          int* I,
-                          int* J,
+                          std::size_t* I,
+                          std::size_t* J,
                           double* real,
                           double* imag,
                           MM_typecode matcode) {
   if (mm_is_complex(matcode)) {
-    if (fscanf(f, "%d %d %lg %lg", I, J, real, imag) != 4)
+    if (fscanf(f, "%zu %zu %lg %lg", I, J, real, imag) != 4)
       return MM_PREMATURE_EOF;
   } else if (mm_is_real(matcode)) {
-    if (fscanf(f, "%d %d %lg\n", I, J, real) != 3)
+    if (fscanf(f, "%zu %zu %lg\n", I, J, real) != 3)
       return MM_PREMATURE_EOF;
 
   }
 
   else if (mm_is_pattern(matcode)) {
-    if (fscanf(f, "%d %d", I, J) != 2)
+    if (fscanf(f, "%zu %zu", I, J) != 2)
       return MM_PREMATURE_EOF;
   } else
     return MM_UNSUPPORTED_TYPE;
@@ -305,11 +315,11 @@ int mm_read_mtx_crd_entry(FILE* f,
 ************************************************************************/
 
 int mm_read_mtx_crd(char* fname,
-                    int* M,
-                    int* N,
-                    int* nz,
-                    int** I,
-                    int** J,
+                    std::size_t* M,
+                    std::size_t* N,
+                    std::size_t* nz,
+                    std::size_t** I,
+                    std::size_t** J,
                     double** val,
                     MM_typecode* matcode) {
   int ret_code;
@@ -330,8 +340,8 @@ int mm_read_mtx_crd(char* fname,
   if ((ret_code = mm_read_mtx_crd_size(f, M, N, nz)) != 0)
     return ret_code;
 
-  *I = (int*)malloc(*nz * sizeof(int));
-  *J = (int*)malloc(*nz * sizeof(int));
+  *I = (std::size_t*)malloc(*nz * sizeof(std::size_t));
+  *J = (std::size_t*)malloc(*nz * sizeof(std::size_t));
   *val = NULL;
 
   if (mm_is_complex(*matcode)) {
@@ -370,15 +380,15 @@ int mm_write_banner(FILE* f, MM_typecode matcode) {
 }
 
 int mm_write_mtx_crd(char fname[],
-                     int M,
-                     int N,
-                     int nz,
-                     int I[],
-                     int J[],
+                     std::size_t M,
+                     std::size_t N,
+                     std::size_t nz,
+                     std::size_t I[],
+                     std::size_t J[],
                      double val[],
                      MM_typecode matcode) {
   FILE* f;
-  int i;
+  std::size_t i;
 
   if (strcmp(fname, "stdout") == 0)
     f = stdout;
@@ -390,18 +400,18 @@ int mm_write_mtx_crd(char fname[],
   fprintf(f, "%s\n", mm_typecode_to_str(matcode));
 
   /* print matrix sizes and nonzeros */
-  fprintf(f, "%d %d %d\n", M, N, nz);
+  fprintf(f, "%zu %zu %zu\n", M, N, nz);
 
   /* print values */
   if (mm_is_pattern(matcode))
     for (i = 0; i < nz; i++)
-      fprintf(f, "%d %d\n", I[i], J[i]);
+      fprintf(f, "%zu %zu\n", I[i], J[i]);
   else if (mm_is_real(matcode))
     for (i = 0; i < nz; i++)
-      fprintf(f, "%d %d %20.16g\n", I[i], J[i], val[i]);
+      fprintf(f, "%zu %zu %20.16g\n", I[i], J[i], val[i]);
   else if (mm_is_complex(matcode))
     for (i = 0; i < nz; i++)
-      fprintf(f, "%d %d %20.16g %20.16g\n", I[i], J[i], val[2 * i],
+      fprintf(f, "%zu %zu %20.16g %20.16g\n", I[i], J[i], val[2 * i],
               val[2 * i + 1]);
   else {
     if (f != stdout)

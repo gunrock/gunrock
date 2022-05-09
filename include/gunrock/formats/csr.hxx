@@ -23,6 +23,10 @@ template <memory_space_t space,
           typename offset_t,
           typename value_t>
 struct csr_t {
+  using index_type = index_t;
+  using offset_type = offset_t;
+  using value_type = value_t;
+
   index_t number_of_rows;
   index_t number_of_columns;
   offset_t number_of_nonzeros;

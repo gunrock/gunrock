@@ -19,6 +19,8 @@
 
 #include <moderngpu/kernel_segreduce.hxx>
 
+// #define LBS_SEGREDUCE 1
+
 namespace gunrock {
 namespace operators {
 namespace neighborreduce {
@@ -66,6 +68,7 @@ void execute(graph_t& G,
   if (context.size() == 1) {
     auto context0 = context.get_context(0);
 
+    using type_t = typename graph_t::vertex_type;
     using find_csr_t = typename graph_t::graph_csr_view_t;
     if (!(G.template contains_representation<find_csr_t>())) {
       error::throw_if_exception(cudaErrorUnknown,
@@ -73,10 +76,27 @@ void execute(graph_t& G,
                                 "required for neighborreduce operator.");
     }
 
+#ifndef LBS_SEGREDUCE
     // TODO: Throw an exception if input_t is not advance_io_type_t::graph.
     mgpu::transform_segreduce(op, G.get_number_of_edges(), G.get_row_offsets(),
                               G.get_number_of_vertices(), output, arithmetic_op,
                               init_value, *(context0->mgpu()));
+
+#else
+
+    auto f = [=] __device__(std::size_t index, std::size_t seg,
+                            std::size_t rank) {
+      auto v = type_t(seg);
+      auto start_edge = G.get_starting_edge(v);
+      auto e = start_edge + rank;
+      return op(e);
+    };
+
+    // TODO: Throw an exception if input_t is not advance_io_type_t::graph.
+    mgpu::lbs_segreduce(f, G.get_number_of_edges(), G.get_row_offsets(),
+                        G.get_number_of_vertices(), output, arithmetic_op,
+                        init_value, *(context0->mgpu()));
+#endif
   }
 }
 

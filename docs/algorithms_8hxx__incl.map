@@ -1,0 +1,29 @@
+<map id="/home/neoblizz/essentials/include/gunrock/algorithms/algorithms.hxx" name="/home/neoblizz/essentials/include/gunrock/algorithms/algorithms.hxx">
+<area shape="rect" id="node4" href="$framework_8hxx.html" title="gunrock/framework/framework.hxx" alt="" coords="701,109,923,136"/>
+<area shape="rect" id="node7" href="$graph_8hxx_source.html" title="gunrock/graph/graph.hxx" alt="" coords="904,363,1069,389"/>
+<area shape="rect" id="node11" href="$math_8hxx.html" title="gunrock/util/math.hxx" alt="" coords="1583,445,1729,471"/>
+<area shape="rect" id="node26" href="$formats_8hxx.html" title="gunrock/formats/formats.hxx" alt="" coords="2241,534,2431,561"/>
+<area shape="rect" id="node28" href="$vector_8hxx.html" title="support for stl based vectors on gpu. Relies on thrust::host and device vectors. " alt="" coords="2222,691,2413,717"/>
+<area shape="rect" id="node36" href="$print_8hxx.html" title="gunrock/util/print.hxx" alt="" coords="3269,534,3411,561"/>
+<area shape="rect" id="node40" href="$compare_8hxx.html" title="gunrock/util/compare.hxx" alt="" coords="1993,445,2161,471"/>
+<area shape="rect" id="node43" href="$matrix__market_8hxx.html" title="gunrock/io/matrix_market.hxx" alt="" coords="2525,445,2720,471"/>
+<area shape="rect" id="node47" href="$sample_8hxx.html" title="gunrock/io/sample.hxx" alt="" coords="2090,281,2243,307"/>
+<area shape="rect" id="node48" href="$array_8hxx.html" title="Dense data structure supported within gunrock. Note that the array structure is modeled exactly after..." alt="" coords="1765,445,1947,471"/>
+<area shape="rect" id="node5" href="$cuda_8hxx.html" title="gunrock/cuda/cuda.hxx" alt="" coords="5,445,163,471"/>
+<area shape="rect" id="node6" href="$frontier_8hxx.html" title="Frontier structure for graph algorithms. Frontiers are one of the fundamental structure used to imple..." alt="" coords="898,273,1075,315"/>
+<area shape="rect" id="node33" href="$problem_8hxx.html" title="gunrock/framework/problem.hxx" alt="" coords="596,281,804,307"/>
+<area shape="rect" id="node34" href="$enactor_8hxx_source.html" title="gunrock/framework/enactor.hxx" alt="" coords="597,191,803,218"/>
+<area shape="rect" id="node35" href="$operators_8hxx.html" title="gunrock/framework/operators\l/operators.hxx" alt="" coords="827,184,1018,225"/>
+<area shape="rect" id="node10" href="$type__traits_8hxx_source.html" title="gunrock/util/type_traits.hxx" alt="" coords="873,765,1052,792"/>
+<area shape="rect" id="node19" href="$properties_8hxx_source.html" title="gunrock/graph/properties.hxx" alt="" coords="414,445,605,471"/>
+<area shape="rect" id="node20" href="$vertex__pair_8hxx_source.html" title="gunrock/graph/vertex\l_pair.hxx" alt="" coords="781,527,925,568"/>
+<area shape="rect" id="node21" href="$graph_2coo_8hxx_source.html" title="gunrock/graph/coo.hxx" alt="" coords="909,445,1064,471"/>
+<area shape="rect" id="node23" href="$graph_2csc_8hxx_source.html" title="gunrock/graph/csc.hxx" alt="" coords="680,445,835,471"/>
+<area shape="rect" id="node24" href="$graph_2csr_8hxx_source.html" title="gunrock/graph/csr.hxx" alt="" coords="1089,445,1239,471"/>
+<area shape="rect" id="node25" href="$build_8hxx.html" title="gunrock/graph/build.hxx" alt="" coords="2185,445,2345,471"/>
+<area shape="rect" id="node16" href="$atomic__functions_8hxx.html" title="gunrock/cuda/atomic\l_functions.hxx" alt="" coords="1366,527,1509,568"/>
+<area shape="rect" id="node27" href="$formats_2coo_8hxx_source.html" title="gunrock/formats/coo.hxx" alt="" coords="2073,616,2239,643"/>
+<area shape="rect" id="node31" href="$formats_2csc_8hxx_source.html" title="gunrock/formats/csc.hxx" alt="" coords="2263,616,2430,643"/>
+<area shape="rect" id="node32" href="$formats_2csr_8hxx_source.html" title="gunrock/formats/csr.hxx" alt="" coords="1885,616,2048,643"/>
+<area shape="rect" id="node46" href="$filepath_8hxx_source.html" title="gunrock/util/filepath.hxx" alt="" coords="2785,534,2945,561"/>
+</map>
