@@ -1,0 +1,30 @@
+<map id="/home/neoblizz/essentials/include/gunrock/algorithms/spgemm.hxx" name="/home/neoblizz/essentials/include/gunrock/algorithms/spgemm.hxx">
+<area shape="rect" id="node2" href="$algorithms_8hxx.html" title="gunrock/algorithms\l/algorithms.hxx" alt="" coords="2327,109,2459,151"/>
+<area shape="rect" id="node5" href="$framework_8hxx.html" title="gunrock/framework/framework.hxx" alt="" coords="651,199,874,225"/>
+<area shape="rect" id="node8" href="$graph_8hxx_source.html" title="gunrock/graph/graph.hxx" alt="" coords="931,452,1096,479"/>
+<area shape="rect" id="node12" href="$math_8hxx.html" title="gunrock/util/math.hxx" alt="" coords="1651,534,1797,561"/>
+<area shape="rect" id="node26" href="$formats_8hxx.html" title="gunrock/formats/formats.hxx" alt="" coords="2248,623,2437,650"/>
+<area shape="rect" id="node28" href="$vector_8hxx.html" title="support for stl based vectors on gpu. Relies on thrust::host and device vectors. " alt="" coords="2082,780,2273,807"/>
+<area shape="rect" id="node36" href="$print_8hxx.html" title="gunrock/util/print.hxx" alt="" coords="3225,623,3367,650"/>
+<area shape="rect" id="node40" href="$compare_8hxx.html" title="gunrock/util/compare.hxx" alt="" coords="2029,534,2197,561"/>
+<area shape="rect" id="node43" href="$matrix__market_8hxx.html" title="gunrock/io/matrix_market.hxx" alt="" coords="2557,534,2752,561"/>
+<area shape="rect" id="node47" href="$sample_8hxx.html" title="gunrock/io/sample.hxx" alt="" coords="2151,370,2305,397"/>
+<area shape="rect" id="node48" href="$array_8hxx.html" title="Dense data structure supported within gunrock. Note that the array structure is modeled exactly after..." alt="" coords="1822,534,2005,561"/>
+<area shape="rect" id="node6" href="$cuda_8hxx.html" title="gunrock/cuda/cuda.hxx" alt="" coords="5,534,163,561"/>
+<area shape="rect" id="node7" href="$frontier_8hxx.html" title="Frontier structure for graph algorithms. Frontiers are one of the fundamental structure used to imple..." alt="" coords="925,363,1102,404"/>
+<area shape="rect" id="node33" href="$problem_8hxx.html" title="gunrock/framework/problem.hxx" alt="" coords="692,370,900,397"/>
+<area shape="rect" id="node34" href="$enactor_8hxx_source.html" title="gunrock/framework/enactor.hxx" alt="" coords="771,281,976,307"/>
+<area shape="rect" id="node35" href="$operators_8hxx.html" title="gunrock/framework/operators\l/operators.hxx" alt="" coords="555,273,746,315"/>
+<area shape="rect" id="node11" href="$type__traits_8hxx_source.html" title="gunrock/util/type_traits.hxx" alt="" coords="1069,855,1248,881"/>
+<area shape="rect" id="node20" href="$properties_8hxx_source.html" title="gunrock/graph/properties.hxx" alt="" coords="507,534,698,561"/>
+<area shape="rect" id="node21" href="$vertex__pair_8hxx_source.html" title="gunrock/graph/vertex\l_pair.hxx" alt="" coords="887,616,1031,657"/>
+<area shape="rect" id="node22" href="$graph_2coo_8hxx_source.html" title="gunrock/graph/coo.hxx" alt="" coords="1229,534,1384,561"/>
+<area shape="rect" id="node23" href="$graph_2csc_8hxx_source.html" title="gunrock/graph/csc.hxx" alt="" coords="1051,534,1205,561"/>
+<area shape="rect" id="node24" href="$graph_2csr_8hxx_source.html" title="gunrock/graph/csr.hxx" alt="" coords="774,534,925,561"/>
+<area shape="rect" id="node25" href="$build_8hxx.html" title="gunrock/graph/build.hxx" alt="" coords="2221,534,2381,561"/>
+<area shape="rect" id="node17" href="$atomic__functions_8hxx.html" title="gunrock/cuda/atomic\l_functions.hxx" alt="" coords="1525,616,1667,657"/>
+<area shape="rect" id="node27" href="$formats_2coo_8hxx_source.html" title="gunrock/formats/coo.hxx" alt="" coords="2270,705,2437,732"/>
+<area shape="rect" id="node31" href="$formats_2csc_8hxx_source.html" title="gunrock/formats/csc.hxx" alt="" coords="1891,705,2058,732"/>
+<area shape="rect" id="node32" href="$formats_2csr_8hxx_source.html" title="gunrock/formats/csr.hxx" alt="" coords="2083,705,2245,732"/>
+<area shape="rect" id="node46" href="$filepath_8hxx_source.html" title="gunrock/util/filepath.hxx" alt="" coords="2792,623,2952,650"/>
+</map>

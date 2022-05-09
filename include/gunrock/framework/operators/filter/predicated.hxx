@@ -2,6 +2,7 @@
 
 #include <gunrock/util/type_limits.hxx>
 #include <gunrock/framework/operators/configs.hxx>
+#include <thrust/copy.h>
 
 namespace gunrock {
 namespace operators {

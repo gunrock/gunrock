@@ -1,0 +1,19 @@
+<map id="/home/neoblizz/essentials/include/gunrock/framework/operators/advance/block_mapped.hxx" name="/home/neoblizz/essentials/include/gunrock/framework/operators/advance/block_mapped.hxx">
+<area shape="rect" id="node2" href="$math_8hxx.html" title="gunrock/util/math.hxx" alt="" coords="129,385,275,411"/>
+<area shape="rect" id="node8" href="$cuda_8hxx.html" title="gunrock/cuda/cuda.hxx" alt="" coords="1331,117,1489,143"/>
+<area shape="rect" id="node37" href="$operators_2configs_8hxx_source.html" title="gunrock/framework/operators\l/configs.hxx" alt="" coords="1513,109,1704,151"/>
+<area shape="rect" id="node7" href="$atomic__functions_8hxx.html" title="gunrock/cuda/atomic\l_functions.hxx" alt="" coords="5,467,148,508"/>
+<area shape="rect" id="node9" href="$global_8hxx.html" title="gunrock/cuda/global.hxx" alt="" coords="2130,206,2293,233"/>
+<area shape="rect" id="node10" href="$device_8hxx.html" title="gunrock/cuda/device.hxx" alt="" coords="2200,474,2367,501"/>
+<area shape="rect" id="node11" href="$function_8hxx.html" title="gunrock/cuda/function.hxx" alt="" coords="300,385,475,411"/>
+<area shape="rect" id="node12" href="$stream__management_8hxx.html" title="gunrock/cuda/stream\l_management.hxx" alt="" coords="499,377,643,419"/>
+<area shape="rect" id="node13" href="$event__management_8hxx.html" title="gunrock/cuda/event\l_management.hxx" alt="" coords="667,377,803,419"/>
+<area shape="rect" id="node14" href="$device__properties_8hxx.html" title="gunrock/cuda/device\l_properties.hxx" alt="" coords="2068,377,2211,419"/>
+<area shape="rect" id="node17" href="$context_8hxx.html" title="gunrock/cuda/context.hxx" alt="" coords="1400,295,1572,322"/>
+<area shape="rect" id="node33" href="$sm_8hxx.html" title="gunrock/cuda/sm.hxx" alt="" coords="1229,295,1375,322"/>
+<area shape="rect" id="node34" href="$launch__box_8hxx.html" title="gunrock/cuda/launch\l_box.hxx" alt="" coords="1589,199,1732,240"/>
+<area shape="rect" id="node18" href="$timer_8hxx.html" title="Simple timer utility for device side code. " alt="" coords="1250,385,1397,411"/>
+<area shape="rect" id="node19" href="$array_8hxx.html" title="Dense data structure supported within gunrock. Note that the array structure is modeled exactly after..." alt="" coords="828,385,1011,411"/>
+<area shape="rect" id="node26" href="$vector_8hxx.html" title="support for stl based vectors on gpu. Relies on thrust::host and device vectors. " alt="" coords="1035,385,1225,411"/>
+<area shape="rect" id="node28" href="$type__traits_8hxx_source.html" title="gunrock/util/type_traits.hxx" alt="" coords="1034,474,1213,501"/>
+</map>

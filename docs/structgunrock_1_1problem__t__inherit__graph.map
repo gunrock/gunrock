@@ -1,0 +1,15 @@
+<map id="gunrock::problem_t&lt; graph_t &gt;" name="gunrock::problem_t&lt; graph_t &gt;">
+<area shape="rect" id="node2" href="$structgunrock_1_1bc_1_1problem__t.html" title="gunrock::bc::problem\l_t\&lt; graph_t \&gt;" alt="" coords="205,5,349,47"/>
+<area shape="rect" id="node3" href="$structgunrock_1_1bfs_1_1problem__t.html" title="gunrock::bfs::problem\l_t\&lt; graph_t \&gt;" alt="" coords="203,71,351,112"/>
+<area shape="rect" id="node4" href="$structgunrock_1_1color_1_1problem__t.html" title="gunrock::color::problem\l_t\&lt; graph_t \&gt;" alt="" coords="197,136,356,177"/>
+<area shape="rect" id="node5" href="$structgunrock_1_1experimental_1_1async_1_1bfs_1_1problem__t.html" title="gunrock::experimental\l::async::bfs::problem\l_t\&lt; graph_t \&gt;" alt="" coords="201,202,352,258"/>
+<area shape="rect" id="node6" href="$structgunrock_1_1geo_1_1problem__t.html" title="gunrock::geo::problem\l_t\&lt; graph_t \&gt;" alt="" coords="201,283,352,324"/>
+<area shape="rect" id="node7" href="$structgunrock_1_1hits_1_1problem__t.html" title="gunrock::hits::problem\l_t\&lt; graph_t \&gt;" alt="" coords="201,348,352,389"/>
+<area shape="rect" id="node8" href="$structgunrock_1_1kcore_1_1problem__t.html" title="gunrock::kcore::problem\l_t\&lt; graph_t \&gt;" alt="" coords="195,413,358,455"/>
+<area shape="rect" id="node9" href="$structgunrock_1_1mst_1_1problem__t.html" title="gunrock::mst::problem\l_t\&lt; graph_t \&gt;" alt="" coords="201,479,353,520"/>
+<area shape="rect" id="node10" href="$structgunrock_1_1ppr_1_1problem__t.html" title="gunrock::ppr::problem\l_t\&lt; graph_t \&gt;" alt="" coords="203,544,351,585"/>
+<area shape="rect" id="node11" href="$structgunrock_1_1pr_1_1problem__t.html" title="gunrock::pr::problem\l_t\&lt; graph_t \&gt;" alt="" coords="206,609,347,651"/>
+<area shape="rect" id="node12" href="$structgunrock_1_1spgemm_1_1problem__t.html" title="gunrock::spgemm::problem\l_t\&lt; graph_t \&gt;" alt="" coords="187,675,367,716"/>
+<area shape="rect" id="node13" href="$structgunrock_1_1spmv_1_1problem__t.html" title="gunrock::spmv::problem\l_t\&lt; graph_t \&gt;" alt="" coords="195,740,358,781"/>
+<area shape="rect" id="node14" href="$structgunrock_1_1sssp_1_1problem__t.html" title="gunrock::sssp::problem\l_t\&lt; graph_t \&gt;" alt="" coords="197,805,356,847"/>
+</map>

@@ -1,0 +1,9 @@
+var searchData=
+[
+  ['neighborreduce_2ehxx',['neighborreduce.hxx',['../neighborreduce_8hxx.html',1,'']]],
+  ['number_5fof_5fgraph_5frepresentations',['number_of_graph_representations',['../classgunrock_1_1graph_1_1graph__t.html#afda37174d680f72250645f8549ace7ad',1,'gunrock::graph::graph_t']]],
+  ['numeric_5flimits',['numeric_limits',['../structgunrock_1_1numeric__limits.html',1,'gunrock']]],
+  ['numeric_5flimits_3c_20type_5ft_2c_20typename_20std_3a_3aenable_5fif_5ft_3c_20std_3a_3ais_5ffloating_5fpoint_3c_20type_5ft_20_3e_3a_3avalue_20_3e_20_3e',['numeric_limits&lt; type_t, typename std::enable_if_t&lt; std::is_floating_point&lt; type_t &gt;::value &gt; &gt;',['../structgunrock_1_1numeric__limits_3_01type__t_00_01typename_01std_1_1enable__if__t_3_01std_1_1is_cee498b31bd2079b9df0df4f1bfe8c08.html',1,'gunrock']]],
+  ['numeric_5flimits_3c_20type_5ft_2c_20typename_20std_3a_3aenable_5fif_5ft_3c_20std_3a_3ais_5fintegral_3c_20type_5ft_20_3e_3a_3avalue_20_26_26std_3a_3ais_5fsigned_3c_20type_5ft_20_3e_3a_3avalue_20_3e_20_3e',['numeric_limits&lt; type_t, typename std::enable_if_t&lt; std::is_integral&lt; type_t &gt;::value &amp;&amp;std::is_signed&lt; type_t &gt;::value &gt; &gt;',['../structgunrock_1_1numeric__limits_3_01type__t_00_01typename_01std_1_1enable__if__t_3_01std_1_1is_b30cb6c6a4b61bf403c9d39fb3dd1112.html',1,'gunrock']]],
+  ['numeric_5flimits_3c_20type_5ft_2c_20typename_20std_3a_3aenable_5fif_5ft_3c_20std_3a_3ais_5fintegral_3c_20type_5ft_20_3e_3a_3avalue_20_26_26std_3a_3ais_5funsigned_3c_20type_5ft_20_3e_3a_3avalue_20_3e_20_3e',['numeric_limits&lt; type_t, typename std::enable_if_t&lt; std::is_integral&lt; type_t &gt;::value &amp;&amp;std::is_unsigned&lt; type_t &gt;::value &gt; &gt;',['../structgunrock_1_1numeric__limits_3_01type__t_00_01typename_01std_1_1enable__if__t_3_01std_1_1is_6f945ef9bd6508d2d878ab9e4b51adb2.html',1,'gunrock']]]
+];

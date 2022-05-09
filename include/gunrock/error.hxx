@@ -2,6 +2,7 @@
 
 #include <exception>
 #include <string>
+#include <cuda_runtime_api.h>
 
 namespace gunrock {
 
@@ -34,12 +35,12 @@ struct exception_t : std::exception {
  * @param status error_t error code (equivalent to cudaError_t).
  * @param message custom message to be appended to the error message.
  */
-void throw_if_exception(error_t status, std::string message = "") {
+inline void throw_if_exception(error_t status, std::string message = "") {
   if (status != cudaSuccess)
     throw exception_t(status, message);
 }
 
-void throw_if_exception(bool is_exception, std::string message = "") {
+inline void throw_if_exception(bool is_exception, std::string message = "") {
   if (is_exception)
     throw exception_t(message);
 }

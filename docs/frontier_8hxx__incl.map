@@ -1,0 +1,31 @@
+<map id="/home/neoblizz/essentials/include/gunrock/framework/frontier/frontier.hxx" name="/home/neoblizz/essentials/include/gunrock/framework/frontier/frontier.hxx">
+<area shape="rect" id="node2" href="$frontier_2configs_8hxx_source.html" title="gunrock/framework/frontier\l/configs.hxx" alt="" coords="5,348,183,389"/>
+<area shape="rect" id="node3" href="$vector__frontier_8hxx.html" title="Vector&#45;based frontier implementation. " alt="" coords="221,259,399,300"/>
+<area shape="rect" id="node4" href="$type__limits_8hxx_source.html" title="gunrock/util/type_limits.hxx" alt="" coords="517,355,698,382"/>
+<area shape="rect" id="node19" href="$graph_8hxx_source.html" title="gunrock/graph/graph.hxx" alt="" coords="1158,109,1323,136"/>
+<area shape="rect" id="node34" href="$context_8hxx.html" title="gunrock/cuda/context.hxx" alt="" coords="2857,355,3029,382"/>
+<area shape="rect" id="node9" href="$load__store_8hxx.html" title="gunrock/util/load_store.hxx" alt="" coords="125,534,303,561"/>
+<area shape="rect" id="node11" href="$vector_8hxx.html" title="support for stl based vectors on gpu. Relies on thrust::host and device vectors. " alt="" coords="379,445,569,471"/>
+<area shape="rect" id="node15" href="$radix__sort_8hxx.html" title="gunrock/algorithms\l/sort/radix_sort.hxx" alt="" coords="824,348,959,389"/>
+<area shape="rect" id="node7" href="$type__traits_8hxx_source.html" title="gunrock/util/type_traits.hxx" alt="" coords="717,534,895,561"/>
+<area shape="rect" id="node16" href="$stream__management_8hxx.html" title="gunrock/cuda/stream\l_management.hxx" alt="" coords="2029,437,2173,479"/>
+<area shape="rect" id="node22" href="$math_8hxx.html" title="gunrock/util/math.hxx" alt="" coords="1673,355,1819,382"/>
+<area shape="rect" id="node27" href="$cuda_8hxx.html" title="gunrock/cuda/cuda.hxx" alt="" coords="2919,184,3077,211"/>
+<area shape="rect" id="node44" href="$properties_8hxx_source.html" title="gunrock/graph/properties.hxx" alt="" coords="727,184,917,211"/>
+<area shape="rect" id="node45" href="$vertex__pair_8hxx_source.html" title="gunrock/graph/vertex\l_pair.hxx" alt="" coords="1377,527,1521,568"/>
+<area shape="rect" id="node46" href="$graph_2coo_8hxx_source.html" title="gunrock/graph/coo.hxx" alt="" coords="1294,445,1449,471"/>
+<area shape="rect" id="node48" href="$graph_2csc_8hxx_source.html" title="gunrock/graph/csc.hxx" alt="" coords="1115,445,1270,471"/>
+<area shape="rect" id="node49" href="$graph_2csr_8hxx_source.html" title="gunrock/graph/csr.hxx" alt="" coords="940,445,1091,471"/>
+<area shape="rect" id="node50" href="$build_8hxx.html" title="gunrock/graph/build.hxx" alt="" coords="942,184,1102,211"/>
+<area shape="rect" id="node26" href="$atomic__functions_8hxx.html" title="gunrock/cuda/atomic\l_functions.hxx" alt="" coords="1607,437,1749,479"/>
+<area shape="rect" id="node28" href="$global_8hxx.html" title="gunrock/cuda/global.hxx" alt="" coords="2318,266,2481,293"/>
+<area shape="rect" id="node29" href="$device_8hxx.html" title="gunrock/cuda/device.hxx" alt="" coords="3223,534,3389,561"/>
+<area shape="rect" id="node30" href="$function_8hxx.html" title="gunrock/cuda/function.hxx" alt="" coords="3371,445,3545,471"/>
+<area shape="rect" id="node31" href="$event__management_8hxx.html" title="gunrock/cuda/event\l_management.hxx" alt="" coords="3570,437,3706,479"/>
+<area shape="rect" id="node32" href="$device__properties_8hxx.html" title="gunrock/cuda/device\l_properties.hxx" alt="" coords="3204,437,3347,479"/>
+<area shape="rect" id="node40" href="$sm_8hxx.html" title="gunrock/cuda/sm.hxx" alt="" coords="2555,355,2702,382"/>
+<area shape="rect" id="node41" href="$launch__box_8hxx.html" title="gunrock/cuda/launch\l_box.hxx" alt="" coords="2981,259,3124,300"/>
+<area shape="rect" id="node35" href="$timer_8hxx.html" title="Simple timer utility for device side code. " alt="" coords="2506,445,2653,471"/>
+<area shape="rect" id="node36" href="$array_8hxx.html" title="Dense data structure supported within gunrock. Note that the array structure is modeled exactly after..." alt="" coords="2248,445,2431,471"/>
+<area shape="rect" id="node47" href="$binary__search_8hxx_source.html" title="gunrock/algorithms\l/search/binary_search.hxx" alt="" coords="1088,527,1263,568"/>
+</map>
