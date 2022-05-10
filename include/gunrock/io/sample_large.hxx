@@ -41,18 +41,18 @@ format::csr_t<space, vertex_t, edge_t, weight_t> csr() {
 
   // Row Offsets
   thrust::host_vector<int> rowSeq(dim + 1);
-  thrust::host_vector<int> multVector(dim + 1);
+  thrust::host_vector<int> multVect(dim + 1);
   thrust::sequence(rowSeq.begin(), rowSeq.end());
-  thrust::fill(multVector.begin(), multVector.end(), dim);
-  thrust::transform(rowSeq.begin(), rowSeq.end(), multVector.begin(),
+  thrust::fill(multVect.begin(), multVect.end(), dim);
+  thrust::transform(rowSeq.begin(), rowSeq.end(), multVect.begin(),
                     matrix.row_offsets.begin(), thrust::multiplies<int>());
 
   // Column Indices
   thrust::host_vector<int> colSeq(dim * dim);
-  thrust::host_vector<int> modVector(dim * dim);
+  thrust::host_vector<int> modVect(dim * dim);
   thrust::sequence(colSeq.begin(), colSeq.end());
-  thrust::fill(modVector.begin(), modVector.end(), dim);
-  thrust::transform(colSeq.begin(), colSeq.end(), modVector.begin(),
+  thrust::fill(modVect.begin(), modVect.end(), dim);
+  thrust::transform(colSeq.begin(), colSeq.end(), modVect.begin(),
                     matrix.column_indices.begin(), thrust::modulus<int>());
 
   // Non-zero values
