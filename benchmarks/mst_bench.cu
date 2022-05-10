@@ -13,7 +13,7 @@ char** args;
 
 namespace gunrock {
 namespace benchmark {
-void parallel_for(nvbench::state& state) {
+void mst_bench(nvbench::state& state) {
   // Build a graph using a sample csr.
   auto csr = io::sample_large::csr();
   auto G =
@@ -28,18 +28,12 @@ void parallel_for(nvbench::state& state) {
   // --
   // GPU Run
   
-  std::cout << G.get_number_of_edges() << "\n";
-
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
     gunrock::mst::run(G, mst_weight.data().get());
   });
 }
 
-void parse_arg(int argc, char** argv) {
-  std::cout << argv[0] << "\n";
-}
-
-NVBENCH_BENCH(parallel_for).set_name("parallel_for");
+NVBENCH_BENCH(mst_bench).set_name("mst_bench");
 
 }  // namespace benchmark
 }  // namespace gunrock

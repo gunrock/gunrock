@@ -20,9 +20,8 @@ namespace sample_large {
 using namespace memory;
 
 /**
- * @brief Returns a large sample CSR matrix of size 100000 x 100000.
- *
- * @par Overview
+ * @brief Returns a large sample CSR matrix of size 10000 x 10000,
+ * filled with ones.
  *
  * @tparam space Memory space of the CSR matrix.
  * @tparam vertex_t Type of vertex.
@@ -37,25 +36,25 @@ template <memory_space_t space = memory_space_t::device,
 format::csr_t<space, vertex_t, edge_t, weight_t> csr() {
   using csr_t = format::csr_t<memory_space_t::host, vertex_t, edge_t, weight_t>;
 
-  int dim = 10;
+  int dim = 10000;
   csr_t matrix(dim, dim, dim * dim);
 
   // Row Offsets
-  thrust::host_vector<int> hv(dim * dim);
-  thrust::host_vector<int> mod(dim * dim);
-  thrust::sequence(hv.begin(), hv.end());
-  thrust::fill(mod.begin(), mod.end(), dim);
-  thrust::transform(hv.begin(), hv.end(), mod.begin(),
+  thrust::host_vector<int> rowSeq(dim + 1);
+  thrust::host_vector<int> multVector(dim + 1);
+  thrust::sequence(rowSeq.begin(), rowSeq.end());
+  thrust::fill(multVector.begin(), multVector.end(), dim);
+  thrust::transform(rowSeq.begin(), rowSeq.end(), multVector.begin(),
                     matrix.row_offsets.begin(), thrust::multiplies<int>());
-  for(int i = 0; i < matrix.row_offsets.size(); i++)
-        std::cout << "H[" << i << "] = " << matrix.row_offsets[i] << std::endl;
 
   // Column Indices
-  thrust::transform(hv.begin(), hv.end(), mod.begin(),
+  thrust::host_vector<int> colSeq(dim * dim);
+  thrust::host_vector<int> modVector(dim * dim);
+  thrust::sequence(colSeq.begin(), colSeq.end());
+  thrust::fill(modVector.begin(), modVector.end(), dim);
+  thrust::transform(colSeq.begin(), colSeq.end(), modVector.begin(),
                     matrix.column_indices.begin(), thrust::modulus<int>());
-  for(int i = 0; i < matrix.column_indices.size(); i++)
-        std::cout << "H[" << i << "] = " << matrix.column_indices[i] << std::endl;
-  
+
   // Non-zero values
   thrust::fill(matrix.nonzero_values.begin(), matrix.nonzero_values.end(), 1);
 
