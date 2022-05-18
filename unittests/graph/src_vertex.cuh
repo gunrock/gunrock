@@ -9,7 +9,7 @@ template <typename graph_t>
 void test_get_source_vertex(graph_t& G) {
   using edge_t = typename graph_t::edge_type;
   auto context =
-      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
+      std::shared_ptr<gcuda::multi_context_t>(new gcuda::multi_context_t(0));
 
   auto log_edge = [=] __device__(edge_t const& e) -> void {
     auto src = G.get_source_vertex(e);

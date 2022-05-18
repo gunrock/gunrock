@@ -11,9 +11,9 @@
 #pragma once
 
 namespace gunrock {
-namespace cuda {
+namespace gcuda {
 
 typedef cudaStream_t stream_t;
 
-}  // namespace cuda
+}  // namespace gcuda
 }  // namespace gunrock

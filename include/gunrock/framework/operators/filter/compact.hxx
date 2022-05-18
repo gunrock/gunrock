@@ -13,7 +13,7 @@ void execute(graph_t& G,
              operator_t op,
              frontier_t* input,
              frontier_t* output,
-             cuda::standard_context_t& context) {
+             gcuda::standard_context_t& context) {
   using vertex_t = typename graph_t::vertex_type;
   using size_type = decltype(input->get_number_of_elements());
 

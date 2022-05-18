@@ -140,7 +140,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   };
 
   problem_t(graph_t& G,
-            std::shared_ptr<cuda::multi_context_t> _context,
+            std::shared_ptr<gcuda::multi_context_t> _context,
             int max_iterations)
       : gunrock::problem_t<graph_t>(G, _context),
         max_iterations(max_iterations) {
@@ -234,14 +234,14 @@ struct problem_t : gunrock::problem_t<graph_t> {
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
   enactor_t(problem_t* _problem,
-            std::shared_ptr<cuda::multi_context_t> _context)
+            std::shared_ptr<gcuda::multi_context_t> _context)
       : gunrock::enactor_t<problem_t>(_problem, _context) {}
 
   using vertex_t = typename problem_t::vertex_t;
   using edge_t = typename problem_t::edge_t;
   using weight_t = typename problem_t::weight_t;
 
-  void loop(cuda::multi_context_t& context) override {
+  void loop(gcuda::multi_context_t& context) override {
     // Data slice qqq
     auto E = this->get_enactor();
     auto P = this->get_problem();
@@ -275,7 +275,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
   }  // end of loop
 
-  bool is_converged(cuda::multi_context_t& context) override {
+  bool is_converged(gcuda::multi_context_t& context) override {
     auto P = this->get_problem();
     return P->is_converged();
   }
@@ -296,9 +296,9 @@ template <typename graph_t, typename param_t, typename result_t>
 float run(graph_t& G,
           param_t& param,
           result_t& result,
-          std::shared_ptr<cuda::multi_context_t> context =
-              std::shared_ptr<cuda::multi_context_t>(
-                  new cuda::multi_context_t(0))  // Context
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))  // Context
 ) {
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;

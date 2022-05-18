@@ -20,14 +20,14 @@ namespace parallel_for {
  * @tparam frontier_t Frontier type.
  * @param f Frontiers to apply user-defined function to.
  * @param op User-defined function.
- * @param context Device context (@see cuda::multi_context_t).
+ * @param context Device context (@see gcuda::multi_context_t).
  * @return bool ignore the output, limitation of `__device__` lambda functions
  * require a template parameter to be named (see
  * https://github.com/neoblizz/enable_if_bug).
  */
 template <parallel_for_each_t type, typename func_t, typename frontier_t>
 std::enable_if_t<type == parallel_for_each_t::element>
-execute(frontier_t& f, func_t op, cuda::multi_context_t& context) {
+execute(frontier_t& f, func_t op, gcuda::multi_context_t& context) {
   static_assert(type == parallel_for_each_t::element);
   using type_t = typename frontier_t::type_t;
   auto single_context = context.get_context(0);
@@ -52,14 +52,14 @@ execute(frontier_t& f, func_t op, cuda::multi_context_t& context) {
  * @tparam graph_t Graph type.
  * @param G Graph to apply user-defined function to.
  * @param op User-defined function.
- * @param context Device context (@see cuda::multi_context_t).
+ * @param context Device context (@see gcuda::multi_context_t).
  * @return bool ignore the output, limitation of `__device__` lambda functions
  * require a template parameter to be named (see
  * https://github.com/neoblizz/enable_if_bug).
  */
 template <parallel_for_each_t type, typename func_t, typename graph_t>
 std::enable_if_t<type != parallel_for_each_t::element>
-execute(graph_t& G, func_t op, cuda::multi_context_t& context) {
+execute(graph_t& G, func_t op, gcuda::multi_context_t& context) {
   static_assert((type == parallel_for_each_t::weight) ||
                 (type == parallel_for_each_t::edge) ||
                 (type == parallel_for_each_t::vertex));

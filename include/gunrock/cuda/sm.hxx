@@ -11,7 +11,7 @@
 #pragma once
 
 namespace gunrock {
-namespace cuda {
+namespace gcuda {
 
 namespace launch_box {
 
@@ -64,5 +64,5 @@ constexpr sm_flag_t operator&(sm_flag_t lhs, sm_flag_t rhs) {
 
 }  // namespace launch_box
 
-}  // namespace cuda
+}  // namespace gcuda
 }  // namespace gunrock

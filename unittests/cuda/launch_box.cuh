@@ -3,7 +3,7 @@
 
 #include <gunrock/cuda/launch_box.hxx>
 
-using namespace gunrock::cuda::launch_box;
+using namespace gunrock::gcuda::launch_box;
 
 typedef launch_box_t<
     launch_params_t<sm_86 | sm_80, dim3_t<16, 2, 2>, dim3_t<64, 1, 4>, 2>,

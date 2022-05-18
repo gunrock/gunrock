@@ -29,8 +29,8 @@ TEST(operators, prallel_for) {
                                            gunrock::graph::view_t::csr>(csr);
 
   // Initialize the devicecontext.
-  gunrock::cuda::device_id_t device = 0;
-  gunrock::cuda::multi_context_t context(device);
+  gunrock::gcuda::device_id_t device = 0;
+  gunrock::gcuda::multi_context_t context(device);
 
   // Launch for using a separate function.
   gunrock::operators::parallel_for::execute<

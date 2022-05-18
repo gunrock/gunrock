@@ -11,9 +11,9 @@
 #pragma once
 
 namespace gunrock {
-namespace cuda {
+namespace gcuda {
 
 typedef cudaFuncAttributes function_attributes_t;
 
-}  // namespace cuda
+}  // namespace gcuda
 }  // namespace gunrock
