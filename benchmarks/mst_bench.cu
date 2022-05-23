@@ -14,7 +14,7 @@ using namespace gunrock;
 using namespace memory;
 
 using csr_t = format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
-csr_t csr;
+std::string filename;
 
 void mst_bench(nvbench::state& state) {
   state.collect_dram_throughput();
@@ -22,6 +22,17 @@ void mst_bench(nvbench::state& state) {
   state.collect_l2_hit_rates();
   state.collect_loads_efficiency();
   state.collect_stores_efficiency();
+
+  csr_t csr;
+  if (util::is_market(filename)) {
+    io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+    csr.from_coo(mm.load(filename));
+  } else if (util::is_binary_csr(filename)) {
+    csr.read_binary(filename);
+  } else {
+    std::cerr << "Unknown file format: " << filename << std::endl;
+    exit(1);
+  }
 
   thrust::device_vector<vertex_t> row_indices(csr.number_of_nonzeros);
   thrust::device_vector<vertex_t> column_indices(csr.number_of_nonzeros);
@@ -59,17 +70,7 @@ void mst_bench(nvbench::state& state) {
 }
 
 int main(int argc, char** argv) {
-  std::string filename = argv[1];
-
-  if (util::is_market(filename)) {
-    io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-    csr.from_coo(mm.load(filename));
-  } else if (util::is_binary_csr(filename)) {
-    csr.read_binary(filename);
-  } else {
-    std::cerr << "Unknown file format: " << filename << std::endl;
-    exit(1);
-  }
+  filename = argv[1];
 
   char* args[argc - 1];
   args[0] = argv[0];

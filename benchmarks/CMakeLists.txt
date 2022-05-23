@@ -1,6 +1,6 @@
 set(BENCHMARK_SOURCES
   for.cu
-  bench.cu
+  mst_bench.cu
 )
 
 foreach(SOURCE IN LISTS BENCHMARK_SOURCES)
