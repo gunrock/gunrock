@@ -39,7 +39,7 @@ template <typename graph_t, typename frontier_t, typename work_tiles_t>
 std::size_t compute_output_offsets(graph_t& G,
                                    frontier_t* input,
                                    work_tiles_t& segments,
-                                   cuda::standard_context_t& context,
+                                   gcuda::standard_context_t& context,
                                    bool graph_as_frontier = false) {
   using vertex_t = typename graph_t::vertex_type;
   using edge_t = typename graph_t::edge_type;
@@ -112,7 +112,7 @@ std::size_t compute_output_offsets(graph_t& G,
 template <typename graph_t, typename frontier_t>
 std::size_t compute_output_length(graph_t& G,
                                   frontier_t& input,
-                                  cuda::standard_context_t& context,
+                                  gcuda::standard_context_t& context,
                                   bool graph_as_frontier = false) {
   using vertex_t = typename graph_t::vertex_type;
   using edge_t = typename graph_t::edge_type;

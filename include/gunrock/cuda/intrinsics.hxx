@@ -11,5 +11,5 @@
 
 #pragma once
 namespace gunrock {
-namespace cuda {}  // namespace cuda
+namespace gcuda {}  // namespace gcuda
 }  // namespace gunrock

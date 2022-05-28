@@ -50,7 +50,7 @@ namespace neighborreduce {
  * @param op user-defined lambda function.
  * @param arithmetic_op arithmetic operator (binary).
  * @param init_value initial value for the reduction.
- * @param context cuda context (@see cuda::multi_context_t).
+ * @param context cuda context (@see gcuda::multi_context_t).
  */
 template <advance_io_type_t input_t = advance_io_type_t::graph,
           typename graph_t,
@@ -64,7 +64,7 @@ void execute(graph_t& G,
              operator_t op,
              arithmetic_t arithmetic_op,
              output_t init_value,
-             cuda::multi_context_t& context) {
+             gcuda::multi_context_t& context) {
   if (context.size() == 1) {
     auto context0 = context.get_context(0);
 

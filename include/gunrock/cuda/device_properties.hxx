@@ -14,7 +14,7 @@
 #include <gunrock/error.hxx>
 
 namespace gunrock {
-namespace cuda {
+namespace gcuda {
 
 typedef cudaDeviceProp device_properties_t;
 
@@ -241,5 +241,5 @@ void print(device_properties_t& prop) {
 
 }  // namespace properties
 
-}  // namespace cuda
+}  // namespace gcuda
 }  // namespace gunrock

@@ -13,7 +13,7 @@
 #include <gunrock/cuda/sm.hxx>
 
 namespace gunrock {
-namespace cuda {
+namespace gcuda {
 namespace launch_box {
 namespace detail {
 
@@ -97,5 +97,5 @@ inline void for_each_argument_address(void** collected_addresses,
 
 }  // namespace detail
 }  // namespace launch_box
-}  // namespace cuda
+}  // namespace gcuda
 }  // namespace gunrock

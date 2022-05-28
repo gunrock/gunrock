@@ -10,7 +10,7 @@
  */
 #pragma once
 namespace gunrock {
-namespace cuda {
+namespace gcuda {
 
 /**
  * @brief Wrapper around CUDA's natively supported atomicMin types.
@@ -122,5 +122,5 @@ __device__ static double atomicMax(double* address, double value) {
   return __longlong_as_double(old);
 }
 
-}  // namespace cuda
+}  // namespace gcuda
 }  // namespace gunrock

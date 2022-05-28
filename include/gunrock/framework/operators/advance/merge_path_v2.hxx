@@ -196,7 +196,7 @@ void execute(graph_t& G,
              frontier_t& input,
              frontier_t& output,
              work_tiles_t& segments,
-             cuda::standard_context_t& context) {
+             gcuda::standard_context_t& context) {
   auto size_of_output = compute_output_offsets(
       G, &input, segments, context,
       (input_type == advance_io_type_t::graph) ? true : false);

@@ -93,9 +93,9 @@ struct enactor_t {
 
   /*!
    * A shared_ptr to a multi-gpu context.
-   * @see `gunrock::cuda::multi_context_t`
+   * @see `gunrock::gcuda::multi_context_t`
    */
-  std::shared_ptr<cuda::multi_context_t> context;
+  std::shared_ptr<gcuda::multi_context_t> context;
 
   /*!
    * Algorithm's problem structure.
@@ -151,7 +151,7 @@ struct enactor_t {
    * @brief Construct a new enactor t object.
    *
    * @param _problem algorithm's problem data structure.
-   * @param _context shared pointer to the cuda::multi_context_t context that
+   * @param _context shared pointer to the gcuda::multi_context_t context that
    * stores information about multiple GPUs (such as streams, device ids,
    * events, etc.)
    * @param _properties `gunrock::enactor_properties_t`, includes
@@ -159,7 +159,7 @@ struct enactor_t {
    * frontier buffers to create for the enactor.
    */
   enactor_t(algorithm_problem_t* _problem,
-            std::shared_ptr<cuda::multi_context_t> _context,
+            std::shared_ptr<gcuda::multi_context_t> _context,
             enactor_properties_t _properties = enactor_properties_t())
       : problem(_problem),
         properties(_properties),
@@ -265,17 +265,17 @@ struct enactor_t {
    * function if they are not part of the algorithm's core, or running API calls
    * that are incredibly slow (such as `printfs` or debug statements).
    *
-   * @param context `gunrock::cuda::multi_context_t`.
+   * @param context `gunrock::gcuda::multi_context_t`.
    */
-  virtual void loop(cuda::multi_context_t& context) = 0;
+  virtual void loop(gcuda::multi_context_t& context) = 0;
 
   /**
    * @brief Prepare the initial frontier.
    *
-   * @param context `gunrock::cuda::multi_context_t`.
+   * @param context `gunrock::gcuda::multi_context_t`.
    */
   virtual void prepare_frontier(frontier_t* f,
-                                cuda::multi_context_t& context){};
+                                gcuda::multi_context_t& context){};
 
   /**
    * @brief Algorithm is converged if true is returned, keep on iterating if
@@ -291,7 +291,7 @@ struct enactor_t {
    * @return true converged!
    * @return false not converged, keep looping!
    */
-  virtual bool is_converged(cuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) {
     return active_frontier->is_empty();
   }
 
@@ -303,9 +303,9 @@ struct enactor_t {
    * one final wrap-up of the application. Users are not required to implement
    * this function.
    *
-   * @param context `gunrock::cuda::multi_context_t`.
+   * @param context `gunrock::gcuda::multi_context_t`.
    */
-  virtual void finalize(cuda::multi_context_t& context) {}
+  virtual void finalize(gcuda::multi_context_t& context) {}
 
 };  // struct enactor_t
 

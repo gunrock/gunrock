@@ -33,16 +33,16 @@ struct problem_t {
   using weight_t = typename graph_t::weight_type;
 
   graph_t graph_slice;
-  std::shared_ptr<cuda::multi_context_t> context;
+  std::shared_ptr<gcuda::multi_context_t> context;
 
   problem_t() : graph_slice(nullptr) {}
 
-  problem_t(graph_t& G, std::shared_ptr<cuda::multi_context_t> _context)
+  problem_t(graph_t& G, std::shared_ptr<gcuda::multi_context_t> _context)
       : graph_slice(G), context(_context) {}
 
   auto get_graph() { return graph_slice; }
   auto get_multi_context() { return context; }
-  auto get_single_context(cuda::device_id_t device = 0) {
+  auto get_single_context(gcuda::device_id_t device = 0) {
     return context->get_context(device);
   }
 

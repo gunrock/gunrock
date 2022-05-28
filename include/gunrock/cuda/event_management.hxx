@@ -12,9 +12,9 @@
 #pragma once
 
 namespace gunrock {
-namespace cuda {
+namespace gcuda {
 
 typedef cudaEvent_t event_t;
 
-}  // namespace cuda
+}  // namespace gcuda
 }  // namespace gunrock

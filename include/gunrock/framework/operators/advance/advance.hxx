@@ -98,7 +98,7 @@ void execute(graph_t& G,
              frontier_t* input,
              frontier_t* output,
              work_tiles_t& segments,
-             cuda::multi_context_t& context) {
+             gcuda::multi_context_t& context) {
   if (context.size() == 1) {
     auto context0 = context.get_context(0);
 
@@ -193,7 +193,7 @@ template <load_balance_t lb = load_balance_t::merge_path,
 void execute(graph_t& G,
              enactor_type* E,
              operator_type op,
-             cuda::multi_context_t& context,
+             gcuda::multi_context_t& context,
              bool swap_buffers = true) {
   execute<lb, direction, input_type, output_type>(
       G,                         // graph
