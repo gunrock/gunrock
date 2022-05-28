@@ -27,7 +27,7 @@
 #endif
 
 namespace gunrock {
-namespace cuda {
+namespace gcuda {
 namespace launch_box {
 
 struct dimensions_t {
@@ -212,7 +212,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * auto f = [=] __device__(int const& tid, int const& bid) {
    *  // Do something
    * };
-   * using namespace cuda::launch_box;
+   * using namespace gcuda::launch_box;
    * using launch_t =
    *  launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
    *
@@ -230,7 +230,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * @param args arguments to be passed to the function.
    */
   template <typename func_t, typename... args_t>
-  void launch_strided(cuda::standard_context_t& context,
+  void launch_strided(gcuda::standard_context_t& context,
                       func_t& f,
                       const std::size_t num_elements,
                       args_t&&... args) {
@@ -257,7 +257,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * auto f = [=] __device__(int const& tid, int const& bid) {
    *  // Do something
    * };
-   * using namespace cuda::launch_box;
+   * using namespace gcuda::launch_box;
    * using launch_t =
    *  launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<128>>>;
    *
@@ -275,7 +275,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * @param args arguments to be passed to the function.
    */
   template <typename func_t, typename... args_t>
-  void launch_blocked(cuda::standard_context_t& context,
+  void launch_blocked(gcuda::standard_context_t& context,
                       func_t& f,
                       const std::size_t num_elements,
                       args_t&&... args) {
@@ -289,7 +289,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
   }
 
   template <typename func_t, typename... args_t>
-  void launch_cooperative(cuda::standard_context_t& context,
+  void launch_cooperative(gcuda::standard_context_t& context,
                           const func_t& f,
                           const std::size_t num_elements,
                           args_t&&... args) {
@@ -325,7 +325,7 @@ struct launch_box_t : public select_launch_params_t<lp_v...> {
    * \return void
    */
   template <typename func_t, typename... args_t>
-  void launch(cuda::standard_context_t& context,
+  void launch(gcuda::standard_context_t& context,
               const func_t& f,
               args_t&&... args) {
     f<<<params_t::grid_dimensions, params_t::block_dimensions,
@@ -360,5 +360,5 @@ inline float occupancy(func_t kernel) {
 }
 
 }  // namespace launch_box
-}  // namespace cuda
+}  // namespace gcuda
 }  // namespace gunrock

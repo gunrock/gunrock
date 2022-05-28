@@ -15,7 +15,7 @@ struct enactor_t {
   queue_t q;
 
   algorithm_problem_t* problem;
-  std::shared_ptr<cuda::multi_context_t> context;
+  std::shared_ptr<gcuda::multi_context_t> context;
 
   enactor_t(const enactor_t& rhs) = delete;
   enactor_t& operator=(const enactor_t& rhs) = delete;
@@ -31,7 +31,7 @@ struct enactor_t {
   float sizing_factor = 1.5;
 
   enactor_t(algorithm_problem_t* _problem,
-            std::shared_ptr<cuda::multi_context_t> _context,
+            std::shared_ptr<gcuda::multi_context_t> _context,
             enactor_properties_t _properties = enactor_properties_t())
       : problem(_problem), context(_context) {
     auto n_vertices = problem->get_graph().get_number_of_vertices();
@@ -47,8 +47,9 @@ struct enactor_t {
   enactor_t* get_enactor() { return this; }
   algorithm_problem_t* get_problem() { return problem; }
 
-  virtual void loop(cuda::multi_context_t& context) = 0;
-  virtual void prepare_frontier(queue_t& q, cuda::multi_context_t& context) = 0;
+  virtual void loop(gcuda::multi_context_t& context) = 0;
+  virtual void prepare_frontier(queue_t& q,
+                                gcuda::multi_context_t& context) = 0;
 
   float enact() {
     auto single_context = context->get_context(0);

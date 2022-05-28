@@ -26,7 +26,7 @@
 #include <thrust/execution_policy.h>
 
 namespace gunrock {
-namespace cuda {
+namespace gcuda {
 
 template <int dummy_arg>
 __global__ void dummy_k() {}
@@ -39,26 +39,26 @@ struct context_t {
   context_t(const context_t& rhs) = delete;
   context_t& operator=(const context_t& rhs) = delete;
 
-  virtual const cuda::device_properties_t& props() const = 0;
+  virtual const gcuda::device_properties_t& props() const = 0;
   virtual void print_properties() = 0;
-  virtual cuda::compute_capability_t ptx_version() const = 0;
-  virtual cuda::stream_t stream() = 0;
+  virtual gcuda::compute_capability_t ptx_version() const = 0;
+  virtual gcuda::stream_t stream() = 0;
   virtual mgpu::standard_context_t* mgpu() = 0;
 
   // cudaStreamSynchronize or cudaDeviceSynchronize for stream 0.
   virtual void synchronize() = 0;
-  virtual cuda::event_t event() = 0;
+  virtual gcuda::event_t event() = 0;
   virtual util::timer_t& timer() = 0;
 };  // struct context_t
 
 class standard_context_t : public context_t {
  protected:
-  cuda::device_properties_t _props;
-  cuda::compute_capability_t _ptx_version;
+  gcuda::device_properties_t _props;
+  gcuda::compute_capability_t _ptx_version;
 
-  cuda::device_id_t _ordinal;
-  cuda::stream_t _stream;
-  cuda::event_t _event;
+  gcuda::device_id_t _ordinal;
+  gcuda::stream_t _stream;
+  gcuda::event_t _event;
 
   /**
    * @todo Find out how to use a shared_ptr<> without printing the GPU debug
@@ -73,10 +73,10 @@ class standard_context_t : public context_t {
   // of dummy_k for each translation unit.
   template <int dummy_arg = 0>
   void init() {
-    cuda::function_attributes_t attr;
+    gcuda::function_attributes_t attr;
     error::error_t status = cudaFuncGetAttributes(&attr, dummy_k<0>);
     error::throw_if_exception(status);
-    _ptx_version = cuda::make_compute_capability(attr.ptxVersion);
+    _ptx_version = gcuda::make_compute_capability(attr.ptxVersion);
 
     cudaSetDevice(_ordinal);
     cudaStreamCreateWithFlags(&_stream, cudaStreamNonBlocking);
@@ -87,32 +87,32 @@ class standard_context_t : public context_t {
   }
 
  public:
-  standard_context_t(cuda::device_id_t device = 0)
+  standard_context_t(gcuda::device_id_t device = 0)
       : context_t(), _ordinal(device), _mgpu_context(nullptr) {
     init();
   }
 
-  standard_context_t(cudaStream_t stream, cuda::device_id_t device = 0)
+  standard_context_t(cudaStream_t stream, gcuda::device_id_t device = 0)
       : context_t(), _ordinal(device), _mgpu_context(nullptr), _stream(stream) {
     init();
   }
 
   ~standard_context_t() { cudaEventDestroy(_event); }
 
-  virtual const cuda::device_properties_t& props() const override {
+  virtual const gcuda::device_properties_t& props() const override {
     return _props;
   }
 
   virtual void print_properties() override {
-    cuda::device::set(_ordinal);
-    cuda::properties::print(_props);
+    gcuda::device::set(_ordinal);
+    gcuda::properties::print(_props);
   }
 
-  virtual cuda::compute_capability_t ptx_version() const override {
+  virtual gcuda::compute_capability_t ptx_version() const override {
     return _ptx_version;
   }
 
-  virtual cuda::stream_t stream() override { return _stream; }
+  virtual gcuda::stream_t stream() override { return _stream; }
   virtual mgpu::standard_context_t* mgpu() override { return _mgpu_context; }
 
   virtual void synchronize() override {
@@ -121,11 +121,11 @@ class standard_context_t : public context_t {
     error::throw_if_exception(status);
   }
 
-  virtual cuda::event_t event() override { return _event; }
+  virtual gcuda::event_t event() override { return _event; }
 
   virtual util::timer_t& timer() override { return _timer; }
 
-  virtual cuda::device_id_t ordinal() { return _ordinal; }
+  virtual gcuda::device_id_t ordinal() { return _ordinal; }
 
   auto execution_policy() {
     return thrust::cuda::par_nosync.on(this->stream());
@@ -136,11 +136,11 @@ class standard_context_t : public context_t {
 class multi_context_t {
  public:
   thrust::host_vector<standard_context_t*> contexts;
-  thrust::host_vector<cuda::device_id_t> devices;
+  thrust::host_vector<gcuda::device_id_t> devices;
   static constexpr std::size_t MAX_NUMBER_OF_GPUS = 1024;
 
   // Multiple devices.
-  multi_context_t(thrust::host_vector<cuda::device_id_t> _devices)
+  multi_context_t(thrust::host_vector<gcuda::device_id_t> _devices)
       : devices(_devices) {
     for (auto& device : devices) {
       standard_context_t* device_context = new standard_context_t(device);
@@ -149,7 +149,7 @@ class multi_context_t {
   }
 
   // Multiple devices with a user-provided stream
-  multi_context_t(thrust::host_vector<cuda::device_id_t> _devices,
+  multi_context_t(thrust::host_vector<gcuda::device_id_t> _devices,
                   cudaStream_t _stream)
       : devices(_devices) {
     for (auto& device : devices) {
@@ -160,7 +160,7 @@ class multi_context_t {
   }
 
   // Single device.
-  multi_context_t(cuda::device_id_t _device) : devices(1, _device) {
+  multi_context_t(gcuda::device_id_t _device) : devices(1, _device) {
     for (auto& device : devices) {
       standard_context_t* device_context = new standard_context_t(device);
       contexts.push_back(device_context);
@@ -168,7 +168,7 @@ class multi_context_t {
   }
 
   // Single device with a user-provided stream
-  multi_context_t(cuda::device_id_t _device, cudaStream_t _stream)
+  multi_context_t(gcuda::device_id_t _device, cudaStream_t _stream)
       : devices(1, _device) {
     for (auto& device : devices) {
       standard_context_t* device_context =
@@ -178,7 +178,7 @@ class multi_context_t {
   }
   ~multi_context_t() {}
 
-  auto get_context(cuda::device_id_t device) {
+  auto get_context(gcuda::device_id_t device) {
     auto contexts_ptr = contexts.data();
     return contexts_ptr[device];
   }
@@ -205,5 +205,5 @@ class multi_context_t {
   }
 };  // class multi_context_t
 
-}  // namespace cuda
+}  // namespace gcuda
 }  // namespace gunrock

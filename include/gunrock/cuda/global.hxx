@@ -11,7 +11,7 @@
 
 #pragma once
 namespace gunrock {
-namespace cuda {
+namespace gcuda {
 
 typedef int thread_idx_t;
 
@@ -103,5 +103,5 @@ __device__ __forceinline__ int total() {
 }  // namespace size
 }  // namespace grid
 
-}  // namespace cuda
+}  // namespace gcuda
 }  // namespace gunrock

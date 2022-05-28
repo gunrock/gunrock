@@ -118,7 +118,7 @@ class frontier_t : public frontier::vector_frontier_t<vertex_t, edge_t, _kind> {
    * @return std::size_t
    */
   __host__ __device__ __forceinline__ std::size_t get_number_of_elements(
-      cuda::stream_t stream = 0) {
+      gcuda::stream_t stream = 0) {
     return underlying_view_t::get_number_of_elements(stream);
   }
 

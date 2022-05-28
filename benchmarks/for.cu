@@ -16,8 +16,8 @@ void parallel_for(nvbench::state& state) {
       graph::build::from_csr<memory_space_t::device, graph::view_t::csr>(csr);
 
   // Initialize the context.
-  cuda::device_id_t device = 0;
-  cuda::multi_context_t context(device);
+  gcuda::device_id_t device = 0;
+  gcuda::multi_context_t context(device);
 
   vector_t<int> vertices(G.get_number_of_vertices());
   auto d_vertices = vertices.data().get();

@@ -11,16 +11,16 @@
 
 #pragma once
 namespace gunrock {
-namespace cuda {
+namespace gcuda {
 
 typedef int device_id_t;
 
 namespace device {
 
-void set(cuda::device_id_t device) {
+void set(gcuda::device_id_t device) {
   cudaSetDevice(device);
 }
 
 }  // namespace device
-}  // namespace cuda
+}  // namespace gcuda
 }  // namespace gunrock

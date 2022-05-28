@@ -377,7 +377,7 @@ __host__ __device__ double get_degree_standard_deviation(graph_type const& G) {
 template <typename graph_type, typename histogram_t>
 void build_degree_histogram(graph_type const& G,
                             histogram_t* histogram,
-                            cuda::stream_t stream = 0) {
+                            gcuda::stream_t stream = 0) {
   using vertex_t = typename graph_type::vertex_type;
   auto length = sizeof(vertex_t) * 8 + 1;
 
