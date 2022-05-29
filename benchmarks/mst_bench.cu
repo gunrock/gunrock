@@ -13,8 +13,6 @@
 using namespace gunrock;
 using namespace memory;
 
-std::string filename;  // Global
-
 void mst_bench(nvbench::state& state) {
   // Add metrics.
   state.collect_dram_throughput();
@@ -71,18 +69,4 @@ void mst_bench(nvbench::state& state) {
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
     gunrock::mst::run(G, mst_weight.data().get());
   });
-}
-
-int main(int argc, char** argv) {
-  filename = argv[1];
-
-  // Create a new argument array without filename to pass to NVBench.
-  char* args[argc - 1];
-  args[0] = argv[0];
-  for (int i = 1; i < argc; i++) {
-    args[i] = argv[i + 1];
-  }
-
-  NVBENCH_BENCH(mst_bench);
-  NVBENCH_MAIN_BODY(argc - 1, args);
 }
