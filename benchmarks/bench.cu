@@ -1,8 +1,14 @@
 std::string filename;
 
-#include "mst_bench.cu"
-#include "bfs_bench.cu"
-#include <cxxopts.hpp>
+#include "algorithms/mst_bench.cu"
+#include "algorithms/bfs_bench.cu"
+#include "algorithms/bc_bench.cu"
+#include "algorithms/color_bench.cu"
+#include "algorithms/kcore_bench.cu"
+#include "algorithms/ppr_bench.cu"
+#include "algorithms/pr_bench.cu"
+#include "algorithms/spmv_bench.cu"
+#include "algorithms/sssp_bench.cu"
 
 std::vector<std::string> benchmarks;
 struct parameters_t {
@@ -64,20 +70,19 @@ struct parameters_t {
 };
 
 int main(int argc, char** argv) {
-  benchmarks = {"mst_bench", "bfs_bench"};
+  benchmarks = {"mst_bench",   "bfs_bench",   "bc_bench",
+                "color_bench", "kcore_bench", "ppr_bench",
+                "pr_bench",    "spmv_bench",  "sssp_bench"};
 
   parameters_t params(argc, argv);
   filename = params.filename;
   std::string benchmark = params.benchmark;
 
-  // Create a new argument array without filename to pass to NVBench.
   if (params.help) {
     const char* args[1] = {"-h"};
-    NVBENCH_BENCH(mst_bench);
-    NVBENCH_BENCH(bfs_bench);
     NVBENCH_MAIN_BODY(1, args);
-
   } else {
+    // Create a new argument array without matrix filename to pass to NVBench.
     char* args[argc - 2];
     int j = 0;
     for (int i = 0; i < argc; i++) {
@@ -91,6 +96,13 @@ int main(int argc, char** argv) {
 
     NVBENCH_BENCH(mst_bench);
     NVBENCH_BENCH(bfs_bench);
+    NVBENCH_BENCH(bc_bench);
+    NVBENCH_BENCH(color_bench);
+    NVBENCH_BENCH(kcore_bench);
+    NVBENCH_BENCH(ppr_bench);
+    NVBENCH_BENCH(pr_bench);
+    NVBENCH_BENCH(spmv_bench);
+    NVBENCH_BENCH(sssp_bench);
     NVBENCH_MAIN_BODY(argc - 2, args);
   }
 }

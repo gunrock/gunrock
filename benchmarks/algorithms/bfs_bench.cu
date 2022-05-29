@@ -1,19 +1,19 @@
-#include <gunrock/error.hxx>
+#ifndef BENCH_INCLUDES
+#define BENCH_INCLUDES
 #include <gunrock/graph/graph.hxx>
 #include <gunrock/formats/formats.hxx>
 #include <gunrock/cuda/cuda.hxx>
-#include <gunrock/framework/operators/for/for.hxx>
 #include <nvbench/nvbench.cuh>
-#include <iostream>
 #include <gunrock/algorithms/algorithms.hxx>
-#include <gunrock/algorithms/mst.hxx>
-#include <gunrock/algorithms/bfs.hxx>
 #include <cxxopts.hpp>
+#endif
+
+#include <gunrock/algorithms/bfs.hxx>
 
 using namespace gunrock;
 using namespace memory;
 
-void mst_bench(nvbench::state& state) {
+void bfs_bench(nvbench::state& state) {
   // Add metrics.
   state.collect_dram_throughput();
   state.collect_l1_hit_rates();
@@ -27,8 +27,9 @@ void mst_bench(nvbench::state& state) {
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
 
   // --
-  // Build graph + metadata
+  // IO
   csr_t csr;
+
   if (util::is_market(filename)) {
     io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
     csr.from_coo(mm.load(filename));
@@ -43,6 +44,8 @@ void mst_bench(nvbench::state& state) {
   thrust::device_vector<vertex_t> column_indices(csr.number_of_nonzeros);
   thrust::device_vector<edge_t> column_offsets(csr.number_of_columns + 1);
 
+  // --
+  // Build graph + metadata
   auto G =
       graph::build::from_csr<memory_space_t::device,
                              graph::view_t::csr /* | graph::view_t::csc */>(
@@ -56,17 +59,19 @@ void mst_bench(nvbench::state& state) {
           column_offsets.data().get()       // column_offsets
       );
 
-  // Initialize the context.
-  cuda::device_id_t device = 0;
-  cuda::multi_context_t context(device);
-
   // --
   // Params and memory allocation
-  thrust::device_vector<weight_t> mst_weight(1);
+
+  vertex_t single_source = 0;
+
+  vertex_t n_vertices = G.get_number_of_vertices();
+  thrust::device_vector<vertex_t> distances(n_vertices);
+  thrust::device_vector<vertex_t> predecessors(n_vertices);
 
   // --
-  // Run MST with NVBench
+  // Run BFS with NVBench
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
-    gunrock::mst::run(G, mst_weight.data().get());
+    gunrock::bfs::run(G, single_source, distances.data().get(),
+                      predecessors.data().get());
   });
 }
