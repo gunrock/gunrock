@@ -9,6 +9,7 @@ set(BENCHMARK_SOURCES
   mst_bench.cu
   ppr_bench.cu
   pr_bench.cu
+  spgemm_bench.cu
   spmv_bench.cu
   sssp_bench.cu
 )
