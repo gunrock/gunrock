@@ -81,10 +81,15 @@ struct ColorIterationLoop
 
     auto &colors = data_slice.colors;
     auto &rand = data_slice.rand;
+    auto gen = data_slice.gen;
 
     //======================================================================//
     // Jones-Plassman-Luby Graph Coloring: Filter Operator                  //
     //======================================================================//
+
+    if (iteration % 2)
+	curandGenerateUniform(gen, rand.GetPointer(util::DEVICE),
+			      graph.nodes);
 
     // The filter operation
     auto filter_op = [graph, colors, rand, iteration] 
