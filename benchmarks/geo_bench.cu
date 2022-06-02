@@ -30,9 +30,9 @@ struct parameters_t {
     // Add command line options
     options.add_options()("h,help", "Print help")  // help
         ("m,market", "Matrix file",
-         cxxopts::value<std::string>())  // coords
+         cxxopts::value<std::string>())  // mtx
         ("c,coordinates", "Coordinates file",
-         cxxopts::value<std::string>());  // mtx
+         cxxopts::value<std::string>());  // coords
 
     // Parse command line arguments
     auto result = options.parse(argc, argv);
@@ -56,7 +56,7 @@ struct parameters_t {
         std::exit(0);
       }
       if (result.count("coordinates") == 1) {
-        coordinates_filename = result["market"].as<std::string>();
+        coordinates_filename = result["coordinates"].as<std::string>();
       } else {
         std::cout << options.help({""});
         std::cout << "  [optional nvbench args]" << std::endl << std::endl;
@@ -241,7 +241,7 @@ int main(int argc, char** argv) {
     int j = 0;
     for (int i = 0; i < argc; i++) {
       if (strcmp(argv[i], "--market") == 0 || strcmp(argv[i], "-m") == 0 ||
-          strcmp(argv[i], "--coordinates") == 0 || strcmp(argv[i], "-c")) {
+          strcmp(argv[i], "--coordinates") == 0 || strcmp(argv[i], "-c") == 0) {
         i++;
         continue;
       }

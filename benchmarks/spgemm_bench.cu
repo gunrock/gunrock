@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
     const char* args[1] = {"-h"};
     NVBENCH_MAIN_BODY(1, args);
   } else {
-    // Create a new argument array without matrix filename to pass to NVBench.
+    // Create a new argument array without matrix filenames to pass to NVBench.
     char* args[argc - 4];
     int j = 0;
     for (int i = 0; i < argc; i++) {
