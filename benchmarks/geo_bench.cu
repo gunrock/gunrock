@@ -165,7 +165,8 @@ void read_coordinates_file(std::string filename,
 }
 
 void geo_bench(nvbench::state& state) {
-  // Add metrics.
+  // --
+  // Add metrics
   state.collect_dram_throughput();
   state.collect_l1_hit_rates();
   state.collect_l2_hit_rates();
@@ -201,7 +202,6 @@ void geo_bench(nvbench::state& state) {
 
   // --
   // Params and memory allocation
-
   unsigned int spatial_iterations = 1000;
   unsigned int total_iterations = 10;
 

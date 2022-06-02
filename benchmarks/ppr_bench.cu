@@ -58,7 +58,7 @@ struct parameters_t {
 
 void ppr_bench(nvbench::state& state) {
   // --
-  // Add metrics.
+  // Add metrics
   state.collect_dram_throughput();
   state.collect_l1_hit_rates();
   state.collect_l2_hit_rates();
