@@ -96,7 +96,7 @@ void hits_bench(nvbench::state& state) {
   hits::result_c result{G};
 
   // --
-  // Run BC with NVBench
+  // Run HITS with NVBench
   state.exec(nvbench::exec_tag::sync, [&](nvbench::launch& launch) {
     gunrock::hits::run(G, param, result);
   });
