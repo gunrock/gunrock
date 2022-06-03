@@ -1,6 +1,7 @@
 # ------------------------------------------------------------------------
 # Algorithm benchmarking tests
 # Run this from build directory
+# If error CUPTI_ERROR_INSUFFICIENT_PRIVILEGES: run with sudo
 # ------------------------------------------------------------------------
 
 #!/bin/bash
@@ -34,15 +35,15 @@ make spgemm_bench
 make spmv_bench
 make sssp_bench
 
-sudo ${BIN_DIR}/bc_bench -m ${MATRIX_FILE}  --json ${JSON_DIR}/bc.json
-sudo ${BIN_DIR}/bfs_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/bfs.json
-sudo ${BIN_DIR}/color_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/color.json
-sudo ${BIN_DIR}/geo_bench -m ${MATRIX_FILE} -c ${COORDINATES_FILE} --json ${JSON_DIR}/geo.json
-sudo ${BIN_DIR}/hits_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/hits.json
-sudo ${BIN_DIR}/kcore_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/kcore.json
-sudo ${BIN_DIR}/mst_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/mst.json
-sudo ${BIN_DIR}/ppr_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/ppr.json
-sudo ${BIN_DIR}/pr_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/pr.json
-sudo ${BIN_DIR}/spgemm_bench -a ${A_MATRIX} -b ${B_MATRIX} --json ${JSON_DIR}/spgemm.json
-sudo ${BIN_DIR}/spmv_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/spmv.json
-sudo ${BIN_DIR}/sssp_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/sssp.json
+${BIN_DIR}/bc_bench -m ${MATRIX_FILE}  --json ${JSON_DIR}/bc.json
+${BIN_DIR}/bfs_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/bfs.json
+${BIN_DIR}/color_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/color.json
+${BIN_DIR}/geo_bench -m ${MATRIX_FILE} -c ${COORDINATES_FILE} --json ${JSON_DIR}/geo.json
+${BIN_DIR}/hits_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/hits.json
+${BIN_DIR}/kcore_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/kcore.json
+${BIN_DIR}/mst_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/mst.json
+${BIN_DIR}/ppr_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/ppr.json
+${BIN_DIR}/pr_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/pr.json
+${BIN_DIR}/spgemm_bench -a ${A_MATRIX} -b ${B_MATRIX} --json ${JSON_DIR}/spgemm.json
+${BIN_DIR}/spmv_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/spmv.json
+${BIN_DIR}/sssp_bench -m ${MATRIX_FILE} --json ${JSON_DIR}/sssp.json
