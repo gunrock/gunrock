@@ -19,7 +19,7 @@ struct parameters_t {
    * @param argv Command line arguments.
    */
   parameters_t(int argc, char** argv)
-      : options(argv[0], "Sparse Matrix-Vector Multiplication example") {
+      : options(argv[0], "Minimum Spanning Tree example") {
     // Add command line options
     options.add_options()("help", "Print help")                      // help
         ("validate", "CPU validation")                               // validate
