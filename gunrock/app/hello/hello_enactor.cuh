@@ -51,10 +51,10 @@ cudaError_t UseParameters_enactor(util::Parameters &parameters) {
 template <typename EnactorT>
 struct helloIterationLoop
     : public IterationLoopBase<EnactorT, Use_FullQ | Push
-                               // <TODO>if needed, stack more options, e.g.:
-                               // | (((EnactorT::Problem::FLAG &
-                               // Mark_Predecessors) != 0) ? Update_Predecessors
-                               // : 0x0)
+                               // <TODO>if needed, stack more option, e.g.:
+                              //  | (((EnactorT::Problem::FLAG &
+                              //  Mark_Predecessors) != 0) ? Update_Predecessors
+                              //  : 0x0)
                                // </TODO>
                                > {
   typedef typename EnactorT::VertexT VertexT;
@@ -115,13 +115,20 @@ struct helloIterationLoop
       // <TODO> Implement advance operation
 
       // Mark src and dest as visited
+      // atomic max takes a pointer and a numeric val
+      // TODO why is visited must be the base reference to the vertices
+
+      // atomicMax sets the value of src as 1
+      // is there a reason to use the max value here?
+      // why cant we just have an atomic write with a return of the previous value?
       atomicMax(visited + src, 1);
+
       auto dest_visited = atomicMax(visited + dest, 1);
 
       // Increment degree of src
       atomicAdd(degrees + src, 1);
 
-      // Add dest to queue if previously unsen
+
       return dest_visited == 0;
 
       // </TODO>
@@ -180,14 +187,19 @@ struct helloIterationLoop
   template <int NUM_VERTEX_ASSOCIATES, int NUM_VALUE__ASSOCIATES>
   cudaError_t ExpandIncoming(SizeT &received_length, int peer_) {
     // ================ INCOMPLETE TEMPLATE - MULTIGPU ====================
+    // so why is this incomplete
 
     auto &data_slice = this->enactor->problem->data_slices[this->gpu_num][0];
+
+    // each pairwise frontier is called an enactor slice
     auto &enactor_slice =
         this->enactor
             ->enactor_slices[this->gpu_num * this->enactor->num_gpus + peer_];
     // auto iteration = enactor_slice.enactor_stats.iteration;
     // TODO: add problem specific data alias here, e.g.:
     // auto         &distances          =   data_slice.distances;
+
+    // is expand op for frontier expansion? 
 
     auto expand_op = [
                          // TODO: pass data used by the lambda, e.g.:
@@ -282,13 +294,27 @@ class Enactor
     GUARD_CU(BaseEnactor::Init(
         problem, Enactor_None,
         // <TODO> change to how many frontier queues, and their types
+
+        // what is this 2 and NULL specifically?
+        // number of queues in the frontier and what does that mean?
+        //  frontier type is NULL which means its a vertex frontier?
+        // are the frontier
         2, NULL,
         // </TODO>
+
+        // false is for whether to skip makeout selection routine during communication
+        // what does that mean?
         target, false));
     for (int gpu = 0; gpu < this->num_gpus; gpu++) {
+      // we select a gpu := gpu
       GUARD_CU(util::SetDevice(this->gpu_idx[gpu]));
+      // enactor slice
+      // why is it current gpu * number of gpus? are the total enactor slices = num_gpus ** 2?
+      // yes there are pair wise frontiers
       auto &enactor_slice = this->enactor_slices[gpu * this->num_gpus + 0];
       auto &graph = problem.sub_graphs[gpu];
+      // so each enactor slice frontier is allocated graph.nodes and graph.edges?
+      // makes sense but this would be worst case?
       GUARD_CU(enactor_slice.frontier.Allocate(graph.nodes, graph.edges,
                                                this->queue_factors));
     }

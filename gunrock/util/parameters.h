@@ -33,6 +33,7 @@ namespace util {
 
 using Parameter_Flag = unsigned int;
 
+// The parameter type flags are defined here
 enum {
     NO_ARGUMENT        = 0x1,
     REQUIRED_ARGUMENT  = 0x2,
@@ -147,6 +148,8 @@ public:
         p_map.clear();
     }
 
+    // Parameters.Use function is defined here
+    // 
     cudaError_t Use(
         std::string     name,
         Parameter_Flag  flag,

@@ -54,8 +54,9 @@ SM_TARGETS = $(GEN_SM35)
 #-------------------------------------------------------------------------------
 
 CUDA_INC = -I"$(shell dirname $(NVCC))/../include"
-MGPU_INC = -I"../../externals/moderngpu/src"
+# MGPU_INC = -I"../../externals/moderngpu/src"
 CUB_INC = -I"../../externals/cub"
+MGPU_INC = -I"../../../moderngpu/src"
 
 BOOST_INC =
 BOOST_LINK =

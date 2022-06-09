@@ -230,6 +230,8 @@ option(GUNROCK_APP_COLOR
 
 option(GUNROCK_APP_KCORE
   "If on, builds only KCORE application."
+  OFF)
+  
 option(GUNROCK_APP_LP
   "If on, builds only LP application."
   OFF)

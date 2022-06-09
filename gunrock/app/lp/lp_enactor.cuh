@@ -210,7 +210,6 @@ struct LPIterationLoop
       //              util::DEVICE,
       //              stream));
 
-
       GUARD_CU2(cudaDeviceSynchronize(), "cudaDeviceSynchronize failed.");
       GUARD_CU2(cudaStreamSynchronize(oprtr_parameters.stream),
               "cudaStreamSynchronize failed.");
@@ -275,7 +274,7 @@ struct LPIterationLoop
       GUARD_CU(neighbour_labels_size.ForEach( [] __host__ __device__(int &x) { x = (int)0; }, 1, util::DEVICE, oprtr_parameters.stream));
 
       GUARD_CU(segments_size.ForEach( [] __host__ __device__(int &x) { x = (int)0; }, 1, util::DEVICE, oprtr_parameters.stream));
-
+      
       GUARD_CU(frontier.V_Q()->ForAll(
       [segments, labels, graph, old_labels] __host__ __device__(
       const VertexT *v, const SizeT &index) {         

@@ -316,6 +316,11 @@ struct Array1D {
                       Location target = LOCATION_DEFAULT,
                       cudaStream_t stream = 0);
 
+  template <typename ArrayT_in, typename ApplyLambda>
+  cudaError_t ForEach_index(ArrayT_in &elements, ApplyLambda apply, SizeT length,
+                      Location target = LOCATION_DEFAULT,
+                      cudaStream_t stream = 0);
+                      
   template <typename ArrayT_in1, typename ArrayT_in2, typename ApplyLambda>
   cudaError_t ForEach(ArrayT_in1 &array_in1, ArrayT_in2 &array_in2,
                       ApplyLambda apply,
@@ -380,6 +385,9 @@ struct Array1D {
     return cudaSuccess;
   }
 
+
+  // what does this allocate function do?
+  // array, size, target
   cudaError_t Allocate(SizeT size, Location target = ARRAY_DEFAULT_TARGET) {
     cudaError_t retval = cudaSuccess;
 
@@ -594,6 +602,7 @@ DEVICE)); #endif } else {*/
     PrintMsg(std::string(name) + " EnsureSize : " + std::to_string(this->size) +
              " -> " + std::to_string(size));
 #endif
+    // so basically we want an array to be atleast as big as size?
     if (this->size >= size) return cudaSuccess;
 
     /*#ifdef ENABLE_ARRAY_DEBUG
