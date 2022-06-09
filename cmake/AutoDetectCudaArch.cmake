@@ -58,6 +58,7 @@ if(NOT DEFINED CUDA_ARCHS)
 				               -gencode=arch=compute_70,code=sm_70
 				               -gencode=arch=compute_72,code=sm_72
 				               -gencode=arch=compute_75,code=sm_75
+				               -gencode=arch=compute_80,code=sm_80
 							   CACHE STRING "CUDA Arch")
 		endif()
 		message(STATUS "CUDA Autodetected, setting CUDA_ARCHS=" ${CUDA_ARCHS})	

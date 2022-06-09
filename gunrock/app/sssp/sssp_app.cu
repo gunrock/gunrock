@@ -172,15 +172,15 @@ double gunrock_sssp(gunrock::util::Parameters &parameters, GraphT &graph,
   typedef gunrock::app::sssp::Problem<GraphT> ProblemT;
   typedef gunrock::app::sssp::Enactor<ProblemT> EnactorT;
   gunrock::util::CpuTimer cpu_timer;
-  gunrock::util::Location target = gunrock::util::DEVICE;
+  gunrock::util::Location ExecPolicy = parameters.Get<gunrock::util::Location>("exec-policy");
   double total_time = 0;
   if (parameters.UseDefault("quiet")) parameters.Set("quiet", true);
 
   // Allocate problem and enactor on GPU, and initialize them
   ProblemT problem(parameters);
   EnactorT enactor;
-  problem.Init(graph, target);
-  enactor.Init(problem, target);
+  problem.Init(graph, ExecPolicy);
+  enactor.Init(problem, ExecPolicy);
 
   std::vector<VertexT> srcs = parameters.Get<std::vector<VertexT>>("srcs");
   int num_runs = parameters.Get<int>("num-runs");
@@ -188,8 +188,8 @@ double gunrock_sssp(gunrock::util::Parameters &parameters, GraphT &graph,
   for (int run_num = 0; run_num < num_runs; ++run_num) {
     int src_num = run_num % num_srcs;
     VertexT src = srcs[src_num];
-    problem.Reset(src, target);
-    enactor.Reset(src, target);
+    problem.Reset(src, ExecPolicy);
+    enactor.Reset(src, ExecPolicy);
 
     cpu_timer.Start();
     enactor.Enact(src);
@@ -199,8 +199,8 @@ double gunrock_sssp(gunrock::util::Parameters &parameters, GraphT &graph,
     problem.Extract(distances[src_num], preds == NULL ? NULL : preds[src_num]);
   }
 
-  enactor.Release(target);
-  problem.Release(target);
+  enactor.Release(ExecPolicy);
+  problem.Release(ExecPolicy);
   srcs.clear();
   return total_time;
 }
@@ -217,6 +217,8 @@ double gunrock_sssp(gunrock::util::Parameters &parameters, GraphT &graph,
  * @param[in]  mark_preds  Whether to output predecessor info
  * @param[out] distances   Return shortest distance to source per vertex
  * @param[out] preds       Return predecessors of each vertex
+ * @param[in]  memspace    Location of input and desired output
+ * @param[in]  exec_policy Location where app will be run
  * \return     double      Return accumulated elapsed times for all runs
  */
 template <typename VertexT = int, typename SizeT = int,
@@ -224,8 +226,9 @@ template <typename VertexT = int, typename SizeT = int,
 double sssp(const SizeT num_nodes, const SizeT num_edges,
             const SizeT *row_offsets, const VertexT *col_indices,
             const GValueT *edge_values, const int num_runs, VertexT *sources,
-            const bool mark_pred, SSSPValueT **distances,
-            VertexT **preds = NULL) {
+            const bool mark_pred, SSSPValueT **distances, VertexT **preds = NULL, 
+            gunrock::util::Location memspace = gunrock::util::HOST,
+            gunrock::util::Location exec_policy = gunrock::util::DEVICE) {
   typedef typename gunrock::app::TestGraph<VertexT, SizeT, GValueT,
                                            gunrock::graph::HAS_EDGE_VALUES |
                                                gunrock::graph::HAS_CSR>
@@ -241,6 +244,8 @@ double sssp(const SizeT num_nodes, const SizeT num_edges,
   parameters.Set("graph-type", "by-pass");
   parameters.Set("mark-pred", mark_pred);
   parameters.Set("num-runs", num_runs);
+  parameters.Set("mem-space", memspace);
+  parameters.Set("exec-policy", exec_policy);
   std::vector<VertexT> srcs;
   for (int i = 0; i < num_runs; i++) srcs.push_back(sources[i]);
   parameters.Set("srcs", srcs);
@@ -248,15 +253,17 @@ double sssp(const SizeT num_nodes, const SizeT num_edges,
   bool quiet = parameters.Get<bool>("quiet");
   GraphT graph;
   // Assign pointers into gunrock graph format
-  graph.CsrT::Allocate(num_nodes, num_edges, gunrock::util::HOST);
+  graph.CsrT::Allocate(num_nodes, num_edges, memspace);
   graph.CsrT::row_offsets.SetPointer((SizeT *)row_offsets, num_nodes + 1,
-                                     gunrock::util::HOST);
+                                     memspace);
   graph.CsrT::column_indices.SetPointer((VertexT *)col_indices, num_edges,
-                                        gunrock::util::HOST);
+                                        memspace);
   graph.CsrT::edge_values.SetPointer((GValueT *)edge_values, num_edges,
-                                     gunrock::util::HOST);
+                                     memspace);
+  graph.FromCsr(graph.csr(), memspace, 0, quiet, true);
   gunrock::graphio::LoadGraph(parameters, graph);
 
+  //TODO: Pass execpolicy to gunrock_sssp
   // Run the SSSP
   double elapsed_time = gunrock_sssp(parameters, graph, distances, preds);
 
@@ -278,13 +285,16 @@ double sssp(const SizeT num_nodes, const SizeT num_edges,
  * @param[in]  mark_preds  Whether to output predecessor info
  * @param[out] distances   Return shortest distance to source per vertex
  * @param[out] preds       Return predecessors of each vertex
+ * @param[in]  memspace    Location of input and desired output
+ * @param[in]  exec_policy Location where app will be run
  * \return     double      Return accumulated elapsed times for all runs
  */
 double sssp(const int num_nodes, const int num_edges, const int *row_offsets,
             const int *col_indices, const float *edge_values, int source,
-            const bool mark_pred, float *distances, int *preds) {
+            const bool mark_pred, float *distances, int *preds, gunrock::util::Location memspace = gunrock::util::HOST,
+            gunrock::util::Location exec_policy = gunrock::util::DEVICE) {
   return sssp(num_nodes, num_edges, row_offsets, col_indices, edge_values,
-              1 /* num_runs */, &source, mark_pred, &distances, &preds);
+              1 /* num_runs */, &source, mark_pred, &distances, &preds, memspace, exec_policy);
 }
 
 // Leave this at the end of the file

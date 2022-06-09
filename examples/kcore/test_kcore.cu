@@ -7,17 +7,17 @@
 
 /**
  * @file
- * test_hello.cu
+ * test_kcore.cu
  *
- * @brief Simple test driver program for Gunrock template.
+ * @brief Simple test driver program for vertex k-core decomposition.
  */
 
-#include <gunrock/app/hello/hello_app.cu>
+#include <gunrock/app/kcore/kcore_app.cu>
 #include <gunrock/app/test_base.cuh>
 
 using namespace gunrock;
 
-namespace APP_NAMESPACE = app::hello;
+namespace APP_NAMESPACE = app::kcore;
 
 /******************************************************************************
  * Main
@@ -44,9 +44,10 @@ struct main_struct {
     // CLI parameters
     bool quick = parameters.Get<bool>("quick");
     bool quiet = parameters.Get<bool>("quiet");
+    parameters.Set("undirected", true);
 
     typedef typename app::TestGraph<VertexT, SizeT, ValueT,
-                                    graph::HAS_EDGE_VALUES | graph::HAS_COO |
+                                        graph::HAS_COO |
                                         graph::HAS_CSR | graph::HAS_CSC>
         GraphT;
 
@@ -59,56 +60,40 @@ struct main_struct {
     cpu_timer.Stop();
     parameters.Set("load-time", cpu_timer.ElapsedMillis());
 
-    // <TODO> get srcs if needed, e.g.:
-    // GUARD_CU(app::Set_Srcs (parameters, graph));
-    // std::vector<VertexT> srcs
-    //    = parameters.Get<std::vector<VertexT> >("srcs");
-    // int num_srcs = srcs.size();
-    // </TODO>
-
-    // <TODO> declare datastructures for reference result on GPU
-    ValueT *ref_degrees;
-    // </TODO>
+    //Declare data structures for reference result on CPU
+    SizeT *ref_k_cores = NULL;
 
     if (!quick) {
-      // <TODO> init data structures for reference result on GPU
-      ref_degrees = new ValueT[graph.nodes];
-      // </TODO>
+      //Init data structures for reference result on CPU
+      ref_k_cores = new SizeT[graph.nodes];
 
       // If not in `quick` mode, compute CPU reference implementation
       util::PrintMsg("__________________________", !quiet);
 
       float elapsed =
-          app::hello::CPU_Reference(graph.csr(), ref_degrees, quiet);
+          app::kcore::CPU_Reference(graph.csr(), ref_k_cores, quiet);
 
       util::PrintMsg(
           "--------------------------\n Elapsed: " + std::to_string(elapsed),
           !quiet);
     }
 
-    // <TODO> add other switching parameters, if needed
+    //Add other switching parameters, if needed
     std::vector<std::string> switches{"advance-mode"};
-    // </TODO>
 
     GUARD_CU(app::Switch_Parameters(parameters, graph, switches,
                                     [
-                                        // </TODO> pass necessary data to lambda
-                                        ref_degrees
-                                        // </TODO>
+                                        ref_k_cores
     ](util::Parameters &parameters, GraphT &graph) {
-                                      // <TODO> pass necessary data to
-                                      // app::Template::RunTests
-                                      return app::hello::RunTests(
-                                          parameters, graph, ref_degrees,
+                                      return app::kcore::RunTests(
+                                          parameters, graph, ref_k_cores,
                                           util::DEVICE);
-                                      // </TODO>
                                     }));
 
     if (!quick) {
-      // <TODO> deallocate host references
-      delete[] ref_degrees;
-      ref_degrees = NULL;
-      // </TODO>
+      //Deallocate host references
+      delete[] ref_k_cores;
+      ref_k_cores = NULL;
     }
     return retval;
   }
@@ -116,9 +101,9 @@ struct main_struct {
 
 int main(int argc, char **argv) {
   cudaError_t retval = cudaSuccess;
-  util::Parameters parameters("test hello");
+  util::Parameters parameters("test kcore");
   GUARD_CU(graphio::UseParameters(parameters));
-  GUARD_CU(app::hello::UseParameters(parameters));
+  GUARD_CU(app::kcore::UseParameters(parameters));
   GUARD_CU(app::UseParameters_test(parameters));
   GUARD_CU(parameters.Parse_CommandLine(argc, argv));
   if (parameters.Get<bool>("help")) {
@@ -127,11 +112,11 @@ int main(int argc, char **argv) {
   }
   GUARD_CU(parameters.Check_Required());
 
-  // TODO: change available graph types, according to requirements
+  //Available graph types
   return app::Switch_Types<app::VERTEXT_U32B | app::VERTEXT_U64B |
-                           app::SIZET_U32B | app::SIZET_U64B |
-                           app::VALUET_F32B | app::DIRECTED | app::UNDIRECTED>(
-      parameters, main_struct());
+                           app::SIZET_U32B |
+                           app::VALUET_F32B | app::UNDIRECTED>(
+                           parameters, main_struct());
 }
 
 // Leave this at the end of the file

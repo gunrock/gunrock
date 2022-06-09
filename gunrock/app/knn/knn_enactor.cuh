@@ -134,7 +134,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     [num_points, k, dim, points, keys_out, transpose] 
     __device__ (ValueT* d, const SizeT &src, char* shared){
         ValueT* new_dist = (ValueT*)shared;
-        int* dist_key = (int*)(shared + (blockDim.x * 8));
+        int* dist_key = (int*)(shared + (blockDim.x * sizeof(ValueT)));
         dist_key[threadIdx.x] = src;
         for (SizeT i = 0; i<num_points; ++i){
             new_dist[threadIdx.x] = (ValueT)0;
@@ -172,7 +172,7 @@ struct knnIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     [num_points, k, dim, points, keys_out, transpose, sem] 
     __device__ (ValueT* d, const SizeT &src, char* shared){
         ValueT* new_dist = (ValueT*)shared;
-        SizeT* new_keys = (SizeT*)(shared + (blockDim.x * 8));
+        SizeT* new_keys = (SizeT*)(shared + (blockDim.x * sizeof(ValueT)));
         
         int offset = (src/(blockDim.x*gridDim.x))*blockDim.x*gridDim.x;
         for (SizeT i0 = offset; i0<num_points; ++i0){

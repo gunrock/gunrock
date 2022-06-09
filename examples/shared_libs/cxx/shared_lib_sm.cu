@@ -4,7 +4,7 @@
  */
 
 #include <stdio.h>
-#include <gunrock/gunrock.h>
+#include <gunrock/gunrock.hpp>
 
 int main(int argc, char *argv[]) {
   int num_data_nodes = 5, num_data_edges = 10;
@@ -16,18 +16,19 @@ int main(int argc, char *argv[]) {
   int query_col_indices[6] = {1, 2, 0, 2, 0, 1};
   unsigned int device = 0x01;  // CPU
 
-  unsigned long *sm_counts = (unsigned long *)malloc(sizeof(unsigned long));
-  unsigned long *list_sm;
+  unsigned long *sm_counts = new unsigned long[1];
+  unsigned long **list_sm = new unsigned long*[1];
+  unsigned int memspace = 0x01;  // CPU
 
   double elapsed =
-      sm(num_data_nodes, num_data_edges, data_row_offsets, data_col_indices,
+      sm<int, int>(num_data_nodes, num_data_edges, data_row_offsets, data_col_indices,
          num_query_nodes, num_query_edges, query_row_offsets, query_col_indices,
          1, sm_counts, list_sm, device);
 
   printf("Number matched subgraphs: [%d]\n", sm_counts[0]);
 
-  if (sm_counts) free(sm_counts);
-  if (list_sm) free(list_sm);
+  if (sm_counts) delete[] sm_counts;
+  if (list_sm) delete[] list_sm;
 
   return 0;
 }

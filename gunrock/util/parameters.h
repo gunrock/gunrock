@@ -521,7 +521,9 @@ public:
                 if (it != p_map.end())
                 {
                     it = p_map.find("graph-file");
-                    if (it != p_map.end() && Get<std::string>("graph-type") == "market")
+                    if (it != p_map.end() &&
+                    (Get<std::string>("graph-type") == "market"
+                    ||Get<std::string>("graph-type") == "csv"))
                     {
                         Read_In_Opt("graph-file", std::string(argv[i]));
                         valid_parameter = true;
