@@ -94,6 +94,49 @@ class graph_csr_t {
                                               offsets[source + 1] - 1);
   }
 
+  __host__ __device__ __forceinline__ vertex_type
+  get_intersection_count(const vertex_type& source,
+                         const vertex_type& destination) const {
+    vertex_type intersection_count = 0;
+
+    auto source_neighbors_count = get_number_of_neighbors(source);
+    auto destination_neighbors_count = get_number_of_neighbors(destination);
+
+    auto source_offset = offsets[source];
+    auto destination_offset = offsets[destination];
+
+    // if (source_neighbors_count > destination_neighbors_count) {
+    //   std::swap(source_offset, destination_offset);
+    //   std::swap(source_neighbors_count, destination_neighbors_count);
+    // }
+
+    auto source_edges_iter = indices + source_offset;
+    auto destination_edges_iter = indices + destination_offset;
+
+    auto needle = *destination_edges_iter;
+    auto source_search_start = search::binary::execute(
+        source_edges_iter, needle, 0, source_neighbors_count);
+    edge_type destination_search_start = 0;
+
+    while (source_search_start < source_neighbors_count &&
+           destination_search_start < destination_neighbors_count) {
+      auto cur_edge_src = source_edges_iter[source_search_start];
+      auto cur_edge_dst = destination_edges_iter[destination_search_start];
+      if (cur_edge_src == cur_edge_dst) {
+        intersection_count++;
+        source_search_start++;
+        destination_search_start++;
+        printf("Triangle: %i, %i, %i\n", source, destination, cur_edge_src);
+      } else if (cur_edge_src > cur_edge_dst) {
+        destination_search_start++;
+      } else {
+        source_search_start++;
+      }
+    }
+
+    return intersection_count;
+  }
+
   __host__ __device__ __forceinline__ weight_type
   get_edge_weight(edge_type const& e) const {
     return thread::load(&values[e]);
@@ -113,7 +156,7 @@ class graph_csr_t {
     return values;
   }
 
-  // Graph type (inherited from this class) has equivalents of this in graph 
+  // Graph type (inherited from this class) has equivalents of this in graph
   // terminology (vertices and edges). Also include these for linear algebra
   // terminology
   __host__ __device__ __forceinline__ auto get_number_of_rows() const {
