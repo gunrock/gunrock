@@ -41,9 +41,11 @@ namespace binary {
 // that the element found will be leftmost or rightmost element.
 // XXX: Implement Search
 template <typename key_pointer_t, typename key_t, typename int_t>
-__host__ __device__ int_t
-execute(const key_pointer_t& keys, const key_t& key, int_t begin, int_t end) {
-  bound_t bounds = bound_t::upper;
+__host__ __device__ int_t execute(const key_pointer_t& keys,
+                                  const key_t& key,
+                                  int_t begin,
+                                  int_t end,
+                                  const bound_t bounds = bound_t::upper) {
   auto comp = [](const key_t& a, const key_t& b) { return a < b; };
   while (begin < end) {
     int_t mid = (begin + end) / 2;
