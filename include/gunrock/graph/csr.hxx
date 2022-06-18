@@ -94,9 +94,21 @@ class graph_csr_t {
                                               offsets[source + 1] - 1);
   }
 
+  /**
+   * @brief Count the number of vertices belonging to the set intersection
+   * between the source and destination vertices adjacency lists. Executes a
+   * function on each intersection.
+   *
+   * @param source Index of the source vertex
+   * @param destination Index of the destination
+   * @param on_intersection Lambda function executed at each intersection
+   * @return Number of shared vertices between source and destination
+   */
+  template <typename operator_type>
   __host__ __device__ __forceinline__ vertex_type
   get_intersection_count(const vertex_type& source,
-                         const vertex_type& destination) const {
+                         const vertex_type& destination,
+                         operator_type on_intersection) const {
     vertex_type intersection_count = 0;
 
     auto source_neighbors_count = get_number_of_neighbors(source);
@@ -114,19 +126,30 @@ class graph_csr_t {
     auto destination_edges_iter = indices + destination_offset;
 
     auto needle = *destination_edges_iter;
-    auto source_search_start = search::binary::execute(
-        source_edges_iter, needle, 0, source_neighbors_count);
+    auto source_search_start =
+        search::binary::execute(source_edges_iter, needle, vertex_t{0},
+                                source_neighbors_count, search::bound_t::lower);
     edge_type destination_search_start = 0;
+    // printf("[%i -> %i] %i, [%i, %i], [%i, %i]\n", source, destination,
+    // needle,
+    //        source_search_start, destination_search_start,
+    //        source_neighbors_count, destination_neighbors_count);
 
     while (source_search_start < source_neighbors_count &&
            destination_search_start < destination_neighbors_count) {
       auto cur_edge_src = source_edges_iter[source_search_start];
       auto cur_edge_dst = destination_edges_iter[destination_search_start];
+      // printf("%i, %i | %i, %i\n", cur_edge_src, cur_edge_dst,
+      //        source_search_start, destination_search_start);
+      // if (source == 1 and destination == 2) {
+      //   printf("%i, %i\n", cur_edge_src, cur_edge_dst);
+      // }
       if (cur_edge_src == cur_edge_dst) {
         intersection_count++;
         source_search_start++;
         destination_search_start++;
-        printf("Triangle: %i, %i, %i\n", source, destination, cur_edge_src);
+        on_intersection(cur_edge_src);
+        // printf("Triangle: %i, %i, %i\n", source, destination, cur_edge_src);
       } else if (cur_edge_src > cur_edge_dst) {
         destination_search_start++;
       } else {
