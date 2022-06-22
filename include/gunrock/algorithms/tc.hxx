@@ -11,6 +11,7 @@
 #pragma once
 
 #include <gunrock/algorithms/algorithms.hxx>
+#include <gunrock/util/timer.hxx>
 
 namespace gunrock {
 namespace tc {
@@ -101,6 +102,25 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     operators::advance::execute<operators::load_balance_t::block_mapped>(
         G, E, intersect, context);
   }
+
+  float post_process() {
+    util::timer_t timer;
+    timer.begin();
+    auto P = this->get_problem();
+    auto G = P->get_graph();
+
+    if (P->param.reduce_all_triangles) {
+      auto policy = this->context->get_context(0)->execution_policy();
+      *P->result.total_triangles_count = thrust::transform_reduce(
+          policy, P->result.vertex_triangles_count,
+          P->result.vertex_triangles_count + G.get_number_of_vertices(),
+          [] __device__(const vertex_t& vertex_triangles) {
+            return static_cast<std::size_t>(vertex_triangles);
+          },
+          std::size_t{0}, thrust::plus<std::size_t>());
+    }
+    return timer.end();
+  }
 };  // struct enactor_t
 
 template <typename graph_t>
@@ -132,17 +152,7 @@ float run(graph_t& G,
 
   enactor_type enactor(&problem, context);
   auto time = enactor.enact();
-
-  if (param.reduce_all_triangles) {
-    auto policy = context->get_context(0)->execution_policy();
-    *result.total_triangles_count = thrust::transform_reduce(
-        policy, result.vertex_triangles_count,
-        result.vertex_triangles_count + G.get_number_of_vertices(),
-        [] __device__(const vertex_t& vertex_triangles) {
-          return static_cast<std::size_t>(vertex_triangles);
-        },
-        std::size_t{0}, thrust::plus<std::size_t>());
-  }
+  time += enactor.post_process();
 
   // </boiler-plate>
   return time;
