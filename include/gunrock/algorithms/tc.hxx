@@ -1,5 +1,5 @@
 /**
- * @file sssp.hxx
+ * @file tc.hxx
  * @author Muhammad A. Awad (mawad@ucdavis.edu)
  * @brief Triangle Counting algorithm.
  * @version 0.1
@@ -100,9 +100,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // Execute advance operator on the provided lambda
     operators::advance::execute<operators::load_balance_t::block_mapped>(
         G, E, intersect, context);
-    std::cout << "iteration: " << iteration << std::endl;
   }
-
 };  // struct enactor_t
 
 template <typename graph_t>

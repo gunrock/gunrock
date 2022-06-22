@@ -1,6 +1,6 @@
 /**
  * @file tc.cuh
- * @author Muhammad A. Awad (awad@ucdavis.edu)
+ * @author Muhammad A. Awad (mawad@ucdavis.edu)
  * @brief Unit test for the triangle counting algorithm.
  * @version 0.1
  * @date 2022-17-06
