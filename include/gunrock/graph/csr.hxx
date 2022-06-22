@@ -133,26 +133,16 @@ class graph_csr_t {
         search::binary::execute(source_edges_iter, needle, vertex_t{0},
                                 source_neighbors_count, search::bound_t::lower);
     edge_type destination_search_start = 0;
-    // printf("[%i -> %i] %i, [%i, %i], [%i, %i]\n", source, destination,
-    // needle,
-    //        source_search_start, destination_search_start,
-    //        source_neighbors_count, destination_neighbors_count);
 
     while (source_search_start < source_neighbors_count &&
            destination_search_start < destination_neighbors_count) {
       auto cur_edge_src = source_edges_iter[source_search_start];
       auto cur_edge_dst = destination_edges_iter[destination_search_start];
-      // printf("%i, %i | %i, %i\n", cur_edge_src, cur_edge_dst,
-      //        source_search_start, destination_search_start);
-      // if (source == 1 and destination == 2) {
-      //   printf("%i, %i\n", cur_edge_src, cur_edge_dst);
-      // }
       if (cur_edge_src == cur_edge_dst) {
         intersection_count++;
         source_search_start++;
         destination_search_start++;
         on_intersection(cur_edge_src);
-        // printf("Triangle: %i, %i, %i\n", source, destination, cur_edge_src);
       } else if (cur_edge_src > cur_edge_dst) {
         destination_search_start++;
       } else {
