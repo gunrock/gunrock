@@ -111,16 +111,19 @@ class graph_csr_t {
                          operator_type on_intersection) const {
     vertex_type intersection_count = 0;
 
+    auto intersection_source = source;
+    auto intersection_destination = destination;
+
     auto source_neighbors_count = get_number_of_neighbors(source);
     auto destination_neighbors_count = get_number_of_neighbors(destination);
 
-    auto source_offset = offsets[source];
-    auto destination_offset = offsets[destination];
+    if (source_neighbors_count > destination_neighbors_count) {
+      std::swap(intersection_source, intersection_destination);
+      std::swap(source_neighbors_count, destination_neighbors_count);
+    }
 
-    // if (source_neighbors_count > destination_neighbors_count) {
-    //   std::swap(source_offset, destination_offset);
-    //   std::swap(source_neighbors_count, destination_neighbors_count);
-    // }
+    auto source_offset = offsets[intersection_source];
+    auto destination_offset = offsets[intersection_destination];
 
     auto source_edges_iter = indices + source_offset;
     auto destination_edges_iter = indices + destination_offset;
