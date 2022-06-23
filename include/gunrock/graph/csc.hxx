@@ -108,6 +108,14 @@ class graph_csc_t {
     return values;
   }
 
+  __host__ __device__ __forceinline__ auto get_number_of_vertices() const {
+    return number_of_vertices;
+  }
+
+  __host__ __device__ __forceinline__ auto get_number_of_edges() const {
+    return number_of_edges;
+  }
+
  protected:
   __host__ __device__ void set(vertex_type const& _number_of_vertices,
                                edge_type const& _number_of_edges,
@@ -124,8 +132,8 @@ class graph_csc_t {
 
  private:
   // Underlying data storage
-  vertex_type number_of_vertices;  // XXX: redundant
-  edge_type number_of_edges;       // XXX: redundant
+  vertex_type number_of_vertices;
+  edge_type number_of_edges;
 
   edge_type* offsets;
   vertex_type* indices;
