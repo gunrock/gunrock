@@ -135,10 +135,6 @@ class graph_csr_t {
     auto destination_edges_iter = indices + destination_offset;
 
     auto needle = *destination_edges_iter;
-    // auto source_search_start =
-    //     search::binary::execute(source_edges_iter, needle, vertex_t{0},
-    //                             source_neighbors_count,
-    //                             search::bound_t::lower);
 
     auto source_search_start = thrust::distance(
         source_edges_iter,
