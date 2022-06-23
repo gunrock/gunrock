@@ -87,11 +87,7 @@ class graph_t : public graph_view_t... {
   /**
    * @brief Default constructor for the graph.
    */
-  __host__ __device__ graph_t()
-      : number_of_vertices(0),
-        number_of_edges(0),
-        properties(),
-        graph_view_t()... {}
+  __host__ __device__ graph_t() : properties(), graph_view_t()... {}
 
   /**
    * @brief Get the number of vertices in the graph. Callable from both host and
