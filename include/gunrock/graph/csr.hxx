@@ -10,6 +10,9 @@
 #include <gunrock/graph/vertex_pair.hxx>
 #include <gunrock/algorithms/search/binary_search.hxx>
 
+#include <thrust/binary_search.h>
+#include <thrust/execution_policy.h>
+
 namespace gunrock {
 namespace graph {
 
@@ -117,10 +120,14 @@ class graph_csr_t {
     auto source_neighbors_count = get_number_of_neighbors(source);
     auto destination_neighbors_count = get_number_of_neighbors(destination);
 
-    if (source_neighbors_count > destination_neighbors_count) {
-      std::swap(intersection_source, intersection_destination);
-      std::swap(source_neighbors_count, destination_neighbors_count);
+    if (source_neighbors_count == 0 || destination_neighbors_count == 0) {
+      printf("Singleton node\n");
+      return 0;
     }
+    // if (source_neighbors_count > destination_neighbors_count) {
+    //   std::swap(intersection_source, intersection_destination);
+    //   std::swap(source_neighbors_count, destination_neighbors_count);
+    // }
 
     auto source_offset = offsets[intersection_source];
     auto destination_offset = offsets[intersection_destination];
@@ -129,9 +136,20 @@ class graph_csr_t {
     auto destination_edges_iter = indices + destination_offset;
 
     auto needle = *destination_edges_iter;
-    auto source_search_start =
-        search::binary::execute(source_edges_iter, needle, vertex_t{0},
-                                source_neighbors_count, search::bound_t::lower);
+    // auto source_search_start =
+    //     search::binary::execute(source_edges_iter, needle, vertex_t{0},
+    //                             source_neighbors_count,
+    //                             search::bound_t::lower);
+
+    auto source_search_start = thrust::distance(
+        source_edges_iter,
+        thrust::lower_bound(thrust::seq, source_edges_iter,
+                            source_edges_iter + source_neighbors_count,
+                            needle));
+
+    if (source_search_start == source_neighbors_count) {
+      return 0;
+    }
     edge_type destination_search_start = 0;
 
     while (source_search_start < source_neighbors_count &&
