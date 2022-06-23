@@ -56,8 +56,9 @@ struct problem_t : gunrock::problem_t<graph_t> {
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
   enactor_t(problem_t* _problem,
-            std::shared_ptr<gcuda::multi_context_t> _context)
-      : gunrock::enactor_t<problem_t>(_problem, _context) {}
+            std::shared_ptr<gcuda::multi_context_t> _context,
+            enactor_properties_t _properties)
+      : gunrock::enactor_t<problem_t>(_problem, _context, _properties) {}
 
   using vertex_t = typename problem_t::vertex_t;
   using edge_t = typename problem_t::edge_t;
@@ -79,7 +80,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto G = P->get_graph();
 
     auto vertex_triangles_count = P->result.vertex_triangles_count;
-    auto iteration = this->iteration;
 
     auto intersect = [G, vertex_triangles_count] __host__ __device__(
                          vertex_t const& source,    // ... source
@@ -99,8 +99,17 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator on the provided lambda
-    operators::advance::execute<operators::load_balance_t::block_mapped>(
+    operators::advance::execute<operators::load_balance_t::block_mapped,
+                                operators::advance_direction_t::forward,
+                                operators::advance_io_type_t::graph,
+                                operators::advance_io_type_t::none>(
         G, E, intersect, context);
+  }
+
+  virtual bool is_converged(gcuda::multi_context_t& context) {
+    if (this->iteration == 1)
+      return true;
+    return false;
   }
 
   float post_process() {
@@ -150,7 +159,10 @@ float run(graph_t& G,
   problem.init();
   problem.reset();
 
-  enactor_type enactor(&problem, context);
+  // Disable internal-frontiers:
+  enactor_properties_t props;
+  props.self_manage_frontiers = true;
+  enactor_type enactor(&problem, context, props);
   auto time = enactor.enact();
   time += enactor.post_process();
 
