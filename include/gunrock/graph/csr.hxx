@@ -121,13 +121,12 @@ class graph_csr_t {
     auto destination_neighbors_count = get_number_of_neighbors(destination);
 
     if (source_neighbors_count == 0 || destination_neighbors_count == 0) {
-      printf("Singleton node\n");
       return 0;
     }
-    // if (source_neighbors_count > destination_neighbors_count) {
-    //   std::swap(intersection_source, intersection_destination);
-    //   std::swap(source_neighbors_count, destination_neighbors_count);
-    // }
+    if (source_neighbors_count > destination_neighbors_count) {
+      std::swap(intersection_source, intersection_destination);
+      std::swap(source_neighbors_count, destination_neighbors_count);
+    }
 
     auto source_offset = offsets[intersection_source];
     auto destination_offset = offsets[intersection_destination];
@@ -229,8 +228,8 @@ class graph_csr_t {
 
  private:
   // Underlying data storage
-  vertex_type number_of_vertices;  
-  edge_type number_of_edges;       
+  vertex_type number_of_vertices;
+  edge_type number_of_edges;
 
   edge_type* offsets;
   vertex_type* indices;
