@@ -99,8 +99,8 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
     if (local_idx == 0)
       offset[0] = math::atomic::add(
           &block_offsets[0], (offset_counter_t)aggregate_degree_per_block);
-    __syncthreads();
   }
+  __syncthreads();
 
   auto length = global_idx - local_idx + gcuda::block::size::x();
 
