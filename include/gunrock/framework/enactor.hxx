@@ -161,15 +161,15 @@ struct enactor_t {
   enactor_t(algorithm_problem_t* _problem,
             std::shared_ptr<gcuda::multi_context_t> _context,
             enactor_properties_t _properties = enactor_properties_t())
-      : problem(_problem),
-        properties(_properties),
+      : properties(_properties),
         context(_context),
+        problem(_problem),
         frontiers(properties.number_of_frontier_buffers),
+        scanned_work_domain(problem->get_graph().get_number_of_vertices() + 1),
         active_frontier(reinterpret_cast<frontier_t*>(&frontiers[0])),
         inactive_frontier(reinterpret_cast<frontier_t*>(&frontiers[1])),
         buffer_selector(0),
-        iteration(0),
-        scanned_work_domain(problem->get_graph().get_number_of_vertices() + 1) {
+        iteration(0) {
     /*!
      * If the self manage frontiers property is false, the enactor interface
      * will resize the frontier buffers ahead of time to avoid the first

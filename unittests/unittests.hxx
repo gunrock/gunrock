@@ -41,3 +41,5 @@
 // #include "io/matrix_market.cuh"
 #include "io/smtx.cuh"
 // #include "io/mtxbin.cuh"
+
+#include "algorithms/tc.cuh"
