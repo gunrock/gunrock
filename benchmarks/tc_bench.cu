@@ -28,12 +28,12 @@ struct parameters_t {
   parameters_t(int argc, char** argv) : options(argv[0], "TC Benchmarking") {
     options.allow_unrecognised_options();
     // Add command line options
-    options.add_options()("h,help", "Print help")  // help
-        ("m,market", "Matrix file", cxxopts::value<std::string>())(
-            "r,reduce",
-            "Compute a single triangle count for the entire graph (default = "
-            "false)",
-            cxxopts::value<bool>()->default_value("false"));
+    options.add_options()("h,help", "Print help")(
+        "m,market", "Matrix file", cxxopts::value<std::string>())(
+        "r,reduce",
+        "Compute a single triangle count for the entire graph (default = "
+        "false)",
+        cxxopts::value<bool>()->default_value("false"));
 
     // Parse command line arguments
     auto result = options.parse(argc, argv);
