@@ -45,9 +45,8 @@ float run(const csr_t& csr,
 
     for (vertex_t i = 0; i < source_neighbors_count; i++) {
       auto destination = source_neighbors_ptr[i];
-      continue;
       if (destination >= source)
-        break;
+        continue;
       auto destination_offset_start = row_offsets[destination];
       auto destination_offset_end = row_offsets[destination + 1];
       auto destination_neighbors_count =
