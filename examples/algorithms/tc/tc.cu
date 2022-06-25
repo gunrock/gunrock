@@ -23,15 +23,14 @@ struct parameters_t {
   parameters_t(int argc, char** argv)
       : options(argv[0], "Traingle Counting example") {
     // Add command line options
-    options.add_options()       //
-        ("help", "Print help")  //
-        ("validate", "CPU validation",
-         cxxopts::value<bool>()->default_value("false"))            //
-        ("m,market", "Matrix file", cxxopts::value<std::string>())  //
-        ("r,reduce",
-         "Compute a single triangle count for the entire graph (default = "
-         "false)",
-         cxxopts::value<bool>()->default_value("false"));
+    options.add_options()("help", "Print help")(
+        "validate", "CPU validation",
+        cxxopts::value<bool>()->default_value("false"))(
+        "m,market", "Matrix file", cxxopts::value<std::string>())(
+        "r,reduce",
+        "Compute a single triangle count for the entire graph (default = "
+        "false)",
+        cxxopts::value<bool>()->default_value("false"));
 
     // Parse command line arguments
     auto result = options.parse(argc, argv);

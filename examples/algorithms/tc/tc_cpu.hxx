@@ -26,7 +26,6 @@ float run(const csr_t& csr,
   using edge_t = typename csr_t::offset_type;
   using vertex_t = typename csr_t::index_type;
 
-  // Copy data to CPU
   thrust::host_vector<edge_t> row_offsets(csr.row_offsets);
   thrust::host_vector<vertex_t> column_indices(csr.column_indices);
   vertex_t n_vertices = csr.number_of_rows;
