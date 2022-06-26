@@ -1,0 +1,11 @@
+# .github/release.yml
+
+changelog:
+  exclude:
+    labels:
+      - ignore
+  categories:
+    - title: 🎉 New Features
+      labels:
+        - 🍍%20algorithms
+        - 🚂%20operators
