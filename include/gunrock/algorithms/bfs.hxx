@@ -24,7 +24,7 @@ struct param_t {
 template <typename vertex_t>
 struct result_t {
   vertex_t* distances;
-  vertex_t* predecessors;
+  vertex_t* predecessors; /// @todo: implement this.
   result_t(vertex_t* _distances, vertex_t* _predecessors)
       : distances(_distances), predecessors(_predecessors) {}
 };
@@ -99,12 +99,18 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // here means that the neighbor is not added to the output frontier, and
       // instead an invalid vertex is added in its place. These invalides (-1 in
       // most cases) can be removed using a filter operator or uniquify.
-      if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
-        return false;
-      else
-        return (math::atomic::cas(
-                    &distances[neighbor], std::numeric_limits<vertex_t>::max(),
-                    iteration + 1) == std::numeric_limits<vertex_t>::max());
+      // if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
+      //   return false;
+      // else
+      //   return (math::atomic::cas(
+      //               &distances[neighbor],
+      //               std::numeric_limits<vertex_t>::max(), iteration + 1) ==
+      //               std::numeric_limits<vertex_t>::max());
+
+      // Simpler logic for the above.
+      auto old_distance =
+          math::atomic::min(&distances[neighbor], iteration + 1);
+      return (iteration + 1 < old_distance);
     };
 
     auto remove_invalids =
