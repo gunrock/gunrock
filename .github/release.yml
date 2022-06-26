@@ -1,6 +1,7 @@
 # Gunrock/Release generator .github/release.yml
-template: |
-  <!-- Optional: add a release summary here -->
+name-template: $NEXT_MINOR_VERSION
+tag-template: $NEXT_MINOR_VERSION
+version-template: $MAJOR.$MINOR.$PATCH
 
 changelog:
   exclude:
@@ -29,6 +30,11 @@ changelog:
         - 🧪 testing
         - 🔬 experiment
         - 📼 i/o
+        
+template: |
+  <!-- Optional: add a release summary here -->
+  ## Changes
+  $CHANGES
 
 autolabeler:
   - label: '📋 documentation'
