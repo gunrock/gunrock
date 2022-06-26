@@ -1,4 +1,6 @@
-# .github/release.yml
+# Gunrock/Release generator .github/release.yml
+template: |
+  <!-- Optional: add a release summary here -->
 
 changelog:
   exclude:
