@@ -23,7 +23,7 @@ preferred-citation:
   doi: "10.1109/IPDPSW55747.2022.00061"
   collection-title: "Proceedings of the Workshop on Graphs, Architectures, Programming, and Learning"
   conference:
-    name: "The 36th IEEE International Parallel and Distributed Processing Symposium Workshops"
+    name: "GrAPL 2022"
   month: 5
   start: 314 # First page number
   end: 317 # Last page number
