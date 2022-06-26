@@ -100,7 +100,7 @@ class graph_csr_t {
   /**
    * @brief Count the number of vertices belonging to the set intersection
    * between the source and destination vertices adjacency lists. Executes a
-   * function on each intersection.
+   * function on each intersection. This function does not handle self-loops.
    *
    * @param source Index of the source vertex
    * @param destination Index of the destination

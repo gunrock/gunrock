@@ -82,9 +82,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       if (neighbor > source) {
         auto src_vertex_triangles_count = G.get_intersection_count(
             source, neighbor,
-            [vertex_triangles_count](auto intersection_vertex) {
-              math::atomic::add(&(vertex_triangles_count[intersection_vertex]),
-                                vertex_t{1});
+            [vertex_triangles_count, source,
+             neighbor](auto intersection_vertex) {
+              if (source != intersection_vertex &&
+                  neighbor != intersection_vertex) {
+                math::atomic::add(
+                    &(vertex_triangles_count[intersection_vertex]),
+                    vertex_t{1});
+              }
             });
       }
       return false;
