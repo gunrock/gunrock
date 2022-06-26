@@ -42,6 +42,9 @@ namespace advance {
  * Thus a vertex in an input frontier map to multiple output items. An efficient
  * advance is the most significant challenge of a GPU implementation.
  *
+ * @note Advance does not remove self-loops, i.e., a vertex can be a neighbor of
+ * itself.
+ *
  * @par Example
  *  The following code is a simple snippet on how to use advance within the
  * enactor loop.
@@ -138,6 +141,9 @@ void execute(graph_t& G,
  *  2. vertices share neighbors.
  * Thus a vertex in an input frontier map to multiple output items. An efficient
  * advance is the most significant challenge of a GPU implementation.
+ *
+ * @note Advance does not remove self-loops, i.e., a vertex can be a neighbor of
+ * itself.
  *
  * @par Example
  *  The following code is a simple snippet on how to use advance within the

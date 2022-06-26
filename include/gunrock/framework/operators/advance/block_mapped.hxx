@@ -141,7 +141,7 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
     // Store [neighbor] into the output frontier.
     if constexpr (output_type != advance_io_type_t::none) {
       output[offset[0] + i] =
-          (cond && n != v) ? n : gunrock::numeric_limits<vertex_t>::invalid();
+          cond ? n : gunrock::numeric_limits<vertex_t>::invalid();
     }
   }
 }

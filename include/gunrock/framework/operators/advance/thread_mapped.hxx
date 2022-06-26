@@ -64,10 +64,10 @@ void execute(graph_t& G,
     if (!gunrock::util::limits::is_valid(v))
       return;
 
-    auto starting_edge = G.get_starting_edge(v);
     auto total_edges = G.get_number_of_neighbors(v);
 
     for (auto i = 0; i < total_edges; ++i) {
+      auto starting_edge = G.get_starting_edge(v);
       auto e = i + starting_edge;            // edge id
       auto n = G.get_destination_vertex(e);  // neighbor id
       auto w = G.get_edge_weight(e);         // weight
@@ -75,8 +75,7 @@ void execute(graph_t& G,
 
       if (output_type != advance_io_type_t::none) {
         std::size_t out_idx = segments_ptr[tid] + i;
-        type_t element =
-            (cond && n != v) ? n : gunrock::numeric_limits<type_t>::invalid();
+        type_t element = cond ? n : gunrock::numeric_limits<type_t>::invalid();
         output.set_element_at(element, out_idx);
       }
     }

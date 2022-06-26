@@ -169,9 +169,8 @@ __global__ void merge_path_v2_kernel(graph_t G,
 
       if (output_type != advance_io_type_t::none) {
         // std::size_t out_idx = ;
-        // type_t element = (cond && neighbor != source)
-        //                      ? neighbor
-        //                      : gunrock::numeric_limits<type_t>::invalid();
+        // type_t element = cond ? neighbor
+        //                  : gunrock::numeric_limits<type_t>::invalid();
         // output.set_element_at(element, out_idx);
       }
 
