@@ -21,7 +21,7 @@ bin/sssp ../datasets/chesapeake/chesapeake.mtx
 ## How to Cite Gunrock & Essentials
 Thank you for citing our work.
 
-```tex
+```bibtex
 @article{Wang:2017:GGG,
   author =	 {Yangzihao Wang and Yuechao Pan and Andrew Davidson
                   and Yuduo Wu and Carl Yang and Leyuan Wang and
@@ -43,7 +43,7 @@ Thank you for citing our work.
 }
 ```
 
-```tex
+```bibtex
 @InProceedings{Osama:2022:EOP,
   author =	 {Muhammad Osama and Serban D. Porumbescu and John D. Owens},
   title =	 {Essentials of Parallel Graph Analytics},
