@@ -78,7 +78,7 @@ class vector_frontier_t {
    * @return std::size_t
    */
   __host__ __device__ __forceinline__ std::size_t get_number_of_elements(
-      cuda::stream_t stream = 0) const {
+      gcuda::stream_t stream = 0) const {
     return num_elements;
   }
 
@@ -173,7 +173,7 @@ class vector_frontier_t {
    * @param value
    * @param stream
    */
-  void fill(type_t const value, cuda::stream_t stream = 0) {
+  void fill(type_t const value, gcuda::stream_t stream = 0) {
     thrust::fill(thrust::cuda::par.on(stream), this->begin(), this->end(),
                  value);
   }
@@ -190,7 +190,7 @@ class vector_frontier_t {
    */
   void sequence(type_t const initial_value,
                 std::size_t const& size,
-                cuda::stream_t stream = 0) {
+                gcuda::stream_t stream = 0) {
     // Resize if needed.
     if (this->get_capacity() < size)
       this->reserve(size);
@@ -232,10 +232,10 @@ class vector_frontier_t {
    * @brief Parallel sort the frontier.
    *
    * @param order see sort::order_t
-   * @param stream see cuda::stream
+   * @param stream see gcuda::stream
    */
   void sort(sort::order_t order = sort::order_t::ascending,
-            cuda::stream_t stream = 0) {
+            gcuda::stream_t stream = 0) {
     sort::radix::sort_keys(p_storage.get()->data().get(),
                            this->get_number_of_elements(), order, stream);
   }

@@ -35,7 +35,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   problem_t(graph_t& G,
             param_type& _param,
             result_type& _result,
-            std::shared_ptr<cuda::multi_context_t> _context)
+            std::shared_ptr<gcuda::multi_context_t> _context)
       : gunrock::problem_t<graph_t>(G, _context),
         param(_param),
         result(_result) {}
@@ -79,7 +79,7 @@ struct enactor_t : async::enactor_t<problem_t> {
   using queue_t = typename async::enactor_t<problem_t>::queue_t;
 
   // !! Breaks w/ standard essentials (mildly...)
-  void prepare_frontier(queue_t& q, cuda::multi_context_t& context) {
+  void prepare_frontier(queue_t& q, gcuda::multi_context_t& context) {
     auto P = this->get_problem();
 
     // !! Queues creates it's own streams.  But I think we should at least
@@ -88,7 +88,7 @@ struct enactor_t : async::enactor_t<problem_t> {
   }
 
   // !! Breaks w/ standard essentials (mildly...)
-  void loop(cuda::multi_context_t& context) {
+  void loop(gcuda::multi_context_t& context) {
     auto P = this->get_problem();
     auto G = P->get_graph();
     auto q = this->q;
@@ -130,7 +130,7 @@ float run(graph_t& G,
 
   // <boiler-plate>
   auto multi_context =
-      std::shared_ptr<cuda::multi_context_t>(new cuda::multi_context_t(0));
+      std::shared_ptr<gcuda::multi_context_t>(new gcuda::multi_context_t(0));
 
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;

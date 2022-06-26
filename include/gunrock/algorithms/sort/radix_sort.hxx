@@ -41,7 +41,7 @@ template <typename type_t>
 void sort_keys(type_t* keys,
                std::size_t num_items,
                order_t order = order_t::ascending,
-               cuda::stream_t stream = 0) {
+               gcuda::stream_t stream = 0) {
   if (order == order_t::ascending)
     thrust::sort(thrust::cuda::par.on(stream), keys, keys + num_items,
                  thrust::less<type_t>());

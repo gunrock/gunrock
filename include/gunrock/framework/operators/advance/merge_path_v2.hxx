@@ -169,9 +169,8 @@ __global__ void merge_path_v2_kernel(graph_t G,
 
       if (output_type != advance_io_type_t::none) {
         // std::size_t out_idx = ;
-        // type_t element = (cond && neighbor != source)
-        //                      ? neighbor
-        //                      : gunrock::numeric_limits<type_t>::invalid();
+        // type_t element = cond ? neighbor
+        //                  : gunrock::numeric_limits<type_t>::invalid();
         // output.set_element_at(element, out_idx);
       }
 
@@ -196,7 +195,7 @@ void execute(graph_t& G,
              frontier_t& input,
              frontier_t& output,
              work_tiles_t& segments,
-             cuda::standard_context_t& context) {
+             gcuda::standard_context_t& context) {
   auto size_of_output = compute_output_offsets(
       G, &input, segments, context,
       (input_type == advance_io_type_t::graph) ? true : false);

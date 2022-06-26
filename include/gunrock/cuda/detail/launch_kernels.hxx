@@ -14,7 +14,7 @@
 #include <gunrock/cuda/global.hxx>
 
 namespace gunrock {
-namespace cuda {
+namespace gcuda {
 namespace kernels {
 namespace detail {
 template <unsigned int threads_per_block,
@@ -24,16 +24,16 @@ template <unsigned int threads_per_block,
 __global__ __launch_bounds__(threads_per_block,
                              items_per_thread)  // strict launch bounds
     void blocked_kernel(func_t f, const std::size_t bound, args_t... args) {
-  const int stride = cuda::block::size::x() * cuda::grid::size::x();
-  for (int i = cuda::thread::global::id::x();  // global id
-       i < bound;                              // bound check
-       i += (stride * items_per_thread)        // offset
+  const int stride = gcuda::block::size::x() * gcuda::grid::size::x();
+  for (int i = gcuda::thread::global::id::x();  // global id
+       i < bound;                               // bound check
+       i += (stride * items_per_thread)         // offset
   ) {
 #pragma unroll items_per_thread
     for (int j = 0; j < items_per_thread; ++j) {
       // Simple blocking per thread (unrolled items_per_thread_t)
       if ((i + (stride * j)) < bound)
-        f(i + (stride * j), cuda::block::id::x(), args...);
+        f(i + (stride * j), gcuda::block::id::x(), args...);
     }
   }
 }
@@ -41,15 +41,15 @@ __global__ __launch_bounds__(threads_per_block,
 template <unsigned int threads_per_block, typename func_t, typename... args_t>
 __global__ __launch_bounds__(threads_per_block, 1)  // strict launch bounds
     void strided_kernel(func_t f, const std::size_t bound, args_t... args) {
-  const int stride = cuda::block::size::x() * cuda::grid::size::x();
-  for (int i = cuda::thread::global::id::x();  // global id
-       i < bound;                              // bound check
-       i += stride                             // offset
+  const int stride = gcuda::block::size::x() * gcuda::grid::size::x();
+  for (int i = gcuda::thread::global::id::x();  // global id
+       i < bound;                               // bound check
+       i += stride                              // offset
   ) {
-    f(i, cuda::block::id::x(), args...);
+    f(i, gcuda::block::id::x(), args...);
   }
 }
 }  // namespace detail
 }  // namespace kernels
-}  // namespace cuda
+}  // namespace gcuda
 }  // namespace gunrock

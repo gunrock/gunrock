@@ -24,7 +24,7 @@ struct param_t {
 template <typename vertex_t>
 struct result_t {
   vertex_t* distances;
-  vertex_t* predecessors;
+  vertex_t* predecessors; /// @todo: implement this.
   result_t(vertex_t* _distances, vertex_t* _predecessors)
       : distances(_distances), predecessors(_predecessors) {}
 };
@@ -37,7 +37,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   problem_t(graph_t& G,
             param_type& _param,
             result_type& _result,
-            std::shared_ptr<cuda::multi_context_t> _context)
+            std::shared_ptr<gcuda::multi_context_t> _context)
       : gunrock::problem_t<graph_t>(G, _context),
         param(_param),
         result(_result) {}
@@ -63,7 +63,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
   enactor_t(problem_t* _problem,
-            std::shared_ptr<cuda::multi_context_t> _context)
+            std::shared_ptr<gcuda::multi_context_t> _context)
       : gunrock::enactor_t<problem_t>(_problem, _context) {}
 
   using vertex_t = typename problem_t::vertex_t;
@@ -72,12 +72,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using frontier_t = typename enactor_t<problem_t>::frontier_t;
 
   void prepare_frontier(frontier_t* f,
-                        cuda::multi_context_t& context) override {
+                        gcuda::multi_context_t& context) override {
     auto P = this->get_problem();
     f->push_back(P->param.single_source);
   }
 
-  void loop(cuda::multi_context_t& context) override {
+  void loop(gcuda::multi_context_t& context) override {
     // Data slice
     auto E = this->get_enactor();
     auto P = this->get_problem();
@@ -99,12 +99,18 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // here means that the neighbor is not added to the output frontier, and
       // instead an invalid vertex is added in its place. These invalides (-1 in
       // most cases) can be removed using a filter operator or uniquify.
-      if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
-        return false;
-      else
-        return (math::atomic::cas(
-                    &distances[neighbor], std::numeric_limits<vertex_t>::max(),
-                    iteration + 1) == std::numeric_limits<vertex_t>::max());
+      // if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
+      //   return false;
+      // else
+      //   return (math::atomic::cas(
+      //               &distances[neighbor],
+      //               std::numeric_limits<vertex_t>::max(), iteration + 1) ==
+      //               std::numeric_limits<vertex_t>::max());
+
+      // Simpler logic for the above.
+      auto old_distance =
+          math::atomic::min(&distances[neighbor], iteration + 1);
+      return (iteration + 1 < old_distance);
     };
 
     auto remove_invalids =
@@ -147,9 +153,9 @@ float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter
           typename graph_t::vertex_type* distances,      // Output
           typename graph_t::vertex_type* predecessors,   // Output
-          std::shared_ptr<cuda::multi_context_t> context =
-              std::shared_ptr<cuda::multi_context_t>(
-                  new cuda::multi_context_t(0))  // Context
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))  // Context
 ) {
   using vertex_t = typename graph_t::vertex_type;
   using param_type = param_t<vertex_t>;

@@ -87,11 +87,7 @@ class graph_t : public graph_view_t... {
   /**
    * @brief Default constructor for the graph.
    */
-  __host__ __device__ graph_t()
-      : number_of_vertices(0),
-        number_of_edges(0),
-        properties(),
-        graph_view_t()... {}
+  __host__ __device__ graph_t() : properties(), graph_view_t()... {}
 
   /**
    * @brief Get the number of vertices in the graph. Callable from both host and
@@ -99,9 +95,10 @@ class graph_t : public graph_view_t... {
    *
    * @return vertex_type number of vertices in the graph.
    */
+  template <class input_view_t = default_view_t>
   __host__ __device__ __forceinline__ const vertex_type
   get_number_of_vertices() const {
-    return number_of_vertices;
+    return input_view_t::get_number_of_vertices();
   }
 
   /**
@@ -110,9 +107,10 @@ class graph_t : public graph_view_t... {
    *
    * @return edge_type number of edges in the graph.
    */
+  template <class input_view_t = default_view_t>
   __host__ __device__ __forceinline__ const edge_type
   get_number_of_edges() const {
-    return number_of_edges;
+    return input_view_t::get_number_of_edges();
   }
 
   /**
@@ -190,8 +188,6 @@ class graph_t : public graph_view_t... {
   __host__ __device__ void set(vertex_type const& _number_of_vertices,
                                edge_type const& _number_of_edges,
                                args_t... args) {
-    this->number_of_vertices = _number_of_vertices;
-    this->number_of_edges = _number_of_edges;
     input_view_t::set(_number_of_vertices, _number_of_edges, args...);
   }
 
@@ -316,8 +312,6 @@ class graph_t : public graph_view_t... {
   static constexpr std::size_t number_of_formats_inherited =
       std::tuple_size_v<true_view_t>;
 
-  vertex_type number_of_vertices;
-  edge_type number_of_edges;
   graph_properties_t properties;
 
 };  // namespace graph
@@ -377,7 +371,7 @@ __host__ __device__ double get_degree_standard_deviation(graph_type const& G) {
 template <typename graph_type, typename histogram_t>
 void build_degree_histogram(graph_type const& G,
                             histogram_t* histogram,
-                            cuda::stream_t stream = 0) {
+                            gcuda::stream_t stream = 0) {
   using vertex_t = typename graph_type::vertex_type;
   auto length = sizeof(vertex_t) * 8 + 1;
 

@@ -35,7 +35,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   problem_t(graph_t& G,
             param_type& _param,
             result_type& _result,
-            std::shared_ptr<cuda::multi_context_t> _context)
+            std::shared_ptr<gcuda::multi_context_t> _context)
       : gunrock::problem_t<graph_t>(G, _context),
         param(_param),
         result(_result) {}
@@ -44,7 +44,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
 
-  thrust::device_vector<weight_t> randoms;
+  thrust::device_vector<float> randoms;
 
   void init() override {
     auto g = this->get_graph();
@@ -62,14 +62,14 @@ struct problem_t : gunrock::problem_t<graph_t> {
                  gunrock::numeric_limits<vertex_t>::invalid());
 
     // Generate random numbers.
-    generate::random::uniform_distribution(randoms);
+    generate::random::uniform_distribution(randoms, float(0.0f), float(n_vertices));
   }
 };
 
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
   enactor_t(problem_t* _problem,
-            std::shared_ptr<cuda::multi_context_t> _context)
+            std::shared_ptr<gcuda::multi_context_t> _context)
       : gunrock::enactor_t<problem_t>(_problem, _context) {}
 
   using vertex_t = typename problem_t::vertex_t;
@@ -78,7 +78,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using frontier_t = typename enactor_t<problem_t>::frontier_t;
 
   void prepare_frontier(frontier_t* f,
-                        cuda::multi_context_t& context) override {
+                        gcuda::multi_context_t& context) override {
     auto P = this->get_problem();
     auto n_vertices = P->get_graph().get_number_of_vertices();
 
@@ -86,7 +86,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     f->sequence((vertex_t)0, n_vertices, context.get_context(0)->stream());
   }
 
-  void loop(cuda::multi_context_t& context) override {
+  void loop(gcuda::multi_context_t& context) override {
     // Data slice
     auto E = this->get_enactor();
     auto P = this->get_problem();
@@ -98,14 +98,22 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto color_me_in = [G, colors, randoms, iteration] __host__ __device__(
                            vertex_t const& vertex) -> bool {
-      edge_t start_edge = G.get_starting_edge(vertex);
       edge_t num_neighbors = G.get_number_of_neighbors(vertex);
+
+      // Color two nodes at the same time.
+      const int color = iteration * 2;
+
+      // Exit early if the vertex has no neighbors.
+      if (num_neighbors == 0) {
+        colors[vertex] = color;
+        return false; // remove (colored)
+      }
 
       bool colormax = true;
       bool colormin = true;
 
-      // Color two nodes at the same time.
-      int color = iteration * 2;
+      edge_t start_edge = G.get_starting_edge(vertex);
+      auto rand_v = randoms[vertex];
 
       // Main loop that goes over all the neighbors and finds the maximum or
       // minimum random number vertex.
@@ -113,22 +121,24 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         vertex_t u = G.get_destination_vertex(e);
 
         if (gunrock::util::limits::is_valid(colors[u]) &&
-                (colors[u] != color + 1) && (colors[u] != color + 2) ||
+                (colors[u] != color) && (colors[u] != color + 1) ||
             (vertex == u))
           continue;
-        if (randoms[vertex] <= randoms[u])
+
+        auto rand_u = randoms[u];
+        if (rand_v <= rand_u)
           colormax = false;
-        if (randoms[vertex] >= randoms[u])
+        if (rand_v >= rand_u)
           colormin = false;
       }
 
       // Color if the node has the maximum OR minimum random number, this way,
       // per iteration we can possibly fill 2 colors at the same time.
       if (colormax) {
-        colors[vertex] = color + 1;
+        colors[vertex] = color;
         return false;  // remove (colored).
       } else if (colormin) {
-        colors[vertex] = color + 2;
+        colors[vertex] = color + 1;
         return false;  // remove (colored).
       } else {
         return true;  // keep (not colored).
@@ -136,7 +146,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute filter operator on the provided lambda.
-    operators::filter::execute<operators::filter_algorithm_t::compact>(
+    operators::filter::execute<operators::filter_algorithm_t::predicated>(
         G, E, color_me_in, context);
   }
 
@@ -145,9 +155,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type* colors,  // Output
-          std::shared_ptr<cuda::multi_context_t> context =
-              std::shared_ptr<cuda::multi_context_t>(
-                  new cuda::multi_context_t(0))  // Context
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))  // Context
 ) {
   using vertex_t = typename graph_t::vertex_type;
 

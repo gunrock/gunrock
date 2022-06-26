@@ -45,7 +45,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   problem_t(graph_t& A,
             param_type& _param,
             result_type& _result,
-            std::shared_ptr<cuda::multi_context_t> _context)
+            std::shared_ptr<gcuda::multi_context_t> _context)
       : gunrock::problem_t<graph_t>(A, _context),
         param(_param),
         result(_result) {}
@@ -80,7 +80,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
   enactor_t(problem_t* _problem,
-            std::shared_ptr<cuda::multi_context_t> _context,
+            std::shared_ptr<gcuda::multi_context_t> _context,
             enactor_properties_t _properties = enactor_properties_t())
       : gunrock::enactor_t<problem_t>(_problem, _context, _properties) {}
 
@@ -88,7 +88,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using edge_t = typename problem_t::edge_t;
   using weight_t = typename problem_t::weight_t;
 
-  void loop(cuda::multi_context_t& context) override {
+  void loop(gcuda::multi_context_t& context) override {
     auto E = this->get_enactor();
     auto P = this->get_problem();
 
@@ -251,7 +251,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
    * @param context The context of the execution (unused).
    * @return true returns true after one iteration.
    */
-  virtual bool is_converged(cuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) {
     return this->iteration == 0 ? false : true;
   }
 };  // struct enactor_t
@@ -260,9 +260,9 @@ template <typename graph_t, typename csr_t>
 float run(graph_t& A,
           graph_t& B,
           csr_t& C,
-          std::shared_ptr<cuda::multi_context_t> context =
-              std::shared_ptr<cuda::multi_context_t>(
-                  new cuda::multi_context_t(0))  // Context
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))  // Context
 ) {
   using param_type = param_t<graph_t>;
   using result_type = result_t<csr_t>;

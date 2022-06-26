@@ -22,7 +22,7 @@ namespace unique_copy {
 template <typename frontier_t>
 void execute(frontier_t* input,
              frontier_t* output,
-             cuda::standard_context_t& context) {
+             gcuda::standard_context_t& context) {
   // Make sure output frontier has enough space.
   if (output->get_capacity() < input->get_number_of_elements())
     output->reserve(input->get_number_of_elements());

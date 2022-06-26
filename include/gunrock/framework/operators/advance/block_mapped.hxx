@@ -51,8 +51,8 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
   // Specialize Block Scan for 1D block of THREADS_PER_BLOCK.
   using block_scan_t = cub::BlockScan<edge_t, THREADS_PER_BLOCK>;
 
-  auto global_idx = cuda::thread::global::id::x();
-  auto local_idx = cuda::thread::local::id::x();
+  auto global_idx = gcuda::thread::global::id::x();
+  auto local_idx = gcuda::thread::local::id::x();
 
   thrust::counting_iterator<type_t> all_vertices(0);
   __shared__ typename block_scan_t::TempStorage scan;
@@ -99,10 +99,10 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
     if (local_idx == 0)
       offset[0] = math::atomic::add(
           &block_offsets[0], (offset_counter_t)aggregate_degree_per_block);
-    __syncthreads();
   }
+  __syncthreads();
 
-  auto length = global_idx - local_idx + cuda::block::size::x();
+  auto length = global_idx - local_idx + gcuda::block::size::x();
 
   if (input_size < length)
     length = input_size;
@@ -115,7 +115,7 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
   /// resultant neighbor or invalid vertex is written to the output frontier.
   for (edge_t i = local_idx;            // threadIdx.x
        i < aggregate_degree_per_block;  // total degree to process
-       i += cuda::block::size::x()      // increment by blockDim.x
+       i += gcuda::block::size::x()     // increment by blockDim.x
   ) {
     // Binary search to find which vertex id to work on.
     int id = search::binary::rightmost(degrees, i, length);
@@ -141,7 +141,7 @@ __global__ void __launch_bounds__(THREADS_PER_BLOCK, 2)
     // Store [neighbor] into the output frontier.
     if constexpr (output_type != advance_io_type_t::none) {
       output[offset[0] + i] =
-          (cond && n != v) ? n : gunrock::numeric_limits<vertex_t>::invalid();
+          cond ? n : gunrock::numeric_limits<vertex_t>::invalid();
     }
   }
 }
@@ -156,7 +156,7 @@ void execute(graph_t& G,
              operator_t op,
              frontier_t& input,
              frontier_t& output,
-             cuda::standard_context_t& context) {
+             gcuda::standard_context_t& context) {
   if constexpr (output_type != advance_io_type_t::none) {
     auto size_of_output = compute_output_length(G, input, context);
 
@@ -178,7 +178,7 @@ void execute(graph_t& G,
                                  : input.get_number_of_elements();
 
   // Set-up and launch block-mapped advance.
-  using namespace cuda::launch_box;
+  using namespace gcuda::launch_box;
   using launch_t =
       launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<256>>>;
 

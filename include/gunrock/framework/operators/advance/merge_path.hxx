@@ -37,7 +37,7 @@ void execute(graph_t& G,
              frontier_t* input,
              frontier_t* output,
              work_tiles_t& segments,
-             cuda::standard_context_t& context) {
+             gcuda::standard_context_t& context) {
   if constexpr (direction == advance_direction_t::optimized) {
     error::throw_if_exception(cudaErrorUnknown,
                               "Direction-optimized not yet implemented.");

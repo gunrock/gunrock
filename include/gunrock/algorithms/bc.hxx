@@ -35,7 +35,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   problem_t(graph_t& G,
             param_type& _param,
             result_type& _result,
-            std::shared_ptr<cuda::multi_context_t> _context)
+            std::shared_ptr<gcuda::multi_context_t> _context)
       : gunrock::problem_t<graph_t>(G, _context),
         param(_param),
         result(_result) {}
@@ -82,7 +82,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
   enactor_t(problem_t* _problem,
-            std::shared_ptr<cuda::multi_context_t> _context,
+            std::shared_ptr<gcuda::multi_context_t> _context,
             enactor_properties_t _properties)
       : gunrock::enactor_t<problem_t>(_problem, _context, _properties) {}
 
@@ -96,12 +96,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   std::size_t depth = 0;
 
   void prepare_frontier(frontier_t* f,
-                        cuda::multi_context_t& context) override {
+                        gcuda::multi_context_t& context) override {
     auto P = this->get_problem();
     this->frontiers[0].push_back(P->param.single_source);
   }
 
-  void loop(cuda::multi_context_t& context) override {
+  void loop(gcuda::multi_context_t& context) override {
     auto E = this->get_enactor();
     auto P = this->get_problem();
     auto G = P->get_graph();
@@ -188,7 +188,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     }
   }
 
-  bool is_forward_converged(cuda::multi_context_t& context) {
+  bool is_forward_converged(gcuda::multi_context_t& context) {
     auto P = this->get_problem();
     auto out_frontier = &(this->frontiers[this->depth]);
     bool forward_converged = out_frontier->is_empty();
@@ -199,7 +199,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     return false;
   }
 
-  bool is_backward_converged(cuda::multi_context_t& context) {
+  bool is_backward_converged(gcuda::multi_context_t& context) {
     if (depth == 0) {
       backward = false;
       return true;
@@ -208,7 +208,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     return false;
   }
 
-  virtual bool is_converged(cuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) {
     return (!forward && !backward) ? true : false;
   }
 };  // struct enactor_t
@@ -217,9 +217,9 @@ template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type single_source,
           typename graph_t::weight_type* bc_values,
-          std::shared_ptr<cuda::multi_context_t> context =
-              std::shared_ptr<cuda::multi_context_t>(
-                  new cuda::multi_context_t(0))  // Context
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))  // Context
 ) {
   // <user-defined>
   using vertex_t = typename graph_t::vertex_type;

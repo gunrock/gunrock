@@ -42,8 +42,8 @@ float run(csr_t& csr, vertex_t* colors) {
       for (edge_t e = start_edge; e < start_edge + num_neighbors; ++e) {
         vertex_t u = column_indices[e];
 
-        if ((colors[u] != -1) && (colors[u] != color + 1) &&
-                (colors[u] != color + 2) ||
+        if ((colors[u] != -1) && (colors[u] != color) &&
+                (colors[u] != color + 1) ||
             (v == u))
           continue;
 
@@ -54,9 +54,9 @@ float run(csr_t& csr, vertex_t* colors) {
       }
 
       if (colormax) {
-        colors[v] = color + 1;
+        colors[v] = color;
       } else if (colormin) {
-        colors[v] = color + 2;
+        colors[v] = color + 1;
       }
 
       if (colormax || colormin)
@@ -87,8 +87,17 @@ float compute_error(csr_t& csr,
   for (vertex_t v = 0; v < n_vertices; v++) {
     for (edge_t e = row_offsets[v]; e < row_offsets[v + 1]; e++) {
       vertex_t u = column_indices[e];
-      if (gpu_colors[u] == gpu_colors[v] || gpu_colors[v] == -1)
+
+      // Do not check self-loops.
+      if(v == u)
+        continue;
+        
+      // Check if colors are the same among neighborhoods.
+      if (gpu_colors[u] == gpu_colors[v] || gpu_colors[v] == -1) {
+        std::cout << "Error: " << v << " " << u << " " << gpu_colors[v] << " "
+                  << gpu_colors[u] << std::endl;
         gpu_errors++;
+      }
       // if(cpu_colors[u] == cpu_colors[v] || cpu_colors[v] == -1) cpu_errors++;
     }
   }
