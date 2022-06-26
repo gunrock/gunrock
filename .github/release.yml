@@ -30,13 +30,11 @@ changelog:
         - 🧪 testing
         - 🔬 experiment
         - 📼 i/o
-        
-template: |
-  <!-- Optional: add a release summary here -->
-  ## Changes
-  $CHANGES
-
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 autolabeler:
   - label: '📋 documentation'
     files:
       - '*.md'
+template: |
+  <!-- Optional: add a release summary here -->
+  $CHANGES
