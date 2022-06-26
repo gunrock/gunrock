@@ -33,14 +33,14 @@ struct point_t {
 
   point_t operator+(const point_t& p) { return point_t(x + p.x, y + p.y); }
   bool operator<(const point_t& p1) const {
-    return (p1.y > y) || (p1.y == y && p1.x < x);
+    return ((p1.y > y) || ((p1.y == y) && (p1.x < x)));
   }
 };
 
 struct comp {
   template <typename type_t = int>
   inline bool operator()(const point_t<type_t>& p1, const point_t<type_t>& p2) {
-    return (p1.y > p2.y) || (p1.y == p2.y && p1.x < p2.x);
+    return ((p1.y > p2.y) || ((p1.y == p2.y) && (p1.x < p2.x)));
   }
 };
 
@@ -107,7 +107,7 @@ void draw(std::vector<point_t<type_t>>& points, int dim1, int dim2, int n) {
   for (int i = dim2; i > 0; i--) {
     fprintf(stderr, "%2.d|", i);
     for (int j = 1; j <= dim1; ++j) {
-      if (points[iterator].y == i && points[iterator].x == j) {
+      if ((points[iterator].y == i) && (points[iterator].x == j)) {
         fprintf(stderr, "%2.d ", O);
         ++iterator;
       } else {
