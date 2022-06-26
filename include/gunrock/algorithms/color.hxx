@@ -44,7 +44,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   using edge_t = typename graph_t::edge_type;
   using weight_t = typename graph_t::weight_type;
 
-  thrust::device_vector<weight_t> randoms;
+  thrust::device_vector<float> randoms;
 
   void init() override {
     auto g = this->get_graph();
@@ -62,7 +62,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
                  gunrock::numeric_limits<vertex_t>::invalid());
 
     // Generate random numbers.
-    generate::random::uniform_distribution(randoms);
+    generate::random::uniform_distribution(randoms, float(0.0f), float(n_vertices));
   }
 };
 
@@ -98,14 +98,22 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto color_me_in = [G, colors, randoms, iteration] __host__ __device__(
                            vertex_t const& vertex) -> bool {
-      edge_t start_edge = G.get_starting_edge(vertex);
       edge_t num_neighbors = G.get_number_of_neighbors(vertex);
+
+      // Color two nodes at the same time.
+      const int color = iteration * 2;
+
+      // Exit early if the vertex has no neighbors.
+      if (num_neighbors == 0) {
+        colors[vertex] = color;
+        return false; // remove (colored)
+      }
 
       bool colormax = true;
       bool colormin = true;
 
-      // Color two nodes at the same time.
-      int color = iteration * 2;
+      edge_t start_edge = G.get_starting_edge(vertex);
+      auto rand_v = randoms[vertex];
 
       // Main loop that goes over all the neighbors and finds the maximum or
       // minimum random number vertex.
@@ -113,22 +121,24 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         vertex_t u = G.get_destination_vertex(e);
 
         if (gunrock::util::limits::is_valid(colors[u]) &&
-                (colors[u] != color + 1) && (colors[u] != color + 2) ||
+                (colors[u] != color) && (colors[u] != color + 1) ||
             (vertex == u))
           continue;
-        if (randoms[vertex] <= randoms[u])
+
+        auto rand_u = randoms[u];
+        if (rand_v <= rand_u)
           colormax = false;
-        if (randoms[vertex] >= randoms[u])
+        if (rand_v >= rand_u)
           colormin = false;
       }
 
       // Color if the node has the maximum OR minimum random number, this way,
       // per iteration we can possibly fill 2 colors at the same time.
       if (colormax) {
-        colors[vertex] = color + 1;
+        colors[vertex] = color;
         return false;  // remove (colored).
       } else if (colormin) {
-        colors[vertex] = color + 2;
+        colors[vertex] = color + 1;
         return false;  // remove (colored).
       } else {
         return true;  // keep (not colored).
@@ -136,7 +146,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute filter operator on the provided lambda.
-    operators::filter::execute<operators::filter_algorithm_t::compact>(
+    operators::filter::execute<operators::filter_algorithm_t::predicated>(
         G, E, color_me_in, context);
   }
 
