@@ -1,13 +1,13 @@
-# [Essentials: CUDA/C++ GPU Graph Analytics](https://github.com/gunrock/essentials/wiki)
+# Essentials: CUDA/C++ GPU Graph Analytics
 [![Ubuntu](https://github.com/gunrock/essentials/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/gunrock/essentials/actions/workflows/ubuntu.yml) [![Windows](https://github.com/gunrock/essentials/actions/workflows/windows.yml/badge.svg)](https://github.com/gunrock/essentials/actions/workflows/windows.yml) [![Code Quality](https://github.com/gunrock/essentials/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/gunrock/essentials/actions/workflows/codeql-analysis.yml) [![Ubuntu: Testing](https://github.com/gunrock/essentials/actions/workflows/ubuntu-tests.yml/badge.svg)](https://github.com/gunrock/essentials/actions/workflows/ubuntu-tests.yml)
 
-**Gunrock/Essentials** is a CUDA library for graph-processing designed specifically for the GPU. It uses a **high-level**, **bulk-synchronous**, **data-centric abstraction** focused on operations on vertex or edge frontiers. Gunrock achieves a balance between performance and expressiveness by coupling high-performance GPU computing primitives and optimization strategies, particularly in the area of fine-grained load balancing, with a high-level programming model that allows programmers to quickly develop new graph primitives that scale from one to many GPUs on a node with small code size and minimal GPU programming knowledge.
+| [**Examples**](https://github.com/gunrock/essentials/tree/master/examples/algorithms) | [**Project Template**](https://github.com/gunrock/template) | [**Documentation**](https://github.com/gunrock/essentials/wiki) |
+|--------------|----------------------|-------------------|
+
+**Gunrock/Essentials**[<sup>[1]</sup>](#footnotes) is a CUDA library for graph-processing designed specifically for the GPU. It uses a **high-level**, **bulk-synchronous/asynchronous**, **data-centric abstraction** focused on operations on vertex or edge frontiers. Gunrock achieves a balance between performance and expressiveness by coupling high-performance GPU computing primitives and optimization strategies, particularly in the area of fine-grained load balancing, with a high-level programming model that allows programmers to quickly develop new graph primitives that scale from one to many GPUs on a node with small code size and minimal GPU programming knowledge.
 
 ## Quick Start Guide
-
-- [Gunrock's Documentation](https://github.com/gunrock/essentials/wiki)
-
-Before building Gunrock make sure you have **CUDA Toolkit**[<sup>[1]</sup>](#footnotes) installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
+Before building Gunrock make sure you have **CUDA Toolkit**[<sup>[2]</sup>](#footnotes) installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
 
 ```shell
 git clone https://github.com/gunrock/essentials.git
@@ -64,5 +64,5 @@ Gunrock is copyright The Regents of the University of California. The library, e
 
 <a class="anchor" id="1"></a>
 ## Footnotes
-1. Preferred **CUDA v11.5.1 or higher** due to support for stream ordered memory allocators.
-2. Essentials is intended as a future release of [Gunrock](https://github.com/gunrock/gunrock). You can read more about in our vision paper: [Essentials of Parallel Graph Analytics](https://escholarship.org/content/qt2p19z28q/qt2p19z28q_noSplash_38a658bccc817ba025517311a776840f.pdf).
+1. Essentials is intended as a future release of [Gunrock](https://github.com/gunrock/gunrock). You can read more about in our vision paper: [Essentials of Parallel Graph Analytics](https://escholarship.org/content/qt2p19z28q/qt2p19z28q_noSplash_38a658bccc817ba025517311a776840f.pdf).
+2. Preferred **CUDA v11.5.1 or higher** due to support for stream ordered memory allocators.
