@@ -126,9 +126,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
           continue;
 
         auto rand_u = randoms[u];
-        if (rand_v <= rand_u)
+        if (rand_v < rand_u || (rand_v == rand_u && vertex < u))
           colormax = false;
-        if (rand_v >= rand_u)
+        if (rand_v > rand_u || (rand_v == rand_u && vertex > u))
           colormin = false;
       }
 
