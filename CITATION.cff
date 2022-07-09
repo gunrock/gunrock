@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "Thank you for citing our work."
+authors:
+- family-names: "Osama"
+  given-names: "Muhammad"
+  orcid: "https://orcid.org/0000-0003-1616-6817"
+title: "Essentials of Parallel Graph Analytics"
+version: 0.0.1
+doi: 10.1109/IPDPSW55747.2022.00061
+url: "https://github.com/gunrock/essentials"
+license: Apache-2.0
+preferred-citation:
+  type: conference-paper
+  authors:
+  - family-names: "Osama"
+    given-names: "Muhammad"
+    orcid: "https://orcid.org/0000-0003-1616-6817"
+  - family-names: "Porumbescu"
+    given-names: "Serban D."
+  - family-names: "Owens"
+    given-names: "John D."
+    orcid: "https://orcid.org/0000-0001-6582-8237"
+  doi: "10.1109/IPDPSW55747.2022.00061"
+  collection-title: "Proceedings of the Workshop on Graphs, Architectures, Programming, and Learning"
+  conference:
+    name: "GrAPL 2022"
+  month: 5
+  start: 314 # First page number
+  end: 317 # Last page number
+  title: "Essentials of Parallel Graph Analytics"
+  issue: 36
+  year: 2022
+  url: "https://escholarship.org/uc/item/2p19z28q"
