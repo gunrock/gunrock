@@ -59,11 +59,15 @@ void test_color(int num_arguments, char** argument_array) {
 
   thrust::host_vector<vertex_t> h_colors(n_vertices);
 
-  float cpu_elapsed =
-      color_cpu::run<csr_t, vertex_t, edge_t, weight_t>(csr, h_colors.data());
+  float cpu_elapsed = 
+     color_cpu::run<csr_t, vertex_t, edge_t, weight_t>(csr, h_colors.data());
 
   int n_errors = color_cpu::compute_error<csr_t, vertex_t, edge_t, weight_t>(
       csr, colors, h_colors);
+
+  std::vector<int> stl_colors(n_vertices);
+  thrust::copy(colors.begin(), colors.end(), stl_colors.begin());
+  int n_colors = std::set(stl_colors.begin(), stl_colors.end()).size();
 
   // --
   // Log
@@ -72,6 +76,7 @@ void test_color(int num_arguments, char** argument_array) {
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
+  std::cout << "Number of colors : " << n_colors << std::endl;
   std::cout << "Number of errors : " << n_errors << std::endl;
 }
 

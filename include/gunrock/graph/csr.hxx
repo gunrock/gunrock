@@ -93,8 +93,8 @@ class graph_csr_t {
   __host__ __device__ __forceinline__ edge_type
   get_edge(const vertex_type& source, const vertex_type& destination) const {
     return (edge_type)search::binary::execute(get_column_indices(), destination,
-                                              offsets[source],
-                                              offsets[source + 1] - 1);
+                                              get_starting_edge(source),
+                                              get_starting_edge(source + 1) - 1);
   }
 
   /**
