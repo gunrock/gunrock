@@ -25,8 +25,16 @@ template <typename vertex_t>
 struct result_t {
   vertex_t* distances;
   vertex_t* predecessors;
-  result_t(vertex_t* _distances, vertex_t* _predecessors)
-      : distances(_distances), predecessors(_predecessors) {}
+  int* edges_visited;
+  int* search_depth;
+  result_t(vertex_t* _distances,
+           vertex_t* _predecessors,
+           int* _edges_visited,
+           int* _search_depth)
+      : distances(_distances),
+        predecessors(_predecessors),
+        edges_visited(_edges_visited),
+        search_depth(_search_depth) {}
 };
 
 template <typename graph_t, typename param_type, typename result_type>
@@ -53,6 +61,13 @@ struct problem_t : gunrock::problem_t<graph_t> {
   void reset() override {
     auto n_vertices = this->get_graph().get_number_of_vertices();
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
+    auto d_edges_visited =
+        thrust::device_pointer_cast(this->result.edges_visited);
+    auto d_search_depth =
+        thrust::device_pointer_cast(this->result.search_depth);
+    // Add one edge visited for source vertex
+    thrust::fill(thrust::device, d_edges_visited, d_edges_visited + 1, 1);
+    thrust::fill(thrust::device, d_search_depth, d_search_depth + 1, 0);
     thrust::fill(thrust::device, d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<vertex_t>::max());
     thrust::fill(thrust::device, d_distances + this->param.single_source,
@@ -85,20 +100,24 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto single_source = P->param.single_source;
     auto distances = P->result.distances;
+    auto edges_visited = P->result.edges_visited;
+    auto search_depth = P->result.search_depth;
     auto visited = P->visited.data().get();
-
+  
     auto iteration = this->iteration;
 
-    auto search = [distances, single_source, iteration] __host__ __device__(
-                      vertex_t const& source,    // ... source
-                      vertex_t const& neighbor,  // neighbor
-                      edge_t const& edge,        // edge
-                      weight_t const& weight     // weight (tuple).
-                      ) -> bool {
+    auto search = [distances, single_source, iteration, edges_visited, search_depth] __host__
+                  __device__(vertex_t const& source,    // ... source
+                             vertex_t const& neighbor,  // neighbor
+                             edge_t const& edge,        // edge
+                             weight_t const& weight     // weight (tuple).
+                             ) -> bool {
       // If the neighbor is not visited, update the distance. Returning false
       // here means that the neighbor is not added to the output frontier, and
       // instead an invalid vertex is added in its place. These invalides (-1 in
       // most cases) can be removed using a filter operator or uniquify.
+      math::atomic::add(&edges_visited[0], 1);
+      search_depth[0] = iteration;
       if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
         return false;
       else
@@ -147,6 +166,8 @@ float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter
           typename graph_t::vertex_type* distances,      // Output
           typename graph_t::vertex_type* predecessors,   // Output
+          int* edges_visited,                            // Output
+          int* search_depth,                            // Output
           std::shared_ptr<cuda::multi_context_t> context =
               std::shared_ptr<cuda::multi_context_t>(
                   new cuda::multi_context_t(0))  // Context
@@ -156,7 +177,7 @@ float run(graph_t& G,
   using result_type = result_t<vertex_t>;
 
   param_type param(single_source);
-  result_type result(distances, predecessors);
+  result_type result(distances, predecessors, edges_visited, search_depth);
 
   using problem_type = problem_t<graph_t, param_type, result_type>;
   using enactor_type = enactor_t<problem_type>;

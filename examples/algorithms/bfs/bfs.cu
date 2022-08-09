@@ -64,12 +64,15 @@ void test_bfs(int num_arguments, char** argument_array) {
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<vertex_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
+  thrust::device_vector<int> edges_visited(1);
+  thrust::device_vector<int> search_depth(1);
 
   // --
   // Run problem
 
   float gpu_elapsed = gunrock::bfs::run(
-      G, single_source, distances.data().get(), predecessors.data().get());
+      G, single_source, distances.data().get(), predecessors.data().get(),
+      edges_visited.data().get(), search_depth.data().get());
 
   // --
   // CPU Run
@@ -88,6 +91,13 @@ void test_bfs(int num_arguments, char** argument_array) {
 
   print::head(distances, 40, "GPU distances");
   print::head(h_distances, 40, "CPU Distances");
+
+  // Print performance analaysis stats
+  thrust::host_vector<int> h_edges_visited = edges_visited;
+  thrust::host_vector<int> h_search_depth = search_depth;
+  std::cout << "Edges visited : " << h_edges_visited[0] << std::endl;
+  // Add 1 because iteration is 0-indexed
+  std::cout << "Search depth : " << h_search_depth[0] + 1 << std::endl;
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
