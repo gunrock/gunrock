@@ -21,31 +21,25 @@ set (mgpu_SOURCE_FILES
   ${mgpu_SOURCE_DIRS}/context.hxx)
 # end /* moderngpu include directories */
 
-# begin /* CUB include directories */
-if (cub_INCLUDE_DIRS)
-  include_directories(${cub_INCLUDE_DIRS})
-else()
-  message(SEND_ERROR "CUB include directory not set.")
-endif()
-# end /* CUB include directories */
-
 # begin /* FAISS include directories */
 #if (FAISS_INCLUDE_DIRS)
 #  include_directories(${FAISS_INCLUDE_DIRS})
 #endif()
 # end /* FAISS include directories */
 
+CUDA_ADD_LIBRARY(${PROJECT_NAME}_app STATIC
+  ${CMAKE_SOURCE_DIR}/gunrock/app/${PROJECT_NAME}/${PROJECT_NAME}_app.cu
+  OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
+
 # begin /* Add CUDA executables */
 CUDA_ADD_EXECUTABLE(${PROJECT_NAME}
   test_${PROJECT_NAME}.cu
-  ${CMAKE_SOURCE_DIR}/gunrock/util/str_to_T.cu
-  ${CMAKE_SOURCE_DIR}/gunrock/util/test_utils.cu
-  ${CMAKE_SOURCE_DIR}/gunrock/util/error_utils.cu
-  ${CMAKE_SOURCE_DIR}/gunrock/util/misc_utils.cu
-  ${CMAKE_SOURCE_DIR}/gunrock/util/gitsha1.c
-  ${mgpu_SOURCE_FILES}
   OPTIONS ${GENCODE} ${VERBOSE_PTXAS})
 # end /* Add CUDA executables */
+
+# link gunrock
+target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_app)
+target_link_libraries(${PROJECT_NAME} gunrock_utils)
 
 # begin /* Link Metis and Boost */
 target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
@@ -64,3 +58,4 @@ set_tests_properties(TEST_${PROJECT_NAME_UP}_CMD PROPERTIES
 PASS_REGULAR_EXPRESSION "Required arguments:")
 # end /* Simple ctest that tests cmd help */
 
+set_target_properties(${PROJECT_NAME}_app PROPERTIES LINKER_LANGUAGE CXX)

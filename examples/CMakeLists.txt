@@ -40,7 +40,7 @@ if(GUNROCK_BUILD_APPLICATIONS)
   #add_subdirectory(hello)
 
   # SHARED LIBRARY SUBDIRECTORY
-  add_subdirectory(shared_libs)
+  # add_subdirectory(shared_libs)
 
 # Individual options to build specific applications
 else(GUNROCK_BUILD_APPLICATIONS)
