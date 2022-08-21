@@ -1,0 +1,40 @@
+# Gunrock/Release generator .github/release.yml
+name-template: $NEXT_MINOR_VERSION
+tag-template: $NEXT_MINOR_VERSION
+version-template: $MAJOR.$MINOR.$PATCH
+
+changelog:
+  exclude:
+    labels:
+      - ignore
+      - 💩 wontfix
+  categories:
+    - title: 🎉 Algorithms and Operators
+      labels:
+        - 🍍 algorithms
+        - 🚂 operators
+        - ⚖️ load-balancing
+        - 🐲 enhancement
+    - title: 🐛 Bug Fixes
+      labels:
+        - 🐛 bug
+    - title: 🏡 API Changes/Improvements
+      labels:
+        - 🏡 api
+        - 🏭 build
+    - title: 📝 Documentation Updates
+      labels:
+        - 📋 documentation
+    - title: 🧪 Testing
+      labels:
+        - 🧪 testing
+        - 🔬 experiment
+        - 📼 i/o
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+autolabeler:
+  - label: '📋 documentation'
+    files:
+      - '*.md'
+template: |
+  <!-- Optional: add a release summary here -->
+  $CHANGES

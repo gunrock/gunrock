@@ -29,7 +29,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
   problem_t(graph_t& G,
             result_type& _result,
-            std::shared_ptr<cuda::multi_context_t> _context)
+            std::shared_ptr<gcuda::multi_context_t> _context)
       : gunrock::problem_t<graph_t>(G, _context), result(_result) {}
 
   using vertex_t = typename graph_t::vertex_type;
@@ -90,7 +90,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
 template <typename problem_t>
 struct enactor_t : gunrock::enactor_t<problem_t> {
   enactor_t(problem_t* _problem,
-            std::shared_ptr<cuda::multi_context_t> _context)
+            std::shared_ptr<gcuda::multi_context_t> _context)
       : gunrock::enactor_t<problem_t>(_problem, _context) {}
 
   using vertex_t = typename problem_t::vertex_t;
@@ -99,7 +99,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   using frontier_t = typename enactor_t<problem_t>::frontier_t;
 
   void prepare_frontier(frontier_t* f,
-                        cuda::multi_context_t& context) override {
+                        gcuda::multi_context_t& context) override {
     // get pointer to the problem
     auto P = this->get_problem();
     auto n_vertices = P->get_graph().get_number_of_vertices();
@@ -109,7 +109,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
   }
 
   // One iteration of the application
-  void loop(cuda::multi_context_t& context) override {
+  void loop(gcuda::multi_context_t& context) override {
     auto E = this->get_enactor();
     auto P = this->get_problem();
     auto G = P->get_graph();
@@ -177,7 +177,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     }
   }
 
-  virtual bool is_converged(cuda::multi_context_t& context) {
+  virtual bool is_converged(gcuda::multi_context_t& context) {
     auto P = this->get_problem();
     auto G = P->get_graph();
     auto n_vertices = G.get_number_of_vertices();
@@ -202,9 +202,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           int* k_cores,  // Output
-          std::shared_ptr<cuda::multi_context_t> context =
-              std::shared_ptr<cuda::multi_context_t>(
-                  new cuda::multi_context_t(0))  // Context
+          std::shared_ptr<gcuda::multi_context_t> context =
+              std::shared_ptr<gcuda::multi_context_t>(
+                  new gcuda::multi_context_t(0))  // Context
 ) {
   using vertex_t = typename graph_t::vertex_type;
   using weight_t = typename graph_t::weight_type;

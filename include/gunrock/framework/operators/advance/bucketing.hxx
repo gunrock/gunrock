@@ -33,7 +33,7 @@ void execute(graph_t& G,
              frontier_t* input,
              frontier_t* output,
              work_tiles_t& segments,
-             cuda::standard_context_t& context) {}
+             gcuda::standard_context_t& context) {}
 }  // namespace bucketing
 
 }  // namespace advance

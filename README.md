@@ -1,11 +1,13 @@
-# **Essentials:** High-Performance C++ GPU Graph Analytics 
+# Essentials: CUDA/C++ GPU Graph Analytics
 [![Ubuntu](https://github.com/gunrock/essentials/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/gunrock/essentials/actions/workflows/ubuntu.yml) [![Windows](https://github.com/gunrock/essentials/actions/workflows/windows.yml/badge.svg)](https://github.com/gunrock/essentials/actions/workflows/windows.yml) [![Code Quality](https://github.com/gunrock/essentials/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/gunrock/essentials/actions/workflows/codeql-analysis.yml) [![Ubuntu: Testing](https://github.com/gunrock/essentials/actions/workflows/ubuntu-tests.yml/badge.svg)](https://github.com/gunrock/essentials/actions/workflows/ubuntu-tests.yml)
 
-**Gunrock/Essentials** is a CUDA library for graph-processing designed specifically for the GPU. It uses a **high-level**, **bulk-synchronous**, **data-centric abstraction** focused on operations on vertex or edge frontiers. Gunrock achieves a balance between performance and expressiveness by coupling high-performance GPU computing primitives and optimization strategies, particularly in the area of fine-grained load balancing, with a high-level programming model that allows programmers to quickly develop new graph primitives that scale from one to many GPUs on a node with small code size and minimal GPU programming knowledge.
+| [**Examples**](https://github.com/gunrock/essentials/tree/master/examples/algorithms) | [**Project Template**](https://github.com/gunrock/template) | [**Documentation**](https://github.com/gunrock/essentials/wiki) | [**GitHub Actions**](https://github.com/gunrock/essentials/actions) |
+|--------------|----------------------|-------------------|-------------------|
+
+**Gunrock/Essentials**[<sup>[1]</sup>](#footnotes) is a CUDA library for graph-processing designed specifically for the GPU. It uses a **high-level**, **bulk-synchronous/asynchronous**, **data-centric abstraction** focused on operations on vertex or edge frontiers. Gunrock achieves a balance between performance and expressiveness by coupling high-performance GPU computing primitives and optimization strategies, particularly in the area of fine-grained load balancing, with a high-level programming model that allows programmers to quickly develop new graph primitives that scale from one to many GPUs on a node with small code size and minimal GPU programming knowledge.
 
 ## Quick Start Guide
-
-Before building Gunrock make sure you have **CUDA Toolkit**[^1] installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
+Before building Gunrock make sure you have **CUDA Toolkit**[<sup>[2]</sup>](#footnotes) installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
 
 ```shell
 git clone https://github.com/gunrock/essentials.git
@@ -15,23 +17,59 @@ cmake ..
 make sssp # or for all algorithms, use: make -j$(nproc)
 bin/sssp ../datasets/chesapeake/chesapeake.mtx
 ```
-[^1]: Preferred **CUDA v11.5.1 or higher** due to support for stream ordered memory allocators (e.g. `cudaFreeAsync()`).
 
-## Getting Started with Gunrock
+## Implementing Graph Algorithms
+For a detailed explanation, please see the full [documentation](https://github.com/gunrock/essentials/wiki/How-to-write-a-new-graph-algorithm). The following example shows simple APIs using Gunrock's data-centric, bulk-synchronous programming model, we implement Breadth-First Search on GPUs. This example skips the setup phase of creating a `problem_t` and `enactor_t` struct and jumps straight into the actual algorithm.
 
-- [👻 (GitHub Template) `essentials` project example](https://github.com/gunrock/applications)
-- [Gunrock's documentation](https://github.com/gunrock/essentials/wiki)
-- [Gunrock's overview](https://github.com/gunrock/essentials/wiki/Overview)
-- [Gunrock's programming model](https://github.com/gunrock/essentials/wiki/Programming-Model)
-- [Publications](https://github.com/gunrock/essentials/wiki/Publications) and [presentations](https://github.com/gunrock/essentials/wiki/Presentations)
-- [Essentials](https://github.com/gunrock/essentials) versus [Gunrock](https://github.com/gunrock/gunrock)[^2]
+We first prepare our frontier with the initial source vertex to begin
+push-based BFS traversal. A simple `f->push_back(source)` places
+the initial vertex we will use for our first iteration.
+```cpp
+void prepare_frontier(frontier_t* f,
+                      gcuda::multi_context_t& context) override {
+  auto P = this->get_problem();
+  f->push_back(P->param.single_source);
+}
+```
+We then begin our iterative loop, which iterates until a convergence condition has been met. If no condition has been specified, the loop converges when the frontier is empty.
+```cpp
+void loop(gcuda::multi_context_t& context) override {
+  auto E = this->get_enactor();   // Pointer to enactor interface.
+  auto P = this->get_problem();   // Pointer to problem (data) interface.
+  auto G = P->get_graph();        // Graph that we are processing.
 
-[^2]: Essentials is the future of Gunrock. The idea is to take the lessons learned from Gunrock to a new design, which simplifies the effort it takes to **(1)** implement graph algorithms, **(2)** add internal optimizations, **(3)** conduct future research. One example is Gunrock's SSSP, implemented in 4-5 files with 1000s of lines of code versus in essentials, it is a single file with less than 200 lines of code. Our end goal with essentials is possibly releasing it as a `v2.0.0` for Gunrock.
+  auto single_source = P->param.single_source;  // Initial source node.
+  auto distances = P->result.distances;         // Distances array for BFS.
+  auto visited = P->visited.data().get();       // Visited map.
+  auto iteration = this->iteration;             // Iteration we are on.
 
-## How to Cite Gunrock
+  // Following lambda expression is applied on every source,
+  // neighbor, edge, weight tuple during the traversal.
+  // Our intent here is to find and update the minimum distance when found.
+  // And return which neighbor goes in the output frontier after traversal.
+  auto search = [=] __host__ __device__(
+                      vertex_t const& source,    // ... source
+                      vertex_t const& neighbor,  // neighbor
+                      edge_t const& edge,        // edge
+                      weight_t const& weight     // weight (tuple).
+                      ) -> bool {
+    auto old_distance =
+      math::atomic::min(&distances[neighbor], iteration + 1);
+    return (iteration + 1 < old_distance);
+  };
+
+  // Execute advance operator on the search lambda expression.
+  // Uses load_balance_t::block_mapped algorithm (try others for perf. tuning.)
+  operators::advance::execute<operators::load_balance_t::block_mapped>(
+    G, E, search, context);
+}
+```
+[include/gunrock/algorithms/bfs.hxx](include/gunrock/algorithms/bfs.hxx)
+
+## How to Cite Gunrock & Essentials
 Thank you for citing our work.
 
-```tex
+```bibtex
 @article{Wang:2017:GGG,
   author =	 {Yangzihao Wang and Yuechao Pan and Andrew Davidson
                   and Yuduo Wu and Carl Yang and Leyuan Wang and
@@ -53,6 +91,26 @@ Thank you for citing our work.
 }
 ```
 
-## Copyright and License
+```bibtex
+@InProceedings{Osama:2022:EOP,
+  author =	 {Muhammad Osama and Serban D. Porumbescu and John D. Owens},
+  title =	 {Essentials of Parallel Graph Analytics},
+  booktitle =	 {Proceedings of the Workshop on Graphs,
+                  Architectures, Programming, and Learning},
+  year =	 2022,
+  series =	 {GrAPL 2022},
+  month =	 may,
+  pages =	 {314--317},
+  doi =		 {10.1109/IPDPSW55747.2022.00061},
+  url =          {https://escholarship.org/uc/item/2p19z28q},
+}
+```
+
+## Copyright & License
 
 Gunrock is copyright The Regents of the University of California. The library, examples, and all source code are released under [Apache 2.0](https://github.com/gunrock/essentials/blob/master/LICENSE).
+
+## Footnotes
+1. Essentials is intended as a future release of [Gunrock](https://github.com/gunrock/gunrock). 
+    - You can read more about it in our vision paper: [Essentials of Parallel Graph Analytics](https://escholarship.org/content/qt2p19z28q/qt2p19z28q_noSplash_38a658bccc817ba025517311a776840f.pdf).
+2. Recommended **CUDA v11.5.1 or higher** due to support for stream ordered memory allocators.

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <numeric>
+#include <random>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/random.h>
 
@@ -28,6 +30,22 @@ void uniform_distribution(vector_t& input,
   thrust::transform(thrust::make_counting_iterator<int>(0),
                     thrust::make_counting_iterator<int>(input.size()),
                     input.begin(), generate_random);
+}
+
+/**
+ * @brief Get a random floating point value
+ * 
+ * @tparam rand_t type of value (default = float)
+ * @param begin low random value
+ * @param end high random value
+ * @return rand_t random value in the range [begin, end]
+ */
+template <typename rand_t = float>
+rand_t get_random(rand_t begin = 0.0f, rand_t end = 1.0f) {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dis(begin, end);
+  return (rand_t)dis(gen);
 }
 
 }  // namespace random

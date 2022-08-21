@@ -34,7 +34,7 @@ void execute(graph_t& G,
              frontier_t& input,
              frontier_t& output,
              work_tiles_t& segments,
-             cuda::standard_context_t& context) {
+             gcuda::standard_context_t& context) {
   using type_t = typename frontier_t::type_t;
 
   if (output_type != advance_io_type_t::none) {
@@ -64,10 +64,10 @@ void execute(graph_t& G,
     if (!gunrock::util::limits::is_valid(v))
       return;
 
-    auto starting_edge = G.get_starting_edge(v);
     auto total_edges = G.get_number_of_neighbors(v);
 
     for (auto i = 0; i < total_edges; ++i) {
+      auto starting_edge = G.get_starting_edge(v);
       auto e = i + starting_edge;            // edge id
       auto n = G.get_destination_vertex(e);  // neighbor id
       auto w = G.get_edge_weight(e);         // weight
@@ -75,8 +75,7 @@ void execute(graph_t& G,
 
       if (output_type != advance_io_type_t::none) {
         std::size_t out_idx = segments_ptr[tid] + i;
-        type_t element =
-            (cond && n != v) ? n : gunrock::numeric_limits<type_t>::invalid();
+        type_t element = cond ? n : gunrock::numeric_limits<type_t>::invalid();
         output.set_element_at(element, out_idx);
       }
     }
@@ -87,7 +86,7 @@ void execute(graph_t& G,
                                  : input.get_number_of_elements();
 
   // Set-up and launch thread-mapped advance.
-  using namespace cuda::launch_box;
+  using namespace gcuda::launch_box;
   using launch_t =
       launch_box_t<launch_params_dynamic_grid_t<fallback, dim3_t<256>, 3>>;
 

@@ -9,7 +9,7 @@ set(FETCHCONTENT_BASE_DIR ${FC_BASE})
 FetchContent_Declare(
   cub
     GIT_REPOSITORY https://github.com/NVIDIA/cub.git
-    GIT_TAG        1.15.0
+    GIT_TAG        1.17.0
 )
 
 FetchContent_GetProperties(cub)

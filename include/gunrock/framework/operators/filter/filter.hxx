@@ -53,7 +53,7 @@ namespace filter {
  * @param input Input frontier.
  * @param output Output frontier (some algorithms may not use this, and allow
  * for in-place filter operation).
- * @param context a `cuda::multi_context_t` that contains GPU contexts for the
+ * @param context a `gcuda::multi_context_t` that contains GPU contexts for the
  * available CUDA devices. Used to launch the filter kernels.
  */
 template <filter_algorithm_t alg_type,
@@ -64,7 +64,7 @@ void execute(graph_t& G,
              operator_t op,
              frontier_t* input,
              frontier_t* output,
-             cuda::multi_context_t& context) {
+             gcuda::multi_context_t& context) {
   if (context.size() == 1) {
     auto single_context = context.get_context(0);
 
@@ -122,7 +122,7 @@ void execute(graph_t& G,
  * @param G Input graph used.
  * @param op Predicate function, can be defined using a C++ lambda function.
  * @param E Enactor struct containing input and output frontiers.
- * @param context a `cuda::multi_context_t` that contains GPU contexts for the
+ * @param context a `gcuda::multi_context_t` that contains GPU contexts for the
  * available CUDA devices. Used to launch the filter kernels.
  */
 template <filter_algorithm_t alg_type,
@@ -132,7 +132,7 @@ template <filter_algorithm_t alg_type,
 void execute(graph_t& G,
              enactor_type* E,
              operator_t op,
-             cuda::multi_context_t& context,
+             gcuda::multi_context_t& context,
              bool swap_buffers = true) {
   execute<alg_type>(G,                         // graph
                     op,                        // operator_t

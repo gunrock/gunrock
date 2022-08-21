@@ -15,7 +15,7 @@ namespace uniquify {
 template <uniquify_algorithm_t type, typename frontier_t>
 void execute(frontier_t* input,
              frontier_t* output,
-             cuda::multi_context_t& context,
+             gcuda::multi_context_t& context,
              bool best_effort_uniquification = false,
              const float uniquification_percent = 100) {
   if (context.size() == 1) {
@@ -44,7 +44,7 @@ void execute(frontier_t* input,
 template <uniquify_algorithm_t type = uniquify_algorithm_t::unique,
           typename enactor_type>
 void execute(enactor_type* E,
-             cuda::multi_context_t& context,
+             gcuda::multi_context_t& context,
              bool best_effort_uniquification = false,
              const float uniquification_percent = 100,
              bool swap_buffers = true) {

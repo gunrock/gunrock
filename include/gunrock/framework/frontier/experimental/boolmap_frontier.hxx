@@ -53,7 +53,7 @@ class boolmap_frontier_t {
    * @return std::size_t
    */
   __host__ __device__ __forceinline__ std::size_t get_number_of_elements(
-      cuda::stream_t stream = 0) {
+      gcuda::stream_t stream = 0) {
     // Compute number of elements using a reduction.
 #ifdef __CUDA_ARCH__
     num_elements = thrust::reduce(thrust::seq, this->begin(), this->end(), 0);
@@ -99,7 +99,7 @@ class boolmap_frontier_t {
   __device__ __forceinline__ constexpr void set_element_at(
       type_t const& element,
       std::size_t const& idx = 0  // Ignore idx for boolmap.
-      ) const noexcept {          // XXX: This should not be const
+  ) const noexcept {              // XXX: This should not be const
     thread::store(this->get() + element, 1);
   }
 
@@ -143,7 +143,7 @@ class boolmap_frontier_t {
    * @param value
    * @param stream
    */
-  void fill(type_t const value, cuda::stream_t stream = 0) {
+  void fill(type_t const value, gcuda::stream_t stream = 0) {
     if (value != 0 || value != 1)
       error::throw_if_exception(cudaErrorUnknown,
                                 "Boolmap only supports 1 or 0 as fill value.");
@@ -180,10 +180,10 @@ class boolmap_frontier_t {
    * @brief Parallel sort the frontier.
    *
    * @param order see sort::order_t
-   * @param stream see cuda::stream
+   * @param stream see gcuda::stream
    */
   void sort(sort::order_t order = sort::order_t::ascending,
-            cuda::stream_t stream = 0) {
+            gcuda::stream_t stream = 0) {
     // Bool-map frontier is always sorted.
   }
 
