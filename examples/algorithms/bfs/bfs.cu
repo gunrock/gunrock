@@ -1,10 +1,16 @@
 #include <gunrock/algorithms/bfs.hxx>
 #include "bfs_cpu.hxx"  // Reference implementation
+#include <sys/utsname.h>
+#include "nlohmann/json.hpp"
+#include "../../performance/perf.hxx"
 
 using namespace gunrock;
 using namespace memory;
 
 void test_bfs(int num_arguments, char** argument_array) {
+  // TODO: CLA
+  bool performance = true;
+
   if (num_arguments != 2) {
     std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
     exit(1);
@@ -92,12 +98,13 @@ void test_bfs(int num_arguments, char** argument_array) {
   print::head(distances, 40, "GPU distances");
   print::head(h_distances, 40, "CPU Distances");
 
-  // Print performance analaysis stats
-  thrust::host_vector<int> h_edges_visited = edges_visited;
-  thrust::host_vector<int> h_search_depth = search_depth;
-  std::cout << "Edges visited : " << h_edges_visited[0] << std::endl;
-  // Add 1 because iteration is 0-indexed
-  std::cout << "Search depth : " << h_search_depth[0] + 1 << std::endl;
+  if (performance) {
+    nlohmann::json jsn;
+    thrust::host_vector<int> h_edges_visited = edges_visited;
+    thrust::host_vector<int> h_search_depth = search_depth;
+    get_performance_stats(&jsn, h_edges_visited[0], h_search_depth[0],
+                          gpu_elapsed);
+  }
 
   std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
