@@ -1,7 +1,4 @@
 #include <sys/utsname.h>
-#include "nlohmann/json.hpp"
-#include <string>
-#include <gunrock/algorithms/algorithms.hxx>
 
 class Sysinfo {
  private:
@@ -69,5 +66,8 @@ void get_performance_stats(nlohmann::json* jsn,
   get_gpu_info(jsn);
   Sysinfo sys;
   sys.get_sys_info(jsn);
+  
+  jsn->push_back(nlohmann::json::object_t::value_type("engine","Essentials"));
+  
   std::cout << *jsn << "\n";
 }
