@@ -16,7 +16,15 @@ class Sysinfo {
   std::string machine() const { return std::string(uts.machine); }
   std::string nodename() const { return std::string(uts.nodename); }
 
-  void get_sys_info() { std::cout << "sysname:" << sysname() << "\n"; }
+  void get_sys_info(nlohmann::json* jsn) {
+    std::map<std::string, std::string> sysinfo;
+    sysinfo["sysname"] = sysname();
+    sysinfo["release"] = release();
+    sysinfo["version"] = version();
+    sysinfo["machine"] = machine();
+    sysinfo["nodename"] = nodename();
+    jsn->push_back(nlohmann::json::object_t::value_type("sysinfo", sysinfo));
+  }
 };
 
 void get_gpu_info(nlohmann::json* jsn) {
@@ -50,7 +58,6 @@ void get_gpu_info(nlohmann::json* jsn) {
       std::to_string(devProps.major * 10 + devProps.minor);
 
   jsn->push_back(nlohmann::json::object_t::value_type("gpuinfo", gpuinfo));
-  std::cout << *jsn << "\n";
 }
 
 void get_system_info(std::vector<std::vector<std::string>>* jsn) {}
@@ -60,4 +67,7 @@ void get_performance_stats(nlohmann::json* jsn,
                            int search_depth,
                            int gpu_elapsed) {
   get_gpu_info(jsn);
+  Sysinfo sys;
+  sys.get_sys_info(jsn);
+  std::cout << *jsn << "\n";
 }
