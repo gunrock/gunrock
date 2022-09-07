@@ -1,4 +1,5 @@
 #include <sys/utsname.h>
+#include "nlohmann/json.hpp"
 
 class Sysinfo {
  private:
@@ -57,17 +58,32 @@ void get_gpu_info(nlohmann::json* jsn) {
   jsn->push_back(nlohmann::json::object_t::value_type("gpuinfo", gpuinfo));
 }
 
-void get_system_info(std::vector<std::vector<std::string>>* jsn) {}
-
-void get_performance_stats(nlohmann::json* jsn,
-                           int edges_visited,
+void get_performance_stats(int edges_visited,
+                           int nodes_visited,
                            int search_depth,
-                           int gpu_elapsed) {
-  get_gpu_info(jsn);
+                           float gpu_elapsed,
+                           std::string primitive,
+                           std::string filename,
+                           std::string graph_type,
+                           std::string json) {
+  nlohmann::json jsn;
+
+  jsn.push_back(nlohmann::json::object_t::value_type("engine", "Essentials"));
+  jsn.push_back(nlohmann::json::object_t::value_type("primitive", primitive));
+  jsn.push_back(nlohmann::json::object_t::value_type("graph_type", graph_type));
+  jsn.push_back(
+      nlohmann::json::object_t::value_type("edges_visited", edges_visited));
+  jsn.push_back(
+      nlohmann::json::object_t::value_type("nodes_visited", nodes_visited));
+  jsn.push_back(
+      nlohmann::json::object_t::value_type("process_time", gpu_elapsed));
+  jsn.push_back(
+      nlohmann::json::object_t::value_type("search_depth", search_depth));
+  jsn.push_back(nlohmann::json::object_t::value_type("graph-file", filename));
+
+  get_gpu_info(&jsn);
   Sysinfo sys;
-  sys.get_sys_info(jsn);
-  
-  jsn->push_back(nlohmann::json::object_t::value_type("engine","Essentials"));
-  
-  std::cout << *jsn << "\n";
+  sys.get_sys_info(&jsn);
+
+  std::cout << jsn << "\n";
 }

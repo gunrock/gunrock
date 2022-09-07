@@ -1,8 +1,7 @@
 #include <gunrock/algorithms/bfs.hxx>
 #include "bfs_cpu.hxx"  // Reference implementation
 #include <sys/utsname.h>
-#include "nlohmann/json.hpp"
-#include "../../performance/perf.hxx"
+#include "gunrock/util/performance.hxx"
 #include <cxxopts.hpp>
 
 using namespace gunrock;
@@ -61,6 +60,7 @@ struct parameters_t {
       performance = true;
     }
 
+    // TODO: check for valid file path
     if (result.count("json") == 1) {
       json = result["json"].as<std::string>();
     }
@@ -152,11 +152,13 @@ void test_bfs(int num_arguments, char** argument_array) {
   }
 
   if (params.performance) {
-    nlohmann::json jsn;
     thrust::host_vector<int> h_edges_visited = edges_visited;
     thrust::host_vector<int> h_search_depth = search_depth;
-    get_performance_stats(&jsn, h_edges_visited[0], h_search_depth[0],
-                          gpu_elapsed);
+
+    // For BFS - the number of nodes visited is just 2 * edges_visited
+    get_performance_stats(h_edges_visited[0], (2 * h_edges_visited[0]),
+                          h_search_depth[0], gpu_elapsed, "bfs",
+                          params.filename, "market", params.json);
   }
 }
 
