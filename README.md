@@ -1,7 +1,7 @@
-# Essentials: CUDA/C++ GPU Graph Analytics
-[![Ubuntu](https://github.com/gunrock/essentials/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/gunrock/essentials/actions/workflows/ubuntu.yml) [![Windows](https://github.com/gunrock/essentials/actions/workflows/windows.yml/badge.svg)](https://github.com/gunrock/essentials/actions/workflows/windows.yml) [![Code Quality](https://github.com/gunrock/essentials/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/gunrock/essentials/actions/workflows/codeql-analysis.yml) [![Ubuntu: Testing](https://github.com/gunrock/essentials/actions/workflows/ubuntu-tests.yml/badge.svg)](https://github.com/gunrock/essentials/actions/workflows/ubuntu-tests.yml)
+# Gunrock: CUDA/C++ GPU Graph Analytics
+[![Ubuntu](https://github.com/gunrock/gunrock/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/ubuntu.yml) [![Windows](https://github.com/gunrock/gunrock/actions/workflows/windows.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/windows.yml) [![Code Quality](https://github.com/gunrock/gunrock/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/codeql-analysis.yml) [![Ubuntu: Testing](https://github.com/gunrock/gunrock/actions/workflows/ubuntu-tests.yml/badge.svg)](https://github.com/gunrock/gunrock/actions/workflows/ubuntu-tests.yml)
 
-| [**Examples**](https://github.com/gunrock/essentials/tree/master/examples/algorithms) | [**Project Template**](https://github.com/gunrock/template) | [**Documentation**](https://github.com/gunrock/essentials/wiki) | [**GitHub Actions**](https://github.com/gunrock/essentials/actions) |
+| [**Examples**](https://github.com/gunrock/gunrock/tree/main/examples/algorithms) | [**Project Template**](https://github.com/gunrock/template) | [**Documentation**](https://github.com/gunrock/gunrock/wiki) | [**GitHub Actions**](https://github.com/gunrock/gunrock/actions) |
 |--------------|----------------------|-------------------|-------------------|
 
 **Gunrock**[<sup>[1]</sup>](#footnotes) is a CUDA library for graph-processing designed specifically for the GPU. It uses a **high-level**, **bulk-synchronous/asynchronous**, **data-centric abstraction** focused on operations on vertex or edge frontiers. Gunrock achieves a balance between performance and expressiveness by coupling high-performance GPU computing primitives and optimization strategies, particularly in the area of fine-grained load balancing, with a high-level programming model that allows programmers to quickly develop new graph primitives that scale from one to many GPUs on a node with small code size and minimal GPU programming knowledge.
@@ -10,8 +10,8 @@
 Before building Gunrock make sure you have **CUDA Toolkit**[<sup>[2]</sup>](#footnotes) installed on your system. Other external dependencies such as `NVIDIA/thrust`, `NVIDIA/cub`, etc. are automatically fetched using `cmake`.
 
 ```shell
-git clone https://github.com/gunrock/essentials.git
-cd essentials
+git clone https://github.com/gunrock/gunrock.git
+cd gunrock
 mkdir build && cd build
 cmake .. 
 make sssp # or for all algorithms, use: make -j$(nproc)
@@ -19,7 +19,7 @@ bin/sssp ../datasets/chesapeake/chesapeake.mtx
 ```
 
 ## Implementing Graph Algorithms
-For a detailed explanation, please see the full [documentation](https://github.com/gunrock/essentials/wiki/How-to-write-a-new-graph-algorithm). The following example shows simple APIs using Gunrock's data-centric, bulk-synchronous programming model, we implement Breadth-First Search on GPUs. This example skips the setup phase of creating a `problem_t` and `enactor_t` struct and jumps straight into the actual algorithm.
+For a detailed explanation, please see the full [documentation](https://github.com/gunrock/gunrock/wiki/How-to-write-a-new-graph-algorithm). The following example shows simple APIs using Gunrock's data-centric, bulk-synchronous programming model, we implement Breadth-First Search on GPUs. This example skips the setup phase of creating a `problem_t` and `enactor_t` struct and jumps straight into the actual algorithm.
 
 We first prepare our frontier with the initial source vertex to begin
 push-based BFS traversal. A simple `f->push_back(source)` places
@@ -108,8 +108,8 @@ Thank you for citing our work.
 
 ## Copyright & License
 
-Gunrock is copyright The Regents of the University of California. The library, examples, and all source code are released under [Apache 2.0](https://github.com/gunrock/essentials/blob/master/LICENSE).
+Gunrock is copyright The Regents of the University of California. The library, examples, and all source code are released under [Apache 2.0](https://github.com/gunrock/gunrock/blob/main/LICENSE).
 
 ## Footnotes
-1. Read more gunrock and essentials in our vision paper: [Essentials of Parallel Graph Analytics](https://escholarship.org/content/qt2p19z28q/qt2p19z28q_noSplash_38a658bccc817ba025517311a776840f.pdf).
+1. This repository has been moved from https://github.com/gunrock/essentials and the previous history is preserved with tags and under `master` branch. Read more about gunrock and essentials in our vision paper: [Essentials of Parallel Graph Analytics](https://escholarship.org/content/qt2p19z28q/qt2p19z28q_noSplash_38a658bccc817ba025517311a776840f.pdf).
 2. Recommended **CUDA v11.5.1 or higher** due to support for stream ordered memory allocators.
