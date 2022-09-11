@@ -22,7 +22,7 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Fetch CUDA toolkit using Jimver/cuda-toolkit@v0.2.5
+      # Fetch CUDA toolkit using Jimver/cuda-toolkit
       - name: Fetch CUDA toolkit
         uses: Jimver/cuda-toolkit@v0.2.8
         id: cuda-toolkit
