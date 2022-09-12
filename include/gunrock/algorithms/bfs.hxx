@@ -18,13 +18,15 @@ namespace bfs {
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
-  param_t(vertex_t _single_source) : single_source(_single_source) {}
+  bool performance;
+  param_t(vertex_t _single_source, bool _performance)
+      : single_source(_single_source), performance(_performance) {}
 };
 
 template <typename vertex_t>
 struct result_t {
   vertex_t* distances;
-  vertex_t* predecessors; /// @todo: implement this.
+  vertex_t* predecessors;  /// @todo: implement this.
   int* edges_visited;
   int* search_depth;
   result_t(vertex_t* _distances,
@@ -98,14 +100,46 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto G = P->get_graph();
 
     auto single_source = P->param.single_source;
+    auto performance = P->param.performance;
     auto distances = P->result.distances;
     auto edges_visited = P->result.edges_visited;
     auto search_depth = P->result.search_depth;
     auto visited = P->visited.data().get();
-  
+
     auto iteration = this->iteration;
 
-    auto search = [distances, single_source, iteration, edges_visited, search_depth] __host__
+    auto search_with_performance =
+        [distances, single_source, iteration, edges_visited,
+         search_depth] __host__
+        __device__(vertex_t const& source,    // ... source
+                   vertex_t const& neighbor,  // neighbor
+                   edge_t const& edge,        // edge
+                   weight_t const& weight     // weight (tuple).
+                   ) -> bool {
+      // If the neighbor is not visited, update the distance. Returning false
+      // here means that the neighbor is not added to the output frontier, and
+      // instead an invalid vertex is added in its place. These invalides (-1 in
+      // most cases) can be removed using a filter operator or uniquify.
+
+      math::atomic::add(&edges_visited[0], 1);
+      search_depth[0] = iteration;
+
+      // if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
+      //   return false;
+      // else
+      //   return (math::atomic::cas(
+      //               &distances[neighbor],
+      //               std::numeric_limits<vertex_t>::max(), iteration + 1) ==
+      //               std::numeric_limits<vertex_t>::max());
+
+      // Simpler logic for the above.
+      auto old_distance =
+          math::atomic::min(&distances[neighbor], iteration + 1);
+      return (iteration + 1 < old_distance);
+    };
+
+    auto search = [distances, single_source, iteration, edges_visited,
+                   search_depth] __host__
                   __device__(vertex_t const& source,    // ... source
                              vertex_t const& neighbor,  // neighbor
                              edge_t const& edge,        // edge
@@ -115,10 +149,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // here means that the neighbor is not added to the output frontier, and
       // instead an invalid vertex is added in its place. These invalides (-1 in
       // most cases) can be removed using a filter operator or uniquify.
-      
-      math::atomic::add(&edges_visited[0], 1);
-      search_depth[0] = iteration;
-      
+
       // if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
       //   return false;
       // else
@@ -142,9 +173,14 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator on the provided lambda
-    operators::advance::execute<operators::load_balance_t::block_mapped>(
-        G, E, search, context);
-
+    // Track performance stats if performance evaluation is turned on
+    if (performance) {
+      operators::advance::execute<operators::load_balance_t::block_mapped>(
+          G, E, search_with_performance, context);
+    } else {
+      operators::advance::execute<operators::load_balance_t::block_mapped>(
+          G, E, search, context);
+    }
     // Execute filter operator to remove the invalids.
     // @todo: Add CLI option to enable or disable this.
     // operators::filter::execute<operators::filter_algorithm_t::compact>(
@@ -171,10 +207,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter
+          bool performance,                              // Parameter
           typename graph_t::vertex_type* distances,      // Output
           typename graph_t::vertex_type* predecessors,   // Output
           int* edges_visited,                            // Output
-          int* search_depth,                            // Output
+          int* search_depth,                             // Output
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))  // Context
@@ -183,7 +220,7 @@ float run(graph_t& G,
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t>;
 
-  param_type param(single_source);
+  param_type param(single_source, performance);
   result_type result(distances, predecessors, edges_visited, search_depth);
 
   using problem_type = problem_t<graph_t, param_type, result_type>;

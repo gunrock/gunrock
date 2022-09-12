@@ -3,13 +3,16 @@
 #include <sys/utsname.h>
 #include "gunrock/util/performance.hxx"
 #include <cxxopts.hpp>
+#include <filesystem>
 
 using namespace gunrock;
 using namespace memory;
 
 struct parameters_t {
   std::string filename;
-  std::string json = "";
+  std::string json_dir = ".";
+  std::string json_file = "";
+  int num_runs = 1;
   cxxopts::Options options;
   bool validate = false;
   bool performance = false;
@@ -24,11 +27,14 @@ struct parameters_t {
   parameters_t(int argc, char** argv)
       : options(argv[0], "Breadth First Search example") {
     // Add command line options
-    options.add_options()("help", "Print help")                     // help
-        ("validate", "CPU validation")                              // validate
-        ("performance", "performance analysis")                     // validate
-        ("m,market", "Matrix file", cxxopts::value<std::string>())  // mtx
-        ("j,json", "JSON output file",
+    options.add_options()("help", "Print help")  // help
+        ("validate", "CPU validation")           // validate
+        ("performance", "performance analysis")  // performance evaluation
+        ("m,market", "Matrix file", cxxopts::value<std::string>())  // mtx file
+        ("n,num_runs", "Number of runs", cxxopts::value<int>())     // runs
+        ("d,json_dir", "JSON output directory",
+         cxxopts::value<std::string>())  // json output directory
+        ("f,json_file", "JSON output file",
          cxxopts::value<std::string>());  // json output file
 
     // Parse command line arguments
@@ -59,10 +65,18 @@ struct parameters_t {
     if (result.count("performance") == 1) {
       performance = true;
     }
+    
+    if (result.count("num_runs") == 1) {
+      num_runs = result["num_runs"].as<int>();
+    }
 
-    // TODO: check for valid file path
-    if (result.count("json") == 1) {
-      json = result["json"].as<std::string>();
+    // TODO: add check for valid path
+    if (result.count("json_dir") == 1) {
+      json_dir = result["json_dir"].as<std::string>();
+    }
+
+    if (result.count("json_file") == 1) {
+      json_dir = result["json_file"].as<std::string>();
     }
   }
 };
@@ -88,7 +102,6 @@ void test_bfs(int num_arguments, char** argument_array) {
   if (params.binary) {
     csr.read_binary(params.filename);
   } else {
-    std::cout << params.filename << "\n";
     csr.from_coo(mm.load(params.filename));
   }
 
@@ -126,12 +139,17 @@ void test_bfs(int num_arguments, char** argument_array) {
   // --
   // Run problem
 
-  float gpu_elapsed = gunrock::bfs::run(
-      G, single_source, distances.data().get(), predecessors.data().get(),
-      edges_visited.data().get(), search_depth.data().get());
+  std::vector<float> run_times;
+  for (int i = 0; i < params.num_runs; i++) {
+    run_times.push_back(gunrock::bfs::run(
+        G, single_source, params.performance, distances.data().get(),
+        predecessors.data().get(), edges_visited.data().get(),
+        search_depth.data().get()));
+  }
 
   print::head(distances, 40, "GPU distances");
-  std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
+  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1] << " (ms)"
+            << std::endl;
 
   // --
   // CPU Run
@@ -154,11 +172,13 @@ void test_bfs(int num_arguments, char** argument_array) {
   if (params.performance) {
     thrust::host_vector<int> h_edges_visited = edges_visited;
     thrust::host_vector<int> h_search_depth = search_depth;
+    vertex_t n_edges = G.get_number_of_edges();
 
     // For BFS - the number of nodes visited is just 2 * edges_visited
-    get_performance_stats(h_edges_visited[0], (2 * h_edges_visited[0]),
-                          h_search_depth[0], gpu_elapsed, "bfs",
-                          params.filename, "market", params.json);
+    get_performance_stats(h_edges_visited[0], (2 * h_edges_visited[0]), n_edges,
+                          n_vertices, h_search_depth[0], run_times, "bfs",
+                          params.filename, "market", params.json_dir,
+                          params.json_file);
   }
 }
 
