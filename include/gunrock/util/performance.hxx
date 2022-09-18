@@ -37,13 +37,13 @@ void get_gpu_info(nlohmann::json* jsn) {
   int deviceCount;
   int dev = 0;
   int runtimeVersion, driverVersion;
-  
+
   cudaGetDeviceCount(&deviceCount);
   if (deviceCount == 0) /* no valid devices */
   {
     return;
   }
-  
+
   cudaGetDevice(&dev);
   cudaGetDeviceProperties(&devProps, dev);
 
@@ -82,9 +82,9 @@ void get_performance_stats(int edges_visited,
   float stdev_run_times;
   float min_run_time;
   float max_run_time;
-  float avg_mteps; 
-  float min_mteps; 
-  float max_mteps; 
+  float avg_mteps;
+  float min_mteps;
+  float max_mteps;
   std::string time_s;
   nlohmann::json jsn;
   std::string json_dir_file;
@@ -150,8 +150,7 @@ void get_performance_stats(int edges_visited,
   jsn.push_back(nlohmann::json::object_t::value_type("avg-mteps", avg_mteps));
   jsn.push_back(nlohmann::json::object_t::value_type("min-mteps", min_mteps));
   jsn.push_back(nlohmann::json::object_t::value_type("max-mteps", max_mteps));
-  jsn.push_back(nlohmann::json::object_t::value_type(
-      "time", time_s));
+  jsn.push_back(nlohmann::json::object_t::value_type("time", time_s));
 
   // Get GPU info
   get_gpu_info(&jsn);
@@ -177,9 +176,8 @@ void get_performance_stats(int edges_visited,
   } else {
     json_dir_file = json_dir + "/" + json_file;
   }
-  
-  std::ofstream outfile(json_dir_file);
-  outfile << jsn;
-  outfile.close();
 
+  std::ofstream outfile(json_dir_file);
+  outfile << jsn.dump(4);
+  outfile.close();
 }

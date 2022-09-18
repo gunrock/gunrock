@@ -3,7 +3,6 @@
 #include <sys/utsname.h>
 #include "gunrock/util/performance.hxx"
 #include <cxxopts.hpp>
-#include <filesystem>
 
 using namespace gunrock;
 using namespace memory;
@@ -168,6 +167,9 @@ void test_bfs(int num_arguments, char** argument_array) {
     std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
     std::cout << "Number of errors : " << n_errors << std::endl;
   }
+
+  // --
+  // Run performance evaluation 
 
   if (params.performance) {
     thrust::host_vector<int> h_edges_visited = edges_visited;
