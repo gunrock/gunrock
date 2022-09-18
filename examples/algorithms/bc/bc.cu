@@ -1,14 +1,79 @@
 #include <gunrock/algorithms/bc.hxx>
+#include "gunrock/util/performance.hxx"
+#include <cxxopts.hpp>
 
 using namespace gunrock;
 using namespace memory;
 
-void test_bc(int num_arguments, char** argument_array) {
-  if (num_arguments != 2) {
-    std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
-    exit(1);
-  }
+struct parameters_t {
+  std::string filename;
+  std::string json_dir = ".";
+  std::string json_file = "";
+  int num_runs = 1;
+  cxxopts::Options options;
+  bool performance = false;
+  bool binary = false;
 
+  /**
+   * @brief Construct a new parameters object and parse command line arguments.
+   *
+   * @param argc Number of command line arguments.
+   * @param argv Command line arguments.
+   */
+  parameters_t(int argc, char** argv)
+      : options(argv[0], "Breadth First Search example") {
+    // Add command line options
+    options.add_options()("help", "Print help")  // help
+        ("validate", "CPU validation")           // validate
+        ("performance", "performance analysis")  // performance evaluation
+        ("m,market", "Matrix file", cxxopts::value<std::string>())  // mtx file
+        ("n,num_runs", "Number of runs", cxxopts::value<int>())     // runs
+        ("d,json_dir", "JSON output directory",
+         cxxopts::value<std::string>())  // json output directory
+        ("f,json_file", "JSON output file",
+         cxxopts::value<std::string>());  // json output file
+
+    // Parse command line arguments
+    auto result = options.parse(argc, argv);
+
+    if (result.count("help") || (result.count("market") == 0)) {
+      std::cout << options.help({""}) << std::endl;
+      std::exit(0);
+    }
+
+    if (result.count("market") == 1) {
+      filename = result["market"].as<std::string>();
+      if (util::is_binary_csr(filename)) {
+        binary = true;
+      } else if (!util::is_market(filename)) {
+        std::cout << options.help({""}) << std::endl;
+        std::exit(0);
+      }
+    } else {
+      std::cout << options.help({""}) << std::endl;
+      std::exit(0);
+    }
+
+    if (result.count("performance") == 1) {
+      performance = true;
+    }
+
+    if (result.count("num_runs") == 1) {
+      num_runs = result["num_runs"].as<int>();
+    }
+
+    // TODO: add check for valid path
+    if (result.count("json_dir") == 1) {
+      json_dir = result["json_dir"].as<std::string>();
+    }
+
+    if (result.count("json_file") == 1) {
+      json_dir = result["json_file"].as<std::string>();
+    }
+  }
+};
+
+void test_bc(int num_arguments, char** argument_array) {
   // --
   // Define types
 
@@ -19,14 +84,14 @@ void test_bc(int num_arguments, char** argument_array) {
   // --
   // IO
 
-  std::string filename = argument_array[1];
+  parameters_t params(num_arguments, argument_array);
 
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
 
   using csr_t =
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
   csr_t csr;
-  csr.from_coo(mm.load(filename));
+  csr.from_coo(mm.load(params.filename));
 
   // --
   // Build graph
@@ -43,21 +108,43 @@ void test_bc(int num_arguments, char** argument_array) {
   // --
   // Params and memory allocation
 
-  // vertex_t single_source = 0;
+  //vertex_t single_source = 0;
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> bc_values(n_vertices);
+  thrust::device_vector<int> edges_visited(1);
+  thrust::device_vector<int> vertices_visited(1);
+  thrust::device_vector<int> search_depth(1);
 
   // --
   // GPU Run
 
-  float gpu_elapsed =
-      gunrock::bc::run(G, /* single_source, */ bc_values.data().get());
+  std::vector<float> run_times;
+  for (int i = 0; i < params.num_runs; i++) {
+    run_times.push_back(gunrock::bc::run(
+      G, params.performance, bc_values.data().get(), edges_visited.data().get(),
+      vertices_visited.data().get(), search_depth.data().get()));
+  }
 
   // --
   // Log + Validate
 
   print::head(bc_values, 40, "GPU bc values");
-  std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
+  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
+            << " (ms)" << std::endl;
+
+  // --
+  // Run performance evaluation
+  if (params.performance) {
+    thrust::host_vector<int> h_edges_visited = edges_visited;
+    thrust::host_vector<int> h_search_depth = search_depth;
+    vertex_t n_edges = G.get_number_of_edges();
+
+    // For BFS - the number of nodes visited is just 2 * edges_visited
+    get_performance_stats(h_edges_visited[0], (2 * h_edges_visited[0]), n_edges,
+                          n_vertices, h_search_depth[0], run_times, "bfs",
+                          params.filename, "market", params.json_dir,
+                          params.json_file);
+  }
 }
 
 int main(int argc, char** argv) {
