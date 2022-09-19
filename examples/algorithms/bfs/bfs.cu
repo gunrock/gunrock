@@ -94,10 +94,11 @@ void test_bfs(int num_arguments, char** argument_array) {
   // --
   // IO
 
-  csr_t csr;
   parameters_t params(num_arguments, argument_array);
-
+  
+  csr_t csr;
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+  
   if (params.binary) {
     csr.read_binary(params.filename);
   } else {

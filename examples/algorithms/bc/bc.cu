@@ -80,18 +80,23 @@ void test_bc(int num_arguments, char** argument_array) {
   using vertex_t = int;
   using edge_t = int;
   using weight_t = float;
+  
+  using csr_t =
+      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
 
   // --
   // IO
 
   parameters_t params(num_arguments, argument_array);
-
-  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-
-  using csr_t =
-      format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
+  
   csr_t csr;
-  csr.from_coo(mm.load(params.filename));
+  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+  
+  if (params.binary) {
+    csr.read_binary(params.filename);
+  } else {
+    csr.from_coo(mm.load(params.filename));
+  }
 
   // --
   // Build graph
@@ -134,14 +139,15 @@ void test_bc(int num_arguments, char** argument_array) {
 
   // --
   // Run performance evaluation
+  
   if (params.performance) {
     thrust::host_vector<int> h_edges_visited = edges_visited;
+    thrust::host_vector<int> h_vertices_visited = vertices_visited;
     thrust::host_vector<int> h_search_depth = search_depth;
     vertex_t n_edges = G.get_number_of_edges();
 
-    // For BFS - the number of nodes visited is just 2 * edges_visited
-    get_performance_stats(h_edges_visited[0], (2 * h_edges_visited[0]), n_edges,
-                          n_vertices, h_search_depth[0], run_times, "bfs",
+    get_performance_stats(h_edges_visited[0], h_vertices_visited[0], n_edges,
+                          n_vertices, h_search_depth[0], run_times, "bc",
                           params.filename, "market", params.json_dir,
                           params.json_file);
   }
