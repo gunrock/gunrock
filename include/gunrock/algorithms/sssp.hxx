@@ -18,15 +18,29 @@ namespace sssp {
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
-  param_t(vertex_t _single_source) : single_source(_single_source) {}
+  bool performance;
+  param_t(vertex_t _single_source, bool _performance)
+      : single_source(_single_source), performance(_performance) {}
 };
 
 template <typename vertex_t, typename weight_t>
 struct result_t {
   weight_t* distances;
   vertex_t* predecessors;
-  result_t(weight_t* _distances, vertex_t* _predecessors, vertex_t n_vertices)
-      : distances(_distances), predecessors(_predecessors) {}
+  int* edges_visited;
+  int* vertices_visited;
+  int* search_depth;
+  result_t(weight_t* _distances,
+           vertex_t* _predecessors,
+           int* _edges_visited,
+           int* _vertices_visited,
+           int* _search_depth,
+           vertex_t n_vertices)
+      : distances(_distances),
+        predecessors(_predecessors),
+        edges_visited(_edges_visited),
+        vertices_visited(_vertices_visited),
+        search_depth(_search_depth) {}
 };
 
 template <typename graph_t, typename param_type, typename result_type>
@@ -67,11 +81,22 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
     auto single_source = this->param.single_source;
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
+    auto d_edges_visited =
+        thrust::device_pointer_cast(this->result.edges_visited);
+    auto d_vertices_visited =
+        thrust::device_pointer_cast(this->result.vertices_visited);
+    auto d_search_depth =
+        thrust::device_pointer_cast(this->result.search_depth);
+
     thrust::fill(policy, d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<weight_t>::max());
 
     thrust::fill(policy, d_distances + single_source,
                  d_distances + single_source + 1, 0);
+
+    thrust::fill(thrust::device, d_edges_visited, d_edges_visited + 1, 0);
+    thrust::fill(thrust::device, d_vertices_visited, d_vertices_visited + 1, 0);
+    thrust::fill(thrust::device, d_search_depth, d_search_depth + 1, 0);
 
     thrust::fill(policy, visited.begin(), visited.end(),
                  -1);  // This does need to be reset in between runs though
@@ -105,14 +130,22 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto distances = P->result.distances;
     auto visited = P->visited.data().get();
 
+    auto edges_visited = P->result.edges_visited;
+    auto vertices_visited = P->result.vertices_visited;
+    auto search_depth = P->result.search_depth;
+    
+
     auto iteration = this->iteration;
 
-    auto shortest_path = [distances, single_source] __host__ __device__(
+    auto shortest_path = [distances, single_source, edges_visited, vertices_visited, search_depth, iteration] __host__ __device__(
                              vertex_t const& source,    // ... source
                              vertex_t const& neighbor,  // neighbor
                              edge_t const& edge,        // edge
                              weight_t const& weight     // weight (tuple).
                              ) -> bool {
+      math::atomic::add(&edges_visited[0], 1);
+      math::atomic::add(&vertices_visited[0], 2);
+      search_depth[0] = iteration;
       weight_t source_distance = thread::load(&distances[source]);
       weight_t distance_to_neighbor = source_distance + weight;
 
@@ -123,8 +156,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return (distance_to_neighbor < recover_distance);
     };
 
-    auto remove_completed_paths = [G, visited, iteration] __host__ __device__(
+    auto remove_completed_paths = [G, visited, iteration, vertices_visited] __host__ __device__(
                                       vertex_t const& vertex) -> bool {
+      math::atomic::add(&vertices_visited[0], 1);
       if (visited[vertex] == iteration)
         return false;
 
@@ -155,8 +189,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter
+          bool performance,                              // Parameter
           typename graph_t::weight_type* distances,      // Output
           typename graph_t::vertex_type* predecessors,   // Output
+          int* edges_visited,                            // Output
+          int* vertices_visited,                         // Output
+          int* search_depth,                             // Output
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))  // Context
@@ -168,8 +206,9 @@ float run(graph_t& G,
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t, weight_t>;
 
-  param_type param(single_source);
-  result_type result(distances, predecessors, G.get_number_of_vertices());
+  param_type param(single_source, performance);
+  result_type result(distances, predecessors, edges_visited, vertices_visited,
+                     search_depth, G.get_number_of_vertices());
   // </user-defined>
 
   using problem_type = problem_t<graph_t, param_type, result_type>;

@@ -63,12 +63,7 @@ struct problem_t : gunrock::problem_t<graph_t> {
   void reset() override {
     auto n_vertices = this->get_graph().get_number_of_vertices();
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
-    auto d_edges_visited =
-        thrust::device_pointer_cast(this->result.edges_visited);
-    auto d_search_depth =
-        thrust::device_pointer_cast(this->result.search_depth);
-    thrust::fill(thrust::device, d_edges_visited, d_edges_visited + 1, 0);
-    thrust::fill(thrust::device, d_search_depth, d_search_depth + 1, 0);
+    
     thrust::fill(thrust::device, d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<vertex_t>::max());
     thrust::fill(thrust::device, d_distances + this->param.single_source,
@@ -98,7 +93,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto E = this->get_enactor();
     auto P = this->get_problem();
     auto G = P->get_graph();
-
+    auto f = this->get_input_frontier();
     auto single_source = P->param.single_source;
     auto performance = P->param.performance;
     auto distances = P->result.distances;
@@ -107,39 +102,13 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto visited = P->visited.data().get();
 
     auto iteration = this->iteration;
-
-    auto search_with_performance =
-        [distances, single_source, iteration, edges_visited,
-         search_depth] __host__
-        __device__(vertex_t const& source,    // ... source
-                   vertex_t const& neighbor,  // neighbor
-                   edge_t const& edge,        // edge
-                   weight_t const& weight     // weight (tuple).
-                   ) -> bool {
-      // If the neighbor is not visited, update the distance. Returning false
-      // here means that the neighbor is not added to the output frontier, and
-      // instead an invalid vertex is added in its place. These invalides (-1 in
-      // most cases) can be removed using a filter operator or uniquify.
-
-      math::atomic::add(&edges_visited[0], 1);
-      search_depth[0] = iteration;
-
-      // if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
-      //   return false;
-      // else
-      //   return (math::atomic::cas(
-      //               &distances[neighbor],
-      //               std::numeric_limits<vertex_t>::max(), iteration + 1) ==
-      //               std::numeric_limits<vertex_t>::max());
-
-      // Simpler logic for the above.
-      auto old_distance =
-          math::atomic::min(&distances[neighbor], iteration + 1);
-      return (iteration + 1 < old_distance);
-    };
-
-    auto search = [distances, single_source, iteration, edges_visited,
-                   search_depth] __host__
+    
+    if (iteration > 0) {
+      *edges_visited += f->get_number_of_elements();
+      *search_depth = iteration;
+    }
+    
+    auto search = [distances, single_source, iteration] __host__
                   __device__(vertex_t const& source,    // ... source
                              vertex_t const& neighbor,  // neighbor
                              edge_t const& edge,        // edge
@@ -163,7 +132,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
           math::atomic::min(&distances[neighbor], iteration + 1);
       return (iteration + 1 < old_distance);
     };
-
+    
     auto remove_invalids =
         [] __host__ __device__(vertex_t const& vertex) -> bool {
       // Returning true here means that we keep all the valid vertices.
@@ -173,14 +142,9 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator on the provided lambda
-    // Track performance stats if performance evaluation is turned on
-    if (performance) {
-      operators::advance::execute<operators::load_balance_t::block_mapped>(
-          G, E, search_with_performance, context);
-    } else {
-      operators::advance::execute<operators::load_balance_t::block_mapped>(
+    operators::advance::execute<operators::load_balance_t::block_mapped>(
           G, E, search, context);
-    }
+    
     // Execute filter operator to remove the invalids.
     // @todo: Add CLI option to enable or disable this.
     // operators::filter::execute<operators::filter_algorithm_t::compact>(

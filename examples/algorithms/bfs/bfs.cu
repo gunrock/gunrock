@@ -1,6 +1,5 @@
 #include <gunrock/algorithms/bfs.hxx>
 #include "bfs_cpu.hxx"  // Reference implementation
-#include <sys/utsname.h>
 #include "gunrock/util/performance.hxx"
 #include <cxxopts.hpp>
 
@@ -133,8 +132,8 @@ void test_bfs(int num_arguments, char** argument_array) {
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<vertex_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
-  thrust::device_vector<int> edges_visited(1);
-  thrust::device_vector<int> search_depth(1);
+  int edges_visited = 0;
+  int search_depth = 0;
 
   // --
   // Run problem
@@ -143,8 +142,8 @@ void test_bfs(int num_arguments, char** argument_array) {
   for (int i = 0; i < params.num_runs; i++) {
     run_times.push_back(gunrock::bfs::run(
         G, single_source, params.performance, distances.data().get(),
-        predecessors.data().get(), edges_visited.data().get(),
-        search_depth.data().get()));
+        predecessors.data().get(), &edges_visited,
+        &search_depth));
   }
 
   print::head(distances, 40, "GPU distances");
@@ -173,13 +172,11 @@ void test_bfs(int num_arguments, char** argument_array) {
   // Run performance evaluation 
 
   if (params.performance) {
-    thrust::host_vector<int> h_edges_visited = edges_visited;
-    thrust::host_vector<int> h_search_depth = search_depth;
     vertex_t n_edges = G.get_number_of_edges();
 
     // For BFS - the number of nodes visited is just 2 * edges_visited
-    get_performance_stats(h_edges_visited[0], (2 * h_edges_visited[0]), n_edges,
-                          n_vertices, h_search_depth[0], run_times, "bfs",
+    get_performance_stats(edges_visited, (2 * edges_visited), n_edges,
+                          n_vertices, search_depth, run_times, "bfs",
                           params.filename, "market", params.json_dir,
                           params.json_file);
   }
