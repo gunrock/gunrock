@@ -120,19 +120,17 @@ void test_pr(int num_arguments, char** argument_array) {
 
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> p(n_vertices);
-  thrust::device_vector<int> edges_visited(1);
-  thrust::device_vector<int> vertices_visited(1);
-  thrust::device_vector<int> search_depth(1);
+  int edges_visited = 0;
+  int search_depth = 0;
 
   // --
   // GPU Run
 
   std::vector<float> run_times;
   for (int i = 0; i < params.num_runs; i++) {
-    run_times.push_back(
-        gunrock::pr::run(G, alpha, tol, params.performance, p.data().get(),
-        edges_visited.data().get(), vertices_visited.data().get(),
-        search_depth.data().get()));
+    run_times.push_back(gunrock::pr::run(G, alpha, tol, params.performance,
+                                         p.data().get(), &edges_visited,
+                                         &search_depth));
   }
 
   // --
@@ -146,13 +144,11 @@ void test_pr(int num_arguments, char** argument_array) {
   // Run performance evaluation
 
   if (params.performance) {
-    thrust::host_vector<int> h_edges_visited = edges_visited;
-    thrust::host_vector<int> h_vertices_visited = vertices_visited;
-    thrust::host_vector<int> h_search_depth = search_depth;
     vertex_t n_edges = G.get_number_of_edges();
 
-    get_performance_stats(h_edges_visited[0], h_vertices_visited[0], n_edges,
-                          n_vertices, h_search_depth[0], run_times, "pr",
+    // For PR - the number of nodes visited is just 2 * edges_visited
+    get_performance_stats(edges_visited, (2 * edges_visited), n_edges,
+                          n_vertices, search_depth, run_times, "pr",
                           params.filename, "market", params.json_dir,
                           params.json_file);
   }

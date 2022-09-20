@@ -145,10 +145,12 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     if (forward) {
       // Run advance
-      auto forward_op = [sigmas, labels] __host__ __device__(
-                            vertex_t const& src, vertex_t const& dst,
-                            edge_t const& edge,
-                            weight_t const& weight) -> bool {
+      auto forward_op =
+          [sigmas, labels, edges_visited, vertices_visited] __host__ __device__(
+              vertex_t const& src, vertex_t const& dst, edge_t const& edge,
+              weight_t const& weight) -> bool {
+        math::atomic::add(&edges_visited[0], 1);
+        math::atomic::add(&vertices_visited[0], 2);
         auto new_label = labels[src] + 1;
         auto old_label = math::atomic::cas(labels + dst, -1, new_label);
 
@@ -163,6 +165,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         auto in_frontier = &(this->frontiers[this->depth]);
         auto out_frontier = &(this->frontiers[this->depth + 1]);
 
+        std::cout << in_frontier->get_number_of_elements() << "\n";
         operators::advance::execute<operators::load_balance_t::merge_path,
                                     operators::advance_direction_t::forward,
                                     operators::advance_io_type_t::vertices,
@@ -177,10 +180,13 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     } else {
       // Run advance
-      auto backward_op =
-          [sigmas, labels, bc_values, deltas, single_source] __host__
-          __device__(vertex_t const& src, vertex_t const& dst,
-                     edge_t const& edge, weight_t const& weight) -> bool {
+      auto backward_op = [sigmas, labels, bc_values, deltas, single_source,
+                          edges_visited, vertices_visited] __host__
+                         __device__(vertex_t const& src, vertex_t const& dst,
+                                    edge_t const& edge,
+                                    weight_t const& weight) -> bool {
+        math::atomic::add(&edges_visited[0], 1);
+        math::atomic::add(&vertices_visited[0], 2);
         if (src == single_source)
           return false;
 
@@ -200,6 +206,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         auto in_frontier = &(this->frontiers[this->depth]);
         auto out_frontier = &(this->frontiers[this->depth + 1]);
 
+        std::cout << in_frontier->get_number_of_elements() << "\n";
         operators::advance::execute<operators::load_balance_t::merge_path,
                                     operators::advance_direction_t::forward,
                                     operators::advance_io_type_t::vertices,

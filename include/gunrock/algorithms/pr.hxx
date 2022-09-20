@@ -31,15 +31,12 @@ template <typename weight_t>
 struct result_t {
   weight_t* p;
   int* edges_visited;
-  int* vertices_visited;
   int* search_depth;
   result_t(weight_t* _p,
            int* _edges_visited,
-           int* _vertices_visited,
            int* _search_depth)
       : p(_p),
         edges_visited(_edges_visited),
-        vertices_visited(_vertices_visited),
         search_depth(_search_depth) {}
 };
 
@@ -85,16 +82,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
     thrust::fill_n(policy, this->result.p, n_vertices, 1.0 / n_vertices);
 
     thrust::fill_n(policy, plast.begin(), n_vertices, 0);
-    
-    auto d_edges_visited =
-        thrust::device_pointer_cast(this->result.edges_visited);
-    auto d_vertices_visited =
-        thrust::device_pointer_cast(this->result.vertices_visited);
-    auto d_search_depth =
-        thrust::device_pointer_cast(this->result.search_depth);
-    thrust::fill(thrust::device, d_edges_visited, d_edges_visited + 1, 0);
-    thrust::fill(thrust::device, d_vertices_visited, d_vertices_visited + 1, 0);
-    thrust::fill(thrust::device, d_search_depth, d_search_depth + 1, 0);
 
     auto get_weight = [=] __device__(const int& i) -> weight_t {
       weight_t val = 0;
@@ -138,10 +125,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto alpha = P->param.alpha;
 
     auto policy = this->context->get_context(0)->execution_policy();
-    
+
     auto edges_visited = P->result.edges_visited;
-    auto vertices_visited = P->result.vertices_visited;
     auto search_depth = P->result.search_depth;
+
+    *search_depth = this->iteration;
 
     thrust::copy_n(policy, p, n_vertices, plast);
 
@@ -176,6 +164,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                 operators::advance_io_type_t::graph,
                                 operators::advance_io_type_t::none>(
         G, E, spread_op, context);
+
+    *edges_visited += G.get_number_of_edges();
   }
 
   virtual bool is_converged(gcuda::multi_context_t& context) {
@@ -211,9 +201,8 @@ float run(graph_t& G,
           typename graph_t::weight_type tol,
           bool performance,
           typename graph_t::weight_type* p,  // Output
-          int* edges_visited,  // Output
-          int* vertices_visited,  // Output
-          int* search_depth,  // Output
+          int* edges_visited,                // Output
+          int* search_depth,                 // Output
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
                   new gcuda::multi_context_t(0))  // Context
@@ -226,7 +215,7 @@ float run(graph_t& G,
   using result_type = result_t<weight_t>;
 
   param_type param(alpha, tol, performance);
-  result_type result(p, edges_visited, vertices_visited, search_depth);
+  result_type result(p, edges_visited, search_depth);
   // </user-defined>
 
   using problem_type = problem_t<graph_t, param_type, result_type>;
