@@ -113,7 +113,7 @@ void test_bc(int num_arguments, char** argument_array) {
   // --
   // Params and memory allocation
 
-  //vertex_t single_source = 0;
+  vertex_t single_source = 0;
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> bc_values(n_vertices);
   thrust::device_vector<int> edges_visited(1);
@@ -126,7 +126,7 @@ void test_bc(int num_arguments, char** argument_array) {
   std::vector<float> run_times;
   for (int i = 0; i < params.num_runs; i++) {
     run_times.push_back(gunrock::bc::run(
-      G, params.performance, bc_values.data().get(), edges_visited.data().get(),
+      G, single_source, params.performance, bc_values.data().get(), edges_visited.data().get(),
       vertices_visited.data().get(), search_depth.data().get()));
   }
 
