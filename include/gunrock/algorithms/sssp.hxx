@@ -85,8 +85,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
         thrust::device_pointer_cast(this->result.edges_visited);
     auto d_vertices_visited =
         thrust::device_pointer_cast(this->result.vertices_visited);
-    auto d_search_depth =
-        thrust::device_pointer_cast(this->result.search_depth);
 
     thrust::fill(policy, d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<weight_t>::max());
@@ -96,7 +94,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
     thrust::fill(thrust::device, d_edges_visited, d_edges_visited + 1, 0);
     thrust::fill(thrust::device, d_vertices_visited, d_vertices_visited + 1, 0);
-    thrust::fill(thrust::device, d_search_depth, d_search_depth + 1, 0);
 
     thrust::fill(policy, visited.begin(), visited.end(),
                  -1);  // This does need to be reset in between runs though
@@ -133,19 +130,17 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto edges_visited = P->result.edges_visited;
     auto vertices_visited = P->result.vertices_visited;
     auto search_depth = P->result.search_depth;
-    
-
+    auto performance = P->param.performance;
     auto iteration = this->iteration;
 
-    auto shortest_path = [distances, single_source, edges_visited, vertices_visited, search_depth, iteration] __host__ __device__(
+    *search_depth = iteration;
+
+    auto shortest_path = [distances, single_source] __host__ __device__(
                              vertex_t const& source,    // ... source
                              vertex_t const& neighbor,  // neighbor
                              edge_t const& edge,        // edge
                              weight_t const& weight     // weight (tuple).
                              ) -> bool {
-      math::atomic::add(&edges_visited[0], 1);
-      math::atomic::add(&vertices_visited[0], 2);
-      search_depth[0] = iteration;
       weight_t source_distance = thread::load(&distances[source]);
       weight_t distance_to_neighbor = source_distance + weight;
 
@@ -156,8 +151,41 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return (distance_to_neighbor < recover_distance);
     };
 
-    auto remove_completed_paths = [G, visited, iteration, vertices_visited] __host__ __device__(
+    auto shortest_path_performance =
+        [distances, single_source, edges_visited,
+         vertices_visited] __host__
+        __device__(vertex_t const& source,    // ... source
+                   vertex_t const& neighbor,  // neighbor
+                   edge_t const& edge,        // edge
+                   weight_t const& weight     // weight (tuple).
+                   ) -> bool {
+      math::atomic::add(&edges_visited[0], 1);
+      math::atomic::add(&vertices_visited[0], 2);
+      weight_t source_distance = thread::load(&distances[source]);
+      weight_t distance_to_neighbor = source_distance + weight;
+
+      // Check if the destination node has been claimed as someone's child
+      weight_t recover_distance =
+          math::atomic::min(&(distances[neighbor]), distance_to_neighbor);
+
+      return (distance_to_neighbor < recover_distance);
+    };
+
+    auto remove_completed_paths = [G, visited, iteration] __host__ __device__(
                                       vertex_t const& vertex) -> bool {
+      if (visited[vertex] == iteration)
+        return false;
+
+      visited[vertex] = iteration;
+      /// @todo Confirm we do not need the following for bug
+      /// https://github.com/gunrock/essentials/issues/9 anymore.
+      // return G.get_number_of_neighbors(vertex) > 0;
+      return true;
+    };
+
+    auto remove_completed_paths_performance =
+        [G, visited, iteration, vertices_visited] __host__ __device__(
+            vertex_t const& vertex) -> bool {
       math::atomic::add(&vertices_visited[0], 1);
       if (visited[vertex] == iteration)
         return false;
@@ -169,13 +197,25 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return true;
     };
 
-    // Execute advance operator on the provided lambda
-    operators::advance::execute<operators::load_balance_t::block_mapped>(
-        G, E, shortest_path, context);
+    // Execute without collecting performance metrics
+    if (!performance) {
+      // Execute advance operator on the provided lambda
+      operators::advance::execute<operators::load_balance_t::block_mapped>(
+          G, E, shortest_path, context);
 
-    // Execute filter operator on the provided lambda
-    operators::filter::execute<operators::filter_algorithm_t::bypass>(
-        G, E, remove_completed_paths, context);
+      // Execute filter operator on the provided lambda
+      operators::filter::execute<operators::filter_algorithm_t::bypass>(
+          G, E, remove_completed_paths, context);
+      // Execute while collecting performance metrics
+    } else {
+      // Execute advance operator on the provided lambda
+      operators::advance::execute<operators::load_balance_t::block_mapped>(
+          G, E, shortest_path_performance, context);
+
+      // Execute filter operator on the provided lambda
+      operators::filter::execute<operators::filter_algorithm_t::bypass>(
+          G, E, remove_completed_paths_performance, context);
+    }
 
     /// @brief Execute uniquify operator to deduplicate the frontier
     /// @note Not required.

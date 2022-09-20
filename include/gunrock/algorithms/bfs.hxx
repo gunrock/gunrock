@@ -95,7 +95,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto G = P->get_graph();
     auto f = this->get_input_frontier();
     auto single_source = P->param.single_source;
-    auto performance = P->param.performance;
     auto distances = P->result.distances;
     auto edges_visited = P->result.edges_visited;
     auto search_depth = P->result.search_depth;

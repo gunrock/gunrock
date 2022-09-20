@@ -141,14 +141,16 @@ void test_sssp(int num_arguments, char** argument_array) {
   thrust::device_vector<vertex_t> predecessors(n_vertices);
   thrust::device_vector<int> edges_visited(1);
   thrust::device_vector<int> vertices_visited(1);
-  thrust::device_vector<int> search_depth(1);
+  int search_depth = 0;
 
   std::vector<float> run_times;
   for (int i = 0; i < params.num_runs; i++) {
     run_times.push_back(gunrock::sssp::run(
-        G, single_source, params.performance, distances.data().get(), predecessors.data().get(), edges_visited.data().get(), vertices_visited.data().get(), search_depth.data().get()));
+        G, single_source, params.performance, distances.data().get(),
+        predecessors.data().get(), edges_visited.data().get(),
+        vertices_visited.data().get(), &search_depth));
   }
-  
+
   // --
   // CPU Run
 
@@ -171,9 +173,9 @@ void test_sssp(int num_arguments, char** argument_array) {
             << " (ms)" << std::endl;
   std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
   std::cout << "Number of errors : " << n_errors << std::endl;
-  
+
   // --
-  // Run performance evaluation 
+  // Run performance evaluation
 
   if (params.performance) {
     vertex_t n_edges = G.get_number_of_edges();
@@ -181,9 +183,8 @@ void test_sssp(int num_arguments, char** argument_array) {
     // For BFS - the number of nodes visited is just 2 * edges_visited
     thrust::host_vector<int> h_edges_visited = edges_visited;
     thrust::host_vector<int> h_vertices_visited = vertices_visited;
-    thrust::host_vector<int> h_search_depth = search_depth;
     get_performance_stats(h_edges_visited[0], h_vertices_visited[0], n_edges,
-                          n_vertices, h_search_depth[0], run_times, "sssp",
+                          n_vertices, search_depth, run_times, "sssp",
                           params.filename, "market", params.json_dir,
                           params.json_file);
   }
