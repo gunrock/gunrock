@@ -97,6 +97,8 @@ struct problem_t : gunrock::problem_t<graph_t> {
 
     thrust::fill(policy, visited.begin(), visited.end(),
                  -1);  // This does need to be reset in between runs though
+
+    *(this->result.search_depth) = 0;
   }
 };
 
@@ -132,8 +134,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto search_depth = P->result.search_depth;
     auto performance = P->param.performance;
     auto iteration = this->iteration;
-
-    *search_depth = iteration;
 
     auto shortest_path = [distances, single_source] __host__ __device__(
                              vertex_t const& source,    // ... source
@@ -197,17 +197,8 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return true;
     };
 
-    // Execute without collecting performance metrics
-    if (!performance) {
-      // Execute advance operator on the provided lambda
-      operators::advance::execute<operators::load_balance_t::block_mapped>(
-          G, E, shortest_path, context);
-
-      // Execute filter operator on the provided lambda
-      operators::filter::execute<operators::filter_algorithm_t::bypass>(
-          G, E, remove_completed_paths, context);
-      // Execute while collecting performance metrics
-    } else {
+    // Execute while collecting performance metrics
+    if (performance) {
       // Execute advance operator on the provided lambda
       operators::advance::execute<operators::load_balance_t::block_mapped>(
           G, E, shortest_path_performance, context);
@@ -215,6 +206,16 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       // Execute filter operator on the provided lambda
       operators::filter::execute<operators::filter_algorithm_t::bypass>(
           G, E, remove_completed_paths_performance, context);
+
+      *search_depth = iteration;
+    } else {
+      // Execute advance operator on the provided lambda
+      operators::advance::execute<operators::load_balance_t::block_mapped>(
+          G, E, shortest_path, context);
+
+      // Execute filter operator on the provided lambda
+      operators::filter::execute<operators::filter_algorithm_t::bypass>(
+          G, E, remove_completed_paths, context);
     }
 
     /// @brief Execute uniquify operator to deduplicate the frontier

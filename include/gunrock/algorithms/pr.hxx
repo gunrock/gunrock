@@ -32,12 +32,8 @@ struct result_t {
   weight_t* p;
   int* edges_visited;
   int* search_depth;
-  result_t(weight_t* _p,
-           int* _edges_visited,
-           int* _search_depth)
-      : p(_p),
-        edges_visited(_edges_visited),
-        search_depth(_search_depth) {}
+  result_t(weight_t* _p, int* _edges_visited, int* _search_depth)
+      : p(_p), edges_visited(_edges_visited), search_depth(_search_depth) {}
 };
 
 template <typename graph_t, typename param_type, typename result_type>
@@ -98,6 +94,9 @@ struct problem_t : gunrock::problem_t<graph_t> {
     thrust::transform(policy, thrust::counting_iterator<vertex_t>(0),
                       thrust::counting_iterator<vertex_t>(n_vertices),
                       iweights.begin(), get_weight);
+
+    *(this->result.search_depth) = 0;
+    *(this->result.edges_visited) = 0;
   }
 };
 
@@ -129,7 +128,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto edges_visited = P->result.edges_visited;
     auto search_depth = P->result.search_depth;
 
-    *search_depth = this->iteration;
+    auto performance = P->param.performance;
 
     thrust::copy_n(policy, p, n_vertices, plast);
 
@@ -165,7 +164,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                 operators::advance_io_type_t::none>(
         G, E, spread_op, context);
 
-    *edges_visited += G.get_number_of_edges();
+    if (performance) {
+      *edges_visited += G.get_number_of_edges();
+      *search_depth = this->iteration;
+    }
   }
 
   virtual bool is_converged(gcuda::multi_context_t& context) {

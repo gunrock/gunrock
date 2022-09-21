@@ -28,9 +28,7 @@ struct result_t {
   weight_t* bc_values;
   int* edges_visited;
   int* search_depth;
-  result_t(weight_t* _bc_values,
-           int* _edges_visited,
-           int* _search_depth)
+  result_t(weight_t* _bc_values, int* _edges_visited, int* _search_depth)
       : bc_values(_bc_values),
         edges_visited(_edges_visited),
         search_depth(_search_depth) {}
@@ -85,6 +83,9 @@ struct problem_t : gunrock::problem_t<graph_t> {
                  d_sigmas + this->param.single_source + 1, 1);
     thrust::fill(policy, d_labels + this->param.single_source,
                  d_labels + this->param.single_source + 1, 0);
+
+    *(this->result.search_depth) = 0;
+    *(this->result.edges_visited) = 0;
   }
 };
 
@@ -127,14 +128,16 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto edges_visited = P->result.edges_visited;
     auto search_depth = P->result.search_depth;
 
+    auto performance = P->param.performance;
+
     auto policy = context.get_context(0)->execution_policy();
 
     if (forward) {
       // Run advance
-      auto forward_op =
-          [sigmas, labels] __host__ __device__(
-              vertex_t const& src, vertex_t const& dst, edge_t const& edge,
-              weight_t const& weight) -> bool {
+      auto forward_op = [sigmas, labels] __host__ __device__(
+                            vertex_t const& src, vertex_t const& dst,
+                            edge_t const& edge,
+                            weight_t const& weight) -> bool {
         auto new_label = labels[src] + 1;
         auto old_label = math::atomic::cas(labels + dst, -1, new_label);
 
@@ -146,7 +149,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       };
 
       while (true) {
-        (*search_depth)++;
         auto in_frontier = &(this->frontiers[this->depth]);
         auto out_frontier = &(this->frontiers[this->depth + 1]);
 
@@ -156,7 +158,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                     operators::advance_io_type_t::vertices>(
             G, forward_op, in_frontier, out_frontier, E->scanned_work_domain,
             context);
-        (*edges_visited) += out_frontier->get_number_of_elements();
+
+        if (performance) {
+          (*search_depth)++;
+          (*edges_visited) += out_frontier->get_number_of_elements();
+        }
 
         this->depth++;
         if (is_forward_converged(context))
@@ -165,10 +171,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     } else {
       // Run advance
-      auto backward_op = [sigmas, labels, bc_values, deltas, single_source] __host__
-                         __device__(vertex_t const& src, vertex_t const& dst,
-                                    edge_t const& edge,
-                                    weight_t const& weight) -> bool {
+      auto backward_op =
+          [sigmas, labels, bc_values, deltas, single_source] __host__
+          __device__(vertex_t const& src, vertex_t const& dst,
+                     edge_t const& edge, weight_t const& weight) -> bool {
         if (src == single_source)
           return false;
 
@@ -185,7 +191,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       };
 
       while (true) {
-        (*search_depth)++;
         auto in_frontier = &(this->frontiers[this->depth]);
         auto out_frontier = &(this->frontiers[this->depth + 1]);
 
@@ -195,7 +200,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                     operators::advance_io_type_t::vertices>(
             G, backward_op, in_frontier, out_frontier, E->scanned_work_domain,
             context);
-        (*edges_visited) += out_frontier->get_number_of_elements();
+
+        if (performance) {
+          (*search_depth)++;
+          (*edges_visited) += out_frontier->get_number_of_elements();
+        }
 
         this->depth--;
         if (is_backward_converged(context))

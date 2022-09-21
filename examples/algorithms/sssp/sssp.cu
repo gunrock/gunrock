@@ -68,7 +68,6 @@ struct parameters_t {
       num_runs = result["num_runs"].as<int>();
     }
 
-    // TODO: add check for valid path
     if (result.count("json_dir") == 1) {
       json_dir = result["json_dir"].as<std::string>();
     }

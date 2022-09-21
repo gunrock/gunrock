@@ -64,12 +64,11 @@ struct parameters_t {
     if (result.count("performance") == 1) {
       performance = true;
     }
-    
+
     if (result.count("num_runs") == 1) {
       num_runs = result["num_runs"].as<int>();
     }
 
-    // TODO: add check for valid path
     if (result.count("json_dir") == 1) {
       json_dir = result["json_dir"].as<std::string>();
     }
@@ -95,10 +94,10 @@ void test_bfs(int num_arguments, char** argument_array) {
   // IO
 
   parameters_t params(num_arguments, argument_array);
-  
+
   csr_t csr;
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  
+
   if (params.binary) {
     csr.read_binary(params.filename);
   } else {
@@ -134,7 +133,7 @@ void test_bfs(int num_arguments, char** argument_array) {
   thrust::device_vector<vertex_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
   thrust::device_vector<int> edges_visited(1);
-  thrust::device_vector<int> search_depth(1);
+  int search_depth = 0;
 
   // --
   // Run problem
@@ -143,13 +142,12 @@ void test_bfs(int num_arguments, char** argument_array) {
   for (int i = 0; i < params.num_runs; i++) {
     run_times.push_back(gunrock::bfs::run(
         G, single_source, params.performance, distances.data().get(),
-        predecessors.data().get(), edges_visited.data().get(),
-        search_depth.data().get()));
+        predecessors.data().get(), edges_visited.data().get(), &search_depth));
   }
 
   print::head(distances, 40, "GPU distances");
-  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1] << " (ms)"
-            << std::endl;
+  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
+            << " (ms)" << std::endl;
 
   // --
   // CPU Run
@@ -170,16 +168,15 @@ void test_bfs(int num_arguments, char** argument_array) {
   }
 
   // --
-  // Run performance evaluation 
+  // Run performance evaluation
 
   if (params.performance) {
     thrust::host_vector<int> h_edges_visited = edges_visited;
-    thrust::host_vector<int> h_search_depth = search_depth;
     vertex_t n_edges = G.get_number_of_edges();
 
     // For BFS - the number of nodes visited is just 2 * edges_visited
     get_performance_stats(h_edges_visited[0], (2 * h_edges_visited[0]), n_edges,
-                          n_vertices, h_search_depth[0], run_times, "bfs",
+                          n_vertices, search_depth, run_times, "bfs",
                           params.filename, "market", params.json_dir,
                           params.json_file);
   }

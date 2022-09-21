@@ -65,14 +65,12 @@ struct problem_t : gunrock::problem_t<graph_t> {
     auto d_distances = thrust::device_pointer_cast(this->result.distances);
     auto d_edges_visited =
         thrust::device_pointer_cast(this->result.edges_visited);
-    auto d_search_depth =
-        thrust::device_pointer_cast(this->result.search_depth);
     thrust::fill(thrust::device, d_edges_visited, d_edges_visited + 1, 0);
-    thrust::fill(thrust::device, d_search_depth, d_search_depth + 1, 0);
     thrust::fill(thrust::device, d_distances + 0, d_distances + n_vertices,
                  std::numeric_limits<vertex_t>::max());
     thrust::fill(thrust::device, d_distances + this->param.single_source,
                  d_distances + this->param.single_source + 1, 0);
+    *(this->result.search_depth) = 0;
   }
 };
 
@@ -108,21 +106,16 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto iteration = this->iteration;
 
-    auto search_with_performance =
-        [distances, single_source, iteration, edges_visited,
-         search_depth] __host__
-        __device__(vertex_t const& source,    // ... source
-                   vertex_t const& neighbor,  // neighbor
-                   edge_t const& edge,        // edge
-                   weight_t const& weight     // weight (tuple).
-                   ) -> bool {
+    auto search = [distances, single_source, iteration, edges_visited] __host__
+                  __device__(vertex_t const& source,    // ... source
+                             vertex_t const& neighbor,  // neighbor
+                             edge_t const& edge,        // edge
+                             weight_t const& weight     // weight (tuple).
+                             ) -> bool {
       // If the neighbor is not visited, update the distance. Returning false
       // here means that the neighbor is not added to the output frontier, and
       // instead an invalid vertex is added in its place. These invalides (-1 in
       // most cases) can be removed using a filter operator or uniquify.
-
-      math::atomic::add(&edges_visited[0], 1);
-      search_depth[0] = iteration;
 
       // if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
       //   return false;
@@ -138,17 +131,19 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return (iteration + 1 < old_distance);
     };
 
-    auto search = [distances, single_source, iteration, edges_visited,
-                   search_depth] __host__
-                  __device__(vertex_t const& source,    // ... source
-                             vertex_t const& neighbor,  // neighbor
-                             edge_t const& edge,        // edge
-                             weight_t const& weight     // weight (tuple).
-                             ) -> bool {
+    auto search_with_performance =
+        [distances, single_source, iteration, edges_visited] __host__
+        __device__(vertex_t const& source,    // ... source
+                   vertex_t const& neighbor,  // neighbor
+                   edge_t const& edge,        // edge
+                   weight_t const& weight     // weight (tuple).
+                   ) -> bool {
       // If the neighbor is not visited, update the distance. Returning false
       // here means that the neighbor is not added to the output frontier, and
       // instead an invalid vertex is added in its place. These invalides (-1 in
       // most cases) can be removed using a filter operator or uniquify.
+
+      math::atomic::add(&edges_visited[0], 1);
 
       // if (distances[neighbor] != std::numeric_limits<vertex_t>::max())
       //   return false;
@@ -177,6 +172,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     if (performance) {
       operators::advance::execute<operators::load_balance_t::block_mapped>(
           G, E, search_with_performance, context);
+      *search_depth = iteration;
     } else {
       operators::advance::execute<operators::load_balance_t::block_mapped>(
           G, E, search, context);
