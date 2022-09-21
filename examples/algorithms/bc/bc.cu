@@ -74,13 +74,14 @@ struct parameters_t {
 };
 
 void test_bc(int num_arguments, char** argument_array) {
+  
   // --
   // Define types
 
   using vertex_t = int;
   using edge_t = int;
   using weight_t = float;
-  
+
   using csr_t =
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
 
@@ -88,10 +89,10 @@ void test_bc(int num_arguments, char** argument_array) {
   // IO
 
   parameters_t params(num_arguments, argument_array);
-  
+
   csr_t csr;
   io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-  
+
   if (params.binary) {
     csr.read_binary(params.filename);
   } else {
@@ -116,18 +117,18 @@ void test_bc(int num_arguments, char** argument_array) {
   vertex_t single_source = 0;
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> bc_values(n_vertices);
-  thrust::device_vector<int> edges_visited(1);
-  thrust::device_vector<int> vertices_visited(1);
-  thrust::device_vector<int> search_depth(1);
+  int edges_visited = 0;
+  int search_depth = 0;
 
   // --
   // GPU Run
 
   std::vector<float> run_times;
   for (int i = 0; i < params.num_runs; i++) {
+    // To alternatively compute for all vertices, call without single source
     run_times.push_back(gunrock::bc::run(
-      G, single_source, params.performance, bc_values.data().get(), edges_visited.data().get(),
-      vertices_visited.data().get(), search_depth.data().get()));
+        G, single_source, params.performance, bc_values.data().get(),
+        &edges_visited, &search_depth));
   }
 
   // --
@@ -139,15 +140,13 @@ void test_bc(int num_arguments, char** argument_array) {
 
   // --
   // Run performance evaluation
-  
+
   if (params.performance) {
-    thrust::host_vector<int> h_edges_visited = edges_visited;
-    thrust::host_vector<int> h_vertices_visited = vertices_visited;
-    thrust::host_vector<int> h_search_depth = search_depth;
     vertex_t n_edges = G.get_number_of_edges();
 
-    get_performance_stats(h_edges_visited[0], h_vertices_visited[0], n_edges,
-                          n_vertices, h_search_depth[0], run_times, "bc",
+    // For BC - the number of nodes visited is just 2 * edges_visited
+    get_performance_stats(edges_visited, (2 * edges_visited), n_edges,
+                          n_vertices, search_depth, run_times, "bc",
                           params.filename, "market", params.json_dir,
                           params.json_file);
   }
