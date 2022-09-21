@@ -147,7 +147,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
       while (true) {
         (*search_depth)++;
-        std::cout << *search_depth << "\n";
         auto in_frontier = &(this->frontiers[this->depth]);
         auto out_frontier = &(this->frontiers[this->depth + 1]);
 
@@ -187,7 +186,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
       while (true) {
         (*search_depth)++;
-        std::cout << *search_depth << "\n";
         auto in_frontier = &(this->frontiers[this->depth]);
         auto out_frontier = &(this->frontiers[this->depth + 1]);
 
