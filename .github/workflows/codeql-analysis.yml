@@ -13,7 +13,7 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -35,12 +35,12 @@ jobs:
         # Learn more about CodeQL language support at https://git.io/codeql-language-support
 
     steps:
-      # Fetch CUDA toolkit using Jimver/cuda-toolkit@v0.2.5
+      # Fetch CUDA toolkit using Jimver/cuda-toolkit
       - name: Fetch CUDA toolkit
-        uses: Jimver/cuda-toolkit@v0.2.5
+        uses: Jimver/cuda-toolkit@v0.2.8
         id: cuda-toolkit
         with:
-          cuda: '11.5.1'
+          cuda: '11.7.0'
           linux-local-args: '["--toolkit"]'
           
       # Runs a single command using the runners shell
@@ -48,11 +48,11 @@ jobs:
         run: nvcc -V
           
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v1
+        uses: github/codeql-action/init@v2
         with:
           languages: ${{ matrix.language }}
           # If you wish to specify custom queries, you can do so here or in a config file.
@@ -83,10 +83,10 @@ jobs:
         
       - name: Build all applications
         # Build your program with the given configuration
-        run: cmake  --build ${{github.workspace}}/build
+        run: cmake --build ${{github.workspace}}/build
         
       # TODO: Use the following once we have BUILD_TYPE and envrionment variables set-up:
       # run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v1
+        uses: github/codeql-action/analyze@v2
