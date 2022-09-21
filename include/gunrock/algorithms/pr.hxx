@@ -30,10 +30,9 @@ struct param_t {
 template <typename weight_t>
 struct result_t {
   weight_t* p;
-  int* edges_visited;
   int* search_depth;
-  result_t(weight_t* _p, int* _edges_visited, int* _search_depth)
-      : p(_p), edges_visited(_edges_visited), search_depth(_search_depth) {}
+  result_t(weight_t* _p, int* _search_depth)
+      : p(_p), search_depth(_search_depth) {}
 };
 
 template <typename graph_t, typename param_type, typename result_type>
@@ -96,7 +95,6 @@ struct problem_t : gunrock::problem_t<graph_t> {
                       iweights.begin(), get_weight);
 
     *(this->result.search_depth) = 0;
-    *(this->result.edges_visited) = 0;
   }
 };
 
@@ -125,7 +123,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto policy = this->context->get_context(0)->execution_policy();
 
-    auto edges_visited = P->result.edges_visited;
     auto search_depth = P->result.search_depth;
 
     auto performance = P->param.performance;
@@ -165,7 +162,6 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
         G, E, spread_op, context);
 
     if (performance) {
-      *edges_visited += G.get_number_of_edges();
       *search_depth = this->iteration;
     }
   }
@@ -203,7 +199,6 @@ float run(graph_t& G,
           typename graph_t::weight_type tol,
           bool performance,
           typename graph_t::weight_type* p,  // Output
-          int* edges_visited,                // Output
           int* search_depth,                 // Output
           std::shared_ptr<gcuda::multi_context_t> context =
               std::shared_ptr<gcuda::multi_context_t>(
@@ -217,7 +212,7 @@ float run(graph_t& G,
   using result_type = result_t<weight_t>;
 
   param_type param(alpha, tol, performance);
-  result_type result(p, edges_visited, search_depth);
+  result_type result(p, search_depth);
   // </user-defined>
 
   using problem_type = problem_t<graph_t, param_type, result_type>;

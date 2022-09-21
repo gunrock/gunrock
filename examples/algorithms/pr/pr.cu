@@ -127,8 +127,7 @@ void test_pr(int num_arguments, char** argument_array) {
   std::vector<float> run_times;
   for (int i = 0; i < params.num_runs; i++) {
     run_times.push_back(gunrock::pr::run(G, alpha, tol, params.performance,
-                                         p.data().get(), &edges_visited,
-                                         &search_depth));
+                                         p.data().get(), &search_depth));
   }
 
   // --
@@ -144,6 +143,8 @@ void test_pr(int num_arguments, char** argument_array) {
 
   if (params.performance) {
     vertex_t n_edges = G.get_number_of_edges();
+    // For PR - we visit every edge in the graph during each iteration
+    edges_visited = n_edges * (search_depth + 1);
 
     // For PR - the number of nodes visited is just 2 * edges_visited
     get_performance_stats(edges_visited, (2 * edges_visited), n_edges,
