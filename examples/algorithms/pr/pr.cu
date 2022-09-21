@@ -24,7 +24,6 @@ struct parameters_t {
       : options(argv[0], "Breadth First Search example") {
     // Add command line options
     options.add_options()("help", "Print help")  // help
-        ("validate", "CPU validation")           // validate
         ("performance", "performance analysis")  // performance evaluation
         ("m,market", "Matrix file", cxxopts::value<std::string>())  // mtx file
         ("n,num_runs", "Number of runs", cxxopts::value<int>())     // runs
@@ -133,7 +132,8 @@ void test_pr(int num_arguments, char** argument_array) {
   }
 
   // --
-  // Log + Validate
+  // Log
+
   print::head(p, 40, "GPU rank");
 
   std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]

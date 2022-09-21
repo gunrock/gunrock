@@ -150,28 +150,28 @@ void test_sssp(int num_arguments, char** argument_array) {
         vertices_visited.data().get(), &search_depth));
   }
 
+  print::head(distances, 40, "GPU distances");
+  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
+            << " (ms)" << std::endl;
+
   // --
   // CPU Run
 
-  thrust::host_vector<weight_t> h_distances(n_vertices);
-  thrust::host_vector<vertex_t> h_predecessors(n_vertices);
+  if (params.validate) {
+    thrust::host_vector<weight_t> h_distances(n_vertices);
+    thrust::host_vector<vertex_t> h_predecessors(n_vertices);
 
-  float cpu_elapsed = sssp_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
-      csr, single_source, h_distances.data(), h_predecessors.data());
+    float cpu_elapsed = sssp_cpu::run<csr_t, vertex_t, edge_t, weight_t>(
+        csr, single_source, h_distances.data(), h_predecessors.data());
 
-  int n_errors =
-      util::compare(distances.data().get(), h_distances.data(), n_vertices);
+    int n_errors =
+        util::compare(distances.data().get(), h_distances.data(), n_vertices);
 
-  // --
-  // Log + Validate
+    print::head(h_distances, 40, "CPU Distances");
 
-  print::head(distances, 40, "GPU distances");
-  print::head(h_distances, 40, "CPU Distances");
-
-  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
-            << " (ms)" << std::endl;
-  std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
-  std::cout << "Number of errors : " << n_errors << std::endl;
+    std::cout << "CPU Elapsed Time : " << cpu_elapsed << " (ms)" << std::endl;
+    std::cout << "Number of errors : " << n_errors << std::endl;
+  }
 
   // --
   // Run performance evaluation
