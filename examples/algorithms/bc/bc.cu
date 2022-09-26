@@ -1,6 +1,6 @@
 #include <gunrock/algorithms/bc.hxx>
-#include "gunrock/util/performance.hxx"
-#include "gunrock/io/parameters.hxx"
+#include <gunrock/util/performance.hxx>
+#include <gunrock/io/parameters.hxx>
 
 using namespace gunrock;
 using namespace memory;

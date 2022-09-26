@@ -1,7 +1,7 @@
 #include <gunrock/algorithms/sssp.hxx>
 #include "sssp_cpu.hxx"  // Reference implementation
-#include "gunrock/util/performance.hxx"
-#include "gunrock/io/parameters.hxx"
+#include <gunrock/util/performance.hxx>
+#include <gunrock/io/parameters.hxx>
 
 using namespace gunrock;
 using namespace memory;
