@@ -21,10 +21,10 @@ template <typename weight_t>
 struct param_t {
   weight_t alpha;
   weight_t tol;
-  bool performance;
+  bool collect_metrics;
 
-  param_t(weight_t _alpha, weight_t _tol, bool _performance)
-      : alpha(_alpha), tol(_tol), performance(_performance) {}
+  param_t(weight_t _alpha, weight_t _tol, bool _collect_metrics)
+      : alpha(_alpha), tol(_tol), collect_metrics(_collect_metrics) {}
 };
 
 template <typename weight_t>
@@ -125,7 +125,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 
     auto search_depth = P->result.search_depth;
 
-    auto performance = P->param.performance;
+    auto collect_metrics = P->param.collect_metrics;
 
     thrust::copy_n(policy, p, n_vertices, plast);
 
@@ -161,7 +161,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
                                 operators::advance_io_type_t::none>(
         G, E, spread_op, context);
 
-    if (performance) {
+    if (collect_metrics) {
       *search_depth = this->iteration;
     }
   }
@@ -197,7 +197,7 @@ template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::weight_type alpha,
           typename graph_t::weight_type tol,
-          bool performance,
+          bool collect_metrics,
           typename graph_t::weight_type* p,  // Output
           int* search_depth,                 // Output
           std::shared_ptr<gcuda::multi_context_t> context =
@@ -211,7 +211,7 @@ float run(graph_t& G,
   using param_type = param_t<weight_t>;
   using result_type = result_t<weight_t>;
 
-  param_type param(alpha, tol, performance);
+  param_type param(alpha, tol, collect_metrics);
   result_type result(p, search_depth);
   // </user-defined>
 

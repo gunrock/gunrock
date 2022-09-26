@@ -18,9 +18,9 @@ namespace bfs {
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
-  bool performance;
-  param_t(vertex_t _single_source, bool _performance)
-      : single_source(_single_source), performance(_performance) {}
+  bool collect_metrics;
+  param_t(vertex_t _single_source, bool _collect_metrics)
+      : single_source(_single_source), collect_metrics(_collect_metrics) {}
 };
 
 template <typename vertex_t>
@@ -98,7 +98,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto G = P->get_graph();
 
     auto single_source = P->param.single_source;
-    auto performance = P->param.performance;
+    auto collect_metrics = P->param.collect_metrics;
     auto distances = P->result.distances;
     auto edges_visited = P->result.edges_visited;
     auto search_depth = P->result.search_depth;
@@ -131,7 +131,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return (iteration + 1 < old_distance);
     };
 
-    auto search_with_performance =
+    auto search_metrics =
         [distances, single_source, iteration, edges_visited] __host__
         __device__(vertex_t const& source,    // ... source
                    vertex_t const& neighbor,  // neighbor
@@ -168,10 +168,10 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     };
 
     // Execute advance operator on the provided lambda
-    // Track performance stats if performance evaluation is turned on
-    if (performance) {
+    // Collect metrics if option is turned on
+    if (collect_metrics) {
       operators::advance::execute<operators::load_balance_t::block_mapped>(
-          G, E, search_with_performance, context);
+          G, E, search_metrics, context);
       *search_depth = iteration;
     } else {
       operators::advance::execute<operators::load_balance_t::block_mapped>(
@@ -203,7 +203,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter
-          bool performance,                              // Parameter
+          bool collect_metrics,                              // Parameter
           typename graph_t::vertex_type* distances,      // Output
           typename graph_t::vertex_type* predecessors,   // Output
           int* edges_visited,                            // Output
@@ -216,7 +216,7 @@ float run(graph_t& G,
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t>;
 
-  param_type param(single_source, performance);
+  param_type param(single_source, collect_metrics);
   result_type result(distances, predecessors, edges_visited, search_depth);
 
   using problem_type = problem_t<graph_t, param_type, result_type>;

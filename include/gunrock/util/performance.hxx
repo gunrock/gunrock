@@ -4,16 +4,21 @@
 #include <regex>
 #include <filesystem>
 #include <fstream>
+#include <gunrock/cuda/device_properties.hxx>
+
+namespace gunrock {
+namespace util {
+namespace stats {
 
 using vertex_t = int;
 using edge_t = int;
 
-class Sysinfo {
+class system_info_t {
  private:
   struct utsname uts;
 
  public:
-  Sysinfo() { uname(&uts); }
+  system_info_t() { uname(&uts); }
 
   std::string sysname() const { return std::string(uts.sysname); }
   std::string release() const { return std::string(uts.release); }
@@ -22,47 +27,44 @@ class Sysinfo {
   std::string nodename() const { return std::string(uts.nodename); }
 
   void get_sys_info(nlohmann::json* jsn) {
-    std::map<std::string, std::string> sysinfo;
-    sysinfo["sysname"] = sysname();
-    sysinfo["release"] = release();
-    sysinfo["version"] = version();
-    sysinfo["machine"] = machine();
-    sysinfo["nodename"] = nodename();
-    jsn->push_back(nlohmann::json::object_t::value_type("sysinfo", sysinfo));
+    std::map<std::string, std::string> system_info;
+    system_info["sysname"] = sysname();
+    system_info["release"] = release();
+    system_info["version"] = version();
+    system_info["machine"] = machine();
+    system_info["nodename"] = nodename();
+    jsn->push_back(
+        nlohmann::json::object_t::value_type("sysinfo", system_info));
   }
 };
 
 void get_gpu_info(nlohmann::json* jsn) {
-  cudaDeviceProp devProps;
-  int deviceCount;
-  int dev = 0;
-  int runtimeVersion, driverVersion;
+  gunrock::gcuda::device_properties_t device_properties;
+  std::map<std::string, std::string> gpuinfo;
 
-  cudaGetDeviceCount(&deviceCount);
-  if (deviceCount == 0) /* no valid devices */
-  {
+  // If no valid devices
+  if (gunrock::gcuda::properties::device_count() == 0) {
     return;
   }
 
-  cudaGetDevice(&dev);
-  cudaGetDeviceProperties(&devProps, dev);
-
-  cudaRuntimeGetVersion(&runtimeVersion);
-  cudaDriverGetVersion(&driverVersion);
-
-  std::map<std::string, std::string> gpuinfo;
-  gpuinfo["name"] = devProps.name;
-  gpuinfo["total_global_mem"] = std::to_string(devProps.totalGlobalMem);
-  gpuinfo["major"] = std::to_string(devProps.major);
-  gpuinfo["minor"] = std::to_string(devProps.minor);
-  gpuinfo["clock_rate"] = std::to_string(devProps.clockRate);
-  gpuinfo["multi_processor_count"] =
-      std::to_string(devProps.multiProcessorCount);
-  gpuinfo["driver_api"] = std::to_string(CUDA_VERSION);
-  gpuinfo["driver_version"] = driverVersion;
-  gpuinfo["runtime_version"] = runtimeVersion;
-  gpuinfo["compute_version"] =
-      std::to_string(devProps.major * 10 + devProps.minor);
+  gunrock::gcuda::properties::set_device_properties(&device_properties);
+  gpuinfo["name"] = gunrock::gcuda::properties::gpu_name(device_properties);
+  gpuinfo["total_global_mem"] = std::to_string(
+      gunrock::gcuda::properties::total_global_memory(device_properties));
+  gpuinfo["major"] =
+      std::to_string(gunrock::gcuda::properties::major(device_properties));
+  gpuinfo["minor"] =
+      std::to_string(gunrock::gcuda::properties::minor(device_properties));
+  gpuinfo["clock_rate"] =
+      std::to_string(gunrock::gcuda::properties::clock_rate(device_properties));
+  gpuinfo["multi_processor_count"] = std::to_string(
+      gunrock::gcuda::properties::multi_processor_count(device_properties));
+  gpuinfo["driver_version"] =
+      std::to_string(gunrock::gcuda::properties::driver_version());
+  gpuinfo["runtime_version"] =
+      std::to_string(gunrock::gcuda::properties::runtime_version());
+  gpuinfo["compute_version"] = std::to_string(
+      gunrock::gcuda::properties::compute_version(device_properties));
 
   jsn->push_back(nlohmann::json::object_t::value_type("gpuinfo", gpuinfo));
 }
@@ -156,7 +158,7 @@ void get_performance_stats(int edges_visited,
   get_gpu_info(&jsn);
 
   // Get System info
-  Sysinfo sys;
+  system_info_t sys;
   sys.get_sys_info(&jsn);
 
   // Write JSON to file
@@ -181,3 +183,7 @@ void get_performance_stats(int edges_visited,
   outfile << jsn.dump(4);
   outfile.close();
 }
+
+}  // namespace stats
+}  // namespace util
+}  // namespace gunrock

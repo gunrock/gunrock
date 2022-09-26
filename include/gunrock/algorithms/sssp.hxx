@@ -18,9 +18,9 @@ namespace sssp {
 template <typename vertex_t>
 struct param_t {
   vertex_t single_source;
-  bool performance;
-  param_t(vertex_t _single_source, bool _performance)
-      : single_source(_single_source), performance(_performance) {}
+  bool collect_metrics;
+  param_t(vertex_t _single_source, bool _collect_metrics)
+      : single_source(_single_source), collect_metrics(_collect_metrics) {}
 };
 
 template <typename vertex_t, typename weight_t>
@@ -132,7 +132,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     auto edges_visited = P->result.edges_visited;
     auto vertices_visited = P->result.vertices_visited;
     auto search_depth = P->result.search_depth;
-    auto performance = P->param.performance;
+    auto collect_metrics = P->param.collect_metrics;
     auto iteration = this->iteration;
 
     auto shortest_path = [distances, single_source] __host__ __device__(
@@ -151,7 +151,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return (distance_to_neighbor < recover_distance);
     };
 
-    auto shortest_path_performance =
+    auto shortest_path_metrics =
         [distances, single_source, edges_visited,
          vertices_visited] __host__
         __device__(vertex_t const& source,    // ... source
@@ -183,7 +183,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return true;
     };
 
-    auto remove_completed_paths_performance =
+    auto remove_completed_paths_metrics =
         [G, visited, iteration, vertices_visited] __host__ __device__(
             vertex_t const& vertex) -> bool {
       math::atomic::add(&vertices_visited[0], 1);
@@ -197,15 +197,15 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return true;
     };
 
-    // Execute while collecting performance metrics
-    if (performance) {
+    // Execute while collecting metrics if option is turned on
+    if (collect_metrics) {
       // Execute advance operator on the provided lambda
       operators::advance::execute<operators::load_balance_t::block_mapped>(
-          G, E, shortest_path_performance, context);
+          G, E, shortest_path_metrics, context);
 
       // Execute filter operator on the provided lambda
       operators::filter::execute<operators::filter_algorithm_t::bypass>(
-          G, E, remove_completed_paths_performance, context);
+          G, E, remove_completed_paths_metrics, context);
 
       *search_depth = iteration;
     } else {
@@ -230,7 +230,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
 template <typename graph_t>
 float run(graph_t& G,
           typename graph_t::vertex_type& single_source,  // Parameter
-          bool performance,                              // Parameter
+          bool collect_metrics,                              // Parameter
           typename graph_t::weight_type* distances,      // Output
           typename graph_t::vertex_type* predecessors,   // Output
           int* edges_visited,                            // Output
@@ -247,7 +247,7 @@ float run(graph_t& G,
   using param_type = param_t<vertex_t>;
   using result_type = result_t<vertex_t, weight_t>;
 
-  param_type param(single_source, performance);
+  param_type param(single_source, collect_metrics);
   result_type result(distances, predecessors, edges_visited, vertices_visited,
                      search_depth, G.get_number_of_vertices());
   // </user-defined>
