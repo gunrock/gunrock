@@ -151,7 +151,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return (distance_to_neighbor < recover_distance);
     };
 
-    auto shortest_path_metrics =
+    auto shortest_path_with_metrics =
         [distances, single_source, edges_visited,
          vertices_visited] __host__
         __device__(vertex_t const& source,    // ... source
@@ -183,7 +183,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return true;
     };
 
-    auto remove_completed_paths_metrics =
+    auto remove_completed_paths_with_metrics =
         [G, visited, iteration, vertices_visited] __host__ __device__(
             vertex_t const& vertex) -> bool {
       math::atomic::add(&vertices_visited[0], 1);
@@ -201,11 +201,11 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     if (collect_metrics) {
       // Execute advance operator on the provided lambda
       operators::advance::execute<operators::load_balance_t::block_mapped>(
-          G, E, shortest_path_metrics, context);
+          G, E, shortest_path_with_metrics, context);
 
       // Execute filter operator on the provided lambda
       operators::filter::execute<operators::filter_algorithm_t::bypass>(
-          G, E, remove_completed_paths_metrics, context);
+          G, E, remove_completed_paths_with_metrics, context);
 
       *search_depth = iteration;
     } else {

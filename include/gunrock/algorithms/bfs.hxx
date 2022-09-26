@@ -131,7 +131,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
       return (iteration + 1 < old_distance);
     };
 
-    auto search_metrics =
+    auto search_with_metrics =
         [distances, single_source, iteration, edges_visited] __host__
         __device__(vertex_t const& source,    // ... source
                    vertex_t const& neighbor,  // neighbor
@@ -171,7 +171,7 @@ struct enactor_t : gunrock::enactor_t<problem_t> {
     // Collect metrics if option is turned on
     if (collect_metrics) {
       operators::advance::execute<operators::load_balance_t::block_mapped>(
-          G, E, search_metrics, context);
+          G, E, search_with_metrics, context);
       *search_depth = iteration;
     } else {
       operators::advance::execute<operators::load_balance_t::block_mapped>(
