@@ -1,14 +1,11 @@
 #include <gunrock/algorithms/pr.hxx>
+#include <gunrock/util/performance.hxx>
+#include <gunrock/io/parameters.hxx>
 
 using namespace gunrock;
 using namespace memory;
 
 void test_pr(int num_arguments, char** argument_array) {
-  if (num_arguments != 2) {
-    std::cerr << "usage: ./bin/<program-name> filename.mtx" << std::endl;
-    exit(1);
-  }
-
   // --
   // Define types
 
@@ -18,21 +15,20 @@ void test_pr(int num_arguments, char** argument_array) {
 
   using csr_t =
       format::csr_t<memory_space_t::device, vertex_t, edge_t, weight_t>;
-  csr_t csr;
 
   // --
   // IO
 
-  std::string filename = argument_array[1];
+  gunrock::io::cli::parameters_t params(num_arguments, argument_array,
+                                        "Page Rank");
 
-  if (util::is_market(filename)) {
-    io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
-    csr.from_coo(mm.load(filename));
-  } else if (util::is_binary_csr(filename)) {
-    csr.read_binary(filename);
+  csr_t csr;
+  io::matrix_market_t<vertex_t, edge_t, weight_t> mm;
+
+  if (params.binary) {
+    csr.read_binary(params.filename);
   } else {
-    std::cerr << "Unknown file format: " << filename << std::endl;
-    exit(1);
+    csr.from_coo(mm.load(params.filename));
   }
 
   // --
@@ -57,17 +53,40 @@ void test_pr(int num_arguments, char** argument_array) {
 
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<weight_t> p(n_vertices);
+  int edges_visited = 0;
+  int search_depth = 0;
 
   // --
   // GPU Run
 
-  float gpu_elapsed = gunrock::pr::run(G, alpha, tol, p.data().get());
+  std::vector<float> run_times;
+  for (int i = 0; i < params.num_runs; i++) {
+    run_times.push_back(gunrock::pr::run(G, alpha, tol, params.collect_metrics,
+                                         p.data().get(), &search_depth));
+  }
 
   // --
-  // Log + Validate
+  // Log
+
   print::head(p, 40, "GPU rank");
 
-  std::cout << "GPU Elapsed Time : " << gpu_elapsed << " (ms)" << std::endl;
+  std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
+            << " (ms)" << std::endl;
+
+  // --
+  // Run performance evaluation
+
+  if (params.collect_metrics) {
+    vertex_t n_edges = G.get_number_of_edges();
+    // For PR - we visit every edge in the graph during each iteration
+    edges_visited = n_edges * (search_depth + 1);
+
+    // For PR - the number of nodes visited is just 2 * edges_visited
+    gunrock::util::stats::get_performance_stats(
+        edges_visited, (2 * edges_visited), n_edges, n_vertices, search_depth,
+        run_times, "pr", params.filename, "market", params.json_dir,
+        params.json_file);
+  }
 }
 
 int main(int argc, char** argv) {
