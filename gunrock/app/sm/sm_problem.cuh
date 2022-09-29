@@ -185,11 +185,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
       GUARD_CU(NT.Allocate(num_query_edge, util::HOST | util::DEVICE));
       GUARD_CU(
           NT_offset.Allocate(num_query_node + 1, util::HOST | util::DEVICE));
-      unsigned long mem_limit =
-          ((unsigned long)sub_graph.nodes) * ((unsigned long)sub_graph.nodes);
-      GUARD_CU(indices.Allocate(mem_limit, util::DEVICE));
-      GUARD_CU(results.Allocate(mem_limit, util::HOST | util::DEVICE));
-      GUARD_CU(flags_write.Allocate(mem_limit, util::DEVICE));
+
+      GUARD_CU(indices.Allocate(sub_graph.nodes, util::DEVICE));
+      GUARD_CU(results.Allocate(sub_graph.nodes, util::HOST | util::DEVICE));
+      GUARD_CU(flags_write.Allocate(sub_graph.nodes, util::DEVICE));
 
       // Initialize query graph node degree by row offsets
       // neighbor node encoding = sum of neighbor node labels
@@ -319,10 +318,10 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
           [] __device__(unsigned long *x, const unsigned long &pos) {
             x[pos] = 0;
           },
-          mem_limit, target, this->stream));
+          sub_graph.nodes, target, this->stream));
       GUARD_CU(flags_write.ForAll(
           [] __device__(bool *x, const unsigned long &pos) { x[pos] = false; },
-          mem_limit, target, this->stream));
+          sub_graph.nodes, target, this->stream));
       GUARD_CU(counter.ForAll(
           [] __device__(SizeT * x, const SizeT &pos) { x[pos] = 0; }, 1, target,
           this->stream));
@@ -423,7 +422,7 @@ struct Problem : ProblemBase<_GraphT, _FLAG> {
     if (this->num_gpus == 1) {
       auto &data_slice = data_slices[0][0];
       SizeT nodes_query = data_slice.nodes_query;
-      unsigned long mem_limit = nodes * nodes;
+      //unsigned long mem_limit = nodes * nodes;
 
       // returning results will be stored on the CPU
       if (device == util::HOST) {

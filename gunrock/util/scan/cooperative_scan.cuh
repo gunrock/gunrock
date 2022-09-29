@@ -287,6 +287,8 @@ struct CooperativeGridScan<RakingDetails, NullType> {
       T exclusive_partial = WarpScan<RakingDetails::LOG_RAKING_THREADS>::Invoke(
           inclusive_partial, warpscan_total, raking_details.warpscan, scan_op);
 
+      __syncthreads();
+
       // Atomic-increment the global counter with the total allocation
       T reservation_offset;
       if (threadIdx.x == 0) {
@@ -294,6 +296,8 @@ struct CooperativeGridScan<RakingDetails, NullType> {
             util::AtomicInt<T>::Add(d_enqueue_counter, warpscan_total);
         raking_details.warpscan[1][0] = reservation_offset;
       }
+
+      __syncthreads();
 
       // Seed exclusive partial with queue reservation offset
       reservation_offset = raking_details.warpscan[1][0];

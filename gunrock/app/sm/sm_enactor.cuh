@@ -85,8 +85,7 @@ struct SMIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto target = util::DEVICE;
     size_t nodes_query = data_slice.nodes_query;
     unsigned long nodes_data = graph.nodes;
-    unsigned long edges_data = graph.edges;
-    unsigned long mem_limit = nodes_data * nodes_data;
+    unsigned long edges_data = graph.edges; 
 
     util::Array1D<SizeT, VertexT> *null_frontier = NULL;
     auto complete_graph = null_frontier;
@@ -117,7 +116,7 @@ struct SMIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
     auto prune_op =
         [subgraphs, row_offsets, col_indices, isValid, NS, NN, NT, NT_offset,
          query_ro, query_ci, flags_write, counter, results, temp_count,
-         nodes_data, nodes_query, mem_limit] __host__
+         nodes_data, nodes_query] __host__
         __device__(const VertexT &src, VertexT &dest, const SizeT &edge_id,
                    const VertexT &input_item, const SizeT &input_pos,
                    SizeT &output_pos) -> bool {
@@ -206,7 +205,7 @@ struct SMIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
         }
         // Checks finished, add dest to combination and write to new flags pos
         unsigned long pos = (unsigned long)i * nodes_data + (unsigned long)dest;
-        if (pos >= mem_limit) {
+        if (pos >= n) {
           continue;
         }
         flags_write[pos] = true;
@@ -241,7 +240,7 @@ struct SMIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             [] __device__(bool *x, const unsigned long &pos) {
               x[pos] = false;
             },
-            mem_limit, target, stream));
+            graph.nodes, target, stream));
 
         // Second and later iterations
         GUARD_CU(oprtr::Advance<oprtr::OprtrType_V2V>(
@@ -252,7 +251,7 @@ struct SMIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
 
         GUARD_CU(temp_count.Move(util::DEVICE, util::HOST));
         // Update indices and reset results for compression
-        unsigned long size = min(temp_count[0] * nodes_data, mem_limit);
+        unsigned long size = min(temp_count[0] * nodes_data, (unsigned long)graph.nodes);
         GUARD_CU(indices.ForAll(
             [results, nodes_data] __device__(unsigned long *x,
                                              const unsigned long &pos) {
@@ -264,14 +263,14 @@ struct SMIterationLoop : public IterationLoopBase<EnactorT, Use_FullQ | Push> {
             [] __host__ __device__(unsigned long *x, const unsigned long &pos) {
               x[pos] = 0;
             },
-            mem_limit, target, stream));
+            graph.nodes, target, stream));
       }
 
       GUARD_CU(util::CUBSelect_flagged(indices.GetPointer(util::DEVICE),
                                        flags_write.GetPointer(util::DEVICE),
                                        results.GetPointer(util::DEVICE),
                                        temp_count.GetPointer(util::DEVICE),
-                                       mem_limit));
+                                       graph.nodes));
       // counter.Print();
       // indices.Print();
       // flags_write.Print();

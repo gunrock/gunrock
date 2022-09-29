@@ -75,6 +75,7 @@ include_directories(${gunrock_INCLUDE_DIRS})
 include(cmake/CPM.cmake)
 CPMAddPackage(
   NAME RapidJSON
+  OPTIONS "RAPIDJSON_BUILD_UNITTESTS OFF"
   GITHUB_REPOSITORY Tencent/rapidjson
   GIT_TAG v1.1.0-489-g4b3d7c2f
   SOURCE_DIR ${CMAKE_SOURCE_DIR}/externals/rapidjson)
@@ -83,16 +84,10 @@ CPMAddPackage(
   GITHUB_REPOSITORY NVlabs/moderngpu
   GIT_TAG v2.12_june_8_2016-16-g2b39855
   SOURCE_DIR ${CMAKE_SOURCE_DIR}/externals/moderngpu)
-CPMAddPackage(
-  NAME CUB
-  GITHUB_REPOSITORY NVlabs/cub
-  GIT_TAG 1.8.0
-  SOURCE_DIR ${CMAKE_SOURCE_DIR}/externals/cub)
 
 # begin /* Include moderngpu & cub */
 include(${CMAKE_SOURCE_DIR}/cmake/FindRapidJson.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/FindModernGPU.cmake)
-include(${CMAKE_SOURCE_DIR}/cmake/FindCUB.cmake)
 # end /* Include moderngpu & cub */
 
 # begin /* Include googletest & googlemock */
@@ -226,6 +221,18 @@ option(GUNROCK_APP_LOUVAIN
 
 option(GUNROCK_APP_COLOR
   "If on, builds only COLOR application."
+  OFF)
+
+option(GUNROCK_APP_KCORE
+  "If on, builds only KCORE application."
+  OFF)
+  
+option(GUNROCK_APP_LP
+  "If on, builds only LP application."
+  OFF)
+
+option(GUNROCK_APP_LCC
+  "If on, builds only LCC application."
   OFF)
 
 #option(GUNROCK_APP_SAMPLE
