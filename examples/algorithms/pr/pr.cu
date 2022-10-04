@@ -61,8 +61,9 @@ void test_pr(int num_arguments, char** argument_array) {
 
   std::vector<float> run_times;
   for (int i = 0; i < params.num_runs; i++) {
-    run_times.push_back(gunrock::pr::run(G, alpha, tol, params.collect_metrics,
-                                         p.data().get(), &search_depth));
+    // Collect run times without collecting metrics (due to overhead)
+    run_times.push_back(
+        gunrock::pr::run(G, alpha, tol, false, p.data().get(), &search_depth));
   }
 
   // --
@@ -77,6 +78,9 @@ void test_pr(int num_arguments, char** argument_array) {
   // Run performance evaluation
 
   if (params.collect_metrics) {
+    float metrics_run_time = gunrock::pr::run(
+        G, alpha, tol, params.collect_metrics, p.data().get(), &search_depth);
+
     vertex_t n_edges = G.get_number_of_edges();
     // For PR - we visit every edge in the graph during each iteration
     edges_visited = n_edges * (search_depth + 1);
@@ -85,7 +89,7 @@ void test_pr(int num_arguments, char** argument_array) {
     gunrock::util::stats::get_performance_stats(
         edges_visited, (2 * edges_visited), n_edges, n_vertices, search_depth,
         run_times, "pr", params.filename, "market", params.json_dir,
-        params.json_file);
+        params.json_file, num_arguments, argument_array);
   }
 }
 

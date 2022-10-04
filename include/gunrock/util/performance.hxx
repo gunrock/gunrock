@@ -1,11 +1,14 @@
+#if (defined _WIN32 || defined __WIN32__) && !defined __CYGWIN__
+#include <gunrock/util/utsname_windows.hxx>
+#else
 #include <sys/utsname.h>
+#endif
 #include "nlohmann/json.hpp"
 #include <time.h>
 #include <regex>
 #include <filesystem>
 #include <fstream>
 #include <gunrock/cuda/device_properties.hxx>
-
 namespace gunrock {
 namespace util {
 namespace stats {
@@ -79,7 +82,9 @@ void get_performance_stats(int edges_visited,
                            std::string filename,
                            std::string graph_type,
                            std::string json_dir,
-                           std::string json_file) {
+                           std::string json_file,
+                           int argc,
+                           char** argv) {
   float avg_run_time;
   float stdev_run_times;
   float min_run_time;
@@ -90,6 +95,7 @@ void get_performance_stats(int edges_visited,
   std::string time_s;
   nlohmann::json jsn;
   std::string json_dir_file;
+  std::string command_line_call;
 
   // Get average run time
   avg_run_time =
@@ -124,35 +130,45 @@ void get_performance_stats(int edges_visited,
   }
   time_s = std::string(ctime(&now));
   time_s = time_s.substr(0, time_s.size() - 1);
+  time_s = std::regex_replace(time_s, std::regex("  "), " ");
   std::string time_ms = std::to_string(ms);
+
+  // Get command line call
+  for (int i = 0; i < argc; i++) {
+    command_line_call += argv[i];
+    command_line_call += " ";
+  }
+  command_line_call = command_line_call.substr(0, command_line_call.size()-1);
 
   // Write values to JSON object
   jsn.push_back(nlohmann::json::object_t::value_type("engine", "Essentials"));
   jsn.push_back(nlohmann::json::object_t::value_type("primitive", primitive));
-  jsn.push_back(nlohmann::json::object_t::value_type("graph-type", graph_type));
+  jsn.push_back(nlohmann::json::object_t::value_type("graph_type", graph_type));
   jsn.push_back(
-      nlohmann::json::object_t::value_type("edges-visited", edges_visited));
+      nlohmann::json::object_t::value_type("edges_visited", edges_visited));
   jsn.push_back(
-      nlohmann::json::object_t::value_type("nodes-visited", nodes_visited));
-  jsn.push_back(nlohmann::json::object_t::value_type("num-edges", edges));
-  jsn.push_back(nlohmann::json::object_t::value_type("num-vertices", vertices));
+      nlohmann::json::object_t::value_type("nodes_visited", nodes_visited));
+  jsn.push_back(nlohmann::json::object_t::value_type("num_edges", edges));
+  jsn.push_back(nlohmann::json::object_t::value_type("num_vertices", vertices));
   jsn.push_back(
-      nlohmann::json::object_t::value_type("process-times", run_times));
+      nlohmann::json::object_t::value_type("process_times", run_times));
   jsn.push_back(
-      nlohmann::json::object_t::value_type("search-depth", search_depth));
-  jsn.push_back(nlohmann::json::object_t::value_type("graph-file", filename));
+      nlohmann::json::object_t::value_type("search_depth", search_depth));
+  jsn.push_back(nlohmann::json::object_t::value_type("graph_file", filename));
   jsn.push_back(
-      nlohmann::json::object_t::value_type("avg-process-time", avg_run_time));
-  jsn.push_back(nlohmann::json::object_t::value_type("stddev-process-time",
+      nlohmann::json::object_t::value_type("avg_process_time", avg_run_time));
+  jsn.push_back(nlohmann::json::object_t::value_type("stddev_process_time",
                                                      stdev_run_times));
   jsn.push_back(
-      nlohmann::json::object_t::value_type("min-process-time", min_run_time));
+      nlohmann::json::object_t::value_type("min_process_time", min_run_time));
   jsn.push_back(
-      nlohmann::json::object_t::value_type("max-process-time", max_run_time));
-  jsn.push_back(nlohmann::json::object_t::value_type("avg-mteps", avg_mteps));
-  jsn.push_back(nlohmann::json::object_t::value_type("min-mteps", min_mteps));
-  jsn.push_back(nlohmann::json::object_t::value_type("max-mteps", max_mteps));
+      nlohmann::json::object_t::value_type("max_process_time", max_run_time));
+  jsn.push_back(nlohmann::json::object_t::value_type("avg_mteps", avg_mteps));
+  jsn.push_back(nlohmann::json::object_t::value_type("min_mteps", min_mteps));
+  jsn.push_back(nlohmann::json::object_t::value_type("max_mteps", max_mteps));
   jsn.push_back(nlohmann::json::object_t::value_type("time", time_s));
+  jsn.push_back(
+      nlohmann::json::object_t::value_type("command_line", command_line_call));
 
   // Get GPU info
   get_gpu_info(&jsn);

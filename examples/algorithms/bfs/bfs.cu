@@ -3,6 +3,7 @@
 #include <sys/utsname.h>
 #include <gunrock/util/performance.hxx>
 #include <gunrock/io/parameters.hxx>
+#include <random>
 
 using namespace gunrock;
 using namespace memory;
@@ -56,24 +57,40 @@ void test_bfs(int num_arguments, char** argument_array) {
   // --
   // Params and memory allocation
 
-  vertex_t single_source = 0;
-
   vertex_t n_vertices = G.get_number_of_vertices();
   thrust::device_vector<vertex_t> distances(n_vertices);
   thrust::device_vector<vertex_t> predecessors(n_vertices);
   thrust::device_vector<int> edges_visited(1);
   int search_depth = 0;
 
+  // Determine starting source
+  vertex_t single_source;
+  if (params.source == -1) {
+    // Generate random starting source
+    std::random_device seed;
+    std::mt19937 engine(seed());
+    std::uniform_int_distribution<int> dist(0, n_vertices - 1);
+    single_source = dist(engine);
+  } else if (params.source >= 0 && params.source < n_vertices) {
+    single_source = params.source;
+  } else {
+    std::cout << "Error: invalid source"
+              << "\n";
+    exit(1);
+  }
+
   // --
   // Run problem
 
   std::vector<float> run_times;
   for (int i = 0; i < params.num_runs; i++) {
+    // Collect run times without collecting metrics (due to overhead)
     run_times.push_back(gunrock::bfs::run(
-        G, single_source, params.collect_metrics, distances.data().get(),
+        G, single_source, false, distances.data().get(),
         predecessors.data().get(), edges_visited.data().get(), &search_depth));
   }
 
+  std::cout << "Single source : " << single_source << "\n";
   print::head(distances, 40, "GPU distances");
   std::cout << "GPU Elapsed Time : " << run_times[params.num_runs - 1]
             << " (ms)" << std::endl;
@@ -100,6 +117,10 @@ void test_bfs(int num_arguments, char** argument_array) {
   // Run performance evaluation
 
   if (params.collect_metrics) {
+    float metrics_run_time = gunrock::bfs::run(
+        G, single_source, params.collect_metrics, distances.data().get(),
+        predecessors.data().get(), edges_visited.data().get(), &search_depth);
+
     thrust::host_vector<int> h_edges_visited = edges_visited;
     vertex_t n_edges = G.get_number_of_edges();
 
@@ -107,7 +128,7 @@ void test_bfs(int num_arguments, char** argument_array) {
     gunrock::util::stats::get_performance_stats(
         h_edges_visited[0], (2 * h_edges_visited[0]), n_edges, n_vertices,
         search_depth, run_times, "bfs", params.filename, "market",
-        params.json_dir, params.json_file);
+        params.json_dir, params.json_file, num_arguments, argument_array);
   }
 }
 

@@ -49,7 +49,23 @@ void test_sssp(int num_arguments, char** argument_array) {
   srand(time(NULL));
 
   vertex_t n_vertices = G.get_number_of_vertices();
-  vertex_t single_source = 0;  // rand() % n_vertices;
+
+  // Determine starting source
+  vertex_t single_source;
+  if (params.source == -1) {
+    // Generate random starting source
+    std::random_device seed;
+    std::mt19937 engine(seed());
+    std::uniform_int_distribution<int> dist(0, n_vertices - 1);
+    single_source = dist(engine);
+  } else if (params.source >= 0 && params.source < n_vertices) {
+    single_source = params.source;
+  } else {
+    std::cout << "Error: invalid source"
+              << "\n";
+    exit(1);
+  }
+
   std::cout << "Single Source = " << single_source << std::endl;
 
   // --
@@ -73,8 +89,9 @@ void test_sssp(int num_arguments, char** argument_array) {
 
   std::vector<float> run_times;
   for (int i = 0; i < params.num_runs; i++) {
+    // Collect run times without collecting metrics (due to overhead)
     run_times.push_back(gunrock::sssp::run(
-        G, single_source, params.collect_metrics, distances.data().get(),
+        G, single_source, false, distances.data().get(),
         predecessors.data().get(), edges_visited.data().get(),
         vertices_visited.data().get(), &search_depth));
   }
@@ -106,6 +123,11 @@ void test_sssp(int num_arguments, char** argument_array) {
   // Run performance evaluation
 
   if (params.collect_metrics) {
+    float metrics_run_time = gunrock::sssp::run(
+        G, single_source, params.collect_metrics, distances.data().get(),
+        predecessors.data().get(), edges_visited.data().get(),
+        vertices_visited.data().get(), &search_depth);
+
     vertex_t n_edges = G.get_number_of_edges();
 
     // For BFS - the number of nodes visited is just 2 * edges_visited
@@ -114,7 +136,7 @@ void test_sssp(int num_arguments, char** argument_array) {
     gunrock::util::stats::get_performance_stats(
         h_edges_visited[0], h_vertices_visited[0], n_edges, n_vertices,
         search_depth, run_times, "sssp", params.filename, "market",
-        params.json_dir, params.json_file);
+        params.json_dir, params.json_file, num_arguments, argument_array);
   }
 }
 

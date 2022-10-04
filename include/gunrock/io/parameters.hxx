@@ -6,6 +6,7 @@ namespace cli {
 
 struct parameters_t {
   std::string filename;
+  int source = -1;
   std::string json_dir = ".";
   std::string json_file = "";
   int num_runs = 1;
@@ -24,7 +25,6 @@ struct parameters_t {
       : options(argv[0], algorithm + " example") {
     // Add command line options
     options.add_options()("help", "Print help")  // help
-        ("validate", "CPU validation")           // validate
         ("collect_metrics",
          "collect performance analysis metrics")  // performance evaluation
         ("m,market", "Matrix file", cxxopts::value<std::string>())  // mtx file
@@ -33,6 +33,14 @@ struct parameters_t {
          cxxopts::value<std::string>())  // json output directory
         ("f,json_file", "JSON output file",
          cxxopts::value<std::string>());  // json output file
+
+    if (algorithm == "bc" || algorithm == "bfs" || algorithm == "sssp") {
+      options.add_options()("s,source", "Starting source (random if omitted)",
+                            cxxopts::value<int>());  // source
+      if (algorithm == "bfs" || algorithm == "sssp") {
+        options.add_options()("validate", "CPU validation");  // validate
+      }
+    }
 
     // Parse command line arguments
     auto result = options.parse(argc, argv);
@@ -65,6 +73,10 @@ struct parameters_t {
 
     if (result.count("num_runs") == 1) {
       num_runs = result["num_runs"].as<int>();
+    }
+
+    if (result.count("source") == 1) {
+      source = result["source"].as<int>();
     }
 
     if (result.count("json_dir") == 1) {
