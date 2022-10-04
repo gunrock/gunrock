@@ -21,7 +21,7 @@ message(STATUS "Example Added: ${APPLICATION_NAME}")
 # end /* Add CUDA executables */
 
 # Add GIT SHA-1 definition
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../cmake/")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/cmake_modules-src/")
 include(GetGitRevisionDescription)
 get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 

@@ -39,6 +39,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/FetchModernGPU.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchCXXOpts.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchRapidJSON.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/FetchNlohmannJson.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/FetchCMakeModules.cmake)
 # end /* Include cmake modules */
 
 ## Set the directory where the binaries will be stored
@@ -115,6 +116,7 @@ target_include_directories(essentials
   INTERFACE ${RAPIDJSON_INCLUDE_DIR}
   INTERFACE ${NHLOMANN_JSON_INCLUDE_DIR}
   INTERFACE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+  INTERFACE ${CMAKE_MODULES_INCLUDE_DIR}
 )
 
 ####################################################
