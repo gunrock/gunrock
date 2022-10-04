@@ -101,7 +101,7 @@ void test_bc(int num_arguments, char** argument_array) {
     gunrock::util::stats::get_performance_stats(
         edges_visited, (2 * edges_visited), n_edges, n_vertices, search_depth,
         run_times, "bc", params.filename, "market", params.json_dir,
-        params.json_file, num_arguments, argument_array);
+        params.json_file, num_arguments, argument_array, GIT_SHA1);
   }
 }
 

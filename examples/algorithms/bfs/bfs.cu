@@ -128,7 +128,7 @@ void test_bfs(int num_arguments, char** argument_array) {
     gunrock::util::stats::get_performance_stats(
         h_edges_visited[0], (2 * h_edges_visited[0]), n_edges, n_vertices,
         search_depth, run_times, "bfs", params.filename, "market",
-        params.json_dir, params.json_file, num_arguments, argument_array);
+        params.json_dir, params.json_file, num_arguments, argument_array, GIT_SHA1);
   }
 }
 

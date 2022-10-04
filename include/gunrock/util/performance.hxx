@@ -84,7 +84,8 @@ void get_performance_stats(int edges_visited,
                            std::string json_dir,
                            std::string json_file,
                            int argc,
-                           char** argv) {
+                           char** argv,
+                           std::string git_commit) {
   float avg_run_time;
   float stdev_run_times;
   float min_run_time;
@@ -169,6 +170,8 @@ void get_performance_stats(int edges_visited,
   jsn.push_back(nlohmann::json::object_t::value_type("time", time_s));
   jsn.push_back(
       nlohmann::json::object_t::value_type("command_line", command_line_call));
+  jsn.push_back(
+      nlohmann::json::object_t::value_type("git_commit_sha", git_commit));
 
   // Get GPU info
   get_gpu_info(&jsn);
