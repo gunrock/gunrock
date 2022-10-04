@@ -6,9 +6,10 @@ namespace cli {
 
 struct parameters_t {
   std::string filename;
-  int source = -1;
+  std::string source_string = "";
   std::string json_dir = ".";
   std::string json_file = "";
+  std::string tag_string = "";
   int num_runs = 1;
   cxxopts::Options options;
   bool collect_metrics = false;
@@ -28,16 +29,24 @@ struct parameters_t {
         ("collect_metrics",
          "collect performance analysis metrics")  // performance evaluation
         ("m,market", "Matrix file", cxxopts::value<std::string>())  // mtx file
-        ("n,num_runs", "Number of runs", cxxopts::value<int>())     // runs
+        ("n,num_runs", "Number of runs (per source)",
+         cxxopts::value<int>())  // runs
         ("d,json_dir", "JSON output directory",
          cxxopts::value<std::string>())  // json output directory
         ("f,json_file", "JSON output file",
-         cxxopts::value<std::string>());  // json output file
+         cxxopts::value<std::string>())  // json output file
+        ("t,tag", "Tags for the JSON output; comma-separated string of tags",
+         cxxopts::value<std::string>());  // tags
 
-    if (algorithm == "bc" || algorithm == "bfs" || algorithm == "sssp") {
-      options.add_options()("s,source", "Starting source (random if omitted)",
-                            cxxopts::value<int>());  // source
-      if (algorithm == "bfs" || algorithm == "sssp") {
+    if (algorithm == "Betweenness Centrality" ||
+        algorithm == "Breadth First Search" ||
+        algorithm == "Single Source Shortest Path") {
+      options.add_options()("s,src",
+                            "Source(s) (random if omitted); "
+                            "comma-separated string of ints",
+                            cxxopts::value<std::string>());  // source
+      if (algorithm == "Breadth First Search" ||
+          algorithm == "Single Source Shortest Path") {
         options.add_options()("validate", "CPU validation");  // validate
       }
     }
@@ -75,8 +84,12 @@ struct parameters_t {
       num_runs = result["num_runs"].as<int>();
     }
 
-    if (result.count("source") == 1) {
-      source = result["source"].as<int>();
+    if (result.count("tag") == 1) {
+      tag_string = result["tag"].as<std::string>();
+    }
+
+    if (result.count("src") == 1) {
+      source_string = result["src"].as<std::string>();
     }
 
     if (result.count("json_dir") == 1) {
@@ -88,6 +101,48 @@ struct parameters_t {
     }
   }
 };
+
+void parse_source_string(std::string source_str,
+                         std::vector<int>* source_vect,
+                         int n_vertices) {
+  if (source_str == "") {
+    // Generate random starting source
+    std::random_device seed;
+    std::mt19937 engine(seed());
+    std::uniform_int_distribution<int> dist(0, n_vertices - 1);
+    source_vect->push_back(dist(engine));
+  } else {
+    std::stringstream ss(source_str);
+    while (ss.good()) {
+      std::string source;
+      getline(ss, source, ',');
+      int source_int;
+      try {
+        source_int = std::stoi(source);
+      } catch (...) {
+        std::cout << "Error: Invalid source"
+                  << "\n";
+        exit(1);
+      }
+      if (source_int >= 0 && source_int < n_vertices) {
+        source_vect->push_back(source_int);
+      } else {
+        std::cout << "Error: Invalid source"
+                  << "\n";
+        exit(1);
+      }
+    }
+  }
+}
+
+void parse_tag_string(std::string tag_str, std::vector<std::string>* tag_vect) {
+  std::stringstream ss(tag_str);
+  while (ss.good()) {
+    std::string tag;
+    getline(ss, tag, ',');
+    tag_vect->push_back(tag);
+  }
+}
 
 }  // namespace cli
 }  // namespace io
