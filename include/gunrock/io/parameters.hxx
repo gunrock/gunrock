@@ -29,8 +29,6 @@ struct parameters_t {
         ("collect_metrics",
          "collect performance analysis metrics")  // performance evaluation
         ("m,market", "Matrix file", cxxopts::value<std::string>())  // mtx file
-        ("n,num_runs", "Number of runs (per source)",
-         cxxopts::value<int>())  // runs
         ("d,json_dir", "JSON output directory",
          cxxopts::value<std::string>())  // json output directory
         ("f,json_file", "JSON output file",
@@ -38,17 +36,23 @@ struct parameters_t {
         ("t,tag", "Tags for the JSON output; comma-separated string of tags",
          cxxopts::value<std::string>());  // tags
 
+    // Algorithms with sources
     if (algorithm == "Betweenness Centrality" ||
         algorithm == "Breadth First Search" ||
         algorithm == "Single Source Shortest Path") {
       options.add_options()("s,src",
                             "Source(s) (random if omitted); "
                             "comma-separated string of ints",
-                            cxxopts::value<std::string>());  // source
+                            cxxopts::value<std::string>())  // source
+          ("n,num_runs", "Number of runs (ignored if multiple sources passed)",
+           cxxopts::value<int>());  // runs
       if (algorithm == "Breadth First Search" ||
           algorithm == "Single Source Shortest Path") {
         options.add_options()("validate", "CPU validation");  // validate
       }
+    } else {
+      options.add_options()("n,num_runs", "Number of runs",
+                            cxxopts::value<int>());  // runs
     }
 
     // Parse command line arguments
@@ -104,13 +108,16 @@ struct parameters_t {
 
 void parse_source_string(std::string source_str,
                          std::vector<int>* source_vect,
-                         int n_vertices) {
+                         int n_vertices,
+                         int n_runs) {
   if (source_str == "") {
     // Generate random starting source
     std::random_device seed;
     std::mt19937 engine(seed());
-    std::uniform_int_distribution<int> dist(0, n_vertices - 1);
-    source_vect->push_back(dist(engine));
+    for (int i = 0; i < n_runs; i++) {
+      std::uniform_int_distribution<int> dist(0, n_vertices - 1);
+      source_vect->push_back(dist(engine));
+    }
   } else {
     std::stringstream ss(source_str);
     while (ss.good()) {
@@ -132,6 +139,9 @@ void parse_source_string(std::string source_str,
         exit(1);
       }
     }
+    if (source_vect->size() == 1) {
+      source_vect->insert(source_vect->end(), n_runs - 1, source_vect->at(0));
+    }
   }
 }
 
@@ -140,7 +150,9 @@ void parse_tag_string(std::string tag_str, std::vector<std::string>* tag_vect) {
   while (ss.good()) {
     std::string tag;
     getline(ss, tag, ',');
-    tag_vect->push_back(tag);
+    if (tag != "") {
+      tag_vect->push_back(tag);
+    }
   }
 }
 

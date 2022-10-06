@@ -66,7 +66,7 @@ void test_bfs(int num_arguments, char** argument_array) {
   // Parse sources
   std::vector<int> source_vect;
   gunrock::io::cli::parse_source_string(params.source_string, &source_vect,
-                                        n_vertices);
+                                        n_vertices, params.num_runs);
   // Parse tags
   std::vector<std::string> tag_vect;
   gunrock::io::cli::parse_tag_string(params.tag_string, &tag_vect);
@@ -75,14 +75,12 @@ void test_bfs(int num_arguments, char** argument_array) {
   // Run problem
 
   std::vector<float> run_times;
+
   for (int i = 0; i < source_vect.size(); i++) {
-    for (int j = 0; j < params.num_runs; j++) {
-      // Collect run times without collecting metrics (due to overhead)
-      run_times.push_back(
-          gunrock::bfs::run(G, source_vect[i], false, distances.data().get(),
-                            predecessors.data().get(),
-                            edges_visited.data().get(), &search_depth));
-    }
+    // Record run times without collecting metrics (due to overhead)
+    run_times.push_back(gunrock::bfs::run(
+        G, source_vect[i], false, distances.data().get(),
+        predecessors.data().get(), edges_visited.data().get(), &search_depth));
   }
 
   // Print info for last run
@@ -116,24 +114,19 @@ void test_bfs(int num_arguments, char** argument_array) {
   if (params.collect_metrics) {
     std::vector<int> edges_visited_vect;
     std::vector<int> search_depth_vect;
-    std::vector<int> nodes_visited_vect(source_vect.size() * params.num_runs);
+    std::vector<int> nodes_visited_vect(source_vect.size());
 
     vertex_t n_edges = G.get_number_of_edges();
 
-    std::vector<int> source_vect_all_runs;
     for (int i = 0; i < source_vect.size(); i++) {
-      for (int j = 0; j < params.num_runs; j++) {
-        float metrics_run_time =
-            gunrock::bfs::run(G, source_vect[i], params.collect_metrics,
-                              distances.data().get(), predecessors.data().get(),
-                              edges_visited.data().get(), &search_depth);
+      float metrics_run_time = gunrock::bfs::run(
+          G, source_vect[i], params.collect_metrics, distances.data().get(),
+          predecessors.data().get(), edges_visited.data().get(), &search_depth);
 
-        thrust::host_vector<int> h_edges_visited = edges_visited;
+      thrust::host_vector<int> h_edges_visited = edges_visited;
 
-        edges_visited_vect.push_back(h_edges_visited[0]);
-        search_depth_vect.push_back(search_depth);
-        source_vect_all_runs.push_back(source_vect[i]);
-      }
+      edges_visited_vect.push_back(h_edges_visited[0]);
+      search_depth_vect.push_back(search_depth);
     }
 
     // For BFS - the number of nodes visited is just 2 * edges_visited
@@ -143,7 +136,7 @@ void test_bfs(int num_arguments, char** argument_array) {
     gunrock::util::stats::get_performance_stats(
         edges_visited_vect, nodes_visited_vect, n_edges, n_vertices,
         search_depth_vect, run_times, "bfs", params.filename, "market",
-        params.json_dir, params.json_file, source_vect_all_runs, tag_vect,
+        params.json_dir, params.json_file, source_vect, tag_vect,
         num_arguments, argument_array, GIT_SHA1);
   }
 }
